@@ -8,6 +8,30 @@ A local Claude Code plugin marketplace. Private plugins for extending Claude Cod
 |--------|-------------|
 | [token-atlas](./token-atlas) | Local web dashboard for Claude Code & Codex usage — sessions, tokens, cost, model mix, project activity |
 
+## Installation
+
+### CLI
+
+```bash
+claude plugins add-marketplace --source github --repo FunnyQ/cc-plugins
+claude plugins install token-atlas
+```
+
+### TUI (interactive)
+
+1. Open Claude Code
+2. Type `/plugins` to open the plugin manager
+3. Select **Add Marketplace** → enter `FunnyQ/cc-plugins`
+4. Select **Install Plugin** → choose `token-atlas`
+
+After installation, run the prerequisite check inside Claude Code:
+
+```bash
+bun $CLAUDE_PLUGIN_ROOT/skills/dashboard/scripts/install.ts
+```
+
+This verifies that Bun is available, vendor files are in place, and Claude data sources exist. If `stats-cache.json` is missing, run `/stats` once in Claude Code to seed it.
+
 ## token-atlas
 
 A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data and visualizes it in a browser. No telemetry, no cloud — everything stays on your machine.
