@@ -1,0 +1,14 @@
+{
+  "name": "q-lab-marketplace",
+  "owner": {
+    "name": "Q"
+  },
+  "plugins": [
+    {
+      "name": "token-atlas",
+      "source": "./token-atlas",
+      "description": "Local web dashboard for Claude Code and Codex usage — sessions, tokens, cost, model mix, project activity.",
+      "version": "1.0.0"
+    }
+  ]
+}

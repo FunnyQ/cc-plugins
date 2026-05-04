@@ -1,0 +1,17 @@
+{
+  "name": "token-atlas",
+  "version": "1.0.0",
+  "description": "Local web dashboard for Claude Code and Codex usage — sessions, tokens, cost, model mix, project activity.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dashboard",
+    "stats",
+    "usage",
+    "claude-code",
+    "codex",
+    "token-atlas"
+  ]
+}
