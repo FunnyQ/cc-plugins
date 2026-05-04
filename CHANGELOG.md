@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1] - 2026-05-05
+
+### Added
+
+- Installation instructions for Claude plugins (CLI and TUI methods)
+- Prerequisite check command for dashboard setup
+- Documentation for stats-cache.json seeding via /stats command
+
 ## [1.0.0] - 2026-05-05
 
 ### Added
