@@ -17,7 +17,10 @@
           <h1>Token Atlas</h1>
         </div>
         <div class="controls">
-          <div class="segmented-control provider-switch" aria-label="Usage source">
+          <div
+            class="segmented-control provider-switch"
+            aria-label="Usage source"
+          >
             <button
               type="button"
               :class="{ active: providerKey === 'all' }"
@@ -66,47 +69,49 @@
         </div>
       </header>
 
-      <main v-if="error" id="main-content" class="error-card" role="alert">{{ error }}</main>
+      <main v-if="error" id="main-content" class="error-card" role="alert">
+        {{ error }}
+      </main>
 
-      <main v-else-if="stats" id="main-content" class="main-shell main-shell--corner-signal">
+      <main
+        v-else-if="stats"
+        id="main-content"
+        class="main-shell main-shell--corner-signal"
+      >
         <!-- Overview cards -->
         <section class="cards metric-type-ledger" aria-label="Usage summary">
-            <div class="card">
-              <div class="card-label">Estimated cost</div>
-              <div class="card-value">
-                ${{ filtered.summary.cost.toFixed(2) }}
-              </div>
-              <div class="card-sub">
-                {{ activeWindowLabel }} · usage-based estimate
-              </div>
+          <div class="card">
+            <div class="card-label">Estimated cost</div>
+            <div class="card-value">
+              ${{ filtered.summary.cost.toFixed(2) }}
             </div>
-            <div class="card">
-              <div class="card-label">Tokens</div>
-              <div class="card-value">
-                {{ fmtTokens(filtered.summary.tokens) }}
-              </div>
-              <div class="card-sub">
-                {{ fmtNum(filtered.summary.toolCalls) }} tool calls
-              </div>
+            <div class="card-sub">
+              {{ activeWindowLabel }} · usage-based estimate
             </div>
-            <div class="card">
-              <div class="card-label">Interactions</div>
-              <div class="card-value">
-                {{ fmtNum(filtered.summary.messages) }}
-              </div>
-              <div class="card-sub">
-                Claude messages + Codex threads
-              </div>
+          </div>
+          <div class="card">
+            <div class="card-label">Tokens</div>
+            <div class="card-value">
+              {{ fmtTokens(filtered.summary.tokens) }}
             </div>
-            <div class="card">
-              <div class="card-label">Sessions</div>
-              <div class="card-value">
-                {{ fmtNum(filtered.summary.sessions) }}
-              </div>
-              <div class="card-sub">
-                {{ activeWindowLabel }} · Claude + Codex
-              </div>
+            <div class="card-sub">
+              {{ fmtNum(filtered.summary.toolCalls) }} tool calls
             </div>
+          </div>
+          <div class="card">
+            <div class="card-label">Interactions</div>
+            <div class="card-value">
+              {{ fmtNum(filtered.summary.messages) }}
+            </div>
+            <div class="card-sub">Claude messages + Codex threads</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Sessions</div>
+            <div class="card-value">
+              {{ fmtNum(filtered.summary.sessions) }}
+            </div>
+            <div class="card-sub">{{ activeWindowLabel }} · Claude + Codex</div>
+          </div>
         </section>
 
         <!-- Trend + donut row -->
@@ -115,7 +120,10 @@
             <div class="panel-head">
               <h2>Daily trend</h2>
               <div class="trend-controls">
-                <div class="segmented-control" aria-label="Daily trend model scope">
+                <div
+                  class="segmented-control"
+                  aria-label="Daily trend model scope"
+                >
                   <button
                     type="button"
                     :class="{ active: trendModelScope === 'all' }"
@@ -164,7 +172,10 @@
                   v-model="selectedModels[m]"
                   @change="renderTrend"
                 />
-                <span :class="modelMarkClass(m)" :style="{ background: colorFor(m) }"></span>
+                <span
+                  :class="modelMarkClass(m)"
+                  :style="{ background: colorFor(m) }"
+                ></span>
                 {{ shortModel(m) }}
               </label>
             </div>
@@ -175,7 +186,8 @@
                 aria-label="Daily usage trend chart"
               ></canvas>
               <div v-if="!activeTrendModels.length" class="empty-state">
-                {{ trendModels.length ? 'Select at least one model.' : 'No model activity in this window.' }}
+                {{ trendModels.length ? 'Select at least one model.' : 'No model
+                activity in this window.' }}
               </div>
             </div>
           </div>
@@ -203,7 +215,9 @@
           <div class="cost-ledger-head">
             <div>
               <h2>Per-model cost & tokens</h2>
-              <span class="muted">{{ activeWindowLabel }} · usage-based estimate</span>
+              <span class="muted"
+                >{{ activeWindowLabel }} · usage-based estimate</span
+              >
             </div>
             <div class="cost-ledger-peak" v-if="filteredByModel.length">
               <span>highest model cost</span>
@@ -230,7 +244,10 @@
               <tr v-for="m in filteredByModel" :key="m.model">
                 <td data-label="Model">
                   <span class="model-cell">
-                    <span :class="modelMarkClass(m.model)" :style="{ background: colorFor(m.model) }"></span>
+                    <span
+                      :class="modelMarkClass(m.model)"
+                      :style="{ background: colorFor(m.model) }"
+                    ></span>
                     {{ shortModel(m.model) }}
                     <span v-if="m.isExternal" class="badge">ext</span>
                   </span>
@@ -238,7 +255,9 @@
                     class="row-meter"
                     :title="'Cost share vs highest model: ' + modelCostPct(m).toFixed(1) + '%'"
                   >
-                    <span :style="{ width: modelCostPct(m).toFixed(1) + '%' }"></span>
+                    <span
+                      :style="{ width: modelCostPct(m).toFixed(1) + '%' }"
+                    ></span>
                   </div>
                 </td>
                 <td data-label="Source">
@@ -246,12 +265,24 @@
                     {{ m.provider || 'claude' }}
                   </span>
                 </td>
-                <td data-label="Input" class="num">{{ fmtTokens(m.inputTokens) }}</td>
-                <td data-label="Output" class="num">{{ fmtTokens(m.outputTokens) }}</td>
-                <td data-label="Cache read" class="num">{{ fmtTokens(m.cacheReadTokens) }}</td>
-                <td data-label="Cache write" class="num">{{ fmtTokens(m.cacheCreationTokens) }}</td>
-                <td data-label="Reasoning" class="num">{{ fmtTokens(m.reasoningTokens || 0) }}</td>
-                <td data-label="Cost" class="num cost">${{ m.costUSD.toFixed(2) }}</td>
+                <td data-label="Input" class="num">
+                  {{ fmtTokens(m.inputTokens) }}
+                </td>
+                <td data-label="Output" class="num">
+                  {{ fmtTokens(m.outputTokens) }}
+                </td>
+                <td data-label="Cache read" class="num">
+                  {{ fmtTokens(m.cacheReadTokens) }}
+                </td>
+                <td data-label="Cache write" class="num">
+                  {{ fmtTokens(m.cacheCreationTokens) }}
+                </td>
+                <td data-label="Reasoning" class="num">
+                  {{ fmtTokens(m.reasoningTokens || 0) }}
+                </td>
+                <td data-label="Cost" class="num cost">
+                  ${{ m.costUSD.toFixed(2) }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -287,7 +318,10 @@
                     <span>{{ p.displayLabel }}</span>
                   </div>
                   <div class="top-cost-meter">
-                    <div class="project-rank-meter-fill" :style="{ width: p.pct + '%' }">
+                    <div
+                      class="project-rank-meter-fill"
+                      :style="{ width: p.pct + '%' }"
+                    >
                       <span
                         v-if="p.hasClaude"
                         class="project-rank-meter-segment project-rank-meter-segment--claude"
@@ -312,7 +346,10 @@
             <div class="panel activity-heatmap-panel">
               <div class="panel-head">
                 <h2>Hourly rhythm</h2>
-                <span class="muted">day of week × hour</span>
+                <span class="muted heatmap-range-label">
+                  <span>{{ activeWindowLabel }} · day of week × hour</span>
+                  <span>{{ activeDateRangeLabel }}</span>
+                </span>
               </div>
               <div class="heatmap">
                 <div class="heatmap-grid">
@@ -379,7 +416,10 @@
           <div class="panel project-rank-panel">
             <div class="panel-head">
               <h2>Recent projects</h2>
-              <div class="segmented-control" aria-label="Recent projects metric">
+              <div
+                class="segmented-control"
+                aria-label="Recent projects metric"
+              >
                 <button
                   type="button"
                   :class="{ active: topProjectMode === 'tokens' }"
@@ -415,7 +455,10 @@
                   {{ p.displayLabel }}
                 </span>
                 <div class="project-rank-meter">
-                  <div class="project-rank-meter-fill" :style="{ width: p.pct + '%' }">
+                  <div
+                    class="project-rank-meter-fill"
+                    :style="{ width: p.pct + '%' }"
+                  >
                     <span
                       v-if="p.hasClaude"
                       class="project-rank-meter-segment project-rank-meter-segment--claude"
@@ -446,7 +489,9 @@
         </footer>
       </main>
 
-      <main v-else id="main-content" class="loading" aria-live="polite">Loading dashboard…</main>
+      <main v-else id="main-content" class="loading" aria-live="polite">
+        Loading dashboard…
+      </main>
     </div>
 
     <script type="module" src="/app.js"></script>

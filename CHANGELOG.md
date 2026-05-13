@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2026-05-13
+
+### 🔧 Improvements
+
+- **Dashboard sync**: Updated Token Atlas dashboard runtime and data engine to stay in sync with the latest odin-dashboard improvements — includes refined API logic and frontend presentation tweaks
+
 ## [1.0.1] - 2026-05-05
 
 ### Added
