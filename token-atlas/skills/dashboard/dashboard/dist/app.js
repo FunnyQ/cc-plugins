@@ -474,9 +474,31 @@ function App() {
       return `last ${this.rangeKey} days`;
     },
 
+    get activeDateRangeLabel() {
+      const daily = this.filteredDaily;
+      if (!daily.length) return "";
+      const first = this.parseDate(daily[0].date);
+      const last = this.parseDate(daily[daily.length - 1].date);
+      return this.formatDateRange(first, last);
+    },
+
     get heatmapCells() {
       if (!this.stats) return [];
-      const matrix = this.stats.weekHourMatrix;
+      let matrix;
+      if (this.rangeKey === "all" || !this.stats.dailyHourCounts) {
+        matrix = this.stats.weekHourMatrix;
+      } else {
+        matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
+        const dailyHourCounts = this.stats.dailyHourCounts;
+        for (const day of this.filteredDaily) {
+          const counts = dailyHourCounts[day.date];
+          if (!counts) continue;
+          const dow = this.parseDate(day.date).getDay();
+          for (let h = 0; h < 24; h++) {
+            matrix[dow][h] += counts[h] ?? 0;
+          }
+        }
+      }
       let max = 0;
       for (const row of matrix) for (const v of row) if (v > max) max = v;
       const cells = [];
@@ -639,6 +661,16 @@ function App() {
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
+    },
+
+    formatDateRange(first, last) {
+      const fmt = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      if (first.getTime() === last.getTime()) return fmt.format(first);
+      return `${fmt.format(first)} - ${fmt.format(last)}`;
     },
 
     heatColorFromMax(v, max) {

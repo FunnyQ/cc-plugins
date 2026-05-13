@@ -144,8 +144,12 @@ function safeReadJSON<T>(path: string): T | null {
   }
 }
 
+function isAnthropicModel(model: string): boolean {
+  return model.startsWith("claude-") || model.startsWith("anthropic/claude-");
+}
+
 function isExternal(model: string, prefixes: string[]): boolean {
-  return prefixes.some((p) => model.startsWith(p));
+  return !isAnthropicModel(model) || prefixes.some((p) => model.startsWith(p));
 }
 
 // ---------- Pricing ----------
@@ -215,7 +219,9 @@ async function loadPricing(): Promise<PricingTable> {
 }
 
 function priceFor(model: string, table: PricingTable): ModelPrice {
-  return table.models[model] ?? table.models[`openai/${model}`] ?? table.fallback;
+  return (
+    table.models[model] ?? table.models[`openai/${model}`] ?? table.fallback
+  );
 }
 
 function calcCost(
@@ -267,6 +273,7 @@ function parseHistory(): {
   >;
   weekHourMatrix: number[][];
   dailyHistory: Map<string, { messageCount: number; sessionIds: Set<string> }>;
+  dailyHourCounts: Map<string, number[]>;
 } {
   const byProject = new Map<
     string,
@@ -276,11 +283,13 @@ function parseHistory(): {
     string,
     { messageCount: number; sessionIds: Set<string> }
   >();
+  const dailyHourCounts = new Map<string, number[]>();
   // [dayOfWeek 0=Sun..6=Sat][hour 0..23]
   const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0),
   );
-  if (!existsSync(HISTORY)) return { byProject, weekHourMatrix, dailyHistory };
+  if (!existsSync(HISTORY))
+    return { byProject, weekHourMatrix, dailyHistory, dailyHourCounts };
 
   const raw = readFileSync(HISTORY, "utf-8");
   for (const line of raw.split("\n")) {
@@ -303,6 +312,9 @@ function parseHistory(): {
       daily.messageCount += 1;
       if (entry.sessionId) daily.sessionIds.add(entry.sessionId);
       dailyHistory.set(date, daily);
+      const hourCounts = dailyHourCounts.get(date) ?? new Array(24).fill(0);
+      hourCounts[d.getHours()] += 1;
+      dailyHourCounts.set(date, hourCounts);
     }
     if (!entry.project) continue;
     const path = entry.project;
@@ -320,7 +332,7 @@ function parseHistory(): {
       });
     }
   }
-  return { byProject, weekHourMatrix, dailyHistory };
+  return { byProject, weekHourMatrix, dailyHistory, dailyHourCounts };
 }
 
 function parseSessions(): Array<{
@@ -483,7 +495,10 @@ function parseTranscriptUsage(): {
       addUsage(modelUsage[model], usage);
 
       if (entry.cwd) {
-        projectTokens.set(entry.cwd, (projectTokens.get(entry.cwd) ?? 0) + tokenTotal);
+        projectTokens.set(
+          entry.cwd,
+          (projectTokens.get(entry.cwd) ?? 0) + tokenTotal,
+        );
         let byModel = projectModelUsage.get(entry.cwd);
         if (!byModel) {
           byModel = new Map();
@@ -639,6 +654,7 @@ function parseCodexUsage(): {
   >;
   hourCounts: Record<string, number>;
   weekHourMatrix: number[][];
+  dailyHourCounts: Map<string, number[]>;
   totalThreads: number;
   totalInteractions: number;
   totalToolCalls: number;
@@ -663,6 +679,7 @@ function parseCodexUsage(): {
     { threadCount: number; interactionCount: number; toolCallCount: number }
   >();
   const hourCounts: Record<string, number> = {};
+  const dailyHourCounts = new Map<string, number[]>();
   const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0),
   );
@@ -706,9 +723,7 @@ function parseCodexUsage(): {
     const createdMs = row?.created_at
       ? row.created_at * 1000
       : (session?.timestampMs ?? 0);
-    const updatedMs = row?.updated_at
-      ? row.updated_at * 1000
-      : createdMs;
+    const updatedMs = row?.updated_at ? row.updated_at * 1000 : createdMs;
     if (!createdMs) continue;
     const cwd = row?.cwd || session?.cwd || "";
     const interactionCount = session?.userMessages || 1;
@@ -772,6 +787,9 @@ function parseCodexUsage(): {
     hourCounts[String(d.getHours())] =
       (hourCounts[String(d.getHours())] || 0) + interactionCount;
     weekHourMatrix[d.getDay()][d.getHours()] += interactionCount;
+    const hourBuckets = dailyHourCounts.get(date) ?? new Array(24).fill(0);
+    hourBuckets[d.getHours()] += interactionCount;
+    dailyHourCounts.set(date, hourBuckets);
   }
 
   return {
@@ -783,6 +801,7 @@ function parseCodexUsage(): {
     dailyActivity,
     hourCounts,
     weekHourMatrix,
+    dailyHourCounts,
     totalThreads: sessionFiles.size,
     totalInteractions,
     totalToolCalls,
@@ -810,7 +829,12 @@ function projectName(path: string): string {
 
 export async function buildStats() {
   const cache = parseStatsCache();
-  const { byProject, weekHourMatrix, dailyHistory } = parseHistory();
+  const {
+    byProject,
+    weekHourMatrix,
+    dailyHistory,
+    dailyHourCounts: historyDailyHourCounts,
+  } = parseHistory();
   const sessions = parseSessions();
   const pricing = await loadPricing();
   const transcriptUsage = parseTranscriptUsage();
@@ -861,7 +885,10 @@ export async function buildStats() {
     );
   }
   const combinedDailyModelUsage = new Map<string, Map<string, ModelUsage>>();
-  for (const [date, usageByModel] of transcriptUsage.dailyModelUsage.entries()) {
+  for (const [
+    date,
+    usageByModel,
+  ] of transcriptUsage.dailyModelUsage.entries()) {
     let combined = combinedDailyModelUsage.get(date);
     if (!combined) {
       combined = new Map();
@@ -963,14 +990,12 @@ export async function buildStats() {
             codexUsage.dailyActivity.get(date)?.interactionCount ??
             codexThreads,
           sessions: codexThreads,
-          toolCalls:
-            codexUsage.dailyActivity.get(date)?.toolCallCount ?? 0,
+          toolCalls: codexUsage.dailyActivity.get(date)?.toolCallCount ?? 0,
         },
       };
       return {
         date,
-        messages:
-          providerDaily.claude.messages + providerDaily.codex.messages,
+        messages: providerDaily.claude.messages + providerDaily.codex.messages,
         sessions: activity?.sessionCount ?? 0,
         toolCalls:
           providerDaily.claude.toolCalls + providerDaily.codex.toolCalls,
@@ -1020,7 +1045,10 @@ export async function buildStats() {
     (s, m) => s + m.cacheCreationTokens,
     0,
   );
-  const totalReasoningTokens = byModel.reduce((s, m) => s + m.reasoningTokens, 0);
+  const totalReasoningTokens = byModel.reduce(
+    (s, m) => s + m.reasoningTokens,
+    0,
+  );
   const totalTokens =
     totalInputTokens +
     totalOutputTokens +
@@ -1107,10 +1135,25 @@ export async function buildStats() {
     return !best || tokens > best.tokens ? { model: m.model, tokens } : best;
   }, null);
   const combinedWeekHourMatrix = weekHourMatrix.map((row, dow) =>
-    row.map((value, hour) => value + (codexUsage.weekHourMatrix[dow]?.[hour] ?? 0)),
+    row.map(
+      (value, hour) => value + (codexUsage.weekHourMatrix[dow]?.[hour] ?? 0),
+    ),
   );
+  const combinedDailyHourCounts: Record<string, number[]> = {};
+  for (const [date, counts] of historyDailyHourCounts) {
+    combinedDailyHourCounts[date] = [...counts];
+  }
+  for (const [date, counts] of codexUsage.dailyHourCounts) {
+    const existing = combinedDailyHourCounts[date];
+    if (existing) {
+      for (let h = 0; h < 24; h++) existing[h] += counts[h] ?? 0;
+    } else {
+      combinedDailyHourCounts[date] = [...counts];
+    }
+  }
   const totalSessions = (cache.totalSessions ?? 0) + codexUsage.totalThreads;
-  const totalMessages = (cache.totalMessages ?? 0) + codexUsage.totalInteractions;
+  const totalMessages =
+    (cache.totalMessages ?? 0) + codexUsage.totalInteractions;
   const averageMessagesPerSession = totalSessions
     ? totalMessages / totalSessions
     : 0;
@@ -1156,6 +1199,7 @@ export async function buildStats() {
       .sort((a, b) => a.date.localeCompare(b.date)),
     hourlyDistribution: cache.hourCounts ?? {},
     weekHourMatrix: combinedWeekHourMatrix,
+    dailyHourCounts: combinedDailyHourCounts,
     projects,
     sessions,
     insights: {

@@ -24,17 +24,9 @@
   --danger: oklch(68% 0.13 24);
   --edge: oklch(92% 0.01 224 / 0.1);
   --edge-soft: oklch(92% 0.01 224 / 0.055);
-  --edge-warm: color-mix(
-    in oklch,
-    var(--accent) 10%,
-    var(--edge-soft)
-  );
+  --edge-warm: color-mix(in oklch, var(--accent) 10%, var(--edge-soft));
   --theme-edge: var(--edge-warm);
-  --theme-edge-strong: color-mix(
-    in oklch,
-    var(--accent) 16%,
-    var(--edge)
-  );
+  --theme-edge-strong: color-mix(in oklch, var(--accent) 16%, var(--edge));
   --theme-surface: color-mix(
     in oklch,
     var(--accent-soft) 7%,
@@ -136,7 +128,11 @@ label:focus-within {
   padding: 18px max(24px, calc((100dvw - 1480px) / 2 + 24px)) 16px;
   border-bottom: 1px solid var(--theme-edge);
   background:
-    linear-gradient(90deg, oklch(17% 0.018 224 / 0.94), oklch(15% 0.016 224 / 0.96)),
+    linear-gradient(
+      90deg,
+      oklch(17% 0.018 224 / 0.94),
+      oklch(15% 0.016 224 / 0.96)
+    ),
     var(--bg);
   backdrop-filter: blur(14px);
   box-shadow: 0 12px 30px oklch(8% 0.014 224 / 0.18);
@@ -187,7 +183,9 @@ label:focus-within {
 }
 
 .brand:hover .logo img {
-  filter: drop-shadow(0 0 14px color-mix(in oklch, var(--accent) 24%, transparent));
+  filter: drop-shadow(
+    0 0 14px color-mix(in oklch, var(--accent) 24%, transparent)
+  );
   transform: translateY(-1px);
 }
 
@@ -286,12 +284,14 @@ select:hover,
   border: 1px solid var(--theme-edge);
   border-radius: var(--radius);
   background:
-    radial-gradient(circle at 8% 0, oklch(84% 0.03 190 / 0.035), transparent 34%),
+    radial-gradient(
+      circle at 8% 0,
+      oklch(84% 0.03 190 / 0.035),
+      transparent 34%
+    ),
     linear-gradient(180deg, oklch(100% 0.005 224 / 0.026), transparent 38%),
     var(--theme-surface);
-  box-shadow:
-    var(--shadow-inset),
-    var(--theme-shadow);
+  box-shadow: var(--shadow-inset), var(--theme-shadow);
   padding: 17px 18px 15px;
   transition:
     border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -305,13 +305,18 @@ select:hover,
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border:
-    1px solid
-    color-mix(in oklch, var(--rune-mark) 54%, transparent);
+  border: 1px solid color-mix(in oklch, var(--rune-mark) 54%, transparent);
   background:
-    linear-gradient(90deg, var(--rune-mark) 0 1px, transparent 1px 9px) left 13px top 13px / 54px 1px no-repeat,
-    linear-gradient(180deg, var(--rune-mark) 0 1px, transparent 1px 9px) left 13px top 13px / 1px 54px no-repeat,
-    linear-gradient(90deg, transparent 0 34%, var(--glass-highlight) 49%, transparent 62% 100%);
+    linear-gradient(90deg, var(--rune-mark) 0 1px, transparent 1px 9px) left
+      13px top 13px / 54px 1px no-repeat,
+    linear-gradient(180deg, var(--rune-mark) 0 1px, transparent 1px 9px) left
+      13px top 13px / 1px 54px no-repeat,
+    linear-gradient(
+      90deg,
+      transparent 0 34%,
+      var(--glass-highlight) 49%,
+      transparent 62% 100%
+    );
   opacity: 0;
   pointer-events: none;
   transform: translateX(-18%);
@@ -323,9 +328,7 @@ select:hover,
 .card:hover,
 .panel:hover {
   border-color: color-mix(in oklch, var(--accent) 18%, var(--edge));
-  box-shadow:
-    var(--shadow-inset),
-    var(--theme-shadow-raised);
+  box-shadow: var(--shadow-inset), var(--theme-shadow-raised);
   transform: translateY(-1px);
 }
 
@@ -357,8 +360,12 @@ select:hover,
   bottom: 0;
   left: 0;
   height: 5px;
-  background:
-    linear-gradient(90deg, var(--accent), var(--bifrost-cyan), var(--bifrost-green));
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    var(--bifrost-cyan),
+    var(--bifrost-green)
+  );
 }
 
 .card-label {
@@ -426,12 +433,14 @@ select:hover,
   border: 1px solid var(--theme-edge);
   border-radius: var(--radius);
   background:
-    radial-gradient(circle at 0 0, oklch(84% 0.03 190 / 0.025), transparent 28%),
+    radial-gradient(
+      circle at 0 0,
+      oklch(84% 0.03 190 / 0.025),
+      transparent 28%
+    ),
     linear-gradient(180deg, oklch(100% 0.005 224 / 0.02), transparent 30%),
     var(--theme-surface);
-  box-shadow:
-    var(--shadow-inset),
-    var(--theme-shadow);
+  box-shadow: var(--shadow-inset), var(--theme-shadow);
   padding: 16px 17px;
   margin-bottom: 14px;
   transition:
@@ -637,7 +646,11 @@ select:hover,
 .top-cost-panel {
   border-color: color-mix(in oklch, var(--violet) 12%, var(--edge));
   background:
-    linear-gradient(135deg, color-mix(in oklch, var(--violet) 6%, transparent), transparent 48%),
+    linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--violet) 6%, transparent),
+      transparent 48%
+    ),
     var(--theme-surface);
 }
 
@@ -718,13 +731,14 @@ select:hover,
   overflow: hidden;
   border-color: color-mix(in oklch, var(--accent) 12%, var(--edge));
   background:
-    radial-gradient(circle at 50% 48%, color-mix(in oklch, var(--accent-soft) 20%, transparent), transparent 55%),
+    radial-gradient(
+      circle at 50% 48%,
+      color-mix(in oklch, var(--accent-soft) 20%, transparent),
+      transparent 55%
+    ),
     var(--theme-surface);
-  box-shadow:
-    var(--shadow-inset),
-    var(--theme-shadow);
-  animation: distribution-command-in 360ms cubic-bezier(0.16, 1, 0.3, 1)
-    both;
+  box-shadow: var(--shadow-inset), var(--theme-shadow);
+  animation: distribution-command-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .distribution-command-panel::before {
@@ -747,11 +761,13 @@ select:hover,
   overflow: hidden;
   border-color: color-mix(in oklch, var(--accent) 12%, var(--edge));
   background:
-    linear-gradient(125deg, color-mix(in oklch, var(--bifrost-cyan) 8%, transparent), transparent 44%),
+    linear-gradient(
+      125deg,
+      color-mix(in oklch, var(--bifrost-cyan) 8%, transparent),
+      transparent 44%
+    ),
     var(--theme-surface);
-  box-shadow:
-    var(--shadow-inset),
-    var(--theme-shadow);
+  box-shadow: var(--shadow-inset), var(--theme-shadow);
   animation: trend-command-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -774,8 +790,16 @@ select:hover,
 .trend-command-panel .chart-box {
   border-radius: var(--radius-sm);
   background:
-    radial-gradient(circle at 12% 0, color-mix(in oklch, var(--bifrost-cyan) 8%, transparent), transparent 38%),
-    linear-gradient(180deg, transparent, color-mix(in oklch, var(--accent-soft) 10%, transparent));
+    radial-gradient(
+      circle at 12% 0,
+      color-mix(in oklch, var(--bifrost-cyan) 8%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in oklch, var(--accent-soft) 10%, transparent)
+    );
   padding: 10px 8px 8px;
 }
 
@@ -823,6 +847,12 @@ select:hover,
   min-width: 58px;
 }
 
+.provider-switch button.active {
+  border: 1px solid color-mix(in oklch, var(--accent) 34%, var(--edge));
+  background: color-mix(in oklch, var(--accent) 10%, var(--bg-rail));
+  color: color-mix(in oklch, var(--accent) 58%, var(--text));
+}
+
 .trend-controls {
   display: inline-flex;
   align-items: center;
@@ -854,7 +884,11 @@ select:hover,
   border: 1px dashed color-mix(in oklch, var(--accent) 12%, var(--edge));
   border-radius: var(--radius-sm);
   background:
-    linear-gradient(135deg, color-mix(in oklch, var(--accent-soft) 8%, transparent), transparent),
+    linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--accent-soft) 8%, transparent),
+      transparent
+    ),
     var(--surface);
   color: var(--text-faint);
   font-size: 12px;
@@ -953,7 +987,8 @@ select:hover,
 
 .table th,
 .table td {
-  border-bottom: 1px solid color-mix(in oklch, var(--accent) 7%, var(--edge-soft));
+  border-bottom: 1px solid
+    color-mix(in oklch, var(--accent) 7%, var(--edge-soft));
   padding: 10px 10px;
   text-align: left;
   vertical-align: middle;
@@ -995,7 +1030,10 @@ select:hover,
 }
 
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
   margin-left: 6px;
   border: 1px solid var(--theme-edge);
   border-radius: 999px;
@@ -1006,6 +1044,10 @@ select:hover,
   letter-spacing: 0.06em;
   padding: 1px 7px;
   text-transform: uppercase;
+}
+
+.cost-ledger-panel .table td[data-label="Source"] .badge {
+  margin-left: 0;
 }
 
 .badge--claude {
@@ -1144,6 +1186,13 @@ select:hover,
 .activity-heatmap-panel {
   border-color: color-mix(in oklch, var(--rose) 9%, var(--edge));
   background: color-mix(in oklch, var(--rose) 4%, var(--surface-glass));
+}
+
+.heatmap-range-label {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
 }
 
 .activity-heatmap-panel .heatmap {
@@ -1357,6 +1406,10 @@ select:hover,
     letter-spacing: 0.06em;
     text-align: left;
     text-transform: uppercase;
+  }
+
+  .cost-ledger-panel .table td[data-label="Source"] .badge {
+    justify-self: end;
   }
 
   .cost-ledger-panel .table td:first-child {
