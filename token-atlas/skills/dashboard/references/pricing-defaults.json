@@ -1,5 +1,5 @@
 {
-  "_comment": "Per-1M-token USD pricing. Verified 2026-04-30. Cache read = 10% of input, cache write = 125% of input (Anthropic standard).",
+  "_comment": "Per-1M-token USD pricing. Verified 2026-05-17. Cache read = 10% of input, cache write = 125% of input (Anthropic standard).",
   "_source": "Anthropic public pricing + OpenRouter for external models",
   "models": {
     "claude-opus-4-7": {
@@ -44,6 +44,18 @@
       "cacheRead": 0.1,
       "cacheWrite": 1.25
     },
+    "qwen/qwen3.6-plus": {
+      "input": 0.325,
+      "output": 1.95,
+      "cacheRead": 0.0325,
+      "cacheWrite": 0.40625
+    },
+    "qwen3.6-plus": {
+      "input": 0.325,
+      "output": 1.95,
+      "cacheRead": 0.0325,
+      "cacheWrite": 0.40625
+    },
     "moonshotai/kimi-k2.6": {
       "input": 0.75,
       "output": 3.5,
@@ -87,6 +99,7 @@
     "minimax/",
     "MiniMax",
     "frank/",
+    "qwen/",
     "openai/",
     "google/",
     "deepseek/"

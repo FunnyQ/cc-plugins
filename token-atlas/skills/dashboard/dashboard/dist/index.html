@@ -66,31 +66,169 @@
             <span v-else-if="refreshInFlight">Updating…</span>
             <span v-else>↻ Refresh</span>
           </button>
-          <div class="export-actions" aria-label="Export current view">
-            <button
-              type="button"
-              class="btn export-btn"
-              @click="exportCurrentViewJSON"
-            >
-              Export JSON
-            </button>
-            <button
-              type="button"
-              class="btn export-btn"
-              @click="exportModelsCSV"
-            >
-              Models CSV
-            </button>
-            <button
-              type="button"
-              class="btn export-btn"
-              @click="exportProjectsCSV"
-            >
-              Projects CSV
-            </button>
-          </div>
+          <details class="export-menu">
+            <summary class="btn export-menu-trigger">Export</summary>
+            <div class="export-menu-panel" aria-label="Export current view">
+              <button type="button" @click="exportCurrentViewJSON">
+                Current view JSON
+              </button>
+              <button type="button" @click="exportModelsCSV">Models CSV</button>
+              <button type="button" @click="exportProjectsCSV">
+                Projects CSV
+              </button>
+            </div>
+          </details>
         </div>
       </header>
+
+      <div
+        v-if="selectedProject"
+        class="project-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-detail-title"
+        @click.self="clearSelectedProject"
+        @keydown.escape="clearSelectedProject"
+      >
+        <section
+          class="panel project-detail-panel"
+          aria-label="Selected project detail"
+          ref="projectDetailDialog"
+          tabindex="-1"
+        >
+          <div class="project-detail-head">
+            <div>
+              <h2 id="project-detail-title">
+                {{ activeProjectDetail.project.name }}
+              </h2>
+              <code>{{ activeProjectDetail.project.path }}</code>
+            </div>
+            <button
+              type="button"
+              class="btn project-detail-close"
+              aria-label="Close project detail"
+              @click="clearSelectedProject"
+            >
+              Close
+            </button>
+          </div>
+          <div class="project-detail-meta">
+            <div>
+              <span>First seen</span>
+              <strong
+                >{{ activeProjectDetail.project.firstSeen || 'n/a' }}</strong
+              >
+            </div>
+            <div>
+              <span>Last seen</span>
+              <strong
+                >{{ activeProjectDetail.project.lastSeen || 'n/a' }}</strong
+              >
+            </div>
+            <div>
+              <span>{{ activeProjectDetail.summary.label }} tokens</span>
+              <strong
+                >{{ fmtTokens(activeProjectDetail.summary.tokens) }}</strong
+              >
+            </div>
+            <div>
+              <span>{{ activeProjectDetail.summary.label }} cost</span>
+              <strong
+                >${{ activeProjectDetail.summary.costUSD.toFixed(2) }}</strong
+              >
+            </div>
+          </div>
+          <div class="project-provider-split">
+            <div>
+              <span>Claude</span>
+              <strong
+                >{{ fmtTokens(activeProjectDetail.project.claudeTokens || 0)
+                }}</strong
+              >
+              <small
+                >${{ (activeProjectDetail.project.claudeCostUSD || 0).toFixed(2)
+                }}</small
+              >
+            </div>
+            <div>
+              <span>Codex</span>
+              <strong
+                >{{ fmtTokens(activeProjectDetail.project.codexTokens || 0)
+                }}</strong
+              >
+              <small
+                >${{ (activeProjectDetail.project.codexCostUSD || 0).toFixed(2)
+                }}</small
+              >
+            </div>
+          </div>
+          <div class="project-detail-subhead">
+            <div>
+              <h3>Model breakdown</h3>
+              <span class="muted"
+                >{{ activeProjectDetail.summary.label }} · all-time project
+                totals</span
+              >
+            </div>
+            <strong v-if="activeProjectDetail.models.length"
+              >{{ fmtUSD(activeProjectDetail.modelTotalCost) }}</strong
+            >
+          </div>
+          <table v-if="activeProjectDetail.models.length" class="table compact">
+            <caption>
+              Model totals for selected project.
+            </caption>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Source</th>
+                <th class="num">Tokens</th>
+                <th class="num">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in activeProjectDetail.models" :key="m.model">
+                <td data-label="Model">
+                  <span class="model-cell">
+                    <span
+                      :class="modelMarkClass(m.model)"
+                      :style="{ background: colorFor(m.model) }"
+                    ></span>
+                    {{ shortModel(m.model) }}
+                    <span v-if="m.isExternal" class="badge">ext</span>
+                  </span>
+                  <div
+                    class="row-meter"
+                    :title="'Cost share vs highest project model: ' + projectModelCostPct(m).toFixed(1) + '%'"
+                  >
+                    <span
+                      :style="{ width: projectModelCostPct(m).toFixed(1) + '%' }"
+                    ></span>
+                  </div>
+                </td>
+                <td data-label="Source">
+                  <span :class="providerBadgeClass(m.provider || 'claude')">
+                    {{ m.provider || 'claude' }}
+                  </span>
+                </td>
+                <td data-label="Tokens" class="num">
+                  {{ fmtTokens(modelTokenTotal(m)) }}
+                </td>
+                <td data-label="Cost" class="num cost">
+                  ${{ (m.costUSD || 0).toFixed(2) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty-state empty-state--panel">
+            No model breakdown for this project and provider filter.
+          </div>
+          <div class="project-detail-note">
+            Daily project trend needs per-project daily rows and is not yet
+            available in this API slice.
+          </div>
+        </section>
+      </div>
 
       <main v-if="error" id="main-content" class="error-card" role="alert">
         {{ error }}
@@ -104,113 +242,82 @@
         <!-- Overview cards -->
         <section class="cards metric-type-ledger" aria-label="Usage summary">
           <div class="card">
-            <div class="card-label">Estimated cost</div>
-            <div class="card-value">
-              ${{ filtered.summary.cost.toFixed(2) }}
-            </div>
-            <div class="card-sub">
-              {{ activeWindowLabel }} · usage-based estimate
+            <div class="metric-main">
+              <div class="card-label">Estimated cost</div>
+              <div class="card-value">
+                ${{ filtered.summary.cost.toFixed(2) }}
+              </div>
+              <div class="card-sub">
+                {{ activeWindowLabel }} · usage-based estimate
+              </div>
             </div>
             <div :class="deltaClass('cost')">
-              {{ summaryDeltas.cost.label }}
+              <span class="compare-context">
+                {{ summaryDeltas.cost.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.cost.valueLabel }}</strong>
+                <span>{{ summaryDeltas.cost.pctLabel }}</span>
+              </span>
             </div>
           </div>
           <div class="card">
-            <div class="card-label">Tokens</div>
-            <div class="card-value">
-              {{ fmtTokens(filtered.summary.tokens) }}
-            </div>
-            <div class="card-sub">
-              {{ fmtNum(filtered.summary.toolCalls) }} tool calls
+            <div class="metric-main">
+              <div class="card-label">Tokens</div>
+              <div class="card-value">
+                {{ fmtTokens(filtered.summary.tokens) }}
+              </div>
+              <div class="card-sub">
+                {{ fmtNum(filtered.summary.toolCalls) }} tool calls
+              </div>
             </div>
             <div :class="deltaClass('tokens')">
-              {{ summaryDeltas.tokens.label }}
-            </div>
-            <div class="card-delta--secondary" :class="deltaClass('toolCalls')">
-              Tool calls: {{ summaryDeltas.toolCalls.label }}
+              <span class="compare-context">
+                {{ summaryDeltas.tokens.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.tokens.valueLabel }}</strong>
+                <span>{{ summaryDeltas.tokens.pctLabel }}</span>
+              </span>
             </div>
           </div>
           <div class="card">
-            <div class="card-label">Interactions</div>
-            <div class="card-value">
-              {{ fmtNum(filtered.summary.messages) }}
+            <div class="metric-main">
+              <div class="card-label">Interactions</div>
+              <div class="card-value">
+                {{ fmtNum(filtered.summary.messages) }}
+              </div>
+              <div class="card-sub">Claude messages + Codex threads</div>
             </div>
-            <div class="card-sub">Claude messages + Codex threads</div>
             <div :class="deltaClass('messages')">
-              {{ summaryDeltas.messages.label }}
+              <span class="compare-context">
+                {{ summaryDeltas.messages.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.messages.valueLabel }}</strong>
+                <span>{{ summaryDeltas.messages.pctLabel }}</span>
+              </span>
             </div>
           </div>
           <div class="card">
-            <div class="card-label">Sessions</div>
-            <div class="card-value">
-              {{ fmtNum(filtered.summary.sessions) }}
+            <div class="metric-main">
+              <div class="card-label">Sessions</div>
+              <div class="card-value">
+                {{ fmtNum(filtered.summary.sessions) }}
+              </div>
+              <div class="card-sub">
+                {{ activeWindowLabel }} · Claude + Codex
+              </div>
             </div>
-            <div class="card-sub">{{ activeWindowLabel }} · Claude + Codex</div>
             <div :class="deltaClass('sessions')">
-              {{ summaryDeltas.sessions.label }}
+              <span class="compare-context">
+                {{ summaryDeltas.sessions.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.sessions.valueLabel }}</strong>
+                <span>{{ summaryDeltas.sessions.pctLabel }}</span>
+              </span>
             </div>
-          </div>
-        </section>
-
-        <section class="budget-panel" aria-label="Monthly budget">
-          <div class="budget-panel-main">
-            <div>
-              <h2>Monthly budget</h2>
-              <span class="muted"
-                >estimated · {{ budgetView.providerLabel }} · {{
-                budgetView.source }}</span
-              >
-            </div>
-            <span
-              v-if="budgetView.configured"
-              :class="'budget-state budget-state--' + budgetView.state"
-            >
-              {{ budgetStateLabel(budgetView.state) }}
-            </span>
-            <span v-else class="budget-state">setup optional</span>
-          </div>
-
-          <div v-if="budgetView.configured" class="budget-grid">
-            <div class="budget-meter" aria-label="Budget usage">
-              <div class="budget-meter-head">
-                <strong>{{ budgetView.usagePctLabel }}</strong>
-                <span
-                  >{{ fmtUSD(budgetView.monthToDateCostUSD) }} of {{
-                  fmtUSD(budgetView.monthlyBudgetUSD) }}</span
-                >
-              </div>
-              <div class="budget-meter-track">
-                <span
-                  :class="budgetMeterClass(budgetView.state)"
-                  :style="{ width: budgetView.usageMeterWidth }"
-                ></span>
-              </div>
-            </div>
-            <dl class="budget-stats">
-              <div>
-                <dt>Remaining</dt>
-                <dd>{{ fmtUSD(budgetView.remainingBudgetUSD) }}</dd>
-              </div>
-              <div>
-                <dt>Projected</dt>
-                <dd>{{ fmtUSD(budgetView.projectedMonthEndCostUSD) }}</dd>
-              </div>
-              <div>
-                <dt>Projected use</dt>
-                <dd>{{ budgetView.projectedPctLabel }}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div v-else class="budget-setup">
-            <span v-if="budgetView.error"
-              >Budget config warning: {{ budgetView.error }}</span
-            >
-            <span v-else
-              >Create <code>{{ budgetView.source }}</code> with
-              <code>{"monthlyBudgetUSD":100}</code> to enable burn-rate
-              planning.</span
-            >
           </div>
         </section>
 
@@ -260,6 +367,10 @@
                   </button>
                 </div>
               </div>
+            </div>
+            <div v-if="previousTrendAvailable" class="trend-reference">
+              <span class="trend-reference-line"></span>
+              <span>{{ previousTrendLabel }}</span>
             </div>
             <div v-if="trendModels.length" class="model-toggles">
               <label
@@ -337,6 +448,68 @@
           </div>
           <div v-else class="empty-state empty-state--panel">
             {{ usageAnomalyState.label }}
+          </div>
+        </section>
+
+        <section class="budget-panel" aria-label="Monthly budget">
+          <div class="budget-panel-main">
+            <div>
+              <h2>Monthly budget</h2>
+              <span class="muted"
+                >estimated · {{ budgetView.providerLabel }} · {{
+                budgetView.source }}</span
+              >
+            </div>
+            <span
+              v-if="budgetView.configured"
+              :class="'budget-state budget-state--' + budgetView.state"
+            >
+              {{ budgetStateLabel(budgetView.state) }}
+            </span>
+            <span v-else class="budget-state">setup optional</span>
+          </div>
+
+          <div v-if="budgetView.configured" class="budget-grid">
+            <div class="budget-meter" aria-label="Budget usage">
+              <div class="budget-meter-head">
+                <strong>{{ budgetView.usagePctLabel }}</strong>
+                <span
+                  >{{ fmtUSD(budgetView.monthToDateCostUSD) }} of {{
+                  fmtUSD(budgetView.monthlyBudgetUSD) }}</span
+                >
+              </div>
+              <div class="budget-meter-track">
+                <span
+                  :class="budgetMeterClass(budgetView.state)"
+                  :style="{ width: budgetView.usageMeterWidth }"
+                ></span>
+              </div>
+            </div>
+            <dl class="budget-stats">
+              <div>
+                <dt>Remaining</dt>
+                <dd>{{ fmtUSD(budgetView.remainingBudgetUSD) }}</dd>
+              </div>
+              <div>
+                <dt>Projected</dt>
+                <dd>{{ fmtUSD(budgetView.projectedMonthEndCostUSD) }}</dd>
+              </div>
+              <div>
+                <dt>Projected use</dt>
+                <dd>{{ budgetView.projectedPctLabel }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div v-else class="budget-setup">
+            <span v-if="budgetView.error"
+              >Budget config warning: {{ budgetView.error }}</span
+            >
+            <span v-else
+              >Create <code>{{ budgetView.source }}</code> with
+              <code>{"monthlyBudgetUSD":100}</code> to enable burn-rate
+              planning.</span
+            >
           </div>
         </section>
 
@@ -539,99 +712,6 @@
           </div>
         </section>
 
-        <section class="panel session-ledger-panel" aria-label="Session ledger">
-          <div class="session-ledger-head">
-            <div>
-              <h2>Session ledger</h2>
-              <span class="muted">{{ ledgerSummaryLabel }}</span>
-            </div>
-            <div class="segmented-control" aria-label="Session ledger sort">
-              <button
-                v-for="sortKey in ['date', 'tokens', 'cost']"
-                :key="sortKey"
-                type="button"
-                :class="{ active: ledgerSortKey === sortKey }"
-                :aria-pressed="ledgerSortKey === sortKey"
-                @click="onLedgerSortChange(sortKey)"
-              >
-                {{ ledgerSortLabel(sortKey) }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="visibleLedgerRows.length" class="ledger-table-wrap">
-            <table class="table compact ledger-table">
-              <caption>
-                Recent Claude sessions and Codex threads for {{
-                activeWindowLabel }}.
-              </caption>
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Source</th>
-                  <th>Project</th>
-                  <th>Model</th>
-                  <th class="num">Msgs</th>
-                  <th class="num">Tools</th>
-                  <th class="num">Tokens</th>
-                  <th class="num">Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in visibleLedgerRows" :key="row.id">
-                  <td data-label="When">
-                    <span class="ledger-time">
-                      {{ formatDateTime(row.timestampMs) }}
-                    </span>
-                  </td>
-                  <td data-label="Source">
-                    <span :class="providerBadgeClass(row.provider)">
-                      {{ row.provider }}
-                    </span>
-                  </td>
-                  <td data-label="Project">
-                    <span class="project-name">{{ row.projectName }}</span>
-                    <span class="project-path"
-                      >{{ row.projectPath || 'n/a' }}</span
-                    >
-                  </td>
-                  <td data-label="Model">
-                    <span class="model-cell">
-                      <span
-                        v-if="row.model !== 'mixed' && row.model !== 'n/a'"
-                        :class="modelMarkClass(row.model)"
-                        :style="{ background: colorFor(row.model) }"
-                      ></span>
-                      {{ ledgerModelLabel(row.model) }}
-                    </span>
-                  </td>
-                  <td data-label="Msgs" class="num">
-                    {{ fmtNum(row.interactions) }}
-                  </td>
-                  <td data-label="Tools" class="num">
-                    {{ fmtNum(row.toolCalls) }}
-                  </td>
-                  <td data-label="Tokens" class="num">
-                    {{ fmtTokens(row.tokens) }}
-                  </td>
-                  <td data-label="Cost" class="num cost">
-                    <span>{{ ledgerCostLabel(row) }}</span>
-                    <small>{{ ledgerCostNote(row) }}</small>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="empty-state empty-state--panel">
-            No sessions or threads for this filter.
-          </div>
-          <div v-if="hasMoreLedgerRows" class="session-ledger-more">
-            <button type="button" class="btn" @click="showMoreLedgerRows">
-              Show 50 more
-            </button>
-          </div>
-        </section>
-
         <!-- Activity charts + projects ranking -->
         <section class="row">
           <div class="activity-stack">
@@ -830,130 +910,96 @@
           </div>
         </section>
 
-        <section
-          v-if="selectedProject"
-          class="panel project-detail-panel"
-          aria-label="Selected project detail"
-        >
-          <div class="project-detail-head">
+        <section class="panel session-ledger-panel" aria-label="Session ledger">
+          <div class="session-ledger-head">
             <div>
-              <h2>{{ selectedProject.name }}</h2>
-              <code>{{ selectedProject.path }}</code>
+              <h2>Session ledger</h2>
+              <span class="muted">{{ ledgerSummaryLabel }}</span>
             </div>
-            <button
-              type="button"
-              class="btn project-detail-close"
-              aria-label="Close project detail"
-              @click="clearSelectedProject"
-            >
-              Close
-            </button>
-          </div>
-          <div class="project-detail-meta">
-            <div>
-              <span>First seen</span>
-              <strong>{{ selectedProject.firstSeen || 'n/a' }}</strong>
-            </div>
-            <div>
-              <span>Last seen</span>
-              <strong>{{ selectedProject.lastSeen || 'n/a' }}</strong>
-            </div>
-            <div>
-              <span>{{ selectedProjectProviderSummary.label }} tokens</span>
-              <strong
-                >{{ fmtTokens(selectedProjectProviderSummary.tokens) }}</strong
+            <div class="segmented-control" aria-label="Session ledger sort">
+              <button
+                v-for="sortKey in ['date', 'tokens', 'cost']"
+                :key="sortKey"
+                type="button"
+                :class="{ active: ledgerSortKey === sortKey }"
+                :aria-pressed="ledgerSortKey === sortKey"
+                @click="onLedgerSortChange(sortKey)"
               >
-            </div>
-            <div>
-              <span>{{ selectedProjectProviderSummary.label }} cost</span>
-              <strong
-                >${{ selectedProjectProviderSummary.costUSD.toFixed(2)
-                }}</strong
-              >
+                {{ ledgerSortLabel(sortKey) }}
+              </button>
             </div>
           </div>
-          <div class="project-provider-split">
-            <div>
-              <span>Claude</span>
-              <strong
-                >{{ fmtTokens(selectedProject.claudeTokens || 0) }}</strong
-              >
-              <small
-                >${{ (selectedProject.claudeCostUSD || 0).toFixed(2) }}</small
-              >
-            </div>
-            <div>
-              <span>Codex</span>
-              <strong>{{ fmtTokens(selectedProject.codexTokens || 0) }}</strong>
-              <small
-                >${{ (selectedProject.codexCostUSD || 0).toFixed(2) }}</small
-              >
-            </div>
+
+          <div v-if="visibleLedgerRows.length" class="ledger-table-wrap">
+            <table class="table compact ledger-table">
+              <caption>
+                Recent Claude sessions and Codex threads for {{
+                activeWindowLabel }}.
+              </caption>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Source</th>
+                  <th>Project</th>
+                  <th>Model</th>
+                  <th class="num">Msgs</th>
+                  <th class="num">Tools</th>
+                  <th class="num">Tokens</th>
+                  <th class="num">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in visibleLedgerRows" :key="row.id">
+                  <td data-label="When">
+                    <span class="ledger-time">
+                      {{ formatDateTime(row.timestampMs) }}
+                    </span>
+                  </td>
+                  <td data-label="Source">
+                    <span :class="providerBadgeClass(row.provider)">
+                      {{ row.provider }}
+                    </span>
+                  </td>
+                  <td data-label="Project">
+                    <span class="project-name">{{ row.projectName }}</span>
+                    <span class="project-path"
+                      >{{ row.projectPath || 'n/a' }}</span
+                    >
+                  </td>
+                  <td data-label="Model">
+                    <span class="model-cell">
+                      <span
+                        v-if="row.model !== 'mixed' && row.model !== 'n/a'"
+                        :class="modelMarkClass(row.model)"
+                        :style="{ background: colorFor(row.model) }"
+                      ></span>
+                      {{ ledgerModelLabel(row.model) }}
+                    </span>
+                  </td>
+                  <td data-label="Msgs" class="num">
+                    {{ fmtNum(row.interactions) }}
+                  </td>
+                  <td data-label="Tools" class="num">
+                    {{ fmtNum(row.toolCalls) }}
+                  </td>
+                  <td data-label="Tokens" class="num">
+                    {{ fmtTokens(row.tokens) }}
+                  </td>
+                  <td data-label="Cost" class="num cost">
+                    <span>{{ ledgerCostLabel(row) }}</span>
+                    <small>{{ ledgerCostNote(row) }}</small>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div class="project-detail-subhead">
-            <div>
-              <h3>Model breakdown</h3>
-              <span class="muted"
-                >{{ selectedProjectProviderSummary.label }} · all-time project
-                totals</span
-              >
-            </div>
-            <strong v-if="selectedProjectModels.length"
-              >{{ fmtUSD(selectedProjectModelTotalCost) }}</strong
-            >
-          </div>
-          <table v-if="selectedProjectModels.length" class="table compact">
-            <caption>
-              Model totals for selected project.
-            </caption>
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Source</th>
-                <th class="num">Tokens</th>
-                <th class="num">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="m in selectedProjectModels" :key="m.model">
-                <td data-label="Model">
-                  <span class="model-cell">
-                    <span
-                      :class="modelMarkClass(m.model)"
-                      :style="{ background: colorFor(m.model) }"
-                    ></span>
-                    {{ shortModel(m.model) }}
-                    <span v-if="m.isExternal" class="badge">ext</span>
-                  </span>
-                  <div
-                    class="row-meter"
-                    :title="'Cost share vs highest project model: ' + projectModelCostPct(m).toFixed(1) + '%'"
-                  >
-                    <span
-                      :style="{ width: projectModelCostPct(m).toFixed(1) + '%' }"
-                    ></span>
-                  </div>
-                </td>
-                <td data-label="Source">
-                  <span :class="providerBadgeClass(m.provider || 'claude')">
-                    {{ m.provider || 'claude' }}
-                  </span>
-                </td>
-                <td data-label="Tokens" class="num">
-                  {{ fmtTokens(modelTokenTotal(m)) }}
-                </td>
-                <td data-label="Cost" class="num cost">
-                  ${{ (m.costUSD || 0).toFixed(2) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
           <div v-else class="empty-state empty-state--panel">
-            No model breakdown for this project and provider filter.
+            No sessions or threads for this filter.
           </div>
-          <div class="project-detail-note">
-            Daily project trend needs per-project daily rows and is not yet
-            available in this API slice.
+          <div v-if="hasMoreLedgerRows" class="session-ledger-more">
+            <button type="button" class="btn" @click="showMoreLedgerRows">
+              Show 50 more
+            </button>
           </div>
         </section>
 

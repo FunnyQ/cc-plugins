@@ -468,20 +468,29 @@ async function loadPricing(): Promise<PricingTable> {
   return (await loadPricingWithMeta()).table;
 }
 
+function pricingModelAliases(model: string, table: PricingTable): string[] {
+  const raw = rawModelFromKey(model);
+  const aliases = new Set([raw, `openai/${raw}`]);
+  for (const prefix of table.externalModelPrefixes ?? []) {
+    aliases.add(`${prefix}${raw}`);
+  }
+  return [...aliases];
+}
+
 function priceFor(model: string, table: PricingTable): ModelPrice {
-  return (
-    table.models[model] ?? table.models[`openai/${model}`] ?? table.fallback
-  );
+  for (const key of pricingModelAliases(model, table)) {
+    if (table.models[key]) return table.models[key];
+  }
+  return table.fallback;
 }
 
 function pricingSourceForModel(
   model: string,
   pricing: PricingLoad,
 ): PricingSource | "fallback" {
-  const raw = rawModelFromKey(model);
-  if (pricing.sourceByModel[raw]) return pricing.sourceByModel[raw];
-  const openAIKey = `openai/${raw}`;
-  if (pricing.sourceByModel[openAIKey]) return pricing.sourceByModel[openAIKey];
+  for (const key of pricingModelAliases(model, pricing.table)) {
+    if (pricing.sourceByModel[key]) return pricing.sourceByModel[key];
+  }
   return "fallback";
 }
 
