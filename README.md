@@ -38,6 +38,8 @@ A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data 
 
 The visual direction is **Sunrise Atlas** — Big Sur dawn palette over a calm working surface, designed for repeated daily use.
 
+![Token Atlas dashboard preview](./assets/token-atlas-dashboard.jpg)
+
 ### Features
 
 - **Daily burn hero** — today's spend as the primary metric, with sparkline and 7-day delta
