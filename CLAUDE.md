@@ -11,11 +11,12 @@ A Claude Code plugin marketplace (`q-lab-marketplace`) containing local plugins.
 ```
 cc-plugins/
 ├── .claude-plugin/marketplace.json   # marketplace registry (lists plugins)
+├── CHANGELOG.md                      # release notes (Keep a Changelog format)
 └── token-atlas/                      # plugin: usage dashboard
     ├── .claude-plugin/plugin.json    # plugin manifest
     └── skills/dashboard/             # the skill that powers /token-atlas
         ├── SKILL.md                  # skill trigger config & docs
-        ├── PRODUCT.md                # design direction (Nordic-inflected, data-dense)
+        ├── PRODUCT.md                # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
         ├── scripts/
         │   ├── api.ts               # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
         │   ├── serve-dashboard.ts   # Bun HTTP server (serves static + /api/stats)
@@ -38,6 +39,9 @@ cc-plugins/
 - **Bun-only** runtime — uses `bun:sqlite`, `Bun.serve`, `Bun.file`
 - Model usage keys are namespaced as `provider:model` (e.g. `claude:claude-opus-4-7`, `codex:o3`)
 - Deduplication of billing: transcript entries are deduped by `requestId:messageId` to avoid double-counting
+- **Theme** — light + dark via `[data-theme]` on `<html>`; tokens defined twice in `style.css`; toggle uses the View Transitions API for a cross-fade
+- **Sunrise Bloom delight** — `.panel` / `.card` / `.budget-panel` / `.data-health-panel` use an `::before` (or `::after`) radial-gradient bloom. JS `installBloomTracker()` in `app.js` lerps `--bloom-x/--bloom-y` toward cursor each frame for the trailing effect. Add new panel-shaped classes to **both** the CSS selector list and the JS `SELECTOR` constant
+- **Hero wave** — `.hero-band` uses a 200%-wide SVG `mask-image` containing two identical wave cycles; `hero-wave-drift` animation slides `mask-position-x` one wavelength for a seamless loop
 
 ## Commands
 
