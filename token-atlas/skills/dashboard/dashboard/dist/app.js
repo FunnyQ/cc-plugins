@@ -357,13 +357,23 @@ function App() {
 
     toggleTheme() {
       const next = this.themeMode === "dark" ? "light" : "dark";
-      this.applyTheme(next);
-      saveStoredTheme(next);
-      // Charts read cssVar at render time — redraw so tooltip/grid pick up new theme
-      this.$nextTick(() => {
-        this.renderTrend();
-        this.renderDonut();
-      });
+      const apply = () => {
+        this.applyTheme(next);
+        saveStoredTheme(next);
+        // Charts read cssVar at render time — redraw so tooltip/grid pick up new theme
+        this.$nextTick(() => {
+          this.renderTrend();
+          this.renderDonut();
+        });
+      };
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (document.startViewTransition && !reduceMotion) {
+        document.startViewTransition(apply);
+      } else {
+        apply();
+      }
     },
 
     startAutoRefresh() {

@@ -9,8 +9,6 @@
   /* Working surface — Dawn */
   --bg: oklch(97% 0.008 60);
   --bg-rail: oklch(95% 0.012 55);
-  --status-surface: oklch(95% 0.012 55);
-  --scrim: oklch(18% 0.03 40 / 0.5);
   --surface: oklch(97% 0.008 60);
   --surface-2: oklch(94.5% 0.014 55);
   --surface-3: oklch(91.5% 0.022 50);
@@ -92,8 +90,6 @@
   /* Working surface — Dusk */
   --bg: oklch(20% 0.035 270);
   --bg-rail: oklch(23% 0.038 268);
-  --status-surface: oklch(28% 0.022 50);
-  --scrim: oklch(10% 0.04 275 / 0.66);
   --surface: oklch(22% 0.036 270);
   --surface-2: oklch(26% 0.04 268);
   --surface-3: oklch(30% 0.045 265);
@@ -252,8 +248,6 @@ label:focus-within {
   pointer-events: none;
 }
 
-
-
 .hero-band-inner {
   position: relative;
   z-index: 1;
@@ -338,9 +332,16 @@ label:focus-within {
   }
 }
 
+/* Theme toggle cross-fade via View Transitions API.
+   toggleTheme() wraps the apply() call in document.startViewTransition,
+   which snapshots the page before/after and cross-fades between them. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease-out);
+}
 
-
-.brand {
+  .brand {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
   column-gap: 14px;
@@ -706,7 +707,7 @@ select:hover,
 
 .compare-block--increase .compare-values span {
   border-color: color-mix(in oklch, var(--green) 22%, var(--edge-soft));
-  background: color-mix(in oklch, var(--green) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--green) 8%, var(--bg-rail));
 }
 
 .compare-block--decrease .compare-values strong,
@@ -716,7 +717,7 @@ select:hover,
 
 .compare-block--decrease .compare-values span {
   border-color: color-mix(in oklch, var(--cyan) 22%, var(--edge-soft));
-  background: color-mix(in oklch, var(--cyan) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--cyan) 8%, var(--bg-rail));
 }
 
 .compare-block--neutral .compare-values strong,
@@ -852,25 +853,25 @@ select:hover,
 
 .budget-state--low {
   border-color: color-mix(in oklch, var(--green) 22%, var(--edge));
-  background: color-mix(in oklch, var(--green) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--green) 8%, var(--bg-rail));
   color: color-mix(in oklch, var(--green) 54%, var(--text));
 }
 
 .budget-state--medium {
   border-color: color-mix(in oklch, var(--cyan) 22%, var(--edge));
-  background: color-mix(in oklch, var(--cyan) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--cyan) 8%, var(--bg-rail));
   color: color-mix(in oklch, var(--cyan) 54%, var(--text));
 }
 
 .budget-state--high {
   border-color: color-mix(in oklch, var(--warn) 24%, var(--edge));
-  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
   color: color-mix(in oklch, var(--warn) 58%, var(--text));
 }
 
 .budget-state--over {
   border-color: color-mix(in oklch, var(--rose) 24%, var(--edge));
-  background: color-mix(in oklch, var(--rose) 9%, var(--status-surface));
+  background: color-mix(in oklch, var(--rose) 9%, var(--bg-rail));
   color: color-mix(in oklch, var(--rose) 58%, var(--text));
 }
 
@@ -1265,7 +1266,7 @@ select:hover,
   place-items: center;
   border: 1px solid color-mix(in oklch, var(--green) 18%, var(--edge));
   border-radius: 999px;
-  background: color-mix(in oklch, var(--green) 10%, var(--status-surface));
+  background: color-mix(in oklch, var(--green) 10%, var(--bg-rail));
   color: color-mix(in oklch, var(--green) 54%, var(--text));
   font-size: 11px;
   font-weight: 720;
@@ -1276,7 +1277,7 @@ select:hover,
 
 .pricing-confidence-state--warn {
   border-color: color-mix(in oklch, var(--warn) 24%, var(--edge));
-  background: color-mix(in oklch, var(--warn) 10%, var(--status-surface));
+  background: color-mix(in oklch, var(--warn) 10%, var(--bg-rail));
   color: color-mix(in oklch, var(--warn) 58%, var(--text));
 }
 
@@ -1315,7 +1316,7 @@ select:hover,
 .pricing-confidence-warning {
   border: 1px solid color-mix(in oklch, var(--warn) 22%, var(--edge-soft));
   border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
   color: color-mix(in oklch, var(--warn) 52%, var(--text));
   font-size: 12px;
   line-height: 1.4;
@@ -1335,7 +1336,7 @@ select:hover,
   max-width: 100%;
   border: 1px solid color-mix(in oklch, var(--warn) 18%, var(--edge-soft));
   border-radius: 999px;
-  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1;
@@ -1492,7 +1493,7 @@ select:hover,
   border: 1px solid color-mix(in oklch, var(--violet) 14%, var(--edge-soft));
   border-radius: var(--radius-sm);
   background:
-    linear-gradient(180deg, oklch(100% 0.005 50 / 0.02), transparent),
+    linear-gradient(180deg, oklch(100% 0.005 224 / 0.02), transparent),
     color-mix(in oklch, var(--violet) 4%, var(--surface-glass-raised));
   color: inherit;
   cursor: pointer;
@@ -1529,7 +1530,7 @@ select:hover,
   height: 28px;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--violet) 20%, var(--status-surface));
+  background: color-mix(in oklch, var(--violet) 20%, var(--bg-rail));
   color: color-mix(in oklch, var(--violet) 54%, var(--text));
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -1854,15 +1855,15 @@ select:hover,
   height: 8px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 2px oklch(100% 0.005 50 / 0.04);
+  box-shadow: 0 0 0 2px oklch(100% 0.005 248 / 0.04);
 }
 
 .dot--codex {
   border-radius: 2px;
   transform: rotate(45deg);
   box-shadow:
-    0 0 0 2px oklch(100% 0.005 50 / 0.04),
-    0 0 0 1px oklch(92% 0.02 50 / 0.18);
+    0 0 0 2px oklch(100% 0.005 248 / 0.04),
+    0 0 0 1px oklch(92% 0.02 248 / 0.18);
 }
 
 .dot--claude {
@@ -2033,7 +2034,7 @@ select:hover,
   min-height: 100dvh;
   overflow: auto;
   overscroll-behavior: contain;
-  background: var(--scrim);
+  background: oklch(8% 0.012 224 / 0.72);
   padding: 24px;
 }
 
@@ -2247,7 +2248,7 @@ select:hover,
 .activity-wall-cell {
   width: 100%;
   aspect-ratio: 1;
-  border: 1px solid oklch(100% 0.005 50 / 0.026);
+  border: 1px solid oklch(100% 0.005 248 / 0.026);
   border-radius: 3px;
   background: var(--bg-rail);
   cursor: default;
@@ -2283,7 +2284,7 @@ select:hover,
 }
 
 .activity-heatmap-panel .heatmap-cell {
-  border-color: oklch(100% 0.005 50 / 0.035);
+  border-color: oklch(100% 0.005 248 / 0.035);
 }
 
 .activity-calendar-panel {
@@ -2299,7 +2300,7 @@ select:hover,
 
 .activity-calendar-panel .activity-wall-cell {
   border-radius: 2px 7px;
-  border-color: oklch(100% 0.005 50 / 0.035);
+  border-color: oklch(100% 0.005 248 / 0.035);
 }
 
 .activity-wall-scroll {
@@ -2479,20 +2480,20 @@ select:hover,
 
 .data-health-status--ok {
   border-color: color-mix(in oklch, var(--green) 22%, var(--edge));
-  background: color-mix(in oklch, var(--green) 9%, var(--status-surface));
+  background: color-mix(in oklch, var(--green) 9%, var(--bg-rail));
   color: color-mix(in oklch, var(--green) 52%, var(--text));
 }
 
 .data-health-status--missing,
 .data-health-status--empty {
   border-color: color-mix(in oklch, var(--warn) 22%, var(--edge));
-  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
   color: color-mix(in oklch, var(--warn) 55%, var(--text));
 }
 
 .data-health-status--unreadable {
   border-color: color-mix(in oklch, var(--danger) 24%, var(--edge));
-  background: color-mix(in oklch, var(--danger) 10%, var(--status-surface));
+  background: color-mix(in oklch, var(--danger) 10%, var(--bg-rail));
   color: color-mix(in oklch, var(--danger) 58%, var(--text));
 }
 
