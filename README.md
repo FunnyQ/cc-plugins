@@ -36,14 +36,26 @@ This verifies that Bun is available, vendor files are in place, and Claude data 
 
 A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data and visualizes it in a browser. No telemetry, no cloud — everything stays on your machine.
 
+The visual direction is **Sunrise Atlas** — Big Sur dawn palette over a calm working surface, designed for repeated daily use.
+
 ### Features
 
+- **Daily burn hero** — today's spend as the primary metric, with sparkline and 7-day delta
+- **Monthly budget tracker** — month-to-date spend, remaining budget, projected burn
 - **Overview cards** — sessions, interactions, tokens, estimated cost
-- **Daily trend** — line chart per model with Tokens/Cost toggle
-- **Model distribution** — donut chart by provider
-- **Per-model table** — input/output/cache/reasoning token breakdown with USD estimate
-- **Activity heatmap** — 7d × 24h grid + GitHub-style daily activity wall
-- **Top projects** — ranked by message count
+- **Daily trend** — stacked bar chart per model with Tokens/Cost toggle
+- **Model distribution** — donut by provider, with a per-model breakdown table (input/output/cache/reasoning + USD)
+- **Project rankings + drilldown modal** — top projects by message count, click for per-model detail
+- **Session ledger** — recent Claude and Codex sessions side by side
+- **Anomaly panel** — flags days that broke from your baseline
+- **Token composition & cache efficiency** — input vs cache-read vs output share
+- **Activity heatmap + activity wall** — 7d × 24h grid + GitHub-style daily wall
+- **Data health diagnostics** — surfaces non-fatal source-read failures
+- **Light + dark themes** — View Transitions cross-fade, honors `prefers-color-scheme`
+- **Pointer-tracking bloom** — warm light glides behind the cursor on hover; respects `prefers-reduced-motion`
+- **Animated hero wave** — sunrise band drifts slowly along its wavy bottom edge
+- **Current-view export** — JSON / CSV of whatever filters are active
+- **Persisted preferences** — provider filter, theme, comparison window
 - **Provider filter** — All / Claude / Codex
 
 ### Prerequisites
