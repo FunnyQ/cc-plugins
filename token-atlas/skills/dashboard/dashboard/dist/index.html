@@ -88,6 +88,9 @@
             <div class="card-sub">
               {{ activeWindowLabel }} · usage-based estimate
             </div>
+            <div :class="deltaClass('cost')">
+              {{ summaryDeltas.cost.label }}
+            </div>
           </div>
           <div class="card">
             <div class="card-label">Tokens</div>
@@ -97,6 +100,12 @@
             <div class="card-sub">
               {{ fmtNum(filtered.summary.toolCalls) }} tool calls
             </div>
+            <div :class="deltaClass('tokens')">
+              {{ summaryDeltas.tokens.label }}
+            </div>
+            <div class="card-delta--secondary" :class="deltaClass('toolCalls')">
+              Tool calls: {{ summaryDeltas.toolCalls.label }}
+            </div>
           </div>
           <div class="card">
             <div class="card-label">Interactions</div>
@@ -104,6 +113,9 @@
               {{ fmtNum(filtered.summary.messages) }}
             </div>
             <div class="card-sub">Claude messages + Codex threads</div>
+            <div :class="deltaClass('messages')">
+              {{ summaryDeltas.messages.label }}
+            </div>
           </div>
           <div class="card">
             <div class="card-label">Sessions</div>
@@ -111,6 +123,9 @@
               {{ fmtNum(filtered.summary.sessions) }}
             </div>
             <div class="card-sub">{{ activeWindowLabel }} · Claude + Codex</div>
+            <div :class="deltaClass('sessions')">
+              {{ summaryDeltas.sessions.label }}
+            </div>
           </div>
         </section>
 
@@ -170,7 +185,7 @@
                 <input
                   type="checkbox"
                   v-model="selectedModels[m]"
-                  @change="renderTrend"
+                  @change="onSelectedModelsChange"
                 />
                 <span
                   :class="modelMarkClass(m)"
@@ -288,6 +303,61 @@
           </table>
           <div v-else class="empty-state empty-state--panel">
             No model usage found for this range.
+          </div>
+          <div v-if="pricingMeta" class="pricing-confidence">
+            <div class="pricing-confidence-head">
+              <div>
+                <h3>Pricing confidence</h3>
+                <span class="muted">{{ pricingBasisLabel }}</span>
+              </div>
+              <span
+                class="pricing-confidence-state"
+                :class="{ 'pricing-confidence-state--warn': pricingMeta.models.fallback > 0 || pricingMeta.userOverride.error }"
+              >
+                {{ pricingMeta.models.fallback > 0 ? 'fallback in use' :
+                'priced' }}
+              </span>
+            </div>
+            <dl class="pricing-confidence-grid">
+              <div>
+                <dt>Live</dt>
+                <dd>{{ pricingMeta.openRouter.used ? 'used' : 'defaults' }}</dd>
+              </div>
+              <div>
+                <dt>Override</dt>
+                <dd>
+                  {{ pricingMeta.userOverride.loaded ? 'loaded' : 'none' }}
+                </dd>
+              </div>
+              <div>
+                <dt>Default</dt>
+                <dd>{{ fmtNum(pricingMeta.models.default) }} models</dd>
+              </div>
+              <div>
+                <dt>Fallback</dt>
+                <dd>{{ fmtNum(pricingMeta.models.fallback) }} models</dd>
+              </div>
+            </dl>
+            <div
+              v-if="pricingMeta.userOverride.error"
+              class="pricing-confidence-warning"
+            >
+              Override warning: {{ pricingMeta.userOverride.error }}
+            </div>
+            <div
+              v-if="fallbackPricingModels.length"
+              class="pricing-confidence-fallbacks"
+              aria-label="Fallback-priced models"
+            >
+              <span
+                v-for="m in fallbackPricingModels"
+                :key="m.model"
+                class="pricing-confidence-chip"
+                :title="m.model"
+              >
+                {{ m.label }}
+              </span>
+            </div>
           </div>
         </section>
 
