@@ -1,0 +1,128 @@
+/* Heatmaps */
+.heatmap,
+.activity-wall-scroll {
+  overflow-x: auto;
+  scrollbar-color: var(--border) transparent;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 34px repeat(24, minmax(13px, 1fr));
+  grid-template-rows: 18px repeat(7, auto);
+  gap: var(--s-4);
+  width: 100%;
+  min-width: 600px;
+}
+
+.heatmap-corner {
+  width: 34px;
+}
+
+.heatmap-h-label,
+.heatmap-d-label,
+.activity-wall-month,
+.activity-wall-day {
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap-h-label {
+  text-align: center;
+}
+
+.heatmap-d-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--s-6);
+}
+
+.heatmap-cell,
+.activity-wall-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid oklch(100% 0.005 50 / 0.026);
+  border-radius: 3px;
+  background: var(--bg-rail);
+  cursor: default;
+  transition:
+    border-color 120ms var(--ease-out),
+    filter 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+.heatmap-cell:hover,
+.activity-wall-cell:hover {
+  border-color: color-mix(in oklch, var(--accent) 18%, var(--edge));
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.activity-heatmap-panel {
+  border-color: color-mix(in oklch, var(--rose) 9%, var(--edge));
+  background: color-mix(in oklch, var(--rose) 4%, var(--surface-glass));
+}
+
+.heatmap-range-label {
+  display: grid;
+  justify-items: end;
+  gap: var(--s-2);
+  text-align: right;
+}
+
+.activity-heatmap-panel .heatmap {
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--rose) 8%, var(--status-surface));
+  padding: var(--s-10);
+}
+
+.activity-heatmap-panel .heatmap-cell {
+  border-color: oklch(100% 0.005 50 / 0.035);
+}
+
+.activity-calendar-panel {
+  border-color: color-mix(in oklch, var(--green) 10%, var(--edge));
+  background: color-mix(in oklch, var(--green) 4%, var(--surface-glass));
+}
+
+.activity-calendar-panel .activity-wall-scroll {
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--green) 7%, var(--status-surface));
+  padding: var(--s-10) var(--s-10) var(--s-12);
+}
+
+.activity-calendar-panel .activity-wall-cell {
+  border-radius: 2px 7px;
+  border-color: oklch(100% 0.005 50 / 0.035);
+}
+
+.activity-wall-scroll {
+  padding-bottom: var(--s-2);
+}
+
+.activity-wall-grid {
+  display: grid;
+  grid-template-rows: 18px repeat(7, auto);
+  gap: var(--s-4);
+  align-items: center;
+  width: 100%;
+  min-width: 600px;
+}
+
+.activity-wall-corner {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.activity-wall-month {
+  grid-row: 1;
+  white-space: nowrap;
+}
+
+.activity-wall-day {
+  grid-column: 1;
+  padding-right: var(--s-6);
+  text-align: right;
+}
+
