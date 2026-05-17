@@ -1,0 +1,479 @@
+/* ============================================================
+   Hero band — sunrise wave + brand + controls + cost metric
+   ============================================================ */
+
+.hero-band {
+  position: relative;
+  margin: -22px calc(50% - 50dvw) 28px;
+  padding: 22px max(24px, calc((100dvw - 1480px) / 2 + 24px)) 56px;
+  color: oklch(99% 0.005 60);
+  background: linear-gradient(
+    100deg,
+    var(--sunrise-violet) 0%,
+    var(--sunrise-magenta) 22%,
+    var(--sunrise-coral) 42%,
+    var(--sunrise-orange) 60%,
+    var(--sunrise-amber) 78%,
+    var(--sunrise-sky) 100%
+  );
+  /* Wavy bottom edge — SVG mask is twice the band's width and contains two
+     identical wave cycles, so animating mask-position-x by a full container
+     width loops seamlessly. preserveAspectRatio=none lets the wave stretch
+     across any viewport width without re-tessellating the path. */
+  --hero-wave-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'><path d='M0,0 H200 V90 Q175,84 150,90 T100,90 T50,90 T0,90 Z' fill='white'/></svg>");
+  mask-image: var(--hero-wave-mask);
+  mask-size: 200% 100%;
+  mask-repeat: no-repeat;
+  mask-position-x: 0%;
+  -webkit-mask-image: var(--hero-wave-mask);
+  -webkit-mask-size: 200% 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position-x: 0%;
+  overflow: hidden;
+  isolation: isolate;
+  /* 420ms delay matches main-shell so hero and dashboard arrive together
+     during the overlay's opacity fade phase. hero-wave-drift slides the
+     mask one wavelength every 22s for slow, ambient drift. */
+  animation:
+    hero-rise 700ms 420ms var(--ease-out-expo) both,
+    hero-wave-drift 22s linear infinite;
+}
+
+@keyframes hero-wave-drift {
+  from {
+    mask-position-x: 0%;
+    -webkit-mask-position-x: 0%;
+  }
+  to {
+    mask-position-x: 100%;
+    -webkit-mask-position-x: 100%;
+  }
+}
+
+/* Layered SVG waves are positioned absolutely inside .hero-band */
+.hero-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero-band-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--s-18);
+}
+
+/* Topbar lives inside .hero-band now — transparent, no sticky */
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-18);
+  background: transparent;
+  overflow: visible;
+}
+
+/* Hero metric block */
+.hero-metric {
+  display: grid;
+  gap: var(--s-4);
+  margin-top: var(--s-16);
+}
+
+.hero-metric-label {
+  margin: 0;
+  color: oklch(99% 0.005 60 / 0.88);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.hero-metric-value {
+  margin: 0;
+  color: oklch(99% 0.005 60);
+  font-size: clamp(48px, 7vw, 96px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.hero-metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-8);
+  margin-top: var(--s-6);
+  color: oklch(99% 0.005 60 / 0.85);
+  font-size: var(--fs-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-metric-delta strong {
+  font-weight: 700;
+}
+
+/* deltaClass() injects .compare-block which adds a border-top + grid.
+   Reset those inside hero so the delta sits inline under the cost number. */
+.hero-band .compare-block {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-10);
+  border-top: 0;
+  padding-top: 0;
+}
+
+@keyframes hero-rise {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-band {
+    animation: none;
+  }
+}
+
+/* Theme toggle cross-fade via View Transitions API.
+   toggleTheme() wraps the apply() call in document.startViewTransition,
+   which snapshots the page before/after and cross-fades between them. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease-out);
+}
+
+/* Organic horizon drift — each layer has its own character (axis, amplitude,
+   keyframe asymmetry, easing) so the three waves never synchronize into a
+   single up-down beat. Back layer breathes wide and slow; mid layer rolls
+   with a faint skew; front layer ripples with quicker lateral travel. */
+@keyframes wave-breathe-back {
+  0% {
+    transform: translate(0, 0);
+  }
+  28% {
+    transform: translate(-3px, -10px);
+  }
+  62% {
+    transform: translate(4px, -5px);
+  }
+  84% {
+    transform: translate(-1px, -7px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes wave-breathe-mid {
+  0% {
+    transform: translate(0, 0) skewX(0deg);
+  }
+  22% {
+    transform: translate(5px, 5px) skewX(0.35deg);
+  }
+  48% {
+    transform: translate(-3px, 8px) skewX(-0.25deg);
+  }
+  76% {
+    transform: translate(4px, 3px) skewX(0.2deg);
+  }
+  100% {
+    transform: translate(0, 0) skewX(0deg);
+  }
+}
+
+@keyframes wave-breathe-front {
+  0% {
+    transform: translate(0, 0);
+  }
+  18% {
+    transform: translate(-6px, -3px);
+  }
+  43% {
+    transform: translate(4px, -4px);
+  }
+  68% {
+    transform: translate(-2px, 1px);
+  }
+  88% {
+    transform: translate(3px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* Different easings per layer break the synchronized "metronome" feel. */
+.hero-wave > path {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.hero-wave > path:nth-child(1) {
+  animation: wave-breathe-back 23s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+}
+
+.hero-wave > path:nth-child(2) {
+  animation: wave-breathe-mid 17s cubic-bezier(0.45, 0.05, 0.55, 1) -3s infinite;
+}
+
+.hero-wave > path:nth-child(3) {
+  animation: wave-breathe-front 13s cubic-bezier(0.55, 0, 0.45, 1) -5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-wave > path {
+    animation: none;
+  }
+}
+
+.brand {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  column-gap: var(--s-14);
+  row-gap: 3px;
+  align-items: center;
+  min-width: 0;
+}
+
+.brand .logo {
+  grid-row: 1 / span 2;
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  line-height: 1;
+}
+
+.brand .logo img {
+  display: block;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  transition:
+    filter 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+
+.brand:hover .logo img {
+  filter: drop-shadow(
+    0 0 14px color-mix(in oklch, var(--accent) 24%, transparent)
+  );
+  transform: translateY(-1px);
+}
+
+.brand h1 {
+  margin: 0;
+  color: oklch(99% 0.005 60);
+  font-size: var(--fs-2xl);
+  font-weight: 680;
+  letter-spacing: 0;
+  line-height: 1.1;
+  align-self: end;
+}
+
+.brand::after {
+  content: "Local usage ledger for Claude + Codex traces";
+  grid-column: 2;
+  color: oklch(99% 0.005 60 / 0.82);
+  font-size: var(--fs-base);
+  line-height: 1.15;
+  align-self: start;
+}
+
+/* Controls sit on bright wave — use translucent dark chrome for legibility */
+.hero-band select,
+.hero-band .btn {
+  background: oklch(22% 0.012 60 / 0.32);
+  color: oklch(99% 0.005 60);
+  border: 1px solid oklch(99% 0.005 60 / 0.24);
+  box-shadow: none;
+}
+
+.hero-band select:hover,
+.hero-band .btn:hover {
+  background: oklch(22% 0.012 60 / 0.46);
+  border-color: oklch(99% 0.005 60 / 0.42);
+}
+
+.hero-band .segmented-control {
+  background: oklch(22% 0.012 60 / 0.28);
+  border-color: oklch(99% 0.005 60 / 0.24);
+}
+
+.hero-band .segmented-control button {
+  color: oklch(99% 0.005 60 / 0.82);
+}
+
+.hero-band .segmented-control button.active {
+  background: oklch(99% 0.005 60 / 0.92);
+  color: oklch(28% 0.04 30);
+}
+
+.hero-band .export-menu-trigger {
+  background: oklch(22% 0.012 60 / 0.32);
+  color: oklch(99% 0.005 60 / 0.92);
+  border-color: oklch(99% 0.005 60 / 0.24);
+}
+
+.hero-band .export-menu-trigger:hover {
+  background: oklch(22% 0.012 60 / 0.46);
+  color: oklch(99% 0.005 60);
+}
+
+/* Export menu panel pops below hero — switch back to surface tokens */
+.hero-band .export-menu-panel {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.hero-band .export-menu-panel button {
+  color: var(--text-muted);
+}
+
+.hero-band .export-menu-panel button:hover,
+.hero-band .export-menu-panel button:focus-visible {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--s-10);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+select,
+.btn {
+  min-height: 36px;
+  border: 1px solid var(--theme-edge);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--accent-soft) 26%, var(--surface));
+  color: var(--text);
+  box-shadow: var(--shadow-inset);
+  font-size: var(--fs-md);
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+select {
+  padding: 0 34px 0 11px;
+}
+
+.btn {
+  padding: 0 13px;
+}
+
+.export-menu {
+  position: relative;
+}
+
+.export-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-8);
+  list-style: none;
+  border-color: var(--edge-soft);
+  background: color-mix(in oklch, var(--surface-3) 78%, var(--bg-rail));
+  color: var(--text-muted);
+}
+
+.export-menu-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.export-menu-trigger::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms var(--ease-out);
+}
+
+.export-menu[open] .export-menu-trigger::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.export-menu[open] .export-menu-trigger,
+.export-menu-trigger:hover {
+  color: var(--text);
+}
+
+.export-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  min-width: 190px;
+  gap: var(--s-4);
+  border: 1px solid var(--theme-edge);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--accent-soft) 16%, transparent),
+      transparent 52%
+    ),
+    var(--surface);
+  box-shadow: var(--shadow-inset), var(--theme-shadow-raised);
+  padding: var(--s-6);
+}
+
+.export-menu-panel button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: left;
+  padding: 0 var(--s-10);
+}
+
+.export-menu-panel button:hover,
+.export-menu-panel button:focus-visible {
+  background: color-mix(in oklch, var(--accent-soft) 44%, var(--surface-2));
+  color: var(--text);
+  outline: none;
+}
+
+select:hover,
+.btn:hover {
+  border-color: color-mix(in oklch, var(--accent) 18%, var(--edge));
+  background: color-mix(in oklch, var(--accent-soft) 42%, var(--surface-2));
+}
+
+.btn:active,
+.segmented-control button:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+

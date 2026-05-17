@@ -1,0 +1,293 @@
+/* ============================================================
+   Token Atlas — Sunrise Atlas tokens
+   Light = Dawn (default), Dark = Dusk via [data-theme="dark"]
+   ============================================================ */
+
+/* Fraunces — variable serif (opsz 9..144, wght 300..900). Self-hosted to
+   keep the dashboard offline-capable. Used for display headings only;
+   body stays on the system stack for developer-tool credibility. */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-variable.woff2") format("woff2-variations");
+}
+
+:root {
+  color-scheme: light;
+
+  /* Working surface — Dawn */
+  --bg: oklch(97% 0.008 60);
+  --bg-rail: oklch(95% 0.012 55);
+  --status-surface: oklch(95% 0.012 55);
+  --scrim: oklch(18% 0.03 40 / 0.5);
+  --surface: oklch(97% 0.008 60);
+  --surface-2: oklch(94.5% 0.014 55);
+  --surface-3: oklch(91.5% 0.022 50);
+  --surface-glass: oklch(97% 0.008 60);
+  --surface-glass-raised: oklch(95.5% 0.012 55);
+
+  --border: oklch(88% 0.014 50);
+  --border-soft: oklch(92% 0.01 55);
+
+  --text: oklch(22% 0.012 60);
+  --text-muted: oklch(48% 0.017 50);
+  --text-faint: oklch(64% 0.014 50);
+
+  /* Sunrise spectrum */
+  --accent: oklch(64% 0.18 30);
+  --accent-strong: oklch(58% 0.22 28);
+  --accent-soft: oklch(92% 0.045 35);
+
+  --sunrise-violet: oklch(58% 0.2 305);
+  --sunrise-magenta: oklch(62% 0.22 340);
+  --sunrise-coral: oklch(64% 0.2 25);
+  --sunrise-orange: oklch(72% 0.18 50);
+  --sunrise-amber: oklch(82% 0.16 75);
+  --sunrise-sky: oklch(82% 0.07 220);
+  --sunrise-glow: oklch(95% 0.04 80);
+
+  /* Semantic — warmed and pulled into sunrise lineage, keeps up/down distinction */
+  --green: oklch(70% 0.15 110);
+  --warn: oklch(75% 0.16 75);
+  --danger: oklch(58% 0.21 25);
+
+  /* Provider hint colors — cool end of sunrise (Codex side) */
+  --cyan: oklch(62% 0.12 250);
+  --blue: oklch(58% 0.16 270);
+  --violet: oklch(60% 0.18 295);
+  --rose: oklch(62% 0.22 340);
+
+  /* Edges */
+  --edge: oklch(86% 0.014 50);
+  --edge-soft: oklch(91% 0.012 55);
+  --edge-warm: var(--edge);
+  --theme-edge: var(--edge-warm);
+  --theme-edge-strong: oklch(82% 0.022 45);
+  --theme-surface: var(--surface);
+
+  /* Flat surfaces — no shadows, no glass */
+  --theme-shadow: 0 0 0 transparent;
+  --theme-shadow-raised: 0 0 0 transparent;
+  --shadow-soft: 0 0 0 transparent;
+  --shadow-inset: 0 0 0 transparent;
+  --glass-highlight: transparent;
+  --glass-highlight-soft: transparent;
+
+  /* Charts */
+  --chart-tooltip-bg: oklch(22% 0.012 60);
+  --chart-tooltip-text: oklch(96% 0.008 60);
+  --chart-tooltip-border: oklch(72% 0.16 55 / 0.55);
+  --chart-grid: oklch(88% 0.012 50 / 0.6);
+  --chart-axis: oklch(48% 0.015 50);
+
+  /* Retired Nordic tokens — neutralized aliases so legacy rules still resolve */
+  --rune-mark: transparent;
+  --ledger-line: oklch(88% 0.012 50 / 0.4);
+  --ledger-line-strong: oklch(82% 0.018 50 / 0.6);
+  --bifrost-cyan: var(--sunrise-magenta);
+  --bifrost-green: var(--sunrise-amber);
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Spacing scale — values map 1:1 to legacy px to ease retrofit */
+  --s-2: 2px;
+  --s-4: 4px;
+  --s-6: 6px;
+  --s-8: 8px;
+  --s-10: 10px;
+  --s-12: 12px;
+  --s-14: 14px;
+  --s-16: 16px;
+  --s-18: 18px;
+  --s-20: 20px;
+  --s-22: 22px;
+  --s-24: 24px;
+  --s-28: 28px;
+  --s-32: 32px;
+
+  /* Type scale */
+  --fs-xs: 10px;
+  --fs-sm: 11px;
+  --fs-base: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --fs-xl: 16px;
+  --fs-2xl: 18px;
+  --fs-3xl: 22px;
+  --fs-hero: clamp(48px, 7vw, 96px);
+
+  /* Type stacks. Display = editorial serif (atlas/cartography feel).
+     Rounded = SF Pro Rounded for the hero metric warmth, falls back to system.
+     Body = system stack — developer-tool credibility. */
+  --ff-body:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ff-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --ff-rounded:
+    "SF Pro Rounded", "SF Pro Display", -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
+
+  font-family: var(--ff-body);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Working surface — Dusk */
+  --bg: oklch(20% 0.035 270);
+  --bg-rail: oklch(23% 0.038 268);
+  --status-surface: oklch(28% 0.022 50);
+  --scrim: oklch(10% 0.04 275 / 0.66);
+  --surface: oklch(22% 0.036 270);
+  --surface-2: oklch(26% 0.04 268);
+  --surface-3: oklch(30% 0.045 265);
+  --surface-glass: oklch(22% 0.036 270);
+  --surface-glass-raised: oklch(26% 0.04 268);
+
+  --border: oklch(34% 0.04 50);
+  --border-soft: oklch(28% 0.03 60);
+
+  --text: oklch(94% 0.012 60);
+  --text-muted: oklch(74% 0.02 55);
+  --text-faint: oklch(58% 0.02 50);
+
+  /* Sunset spectrum */
+  --accent: oklch(72% 0.2 30);
+  --accent-strong: oklch(78% 0.22 28);
+  --accent-soft: oklch(38% 0.1 30);
+
+  --sunrise-violet: oklch(46% 0.2 305);
+  --sunrise-magenta: oklch(54% 0.24 340);
+  --sunrise-coral: oklch(60% 0.22 25);
+  --sunrise-orange: oklch(68% 0.2 50);
+  --sunrise-amber: oklch(78% 0.18 75);
+  --sunrise-sky: oklch(38% 0.1 250);
+  --sunrise-glow: oklch(72% 0.16 65);
+
+  --green: oklch(78% 0.16 110);
+  --warn: oklch(82% 0.16 75);
+  --danger: oklch(68% 0.22 25);
+
+  --cyan: oklch(72% 0.14 250);
+  --blue: oklch(70% 0.16 270);
+  --violet: oklch(70% 0.18 295);
+  --rose: oklch(72% 0.22 340);
+
+  --edge: oklch(35% 0.04 50);
+  --edge-soft: oklch(30% 0.03 55);
+  --theme-edge-strong: oklch(42% 0.05 45);
+
+  --chart-tooltip-bg: oklch(94% 0.012 60);
+  --chart-tooltip-text: oklch(20% 0.035 270);
+  --chart-tooltip-border: oklch(78% 0.18 70 / 0.7);
+  --chart-grid: oklch(40% 0.025 50 / 0.6);
+  --chart-axis: oklch(72% 0.018 55);
+
+  --ledger-line: oklch(50% 0.025 50 / 0.4);
+  --ledger-line-strong: oklch(58% 0.03 50 / 0.6);
+}
+
+[v-cloak] {
+  display: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  /* Surface veil keeps the wallpaper present without competing with data. */
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in oklch, var(--bg) 70%, transparent) 0%,
+      color-mix(in oklch, var(--bg) 76%, transparent) 46%,
+      color-mix(in oklch, var(--bg) 82%, transparent) 100%
+    ),
+    url("/assets/dashboard-bg-dawn.jpg") center top / cover no-repeat fixed,
+    var(--bg);
+  font-size: var(--fs-lg);
+  overflow-x: clip;
+}
+
+[data-theme="dark"] body {
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in oklch, var(--bg) 58%, transparent) 0%,
+      color-mix(in oklch, var(--bg) 66%, transparent) 48%,
+      color-mix(in oklch, var(--bg) 74%, transparent) 100%
+    ),
+    url("/assets/dashboard-bg-dusk.jpg") center top / cover no-repeat fixed,
+    var(--bg);
+}
+
+/* Editorial serif for headings — opsz axis auto-adapts to font-size,
+   so h3 (small) reads cleaner than a fixed display opsz. The atlas/cartography
+   tone lives here, not in body. */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--ff-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.005em;
+}
+
+/* Hero cost metric — SF Pro Rounded on Apple, soft fallback elsewhere.
+   The big cost number gets dawn-warm curves; smaller numbers stay precise
+   on the body sans for ledger feel. */
+.hero-metric-value {
+  font-family: var(--ff-rounded);
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--s-10);
+  left: var(--s-10);
+  z-index: 20;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  padding: 9px var(--s-12);
+  transform: translateY(-160%);
+  transition: transform 160ms var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+button,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+#app {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+  padding: var(--s-22) var(--s-24) var(--s-32);
+}
+
