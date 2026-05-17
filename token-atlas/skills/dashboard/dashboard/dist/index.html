@@ -152,6 +152,68 @@
           </div>
         </section>
 
+        <section class="budget-panel" aria-label="Monthly budget">
+          <div class="budget-panel-main">
+            <div>
+              <h2>Monthly budget</h2>
+              <span class="muted"
+                >estimated · {{ budgetView.providerLabel }} · {{
+                budgetView.source }}</span
+              >
+            </div>
+            <span
+              v-if="budgetView.configured"
+              :class="'budget-state budget-state--' + budgetView.state"
+            >
+              {{ budgetStateLabel(budgetView.state) }}
+            </span>
+            <span v-else class="budget-state">setup optional</span>
+          </div>
+
+          <div v-if="budgetView.configured" class="budget-grid">
+            <div class="budget-meter" aria-label="Budget usage">
+              <div class="budget-meter-head">
+                <strong>{{ budgetView.usagePctLabel }}</strong>
+                <span
+                  >{{ fmtUSD(budgetView.monthToDateCostUSD) }} of {{
+                  fmtUSD(budgetView.monthlyBudgetUSD) }}</span
+                >
+              </div>
+              <div class="budget-meter-track">
+                <span
+                  :class="budgetMeterClass(budgetView.state)"
+                  :style="{ width: budgetView.usageMeterWidth }"
+                ></span>
+              </div>
+            </div>
+            <dl class="budget-stats">
+              <div>
+                <dt>Remaining</dt>
+                <dd>{{ fmtUSD(budgetView.remainingBudgetUSD) }}</dd>
+              </div>
+              <div>
+                <dt>Projected</dt>
+                <dd>{{ fmtUSD(budgetView.projectedMonthEndCostUSD) }}</dd>
+              </div>
+              <div>
+                <dt>Projected use</dt>
+                <dd>{{ budgetView.projectedPctLabel }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div v-else class="budget-setup">
+            <span v-if="budgetView.error"
+              >Budget config warning: {{ budgetView.error }}</span
+            >
+            <span v-else
+              >Create <code>{{ budgetView.source }}</code> with
+              <code>{"monthlyBudgetUSD":100}</code> to enable burn-rate
+              planning.</span
+            >
+          </div>
+        </section>
+
         <!-- Trend + donut row -->
         <section class="row activity-row">
           <div class="panel wide trend-command-panel">
@@ -486,25 +548,29 @@
                 <span class="muted">all-time spend</span>
               </div>
               <div class="top-cost-board" v-if="topCostProjects.length">
-                <div
+                <button
+                  type="button"
                   class="top-cost-card"
+                  :class="{ 'is-selected': isSelectedProject(p.path) }"
+                  :aria-pressed="isSelectedProject(p.path)"
+                  @click="selectProject(p.path)"
                   v-for="(p, i) in topCostProjects"
                   :key="'cost-' + p.path"
                 >
-                  <div class="top-cost-card-head">
+                  <span class="top-cost-card-head">
                     <span class="top-cost-rank">
                       {{ String(i + 1).padStart(2, '0') }}
                     </span>
                     <span class="top-cost-value">{{ p.displayLabel }}</span>
-                  </div>
-                  <div class="project-name">{{ p.name }}</div>
-                  <div class="project-path">{{ p.path }}</div>
-                  <div class="top-cost-stats">
+                  </span>
+                  <span class="project-name">{{ p.name }}</span>
+                  <span class="project-path">{{ p.path }}</span>
+                  <span class="top-cost-stats">
                     <span>{{ p.tokenLabel }}</span>
                     <span>{{ p.displayLabel }}</span>
-                  </div>
-                  <div class="top-cost-meter">
-                    <div
+                  </span>
+                  <span class="top-cost-meter">
+                    <span
                       class="project-rank-meter-fill"
                       :style="{ width: p.pct + '%' }"
                     >
@@ -520,9 +586,9 @@
                         :style="{ width: p.codexPct + '%' }"
                         :title="'Codex · ' + p.codexDisplay"
                       ></span>
-                    </div>
-                  </div>
-                </div>
+                    </span>
+                  </span>
+                </button>
               </div>
               <div v-else class="empty-state empty-state--panel">
                 No project costs recorded yet.
@@ -625,23 +691,27 @@
               </div>
             </div>
             <div v-if="topProjects.length" class="project-rank-list">
-              <div
+              <button
+                type="button"
                 class="project-rank-item"
+                :class="{ 'is-selected': isSelectedProject(p.path) }"
+                :aria-pressed="isSelectedProject(p.path)"
+                @click="selectProject(p.path)"
                 v-for="(p, i) in topProjects"
                 :key="p.path"
               >
                 <span class="project-rank-no">
                   {{ String(i + 1).padStart(2, '0') }}
                 </span>
-                <div class="project-rank-main">
-                  <div class="project-name">{{ p.name }}</div>
-                  <div class="project-path">{{ p.path }}</div>
-                </div>
+                <span class="project-rank-main">
+                  <span class="project-name">{{ p.name }}</span>
+                  <span class="project-path">{{ p.path }}</span>
+                </span>
                 <span class="num" :class="{ cost: topProjectMode === 'cost' }">
                   {{ p.displayLabel }}
                 </span>
-                <div class="project-rank-meter">
-                  <div
+                <span class="project-rank-meter">
+                  <span
                     class="project-rank-meter-fill"
                     :style="{ width: p.pct + '%' }"
                   >
@@ -657,13 +727,140 @@
                       :style="{ width: p.codexPct + '%' }"
                       :title="'Codex · ' + p.codexDisplay"
                     ></span>
-                  </div>
-                </div>
-              </div>
+                  </span>
+                </span>
+              </button>
             </div>
             <div v-else class="empty-state empty-state--panel">
               No recent project activity for this metric.
             </div>
+          </div>
+        </section>
+
+        <section
+          v-if="selectedProject"
+          class="panel project-detail-panel"
+          aria-label="Selected project detail"
+        >
+          <div class="project-detail-head">
+            <div>
+              <h2>{{ selectedProject.name }}</h2>
+              <code>{{ selectedProject.path }}</code>
+            </div>
+            <button
+              type="button"
+              class="btn project-detail-close"
+              aria-label="Close project detail"
+              @click="clearSelectedProject"
+            >
+              Close
+            </button>
+          </div>
+          <div class="project-detail-meta">
+            <div>
+              <span>First seen</span>
+              <strong>{{ selectedProject.firstSeen || 'n/a' }}</strong>
+            </div>
+            <div>
+              <span>Last seen</span>
+              <strong>{{ selectedProject.lastSeen || 'n/a' }}</strong>
+            </div>
+            <div>
+              <span>{{ selectedProjectProviderSummary.label }} tokens</span>
+              <strong
+                >{{ fmtTokens(selectedProjectProviderSummary.tokens) }}</strong
+              >
+            </div>
+            <div>
+              <span>{{ selectedProjectProviderSummary.label }} cost</span>
+              <strong
+                >${{ selectedProjectProviderSummary.costUSD.toFixed(2)
+                }}</strong
+              >
+            </div>
+          </div>
+          <div class="project-provider-split">
+            <div>
+              <span>Claude</span>
+              <strong
+                >{{ fmtTokens(selectedProject.claudeTokens || 0) }}</strong
+              >
+              <small
+                >${{ (selectedProject.claudeCostUSD || 0).toFixed(2) }}</small
+              >
+            </div>
+            <div>
+              <span>Codex</span>
+              <strong>{{ fmtTokens(selectedProject.codexTokens || 0) }}</strong>
+              <small
+                >${{ (selectedProject.codexCostUSD || 0).toFixed(2) }}</small
+              >
+            </div>
+          </div>
+          <div class="project-detail-subhead">
+            <div>
+              <h3>Model breakdown</h3>
+              <span class="muted"
+                >{{ selectedProjectProviderSummary.label }} · all-time project
+                totals</span
+              >
+            </div>
+            <strong v-if="selectedProjectModels.length"
+              >{{ fmtUSD(selectedProjectModelTotalCost) }}</strong
+            >
+          </div>
+          <table v-if="selectedProjectModels.length" class="table compact">
+            <caption>
+              Model totals for selected project.
+            </caption>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Source</th>
+                <th class="num">Tokens</th>
+                <th class="num">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in selectedProjectModels" :key="m.model">
+                <td data-label="Model">
+                  <span class="model-cell">
+                    <span
+                      :class="modelMarkClass(m.model)"
+                      :style="{ background: colorFor(m.model) }"
+                    ></span>
+                    {{ shortModel(m.model) }}
+                    <span v-if="m.isExternal" class="badge">ext</span>
+                  </span>
+                  <div
+                    class="row-meter"
+                    :title="'Cost share vs highest project model: ' + projectModelCostPct(m).toFixed(1) + '%'"
+                  >
+                    <span
+                      :style="{ width: projectModelCostPct(m).toFixed(1) + '%' }"
+                    ></span>
+                  </div>
+                </td>
+                <td data-label="Source">
+                  <span :class="providerBadgeClass(m.provider || 'claude')">
+                    {{ m.provider || 'claude' }}
+                  </span>
+                </td>
+                <td data-label="Tokens" class="num">
+                  {{ fmtTokens(modelTokenTotal(m)) }}
+                </td>
+                <td data-label="Cost" class="num cost">
+                  ${{ (m.costUSD || 0).toFixed(2) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty-state empty-state--panel">
+            No model breakdown for this project and provider filter.
+          </div>
+          <div class="project-detail-note">
+            Daily project trend needs per-project daily rows and is not yet
+            available in this API slice.
           </div>
         </section>
 
