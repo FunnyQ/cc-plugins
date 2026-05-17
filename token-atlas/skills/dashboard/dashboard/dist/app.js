@@ -600,6 +600,32 @@ function App() {
       }));
     },
 
+    get dataHealth() {
+      return this.stats?.dataHealth ?? null;
+    },
+
+    get dataHealthSources() {
+      return this.dataHealth?.sources ?? [];
+    },
+
+    get dataHealthCounts() {
+      const counts = this.dataHealth?.counts ?? {};
+      return [
+        {
+          label: "Claude transcripts",
+          value: counts.claudeTranscriptFiles ?? 0,
+        },
+        {
+          label: "Codex session files",
+          value: counts.codexSessionFiles ?? 0,
+        },
+        {
+          label: "Codex thread rows",
+          value: counts.codexThreadRows ?? 0,
+        },
+      ];
+    },
+
     get heatmapCells() {
       if (!this.stats) return [];
       let matrix;
@@ -897,6 +923,21 @@ function App() {
       });
       if (first.getTime() === last.getTime()) return fmt.format(first);
       return `${fmt.format(first)} - ${fmt.format(last)}`;
+    },
+
+    formatDateTime(value) {
+      if (!value) return "n/a";
+      return new Date(value).toLocaleString();
+    },
+
+    dataHealthStatusClass(status) {
+      return {
+        "data-health-status": true,
+        "data-health-status--ok": status === "ok",
+        "data-health-status--missing": status === "missing",
+        "data-health-status--empty": status === "empty",
+        "data-health-status--unreadable": status === "unreadable",
+      };
     },
 
     heatColorFromMax(v, max) {
