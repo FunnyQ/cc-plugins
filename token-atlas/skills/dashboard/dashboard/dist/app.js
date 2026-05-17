@@ -561,8 +561,15 @@ function App() {
     get summaryDeltas() {
       const current = this.filtered.summary;
       const previous = this.comparisonSummary;
+      const currentDays = this.filteredDaily.length || 1;
+      const previousDays = this.comparisonDaily.length || 1;
       return {
         cost: this.buildSummaryDelta("cost", current.cost, previous.cost),
+        dailyBurn: this.buildSummaryDelta(
+          "dailyBurn",
+          current.cost / currentDays,
+          this.comparisonDaily.length > 0 ? previous.cost / previousDays : 0,
+        ),
         tokens: this.buildSummaryDelta(
           "tokens",
           current.tokens,
@@ -584,6 +591,33 @@ function App() {
           previous.toolCalls,
         ),
       };
+    },
+
+    get dailyBurnUSD() {
+      const days = this.filteredDaily.length || 0;
+      if (!days) return 0;
+      return this.filtered.summary.cost / days;
+    },
+
+    /* Sparkline series for daily cost — used in the Daily burn card.
+       Returns SVG polyline points string sized for a 100×24 viewBox,
+       so the consumer can drop it straight into a <polyline points="..."/>. */
+    get costSparkSeries() {
+      const series = this.filteredDaily.map((d) => d.costUSD || 0);
+      if (!series.length) return { points: "", max: 0, hasData: false };
+      const max = Math.max(...series);
+      if (max <= 0) return { points: "", max, hasData: false };
+      const W = 100;
+      const H = 24;
+      const lastIdx = Math.max(1, series.length - 1);
+      const points = series
+        .map((v, i) => {
+          const x = (i / lastIdx) * W;
+          const y = H - (v / max) * (H - 2) - 1;
+          return `${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(" ");
+      return { points, max, hasData: true };
     },
 
     summarizeDaily(daily) {
@@ -1590,7 +1624,7 @@ function App() {
     },
 
     formatDeltaValue(metric, value) {
-      if (metric === "cost") return fmtUSD(value);
+      if (metric === "cost" || metric === "dailyBurn") return fmtUSD(value);
       if (metric === "tokens") return fmtTokens(value);
       return fmtNum(Math.round(value));
     },

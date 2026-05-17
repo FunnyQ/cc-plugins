@@ -295,23 +295,44 @@
       >
         <!-- Overview cards -->
         <section class="cards metric-type-ledger" aria-label="Usage summary">
-          <div class="card">
+          <div class="card card--burn">
             <div class="metric-main">
-              <div class="card-label">Estimated cost</div>
+              <div class="card-label">Daily burn</div>
               <div class="card-value">
-                ${{ filtered.summary.cost.toFixed(2) }}
+                ${{ dailyBurnUSD.toFixed(2) }}<span class="card-value-suffix"
+                  >/day</span
+                >
               </div>
               <div class="card-sub">
-                {{ activeWindowLabel }} · usage-based estimate
+                {{ activeWindowLabel }} avg · ${{
+                filtered.summary.cost.toFixed(2) }} total
               </div>
+              <svg
+                v-if="costSparkSeries.hasData"
+                class="cost-spark"
+                viewBox="0 0 100 24"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <polyline
+                  :points="costSparkSeries.points"
+                  fill="none"
+                  stroke="var(--sunrise-coral)"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                  vector-effect="non-scaling-stroke"
+                />
+              </svg>
             </div>
-            <div :class="deltaClass('cost')">
+            <div :class="deltaClass('dailyBurn')">
               <span class="compare-context">
-                {{ summaryDeltas.cost.contextLabel }}
+                {{ summaryDeltas.dailyBurn.contextLabel }}
               </span>
               <span class="compare-values">
-                <strong>{{ summaryDeltas.cost.valueLabel }}</strong>
-                <span>{{ summaryDeltas.cost.pctLabel }}</span>
+                <strong>{{ summaryDeltas.dailyBurn.valueLabel }}</strong>
+                <span>{{ summaryDeltas.dailyBurn.pctLabel }}</span>
               </span>
             </div>
           </div>
