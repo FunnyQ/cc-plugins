@@ -954,6 +954,47 @@ select:hover,
   filter: none;
 }
 
+.anomaly-panel {
+  margin-bottom: 18px;
+}
+
+.anomaly-list {
+  display: grid;
+  gap: 8px;
+}
+
+.anomaly-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(110px, 0.5fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--warn) 5%, var(--surface-glass));
+  padding: 10px 12px;
+}
+
+.anomaly-item strong,
+.anomaly-item span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anomaly-item strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.anomaly-item span {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 /* Controls */
 .segmented-control {
   display: inline-flex;
@@ -1643,6 +1684,10 @@ select:hover,
 
   .data-health-summary {
     text-align: left;
+  }
+
+  .anomaly-item {
+    grid-template-columns: 1fr;
   }
 
   .card {

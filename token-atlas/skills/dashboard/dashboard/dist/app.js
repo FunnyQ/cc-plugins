@@ -156,6 +156,9 @@ const MONTHS = [
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
 const AUTO_REFRESH_MS = 60_000;
+const ANOMALY_MULTIPLIER = 2;
+const ANOMALY_MIN_COST = 1;
+const ANOMALY_MIN_TOKENS = 50_000;
 const PREFS_STORAGE_KEY = "token-atlas:prefs:v1";
 const ALLOWED_PREFS = {
   providerKey: ["all", "claude", "codex"],
@@ -626,6 +629,47 @@ function App() {
       ];
     },
 
+    get usageAnomalyState() {
+      const daily = this.filteredDaily.filter(
+        (day) => (day.costUSD ?? 0) > 0 || (day.tokens ?? 0) > 0,
+      );
+      if (daily.length < 5) {
+        return {
+          ready: false,
+          label: "Need at least 5 active days for a baseline.",
+          anomalies: [],
+        };
+      }
+
+      const costMedian = this.median(daily.map((day) => day.costUSD ?? 0));
+      const tokenMedian = this.median(daily.map((day) => day.tokens ?? 0));
+      if (costMedian <= 0 && tokenMedian <= 0) {
+        return {
+          ready: false,
+          label: "No usage baseline in this window.",
+          anomalies: [],
+        };
+      }
+
+      const anomalies = daily
+        .map((day) => this.anomalyForDay(day, costMedian, tokenMedian))
+        .filter(Boolean)
+        .sort((a, b) => b.ratio - a.ratio)
+        .slice(0, 3);
+
+      return {
+        ready: true,
+        label: anomalies.length
+          ? `${anomalies.length} elevated day${anomalies.length === 1 ? "" : "s"}`
+          : "No elevated days in this window.",
+        anomalies,
+      };
+    },
+
+    get usageAnomalies() {
+      return this.usageAnomalyState.anomalies;
+    },
+
     get heatmapCells() {
       if (!this.stats) return [];
       let matrix;
@@ -798,6 +842,69 @@ function App() {
         (model.cacheCreationTokens ?? 0) +
         (model.reasoningTokens ?? 0)
       );
+    },
+
+    median(values) {
+      const sorted = values
+        .filter((value) => Number.isFinite(value))
+        .sort((a, b) => a - b);
+      if (!sorted.length) return 0;
+      const mid = Math.floor(sorted.length / 2);
+      if (sorted.length % 2) return sorted[mid];
+      return (sorted[mid - 1] + sorted[mid]) / 2;
+    },
+
+    anomalyForDay(day, costMedian, tokenMedian) {
+      const cost = day.costUSD ?? 0;
+      const tokens = day.tokens ?? 0;
+      const costRatio = costMedian > 0 ? cost / costMedian : 0;
+      const tokenRatio = tokenMedian > 0 ? tokens / tokenMedian : 0;
+      const costElevated =
+        costMedian > 0 &&
+        cost >= ANOMALY_MIN_COST &&
+        costRatio >= ANOMALY_MULTIPLIER;
+      const tokenElevated =
+        tokenMedian > 0 &&
+        tokens >= ANOMALY_MIN_TOKENS &&
+        tokenRatio >= ANOMALY_MULTIPLIER;
+      if (!costElevated && !tokenElevated) return null;
+
+      const metric =
+        costElevated && costRatio >= tokenRatio ? "cost" : "tokens";
+      const ratio = metric === "cost" ? costRatio : tokenRatio;
+      const topModel = this.topModelForDay(day, metric);
+      return {
+        date: day.date,
+        metric,
+        ratio,
+        value: metric === "cost" ? fmtUSD(cost) : fmtTokens(tokens),
+        ratioLabel: `${ratio.toFixed(ratio >= 10 ? 0 : 1)}x`,
+        baselineLabel: `${this.activeWindowLabel} median`,
+        driverLabel: topModel
+          ? `${shortModel(topModel.model)} · ${
+              metric === "cost"
+                ? fmtUSD(topModel.value)
+                : fmtTokens(topModel.value)
+            }`
+          : "No model breakdown",
+      };
+    },
+
+    topModelForDay(day, metric) {
+      const rows = Object.entries(day.usageByModel ?? {}).map(
+        ([model, usage]) => {
+          const value =
+            metric === "cost"
+              ? (usage.costUSD ?? 0)
+              : (usage.inputTokens ?? 0) +
+                (usage.outputTokens ?? 0) +
+                (usage.cacheReadTokens ?? 0) +
+                (usage.cacheCreationTokens ?? 0) +
+                (usage.reasoningTokens ?? 0);
+          return { model, value };
+        },
+      );
+      return rows.sort((a, b) => b.value - a.value)[0] ?? null;
     },
 
     buildSummaryDelta(metric, current, previous) {
