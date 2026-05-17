@@ -24,13 +24,13 @@ claude plugins install token-atlas
 3. Select **Add Marketplace** → enter `FunnyQ/cc-plugins`
 4. Select **Install Plugin** → choose `token-atlas`
 
-After installation, run the prerequisite check inside Claude Code:
+The skill runs a prerequisite check automatically before launching the dashboard, so there's no manual setup step. If something's missing, the hint will be surfaced — the most common case is `stats-cache.json` not yet existing; just run `/stats` once in Claude Code to seed it.
+
+If you want to run the precheck yourself:
 
 ```bash
 bun $CLAUDE_PLUGIN_ROOT/skills/dashboard/scripts/install.ts
 ```
-
-This verifies that Bun is available, vendor files are in place, and Claude data sources exist. If `stats-cache.json` is missing, run `/stats` once in Claude Code to seed it.
 
 ## token-atlas
 
