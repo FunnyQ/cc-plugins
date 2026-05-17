@@ -333,6 +333,9 @@ function App() {
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
     themeMode: detectInitialTheme(),
+    loaderVisible: true,
+    loaderFading: false,
+    loadingTitleChars: "Reading local traces".split(""),
 
     async mounted() {
       this.applyTheme(this.themeMode);
@@ -401,6 +404,14 @@ function App() {
         await this.$nextTick();
         this.renderTrend();
         this.renderDonut();
+        if (this.loaderVisible && !this.loaderFading) {
+          this.loaderFading = true;
+          // Match the staggered exit: 400ms blur + 350ms opacity fade = 750ms,
+          // plus a small tail before unmounting.
+          window.setTimeout(() => {
+            this.loaderVisible = false;
+          }, 800);
+        }
       } catch (err) {
         if (quiet) {
           console.warn("Auto refresh failed", err);
