@@ -1,5 +1,12 @@
 #!/usr/bin/env bun
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +32,7 @@ const USER_PRICING_OVERRIDE = join(
   "cc-dashboard",
   "pricing.json",
 );
+const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
 
 // ---------- Types ----------
@@ -40,6 +48,57 @@ type PricingTable = {
   fallback: ModelPrice;
   externalModelPrefixes: string[];
 };
+type PricingSource = "default" | "live" | "override";
+type PricingMeta = {
+  defaultsLoaded: boolean;
+  openRouter: {
+    attempted: boolean;
+    used: boolean;
+    error: string | null;
+  };
+  userOverride: {
+    path: string;
+    loaded: boolean;
+    error: string | null;
+  };
+  models: {
+    priced: number;
+    default: number;
+    fallback: number;
+    fallbackModels: string[];
+  };
+};
+type PricingLoad = {
+  table: PricingTable;
+  meta: PricingMeta;
+  sourceByModel: Record<string, PricingSource>;
+};
+type BudgetConfig = {
+  monthlyBudgetUSD?: number;
+};
+type BudgetMeta = {
+  monthlyBudgetUSD: number | null;
+  source: string;
+  loaded: boolean;
+  error: string | null;
+};
+
+type DataHealthSourceStatus = "ok" | "missing" | "unreadable" | "empty";
+type DataHealthSource = {
+  name: string;
+  path: string;
+  status: DataHealthSourceStatus;
+  modifiedAt: string | null;
+  note: string;
+};
+type DataHealth = {
+  sources: DataHealthSource[];
+  counts: {
+    claudeTranscriptFiles: number;
+    codexSessionFiles: number;
+    codexThreadRows: number;
+  };
+};
 
 type ModelUsage = {
   inputTokens: number;
@@ -52,6 +111,24 @@ type ModelUsage = {
 };
 
 type Provider = "claude" | "codex";
+type LedgerCostBasis = "usage" | "thread_tokens" | "unavailable";
+type LedgerRow = {
+  id: string;
+  provider: Provider;
+  timestampMs: number;
+  date: string;
+  projectPath: string;
+  projectName: string;
+  model: string;
+  interactions: number;
+  toolCalls: number;
+  tokens: number;
+  costUSD: number | null;
+  costBasis: LedgerCostBasis;
+};
+type InternalLedgerRow = Omit<LedgerRow, "costUSD"> & {
+  usageByModel: Map<string, ModelUsage>;
+};
 
 type CodexThreadRow = {
   id: string;
@@ -124,23 +201,43 @@ type TranscriptEntry = {
   timestamp?: string;
   requestId?: string;
   uuid?: string;
+  sessionId?: string;
   type?: string;
   cwd?: string;
+  isMeta?: boolean;
   message?: {
     id?: string;
     model?: string;
     usage?: TranscriptUsage;
+    content?: unknown;
   };
 };
 
 // ---------- Utils ----------
 
 function safeReadJSON<T>(path: string): T | null {
+  const result = readJSONWithError<T>(path);
+  return result.data;
+}
+
+function readJSONWithError<T>(path: string): {
+  exists: boolean;
+  data: T | null;
+  error: string | null;
+} {
   try {
-    if (!existsSync(path)) return null;
-    return JSON.parse(readFileSync(path, "utf-8")) as T;
-  } catch {
-    return null;
+    if (!existsSync(path)) return { exists: false, data: null, error: null };
+    return {
+      exists: true,
+      data: JSON.parse(readFileSync(path, "utf-8")) as T,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      exists: true,
+      data: null,
+      error: err instanceof Error ? err.message : "Unreadable JSON",
+    };
   }
 }
 
@@ -152,18 +249,159 @@ function isExternal(model: string, prefixes: string[]): boolean {
   return !isAnthropicModel(model) || prefixes.some((p) => model.startsWith(p));
 }
 
+function displayPath(path: string): string {
+  return path.replace(HOME, "~");
+}
+
+function sourceHealth(
+  name: string,
+  path: string,
+  note: string,
+): DataHealthSource {
+  try {
+    if (!existsSync(path)) {
+      return {
+        name,
+        path: displayPath(path),
+        status: "missing",
+        modifiedAt: null,
+        note,
+      };
+    }
+    accessSync(path, constants.R_OK);
+    const stat = statSync(path);
+    let status: DataHealthSourceStatus = "ok";
+    if (stat.isFile() && stat.size === 0) status = "empty";
+    if (stat.isDirectory() && readdirSync(path).length === 0) status = "empty";
+    return {
+      name,
+      path: displayPath(path),
+      status,
+      modifiedAt: stat.mtime.toISOString(),
+      note,
+    };
+  } catch (err) {
+    return {
+      name,
+      path: displayPath(path),
+      status: "unreadable",
+      modifiedAt: null,
+      note: err instanceof Error ? err.message : note,
+    };
+  }
+}
+
+function buildDataHealth(counts: DataHealth["counts"]): DataHealth {
+  return {
+    sources: [
+      sourceHealth("Claude stats cache", STATS_CACHE, "required"),
+      sourceHealth("Claude history", HISTORY, "optional activity timeline"),
+      sourceHealth("Claude sessions", SESSIONS_DIR, "optional session records"),
+      sourceHealth(
+        "Claude projects",
+        PROJECTS_DIR,
+        "optional transcript records",
+      ),
+      sourceHealth("Codex state DB", CODEX_STATE_DB, "optional thread index"),
+      sourceHealth(
+        "Codex sessions",
+        CODEX_SESSIONS_DIR,
+        "optional rollout records",
+      ),
+      sourceHealth(
+        "Pricing override",
+        USER_PRICING_OVERRIDE,
+        "optional user pricing",
+      ),
+      sourceHealth("Budget config", USER_BUDGET_CONFIG, "optional budget"),
+    ],
+    counts,
+  };
+}
+
+function loadBudgetConfig(): BudgetMeta {
+  const budget = readJSONWithError<BudgetConfig>(USER_BUDGET_CONFIG);
+  const source = displayPath(USER_BUDGET_CONFIG);
+  if (!budget.exists) {
+    return {
+      monthlyBudgetUSD: null,
+      source,
+      loaded: false,
+      error: null,
+    };
+  }
+  if (budget.error) {
+    return {
+      monthlyBudgetUSD: null,
+      source,
+      loaded: false,
+      error: budget.error,
+    };
+  }
+  const monthlyBudgetUSD = budget.data?.monthlyBudgetUSD;
+  if (
+    typeof monthlyBudgetUSD !== "number" ||
+    !Number.isFinite(monthlyBudgetUSD) ||
+    monthlyBudgetUSD <= 0
+  ) {
+    return {
+      monthlyBudgetUSD: null,
+      source,
+      loaded: false,
+      error: "Expected positive numeric monthlyBudgetUSD",
+    };
+  }
+  return {
+    monthlyBudgetUSD,
+    source,
+    loaded: true,
+    error: null,
+  };
+}
+
 // ---------- Pricing ----------
 
-let pricingCache: Promise<PricingTable> | null = null;
+let pricingCache: Promise<PricingLoad> | null = null;
 
-async function loadPricing(): Promise<PricingTable> {
+function clonePricingTable(table: PricingTable): PricingTable {
+  return {
+    models: { ...table.models },
+    fallback: { ...table.fallback },
+    externalModelPrefixes: [...table.externalModelPrefixes],
+  };
+}
+
+async function loadPricingWithMeta(): Promise<PricingLoad> {
   if (pricingCache) return pricingCache;
   pricingCache = (async () => {
     const defaults = safeReadJSON<PricingTable>(PRICING_DEFAULTS);
     if (!defaults)
       throw new Error(`Missing pricing defaults: ${PRICING_DEFAULTS}`);
+    const table = clonePricingTable(defaults);
+    const sourceByModel: Record<string, PricingSource> = Object.fromEntries(
+      Object.keys(table.models).map((model) => [model, "default" as const]),
+    );
+    const meta: PricingMeta = {
+      defaultsLoaded: true,
+      openRouter: {
+        attempted: true,
+        used: false,
+        error: null,
+      },
+      userOverride: {
+        path: USER_PRICING_OVERRIDE.replace(HOME, "~"),
+        loaded: false,
+        error: null,
+      },
+      models: {
+        priced: 0,
+        default: 0,
+        fallback: 0,
+        fallbackModels: [],
+      },
+    };
 
-    // Try OpenRouter — fail silently
+    // Try OpenRouter. Failures are non-fatal; defaults remain the basis.
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 3000);
     try {
@@ -193,35 +431,96 @@ async function loadPricing(): Promise<PricingTable> {
             ? parseFloat(p.input_cache_write) * 1_000_000
             : input * 1.25;
           if (Number.isFinite(input) && Number.isFinite(output)) {
-            defaults.models[m.id] = { input, output, cacheRead, cacheWrite };
+            table.models[m.id] = { input, output, cacheRead, cacheWrite };
+            sourceByModel[m.id] = "live";
+            meta.openRouter.used = true;
           }
         }
+      } else {
+        meta.openRouter.error = `HTTP ${res.status}`;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      meta.openRouter.error =
+        err instanceof Error ? err.name || err.message : "OpenRouter failed";
     } finally {
       clearTimeout(timer);
     }
 
     // User override last (highest priority)
-    const override = safeReadJSON<{ models?: Record<string, ModelPrice> }>(
+    const override = readJSONWithError<{ models?: Record<string, ModelPrice> }>(
       USER_PRICING_OVERRIDE,
     );
-    if (override?.models) {
-      for (const [k, v] of Object.entries(override.models)) {
-        defaults.models[k] = v;
+    meta.userOverride.error = override.error;
+    meta.userOverride.loaded = override.exists && !override.error;
+    if (override.data?.models) {
+      for (const [k, v] of Object.entries(override.data.models)) {
+        table.models[k] = v;
+        sourceByModel[k] = "override";
       }
     }
 
-    return defaults;
+    return { table, meta, sourceByModel };
   })();
   return pricingCache;
 }
 
+async function loadPricing(): Promise<PricingTable> {
+  return (await loadPricingWithMeta()).table;
+}
+
+function pricingModelAliases(model: string, table: PricingTable): string[] {
+  const raw = rawModelFromKey(model);
+  const aliases = new Set([raw, `openai/${raw}`]);
+  for (const prefix of table.externalModelPrefixes ?? []) {
+    aliases.add(`${prefix}${raw}`);
+  }
+  return [...aliases];
+}
+
 function priceFor(model: string, table: PricingTable): ModelPrice {
-  return (
-    table.models[model] ?? table.models[`openai/${model}`] ?? table.fallback
-  );
+  for (const key of pricingModelAliases(model, table)) {
+    if (table.models[key]) return table.models[key];
+  }
+  return table.fallback;
+}
+
+function pricingSourceForModel(
+  model: string,
+  pricing: PricingLoad,
+): PricingSource | "fallback" {
+  for (const key of pricingModelAliases(model, pricing.table)) {
+    if (pricing.sourceByModel[key]) return pricing.sourceByModel[key];
+  }
+  return "fallback";
+}
+
+function pricingMetaForModels(
+  pricing: PricingLoad,
+  models: string[],
+): PricingMeta {
+  const fallbackModels: string[] = [];
+  let priced = 0;
+  let defaultPriced = 0;
+  for (const model of models) {
+    const source = pricingSourceForModel(model, pricing);
+    if (source === "fallback") {
+      fallbackModels.push(model);
+      continue;
+    }
+    priced += 1;
+    if (source === "default") defaultPriced += 1;
+  }
+  return {
+    ...pricing.meta,
+    openRouter: { ...pricing.meta.openRouter },
+    userOverride: { ...pricing.meta.userOverride },
+    models: {
+      priced,
+      default: defaultPriced,
+      fallback: fallbackModels.length,
+      fallbackModels,
+    },
+  };
 }
 
 function calcCost(
@@ -427,6 +726,43 @@ function modelUsageTotal(usage: ModelUsage): number {
   );
 }
 
+function serializeProjectModelUsage(
+  provider: Provider,
+  byModel: Map<string, ModelUsage> | undefined,
+  pricing: PricingTable,
+) {
+  if (!byModel) return [];
+  return Array.from(byModel.entries())
+    .map(([model, usage]) => {
+      // Claude transcript keys are bare model names; codex keys are already "codex:model" namespaced.
+      const modelName =
+        provider === "claude" ? modelKey("claude", model) : model;
+      const rawModel = provider === "claude" ? model : rawModelFromKey(model);
+      return {
+        model: modelName,
+        provider,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadInputTokens,
+        cacheCreationTokens: usage.cacheCreationInputTokens,
+        reasoningTokens: usage.reasoningOutputTokens ?? 0,
+        costUSD: calcCost(usage, rawModel, pricing),
+        isExternal: isExternal(rawModel, pricing.externalModelPrefixes),
+      };
+    })
+    .filter(
+      (row) =>
+        row.inputTokens +
+          row.outputTokens +
+          row.cacheReadTokens +
+          row.cacheCreationTokens +
+          row.reasoningTokens +
+          row.costUSD >
+        0,
+    )
+    .sort((a, b) => b.costUSD - a.costUSD);
+}
+
 function walkJsonlFiles(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
@@ -446,19 +782,37 @@ function walkJsonlFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+function countClaudeToolCalls(content: unknown): number {
+  if (!Array.isArray(content)) return 0;
+  return content.filter(
+    (part) =>
+      part &&
+      typeof part === "object" &&
+      "type" in part &&
+      part.type === "tool_use",
+  ).length;
+}
+
 function parseTranscriptUsage(): {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
   projectTokens: Map<string, number>;
   projectModelUsage: Map<string, Map<string, ModelUsage>>;
+  ledger: InternalLedgerRow[];
+  transcriptFileCount: number;
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
   const projectTokens = new Map<string, number>();
   const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const ledgerBySession = new Map<
+    string,
+    InternalLedgerRow & { toolCallIds: Set<string> }
+  >();
   const seen = new Set<string>();
+  const transcriptFiles = walkJsonlFiles(PROJECTS_DIR);
 
-  for (const file of walkJsonlFiles(PROJECTS_DIR)) {
+  for (const file of transcriptFiles) {
     let raw = "";
     try {
       raw = readFileSync(file, "utf-8");
@@ -473,6 +827,50 @@ function parseTranscriptUsage(): {
         entry = JSON.parse(line);
       } catch {
         continue;
+      }
+
+      const sessionId = entry.sessionId ?? file.split("/").at(-1) ?? file;
+      const parsedTimestamp = entry.timestamp ? Date.parse(entry.timestamp) : 0;
+      const timestampMs = Number.isFinite(parsedTimestamp)
+        ? parsedTimestamp
+        : 0;
+      const projectPath = entry.cwd ?? "";
+      const existingLedger = ledgerBySession.get(sessionId);
+      const ledger =
+        existingLedger ??
+        ({
+          id: `claude:${sessionId}`,
+          provider: "claude",
+          timestampMs,
+          date: timestampMs ? fmtDate(timestampMs) : "",
+          projectPath,
+          projectName: projectPath ? projectName(projectPath) : "n/a",
+          model: "n/a",
+          interactions: 0,
+          toolCalls: 0,
+          tokens: 0,
+          costBasis: "unavailable",
+          usageByModel: new Map<string, ModelUsage>(),
+          toolCallIds: new Set<string>(),
+        } satisfies InternalLedgerRow & { toolCallIds: Set<string> });
+      if (!existingLedger) ledgerBySession.set(sessionId, ledger);
+      if (timestampMs && timestampMs > ledger.timestampMs) {
+        ledger.timestampMs = timestampMs;
+        ledger.date = fmtDate(timestampMs);
+      }
+      if (!ledger.projectPath && projectPath) {
+        ledger.projectPath = projectPath;
+        ledger.projectName = projectName(projectPath);
+      }
+      if (entry.type === "user" && !entry.isMeta) ledger.interactions += 1;
+      const contentToolCalls = countClaudeToolCalls(entry.message?.content);
+      if (contentToolCalls > 0) {
+        const toolKey =
+          entry.message?.id ?? entry.uuid ?? `${file}:${timestampMs}`;
+        if (!ledger.toolCallIds.has(toolKey)) {
+          ledger.toolCallIds.add(toolKey);
+          ledger.toolCalls += contentToolCalls;
+        }
       }
 
       const model = entry.message?.model;
@@ -491,6 +889,14 @@ function parseTranscriptUsage(): {
       seen.add(key);
 
       const tokenTotal = usageTokenTotal(usage);
+      const ledgerUsage = ledger.usageByModel.get(model) ?? emptyModelUsage();
+      addUsage(ledgerUsage, usage);
+      ledger.usageByModel.set(model, ledgerUsage);
+      ledger.tokens += tokenTotal;
+      ledger.costBasis = "usage";
+      ledger.model =
+        ledger.usageByModel.size === 1 ? modelKey("claude", model) : "mixed";
+
       modelUsage[model] ??= emptyModelUsage();
       addUsage(modelUsage[model], usage);
 
@@ -522,7 +928,20 @@ function parseTranscriptUsage(): {
     }
   }
 
-  return { modelUsage, dailyModelUsage, projectTokens, projectModelUsage };
+  return {
+    modelUsage,
+    dailyModelUsage,
+    projectTokens,
+    projectModelUsage,
+    ledger: Array.from(ledgerBySession.values())
+      .map(({ toolCallIds: _toolCallIds, ...row }) => row)
+      .filter(
+        (row) =>
+          row.timestampMs > 0 &&
+          (row.interactions > 0 || row.tokens > 0 || row.toolCalls > 0),
+      ),
+    transcriptFileCount: transcriptFiles.length,
+  };
 }
 
 function readCodexSession(file: string): CodexSessionSummary | null {
@@ -658,6 +1077,9 @@ function parseCodexUsage(): {
   totalThreads: number;
   totalInteractions: number;
   totalToolCalls: number;
+  ledger: InternalLedgerRow[];
+  codexSessionFileCount: number;
+  codexThreadRowCount: number;
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
@@ -680,6 +1102,7 @@ function parseCodexUsage(): {
   >();
   const hourCounts: Record<string, number> = {};
   const dailyHourCounts = new Map<string, number[]>();
+  const ledger: InternalLedgerRow[] = [];
   const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0),
   );
@@ -703,9 +1126,10 @@ function parseCodexUsage(): {
   }
 
   const rowByRollout = new Map(rows.map((row) => [row.rollout_path, row]));
+  const codexSessionFiles = walkJsonlFiles(CODEX_SESSIONS_DIR);
   const sessionFiles = new Set([
     ...rows.map((row) => row.rollout_path).filter(Boolean),
-    ...walkJsonlFiles(CODEX_SESSIONS_DIR),
+    ...codexSessionFiles,
   ]);
   let totalInteractions = 0;
   let totalToolCalls = 0;
@@ -790,6 +1214,48 @@ function parseCodexUsage(): {
     const hourBuckets = dailyHourCounts.get(date) ?? new Array(24).fill(0);
     hourBuckets[d.getHours()] += interactionCount;
     dailyHourCounts.set(date, hourBuckets);
+
+    ledger.push({
+      id: `codex:${row?.id ?? session?.id ?? file}`,
+      provider: "codex",
+      timestampMs: updatedMs || createdMs,
+      date: fmtDate(updatedMs || createdMs),
+      projectPath: cwd,
+      projectName: cwd ? projectName(cwd) : "n/a",
+      model: modelKey("codex", model),
+      interactions: interactionCount,
+      toolCalls: toolCallCount,
+      tokens: tokenTotal,
+      costBasis: session?.tokenUsage
+        ? "usage"
+        : row?.tokens_used
+          ? "thread_tokens"
+          : "unavailable",
+      usageByModel: new Map([[key, usage]]),
+    });
+  }
+
+  for (const row of rows) {
+    if (row.rollout_path) continue;
+    const model = row.model || "unknown";
+    const key = modelKey("codex", model);
+    const usage = codexUsageFromThread({ tokens_used: row.tokens_used }, null);
+    const timestampMs = (row.updated_at || row.created_at) * 1000;
+    if (!timestampMs) continue;
+    ledger.push({
+      id: `codex:${row.id}`,
+      provider: "codex",
+      timestampMs,
+      date: fmtDate(timestampMs),
+      projectPath: row.cwd,
+      projectName: row.cwd ? projectName(row.cwd) : "n/a",
+      model: key,
+      interactions: 1,
+      toolCalls: 0,
+      tokens: row.tokens_used,
+      costBasis: row.tokens_used ? "thread_tokens" : "unavailable",
+      usageByModel: new Map([[key, usage]]),
+    });
   }
 
   return {
@@ -805,6 +1271,9 @@ function parseCodexUsage(): {
     totalThreads: sessionFiles.size,
     totalInteractions,
     totalToolCalls,
+    ledger,
+    codexSessionFileCount: codexSessionFiles.length,
+    codexThreadRowCount: rows.length,
   };
 }
 
@@ -827,6 +1296,37 @@ function projectName(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
+function serializeLedgerRows(
+  rows: InternalLedgerRow[],
+  pricing: PricingTable,
+): LedgerRow[] {
+  return rows
+    .map((row) => {
+      let costUSD: number | null = null;
+      if (row.usageByModel.size > 0 && row.costBasis !== "unavailable") {
+        costUSD = 0;
+        for (const [model, usage] of row.usageByModel.entries()) {
+          costUSD += calcCost(usage, rawModelFromKey(model), pricing);
+        }
+      }
+      return {
+        id: row.id,
+        provider: row.provider,
+        timestampMs: row.timestampMs,
+        date: row.date,
+        projectPath: row.projectPath,
+        projectName: row.projectName,
+        model: row.model,
+        interactions: row.interactions,
+        toolCalls: row.toolCalls,
+        tokens: row.tokens,
+        costUSD,
+        costBasis: row.costBasis,
+      };
+    })
+    .sort((a, b) => b.timestampMs - a.timestampMs);
+}
+
 export async function buildStats() {
   const cache = parseStatsCache();
   const {
@@ -836,9 +1336,16 @@ export async function buildStats() {
     dailyHourCounts: historyDailyHourCounts,
   } = parseHistory();
   const sessions = parseSessions();
-  const pricing = await loadPricing();
+  const pricingLoad = await loadPricingWithMeta();
+  const pricing = pricingLoad.table;
+  const budget = loadBudgetConfig();
   const transcriptUsage = parseTranscriptUsage();
   const codexUsage = parseCodexUsage();
+  const dataHealth = buildDataHealth({
+    claudeTranscriptFiles: transcriptUsage.transcriptFileCount,
+    codexSessionFiles: codexUsage.codexSessionFileCount,
+    codexThreadRows: codexUsage.codexThreadRowCount,
+  });
 
   const claudeModelUsage =
     Object.keys(transcriptUsage.modelUsage).length > 0
@@ -1086,6 +1593,18 @@ export async function buildStats() {
     .map((path) => {
       const claude = byProject.get(path);
       const codex = codexUsage.projectActivity.get(path);
+      const models = [
+        ...serializeProjectModelUsage(
+          "claude",
+          transcriptUsage.projectModelUsage.get(path),
+          pricing,
+        ),
+        ...serializeProjectModelUsage(
+          "codex",
+          codexUsage.projectModelUsage.get(path),
+          pricing,
+        ),
+      ].sort((a, b) => b.costUSD - a.costUSD);
       const firstSeen = Math.min(
         claude?.firstSeen ?? Number.POSITIVE_INFINITY,
         codex?.firstSeen ?? Number.POSITIVE_INFINITY,
@@ -1108,6 +1627,7 @@ export async function buildStats() {
         claudeCostUSD: claudeProjectCost.get(path) ?? 0,
         codexCostUSD: codexProjectCost.get(path) ?? 0,
         costUSD: projectCost.get(path) ?? 0,
+        models,
         firstSeen: Number.isFinite(firstSeen) ? fmtDate(firstSeen) : "",
         lastSeen: fmtDate(lastSeen),
         lastSeenMs: lastSeen,
@@ -1161,6 +1681,10 @@ export async function buildStats() {
 
   const periodFrom = daily[0]?.date ?? "";
   const periodTo = daily[daily.length - 1]?.date ?? "";
+  const ledger = serializeLedgerRows(
+    [...transcriptUsage.ledger, ...codexUsage.ledger],
+    pricing,
+  );
 
   return {
     period: { from: periodFrom, to: periodTo },
@@ -1188,7 +1712,14 @@ export async function buildStats() {
       },
     },
     byModel: byModel.sort((a, b) => b.costUSD - a.costUSD),
+    pricingMeta: pricingMetaForModels(
+      pricingLoad,
+      byModel.map((m) => m.model),
+    ),
+    budget,
+    dataHealth,
     daily,
+    ledger,
     activityDays: Array.from(activityByDate.entries())
       .map(([date, activity]) => ({
         date,
