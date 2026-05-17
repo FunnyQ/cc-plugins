@@ -40,6 +40,31 @@ type PricingTable = {
   fallback: ModelPrice;
   externalModelPrefixes: string[];
 };
+type PricingSource = "default" | "live" | "override";
+type PricingMeta = {
+  defaultsLoaded: boolean;
+  openRouter: {
+    attempted: boolean;
+    used: boolean;
+    error: string | null;
+  };
+  userOverride: {
+    path: string;
+    loaded: boolean;
+    error: string | null;
+  };
+  models: {
+    priced: number;
+    default: number;
+    fallback: number;
+    fallbackModels: string[];
+  };
+};
+type PricingLoad = {
+  table: PricingTable;
+  meta: PricingMeta;
+  sourceByModel: Record<string, PricingSource>;
+};
 
 type ModelUsage = {
   inputTokens: number;
@@ -136,11 +161,28 @@ type TranscriptEntry = {
 // ---------- Utils ----------
 
 function safeReadJSON<T>(path: string): T | null {
+  const result = readJSONWithError<T>(path);
+  return result.data;
+}
+
+function readJSONWithError<T>(path: string): {
+  exists: boolean;
+  data: T | null;
+  error: string | null;
+} {
   try {
-    if (!existsSync(path)) return null;
-    return JSON.parse(readFileSync(path, "utf-8")) as T;
-  } catch {
-    return null;
+    if (!existsSync(path)) return { exists: false, data: null, error: null };
+    return {
+      exists: true,
+      data: JSON.parse(readFileSync(path, "utf-8")) as T,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      exists: true,
+      data: null,
+      error: err instanceof Error ? err.message : "Unreadable JSON",
+    };
   }
 }
 
@@ -154,16 +196,47 @@ function isExternal(model: string, prefixes: string[]): boolean {
 
 // ---------- Pricing ----------
 
-let pricingCache: Promise<PricingTable> | null = null;
+let pricingCache: Promise<PricingLoad> | null = null;
 
-async function loadPricing(): Promise<PricingTable> {
+function clonePricingTable(table: PricingTable): PricingTable {
+  return {
+    models: { ...table.models },
+    fallback: { ...table.fallback },
+    externalModelPrefixes: [...table.externalModelPrefixes],
+  };
+}
+
+async function loadPricingWithMeta(): Promise<PricingLoad> {
   if (pricingCache) return pricingCache;
   pricingCache = (async () => {
     const defaults = safeReadJSON<PricingTable>(PRICING_DEFAULTS);
     if (!defaults)
       throw new Error(`Missing pricing defaults: ${PRICING_DEFAULTS}`);
+    const table = clonePricingTable(defaults);
+    const sourceByModel: Record<string, PricingSource> = Object.fromEntries(
+      Object.keys(table.models).map((model) => [model, "default" as const]),
+    );
+    const meta: PricingMeta = {
+      defaultsLoaded: true,
+      openRouter: {
+        attempted: true,
+        used: false,
+        error: null,
+      },
+      userOverride: {
+        path: USER_PRICING_OVERRIDE.replace(HOME, "~"),
+        loaded: false,
+        error: null,
+      },
+      models: {
+        priced: 0,
+        default: 0,
+        fallback: 0,
+        fallbackModels: [],
+      },
+    };
 
-    // Try OpenRouter — fail silently
+    // Try OpenRouter. Failures are non-fatal; defaults remain the basis.
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 3000);
     try {
@@ -193,35 +266,87 @@ async function loadPricing(): Promise<PricingTable> {
             ? parseFloat(p.input_cache_write) * 1_000_000
             : input * 1.25;
           if (Number.isFinite(input) && Number.isFinite(output)) {
-            defaults.models[m.id] = { input, output, cacheRead, cacheWrite };
+            table.models[m.id] = { input, output, cacheRead, cacheWrite };
+            sourceByModel[m.id] = "live";
+            meta.openRouter.used = true;
           }
         }
+      } else {
+        meta.openRouter.error = `HTTP ${res.status}`;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      meta.openRouter.error =
+        err instanceof Error ? err.name || err.message : "OpenRouter failed";
     } finally {
       clearTimeout(timer);
     }
 
     // User override last (highest priority)
-    const override = safeReadJSON<{ models?: Record<string, ModelPrice> }>(
+    const override = readJSONWithError<{ models?: Record<string, ModelPrice> }>(
       USER_PRICING_OVERRIDE,
     );
-    if (override?.models) {
-      for (const [k, v] of Object.entries(override.models)) {
-        defaults.models[k] = v;
+    meta.userOverride.error = override.error;
+    meta.userOverride.loaded = override.exists && !override.error;
+    if (override.data?.models) {
+      for (const [k, v] of Object.entries(override.data.models)) {
+        table.models[k] = v;
+        sourceByModel[k] = "override";
       }
     }
 
-    return defaults;
+    return { table, meta, sourceByModel };
   })();
   return pricingCache;
+}
+
+async function loadPricing(): Promise<PricingTable> {
+  return (await loadPricingWithMeta()).table;
 }
 
 function priceFor(model: string, table: PricingTable): ModelPrice {
   return (
     table.models[model] ?? table.models[`openai/${model}`] ?? table.fallback
   );
+}
+
+function pricingSourceForModel(
+  model: string,
+  pricing: PricingLoad,
+): PricingSource | "fallback" {
+  const raw = rawModelFromKey(model);
+  if (pricing.sourceByModel[raw]) return pricing.sourceByModel[raw];
+  const openAIKey = `openai/${raw}`;
+  if (pricing.sourceByModel[openAIKey]) return pricing.sourceByModel[openAIKey];
+  return "fallback";
+}
+
+function pricingMetaForModels(
+  pricing: PricingLoad,
+  models: string[],
+): PricingMeta {
+  const fallbackModels: string[] = [];
+  let priced = 0;
+  let defaultPriced = 0;
+  for (const model of models) {
+    const source = pricingSourceForModel(model, pricing);
+    if (source === "fallback") {
+      fallbackModels.push(model);
+      continue;
+    }
+    priced += 1;
+    if (source === "default") defaultPriced += 1;
+  }
+  return {
+    ...pricing.meta,
+    openRouter: { ...pricing.meta.openRouter },
+    userOverride: { ...pricing.meta.userOverride },
+    models: {
+      priced,
+      default: defaultPriced,
+      fallback: fallbackModels.length,
+      fallbackModels,
+    },
+  };
 }
 
 function calcCost(
@@ -836,7 +961,8 @@ export async function buildStats() {
     dailyHourCounts: historyDailyHourCounts,
   } = parseHistory();
   const sessions = parseSessions();
-  const pricing = await loadPricing();
+  const pricingLoad = await loadPricingWithMeta();
+  const pricing = pricingLoad.table;
   const transcriptUsage = parseTranscriptUsage();
   const codexUsage = parseCodexUsage();
 
@@ -1188,6 +1314,10 @@ export async function buildStats() {
       },
     },
     byModel: byModel.sort((a, b) => b.costUSD - a.costUSD),
+    pricingMeta: pricingMetaForModels(
+      pricingLoad,
+      byModel.map((m) => m.model),
+    ),
     daily,
     activityDays: Array.from(activityByDate.entries())
       .map(([date, activity]) => ({

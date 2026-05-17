@@ -156,22 +156,71 @@ const MONTHS = [
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
 const AUTO_REFRESH_MS = 60_000;
+const PREFS_STORAGE_KEY = "token-atlas:prefs:v1";
+const ALLOWED_PREFS = {
+  providerKey: ["all", "claude", "codex"],
+  rangeKey: ["7", "30", "90", "all"],
+  trendMode: ["tokens", "cost"],
+  trendModelScope: ["all", "top5"],
+  topProjectMode: ["tokens", "cost"],
+};
+
+function loadStoredPrefs() {
+  try {
+    const raw = window.localStorage?.getItem(PREFS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredPrefs(prefs) {
+  try {
+    window.localStorage?.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // Preferences are optional; keep the dashboard usable when storage is blocked.
+  }
+}
+
+function normalizePrefs(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const prefs = {};
+  for (const [key, allowed] of Object.entries(ALLOWED_PREFS)) {
+    if (allowed.includes(raw[key])) prefs[key] = raw[key];
+  }
+  if (
+    raw.selectedModels &&
+    typeof raw.selectedModels === "object" &&
+    !Array.isArray(raw.selectedModels)
+  ) {
+    const selectedModels = {};
+    for (const [model, selected] of Object.entries(raw.selectedModels)) {
+      if (typeof model === "string" && typeof selected === "boolean") {
+        selectedModels[model] = selected;
+      }
+    }
+    prefs.selectedModels = selectedModels;
+  }
+  return prefs;
+}
 
 // ---------- App ----------
 
 function App() {
+  const initialPrefs = normalizePrefs(loadStoredPrefs());
+
   return {
     stats: null,
     loading: false,
     refreshInFlight: false,
     refreshTimer: null,
     error: null,
-    rangeKey: "7",
-    providerKey: "all",
-    trendMode: "tokens",
-    trendModelScope: "all",
-    topProjectMode: "tokens",
-    selectedModels: {},
+    rangeKey: initialPrefs.rangeKey ?? "7",
+    providerKey: initialPrefs.providerKey ?? "all",
+    trendMode: initialPrefs.trendMode ?? "tokens",
+    trendModelScope: initialPrefs.trendModelScope ?? "all",
+    topProjectMode: initialPrefs.topProjectMode ?? "tokens",
+    selectedModels: initialPrefs.selectedModels ?? {},
 
     async mounted() {
       this.loading = true;
@@ -207,9 +256,8 @@ function App() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         this.stats = data;
-        for (const m of this.allModels) {
-          if (!(m in this.selectedModels)) this.selectedModels[m] = true;
-        }
+        this.reconcileSelectedModels();
+        this.savePrefs();
         await this.$nextTick();
         this.renderTrend();
         this.renderDonut();
@@ -227,6 +275,7 @@ function App() {
 
     onRangeChange() {
       // Overview, trend, distribution, and per-model table are windowed.
+      this.savePrefs();
       this.$nextTick(() => {
         this.renderTrend();
         this.renderDonut();
@@ -235,12 +284,8 @@ function App() {
 
     onProviderChange(provider) {
       this.providerKey = provider;
-      for (const m of this.allModels) {
-        if (!(m in this.selectedModels)) this.selectedModels[m] = true;
-      }
-      if (!this.allModels.some((m) => this.selectedModels[m])) {
-        for (const m of this.allModels) this.selectedModels[m] = true;
-      }
+      this.reconcileSelectedModels();
+      this.savePrefs();
       this.$nextTick(() => {
         this.renderTrend();
         this.renderDonut();
@@ -249,16 +294,24 @@ function App() {
 
     onTrendModeChange(mode) {
       this.trendMode = mode;
+      this.savePrefs();
       this.$nextTick(() => this.renderTrend());
     },
 
     onTrendModelScopeChange(scope) {
       this.trendModelScope = scope;
+      this.savePrefs();
       this.$nextTick(() => this.renderTrend());
     },
 
     onTopProjectModeChange(mode) {
       this.topProjectMode = mode;
+      this.savePrefs();
+    },
+
+    onSelectedModelsChange() {
+      this.savePrefs();
+      this.renderTrend();
     },
 
     // ---------- Computed ----------
@@ -289,7 +342,54 @@ function App() {
     },
 
     get filtered() {
-      const daily = this.filteredDaily;
+      return { summary: this.summarizeDaily(this.filteredDaily) };
+    },
+
+    get comparisonDaily() {
+      if (!this.stats || this.rangeKey === "all") return [];
+      const days = parseInt(this.rangeKey, 10);
+      if (!Number.isFinite(days) || days <= 0) return [];
+      const providerFiltered = this.stats.daily.map((d) =>
+        this.filterDayByProvider(d),
+      );
+      const currentStart = Math.max(0, providerFiltered.length - days);
+      const previousStart = Math.max(0, currentStart - days);
+      return providerFiltered.slice(previousStart, currentStart);
+    },
+
+    get comparisonSummary() {
+      return this.summarizeDaily(this.comparisonDaily);
+    },
+
+    get summaryDeltas() {
+      const current = this.filtered.summary;
+      const previous = this.comparisonSummary;
+      return {
+        cost: this.buildSummaryDelta("cost", current.cost, previous.cost),
+        tokens: this.buildSummaryDelta(
+          "tokens",
+          current.tokens,
+          previous.tokens,
+        ),
+        messages: this.buildSummaryDelta(
+          "messages",
+          current.messages,
+          previous.messages,
+        ),
+        sessions: this.buildSummaryDelta(
+          "sessions",
+          current.sessions,
+          previous.sessions,
+        ),
+        toolCalls: this.buildSummaryDelta(
+          "toolCalls",
+          current.toolCalls,
+          previous.toolCalls,
+        ),
+      };
+    },
+
+    summarizeDaily(daily) {
       let messages = 0,
         sessions = 0,
         toolCalls = 0,
@@ -312,7 +412,7 @@ function App() {
             (tokens / dailyTotal) * (this.stats.summary.estimatedCostUSD || 0);
         }
       }
-      return { summary: { messages, sessions, toolCalls, tokens, cost } };
+      return { messages, sessions, toolCalls, tokens, cost };
     },
 
     get filteredByModel() {
@@ -482,6 +582,24 @@ function App() {
       return this.formatDateRange(first, last);
     },
 
+    get pricingMeta() {
+      return this.stats?.pricingMeta ?? null;
+    },
+
+    get pricingBasisLabel() {
+      const meta = this.pricingMeta;
+      if (!meta) return "estimate basis unavailable";
+      const basis = meta.openRouter?.used ? "live + defaults" : "defaults only";
+      return meta.userOverride?.loaded ? `${basis} + override` : basis;
+    },
+
+    get fallbackPricingModels() {
+      return (this.pricingMeta?.models?.fallbackModels ?? []).map((model) => ({
+        model,
+        label: shortModel(model),
+      }));
+    },
+
     get heatmapCells() {
       if (!this.stats) return [];
       let matrix;
@@ -600,6 +718,52 @@ function App() {
     providerBadgeClass,
     dayLabel: (i) => DAYS[i],
 
+    loadPrefs() {
+      return normalizePrefs(loadStoredPrefs());
+    },
+
+    savePrefs() {
+      saveStoredPrefs({
+        providerKey: this.providerKey,
+        rangeKey: this.rangeKey,
+        trendMode: this.trendMode,
+        trendModelScope: this.trendModelScope,
+        topProjectMode: this.topProjectMode,
+        selectedModels: this.selectedModels,
+      });
+    },
+
+    normalizePrefs(raw) {
+      return normalizePrefs(raw);
+    },
+
+    reconcileSelectedModels() {
+      const available = this.availableModelKeys();
+      const next = {};
+      for (const model of available) {
+        next[model] = Object.prototype.hasOwnProperty.call(
+          this.selectedModels,
+          model,
+        )
+          ? this.selectedModels[model] === true
+          : true;
+      }
+      this.selectedModels = next;
+    },
+
+    availableModelKeys() {
+      if (!this.stats) return [];
+      const set = new Set();
+      for (const d of this.stats.daily ?? []) {
+        for (const m of Object.keys(d.tokensByModel ?? {})) set.add(m);
+        for (const m of Object.keys(d.usageByModel ?? {})) set.add(m);
+      }
+      for (const m of this.stats.byModel ?? []) {
+        if (m.model) set.add(m.model);
+      }
+      return [...set].sort();
+    },
+
     modelTokenTotal(model) {
       return (
         (model.inputTokens ?? 0) +
@@ -608,6 +772,68 @@ function App() {
         (model.cacheCreationTokens ?? 0) +
         (model.reasoningTokens ?? 0)
       );
+    },
+
+    buildSummaryDelta(metric, current, previous) {
+      if (this.rangeKey === "all") {
+        return {
+          available: false,
+          state: "unavailable",
+          label: "No comparison for all time",
+        };
+      }
+      if (!this.comparisonDaily.length) {
+        return {
+          available: false,
+          state: "unavailable",
+          label: "No previous window",
+        };
+      }
+
+      const delta = current - previous;
+      const windowLabel = `previous ${this.rangeKey}d`;
+      if (previous === 0) {
+        return {
+          available: true,
+          state: current === 0 ? "neutral" : "increase",
+          label:
+            current === 0
+              ? `no change vs ${windowLabel}`
+              : `new activity vs ${windowLabel}`,
+        };
+      }
+
+      const pct = (delta / previous) * 100;
+      const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
+      const formattedDelta = this.formatDeltaValue(metric, Math.abs(delta));
+      const formattedPct = `${sign}${pct.toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%`;
+      return {
+        available: true,
+        state: delta > 0 ? "increase" : delta < 0 ? "decrease" : "neutral",
+        label:
+          delta === 0
+            ? `no change vs ${windowLabel}`
+            : `${sign}${formattedDelta} (${formattedPct}) vs ${windowLabel}`,
+      };
+    },
+
+    formatDeltaValue(metric, value) {
+      if (metric === "cost") return fmtUSD(value);
+      if (metric === "tokens") return fmtTokens(value);
+      return fmtNum(Math.round(value));
+    },
+
+    deltaClass(metric) {
+      return {
+        "card-delta": true,
+        "card-delta--increase":
+          this.summaryDeltas[metric]?.state === "increase",
+        "card-delta--decrease":
+          this.summaryDeltas[metric]?.state === "decrease",
+        "card-delta--neutral": this.summaryDeltas[metric]?.state === "neutral",
+        "card-delta--unavailable":
+          this.summaryDeltas[metric]?.state === "unavailable",
+      };
     },
 
     filterDayByProvider(day) {

@@ -397,10 +397,48 @@ select:hover,
   line-height: 1.35;
 }
 
+.card-delta {
+  width: fit-content;
+  margin-top: 8px;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+  color: var(--text-muted);
+  background: color-mix(in oklch, var(--surface-2) 76%, transparent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.card-delta--increase {
+  border-color: color-mix(in oklch, var(--warn) 24%, var(--edge-soft));
+  color: color-mix(in oklch, var(--warn) 58%, var(--text-muted));
+}
+
+.card-delta--decrease {
+  border-color: color-mix(in oklch, var(--cyan) 22%, var(--edge-soft));
+  color: color-mix(in oklch, var(--cyan) 54%, var(--text-muted));
+}
+
+.card-delta--neutral {
+  color: var(--text-faint);
+}
+
+.card-delta--unavailable {
+  border-color: var(--edge-soft);
+  color: var(--text-faint);
+  background: transparent;
+}
+
+.card-delta--secondary {
+  margin-top: 5px;
+  opacity: 0.82;
+}
+
 .metric-type-ledger .card {
   display: grid;
   align-content: space-between;
-  min-height: 136px;
+  min-height: 158px;
 }
 
 .metric-type-ledger .card-label {
@@ -552,6 +590,115 @@ select:hover,
 .cost-ledger-panel .table .cost {
   color: var(--accent-strong);
   font-size: 15px;
+}
+
+.pricing-confidence {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border-top: 1px solid color-mix(in oklch, var(--accent) 8%, var(--edge-soft));
+  padding-top: 13px;
+}
+
+.pricing-confidence-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.pricing-confidence h3 {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.pricing-confidence-state {
+  display: inline-grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px solid color-mix(in oklch, var(--green) 18%, var(--edge));
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--green) 10%, var(--bg-rail));
+  color: color-mix(in oklch, var(--green) 54%, var(--text));
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+  padding: 0 9px;
+  text-transform: uppercase;
+}
+
+.pricing-confidence-state--warn {
+  border-color: color-mix(in oklch, var(--warn) 24%, var(--edge));
+  background: color-mix(in oklch, var(--warn) 10%, var(--bg-rail));
+  color: color-mix(in oklch, var(--warn) 58%, var(--text));
+}
+
+.pricing-confidence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.pricing-confidence-grid > div {
+  min-width: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
+  padding: 9px 10px;
+}
+
+.pricing-confidence-grid dt {
+  margin: 0 0 4px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pricing-confidence-grid dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+}
+
+.pricing-confidence-warning {
+  border: 1px solid color-mix(in oklch, var(--warn) 22%, var(--edge-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
+  color: color-mix(in oklch, var(--warn) 52%, var(--text));
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px 10px;
+}
+
+.pricing-confidence-fallbacks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.pricing-confidence-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  max-width: 100%;
+  border: 1px solid color-mix(in oklch, var(--warn) 18%, var(--edge-soft));
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  overflow: hidden;
+  padding: 0 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-cell {
@@ -1324,6 +1471,11 @@ select:hover,
 
   .cost-ledger-peak {
     justify-items: start;
+  }
+
+  .pricing-confidence-head,
+  .pricing-confidence-grid {
+    grid-template-columns: 1fr;
   }
 
   .card {
