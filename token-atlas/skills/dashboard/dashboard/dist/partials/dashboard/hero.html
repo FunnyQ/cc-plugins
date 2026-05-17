@@ -1,0 +1,126 @@
+      <header class="hero-band">
+        <svg
+          class="hero-wave"
+          viewBox="0 0 1600 480"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M0,200 C260,120 480,320 800,220 C1120,140 1340,300 1600,240 L1600,480 L0,480 Z"
+            fill="var(--sunrise-violet)"
+            opacity="0.38"
+          />
+          <path
+            d="M0,280 C220,200 460,360 760,280 C1060,200 1300,360 1600,320 L1600,480 L0,480 Z"
+            fill="var(--sunrise-coral)"
+            opacity="0.42"
+          />
+          <path
+            d="M0,360 C260,300 500,400 800,340 C1100,280 1320,400 1600,380 L1600,480 L0,480 Z"
+            fill="var(--sunrise-amber)"
+            opacity="0.46"
+          />
+        </svg>
+        <div class="hero-band-inner">
+          <div class="topbar">
+            <div class="brand">
+              <span class="logo" aria-hidden="true">
+                <img src="/assets/token-atlas-logo.png" alt="" />
+              </span>
+              <h1>Token Atlas</h1>
+            </div>
+            <div class="controls">
+              <div
+                class="segmented-control provider-switch"
+                aria-label="Usage source"
+              >
+                <button
+                  type="button"
+                  :class="{ active: providerKey === 'all' }"
+                  :aria-pressed="providerKey === 'all'"
+                  @click="onProviderChange('all')"
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: providerKey === 'claude' }"
+                  :aria-pressed="providerKey === 'claude'"
+                  @click="onProviderChange('claude')"
+                >
+                  Claude
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: providerKey === 'codex' }"
+                  :aria-pressed="providerKey === 'codex'"
+                  @click="onProviderChange('codex')"
+                >
+                  Codex
+                </button>
+              </div>
+              <select
+                v-model="rangeKey"
+                @change="onRangeChange"
+                aria-label="Usage range"
+              >
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="all">All time</option>
+              </select>
+              <button
+                class="btn theme-toggle"
+                @click="toggleTheme"
+                :aria-label="themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+                :title="themeMode === 'dark' ? 'Dawn' : 'Dusk'"
+              >
+                <span aria-hidden="true"
+                  >{{ themeMode === 'dark' ? '☼' : '☾' }}</span
+                >
+              </button>
+              <button
+                class="btn"
+                @click="refresh"
+                :disabled="loading || refreshInFlight"
+                aria-label="Refresh dashboard data"
+              >
+                <span v-if="loading">Loading…</span>
+                <span v-else-if="refreshInFlight">Updating…</span>
+                <span v-else>↻ Refresh</span>
+              </button>
+              <details class="export-menu">
+                <summary class="btn export-menu-trigger">Export</summary>
+                <div class="export-menu-panel" aria-label="Export current view">
+                  <button type="button" @click="exportCurrentViewJSON">
+                    Current view JSON
+                  </button>
+                  <button type="button" @click="exportModelsCSV">
+                    Models CSV
+                  </button>
+                  <button type="button" @click="exportProjectsCSV">
+                    Projects CSV
+                  </button>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div v-if="stats" class="hero-metric">
+            <div class="hero-metric-label">
+              Estimated cost · {{ activeWindowLabel }}
+            </div>
+            <div class="hero-metric-value">
+              ${{ filtered.summary.cost.toFixed(2) }}
+            </div>
+            <div
+              v-if="summaryDeltas.cost.pctLabel"
+              class="hero-metric-delta"
+              :class="deltaClass('cost')"
+            >
+              <strong>{{ summaryDeltas.cost.pctLabel }}</strong>
+              <span>{{ summaryDeltas.cost.contextLabel }}</span>
+            </div>
+          </div>
+        </div>
+      </header>
+

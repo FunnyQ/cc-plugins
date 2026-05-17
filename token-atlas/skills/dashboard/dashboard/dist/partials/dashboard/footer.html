@@ -1,0 +1,6 @@
+        <footer class="footer">
+          Generated {{ new Date(stats.meta.generatedAt).toLocaleString() }} ·
+          cache v{{ stats.meta.cacheVersion }} · first session {{
+          stats.insights.firstSessionDate ?
+          stats.insights.firstSessionDate.slice(0, 10) : 'n/a' }}
+        </footer>
