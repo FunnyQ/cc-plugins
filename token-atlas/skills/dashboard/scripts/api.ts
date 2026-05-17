@@ -111,6 +111,24 @@ type ModelUsage = {
 };
 
 type Provider = "claude" | "codex";
+type LedgerCostBasis = "usage" | "thread_tokens" | "unavailable";
+type LedgerRow = {
+  id: string;
+  provider: Provider;
+  timestampMs: number;
+  date: string;
+  projectPath: string;
+  projectName: string;
+  model: string;
+  interactions: number;
+  toolCalls: number;
+  tokens: number;
+  costUSD: number | null;
+  costBasis: LedgerCostBasis;
+};
+type InternalLedgerRow = Omit<LedgerRow, "costUSD"> & {
+  usageByModel: Map<string, ModelUsage>;
+};
 
 type CodexThreadRow = {
   id: string;
@@ -183,12 +201,15 @@ type TranscriptEntry = {
   timestamp?: string;
   requestId?: string;
   uuid?: string;
+  sessionId?: string;
   type?: string;
   cwd?: string;
+  isMeta?: boolean;
   message?: {
     id?: string;
     model?: string;
     usage?: TranscriptUsage;
+    content?: unknown;
   };
 };
 
@@ -751,17 +772,33 @@ function walkJsonlFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+function countClaudeToolCalls(content: unknown): number {
+  if (!Array.isArray(content)) return 0;
+  return content.filter(
+    (part) =>
+      part &&
+      typeof part === "object" &&
+      "type" in part &&
+      part.type === "tool_use",
+  ).length;
+}
+
 function parseTranscriptUsage(): {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
   projectTokens: Map<string, number>;
   projectModelUsage: Map<string, Map<string, ModelUsage>>;
+  ledger: InternalLedgerRow[];
   transcriptFileCount: number;
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
   const projectTokens = new Map<string, number>();
   const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const ledgerBySession = new Map<
+    string,
+    InternalLedgerRow & { toolCallIds: Set<string> }
+  >();
   const seen = new Set<string>();
   const transcriptFiles = walkJsonlFiles(PROJECTS_DIR);
 
@@ -782,6 +819,50 @@ function parseTranscriptUsage(): {
         continue;
       }
 
+      const sessionId = entry.sessionId ?? file.split("/").at(-1) ?? file;
+      const parsedTimestamp = entry.timestamp ? Date.parse(entry.timestamp) : 0;
+      const timestampMs = Number.isFinite(parsedTimestamp)
+        ? parsedTimestamp
+        : 0;
+      const projectPath = entry.cwd ?? "";
+      const existingLedger = ledgerBySession.get(sessionId);
+      const ledger =
+        existingLedger ??
+        ({
+          id: `claude:${sessionId}`,
+          provider: "claude",
+          timestampMs,
+          date: timestampMs ? fmtDate(timestampMs) : "",
+          projectPath,
+          projectName: projectPath ? projectName(projectPath) : "n/a",
+          model: "n/a",
+          interactions: 0,
+          toolCalls: 0,
+          tokens: 0,
+          costBasis: "unavailable",
+          usageByModel: new Map<string, ModelUsage>(),
+          toolCallIds: new Set<string>(),
+        } satisfies InternalLedgerRow & { toolCallIds: Set<string> });
+      if (!existingLedger) ledgerBySession.set(sessionId, ledger);
+      if (timestampMs && timestampMs > ledger.timestampMs) {
+        ledger.timestampMs = timestampMs;
+        ledger.date = fmtDate(timestampMs);
+      }
+      if (!ledger.projectPath && projectPath) {
+        ledger.projectPath = projectPath;
+        ledger.projectName = projectName(projectPath);
+      }
+      if (entry.type === "user" && !entry.isMeta) ledger.interactions += 1;
+      const contentToolCalls = countClaudeToolCalls(entry.message?.content);
+      if (contentToolCalls > 0) {
+        const toolKey =
+          entry.message?.id ?? entry.uuid ?? `${file}:${timestampMs}`;
+        if (!ledger.toolCallIds.has(toolKey)) {
+          ledger.toolCallIds.add(toolKey);
+          ledger.toolCalls += contentToolCalls;
+        }
+      }
+
       const model = entry.message?.model;
       const usage = entry.message?.usage;
       if (entry.type !== "assistant" || !model || !usage) continue;
@@ -798,6 +879,14 @@ function parseTranscriptUsage(): {
       seen.add(key);
 
       const tokenTotal = usageTokenTotal(usage);
+      const ledgerUsage = ledger.usageByModel.get(model) ?? emptyModelUsage();
+      addUsage(ledgerUsage, usage);
+      ledger.usageByModel.set(model, ledgerUsage);
+      ledger.tokens += tokenTotal;
+      ledger.costBasis = "usage";
+      ledger.model =
+        ledger.usageByModel.size === 1 ? modelKey("claude", model) : "mixed";
+
       modelUsage[model] ??= emptyModelUsage();
       addUsage(modelUsage[model], usage);
 
@@ -834,6 +923,13 @@ function parseTranscriptUsage(): {
     dailyModelUsage,
     projectTokens,
     projectModelUsage,
+    ledger: Array.from(ledgerBySession.values())
+      .map(({ toolCallIds: _toolCallIds, ...row }) => row)
+      .filter(
+        (row) =>
+          row.timestampMs > 0 &&
+          (row.interactions > 0 || row.tokens > 0 || row.toolCalls > 0),
+      ),
     transcriptFileCount: transcriptFiles.length,
   };
 }
@@ -971,6 +1067,7 @@ function parseCodexUsage(): {
   totalThreads: number;
   totalInteractions: number;
   totalToolCalls: number;
+  ledger: InternalLedgerRow[];
   codexSessionFileCount: number;
   codexThreadRowCount: number;
 } {
@@ -995,6 +1092,7 @@ function parseCodexUsage(): {
   >();
   const hourCounts: Record<string, number> = {};
   const dailyHourCounts = new Map<string, number[]>();
+  const ledger: InternalLedgerRow[] = [];
   const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0),
   );
@@ -1106,6 +1204,48 @@ function parseCodexUsage(): {
     const hourBuckets = dailyHourCounts.get(date) ?? new Array(24).fill(0);
     hourBuckets[d.getHours()] += interactionCount;
     dailyHourCounts.set(date, hourBuckets);
+
+    ledger.push({
+      id: `codex:${row?.id ?? session?.id ?? file}`,
+      provider: "codex",
+      timestampMs: updatedMs || createdMs,
+      date: fmtDate(updatedMs || createdMs),
+      projectPath: cwd,
+      projectName: cwd ? projectName(cwd) : "n/a",
+      model: modelKey("codex", model),
+      interactions: interactionCount,
+      toolCalls: toolCallCount,
+      tokens: tokenTotal,
+      costBasis: session?.tokenUsage
+        ? "usage"
+        : row?.tokens_used
+          ? "thread_tokens"
+          : "unavailable",
+      usageByModel: new Map([[key, usage]]),
+    });
+  }
+
+  for (const row of rows) {
+    if (row.rollout_path) continue;
+    const model = row.model || "unknown";
+    const key = modelKey("codex", model);
+    const usage = codexUsageFromThread({ tokens_used: row.tokens_used }, null);
+    const timestampMs = (row.updated_at || row.created_at) * 1000;
+    if (!timestampMs) continue;
+    ledger.push({
+      id: `codex:${row.id}`,
+      provider: "codex",
+      timestampMs,
+      date: fmtDate(timestampMs),
+      projectPath: row.cwd,
+      projectName: row.cwd ? projectName(row.cwd) : "n/a",
+      model: key,
+      interactions: 1,
+      toolCalls: 0,
+      tokens: row.tokens_used,
+      costBasis: row.tokens_used ? "thread_tokens" : "unavailable",
+      usageByModel: new Map([[key, usage]]),
+    });
   }
 
   return {
@@ -1121,6 +1261,7 @@ function parseCodexUsage(): {
     totalThreads: sessionFiles.size,
     totalInteractions,
     totalToolCalls,
+    ledger,
     codexSessionFileCount: codexSessionFiles.length,
     codexThreadRowCount: rows.length,
   };
@@ -1143,6 +1284,37 @@ function projectName(path: string): string {
   // Last non-empty path segment
   const parts = path.split("/").filter(Boolean);
   return parts[parts.length - 1] ?? path;
+}
+
+function serializeLedgerRows(
+  rows: InternalLedgerRow[],
+  pricing: PricingTable,
+): LedgerRow[] {
+  return rows
+    .map((row) => {
+      let costUSD: number | null = null;
+      if (row.usageByModel.size > 0 && row.costBasis !== "unavailable") {
+        costUSD = 0;
+        for (const [model, usage] of row.usageByModel.entries()) {
+          costUSD += calcCost(usage, rawModelFromKey(model), pricing);
+        }
+      }
+      return {
+        id: row.id,
+        provider: row.provider,
+        timestampMs: row.timestampMs,
+        date: row.date,
+        projectPath: row.projectPath,
+        projectName: row.projectName,
+        model: row.model,
+        interactions: row.interactions,
+        toolCalls: row.toolCalls,
+        tokens: row.tokens,
+        costUSD,
+        costBasis: row.costBasis,
+      };
+    })
+    .sort((a, b) => b.timestampMs - a.timestampMs);
 }
 
 export async function buildStats() {
@@ -1499,6 +1671,10 @@ export async function buildStats() {
 
   const periodFrom = daily[0]?.date ?? "";
   const periodTo = daily[daily.length - 1]?.date ?? "";
+  const ledger = serializeLedgerRows(
+    [...transcriptUsage.ledger, ...codexUsage.ledger],
+    pricing,
+  );
 
   return {
     period: { from: periodFrom, to: periodTo },
@@ -1533,6 +1709,7 @@ export async function buildStats() {
     budget,
     dataHealth,
     daily,
+    ledger,
     activityDays: Array.from(activityByDate.entries())
       .map(([date, activity]) => ({
         date,

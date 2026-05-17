@@ -1813,6 +1813,71 @@ select:hover,
   line-height: 1.45;
 }
 
+.session-ledger-panel {
+  margin-top: 14px;
+}
+
+.session-ledger-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.session-ledger-head h2 {
+  margin: 0;
+}
+
+.ledger-table-wrap {
+  overflow-x: auto;
+  margin-inline: -4px;
+  padding-inline: 4px;
+}
+
+.ledger-table {
+  min-width: 980px;
+}
+
+.ledger-table td {
+  white-space: nowrap;
+}
+
+.ledger-table td[data-label="Project"] {
+  min-width: 250px;
+  white-space: normal;
+}
+
+.ledger-table .project-path {
+  max-width: 34ch;
+}
+
+.ledger-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-table .cost {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.ledger-table .cost small {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.session-ledger-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+
 /* Heatmaps */
 .heatmap,
 .activity-wall-scroll {
@@ -2195,6 +2260,7 @@ select:hover,
   .project-detail-subhead,
   .project-detail-meta,
   .project-provider-split,
+  .session-ledger-head,
   .data-health-panel summary,
   .data-health-counts,
   .data-health-source {
@@ -2247,22 +2313,41 @@ select:hover,
     font-size: 12px;
   }
 
-  .cost-ledger-panel .table thead {
+  .ledger-table-wrap {
+    overflow-x: visible;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .session-ledger-panel .table {
+    display: grid;
+    min-width: 0;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .cost-ledger-panel .table thead,
+  .session-ledger-panel .table thead {
     display: none;
   }
 
   .cost-ledger-panel .table tbody,
   .cost-ledger-panel .table tr,
-  .cost-ledger-panel .table td {
+  .cost-ledger-panel .table td,
+  .session-ledger-panel .table tbody,
+  .session-ledger-panel .table tr,
+  .session-ledger-panel .table td {
     display: block;
   }
 
-  .cost-ledger-panel .table tbody {
+  .cost-ledger-panel .table tbody,
+  .session-ledger-panel .table tbody {
     display: grid;
     gap: 10px;
   }
 
-  .cost-ledger-panel .table tr {
+  .cost-ledger-panel .table tr,
+  .session-ledger-panel .table tr {
     border: 1px solid var(--edge-soft);
     border-radius: var(--radius-sm);
     background:
@@ -2271,7 +2356,8 @@ select:hover,
     padding: 10px;
   }
 
-  .cost-ledger-panel .table td {
+  .cost-ledger-panel .table td,
+  .session-ledger-panel .table td {
     display: grid;
     grid-template-columns: 8.5rem minmax(0, 1fr);
     gap: 12px;
@@ -2281,7 +2367,8 @@ select:hover,
     white-space: normal;
   }
 
-  .cost-ledger-panel .table td::before {
+  .cost-ledger-panel .table td::before,
+  .session-ledger-panel .table td::before {
     content: attr(data-label);
     color: var(--text-faint);
     font-size: 10px;
@@ -2291,7 +2378,8 @@ select:hover,
     text-transform: uppercase;
   }
 
-  .cost-ledger-panel .table td[data-label="Source"] .badge {
+  .cost-ledger-panel .table td[data-label="Source"] .badge,
+  .session-ledger-panel .table td[data-label="Source"] .badge {
     justify-self: end;
   }
 
@@ -2304,7 +2392,21 @@ select:hover,
     content: none;
   }
 
-  .cost-ledger-panel .table td:last-child {
+  .session-ledger-panel .table td[data-label="Project"] {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .session-ledger-panel .table td[data-label="Project"]::before {
+    content: none;
+  }
+
+  .session-ledger-panel .table .cost {
+    justify-items: end;
+  }
+
+  .cost-ledger-panel .table td:last-child,
+  .session-ledger-panel .table td:last-child {
     border-bottom: 0;
   }
 }

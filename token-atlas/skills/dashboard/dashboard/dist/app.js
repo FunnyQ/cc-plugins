@@ -284,6 +284,8 @@ function App() {
     topProjectMode: initialPrefs.topProjectMode ?? "tokens",
     selectedModels: initialPrefs.selectedModels ?? {},
     selectedProjectPath: null,
+    ledgerSortKey: "date",
+    ledgerVisibleCount: 50,
 
     async mounted() {
       this.loading = true;
@@ -339,6 +341,7 @@ function App() {
 
     onRangeChange() {
       // Overview, trend, distribution, and per-model table are windowed.
+      this.ledgerVisibleCount = 50;
       this.savePrefs();
       this.$nextTick(() => {
         this.renderTrend();
@@ -348,6 +351,7 @@ function App() {
 
     onProviderChange(provider) {
       this.providerKey = provider;
+      this.ledgerVisibleCount = 50;
       this.reconcileSelectedModels();
       this.savePrefs();
       this.$nextTick(() => {
@@ -371,6 +375,10 @@ function App() {
     onTopProjectModeChange(mode) {
       this.topProjectMode = mode;
       this.savePrefs();
+    },
+
+    onLedgerSortChange(sortKey) {
+      this.ledgerSortKey = sortKey;
     },
 
     onSelectedModelsChange() {
@@ -912,6 +920,36 @@ function App() {
       ];
     },
 
+    get filteredLedger() {
+      if (!this.stats?.ledger) return [];
+      const dates = this.filteredDaily;
+      const firstDate = this.rangeKey === "all" ? null : dates[0]?.date;
+      const lastDate =
+        this.rangeKey === "all" ? null : dates[dates.length - 1]?.date;
+      return [...this.stats.ledger]
+        .filter((row) => {
+          if (this.providerKey !== "all" && row.provider !== this.providerKey) {
+            return false;
+          }
+          if (!firstDate || !lastDate) return true;
+          return row.date >= firstDate && row.date <= lastDate;
+        })
+        .sort((a, b) => this.compareLedgerRows(a, b));
+    },
+
+    get visibleLedgerRows() {
+      return this.filteredLedger.slice(0, this.ledgerVisibleCount);
+    },
+
+    get hasMoreLedgerRows() {
+      return this.filteredLedger.length > this.visibleLedgerRows.length;
+    },
+
+    get ledgerSummaryLabel() {
+      const count = this.filteredLedger.length;
+      return `${fmtNum(count)} rows · ${this.activeWindowLabel}`;
+    },
+
     get usageAnomalyState() {
       const daily = this.filteredDaily.filter(
         (day) => (day.costUSD ?? 0) > 0 || (day.tokens ?? 0) > 0,
@@ -1124,6 +1162,10 @@ function App() {
       return this.selectedProjectPath === path;
     },
 
+    showMoreLedgerRows() {
+      this.ledgerVisibleCount += 50;
+    },
+
     availableModelKeys() {
       if (!this.stats) return [];
       const set = new Set();
@@ -1151,6 +1193,50 @@ function App() {
       const max = this.maxSelectedProjectModelCost || 0;
       if (max <= 0) return 0;
       return Math.max(0, Math.min(100, ((model.costUSD ?? 0) / max) * 100));
+    },
+
+    compareLedgerRows(a, b) {
+      if (this.ledgerSortKey === "tokens") {
+        return (
+          (b.tokens ?? 0) - (a.tokens ?? 0) ||
+          (b.timestampMs ?? 0) - (a.timestampMs ?? 0)
+        );
+      }
+      if (this.ledgerSortKey === "cost") {
+        return (
+          (b.costUSD ?? -1) - (a.costUSD ?? -1) ||
+          (b.timestampMs ?? 0) - (a.timestampMs ?? 0)
+        );
+      }
+      return (b.timestampMs ?? 0) - (a.timestampMs ?? 0);
+    },
+
+    ledgerSortLabel(sortKey) {
+      return (
+        {
+          date: "Latest",
+          tokens: "Tokens",
+          cost: "Cost",
+        }[sortKey] ?? sortKey
+      );
+    },
+
+    ledgerModelLabel(model) {
+      if (!model || model === "n/a") return "n/a";
+      if (model === "mixed") return "mixed";
+      return shortModel(model);
+    },
+
+    ledgerCostLabel(row) {
+      if (row.costUSD == null) return "n/a";
+      const prefix = row.costBasis === "thread_tokens" ? "~" : "";
+      return `${prefix}${fmtUSD(row.costUSD)}`;
+    },
+
+    ledgerCostNote(row) {
+      if (row.costUSD == null) return "unavailable";
+      if (row.costBasis === "thread_tokens") return "approx";
+      return "usage";
     },
 
     exportPayload() {
