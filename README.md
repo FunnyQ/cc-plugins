@@ -36,29 +36,19 @@ bun $CLAUDE_PLUGIN_ROOT/skills/dashboard/scripts/install.ts
 
 A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data and visualizes it in a browser. No telemetry, no cloud — everything stays on your machine.
 
-The visual direction is **Sunrise Atlas** — Big Sur dawn palette over a calm working surface, designed for repeated daily use.
-
 ![Token Atlas dashboard preview](./assets/token-atlas-dashboard.jpg)
 
 ### Features
 
-- **Daily burn hero** — today's spend as the primary metric, with sparkline and 7-day delta
-- **Monthly budget tracker** — month-to-date spend, remaining budget, projected burn
-- **Overview cards** — sessions, interactions, tokens, estimated cost
-- **Daily trend** — stacked bar chart per model with Tokens/Cost toggle
-- **Model distribution** — donut by provider, with a per-model breakdown table (input/output/cache/reasoning + USD)
-- **Project rankings + drilldown modal** — top projects by message count, click for per-model detail
+- **Cost + usage overview** — sessions, interactions, tokens, estimated spend, daily burn, and monthly budget projection
+- **Model analysis** — daily trend, model distribution, and per-model token/cost breakdown
+- **Project insights** — project rankings with drilldown details for model mix and cost
 - **Session ledger** — recent Claude and Codex sessions side by side
-- **Anomaly panel** — flags days that broke from your baseline
-- **Token composition & cache efficiency** — input vs cache-read vs output share
-- **Activity heatmap + activity wall** — 7d × 24h grid + GitHub-style daily wall
-- **Data health diagnostics** — surfaces non-fatal source-read failures
-- **Light + dark themes** — View Transitions cross-fade, honors `prefers-color-scheme`
-- **Pointer-tracking bloom** — warm light glides behind the cursor on hover; respects `prefers-reduced-motion`
-- **Animated hero wave** — sunrise band drifts slowly along its wavy bottom edge
-- **Current-view export** — JSON / CSV of whatever filters are active
-- **Persisted preferences** — provider filter, theme, comparison window
-- **Provider filter** — All / Claude / Codex
+- **Anomaly detection** — flags days that break from your recent baseline
+- **Token composition** — input, output, cache-read, cache-write, and reasoning token shares
+- **Activity timeline** — hourly and daily activity patterns from local session data
+- **Data health diagnostics** — non-fatal source-read failures and record counts
+- **Filters + export** — provider/range filters, persisted preferences, and JSON/CSV export
 
 ### Prerequisites
 
