@@ -17,19 +17,18 @@ description: >-
 
 A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP server. Reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, and `~/.codex/sessions/` — no telemetry, no network access required (OpenRouter is consulted opportunistically for live pricing but failures are silent).
 
-## Prerequisites
-
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/install.ts
-```
-
-Confirms `bun`, vendor files, and Claude data sources exist.
-
 ## Run
 
+Always run the precheck first; only launch the dashboard if it exits 0.
+
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/serve-dashboard.ts
+bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/install.ts \
+  && bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/serve-dashboard.ts
 ```
+
+The precheck (`install.ts`) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps — typically `history.jsonl` missing because the user hasn't used Claude Code chat yet — do **not** block the dashboard; the affected sections will just show empty.
+
+If the precheck exits non-zero, surface the failed `✗` lines and their `→ hint` to the user verbatim and stop. Do **not** attempt to auto-fix (no `bun install`, no file fetches) — the hints are actionable steps the user takes themselves (e.g. installing bun, running `/stats` once in Claude Code to seed `stats-cache.json`).
 
 Default port `5938`. Opens `http://localhost:5938` in the default browser automatically. If the port is already in use (e.g. a previous dashboard instance), the script kills the existing process first so you don't accumulate stale servers.
 
