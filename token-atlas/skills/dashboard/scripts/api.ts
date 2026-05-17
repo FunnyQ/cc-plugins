@@ -32,6 +32,7 @@ const USER_PRICING_OVERRIDE = join(
   "cc-dashboard",
   "pricing.json",
 );
+const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
 
 // ---------- Types ----------
@@ -71,6 +72,15 @@ type PricingLoad = {
   table: PricingTable;
   meta: PricingMeta;
   sourceByModel: Record<string, PricingSource>;
+};
+type BudgetConfig = {
+  monthlyBudgetUSD?: number;
+};
+type BudgetMeta = {
+  monthlyBudgetUSD: number | null;
+  source: string;
+  loaded: boolean;
+  error: string | null;
 };
 
 type DataHealthSourceStatus = "ok" | "missing" | "unreadable" | "empty";
@@ -282,8 +292,49 @@ function buildDataHealth(counts: DataHealth["counts"]): DataHealth {
         USER_PRICING_OVERRIDE,
         "optional user pricing",
       ),
+      sourceHealth("Budget config", USER_BUDGET_CONFIG, "optional budget"),
     ],
     counts,
+  };
+}
+
+function loadBudgetConfig(): BudgetMeta {
+  const budget = readJSONWithError<BudgetConfig>(USER_BUDGET_CONFIG);
+  const source = displayPath(USER_BUDGET_CONFIG);
+  if (!budget.exists) {
+    return {
+      monthlyBudgetUSD: null,
+      source,
+      loaded: false,
+      error: null,
+    };
+  }
+  if (budget.error) {
+    return {
+      monthlyBudgetUSD: null,
+      source,
+      loaded: false,
+      error: budget.error,
+    };
+  }
+  const monthlyBudgetUSD = budget.data?.monthlyBudgetUSD;
+  if (
+    typeof monthlyBudgetUSD !== "number" ||
+    !Number.isFinite(monthlyBudgetUSD) ||
+    monthlyBudgetUSD <= 0
+  ) {
+    return {
+      monthlyBudgetUSD: null,
+      source,
+      loaded: false,
+      error: "Expected positive numeric monthlyBudgetUSD",
+    };
+  }
+  return {
+    monthlyBudgetUSD,
+    source,
+    loaded: true,
+    error: null,
   };
 }
 
@@ -643,6 +694,42 @@ function modelUsageTotal(usage: ModelUsage): number {
     usage.cacheCreationInputTokens +
     (usage.reasoningOutputTokens ?? 0)
   );
+}
+
+function serializeProjectModelUsage(
+  provider: Provider,
+  byModel: Map<string, ModelUsage> | undefined,
+  pricing: PricingTable,
+) {
+  if (!byModel) return [];
+  return Array.from(byModel.entries())
+    .map(([model, usage]) => {
+      const modelName =
+        provider === "claude" ? modelKey("claude", model) : model;
+      const rawModel = provider === "claude" ? model : rawModelFromKey(model);
+      return {
+        model: modelName,
+        provider,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadInputTokens,
+        cacheCreationTokens: usage.cacheCreationInputTokens,
+        reasoningTokens: usage.reasoningOutputTokens ?? 0,
+        costUSD: calcCost(usage, rawModel, pricing),
+        isExternal: isExternal(rawModel, pricing.externalModelPrefixes),
+      };
+    })
+    .filter(
+      (row) =>
+        row.inputTokens +
+          row.outputTokens +
+          row.cacheReadTokens +
+          row.cacheCreationTokens +
+          row.reasoningTokens +
+          row.costUSD >
+        0,
+    )
+    .sort((a, b) => b.costUSD - a.costUSD);
 }
 
 function walkJsonlFiles(dir: string, out: string[] = []): string[] {
@@ -1069,6 +1156,7 @@ export async function buildStats() {
   const sessions = parseSessions();
   const pricingLoad = await loadPricingWithMeta();
   const pricing = pricingLoad.table;
+  const budget = loadBudgetConfig();
   const transcriptUsage = parseTranscriptUsage();
   const codexUsage = parseCodexUsage();
   const dataHealth = buildDataHealth({
@@ -1323,6 +1411,18 @@ export async function buildStats() {
     .map((path) => {
       const claude = byProject.get(path);
       const codex = codexUsage.projectActivity.get(path);
+      const models = [
+        ...serializeProjectModelUsage(
+          "claude",
+          transcriptUsage.projectModelUsage.get(path),
+          pricing,
+        ),
+        ...serializeProjectModelUsage(
+          "codex",
+          codexUsage.projectModelUsage.get(path),
+          pricing,
+        ),
+      ].sort((a, b) => b.costUSD - a.costUSD);
       const firstSeen = Math.min(
         claude?.firstSeen ?? Number.POSITIVE_INFINITY,
         codex?.firstSeen ?? Number.POSITIVE_INFINITY,
@@ -1345,6 +1445,7 @@ export async function buildStats() {
         claudeCostUSD: claudeProjectCost.get(path) ?? 0,
         codexCostUSD: codexProjectCost.get(path) ?? 0,
         costUSD: projectCost.get(path) ?? 0,
+        models,
         firstSeen: Number.isFinite(firstSeen) ? fmtDate(firstSeen) : "",
         lastSeen: fmtDate(lastSeen),
         lastSeenMs: lastSeen,
@@ -1429,6 +1530,7 @@ export async function buildStats() {
       pricingLoad,
       byModel.map((m) => m.model),
     ),
+    budget,
     dataHealth,
     daily,
     activityDays: Array.from(activityByDate.entries())

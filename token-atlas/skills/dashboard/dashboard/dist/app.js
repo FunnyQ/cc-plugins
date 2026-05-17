@@ -283,6 +283,7 @@ function App() {
     trendModelScope: initialPrefs.trendModelScope ?? "all",
     topProjectMode: initialPrefs.topProjectMode ?? "tokens",
     selectedModels: initialPrefs.selectedModels ?? {},
+    selectedProjectPath: null,
 
     async mounted() {
       this.loading = true;
@@ -319,6 +320,7 @@ function App() {
         if (data.error) throw new Error(data.error);
         this.stats = data;
         this.reconcileSelectedModels();
+        this.reconcileSelectedProject();
         this.savePrefs();
         await this.$nextTick();
         this.renderTrend();
@@ -720,6 +722,68 @@ function App() {
       });
     },
 
+    get selectedProject() {
+      if (!this.stats || !this.selectedProjectPath) return null;
+      return (
+        this.stats.projects.find((p) => p.path === this.selectedProjectPath) ??
+        null
+      );
+    },
+
+    get selectedProjectModels() {
+      const project = this.selectedProject;
+      if (!project) return [];
+      return [...(project.models ?? [])]
+        .filter(
+          (model) =>
+            this.providerKey === "all" ||
+            (model.provider ?? providerForModel(model.model)) ===
+              this.providerKey,
+        )
+        .sort((a, b) => (b.costUSD ?? 0) - (a.costUSD ?? 0));
+    },
+
+    get selectedProjectProviderSummary() {
+      const project = this.selectedProject;
+      if (!project) return null;
+      if (this.providerKey === "claude") {
+        return {
+          label: "Claude",
+          messages: project.claudeMessages ?? 0,
+          tokens: project.claudeTokens ?? 0,
+          costUSD: project.claudeCostUSD ?? 0,
+        };
+      }
+      if (this.providerKey === "codex") {
+        return {
+          label: "Codex",
+          messages: project.codexMessages ?? 0,
+          tokens: project.codexTokens ?? 0,
+          costUSD: project.codexCostUSD ?? 0,
+        };
+      }
+      return {
+        label: "All sources",
+        messages: project.messageCount ?? 0,
+        tokens: project.tokens ?? 0,
+        costUSD: project.costUSD ?? 0,
+      };
+    },
+
+    get selectedProjectModelTotalCost() {
+      return this.selectedProjectModels.reduce(
+        (sum, model) => sum + (model.costUSD ?? 0),
+        0,
+      );
+    },
+
+    get maxSelectedProjectModelCost() {
+      return this.selectedProjectModels.reduce(
+        (max, model) => Math.max(max, model.costUSD ?? 0),
+        0,
+      );
+    },
+
     get activeWindowLabel() {
       if (this.rangeKey === "all") return "all time";
       return `last ${this.rangeKey} days`;
@@ -749,6 +813,77 @@ function App() {
         model,
         label: shortModel(model),
       }));
+    },
+
+    get budgetConfig() {
+      return this.stats?.budget ?? null;
+    },
+
+    get budgetView() {
+      const config = this.budgetConfig;
+      const monthlyBudgetUSD = config?.monthlyBudgetUSD ?? null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const monthKey = `${today.getFullYear()}-${String(
+        today.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      const monthDays = new Date(
+        today.getFullYear(),
+        today.getMonth() + 1,
+        0,
+      ).getDate();
+      const elapsedDays = Math.max(1, today.getDate());
+      const monthDaily = (this.stats?.daily ?? [])
+        .map((day) => this.filterDayByProvider(day))
+        .filter((day) => {
+          if (!day.date?.startsWith(monthKey)) return false;
+          return this.parseDate(day.date) <= today;
+        });
+      const monthToDateCostUSD = monthDaily.reduce(
+        (sum, day) => sum + (day.costUSD ?? 0),
+        0,
+      );
+      const projectedMonthEndCostUSD =
+        (monthToDateCostUSD / elapsedDays) * monthDays;
+      const remainingBudgetUSD =
+        typeof monthlyBudgetUSD === "number"
+          ? monthlyBudgetUSD - monthToDateCostUSD
+          : null;
+      const usagePct =
+        typeof monthlyBudgetUSD === "number" && monthlyBudgetUSD > 0
+          ? (monthToDateCostUSD / monthlyBudgetUSD) * 100
+          : 0;
+      const projectedPct =
+        typeof monthlyBudgetUSD === "number" && monthlyBudgetUSD > 0
+          ? (projectedMonthEndCostUSD / monthlyBudgetUSD) * 100
+          : 0;
+      return {
+        configured:
+          config?.loaded === true && typeof monthlyBudgetUSD === "number",
+        error: config?.error ?? null,
+        source: config?.source ?? "~/.config/cc-dashboard/budget.json",
+        providerLabel:
+          this.providerKey === "all" ? "Claude + Codex" : this.providerKey,
+        monthlyBudgetUSD,
+        monthToDateCostUSD,
+        projectedMonthEndCostUSD,
+        remainingBudgetUSD,
+        usagePct,
+        projectedPct,
+        usagePctLabel: `${Math.min(999, usagePct).toFixed(
+          usagePct >= 10 ? 0 : 1,
+        )}%`,
+        projectedPctLabel: `${Math.min(999, projectedPct).toFixed(
+          projectedPct >= 10 ? 0 : 1,
+        )}%`,
+        usageMeterWidth: `${Math.max(0, Math.min(100, usagePct)).toFixed(1)}%`,
+        projectedMeterWidth: `${Math.max(
+          0,
+          Math.min(100, projectedPct),
+        ).toFixed(1)}%`,
+        state: this.budgetState(usagePct),
+        projectedState: this.budgetState(projectedPct),
+      };
     },
 
     get dataHealth() {
@@ -969,6 +1104,26 @@ function App() {
       this.selectedModels = next;
     },
 
+    reconcileSelectedProject() {
+      if (!this.selectedProjectPath || !this.stats) return;
+      const exists = this.stats.projects?.some(
+        (project) => project.path === this.selectedProjectPath,
+      );
+      if (!exists) this.selectedProjectPath = null;
+    },
+
+    selectProject(path) {
+      this.selectedProjectPath = path;
+    },
+
+    clearSelectedProject() {
+      this.selectedProjectPath = null;
+    },
+
+    isSelectedProject(path) {
+      return this.selectedProjectPath === path;
+    },
+
     availableModelKeys() {
       if (!this.stats) return [];
       const set = new Set();
@@ -990,6 +1145,12 @@ function App() {
         (model.cacheCreationTokens ?? 0) +
         (model.reasoningTokens ?? 0)
       );
+    },
+
+    projectModelCostPct(model) {
+      const max = this.maxSelectedProjectModelCost || 0;
+      if (max <= 0) return 0;
+      return Math.max(0, Math.min(100, ((model.costUSD ?? 0) / max) * 100));
     },
 
     exportPayload() {
@@ -1306,6 +1467,34 @@ function App() {
         "data-health-status--missing": status === "missing",
         "data-health-status--empty": status === "empty",
         "data-health-status--unreadable": status === "unreadable",
+      };
+    },
+
+    budgetState(pct) {
+      if (!Number.isFinite(pct)) return "low";
+      if (pct >= 100) return "over";
+      if (pct >= 80) return "high";
+      if (pct >= 50) return "medium";
+      return "low";
+    },
+
+    budgetStateLabel(state) {
+      return (
+        {
+          low: "under 50%",
+          medium: "50-80%",
+          high: "80-100%",
+          over: "over budget",
+        }[state] ?? "under 50%"
+      );
+    },
+
+    budgetMeterClass(state) {
+      return {
+        "budget-meter-fill": true,
+        "budget-meter-fill--medium": state === "medium",
+        "budget-meter-fill--high": state === "high",
+        "budget-meter-fill--over": state === "over",
       };
     },
 
