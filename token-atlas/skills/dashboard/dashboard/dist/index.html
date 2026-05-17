@@ -551,6 +551,50 @@
           </div>
         </section>
 
+        <section
+          v-if="dataHealth"
+          class="data-health-panel"
+          aria-label="Data health diagnostics"
+        >
+          <details>
+            <summary>
+              <span>Data health</span>
+              <span class="data-health-summary">
+                {{ dataHealthSources.length }} sources · {{
+                fmtNum(dataHealthCounts[0].value) }} Claude transcripts · {{
+                fmtNum(dataHealthCounts[1].value) }} Codex sessions
+              </span>
+            </summary>
+            <div class="data-health-body">
+              <dl class="data-health-counts">
+                <div v-for="count in dataHealthCounts" :key="count.label">
+                  <dt>{{ count.label }}</dt>
+                  <dd>{{ fmtNum(count.value) }}</dd>
+                </div>
+              </dl>
+              <div class="data-health-sources">
+                <div
+                  v-for="source in dataHealthSources"
+                  :key="source.name"
+                  class="data-health-source"
+                >
+                  <div class="data-health-source-main">
+                    <strong>{{ source.name }}</strong>
+                    <code>{{ source.path }}</code>
+                  </div>
+                  <span :class="dataHealthStatusClass(source.status)">
+                    {{ source.status }}
+                  </span>
+                  <span class="data-health-modified">
+                    {{ formatDateTime(source.modifiedAt) }}
+                  </span>
+                  <span class="data-health-note">{{ source.note }}</span>
+                </div>
+              </div>
+            </div>
+          </details>
+        </section>
+
         <footer class="footer">
           Generated {{ new Date(stats.meta.generatedAt).toLocaleString() }} ·
           cache v{{ stats.meta.cacheVersion }} · first session {{

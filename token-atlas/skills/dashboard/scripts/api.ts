@@ -1,5 +1,12 @@
 #!/usr/bin/env bun
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -64,6 +71,23 @@ type PricingLoad = {
   table: PricingTable;
   meta: PricingMeta;
   sourceByModel: Record<string, PricingSource>;
+};
+
+type DataHealthSourceStatus = "ok" | "missing" | "unreadable" | "empty";
+type DataHealthSource = {
+  name: string;
+  path: string;
+  status: DataHealthSourceStatus;
+  modifiedAt: string | null;
+  note: string;
+};
+type DataHealth = {
+  sources: DataHealthSource[];
+  counts: {
+    claudeTranscriptFiles: number;
+    codexSessionFiles: number;
+    codexThreadRows: number;
+  };
 };
 
 type ModelUsage = {
@@ -192,6 +216,75 @@ function isAnthropicModel(model: string): boolean {
 
 function isExternal(model: string, prefixes: string[]): boolean {
   return !isAnthropicModel(model) || prefixes.some((p) => model.startsWith(p));
+}
+
+function displayPath(path: string): string {
+  return path.replace(HOME, "~");
+}
+
+function sourceHealth(
+  name: string,
+  path: string,
+  note: string,
+): DataHealthSource {
+  try {
+    if (!existsSync(path)) {
+      return {
+        name,
+        path: displayPath(path),
+        status: "missing",
+        modifiedAt: null,
+        note,
+      };
+    }
+    accessSync(path, constants.R_OK);
+    const stat = statSync(path);
+    let status: DataHealthSourceStatus = "ok";
+    if (stat.isFile() && stat.size === 0) status = "empty";
+    if (stat.isDirectory() && readdirSync(path).length === 0) status = "empty";
+    return {
+      name,
+      path: displayPath(path),
+      status,
+      modifiedAt: stat.mtime.toISOString(),
+      note,
+    };
+  } catch (err) {
+    return {
+      name,
+      path: displayPath(path),
+      status: "unreadable",
+      modifiedAt: null,
+      note: err instanceof Error ? err.message : note,
+    };
+  }
+}
+
+function buildDataHealth(counts: DataHealth["counts"]): DataHealth {
+  return {
+    sources: [
+      sourceHealth("Claude stats cache", STATS_CACHE, "required"),
+      sourceHealth("Claude history", HISTORY, "optional activity timeline"),
+      sourceHealth("Claude sessions", SESSIONS_DIR, "optional session records"),
+      sourceHealth(
+        "Claude projects",
+        PROJECTS_DIR,
+        "optional transcript records",
+      ),
+      sourceHealth("Codex state DB", CODEX_STATE_DB, "optional thread index"),
+      sourceHealth(
+        "Codex sessions",
+        CODEX_SESSIONS_DIR,
+        "optional rollout records",
+      ),
+      sourceHealth(
+        "Pricing override",
+        USER_PRICING_OVERRIDE,
+        "optional user pricing",
+      ),
+    ],
+    counts,
+  };
 }
 
 // ---------- Pricing ----------
@@ -576,14 +669,16 @@ function parseTranscriptUsage(): {
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
   projectTokens: Map<string, number>;
   projectModelUsage: Map<string, Map<string, ModelUsage>>;
+  transcriptFileCount: number;
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
   const projectTokens = new Map<string, number>();
   const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
   const seen = new Set<string>();
+  const transcriptFiles = walkJsonlFiles(PROJECTS_DIR);
 
-  for (const file of walkJsonlFiles(PROJECTS_DIR)) {
+  for (const file of transcriptFiles) {
     let raw = "";
     try {
       raw = readFileSync(file, "utf-8");
@@ -647,7 +742,13 @@ function parseTranscriptUsage(): {
     }
   }
 
-  return { modelUsage, dailyModelUsage, projectTokens, projectModelUsage };
+  return {
+    modelUsage,
+    dailyModelUsage,
+    projectTokens,
+    projectModelUsage,
+    transcriptFileCount: transcriptFiles.length,
+  };
 }
 
 function readCodexSession(file: string): CodexSessionSummary | null {
@@ -783,6 +884,8 @@ function parseCodexUsage(): {
   totalThreads: number;
   totalInteractions: number;
   totalToolCalls: number;
+  codexSessionFileCount: number;
+  codexThreadRowCount: number;
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
@@ -828,9 +931,10 @@ function parseCodexUsage(): {
   }
 
   const rowByRollout = new Map(rows.map((row) => [row.rollout_path, row]));
+  const codexSessionFiles = walkJsonlFiles(CODEX_SESSIONS_DIR);
   const sessionFiles = new Set([
     ...rows.map((row) => row.rollout_path).filter(Boolean),
-    ...walkJsonlFiles(CODEX_SESSIONS_DIR),
+    ...codexSessionFiles,
   ]);
   let totalInteractions = 0;
   let totalToolCalls = 0;
@@ -930,6 +1034,8 @@ function parseCodexUsage(): {
     totalThreads: sessionFiles.size,
     totalInteractions,
     totalToolCalls,
+    codexSessionFileCount: codexSessionFiles.length,
+    codexThreadRowCount: rows.length,
   };
 }
 
@@ -965,6 +1071,11 @@ export async function buildStats() {
   const pricing = pricingLoad.table;
   const transcriptUsage = parseTranscriptUsage();
   const codexUsage = parseCodexUsage();
+  const dataHealth = buildDataHealth({
+    claudeTranscriptFiles: transcriptUsage.transcriptFileCount,
+    codexSessionFiles: codexUsage.codexSessionFileCount,
+    codexThreadRows: codexUsage.codexThreadRowCount,
+  });
 
   const claudeModelUsage =
     Object.keys(transcriptUsage.modelUsage).length > 0
@@ -1318,6 +1429,7 @@ export async function buildStats() {
       pricingLoad,
       byModel.map((m) => m.model),
     ),
+    dataHealth,
     daily,
     activityDays: Array.from(activityByDate.entries())
       .map(([date, activity]) => ({

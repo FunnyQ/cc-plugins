@@ -1413,6 +1413,166 @@ select:hover,
   text-align: center;
 }
 
+.data-health-panel {
+  margin-top: 18px;
+  border: 1px solid var(--theme-edge);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--surface-glass) 84%, var(--bg));
+  box-shadow: var(--shadow-inset);
+}
+
+.data-health-panel details {
+  padding: 0;
+}
+
+.data-health-panel summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 46px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 720;
+  list-style: none;
+  padding: 0 14px;
+}
+
+.data-health-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.data-health-summary {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 560;
+  text-align: right;
+}
+
+.data-health-body {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--edge-soft);
+  padding: 13px 14px 14px;
+}
+
+.data-health-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.data-health-counts > div {
+  min-width: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
+  padding: 8px 9px;
+}
+
+.data-health-counts dt {
+  margin: 0 0 4px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.data-health-counts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+}
+
+.data-health-sources {
+  display: grid;
+  gap: 7px;
+}
+
+.data-health-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(128px, auto) minmax(
+      0,
+      0.9fr
+    );
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(90deg, var(--ledger-line) 0 1px, transparent 1px),
+    color-mix(in oklch, var(--surface-glass-raised) 72%, var(--bg));
+  padding: 9px 10px;
+}
+
+.data-health-source-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.data-health-source-main strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.data-health-source-main code {
+  color: var(--text-faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.data-health-status {
+  display: inline-grid;
+  min-height: 23px;
+  place-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1;
+  padding: 0 8px;
+  text-transform: uppercase;
+}
+
+.data-health-status--ok {
+  border-color: color-mix(in oklch, var(--green) 22%, var(--edge));
+  background: color-mix(in oklch, var(--green) 9%, var(--bg-rail));
+  color: color-mix(in oklch, var(--green) 52%, var(--text));
+}
+
+.data-health-status--missing,
+.data-health-status--empty {
+  border-color: color-mix(in oklch, var(--warn) 22%, var(--edge));
+  background: color-mix(in oklch, var(--warn) 8%, var(--bg-rail));
+  color: color-mix(in oklch, var(--warn) 55%, var(--text));
+}
+
+.data-health-status--unreadable {
+  border-color: color-mix(in oklch, var(--danger) 24%, var(--edge));
+  background: color-mix(in oklch, var(--danger) 10%, var(--bg-rail));
+  color: color-mix(in oklch, var(--danger) 58%, var(--text));
+}
+
+.data-health-modified,
+.data-health-note {
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.data-health-modified {
+  font-variant-numeric: tabular-nums;
+}
+
 .footer {
   margin-top: 22px;
   color: var(--text-faint);
@@ -1474,8 +1634,15 @@ select:hover,
   }
 
   .pricing-confidence-head,
-  .pricing-confidence-grid {
+  .pricing-confidence-grid,
+  .data-health-panel summary,
+  .data-health-counts,
+  .data-health-source {
     grid-template-columns: 1fr;
+  }
+
+  .data-health-summary {
+    text-align: left;
   }
 
   .card {
