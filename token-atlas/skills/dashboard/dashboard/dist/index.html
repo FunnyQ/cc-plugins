@@ -66,6 +66,29 @@
             <span v-else-if="refreshInFlight">Updating…</span>
             <span v-else>↻ Refresh</span>
           </button>
+          <div class="export-actions" aria-label="Export current view">
+            <button
+              type="button"
+              class="btn export-btn"
+              @click="exportCurrentViewJSON"
+            >
+              Export JSON
+            </button>
+            <button
+              type="button"
+              class="btn export-btn"
+              @click="exportModelsCSV"
+            >
+              Models CSV
+            </button>
+            <button
+              type="button"
+              class="btn export-btn"
+              @click="exportProjectsCSV"
+            >
+              Projects CSV
+            </button>
+          </div>
         </div>
       </header>
 
@@ -268,6 +291,69 @@
               <span>highest model cost</span>
               <strong>${{ filteredByModel[0].costUSD.toFixed(2) }}</strong>
             </div>
+          </div>
+          <div
+            v-if="tokenComposition.total > 0"
+            class="token-composition-panel"
+            aria-label="Token composition and cache efficiency"
+          >
+            <div class="token-composition-summary">
+              <div>
+                <h3>Token composition</h3>
+                <span class="muted"
+                  >{{ tokenComposition.totalLabel }} tokens · {{
+                  activeWindowLabel }}</span
+                >
+              </div>
+              <dl class="cache-efficiency">
+                <div>
+                  <dt>Cache read share</dt>
+                  <dd>{{ cacheEfficiency.cacheReadLabel }}</dd>
+                </div>
+                <div>
+                  <dt>Read / fresh input</dt>
+                  <dd>{{ cacheEfficiency.cacheReadRatioLabel }}</dd>
+                </div>
+                <div>
+                  <dt>Cache write share</dt>
+                  <dd>{{ cacheEfficiency.cacheWriteLabel }}</dd>
+                </div>
+              </dl>
+            </div>
+            <div
+              class="token-composition-bar"
+              role="img"
+              :aria-label="'Token composition: ' + tokenComposition.rows.map((row) => row.label + ' ' + row.pctLabel).join(', ')"
+            >
+              <span
+                v-for="row in tokenComposition.rows"
+                :key="row.key"
+                :class="'token-composition-segment ' + row.className"
+                :style="{ width: row.pct + '%' }"
+                :title="row.title"
+              ></span>
+            </div>
+            <dl class="token-composition-grid">
+              <div v-for="row in tokenComposition.rows" :key="row.key">
+                <dt>
+                  <span
+                    :class="'token-composition-key ' + row.className"
+                    aria-hidden="true"
+                  ></span>
+                  {{ row.label }}
+                </dt>
+                <dd>
+                  <strong>{{ row.valueLabel }}</strong>
+                  <span>{{ row.pctLabel }}</span>
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div
+            v-else-if="filteredByModel.length"
+            class="empty-state empty-state--panel"
+          >
+            No token composition for this range.
           </div>
           <table v-if="filteredByModel.length" class="table">
             <caption>

@@ -160,6 +160,65 @@ const ANOMALY_MULTIPLIER = 2;
 const ANOMALY_MIN_COST = 1;
 const ANOMALY_MIN_TOKENS = 50_000;
 const PREFS_STORAGE_KEY = "token-atlas:prefs:v1";
+const MODEL_EXPORT_HEADERS = [
+  "model",
+  "label",
+  "provider",
+  "inputTokens",
+  "outputTokens",
+  "cacheReadTokens",
+  "cacheCreationTokens",
+  "reasoningTokens",
+  "totalTokens",
+  "costUSD",
+  "isExternal",
+];
+const PROJECT_EXPORT_HEADERS = [
+  "name",
+  "path",
+  "provider",
+  "range",
+  "messages",
+  "tokens",
+  "costUSD",
+  "claudeMessages",
+  "codexMessages",
+  "codexThreads",
+  "codexToolCalls",
+  "claudeTokens",
+  "codexTokens",
+  "claudeCostUSD",
+  "codexCostUSD",
+  "firstSeen",
+  "lastSeen",
+];
+const TOKEN_BUCKETS = [
+  {
+    key: "inputTokens",
+    label: "Input",
+    className: "token-composition-segment--input",
+  },
+  {
+    key: "outputTokens",
+    label: "Output",
+    className: "token-composition-segment--output",
+  },
+  {
+    key: "cacheReadTokens",
+    label: "Cache read",
+    className: "token-composition-segment--cache-read",
+  },
+  {
+    key: "cacheCreationTokens",
+    label: "Cache write",
+    className: "token-composition-segment--cache-write",
+  },
+  {
+    key: "reasoningTokens",
+    label: "Reasoning",
+    className: "token-composition-segment--reasoning",
+  },
+];
 const ALLOWED_PREFS = {
   providerKey: ["all", "claude", "codex"],
   rangeKey: ["7", "30", "90", "all"],
@@ -315,6 +374,44 @@ function App() {
     onSelectedModelsChange() {
       this.savePrefs();
       this.renderTrend();
+    },
+
+    exportCurrentViewJSON() {
+      const content = JSON.stringify(this.exportPayload(), null, 2);
+      this.downloadBlob(
+        this.exportFilename("current-view", "json"),
+        content,
+        "application/json;charset=utf-8",
+      );
+    },
+
+    exportModelsCSV() {
+      const rows = this.filteredByModel.map((model) => ({
+        model: model.model,
+        label: shortModel(model.model),
+        provider: model.provider ?? providerForModel(model.model),
+        inputTokens: model.inputTokens ?? 0,
+        outputTokens: model.outputTokens ?? 0,
+        cacheReadTokens: model.cacheReadTokens ?? 0,
+        cacheCreationTokens: model.cacheCreationTokens ?? 0,
+        reasoningTokens: model.reasoningTokens ?? 0,
+        totalTokens: this.modelTokenTotal(model),
+        costUSD: this.formatCSVNumber(model.costUSD ?? 0),
+        isExternal: model.isExternal === true,
+      }));
+      this.downloadBlob(
+        this.exportFilename("models", "csv"),
+        this.toCSV(rows, MODEL_EXPORT_HEADERS),
+        "text/csv;charset=utf-8",
+      );
+    },
+
+    exportProjectsCSV() {
+      this.downloadBlob(
+        this.exportFilename("projects", "csv"),
+        this.toCSV(this.exportProjectRows(), PROJECT_EXPORT_HEADERS),
+        "text/csv;charset=utf-8",
+      );
     },
 
     // ---------- Computed ----------
@@ -509,6 +606,57 @@ function App() {
       const max = this.maxModelCost || 0;
       if (max <= 0) return 0;
       return Math.max(0, Math.min(100, ((model.costUSD ?? 0) / max) * 100));
+    },
+
+    get tokenComposition() {
+      const totals = Object.fromEntries(
+        TOKEN_BUCKETS.map((bucket) => [bucket.key, 0]),
+      );
+      for (const model of this.filteredByModel) {
+        for (const bucket of TOKEN_BUCKETS) {
+          totals[bucket.key] += model[bucket.key] ?? 0;
+        }
+      }
+      const total = Object.values(totals).reduce(
+        (sum, value) => sum + value,
+        0,
+      );
+      const rows = TOKEN_BUCKETS.map((bucket) => {
+        const value = totals[bucket.key] ?? 0;
+        const pct = this.compositionPct(value, total);
+        return {
+          ...bucket,
+          value,
+          pct,
+          pctLabel: `${pct.toFixed(pct >= 10 || pct === 0 ? 0 : 1)}%`,
+          valueLabel: fmtTokens(value),
+          title: `${bucket.label}: ${fmtNum(value)} tokens (${pct.toFixed(1)}%)`,
+        };
+      });
+      return { total, totalLabel: fmtTokens(total), rows };
+    },
+
+    get cacheEfficiency() {
+      const buckets = this.tokenComposition;
+      const cacheRead =
+        buckets.rows.find((row) => row.key === "cacheReadTokens")?.value ?? 0;
+      const cacheWrite =
+        buckets.rows.find((row) => row.key === "cacheCreationTokens")?.value ??
+        0;
+      const freshInput =
+        buckets.rows.find((row) => row.key === "inputTokens")?.value ?? 0;
+      const total = buckets.total;
+      return {
+        cacheReadShare: this.compositionPct(cacheRead, total),
+        cacheReadRatio: freshInput > 0 ? cacheRead / freshInput : null,
+        cacheWriteShare: this.compositionPct(cacheWrite, total),
+        cacheReadLabel: `${this.compositionPct(cacheRead, total).toFixed(1)}%`,
+        cacheReadRatioLabel:
+          freshInput > 0 ? `${(cacheRead / freshInput).toFixed(2)}x` : "n/a",
+        cacheWriteLabel: `${this.compositionPct(cacheWrite, total).toFixed(
+          1,
+        )}%`,
+      };
     },
 
     get topProjects() {
@@ -842,6 +990,120 @@ function App() {
         (model.cacheCreationTokens ?? 0) +
         (model.reasoningTokens ?? 0)
       );
+    },
+
+    exportPayload() {
+      return {
+        exportedAt: new Date().toISOString(),
+        filters: {
+          provider: this.providerKey,
+          range: this.rangeKey,
+          dateRange: this.activeDateRangeLabel,
+        },
+        summary: this.filtered.summary,
+        daily: this.filteredDaily,
+        models: this.filteredByModel,
+        projects: this.exportProjectRows(),
+      };
+    },
+
+    exportProjectRows() {
+      if (!this.stats) return [];
+      return [...(this.stats.projects ?? [])]
+        .map((project) => this.projectExportRow(project))
+        .filter((project) => project.tokens > 0 || project.costUSD > 0)
+        .sort((a, b) => {
+          const key = this.topProjectMode === "cost" ? "costUSD" : "tokens";
+          return (b[key] ?? 0) - (a[key] ?? 0);
+        });
+    },
+
+    projectExportRow(project) {
+      const provider = this.providerKey;
+      const messages =
+        provider === "claude"
+          ? (project.claudeMessages ?? 0)
+          : provider === "codex"
+            ? (project.codexMessages ?? 0)
+            : (project.messageCount ?? 0);
+      const tokens =
+        provider === "claude"
+          ? (project.claudeTokens ?? 0)
+          : provider === "codex"
+            ? (project.codexTokens ?? 0)
+            : (project.tokens ?? 0);
+      const costUSD =
+        provider === "claude"
+          ? (project.claudeCostUSD ?? 0)
+          : provider === "codex"
+            ? (project.codexCostUSD ?? 0)
+            : (project.costUSD ?? 0);
+      return {
+        name: project.name ?? "",
+        path: project.path ?? "",
+        provider,
+        range: "all-time-project-totals",
+        messages,
+        tokens,
+        costUSD: this.formatCSVNumber(costUSD),
+        claudeMessages: project.claudeMessages ?? 0,
+        codexMessages: project.codexMessages ?? 0,
+        codexThreads: project.codexThreads ?? 0,
+        codexToolCalls: project.codexToolCalls ?? 0,
+        claudeTokens: project.claudeTokens ?? 0,
+        codexTokens: project.codexTokens ?? 0,
+        claudeCostUSD: this.formatCSVNumber(project.claudeCostUSD ?? 0),
+        codexCostUSD: this.formatCSVNumber(project.codexCostUSD ?? 0),
+        firstSeen: project.firstSeen ?? "",
+        lastSeen: project.lastSeen ?? "",
+      };
+    },
+
+    exportFilename(kind, extension) {
+      const date = this.formatDate(new Date());
+      return `token-atlas-${this.providerKey}-${this.rangeKey}-${kind}-${date}.${extension}`;
+    },
+
+    downloadBlob(filename, content, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    },
+
+    toCSV(rows, headers = null) {
+      const activeHeaders = headers ?? Object.keys(rows[0] ?? {});
+      if (!activeHeaders.length) return "";
+      return [
+        activeHeaders.map((header) => this.escapeCSVField(header)).join(","),
+        ...rows.map((row) =>
+          activeHeaders
+            .map((header) => this.escapeCSVField(row[header]))
+            .join(","),
+        ),
+      ].join("\n");
+    },
+
+    escapeCSVField(value) {
+      if (value == null) return "";
+      const text = String(value);
+      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    },
+
+    formatCSVNumber(value) {
+      return Number.isFinite(value) ? Number(value.toFixed(6)) : 0;
+    },
+
+    compositionPct(value, total) {
+      if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) {
+        return 0;
+      }
+      return Math.max(0, Math.min(100, (value / total) * 100));
     },
 
     median(values) {

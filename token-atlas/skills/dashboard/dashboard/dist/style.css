@@ -216,6 +216,13 @@ label:focus-within {
   justify-content: flex-end;
 }
 
+.export-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+}
+
 select,
 .btn {
   min-height: 36px;
@@ -239,6 +246,19 @@ select {
 
 .btn {
   padding: 0 13px;
+}
+
+.export-btn {
+  min-height: 32px;
+  border-color: var(--edge-soft);
+  background: color-mix(in oklch, var(--surface-3) 78%, var(--bg-rail));
+  color: var(--text-muted);
+  font-size: 12px;
+  padding-inline: 10px;
+}
+
+.export-btn:hover {
+  color: var(--text);
 }
 
 select:hover,
@@ -590,6 +610,155 @@ select:hover,
 .cost-ledger-panel .table .cost {
   color: var(--accent-strong);
   font-size: 15px;
+}
+
+.token-composition-panel {
+  display: grid;
+  gap: 11px;
+  margin-bottom: 15px;
+  border: 1px solid color-mix(in oklch, var(--cyan) 12%, var(--edge-soft));
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--cyan) 5%, transparent),
+      transparent 54%
+    ),
+    color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
+  padding: 12px;
+}
+
+.token-composition-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.token-composition-summary h3 {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.cache-efficiency {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.cache-efficiency > div {
+  min-width: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--bg-rail) 62%, transparent);
+  padding: 8px 9px;
+}
+
+.cache-efficiency dt,
+.token-composition-grid dt {
+  margin: 0 0 4px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cache-efficiency dd,
+.token-composition-grid dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+}
+
+.token-composition-bar {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  border: 1px solid color-mix(in oklch, var(--text-faint) 12%, var(--bg-rail));
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--text-faint) 10%, var(--bg-rail));
+  overflow: hidden;
+}
+
+.token-composition-segment {
+  min-width: 0;
+  height: 100%;
+}
+
+.token-composition-segment--input {
+  background: var(--cyan);
+}
+
+.token-composition-segment--output {
+  background: var(--green);
+}
+
+.token-composition-segment--cache-read {
+  background: var(--accent);
+}
+
+.token-composition-segment--cache-write {
+  background: var(--warn);
+}
+
+.token-composition-segment--reasoning {
+  background: var(--violet);
+}
+
+.token-composition-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.token-composition-grid > div {
+  min-width: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--bg-rail) 50%, transparent);
+  padding: 9px 10px;
+}
+
+.token-composition-grid dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.token-composition-grid dd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.token-composition-grid dd strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.token-composition-grid dd span {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.token-composition-key {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
 }
 
 .pricing-confidence {
@@ -1649,6 +1818,12 @@ select:hover,
     width: 100%;
   }
 
+  .export-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
   .provider-switch {
     width: 100%;
   }
@@ -1676,6 +1851,9 @@ select:hover,
 
   .pricing-confidence-head,
   .pricing-confidence-grid,
+  .token-composition-summary,
+  .cache-efficiency,
+  .token-composition-grid,
   .data-health-panel summary,
   .data-health-counts,
   .data-health-source {
