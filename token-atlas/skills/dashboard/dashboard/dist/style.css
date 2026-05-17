@@ -375,49 +375,83 @@ label:focus-within {
   animation-timing-function: var(--ease-out);
 }
 
-/* Subtle breathing — three wave layers drift on independent slow cycles,
-   evoking a horizon that's never quite still. Tiny amplitudes so it reads
-   as ambient, not motion. */
+/* Organic horizon drift — each layer has its own character (axis, amplitude,
+   keyframe asymmetry, easing) so the three waves never synchronize into a
+   single up-down beat. Back layer breathes wide and slow; mid layer rolls
+   with a faint skew; front layer ripples with quicker lateral travel. */
 @keyframes wave-breathe-back {
-  0%,
-  100% {
-    transform: translateY(0);
+  0% {
+    transform: translate(0, 0);
   }
-  50% {
-    transform: translateY(-8px);
+  28% {
+    transform: translate(-3px, -10px);
+  }
+  62% {
+    transform: translate(4px, -5px);
+  }
+  84% {
+    transform: translate(-1px, -7px);
+  }
+  100% {
+    transform: translate(0, 0);
   }
 }
 
 @keyframes wave-breathe-mid {
-  0%,
-  100% {
-    transform: translateY(0);
+  0% {
+    transform: translate(0, 0) skewX(0deg);
   }
-  50% {
-    transform: translateY(6px);
+  22% {
+    transform: translate(5px, 5px) skewX(0.35deg);
+  }
+  48% {
+    transform: translate(-3px, 8px) skewX(-0.25deg);
+  }
+  76% {
+    transform: translate(4px, 3px) skewX(0.2deg);
+  }
+  100% {
+    transform: translate(0, 0) skewX(0deg);
   }
 }
 
 @keyframes wave-breathe-front {
-  0%,
+  0% {
+    transform: translate(0, 0);
+  }
+  18% {
+    transform: translate(-6px, -3px);
+  }
+  43% {
+    transform: translate(4px, -4px);
+  }
+  68% {
+    transform: translate(-2px, 1px);
+  }
+  88% {
+    transform: translate(3px, -2px);
+  }
   100% {
-    transform: translateY(0);
+    transform: translate(0, 0);
   }
-  50% {
-    transform: translateY(-5px);
-  }
+}
+
+/* Different easings per layer break the synchronized "metronome" feel. */
+.hero-wave > path {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
 }
 
 .hero-wave > path:nth-child(1) {
-  animation: wave-breathe-back 18s ease-in-out infinite;
+  animation: wave-breathe-back 23s cubic-bezier(0.4, 0, 0.4, 1) infinite;
 }
 
 .hero-wave > path:nth-child(2) {
-  animation: wave-breathe-mid 14s ease-in-out -4s infinite;
+  animation: wave-breathe-mid 17s cubic-bezier(0.45, 0.05, 0.55, 1) -3s infinite;
 }
 
 .hero-wave > path:nth-child(3) {
-  animation: wave-breathe-front 16s ease-in-out -2s infinite;
+  animation: wave-breathe-front 13s cubic-bezier(0.55, 0, 0.45, 1) -5s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
