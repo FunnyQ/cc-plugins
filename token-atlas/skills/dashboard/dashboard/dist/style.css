@@ -1,59 +1,141 @@
+/* ============================================================
+   Token Atlas — Sunrise Atlas tokens
+   Light = Dawn (default), Dark = Dusk via [data-theme="dark"]
+   ============================================================ */
+
 :root {
-  color-scheme: dark;
-  --bg: oklch(14.5% 0.017 224);
-  --bg-rail: oklch(18% 0.018 224);
-  --surface: oklch(20.5% 0.019 224);
-  --surface-2: oklch(24% 0.02 224);
-  --surface-3: oklch(28% 0.021 224);
-  --surface-glass: oklch(20.5% 0.019 224 / 0.96);
-  --surface-glass-raised: oklch(24% 0.02 224 / 0.96);
-  --border: oklch(35% 0.014 224);
-  --border-soft: oklch(28% 0.012 224);
-  --text: oklch(91.5% 0.009 224);
-  --text-muted: oklch(68% 0.018 224);
-  --text-faint: oklch(55% 0.018 224);
-  --accent: oklch(76% 0.112 70);
-  --accent-strong: oklch(83% 0.12 70);
-  --accent-soft: oklch(33% 0.044 70);
-  --green: oklch(72% 0.112 157);
-  --cyan: oklch(75% 0.09 205);
-  --blue: oklch(70% 0.088 245);
-  --violet: oklch(71% 0.09 286);
-  --rose: oklch(70% 0.1 26);
-  --warn: oklch(78% 0.12 82);
-  --danger: oklch(68% 0.13 24);
-  --edge: oklch(92% 0.01 224 / 0.1);
-  --edge-soft: oklch(92% 0.01 224 / 0.055);
-  --edge-warm: color-mix(in oklch, var(--accent) 10%, var(--edge-soft));
+  color-scheme: light;
+
+  /* Working surface — Dawn */
+  --bg: oklch(97% 0.008 60);
+  --bg-rail: oklch(95% 0.012 55);
+  --surface: oklch(97% 0.008 60);
+  --surface-2: oklch(94.5% 0.014 55);
+  --surface-3: oklch(91.5% 0.022 50);
+  --surface-glass: oklch(97% 0.008 60);
+  --surface-glass-raised: oklch(95.5% 0.012 55);
+
+  --border: oklch(88% 0.014 50);
+  --border-soft: oklch(92% 0.01 55);
+
+  --text: oklch(22% 0.012 60);
+  --text-muted: oklch(48% 0.017 50);
+  --text-faint: oklch(64% 0.014 50);
+
+  /* Sunrise spectrum */
+  --accent: oklch(64% 0.18 30);
+  --accent-strong: oklch(58% 0.22 28);
+  --accent-soft: oklch(92% 0.045 35);
+
+  --sunrise-violet: oklch(58% 0.2 305);
+  --sunrise-magenta: oklch(62% 0.22 340);
+  --sunrise-coral: oklch(64% 0.2 25);
+  --sunrise-orange: oklch(72% 0.18 50);
+  --sunrise-amber: oklch(82% 0.16 75);
+  --sunrise-sky: oklch(82% 0.07 220);
+  --sunrise-glow: oklch(95% 0.04 80);
+
+  /* Semantic — warmed and pulled into sunrise lineage, keeps up/down distinction */
+  --green: oklch(70% 0.15 110);
+  --warn: oklch(75% 0.16 75);
+  --danger: oklch(58% 0.21 25);
+
+  /* Provider hint colors — cool end of sunrise (Codex side) */
+  --cyan: oklch(62% 0.12 250);
+  --blue: oklch(58% 0.16 270);
+  --violet: oklch(60% 0.18 295);
+  --rose: oklch(62% 0.22 340);
+
+  /* Edges */
+  --edge: oklch(86% 0.014 50);
+  --edge-soft: oklch(91% 0.012 55);
+  --edge-warm: var(--edge);
   --theme-edge: var(--edge-warm);
-  --theme-edge-strong: color-mix(in oklch, var(--accent) 16%, var(--edge));
-  --theme-surface: color-mix(
-    in oklch,
-    var(--accent-soft) 7%,
-    var(--surface-glass)
-  );
-  --theme-shadow: 0 16px 42px oklch(8% 0.014 224 / 0.28);
-  --theme-shadow-raised: 0 20px 52px oklch(8% 0.014 224 / 0.34);
-  --glass-highlight: oklch(96% 0.012 224 / 0.035);
-  --glass-highlight-soft: oklch(96% 0.012 224 / 0.018);
-  --chart-tooltip-bg: oklch(21% 0.019 224);
-  --chart-tooltip-text: oklch(91.5% 0.009 224);
-  --chart-grid: oklch(35% 0.014 224 / 0.74);
-  --chart-axis: oklch(57% 0.018 224);
-  --ledger-line: oklch(86% 0.012 224 / 0.075);
-  --ledger-line-strong: oklch(90% 0.014 224 / 0.15);
-  --rune-mark: oklch(78% 0.07 70 / 0.42);
-  --bifrost-cyan: oklch(75% 0.09 205);
-  --bifrost-green: oklch(72% 0.112 157);
-  --radius: 8px;
-  --radius-sm: 5px;
-  --shadow-soft: 0 18px 48px oklch(8% 0.014 224 / 0.36);
-  --shadow-inset:
-    inset 0 1px 0 oklch(100% 0.005 224 / 0.035),
-    inset 0 -1px 0 oklch(0% 0.005 224 / 0.16);
+  --theme-edge-strong: oklch(82% 0.022 45);
+  --theme-surface: var(--surface);
+
+  /* Flat surfaces — no shadows, no glass */
+  --theme-shadow: 0 0 0 transparent;
+  --theme-shadow-raised: 0 0 0 transparent;
+  --shadow-soft: 0 0 0 transparent;
+  --shadow-inset: 0 0 0 transparent;
+  --glass-highlight: transparent;
+  --glass-highlight-soft: transparent;
+
+  /* Charts */
+  --chart-tooltip-bg: oklch(22% 0.012 60);
+  --chart-tooltip-text: oklch(96% 0.008 60);
+  --chart-grid: oklch(88% 0.012 50 / 0.6);
+  --chart-axis: oklch(48% 0.015 50);
+
+  /* Retired Nordic tokens — neutralized aliases so legacy rules still resolve */
+  --rune-mark: transparent;
+  --ledger-line: oklch(88% 0.012 50 / 0.4);
+  --ledger-line-strong: oklch(82% 0.018 50 / 0.6);
+  --bifrost-cyan: var(--sunrise-magenta);
+  --bifrost-green: var(--sunrise-amber);
+
+  --radius: 10px;
+  --radius-sm: 6px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Working surface — Dusk */
+  --bg: oklch(20% 0.035 270);
+  --bg-rail: oklch(23% 0.038 268);
+  --surface: oklch(22% 0.036 270);
+  --surface-2: oklch(26% 0.04 268);
+  --surface-3: oklch(30% 0.045 265);
+  --surface-glass: oklch(22% 0.036 270);
+  --surface-glass-raised: oklch(26% 0.04 268);
+
+  --border: oklch(34% 0.04 50);
+  --border-soft: oklch(28% 0.03 60);
+
+  --text: oklch(94% 0.012 60);
+  --text-muted: oklch(74% 0.02 55);
+  --text-faint: oklch(58% 0.02 50);
+
+  /* Sunset spectrum */
+  --accent: oklch(72% 0.2 30);
+  --accent-strong: oklch(78% 0.22 28);
+  --accent-soft: oklch(38% 0.1 30);
+
+  --sunrise-violet: oklch(46% 0.2 305);
+  --sunrise-magenta: oklch(54% 0.24 340);
+  --sunrise-coral: oklch(60% 0.22 25);
+  --sunrise-orange: oklch(68% 0.2 50);
+  --sunrise-amber: oklch(78% 0.18 75);
+  --sunrise-sky: oklch(38% 0.1 250);
+  --sunrise-glow: oklch(72% 0.16 65);
+
+  --green: oklch(78% 0.16 110);
+  --warn: oklch(82% 0.16 75);
+  --danger: oklch(68% 0.22 25);
+
+  --cyan: oklch(72% 0.14 250);
+  --blue: oklch(70% 0.16 270);
+  --violet: oklch(70% 0.18 295);
+  --rose: oklch(72% 0.22 340);
+
+  --edge: oklch(35% 0.04 50);
+  --edge-soft: oklch(30% 0.03 55);
+  --theme-edge-strong: oklch(42% 0.05 45);
+
+  --chart-tooltip-bg: oklch(94% 0.012 60);
+  --chart-tooltip-text: oklch(20% 0.035 270);
+  --chart-grid: oklch(40% 0.025 50 / 0.6);
+  --chart-axis: oklch(72% 0.018 55);
+
+  --ledger-line: oklch(50% 0.025 50 / 0.4);
+  --ledger-line-strong: oklch(58% 0.03 50 / 0.6);
 }
 
 [v-cloak] {
@@ -72,9 +154,7 @@ body {
   min-height: 100vh;
   margin: 0;
   color: var(--text);
-  background:
-    url("/assets/dashboard-bg.jpg") center top / cover fixed,
-    var(--bg);
+  background: var(--bg);
   font-size: 14px;
   overflow-x: clip;
 }
@@ -115,43 +195,121 @@ label:focus-within {
   padding: 22px 24px 32px;
 }
 
-/* Header */
+/* ============================================================
+   Hero band — sunrise wave + brand + controls + cost metric
+   ============================================================ */
+
+.hero-band {
+  position: relative;
+  margin: -22px calc(50% - 50dvw) 28px;
+  padding: 22px max(24px, calc((100dvw - 1480px) / 2 + 24px)) 56px;
+  color: oklch(99% 0.005 60);
+  background: linear-gradient(
+    100deg,
+    var(--sunrise-violet) 0%,
+    var(--sunrise-magenta) 22%,
+    var(--sunrise-coral) 42%,
+    var(--sunrise-orange) 60%,
+    var(--sunrise-amber) 78%,
+    var(--sunrise-sky) 100%
+  );
+  overflow: hidden;
+  isolation: isolate;
+  animation: hero-rise 600ms var(--ease-out-expo) both;
+}
+
+/* Layered SVG waves are positioned absolutely inside .hero-band */
+.hero-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero-band-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+}
+
+/* Topbar lives inside .hero-band now — transparent, no sticky */
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  margin: -22px calc(50% - 50dvw) 22px;
-  padding: 18px max(24px, calc((100dvw - 1480px) / 2 + 24px)) 16px;
-  border-bottom: 1px solid var(--theme-edge);
-  background:
-    linear-gradient(
-      90deg,
-      oklch(17% 0.018 224 / 0.94),
-      oklch(15% 0.016 224 / 0.96)
-    ),
-    var(--bg);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 12px 30px oklch(8% 0.014 224 / 0.18);
+  background: transparent;
   overflow: visible;
 }
 
-.topbar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-top: 1px solid var(--glass-highlight-soft);
-  background: linear-gradient(
-    100deg,
-    transparent 0 18%,
-    var(--glass-highlight-soft) 42%,
-    transparent 68% 100%
-  );
-  opacity: 0.28;
-  pointer-events: none;
+/* Hero metric block */
+.hero-metric {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+.hero-metric-label {
+  margin: 0;
+  color: oklch(99% 0.005 60 / 0.88);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.hero-metric-value {
+  margin: 0;
+  color: oklch(99% 0.005 60);
+  font-size: clamp(48px, 7vw, 96px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.hero-metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: oklch(99% 0.005 60 / 0.85);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-metric-delta strong {
+  font-weight: 700;
+}
+
+/* deltaClass() injects .compare-block which adds a border-top + grid.
+   Reset those inside hero so the delta sits inline under the cost number. */
+.hero-band .compare-block {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  border-top: 0;
+  padding-top: 0;
+}
+
+@keyframes hero-rise {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-band {
+    animation: none;
+  }
 }
 
 .brand {
@@ -191,7 +349,7 @@ label:focus-within {
 
 .brand h1 {
   margin: 0;
-  color: var(--text);
+  color: oklch(99% 0.005 60);
   font-size: 18px;
   font-weight: 680;
   letter-spacing: 0;
@@ -202,10 +360,67 @@ label:focus-within {
 .brand::after {
   content: "Local usage ledger for Claude + Codex traces";
   grid-column: 2;
-  color: var(--text-muted);
+  color: oklch(99% 0.005 60 / 0.82);
   font-size: 12px;
   line-height: 1.15;
   align-self: start;
+}
+
+/* Controls sit on bright wave — use translucent dark chrome for legibility */
+.hero-band select,
+.hero-band .btn {
+  background: oklch(22% 0.012 60 / 0.32);
+  color: oklch(99% 0.005 60);
+  border: 1px solid oklch(99% 0.005 60 / 0.24);
+  box-shadow: none;
+}
+
+.hero-band select:hover,
+.hero-band .btn:hover {
+  background: oklch(22% 0.012 60 / 0.46);
+  border-color: oklch(99% 0.005 60 / 0.42);
+}
+
+.hero-band .segmented-control {
+  background: oklch(22% 0.012 60 / 0.28);
+  border-color: oklch(99% 0.005 60 / 0.24);
+}
+
+.hero-band .segmented-control button {
+  color: oklch(99% 0.005 60 / 0.82);
+}
+
+.hero-band .segmented-control button.active {
+  background: oklch(99% 0.005 60 / 0.92);
+  color: oklch(28% 0.04 30);
+}
+
+.hero-band .export-menu-trigger {
+  background: oklch(22% 0.012 60 / 0.32);
+  color: oklch(99% 0.005 60 / 0.92);
+  border-color: oklch(99% 0.005 60 / 0.24);
+}
+
+.hero-band .export-menu-trigger:hover {
+  background: oklch(22% 0.012 60 / 0.46);
+  color: oklch(99% 0.005 60);
+}
+
+/* Export menu panel pops below hero — switch back to surface tokens */
+.hero-band .export-menu-panel {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.hero-band .export-menu-panel button {
+  color: var(--text-muted);
+}
+
+.hero-band .export-menu-panel button:hover,
+.hero-band .export-menu-panel button:focus-visible {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .controls {
@@ -359,91 +574,26 @@ select:hover,
   container-type: inline-size;
   min-height: 126px;
   overflow: hidden;
-  border: 1px solid var(--theme-edge);
+  border: 0;
   border-radius: var(--radius);
-  background:
-    radial-gradient(
-      circle at 8% 0,
-      oklch(84% 0.03 190 / 0.035),
-      transparent 34%
-    ),
-    linear-gradient(180deg, oklch(100% 0.005 224 / 0.026), transparent 38%),
-    var(--theme-surface);
-  box-shadow: var(--shadow-inset), var(--theme-shadow);
+  background: var(--surface-2);
   padding: 22px 24px 20px;
-  transition:
-    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 180ms var(--ease-out);
 }
 
+/* Retired: rune corner ticks + bifrost rainbow stripe. Keep selectors
+   so legacy hover rules below are inert without producing visual artifacts. */
 .card::before,
 .panel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border: 1px solid color-mix(in oklch, var(--rune-mark) 54%, transparent);
-  background:
-    linear-gradient(90deg, var(--rune-mark) 0 1px, transparent 1px 9px) left
-      13px top 13px / 54px 1px no-repeat,
-    linear-gradient(180deg, var(--rune-mark) 0 1px, transparent 1px 9px) left
-      13px top 13px / 1px 54px no-repeat,
-    linear-gradient(
-      90deg,
-      transparent 0 34%,
-      var(--glass-highlight) 49%,
-      transparent 62% 100%
-    );
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-18%);
-  transition:
-    opacity 180ms var(--ease-out),
-    transform 220ms var(--ease-out);
+  content: none;
 }
 
-.card:hover,
-.panel:hover {
-  border-color: color-mix(in oklch, var(--accent) 18%, var(--edge));
-  box-shadow: var(--shadow-inset), var(--theme-shadow-raised);
-  transform: translateY(-1px);
-}
-
-.card:hover::before,
-.panel:hover::after {
-  opacity: 0.46;
-  transform: translateX(0);
+.card:hover {
+  background: var(--surface-3);
 }
 
 .card:first-child {
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--accent-soft) 26%, var(--surface-glass-raised)),
-      var(--surface-glass) 62%
-    ),
-    var(--surface-glass);
-  border-color: var(--theme-edge-strong);
-}
-
-.card:first-child .card-value {
-  text-shadow: 0 0 18px color-mix(in oklch, var(--accent) 18%, transparent);
-}
-
-.card:first-child::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 5px;
-  background: linear-gradient(
-    90deg,
-    var(--accent),
-    var(--bifrost-cyan),
-    var(--bifrost-green)
-  );
+  background: var(--surface-2);
 }
 
 .card-label {
@@ -746,19 +896,19 @@ select:hover,
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--green);
+  background: var(--sunrise-amber);
 }
 
 .budget-meter-fill--medium {
-  background: var(--cyan);
+  background: var(--sunrise-orange);
 }
 
 .budget-meter-fill--high {
-  background: var(--warn);
+  background: var(--sunrise-coral);
 }
 
 .budget-meter-fill--over {
-  background: var(--rose);
+  background: var(--sunrise-magenta);
 }
 
 .budget-stats {
@@ -808,23 +958,12 @@ select:hover,
   position: relative;
   container-type: inline-size;
   overflow: hidden;
-  border: 1px solid var(--theme-edge);
+  border: 0;
   border-radius: var(--radius);
-  background:
-    radial-gradient(
-      circle at 0 0,
-      oklch(84% 0.03 190 / 0.025),
-      transparent 28%
-    ),
-    linear-gradient(180deg, oklch(100% 0.005 224 / 0.02), transparent 30%),
-    var(--theme-surface);
-  box-shadow: var(--shadow-inset), var(--theme-shadow);
-  padding: 16px 17px;
+  background: var(--surface-2);
+  padding: 18px 20px;
   margin-bottom: 14px;
-  transition:
-    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 180ms var(--ease-out);
 }
 
 .panel-head {
@@ -840,20 +979,14 @@ select:hover,
 .panel-head h2 {
   margin: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0;
 }
 
+/* Retired: Nordic rune diamond marker before panel headings */
 .panel-head h2::before {
-  content: "";
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 8px;
-  border: 1px solid var(--rune-mark);
-  border-radius: 2px;
-  transform: rotate(45deg) translateY(-1px);
+  content: none;
 }
 
 .muted {
@@ -936,16 +1069,10 @@ select:hover,
   display: grid;
   gap: 11px;
   margin-bottom: 15px;
-  border: 1px solid color-mix(in oklch, var(--cyan) 12%, var(--edge-soft));
+  border: 0;
   border-radius: var(--radius-sm);
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in oklch, var(--cyan) 5%, transparent),
-      transparent 54%
-    ),
-    color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
-  padding: 12px;
+  background: var(--surface-3);
+  padding: 14px;
 }
 
 .token-composition-summary {
@@ -1012,23 +1139,23 @@ select:hover,
 }
 
 .token-composition-segment--input {
-  background: var(--cyan);
+  background: var(--sunrise-sky);
 }
 
 .token-composition-segment--output {
-  background: var(--green);
+  background: var(--sunrise-coral);
 }
 
 .token-composition-segment--cache-read {
-  background: var(--accent);
+  background: var(--sunrise-amber);
 }
 
 .token-composition-segment--cache-write {
-  background: var(--warn);
+  background: var(--sunrise-orange);
 }
 
 .token-composition-segment--reasoning {
-  background: var(--violet);
+  background: var(--sunrise-violet);
 }
 
 .token-composition-grid {
@@ -1303,11 +1430,11 @@ select:hover,
 }
 
 .project-rank-meter-segment--claude {
-  background: oklch(74% 0.15 43);
+  background: var(--sunrise-coral);
 }
 
 .project-rank-meter-segment--codex {
-  background: oklch(71% 0.12 162);
+  background: var(--sunrise-violet);
 }
 
 .top-cost-panel {
@@ -1581,7 +1708,7 @@ select:hover,
 
 .segmented-control button.active {
   background: var(--accent);
-  color: oklch(18% 0.025 70);
+  color: oklch(99% 0.005 60);
 }
 
 .segmented-control button:not(.active):hover {
@@ -1797,15 +1924,15 @@ select:hover,
 }
 
 .badge--claude {
-  border-color: oklch(67% 0.14 43 / 0.42);
-  background: color-mix(in oklch, oklch(67% 0.14 43) 10%, var(--bg-rail));
-  color: oklch(74% 0.15 43);
+  border-color: color-mix(in oklch, var(--sunrise-coral) 38%, transparent);
+  background: color-mix(in oklch, var(--sunrise-coral) 10%, var(--bg-rail));
+  color: var(--sunrise-coral);
 }
 
 .badge--codex {
-  border-color: oklch(61% 0.105 162 / 0.42);
-  background: color-mix(in oklch, oklch(61% 0.105 162) 10%, var(--bg-rail));
-  color: oklch(71% 0.12 162);
+  border-color: color-mix(in oklch, var(--sunrise-violet) 38%, transparent);
+  background: color-mix(in oklch, var(--sunrise-violet) 10%, var(--bg-rail));
+  color: var(--sunrise-violet);
 }
 
 .project-name {
