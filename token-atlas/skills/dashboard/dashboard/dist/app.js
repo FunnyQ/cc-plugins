@@ -20,29 +20,31 @@ function loadChartJs() {
 
 // ---------- Color palette ----------
 
+// Sunrise spectrum — Claude pulls warm dawn hues, Codex pulls cool dusk hues.
+// Both readable on warm-light surface and dusk-dark surface.
 const CLAUDE_PALETTE = [
-  "oklch(76% 0.112 70)",
-  "oklch(72% 0.096 52)",
-  "oklch(79% 0.086 86)",
-  "oklch(69% 0.076 38)",
-  "oklch(74% 0.082 104)",
-  "oklch(66% 0.07 62)",
-  "oklch(82% 0.072 76)",
-  "oklch(70% 0.064 92)",
+  "oklch(66% 0.20 25)",
+  "oklch(72% 0.18 50)",
+  "oklch(80% 0.16 70)",
+  "oklch(60% 0.20 15)",
+  "oklch(76% 0.14 60)",
+  "oklch(82% 0.12 85)",
+  "oklch(64% 0.20 35)",
+  "oklch(70% 0.16 45)",
 ];
 
 const CODEX_PALETTE = [
-  "oklch(75% 0.09 205)",
-  "oklch(72% 0.112 157)",
-  "oklch(70% 0.088 245)",
-  "oklch(71% 0.09 286)",
-  "oklch(69% 0.074 194)",
-  "oklch(74% 0.07 175)",
-  "oklch(66% 0.078 232)",
-  "oklch(73% 0.072 268)",
+  "oklch(58% 0.20 305)",
+  "oklch(62% 0.22 340)",
+  "oklch(58% 0.18 285)",
+  "oklch(64% 0.16 260)",
+  "oklch(72% 0.12 250)",
+  "oklch(54% 0.20 320)",
+  "oklch(68% 0.14 235)",
+  "oklch(60% 0.16 290)",
 ];
 
-const OTHER_COLOR = "oklch(58% 0.018 224)";
+const OTHER_COLOR = "oklch(64% 0.014 50)";
 
 const colorCache = new Map();
 function colorFor(model) {
@@ -162,6 +164,32 @@ const ANOMALY_MIN_TOKENS = 50_000;
 const LEDGER_INITIAL_VISIBLE = 5;
 const LEDGER_PAGE_SIZE = 50;
 const PREFS_STORAGE_KEY = "token-atlas:prefs:v1";
+const THEME_STORAGE_KEY = "token-atlas:theme:v1";
+
+function loadStoredTheme() {
+  try {
+    const raw = window.localStorage?.getItem(THEME_STORAGE_KEY);
+    return raw === "light" || raw === "dark" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredTheme(mode) {
+  try {
+    window.localStorage?.setItem(THEME_STORAGE_KEY, mode);
+  } catch {
+    // Theme is optional; keep usable when storage is blocked.
+  }
+}
+
+function detectInitialTheme() {
+  const stored = loadStoredTheme();
+  if (stored) return stored;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 const MODEL_EXPORT_HEADERS = [
   "model",
   "label",
@@ -304,8 +332,10 @@ function App() {
     modalScrollY: 0,
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
+    themeMode: detectInitialTheme(),
 
     async mounted() {
+      this.applyTheme(this.themeMode);
       this.loading = true;
       this.error = null;
       try {
@@ -317,6 +347,23 @@ function App() {
       }
       await this.refresh();
       this.startAutoRefresh();
+    },
+
+    applyTheme(mode) {
+      const resolved = mode === "dark" ? "dark" : "light";
+      this.themeMode = resolved;
+      document.documentElement.dataset.theme = resolved;
+    },
+
+    toggleTheme() {
+      const next = this.themeMode === "dark" ? "light" : "dark";
+      this.applyTheme(next);
+      saveStoredTheme(next);
+      // Charts read cssVar at render time — redraw so tooltip/grid pick up new theme
+      this.$nextTick(() => {
+        this.renderTrend();
+        this.renderDonut();
+      });
     },
 
     startAutoRefresh() {
@@ -1663,7 +1710,8 @@ function App() {
       if (v === 0) return "var(--bg-rail)";
       const ratio = Math.pow(v / max, 0.5);
       const alpha = 0.15 + ratio * 0.85;
-      return `rgba(220, 162, 79, ${alpha.toFixed(3)})`;
+      // Violet-magenta — pulls from sunrise's cool end, contrasts the calendar's coral
+      return `oklch(60% 0.20 318 / ${alpha.toFixed(3)})`;
     },
 
     activityColorFromMax(v, max) {
@@ -1671,7 +1719,8 @@ function App() {
       if (v === 0) return "var(--bg-rail)";
       const ratio = Math.pow(v / max, 0.5);
       const alpha = 0.14 + ratio * 0.82;
-      return `oklch(73% 0.13 151 / ${alpha.toFixed(3)})`;
+      // Coral-orange — distinct from heatmap's amber, same sunrise lineage
+      return `oklch(68% 0.18 32 / ${alpha.toFixed(3)})`;
     },
 
     trendDayValue(day, models, isCost) {
@@ -1837,6 +1886,7 @@ function App() {
       const tooltipBg = cssVar("--chart-tooltip-bg");
       const tooltipText = cssVar("--chart-tooltip-text");
       const chartGrid = cssVar("--chart-grid");
+      const surfaceText = cssVar("--text");
 
       charts.donut = new window.Chart(ctx, {
         type: "doughnut",
@@ -1846,7 +1896,7 @@ function App() {
             {
               data: donutData.map((d) => d.value),
               backgroundColor: donutData.map((d) => colorFor(d.full)),
-              borderColor: cssVar("--bg"),
+              borderColor: cssVar("--surface-2"),
               borderWidth: 2,
             },
           ],
@@ -1859,7 +1909,7 @@ function App() {
             legend: {
               position: "bottom",
               labels: {
-                color: tooltipText,
+                color: surfaceText,
                 font: { size: 11 },
                 boxWidth: 10,
               },
