@@ -13,8 +13,8 @@ A local Claude Code plugin marketplace. Private plugins for extending Claude Cod
 ### CLI
 
 ```bash
-claude plugins add-marketplace --source github --repo FunnyQ/cc-plugins
-claude plugins install token-atlas
+claude plugins marketplace add FunnyQ/cc-plugins
+claude plugins install token-atlas@q-lab-marketplace
 ```
 
 ### TUI (interactive)
