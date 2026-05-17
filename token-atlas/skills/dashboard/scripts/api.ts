@@ -734,6 +734,7 @@ function serializeProjectModelUsage(
   if (!byModel) return [];
   return Array.from(byModel.entries())
     .map(([model, usage]) => {
+      // Claude transcript keys are bare model names; codex keys are already "codex:model" namespaced.
       const modelName =
         provider === "claude" ? modelKey("claude", model) : model;
       const rawModel = provider === "claude" ? model : rawModelFromKey(model);

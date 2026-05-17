@@ -268,6 +268,21 @@ function normalizePrefs(raw) {
   return prefs;
 }
 
+function enrichProjectRow(p, value, claudeValue, codexValue, total, fmt) {
+  const providerTotal = claudeValue + codexValue || value || 1;
+  return {
+    ...p,
+    displayLabel: fmt(value),
+    pct: ((value / total) * 100).toFixed(1),
+    claudePct: ((claudeValue / providerTotal) * 100).toFixed(1),
+    codexPct: ((codexValue / providerTotal) * 100).toFixed(1),
+    hasClaude: claudeValue > 0,
+    hasCodex: codexValue > 0,
+    claudeDisplay: fmt(claudeValue),
+    codexDisplay: fmt(codexValue),
+  };
+}
+
 // ---------- App ----------
 
 function App() {
@@ -326,7 +341,6 @@ function App() {
         this.stats = data;
         this.reconcileSelectedModels();
         this.reconcileSelectedProject();
-        this.savePrefs();
         await this.$nextTick();
         this.renderTrend();
         this.renderDonut();
@@ -704,18 +718,14 @@ function App() {
           const codexValue = isCost
             ? (p.codexCostUSD ?? 0)
             : (p.codexTokens ?? 0);
-          const providerTotal = claudeValue + codexValue || value || 1;
-          return {
-            ...p,
-            displayLabel: fmt(value),
-            pct: ((value / total) * 100).toFixed(1),
-            claudePct: ((claudeValue / providerTotal) * 100).toFixed(1),
-            codexPct: ((codexValue / providerTotal) * 100).toFixed(1),
-            hasClaude: claudeValue > 0,
-            hasCodex: codexValue > 0,
-            claudeDisplay: fmt(claudeValue),
-            codexDisplay: fmt(codexValue),
-          };
+          return enrichProjectRow(
+            p,
+            value,
+            claudeValue,
+            codexValue,
+            total,
+            fmt,
+          );
         });
     },
 
@@ -727,22 +737,15 @@ function App() {
         .slice(0, 3);
       const total = projects.reduce((s, p) => s + (p.costUSD ?? 0), 0) || 1;
       return projects.map((p) => {
-        const value = p.costUSD ?? 0;
-        const claudeValue = p.claudeCostUSD ?? 0;
-        const codexValue = p.codexCostUSD ?? 0;
-        const providerTotal = claudeValue + codexValue || value || 1;
-        return {
-          ...p,
-          displayLabel: fmtUSD(value),
-          tokenLabel: fmtTokens(p.tokens ?? 0),
-          pct: ((value / total) * 100).toFixed(1),
-          claudePct: ((claudeValue / providerTotal) * 100).toFixed(1),
-          codexPct: ((codexValue / providerTotal) * 100).toFixed(1),
-          hasClaude: claudeValue > 0,
-          hasCodex: codexValue > 0,
-          claudeDisplay: fmtUSD(claudeValue),
-          codexDisplay: fmtUSD(codexValue),
-        };
+        const enriched = enrichProjectRow(
+          p,
+          p.costUSD ?? 0,
+          p.claudeCostUSD ?? 0,
+          p.codexCostUSD ?? 0,
+          total,
+          fmtUSD,
+        );
+        return { ...enriched, tokenLabel: fmtTokens(p.tokens ?? 0) };
       });
     },
 
@@ -1154,10 +1157,6 @@ function App() {
         topProjectMode: this.topProjectMode,
         selectedModels: this.selectedModels,
       });
-    },
-
-    normalizePrefs(raw) {
-      return normalizePrefs(raw);
     },
 
     reconcileSelectedModels() {
