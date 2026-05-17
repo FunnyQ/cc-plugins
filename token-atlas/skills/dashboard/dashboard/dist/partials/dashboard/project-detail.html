@@ -1,0 +1,149 @@
+      <div
+        v-if="selectedProject"
+        class="project-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-detail-title"
+        @click.self="clearSelectedProject"
+        @keydown.escape="clearSelectedProject"
+      >
+        <section
+          class="panel project-detail-panel"
+          aria-label="Selected project detail"
+          ref="projectDetailDialog"
+          tabindex="-1"
+        >
+          <div class="project-detail-head">
+            <div>
+              <h2 id="project-detail-title">
+                {{ activeProjectDetail.project.name }}
+              </h2>
+              <code>{{ activeProjectDetail.project.path }}</code>
+            </div>
+            <button
+              type="button"
+              class="btn project-detail-close"
+              aria-label="Close project detail"
+              @click="clearSelectedProject"
+            >
+              Close
+            </button>
+          </div>
+          <div class="project-detail-meta">
+            <div>
+              <span>First seen</span>
+              <strong
+                >{{ activeProjectDetail.project.firstSeen || 'n/a' }}</strong
+              >
+            </div>
+            <div>
+              <span>Last seen</span>
+              <strong
+                >{{ activeProjectDetail.project.lastSeen || 'n/a' }}</strong
+              >
+            </div>
+            <div>
+              <span>{{ activeProjectDetail.summary.label }} tokens</span>
+              <strong
+                >{{ fmtTokens(activeProjectDetail.summary.tokens) }}</strong
+              >
+            </div>
+            <div>
+              <span>{{ activeProjectDetail.summary.label }} cost</span>
+              <strong
+                >${{ activeProjectDetail.summary.costUSD.toFixed(2) }}</strong
+              >
+            </div>
+          </div>
+          <div class="project-provider-split">
+            <div>
+              <span>Claude</span>
+              <strong
+                >{{ fmtTokens(activeProjectDetail.project.claudeTokens || 0)
+                }}</strong
+              >
+              <small
+                >${{ (activeProjectDetail.project.claudeCostUSD || 0).toFixed(2)
+                }}</small
+              >
+            </div>
+            <div>
+              <span>Codex</span>
+              <strong
+                >{{ fmtTokens(activeProjectDetail.project.codexTokens || 0)
+                }}</strong
+              >
+              <small
+                >${{ (activeProjectDetail.project.codexCostUSD || 0).toFixed(2)
+                }}</small
+              >
+            </div>
+          </div>
+          <div class="project-detail-subhead">
+            <div>
+              <h3>Model breakdown</h3>
+              <span class="muted"
+                >{{ activeProjectDetail.summary.label }} · all-time project
+                totals</span
+              >
+            </div>
+            <strong v-if="activeProjectDetail.models.length"
+              >{{ fmtUSD(activeProjectDetail.modelTotalCost) }}</strong
+            >
+          </div>
+          <table v-if="activeProjectDetail.models.length" class="table compact">
+            <caption>
+              Model totals for selected project.
+            </caption>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Source</th>
+                <th class="num">Tokens</th>
+                <th class="num">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in activeProjectDetail.models" :key="m.model">
+                <td data-label="Model">
+                  <span class="model-cell">
+                    <span
+                      :class="modelMarkClass(m.model)"
+                      :style="{ background: colorFor(m.model) }"
+                    ></span>
+                    {{ shortModel(m.model) }}
+                    <span v-if="m.isExternal" class="badge">ext</span>
+                  </span>
+                  <div
+                    class="row-meter"
+                    :title="'Cost share vs highest project model: ' + projectModelCostPct(m).toFixed(1) + '%'"
+                  >
+                    <span
+                      :style="{ width: projectModelCostPct(m).toFixed(1) + '%' }"
+                    ></span>
+                  </div>
+                </td>
+                <td data-label="Source">
+                  <span :class="providerBadgeClass(m.provider || 'claude')">
+                    {{ m.provider || 'claude' }}
+                  </span>
+                </td>
+                <td data-label="Tokens" class="num">
+                  {{ fmtTokens(modelTokenTotal(m)) }}
+                </td>
+                <td data-label="Cost" class="num cost">
+                  ${{ (m.costUSD || 0).toFixed(2) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty-state empty-state--panel">
+            No model breakdown for this project and provider filter.
+          </div>
+          <div class="project-detail-note">
+            Daily project trend needs per-project daily rows and is not yet
+            available in this API slice.
+          </div>
+        </section>
+      </div>
+

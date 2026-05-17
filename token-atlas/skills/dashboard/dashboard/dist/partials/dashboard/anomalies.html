@@ -1,0 +1,31 @@
+        <!-- Usage shifts (moved down: diagnostic, after the cost table that explains spend) -->
+        <section class="panel anomaly-panel" aria-label="Usage anomalies">
+          <div class="panel-head">
+            <h2>Usage shifts</h2>
+            <span class="muted">{{ usageAnomalyState.label }}</span>
+          </div>
+          <div v-if="usageAnomalies.length" class="anomaly-list">
+            <div
+              v-for="item in usageAnomalies"
+              :key="item.date + '-' + item.metric"
+              class="anomaly-item"
+            >
+              <div>
+                <strong>{{ item.date }}</strong>
+                <span>{{ item.value }} · {{ item.metric }}</span>
+              </div>
+              <div>
+                <strong>{{ item.ratioLabel }}</strong>
+                <span>{{ item.baselineLabel }}</span>
+              </div>
+              <div>
+                <strong>Main driver</strong>
+                <span>{{ item.driverLabel }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state empty-state--panel">
+            {{ usageAnomalyState.label }}
+          </div>
+        </section>
+

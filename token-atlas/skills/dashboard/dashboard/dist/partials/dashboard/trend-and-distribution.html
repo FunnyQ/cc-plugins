@@ -1,0 +1,100 @@
+        <!-- Trend + donut row -->
+        <section class="row activity-row">
+          <div class="panel wide trend-command-panel">
+            <div class="panel-head">
+              <h2>Daily trend</h2>
+              <div class="trend-controls">
+                <div
+                  class="segmented-control"
+                  aria-label="Daily trend model scope"
+                >
+                  <button
+                    type="button"
+                    :class="{ active: trendModelScope === 'all' }"
+                    :aria-pressed="trendModelScope === 'all'"
+                    @click="onTrendModelScopeChange('all')"
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    :class="{ active: trendModelScope === 'top5' }"
+                    :aria-pressed="trendModelScope === 'top5'"
+                    @click="onTrendModelScopeChange('top5')"
+                  >
+                    Top 5
+                  </button>
+                </div>
+                <div class="segmented-control" aria-label="Daily trend mode">
+                  <button
+                    type="button"
+                    :class="{ active: trendMode === 'tokens' }"
+                    :aria-pressed="trendMode === 'tokens'"
+                    @click="onTrendModeChange('tokens')"
+                  >
+                    Tokens
+                  </button>
+                  <button
+                    type="button"
+                    :class="{ active: trendMode === 'cost' }"
+                    :aria-pressed="trendMode === 'cost'"
+                    @click="onTrendModeChange('cost')"
+                  >
+                    Cost
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-if="previousTrendAvailable" class="trend-reference">
+              <span class="trend-reference-line"></span>
+              <span>{{ previousTrendLabel }}</span>
+            </div>
+            <div v-if="trendModels.length" class="model-toggles">
+              <label
+                v-for="m in trendModels"
+                :key="m"
+                :class="{ off: !selectedModels[m] }"
+              >
+                <input
+                  type="checkbox"
+                  v-model="selectedModels[m]"
+                  @change="onSelectedModelsChange"
+                />
+                <span
+                  :class="modelMarkClass(m)"
+                  :style="{ background: colorFor(m) }"
+                ></span>
+                {{ shortModel(m) }}
+              </label>
+            </div>
+            <div class="chart-box">
+              <canvas
+                ref="trendCanvas"
+                role="img"
+                aria-label="Daily usage trend chart"
+              ></canvas>
+              <div v-if="!activeTrendModels.length" class="empty-state">
+                {{ trendModels.length ? 'Select at least one model.' : 'No model
+                activity in this window.' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="panel distribution-panel distribution-command-panel">
+            <div class="panel-head">
+              <h2>Model distribution</h2>
+              <span class="muted">{{ activeWindowLabel }}</span>
+            </div>
+            <div class="chart-box small">
+              <canvas
+                ref="donutCanvas"
+                role="img"
+                aria-label="Model distribution chart"
+              ></canvas>
+              <div v-if="!filteredByModel.length" class="empty-state">
+                No model totals for this filter.
+              </div>
+            </div>
+          </div>
+        </section>
+

@@ -1,0 +1,24 @@
+    <div id="app" v-scope="App()" @vue:mounted="mounted()" v-cloak>
+      <a class="skip-link" href="#main-content">Skip to dashboard</a>
+
+      <div data-partial="/partials/dashboard/loading.html"></div>
+      <div data-partial="/partials/dashboard/hero.html"></div>
+      <div data-partial="/partials/dashboard/project-detail.html"></div>
+      <div data-partial="/partials/dashboard/error.html"></div>
+
+      <main
+        v-else-if="stats"
+        id="main-content"
+        class="main-shell main-shell--corner-signal"
+      >
+        <div data-partial="/partials/dashboard/overview.html"></div>
+        <div data-partial="/partials/dashboard/budget.html"></div>
+        <div data-partial="/partials/dashboard/trend-and-distribution.html"></div>
+        <div data-partial="/partials/dashboard/model-costs.html"></div>
+        <div data-partial="/partials/dashboard/anomalies.html"></div>
+        <div data-partial="/partials/dashboard/activity-and-projects.html"></div>
+        <div data-partial="/partials/dashboard/session-ledger.html"></div>
+        <div data-partial="/partials/dashboard/data-health.html"></div>
+        <div data-partial="/partials/dashboard/footer.html"></div>
+      </main>
+    </div>
