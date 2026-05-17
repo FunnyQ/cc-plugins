@@ -3,6 +3,17 @@
    Light = Dawn (default), Dark = Dusk via [data-theme="dark"]
    ============================================================ */
 
+/* Fraunces — variable serif (opsz 9..144, wght 300..900). Self-hosted to
+   keep the dashboard offline-capable. Used for display headings only;
+   body stays on the system stack for developer-tool credibility. */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-variable.woff2") format("woff2-variations");
+}
+
 :root {
   color-scheme: light;
 
@@ -110,8 +121,17 @@
   --fs-3xl: 22px;
   --fs-hero: clamp(48px, 7vw, 96px);
 
-  font-family:
+  /* Type stacks. Display = editorial serif (atlas/cartography feel).
+     Rounded = SF Pro Rounded for the hero metric warmth, falls back to system.
+     Body = system stack — developer-tool credibility. */
+  --ff-body:
     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ff-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --ff-rounded:
+    "SF Pro Rounded", "SF Pro Display", -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
+
+  font-family: var(--ff-body);
 }
 
 [data-theme="dark"] {
@@ -209,6 +229,25 @@ body {
     ),
     url("/assets/dashboard-bg-dusk.jpg") center top / cover no-repeat fixed,
     var(--bg);
+}
+
+/* Editorial serif for headings — opsz axis auto-adapts to font-size,
+   so h3 (small) reads cleaner than a fixed display opsz. The atlas/cartography
+   tone lives here, not in body. */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--ff-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.005em;
+}
+
+/* Hero cost metric — SF Pro Rounded on Apple, soft fallback elsewhere.
+   The big cost number gets dawn-warm curves; smaller numbers stay precise
+   on the body sans for ledger feel. */
+.hero-metric-value {
+  font-family: var(--ff-rounded);
 }
 
 .skip-link {
