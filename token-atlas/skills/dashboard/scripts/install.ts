@@ -3,17 +3,21 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const HOME = homedir();
-const checks: Array<{ label: string; ok: boolean; hint?: string }> = [];
+type Level = "required" | "optional";
+type Check = { label: string; ok: boolean; level: Level; hint?: string };
 
-function check(label: string, ok: boolean, hint?: string) {
-  checks.push({ label, ok, hint });
+const HOME = homedir();
+const checks: Check[] = [];
+
+function check(label: string, ok: boolean, level: Level, hint?: string) {
+  checks.push({ label, ok, level, hint });
 }
 
 // Bun
 check(
   "bun runtime",
   typeof Bun !== "undefined" && !!Bun.version,
+  "required",
   "Install bun: https://bun.sh",
 );
 
@@ -22,15 +26,17 @@ const statsCache = join(HOME, ".claude", "stats-cache.json");
 check(
   `stats-cache.json (${statsCache})`,
   existsSync(statsCache),
+  "required",
   "File created by Claude Code on first /stats run; open Claude Code at least once.",
 );
 
-// history
+// history — optional: project ranking just stays empty without it
 const history = join(HOME, ".claude", "history.jsonl");
 check(
   `history.jsonl (${history})`,
   existsSync(history),
-  "Optional — project ranking will be empty without it.",
+  "optional",
+  "Project ranking will be empty without it.",
 );
 
 // Vendor files
@@ -38,10 +44,12 @@ const vendor = join(import.meta.dir, "..", "dashboard", "dist", "vendor");
 check(
   `petite-vue (${vendor}/petite-vue.es.js)`,
   existsSync(join(vendor, "petite-vue.es.js")),
+  "required",
 );
 check(
   `chart.js (${vendor}/chart.umd.js)`,
   existsSync(join(vendor, "chart.umd.js")),
+  "required",
 );
 
 // Pricing defaults
@@ -51,23 +59,30 @@ const pricing = join(
   "references",
   "pricing-defaults.json",
 );
-check(`pricing defaults (${pricing})`, existsSync(pricing));
+check(`pricing defaults (${pricing})`, existsSync(pricing), "required");
 
-let allOk = true;
+let requiredFailed = false;
+let optionalFailed = false;
 for (const c of checks) {
-  const mark = c.ok ? "✓" : "✗";
+  const mark = c.ok ? "✓" : c.level === "required" ? "✗" : "○";
   console.log(`${mark} ${c.label}`);
   if (!c.ok) {
-    allOk = false;
+    if (c.level === "required") requiredFailed = true;
+    else optionalFailed = true;
     if (c.hint) console.log(`   → ${c.hint}`);
   }
 }
 
 console.log();
-if (allOk) {
-  console.log("All checks passed. Run: bun run scripts/serve-dashboard.ts");
-  process.exit(0);
-} else {
-  console.log("Some checks failed. Fix the issues above and rerun.");
+if (requiredFailed) {
+  console.log("Required checks failed. Fix the issues above and rerun.");
   process.exit(1);
 }
+if (optionalFailed) {
+  console.log(
+    "All required checks passed (some optional data missing — dashboard will still launch).",
+  );
+} else {
+  console.log("All checks passed. Run: bun run scripts/serve-dashboard.ts");
+}
+process.exit(0);

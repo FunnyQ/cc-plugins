@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.2] - 2026-05-17
+
+### 🔧 Improvements
+
+- **Auto-precheck before launch**: `SKILL.md` now chains the install precheck in front of `serve-dashboard.ts`, so the dashboard only starts once the environment is verified. Failed checks surface verbatim with their hints — no silent auto-fixes.
+- **Required vs optional install checks**: `install.ts` now distinguishes required failures (`✗`, exit 1) from optional ones (`○`, exit 0 with a notice). Missing `history.jsonl` — common for fresh Claude Code installs without chat history — no longer blocks the dashboard; the project ranking section just stays empty.
+
+### 🐛 Bug Fixes
+
+- **Plugin manifest version drift**: `token-atlas/.claude-plugin/plugin.json` was stuck at `1.0.0` while the marketplace tracked `2.0.x`. Both files now agree on the released version.
+
 ## [2.0.1] - 2026-05-17
 
 ### 📖 Documentation
