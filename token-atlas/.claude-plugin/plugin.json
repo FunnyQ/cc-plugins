@@ -1,6 +1,6 @@
 {
   "name": "token-atlas",
-  "version": "1.0.0",
+  "version": "2.0.2",
   "description": "Local web dashboard for Claude Code and Codex usage — sessions, tokens, cost, model mix, project activity.",
   "author": {
     "name": "Q"
