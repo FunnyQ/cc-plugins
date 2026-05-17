@@ -945,17 +945,9 @@ select:hover,
   display: grid;
   gap: var(--s-12);
   margin: 0 0 var(--s-14);
-  border: 1px solid color-mix(in oklch, var(--green) 11%, var(--theme-edge));
   border-radius: var(--radius);
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in oklch, var(--green) 5%, transparent),
-      transparent 58%
-    ),
-    color-mix(in oklch, var(--surface-glass) 88%, var(--bg));
-  box-shadow: var(--shadow-inset), var(--theme-shadow);
-  padding: var(--s-14) var(--s-16);
+  background: var(--surface-2);
+  padding: var(--s-18) var(--s-20);
 }
 
 .budget-panel-main {
@@ -2499,10 +2491,8 @@ select:hover,
 
 .data-health-panel {
   margin-top: var(--s-18);
-  border: 1px solid var(--theme-edge);
   border-radius: var(--radius);
-  background: color-mix(in oklch, var(--surface-glass) 84%, var(--bg));
-  box-shadow: var(--shadow-inset);
+  background: var(--surface-2);
 }
 
 .data-health-panel details {
