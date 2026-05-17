@@ -154,9 +154,29 @@ body {
   min-height: 100vh;
   margin: 0;
   color: var(--text);
-  background: var(--bg);
+  /* Surface veil sits over a Big Sur sunrise wallpaper — the image breathes
+     through at low intensity so it never competes with cards or charts. */
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in oklch, var(--bg) 86%, transparent) 0%,
+      color-mix(in oklch, var(--bg) 86%, transparent) 100%
+    ),
+    url("/assets/dashboard-bg-dawn.jpg") center top / cover no-repeat fixed,
+    var(--bg);
   font-size: 14px;
   overflow-x: clip;
+}
+
+[data-theme="dark"] body {
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in oklch, var(--bg) 78%, transparent) 0%,
+      color-mix(in oklch, var(--bg) 78%, transparent) 100%
+    ),
+    url("/assets/dashboard-bg-dusk.jpg") center top / cover no-repeat fixed,
+    var(--bg);
 }
 
 .skip-link {
