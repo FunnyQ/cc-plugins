@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.3] - 2026-05-18
+
+### 🔧 Improvements
+
+- **Dashboard preview in README**: Added the Token Atlas dashboard screenshot so marketplace visitors can see the current Sunrise Atlas experience before installing.
+- **Install guidance polish**: Clarified the automatic precheck behavior and fixed marketplace/CLI install syntax so setup instructions match the current plugin workflow.
+- **Dashboard asset organization**: Split the shipped dashboard runtime and styles into focused modules, making future updates easier to maintain without changing the user-facing dashboard behavior.
+
 ## [2.0.2] - 2026-05-17
 
 ### 🔧 Improvements
