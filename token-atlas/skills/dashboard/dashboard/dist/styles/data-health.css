@@ -1,0 +1,180 @@
+  .loading-overlay__wave > path,
+  .loading-overlay__title > span,
+  .loading-overlay__sub,
+  .loading-overlay__dot {
+    animation: none;
+  }
+
+  .loading-overlay__title > span,
+  .loading-overlay__sub {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.data-health-panel {
+  margin-top: var(--s-18);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.data-health-panel details {
+  padding: 0;
+}
+
+.data-health-panel summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-12);
+  align-items: center;
+  min-height: 46px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: var(--fs-base);
+  font-weight: 720;
+  list-style: none;
+  padding: 0 var(--s-14);
+}
+
+.data-health-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.data-health-summary {
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  font-weight: 560;
+  text-align: right;
+}
+
+.data-health-body {
+  display: grid;
+  gap: var(--s-12);
+  border-top: 1px solid var(--edge-soft);
+  padding: 13px var(--s-14) var(--s-14);
+}
+
+.data-health-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-8);
+  margin: 0;
+}
+
+.data-health-counts > div {
+  min-width: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
+  padding: var(--s-8) 9px;
+}
+
+.data-health-counts dt {
+  margin: 0 0 var(--s-4);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-weight: 720;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.data-health-counts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+}
+
+.data-health-sources {
+  display: grid;
+  gap: 7px;
+}
+
+.data-health-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(128px, auto) minmax(
+      0,
+      0.9fr
+    );
+  gap: var(--s-10);
+  align-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(90deg, var(--ledger-line) 0 1px, transparent 1px),
+    color-mix(in oklch, var(--surface-glass-raised) 72%, var(--bg));
+  padding: 9px var(--s-10);
+}
+
+.data-health-source-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.data-health-source-main strong {
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-weight: 680;
+}
+
+.data-health-source-main code {
+  color: var(--text-faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.data-health-status {
+  display: inline-grid;
+  min-height: 23px;
+  place-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 760;
+  line-height: 1;
+  padding: 0 var(--s-8);
+  text-transform: uppercase;
+}
+
+.data-health-status--ok {
+  border-color: color-mix(in oklch, var(--green) 22%, var(--edge));
+  background: color-mix(in oklch, var(--green) 9%, var(--status-surface));
+  color: color-mix(in oklch, var(--green) 52%, var(--text));
+}
+
+.data-health-status--missing,
+.data-health-status--empty {
+  border-color: color-mix(in oklch, var(--warn) 22%, var(--edge));
+  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--warn) 55%, var(--text));
+}
+
+.data-health-status--unreadable {
+  border-color: color-mix(in oklch, var(--danger) 24%, var(--edge));
+  background: color-mix(in oklch, var(--danger) 10%, var(--status-surface));
+  color: color-mix(in oklch, var(--danger) 58%, var(--text));
+}
+
+.data-health-modified,
+.data-health-note {
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+}
+
+.data-health-modified {
+  font-variant-numeric: tabular-nums;
+}
+
+.footer {
+  margin-top: var(--s-22);
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+

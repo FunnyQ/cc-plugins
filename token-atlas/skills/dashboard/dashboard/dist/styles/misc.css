@@ -1,0 +1,10 @@
+/* Misc */
+.error-card {
+  margin: var(--s-24) 0;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: oklch(25% 0.045 24);
+  color: oklch(86% 0.065 24);
+  padding: var(--s-16);
+}
+
