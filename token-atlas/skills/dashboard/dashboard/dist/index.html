@@ -9,6 +9,67 @@
   <body>
     <div id="app" v-scope="App()" @vue:mounted="mounted()" v-cloak>
       <a class="skip-link" href="#main-content">Skip to dashboard</a>
+
+      <div
+        v-if="loaderVisible"
+        :class="['loading-overlay', { 'loading-overlay--hide': loaderFading }]"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="loading-overlay__sky" aria-hidden="true"></div>
+        <div class="loading-overlay__sun" aria-hidden="true"></div>
+        <svg
+          class="loading-overlay__wave"
+          viewBox="0 0 1600 480"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            d="M0,180 C260,100 480,300 800,200 C1120,120 1340,280 1600,220 L1600,480 L0,480 Z"
+            fill="var(--sunrise-violet)"
+            opacity="0.5"
+          />
+          <path
+            d="M0,240 C220,160 460,320 760,240 C1060,160 1300,320 1600,280 L1600,480 L0,480 Z"
+            fill="var(--sunrise-magenta)"
+            opacity="0.52"
+          />
+          <path
+            d="M0,300 C260,240 500,340 800,280 C1100,220 1320,340 1600,320 L1600,480 L0,480 Z"
+            fill="var(--sunrise-coral)"
+            opacity="0.56"
+          />
+          <path
+            d="M0,360 C260,320 520,400 820,340 C1120,300 1340,400 1600,380 L1600,480 L0,480 Z"
+            fill="var(--sunrise-orange)"
+            opacity="0.6"
+          />
+          <path
+            d="M0,420 C320,380 600,440 900,400 C1180,370 1380,440 1600,430 L1600,480 L0,480 Z"
+            fill="var(--sunrise-amber)"
+            opacity="0.64"
+          />
+        </svg>
+        <div class="loading-overlay__center">
+          <h2 class="loading-overlay__title" aria-label="Reading local traces">
+            <span
+              v-for="(ch, i) in loadingTitleChars"
+              :key="i"
+              :style="{ animationDelay: (i * 38) + 'ms' }"
+              :aria-hidden="true"
+              :class="{ 'is-space': ch === ' ' }"
+              >{{ ch === ' ' ? ' ' : ch }}</span
+            >
+          </h2>
+          <p class="loading-overlay__sub">
+            <span class="loading-overlay__dot" aria-hidden="true"></span>
+            Atlas, unfolding
+          </p>
+        </div>
+      </div>
+
       <header class="hero-band">
         <svg
           class="hero-wave"
@@ -1130,10 +1191,6 @@
           stats.insights.firstSessionDate ?
           stats.insights.firstSessionDate.slice(0, 10) : 'n/a' }}
         </footer>
-      </main>
-
-      <main v-else id="main-content" class="loading" aria-live="polite">
-        Loading dashboard…
       </main>
     </div>
 
