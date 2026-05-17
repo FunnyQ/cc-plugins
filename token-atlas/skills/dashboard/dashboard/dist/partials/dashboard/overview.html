@@ -1,0 +1,103 @@
+        <!-- Overview cards -->
+        <section class="cards metric-type-ledger" aria-label="Usage summary">
+          <div class="card card--burn">
+            <div class="metric-main">
+              <div class="card-label">Daily burn</div>
+              <div class="card-value">
+                ${{ dailyBurnUSD.toFixed(2) }}<span class="card-value-suffix"
+                  >/day</span
+                >
+              </div>
+              <div class="card-sub">
+                {{ activeWindowLabel }} avg · ${{
+                filtered.summary.cost.toFixed(2) }} total
+              </div>
+              <svg
+                v-if="costSparkSeries.hasData"
+                class="cost-spark"
+                viewBox="0 0 100 24"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <polyline
+                  :points="costSparkSeries.points"
+                  fill="none"
+                  stroke="var(--sunrise-coral)"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                  vector-effect="non-scaling-stroke"
+                />
+              </svg>
+            </div>
+            <div :class="deltaClass('dailyBurn')">
+              <span class="compare-context">
+                {{ summaryDeltas.dailyBurn.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.dailyBurn.valueLabel }}</strong>
+                <span>{{ summaryDeltas.dailyBurn.pctLabel }}</span>
+              </span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="metric-main">
+              <div class="card-label">Tokens</div>
+              <div class="card-value">
+                {{ fmtTokens(filtered.summary.tokens) }}
+              </div>
+              <div class="card-sub">
+                {{ fmtNum(filtered.summary.toolCalls) }} tool calls
+              </div>
+            </div>
+            <div :class="deltaClass('tokens')">
+              <span class="compare-context">
+                {{ summaryDeltas.tokens.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.tokens.valueLabel }}</strong>
+                <span>{{ summaryDeltas.tokens.pctLabel }}</span>
+              </span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="metric-main">
+              <div class="card-label">Interactions</div>
+              <div class="card-value">
+                {{ fmtNum(filtered.summary.messages) }}
+              </div>
+              <div class="card-sub">Claude messages + Codex threads</div>
+            </div>
+            <div :class="deltaClass('messages')">
+              <span class="compare-context">
+                {{ summaryDeltas.messages.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.messages.valueLabel }}</strong>
+                <span>{{ summaryDeltas.messages.pctLabel }}</span>
+              </span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="metric-main">
+              <div class="card-label">Sessions</div>
+              <div class="card-value">
+                {{ fmtNum(filtered.summary.sessions) }}
+              </div>
+              <div class="card-sub">
+                {{ activeWindowLabel }} · Claude + Codex
+              </div>
+            </div>
+            <div :class="deltaClass('sessions')">
+              <span class="compare-context">
+                {{ summaryDeltas.sessions.contextLabel }}
+              </span>
+              <span class="compare-values">
+                <strong>{{ summaryDeltas.sessions.valueLabel }}</strong>
+                <span>{{ summaryDeltas.sessions.pctLabel }}</span>
+              </span>
+            </div>
+          </div>
+        </section>
+

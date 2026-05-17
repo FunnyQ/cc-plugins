@@ -1,0 +1,93 @@
+        <section class="panel session-ledger-panel" aria-label="Session ledger">
+          <div class="session-ledger-head">
+            <div>
+              <h2>Session ledger</h2>
+              <span class="muted">{{ ledgerSummaryLabel }}</span>
+            </div>
+            <div class="segmented-control" aria-label="Session ledger sort">
+              <button
+                v-for="sortKey in ['date', 'tokens', 'cost']"
+                :key="sortKey"
+                type="button"
+                :class="{ active: ledgerSortKey === sortKey }"
+                :aria-pressed="ledgerSortKey === sortKey"
+                @click="onLedgerSortChange(sortKey)"
+              >
+                {{ ledgerSortLabel(sortKey) }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="visibleLedgerRows.length" class="ledger-table-wrap">
+            <table class="table compact ledger-table">
+              <caption>
+                Recent Claude sessions and Codex threads for {{
+                activeWindowLabel }}.
+              </caption>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Source</th>
+                  <th>Project</th>
+                  <th>Model</th>
+                  <th class="num">Msgs</th>
+                  <th class="num">Tools</th>
+                  <th class="num">Tokens</th>
+                  <th class="num">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in visibleLedgerRows" :key="row.id">
+                  <td data-label="When">
+                    <span class="ledger-time">
+                      {{ formatDateTime(row.timestampMs) }}
+                    </span>
+                  </td>
+                  <td data-label="Source">
+                    <span :class="providerBadgeClass(row.provider)">
+                      {{ row.provider }}
+                    </span>
+                  </td>
+                  <td data-label="Project">
+                    <span class="project-name">{{ row.projectName }}</span>
+                    <span class="project-path"
+                      >{{ row.projectPath || 'n/a' }}</span
+                    >
+                  </td>
+                  <td data-label="Model">
+                    <span class="model-cell">
+                      <span
+                        v-if="row.model !== 'mixed' && row.model !== 'n/a'"
+                        :class="modelMarkClass(row.model)"
+                        :style="{ background: colorFor(row.model) }"
+                      ></span>
+                      {{ ledgerModelLabel(row.model) }}
+                    </span>
+                  </td>
+                  <td data-label="Msgs" class="num">
+                    {{ fmtNum(row.interactions) }}
+                  </td>
+                  <td data-label="Tools" class="num">
+                    {{ fmtNum(row.toolCalls) }}
+                  </td>
+                  <td data-label="Tokens" class="num">
+                    {{ fmtTokens(row.tokens) }}
+                  </td>
+                  <td data-label="Cost" class="num cost">
+                    <span>{{ ledgerCostLabel(row) }}</span>
+                    <small>{{ ledgerCostNote(row) }}</small>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="empty-state empty-state--panel">
+            No sessions or threads for this filter.
+          </div>
+          <div v-if="hasMoreLedgerRows" class="session-ledger-more">
+            <button type="button" class="btn" @click="showMoreLedgerRows">
+              Show 50 more
+            </button>
+          </div>
+        </section>
+
