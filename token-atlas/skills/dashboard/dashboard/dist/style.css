@@ -341,7 +341,58 @@ label:focus-within {
   animation-timing-function: var(--ease-out);
 }
 
-  .brand {
+/* Subtle breathing — three wave layers drift on independent slow cycles,
+   evoking a horizon that's never quite still. Tiny amplitudes so it reads
+   as ambient, not motion. */
+@keyframes wave-breathe-back {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes wave-breathe-mid {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes wave-breathe-front {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.hero-wave > path:nth-child(1) {
+  animation: wave-breathe-back 18s ease-in-out infinite;
+}
+
+.hero-wave > path:nth-child(2) {
+  animation: wave-breathe-mid 14s ease-in-out -4s infinite;
+}
+
+.hero-wave > path:nth-child(3) {
+  animation: wave-breathe-front 16s ease-in-out -2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-wave > path {
+    animation: none;
+  }
+}
+
+.brand {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
   column-gap: 14px;
