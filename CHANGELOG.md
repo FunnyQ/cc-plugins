@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.4] - 2026-05-18
+
+### 🔧 Improvements
+
+- **Dashboard HTML maintainability**: Split the generated dashboard shell into focused partial files and added a lightweight loader so the shipped interface stays easier to maintain without changing runtime behavior.
+
+### 📖 Documentation
+
+- **README feature overview**: Simplified the feature list into clearer grouped sections and removed visual direction copy so marketplace readers can scan the plugin capabilities faster.
+
 ## [2.0.3] - 2026-05-18
 
 ### 🔧 Improvements
