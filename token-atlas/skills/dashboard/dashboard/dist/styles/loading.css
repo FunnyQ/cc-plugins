@@ -1,0 +1,264 @@
+/* Loading overlay — drenched Sunrise Atlas takeover while the dashboard
+   reads local traces. Fullscreen so the hero band can finish resizing
+   underneath without the user seeing the jump. Fades out the moment data
+   lands (.loading-overlay--hide), unmounts after 520ms. */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      circle at 28% 110%,
+      var(--sunrise-coral) 0%,
+      color-mix(in oklch, var(--sunrise-magenta) 80%, var(--sunrise-violet)) 38%,
+      var(--sunrise-violet) 78%,
+      oklch(22% 0.08 295) 100%
+    ),
+    var(--sunrise-violet);
+  color: oklch(99% 0.005 60);
+  transform-origin: 50% 50%;
+  /* Exit choreography: blur + scale-out run FIRST (0..400ms), then opacity
+     fades AFTER blur is fully built up (400..750ms). No entry animation —
+     a keyframe animation on opacity would block this transition from firing
+     when stats arrives mid-animation. */
+  transition:
+    filter 400ms cubic-bezier(0.4, 0, 0.4, 1),
+    transform 400ms cubic-bezier(0.4, 0, 0.4, 1),
+    opacity 350ms cubic-bezier(0.4, 0, 0.4, 1) 400ms,
+    visibility 0s linear 750ms;
+}
+
+/* Inner content (sun / sky / wave / center) fades out FIRST — within 300ms
+   of --hide. Leaves only the background gradient to be blurred and faded by
+   the outer transition. Avoids the visual mess of two overlapping sunrises
+   (overlay + hero band) during the cross-fade window. */
+.loading-overlay__sky,
+.loading-overlay__sun,
+.loading-overlay__wave,
+.loading-overlay__center {
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.4, 1);
+}
+
+.loading-overlay--hide .loading-overlay__sky,
+.loading-overlay--hide .loading-overlay__sun,
+.loading-overlay--hide .loading-overlay__wave,
+.loading-overlay--hide .loading-overlay__center {
+  opacity: 0;
+}
+
+[data-theme="dark"] .loading-overlay {
+  background:
+    radial-gradient(
+      circle at 28% 110%,
+      color-mix(in oklch, var(--sunrise-magenta) 86%, transparent) 0%,
+      color-mix(in oklch, var(--sunrise-violet) 70%, transparent) 36%,
+      oklch(18% 0.07 282) 78%,
+      oklch(10% 0.05 275) 100%
+    ),
+    oklch(12% 0.05 280);
+}
+
+/* Exit: disperse like morning fog lifting — fade + slight scale-out + blur.
+   The dashboard underneath finishes its own staggered rise during this window. */
+.loading-overlay--hide {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(1.04);
+  filter: blur(28px);
+}
+
+/* Atmospheric sky glow — second layer that breathes hue + scale,
+   gives the surface the "sky turning over" feel of real dawn. */
+.loading-overlay__sky {
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 35% 55%,
+      color-mix(in oklch, var(--sunrise-orange) 80%, transparent) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 60% 45% at 75% 80%,
+      color-mix(in oklch, var(--sunrise-amber) 50%, transparent) 0%,
+      transparent 55%
+    );
+  mix-blend-mode: screen;
+  filter: blur(20px);
+  animation: loading-sky-drift 9s ease-in-out infinite alternate;
+  opacity: 0.8;
+}
+
+/* First light — atmospheric glow patch sitting just above the horizon waves.
+   No hard edges, no orb. Reads as "the air over there is brighter," not as
+   a sun crossing the sky. Heavy blur + low opacity + small drift do the work. */
+.loading-overlay__sun {
+  position: absolute;
+  top: 48%;
+  left: 22%;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--sunrise-amber) 34%, transparent) 0%,
+    color-mix(in oklch, var(--sunrise-orange) 18%, transparent) 28%,
+    color-mix(in oklch, var(--sunrise-coral) 10%, transparent) 52%,
+    transparent 78%
+  );
+  filter: blur(56px);
+  mix-blend-mode: screen;
+  opacity: 0.58;
+  animation: loading-sun-arc 14s cubic-bezier(0.45, 0.05, 0.55, 1) infinite
+    alternate;
+  will-change: transform, opacity;
+}
+
+/* Horizon waves — 5 layers, full viewport width, breathing on independent
+   cycles. Cousin of hero-wave but bolder (taller, more saturated). */
+.loading-overlay__wave {
+  position: absolute;
+  inset: auto 0 0 0;
+  width: 100%;
+  height: 60%;
+  pointer-events: none;
+}
+
+.loading-overlay__wave > path {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.loading-overlay__wave > path:nth-child(1) {
+  animation: wave-breathe-back 21s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+}
+
+.loading-overlay__wave > path:nth-child(2) {
+  animation: wave-breathe-mid 17s cubic-bezier(0.45, 0.05, 0.55, 1) -3s infinite;
+}
+
+.loading-overlay__wave > path:nth-child(3) {
+  animation: wave-breathe-front 13s cubic-bezier(0.55, 0, 0.45, 1) -5s infinite;
+}
+
+.loading-overlay__wave > path:nth-child(4) {
+  animation: wave-breathe-back 19s cubic-bezier(0.4, 0, 0.4, 1) -8s infinite;
+}
+
+.loading-overlay__wave > path:nth-child(5) {
+  animation: wave-breathe-mid 15s cubic-bezier(0.45, 0.05, 0.55, 1) -2s infinite;
+}
+
+/* Center text stack — sits on top of the sky/sun/wave layers. */
+.loading-overlay__center {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: var(--s-14);
+  text-align: center;
+  padding: 0 var(--s-24);
+}
+
+.loading-overlay__title {
+  margin: 0;
+  color: oklch(99% 0.005 60);
+  font-family: var(--ff-display);
+  font-size: clamp(36px, 5.4vw, 62px);
+  font-weight: 580;
+  letter-spacing: -0.012em;
+  line-height: 1.05;
+  text-shadow: 0 6px 24px
+    color-mix(in oklch, oklch(15% 0.06 295) 60%, transparent);
+}
+
+.loading-overlay__title > span {
+  display: inline-block;
+  animation: loading-letter-in 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.loading-overlay__title > span.is-space {
+  width: 0.32em;
+}
+
+.loading-overlay__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-8);
+  margin: 0;
+  color: oklch(99% 0.005 60 / 0.78);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  animation: loading-letter-in 720ms 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.loading-overlay__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(99% 0.005 60);
+  box-shadow: 0 0 14px 4px
+    color-mix(in oklch, var(--sunrise-amber) 70%, transparent);
+  animation: loading-dot-pulse 1.4s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+}
+
+@keyframes loading-sky-drift {
+  0% {
+    transform: translate(-2%, 1%) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(3%, -2%) scale(1.08);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(-1%, 2%) scale(1.02);
+    opacity: 0.7;
+  }
+}
+
+@keyframes loading-sun-arc {
+  0% {
+    transform: translate(-3vw, 1vh) scale(1);
+  }
+  100% {
+    transform: translate(3vw, -2vh) scale(1.06);
+  }
+}
+
+@keyframes loading-letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes loading-dot-pulse {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-overlay,
+  .loading-overlay__sky,
+  .loading-overlay__sun,

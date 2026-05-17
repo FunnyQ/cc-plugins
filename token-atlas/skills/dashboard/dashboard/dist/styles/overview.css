@@ -1,0 +1,422 @@
+/* Overview */
+.main-shell {
+  display: block;
+  /* Wait for the overlay's blur phase (~400ms) before settling in, so the
+     dashboard arrives during the opacity fade — not while the overlay is
+     still opaque-and-blurring. */
+  animation: shell-rise 700ms 420ms var(--ease-out) both;
+}
+
+.main-shell--corner-signal {
+  --signal-air: 0.35;
+  --signal-delight: 0.5;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(180px, 1fr));
+  gap: calc(8px + var(--signal-air, 0) * 12px);
+  margin-bottom: var(--s-14);
+}
+
+.card {
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  min-height: 126px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--s-22) var(--s-24) var(--s-20);
+}
+
+/* Retired: rune corner ticks + bifrost rainbow stripe. Keep selectors
+   so legacy hover rules below are inert without producing visual artifacts. */
+.card::before,
+.panel::after {
+  content: none;
+}
+
+.card:hover {
+  background: var(--surface-3);
+}
+
+.card:first-child {
+  background: var(--surface-2);
+}
+
+.card-label {
+  margin-bottom: var(--s-16);
+  color: color-mix(in oklch, var(--accent-strong) 44%, var(--text-muted));
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-value {
+  color: var(--text);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.card-value.cost {
+  color: var(--accent-strong);
+}
+
+.card-sub {
+  margin-top: var(--s-12);
+  color: var(--text-faint);
+  font-size: var(--fs-base);
+  line-height: 1.35;
+}
+
+.card-value-suffix {
+  margin-left: 2px;
+  color: var(--text-faint);
+  font-size: 0.5em;
+  font-weight: 560;
+  letter-spacing: 0;
+}
+
+/* Tiny daily cost spark — sits beneath the Daily burn metric.
+   Strokes in sunrise-coral so it reads as part of the cost lineage,
+   not as a generic line chart. */
+.cost-spark {
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin-top: var(--s-10);
+  color: var(--sunrise-coral);
+  opacity: 0.88;
+}
+
+.card--burn .metric-main {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.compare-block {
+  display: grid;
+  gap: var(--s-8);
+  border-top: 1px solid var(--edge-soft);
+  padding-top: var(--s-14);
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-context {
+  color: color-mix(in oklch, var(--accent-strong) 26%, var(--text-faint));
+  font-size: var(--fs-xs);
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  margin-bottom: 1px;
+  text-transform: uppercase;
+}
+
+.compare-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-10);
+  align-items: baseline;
+}
+
+.compare-values strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 760;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-values span {
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 720;
+  line-height: 1;
+  padding: var(--s-4) 7px;
+}
+
+.compare-block--increase .compare-values strong,
+.compare-block--increase .compare-values span {
+  color: color-mix(in oklch, var(--green) 54%, var(--text));
+}
+
+.compare-block--increase .compare-values span {
+  border-color: color-mix(in oklch, var(--green) 22%, var(--edge-soft));
+  background: color-mix(in oklch, var(--green) 8%, var(--status-surface));
+}
+
+.compare-block--decrease .compare-values strong,
+.compare-block--decrease .compare-values span {
+  color: color-mix(in oklch, var(--cyan) 54%, var(--text));
+}
+
+.compare-block--decrease .compare-values span {
+  border-color: color-mix(in oklch, var(--cyan) 22%, var(--edge-soft));
+  background: color-mix(in oklch, var(--cyan) 8%, var(--status-surface));
+}
+
+.compare-block--neutral .compare-values strong,
+.compare-block--unavailable .compare-values strong {
+  color: var(--text-faint);
+}
+
+.compare-block--unavailable .compare-values span {
+  color: var(--text-faint);
+  background: transparent;
+}
+
+.metric-type-ledger .card {
+  display: grid;
+  grid-template-rows: auto auto;
+  min-height: 0;
+}
+
+.metric-main {
+  display: grid;
+  align-content: start;
+  padding-bottom: var(--s-14);
+}
+
+.metric-type-ledger .compare-block {
+  align-self: end;
+}
+
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 1121px) {
+    .metric-type-ledger {
+      grid-template-rows: auto auto;
+    }
+
+    .metric-type-ledger .card {
+      grid-row: 1 / span 2;
+      grid-template-rows: subgrid;
+    }
+
+    .metric-type-ledger .card:nth-child(1) {
+      grid-column: 1;
+    }
+
+    .metric-type-ledger .card:nth-child(2) {
+      grid-column: 2;
+    }
+
+    .metric-type-ledger .card:nth-child(3) {
+      grid-column: 3;
+    }
+
+    .metric-type-ledger .card:nth-child(4) {
+      grid-column: 4;
+    }
+  }
+}
+
+.metric-type-ledger .card-label {
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  font-weight: 720;
+}
+
+.metric-type-ledger .card-value {
+  color: var(--text);
+  font-size: 2.18rem;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.metric-type-ledger .card:first-child .card-value {
+  color: var(--accent-strong);
+}
+
+.metric-type-ledger .card-sub {
+  max-width: 22ch;
+  font-size: 0.75rem;
+}
+
+.budget-panel {
+  display: grid;
+  gap: var(--s-12);
+  margin: 0 0 var(--s-14);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--s-18) var(--s-20);
+}
+
+.budget-panel-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-12);
+  align-items: start;
+}
+
+.budget-panel h2 {
+  margin: 0 0 var(--s-4);
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.budget-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.15fr) minmax(360px, 1fr);
+  gap: var(--s-12);
+  align-items: stretch;
+}
+
+.budget-state {
+  display: inline-grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--surface-2) 76%, var(--bg-rail));
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 760;
+  line-height: 1;
+  padding: 0 9px;
+  text-transform: uppercase;
+}
+
+.budget-state--low {
+  border-color: color-mix(in oklch, var(--green) 22%, var(--edge));
+  background: color-mix(in oklch, var(--green) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--green) 54%, var(--text));
+}
+
+.budget-state--medium {
+  border-color: color-mix(in oklch, var(--cyan) 22%, var(--edge));
+  background: color-mix(in oklch, var(--cyan) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--cyan) 54%, var(--text));
+}
+
+.budget-state--high {
+  border-color: color-mix(in oklch, var(--warn) 24%, var(--edge));
+  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--warn) 58%, var(--text));
+}
+
+.budget-state--over {
+  border-color: color-mix(in oklch, var(--rose) 24%, var(--edge));
+  background: color-mix(in oklch, var(--rose) 9%, var(--status-surface));
+  color: color-mix(in oklch, var(--rose) 58%, var(--text));
+}
+
+.budget-meter,
+.budget-stats > div,
+.budget-setup {
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
+}
+
+.budget-meter {
+  display: grid;
+  align-content: center;
+  gap: var(--s-10);
+  min-height: 88px;
+  padding: var(--s-12);
+}
+
+.budget-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-12);
+}
+
+.budget-meter-head strong {
+  color: var(--text);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.budget-meter-head span {
+  color: var(--text-faint);
+  font-size: var(--fs-base);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.budget-meter-track {
+  height: 9px;
+  border: 1px solid color-mix(in oklch, var(--text-faint) 10%, var(--bg-rail));
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--text-faint) 9%, var(--bg-rail));
+  overflow: hidden;
+}
+
+.budget-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sunrise-amber);
+}
+
+.budget-meter-fill--medium {
+  background: var(--sunrise-orange);
+}
+
+.budget-meter-fill--high {
+  background: var(--sunrise-coral);
+}
+
+.budget-meter-fill--over {
+  background: var(--sunrise-magenta);
+}
+
+.budget-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-8);
+  margin: 0;
+}
+
+.budget-stats > div {
+  min-width: 0;
+  padding: var(--s-10);
+}
+
+.budget-stats dt {
+  margin: 0 0 5px;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-weight: 720;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.budget-stats dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+}
+
+.budget-setup {
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.45;
+  padding: var(--s-10) var(--s-12);
+}
+
+.budget-setup code {
+  color: color-mix(in oklch, var(--green) 48%, var(--text));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-sm);
+}
+
