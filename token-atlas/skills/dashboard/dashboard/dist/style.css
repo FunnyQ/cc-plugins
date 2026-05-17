@@ -78,6 +78,7 @@
   /* Charts */
   --chart-tooltip-bg: oklch(22% 0.012 60);
   --chart-tooltip-text: oklch(96% 0.008 60);
+  --chart-tooltip-border: oklch(72% 0.16 55 / 0.55);
   --chart-grid: oklch(88% 0.012 50 / 0.6);
   --chart-axis: oklch(48% 0.015 50);
 
@@ -183,6 +184,7 @@
 
   --chart-tooltip-bg: oklch(94% 0.012 60);
   --chart-tooltip-text: oklch(20% 0.035 270);
+  --chart-tooltip-border: oklch(78% 0.18 70 / 0.7);
   --chart-grid: oklch(40% 0.025 50 / 0.6);
   --chart-axis: oklch(72% 0.018 55);
 
@@ -307,11 +309,38 @@ label:focus-within {
     var(--sunrise-amber) 78%,
     var(--sunrise-sky) 100%
   );
+  /* Wavy bottom edge — SVG mask is twice the band's width and contains two
+     identical wave cycles, so animating mask-position-x by a full container
+     width loops seamlessly. preserveAspectRatio=none lets the wave stretch
+     across any viewport width without re-tessellating the path. */
+  --hero-wave-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'><path d='M0,0 H200 V90 Q175,84 150,90 T100,90 T50,90 T0,90 Z' fill='white'/></svg>");
+  mask-image: var(--hero-wave-mask);
+  mask-size: 200% 100%;
+  mask-repeat: no-repeat;
+  mask-position-x: 0%;
+  -webkit-mask-image: var(--hero-wave-mask);
+  -webkit-mask-size: 200% 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position-x: 0%;
   overflow: hidden;
   isolation: isolate;
   /* 420ms delay matches main-shell so hero and dashboard arrive together
-     during the overlay's opacity fade phase. */
-  animation: hero-rise 700ms 420ms var(--ease-out-expo) both;
+     during the overlay's opacity fade phase. hero-wave-drift slides the
+     mask one wavelength every 22s for slow, ambient drift. */
+  animation:
+    hero-rise 700ms 420ms var(--ease-out-expo) both,
+    hero-wave-drift 22s linear infinite;
+}
+
+@keyframes hero-wave-drift {
+  from {
+    mask-position-x: 0%;
+    -webkit-mask-position-x: 0%;
+  }
+  to {
+    mask-position-x: 100%;
+    -webkit-mask-position-x: 100%;
+  }
 }
 
 /* Layered SVG waves are positioned absolutely inside .hero-band */
@@ -764,6 +793,7 @@ select:hover,
 
 .card {
   position: relative;
+  isolation: isolate;
   container-type: inline-size;
   min-height: 126px;
   overflow: hidden;
@@ -771,7 +801,6 @@ select:hover,
   border-radius: var(--radius);
   background: var(--surface-2);
   padding: var(--s-22) var(--s-24) var(--s-20);
-  transition: background-color 180ms var(--ease-out);
 }
 
 /* Retired: rune corner ticks + bifrost rainbow stripe. Keep selectors
@@ -1166,6 +1195,7 @@ select:hover,
 /* Panels */
 .panel {
   position: relative;
+  isolation: isolate;
   container-type: inline-size;
   overflow: hidden;
   border: 0;
@@ -1173,7 +1203,80 @@ select:hover,
   background: var(--surface-2);
   padding: var(--s-18) var(--s-20);
   margin-bottom: var(--s-14);
+}
+
+/* Sunrise Bloom — warm light from behind the surface. JS continuously lerps
+   --bloom-x/--bloom-y toward the cursor each frame, so the light trails with
+   exponential ease-out (the closer it gets, the smaller the step).
+   `.budget-panel` and `.data-health-panel` opt in without the base `.panel`
+   class, so they need the same isolated stacking context. */
+.budget-panel,
+.data-health-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.panel,
+.card {
   transition: background-color 180ms var(--ease-out);
+}
+
+.panel::before,
+.card::after,
+.budget-panel::before,
+.data-health-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    420px circle at var(--bloom-x, 50%) var(--bloom-y, 50%),
+    oklch(82% 0.16 75 / 0.18) 0%,
+    oklch(64% 0.2 25 / 0.06) 42%,
+    transparent 72%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 320ms var(--ease-out);
+  z-index: -1;
+}
+
+.panel:hover::before,
+.card:hover::after,
+.budget-panel:hover::before,
+.data-health-panel:hover::before {
+  opacity: 1;
+  transition-duration: 240ms;
+}
+
+.panel:focus-visible::before,
+.card:focus-visible::after,
+.budget-panel:focus-visible::before,
+.data-health-panel:focus-visible::before {
+  opacity: 0.85;
+  transition-duration: 200ms;
+}
+
+[data-theme="dark"] .panel::before,
+[data-theme="dark"] .card::after,
+[data-theme="dark"] .budget-panel::before,
+[data-theme="dark"] .data-health-panel::before {
+  background: radial-gradient(
+    420px circle at var(--bloom-x, 50%) var(--bloom-y, 50%),
+    oklch(78% 0.18 70 / 0.12) 0%,
+    oklch(60% 0.22 25 / 0.05) 42%,
+    transparent 72%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel::before,
+  .card::after,
+  .budget-panel::before,
+  .data-health-panel::before {
+    display: none;
+  }
 }
 
 .panel-head {
@@ -1765,10 +1868,6 @@ select:hover,
   animation: distribution-command-in 360ms var(--ease-out) both;
 }
 
-.distribution-command-panel::before {
-  content: none;
-}
-
 .distribution-command-panel .panel-head h2 {
   color: var(--text);
   font-size: var(--fs-xl);
@@ -1793,10 +1892,6 @@ select:hover,
     var(--theme-surface);
   box-shadow: var(--shadow-inset), var(--theme-shadow);
   animation: trend-command-in 360ms var(--ease-out) both;
-}
-
-.trend-command-panel::before {
-  content: none;
 }
 
 .trend-command-panel .panel-head h2 {
