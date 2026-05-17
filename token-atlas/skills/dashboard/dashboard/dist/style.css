@@ -136,7 +136,7 @@ label:focus-within {
     var(--bg);
   backdrop-filter: blur(14px);
   box-shadow: 0 12px 30px oklch(8% 0.014 224 / 0.18);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .topbar::before {
@@ -216,13 +216,6 @@ label:focus-within {
   justify-content: flex-end;
 }
 
-.export-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 2px;
-}
-
 select,
 .btn {
   min-height: 36px;
@@ -248,17 +241,82 @@ select {
   padding: 0 13px;
 }
 
-.export-btn {
-  min-height: 32px;
+.export-menu {
+  position: relative;
+}
+
+.export-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
   border-color: var(--edge-soft);
   background: color-mix(in oklch, var(--surface-3) 78%, var(--bg-rail));
   color: var(--text-muted);
-  font-size: 12px;
-  padding-inline: 10px;
 }
 
-.export-btn:hover {
+.export-menu-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.export-menu-trigger::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms var(--ease-out);
+}
+
+.export-menu[open] .export-menu-trigger::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.export-menu[open] .export-menu-trigger,
+.export-menu-trigger:hover {
   color: var(--text);
+}
+
+.export-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  min-width: 190px;
+  gap: 4px;
+  border: 1px solid var(--theme-edge);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--accent-soft) 16%, transparent),
+      transparent 52%
+    ),
+    var(--surface);
+  box-shadow: var(--shadow-inset), var(--theme-shadow-raised);
+  padding: 6px;
+}
+
+.export-menu-panel button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.export-menu-panel button:hover,
+.export-menu-panel button:focus-visible {
+  background: color-mix(in oklch, var(--accent-soft) 44%, var(--surface-2));
+  color: var(--text);
+  outline: none;
 }
 
 select:hover,
@@ -312,7 +370,7 @@ select:hover,
     linear-gradient(180deg, oklch(100% 0.005 224 / 0.026), transparent 38%),
     var(--theme-surface);
   box-shadow: var(--shadow-inset), var(--theme-shadow);
-  padding: 17px 18px 15px;
+  padding: 22px 24px 20px;
   transition:
     border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -389,7 +447,7 @@ select:hover,
 }
 
 .card-label {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   color: color-mix(in oklch, var(--accent-strong) 44%, var(--text-muted));
   font-size: 11px;
   font-weight: 700;
@@ -411,54 +469,131 @@ select:hover,
 }
 
 .card-sub {
-  margin-top: 9px;
+  margin-top: 12px;
   color: var(--text-faint);
   font-size: 12px;
   line-height: 1.35;
 }
 
-.card-delta {
-  width: fit-content;
-  margin-top: 8px;
-  border: 1px solid var(--edge-soft);
-  border-radius: var(--radius-sm);
-  padding: 4px 7px;
-  color: var(--text-muted);
-  background: color-mix(in oklch, var(--surface-2) 76%, transparent);
-  font-size: 11px;
+.compare-block {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--edge-soft);
+  padding-top: 14px;
   font-variant-numeric: tabular-nums;
-  line-height: 1.25;
 }
 
-.card-delta--increase {
-  border-color: color-mix(in oklch, var(--warn) 24%, var(--edge-soft));
-  color: color-mix(in oklch, var(--warn) 58%, var(--text-muted));
+.compare-context {
+  color: color-mix(in oklch, var(--accent-strong) 26%, var(--text-faint));
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  margin-bottom: 1px;
+  text-transform: uppercase;
 }
 
-.card-delta--decrease {
+.compare-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.compare-values strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 760;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-values span {
+  border: 1px solid var(--edge-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.compare-block--increase .compare-values strong,
+.compare-block--increase .compare-values span {
+  color: color-mix(in oklch, var(--green) 54%, var(--text));
+}
+
+.compare-block--increase .compare-values span {
+  border-color: color-mix(in oklch, var(--green) 22%, var(--edge-soft));
+  background: color-mix(in oklch, var(--green) 8%, var(--bg-rail));
+}
+
+.compare-block--decrease .compare-values strong,
+.compare-block--decrease .compare-values span {
+  color: color-mix(in oklch, var(--cyan) 54%, var(--text));
+}
+
+.compare-block--decrease .compare-values span {
   border-color: color-mix(in oklch, var(--cyan) 22%, var(--edge-soft));
-  color: color-mix(in oklch, var(--cyan) 54%, var(--text-muted));
+  background: color-mix(in oklch, var(--cyan) 8%, var(--bg-rail));
 }
 
-.card-delta--neutral {
+.compare-block--neutral .compare-values strong,
+.compare-block--unavailable .compare-values strong {
   color: var(--text-faint);
 }
 
-.card-delta--unavailable {
-  border-color: var(--edge-soft);
+.compare-block--unavailable .compare-values span {
   color: var(--text-faint);
   background: transparent;
 }
 
-.card-delta--secondary {
-  margin-top: 5px;
-  opacity: 0.82;
-}
-
 .metric-type-ledger .card {
   display: grid;
-  align-content: space-between;
-  min-height: 158px;
+  grid-template-rows: auto auto;
+  min-height: 0;
+}
+
+.metric-main {
+  display: grid;
+  align-content: start;
+  padding-bottom: 14px;
+}
+
+.metric-type-ledger .compare-block {
+  align-self: end;
+}
+
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 1121px) {
+    .metric-type-ledger {
+      grid-template-rows: auto auto;
+    }
+
+    .metric-type-ledger .card {
+      grid-row: 1 / span 2;
+      grid-template-rows: subgrid;
+    }
+
+    .metric-type-ledger .card:nth-child(1) {
+      grid-column: 1;
+    }
+
+    .metric-type-ledger .card:nth-child(2) {
+      grid-column: 2;
+    }
+
+    .metric-type-ledger .card:nth-child(3) {
+      grid-column: 3;
+    }
+
+    .metric-type-ledger .card:nth-child(4) {
+      grid-column: 4;
+    }
+  }
 }
 
 .metric-type-ledger .card-label {
@@ -1340,6 +1475,23 @@ select:hover,
   background: color-mix(in oklch, var(--accent-soft) 42%, var(--bg-rail));
 }
 
+.trend-reference {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trend-reference-line {
+  width: 34px;
+  border-top: 2px dashed var(--accent);
+}
+
 .trend-command-panel .chart-box {
   border-radius: var(--radius-sm);
   background:
@@ -1716,8 +1868,26 @@ select:hover,
   line-height: 17px;
 }
 
+.project-detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: safe center;
+  justify-content: center;
+  min-height: 100dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: oklch(8% 0.012 224 / 0.72);
+  padding: 24px;
+}
+
 .project-detail-panel {
-  margin-top: 14px;
+  width: min(920px, calc(100dvw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
 }
 
 .project-detail-head,
@@ -2217,10 +2387,19 @@ select:hover,
     width: 100%;
   }
 
-  .export-actions {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .export-menu {
+    flex: 1;
+  }
+
+  .export-menu-trigger {
+    justify-content: center;
     width: 100%;
+  }
+
+  .export-menu-panel {
+    right: 0;
+    left: auto;
+    min-width: min(220px, calc(100dvw - 28px));
   }
 
   .provider-switch {
@@ -2464,12 +2643,10 @@ select:hover,
 @keyframes shell-rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

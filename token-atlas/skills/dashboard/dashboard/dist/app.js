@@ -159,6 +159,8 @@ const AUTO_REFRESH_MS = 60_000;
 const ANOMALY_MULTIPLIER = 2;
 const ANOMALY_MIN_COST = 1;
 const ANOMALY_MIN_TOKENS = 50_000;
+const LEDGER_INITIAL_VISIBLE = 5;
+const LEDGER_PAGE_SIZE = 50;
 const PREFS_STORAGE_KEY = "token-atlas:prefs:v1";
 const MODEL_EXPORT_HEADERS = [
   "model",
@@ -284,8 +286,9 @@ function App() {
     topProjectMode: initialPrefs.topProjectMode ?? "tokens",
     selectedModels: initialPrefs.selectedModels ?? {},
     selectedProjectPath: null,
+    modalScrollY: 0,
     ledgerSortKey: "date",
-    ledgerVisibleCount: 50,
+    ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
 
     async mounted() {
       this.loading = true;
@@ -341,7 +344,7 @@ function App() {
 
     onRangeChange() {
       // Overview, trend, distribution, and per-model table are windowed.
-      this.ledgerVisibleCount = 50;
+      this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
       this.savePrefs();
       this.$nextTick(() => {
         this.renderTrend();
@@ -351,7 +354,7 @@ function App() {
 
     onProviderChange(provider) {
       this.providerKey = provider;
-      this.ledgerVisibleCount = 50;
+      this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
       this.reconcileSelectedModels();
       this.savePrefs();
       this.$nextTick(() => {
@@ -465,6 +468,19 @@ function App() {
       const currentStart = Math.max(0, providerFiltered.length - days);
       const previousStart = Math.max(0, currentStart - days);
       return providerFiltered.slice(previousStart, currentStart);
+    },
+
+    get previousTrendAvailable() {
+      return (
+        this.rangeKey !== "all" &&
+        this.activeTrendModels.length > 0 &&
+        this.comparisonDaily.length === this.filteredDaily.length
+      );
+    },
+
+    get previousTrendLabel() {
+      if (this.rangeKey === "all") return "";
+      return `Previous ${this.rangeKey}d`;
     },
 
     get comparisonSummary() {
@@ -775,6 +791,22 @@ function App() {
         messages: project.messageCount ?? 0,
         tokens: project.tokens ?? 0,
         costUSD: project.costUSD ?? 0,
+      };
+    },
+
+    get activeProjectDetail() {
+      const project = this.selectedProject ?? {};
+      const summary = this.selectedProjectProviderSummary ?? {
+        label: "All sources",
+        messages: 0,
+        tokens: 0,
+        costUSD: 0,
+      };
+      return {
+        project,
+        summary,
+        models: this.selectedProjectModels,
+        modelTotalCost: this.selectedProjectModelTotalCost,
       };
     },
 
@@ -1147,23 +1179,43 @@ function App() {
       const exists = this.stats.projects?.some(
         (project) => project.path === this.selectedProjectPath,
       );
-      if (!exists) this.selectedProjectPath = null;
+      if (!exists) this.clearSelectedProject();
     },
 
     selectProject(path) {
+      this.lockPageScroll();
       this.selectedProjectPath = path;
+      this.$nextTick(() => {
+        this.$refs.projectDetailDialog?.focus();
+      });
     },
 
     clearSelectedProject() {
       this.selectedProjectPath = null;
+      this.unlockPageScroll();
     },
 
     isSelectedProject(path) {
       return this.selectedProjectPath === path;
     },
 
+    lockPageScroll() {
+      this.modalScrollY = window.scrollY || 0;
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+      document.body.style.paddingRight = `${window.innerWidth - document.documentElement.clientWidth}px`;
+    },
+
+    unlockPageScroll() {
+      const scrollY = this.modalScrollY || 0;
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
+      window.scrollTo(0, scrollY);
+    },
+
     showMoreLedgerRows() {
-      this.ledgerVisibleCount += 50;
+      this.ledgerVisibleCount += LEDGER_PAGE_SIZE;
     },
 
     availableModelKeys() {
@@ -1422,6 +1474,9 @@ function App() {
           available: false,
           state: "unavailable",
           label: "No comparison for all time",
+          valueLabel: "n/a",
+          pctLabel: "all time",
+          contextLabel: "No comparison",
         };
       }
       if (!this.comparisonDaily.length) {
@@ -1429,6 +1484,9 @@ function App() {
           available: false,
           state: "unavailable",
           label: "No previous window",
+          valueLabel: "n/a",
+          pctLabel: "no baseline",
+          contextLabel: "Previous window",
         };
       }
 
@@ -1442,6 +1500,15 @@ function App() {
             current === 0
               ? `no change vs ${windowLabel}`
               : `new activity vs ${windowLabel}`,
+          valueLabel:
+            current === 0
+              ? "no change"
+              : `${this.formatDeltaSign(current)}${this.formatDeltaValue(
+                  metric,
+                  Math.abs(current),
+                )}`,
+          pctLabel: current === 0 ? "0%" : "new",
+          contextLabel: `vs ${windowLabel}`,
         };
       }
 
@@ -1456,7 +1523,14 @@ function App() {
           delta === 0
             ? `no change vs ${windowLabel}`
             : `${sign}${formattedDelta} (${formattedPct}) vs ${windowLabel}`,
+        valueLabel: delta === 0 ? "no change" : `${sign}${formattedDelta}`,
+        pctLabel: delta === 0 ? "0%" : formattedPct,
+        contextLabel: `vs ${windowLabel}`,
       };
+    },
+
+    formatDeltaSign(value) {
+      return value > 0 ? "+" : value < 0 ? "-" : "";
     },
 
     formatDeltaValue(metric, value) {
@@ -1467,13 +1541,14 @@ function App() {
 
     deltaClass(metric) {
       return {
-        "card-delta": true,
-        "card-delta--increase":
+        "compare-block": true,
+        "compare-block--increase":
           this.summaryDeltas[metric]?.state === "increase",
-        "card-delta--decrease":
+        "compare-block--decrease":
           this.summaryDeltas[metric]?.state === "decrease",
-        "card-delta--neutral": this.summaryDeltas[metric]?.state === "neutral",
-        "card-delta--unavailable":
+        "compare-block--neutral":
+          this.summaryDeltas[metric]?.state === "neutral",
+        "compare-block--unavailable":
           this.summaryDeltas[metric]?.state === "unavailable",
       };
     },
@@ -1600,6 +1675,17 @@ function App() {
       return `oklch(73% 0.13 151 / ${alpha.toFixed(3)})`;
     },
 
+    trendDayValue(day, models, isCost) {
+      return models.reduce(
+        (sum, model) =>
+          sum +
+          (isCost
+            ? (day.usageByModel?.[model]?.costUSD ?? 0)
+            : (day.tokensByModel?.[model] ?? 0)),
+        0,
+      );
+    },
+
     renderTrend() {
       if (!window.Chart || !this.stats) return;
       const ctx = this.$refs.trendCanvas?.getContext("2d");
@@ -1608,6 +1694,9 @@ function App() {
       const labels = daily.map((d) => d.date);
       const isCost = this.trendMode === "cost";
       const activeModels = this.activeTrendModels;
+      const previousDaily = this.previousTrendAvailable
+        ? this.comparisonDaily
+        : [];
 
       if (charts.trend) {
         charts.trend.destroy();
@@ -1636,6 +1725,35 @@ function App() {
         categoryPercentage: 0.72,
         barPercentage: 0.82,
       }));
+
+      if (previousDaily.length) {
+        datasets.push({
+          type: "line",
+          label: this.previousTrendLabel,
+          data: previousDaily.map((d) =>
+            this.trendDayValue(d, activeModels, isCost),
+          ),
+          borderColor: cssVar("--accent"),
+          backgroundColor: cssVar("--accent"),
+          borderDash: [7, 5],
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          fill: false,
+          order: 0,
+          yAxisID: "yPrevious",
+        });
+      }
+
+      const maxTrendValue = Math.max(
+        0,
+        ...daily.map((d) => this.trendDayValue(d, activeModels, isCost)),
+        ...previousDaily.map((d) =>
+          this.trendDayValue(d, activeModels, isCost),
+        ),
+      );
+      const trendAxisMax = maxTrendValue > 0 ? maxTrendValue * 1.08 : undefined;
 
       charts.trend = new window.Chart(ctx, {
         type: "bar",
@@ -1676,6 +1794,12 @@ function App() {
               grid: { color: chartGrid },
               stacked: true,
               beginAtZero: true,
+              max: trendAxisMax,
+            },
+            yPrevious: {
+              display: false,
+              beginAtZero: true,
+              max: trendAxisMax,
             },
           },
         },
