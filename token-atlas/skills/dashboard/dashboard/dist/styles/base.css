@@ -24,6 +24,7 @@
   --scrim: oklch(18% 0.03 40 / 0.5);
   --surface: oklch(97% 0.008 60);
   --surface-2: oklch(94.5% 0.014 55);
+  --surface-well: oklch(92.5% 0.016 55);
   --surface-3: oklch(91.5% 0.022 50);
   --surface-glass: oklch(97% 0.008 60);
   --surface-glass-raised: oklch(95.5% 0.012 55);
@@ -50,6 +51,7 @@
 
   /* Semantic — warmed and pulled into sunrise lineage, keeps up/down distinction */
   --green: oklch(70% 0.15 110);
+  --positive: oklch(64% 0.16 152);
   --warn: oklch(75% 0.16 75);
   --danger: oklch(58% 0.21 25);
 
@@ -145,6 +147,7 @@
   --scrim: oklch(10% 0.04 275 / 0.66);
   --surface: oklch(22% 0.036 270);
   --surface-2: oklch(26% 0.04 268);
+  --surface-well: oklch(22.5% 0.038 268);
   --surface-3: oklch(30% 0.045 265);
   --surface-glass: oklch(22% 0.036 270);
   --surface-glass-raised: oklch(26% 0.04 268);
@@ -170,6 +173,7 @@
   --sunrise-glow: oklch(72% 0.16 65);
 
   --green: oklch(78% 0.16 110);
+  --positive: oklch(74% 0.16 152);
   --warn: oklch(82% 0.16 75);
   --danger: oklch(68% 0.22 25);
 
@@ -290,4 +294,3 @@ label:focus-within {
   margin: 0 auto;
   padding: var(--s-22) var(--s-24) var(--s-32);
 }
-

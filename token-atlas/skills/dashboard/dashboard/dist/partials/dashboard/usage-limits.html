@@ -1,0 +1,95 @@
+<section class="usage-limits-panel" aria-label="Usage windows">
+  <div class="usage-limits-head">
+    <div>
+      <h2>Usage windows</h2>
+      <span class="muted">Claude and Codex live limits</span>
+    </div>
+  </div>
+
+  <div v-if="usageLimitsView.available" class="usage-limit-provider-row">
+    <section
+      v-for="provider in usageLimitsView.providers"
+      :key="provider.key"
+      class="usage-limit-provider"
+      :aria-label="provider.label + ' usage windows'"
+    >
+      <div class="usage-limit-provider-head">
+        <div>
+          <span :class="providerBadgeClass(provider.key)">
+            {{ provider.label }}
+          </span>
+          <span class="muted">{{ provider.sourceLabel }}</span>
+        </div>
+        <span :class="'usage-limit-state usage-limit-state--' + provider.state">
+          {{ provider.state }}
+        </span>
+      </div>
+
+      <div v-if="provider.windows.length" class="usage-limit-grid">
+        <article
+          v-for="window in provider.windows"
+          :key="provider.key + '-' + window.key"
+          class="usage-ring-window"
+        >
+          <span class="usage-ring-label">{{ window.label }}</span>
+          <div
+            class="usage-ring"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="window.usedValueNow"
+            :aria-label="window.meterLabel"
+          >
+            <svg class="usage-ring-svg" viewBox="0 0 36 36" aria-hidden="true">
+              <circle
+                class="usage-ring-track"
+                cx="18"
+                cy="18"
+                r="15.9155"
+              ></circle>
+              <circle
+                class="usage-ring-elapsed"
+                cx="18"
+                cy="18"
+                r="15.9155"
+                :stroke-dasharray="window.elapsedArc + ' 100'"
+              ></circle>
+              <circle
+                :class="'usage-ring-fill usage-ring-fill--' + window.severity"
+                cx="18"
+                cy="18"
+                r="15.9155"
+                :stroke-dasharray="window.usedArc + ' 100'"
+              ></circle>
+              <circle
+                v-if="window.projectedAngle !== null"
+                :class="'usage-ring-projection usage-ring-projection--' + window.projectedLevel"
+                cx="18"
+                cy="2.0845"
+                r="1.9"
+                :transform="'rotate(' + window.projectedAngle + ' 18 18)'"
+              >
+                <title>{{ window.projectedAria }}</title>
+              </circle>
+            </svg>
+            <span class="usage-ring-value">{{ window.usedLabel }}</span>
+          </div>
+          <span class="usage-ring-reset">{{ window.resetLabel }}</span>
+          <p class="usage-ring-meta">
+            <span>{{ window.elapsedLabel }} elapsed</span>
+            <span>{{ window.remainingLabel }} left</span>
+          </p>
+        </article>
+      </div>
+
+      <div v-else class="usage-limit-empty">
+        <span>{{ provider.emptyLabel }}</span>
+        <code>{{ provider.path }}</code>
+      </div>
+    </section>
+  </div>
+
+  <div v-else class="usage-limit-empty">
+    <span>{{ usageLimitsView.emptyLabel }}</span>
+  </div>
+</section>

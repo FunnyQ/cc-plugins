@@ -1,63 +1,61 @@
-        <!-- Monthly budget (moved up: pace question after the cost question) -->
-        <section class="budget-panel" aria-label="Monthly budget">
-          <div class="budget-panel-main">
-            <div>
-              <h2>Monthly budget</h2>
-              <span class="muted"
-                >estimated · {{ budgetView.providerLabel }} · {{
-                budgetView.source }}</span
-              >
-            </div>
-            <span
-              v-if="budgetView.configured"
-              :class="'budget-state budget-state--' + budgetView.state"
-            >
-              {{ budgetStateLabel(budgetView.state) }}
-            </span>
-            <span v-else class="budget-state">setup optional</span>
-          </div>
+<!-- Monthly budget: spend pacing, sits just above the usage shifts panel -->
+<section class="budget-panel" aria-label="Monthly budget">
+  <div class="budget-panel-main">
+    <div>
+      <h2>Monthly budget</h2>
+      <span class="muted"
+        >estimated · {{ budgetView.providerLabel }} · {{ budgetView.source
+        }}</span
+      >
+    </div>
+    <span
+      v-if="budgetView.configured"
+      :class="'budget-state budget-state--' + budgetView.state"
+    >
+      {{ budgetStateLabel(budgetView.state) }}
+    </span>
+    <span v-else class="budget-state">setup optional</span>
+  </div>
 
-          <div v-if="budgetView.configured" class="budget-grid">
-            <div class="budget-meter" aria-label="Budget usage">
-              <div class="budget-meter-head">
-                <strong>{{ budgetView.usagePctLabel }}</strong>
-                <span
-                  >{{ fmtUSD(budgetView.monthToDateCostUSD) }} of {{
-                  fmtUSD(budgetView.monthlyBudgetUSD) }}</span
-                >
-              </div>
-              <div class="budget-meter-track">
-                <span
-                  :class="budgetMeterClass(budgetView.state)"
-                  :style="{ width: budgetView.usageMeterWidth }"
-                ></span>
-              </div>
-            </div>
-            <dl class="budget-stats">
-              <div>
-                <dt>Remaining</dt>
-                <dd>{{ fmtUSD(budgetView.remainingBudgetUSD) }}</dd>
-              </div>
-              <div>
-                <dt>Projected</dt>
-                <dd>{{ fmtUSD(budgetView.projectedMonthEndCostUSD) }}</dd>
-              </div>
-              <div>
-                <dt>Projected use</dt>
-                <dd>{{ budgetView.projectedPctLabel }}</dd>
-              </div>
-            </dl>
-          </div>
+  <div v-if="budgetView.configured" class="budget-grid">
+    <div class="budget-meter" aria-label="Budget usage">
+      <div class="budget-meter-head">
+        <strong>{{ budgetView.usagePctLabel }}</strong>
+        <span
+          >{{ fmtUSD(budgetView.monthToDateCostUSD) }} of {{
+          fmtUSD(budgetView.monthlyBudgetUSD) }}</span
+        >
+      </div>
+      <div class="budget-meter-track">
+        <span
+          :class="budgetMeterClass(budgetView.state)"
+          :style="{ width: budgetView.usageMeterWidth }"
+        ></span>
+      </div>
+    </div>
+    <dl class="budget-stats">
+      <div>
+        <dt>Remaining</dt>
+        <dd>{{ fmtUSD(budgetView.remainingBudgetUSD) }}</dd>
+      </div>
+      <div>
+        <dt>Projected</dt>
+        <dd>{{ fmtUSD(budgetView.projectedMonthEndCostUSD) }}</dd>
+      </div>
+      <div>
+        <dt>Projected use</dt>
+        <dd>{{ budgetView.projectedPctLabel }}</dd>
+      </div>
+    </dl>
+  </div>
 
-          <div v-else class="budget-setup">
-            <span v-if="budgetView.error"
-              >Budget config warning: {{ budgetView.error }}</span
-            >
-            <span v-else
-              >Create <code>{{ budgetView.source }}</code> with
-              <code>{"monthlyBudgetUSD":100}</code> to enable burn-rate
-              planning.</span
-            >
-          </div>
-        </section>
-
+  <div v-else class="budget-setup">
+    <span v-if="budgetView.error"
+      >Budget config warning: {{ budgetView.error }}</span
+    >
+    <span v-else
+      >Create <code>{{ budgetView.source }}</code> with
+      <code>{"monthlyBudgetUSD":100}</code> to enable burn-rate planning.</span
+    >
+  </div>
+</section>

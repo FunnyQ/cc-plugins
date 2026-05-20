@@ -751,6 +751,38 @@ export function App() {
       };
     },
 
+    get usageLimitsConfig() {
+      return this.stats?.usageLimits ?? null;
+    },
+
+    get codexUsageLimitsConfig() {
+      return this.stats?.codexUsageLimits ?? null;
+    },
+
+    get usageLimitsView() {
+      const providers = [
+        this.usageLimitProviderView(
+          "claude",
+          "Claude",
+          this.usageLimitsConfig,
+          "waiting for Claude Code",
+          "~/.cache/token-atlas/rate-limits.json",
+        ),
+        this.usageLimitProviderView(
+          "codex",
+          "Codex",
+          this.codexUsageLimitsConfig,
+          "waiting for Codex login",
+          "~/.cache/token-atlas/codex-usage-limits.json",
+        ),
+      ].filter(Boolean);
+      return {
+        available: providers.length > 0,
+        providers,
+        emptyLabel: "Usage window data is unavailable.",
+      };
+    },
+
     get dataHealth() {
       return this.stats?.dataHealth ?? null;
     },
@@ -1440,6 +1472,162 @@ export function App() {
     formatDateTime(value) {
       if (!value) return "n/a";
       return new Date(value).toLocaleString();
+    },
+
+    usageLimitProviderView(key, label, limits, waitingLabel, fallbackPath) {
+      const windows = [
+        this.usageLimitWindowView("fiveHour", "5hr", limits?.fiveHour),
+        this.usageLimitWindowView("weekly", "Weekly", limits?.weekly),
+      ].filter(Boolean);
+      const error = limits?.error ?? null;
+      const stale = limits?.stale === true;
+      const state =
+        error && windows.length === 0 ? "missing" : stale ? "stale" : "live";
+      const sourceParts = [];
+      if (limits?.capturedAt) {
+        sourceParts.push(
+          `captured ${this.formatUsageLimitCapture(limits.capturedAt)}`,
+        );
+      } else {
+        sourceParts.push(waitingLabel);
+      }
+      if (limits?.plan) sourceParts.push(limits.plan);
+
+      return {
+        key,
+        label,
+        windows,
+        state,
+        sourceLabel: sourceParts.join(" / "),
+        emptyLabel:
+          error === "missing" || error === "missing-auth"
+            ? "No live rate limit capture yet."
+            : "Usage window data is unavailable.",
+        path: limits?.path ?? fallbackPath,
+      };
+    },
+
+    usageLimitWindowView(key, label, window) {
+      if (!window) return null;
+
+      const usedPercent =
+        typeof window.usedPercent === "number" &&
+        Number.isFinite(window.usedPercent)
+          ? window.usedPercent
+          : null;
+      const elapsedPercent =
+        typeof window.elapsedPercent === "number" &&
+        Number.isFinite(window.elapsedPercent)
+          ? window.elapsedPercent
+          : null;
+      const remainingMs =
+        typeof window.remainingMs === "number" &&
+        Number.isFinite(window.remainingMs)
+          ? window.remainingMs
+          : null;
+      const usedClamped =
+        usedPercent === null ? null : Math.max(0, Math.min(100, usedPercent));
+      const elapsedClamped =
+        elapsedPercent === null
+          ? null
+          : Math.max(0, Math.min(100, elapsedPercent));
+      const usedLabel =
+        usedPercent === null
+          ? "n/a"
+          : `${Math.min(999, Math.max(0, usedPercent)).toFixed(
+              usedPercent >= 10 ? 0 : 1,
+            )}%`;
+      const elapsedLabel =
+        elapsedClamped === null ? "n/a" : `${elapsedClamped.toFixed(1)}%`;
+      // Color encodes how close the window is to its cap, matching the budget
+      // meter's sunrise ramp, not which window this is.
+      const severity =
+        usedClamped === null || usedClamped < 50
+          ? "low"
+          : usedClamped < 75
+            ? "medium"
+            : usedClamped < 90
+              ? "high"
+              : "critical";
+
+      // Projected end-of-window usage if the current burn rate holds. Hold off
+      // until enough of the window has elapsed that used/elapsed isn't dominated
+      // by early noise (5% of the window: ~15min for 5hr, ~8h for weekly).
+      let projectedAngle = null;
+      let projectedLevel = null;
+      let projectedAria = null;
+      if (
+        usedClamped !== null &&
+        elapsedClamped !== null &&
+        elapsedClamped >= 5
+      ) {
+        const projected = (usedClamped / elapsedClamped) * 100;
+        projectedLevel =
+          projected >= 100 ? "over" : projected >= 80 ? "warn" : "safe";
+        // Marker angle around the ring: 0% sits at 12 o'clock, sweeping clockwise.
+        projectedAngle = Math.min(100, projected) * 3.6;
+        projectedAria =
+          projectedLevel === "over"
+            ? "Projected to hit the limit before reset"
+            : `Projected ~${Math.round(projected)}% at reset`;
+      }
+
+      return {
+        key,
+        label,
+        usedLabel,
+        usedValueNow: usedClamped === null ? null : Math.round(usedClamped),
+        severity,
+        // Arc lengths feed stroke-dasharray on a circle whose circumference is
+        // normalized to 100, so the clamped percent maps straight to the dash.
+        usedArc: usedClamped === null ? 0 : Number(usedClamped.toFixed(2)),
+        elapsedArc:
+          elapsedClamped === null ? 0 : Number(elapsedClamped.toFixed(2)),
+        projectedAngle,
+        projectedLevel,
+        projectedAria,
+        resetLabel: window.resetAt
+          ? `resets ${this.formatUsageLimitReset(window.resetAt)}`
+          : "reset unavailable",
+        elapsedLabel,
+        remainingLabel: this.formatUsageLimitDuration(remainingMs),
+        meterLabel:
+          usedPercent === null
+            ? `${label} usage unavailable`
+            : `${label}: ${usedLabel} used, ${elapsedLabel} of window elapsed`,
+      };
+    },
+
+    formatUsageLimitCapture(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "n/a";
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
+    formatUsageLimitReset(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "n/a";
+      return date.toLocaleString([], {
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
+    formatUsageLimitDuration(value) {
+      if (typeof value !== "number" || !Number.isFinite(value)) return "n/a";
+
+      const totalMinutes = Math.max(0, Math.floor(value / 60000));
+      const days = Math.floor(totalMinutes / 1440);
+      const hours = Math.floor((totalMinutes % 1440) / 60);
+      const minutes = totalMinutes % 60;
+
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      return `${minutes}m`;
     },
 
     dataHealthStatusClass(status) {

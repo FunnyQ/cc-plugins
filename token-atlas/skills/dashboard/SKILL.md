@@ -36,6 +36,42 @@ Flags:
 - `--port <n>` — pick a different port
 - `--no-open` — skip auto-open (just print URL)
 
+## Live Usage Limits
+
+The dashboard's usage-window panel (5hr / weekly) is fed by `rate_limits` that
+Claude Code only hands to the **status line** command. To capture it, point
+`statusLine.command` in `~/.claude/settings.json` at `statusline-collector.ts`:
+the collector reads the statusline JSON from stdin, writes
+`~/.cache/token-atlas/rate-limits.json`, then forwards the unchanged payload to
+its inner statusline (default `bunx -y ccstatusline@latest`; override with the
+`TOKEN_ATLAS_STATUSLINE_COMMAND` env var to keep an existing line like
+claude-powerline rendering).
+
+**Don't hand-write the path.** The precheck (`install.ts`) reports whether the
+collector is wired (the `○ live usage limits (statusline collector)` line). Use
+its resolved path rather than `${CLAUDE_PLUGIN_ROOT}`: that variable is not
+expanded in the status-line context, and installed plugins live at
+version-pinned cache paths, so the absolute path must be resolved at runtime.
+After `claude plugin update` the cache path changes; the precheck detects the
+now-stale path, so re-running the dashboard re-surfaces the offer below.
+
+### Offer to wire it up
+
+When the precheck shows the usage-limits check as `○` (not wired), **ask the
+user with the `AskUserQuestion` tool** whether they want it set up automatically
+— don't silently edit their global config. Offer these options:
+
+- **Set it up for me** — run
+  `bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/setup-statusline.ts`, then
+  relay its output. The script edits `~/.claude/settings.json`, backs it up to
+  `settings.json.bak` first, preserves any existing status line by wrapping it
+  via `TOKEN_ATLAS_STATUSLINE_COMMAND`, is idempotent, and refuses to touch the
+  file if it isn't valid JSON. Tell the user to **restart Claude Code** for the
+  new status line to take effect.
+- **Show manual steps** — print the precheck's paste-ready `statusLine.command`
+  hint verbatim and stop.
+- **Skip** — launch the dashboard without usage limits; the panel stays empty.
+
 ## Sections
 
 - **Provider switch** — All / Claude / Codex, with All as the combined default
@@ -76,7 +112,9 @@ dashboard/
 ├── scripts/
 │   ├── install.ts            # diagnostic
 │   ├── api.ts                # data engine (also CLI: prints JSON)
-│   └── serve-dashboard.ts    # HTTP server + auto-open
+│   ├── serve-dashboard.ts    # HTTP server + auto-open
+│   ├── statusline-collector.ts # captures live rate_limits and chains ccstatusline
+│   └── setup-statusline.ts   # wires the collector into settings.json (user-approved)
 ├── dashboard/dist/           # static frontend (no build step)
 │   ├── index.html
 │   ├── app.js

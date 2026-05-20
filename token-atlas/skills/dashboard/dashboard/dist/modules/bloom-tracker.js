@@ -5,7 +5,8 @@
 export function installBloomTracker() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-  const SELECTOR = ".panel, .card, .budget-panel, .data-health-panel";
+  const SELECTOR =
+    ".panel, .card, .budget-panel, .usage-limits-panel, .data-health-panel";
   // Per-frame lerp factor. Lower = laggier trail. 0.14 ≈ ~300ms to settle.
   const SMOOTH = 0.14;
   const SNAP_EPSILON = 0.15;
