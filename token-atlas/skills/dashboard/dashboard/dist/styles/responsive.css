@@ -71,6 +71,9 @@
   .budget-panel-main,
   .budget-grid,
   .budget-stats,
+  .usage-limits-head,
+  .usage-limit-grid,
+  .usage-limit-window-head,
   .token-composition-summary,
   .cache-efficiency,
   .token-composition-grid,
@@ -314,4 +317,3 @@
     transform: translateY(0);
   }
 }
-

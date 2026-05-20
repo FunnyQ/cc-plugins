@@ -751,6 +751,34 @@ export function App() {
       };
     },
 
+    get usageLimitsConfig() {
+      return this.stats?.usageLimits ?? null;
+    },
+
+    get usageLimitsView() {
+      const limits = this.usageLimitsConfig;
+      const windows = [
+        this.usageLimitWindowView("fiveHour", "5hr", limits?.fiveHour),
+        this.usageLimitWindowView("weekly", "Weekly", limits?.weekly),
+      ].filter(Boolean);
+      const error = limits?.error ?? null;
+      const stale = limits?.stale === true;
+      const state = error ? "missing" : stale ? "stale" : "live";
+      return {
+        available: windows.length > 0,
+        windows,
+        state,
+        sourceLabel: limits?.capturedAt
+          ? `captured ${this.formatUsageLimitCapture(limits.capturedAt)}`
+          : "waiting for Claude Code",
+        emptyLabel:
+          error === "missing"
+            ? "No live rate limit capture yet."
+            : "Usage window data is unavailable.",
+        path: limits?.path ?? "~/.cache/token-atlas/rate-limits.json",
+      };
+    },
+
     get dataHealth() {
       return this.stats?.dataHealth ?? null;
     },
@@ -1440,6 +1468,84 @@ export function App() {
     formatDateTime(value) {
       if (!value) return "n/a";
       return new Date(value).toLocaleString();
+    },
+
+    usageLimitWindowView(key, label, window) {
+      if (!window) return null;
+
+      const usedPercent =
+        typeof window.usedPercent === "number" &&
+        Number.isFinite(window.usedPercent)
+          ? window.usedPercent
+          : null;
+      const elapsedPercent =
+        typeof window.elapsedPercent === "number" &&
+        Number.isFinite(window.elapsedPercent)
+          ? window.elapsedPercent
+          : null;
+      const remainingMs =
+        typeof window.remainingMs === "number" &&
+        Number.isFinite(window.remainingMs)
+          ? window.remainingMs
+          : null;
+      const usedLabel =
+        usedPercent === null
+          ? "n/a"
+          : `${Math.min(999, Math.max(0, usedPercent)).toFixed(
+              usedPercent >= 10 ? 0 : 1,
+            )}%`;
+      const elapsedLabel =
+        elapsedPercent === null
+          ? "n/a"
+          : `${Math.max(0, Math.min(100, elapsedPercent)).toFixed(1)}% elapsed`;
+
+      return {
+        key,
+        label,
+        usedLabel,
+        resetLabel: window.resetAt
+          ? `resets ${this.formatUsageLimitReset(window.resetAt)}`
+          : "reset unavailable",
+        elapsedLabel,
+        remainingLabel: this.formatUsageLimitDuration(remainingMs),
+        meterLabel: `${label} usage ${usedLabel}`,
+        meterWidth:
+          usedPercent === null
+            ? "0%"
+            : `${Math.max(0, Math.min(100, usedPercent)).toFixed(1)}%`,
+      };
+    },
+
+    formatUsageLimitCapture(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "n/a";
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
+    formatUsageLimitReset(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "n/a";
+      return date.toLocaleString([], {
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
+    formatUsageLimitDuration(value) {
+      if (typeof value !== "number" || !Number.isFinite(value)) return "n/a";
+
+      const totalMinutes = Math.max(0, Math.floor(value / 60000));
+      const days = Math.floor(totalMinutes / 1440);
+      const hours = Math.floor((totalMinutes % 1440) / 60);
+      const minutes = totalMinutes % 60;
+
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      return `${minutes}m`;
     },
 
     dataHealthStatusClass(status) {

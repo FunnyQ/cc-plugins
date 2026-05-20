@@ -33,7 +33,12 @@ const USER_PRICING_OVERRIDE = join(
   "pricing.json",
 );
 const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
+const TOKEN_ATLAS_CACHE_DIR = join(HOME, ".cache", "token-atlas");
+const RATE_LIMITS_CACHE = join(TOKEN_ATLAS_CACHE_DIR, "rate-limits.json");
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
+const RATE_LIMITS_STALE_AFTER_MS = 5 * 60 * 1000;
+const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
+const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ---------- Types ----------
 
@@ -81,6 +86,33 @@ type BudgetMeta = {
   source: string;
   loaded: boolean;
   error: string | null;
+};
+type RateLimitBucket = {
+  used_percentage?: number | string | null;
+  resets_at?: number | string | null;
+};
+type RateLimitsCache = {
+  capturedAt?: string;
+  capturedAtEpochMs?: number;
+  rate_limits?: {
+    five_hour?: RateLimitBucket | null;
+    seven_day?: RateLimitBucket | null;
+  } | null;
+};
+type UsageLimitWindow = {
+  usedPercent: number | null;
+  resetAt: string | null;
+  elapsedPercent: number | null;
+  remainingMs: number | null;
+};
+type UsageLimits = {
+  source: string;
+  path: string;
+  capturedAt: string | null;
+  stale: boolean;
+  error: string | null;
+  fiveHour: UsageLimitWindow | null;
+  weekly: UsageLimitWindow | null;
 };
 
 type DataHealthSourceStatus = "ok" | "missing" | "unreadable" | "empty";
@@ -356,6 +388,102 @@ function loadBudgetConfig(): BudgetMeta {
     source,
     loaded: true,
     error: null,
+  };
+}
+
+function coerceNumber(
+  value: number | string | null | undefined,
+): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildUsageLimitWindow(
+  bucket: RateLimitBucket | null | undefined,
+  durationMs: number,
+  nowMs: number,
+): UsageLimitWindow | null {
+  if (!bucket) return null;
+
+  const usedPercent = coerceNumber(bucket.used_percentage);
+  const resetAtSeconds = coerceNumber(bucket.resets_at);
+  if (resetAtSeconds === null) {
+    return {
+      usedPercent,
+      resetAt: null,
+      elapsedPercent: null,
+      remainingMs: null,
+    };
+  }
+
+  const resetAtMs = resetAtSeconds * 1000;
+  const resetAt = new Date(resetAtMs).toISOString();
+  const startAtMs = resetAtMs - durationMs;
+  const elapsedMs = Math.max(0, Math.min(durationMs, nowMs - startAtMs));
+  const remainingMs = durationMs - elapsedMs;
+
+  return {
+    usedPercent,
+    resetAt,
+    elapsedPercent: (elapsedMs / durationMs) * 100,
+    remainingMs,
+  };
+}
+
+function readUsageLimits(): UsageLimits {
+  const cache = readJSONWithError<RateLimitsCache>(RATE_LIMITS_CACHE);
+  const base = {
+    source: "statusline-cache",
+    path: displayPath(RATE_LIMITS_CACHE),
+    capturedAt: null,
+    stale: true,
+    error: null,
+    fiveHour: null,
+    weekly: null,
+  };
+
+  if (!cache.exists) {
+    return {
+      ...base,
+      error: "missing",
+    };
+  }
+
+  if (cache.error || !cache.data) {
+    return {
+      ...base,
+      error: cache.error ?? "unreadable",
+    };
+  }
+
+  const capturedAtMs =
+    cache.data.capturedAtEpochMs ??
+    (cache.data.capturedAt ? Date.parse(cache.data.capturedAt) : Number.NaN);
+  const nowMs = Date.now();
+  const stale =
+    !Number.isFinite(capturedAtMs) ||
+    nowMs - capturedAtMs > RATE_LIMITS_STALE_AFTER_MS;
+  const rateLimits = cache.data.rate_limits;
+
+  if (!rateLimits) {
+    return {
+      ...base,
+      capturedAt: cache.data.capturedAt ?? null,
+      stale,
+      error: "missing-rate-limits",
+    };
+  }
+
+  return {
+    ...base,
+    capturedAt: cache.data.capturedAt ?? null,
+    stale,
+    error: null,
+    fiveHour: buildUsageLimitWindow(rateLimits.five_hour, FIVE_HOUR_MS, nowMs),
+    weekly: buildUsageLimitWindow(rateLimits.seven_day, SEVEN_DAY_MS, nowMs),
   };
 }
 
@@ -1339,6 +1467,7 @@ export async function buildStats() {
   const pricingLoad = await loadPricingWithMeta();
   const pricing = pricingLoad.table;
   const budget = loadBudgetConfig();
+  const usageLimits = readUsageLimits();
   const transcriptUsage = parseTranscriptUsage();
   const codexUsage = parseCodexUsage();
   const dataHealth = buildDataHealth({
@@ -1717,6 +1846,7 @@ export async function buildStats() {
       byModel.map((m) => m.model),
     ),
     budget,
+    usageLimits,
     dataHealth,
     daily,
     ledger,
