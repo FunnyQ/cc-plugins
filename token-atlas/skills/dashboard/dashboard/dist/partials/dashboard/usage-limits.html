@@ -1,0 +1,47 @@
+<section class="usage-limits-panel" aria-label="Claude usage windows">
+  <div class="usage-limits-head">
+    <div>
+      <h2>Usage windows</h2>
+      <span class="muted">{{ usageLimitsView.sourceLabel }}</span>
+    </div>
+    <span
+      :class="'usage-limit-state usage-limit-state--' + usageLimitsView.state"
+    >
+      {{ usageLimitsView.state }}
+    </span>
+  </div>
+
+  <div v-if="usageLimitsView.available" class="usage-limit-grid">
+    <article
+      v-for="window in usageLimitsView.windows"
+      :key="window.key"
+      class="usage-limit-window"
+    >
+      <div class="usage-limit-window-head">
+        <div>
+          <h3>{{ window.label }}</h3>
+          <span>{{ window.resetLabel }}</span>
+        </div>
+        <strong>{{ window.usedLabel }}</strong>
+      </div>
+      <div class="usage-limit-meter" :aria-label="window.meterLabel">
+        <span :style="{ width: window.meterWidth }"></span>
+      </div>
+      <dl class="usage-limit-meta">
+        <div>
+          <dt>Window</dt>
+          <dd>{{ window.elapsedLabel }}</dd>
+        </div>
+        <div>
+          <dt>Left</dt>
+          <dd>{{ window.remainingLabel }}</dd>
+        </div>
+      </dl>
+    </article>
+  </div>
+
+  <div v-else class="usage-limit-empty">
+    <span>{{ usageLimitsView.emptyLabel }}</span>
+    <code>{{ usageLimitsView.path }}</code>
+  </div>
+</section>

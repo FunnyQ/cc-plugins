@@ -36,6 +36,20 @@ Flags:
 - `--port <n>` — pick a different port
 - `--no-open` — skip auto-open (just print URL)
 
+## Live Usage Limits
+
+To capture Claude Code's live `rate_limits` while keeping ccstatusline active,
+configure Claude Code's status line command to run:
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/statusline-collector.ts
+```
+
+The collector reads the statusline JSON from stdin, writes
+`~/.cache/token-atlas/rate-limits.json`, then forwards the unchanged payload to
+`bunx -y ccstatusline@latest`. Set `TOKEN_ATLAS_STATUSLINE_COMMAND` if
+ccstatusline needs a custom command path.
+
 ## Sections
 
 - **Provider switch** — All / Claude / Codex, with All as the combined default
@@ -76,7 +90,8 @@ dashboard/
 ├── scripts/
 │   ├── install.ts            # diagnostic
 │   ├── api.ts                # data engine (also CLI: prints JSON)
-│   └── serve-dashboard.ts    # HTTP server + auto-open
+│   ├── serve-dashboard.ts    # HTTP server + auto-open
+│   └── statusline-collector.ts # captures live rate_limits and chains ccstatusline
 ├── dashboard/dist/           # static frontend (no build step)
 │   ├── index.html
 │   ├── app.js

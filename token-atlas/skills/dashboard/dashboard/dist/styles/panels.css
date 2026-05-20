@@ -14,9 +14,10 @@
 /* Sunrise Bloom — warm light from behind the surface. JS continuously lerps
    --bloom-x/--bloom-y toward the cursor each frame, so the light trails with
    exponential ease-out (the closer it gets, the smaller the step).
-   `.budget-panel` and `.data-health-panel` opt in without the base `.panel`
+   `.budget-panel`, `.usage-limits-panel`, and `.data-health-panel` opt in without the base `.panel`
    class, so they need the same isolated stacking context. */
 .budget-panel,
+.usage-limits-panel,
 .data-health-panel {
   position: relative;
   isolation: isolate;
@@ -31,6 +32,7 @@
 .panel::before,
 .card::after,
 .budget-panel::before,
+.usage-limits-panel::before,
 .data-health-panel::before {
   content: "";
   position: absolute;
@@ -51,6 +53,7 @@
 .panel:hover::before,
 .card:hover::after,
 .budget-panel:hover::before,
+.usage-limits-panel:hover::before,
 .data-health-panel:hover::before {
   opacity: 1;
   transition-duration: 240ms;
@@ -59,6 +62,7 @@
 .panel:focus-visible::before,
 .card:focus-visible::after,
 .budget-panel:focus-visible::before,
+.usage-limits-panel:focus-visible::before,
 .data-health-panel:focus-visible::before {
   opacity: 0.85;
   transition-duration: 200ms;
@@ -67,6 +71,7 @@
 [data-theme="dark"] .panel::before,
 [data-theme="dark"] .card::after,
 [data-theme="dark"] .budget-panel::before,
+[data-theme="dark"] .usage-limits-panel::before,
 [data-theme="dark"] .data-health-panel::before {
   background: radial-gradient(
     420px circle at var(--bloom-x, 50%) var(--bloom-y, 50%),
@@ -80,6 +85,7 @@
   .panel::before,
   .card::after,
   .budget-panel::before,
+  .usage-limits-panel::before,
   .data-health-panel::before {
     display: none;
   }
@@ -789,4 +795,3 @@
   color: var(--text-muted);
   font-size: var(--fs-base);
 }
-
