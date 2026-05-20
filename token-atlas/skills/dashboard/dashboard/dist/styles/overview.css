@@ -420,3 +420,247 @@
   font-size: var(--fs-sm);
 }
 
+.usage-limits-panel {
+  display: grid;
+  gap: var(--s-12);
+  margin: 0 0 var(--s-14);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--s-18) var(--s-20);
+}
+
+.usage-limits-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-12);
+  align-items: start;
+}
+
+.usage-limits-head h2 {
+  margin: 0 0 var(--s-4);
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.usage-limit-state {
+  display: inline-grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--surface-2) 76%, var(--bg-rail));
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 760;
+  line-height: 1;
+  padding: 0 9px;
+  text-transform: uppercase;
+}
+
+.usage-limit-state--live {
+  border-color: color-mix(in oklch, var(--green) 22%, var(--edge));
+  background: color-mix(in oklch, var(--green) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--green) 54%, var(--text));
+}
+
+.usage-limit-state--stale {
+  border-color: color-mix(in oklch, var(--warn) 24%, var(--edge));
+  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--warn) 58%, var(--text));
+}
+
+.usage-limit-state--missing {
+  border-color: color-mix(in oklch, var(--rose) 20%, var(--edge));
+  background: color-mix(in oklch, var(--rose) 7%, var(--status-surface));
+  color: color-mix(in oklch, var(--rose) 52%, var(--text));
+}
+
+.usage-limit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-12);
+}
+
+.usage-limit-provider-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-16);
+}
+
+.usage-limit-provider {
+  display: grid;
+  gap: var(--s-16);
+  align-content: start;
+  min-width: 0;
+  border-radius: var(--radius);
+  background: var(--surface-well);
+  padding: var(--s-16) var(--s-18);
+}
+
+.usage-limit-provider-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-12);
+  align-items: center;
+  padding-bottom: var(--s-12);
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.usage-limit-provider-head > div {
+  display: grid;
+  gap: var(--s-6);
+  justify-items: start;
+  min-width: 0;
+}
+
+.usage-limit-provider-head .badge {
+  margin-left: 0;
+}
+
+.usage-ring-window {
+  display: grid;
+  gap: var(--s-8);
+  justify-items: center;
+  text-align: center;
+  min-width: 0;
+}
+
+.usage-ring-label {
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.usage-ring {
+  position: relative;
+  width: 84px;
+  height: 84px;
+}
+
+.usage-ring-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.usage-ring-track,
+.usage-ring-elapsed,
+.usage-ring-fill {
+  fill: none;
+  stroke-width: 3;
+}
+
+.usage-ring-track {
+  stroke: color-mix(in oklch, var(--text-faint) 12%, var(--bg-rail));
+}
+
+/* Time elapsed in the window, drawn behind the usage arc; the fill arc reaching
+   past it means quota is burning faster than the window's clock. */
+.usage-ring-elapsed {
+  stroke: color-mix(in oklch, var(--text) 12%, transparent);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.usage-ring-fill {
+  stroke: var(--sunrise-amber);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dasharray 0.5s var(--ease-out);
+}
+
+.usage-ring-fill--medium {
+  stroke: var(--sunrise-orange);
+}
+
+.usage-ring-fill--high {
+  stroke: var(--sunrise-coral);
+}
+
+.usage-ring-fill--critical {
+  stroke: var(--sunrise-magenta);
+}
+
+/* Marker for projected usage at reset if the current pace holds, riding the ring
+   at its projected angle. */
+.usage-ring-projection {
+  stroke: var(--surface-2);
+  stroke-width: 1;
+}
+
+.usage-ring-projection--safe {
+  fill: var(--positive);
+}
+
+.usage-ring-projection--warn {
+  fill: var(--warn);
+}
+
+.usage-ring-projection--over {
+  fill: var(--rose);
+}
+
+.usage-ring-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+}
+
+.usage-ring-reset {
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+
+.usage-ring-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-4) var(--s-10);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-ring-meta span:first-child::after {
+  content: "·";
+  margin-left: var(--s-10);
+  color: var(--text-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-ring-fill {
+    transition: none;
+  }
+}
+
+.usage-limit-empty {
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface-glass-raised) 78%, var(--bg));
+  display: grid;
+  gap: var(--s-8);
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.45;
+  padding: var(--s-10) var(--s-12);
+}
+
+.usage-limit-empty code {
+  color: color-mix(in oklch, var(--green) 48%, var(--text));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
