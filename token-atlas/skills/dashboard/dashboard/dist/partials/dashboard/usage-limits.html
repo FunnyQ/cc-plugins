@@ -6,7 +6,7 @@
     </div>
   </div>
 
-  <div v-if="usageLimitsView.available" class="usage-limit-provider-list">
+  <div v-if="usageLimitsView.available" class="usage-limit-provider-row">
     <section
       v-for="provider in usageLimitsView.providers"
       :key="provider.key"
@@ -15,7 +15,9 @@
     >
       <div class="usage-limit-provider-head">
         <div>
-          <h3>{{ provider.label }}</h3>
+          <span :class="providerBadgeClass(provider.key)">
+            {{ provider.label }}
+          </span>
           <span class="muted">{{ provider.sourceLabel }}</span>
         </div>
         <span :class="'usage-limit-state usage-limit-state--' + provider.state">
@@ -27,54 +29,56 @@
         <article
           v-for="window in provider.windows"
           :key="provider.key + '-' + window.key"
-          class="usage-limit-window"
+          class="usage-ring-window"
         >
-          <div class="usage-limit-window-head">
-            <div>
-              <h4>{{ window.label }}</h4>
-              <span>{{ window.resetLabel }}</span>
-            </div>
-            <strong>{{ window.usedLabel }}</strong>
+          <span class="usage-ring-label">{{ window.label }}</span>
+          <div
+            class="usage-ring"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="window.usedValueNow"
+            :aria-label="window.meterLabel"
+          >
+            <svg class="usage-ring-svg" viewBox="0 0 36 36" aria-hidden="true">
+              <circle
+                class="usage-ring-track"
+                cx="18"
+                cy="18"
+                r="15.9155"
+              ></circle>
+              <circle
+                class="usage-ring-elapsed"
+                cx="18"
+                cy="18"
+                r="15.9155"
+                :stroke-dasharray="window.elapsedArc + ' 100'"
+              ></circle>
+              <circle
+                :class="'usage-ring-fill usage-ring-fill--' + window.severity"
+                cx="18"
+                cy="18"
+                r="15.9155"
+                :stroke-dasharray="window.usedArc + ' 100'"
+              ></circle>
+              <circle
+                v-if="window.projectedAngle !== null"
+                :class="'usage-ring-projection usage-ring-projection--' + window.projectedLevel"
+                cx="18"
+                cy="2.0845"
+                r="1.9"
+                :transform="'rotate(' + window.projectedAngle + ' 18 18)'"
+              >
+                <title>{{ window.projectedAria }}</title>
+              </circle>
+            </svg>
+            <span class="usage-ring-value">{{ window.usedLabel }}</span>
           </div>
-          <div class="usage-limit-gauge">
-            <i
-              v-if="window.projectedTickWidth"
-              :class="'usage-limit-projection usage-limit-projection--' + window.projectedLevel"
-              :style="{ left: window.projectedTickWidth }"
-              role="img"
-              :aria-label="window.projectedAria"
-              :title="window.projectedAria"
-            ></i>
-            <div
-              class="usage-limit-meter"
-              role="progressbar"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-valuenow="window.usedValueNow"
-              :aria-label="window.meterLabel"
-            >
-              <i
-                v-if="window.elapsedTickWidth"
-                class="usage-limit-meter-elapsed"
-                :style="{ width: window.elapsedTickWidth }"
-                aria-hidden="true"
-              ></i>
-              <span
-                :class="'usage-limit-meter-fill usage-limit-meter-fill--' + window.severity"
-                :style="{ width: window.meterWidth }"
-              ></span>
-            </div>
-          </div>
-          <dl class="usage-limit-meta">
-            <div>
-              <dt>Elapsed</dt>
-              <dd>{{ window.elapsedLabel }}</dd>
-            </div>
-            <div>
-              <dt>Resets in</dt>
-              <dd>{{ window.remainingLabel }}</dd>
-            </div>
-          </dl>
+          <span class="usage-ring-reset">{{ window.resetLabel }}</span>
+          <p class="usage-ring-meta">
+            <span>{{ window.elapsedLabel }} elapsed</span>
+            <span>{{ window.remainingLabel }} left</span>
+          </p>
         </article>
       </div>
 

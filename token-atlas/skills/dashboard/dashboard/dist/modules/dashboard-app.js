@@ -1553,7 +1553,7 @@ export function App() {
       // Projected end-of-window usage if the current burn rate holds. Hold off
       // until enough of the window has elapsed that used/elapsed isn't dominated
       // by early noise (5% of the window: ~15min for 5hr, ~8h for weekly).
-      let projectedTickWidth = null;
+      let projectedAngle = null;
       let projectedLevel = null;
       let projectedAria = null;
       if (
@@ -1564,7 +1564,8 @@ export function App() {
         const projected = (usedClamped / elapsedClamped) * 100;
         projectedLevel =
           projected >= 100 ? "over" : projected >= 80 ? "warn" : "safe";
-        projectedTickWidth = `${Math.min(100, projected).toFixed(1)}%`;
+        // Marker angle around the ring: 0% sits at 12 o'clock, sweeping clockwise.
+        projectedAngle = Math.min(100, projected) * 3.6;
         projectedAria =
           projectedLevel === "over"
             ? "Projected to hit the limit before reset"
@@ -1577,7 +1578,12 @@ export function App() {
         usedLabel,
         usedValueNow: usedClamped === null ? null : Math.round(usedClamped),
         severity,
-        projectedTickWidth,
+        // Arc lengths feed stroke-dasharray on a circle whose circumference is
+        // normalized to 100, so the clamped percent maps straight to the dash.
+        usedArc: usedClamped === null ? 0 : Number(usedClamped.toFixed(2)),
+        elapsedArc:
+          elapsedClamped === null ? 0 : Number(elapsedClamped.toFixed(2)),
+        projectedAngle,
         projectedLevel,
         projectedAria,
         resetLabel: window.resetAt
@@ -1589,10 +1595,6 @@ export function App() {
           usedPercent === null
             ? `${label} usage unavailable`
             : `${label}: ${usedLabel} used, ${elapsedLabel} of window elapsed`,
-        meterWidth: usedClamped === null ? "0%" : `${usedClamped.toFixed(1)}%`,
-        // Tick marking time elapsed; fill past it means burning faster than the clock.
-        elapsedTickWidth:
-          elapsedClamped === null ? null : `${elapsedClamped.toFixed(1)}%`,
       };
     },
 
