@@ -3,9 +3,11 @@ import {
   accessSync,
   constants,
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
@@ -35,6 +37,14 @@ const USER_PRICING_OVERRIDE = join(
 const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
 const TOKEN_ATLAS_CACHE_DIR = join(HOME, ".cache", "token-atlas");
 const RATE_LIMITS_CACHE = join(TOKEN_ATLAS_CACHE_DIR, "rate-limits.json");
+const CODEX_AUTH = join(CODEX_DIR, "auth.json");
+const CODEX_USAGE_CACHE = join(
+  TOKEN_ATLAS_CACHE_DIR,
+  "codex-usage-limits.json",
+);
+const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/codex/usage";
+const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
+const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
 const RATE_LIMITS_STALE_AFTER_MS = 5 * 60 * 1000;
 const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
@@ -111,8 +121,33 @@ type UsageLimits = {
   capturedAt: string | null;
   stale: boolean;
   error: string | null;
+  plan?: string | null;
   fiveHour: UsageLimitWindow | null;
   weekly: UsageLimitWindow | null;
+};
+type CodexAuth = {
+  tokens?: {
+    access_token?: string;
+    refresh_token?: string;
+    account_id?: string;
+  };
+};
+type CodexApiRateLimitBucket = {
+  used_percent?: number | string | null;
+  reset_at?: number | string | null;
+  limit_window_seconds?: number | string | null;
+};
+type CodexApiUsage = {
+  plan_type?: string | null;
+  rate_limit?: {
+    primary_window?: CodexApiRateLimitBucket | null;
+    secondary_window?: CodexApiRateLimitBucket | null;
+  } | null;
+};
+type CodexUsageCache = {
+  capturedAt?: string;
+  capturedAtEpochMs?: number;
+  usage?: CodexApiUsage | null;
 };
 
 type DataHealthSourceStatus = "ok" | "missing" | "unreadable" | "empty";
@@ -341,6 +376,11 @@ function buildDataHealth(counts: DataHealth["counts"]): DataHealth {
         "optional rollout records",
       ),
       sourceHealth(
+        "Codex usage cache",
+        CODEX_USAGE_CACHE,
+        "optional live limit cache",
+      ),
+      sourceHealth(
         "Pricing override",
         USER_PRICING_OVERRIDE,
         "optional user pricing",
@@ -485,6 +525,197 @@ function readUsageLimits(): UsageLimits {
     fiveHour: buildUsageLimitWindow(rateLimits.five_hour, FIVE_HOUR_MS, nowMs),
     weekly: buildUsageLimitWindow(rateLimits.seven_day, SEVEN_DAY_MS, nowMs),
   };
+}
+
+function codexUsageBase(error: string | null = null): UsageLimits {
+  return {
+    source: "codex-api",
+    path: displayPath(CODEX_USAGE_CACHE),
+    capturedAt: null,
+    stale: true,
+    error,
+    plan: null,
+    fiveHour: null,
+    weekly: null,
+  };
+}
+
+function buildCodexUsageLimits(
+  usage: CodexApiUsage | null | undefined,
+  capturedAt: string | null,
+  capturedAtMs: number,
+  error: string | null,
+): UsageLimits {
+  const nowMs = Date.now();
+  const rateLimit = usage?.rate_limit;
+  const primary = rateLimit?.primary_window ?? null;
+  const secondary = rateLimit?.secondary_window ?? null;
+  const nextError =
+    error ?? (!primary && !secondary ? "missing-rate-limits" : null);
+  const primaryDurationMs =
+    (coerceNumber(primary?.limit_window_seconds) ?? 5 * 60 * 60) * 1000;
+  const secondaryDurationMs =
+    (coerceNumber(secondary?.limit_window_seconds) ?? 7 * 24 * 60 * 60) * 1000;
+
+  return {
+    ...codexUsageBase(nextError),
+    capturedAt,
+    stale:
+      !Number.isFinite(capturedAtMs) ||
+      nowMs - capturedAtMs > RATE_LIMITS_STALE_AFTER_MS,
+    plan: usage?.plan_type ?? null,
+    fiveHour: primary
+      ? buildUsageLimitWindow(
+          {
+            used_percentage: primary.used_percent,
+            resets_at: primary.reset_at,
+          },
+          primaryDurationMs,
+          nowMs,
+        )
+      : null,
+    weekly: secondary
+      ? buildUsageLimitWindow(
+          {
+            used_percentage: secondary.used_percent,
+            resets_at: secondary.reset_at,
+          },
+          secondaryDurationMs,
+          nowMs,
+        )
+      : null,
+  };
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function refreshCodexAccessToken(auth: CodexAuth): Promise<string> {
+  const refreshToken = auth.tokens?.refresh_token;
+  if (!refreshToken) throw new Error("missing-refresh-token");
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: CODEX_CLIENT_ID,
+  });
+  const res = await fetchWithTimeout(
+    CODEX_TOKEN_URL,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    },
+    4000,
+  );
+  if (!res.ok) throw new Error(`refresh-http-${res.status}`);
+  const json = (await res.json()) as { access_token?: string };
+  if (!json.access_token) throw new Error("missing-refreshed-access-token");
+  return json.access_token;
+}
+
+async function fetchCodexUsageWithToken(
+  accessToken: string,
+  accountId: string,
+): Promise<CodexApiUsage> {
+  const res = await fetchWithTimeout(
+    CODEX_USAGE_URL,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "chatgpt-account-id": accountId,
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      },
+    },
+    4000,
+  );
+  if (!res.ok) throw new Error(`http-${res.status}`);
+  return (await res.json()) as CodexApiUsage;
+}
+
+async function fetchCodexUsage(): Promise<CodexApiUsage> {
+  const auth = readJSONWithError<CodexAuth>(CODEX_AUTH);
+  if (!auth.exists) throw new Error("missing-auth");
+  if (auth.error || !auth.data)
+    throw new Error(auth.error ?? "unreadable-auth");
+
+  const accessToken = auth.data.tokens?.access_token;
+  if (!accessToken) throw new Error("missing-access-token");
+  const accountId = auth.data.tokens?.account_id ?? "";
+
+  try {
+    return await fetchCodexUsageWithToken(accessToken, accountId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (!message.includes("http-401") && !message.includes("http-403")) {
+      throw err;
+    }
+    const refreshed = await refreshCodexAccessToken(auth.data);
+    return await fetchCodexUsageWithToken(refreshed, accountId);
+  }
+}
+
+function readCodexUsageCache(): UsageLimits {
+  const cache = readJSONWithError<CodexUsageCache>(CODEX_USAGE_CACHE);
+  if (!cache.exists) return codexUsageBase("missing");
+  if (cache.error || !cache.data) {
+    return codexUsageBase(cache.error ?? "unreadable");
+  }
+
+  const capturedAtMs =
+    cache.data.capturedAtEpochMs ??
+    (cache.data.capturedAt ? Date.parse(cache.data.capturedAt) : Number.NaN);
+  return buildCodexUsageLimits(
+    cache.data.usage,
+    cache.data.capturedAt ?? null,
+    capturedAtMs,
+    null,
+  );
+}
+
+async function readCodexUsageLimits(): Promise<UsageLimits> {
+  const cached = readCodexUsageCache();
+  if (!cached.stale && !cached.error) return cached;
+
+  try {
+    const usage = await fetchCodexUsage();
+    const capturedAtEpochMs = Date.now();
+    const cache: CodexUsageCache = {
+      capturedAt: new Date(capturedAtEpochMs).toISOString(),
+      capturedAtEpochMs,
+      usage,
+    };
+    mkdirSync(TOKEN_ATLAS_CACHE_DIR, { recursive: true });
+    writeFileSync(CODEX_USAGE_CACHE, `${JSON.stringify(cache, null, 2)}\n`);
+    return buildCodexUsageLimits(
+      usage,
+      cache.capturedAt ?? null,
+      capturedAtEpochMs,
+      null,
+    );
+  } catch (err) {
+    if (cached.capturedAt) {
+      return {
+        ...cached,
+        stale: true,
+        error: err instanceof Error ? err.message : "fetch-failed",
+      };
+    }
+    return codexUsageBase(err instanceof Error ? err.message : "fetch-failed");
+  }
 }
 
 // ---------- Pricing ----------
@@ -1464,7 +1695,10 @@ export async function buildStats() {
     dailyHourCounts: historyDailyHourCounts,
   } = parseHistory();
   const sessions = parseSessions();
-  const pricingLoad = await loadPricingWithMeta();
+  const [pricingLoad, codexUsageLimits] = await Promise.all([
+    loadPricingWithMeta(),
+    readCodexUsageLimits(),
+  ]);
   const pricing = pricingLoad.table;
   const budget = loadBudgetConfig();
   const usageLimits = readUsageLimits();
@@ -1847,6 +2081,7 @@ export async function buildStats() {
     ),
     budget,
     usageLimits,
+    codexUsageLimits,
     dataHealth,
     daily,
     ledger,

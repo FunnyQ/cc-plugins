@@ -755,27 +755,31 @@ export function App() {
       return this.stats?.usageLimits ?? null;
     },
 
+    get codexUsageLimitsConfig() {
+      return this.stats?.codexUsageLimits ?? null;
+    },
+
     get usageLimitsView() {
-      const limits = this.usageLimitsConfig;
-      const windows = [
-        this.usageLimitWindowView("fiveHour", "5hr", limits?.fiveHour),
-        this.usageLimitWindowView("weekly", "Weekly", limits?.weekly),
+      const providers = [
+        this.usageLimitProviderView(
+          "claude",
+          "Claude",
+          this.usageLimitsConfig,
+          "waiting for Claude Code",
+          "~/.cache/token-atlas/rate-limits.json",
+        ),
+        this.usageLimitProviderView(
+          "codex",
+          "Codex",
+          this.codexUsageLimitsConfig,
+          "waiting for Codex login",
+          "~/.cache/token-atlas/codex-usage-limits.json",
+        ),
       ].filter(Boolean);
-      const error = limits?.error ?? null;
-      const stale = limits?.stale === true;
-      const state = error ? "missing" : stale ? "stale" : "live";
       return {
-        available: windows.length > 0,
-        windows,
-        state,
-        sourceLabel: limits?.capturedAt
-          ? `captured ${this.formatUsageLimitCapture(limits.capturedAt)}`
-          : "waiting for Claude Code",
-        emptyLabel:
-          error === "missing"
-            ? "No live rate limit capture yet."
-            : "Usage window data is unavailable.",
-        path: limits?.path ?? "~/.cache/token-atlas/rate-limits.json",
+        available: providers.length > 0,
+        providers,
+        emptyLabel: "Usage window data is unavailable.",
       };
     },
 
@@ -1470,6 +1474,39 @@ export function App() {
       return new Date(value).toLocaleString();
     },
 
+    usageLimitProviderView(key, label, limits, waitingLabel, fallbackPath) {
+      const windows = [
+        this.usageLimitWindowView("fiveHour", "5hr", limits?.fiveHour),
+        this.usageLimitWindowView("weekly", "Weekly", limits?.weekly),
+      ].filter(Boolean);
+      const error = limits?.error ?? null;
+      const stale = limits?.stale === true;
+      const state =
+        error && windows.length === 0 ? "missing" : stale ? "stale" : "live";
+      const sourceParts = [];
+      if (limits?.capturedAt) {
+        sourceParts.push(
+          `captured ${this.formatUsageLimitCapture(limits.capturedAt)}`,
+        );
+      } else {
+        sourceParts.push(waitingLabel);
+      }
+      if (limits?.plan) sourceParts.push(limits.plan);
+
+      return {
+        key,
+        label,
+        windows,
+        state,
+        sourceLabel: sourceParts.join(" / "),
+        emptyLabel:
+          error === "missing" || error === "missing-auth"
+            ? "No live rate limit capture yet."
+            : "Usage window data is unavailable.",
+        path: limits?.path ?? fallbackPath,
+      };
+    },
+
     usageLimitWindowView(key, label, window) {
       if (!window) return null;
 
@@ -1502,8 +1539,8 @@ export function App() {
             )}%`;
       const elapsedLabel =
         elapsedClamped === null ? "n/a" : `${elapsedClamped.toFixed(1)}%`;
-      // Color encodes how close the window is to its cap, mirroring the budget
-      // meter's sunrise ramp — not which window this is.
+      // Color encodes how close the window is to its cap, matching the budget
+      // meter's sunrise ramp, not which window this is.
       const severity =
         usedClamped === null || usedClamped < 50
           ? "low"
@@ -1531,7 +1568,7 @@ export function App() {
         projectedAria =
           projectedLevel === "over"
             ? "Projected to hit the limit before reset"
-            : `Projected ≈ ${Math.round(projected)}% at reset`;
+            : `Projected ~${Math.round(projected)}% at reset`;
       }
 
       return {

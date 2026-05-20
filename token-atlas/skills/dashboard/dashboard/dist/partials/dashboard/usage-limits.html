@@ -1,73 +1,91 @@
-<section class="usage-limits-panel" aria-label="Claude usage windows">
+<section class="usage-limits-panel" aria-label="Usage windows">
   <div class="usage-limits-head">
     <div>
       <h2>Usage windows</h2>
-      <span class="muted">{{ usageLimitsView.sourceLabel }}</span>
+      <span class="muted">Claude and Codex live limits</span>
     </div>
-    <span
-      :class="'usage-limit-state usage-limit-state--' + usageLimitsView.state"
-    >
-      {{ usageLimitsView.state }}
-    </span>
   </div>
 
-  <div v-if="usageLimitsView.available" class="usage-limit-grid">
-    <article
-      v-for="window in usageLimitsView.windows"
-      :key="window.key"
-      class="usage-limit-window"
+  <div v-if="usageLimitsView.available" class="usage-limit-provider-list">
+    <section
+      v-for="provider in usageLimitsView.providers"
+      :key="provider.key"
+      class="usage-limit-provider"
+      :aria-label="provider.label + ' usage windows'"
     >
-      <div class="usage-limit-window-head">
+      <div class="usage-limit-provider-head">
         <div>
-          <h3>{{ window.label }}</h3>
-          <span>{{ window.resetLabel }}</span>
+          <h3>{{ provider.label }}</h3>
+          <span class="muted">{{ provider.sourceLabel }}</span>
         </div>
-        <strong>{{ window.usedLabel }}</strong>
+        <span :class="'usage-limit-state usage-limit-state--' + provider.state">
+          {{ provider.state }}
+        </span>
       </div>
-      <div class="usage-limit-gauge">
-        <i
-          v-if="window.projectedTickWidth"
-          :class="'usage-limit-projection usage-limit-projection--' + window.projectedLevel"
-          :style="{ left: window.projectedTickWidth }"
-          role="img"
-          :aria-label="window.projectedAria"
-          :title="window.projectedAria"
-        ></i>
-        <div
-          class="usage-limit-meter"
-          role="progressbar"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuenow="window.usedValueNow"
-          :aria-label="window.meterLabel"
+
+      <div v-if="provider.windows.length" class="usage-limit-grid">
+        <article
+          v-for="window in provider.windows"
+          :key="provider.key + '-' + window.key"
+          class="usage-limit-window"
         >
-          <i
-            v-if="window.elapsedTickWidth"
-            class="usage-limit-meter-elapsed"
-            :style="{ width: window.elapsedTickWidth }"
-            aria-hidden="true"
-          ></i>
-          <span
-            :class="'usage-limit-meter-fill usage-limit-meter-fill--' + window.severity"
-            :style="{ width: window.meterWidth }"
-          ></span>
-        </div>
+          <div class="usage-limit-window-head">
+            <div>
+              <h4>{{ window.label }}</h4>
+              <span>{{ window.resetLabel }}</span>
+            </div>
+            <strong>{{ window.usedLabel }}</strong>
+          </div>
+          <div class="usage-limit-gauge">
+            <i
+              v-if="window.projectedTickWidth"
+              :class="'usage-limit-projection usage-limit-projection--' + window.projectedLevel"
+              :style="{ left: window.projectedTickWidth }"
+              role="img"
+              :aria-label="window.projectedAria"
+              :title="window.projectedAria"
+            ></i>
+            <div
+              class="usage-limit-meter"
+              role="progressbar"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-valuenow="window.usedValueNow"
+              :aria-label="window.meterLabel"
+            >
+              <i
+                v-if="window.elapsedTickWidth"
+                class="usage-limit-meter-elapsed"
+                :style="{ width: window.elapsedTickWidth }"
+                aria-hidden="true"
+              ></i>
+              <span
+                :class="'usage-limit-meter-fill usage-limit-meter-fill--' + window.severity"
+                :style="{ width: window.meterWidth }"
+              ></span>
+            </div>
+          </div>
+          <dl class="usage-limit-meta">
+            <div>
+              <dt>Elapsed</dt>
+              <dd>{{ window.elapsedLabel }}</dd>
+            </div>
+            <div>
+              <dt>Resets in</dt>
+              <dd>{{ window.remainingLabel }}</dd>
+            </div>
+          </dl>
+        </article>
       </div>
-      <dl class="usage-limit-meta">
-        <div>
-          <dt>Elapsed</dt>
-          <dd>{{ window.elapsedLabel }}</dd>
-        </div>
-        <div>
-          <dt>Resets in</dt>
-          <dd>{{ window.remainingLabel }}</dd>
-        </div>
-      </dl>
-    </article>
+
+      <div v-else class="usage-limit-empty">
+        <span>{{ provider.emptyLabel }}</span>
+        <code>{{ provider.path }}</code>
+      </div>
+    </section>
   </div>
 
   <div v-else class="usage-limit-empty">
     <span>{{ usageLimitsView.emptyLabel }}</span>
-    <code>{{ usageLimitsView.path }}</code>
   </div>
 </section>
