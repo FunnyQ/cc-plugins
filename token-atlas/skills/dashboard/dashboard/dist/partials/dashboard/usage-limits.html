@@ -24,16 +24,42 @@
         </div>
         <strong>{{ window.usedLabel }}</strong>
       </div>
-      <div class="usage-limit-meter" :aria-label="window.meterLabel">
-        <span :style="{ width: window.meterWidth }"></span>
+      <div class="usage-limit-gauge">
+        <i
+          v-if="window.projectedTickWidth"
+          :class="'usage-limit-projection usage-limit-projection--' + window.projectedLevel"
+          :style="{ left: window.projectedTickWidth }"
+          role="img"
+          :aria-label="window.projectedAria"
+          :title="window.projectedAria"
+        ></i>
+        <div
+          class="usage-limit-meter"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="window.usedValueNow"
+          :aria-label="window.meterLabel"
+        >
+          <i
+            v-if="window.elapsedTickWidth"
+            class="usage-limit-meter-elapsed"
+            :style="{ width: window.elapsedTickWidth }"
+            aria-hidden="true"
+          ></i>
+          <span
+            :class="'usage-limit-meter-fill usage-limit-meter-fill--' + window.severity"
+            :style="{ width: window.meterWidth }"
+          ></span>
+        </div>
       </div>
       <dl class="usage-limit-meta">
         <div>
-          <dt>Window</dt>
+          <dt>Elapsed</dt>
           <dd>{{ window.elapsedLabel }}</dd>
         </div>
         <div>
-          <dt>Left</dt>
+          <dt>Resets in</dt>
           <dd>{{ window.remainingLabel }}</dd>
         </div>
       </dl>

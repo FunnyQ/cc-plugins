@@ -507,9 +507,11 @@
 .usage-limit-window h3 {
   margin: 0 0 var(--s-4);
   color: var(--text);
+  font-family: var(--ff-body);
   font-size: var(--fs-base);
   font-weight: 760;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .usage-limit-window-head span {
@@ -527,6 +529,7 @@
 }
 
 .usage-limit-meter {
+  position: relative;
   height: 9px;
   border: 1px solid color-mix(in oklch, var(--text-faint) 10%, var(--bg-rail));
   border-radius: var(--radius-pill);
@@ -534,15 +537,64 @@
   overflow: hidden;
 }
 
-.usage-limit-meter span {
+.usage-limit-meter-fill {
+  position: relative;
+  z-index: 1;
   display: block;
   height: 100%;
   border-radius: inherit;
+  background: var(--sunrise-amber);
+}
+
+.usage-limit-meter-fill--medium {
+  background: var(--sunrise-orange);
+}
+
+.usage-limit-meter-fill--high {
   background: var(--sunrise-coral);
 }
 
-.usage-limit-window:nth-child(2) .usage-limit-meter span {
+.usage-limit-meter-fill--critical {
   background: var(--sunrise-magenta);
+}
+
+/* Faint wash spanning time elapsed; the solid fill reaching past its edge means
+   quota is burning faster than the window's clock. */
+.usage-limit-meter-elapsed {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--text) 12%, transparent);
+}
+
+.usage-limit-gauge {
+  position: relative;
+  padding-top: 7px;
+}
+
+/* Caret marking projected usage at reset if the current pace holds. Sits in the
+   gauge's top padding, tip pointing down at its position on the track. */
+.usage-limit-projection {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 6px;
+  margin-left: -4px;
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+
+.usage-limit-projection--safe {
+  background: var(--positive);
+}
+
+.usage-limit-projection--warn {
+  background: var(--warn);
+}
+
+.usage-limit-projection--over {
+  background: var(--rose);
 }
 
 .usage-limit-meta {
@@ -554,6 +606,10 @@
 
 .usage-limit-meta > div {
   min-width: 0;
+}
+
+.usage-limit-meta > div:last-child {
+  text-align: right;
 }
 
 .usage-limit-meta dt {
