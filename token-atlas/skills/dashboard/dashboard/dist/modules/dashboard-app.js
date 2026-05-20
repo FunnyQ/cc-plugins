@@ -1488,6 +1488,12 @@ export function App() {
         Number.isFinite(window.remainingMs)
           ? window.remainingMs
           : null;
+      const usedClamped =
+        usedPercent === null ? null : Math.max(0, Math.min(100, usedPercent));
+      const elapsedClamped =
+        elapsedPercent === null
+          ? null
+          : Math.max(0, Math.min(100, elapsedPercent));
       const usedLabel =
         usedPercent === null
           ? "n/a"
@@ -1495,24 +1501,61 @@ export function App() {
               usedPercent >= 10 ? 0 : 1,
             )}%`;
       const elapsedLabel =
-        elapsedPercent === null
-          ? "n/a"
-          : `${Math.max(0, Math.min(100, elapsedPercent)).toFixed(1)}% elapsed`;
+        elapsedClamped === null ? "n/a" : `${elapsedClamped.toFixed(1)}%`;
+      // Color encodes how close the window is to its cap, mirroring the budget
+      // meter's sunrise ramp — not which window this is.
+      const severity =
+        usedClamped === null || usedClamped < 50
+          ? "low"
+          : usedClamped < 75
+            ? "medium"
+            : usedClamped < 90
+              ? "high"
+              : "critical";
+
+      // Projected end-of-window usage if the current burn rate holds. Hold off
+      // until enough of the window has elapsed that used/elapsed isn't dominated
+      // by early noise (5% of the window: ~15min for 5hr, ~8h for weekly).
+      let projectedTickWidth = null;
+      let projectedLevel = null;
+      let projectedAria = null;
+      if (
+        usedClamped !== null &&
+        elapsedClamped !== null &&
+        elapsedClamped >= 5
+      ) {
+        const projected = (usedClamped / elapsedClamped) * 100;
+        projectedLevel =
+          projected >= 100 ? "over" : projected >= 80 ? "warn" : "safe";
+        projectedTickWidth = `${Math.min(100, projected).toFixed(1)}%`;
+        projectedAria =
+          projectedLevel === "over"
+            ? "Projected to hit the limit before reset"
+            : `Projected ≈ ${Math.round(projected)}% at reset`;
+      }
 
       return {
         key,
         label,
         usedLabel,
+        usedValueNow: usedClamped === null ? null : Math.round(usedClamped),
+        severity,
+        projectedTickWidth,
+        projectedLevel,
+        projectedAria,
         resetLabel: window.resetAt
           ? `resets ${this.formatUsageLimitReset(window.resetAt)}`
           : "reset unavailable",
         elapsedLabel,
         remainingLabel: this.formatUsageLimitDuration(remainingMs),
-        meterLabel: `${label} usage ${usedLabel}`,
-        meterWidth:
+        meterLabel:
           usedPercent === null
-            ? "0%"
-            : `${Math.max(0, Math.min(100, usedPercent)).toFixed(1)}%`,
+            ? `${label} usage unavailable`
+            : `${label}: ${usedLabel} used, ${elapsedLabel} of window elapsed`,
+        meterWidth: usedClamped === null ? "0%" : `${usedClamped.toFixed(1)}%`,
+        // Tick marking time elapsed; fill past it means burning faster than the clock.
+        elapsedTickWidth:
+          elapsedClamped === null ? null : `${elapsedClamped.toFixed(1)}%`,
       };
     },
 

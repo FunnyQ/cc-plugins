@@ -50,6 +50,7 @@
 
   /* Semantic — warmed and pulled into sunrise lineage, keeps up/down distinction */
   --green: oklch(70% 0.15 110);
+  --positive: oklch(64% 0.16 152);
   --warn: oklch(75% 0.16 75);
   --danger: oklch(58% 0.21 25);
 
@@ -170,6 +171,7 @@
   --sunrise-glow: oklch(72% 0.16 65);
 
   --green: oklch(78% 0.16 110);
+  --positive: oklch(74% 0.16 152);
   --warn: oklch(82% 0.16 75);
   --danger: oklch(68% 0.22 25);
 
@@ -290,4 +292,3 @@ label:focus-within {
   margin: 0 auto;
   padding: var(--s-22) var(--s-24) var(--s-32);
 }
-
