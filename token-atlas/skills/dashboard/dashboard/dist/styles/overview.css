@@ -483,6 +483,32 @@
   gap: var(--s-12);
 }
 
+.usage-limit-provider-list {
+  display: grid;
+  gap: var(--s-16);
+}
+
+.usage-limit-provider {
+  display: grid;
+  gap: var(--s-10);
+  min-width: 0;
+}
+
+.usage-limit-provider-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-12);
+  align-items: start;
+}
+
+.usage-limit-provider-head h3 {
+  margin: 0 0 var(--s-4);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
 .usage-limit-window,
 .usage-limit-empty {
   border: 1px solid var(--edge-soft);
@@ -504,7 +530,7 @@
   align-items: start;
 }
 
-.usage-limit-window h3 {
+.usage-limit-window h4 {
   margin: 0 0 var(--s-4);
   color: var(--text);
   font-family: var(--ff-body);
