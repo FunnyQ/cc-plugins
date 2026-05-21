@@ -1,6 +1,7 @@
 import { createApp } from "/vendor/petite-vue.es.js";
 import { App } from "./modules/dashboard-app.js";
 import { installBloomTracker } from "./modules/bloom-tracker.js";
+import { installHeroMotionSettler } from "./modules/hero-motion-settler.js";
 
 async function loadDashboardMarkup() {
   const root = document.getElementById("dashboard-root");
@@ -32,3 +33,4 @@ window.App = App;
 await loadDashboardMarkup();
 createApp({ App }).mount("#app");
 installBloomTracker();
+installHeroMotionSettler();

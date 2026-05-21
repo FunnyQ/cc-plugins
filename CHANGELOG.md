@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.1] - 2026-05-21
+
+### ✨ New Features
+
+- **Hero wave settles into calm**: The animated hero wave now gently eases to a gentle stop after 60 seconds of inactivity, using a smooth quintic decay so the dashboard relaxes into a restful state instead of looping forever. Fully respects `prefers-reduced-motion`.
+
 ## [2.1.0] - 2026-05-21
 
 ### ✨ New Features
