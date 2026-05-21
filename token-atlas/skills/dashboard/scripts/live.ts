@@ -30,6 +30,8 @@ const PROJECTS_REAL = (() => {
 const STALE_CUTOFF_MS = 10 * 60 * 1000;
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const BACKLOG_LINES = 50;
+const BACKLOG_READ_CHUNK_BYTES = 256 * 1024;
+const MAX_BACKLOG_READ_BYTES = 2 * 1024 * 1024;
 const HEARTBEAT_MS = 10_000;
 const RESOLVE_POLL_MS = 2_000;
 const TRANSCRIPT_INDEX_TTL_MS = 5_000;
@@ -272,14 +274,34 @@ export function streamTranscript(sessionId: string | null): Response {
   function readBacklog(controller: ReadableStreamDefaultController): void {
     if (!filePath || closed) return;
     try {
-      const body = readFileSync(filePath, "utf-8");
+      const size = statSync(filePath).size;
+      let start = size;
+      let body = "";
+      const fd = openSync(filePath, "r");
+      try {
+        while (start > 0 && size - start < MAX_BACKLOG_READ_BYTES) {
+          const nextStart = Math.max(0, start - BACKLOG_READ_CHUNK_BYTES);
+          const length = start - nextStart;
+          const buf = Buffer.allocUnsafe(length);
+          readSync(fd, buf, 0, length, nextStart);
+          body = buf.toString("utf-8") + body;
+          start = nextStart;
+
+          const { complete } = splitCompleteLines(body);
+          if (complete.split("\n").length >= BACKLOG_LINES) break;
+        }
+      } finally {
+        closeSync(fd);
+      }
+      if (start > 0) {
+        const firstNewline = body.indexOf("\n");
+        body = firstNewline >= 0 ? body.slice(firstNewline + 1) : "";
+      }
       const { complete, partial: trailing } = splitCompleteLines(body);
-      // Cap the displayed backlog, but resume tailing from the true EOF so the
-      // partial-line buffer stays aligned with the file's byte length.
       const lines = complete ? complete.split("\n").slice(-BACKLOG_LINES) : [];
       emitLines(controller, lines.join("\n"));
       partial = trailing;
-      offset = Buffer.byteLength(body);
+      offset = size;
     } catch {
       // File vanished/rotated between resolve and read; the next poll retries.
     }

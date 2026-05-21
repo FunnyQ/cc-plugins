@@ -34,6 +34,132 @@ import {
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char];
+  });
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
+function renderInlineMarkdown(text) {
+  return escapeHtml(text)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+    .replace(/_([^_\n]+)_/g, "<em>$1</em>")
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      (_match, label, href) =>
+        `<a href="${escapeAttribute(href)}" target="_blank" rel="noreferrer">${label}</a>`,
+    );
+}
+
+function renderMarkdown(text) {
+  const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+  const html = [];
+  let paragraph = [];
+  let list = null;
+  let quote = [];
+  let code = null;
+
+  function flushParagraph() {
+    if (!paragraph.length) return;
+    html.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  }
+
+  function flushList() {
+    if (!list) return;
+    html.push(`<${list.tag}>${list.items.join("")}</${list.tag}>`);
+    list = null;
+  }
+
+  function flushQuote() {
+    if (!quote.length) return;
+    html.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+    quote = [];
+  }
+
+  function flushOpenBlocks() {
+    flushParagraph();
+    flushList();
+    flushQuote();
+  }
+
+  for (const line of lines) {
+    const fence = line.match(/^```/);
+    if (fence) {
+      if (code) {
+        html.push(
+          `<pre><code>${escapeHtml(code.lines.join("\n"))}</code></pre>`,
+        );
+        code = null;
+      } else {
+        flushOpenBlocks();
+        code = { lines: [] };
+      }
+      continue;
+    }
+    if (code) {
+      code.lines.push(line);
+      continue;
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushOpenBlocks();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushOpenBlocks();
+      const level = heading[1].length + 2;
+      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      flushParagraph();
+      flushList();
+      quote.push(quoteMatch[1]);
+      continue;
+    }
+
+    const listMatch = trimmed.match(/^([-*]|\d+\.)\s+(.+)$/);
+    if (listMatch) {
+      flushParagraph();
+      flushQuote();
+      const tag = listMatch[1].endsWith(".") ? "ol" : "ul";
+      if (!list || list.tag !== tag) flushList();
+      if (!list) list = { tag, items: [] };
+      list.items.push(`<li>${renderInlineMarkdown(listMatch[2])}</li>`);
+      continue;
+    }
+
+    flushList();
+    flushQuote();
+    paragraph.push(trimmed);
+  }
+
+  if (code)
+    html.push(`<pre><code>${escapeHtml(code.lines.join("\n"))}</code></pre>`);
+  flushOpenBlocks();
+  return html.join("");
+}
+
 export function App() {
   const initialPrefs = normalizePrefs(loadStoredPrefs());
 
@@ -1132,9 +1258,13 @@ export function App() {
       const source = new EventSource(
         `/api/stream?session=${encodeURIComponent(session.id)}`,
       );
+      source.onopen = () => {
+        this.streamError = null;
+      };
       source.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
+          this.streamError = null;
           if (payload.kind && !payload.entry) return;
           const entry = payload.entry ?? payload;
           this.streamEntries.push(entry);
@@ -1180,6 +1310,10 @@ export function App() {
         return JSON.stringify(entry.message.usage, null, 2);
       }
       return JSON.stringify(entry, null, 2);
+    },
+
+    streamEntryHtml(entry) {
+      return renderMarkdown(this.streamEntryText(entry));
     },
 
     streamContentText(content) {
