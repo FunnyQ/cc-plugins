@@ -6,6 +6,7 @@ import {
   DAYS,
   LEDGER_INITIAL_VISIBLE,
   LEDGER_PAGE_SIZE,
+  LIVE_POLL_MS,
   MODEL_EXPORT_HEADERS,
   MONTHS,
   PROJECT_EXPORT_HEADERS,
@@ -32,6 +33,143 @@ import {
 // any object property, but Chart.js stores Maps internally which crashes its
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
+const STREAM_ERROR_NOTICE_DELAY_MS = 15_000;
+// Code/tool-result blocks taller than this collapse into a <details> by default.
+const STREAM_COLLAPSE_LINES = 10;
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char];
+  });
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
+function renderInlineMarkdown(text) {
+  return escapeHtml(text)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+    .replace(/_([^_\n]+)_/g, "<em>$1</em>")
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      (_match, label, href) =>
+        `<a href="${escapeAttribute(href)}" target="_blank" rel="noreferrer">${label}</a>`,
+    );
+}
+
+const MAX_QUOTE_DEPTH = 8;
+
+function renderMarkdown(text, depth = 0) {
+  const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+  const html = [];
+  let paragraph = [];
+  let list = null;
+  let quote = [];
+  let code = null;
+
+  function flushParagraph() {
+    if (!paragraph.length) return;
+    html.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  }
+
+  function flushList() {
+    if (!list) return;
+    html.push(`<${list.tag}>${list.items.join("")}</${list.tag}>`);
+    list = null;
+  }
+
+  function flushQuote() {
+    if (!quote.length) return;
+    // Cap nesting so a line of thousands of `>` can't blow the stack; past the
+    // limit the remaining quote markers render as inline text.
+    const inner =
+      depth >= MAX_QUOTE_DEPTH
+        ? `<p>${renderInlineMarkdown(quote.join(" "))}</p>`
+        : renderMarkdown(quote.join("\n"), depth + 1);
+    html.push(`<blockquote>${inner}</blockquote>`);
+    quote = [];
+  }
+
+  function flushOpenBlocks() {
+    flushParagraph();
+    flushList();
+    flushQuote();
+  }
+
+  for (const line of lines) {
+    const fence = line.match(/^```/);
+    if (fence) {
+      if (code) {
+        html.push(
+          `<pre><code>${escapeHtml(code.lines.join("\n"))}</code></pre>`,
+        );
+        code = null;
+      } else {
+        flushOpenBlocks();
+        code = { lines: [] };
+      }
+      continue;
+    }
+    if (code) {
+      code.lines.push(line);
+      continue;
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushOpenBlocks();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushOpenBlocks();
+      const level = heading[1].length + 2;
+      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      flushParagraph();
+      flushList();
+      quote.push(quoteMatch[1]);
+      continue;
+    }
+
+    const listMatch = trimmed.match(/^([-*]|\d+\.)\s+(.+)$/);
+    if (listMatch) {
+      flushParagraph();
+      flushQuote();
+      const tag = listMatch[1].endsWith(".") ? "ol" : "ul";
+      if (!list || list.tag !== tag) flushList();
+      if (!list) list = { tag, items: [] };
+      list.items.push(`<li>${renderInlineMarkdown(listMatch[2])}</li>`);
+      continue;
+    }
+
+    flushList();
+    flushQuote();
+    paragraph.push(trimmed);
+  }
+
+  if (code)
+    html.push(`<pre><code>${escapeHtml(code.lines.join("\n"))}</code></pre>`);
+  flushOpenBlocks();
+  return html.join("");
+}
 
 export function App() {
   const initialPrefs = normalizePrefs(loadStoredPrefs());
@@ -50,6 +188,25 @@ export function App() {
     selectedModels: initialPrefs.selectedModels ?? {},
     selectedProjectPath: null,
     modalScrollY: 0,
+    liveSessions: [],
+    liveError: null,
+    livePollTimer: null,
+    liveTickTimer: null,
+    liveVisibilityHandler: null,
+    nowTick: Date.now(),
+    streamSessionId: null,
+    streamProjectName: "",
+    streamEntries: [],
+    streamSource: null,
+    streamError: null,
+    streamErrorTimer: null,
+    streamPinnedToBottom: true,
+    streamScrollFrame: null,
+    streamHistoryStart: 0,
+    streamHasMore: false,
+    streamLoadingOlder: false,
+    streamKeySeq: 0,
+    streamSeenEntries: {},
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
     themeMode: detectInitialTheme(),
@@ -70,6 +227,12 @@ export function App() {
       }
       await this.refresh();
       this.startAutoRefresh();
+      this.startLivePolling();
+      this.startLiveClock();
+      this.liveVisibilityHandler = () => {
+        if (!document.hidden) this.fetchLive();
+      };
+      document.addEventListener("visibilitychange", this.liveVisibilityHandler);
     },
 
     applyTheme(mode) {
@@ -105,6 +268,39 @@ export function App() {
         if (document.hidden) return;
         this.refresh({ quiet: true });
       }, AUTO_REFRESH_MS);
+    },
+
+    async fetchLive() {
+      if (document.hidden) return;
+      try {
+        const res = await fetch("/api/live");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        this.liveSessions = data.sessions ?? [];
+        this.liveError = null;
+      } catch (err) {
+        this.liveError = err.message ?? String(err);
+      }
+    },
+
+    startLivePolling() {
+      this.fetchLive();
+      if (this.livePollTimer) window.clearInterval(this.livePollTimer);
+      this.livePollTimer = window.setInterval(
+        () => this.fetchLive(),
+        LIVE_POLL_MS,
+      );
+    },
+
+    startLiveClock() {
+      if (this.liveTickTimer) window.clearInterval(this.liveTickTimer);
+      this.liveTickTimer = window.setInterval(() => {
+        // Only churn the relative-time bindings when the panel is actually
+        // visible with rows — otherwise this is a 1Hz no-op re-render forever.
+        if (document.hidden || !this.liveSessions.length) return;
+        this.nowTick = Date.now();
+      }, 1_000);
     },
 
     async refresh(options = {}) {
@@ -1050,6 +1246,420 @@ export function App() {
 
     isSelectedProject(path) {
       return this.selectedProjectPath === path;
+    },
+
+    liveAgo(updatedAt) {
+      const ms = this.nowTick - new Date(updatedAt).getTime();
+      const s = Math.max(0, Math.round(ms / 1000));
+      if (s < 60) return `${s}s ago`;
+      const m = Math.round(s / 60);
+      if (m < 60) return `${m}m ago`;
+      return `${Math.round(m / 60)}h ago`;
+    },
+
+    liveStatusClass(status) {
+      const known = {
+        busy: "is-busy",
+        idle: "is-idle",
+        waiting: "is-waiting",
+      };
+      return "live-dot " + (known[status] ?? "is-unknown");
+    },
+
+    openStream(session) {
+      this.closeStream();
+      this.streamSessionId = session.id;
+      this.streamProjectName = session.projectName;
+      this.streamEntries = [];
+      this.streamError = null;
+      this.streamPinnedToBottom = true;
+      this.streamHistoryStart = 0;
+      this.streamHasMore = false;
+      this.streamLoadingOlder = false;
+      this.streamKeySeq = 0;
+      this.streamSeenEntries = {};
+      this.lockPageScroll();
+
+      const source = new EventSource(
+        `/api/stream?session=${encodeURIComponent(session.id)}`,
+      );
+      source.onopen = () => {
+        this.clearDelayedStreamError();
+        this.streamError = null;
+      };
+      source.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          this.clearDelayedStreamError();
+          this.streamError = null;
+          // The backlog-done frame carries the reverse-scroll cursor.
+          if (payload.kind === "backlog-done") {
+            this.streamHistoryStart = payload.historyStart ?? 0;
+            this.streamHasMore = !!payload.hasMore;
+            return;
+          }
+          if (payload.kind && !payload.entry) return;
+          const shouldScroll = this.streamPinnedToBottom;
+          const entry = this.tagStreamEntry(payload.entry ?? payload);
+          if (!entry) return;
+          this.streamEntries.push(entry);
+          this.reconcileToolResults();
+          this.$nextTick(() => this.scheduleStreamScroll(shouldScroll));
+        } catch {
+          // Ignore unparseable stream frames.
+        }
+      };
+      source.onerror = () => {
+        this.scheduleDelayedStreamError(source);
+      };
+      this.streamSource = source;
+      this.$nextTick(() => {
+        this.$refs.liveStreamDialog?.focus();
+      });
+    },
+
+    closeStream() {
+      if (this.streamSource) {
+        this.streamSource.close();
+        this.streamSource = null;
+      }
+      if (this.streamSessionId) this.unlockPageScroll();
+      this.streamSessionId = null;
+      this.streamProjectName = "";
+      this.streamEntries = [];
+      this.streamError = null;
+      this.clearDelayedStreamError();
+      this.streamPinnedToBottom = true;
+      this.streamHistoryStart = 0;
+      this.streamHasMore = false;
+      this.streamLoadingOlder = false;
+      this.streamSeenEntries = {};
+      if (this.streamScrollFrame) {
+        window.cancelAnimationFrame(this.streamScrollFrame);
+        this.streamScrollFrame = null;
+      }
+    },
+
+    scheduleDelayedStreamError(source) {
+      this.clearDelayedStreamError();
+      this.streamErrorTimer = window.setTimeout(() => {
+        this.streamErrorTimer = null;
+        if (source !== this.streamSource) return;
+        this.streamError = "Live connection paused. Reconnecting...";
+      }, STREAM_ERROR_NOTICE_DELAY_MS);
+    },
+
+    clearDelayedStreamError() {
+      if (!this.streamErrorTimer) return;
+      window.clearTimeout(this.streamErrorTimer);
+      this.streamErrorTimer = null;
+    },
+
+    // Stamp a stable v-for key (so prepending older entries doesn't shift keys
+    // and force a full re-render), and drop reconnect duplicates. Dedup on the
+    // same identity the snapshot pipeline uses (api.ts: requestId:messageId,
+    // then uuid) — a content fingerprint would wrongly drop genuinely-distinct
+    // entries with identical content (e.g. a repeated tool call). The positional
+    // fallback keeps id-less entries always unique.
+    tagStreamEntry(entry) {
+      if (!entry || typeof entry !== "object") return entry;
+      // Dedup on uuid only: each transcript line has a unique one, and a
+      // reconnect resends the same uuids. Do NOT key on requestId:messageId —
+      // Claude persists the thinking / text / tool_use of one response as
+      // separate lines that SHARE requestId:messageId, so that key would drop
+      // the text (the actual reply) and tool_use, leaving only the thinking.
+      // Positional fallback keeps id-less lines unique.
+      const key = entry.uuid ?? `pos:${this.streamKeySeq + 1}`;
+      if (this.streamSeenEntries[key]) return null;
+      this.streamSeenEntries[key] = true;
+      entry.__key = ++this.streamKeySeq;
+      entry.__html = this.buildEntryHtml(entry);
+      return entry;
+    },
+
+    isStreamNearBottom() {
+      const el = this.$refs.liveStreamBody;
+      if (!el) return true;
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    },
+
+    handleStreamScroll() {
+      this.streamPinnedToBottom = this.isStreamNearBottom();
+      const el = this.$refs.liveStreamBody;
+      // Page older history on a scroll toward the top, from any input (wheel,
+      // touch, keyboard, scrollbar drag). The guards keep our own programmatic
+      // scrolls from triggering it: streamLoadingOlder covers the anchor-restore
+      // scroll, !streamPinnedToBottom + the scrollable-height check exclude the
+      // auto-scroll-to-bottom and short (non-scrollable) content.
+      if (
+        el &&
+        this.streamHasMore &&
+        !this.streamLoadingOlder &&
+        !this.streamPinnedToBottom &&
+        el.scrollHeight - el.clientHeight > 120 &&
+        el.scrollTop < 120
+      ) {
+        this.loadOlderEntries();
+      }
+    },
+
+    async loadOlderEntries() {
+      if (
+        this.streamLoadingOlder ||
+        !this.streamHasMore ||
+        !this.streamSessionId
+      ) {
+        return;
+      }
+      this.streamLoadingOlder = true;
+      const el = this.$refs.liveStreamBody;
+      // Anchor on the current topmost entry's DOM node (preserved across the
+      // keyed prepend) rather than total height — immune to a live entry landing
+      // at the bottom mid-fetch, which would otherwise skew a height delta.
+      const anchor = el?.querySelector(".live-entry");
+      const anchorTopBefore = anchor ? anchor.offsetTop : 0;
+      const prevTop = el ? el.scrollTop : 0;
+      try {
+        const res = await fetch(
+          `/api/transcript?session=${encodeURIComponent(this.streamSessionId)}` +
+            `&before=${this.streamHistoryStart}&limit=50`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const older = (data.entries ?? [])
+          .map((e) => this.tagStreamEntry(e))
+          .filter(Boolean);
+        if (older.length) this.streamEntries.unshift(...older);
+        this.reconcileToolResults();
+        this.streamHistoryStart = data.historyStart ?? 0;
+        this.streamHasMore = !!data.hasMore;
+        await this.$nextTick();
+        if (el && anchor) {
+          el.scrollTop = prevTop + (anchor.offsetTop - anchorTopBefore);
+        }
+      } catch (err) {
+        this.streamError = err.message ?? String(err);
+      } finally {
+        // Clear after the anchor write's scroll event has fired (scroll steps
+        // run before rAF), so it isn't mistaken for a fresh scroll-to-top.
+        window.requestAnimationFrame(() => {
+          this.streamLoadingOlder = false;
+        });
+      }
+    },
+
+    scheduleStreamScroll(shouldScroll = false) {
+      if (!shouldScroll) return;
+      if (this.streamScrollFrame) {
+        window.cancelAnimationFrame(this.streamScrollFrame);
+      }
+      this.streamScrollFrame = window.requestAnimationFrame(() => {
+        this.streamScrollFrame = window.requestAnimationFrame(() => {
+          this.streamScrollFrame = null;
+          this.scrollStreamToBottom();
+        });
+      });
+    },
+
+    scrollStreamToBottom() {
+      const el = this.$refs.liveStreamBody;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      this.streamPinnedToBottom = true;
+    },
+
+    // Pre-render an entry to HTML once, on receipt. Splitting into segments lets
+    // each block render in its natural form: conversational text as Markdown,
+    // tool calls / tool results / file dumps as verbatim escaped code blocks
+    // (long ones collapsed). Computing once also avoids re-rendering Markdown for
+    // every entry on each reactive update.
+    buildEntryHtml(entry) {
+      const results = entry.__toolResults || {};
+      return this.streamEntrySegments(entry)
+        .map((seg) => {
+          let html = this.renderStreamSegment(seg);
+          // A tool_use renders with its paired result right below it once the
+          // result arrives — a terminal-style call/output block.
+          if (seg.toolUseId && results[seg.toolUseId]) {
+            html += this.renderStreamSegment(
+              this.resultSegment(results[seg.toolUseId]),
+            );
+          }
+          return html;
+        })
+        .join("");
+    },
+
+    resultSegment(part) {
+      return {
+        kind: "code",
+        label: part.is_error ? "⚠ result (error)" : "↳ result",
+        error: !!part.is_error,
+        text: this.segText(part.content),
+      };
+    },
+
+    renderStreamSegment(seg) {
+      if (seg.kind === "markdown") {
+        const body = renderMarkdown(seg.text);
+        if (!seg.label) return body;
+        const cls = seg.note ? "live-seg live-seg--note" : "live-seg";
+        return `<div class="${cls}"><div class="live-seg-label">${escapeHtml(seg.label)}</div>${body}</div>`;
+      }
+      const text = seg.text ?? "";
+      const cls = seg.error ? "live-seg-code is-error" : "live-seg-code";
+      const pre = `<pre class="${cls}">${escapeHtml(text)}</pre>`;
+      const lineCount = text ? text.split("\n").length : 0;
+      if (lineCount > STREAM_COLLAPSE_LINES) {
+        const summary = `${escapeHtml(seg.label || "output")} · ${lineCount} lines`;
+        return `<details class="live-seg"><summary>${summary}</summary>${pre}</details>`;
+      }
+      const label = seg.label
+        ? `<div class="live-seg-label">${escapeHtml(seg.label)}</div>`
+        : "";
+      return `<div class="live-seg">${label}${pre}</div>`;
+    },
+
+    streamEntrySegments(entry) {
+      const content = entry?.message?.content ?? entry?.content ?? entry?.text;
+      const segs = this.contentSegments(content);
+      if (segs.length) return segs;
+      if (entry?.toolUseResult) {
+        return [{ kind: "code", text: this.segText(entry.toolUseResult) }];
+      }
+      if (entry?.message?.usage) {
+        return [
+          { kind: "code", text: JSON.stringify(entry.message.usage, null, 2) },
+        ];
+      }
+      return [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+    },
+
+    contentSegments(content) {
+      if (content == null) return [];
+      if (typeof content === "string") {
+        return content.trim() ? [{ kind: "markdown", text: content }] : [];
+      }
+      if (!Array.isArray(content)) {
+        const text = content.text ?? content.content;
+        if (typeof text === "string") {
+          return text.trim() ? [{ kind: "markdown", text }] : [];
+        }
+        return [{ kind: "code", text: JSON.stringify(content, null, 2) }];
+      }
+      const out = [];
+      for (const part of content) {
+        if (typeof part === "string") {
+          if (part.trim()) out.push({ kind: "markdown", text: part });
+          continue;
+        }
+        if (!part || typeof part !== "object") continue;
+        if (part.type === "text" && part.text?.trim()) {
+          out.push({ kind: "markdown", text: part.text });
+        } else if (part.type === "thinking" && part.thinking?.trim()) {
+          out.push({
+            kind: "markdown",
+            text: part.thinking,
+            label: "💭 thinking",
+            note: true,
+          });
+        } else if (part.type === "tool_use") {
+          const input =
+            typeof part.input === "string"
+              ? part.input
+              : JSON.stringify(part.input ?? {}, null, 2);
+          out.push({
+            kind: "code",
+            label: `🔧 ${part.name ?? "tool"}`,
+            text: input,
+            toolUseId: part.id,
+          });
+        } else if (part.type === "tool_result") {
+          out.push(this.resultSegment(part));
+        } else if (part.type === "image") {
+          out.push({ kind: "code", text: "[image]" });
+        } else {
+          const text = part.text ?? part.content;
+          if (typeof text === "string") out.push({ kind: "markdown", text });
+          else out.push({ kind: "code", text: JSON.stringify(part, null, 2) });
+        }
+      }
+      return out;
+    },
+
+    // Flatten a tool-result/content value (string, array of blocks, or object)
+    // into displayable text for a code block.
+    segText(value) {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (Array.isArray(value)) {
+        return value
+          .map((part) =>
+            typeof part === "string"
+              ? part
+              : (part.text ?? part.content ?? JSON.stringify(part)),
+          )
+          .filter(Boolean)
+          .join("\n");
+      }
+      if (typeof value === "object") {
+        return value.text ?? value.content ?? JSON.stringify(value, null, 2);
+      }
+      return String(value);
+    },
+
+    // The tool_result blocks of a pure tool-result entry (every block is a
+    // tool_result). Mixed entries (real user text + a result) are left alone.
+    streamEntryToolResults(entry) {
+      const content = entry?.message?.content;
+      if (!Array.isArray(content) || !content.length) return [];
+      const results = content.filter((b) => b && b.type === "tool_result");
+      if (!results.length || results.length !== content.length) return [];
+      return results;
+    },
+
+    // Merge each pure tool-result entry into the entry that holds the matching
+    // tool_use (linked by tool_use_id) so a call and its output render as one
+    // terminal-style block — and the standalone result entry (a misleading
+    // "user" bubble) disappears. Runs after live append and history paging;
+    // orphan results whose tool_use isn't loaded stay standalone until it is.
+    reconcileToolResults() {
+      const toolUseEntry = {};
+      for (const e of this.streamEntries) {
+        const content = e?.message?.content;
+        if (!Array.isArray(content)) continue;
+        for (const b of content) {
+          if (b && b.type === "tool_use" && b.id) toolUseEntry[b.id] = e;
+        }
+      }
+      const remove = new Set();
+      for (const e of this.streamEntries) {
+        const results = this.streamEntryToolResults(e);
+        if (!results.length) continue;
+        if (!results.every((r) => toolUseEntry[r.tool_use_id])) continue;
+        for (const r of results) {
+          const target = toolUseEntry[r.tool_use_id];
+          target.__toolResults = {
+            ...(target.__toolResults || {}),
+            [r.tool_use_id]: r,
+          };
+          target.__html = this.buildEntryHtml(target);
+        }
+        remove.add(e.__key);
+      }
+      if (remove.size) {
+        this.streamEntries = this.streamEntries.filter(
+          (e) => !remove.has(e.__key),
+        );
+      }
+    },
+
+    // Display label for an entry's role. A pure tool-result entry that couldn't
+    // be merged (its tool_use isn't loaded) shows "tool result", not "user".
+    streamEntryRole(entry) {
+      if (this.streamEntryToolResults(entry).length) return "tool result";
+      return entry.type || "unknown";
     },
 
     lockPageScroll() {
