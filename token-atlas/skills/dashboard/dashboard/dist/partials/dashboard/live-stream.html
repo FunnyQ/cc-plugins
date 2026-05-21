@@ -40,9 +40,12 @@
       <div v-if="!streamEntries.length" class="live-stream-empty">
         Waiting for transcript entries.
       </div>
+      <div v-if="streamLoadingOlder" class="live-stream-older" role="status">
+        Loading earlier messages…
+      </div>
       <div
         v-for="(entry, i) in streamEntries"
-        :key="i"
+        :key="entry.__key"
         :class="'live-entry is-' + (entry.type || 'unknown')"
       >
         <span class="live-entry-role">{{ entry.type || 'unknown' }}</span>

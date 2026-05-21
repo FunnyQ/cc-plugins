@@ -195,11 +195,11 @@ function sse(controller: ReadableStreamDefaultController, payload: object) {
   controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-function emitLines(
-  controller: ReadableStreamDefaultController,
-  text: string,
-): void {
-  for (const line of text.split("\n")) {
+// Parse JSONL lines into displayable entries, skipping blank/malformed lines
+// and the noise types. Shared by the SSE stream and the history endpoint.
+function parseEntries(lines: string[]): object[] {
+  const out: object[] = [];
+  for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let entry: { type?: string };
@@ -209,8 +209,16 @@ function emitLines(
       continue; // skip malformed / partially-written JSONL entries
     }
     if (!entry || SKIP_ENTRY_TYPES.has(entry.type ?? "")) continue;
-    sse(controller, entry);
+    out.push(entry);
   }
+  return out;
+}
+
+function emitLines(
+  controller: ReadableStreamDefaultController,
+  text: string,
+): void {
+  for (const entry of parseEntries(text.split("\n"))) sse(controller, entry);
 }
 
 function splitCompleteLines(text: string): {
@@ -223,6 +231,59 @@ function splitCompleteLines(text: string): {
     complete: text.slice(0, lastNewline),
     partial: text.slice(lastNewline + 1),
   };
+}
+
+// Read up to `maxLines` complete JSONL lines ending at byte offset `endOffset`,
+// scanning backward in chunks. Returns the lines (oldest first), the trailing
+// partial text after the last newline (only meaningful when endOffset is EOF),
+// and `startOffset` — the byte offset where the first returned line begins, used
+// as the cursor for loading still-older history. startOffset 0 means we reached
+// the start of the file. Decodes once so multi-byte chars spanning a chunk
+// boundary aren't corrupted.
+function readLinesEndingAt(
+  filePath: string,
+  endOffset: number,
+  maxLines: number,
+): { lines: string[]; partial: string; startOffset: number } {
+  let start = endOffset;
+  let newlineCount = 0;
+  const chunks: Buffer[] = [];
+  const fd = openSync(filePath, "r");
+  try {
+    while (start > 0 && endOffset - start < MAX_BACKLOG_READ_BYTES) {
+      const nextStart = Math.max(0, start - BACKLOG_READ_CHUNK_BYTES);
+      const length = start - nextStart;
+      const buf = Buffer.allocUnsafe(length);
+      readSync(fd, buf, 0, length, nextStart);
+      chunks.unshift(buf);
+      start = nextStart;
+      // Native scan for "\n" (0x0A) — never a UTF-8 continuation byte, so safe
+      // on raw bytes and far faster than iterating each byte in JS.
+      for (
+        let nl = buf.indexOf(0x0a);
+        nl !== -1;
+        nl = buf.indexOf(0x0a, nl + 1)
+      ) {
+        newlineCount++;
+      }
+      if (newlineCount >= maxLines) break;
+    }
+  } finally {
+    closeSync(fd);
+  }
+  let body = Buffer.concat(chunks).toString("utf-8");
+  if (start > 0) {
+    // Began mid-file, so the first line is probably partial — drop it.
+    const firstNewline = body.indexOf("\n");
+    body = firstNewline >= 0 ? body.slice(firstNewline + 1) : "";
+  }
+  const { complete, partial } = splitCompleteLines(body);
+  const lines = complete ? complete.split("\n").slice(-maxLines) : [];
+  // Byte distance from the first returned line to endOffset = the returned
+  // lines (each followed by "\n") plus the trailing partial.
+  const tailText = lines.length ? `${lines.join("\n")}\n${partial}` : partial;
+  const startOffset = Math.max(0, endOffset - Buffer.byteLength(tailText));
+  return { lines, partial, startOffset };
 }
 
 export function streamTranscript(sessionId: string | null): Response {
@@ -273,47 +334,26 @@ export function streamTranscript(sessionId: string | null): Response {
 
   function readBacklog(controller: ReadableStreamDefaultController): void {
     if (!filePath || closed) return;
+    let historyStart = 0;
     try {
       const size = statSync(filePath).size;
-      let start = size;
-      let newlineCount = 0;
-      const chunks: Buffer[] = [];
-      const fd = openSync(filePath, "r");
-      try {
-        while (start > 0 && size - start < MAX_BACKLOG_READ_BYTES) {
-          const nextStart = Math.max(0, start - BACKLOG_READ_CHUNK_BYTES);
-          const length = start - nextStart;
-          const buf = Buffer.allocUnsafe(length);
-          readSync(fd, buf, 0, length, nextStart);
-          chunks.unshift(buf);
-          start = nextStart;
-
-          // Count newline bytes directly rather than decoding each chunk: 0x0A
-          // never appears inside a UTF-8 multi-byte sequence, so this is safe,
-          // and it avoids decoding a chunk whose boundary splits a character.
-          for (const byte of buf) if (byte === 0x0a) newlineCount++;
-          if (newlineCount >= BACKLOG_LINES) break;
-        }
-      } finally {
-        closeSync(fd);
-      }
-      // Decode the assembled bytes once — decoding per chunk and concatenating
-      // strings corrupts any multi-byte char that spans a chunk boundary.
-      let body = Buffer.concat(chunks).toString("utf-8");
-      if (start > 0) {
-        // Began mid-file, so the first line is probably partial — drop it.
-        const firstNewline = body.indexOf("\n");
-        body = firstNewline >= 0 ? body.slice(firstNewline + 1) : "";
-      }
-      const { complete, partial: trailing } = splitCompleteLines(body);
-      const lines = complete ? complete.split("\n").slice(-BACKLOG_LINES) : [];
+      const {
+        lines,
+        partial: trailing,
+        startOffset,
+      } = readLinesEndingAt(filePath, size, BACKLOG_LINES);
       emitLines(controller, lines.join("\n"));
       partial = trailing;
       offset = size;
+      historyStart = startOffset;
     } catch {
       // File vanished/rotated between resolve and read; the next poll retries.
     }
-    sse(controller, { kind: "backlog-done" });
+    sse(controller, {
+      kind: "backlog-done",
+      historyStart,
+      hasMore: historyStart > 0,
+    });
   }
 
   function readTail(controller: ReadableStreamDefaultController): void {
@@ -406,6 +446,47 @@ export function streamTranscript(sessionId: string | null): Response {
       Connection: "keep-alive",
     },
   });
+}
+
+// Older-history page for the streaming modal's reverse-scroll. Returns the
+// entries immediately before byte offset `before`, plus the next cursor.
+export function getTranscriptHistory(
+  sessionId: string | null,
+  before: number,
+  limit: number,
+): Response {
+  if (!sessionId || !UUID_RE.test(sessionId)) {
+    return jsonResponse({ error: "invalid session id" }, 400);
+  }
+  const empty = { entries: [], historyStart: 0, hasMore: false };
+  if (!Number.isFinite(before) || before <= 0) return jsonResponse(empty);
+
+  let path = resolveTranscriptPath(sessionId);
+  if (!path) return jsonResponse(empty);
+  try {
+    path = realpathSync(path);
+  } catch {
+    return jsonResponse(empty);
+  }
+  if (!isInsideProjects(path)) {
+    return jsonResponse({ error: "transcript path is outside projects" }, 403);
+  }
+
+  try {
+    // Clamp to the live size in case the file was truncated/rotated since the
+    // cursor was issued, so we never read past EOF into uninitialized bytes.
+    const size = statSync(path).size;
+    const endOffset = Math.min(before, size);
+    const cap = Math.min(Math.max(1, limit || BACKLOG_LINES), 200);
+    const { lines, startOffset } = readLinesEndingAt(path, endOffset, cap);
+    return jsonResponse({
+      entries: parseEntries(lines),
+      historyStart: startOffset,
+      hasMore: startOffset > 0,
+    });
+  } catch (err) {
+    return jsonError(err);
+  }
 }
 
 if (import.meta.main) {

@@ -33,6 +33,7 @@ import {
 // any object property, but Chart.js stores Maps internally which crashes its
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
+const STREAM_ERROR_NOTICE_DELAY_MS = 15_000;
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => {
@@ -196,8 +197,14 @@ export function App() {
     streamEntries: [],
     streamSource: null,
     streamError: null,
+    streamErrorTimer: null,
     streamPinnedToBottom: true,
     streamScrollFrame: null,
+    streamHistoryStart: 0,
+    streamHasMore: false,
+    streamLoadingOlder: false,
+    streamKeySeq: 0,
+    streamSeenEntries: {},
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
     themeMode: detectInitialTheme(),
@@ -1264,21 +1271,35 @@ export function App() {
       this.streamEntries = [];
       this.streamError = null;
       this.streamPinnedToBottom = true;
+      this.streamHistoryStart = 0;
+      this.streamHasMore = false;
+      this.streamLoadingOlder = false;
+      this.streamKeySeq = 0;
+      this.streamSeenEntries = {};
       this.lockPageScroll();
 
       const source = new EventSource(
         `/api/stream?session=${encodeURIComponent(session.id)}`,
       );
       source.onopen = () => {
+        this.clearDelayedStreamError();
         this.streamError = null;
       };
       source.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
+          this.clearDelayedStreamError();
           this.streamError = null;
+          // The backlog-done frame carries the reverse-scroll cursor.
+          if (payload.kind === "backlog-done") {
+            this.streamHistoryStart = payload.historyStart ?? 0;
+            this.streamHasMore = !!payload.hasMore;
+            return;
+          }
           if (payload.kind && !payload.entry) return;
           const shouldScroll = this.streamPinnedToBottom;
-          const entry = payload.entry ?? payload;
+          const entry = this.tagStreamEntry(payload.entry ?? payload);
+          if (!entry) return;
           this.streamEntries.push(entry);
           this.$nextTick(() => this.scheduleStreamScroll(shouldScroll));
         } catch {
@@ -1286,7 +1307,7 @@ export function App() {
         }
       };
       source.onerror = () => {
-        this.streamError = "Stream interrupted - retrying...";
+        this.scheduleDelayedStreamError(source);
       };
       this.streamSource = source;
       this.$nextTick(() => {
@@ -1304,11 +1325,49 @@ export function App() {
       this.streamProjectName = "";
       this.streamEntries = [];
       this.streamError = null;
+      this.clearDelayedStreamError();
       this.streamPinnedToBottom = true;
+      this.streamHistoryStart = 0;
+      this.streamHasMore = false;
+      this.streamLoadingOlder = false;
+      this.streamSeenEntries = {};
       if (this.streamScrollFrame) {
         window.cancelAnimationFrame(this.streamScrollFrame);
         this.streamScrollFrame = null;
       }
+    },
+
+    scheduleDelayedStreamError(source) {
+      this.clearDelayedStreamError();
+      this.streamErrorTimer = window.setTimeout(() => {
+        this.streamErrorTimer = null;
+        if (source !== this.streamSource) return;
+        this.streamError = "Live connection paused. Reconnecting...";
+      }, STREAM_ERROR_NOTICE_DELAY_MS);
+    },
+
+    clearDelayedStreamError() {
+      if (!this.streamErrorTimer) return;
+      window.clearTimeout(this.streamErrorTimer);
+      this.streamErrorTimer = null;
+    },
+
+    // Stamp a stable v-for key (so prepending older entries doesn't shift keys
+    // and force a full re-render), and drop reconnect duplicates. Dedup on the
+    // same identity the snapshot pipeline uses (api.ts: requestId:messageId,
+    // then uuid) — a content fingerprint would wrongly drop genuinely-distinct
+    // entries with identical content (e.g. a repeated tool call). The positional
+    // fallback keeps id-less entries always unique.
+    tagStreamEntry(entry) {
+      if (!entry || typeof entry !== "object") return entry;
+      const key =
+        entry.requestId && entry.message?.id
+          ? `${entry.requestId}:${entry.message.id}`
+          : (entry.uuid ?? `pos:${this.streamKeySeq + 1}`);
+      if (this.streamSeenEntries[key]) return null;
+      this.streamSeenEntries[key] = true;
+      entry.__key = ++this.streamKeySeq;
+      return entry;
     },
 
     isStreamNearBottom() {
@@ -1319,6 +1378,67 @@ export function App() {
 
     handleStreamScroll() {
       this.streamPinnedToBottom = this.isStreamNearBottom();
+      const el = this.$refs.liveStreamBody;
+      // Page older history on a scroll toward the top, from any input (wheel,
+      // touch, keyboard, scrollbar drag). The guards keep our own programmatic
+      // scrolls from triggering it: streamLoadingOlder covers the anchor-restore
+      // scroll, !streamPinnedToBottom + the scrollable-height check exclude the
+      // auto-scroll-to-bottom and short (non-scrollable) content.
+      if (
+        el &&
+        this.streamHasMore &&
+        !this.streamLoadingOlder &&
+        !this.streamPinnedToBottom &&
+        el.scrollHeight - el.clientHeight > 120 &&
+        el.scrollTop < 120
+      ) {
+        this.loadOlderEntries();
+      }
+    },
+
+    async loadOlderEntries() {
+      if (
+        this.streamLoadingOlder ||
+        !this.streamHasMore ||
+        !this.streamSessionId
+      ) {
+        return;
+      }
+      this.streamLoadingOlder = true;
+      const el = this.$refs.liveStreamBody;
+      // Anchor on the current topmost entry's DOM node (preserved across the
+      // keyed prepend) rather than total height — immune to a live entry landing
+      // at the bottom mid-fetch, which would otherwise skew a height delta.
+      const anchor = el?.querySelector(".live-entry");
+      const anchorTopBefore = anchor ? anchor.offsetTop : 0;
+      const prevTop = el ? el.scrollTop : 0;
+      try {
+        const res = await fetch(
+          `/api/transcript?session=${encodeURIComponent(this.streamSessionId)}` +
+            `&before=${this.streamHistoryStart}&limit=50`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const older = (data.entries ?? [])
+          .map((e) => this.tagStreamEntry(e))
+          .filter(Boolean);
+        if (older.length) this.streamEntries.unshift(...older);
+        this.streamHistoryStart = data.historyStart ?? 0;
+        this.streamHasMore = !!data.hasMore;
+        await this.$nextTick();
+        if (el && anchor) {
+          el.scrollTop = prevTop + (anchor.offsetTop - anchorTopBefore);
+        }
+      } catch (err) {
+        this.streamError = err.message ?? String(err);
+      } finally {
+        // Clear after the anchor write's scroll event has fired (scroll steps
+        // run before rAF), so it isn't mistaken for a fresh scroll-to-top.
+        window.requestAnimationFrame(() => {
+          this.streamLoadingOlder = false;
+        });
+      }
     },
 
     scheduleStreamScroll(shouldScroll = false) {
