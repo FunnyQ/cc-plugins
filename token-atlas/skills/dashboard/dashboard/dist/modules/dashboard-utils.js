@@ -156,6 +156,7 @@ const MONTHS = [
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
 const AUTO_REFRESH_MS = 60_000;
+const LIVE_POLL_MS = 3_000;
 const ANOMALY_MULTIPLIER = 2;
 const ANOMALY_MIN_COST = 1;
 const ANOMALY_MIN_TOKENS = 50_000;
@@ -324,6 +325,7 @@ export {
   DAYS,
   MONTHS,
   AUTO_REFRESH_MS,
+  LIVE_POLL_MS,
   ANOMALY_MULTIPLIER,
   ANOMALY_MIN_COST,
   ANOMALY_MIN_TOKENS,

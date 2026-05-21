@@ -1,0 +1,39 @@
+<section
+  class="panel live-panel"
+  aria-label="Live sessions"
+  v-if="liveSessions.length || liveError"
+>
+  <header class="live-head">
+    <div>
+      <h2>Live now</h2>
+      <span class="muted">Claude sessions</span>
+    </div>
+    <span class="live-count">{{ liveSessions.length }} active</span>
+  </header>
+
+  <p v-if="liveError" class="live-error" role="status">{{ liveError }}</p>
+
+  <ul v-else class="live-list">
+    <li
+      v-for="s in liveSessions"
+      :key="s.id"
+      class="live-row"
+      role="button"
+      tabindex="0"
+      @click="openStream(s)"
+      @keydown.enter="openStream(s)"
+    >
+      <span
+        :class="liveStatusClass(s.status)"
+        :title="s.status"
+        aria-hidden="true"
+      ></span>
+      <span class="live-main">
+        <span class="live-project">{{ s.projectName }}</span>
+        <span class="live-path">{{ s.cwd }}</span>
+      </span>
+      <span class="live-status-label">{{ s.status }}</span>
+      <span class="live-ago">{{ liveAgo(s.updatedAt) }}</span>
+    </li>
+  </ul>
+</section>
