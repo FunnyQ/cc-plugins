@@ -48,7 +48,7 @@
         :key="entry.__key"
         :class="'live-entry is-' + (entry.type || 'unknown')"
       >
-        <span class="live-entry-role">{{ entry.type || 'unknown' }}</span>
+        <span class="live-entry-role">{{ streamEntryRole(entry) }}</span>
         <div class="live-entry-content" v-html="entry.__html"></div>
       </div>
     </div>

@@ -408,6 +408,14 @@
   letter-spacing: 0.02em;
 }
 
+.live-seg--note {
+  opacity: 0.66;
+}
+
+.live-seg--note .live-seg-label {
+  color: var(--text-faint);
+}
+
 .live-entry-content .live-seg-code.is-error {
   border-color: color-mix(in oklch, var(--danger) 44%, var(--edge-soft));
   background: color-mix(in oklch, var(--danger) 8%, transparent);
