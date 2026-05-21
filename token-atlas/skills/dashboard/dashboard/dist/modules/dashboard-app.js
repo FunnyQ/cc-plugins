@@ -6,6 +6,7 @@ import {
   DAYS,
   LEDGER_INITIAL_VISIBLE,
   LEDGER_PAGE_SIZE,
+  LIVE_POLL_MS,
   MODEL_EXPORT_HEADERS,
   MONTHS,
   PROJECT_EXPORT_HEADERS,
@@ -50,6 +51,12 @@ export function App() {
     selectedModels: initialPrefs.selectedModels ?? {},
     selectedProjectPath: null,
     modalScrollY: 0,
+    liveSessions: [],
+    liveError: null,
+    livePollTimer: null,
+    liveTickTimer: null,
+    liveVisibilityHandler: null,
+    nowTick: Date.now(),
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
     themeMode: detectInitialTheme(),
@@ -70,6 +77,12 @@ export function App() {
       }
       await this.refresh();
       this.startAutoRefresh();
+      this.startLivePolling();
+      this.startLiveClock();
+      this.liveVisibilityHandler = () => {
+        if (!document.hidden) this.fetchLive();
+      };
+      document.addEventListener("visibilitychange", this.liveVisibilityHandler);
     },
 
     applyTheme(mode) {
@@ -105,6 +118,36 @@ export function App() {
         if (document.hidden) return;
         this.refresh({ quiet: true });
       }, AUTO_REFRESH_MS);
+    },
+
+    async fetchLive() {
+      if (document.hidden) return;
+      try {
+        const res = await fetch("/api/live");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        this.liveSessions = data.sessions ?? [];
+        this.liveError = null;
+      } catch (err) {
+        this.liveError = err.message ?? String(err);
+      }
+    },
+
+    startLivePolling() {
+      this.fetchLive();
+      if (this.livePollTimer) window.clearInterval(this.livePollTimer);
+      this.livePollTimer = window.setInterval(
+        () => this.fetchLive(),
+        LIVE_POLL_MS,
+      );
+    },
+
+    startLiveClock() {
+      if (this.liveTickTimer) window.clearInterval(this.liveTickTimer);
+      this.liveTickTimer = window.setInterval(() => {
+        this.nowTick = Date.now();
+      }, 1_000);
     },
 
     async refresh(options = {}) {
@@ -1050,6 +1093,24 @@ export function App() {
 
     isSelectedProject(path) {
       return this.selectedProjectPath === path;
+    },
+
+    liveAgo(updatedAt) {
+      const ms = this.nowTick - new Date(updatedAt).getTime();
+      const s = Math.max(0, Math.round(ms / 1000));
+      if (s < 60) return `${s}s ago`;
+      const m = Math.round(s / 60);
+      if (m < 60) return `${m}m ago`;
+      return `${Math.round(m / 60)}h ago`;
+    },
+
+    liveStatusClass(status) {
+      const known = {
+        busy: "is-busy",
+        idle: "is-idle",
+        waiting: "is-waiting",
+      };
+      return "live-dot " + (known[status] ?? "is-unknown");
     },
 
     lockPageScroll() {

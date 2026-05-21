@@ -58,7 +58,7 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 | Bucket | NN | Title | Status | Depends on |
 |---|---|---|---|---|
 | panel | 01 | `GET /api/live` active-session endpoint | done | — |
-| panel | 02 | "Live now" panel | todo | panel/01 |
+| panel | 02 | "Live now" panel | done | panel/01 |
 | stream | 03 | `GET /api/stream` SSE transcript stream | done | panel/01 |
 | stream | 04 | Streaming transcript modal | todo | stream/03, panel/02 |
 
