@@ -264,6 +264,10 @@
 .live-entry.is-tool_result,
 .live-entry.is-tool-use,
 .live-entry.is-tool-result {
+  border-left-color: var(--sunrise-amber);
+}
+
+.live-entry.is-system {
   border-left-color: var(--sunrise-violet);
 }
 
