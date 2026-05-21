@@ -57,7 +57,12 @@
 .live-row:focus-visible {
   border-color: color-mix(in oklch, var(--accent) 42%, var(--edge-soft));
   background: color-mix(in oklch, var(--accent-soft) 20%, var(--surface-3));
-  outline: none;
+  outline: 2px solid color-mix(in oklch, var(--accent) 46%, transparent);
+  outline-offset: 2px;
+}
+
+.live-row:active {
+  background: color-mix(in oklch, var(--accent-soft) 28%, var(--surface-3));
 }
 
 .live-dot {
@@ -173,13 +178,26 @@
 }
 
 @container (max-width: 560px) {
-  .live-head,
-  .live-row {
+  .live-head {
     grid-template-columns: 1fr;
   }
 
   .live-row {
-    justify-items: start;
+    grid-template-columns: 12px minmax(0, 1fr) max-content;
+    gap: var(--s-8) var(--s-10);
+  }
+
+  .live-main {
+    grid-column: 2 / 4;
+  }
+
+  .live-status-label {
+    grid-column: 2;
+    width: max-content;
+  }
+
+  .live-ago {
+    grid-column: 3;
   }
 }
 
@@ -243,35 +261,46 @@
 }
 
 .live-entry {
+  --entry-accent: var(--text-faint);
+
   display: grid;
   gap: var(--s-6);
-  border: 1px solid var(--edge-soft);
-  border-left: 3px solid var(--text-faint);
+  border: 1px solid
+    color-mix(in oklch, var(--entry-accent) 26%, var(--edge-soft));
   border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--surface-glass-raised) 82%, transparent);
+  background: color-mix(
+    in oklch,
+    var(--entry-accent) 5%,
+    var(--surface-glass-raised)
+  );
   padding: var(--s-10);
 }
 
 .live-entry.is-user {
-  border-left-color: var(--sunrise-coral);
+  --entry-accent: var(--sunrise-coral);
 }
 
 .live-entry.is-assistant {
-  border-left-color: var(--positive);
+  --entry-accent: var(--positive);
 }
 
 .live-entry.is-tool,
 .live-entry.is-tool_result,
 .live-entry.is-tool-use,
 .live-entry.is-tool-result {
-  border-left-color: var(--sunrise-amber);
+  --entry-accent: var(--sunrise-amber);
 }
 
 .live-entry.is-system {
-  border-left-color: var(--sunrise-violet);
+  --entry-accent: var(--sunrise-violet);
 }
 
 .live-entry-role {
+  width: max-content;
+  border: 1px solid color-mix(in oklch, var(--entry-accent) 36%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--entry-accent) 12%, transparent);
+  padding: 1px var(--s-8);
   color: var(--text-faint);
   font-size: var(--fs-xs);
   font-weight: 740;
