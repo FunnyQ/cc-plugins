@@ -42,12 +42,10 @@
         :class="'live-entry is-' + (entry.type || 'unknown')"
       >
         <span class="live-entry-role">{{ entry.type || 'unknown' }}</span>
-        <pre class="live-entry-content">{{ streamEntryText(entry) }}</pre>
+        <div class="live-entry-content" v-html="streamEntryHtml(entry)"></div>
       </div>
     </div>
 
-    <footer class="live-stream-note">
-      Shows raw local transcript content.
-    </footer>
+    <footer class="live-stream-note">Shows local transcript content.</footer>
   </section>
 </div>
