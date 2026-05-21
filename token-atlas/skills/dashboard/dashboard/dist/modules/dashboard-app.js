@@ -57,6 +57,11 @@ export function App() {
     liveTickTimer: null,
     liveVisibilityHandler: null,
     nowTick: Date.now(),
+    streamSessionId: null,
+    streamProjectName: "",
+    streamEntries: [],
+    streamSource: null,
+    streamError: null,
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
     themeMode: detectInitialTheme(),
@@ -1111,6 +1116,93 @@ export function App() {
         waiting: "is-waiting",
       };
       return "live-dot " + (known[status] ?? "is-unknown");
+    },
+
+    openStream(session) {
+      this.closeStream();
+      this.streamSessionId = session.id;
+      this.streamProjectName = session.projectName;
+      this.streamEntries = [];
+      this.streamError = null;
+      this.lockPageScroll();
+
+      const source = new EventSource(
+        `/api/stream?session=${encodeURIComponent(session.id)}`,
+      );
+      source.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.kind && !payload.entry) return;
+          const entry = payload.entry ?? payload;
+          this.streamEntries.push(entry);
+          this.$nextTick(() => this.scrollStreamToBottom());
+        } catch {
+          // Ignore unparseable stream frames.
+        }
+      };
+      source.onerror = () => {
+        this.streamError = "Stream interrupted - retrying...";
+      };
+      this.streamSource = source;
+      this.$nextTick(() => {
+        this.$refs.liveStreamDialog?.focus();
+      });
+    },
+
+    closeStream() {
+      if (this.streamSource) {
+        this.streamSource.close();
+        this.streamSource = null;
+      }
+      if (this.streamSessionId) this.unlockPageScroll();
+      this.streamSessionId = null;
+      this.streamProjectName = "";
+      this.streamEntries = [];
+      this.streamError = null;
+    },
+
+    scrollStreamToBottom() {
+      const el = this.$refs.liveStreamBody;
+      if (el) el.scrollTop = el.scrollHeight;
+    },
+
+    streamEntryText(entry) {
+      const content = entry.message?.content ?? entry.content ?? entry.text;
+      const text = this.streamContentText(content);
+      if (text) return text;
+      if (entry.toolUseResult)
+        return this.streamContentText(entry.toolUseResult);
+      if (entry.result) return this.streamContentText(entry.result);
+      if (entry.message?.usage) {
+        return JSON.stringify(entry.message.usage, null, 2);
+      }
+      return JSON.stringify(entry, null, 2);
+    },
+
+    streamContentText(content) {
+      if (content == null) return "";
+      if (typeof content === "string") return content;
+      if (Array.isArray(content)) {
+        return content
+          .map((part) => {
+            if (typeof part === "string") return part;
+            return (
+              part.text ??
+              part.content ??
+              part.name ??
+              part.type ??
+              JSON.stringify(part)
+            );
+          })
+          .filter(Boolean)
+          .join("\n");
+      }
+      if (typeof content === "object") {
+        return (
+          content.text ?? content.content ?? JSON.stringify(content, null, 2)
+        );
+      }
+      return String(content);
     },
 
     lockPageScroll() {

@@ -60,7 +60,7 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 | panel | 01 | `GET /api/live` active-session endpoint | done | — |
 | panel | 02 | "Live now" panel | done | panel/01 |
 | stream | 03 | `GET /api/stream` SSE transcript stream | done | panel/01 |
-| stream | 04 | Streaming transcript modal | todo | stream/03, panel/02 |
+| stream | 04 | Streaming transcript modal | done | stream/03, panel/02 |
 
 ## Dependency graphs
 

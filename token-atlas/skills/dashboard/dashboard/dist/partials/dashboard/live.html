@@ -14,7 +14,15 @@
   <p v-if="liveError" class="live-error" role="status">{{ liveError }}</p>
 
   <ul v-else class="live-list">
-    <li v-for="s in liveSessions" :key="s.id" class="live-row">
+    <li
+      v-for="s in liveSessions"
+      :key="s.id"
+      class="live-row"
+      role="button"
+      tabindex="0"
+      @click="openStream(s)"
+      @keydown.enter="openStream(s)"
+    >
       <span
         :class="liveStatusClass(s.status)"
         :title="s.status"

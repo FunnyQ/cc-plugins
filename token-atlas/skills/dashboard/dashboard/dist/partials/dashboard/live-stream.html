@@ -1,0 +1,53 @@
+<div
+  v-if="streamSessionId"
+  class="project-detail-modal live-stream-modal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="live-stream-title"
+  @click.self="closeStream"
+  @keydown.escape="closeStream"
+>
+  <section
+    class="panel live-stream-panel"
+    ref="liveStreamDialog"
+    tabindex="-1"
+    aria-label="Live transcript stream"
+  >
+    <header class="live-stream-head">
+      <div>
+        <h2 id="live-stream-title">{{ streamProjectName }}</h2>
+        <span class="muted">{{ streamSessionId }}</span>
+      </div>
+      <button
+        type="button"
+        class="btn"
+        aria-label="Close stream"
+        @click="closeStream"
+      >
+        Close
+      </button>
+    </header>
+
+    <p v-if="streamError" class="live-stream-error" role="status">
+      {{ streamError }}
+    </p>
+
+    <div class="live-stream-body" ref="liveStreamBody">
+      <div v-if="!streamEntries.length" class="live-stream-empty">
+        Waiting for transcript entries.
+      </div>
+      <div
+        v-for="(entry, i) in streamEntries"
+        :key="i"
+        :class="'live-entry is-' + (entry.type || 'unknown')"
+      >
+        <span class="live-entry-role">{{ entry.type || 'unknown' }}</span>
+        <pre class="live-entry-content">{{ streamEntryText(entry) }}</pre>
+      </div>
+    </div>
+
+    <footer class="live-stream-note">
+      Shows raw local transcript content.
+    </footer>
+  </section>
+</div>
