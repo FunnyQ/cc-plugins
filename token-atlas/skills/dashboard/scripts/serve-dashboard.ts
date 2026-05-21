@@ -3,7 +3,12 @@ import { statSync, existsSync } from "node:fs";
 import { extname, resolve, relative, isAbsolute } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
-import { getLiveSessions, streamTranscript } from "./live.ts";
+import {
+  getLiveSessions,
+  streamTranscript,
+  jsonResponse,
+  jsonError,
+} from "./live.ts";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
@@ -87,37 +92,17 @@ function serveStatic(pathname: string): Response {
 
 async function handleStats(): Promise<Response> {
   try {
-    const data = await buildStats();
-    return new Response(JSON.stringify(data), {
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
+    return jsonResponse(await buildStats());
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-    });
+    return jsonError(err);
   }
 }
 
 function handleLive(): Response {
   try {
-    const sessions = getLiveSessions();
-    return new Response(JSON.stringify({ sessions }), {
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
+    return jsonResponse({ sessions: getLiveSessions() });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-    });
+    return jsonError(err);
   }
 }
 

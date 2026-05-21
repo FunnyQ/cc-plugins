@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 import {
+  closeSync,
   existsSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   realpathSync,
   statSync,
@@ -15,11 +18,27 @@ import { Glob } from "bun";
 const CLAUDE_DIR = join(homedir(), ".claude");
 const SESSIONS_DIR = join(CLAUDE_DIR, "sessions");
 const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
+// Resolve the projects root once: relative() needs the canonical base to
+// compare against the realpath'd transcript paths, and the dir is stable.
+const PROJECTS_REAL = (() => {
+  try {
+    return realpathSync(PROJECTS_DIR);
+  } catch {
+    return PROJECTS_DIR;
+  }
+})();
 const STALE_CUTOFF_MS = 10 * 60 * 1000;
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const BACKLOG_LINES = 50;
 const HEARTBEAT_MS = 10_000;
-const RESOLVE_POLL_MS = 1_000;
+const RESOLVE_POLL_MS = 2_000;
+const TRANSCRIPT_INDEX_TTL_MS = 5_000;
+// Subagent `progress` records have no message body and would render as an opaque
+// JSON blob in the modal, so they're dropped at the source. Everything else
+// (user / assistant / tool / tool_result / system) passes through per the stream
+// contract — this is a denylist, not an allowlist, so no conversation type is
+// accidentally excluded.
+const SKIP_ENTRY_TYPES = new Set(["progress"]);
 const WATCH_DEBOUNCE_MS = 80;
 
 type ClaudeSessionFile = {
@@ -87,9 +106,35 @@ export function resolveTranscriptPath(id: string): string | undefined {
   return undefined;
 }
 
+let transcriptIndex: Map<string, string> | null = null;
+let transcriptIndexAt = 0;
+
+// Build a sessionId -> transcript-path map in a single tree walk, cached for a
+// few seconds. The /api/live poll runs every 3s; resolving each session's path
+// with its own `**/<id>.jsonl` glob was an O(sessions) full-tree walk per poll.
+// One scan keyed by filename stem is O(1) in session count, and the TTL means
+// most polls do no fs work at all. The stream endpoint deliberately does NOT use
+// this cache — a brand-new transcript must resolve immediately.
+function getTranscriptIndex(): Map<string, string> {
+  const now = Date.now();
+  if (transcriptIndex && now - transcriptIndexAt < TRANSCRIPT_INDEX_TTL_MS) {
+    return transcriptIndex;
+  }
+  const index = new Map<string, string>();
+  if (existsSync(PROJECTS_DIR)) {
+    const glob = new Glob("**/*.jsonl");
+    for (const rel of glob.scanSync({ cwd: PROJECTS_DIR, onlyFiles: true })) {
+      const stem = rel.slice(rel.lastIndexOf("/") + 1, -".jsonl".length);
+      if (!index.has(stem)) index.set(stem, join(PROJECTS_DIR, rel));
+    }
+  }
+  transcriptIndex = index;
+  transcriptIndexAt = now;
+  return index;
+}
+
 export function isInsideProjects(filePath: string): boolean {
-  if (!existsSync(PROJECTS_DIR)) return false;
-  const rel = relative(realpathSync(PROJECTS_DIR), filePath);
+  const rel = relative(PROJECTS_REAL, filePath);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
@@ -102,6 +147,7 @@ function statusRank(status: string): number {
 
 export function getLiveSessions(): LiveSession[] {
   const now = Date.now();
+  const index = getTranscriptIndex();
   return readSessionFiles()
     .map((session) => {
       const updatedAtMs = session.updatedAt ?? session.startedAt;
@@ -116,7 +162,7 @@ export function getLiveSessions(): LiveSession[] {
         updatedAt: new Date(updatedAtMs).toISOString(),
         ageMs,
         isStale: ageMs > STALE_CUTOFF_MS,
-        transcriptPath: resolveTranscriptPath(session.sessionId),
+        transcriptPath: index.get(session.sessionId),
         version: session.version,
       } satisfies LiveSession;
     })
@@ -128,11 +174,19 @@ export function getLiveSessions(): LiveSession[] {
     });
 }
 
-function jsonResponse(payload: object, status = 200): Response {
+export function jsonResponse(payload: object, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
   });
+}
+
+export function jsonError(err: unknown, status = 500): Response {
+  const msg = err instanceof Error ? err.message : String(err);
+  return jsonResponse({ error: msg }, status);
 }
 
 function sse(controller: ReadableStreamDefaultController, payload: object) {
@@ -146,11 +200,14 @@ function emitLines(
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
+    let entry: { type?: string };
     try {
-      sse(controller, JSON.parse(trimmed));
+      entry = JSON.parse(trimmed);
     } catch {
-      // skip malformed / partially-written JSONL entries
+      continue; // skip malformed / partially-written JSONL entries
     }
+    if (!entry || SKIP_ENTRY_TYPES.has(entry.type ?? "")) continue;
+    sse(controller, entry);
   }
 }
 
@@ -214,12 +271,18 @@ export function streamTranscript(sessionId: string | null): Response {
 
   function readBacklog(controller: ReadableStreamDefaultController): void {
     if (!filePath || closed) return;
-    const body = readFileSync(filePath, "utf-8");
-    const { complete, partial: trailing } = splitCompleteLines(body);
-    const lines = complete ? complete.split("\n").slice(-BACKLOG_LINES) : [];
-    emitLines(controller, lines.join("\n"));
-    partial = trailing;
-    offset = Buffer.byteLength(body);
+    try {
+      const body = readFileSync(filePath, "utf-8");
+      const { complete, partial: trailing } = splitCompleteLines(body);
+      // Cap the displayed backlog, but resume tailing from the true EOF so the
+      // partial-line buffer stays aligned with the file's byte length.
+      const lines = complete ? complete.split("\n").slice(-BACKLOG_LINES) : [];
+      emitLines(controller, lines.join("\n"));
+      partial = trailing;
+      offset = Buffer.byteLength(body);
+    } catch {
+      // File vanished/rotated between resolve and read; the next poll retries.
+    }
     sse(controller, { kind: "backlog-done" });
   }
 
@@ -231,11 +294,19 @@ export function streamTranscript(sessionId: string | null): Response {
         offset = 0;
         partial = "";
       }
-      if (size === offset) return;
-      const body = readFileSync(filePath);
-      const chunk = body.subarray(offset, size).toString("utf-8");
+      if (size <= offset) return;
+      // Read only the appended [offset, size) slice — re-reading the whole
+      // (potentially multi-MB) transcript on every append is O(filesize) per line.
+      const length = size - offset;
+      const buf = Buffer.allocUnsafe(length);
+      const fd = openSync(filePath, "r");
+      try {
+        readSync(fd, buf, 0, length, offset);
+      } finally {
+        closeSync(fd);
+      }
       offset = size;
-      const lines = splitCompleteLines(partial + chunk);
+      const lines = splitCompleteLines(partial + buf.toString("utf-8"));
       partial = lines.partial;
       emitLines(controller, lines.complete);
     } catch {
@@ -270,7 +341,13 @@ export function streamTranscript(sessionId: string | null): Response {
         if (closed || watcher) return;
         const resolved = resolveTranscriptPath(sessionId);
         if (!resolved) return;
-        const realPath = realpathSync(resolved);
+        let realPath: string;
+        try {
+          realPath = realpathSync(resolved);
+        } catch {
+          // Resolved then vanished before realpath; wait for the next tick.
+          return;
+        }
         if (!isInsideProjects(realPath)) {
           safeEnqueue(
             controller,

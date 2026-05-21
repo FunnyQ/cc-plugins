@@ -151,6 +151,9 @@ export function App() {
     startLiveClock() {
       if (this.liveTickTimer) window.clearInterval(this.liveTickTimer);
       this.liveTickTimer = window.setInterval(() => {
+        // Only churn the relative-time bindings when the panel is actually
+        // visible with rows — otherwise this is a 1Hz no-op re-render forever.
+        if (document.hidden || !this.liveSessions.length) return;
         this.nowTick = Date.now();
       }, 1_000);
     },
