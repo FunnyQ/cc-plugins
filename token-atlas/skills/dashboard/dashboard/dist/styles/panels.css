@@ -18,6 +18,7 @@
    class, so they need the same isolated stacking context. */
 .budget-panel,
 .usage-limits-panel,
+.live-panel,
 .data-health-panel {
   position: relative;
   isolation: isolate;
@@ -33,6 +34,7 @@
 .card::after,
 .budget-panel::before,
 .usage-limits-panel::before,
+.live-panel::before,
 .data-health-panel::before {
   content: "";
   position: absolute;
@@ -54,6 +56,7 @@
 .card:hover::after,
 .budget-panel:hover::before,
 .usage-limits-panel:hover::before,
+.live-panel:hover::before,
 .data-health-panel:hover::before {
   opacity: 1;
   transition-duration: 240ms;
@@ -63,6 +66,7 @@
 .card:focus-visible::after,
 .budget-panel:focus-visible::before,
 .usage-limits-panel:focus-visible::before,
+.live-panel:focus-visible::before,
 .data-health-panel:focus-visible::before {
   opacity: 0.85;
   transition-duration: 200ms;
@@ -72,6 +76,7 @@
 [data-theme="dark"] .card::after,
 [data-theme="dark"] .budget-panel::before,
 [data-theme="dark"] .usage-limits-panel::before,
+[data-theme="dark"] .live-panel::before,
 [data-theme="dark"] .data-health-panel::before {
   background: radial-gradient(
     420px circle at var(--bloom-x, 50%) var(--bloom-y, 50%),
@@ -86,6 +91,7 @@
   .card::after,
   .budget-panel::before,
   .usage-limits-panel::before,
+  .live-panel::before,
   .data-health-panel::before {
     display: none;
   }
