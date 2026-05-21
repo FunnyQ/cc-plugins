@@ -34,6 +34,8 @@ import {
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
 const STREAM_ERROR_NOTICE_DELAY_MS = 15_000;
+// Code/tool-result blocks taller than this collapse into a <details> by default.
+const STREAM_COLLAPSE_LINES = 10;
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => {
@@ -1367,6 +1369,7 @@ export function App() {
       if (this.streamSeenEntries[key]) return null;
       this.streamSeenEntries[key] = true;
       entry.__key = ++this.streamKeySeq;
+      entry.__html = this.buildEntryHtml(entry);
       return entry;
     },
 
@@ -1461,66 +1464,118 @@ export function App() {
       this.streamPinnedToBottom = true;
     },
 
-    // Classify an entry into displayable text plus whether that text is prose
-    // worth markdown-rendering. Anything that fell back to a JSON dump (here or
-    // inside streamContentText) is flagged markdown:false so it renders verbatim
-    // in <pre> instead of having its punctuation mangled into bold/code.
-    streamEntry(entry) {
-      const content = entry.message?.content ?? entry.content ?? entry.text;
-      const primary = this.streamContentText(content);
-      if (primary.text) return primary;
-      if (entry.toolUseResult) {
-        const result = this.streamContentText(entry.toolUseResult);
-        if (result.text) return result;
-      }
-      if (entry.result) {
-        const result = this.streamContentText(entry.result);
-        if (result.text) return result;
-      }
-      if (entry.message?.usage) {
-        return {
-          text: JSON.stringify(entry.message.usage, null, 2),
-          markdown: false,
-        };
-      }
-      return { text: JSON.stringify(entry, null, 2), markdown: false };
+    // Pre-render an entry to HTML once, on receipt. Splitting into segments lets
+    // each block render in its natural form: conversational text as Markdown,
+    // tool calls / tool results / file dumps as verbatim escaped code blocks
+    // (long ones collapsed). Computing once also avoids re-rendering Markdown for
+    // every entry on each reactive update.
+    buildEntryHtml(entry) {
+      return this.streamEntrySegments(entry)
+        .map((seg) => this.renderStreamSegment(seg))
+        .join("");
     },
 
-    streamEntryHtml(entry) {
-      const { text, markdown } = this.streamEntry(entry);
-      // Prose goes through the markdown renderer; JSON fallbacks render verbatim
-      // in an escaped <pre> so their punctuation isn't mangled. Both paths emit
-      // escaped HTML — never raw transcript text into v-html.
-      return markdown ? renderMarkdown(text) : `<pre>${escapeHtml(text)}</pre>`;
+    renderStreamSegment(seg) {
+      if (seg.kind === "markdown") return renderMarkdown(seg.text);
+      const text = seg.text ?? "";
+      const cls = seg.error ? "live-seg-code is-error" : "live-seg-code";
+      const pre = `<pre class="${cls}">${escapeHtml(text)}</pre>`;
+      const lineCount = text ? text.split("\n").length : 0;
+      if (lineCount > STREAM_COLLAPSE_LINES) {
+        const summary = `${escapeHtml(seg.label || "output")} · ${lineCount} lines`;
+        return `<details class="live-seg"><summary>${summary}</summary>${pre}</details>`;
+      }
+      const label = seg.label
+        ? `<div class="live-seg-label">${escapeHtml(seg.label)}</div>`
+        : "";
+      return `<div class="live-seg">${label}${pre}</div>`;
     },
 
-    // Returns { text, markdown }. markdown:false means a JSON.stringify dump was
-    // used somewhere (a content block or whole object had no extractable prose),
-    // so the caller must render it verbatim rather than as Markdown.
-    streamContentText(content) {
-      if (content == null) return { text: "", markdown: true };
-      if (typeof content === "string") return { text: content, markdown: true };
-      if (Array.isArray(content)) {
-        let markdown = true;
-        const text = content
-          .map((part) => {
-            if (typeof part === "string") return part;
-            const extracted =
-              part.text ?? part.content ?? part.name ?? part.type;
-            if (extracted != null) return extracted;
-            markdown = false;
-            return JSON.stringify(part);
-          })
+    streamEntrySegments(entry) {
+      const content = entry?.message?.content ?? entry?.content ?? entry?.text;
+      const segs = this.contentSegments(content);
+      if (segs.length) return segs;
+      if (entry?.toolUseResult) {
+        return [{ kind: "code", text: this.segText(entry.toolUseResult) }];
+      }
+      if (entry?.message?.usage) {
+        return [
+          { kind: "code", text: JSON.stringify(entry.message.usage, null, 2) },
+        ];
+      }
+      return [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+    },
+
+    contentSegments(content) {
+      if (content == null) return [];
+      if (typeof content === "string") {
+        return content.trim() ? [{ kind: "markdown", text: content }] : [];
+      }
+      if (!Array.isArray(content)) {
+        const text = content.text ?? content.content;
+        if (typeof text === "string") {
+          return text.trim() ? [{ kind: "markdown", text }] : [];
+        }
+        return [{ kind: "code", text: JSON.stringify(content, null, 2) }];
+      }
+      const out = [];
+      for (const part of content) {
+        if (typeof part === "string") {
+          if (part.trim()) out.push({ kind: "markdown", text: part });
+          continue;
+        }
+        if (!part || typeof part !== "object") continue;
+        if (part.type === "text" && part.text?.trim()) {
+          out.push({ kind: "markdown", text: part.text });
+        } else if (part.type === "thinking" && part.thinking?.trim()) {
+          out.push({ kind: "markdown", text: part.thinking });
+        } else if (part.type === "tool_use") {
+          const input =
+            typeof part.input === "string"
+              ? part.input
+              : JSON.stringify(part.input ?? {}, null, 2);
+          out.push({
+            kind: "code",
+            label: `🔧 ${part.name ?? "tool"}`,
+            text: input,
+          });
+        } else if (part.type === "tool_result") {
+          out.push({
+            kind: "code",
+            label: part.is_error ? "⚠ result (error)" : "result",
+            error: !!part.is_error,
+            text: this.segText(part.content),
+          });
+        } else if (part.type === "image") {
+          out.push({ kind: "code", text: "[image]" });
+        } else {
+          const text = part.text ?? part.content;
+          if (typeof text === "string") out.push({ kind: "markdown", text });
+          else out.push({ kind: "code", text: JSON.stringify(part, null, 2) });
+        }
+      }
+      return out;
+    },
+
+    // Flatten a tool-result/content value (string, array of blocks, or object)
+    // into displayable text for a code block.
+    segText(value) {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (Array.isArray(value)) {
+        return value
+          .map((part) =>
+            typeof part === "string"
+              ? part
+              : (part.text ?? part.content ?? JSON.stringify(part)),
+          )
           .filter(Boolean)
           .join("\n");
-        return { text, markdown };
       }
-      if (typeof content === "object") {
-        const extracted = content.text ?? content.content;
-        if (extracted != null) return { text: extracted, markdown: true };
-        return { text: JSON.stringify(content, null, 2), markdown: false };
+      if (typeof value === "object") {
+        return value.text ?? value.content ?? JSON.stringify(value, null, 2);
       }
-      return { text: String(content), markdown: true };
+      return String(value);
     },
 
     lockPageScroll() {
