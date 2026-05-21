@@ -263,6 +263,14 @@
   font-size: var(--fs-sm);
 }
 
+.live-stream-older {
+  justify-self: center;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .live-entry {
   --entry-accent: var(--text-faint);
 
