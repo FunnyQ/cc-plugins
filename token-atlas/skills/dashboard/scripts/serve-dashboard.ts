@@ -3,6 +3,7 @@ import { statSync, existsSync } from "node:fs";
 import { extname, resolve, relative, isAbsolute } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
+import { getLiveSessions } from "./live.ts";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
@@ -102,6 +103,24 @@ async function handleStats(): Promise<Response> {
   }
 }
 
+function handleLive(): Response {
+  try {
+    const sessions = getLiveSessions();
+    return new Response(JSON.stringify({ sessions }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+}
+
 // ---------- server ----------
 
 const port = parsePort();
@@ -113,6 +132,7 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/api/stats") return handleStats();
+    if (url.pathname === "/api/live") return handleLive();
     return serveStatic(url.pathname);
   },
 });
