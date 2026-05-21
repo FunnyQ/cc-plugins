@@ -3,7 +3,7 @@ import { statSync, existsSync } from "node:fs";
 import { extname, resolve, relative, isAbsolute } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
-import { getLiveSessions } from "./live.ts";
+import { getLiveSessions, streamTranscript } from "./live.ts";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
@@ -121,6 +121,11 @@ function handleLive(): Response {
   }
 }
 
+function handleStream(req: Request): Response {
+  const url = new URL(req.url);
+  return streamTranscript(url.searchParams.get("session"));
+}
+
 // ---------- server ----------
 
 const port = parsePort();
@@ -133,6 +138,7 @@ const server = Bun.serve({
     const url = new URL(req.url);
     if (url.pathname === "/api/stats") return handleStats();
     if (url.pathname === "/api/live") return handleLive();
+    if (url.pathname === "/api/stream") return handleStream(req);
     return serveStatic(url.pathname);
   },
 });

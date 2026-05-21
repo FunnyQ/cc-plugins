@@ -6,7 +6,7 @@
 >
 > **Depends on**: panel/01
 > **Blocks**: stream/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
