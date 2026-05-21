@@ -276,7 +276,8 @@ export function streamTranscript(sessionId: string | null): Response {
     try {
       const size = statSync(filePath).size;
       let start = size;
-      let body = "";
+      let newlineCount = 0;
+      const chunks: Buffer[] = [];
       const fd = openSync(filePath, "r");
       try {
         while (start > 0 && size - start < MAX_BACKLOG_READ_BYTES) {
@@ -284,16 +285,23 @@ export function streamTranscript(sessionId: string | null): Response {
           const length = start - nextStart;
           const buf = Buffer.allocUnsafe(length);
           readSync(fd, buf, 0, length, nextStart);
-          body = buf.toString("utf-8") + body;
+          chunks.unshift(buf);
           start = nextStart;
 
-          const { complete } = splitCompleteLines(body);
-          if (complete.split("\n").length >= BACKLOG_LINES) break;
+          // Count newline bytes directly rather than decoding each chunk: 0x0A
+          // never appears inside a UTF-8 multi-byte sequence, so this is safe,
+          // and it avoids decoding a chunk whose boundary splits a character.
+          for (const byte of buf) if (byte === 0x0a) newlineCount++;
+          if (newlineCount >= BACKLOG_LINES) break;
         }
       } finally {
         closeSync(fd);
       }
+      // Decode the assembled bytes once — decoding per chunk and concatenating
+      // strings corrupts any multi-byte char that spans a chunk boundary.
+      let body = Buffer.concat(chunks).toString("utf-8");
       if (start > 0) {
+        // Began mid-file, so the first line is probably partial — drop it.
         const firstNewline = body.indexOf("\n");
         body = firstNewline >= 0 ? body.slice(firstNewline + 1) : "";
       }

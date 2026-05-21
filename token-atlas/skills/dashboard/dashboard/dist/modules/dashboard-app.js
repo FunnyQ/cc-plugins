@@ -65,7 +65,9 @@ function renderInlineMarkdown(text) {
     );
 }
 
-function renderMarkdown(text) {
+const MAX_QUOTE_DEPTH = 8;
+
+function renderMarkdown(text, depth = 0) {
   const lines = String(text).replace(/\r\n/g, "\n").split("\n");
   const html = [];
   let paragraph = [];
@@ -87,7 +89,13 @@ function renderMarkdown(text) {
 
   function flushQuote() {
     if (!quote.length) return;
-    html.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+    // Cap nesting so a line of thousands of `>` can't blow the stack; past the
+    // limit the remaining quote markers render as inline text.
+    const inner =
+      depth >= MAX_QUOTE_DEPTH
+        ? `<p>${renderInlineMarkdown(quote.join(" "))}</p>`
+        : renderMarkdown(quote.join("\n"), depth + 1);
+    html.push(`<blockquote>${inner}</blockquote>`);
     quote = [];
   }
 
@@ -188,6 +196,8 @@ export function App() {
     streamEntries: [],
     streamSource: null,
     streamError: null,
+    streamPinnedToBottom: true,
+    streamScrollFrame: null,
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
     themeMode: detectInitialTheme(),
@@ -1253,6 +1263,7 @@ export function App() {
       this.streamProjectName = session.projectName;
       this.streamEntries = [];
       this.streamError = null;
+      this.streamPinnedToBottom = true;
       this.lockPageScroll();
 
       const source = new EventSource(
@@ -1266,9 +1277,10 @@ export function App() {
           const payload = JSON.parse(event.data);
           this.streamError = null;
           if (payload.kind && !payload.entry) return;
+          const shouldScroll = this.streamPinnedToBottom;
           const entry = payload.entry ?? payload;
           this.streamEntries.push(entry);
-          this.$nextTick(() => this.scrollStreamToBottom());
+          this.$nextTick(() => this.scheduleStreamScroll(shouldScroll));
         } catch {
           // Ignore unparseable stream frames.
         }
@@ -1292,54 +1304,103 @@ export function App() {
       this.streamProjectName = "";
       this.streamEntries = [];
       this.streamError = null;
+      this.streamPinnedToBottom = true;
+      if (this.streamScrollFrame) {
+        window.cancelAnimationFrame(this.streamScrollFrame);
+        this.streamScrollFrame = null;
+      }
+    },
+
+    isStreamNearBottom() {
+      const el = this.$refs.liveStreamBody;
+      if (!el) return true;
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    },
+
+    handleStreamScroll() {
+      this.streamPinnedToBottom = this.isStreamNearBottom();
+    },
+
+    scheduleStreamScroll(shouldScroll = false) {
+      if (!shouldScroll) return;
+      if (this.streamScrollFrame) {
+        window.cancelAnimationFrame(this.streamScrollFrame);
+      }
+      this.streamScrollFrame = window.requestAnimationFrame(() => {
+        this.streamScrollFrame = window.requestAnimationFrame(() => {
+          this.streamScrollFrame = null;
+          this.scrollStreamToBottom();
+        });
+      });
     },
 
     scrollStreamToBottom() {
       const el = this.$refs.liveStreamBody;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      this.streamPinnedToBottom = true;
     },
 
-    streamEntryText(entry) {
+    // Classify an entry into displayable text plus whether that text is prose
+    // worth markdown-rendering. Anything that fell back to a JSON dump (here or
+    // inside streamContentText) is flagged markdown:false so it renders verbatim
+    // in <pre> instead of having its punctuation mangled into bold/code.
+    streamEntry(entry) {
       const content = entry.message?.content ?? entry.content ?? entry.text;
-      const text = this.streamContentText(content);
-      if (text) return text;
-      if (entry.toolUseResult)
-        return this.streamContentText(entry.toolUseResult);
-      if (entry.result) return this.streamContentText(entry.result);
-      if (entry.message?.usage) {
-        return JSON.stringify(entry.message.usage, null, 2);
+      const primary = this.streamContentText(content);
+      if (primary.text) return primary;
+      if (entry.toolUseResult) {
+        const result = this.streamContentText(entry.toolUseResult);
+        if (result.text) return result;
       }
-      return JSON.stringify(entry, null, 2);
+      if (entry.result) {
+        const result = this.streamContentText(entry.result);
+        if (result.text) return result;
+      }
+      if (entry.message?.usage) {
+        return {
+          text: JSON.stringify(entry.message.usage, null, 2),
+          markdown: false,
+        };
+      }
+      return { text: JSON.stringify(entry, null, 2), markdown: false };
     },
 
     streamEntryHtml(entry) {
-      return renderMarkdown(this.streamEntryText(entry));
+      const { text, markdown } = this.streamEntry(entry);
+      // Prose goes through the markdown renderer; JSON fallbacks render verbatim
+      // in an escaped <pre> so their punctuation isn't mangled. Both paths emit
+      // escaped HTML — never raw transcript text into v-html.
+      return markdown ? renderMarkdown(text) : `<pre>${escapeHtml(text)}</pre>`;
     },
 
+    // Returns { text, markdown }. markdown:false means a JSON.stringify dump was
+    // used somewhere (a content block or whole object had no extractable prose),
+    // so the caller must render it verbatim rather than as Markdown.
     streamContentText(content) {
-      if (content == null) return "";
-      if (typeof content === "string") return content;
+      if (content == null) return { text: "", markdown: true };
+      if (typeof content === "string") return { text: content, markdown: true };
       if (Array.isArray(content)) {
-        return content
+        let markdown = true;
+        const text = content
           .map((part) => {
             if (typeof part === "string") return part;
-            return (
-              part.text ??
-              part.content ??
-              part.name ??
-              part.type ??
-              JSON.stringify(part)
-            );
+            const extracted =
+              part.text ?? part.content ?? part.name ?? part.type;
+            if (extracted != null) return extracted;
+            markdown = false;
+            return JSON.stringify(part);
           })
           .filter(Boolean)
           .join("\n");
+        return { text, markdown };
       }
       if (typeof content === "object") {
-        return (
-          content.text ?? content.content ?? JSON.stringify(content, null, 2)
-        );
+        const extracted = content.text ?? content.content;
+        if (extracted != null) return { text: extracted, markdown: true };
+        return { text: JSON.stringify(content, null, 2), markdown: false };
       }
-      return String(content);
+      return { text: String(content), markdown: true };
     },
 
     lockPageScroll() {

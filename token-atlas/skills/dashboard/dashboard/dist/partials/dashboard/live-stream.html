@@ -32,7 +32,11 @@
       {{ streamError }}
     </p>
 
-    <div class="live-stream-body" ref="liveStreamBody">
+    <div
+      class="live-stream-body"
+      ref="liveStreamBody"
+      @scroll="handleStreamScroll"
+    >
       <div v-if="!streamEntries.length" class="live-stream-empty">
         Waiting for transcript entries.
       </div>
