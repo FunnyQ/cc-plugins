@@ -396,6 +396,44 @@
   text-underline-offset: 0.18em;
 }
 
+.live-entry-content > .live-seg {
+  margin-block: 0 var(--s-8);
+}
+
+.live-seg-label {
+  margin-block-end: var(--s-4);
+  color: var(--entry-accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.live-entry-content .live-seg-code.is-error {
+  border-color: color-mix(in oklch, var(--danger) 44%, var(--edge-soft));
+  background: color-mix(in oklch, var(--danger) 8%, transparent);
+}
+
+details.live-seg > summary {
+  cursor: pointer;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface-well) 72%, transparent);
+  padding: var(--s-6) var(--s-8);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+details.live-seg > summary:hover {
+  color: var(--text);
+}
+
+details.live-seg[open] > summary {
+  margin-block-end: var(--s-6);
+}
+
 .live-stream-note {
   color: var(--text-faint);
   font-size: var(--fs-xs);
