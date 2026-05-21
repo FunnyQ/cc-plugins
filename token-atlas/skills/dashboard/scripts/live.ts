@@ -35,12 +35,21 @@ const MAX_BACKLOG_READ_BYTES = 2 * 1024 * 1024;
 const HEARTBEAT_MS = 10_000;
 const RESOLVE_POLL_MS = 2_000;
 const TRANSCRIPT_INDEX_TTL_MS = 5_000;
-// Subagent `progress` records have no message body and would render as an opaque
-// JSON blob in the modal, so they're dropped at the source. Everything else
-// (user / assistant / tool / tool_result / system) passes through per the stream
-// contract — this is a denylist, not an allowlist, so no conversation type is
-// accidentally excluded.
-const SKIP_ENTRY_TYPES = new Set(["progress"]);
+// Only conversation entries are streamed. Tool calls/results live inside the
+// content of `user`/`assistant` entries, so this allowlist still carries them.
+// Everything excluded is session-metadata bookkeeping (progress, file-history-
+// snapshot, queue-operation, last-prompt, ai-title, agent-name, permission-mode,
+// pr-link, …) — not conversation, and it repeats in the file, which otherwise
+// piles up duplicate noise in the modal. An allowlist is used (not a denylist)
+// because new metadata types keep appearing; conversation types do not.
+const DISPLAY_ENTRY_TYPES = new Set([
+  "user",
+  "assistant",
+  "system",
+  "tool",
+  "tool_use",
+  "tool_result",
+]);
 const WATCH_DEBOUNCE_MS = 80;
 
 type ClaudeSessionFile = {
@@ -208,7 +217,7 @@ function parseEntries(lines: string[]): object[] {
     } catch {
       continue; // skip malformed / partially-written JSONL entries
     }
-    if (!entry || SKIP_ENTRY_TYPES.has(entry.type ?? "")) continue;
+    if (!entry || !DISPLAY_ENTRY_TYPES.has(entry.type ?? "")) continue;
     out.push(entry);
   }
   return out;

@@ -1303,6 +1303,7 @@ export function App() {
           const entry = this.tagStreamEntry(payload.entry ?? payload);
           if (!entry) return;
           this.streamEntries.push(entry);
+          this.reconcileToolResults();
           this.$nextTick(() => this.scheduleStreamScroll(shouldScroll));
         } catch {
           // Ignore unparseable stream frames.
@@ -1362,10 +1363,13 @@ export function App() {
     // fallback keeps id-less entries always unique.
     tagStreamEntry(entry) {
       if (!entry || typeof entry !== "object") return entry;
-      const key =
-        entry.requestId && entry.message?.id
-          ? `${entry.requestId}:${entry.message.id}`
-          : (entry.uuid ?? `pos:${this.streamKeySeq + 1}`);
+      // Dedup on uuid only: each transcript line has a unique one, and a
+      // reconnect resends the same uuids. Do NOT key on requestId:messageId —
+      // Claude persists the thinking / text / tool_use of one response as
+      // separate lines that SHARE requestId:messageId, so that key would drop
+      // the text (the actual reply) and tool_use, leaving only the thinking.
+      // Positional fallback keeps id-less lines unique.
+      const key = entry.uuid ?? `pos:${this.streamKeySeq + 1}`;
       if (this.streamSeenEntries[key]) return null;
       this.streamSeenEntries[key] = true;
       entry.__key = ++this.streamKeySeq;
@@ -1427,6 +1431,7 @@ export function App() {
           .map((e) => this.tagStreamEntry(e))
           .filter(Boolean);
         if (older.length) this.streamEntries.unshift(...older);
+        this.reconcileToolResults();
         this.streamHistoryStart = data.historyStart ?? 0;
         this.streamHasMore = !!data.hasMore;
         await this.$nextTick();
@@ -1470,13 +1475,38 @@ export function App() {
     // (long ones collapsed). Computing once also avoids re-rendering Markdown for
     // every entry on each reactive update.
     buildEntryHtml(entry) {
+      const results = entry.__toolResults || {};
       return this.streamEntrySegments(entry)
-        .map((seg) => this.renderStreamSegment(seg))
+        .map((seg) => {
+          let html = this.renderStreamSegment(seg);
+          // A tool_use renders with its paired result right below it once the
+          // result arrives — a terminal-style call/output block.
+          if (seg.toolUseId && results[seg.toolUseId]) {
+            html += this.renderStreamSegment(
+              this.resultSegment(results[seg.toolUseId]),
+            );
+          }
+          return html;
+        })
         .join("");
     },
 
+    resultSegment(part) {
+      return {
+        kind: "code",
+        label: part.is_error ? "⚠ result (error)" : "↳ result",
+        error: !!part.is_error,
+        text: this.segText(part.content),
+      };
+    },
+
     renderStreamSegment(seg) {
-      if (seg.kind === "markdown") return renderMarkdown(seg.text);
+      if (seg.kind === "markdown") {
+        const body = renderMarkdown(seg.text);
+        if (!seg.label) return body;
+        const cls = seg.note ? "live-seg live-seg--note" : "live-seg";
+        return `<div class="${cls}"><div class="live-seg-label">${escapeHtml(seg.label)}</div>${body}</div>`;
+      }
       const text = seg.text ?? "";
       const cls = seg.error ? "live-seg-code is-error" : "live-seg-code";
       const pre = `<pre class="${cls}">${escapeHtml(text)}</pre>`;
@@ -1528,7 +1558,12 @@ export function App() {
         if (part.type === "text" && part.text?.trim()) {
           out.push({ kind: "markdown", text: part.text });
         } else if (part.type === "thinking" && part.thinking?.trim()) {
-          out.push({ kind: "markdown", text: part.thinking });
+          out.push({
+            kind: "markdown",
+            text: part.thinking,
+            label: "💭 thinking",
+            note: true,
+          });
         } else if (part.type === "tool_use") {
           const input =
             typeof part.input === "string"
@@ -1538,14 +1573,10 @@ export function App() {
             kind: "code",
             label: `🔧 ${part.name ?? "tool"}`,
             text: input,
+            toolUseId: part.id,
           });
         } else if (part.type === "tool_result") {
-          out.push({
-            kind: "code",
-            label: part.is_error ? "⚠ result (error)" : "result",
-            error: !!part.is_error,
-            text: this.segText(part.content),
-          });
+          out.push(this.resultSegment(part));
         } else if (part.type === "image") {
           out.push({ kind: "code", text: "[image]" });
         } else {
@@ -1576,6 +1607,59 @@ export function App() {
         return value.text ?? value.content ?? JSON.stringify(value, null, 2);
       }
       return String(value);
+    },
+
+    // The tool_result blocks of a pure tool-result entry (every block is a
+    // tool_result). Mixed entries (real user text + a result) are left alone.
+    streamEntryToolResults(entry) {
+      const content = entry?.message?.content;
+      if (!Array.isArray(content) || !content.length) return [];
+      const results = content.filter((b) => b && b.type === "tool_result");
+      if (!results.length || results.length !== content.length) return [];
+      return results;
+    },
+
+    // Merge each pure tool-result entry into the entry that holds the matching
+    // tool_use (linked by tool_use_id) so a call and its output render as one
+    // terminal-style block — and the standalone result entry (a misleading
+    // "user" bubble) disappears. Runs after live append and history paging;
+    // orphan results whose tool_use isn't loaded stay standalone until it is.
+    reconcileToolResults() {
+      const toolUseEntry = {};
+      for (const e of this.streamEntries) {
+        const content = e?.message?.content;
+        if (!Array.isArray(content)) continue;
+        for (const b of content) {
+          if (b && b.type === "tool_use" && b.id) toolUseEntry[b.id] = e;
+        }
+      }
+      const remove = new Set();
+      for (const e of this.streamEntries) {
+        const results = this.streamEntryToolResults(e);
+        if (!results.length) continue;
+        if (!results.every((r) => toolUseEntry[r.tool_use_id])) continue;
+        for (const r of results) {
+          const target = toolUseEntry[r.tool_use_id];
+          target.__toolResults = {
+            ...(target.__toolResults || {}),
+            [r.tool_use_id]: r,
+          };
+          target.__html = this.buildEntryHtml(target);
+        }
+        remove.add(e.__key);
+      }
+      if (remove.size) {
+        this.streamEntries = this.streamEntries.filter(
+          (e) => !remove.has(e.__key),
+        );
+      }
+    },
+
+    // Display label for an entry's role. A pure tool-result entry that couldn't
+    // be merged (its tool_use isn't loaded) shows "tool result", not "user".
+    streamEntryRole(entry) {
+      if (this.streamEntryToolResults(entry).length) return "tool result";
+      return entry.type || "unknown";
     },
 
     lockPageScroll() {
