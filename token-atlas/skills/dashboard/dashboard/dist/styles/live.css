@@ -316,7 +316,7 @@
 
 .live-entry.is-user .live-entry-content,
 .live-entry.is-message .live-entry-content,
-.live-entry.is-assistant .live-entry-content {
+.live-entry.is-assistant:not(.has-tool-segments) .live-entry-content {
   width: fit-content;
   max-width: min(76ch, 100%);
   border: 1px solid
@@ -326,7 +326,7 @@
   padding: var(--s-10) var(--s-12);
 }
 
-.live-entry.is-assistant .live-entry-content {
+.live-entry.is-assistant:not(.has-tool-segments) .live-entry-content {
   background: color-mix(in oklch, var(--surface) 88%, var(--surface-well));
 }
 
@@ -335,7 +335,8 @@
 .live-entry.is-tool-use,
 .live-entry.is-tool-result,
 .live-entry.is-function_call,
-.live-entry.is-function_call_output {
+.live-entry.is-function_call_output,
+.live-entry.has-tool-segments {
   --entry-accent: var(--sunrise-amber);
 
   margin-block: var(--s-8);
