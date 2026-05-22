@@ -267,7 +267,10 @@
   align-content: start;
   gap: 0;
   min-height: 0;
+  min-width: 0;
+  min-inline-size: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   border: 1px solid var(--edge-soft);
   border-radius: var(--radius-sm);
@@ -296,6 +299,9 @@
   gap: var(--s-12);
   align-items: start;
   min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
   border-block-start: 1px solid
     color-mix(in oklch, var(--entry-accent) 16%, var(--edge-soft));
   padding: var(--s-12) var(--s-4);
@@ -368,7 +374,10 @@
 }
 
 .live-entry-content {
+  inline-size: 100%;
   min-width: 0;
+  min-inline-size: 0;
+  max-inline-size: 100%;
   margin: 0;
   color: var(--text);
   font-size: var(--fs-lg);
@@ -508,17 +517,31 @@
 .live-file-change {
   display: grid;
   gap: var(--s-8);
+  inline-size: 100%;
   min-width: 0;
+  min-inline-size: 0;
   max-width: 100%;
+  max-inline-size: 100%;
+  overflow: hidden;
 }
 
 .live-file-change > summary {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .live-file-path {
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
   overflow: hidden;
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -528,8 +551,12 @@
 }
 
 .live-diff {
+  box-sizing: border-box;
+  inline-size: 100%;
   min-width: 0;
+  min-inline-size: 0;
   max-width: 100%;
+  max-inline-size: 100%;
   margin: 0;
   overflow-x: auto;
   border: 1px solid var(--edge-soft);
@@ -544,12 +571,15 @@
 
 .live-diff span {
   display: block;
-  min-width: max-content;
+  width: max-content;
+  min-width: 100%;
   white-space: pre;
 }
 
 .live-diff .is-blank {
-  line-height: 0.45;
+  min-height: 0.3rem;
+  font-size: 0;
+  line-height: 0.3rem;
 }
 
 .live-diff .is-add {
@@ -568,6 +598,10 @@
 }
 
 .live-entry-content > .live-seg {
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
   margin-block: 0 var(--s-8);
 }
 
