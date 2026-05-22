@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.1] - 2026-05-22
+
+### 🐛 Bug Fixes
+
+- **Version sync**: Bumped the plugin manifest (`plugin.json`) to match the marketplace version, which was missed in the 2.3.0 release so the marketplace and the installed plugin reported different versions.
+
+### 📝 Documentation
+
+- Updated the README and project guide to reflect Codex live sessions, GFM Markdown rendering, syntax highlighting, and inline file diffs, and documented that both version files must be bumped together on release.
+
 ## [2.3.0] - 2026-05-22
 
 ### ✨ New Features
