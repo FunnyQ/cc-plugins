@@ -1535,12 +1535,6 @@ export function App() {
           ? segs
           : [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
       }
-      if (entry?.type === "event_msg") {
-        const segs = this.codexPayloadSegments(entry.payload);
-        return segs.length
-          ? segs
-          : [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
-      }
       const content = entry?.message?.content ?? entry?.content ?? entry?.text;
       const segs = this.contentSegments(content);
       if (segs.length) return segs;
@@ -1563,8 +1557,10 @@ export function App() {
         return [
           {
             kind: "code",
-            label: `tool · ${payload.name ?? "function_call"}`,
-            text: payload.arguments ?? JSON.stringify(payload, null, 2),
+            label: payload.name ?? "tool",
+            text: this.prettyJsonText(
+              payload.arguments ?? JSON.stringify(payload, null, 2),
+            ),
             toolUseId: payload.call_id,
           },
         ];
@@ -1578,16 +1574,19 @@ export function App() {
           },
         ];
       }
-      if (payload.type === "agent_message" && payload.message?.trim()) {
-        return [{ kind: "markdown", text: payload.message }];
-      }
-      if (payload.type === "user_message" && payload.message?.trim()) {
-        return [{ kind: "markdown", text: payload.message }];
-      }
-      if (payload.type === "task_complete" && payload.last_agent_message) {
-        return [{ kind: "markdown", text: payload.last_agent_message }];
-      }
       return [];
+    },
+
+    prettyJsonText(value) {
+      if (typeof value !== "string") return this.segText(value);
+      const trimmed = value.trim();
+      if (!trimmed) return "";
+      if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return value;
+      try {
+        return JSON.stringify(JSON.parse(trimmed), null, 2);
+      } catch {
+        return value;
+      }
     },
 
     contentSegments(content) {
@@ -1725,12 +1724,12 @@ export function App() {
         if (entry.payload?.type === "function_call_output")
           return "tool result";
       }
-      if (entry?.type === "event_msg") {
-        if (entry.payload?.type === "user_message") return "user";
-        if (entry.payload?.type === "agent_message") return "assistant";
-        if (entry.payload?.type === "task_complete") return "complete";
-      }
       return entry.type || "unknown";
+    },
+
+    liveEntryClass(entry) {
+      const role = this.streamEntryRole(entry).replace(/\s+/g, "-");
+      return `live-entry is-${role}`;
     },
 
     lockPageScroll() {
