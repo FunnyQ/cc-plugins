@@ -131,7 +131,9 @@ function renderDiffText(text) {
     .split("\n")
     .map((line) => {
       const cls = diffLineClass(line);
-      const classAttr = cls ? ` class="${cls}"` : "";
+      const blankClass = line.trim() ? "" : "is-blank";
+      const classes = [cls, blankClass].filter(Boolean).join(" ");
+      const classAttr = classes ? ` class="${classes}"` : "";
       return `<span${classAttr}>${escapeHtml(line || " ")}</span>`;
     })
     .join("\n");
