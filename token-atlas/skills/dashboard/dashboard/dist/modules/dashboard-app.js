@@ -1727,6 +1727,7 @@ export function App() {
     // be merged (its tool_use isn't loaded) shows "tool result", not "user".
     streamEntryRole(entry) {
       if (this.streamEntryToolResults(entry).length) return "tool result";
+      if (this.streamEntryHasToolSegments(entry)) return "tool";
       if (entry?.type === "response_item") {
         if (entry.payload?.type === "message")
           return entry.payload.role || "message";
@@ -1737,9 +1738,21 @@ export function App() {
       return entry.type || "unknown";
     },
 
+    streamEntryHasToolSegments(entry) {
+      if (entry?.payload?.type === "function_call") return true;
+      const content = entry?.message?.content;
+      return (
+        Array.isArray(content) &&
+        content.some((b) => b && b.type === "tool_use")
+      );
+    },
+
     liveEntryClass(entry) {
       const role = this.streamEntryRole(entry).replace(/\s+/g, "-");
-      return `live-entry is-${role}`;
+      const toolClass = this.streamEntryHasToolSegments(entry)
+        ? " has-tool-segments"
+        : "";
+      return `live-entry is-${role}${toolClass}`;
     },
 
     lockPageScroll() {
