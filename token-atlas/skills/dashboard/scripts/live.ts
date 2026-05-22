@@ -62,7 +62,6 @@ const DISPLAY_ENTRY_TYPES = new Set([
   "tool_use",
   "tool_result",
   "response_item",
-  "event_msg",
 ]);
 const WATCH_DEBOUNCE_MS = 80;
 
@@ -348,17 +347,6 @@ function parseEntries(lines: string[]): object[] {
         payloadType !== "message" &&
         payloadType !== "function_call" &&
         payloadType !== "function_call_output"
-      ) {
-        continue;
-      }
-    }
-    if (entry.type === "event_msg") {
-      const payloadType = (entry as { payload?: { type?: string } }).payload
-        ?.type;
-      if (
-        payloadType !== "user_message" &&
-        payloadType !== "agent_message" &&
-        payloadType !== "task_complete"
       ) {
         continue;
       }
