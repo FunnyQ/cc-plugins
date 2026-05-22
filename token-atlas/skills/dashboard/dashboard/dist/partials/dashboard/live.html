@@ -6,7 +6,7 @@
   <header class="live-head">
     <div>
       <h2>Live now</h2>
-      <span class="muted">Claude sessions</span>
+      <span class="muted">Claude and Codex sessions</span>
     </div>
     <span class="live-count">{{ liveSessions.length }} active</span>
   </header>
@@ -29,7 +29,10 @@
         aria-hidden="true"
       ></span>
       <span class="live-main">
-        <span class="live-project">{{ s.projectName }}</span>
+        <span class="live-project-line">
+          <span :class="providerBadgeClass(s.provider)">{{ s.provider }}</span>
+          <span class="live-project">{{ s.projectName }}</span>
+        </span>
         <span class="live-path">{{ s.cwd }}</span>
       </span>
       <span class="live-status-label">{{ s.status }}</span>
