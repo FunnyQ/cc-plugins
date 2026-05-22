@@ -28,8 +28,9 @@ import {
   saveStoredTheme,
   shortModel,
 } from "./dashboard-utils.js";
-import { marked } from "/vendor/marked.esm.js";
-import DOMPurify from "/vendor/purify.es.mjs";
+import { marked } from "../vendor/marked.esm.js";
+import DOMPurify from "../vendor/purify.es.mjs";
+import hljs from "../vendor/highlight.esm.js";
 
 // Chart instances stay outside reactive scope because petite-vue 0.4 deep-reactivates
 // any object property, but Chart.js stores Maps internally which crashes its
@@ -142,6 +143,32 @@ function renderDiffText(text) {
 // through DOMPurify before it reaches v-html.
 marked.setOptions({ gfm: true, breaks: false });
 
+// Syntax-highlight fenced code blocks with highlight.js. Use the declared
+// language when hljs knows it, else auto-detect. hljs output is escaped span
+// markup; sanitizeHtml() runs over it afterward (DOMPurify keeps the classes).
+marked.use({
+  renderer: {
+    code({ text, lang }) {
+      let highlighted;
+      let cls;
+      try {
+        if (lang && hljs.getLanguage(lang)) {
+          highlighted = hljs.highlight(text, { language: lang }).value;
+          cls = `hljs language-${lang}`;
+        } else {
+          const auto = hljs.highlightAuto(text);
+          highlighted = auto.value;
+          cls = auto.language ? `hljs language-${auto.language}` : "hljs";
+        }
+      } catch {
+        highlighted = escapeHtml(text);
+        cls = "hljs";
+      }
+      return `<pre><code class="${cls}">${highlighted}</code></pre>`;
+    },
+  },
+});
+
 // marked's default renderer leaves links in-place; force new-tab + safe rel.
 // Runs after attribute sanitization so the added attrs survive.
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -169,6 +196,161 @@ function renderMarkdown(text) {
   } catch {
     return escapeHtml(text);
   }
+}
+
+// Highlight raw code-segment text (tool input/result) when it is confirmed
+// JSON — tool inputs are essentially always JSON. Returns null otherwise, so
+// plain stdout stays plain (highlightAuto mis-detects prose, so we don't use
+// it here). hljs output is escaped span markup, safe to embed directly.
+function highlightCode(text) {
+  const trimmed = String(text).trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      JSON.parse(trimmed);
+      return hljs.highlight(String(text), { language: "json" }).value;
+    } catch {
+      /* not valid JSON — leave plain */
+    }
+  }
+  return null;
+}
+
+// File extension → hljs language. Used to highlight Read results by their path.
+const EXT_TO_LANG = {
+  ts: "typescript",
+  tsx: "typescript",
+  mts: "typescript",
+  cts: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  json: "json",
+  jsonc: "json",
+  css: "css",
+  scss: "scss",
+  sass: "scss",
+  less: "less",
+  html: "xml",
+  htm: "xml",
+  xml: "xml",
+  svg: "xml",
+  vue: "xml",
+  py: "python",
+  rb: "ruby",
+  go: "go",
+  rs: "rust",
+  java: "java",
+  kt: "kotlin",
+  swift: "swift",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  cc: "cpp",
+  hpp: "cpp",
+  cs: "csharp",
+  php: "php",
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
+  yml: "yaml",
+  yaml: "yaml",
+  toml: "ini",
+  ini: "ini",
+  md: "markdown",
+  markdown: "markdown",
+  sql: "sql",
+  lua: "lua",
+  r: "r",
+  pl: "perl",
+};
+
+function langForPath(p) {
+  if (typeof p !== "string") return null;
+  const base = (p.split("/").pop() || "").toLowerCase();
+  if (base === "dockerfile")
+    return hljs.getLanguage("dockerfile") ? "dockerfile" : null;
+  const ext = base.includes(".") ? base.split(".").pop() : "";
+  const lang = EXT_TO_LANG[ext];
+  return lang && hljs.getLanguage(lang) ? lang : null;
+}
+
+function parseJsonObject(value) {
+  if (!value || typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function firstCommandPath(cmd) {
+  if (typeof cmd !== "string") return "";
+  const patterns = [
+    /\bnl\s+(?:-[^\s]+\s+)*['"]?([^'"\s|;]+)['"]?/,
+    /\bcat\s+(?:-[^\s]+\s+)*['"]?([^'"\s|;]+)['"]?/,
+    /\bsed\s+(?:-[^\s]+\s+)*['"][^'"]+['"]\s+['"]?([^'"\s|;]+)['"]?/,
+  ];
+  for (const pattern of patterns) {
+    const match = cmd.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return "";
+}
+
+function commandResultOutput(text) {
+  const output = String(text).match(/\nOutput:\n([\s\S]*)$/);
+  if (!output) return String(text);
+  return output[1].replace(/\n\^C$/, "");
+}
+
+// Render a cat -n (line-numbered) Read result as a gutter column of numbers
+// beside one highlighted code block. Highlighting the whole body in a single
+// pass keeps multi-line spans (block comments, template strings) intact; the
+// numbers live in a separate <pre> so they never enter the highlighter.
+// Returns null when the text isn't line-numbered file content.
+function renderFileResult(text, lang) {
+  if (!lang || !hljs.getLanguage(lang)) return null;
+  const body = commandResultOutput(text);
+  const lines = body.split("\n");
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  if (!lines.length) return null;
+  const nums = [];
+  const code = [];
+  let numbered = 0;
+  for (const line of lines) {
+    const tab = line.indexOf("\t");
+    const head = tab >= 0 ? line.slice(0, tab) : "";
+    if (tab >= 0 && /^\s*\d+$/.test(head)) {
+      nums.push(head.trim());
+      code.push(line.slice(tab + 1));
+      numbered++;
+    } else {
+      nums.push("");
+      code.push(line);
+    }
+  }
+  if (numbered < lines.length * 0.6) {
+    try {
+      const highlighted = hljs.highlight(body, { language: lang }).value;
+      return `<pre class="live-seg-code hljs">${highlighted}</pre>`;
+    } catch {
+      return null;
+    }
+  }
+  let highlighted;
+  try {
+    highlighted = hljs.highlight(code.join("\n"), { language: lang }).value;
+  } catch {
+    return null;
+  }
+  return (
+    '<div class="live-code">' +
+    `<pre class="live-code-gutter" aria-hidden="true">${escapeHtml(nums.join("\n"))}</pre>` +
+    `<pre class="live-code-body hljs">${highlighted}</pre>` +
+    "</div>"
+  );
 }
 
 export function App() {
@@ -1490,7 +1672,7 @@ export function App() {
           // result arrives — a terminal-style call/output block.
           if (seg.toolUseId && results[seg.toolUseId]) {
             html += this.renderStreamSegment(
-              this.resultSegment(results[seg.toolUseId]),
+              this.resultSegment(results[seg.toolUseId], seg.resultLang),
             );
           }
           return html;
@@ -1498,12 +1680,13 @@ export function App() {
         .join("");
     },
 
-    resultSegment(part) {
+    resultSegment(part, lang) {
       return {
         kind: "code",
         label: part.is_error ? "⚠ result (error)" : "↳ result",
         error: !!part.is_error,
         text: this.segText(part.content),
+        fileLang: part.is_error ? null : (lang ?? null),
       };
     },
 
@@ -1567,7 +1750,17 @@ export function App() {
       }
       const text = seg.text ?? "";
       const cls = seg.error ? "live-seg-code is-error" : "live-seg-code";
-      const pre = `<pre class="${cls}">${escapeHtml(text)}</pre>`;
+      const fileHtml = seg.fileLang
+        ? renderFileResult(text, seg.fileLang)
+        : null;
+      let pre;
+      if (fileHtml) {
+        pre = fileHtml;
+      } else {
+        const highlighted = highlightCode(text);
+        const preCls = highlighted ? `${cls} hljs` : cls;
+        pre = `<pre class="${preCls}">${highlighted ?? escapeHtml(text)}</pre>`;
+      }
       const lineCount = text ? text.split("\n").length : 0;
       if (seg.label || lineCount > STREAM_COLLAPSE_LINES) {
         const summary = `${escapeHtml(seg.label || "output")} · ${lineCount} lines`;
@@ -1607,16 +1800,22 @@ export function App() {
       if (payload.type === "custom_tool_call") {
         const patch = this.patchSegment(payload.name, payload.input);
         if (patch) return [patch];
+        const args =
+          typeof payload.input === "string"
+            ? parseJsonObject(payload.input)
+            : null;
         return [
           {
             kind: "code",
             label: payload.name ?? "tool",
             text: this.segText(payload.input ?? payload),
             toolUseId: payload.call_id,
+            resultLang: this.codexResultLang(payload.name, args),
           },
         ];
       }
       if (payload.type === "function_call") {
+        const args = parseJsonObject(payload.arguments);
         return [
           {
             kind: "code",
@@ -1625,6 +1824,7 @@ export function App() {
               payload.arguments ?? JSON.stringify(payload, null, 2),
             ),
             toolUseId: payload.call_id,
+            resultLang: this.codexResultLang(payload.name, args),
           },
         ];
       }
@@ -1636,6 +1836,14 @@ export function App() {
         ];
       }
       return [];
+    },
+
+    codexResultLang(name, args) {
+      if (!args || typeof args !== "object") return null;
+      if (name === "exec_command") {
+        return langForPath(firstCommandPath(args.cmd));
+      }
+      return langForPath(args.file_path ?? args.path ?? args.filename);
     },
 
     patchSegment(name, input) {
@@ -1718,6 +1926,8 @@ export function App() {
             label: `🔧 ${part.name ?? "tool"}`,
             text: input,
             toolUseId: part.id,
+            resultLang:
+              part.name === "Read" ? langForPath(part.input?.file_path) : null,
           });
         } else if (part.type === "tool_result") {
           out.push(this.resultSegment(part));
