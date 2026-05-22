@@ -1817,6 +1817,30 @@ export function App() {
       return out;
     },
 
+    // Interleaved line diff: shared leading/trailing lines become context
+    // lines (" "-prefixed), only the changed middle gets -/+. Mirrors the
+    // Codex apply_patch diff shape so both providers render alike.
+    unifiedLineDiff(oldText, newText) {
+      const a = String(oldText ?? "").split("\n");
+      const b = String(newText ?? "").split("\n");
+      const maxLead = Math.min(a.length, b.length);
+      let head = 0;
+      while (head < maxLead && a[head] === b[head]) head++;
+      let tail = 0;
+      while (
+        tail < maxLead - head &&
+        a[a.length - 1 - tail] === b[b.length - 1 - tail]
+      ) {
+        tail++;
+      }
+      const out = [];
+      for (let i = 0; i < head; i++) out.push(` ${a[i]}`);
+      for (let i = head; i < a.length - tail; i++) out.push(`-${a[i]}`);
+      for (let i = head; i < b.length - tail; i++) out.push(`+${b[i]}`);
+      for (let i = a.length - tail; i < a.length; i++) out.push(` ${a[i]}`);
+      return out;
+    },
+
     claudeFileChangeSegment(part) {
       const name = part?.name;
       const input = part?.input;
@@ -1831,12 +1855,7 @@ export function App() {
             `--- ${filePath || "before"}`,
             `+++ ${filePath || "after"}`,
             "@@",
-            ...String(input.old_string ?? "")
-              .split("\n")
-              .map((line) => `-${line}`),
-            ...String(input.new_string ?? "")
-              .split("\n")
-              .map((line) => `+${line}`),
+            ...this.unifiedLineDiff(input.old_string, input.new_string),
           ].join("\n"),
           toolUseId: part.id,
         };
@@ -1848,16 +1867,7 @@ export function App() {
         ];
         for (const edit of input.edits) {
           lines.push("@@");
-          lines.push(
-            ...String(edit.old_string ?? "")
-              .split("\n")
-              .map((line) => `-${line}`),
-          );
-          lines.push(
-            ...String(edit.new_string ?? "")
-              .split("\n")
-              .map((line) => `+${line}`),
-          );
+          lines.push(...this.unifiedLineDiff(edit.old_string, edit.new_string));
         }
         return {
           kind: "file-change",
