@@ -1637,7 +1637,7 @@ export function App() {
           ? `<div class="live-file-path">${escapeHtml(seg.filePath)}</div>`
           : "";
         return [
-          '<details class="live-seg live-file-change">',
+          '<details class="live-seg live-file-change" open>',
           `<summary>${summary}</summary>`,
           path,
           `<pre class="live-diff">${renderDiffText(seg.diffText)}</pre>`,
