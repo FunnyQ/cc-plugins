@@ -314,6 +314,22 @@
   --entry-accent: var(--positive);
 }
 
+.live-entry.is-user .live-entry-content,
+.live-entry.is-message .live-entry-content,
+.live-entry.is-assistant .live-entry-content {
+  width: fit-content;
+  max-width: min(76ch, 100%);
+  border: 1px solid
+    color-mix(in oklch, var(--entry-accent) 24%, var(--edge-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--entry-accent) 7%, var(--surface));
+  padding: var(--s-10) var(--s-12);
+}
+
+.live-entry.is-assistant .live-entry-content {
+  background: color-mix(in oklch, var(--surface) 88%, var(--surface-well));
+}
+
 .live-entry.is-tool,
 .live-entry.is-tool_result,
 .live-entry.is-tool-use,
@@ -342,7 +358,7 @@
   background: color-mix(in oklch, var(--entry-accent) 8%, transparent);
   padding: 1px var(--s-8);
   color: color-mix(in oklch, var(--entry-accent) 62%, var(--text-muted));
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: 740;
   letter-spacing: 0.04em;
   line-height: 1.45;
@@ -354,7 +370,7 @@
   min-width: 0;
   margin: 0;
   color: var(--text);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   line-height: 1.5;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -386,7 +402,7 @@
 .live-entry-content h5 {
   margin-block: 0 var(--s-6);
   color: var(--text);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   line-height: 1.25;
 }
 
@@ -400,6 +416,7 @@
 .live-entry-content pre,
 .live-entry-content code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-lg);
 }
 
 .live-entry-content pre {
@@ -432,7 +449,7 @@
 .live-seg-label {
   margin-block-end: var(--s-4);
   color: var(--entry-accent);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -457,7 +474,7 @@ details.live-seg > summary {
   background: color-mix(in oklch, var(--surface) 74%, var(--surface-well));
   padding: var(--s-6) var(--s-8);
   color: var(--text-muted);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.02em;
   user-select: none;
