@@ -244,12 +244,11 @@ export function isInsideCodexSessions(filePath: string): boolean {
 }
 
 function statusRank(status: string): number {
-  if (status === "waiting") return 0;
-  if (status === "busy") return 1;
-  if (status === "idle") return 2;
-  if (status === "active-inferred") return 3;
-  if (status === "recent") return 4;
-  return 3;
+  if (status === "busy" || status === "active-inferred") return 0;
+  if (status === "waiting") return 1;
+  if (status === "recent") return 2;
+  if (status === "idle") return 3;
+  return 4;
 }
 
 export function getLiveSessions(): LiveSession[] {
@@ -469,10 +468,17 @@ export function streamTranscript(
     return jsonResponse({ error: "invalid session id" }, 400);
   }
 
-  let initialPath = resolveProviderTranscriptPath(provider, sessionId);
-  if (initialPath && existsSync(initialPath)) {
-    initialPath = realpathSync(initialPath);
-    if (!isInsideProviderRoot(provider, initialPath)) {
+  let initialPath: string | undefined = resolveProviderTranscriptPath(
+    provider,
+    sessionId,
+  );
+  if (initialPath) {
+    try {
+      initialPath = realpathSync(initialPath);
+    } catch {
+      initialPath = undefined;
+    }
+    if (initialPath && !isInsideProviderRoot(provider, initialPath)) {
       return jsonResponse(
         { error: `transcript path is outside ${providerRootName(provider)}` },
         403,
@@ -577,7 +583,11 @@ export function streamTranscript(
     if (closed || watcher) return;
     filePath = resolvedPath;
     readBacklog(controller);
-    watcher = watch(filePath, () => scheduleTail(controller));
+    try {
+      watcher = watch(filePath, () => scheduleTail(controller));
+    } catch {
+      filePath = undefined;
+    }
   }
 
   const stream = new ReadableStream({
