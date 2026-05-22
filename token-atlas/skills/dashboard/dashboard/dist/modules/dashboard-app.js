@@ -136,7 +136,7 @@ function renderDiffText(text) {
       const classAttr = classes ? ` class="${classes}"` : "";
       return `<span${classAttr}>${escapeHtml(line || " ")}</span>`;
     })
-    .join("\n");
+    .join("");
 }
 
 function renderInlineMarkdown(text) {
