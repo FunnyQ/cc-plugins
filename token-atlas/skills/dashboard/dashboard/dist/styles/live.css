@@ -505,6 +505,54 @@
   white-space: pre;
 }
 
+.live-file-change {
+  display: grid;
+  gap: var(--s-8);
+}
+
+.live-file-path {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-diff {
+  margin: 0;
+  overflow-x: auto;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface) 82%, var(--surface-well));
+  padding: var(--s-8) var(--s-10);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-lg);
+  line-height: 1.45;
+}
+
+.live-diff span {
+  display: block;
+  min-width: max-content;
+  white-space: pre;
+}
+
+.live-diff .is-add {
+  background: color-mix(in oklch, var(--positive) 12%, transparent);
+  color: color-mix(in oklch, var(--positive) 74%, var(--text));
+}
+
+.live-diff .is-remove {
+  background: color-mix(in oklch, var(--danger) 10%, transparent);
+  color: color-mix(in oklch, var(--danger) 72%, var(--text));
+}
+
+.live-diff .is-hunk,
+.live-diff .is-meta {
+  color: var(--text-faint);
+}
+
 .live-entry-content > .live-seg {
   margin-block: 0 var(--s-8);
 }
