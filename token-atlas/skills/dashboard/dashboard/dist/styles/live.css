@@ -659,6 +659,7 @@
 
 .live-file-change {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s-8);
   inline-size: 100%;
   min-width: 0;
@@ -714,9 +715,8 @@
 
 .live-diff span {
   display: block;
-  width: max-content;
-  min-width: 100%;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .live-diff .is-blank {
