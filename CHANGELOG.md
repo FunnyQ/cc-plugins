@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.2] - 2026-05-22
+
+### 🐛 Bug Fixes
+
+- **Live diff wrapping**: Long lines in live file diffs now soft-wrap inside the diff block instead of clipping or overflowing the panel, so wide edits stay fully readable.
+
 ## [2.3.1] - 2026-05-22
 
 ### 🐛 Bug Fixes
