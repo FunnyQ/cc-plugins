@@ -28,6 +28,9 @@ import {
   saveStoredTheme,
   shortModel,
 } from "./dashboard-utils.js";
+import { marked } from "../vendor/marked.esm.js";
+import DOMPurify from "../vendor/purify.es.mjs";
+import hljs from "../vendor/highlight.esm.js";
 
 // Chart instances stay outside reactive scope because petite-vue 0.4 deep-reactivates
 // any object property, but Chart.js stores Maps internally which crashes its
@@ -50,125 +53,304 @@ function escapeHtml(value) {
   });
 }
 
-function escapeAttribute(value) {
-  return escapeHtml(value).replace(/`/g, "&#96;");
+function decodeXmlText(value) {
+  return String(value)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function readXmlTag(text, tag) {
+  const match = String(text).match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+  return match ? decodeXmlText(match[1].trim()) : "";
+}
+
+function parseTaskNotification(text) {
+  const raw = String(text).trim();
+  if (!raw.startsWith("<task-notification>")) return null;
+  const usage = readXmlTag(raw, "usage");
+  return {
+    status: readXmlTag(raw, "status") || "completed",
+    summary: readXmlTag(raw, "summary") || "Task completed",
+    result: readXmlTag(raw, "result"),
+    totalTokens: readXmlTag(usage, "total_tokens"),
+    toolUses: readXmlTag(usage, "tool_uses"),
+    durationMs: readXmlTag(usage, "duration_ms"),
+  };
+}
+
+function parseSubagentNotification(text) {
+  const raw = String(text).trim();
+  if (!raw.startsWith("<subagent_notification>")) return null;
+  const body = raw
+    .replace(/^<subagent_notification>/, "")
+    .replace(/<\/subagent_notification>$/, "")
+    .trim();
+  try {
+    const data = JSON.parse(body);
+    const status = data?.status ?? {};
+    const agentPath = data?.agent_path ?? Object.keys(status)[0] ?? "";
+    const completed =
+      status?.completed ?? (agentPath ? status?.[agentPath]?.completed : "");
+    return {
+      agentPath,
+      completed: typeof completed === "string" ? completed : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatDurationMs(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+}
+
+function diffLineClass(line) {
+  if (line.startsWith("+") && !line.startsWith("+++")) return "is-add";
+  if (line.startsWith("-") && !line.startsWith("---")) return "is-remove";
+  if (line.startsWith("@@")) return "is-hunk";
+  if (
+    line.startsWith("*** ") ||
+    line.startsWith("diff ") ||
+    line.startsWith("+++ ") ||
+    line.startsWith("--- ")
+  ) {
+    return "is-meta";
+  }
+  return "";
+}
+
+function renderDiffText(text) {
+  return String(text)
+    .split("\n")
+    .map((line) => {
+      const cls = diffLineClass(line);
+      const blankClass = line.trim() ? "" : "is-blank";
+      const classes = [cls, blankClass].filter(Boolean).join(" ");
+      const classAttr = classes ? ` class="${classes}"` : "";
+      return `<span${classAttr}>${escapeHtml(line || " ")}</span>`;
+    })
+    .join("");
+}
+
+// GFM on; breaks off (soft newlines fold into paragraphs, matching the prior
+// renderer). Content is arbitrary transcript text, so every parse is run
+// through DOMPurify before it reaches v-html.
+marked.setOptions({ gfm: true, breaks: false });
+
+// Syntax-highlight fenced code blocks with highlight.js. Use the declared
+// language when hljs knows it, else auto-detect. hljs output is escaped span
+// markup; sanitizeHtml() runs over it afterward (DOMPurify keeps the classes).
+marked.use({
+  renderer: {
+    code({ text, lang }) {
+      let highlighted;
+      let cls;
+      try {
+        if (lang && hljs.getLanguage(lang)) {
+          highlighted = hljs.highlight(text, { language: lang }).value;
+          cls = `hljs language-${lang}`;
+        } else {
+          const auto = hljs.highlightAuto(text);
+          highlighted = auto.value;
+          cls = auto.language ? `hljs language-${auto.language}` : "hljs";
+        }
+      } catch {
+        highlighted = escapeHtml(text);
+        cls = "hljs";
+      }
+      return `<pre><code class="${cls}">${highlighted}</code></pre>`;
+    },
+  },
+});
+
+// marked's default renderer leaves links in-place; force new-tab + safe rel.
+// Runs after attribute sanitization so the added attrs survive.
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A") {
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+  }
+});
+
+function sanitizeHtml(html) {
+  return DOMPurify.sanitize(String(html), { USE_PROFILES: { html: true } });
 }
 
 function renderInlineMarkdown(text) {
-  return escapeHtml(text)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
-    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
-    .replace(/_([^_\n]+)_/g, "<em>$1</em>")
-    .replace(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-      (_match, label, href) =>
-        `<a href="${escapeAttribute(href)}" target="_blank" rel="noreferrer">${label}</a>`,
-    );
+  try {
+    return sanitizeHtml(marked.parseInline(String(text)));
+  } catch {
+    return escapeHtml(text);
+  }
 }
 
-const MAX_QUOTE_DEPTH = 8;
-
-function renderMarkdown(text, depth = 0) {
-  const lines = String(text).replace(/\r\n/g, "\n").split("\n");
-  const html = [];
-  let paragraph = [];
-  let list = null;
-  let quote = [];
-  let code = null;
-
-  function flushParagraph() {
-    if (!paragraph.length) return;
-    html.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
-    paragraph = [];
+function renderMarkdown(text) {
+  try {
+    return sanitizeHtml(marked.parse(String(text)));
+  } catch {
+    return escapeHtml(text);
   }
+}
 
-  function flushList() {
-    if (!list) return;
-    html.push(`<${list.tag}>${list.items.join("")}</${list.tag}>`);
-    list = null;
+// Highlight raw code-segment text (tool input/result) when it is confirmed
+// JSON — tool inputs are essentially always JSON. Returns null otherwise, so
+// plain stdout stays plain (highlightAuto mis-detects prose, so we don't use
+// it here). hljs output is escaped span markup, safe to embed directly.
+function highlightCode(text) {
+  const trimmed = String(text).trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      JSON.parse(trimmed);
+      return hljs.highlight(String(text), { language: "json" }).value;
+    } catch {
+      /* not valid JSON — leave plain */
+    }
   }
+  return null;
+}
 
-  function flushQuote() {
-    if (!quote.length) return;
-    // Cap nesting so a line of thousands of `>` can't blow the stack; past the
-    // limit the remaining quote markers render as inline text.
-    const inner =
-      depth >= MAX_QUOTE_DEPTH
-        ? `<p>${renderInlineMarkdown(quote.join(" "))}</p>`
-        : renderMarkdown(quote.join("\n"), depth + 1);
-    html.push(`<blockquote>${inner}</blockquote>`);
-    quote = [];
+// File extension → hljs language. Used to highlight Read results by their path.
+const EXT_TO_LANG = {
+  ts: "typescript",
+  tsx: "typescript",
+  mts: "typescript",
+  cts: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  json: "json",
+  jsonc: "json",
+  css: "css",
+  scss: "scss",
+  sass: "scss",
+  less: "less",
+  html: "xml",
+  htm: "xml",
+  xml: "xml",
+  svg: "xml",
+  vue: "xml",
+  py: "python",
+  rb: "ruby",
+  go: "go",
+  rs: "rust",
+  java: "java",
+  kt: "kotlin",
+  swift: "swift",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  cc: "cpp",
+  hpp: "cpp",
+  cs: "csharp",
+  php: "php",
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
+  yml: "yaml",
+  yaml: "yaml",
+  toml: "ini",
+  ini: "ini",
+  md: "markdown",
+  markdown: "markdown",
+  sql: "sql",
+  lua: "lua",
+  r: "r",
+  pl: "perl",
+};
+
+function langForPath(p) {
+  if (typeof p !== "string") return null;
+  const base = (p.split("/").pop() || "").toLowerCase();
+  if (base === "dockerfile")
+    return hljs.getLanguage("dockerfile") ? "dockerfile" : null;
+  const ext = base.includes(".") ? base.split(".").pop() : "";
+  const lang = EXT_TO_LANG[ext];
+  return lang && hljs.getLanguage(lang) ? lang : null;
+}
+
+function parseJsonObject(value) {
+  if (!value || typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
   }
+}
 
-  function flushOpenBlocks() {
-    flushParagraph();
-    flushList();
-    flushQuote();
+function firstCommandPath(cmd) {
+  if (typeof cmd !== "string") return "";
+  const patterns = [
+    /\bnl\s+(?:-[^\s]+\s+)*['"]?([^'"\s|;]+)['"]?/,
+    /\bcat\s+(?:-[^\s]+\s+)*['"]?([^'"\s|;]+)['"]?/,
+    /\bsed\s+(?:-[^\s]+\s+)*['"][^'"]+['"]\s+['"]?([^'"\s|;]+)['"]?/,
+  ];
+  for (const pattern of patterns) {
+    const match = cmd.match(pattern);
+    if (match?.[1]) return match[1];
   }
+  return "";
+}
 
+function commandResultOutput(text) {
+  const output = String(text).match(/\nOutput:\n([\s\S]*)$/);
+  if (!output) return String(text);
+  return output[1].replace(/\n\^C$/, "");
+}
+
+// Render a cat -n (line-numbered) Read result as a gutter column of numbers
+// beside one highlighted code block. Highlighting the whole body in a single
+// pass keeps multi-line spans (block comments, template strings) intact; the
+// numbers live in a separate <pre> so they never enter the highlighter.
+// Returns null when the text isn't line-numbered file content.
+function renderFileResult(text, lang) {
+  if (!lang || !hljs.getLanguage(lang)) return null;
+  const body = commandResultOutput(text);
+  const lines = body.split("\n");
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  if (!lines.length) return null;
+  const nums = [];
+  const code = [];
+  let numbered = 0;
   for (const line of lines) {
-    const fence = line.match(/^```/);
-    if (fence) {
-      if (code) {
-        html.push(
-          `<pre><code>${escapeHtml(code.lines.join("\n"))}</code></pre>`,
-        );
-        code = null;
-      } else {
-        flushOpenBlocks();
-        code = { lines: [] };
-      }
-      continue;
+    const tab = line.indexOf("\t");
+    const head = tab >= 0 ? line.slice(0, tab) : "";
+    if (tab >= 0 && /^\s*\d+$/.test(head)) {
+      nums.push(head.trim());
+      code.push(line.slice(tab + 1));
+      numbered++;
+    } else {
+      nums.push("");
+      code.push(line);
     }
-    if (code) {
-      code.lines.push(line);
-      continue;
-    }
-
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushOpenBlocks();
-      continue;
-    }
-
-    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) {
-      flushOpenBlocks();
-      const level = heading[1].length + 2;
-      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
-      continue;
-    }
-
-    const quoteMatch = trimmed.match(/^>\s?(.*)$/);
-    if (quoteMatch) {
-      flushParagraph();
-      flushList();
-      quote.push(quoteMatch[1]);
-      continue;
-    }
-
-    const listMatch = trimmed.match(/^([-*]|\d+\.)\s+(.+)$/);
-    if (listMatch) {
-      flushParagraph();
-      flushQuote();
-      const tag = listMatch[1].endsWith(".") ? "ol" : "ul";
-      if (!list || list.tag !== tag) flushList();
-      if (!list) list = { tag, items: [] };
-      list.items.push(`<li>${renderInlineMarkdown(listMatch[2])}</li>`);
-      continue;
-    }
-
-    flushList();
-    flushQuote();
-    paragraph.push(trimmed);
   }
-
-  if (code)
-    html.push(`<pre><code>${escapeHtml(code.lines.join("\n"))}</code></pre>`);
-  flushOpenBlocks();
-  return html.join("");
+  if (numbered < lines.length * 0.6) {
+    try {
+      const highlighted = hljs.highlight(body, { language: lang }).value;
+      return `<pre class="live-seg-code hljs">${highlighted}</pre>`;
+    } catch {
+      return null;
+    }
+  }
+  let highlighted;
+  try {
+    highlighted = hljs.highlight(code.join("\n"), { language: lang }).value;
+  } catch {
+    return null;
+  }
+  return (
+    '<div class="live-code">' +
+    `<pre class="live-code-gutter" aria-hidden="true">${escapeHtml(nums.join("\n"))}</pre>` +
+    `<pre class="live-code-body hljs">${highlighted}</pre>` +
+    "</div>"
+  );
 }
 
 export function App() {
@@ -195,6 +377,7 @@ export function App() {
     liveVisibilityHandler: null,
     nowTick: Date.now(),
     streamSessionId: null,
+    streamProvider: "claude",
     streamProjectName: "",
     streamEntries: [],
     streamSource: null,
@@ -1262,6 +1445,8 @@ export function App() {
         busy: "is-busy",
         idle: "is-idle",
         waiting: "is-waiting",
+        "active-inferred": "is-busy",
+        recent: "is-recent",
       };
       return "live-dot " + (known[status] ?? "is-unknown");
     },
@@ -1269,6 +1454,7 @@ export function App() {
     openStream(session) {
       this.closeStream();
       this.streamSessionId = session.id;
+      this.streamProvider = session.provider || "claude";
       this.streamProjectName = session.projectName;
       this.streamEntries = [];
       this.streamError = null;
@@ -1281,7 +1467,8 @@ export function App() {
       this.lockPageScroll();
 
       const source = new EventSource(
-        `/api/stream?session=${encodeURIComponent(session.id)}`,
+        `/api/stream?provider=${encodeURIComponent(this.streamProvider)}` +
+          `&id=${encodeURIComponent(session.id)}`,
       );
       source.onopen = () => {
         this.clearDelayedStreamError();
@@ -1325,6 +1512,7 @@ export function App() {
       }
       if (this.streamSessionId) this.unlockPageScroll();
       this.streamSessionId = null;
+      this.streamProvider = "claude";
       this.streamProjectName = "";
       this.streamEntries = [];
       this.streamError = null;
@@ -1421,7 +1609,8 @@ export function App() {
       const prevTop = el ? el.scrollTop : 0;
       try {
         const res = await fetch(
-          `/api/transcript?session=${encodeURIComponent(this.streamSessionId)}` +
+          `/api/transcript?provider=${encodeURIComponent(this.streamProvider)}` +
+            `&id=${encodeURIComponent(this.streamSessionId)}` +
             `&before=${this.streamHistoryStart}&limit=50`,
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1483,7 +1672,7 @@ export function App() {
           // result arrives — a terminal-style call/output block.
           if (seg.toolUseId && results[seg.toolUseId]) {
             html += this.renderStreamSegment(
-              this.resultSegment(results[seg.toolUseId]),
+              this.resultSegment(results[seg.toolUseId], seg.resultLang),
             );
           }
           return html;
@@ -1491,16 +1680,68 @@ export function App() {
         .join("");
     },
 
-    resultSegment(part) {
+    resultSegment(part, lang) {
       return {
         kind: "code",
         label: part.is_error ? "⚠ result (error)" : "↳ result",
         error: !!part.is_error,
         text: this.segText(part.content),
+        fileLang: part.is_error ? null : (lang ?? null),
       };
     },
 
     renderStreamSegment(seg) {
+      if (seg.kind === "task-notification") {
+        const task = seg.task;
+        const usage = [
+          task.totalTokens ? `${fmtNum(Number(task.totalTokens))} tokens` : "",
+          task.toolUses ? `${fmtNum(Number(task.toolUses))} tools` : "",
+          formatDurationMs(task.durationMs),
+        ].filter(Boolean);
+        const result = task.result?.trim()
+          ? `<div class="live-task-result">${renderMarkdown(task.result)}</div>`
+          : "";
+        const usageHtml = usage.length
+          ? `<div class="live-task-meta">${usage
+              .map((item) => `<span>${escapeHtml(item)}</span>`)
+              .join("")}</div>`
+          : "";
+        return [
+          '<section class="live-task-card">',
+          `<div class="live-task-kicker">${escapeHtml(task.status)}</div>`,
+          `<div class="live-task-title">${escapeHtml(task.summary)}</div>`,
+          result,
+          usageHtml,
+          "</section>",
+        ].join("");
+      }
+      if (seg.kind === "subagent-notification") {
+        const task = seg.task;
+        const result = task.completed
+          ? `<pre class="live-subagent-result">${escapeHtml(task.completed)}</pre>`
+          : "";
+        return [
+          '<section class="live-task-card live-subagent-card">',
+          '<div class="live-task-kicker">completed</div>',
+          '<div class="live-task-title">Subagent completed</div>',
+          result,
+          "</section>",
+        ].join("");
+      }
+      if (seg.kind === "file-change") {
+        const lineCount = seg.diffText ? seg.diffText.split("\n").length : 0;
+        const summary = `${escapeHtml(seg.label)} · ${lineCount} lines`;
+        const path = seg.filePath
+          ? `<div class="live-file-path">${escapeHtml(seg.filePath)}</div>`
+          : "";
+        return [
+          '<details class="live-seg live-file-change" open>',
+          `<summary>${summary}</summary>`,
+          path,
+          `<pre class="live-diff">${renderDiffText(seg.diffText)}</pre>`,
+          "</details>",
+        ].join("");
+      }
       if (seg.kind === "markdown") {
         const body = renderMarkdown(seg.text);
         if (!seg.label) return body;
@@ -1509,9 +1750,19 @@ export function App() {
       }
       const text = seg.text ?? "";
       const cls = seg.error ? "live-seg-code is-error" : "live-seg-code";
-      const pre = `<pre class="${cls}">${escapeHtml(text)}</pre>`;
+      const fileHtml = seg.fileLang
+        ? renderFileResult(text, seg.fileLang)
+        : null;
+      let pre;
+      if (fileHtml) {
+        pre = fileHtml;
+      } else {
+        const highlighted = highlightCode(text);
+        const preCls = highlighted ? `${cls} hljs` : cls;
+        pre = `<pre class="${preCls}">${highlighted ?? escapeHtml(text)}</pre>`;
+      }
       const lineCount = text ? text.split("\n").length : 0;
-      if (lineCount > STREAM_COLLAPSE_LINES) {
+      if (seg.label || lineCount > STREAM_COLLAPSE_LINES) {
         const summary = `${escapeHtml(seg.label || "output")} · ${lineCount} lines`;
         return `<details class="live-seg"><summary>${summary}</summary>${pre}</details>`;
       }
@@ -1522,6 +1773,12 @@ export function App() {
     },
 
     streamEntrySegments(entry) {
+      if (entry?.type === "response_item") {
+        const segs = this.codexPayloadSegments(entry.payload);
+        return segs.length
+          ? segs
+          : [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+      }
       const content = entry?.message?.content ?? entry?.content ?? entry?.text;
       const segs = this.contentSegments(content);
       if (segs.length) return segs;
@@ -1536,9 +1793,94 @@ export function App() {
       return [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
     },
 
+    codexPayloadSegments(payload) {
+      if (!payload || typeof payload !== "object") return [];
+      if (payload.type === "message")
+        return this.contentSegments(payload.content);
+      if (payload.type === "custom_tool_call") {
+        const patch = this.patchSegment(payload.name, payload.input);
+        if (patch) return [patch];
+        const args =
+          typeof payload.input === "string"
+            ? parseJsonObject(payload.input)
+            : null;
+        return [
+          {
+            kind: "code",
+            label: payload.name ?? "tool",
+            text: this.segText(payload.input ?? payload),
+            toolUseId: payload.call_id,
+            resultLang: this.codexResultLang(payload.name, args),
+          },
+        ];
+      }
+      if (payload.type === "function_call") {
+        const args = parseJsonObject(payload.arguments);
+        return [
+          {
+            kind: "code",
+            label: payload.name ?? "tool",
+            text: this.prettyJsonText(
+              payload.arguments ?? JSON.stringify(payload, null, 2),
+            ),
+            toolUseId: payload.call_id,
+            resultLang: this.codexResultLang(payload.name, args),
+          },
+        ];
+      }
+      if (payload.type === "function_call_output") {
+        return [
+          this.resultSegment({
+            content: payload.output ?? JSON.stringify(payload, null, 2),
+          }),
+        ];
+      }
+      return [];
+    },
+
+    codexResultLang(name, args) {
+      if (!args || typeof args !== "object") return null;
+      if (name === "exec_command") {
+        return langForPath(firstCommandPath(args.cmd));
+      }
+      return langForPath(args.file_path ?? args.path ?? args.filename);
+    },
+
+    patchSegment(name, input) {
+      if (name !== "apply_patch" || typeof input !== "string") return null;
+      const filePath =
+        input.match(/^\*\*\* Update File: (.+)$/m)?.[1] ??
+        input.match(/^\*\*\* Add File: (.+)$/m)?.[1] ??
+        input.match(/^\*\*\* Delete File: (.+)$/m)?.[1] ??
+        "";
+      return {
+        kind: "file-change",
+        label: filePath ? `apply_patch · ${filePath}` : "apply_patch",
+        filePath,
+        diffText: input,
+      };
+    },
+
+    prettyJsonText(value) {
+      if (typeof value !== "string") return this.segText(value);
+      const trimmed = value.trim();
+      if (!trimmed) return "";
+      if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return value;
+      try {
+        return JSON.stringify(JSON.parse(trimmed), null, 2);
+      } catch {
+        return value;
+      }
+    },
+
     contentSegments(content) {
       if (content == null) return [];
       if (typeof content === "string") {
+        const task = parseTaskNotification(content);
+        if (task) return [{ kind: "task-notification", task }];
+        const subagent = parseSubagentNotification(content);
+        if (subagent)
+          return [{ kind: "subagent-notification", task: subagent }];
         return content.trim() ? [{ kind: "markdown", text: content }] : [];
       }
       if (!Array.isArray(content)) {
@@ -1555,7 +1897,12 @@ export function App() {
           continue;
         }
         if (!part || typeof part !== "object") continue;
-        if (part.type === "text" && part.text?.trim()) {
+        if (
+          (part.type === "text" ||
+            part.type === "input_text" ||
+            part.type === "output_text") &&
+          part.text?.trim()
+        ) {
           out.push({ kind: "markdown", text: part.text });
         } else if (part.type === "thinking" && part.thinking?.trim()) {
           out.push({
@@ -1565,6 +1912,11 @@ export function App() {
             note: true,
           });
         } else if (part.type === "tool_use") {
+          const fileChange = this.claudeFileChangeSegment(part);
+          if (fileChange) {
+            out.push(fileChange);
+            continue;
+          }
           const input =
             typeof part.input === "string"
               ? part.input
@@ -1574,6 +1926,8 @@ export function App() {
             label: `🔧 ${part.name ?? "tool"}`,
             text: input,
             toolUseId: part.id,
+            resultLang:
+              part.name === "Read" ? langForPath(part.input?.file_path) : null,
           });
         } else if (part.type === "tool_result") {
           out.push(this.resultSegment(part));
@@ -1586,6 +1940,85 @@ export function App() {
         }
       }
       return out;
+    },
+
+    // Interleaved line diff: shared leading/trailing lines become context
+    // lines (" "-prefixed), only the changed middle gets -/+. Mirrors the
+    // Codex apply_patch diff shape so both providers render alike.
+    unifiedLineDiff(oldText, newText) {
+      const a = String(oldText ?? "").split("\n");
+      const b = String(newText ?? "").split("\n");
+      const maxLead = Math.min(a.length, b.length);
+      let head = 0;
+      while (head < maxLead && a[head] === b[head]) head++;
+      let tail = 0;
+      while (
+        tail < maxLead - head &&
+        a[a.length - 1 - tail] === b[b.length - 1 - tail]
+      ) {
+        tail++;
+      }
+      const out = [];
+      for (let i = 0; i < head; i++) out.push(` ${a[i]}`);
+      for (let i = head; i < a.length - tail; i++) out.push(`-${a[i]}`);
+      for (let i = head; i < b.length - tail; i++) out.push(`+${b[i]}`);
+      for (let i = a.length - tail; i < a.length; i++) out.push(` ${a[i]}`);
+      return out;
+    },
+
+    claudeFileChangeSegment(part) {
+      const name = part?.name;
+      const input = part?.input;
+      if (!input || typeof input !== "object") return null;
+      const filePath = input.file_path ?? input.path ?? "";
+      if (name === "Edit") {
+        return {
+          kind: "file-change",
+          label: filePath ? `Edit · ${filePath}` : "Edit",
+          filePath,
+          diffText: [
+            `--- ${filePath || "before"}`,
+            `+++ ${filePath || "after"}`,
+            "@@",
+            ...this.unifiedLineDiff(input.old_string, input.new_string),
+          ].join("\n"),
+          toolUseId: part.id,
+        };
+      }
+      if (name === "MultiEdit" && Array.isArray(input.edits)) {
+        const lines = [
+          `--- ${filePath || "before"}`,
+          `+++ ${filePath || "after"}`,
+        ];
+        for (const edit of input.edits) {
+          lines.push("@@");
+          lines.push(...this.unifiedLineDiff(edit.old_string, edit.new_string));
+        }
+        return {
+          kind: "file-change",
+          label: filePath ? `MultiEdit · ${filePath}` : "MultiEdit",
+          filePath,
+          diffText: lines.join("\n"),
+          toolUseId: part.id,
+        };
+      }
+      if (name === "Write") {
+        return {
+          kind: "file-change",
+          label: filePath ? `Write · ${filePath}` : "Write",
+          filePath,
+          diffText: [
+            "--- /dev/null",
+            `+++ ${filePath || "new file"}`,
+            "@@",
+            ...String(input.content ?? "")
+              .split("\n")
+              .map((line) => `+${line}`),
+          ].join("\n"),
+          toolUseId: part.id,
+        };
+      }
+      return null;
     },
 
     // Flatten a tool-result/content value (string, array of blocks, or object)
@@ -1612,6 +2045,15 @@ export function App() {
     // The tool_result blocks of a pure tool-result entry (every block is a
     // tool_result). Mixed entries (real user text + a result) are left alone.
     streamEntryToolResults(entry) {
+      if (entry?.payload?.type === "function_call_output") {
+        return [
+          {
+            content:
+              entry.payload.output ?? JSON.stringify(entry.payload, null, 2),
+            tool_use_id: entry.payload.call_id,
+          },
+        ];
+      }
       const content = entry?.message?.content;
       if (!Array.isArray(content) || !content.length) return [];
       const results = content.filter((b) => b && b.type === "tool_result");
@@ -1627,6 +2069,9 @@ export function App() {
     reconcileToolResults() {
       const toolUseEntry = {};
       for (const e of this.streamEntries) {
+        if (e?.payload?.type === "function_call" && e.payload.call_id) {
+          toolUseEntry[e.payload.call_id] = e;
+        }
         const content = e?.message?.content;
         if (!Array.isArray(content)) continue;
         for (const b of content) {
@@ -1659,7 +2104,37 @@ export function App() {
     // be merged (its tool_use isn't loaded) shows "tool result", not "user".
     streamEntryRole(entry) {
       if (this.streamEntryToolResults(entry).length) return "tool result";
+      if (this.streamEntryHasToolSegments(entry)) return "tool";
+      if (entry?.type === "response_item") {
+        if (entry.payload?.type === "message")
+          return entry.payload.role || "message";
+        if (entry.payload?.type === "function_call") return "tool";
+        if (entry.payload?.type === "function_call_output")
+          return "tool result";
+      }
       return entry.type || "unknown";
+    },
+
+    streamEntryHasToolSegments(entry) {
+      if (
+        entry?.payload?.type === "function_call" ||
+        entry?.payload?.type === "custom_tool_call"
+      ) {
+        return true;
+      }
+      const content = entry?.message?.content;
+      return (
+        Array.isArray(content) &&
+        content.some((b) => b && b.type === "tool_use")
+      );
+    },
+
+    liveEntryClass(entry) {
+      const role = this.streamEntryRole(entry).replace(/\s+/g, "-");
+      const toolClass = this.streamEntryHasToolSegments(entry)
+        ? " has-tool-segments"
+        : "";
+      return `live-entry is-${role}${toolClass}`;
     },
 
     lockPageScroll() {

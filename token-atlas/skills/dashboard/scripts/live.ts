@@ -12,12 +12,16 @@ import {
   type FSWatcher,
 } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 
 const CLAUDE_DIR = join(homedir(), ".claude");
 const SESSIONS_DIR = join(CLAUDE_DIR, "sessions");
 const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
+const CODEX_DIR = join(homedir(), ".codex");
+const CODEX_STATE_DB = join(CODEX_DIR, "state_5.sqlite");
+const CODEX_SESSIONS_DIR = join(CODEX_DIR, "sessions");
 // Resolve the projects root once: relative() needs the canonical base to
 // compare against the realpath'd transcript paths, and the dir is stable.
 const PROJECTS_REAL = (() => {
@@ -27,7 +31,15 @@ const PROJECTS_REAL = (() => {
     return PROJECTS_DIR;
   }
 })();
+const CODEX_SESSIONS_REAL = (() => {
+  try {
+    return realpathSync(CODEX_SESSIONS_DIR);
+  } catch {
+    return CODEX_SESSIONS_DIR;
+  }
+})();
 const STALE_CUTOFF_MS = 10 * 60 * 1000;
+const CODEX_BUSY_CUTOFF_MS = 60 * 1000;
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const BACKLOG_LINES = 50;
 const BACKLOG_READ_CHUNK_BYTES = 256 * 1024;
@@ -49,6 +61,7 @@ const DISPLAY_ENTRY_TYPES = new Set([
   "tool",
   "tool_use",
   "tool_result",
+  "response_item",
 ]);
 const WATCH_DEBOUNCE_MS = 80;
 
@@ -62,6 +75,18 @@ type ClaudeSessionFile = {
   version?: string;
   kind?: string;
   entrypoint?: string;
+};
+
+type CodexThreadRow = {
+  id: string;
+  rollout_path: string;
+  created_at: number;
+  updated_at: number;
+  created_at_ms?: number | null;
+  updated_at_ms?: number | null;
+  cwd: string;
+  title: string;
+  model: string | null;
 };
 
 export type LiveSession = {
@@ -108,13 +133,77 @@ function projectNameFor(cwd: string): string {
   return cwd.split("/").filter(Boolean).at(-1) ?? cwd;
 }
 
-export function resolveTranscriptPath(id: string): string | undefined {
+export function resolveClaudeTranscriptPath(id: string): string | undefined {
   if (!existsSync(PROJECTS_DIR)) return undefined;
   const glob = new Glob(`**/${id}.jsonl`);
   for (const rel of glob.scanSync({ cwd: PROJECTS_DIR, onlyFiles: true })) {
     return join(PROJECTS_DIR, rel);
   }
   return undefined;
+}
+
+export const resolveTranscriptPath = resolveClaudeTranscriptPath;
+
+function readCodexThreadRows(limit = 24): CodexThreadRow[] {
+  if (!existsSync(CODEX_STATE_DB)) return [];
+  try {
+    const db = new Database(CODEX_STATE_DB, { readonly: true });
+    try {
+      return db
+        .query(
+          `select id, rollout_path, created_at, updated_at, created_at_ms, updated_at_ms, cwd, title, model
+           from threads
+           where archived = 0 and rollout_path != ''
+           order by coalesce(updated_at_ms, updated_at * 1000, created_at_ms, created_at * 1000) desc
+           limit ?`,
+        )
+        .all(limit) as CodexThreadRow[];
+    } finally {
+      db.close();
+    }
+  } catch {
+    return [];
+  }
+}
+
+function readCodexThreadRow(id: string): CodexThreadRow | null {
+  if (!existsSync(CODEX_STATE_DB)) return null;
+  try {
+    const db = new Database(CODEX_STATE_DB, { readonly: true });
+    try {
+      return (
+        (db
+          .query(
+            `select id, rollout_path, created_at, updated_at, created_at_ms, updated_at_ms, cwd, title, model
+             from threads
+             where id = ? and archived = 0 and rollout_path != ''
+             limit 1`,
+          )
+          .get(id) as CodexThreadRow | null) ?? null
+      );
+    } finally {
+      db.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+function codexUpdatedAtMs(row: CodexThreadRow): number {
+  return (
+    row.updated_at_ms ||
+    (row.updated_at ? row.updated_at * 1000 : 0) ||
+    row.created_at_ms ||
+    row.created_at * 1000
+  );
+}
+
+function resolveCodexRolloutPath(id: string): string | undefined {
+  const row = readCodexThreadRow(id);
+  if (!row?.rollout_path) return undefined;
+  return isAbsolute(row.rollout_path)
+    ? row.rollout_path
+    : resolve(CODEX_DIR, row.rollout_path);
 }
 
 let transcriptIndex: Map<string, string> | null = null;
@@ -149,20 +238,26 @@ export function isInsideProjects(filePath: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
+export function isInsideCodexSessions(filePath: string): boolean {
+  const rel = relative(CODEX_SESSIONS_REAL, filePath);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
 function statusRank(status: string): number {
-  if (status === "waiting") return 0;
-  if (status === "busy") return 1;
-  if (status === "idle") return 2;
-  return 3;
+  if (status === "busy" || status === "active-inferred") return 0;
+  if (status === "waiting") return 1;
+  if (status === "recent") return 2;
+  if (status === "idle") return 3;
+  return 4;
 }
 
 export function getLiveSessions(): LiveSession[] {
   const now = Date.now();
   const index = getTranscriptIndex();
-  return readSessionFiles()
+  const claudeSessions = readSessionFiles()
     .map((session) => {
       const updatedAtMs = session.updatedAt ?? session.startedAt;
-      const ageMs = now - updatedAtMs;
+      const ageMs = Math.max(0, now - updatedAtMs);
       return {
         provider: "claude",
         id: session.sessionId,
@@ -177,12 +272,38 @@ export function getLiveSessions(): LiveSession[] {
         version: session.version,
       } satisfies LiveSession;
     })
-    .filter((session) => !session.isStale)
-    .sort((a, b) => {
-      const statusDelta = statusRank(a.status) - statusRank(b.status);
-      if (statusDelta !== 0) return statusDelta;
-      return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-    });
+    .filter((session) => !session.isStale);
+
+  const codexSessions = readCodexThreadRows()
+    .map((row) => {
+      const updatedAtMs = codexUpdatedAtMs(row);
+      const ageMs = Math.max(0, now - updatedAtMs);
+      return {
+        provider: "codex",
+        id: row.id,
+        projectName: projectNameFor(row.cwd),
+        cwd: row.cwd,
+        status: ageMs <= CODEX_BUSY_CUTOFF_MS ? "active-inferred" : "recent",
+        statusSource: "codex-sqlite-rollout",
+        updatedAt: new Date(updatedAtMs).toISOString(),
+        ageMs,
+        isStale: ageMs > STALE_CUTOFF_MS,
+        transcriptPath: row.rollout_path || undefined,
+        model: row.model ?? undefined,
+      } satisfies LiveSession;
+    })
+    .filter(
+      (session) =>
+        !session.isStale &&
+        !!session.transcriptPath &&
+        existsSync(session.transcriptPath),
+    );
+
+  return [...claudeSessions, ...codexSessions].sort((a, b) => {
+    const statusDelta = statusRank(a.status) - statusRank(b.status);
+    if (statusDelta !== 0) return statusDelta;
+    return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+  });
 }
 
 export function jsonResponse(payload: object, status = 200): Response {
@@ -218,6 +339,18 @@ function parseEntries(lines: string[]): object[] {
       continue; // skip malformed / partially-written JSONL entries
     }
     if (!entry || !DISPLAY_ENTRY_TYPES.has(entry.type ?? "")) continue;
+    if (entry.type === "response_item") {
+      const payloadType = (entry as { payload?: { type?: string } }).payload
+        ?.type;
+      if (
+        payloadType !== "message" &&
+        payloadType !== "function_call" &&
+        payloadType !== "function_call_output" &&
+        payloadType !== "custom_tool_call"
+      ) {
+        continue;
+      }
+    }
     out.push(entry);
   }
   return out;
@@ -295,17 +428,59 @@ function readLinesEndingAt(
   return { lines, partial, startOffset };
 }
 
-export function streamTranscript(sessionId: string | null): Response {
+type LiveProvider = "claude" | "codex";
+
+function normalizeProvider(provider: string | null): LiveProvider | null {
+  if (!provider || provider === "claude") return "claude";
+  if (provider === "codex") return "codex";
+  return null;
+}
+
+function resolveProviderTranscriptPath(
+  provider: LiveProvider,
+  id: string,
+): string | undefined {
+  return provider === "codex"
+    ? resolveCodexRolloutPath(id)
+    : resolveClaudeTranscriptPath(id);
+}
+
+function isInsideProviderRoot(
+  provider: LiveProvider,
+  filePath: string,
+): boolean {
+  return provider === "codex"
+    ? isInsideCodexSessions(filePath)
+    : isInsideProjects(filePath);
+}
+
+function providerRootName(provider: LiveProvider): string {
+  return provider === "codex" ? "Codex sessions" : "projects";
+}
+
+export function streamTranscript(
+  sessionId: string | null,
+  providerParam: string | null = "claude",
+): Response {
+  const provider = normalizeProvider(providerParam);
+  if (!provider) return jsonResponse({ error: "invalid provider" }, 400);
   if (!sessionId || !UUID_RE.test(sessionId)) {
     return jsonResponse({ error: "invalid session id" }, 400);
   }
 
-  let initialPath = resolveTranscriptPath(sessionId);
+  let initialPath: string | undefined = resolveProviderTranscriptPath(
+    provider,
+    sessionId,
+  );
   if (initialPath) {
-    initialPath = realpathSync(initialPath);
-    if (!isInsideProjects(initialPath)) {
+    try {
+      initialPath = realpathSync(initialPath);
+    } catch {
+      initialPath = undefined;
+    }
+    if (initialPath && !isInsideProviderRoot(provider, initialPath)) {
       return jsonResponse(
-        { error: "transcript path is outside projects" },
+        { error: `transcript path is outside ${providerRootName(provider)}` },
         403,
       );
     }
@@ -408,7 +583,11 @@ export function streamTranscript(sessionId: string | null): Response {
     if (closed || watcher) return;
     filePath = resolvedPath;
     readBacklog(controller);
-    watcher = watch(filePath, () => scheduleTail(controller));
+    try {
+      watcher = watch(filePath, () => scheduleTail(controller));
+    } catch {
+      filePath = undefined;
+    }
   }
 
   const stream = new ReadableStream({
@@ -418,7 +597,7 @@ export function streamTranscript(sessionId: string | null): Response {
 
       resolvePoll = setInterval(() => {
         if (closed || watcher) return;
-        const resolved = resolveTranscriptPath(sessionId);
+        const resolved = resolveProviderTranscriptPath(provider, sessionId);
         if (!resolved) return;
         let realPath: string;
         try {
@@ -427,10 +606,10 @@ export function streamTranscript(sessionId: string | null): Response {
           // Resolved then vanished before realpath; wait for the next tick.
           return;
         }
-        if (!isInsideProjects(realPath)) {
+        if (!isInsideProviderRoot(provider, realPath)) {
           safeEnqueue(
             controller,
-            `data: ${JSON.stringify({ error: "transcript path is outside projects" })}\n\n`,
+            `data: ${JSON.stringify({ error: `transcript path is outside ${providerRootName(provider)}` })}\n\n`,
           );
           cleanup();
           controller.close();
@@ -463,22 +642,28 @@ export function getTranscriptHistory(
   sessionId: string | null,
   before: number,
   limit: number,
+  providerParam: string | null = "claude",
 ): Response {
+  const provider = normalizeProvider(providerParam);
+  if (!provider) return jsonResponse({ error: "invalid provider" }, 400);
   if (!sessionId || !UUID_RE.test(sessionId)) {
     return jsonResponse({ error: "invalid session id" }, 400);
   }
   const empty = { entries: [], historyStart: 0, hasMore: false };
   if (!Number.isFinite(before) || before <= 0) return jsonResponse(empty);
 
-  let path = resolveTranscriptPath(sessionId);
+  let path = resolveProviderTranscriptPath(provider, sessionId);
   if (!path) return jsonResponse(empty);
   try {
     path = realpathSync(path);
   } catch {
     return jsonResponse(empty);
   }
-  if (!isInsideProjects(path)) {
-    return jsonResponse({ error: "transcript path is outside projects" }, 403);
+  if (!isInsideProviderRoot(provider, path)) {
+    return jsonResponse(
+      { error: `transcript path is outside ${providerRootName(provider)}` },
+      403,
+    );
   }
 
   try {
