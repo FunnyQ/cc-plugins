@@ -1612,7 +1612,7 @@ export function App() {
       const cls = seg.error ? "live-seg-code is-error" : "live-seg-code";
       const pre = `<pre class="${cls}">${escapeHtml(text)}</pre>`;
       const lineCount = text ? text.split("\n").length : 0;
-      if (lineCount > STREAM_COLLAPSE_LINES) {
+      if (seg.label || lineCount > STREAM_COLLAPSE_LINES) {
         const summary = `${escapeHtml(seg.label || "output")} · ${lineCount} lines`;
         return `<details class="live-seg"><summary>${summary}</summary>${pre}</details>`;
       }
