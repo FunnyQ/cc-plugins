@@ -19,7 +19,8 @@ cc-plugins/
         ├── PRODUCT.md                # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
         ├── scripts/
         │   ├── api.ts               # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
-        │   ├── serve-dashboard.ts   # Bun HTTP server (serves static + /api/stats)
+        │   ├── live.ts              # LIVE engine (Claude-only) — active sessions + SSE transcript stream + history paging
+        │   ├── serve-dashboard.ts   # Bun HTTP server (static + /api/stats + /api/live + /api/stream + /api/transcript)
         │   └── install.ts           # prerequisite checker
         ├── dashboard/dist/          # static SPA (petite-vue + Chart.js, no build step)
         └── references/
@@ -33,15 +34,27 @@ cc-plugins/
 3. `serve-dashboard.ts` exposes `GET /api/stats` (calls `buildStats()`) and serves `dashboard/dist/` statically
 4. Frontend fetches `/api/stats` on load, renders with petite-vue + Chart.js
 
+### LIVE Data Flow (Claude-only)
+
+Purely additive — the `/api/stats` snapshot is untouched. `live.ts` powers three endpoints (server binds `127.0.0.1`):
+
+1. `GET /api/live` — active Claude sessions from `~/.claude/sessions/*.json` (status `busy`/`idle`/`waiting`, stale-filtered at 10 min). Drives the "Live now" panel, polled every 3s (paused while the tab is hidden).
+2. `GET /api/stream?session=<uuid>` — SSE tail of `~/.claude/projects/**/<uuid>.jsonl`: sends a backlog (last ~50 lines, read backward in chunks, decoded once for UTF-8 safety) then `fs.watch`-tails new appends. Powers the click-to-open transcript modal.
+3. `GET /api/transcript?session=<uuid>&before=<byteOffset>&limit=<n>` — reverse-pagination: older entries before a byte-offset cursor, for scroll-to-top history loading. The SSE `backlog-done` frame carries the initial `historyStart` cursor.
+
+Path security (stream + history): validate `^[0-9a-f-]{36}$` first, glob-locate, then `realpath`-confine inside `~/.claude/projects` (`isInsideProjects`, mirrors `isInsideDist`).
+
 ### Key Design Decisions
 
 - **No build step** for frontend — `dashboard/dist/` is committed as-is, vendor libs included
 - **Bun-only** runtime — uses `bun:sqlite`, `Bun.serve`, `Bun.file`
 - Model usage keys are namespaced as `provider:model` (e.g. `claude:claude-opus-4-7`, `codex:o3`)
-- Deduplication of billing: transcript entries are deduped by `requestId:messageId` to avoid double-counting
+- **Deduplication differs by purpose**: *billing* (`api.ts`) dedups transcript entries by `requestId:messageId` to avoid double-counting usage. *LIVE display* (`live.ts` / frontend) dedups by **`uuid`** instead — one assistant response persists its `thinking` / `text` / `tool_use` as separate lines that *share* `requestId:messageId`, so keying on that would drop the actual reply; `uuid` is per-line, so it only catches true reconnect resends.
 - **Theme** — light + dark via `[data-theme]` on `<html>`; tokens defined twice in `style.css`; toggle uses the View Transitions API for a cross-fade
 - **Sunrise Bloom delight** — `.panel` / `.card` / `.budget-panel` / `.data-health-panel` use an `::before` (or `::after`) radial-gradient bloom. JS `installBloomTracker()` in `app.js` lerps `--bloom-x/--bloom-y` toward cursor each frame for the trailing effect. Add new panel-shaped classes to **both** the CSS selector list and the JS `SELECTOR` constant
 - **Hero wave** — `.hero-band` uses a 200%-wide SVG `mask-image` containing two identical wave cycles; `hero-wave-drift` animation slides `mask-position-x` one wavelength for a seamless loop
+- **LIVE rendering** — each transcript entry is pre-rendered to HTML once on receipt (`entry.__html`, keyed by `entry.__key`) to avoid re-running Markdown on every reactive update. Content is split into segments: prose → Markdown, `thinking` → "💭 thinking" badge (muted), `tool_use` / `tool_result` / JSON dumps → escaped `<pre>` code blocks (>10 lines collapse into `<details>`). Tool calls and their results are paired by `tool_use_id` (`reconcileToolResults()`): a `tool_result`-only entry is merged into the entry holding its `tool_use` and the standalone "user" bubble is dropped. Only conversation types stream (`DISPLAY_ENTRY_TYPES` allowlist) — session-metadata noise (`file-history-snapshot`, `queue-operation`, `last-prompt`, …) is filtered at the source.
+- **LIVE scroll** — auto-scroll only when bottom-pinned (`streamPinnedToBottom`); reverse-pagination triggers on scroll-to-top from any input, anchored on the topmost entry's `offsetTop` (immune to live appends), and the `streamLoadingOlder` flag is cleared in a `requestAnimationFrame` so the anchor-restore scroll isn't mistaken for a fresh user scroll. The `.live-panel` is registered in both the bloom CSS list and the JS `SELECTOR`.
 
 ## Commands
 
@@ -57,6 +70,13 @@ bun token-atlas/skills/dashboard/scripts/install.ts
 
 # Get stats as JSON (CLI mode of api.ts)
 bun token-atlas/skills/dashboard/scripts/api.ts
+
+# Get active live sessions as JSON (CLI mode of live.ts)
+bun token-atlas/skills/dashboard/scripts/live.ts
+
+# Inspect LIVE endpoints against a running server
+curl -s localhost:5938/api/live | jq
+curl -N "localhost:5938/api/stream?session=<uuid>"
 ```
 
 ## Code Conventions

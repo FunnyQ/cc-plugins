@@ -109,15 +109,19 @@ function handleLive(): Response {
 
 function handleStream(req: Request): Response {
   const url = new URL(req.url);
-  return streamTranscript(url.searchParams.get("session"));
+  return streamTranscript(
+    url.searchParams.get("id") ?? url.searchParams.get("session"),
+    url.searchParams.get("provider"),
+  );
 }
 
 function handleTranscript(req: Request): Response {
   const url = new URL(req.url);
   return getTranscriptHistory(
-    url.searchParams.get("session"),
+    url.searchParams.get("id") ?? url.searchParams.get("session"),
     Number(url.searchParams.get("before")),
     Number(url.searchParams.get("limit")),
+    url.searchParams.get("provider"),
   );
 }
 

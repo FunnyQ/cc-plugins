@@ -40,6 +40,7 @@ A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data 
 
 ### Features
 
+- **Live now (Claude)** — a panel of your currently-active Claude sessions with live status (busy / idle / waiting); click one to open a real-time transcript that streams as the session is written, with scroll-to-top history loading, Markdown rendering, and collapsible tool calls/results
 - **Cost + usage overview** — sessions, interactions, tokens, estimated spend, daily burn, and monthly budget projection
 - **Model analysis** — daily trend, model distribution, and per-model token/cost breakdown
 - **Project insights** — project rankings with drilldown details for model mix and cost
