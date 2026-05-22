@@ -453,6 +453,120 @@
   font-size: 0.94em;
 }
 
+/* highlight.js theme mapped onto Sunrise tokens (light + dark come free).
+   No background here — the enclosing .live-entry-content pre owns it. */
+.live-entry-content .hljs {
+  color: var(--text);
+}
+
+.live-entry-content .hljs-comment,
+.live-entry-content .hljs-quote {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.live-entry-content .hljs-keyword,
+.live-entry-content .hljs-selector-tag,
+.live-entry-content .hljs-literal,
+.live-entry-content .hljs-built_in {
+  color: var(--sunrise-violet);
+}
+
+.live-entry-content .hljs-string,
+.live-entry-content .hljs-addition,
+.live-entry-content .hljs-regexp {
+  color: var(--positive);
+}
+
+.live-entry-content .hljs-number,
+.live-entry-content .hljs-symbol,
+.live-entry-content .hljs-bullet {
+  color: var(--sunrise-amber);
+}
+
+.live-entry-content .hljs-title,
+.live-entry-content .hljs-title.function_,
+.live-entry-content .hljs-section {
+  color: var(--sunrise-sky);
+}
+
+.live-entry-content .hljs-type,
+.live-entry-content .hljs-title.class_ {
+  color: var(--sunrise-orange);
+}
+
+.live-entry-content .hljs-attr,
+.live-entry-content .hljs-attribute,
+.live-entry-content .hljs-property,
+.live-entry-content .hljs-variable,
+.live-entry-content .hljs-template-variable,
+.live-entry-content .hljs-params {
+  color: var(--sunrise-coral);
+}
+
+.live-entry-content .hljs-tag,
+.live-entry-content .hljs-name,
+.live-entry-content .hljs-selector-id,
+.live-entry-content .hljs-selector-class {
+  color: var(--sunrise-magenta);
+}
+
+.live-entry-content .hljs-meta,
+.live-entry-content .hljs-doctag {
+  color: var(--text-muted);
+}
+
+.live-entry-content .hljs-deletion {
+  color: var(--danger);
+}
+
+.live-entry-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.live-entry-content .hljs-strong {
+  font-weight: 700;
+}
+
+.live-entry-content .hljs-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Line-numbered file result: gutter column + one highlighted code block. */
+.live-entry-content .live-code {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s-12);
+  margin: 0;
+  overflow-x: auto;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface) 82%, var(--surface-well));
+  padding: var(--s-10);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-lg);
+  line-height: 1.5;
+}
+
+.live-entry-content .live-code pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+  background: none;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre;
+}
+
+.live-entry-content .live-code-gutter {
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+
 .live-entry-content a {
   color: var(--entry-accent);
   text-decoration-thickness: 1px;
