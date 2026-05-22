@@ -195,6 +195,7 @@ export function App() {
     liveVisibilityHandler: null,
     nowTick: Date.now(),
     streamSessionId: null,
+    streamProvider: "claude",
     streamProjectName: "",
     streamEntries: [],
     streamSource: null,
@@ -1262,6 +1263,8 @@ export function App() {
         busy: "is-busy",
         idle: "is-idle",
         waiting: "is-waiting",
+        "active-inferred": "is-busy",
+        recent: "is-recent",
       };
       return "live-dot " + (known[status] ?? "is-unknown");
     },
@@ -1269,6 +1272,7 @@ export function App() {
     openStream(session) {
       this.closeStream();
       this.streamSessionId = session.id;
+      this.streamProvider = session.provider || "claude";
       this.streamProjectName = session.projectName;
       this.streamEntries = [];
       this.streamError = null;
@@ -1281,7 +1285,8 @@ export function App() {
       this.lockPageScroll();
 
       const source = new EventSource(
-        `/api/stream?session=${encodeURIComponent(session.id)}`,
+        `/api/stream?provider=${encodeURIComponent(this.streamProvider)}` +
+          `&id=${encodeURIComponent(session.id)}`,
       );
       source.onopen = () => {
         this.clearDelayedStreamError();
@@ -1325,6 +1330,7 @@ export function App() {
       }
       if (this.streamSessionId) this.unlockPageScroll();
       this.streamSessionId = null;
+      this.streamProvider = "claude";
       this.streamProjectName = "";
       this.streamEntries = [];
       this.streamError = null;
@@ -1421,7 +1427,8 @@ export function App() {
       const prevTop = el ? el.scrollTop : 0;
       try {
         const res = await fetch(
-          `/api/transcript?session=${encodeURIComponent(this.streamSessionId)}` +
+          `/api/transcript?provider=${encodeURIComponent(this.streamProvider)}` +
+            `&id=${encodeURIComponent(this.streamSessionId)}` +
             `&before=${this.streamHistoryStart}&limit=50`,
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1522,6 +1529,18 @@ export function App() {
     },
 
     streamEntrySegments(entry) {
+      if (entry?.type === "response_item") {
+        const segs = this.codexPayloadSegments(entry.payload);
+        return segs.length
+          ? segs
+          : [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+      }
+      if (entry?.type === "event_msg") {
+        const segs = this.codexPayloadSegments(entry.payload);
+        return segs.length
+          ? segs
+          : [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+      }
       const content = entry?.message?.content ?? entry?.content ?? entry?.text;
       const segs = this.contentSegments(content);
       if (segs.length) return segs;
@@ -1534,6 +1553,41 @@ export function App() {
         ];
       }
       return [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+    },
+
+    codexPayloadSegments(payload) {
+      if (!payload || typeof payload !== "object") return [];
+      if (payload.type === "message")
+        return this.contentSegments(payload.content);
+      if (payload.type === "function_call") {
+        return [
+          {
+            kind: "code",
+            label: `tool · ${payload.name ?? "function_call"}`,
+            text: payload.arguments ?? JSON.stringify(payload, null, 2),
+            toolUseId: payload.call_id,
+          },
+        ];
+      }
+      if (payload.type === "function_call_output") {
+        return [
+          {
+            kind: "code",
+            label: "result",
+            text: payload.output ?? JSON.stringify(payload, null, 2),
+          },
+        ];
+      }
+      if (payload.type === "agent_message" && payload.message?.trim()) {
+        return [{ kind: "markdown", text: payload.message }];
+      }
+      if (payload.type === "user_message" && payload.message?.trim()) {
+        return [{ kind: "markdown", text: payload.message }];
+      }
+      if (payload.type === "task_complete" && payload.last_agent_message) {
+        return [{ kind: "markdown", text: payload.last_agent_message }];
+      }
+      return [];
     },
 
     contentSegments(content) {
@@ -1555,7 +1609,12 @@ export function App() {
           continue;
         }
         if (!part || typeof part !== "object") continue;
-        if (part.type === "text" && part.text?.trim()) {
+        if (
+          (part.type === "text" ||
+            part.type === "input_text" ||
+            part.type === "output_text") &&
+          part.text?.trim()
+        ) {
           out.push({ kind: "markdown", text: part.text });
         } else if (part.type === "thinking" && part.thinking?.trim()) {
           out.push({
@@ -1659,6 +1718,18 @@ export function App() {
     // be merged (its tool_use isn't loaded) shows "tool result", not "user".
     streamEntryRole(entry) {
       if (this.streamEntryToolResults(entry).length) return "tool result";
+      if (entry?.type === "response_item") {
+        if (entry.payload?.type === "message")
+          return entry.payload.role || "message";
+        if (entry.payload?.type === "function_call") return "tool";
+        if (entry.payload?.type === "function_call_output")
+          return "tool result";
+      }
+      if (entry?.type === "event_msg") {
+        if (entry.payload?.type === "user_message") return "user";
+        if (entry.payload?.type === "agent_message") return "assistant";
+        if (entry.payload?.type === "task_complete") return "complete";
+      }
       return entry.type || "unknown";
     },
 
