@@ -46,7 +46,7 @@
       <div
         v-for="(entry, i) in streamEntries"
         :key="entry.__key"
-        :class="'live-entry is-' + (entry.type || 'unknown')"
+        :class="liveEntryClass(entry)"
       >
         <span class="live-entry-role">{{ streamEntryRole(entry) }}</span>
         <div class="live-entry-content" v-html="entry.__html"></div>
