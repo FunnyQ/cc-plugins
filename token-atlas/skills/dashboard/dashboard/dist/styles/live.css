@@ -548,6 +548,10 @@
   white-space: pre;
 }
 
+.live-diff .is-blank {
+  line-height: 0.45;
+}
+
 .live-diff .is-add {
   background: color-mix(in oklch, var(--positive) 12%, transparent);
   color: color-mix(in oklch, var(--positive) 74%, var(--text));
