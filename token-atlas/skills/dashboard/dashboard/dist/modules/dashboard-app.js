@@ -1567,11 +1567,9 @@ export function App() {
       }
       if (payload.type === "function_call_output") {
         return [
-          {
-            kind: "code",
-            label: "result",
-            text: payload.output ?? JSON.stringify(payload, null, 2),
-          },
+          this.resultSegment({
+            content: payload.output ?? JSON.stringify(payload, null, 2),
+          }),
         ];
       }
       return [];
@@ -1670,6 +1668,15 @@ export function App() {
     // The tool_result blocks of a pure tool-result entry (every block is a
     // tool_result). Mixed entries (real user text + a result) are left alone.
     streamEntryToolResults(entry) {
+      if (entry?.payload?.type === "function_call_output") {
+        return [
+          {
+            content:
+              entry.payload.output ?? JSON.stringify(entry.payload, null, 2),
+            tool_use_id: entry.payload.call_id,
+          },
+        ];
+      }
       const content = entry?.message?.content;
       if (!Array.isArray(content) || !content.length) return [];
       const results = content.filter((b) => b && b.type === "tool_result");
@@ -1685,6 +1692,9 @@ export function App() {
     reconcileToolResults() {
       const toolUseEntry = {};
       for (const e of this.streamEntries) {
+        if (e?.payload?.type === "function_call" && e.payload.call_id) {
+          toolUseEntry[e.payload.call_id] = e;
+        }
         const content = e?.message?.content;
         if (!Array.isArray(content)) continue;
         for (const b of content) {
