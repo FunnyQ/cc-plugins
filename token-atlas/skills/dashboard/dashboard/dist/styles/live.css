@@ -508,6 +508,14 @@
 .live-file-change {
   display: grid;
   gap: var(--s-8);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.live-file-change > summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .live-file-path {
@@ -520,6 +528,8 @@
 }
 
 .live-diff {
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   overflow-x: auto;
   border: 1px solid var(--edge-soft);
@@ -529,7 +539,7 @@
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: var(--fs-lg);
-  line-height: 1.45;
+  line-height: 1.22;
 }
 
 .live-diff span {
