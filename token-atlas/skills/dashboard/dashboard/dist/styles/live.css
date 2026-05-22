@@ -407,13 +407,20 @@
   padding-inline-start: var(--s-20);
 }
 
+.live-entry-content h1,
+.live-entry-content h2,
 .live-entry-content h3,
 .live-entry-content h4,
-.live-entry-content h5 {
+.live-entry-content h5,
+.live-entry-content h6 {
   margin-block: 0 var(--s-6);
   color: var(--text);
   font-size: var(--fs-lg);
   line-height: 1.25;
+}
+
+.live-entry-content h1 {
+  font-size: var(--fs-xl);
 }
 
 .live-entry-content blockquote {
@@ -450,6 +457,28 @@
   color: var(--entry-accent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
+}
+
+.live-entry-content table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin-block: 0 var(--s-8);
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+
+.live-entry-content th,
+.live-entry-content td {
+  border: 1px solid var(--edge-soft);
+  padding: var(--s-4) var(--s-8);
+  text-align: start;
+}
+
+.live-entry-content th {
+  background: color-mix(in oklch, var(--surface-well) 72%, transparent);
+  font-weight: 700;
 }
 
 .live-task-card {
