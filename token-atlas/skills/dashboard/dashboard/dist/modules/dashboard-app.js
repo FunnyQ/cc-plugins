@@ -54,6 +54,41 @@ function escapeAttribute(value) {
   return escapeHtml(value).replace(/`/g, "&#96;");
 }
 
+function decodeXmlText(value) {
+  return String(value)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function readXmlTag(text, tag) {
+  const match = String(text).match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+  return match ? decodeXmlText(match[1].trim()) : "";
+}
+
+function parseTaskNotification(text) {
+  const raw = String(text).trim();
+  if (!raw.startsWith("<task-notification>")) return null;
+  const usage = readXmlTag(raw, "usage");
+  return {
+    status: readXmlTag(raw, "status") || "completed",
+    summary: readXmlTag(raw, "summary") || "Task completed",
+    result: readXmlTag(raw, "result"),
+    totalTokens: readXmlTag(usage, "total_tokens"),
+    toolUses: readXmlTag(usage, "tool_uses"),
+    durationMs: readXmlTag(usage, "duration_ms"),
+  };
+}
+
+function formatDurationMs(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+}
+
 function renderInlineMarkdown(text) {
   return escapeHtml(text)
     .replace(/`([^`]+)`/g, "<code>$1</code>")
@@ -1508,6 +1543,30 @@ export function App() {
     },
 
     renderStreamSegment(seg) {
+      if (seg.kind === "task-notification") {
+        const task = seg.task;
+        const usage = [
+          task.totalTokens ? `${fmtNum(Number(task.totalTokens))} tokens` : "",
+          task.toolUses ? `${fmtNum(Number(task.toolUses))} tools` : "",
+          formatDurationMs(task.durationMs),
+        ].filter(Boolean);
+        const result = task.result?.trim()
+          ? `<div class="live-task-result">${renderMarkdown(task.result)}</div>`
+          : "";
+        const usageHtml = usage.length
+          ? `<div class="live-task-meta">${usage
+              .map((item) => `<span>${escapeHtml(item)}</span>`)
+              .join("")}</div>`
+          : "";
+        return [
+          '<section class="live-task-card">',
+          `<div class="live-task-kicker">${escapeHtml(task.status)}</div>`,
+          `<div class="live-task-title">${escapeHtml(task.summary)}</div>`,
+          result,
+          usageHtml,
+          "</section>",
+        ].join("");
+      }
       if (seg.kind === "markdown") {
         const body = renderMarkdown(seg.text);
         if (!seg.label) return body;
@@ -1590,6 +1649,8 @@ export function App() {
     contentSegments(content) {
       if (content == null) return [];
       if (typeof content === "string") {
+        const task = parseTaskNotification(content);
+        if (task) return [{ kind: "task-notification", task }];
         return content.trim() ? [{ kind: "markdown", text: content }] : [];
       }
       if (!Array.isArray(content)) {
