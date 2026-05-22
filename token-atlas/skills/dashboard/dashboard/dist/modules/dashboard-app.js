@@ -82,6 +82,28 @@ function parseTaskNotification(text) {
   };
 }
 
+function parseSubagentNotification(text) {
+  const raw = String(text).trim();
+  if (!raw.startsWith("<subagent_notification>")) return null;
+  const body = raw
+    .replace(/^<subagent_notification>/, "")
+    .replace(/<\/subagent_notification>$/, "")
+    .trim();
+  try {
+    const data = JSON.parse(body);
+    const status = data?.status ?? {};
+    const agentPath = data?.agent_path ?? Object.keys(status)[0] ?? "";
+    const completed =
+      status?.completed ?? (agentPath ? status?.[agentPath]?.completed : "");
+    return {
+      agentPath,
+      completed: typeof completed === "string" ? completed : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function formatDurationMs(value) {
   const ms = Number(value);
   if (!Number.isFinite(ms) || ms <= 0) return "";
@@ -1567,6 +1589,19 @@ export function App() {
           "</section>",
         ].join("");
       }
+      if (seg.kind === "subagent-notification") {
+        const task = seg.task;
+        const result = task.completed
+          ? `<pre class="live-subagent-result">${escapeHtml(task.completed)}</pre>`
+          : "";
+        return [
+          '<section class="live-task-card live-subagent-card">',
+          '<div class="live-task-kicker">completed</div>',
+          '<div class="live-task-title">Subagent completed</div>',
+          result,
+          "</section>",
+        ].join("");
+      }
       if (seg.kind === "markdown") {
         const body = renderMarkdown(seg.text);
         if (!seg.label) return body;
@@ -1651,6 +1686,9 @@ export function App() {
       if (typeof content === "string") {
         const task = parseTaskNotification(content);
         if (task) return [{ kind: "task-notification", task }];
+        const subagent = parseSubagentNotification(content);
+        if (subagent)
+          return [{ kind: "subagent-notification", task: subagent }];
         return content.trim() ? [{ kind: "markdown", text: content }] : [];
       }
       if (!Array.isArray(content)) {

@@ -491,6 +491,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+.live-subagent-result {
+  margin: 0;
+  overflow-x: auto;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface) 82%, var(--surface-well));
+  padding: var(--s-8) var(--s-10);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-lg);
+  line-height: 1.45;
+  white-space: pre;
+}
+
 .live-entry-content > .live-seg {
   margin-block: 0 var(--s-8);
 }
