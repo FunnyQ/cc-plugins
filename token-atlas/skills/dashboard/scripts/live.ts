@@ -346,7 +346,8 @@ function parseEntries(lines: string[]): object[] {
       if (
         payloadType !== "message" &&
         payloadType !== "function_call" &&
-        payloadType !== "function_call_output"
+        payloadType !== "function_call_output" &&
+        payloadType !== "custom_tool_call"
       ) {
         continue;
       }

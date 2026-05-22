@@ -111,6 +111,32 @@ function formatDurationMs(value) {
   return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
 }
 
+function diffLineClass(line) {
+  if (line.startsWith("+") && !line.startsWith("+++")) return "is-add";
+  if (line.startsWith("-") && !line.startsWith("---")) return "is-remove";
+  if (line.startsWith("@@")) return "is-hunk";
+  if (
+    line.startsWith("*** ") ||
+    line.startsWith("diff ") ||
+    line.startsWith("+++ ") ||
+    line.startsWith("--- ")
+  ) {
+    return "is-meta";
+  }
+  return "";
+}
+
+function renderDiffText(text) {
+  return String(text)
+    .split("\n")
+    .map((line) => {
+      const cls = diffLineClass(line);
+      const classAttr = cls ? ` class="${cls}"` : "";
+      return `<span${classAttr}>${escapeHtml(line || " ")}</span>`;
+    })
+    .join("\n");
+}
+
 function renderInlineMarkdown(text) {
   return escapeHtml(text)
     .replace(/`([^`]+)`/g, "<code>$1</code>")
@@ -1602,6 +1628,20 @@ export function App() {
           "</section>",
         ].join("");
       }
+      if (seg.kind === "file-change") {
+        const lineCount = seg.diffText ? seg.diffText.split("\n").length : 0;
+        const summary = `${escapeHtml(seg.label)} · ${lineCount} lines`;
+        const path = seg.filePath
+          ? `<div class="live-file-path">${escapeHtml(seg.filePath)}</div>`
+          : "";
+        return [
+          '<details class="live-seg live-file-change">',
+          `<summary>${summary}</summary>`,
+          path,
+          `<pre class="live-diff">${renderDiffText(seg.diffText)}</pre>`,
+          "</details>",
+        ].join("");
+      }
       if (seg.kind === "markdown") {
         const body = renderMarkdown(seg.text);
         if (!seg.label) return body;
@@ -1647,6 +1687,18 @@ export function App() {
       if (!payload || typeof payload !== "object") return [];
       if (payload.type === "message")
         return this.contentSegments(payload.content);
+      if (payload.type === "custom_tool_call") {
+        const patch = this.patchSegment(payload.name, payload.input);
+        if (patch) return [patch];
+        return [
+          {
+            kind: "code",
+            label: payload.name ?? "tool",
+            text: this.segText(payload.input ?? payload),
+            toolUseId: payload.call_id,
+          },
+        ];
+      }
       if (payload.type === "function_call") {
         return [
           {
@@ -1667,6 +1719,21 @@ export function App() {
         ];
       }
       return [];
+    },
+
+    patchSegment(name, input) {
+      if (name !== "apply_patch" || typeof input !== "string") return null;
+      const filePath =
+        input.match(/^\*\*\* Update File: (.+)$/m)?.[1] ??
+        input.match(/^\*\*\* Add File: (.+)$/m)?.[1] ??
+        input.match(/^\*\*\* Delete File: (.+)$/m)?.[1] ??
+        "";
+      return {
+        kind: "file-change",
+        label: filePath ? `apply_patch · ${filePath}` : "apply_patch",
+        filePath,
+        diffText: input,
+      };
     },
 
     prettyJsonText(value) {
@@ -1720,6 +1787,11 @@ export function App() {
             note: true,
           });
         } else if (part.type === "tool_use") {
+          const fileChange = this.claudeFileChangeSegment(part);
+          if (fileChange) {
+            out.push(fileChange);
+            continue;
+          }
           const input =
             typeof part.input === "string"
               ? part.input
@@ -1741,6 +1813,75 @@ export function App() {
         }
       }
       return out;
+    },
+
+    claudeFileChangeSegment(part) {
+      const name = part?.name;
+      const input = part?.input;
+      if (!input || typeof input !== "object") return null;
+      const filePath = input.file_path ?? input.path ?? "";
+      if (name === "Edit") {
+        return {
+          kind: "file-change",
+          label: filePath ? `Edit · ${filePath}` : "Edit",
+          filePath,
+          diffText: [
+            `--- ${filePath || "before"}`,
+            `+++ ${filePath || "after"}`,
+            "@@",
+            ...String(input.old_string ?? "")
+              .split("\n")
+              .map((line) => `-${line}`),
+            ...String(input.new_string ?? "")
+              .split("\n")
+              .map((line) => `+${line}`),
+          ].join("\n"),
+          toolUseId: part.id,
+        };
+      }
+      if (name === "MultiEdit" && Array.isArray(input.edits)) {
+        const lines = [
+          `--- ${filePath || "before"}`,
+          `+++ ${filePath || "after"}`,
+        ];
+        for (const edit of input.edits) {
+          lines.push("@@");
+          lines.push(
+            ...String(edit.old_string ?? "")
+              .split("\n")
+              .map((line) => `-${line}`),
+          );
+          lines.push(
+            ...String(edit.new_string ?? "")
+              .split("\n")
+              .map((line) => `+${line}`),
+          );
+        }
+        return {
+          kind: "file-change",
+          label: filePath ? `MultiEdit · ${filePath}` : "MultiEdit",
+          filePath,
+          diffText: lines.join("\n"),
+          toolUseId: part.id,
+        };
+      }
+      if (name === "Write") {
+        return {
+          kind: "file-change",
+          label: filePath ? `Write · ${filePath}` : "Write",
+          filePath,
+          diffText: [
+            "--- /dev/null",
+            `+++ ${filePath || "new file"}`,
+            "@@",
+            ...String(input.content ?? "")
+              .split("\n")
+              .map((line) => `+${line}`),
+          ].join("\n"),
+          toolUseId: part.id,
+        };
+      }
+      return null;
     },
 
     // Flatten a tool-result/content value (string, array of blocks, or object)
@@ -1838,7 +1979,12 @@ export function App() {
     },
 
     streamEntryHasToolSegments(entry) {
-      if (entry?.payload?.type === "function_call") return true;
+      if (
+        entry?.payload?.type === "function_call" ||
+        entry?.payload?.type === "custom_tool_call"
+      ) {
+        return true;
+      }
       const content = entry?.message?.content;
       return (
         Array.isArray(content) &&
