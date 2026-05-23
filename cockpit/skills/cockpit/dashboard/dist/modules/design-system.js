@@ -140,7 +140,7 @@ export function initDesignSystem(rootEl) {
       loaded = true;
     } catch (e) {
       console.error("cockpit: design-system fetch failed", e);
-      rootEl.innerHTML = `<p class="placeholder">Design system unavailable.</p>`;
+      rootEl.innerHTML = `<p class="placeholder">Design system route unavailable. Restart Cockpit daemon.</p>`;
     }
   }
 
