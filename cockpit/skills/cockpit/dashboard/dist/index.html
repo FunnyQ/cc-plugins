@@ -12,8 +12,13 @@
       <header
         class="viewport"
         :class="{ 'is-idle': !selectedSessionId, 'is-collapsed': heroCollapsed, 'is-awaiting': awaitingCall }"
+        role="button"
+        tabindex="0"
+        :aria-expanded="heroCollapsed ? 'false' : 'true'"
+        :aria-label="heroCollapsed ? 'Lower viewport barrier' : 'Raise viewport barrier'"
         :title="heroCollapsed ? 'Lower barrier' : 'Raise barrier'"
         @click="toggleHero()"
+        @keydown="onHeroKeydown($event)"
       >
         <canvas class="viewport__warp" aria-hidden="true"></canvas>
         <div class="viewport__nebula" aria-hidden="true"></div>
