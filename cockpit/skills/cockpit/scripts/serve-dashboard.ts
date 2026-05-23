@@ -12,7 +12,7 @@ import {
 import { extname, resolve, relative, isAbsolute, join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { projectsPayload, sessionsPayload } from "./registry";
 import { handleLogStream } from "./log-stream";
 import { handleTranscriptStream } from "./transcript-stream";
@@ -47,20 +47,6 @@ function parsePort(): number {
 }
 
 const NO_OPEN = process.argv.includes("--no-open");
-
-function killPort(port: number): void {
-  if (process.platform === "win32") return;
-  const lsof = spawnSync("lsof", ["-ti", `tcp:${port}`], { encoding: "utf8" });
-  const pids = (lsof.stdout ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (pids.length === 0) return;
-  console.log(`Port ${port} in use by PID(s) ${pids.join(", ")} — killing.`);
-  spawnSync("kill", ["-9", ...pids]);
-  // brief settle so the next bind doesn't EADDRINUSE
-  spawnSync("sleep", ["0.2"]);
-}
 
 // ---------- PID-file reuse ----------
 
@@ -200,25 +186,47 @@ function serveStatic(pathname: string): Response {
 reuseIfRunning();
 
 const port = parsePort();
-killPort(port);
 
-const server = Bun.serve({
-  port,
-  hostname: "127.0.0.1",
-  fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === "/api/projects") return handleProjects();
-    if (url.pathname === "/api/token") return handleToken();
-    if (url.pathname === "/api/project-info") return handleProjectInfo(req);
-    if (url.pathname === "/api/sessions") return handleSessions();
-    if (url.pathname === "/api/log/stream") return handleLogStream(req);
-    if (url.pathname === "/api/transcript/stream")
-      return handleTranscriptStream(req);
-    if (url.pathname === "/api/wait") return handleWait(req);
-    if (url.pathname === "/api/respond") return handleRespond(req);
-    return serveStatic(url.pathname);
-  },
-});
+function buildServer() {
+  return Bun.serve({
+    port,
+    hostname: "127.0.0.1",
+    // The long-poll (/api/wait) holds a connection up to ~240s with no data, and
+    // the SSE streams only ping every 25s. Bun's default idleTimeout is 10s —
+    // which would silently drop a parked wait and stall live streams. Raise it to
+    // the max (255s); the broker hop (240s) and SSE pings (25s) both fit under it.
+    idleTimeout: 255,
+    fetch(req) {
+      const url = new URL(req.url);
+      if (url.pathname === "/api/projects") return handleProjects();
+      if (url.pathname === "/api/token") return handleToken();
+      if (url.pathname === "/api/project-info") return handleProjectInfo(req);
+      if (url.pathname === "/api/sessions") return handleSessions();
+      if (url.pathname === "/api/log/stream") return handleLogStream(req);
+      if (url.pathname === "/api/transcript/stream")
+        return handleTranscriptStream(req);
+      if (url.pathname === "/api/wait") return handleWait(req);
+      if (url.pathname === "/api/respond") return handleRespond(req);
+      return serveStatic(url.pathname);
+    },
+  });
+}
+
+// reuseIfRunning() already exited if a live cockpit daemon owns the PID file.
+// If we're here the port should be free; if some *other* process holds it, do
+// NOT kill it (it isn't ours) — fail with a clear message instead.
+let server: ReturnType<typeof Bun.serve>;
+try {
+  server = buildServer();
+} catch (err) {
+  if ((err as { code?: string }).code === "EADDRINUSE") {
+    console.error(
+      `cockpit: port ${port} is in use by another process — stop it or pass --port <n>.`,
+    );
+    process.exit(1);
+  }
+  throw err;
+}
 
 writeDaemonInfo({
   pid: process.pid,
