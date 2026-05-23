@@ -19,21 +19,26 @@ we're going, then log the turns a diff can't explain.
 **Opt-in.** Only run when Q invokes it (`/cockpit-start`, "設定這次的目標", …).
 Never auto-start on session open — not every session deserves a goal.
 
-## Provider
+This skill serves both **Claude Code** and **Codex**. The cockpit storage,
+decision log, dashboard, and wait/send bridge are shared by both providers; only
+a few things differ per provider, and those live in the provider reference.
+
+## Step 0 — Provider
 
 Determine which harness is running this skill:
 
-- **Claude Code**: provider is `claude`.
-- **Codex**: provider is `codex`.
+- Running in **Claude Code** → provider is `claude`.
+- Running in **Codex** → provider is `codex`.
 
-Use the same provider value for `find-session.ts` and `cockpit.ts start`.
-The cockpit storage, decision log, dashboard, and wait/send bridge are shared by
-both providers.
+Then **read the matching reference once** — it gives you the three things this
+procedure defers to it:
 
-Resolve `<plugin-root>` from the installed plugin root that contains this skill.
-In Claude Code this is usually `${CLAUDE_PLUGIN_ROOT}`. In a development checkout
-from this repository, use `cockpit` from the repo root, for example
-`bun cockpit/skills/cockpit/scripts/cockpit.ts ...`.
+- Claude Code → [references/claude.md](references/claude.md)
+- Codex → [references/codex.md](references/codex.md)
+
+Each reference defines, for its provider: the **`<plugin-root>`** used in every
+command below, the exact **session-id command** (Step 1), and the **wait
+policy** for `needs_your_call`. Everything else here is shared.
 
 ## Procedure
 
@@ -42,22 +47,10 @@ mirrors `needs_your_call`: nothing is written until Q confirms.
 
 ### 1. Determine the session id
 
-Use the current harness session id, because the dashboard uses it to join the
-decision log to the live transcript:
-
-```bash
-bun <plugin-root>/skills/cockpit/scripts/find-session.ts --provider <claude|codex>
-```
-
-- Claude: finds the most-recently-touched transcript under
-  `~/.claude/projects/**/<id>.jsonl` for this project.
-- Codex: reads `~/.codex/state_5.sqlite`, finds the latest non-archived thread
-  for this project cwd, and uses its thread id.
-
-If it exits non-zero (no transcript/thread yet), generate one
-(`crypto.randomUUID()`) and note which id you used. For Codex, prefer retrying
-once after a tool call before falling back, because the thread row normally
-exists once the session has written state.
+The dashboard uses the harness session id to join the decision log to the live
+transcript. Run the **session-id command from your provider reference**. If it
+exits non-zero, generate one (`crypto.randomUUID()`) and note which id you used
+(your reference notes any provider-specific retry first).
 
 ### 2. Propose goals (don't write yet)
 
@@ -87,8 +80,9 @@ language you'll write decision/reason/tradeoff entries in:
 
 ### 4. Write (only after confirmation)
 
-Run, substituting the confirmed text, provider, session id, and chosen language
-(omit `--log-language` to keep an existing value / default to English):
+Run, substituting the confirmed text, the provider from Step 0, the session id,
+and the chosen language (omit `--log-language` to keep an existing value /
+default to English):
 
 ```bash
 bun <plugin-root>/skills/cockpit/scripts/cockpit.ts start \
@@ -151,34 +145,24 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
 
 - `--file` and `--option` are repeatable.
 - `log` does not need `--provider` after `start`; the existing registry entry
-  keeps the provider. If logging before `start`, include `--provider codex` for
-  Codex.
+  keeps the provider. If logging before `start`, include `--provider <provider>`.
 - **Handoff (`--needs-call`)** marks the moment autopilot hands the stick back
-  to Q. Supply the choices via `--option`, then immediately run
-  `cockpit wait <id>` to park for Q's answer:
+  to Q. Supply the choices via `--option`, then immediately park with:
 
   ```bash
   bun <plugin-root>/skills/cockpit/scripts/cockpit.ts wait <id>
   ```
 
-  Harness policy:
-
-  - **Claude Code**: run `cockpit wait <id>` as a background task. Claude Code
-    surfaces completed background task output back into the conversation, so the
-    session can stay parked until Q answers in the dashboard.
-  - **Codex**: run `cockpit wait <id>` in the foreground as a blocking tool
-    call, and do not send the final response while it is waiting. The wait
-    stdout is the wake-up signal. When Q clicks a dashboard option, the command
-    prints the answer and this same turn should continue from that answer.
-  - **Other harnesses**: use foreground wait unless the harness is known to
-    resume the conversation from background task stdout.
-
-  Requires the dashboard daemon (step 5) to be running. `cockpit send <id>
+  Run `wait` according to the **wait policy in your provider reference** (Claude
+  Code parks it as a background task; Codex blocks in the foreground). It
+  requires the dashboard daemon (Step 5) to be running. `cockpit send <id>
   <answer>` is the terminal twin of a UI option button — both are part of this
   plugin's control-loop bridge between a parked session and Q's answer.
 
 ## Notes
 
+- Commands use **`<plugin-root>`**; your provider reference (Step 0) says how to
+  resolve it.
 - One session = one log file; concurrent sessions never share a file.
 - The persistent **project** goal lives only in `project-meta.md` frontmatter
   (single source of truth). It is not duplicated into the log. The log's goal
