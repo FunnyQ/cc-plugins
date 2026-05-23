@@ -133,10 +133,16 @@ export function initInfo(rootEl) {
         <span class="info-col__goal-label">Project goal</span>
         <span class="info-col__goal-text">${esc(info.projectGoal || "(no project goal)")}</span>
       </div>
-      ${metaProse ? `<section class="info-col__section"><h4 class="info-col__title">Project meta</h4>${metaProse}</section>` : ""}
-      ${claude ? `<section class="info-col__section">${claude}</section>` : ""}`;
+      ${metaProse ? `<section class="info-col__section"><h4 class="info-col__title">Project meta</h4>${metaProse}</section>` : ""}`;
+    // Design tokens render before CLAUDE.md (which can be long).
     const tokensSection = buildTokensSection(info.tokens);
     if (tokensSection) rootEl.append(tokensSection);
+    if (claude) {
+      const claudeSection = document.createElement("section");
+      claudeSection.className = "info-col__section";
+      claudeSection.innerHTML = claude;
+      rootEl.append(claudeSection);
+    }
   }
 
   async function load(project) {
