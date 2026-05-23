@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 // cockpit CLI — produces the kernel data: session goal + decision trail,
 // plus the control-loop client (wait/send) that talks to the daemon broker.
-//   cockpit start --session <id> --session-goal X --project-goal Y [--owner Q]
+//   cockpit start --session <id> --session-goal X --project-goal Y [--owner user]
 //   cockpit log   --session <id> --decision D --reason R [--tradeoff T]
 //                 [--file p ...] [--option o ...] [--needs-call]
-//   cockpit wait  <sessionId>            # park (long-poll) until Q answers; prints the answer
+//   cockpit wait  <sessionId>            # park (long-poll) until the user answers; prints the answer
 //   cockpit send  <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
 import {
   appendFileSync,
@@ -228,7 +228,7 @@ function cmdStart(args: Args): void {
   const sessionId = args.single["session"] || crypto.randomUUID();
   const sessionGoal = args.single["session-goal"] || "";
   const projectGoal = args.single["project-goal"] || "";
-  const owner = args.single["owner"] || "Q";
+  const owner = args.single["owner"] || "user";
   const logLanguage = args.single["log-language"] || "";
 
   mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
@@ -326,7 +326,7 @@ function positionals(rest: string[]): string[] {
 
 // `cockpit wait <sessionId>` — launched as a background task right after a
 // `--needs-call` log. Long-polls /api/wait; on the re-pollable timeout sentinel
-// it loops again, so a single connection drop doesn't lose Q's pending answer.
+// it loops again, so a single connection drop doesn't lose the user's pending answer.
 async function cmdWait(rest: string[]): Promise<void> {
   const sessionId = positionals(rest)[0];
   if (!sessionId) {

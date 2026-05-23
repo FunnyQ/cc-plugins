@@ -27,5 +27,5 @@ you used.
 
 Run `cockpit wait <id>` as a **background task** (`run_in_background: true`).
 Claude Code surfaces completed background-task output back into the conversation,
-so the session can stay parked until Q answers in the dashboard, after which you
+so the session can stay parked until the user answers in the dashboard, after which you
 are re-invoked with the answer. Never block the foreground on it.

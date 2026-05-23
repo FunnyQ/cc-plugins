@@ -26,5 +26,5 @@ call** before falling back to `crypto.randomUUID()`.
 
 Run `cockpit wait <id>` in the **foreground as a blocking tool call**, and do not
 send the final response while it is waiting. The wait's stdout is the wake-up
-signal: when Q clicks a dashboard option, the command prints the answer and this
+signal: when the user clicks a dashboard option, the command prints the answer and this
 same turn should continue from that answer.
