@@ -139,10 +139,10 @@ export function initDecisionLog(rootEl) {
       ${rec.needs_your_call ? '<div class="decision-card__badge">🕹 needs your call</div>' : ""}
       <header class="decision-card__head">
         <div class="decision-card__decision">${mdInline(rec.decision)}</div>
-        <time class="decision-card__time">${relTime(rec.timestamp)}</time>
+        <time class="decision-card__time" datetime="${esc(rec.timestamp || "")}">${relTime(rec.timestamp)}</time>
       </header>
       <div class="decision-card__reason">${md(rec.reason)}</div>
-      ${rec.tradeoff ? `<p class="decision-card__tradeoff">gave up: ${esc(rec.tradeoff)}</p>` : ""}
+      ${rec.tradeoff ? `<p class="decision-card__tradeoff">tradeoff: ${esc(rec.tradeoff)}</p>` : ""}
       ${files ? `<div class="decision-card__files">${files}</div>` : ""}
       ${options ? `<ul class="decision-card__options">${options}</ul>` : ""}
       ${rec.needs_your_call ? respondForm(rec) : ""}
@@ -292,6 +292,15 @@ export function initDecisionLog(rootEl) {
       // EventSource auto-reconnects; dedupe guards against backlog resends.
     };
   }
+
+  // Each card's relative time ("3m ago") is rendered once when the card is
+  // created, so without a ticker it freezes — a live-logged card stays at
+  // "0s ago" forever. Refresh all cards periodically from each <time>'s
+  // datetime attribute (the source-of-truth ISO timestamp).
+  setInterval(() => {
+    for (const el of cardsEl.querySelectorAll(".decision-card__time[datetime]"))
+      el.textContent = relTime(el.getAttribute("datetime"));
+  }, 15_000);
 
   store.subscribe((project, session) => open(project, session));
   // Open immediately for the current selection (set before this mounts).
