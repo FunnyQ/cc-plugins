@@ -14,6 +14,7 @@ import { initLead } from "./modules/lead.js";
 import { initDesignSystem } from "./modules/design-system.js";
 
 const POLL_MS = 3000;
+const HERO_AUTO_COLLAPSE_MS = 60_000;
 
 function sortActiveFirst(sessions) {
   return [...sessions].sort((a, b) => {
@@ -120,11 +121,15 @@ export const store = reactive({
     this.manifestOpen = !this.manifestOpen;
   },
 
-  toggleHero() {
-    this.heroCollapsed = !this.heroCollapsed;
+  setHeroCollapsed(collapsed) {
+    this.heroCollapsed = collapsed;
     if (!this._starfield) return;
     if (this.heroCollapsed) this._starfield.pause();
     else this._starfield.resume();
+  },
+
+  toggleHero() {
+    this.setHeroCollapsed(!this.heroCollapsed);
   },
 
   onHeroKeydown(e) {
@@ -277,6 +282,9 @@ startPolling();
 // The viewport warp starfield (canvas behind the HUD). Keep the control so the
 // hero toggle can pause/resume it.
 store._starfield = initStarfield(document.querySelector(".viewport__warp"));
+window.setTimeout(() => {
+  if (!store.heroCollapsed) store.setHeroCollapsed(true);
+}, HERO_AUTO_COLLAPSE_MS);
 
 // The HUD leader line (underline under the destination → connector to beacon).
 initLead({
