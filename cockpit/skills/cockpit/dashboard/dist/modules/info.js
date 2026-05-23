@@ -125,7 +125,7 @@ export function initInfo(rootEl) {
     ]
       .filter(([, body]) => body)
       .map(
-        ([name, body]) => `<details class="info-col__instructions" open>
+        ([name, body]) => `<details class="info-col__instructions">
            <summary>${esc(name)}</summary>
            <div class="info-col__prose markdown">${md(body)}</div>
          </details>`,
