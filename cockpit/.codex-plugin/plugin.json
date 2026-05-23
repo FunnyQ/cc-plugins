@@ -18,7 +18,7 @@
   "interface": {
     "displayName": "Cockpit",
     "shortDescription": "Goal + decision cockpit for Claude Code and Codex.",
-    "longDescription": "A local dashboard and skill for setting a session goal, logging decisions that diffs cannot explain, streaming the live transcript, and handing needs_your_call choices back to Q.",
+    "longDescription": "A local dashboard and skill for setting a session goal, logging decisions that diffs cannot explain, streaming the live transcript, and handing needs_your_call choices back to the user.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
