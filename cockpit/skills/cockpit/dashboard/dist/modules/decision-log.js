@@ -36,10 +36,10 @@ function relTime(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-// Stable, content-derived dedupe key — NOT receive order. The SSE server resends
-// the whole backlog on every reconnect, so a key must map a given record to the
-// same string each time it arrives or reconnects would duplicate every card.
+// Stable dedupe key — NOT receive order. New records carry ids; old JSONL logs
+// fall back to content-derived keys so reconnects still avoid duplicate cards.
 function recordKey(rec) {
+  if (rec.id) return `${rec.type}|${rec.id}`;
   if (rec.type === "goal") return "goal"; // one goal record per session (singleton)
   if (rec.type === "decision")
     return `decision|${rec.timestamp || ""}|${rec.decision || ""}`;
@@ -64,7 +64,7 @@ export function initDecisionLog(rootEl) {
   if (!rootEl) return;
 
   let es = null;
-  const seen = new Set(); // dedupe reconnect resends by stable content key
+  const seen = new Set(); // dedupe reconnect resends by stable record key
   let lastOpenCall = null; // most recent unresolved needs_your_call card
   let currentSession = null;
 

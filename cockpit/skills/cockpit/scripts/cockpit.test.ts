@@ -154,7 +154,7 @@ describe("cockpit log", () => {
     ]);
   });
 
-  test("appends one valid 8-field decision record with defaults", () => {
+  test("appends one valid decision record with defaults", () => {
     const r = run([
       "log",
       "--session",
@@ -172,6 +172,7 @@ describe("cockpit log", () => {
       [
         "decision",
         "files",
+        "id",
         "needs_your_call",
         "options",
         "reason",
@@ -180,6 +181,7 @@ describe("cockpit log", () => {
         "type",
       ].sort(),
     );
+    expect(rec.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(rec.type).toBe("decision");
     expect(rec.decision).toBe("chose X");
     expect(rec.reason).toBe("Y");

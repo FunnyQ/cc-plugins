@@ -109,7 +109,12 @@ export async function handleRespond(req: Request): Promise<Response> {
   // Append a durable response record (streams to the UI via the log SSE).
   const logPath = logPathFor(session);
   if (logPath) {
-    const rec = { type: "response", answer, ts: new Date().toISOString() };
+    const rec = {
+      id: crypto.randomUUID(),
+      type: "response",
+      answer,
+      ts: new Date().toISOString(),
+    };
     try {
       appendFileSync(logPath, JSON.stringify(rec) + "\n");
     } catch {

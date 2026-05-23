@@ -53,6 +53,19 @@ function badTokenHome(): string {
   return home;
 }
 
+function staleDaemonHome(): string {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-stale-")));
+  writeFileSync(
+    join(home, "daemon.json"),
+    JSON.stringify({
+      pid: process.pid,
+      port: freePort(),
+      token: "stale-token",
+    }),
+  );
+  return home;
+}
+
 async function waitForDaemon(p: number, timeoutMs = 8000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -182,6 +195,22 @@ describe("auth / validation errors (non-2xx must not be misreported)", () => {
     expect(r.stderr.toLowerCase()).toContain("invalid session");
     expect(r.stdout).not.toContain("delivered");
   });
+
+  test("wait with a stale daemon port exits quickly instead of waiting to the ceiling", () => {
+    const home = staleDaemonHome();
+    try {
+      const t0 = Date.now();
+      const r = runCli(["wait", SID], home, projectDir, {
+        COCKPIT_WAIT_MAX_MS: "8000",
+      });
+      const elapsed = Date.now() - t0;
+      expect(r.code).not.toBe(0);
+      expect(r.stderr.toLowerCase()).toContain("lost connection");
+      expect(elapsed).toBeLessThan(5000);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 10000);
 });
 
 describe("daemon down", () => {
