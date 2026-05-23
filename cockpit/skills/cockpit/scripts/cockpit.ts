@@ -21,6 +21,7 @@ import { join } from "node:path";
 type GoalRecord = { type: "goal"; session_goal: string; ts: string };
 
 type DecisionRecord = {
+  id: string;
   type: "decision";
   decision: string;
   reason: string;
@@ -206,6 +207,7 @@ function cmdLog(args: Args): void {
     process.exit(1);
   }
   const rec: DecisionRecord = {
+    id: crypto.randomUUID(),
     type: "decision",
     decision: args.single["decision"] || "",
     reason: args.single["reason"] || "",
@@ -227,6 +229,7 @@ function cmdLog(args: Args): void {
 // ---------- Daemon broker client (wait / send) ----------
 
 type DaemonInfo = { pid: number; port: number; token: string };
+const MAX_WAIT_CONNECTION_FAILURES = 3;
 
 function readDaemon(): DaemonInfo | null {
   try {
@@ -240,9 +243,18 @@ function readDaemon(): DaemonInfo | null {
   return null;
 }
 
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException)?.code === "EPERM";
+  }
+}
+
 function requireDaemon(): DaemonInfo {
   const d = readDaemon();
-  if (!d) {
+  if (!d || (typeof d.pid === "number" && !isAlive(d.pid))) {
     console.error("cockpit daemon not running — start the dashboard first");
     process.exit(1);
   }
@@ -272,13 +284,27 @@ async function cmdWait(rest: string[]): Promise<void> {
     `?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(d.token)}`;
 
   const start = Date.now();
+  let connectionFailures = 0;
   while (Date.now() - start < maxMs) {
     let res: Response;
     try {
       res = await fetch(url);
-    } catch {
-      // Transient (e.g. the daemon is restarting). Pause briefly and re-poll
-      // within the wall-clock ceiling rather than losing Q's pending answer.
+      connectionFailures = 0;
+    } catch (err) {
+      connectionFailures++;
+      const fresh = readDaemon();
+      if (
+        !fresh ||
+        (typeof fresh.pid === "number" && !isAlive(fresh.pid)) ||
+        fresh.port !== d.port ||
+        fresh.token !== d.token ||
+        connectionFailures >= MAX_WAIT_CONNECTION_FAILURES
+      ) {
+        console.error(
+          `cockpit wait: lost connection to daemon (${(err as Error).message})`,
+        );
+        process.exit(1);
+      }
       await Bun.sleep(1000);
       continue;
     }

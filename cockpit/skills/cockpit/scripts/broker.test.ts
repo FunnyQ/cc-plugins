@@ -108,6 +108,7 @@ describe("wait + respond round-trip", () => {
     expect(woken).toEqual({ answer: "yes" });
 
     const last = logLines(projA, SID_A).at(-1);
+    expect(last.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(last.type).toBe("response");
     expect(last.answer).toBe("yes");
     expect(last.ts).toBeTruthy();
@@ -150,6 +151,7 @@ describe("unparked respond", () => {
       type: "response",
       answer: "nobody-home",
     });
+    expect(lines.at(-1).id).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 
