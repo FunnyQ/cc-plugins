@@ -9,7 +9,6 @@ import {
 } from "./modules/project-rail.js";
 import { initDecisionLog } from "./modules/decision-log.js";
 import { initTranscript } from "./modules/transcript.js";
-import { initInfo } from "./modules/info.js";
 import { initStarfield } from "./modules/starfield.js";
 import { initLead } from "./modules/lead.js";
 import { initDesignSystem } from "./modules/design-system.js";
@@ -54,10 +53,6 @@ export const store = reactive({
   // current project + goal, so the project list stays out of the way until
   // opened. Toggled by the manifest bar.
   manifestOpen: false,
-  // Project Info modal: the project path whose info is open (null = closed).
-  infoModalProject: null,
-  // Set by initInfo() so openInfo() can drive the modal's content on demand.
-  _loadInfo: null,
   designSystemOpen: false,
   _loadDesignSystem: null,
 
@@ -157,25 +152,6 @@ export const store = reactive({
   isProjectExpanded(group) {
     const o = this.expandedOverrides[group.project];
     return o === undefined ? defaultExpanded(group) : o;
-  },
-
-  get infoModalName() {
-    if (!this.infoModalProject) return "";
-    return (
-      this.infoModalProject.split("/").filter(Boolean).pop() ||
-      this.infoModalProject
-    );
-  },
-
-  // Open the Project Info modal for a rail group (info button is @click.stop so
-  // it never toggles the project's collapse).
-  openInfo(group) {
-    this.infoModalProject = group.project;
-    if (this._loadInfo) this._loadInfo(group.project);
-  },
-
-  closeInfo() {
-    this.infoModalProject = null;
   },
 
   openDesignSystem() {
@@ -314,17 +290,12 @@ initLead({
 // Mount the imperative columns (they read the store + subscribe to selection).
 initTranscript(document.querySelector('[data-column="transcript"]'));
 initDecisionLog(document.querySelector('[data-column="decision"]'));
-// Project Info is modal-driven now: initInfo returns a load(project) the store
-// calls from openInfo() instead of following the session selection.
-const info = initInfo(document.querySelector('[data-column="info"]'));
-store._loadInfo = info && info.load;
 const designSystem = initDesignSystem(
   document.querySelector('[data-column="design-system"]'),
 );
 store._loadDesignSystem = designSystem && designSystem.load;
 
-// Escape closes modal/drawer overlays.
+// Escape closes drawer overlays.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && store.infoModalProject) store.closeInfo();
   if (e.key === "Escape" && store.designSystemOpen) store.closeDesignSystem();
 });
