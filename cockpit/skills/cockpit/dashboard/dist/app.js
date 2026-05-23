@@ -9,11 +9,12 @@ import {
 } from "./modules/project-rail.js";
 import { initDecisionLog } from "./modules/decision-log.js";
 import { initTranscript } from "./modules/transcript.js";
-import { initInfo } from "./modules/info.js";
 import { initStarfield } from "./modules/starfield.js";
 import { initLead } from "./modules/lead.js";
+import { initDesignSystem } from "./modules/design-system.js";
 
 const POLL_MS = 3000;
+const HERO_AUTO_COLLAPSE_MS = 60_000;
 
 function sortActiveFirst(sessions) {
   return [...sessions].sort((a, b) => {
@@ -53,10 +54,8 @@ export const store = reactive({
   // current project + goal, so the project list stays out of the way until
   // opened. Toggled by the manifest bar.
   manifestOpen: false,
-  // Project Info modal: the project path whose info is open (null = closed).
-  infoModalProject: null,
-  // Set by initInfo() so openInfo() can drive the modal's content on demand.
-  _loadInfo: null,
+  designSystemOpen: false,
+  _loadDesignSystem: null,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -122,11 +121,15 @@ export const store = reactive({
     this.manifestOpen = !this.manifestOpen;
   },
 
-  toggleHero() {
-    this.heroCollapsed = !this.heroCollapsed;
+  setHeroCollapsed(collapsed) {
+    this.heroCollapsed = collapsed;
     if (!this._starfield) return;
     if (this.heroCollapsed) this._starfield.pause();
     else this._starfield.resume();
+  },
+
+  toggleHero() {
+    this.setHeroCollapsed(!this.heroCollapsed);
   },
 
   onHeroKeydown(e) {
@@ -156,23 +159,18 @@ export const store = reactive({
     return o === undefined ? defaultExpanded(group) : o;
   },
 
-  get infoModalName() {
-    if (!this.infoModalProject) return "";
-    return (
-      this.infoModalProject.split("/").filter(Boolean).pop() ||
-      this.infoModalProject
-    );
+  openDesignSystem() {
+    this.designSystemOpen = true;
+    if (this._loadDesignSystem) this._loadDesignSystem();
   },
 
-  // Open the Project Info modal for a rail group (info button is @click.stop so
-  // it never toggles the project's collapse).
-  openInfo(group) {
-    this.infoModalProject = group.project;
-    if (this._loadInfo) this._loadInfo(group.project);
+  toggleDesignSystem() {
+    if (this.designSystemOpen) this.closeDesignSystem();
+    else this.openDesignSystem();
   },
 
-  closeInfo() {
-    this.infoModalProject = null;
+  closeDesignSystem() {
+    this.designSystemOpen = false;
   },
 
   toggleProject(group) {
@@ -284,6 +282,9 @@ startPolling();
 // The viewport warp starfield (canvas behind the HUD). Keep the control so the
 // hero toggle can pause/resume it.
 store._starfield = initStarfield(document.querySelector(".viewport__warp"));
+window.setTimeout(() => {
+  if (!store.heroCollapsed) store.setHeroCollapsed(true);
+}, HERO_AUTO_COLLAPSE_MS);
 
 // The HUD leader line (underline under the destination → connector to beacon).
 initLead({
@@ -297,12 +298,12 @@ initLead({
 // Mount the imperative columns (they read the store + subscribe to selection).
 initTranscript(document.querySelector('[data-column="transcript"]'));
 initDecisionLog(document.querySelector('[data-column="decision"]'));
-// Project Info is modal-driven now: initInfo returns a load(project) the store
-// calls from openInfo() instead of following the session selection.
-const info = initInfo(document.querySelector('[data-column="info"]'));
-store._loadInfo = info && info.load;
+const designSystem = initDesignSystem(
+  document.querySelector('[data-column="design-system"]'),
+);
+store._loadDesignSystem = designSystem && designSystem.load;
 
-// Escape closes the Project Info modal.
+// Escape closes drawer overlays.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && store.infoModalProject) store.closeInfo();
+  if (e.key === "Escape" && store.designSystemOpen) store.closeDesignSystem();
 });

@@ -63,6 +63,19 @@
         </div>
       </header>
 
+      <button
+        class="design-toggle"
+        type="button"
+        :aria-expanded="designSystemOpen ? 'true' : 'false'"
+        aria-controls="design-system-panel"
+        @click="toggleDesignSystem()"
+      >
+        <span class="design-toggle__mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span class="design-toggle__label">Design</span>
+      </button>
+
       <!-- MANIFEST — collapsed by default; the viewport already names the flight -->
       <nav class="manifest" :class="{ 'is-open': manifestOpen }">
         <button
@@ -71,17 +84,15 @@
           :aria-expanded="manifestOpen ? 'true' : 'false'"
           @click="toggleManifest()"
         >
-          <span class="manifest__caret" :class="{ 'is-open': manifestOpen }"
-            >▸</span
-          >
           <span class="manifest__legend">Projects</span>
+          <span
+            class="manifest__beacon"
+            :class="{ 'is-open': manifestOpen }"
+            aria-hidden="true"
+          ></span>
           <span
             class="manifest__count readout"
             v-text="projectGroups.length + ' flights'"
-          ></span>
-          <span
-            class="manifest__hint"
-            v-text="manifestOpen ? 'Close' : 'Open'"
           ></span>
         </button>
 
@@ -113,15 +124,6 @@
                     v-text="g.activeCount + '/' + g.sessionCount"
                   ></span>
                 </span>
-                <button
-                  class="flight__info"
-                  type="button"
-                  title="Project info"
-                  aria-label="Project info"
-                  @click.stop="openInfo(g)"
-                >
-                  ⓘ
-                </button>
               </div>
               <ul class="flight__legs" v-show="isProjectExpanded(g)">
                 <template v-for="s in g.sessions" :key="s.sessionId">
@@ -133,6 +135,7 @@
                     <span class="status-led" :class="s.status"></span>
                     <span
                       class="provider-badge"
+                      :class="'provider-badge--' + (s.provider || 'claude')"
                       v-text="(s.provider || 'claude').toUpperCase()"
                     ></span>
                     <span class="leg__goal" v-text="shortGoal(s)"></span>
@@ -168,30 +171,29 @@
         </section>
       </main>
 
-      <div class="info-modal" v-show="infoModalProject" @click="closeInfo()">
-        <div
-          class="info-modal__dialog"
-          role="dialog"
-          aria-modal="true"
-          @click.stop
-        >
-          <header class="info-modal__header">
-            <span class="info-modal__legend">Project Info</span>
-            <span class="info-modal__name" v-text="infoModalName"></span>
-            <button
-              class="info-modal__close"
-              type="button"
-              aria-label="Close"
-              @click="closeInfo()"
-            >
-              ✕
-            </button>
-          </header>
-          <div class="info-modal__body" data-column="info">
-            <p class="placeholder">Project goal, meta &amp; instructions.</p>
-          </div>
+      <aside
+        id="design-system-panel"
+        class="design-panel"
+        :class="{ 'is-open': designSystemOpen }"
+        v-show="designSystemOpen"
+        aria-label="Design system"
+        :aria-hidden="designSystemOpen ? 'false' : 'true'"
+      >
+        <header class="design-panel__header">
+          <span class="design-panel__legend">Cockpit System</span>
+          <button
+            class="design-panel__close"
+            type="button"
+            aria-label="Close design system"
+            @click="closeDesignSystem()"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="design-panel__body" data-column="design-system">
+          <p class="placeholder">Design tokens and component rules.</p>
         </div>
-      </div>
+      </aside>
     </div>
 
     <script type="module" src="./app.js"></script>
