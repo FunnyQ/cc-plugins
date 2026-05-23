@@ -2,3 +2,7 @@
 
 # cockpit runtime state (per-project meta + session logs)
 .cockpit/
+
+# impeccable live mode (local dev artifacts)
+.impeccable-live.json
+.impeccable-live/

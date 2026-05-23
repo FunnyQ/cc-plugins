@@ -18,6 +18,7 @@ import { handleLogStream } from "./log-stream";
 import { handleTranscriptStream } from "./transcript-stream";
 import { handleWait, handleRespond } from "./broker";
 import { handleProjectInfo } from "./project-info";
+import { handleDesignSystem } from "./design-system";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
@@ -200,6 +201,7 @@ function buildServer() {
       const url = new URL(req.url);
       if (url.pathname === "/api/projects") return handleProjects();
       if (url.pathname === "/api/token") return handleToken();
+      if (url.pathname === "/api/design-system") return handleDesignSystem();
       if (url.pathname === "/api/project-info") return handleProjectInfo(req);
       if (url.pathname === "/api/sessions") return handleSessions();
       if (url.pathname === "/api/log/stream") return handleLogStream(req);
