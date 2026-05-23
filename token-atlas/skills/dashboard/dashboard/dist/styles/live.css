@@ -397,7 +397,7 @@
   max-inline-size: 100%;
   margin: 0;
   color: var(--text);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
   line-height: 1.5;
   overflow-wrap: anywhere;
   word-break: break-word;
