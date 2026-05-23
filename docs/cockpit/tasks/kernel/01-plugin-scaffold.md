@@ -5,7 +5,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: kernel/02, server/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
