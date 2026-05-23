@@ -336,6 +336,16 @@
   background: color-mix(in oklch, var(--surface) 88%, var(--surface-well));
 }
 
+/* Bubbles holding wide block children (tables, code blocks) take a definite
+   width instead of shrink-wrapping, so the child's `max-width: 100%` resolves
+   and `overflow-x: auto` scrolls rather than overflowing the bubble. */
+.live-entry.is-user.has-wide-content .live-entry-content,
+.live-entry.is-message.has-wide-content .live-entry-content,
+.live-entry.is-assistant.has-wide-content:not(.has-tool-segments)
+  .live-entry-content {
+  width: 100%;
+}
+
 .live-entry.is-tool,
 .live-entry.is-tool_result,
 .live-entry.is-tool-use,
@@ -345,6 +355,13 @@
 .live-entry.has-tool-segments {
   --entry-accent: var(--sunrise-amber);
 
+  /* The card's border + larger padding push the grid right of plain entries
+     (border 1px + the s-10/s-4 padding gap). Pull the role column in by the
+     same amount so tool content lines up with assistant/user content. */
+  grid-template-columns: calc(88px - 1px - (var(--s-10) - var(--s-4))) minmax(
+      0,
+      1fr
+    );
   margin-block: var(--s-8);
   border: 1px solid
     color-mix(in oklch, var(--entry-accent) 28%, var(--edge-soft));
@@ -588,6 +605,10 @@
   border: 1px solid var(--edge-soft);
   padding: var(--s-4) var(--s-8);
   text-align: start;
+  /* Keep cells on one line so the table holds its max-content width and
+     scrolls horizontally (via the table's overflow-x: auto) instead of
+     wrapping into cramped multi-line cells. */
+  white-space: nowrap;
 }
 
 .live-entry-content th {
@@ -597,8 +618,14 @@
 
 .live-task-card {
   display: grid;
+  /* Cap the track at the available width — without this the implicit `auto`
+     column grows to a wide child's max-content (e.g. a markdown table) and
+     bursts the card out of its parent. With it, wide tables / <pre> scroll
+     inside their own `overflow-x: auto` while the header stays put. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s-8);
   min-width: min(620px, 100%);
+  max-inline-size: 100%;
 }
 
 .live-task-kicker {
