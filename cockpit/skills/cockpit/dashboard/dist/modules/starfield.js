@@ -5,7 +5,7 @@
 // not a launch sequence. No dependencies; pauses when the tab is hidden and
 // renders a single static frame under prefers-reduced-motion.
 
-const COUNT = 360;
+const COUNT = 560;
 // z units travelled per millisecond — the warp speed. Small = slow cruise.
 const SPEED = 0.00018;
 // Canvas can't be trusted to parse oklch() across engines, so the two star
