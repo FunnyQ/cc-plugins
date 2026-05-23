@@ -355,6 +355,13 @@
 .live-entry.has-tool-segments {
   --entry-accent: var(--sunrise-amber);
 
+  /* The card's border + larger padding push the grid right of plain entries
+     (border 1px + the s-10/s-4 padding gap). Pull the role column in by the
+     same amount so tool content lines up with assistant/user content. */
+  grid-template-columns: calc(88px - 1px - (var(--s-10) - var(--s-4))) minmax(
+      0,
+      1fr
+    );
   margin-block: var(--s-8);
   border: 1px solid
     color-mix(in oklch, var(--entry-accent) 28%, var(--edge-soft));
