@@ -1,0 +1,242 @@
+#!/usr/bin/env bun
+// cockpit CLI — produces the kernel data: session goal + decision trail.
+//   cockpit start --session <id> --session-goal X --project-goal Y [--owner Q]
+//   cockpit log   --session <id> --decision D --reason R [--tradeoff T]
+//                 [--file p ...] [--option o ...] [--needs-call]
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+// ---------- Types ----------
+
+type GoalRecord = { type: "goal"; session_goal: string; ts: string };
+
+type DecisionRecord = {
+  type: "decision";
+  decision: string;
+  reason: string;
+  tradeoff: string;
+  needs_your_call: boolean;
+  options: string[];
+  files: string[];
+  timestamp: string;
+};
+
+type RegistryEntry = {
+  project: string;
+  sessionId: string;
+  logPath: string;
+  lastHeartbeat: string;
+};
+
+type Registry = { sessions: RegistryEntry[] };
+
+// ---------- Paths ----------
+
+const COCKPIT_HOME = process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
+const REGISTRY_PATH = join(COCKPIT_HOME, "registry.json");
+
+function projectCockpitDir(project: string): string {
+  return join(project, ".cockpit");
+}
+
+function logPathFor(project: string, sessionId: string): string {
+  return join(projectCockpitDir(project), "logs", `${sessionId}.jsonl`);
+}
+
+// ---------- Arg parsing ----------
+
+type Args = {
+  single: Record<string, string>;
+  repeated: Record<string, string[]>;
+  flags: Set<string>;
+};
+
+const SINGLE_FLAGS = new Set([
+  "session",
+  "session-goal",
+  "project-goal",
+  "owner",
+  "decision",
+  "reason",
+  "tradeoff",
+]);
+const REPEATED_FLAGS = new Set(["file", "option"]);
+const BOOL_FLAGS = new Set(["needs-call"]);
+
+function parseArgs(argv: string[]): Args {
+  const single: Record<string, string> = {};
+  const repeated: Record<string, string[]> = {};
+  const flags = new Set<string>();
+  for (let i = 0; i < argv.length; i++) {
+    const tok = argv[i];
+    if (!tok.startsWith("--")) continue;
+    const name = tok.slice(2);
+    if (BOOL_FLAGS.has(name)) {
+      flags.add(name);
+    } else if (REPEATED_FLAGS.has(name)) {
+      (repeated[name] ||= []).push(argv[++i]);
+    } else if (SINGLE_FLAGS.has(name)) {
+      single[name] = argv[++i];
+    } else {
+      // unknown flag with a value — capture it loosely
+      single[name] = argv[++i];
+    }
+  }
+  return { single, repeated, flags };
+}
+
+// ---------- Registry ----------
+
+function readRegistry(): Registry {
+  try {
+    const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf8"));
+    if (raw && Array.isArray(raw.sessions)) return raw as Registry;
+  } catch {
+    // missing or corrupt → start fresh
+  }
+  return { sessions: [] };
+}
+
+function upsertSession(entry: RegistryEntry): void {
+  mkdirSync(COCKPIT_HOME, { recursive: true });
+  const reg = readRegistry();
+  const idx = reg.sessions.findIndex((s) => s.sessionId === entry.sessionId);
+  if (idx >= 0) reg.sessions[idx] = entry;
+  else reg.sessions.push(entry);
+  writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
+}
+
+function refreshHeartbeat(project: string, sessionId: string): void {
+  const reg = readRegistry();
+  const entry = reg.sessions.find((s) => s.sessionId === sessionId);
+  const now = new Date().toISOString();
+  if (entry) {
+    entry.lastHeartbeat = now;
+    mkdirSync(COCKPIT_HOME, { recursive: true });
+    writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
+  } else {
+    upsertSession({
+      project,
+      sessionId,
+      logPath: logPathFor(project, sessionId),
+      lastHeartbeat: now,
+    });
+  }
+}
+
+// ---------- project-meta.md ----------
+
+function readCreated(metaPath: string): string | undefined {
+  if (!existsSync(metaPath)) return undefined;
+  const m = readFileSync(metaPath, "utf8").match(/^created:\s*(\S+)\s*$/m);
+  return m?.[1];
+}
+
+function writeProjectMeta(
+  project: string,
+  projectGoal: string,
+  owner: string,
+): void {
+  const metaPath = join(projectCockpitDir(project), "project-meta.md");
+  const created = readCreated(metaPath) || new Date().toISOString();
+  const body = [
+    "---",
+    `project_goal: ${projectGoal}`,
+    `created: ${created}`,
+    `owner: ${owner}`,
+    "---",
+    "",
+    "Longer prose describing the project's purpose, constraints, north star.",
+    "Free-form — hand-edit or regenerate as the project evolves.",
+    "",
+  ].join("\n");
+  writeFileSync(metaPath, body);
+}
+
+// ---------- Subcommands ----------
+
+function cmdStart(args: Args): void {
+  const project = process.cwd();
+  const sessionId = args.single["session"] || crypto.randomUUID();
+  const sessionGoal = args.single["session-goal"] || "";
+  const projectGoal = args.single["project-goal"] || "";
+  const owner = args.single["owner"] || "Q";
+
+  mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
+  writeProjectMeta(project, projectGoal, owner);
+
+  const logPath = logPathFor(project, sessionId);
+  const goal: GoalRecord = {
+    type: "goal",
+    session_goal: sessionGoal,
+    ts: new Date().toISOString(),
+  };
+  writeFileSync(logPath, JSON.stringify(goal) + "\n");
+
+  upsertSession({
+    project,
+    sessionId,
+    logPath,
+    lastHeartbeat: new Date().toISOString(),
+  });
+
+  console.log(`cockpit: started session ${sessionId}`);
+  console.log(
+    `  meta:  ${join(projectCockpitDir(project), "project-meta.md")}`,
+  );
+  console.log(`  log:   ${logPath}`);
+}
+
+function cmdLog(args: Args): void {
+  const project = process.cwd();
+  const sessionId = args.single["session"];
+  if (!sessionId) {
+    console.error("cockpit log: --session <id> is required");
+    process.exit(1);
+  }
+  const rec: DecisionRecord = {
+    type: "decision",
+    decision: args.single["decision"] || "",
+    reason: args.single["reason"] || "",
+    tradeoff: args.single["tradeoff"] || "",
+    needs_your_call: args.flags.has("needs-call"),
+    options: args.repeated["option"] || [],
+    files: args.repeated["file"] || [],
+    timestamp: new Date().toISOString(),
+  };
+
+  const logPath = logPathFor(project, sessionId);
+  mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
+  appendFileSync(logPath, JSON.stringify(rec) + "\n");
+  refreshHeartbeat(project, sessionId);
+
+  console.log(`cockpit: logged decision for ${sessionId}`);
+}
+
+// ---------- Main ----------
+
+function main(): void {
+  const [sub, ...rest] = process.argv.slice(2);
+  const args = parseArgs(rest);
+  switch (sub) {
+    case "start":
+      cmdStart(args);
+      break;
+    case "log":
+      cmdLog(args);
+      break;
+    default:
+      console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
+      console.error("usage: cockpit <start|log> [flags]");
+      process.exit(1);
+  }
+}
+
+main();
