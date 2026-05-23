@@ -63,6 +63,19 @@
         </div>
       </header>
 
+      <button
+        class="design-toggle"
+        type="button"
+        :aria-expanded="designSystemOpen ? 'true' : 'false'"
+        aria-controls="design-system-panel"
+        @click="toggleDesignSystem()"
+      >
+        <span class="design-toggle__mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span class="design-toggle__label">Design</span>
+      </button>
+
       <!-- MANIFEST — collapsed by default; the viewport already names the flight -->
       <nav class="manifest" :class="{ 'is-open': manifestOpen }">
         <button
@@ -192,6 +205,30 @@
           </div>
         </div>
       </div>
+
+      <aside
+        id="design-system-panel"
+        class="design-panel"
+        :class="{ 'is-open': designSystemOpen }"
+        v-show="designSystemOpen"
+        aria-label="Design system"
+        :aria-hidden="designSystemOpen ? 'false' : 'true'"
+      >
+        <header class="design-panel__header">
+          <span class="design-panel__legend">Cockpit System</span>
+          <button
+            class="design-panel__close"
+            type="button"
+            aria-label="Close design system"
+            @click="closeDesignSystem()"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="design-panel__body" data-column="design-system">
+          <p class="placeholder">Design tokens and component rules.</p>
+        </div>
+      </aside>
     </div>
 
     <script type="module" src="./app.js"></script>

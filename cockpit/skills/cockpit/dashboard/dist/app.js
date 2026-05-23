@@ -12,6 +12,7 @@ import { initTranscript } from "./modules/transcript.js";
 import { initInfo } from "./modules/info.js";
 import { initStarfield } from "./modules/starfield.js";
 import { initLead } from "./modules/lead.js";
+import { initDesignSystem } from "./modules/design-system.js";
 
 const POLL_MS = 3000;
 
@@ -57,6 +58,8 @@ export const store = reactive({
   infoModalProject: null,
   // Set by initInfo() so openInfo() can drive the modal's content on demand.
   _loadInfo: null,
+  designSystemOpen: false,
+  _loadDesignSystem: null,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -173,6 +176,20 @@ export const store = reactive({
 
   closeInfo() {
     this.infoModalProject = null;
+  },
+
+  openDesignSystem() {
+    this.designSystemOpen = true;
+    if (this._loadDesignSystem) this._loadDesignSystem();
+  },
+
+  toggleDesignSystem() {
+    if (this.designSystemOpen) this.closeDesignSystem();
+    else this.openDesignSystem();
+  },
+
+  closeDesignSystem() {
+    this.designSystemOpen = false;
   },
 
   toggleProject(group) {
@@ -301,8 +318,13 @@ initDecisionLog(document.querySelector('[data-column="decision"]'));
 // calls from openInfo() instead of following the session selection.
 const info = initInfo(document.querySelector('[data-column="info"]'));
 store._loadInfo = info && info.load;
+const designSystem = initDesignSystem(
+  document.querySelector('[data-column="design-system"]'),
+);
+store._loadDesignSystem = designSystem && designSystem.load;
 
-// Escape closes the Project Info modal.
+// Escape closes modal/drawer overlays.
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && store.infoModalProject) store.closeInfo();
+  if (e.key === "Escape" && store.designSystemOpen) store.closeDesignSystem();
 });
