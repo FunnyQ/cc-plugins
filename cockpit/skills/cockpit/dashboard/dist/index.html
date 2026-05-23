@@ -1,97 +1,161 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="night">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cockpit · Project Driving View</title>
+    <title>Cockpit · Night Flight Deck</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <div id="app" v-scope v-cloak>
-      <header class="goal-bar">
-        <span class="goal-bar__label">🎯</span>
-        <span class="goal-bar__project" v-text="selectedProjectName"></span>
-        <span
-          class="goal-bar__goal"
-          v-text="selectedProjectGoal || 'Select a session to begin'"
-        ></span>
+      <!-- VIEWPORT — HUD over a forward warp; click to raise the barrier -->
+      <header
+        class="viewport"
+        :class="{ 'is-idle': !selectedSessionId, 'is-collapsed': heroCollapsed, 'is-awaiting': awaitingCall }"
+        :title="heroCollapsed ? 'Lower barrier' : 'Raise barrier'"
+        @click="toggleHero()"
+      >
+        <canvas class="viewport__warp" aria-hidden="true"></canvas>
+        <div class="viewport__nebula" aria-hidden="true"></div>
+        <div class="viewport__barrier" aria-hidden="true"></div>
+        <svg class="viewport__lead" aria-hidden="true">
+          <line class="lead-underline" />
+          <line class="lead-connector" />
+        </svg>
+        <div class="viewport__beacon" aria-hidden="true">
+          <span class="viewport__beacon-ring"></span>
+          <span class="viewport__beacon-core"></span>
+        </div>
+
+        <div class="hud">
+          <div class="hud__alert" v-show="awaitingCall">
+            <span class="status-led waiting"></span>
+            <span class="hud__alert-text">Awaiting your call</span>
+          </div>
+          <div class="hud__heading">
+            <span class="hud__tag">◢ Heading</span>
+            <span
+              class="viewport__project"
+              v-text="selectedProjectName || 'No flight selected'"
+            ></span>
+          </div>
+          <p
+            class="viewport__destination"
+            v-text="selectedSessionGoal || selectedProjectGoal || 'Select a session to begin'"
+          ></p>
+
+          <div class="hud__telemetry" aria-hidden="true">
+            <span class="readout">SES</span>
+            <span class="readout" v-text="sessionShortId"></span>
+            <span class="hud__dot">·</span>
+            <span
+              class="readout"
+              v-text="projectGroups.length + ' FLIGHTS'"
+            ></span>
+          </div>
+        </div>
       </header>
 
-      <div class="layout">
-        <aside class="rail">
-          <div class="rail__header">Projects</div>
-          <ul class="rail__list">
-            <template v-for="g in projectGroups" :key="g.project">
-              <li class="project">
-                <div
-                  class="project__header"
-                  :class="{ 'is-collapsed': !isProjectExpanded(g) }"
+      <!-- MANIFEST — collapsed by default; the viewport already names the flight -->
+      <nav class="manifest" :class="{ 'is-open': manifestOpen }">
+        <button
+          class="manifest__bar"
+          type="button"
+          :aria-expanded="manifestOpen ? 'true' : 'false'"
+          @click="toggleManifest()"
+        >
+          <span class="manifest__caret" :class="{ 'is-open': manifestOpen }"
+            >▸</span
+          >
+          <span class="manifest__legend">Projects</span>
+          <span
+            class="manifest__count readout"
+            v-text="projectGroups.length + ' flights'"
+          ></span>
+          <span
+            class="manifest__hint"
+            v-text="manifestOpen ? 'Close' : 'Open'"
+          ></span>
+        </button>
+
+        <ul class="manifest__flights">
+          <template v-for="g in projectGroups" :key="g.project">
+            <li
+              class="flight"
+              :class="{ 'is-collapsed': !isProjectExpanded(g) }"
+            >
+              <div class="flight__head">
+                <button
+                  class="flight__toggle"
+                  type="button"
                   @click="toggleProject(g)"
                 >
                   <span
-                    class="project__caret"
+                    class="flight__caret"
                     v-text="isProjectExpanded(g) ? '▾' : '▸'"
                   ></span>
-                  <span class="project__name" v-text="g.name"></span>
+                  <span class="flight__name" v-text="g.name"></span>
+                </button>
+                <span class="flight__counts">
                   <span
-                    class="project__goal"
-                    v-text="goalSnippet(g.goal)"
+                    class="status-led"
+                    :class="g.activeCount ? 'active' : 'ended'"
                   ></span>
-                  <span class="project__counts">
-                    <span
-                      class="status-dot"
-                      :class="g.activeCount ? 'active' : 'ended'"
-                    ></span>
-                    <span
-                      v-text="g.activeCount + ' active / ' + g.sessionCount"
-                    ></span>
-                  </span>
-                  <button
-                    class="project__info-btn"
-                    type="button"
-                    title="Project info"
-                    aria-label="Project info"
-                    @click.stop="openInfo(g)"
+                  <span
+                    class="readout"
+                    v-text="g.activeCount + '/' + g.sessionCount"
+                  ></span>
+                </span>
+                <button
+                  class="flight__info"
+                  type="button"
+                  title="Project info"
+                  aria-label="Project info"
+                  @click.stop="openInfo(g)"
+                >
+                  ⓘ
+                </button>
+              </div>
+              <ul class="flight__legs" v-show="isProjectExpanded(g)">
+                <template v-for="s in g.sessions" :key="s.sessionId">
+                  <li
+                    class="leg"
+                    :class="{ 'is-selected': isSelected(s.sessionId), 'is-ended': s.status === 'ended' }"
+                    @click="selectSession(s)"
                   >
-                    ⓘ
-                  </button>
-                </div>
-                <ul class="project__sessions" v-show="isProjectExpanded(g)">
-                  <template v-for="s in g.sessions" :key="s.sessionId">
-                    <li
-                      class="rail__item"
-                      :class="{ 'is-selected': isSelected(s.sessionId), 'is-ended': s.status === 'ended' }"
-                      @click="selectSession(s)"
-                    >
-                      <span class="status-dot" :class="s.status"></span>
-                      <span class="rail__goal" v-text="shortGoal(s)"></span>
-                    </li>
-                  </template>
-                </ul>
-              </li>
-            </template>
-            <li v-if="loaded && !sessions.length" class="rail__empty">
-              No sessions registered.
+                    <span class="status-led" :class="s.status"></span>
+                    <span class="leg__goal" v-text="shortGoal(s)"></span>
+                  </li>
+                </template>
+              </ul>
             </li>
-          </ul>
-        </aside>
+          </template>
+          <li v-if="loaded && !sessions.length" class="manifest__empty">
+            No sessions registered.
+          </li>
+        </ul>
+      </nav>
 
-        <main class="columns">
-          <section class="column" id="col-transcript">
-            <header class="column__header">Live Transcript</header>
-            <div class="column__body" data-column="transcript">
-              <p class="placeholder">No live transcript.</p>
-            </div>
-          </section>
+      <!-- INSTRUMENTS — two display screens: comms feed + flight log -->
+      <main class="instruments">
+        <section class="instrument" id="col-transcript">
+          <header class="instrument__head">
+            <span class="instrument__legend">Live Transcript</span>
+          </header>
+          <div class="instrument__body" data-column="transcript">
+            <p class="placeholder">No live transcript.</p>
+          </div>
+        </section>
 
-          <section class="column" id="col-decision">
-            <header class="column__header">Decision Log</header>
-            <div class="column__body" data-column="decision">
-              <p class="placeholder">No decisions logged yet.</p>
-            </div>
-          </section>
-        </main>
-      </div>
+        <section class="instrument" id="col-decision">
+          <header class="instrument__head">
+            <span class="instrument__legend">Decision Log</span>
+          </header>
+          <div class="instrument__body" data-column="decision">
+            <p class="placeholder">No decisions logged yet.</p>
+          </div>
+        </section>
+      </main>
 
       <div class="info-modal" v-show="infoModalProject" @click="closeInfo()">
         <div
@@ -101,7 +165,7 @@
           @click.stop
         >
           <header class="info-modal__header">
-            <span class="column__header">Project Info</span>
+            <span class="info-modal__legend">Project Info</span>
             <span class="info-modal__name" v-text="infoModalName"></span>
             <button
               class="info-modal__close"

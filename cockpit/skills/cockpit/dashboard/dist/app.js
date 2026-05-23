@@ -10,6 +10,8 @@ import {
 import { initDecisionLog } from "./modules/decision-log.js";
 import { initTranscript } from "./modules/transcript.js";
 import { initInfo } from "./modules/info.js";
+import { initStarfield } from "./modules/starfield.js";
+import { initLead } from "./modules/lead.js";
 
 const POLL_MS = 3000;
 
@@ -34,6 +36,19 @@ export const store = reactive({
   // per-project expand/collapse overrides (project path → bool); persists
   // across the 3s poll because it lives on the store, not in the render.
   expandedOverrides: {},
+  // Hero: clicking the viewport collapses it to a slim bar (a "barrier
+  // raised" over the warp) keeping only heading / goal / telemetry, and pauses
+  // the warp animation. Toggled by clicking the viewport.
+  heroCollapsed: false,
+  // Starfield control (set after mount) so toggleHero can pause/resume it.
+  _starfield: null,
+  // Set true by the decision-log module when the selected (active) session is
+  // parked on an open needs_your_call — drives the warm HUD "your turn" alert.
+  awaitingCall: false,
+  // Manifest drawer: collapsed by default — the viewport already shows the
+  // current project + goal, so the project list stays out of the way until
+  // opened. Toggled by the manifest bar.
+  manifestOpen: false,
   // Project Info modal: the project path whose info is open (null = closed).
   infoModalProject: null,
   // Set by initInfo() so openInfo() can drive the modal's content on demand.
@@ -53,6 +68,49 @@ export const store = reactive({
     if (p && p.projectGoal) return p.projectGoal;
     const s = this.sessions.find((x) => x.project === this.selectedProject);
     return s ? s.projectGoal || "" : "";
+  },
+
+  // The selected session object + its derived fields drive the viewport hero
+  // (the destination we're flying toward and the heading-indicator LED).
+  get selectedSession() {
+    if (!this.selectedSessionId) return null;
+    return (
+      this.sessions.find((x) => x.sessionId === this.selectedSessionId) || null
+    );
+  },
+
+  get selectedSessionGoal() {
+    const s = this.selectedSession;
+    return s ? (s.sessionGoal || "").trim() : "";
+  },
+
+  // "" when nothing is selected; otherwise the raw session status ("active" /
+  // "ended"), used both as the viewport LED modifier class and to pick a label.
+  get selectedStatus() {
+    const s = this.selectedSession;
+    return s ? s.status : "";
+  },
+
+  get statusLabel() {
+    return this.selectedStatus === "active" ? "Flying" : "Arrived";
+  },
+
+  // Short session id for the HUD telemetry readout (first uuid segment).
+  get sessionShortId() {
+    return this.selectedSessionId
+      ? this.selectedSessionId.split("-")[0]
+      : "--------";
+  },
+
+  toggleManifest() {
+    this.manifestOpen = !this.manifestOpen;
+  },
+
+  toggleHero() {
+    this.heroCollapsed = !this.heroCollapsed;
+    if (!this._starfield) return;
+    if (this.heroCollapsed) this._starfield.pause();
+    else this._starfield.resume();
   },
 
   isSelected(id) {
@@ -176,6 +234,19 @@ await store.fetchProjects();
 await store.fetchSessions();
 createApp(store).mount("#app");
 startPolling();
+
+// The viewport warp starfield (canvas behind the HUD). Keep the control so the
+// hero toggle can pause/resume it.
+store._starfield = initStarfield(document.querySelector(".viewport__warp"));
+
+// The HUD leader line (underline under the destination → connector to beacon).
+initLead({
+  svg: document.querySelector(".viewport__lead"),
+  viewport: document.querySelector(".viewport"),
+  dest: document.querySelector(".viewport__destination"),
+  beacon: document.querySelector(".viewport__beacon"),
+  telemetry: document.querySelector(".hud__telemetry"),
+});
 
 // Mount the imperative columns (they read the store + subscribe to selection).
 initTranscript(document.querySelector('[data-column="transcript"]'));

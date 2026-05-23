@@ -1,17 +1,54 @@
-/* cockpit SPA — neutral default theme.
-   The themeable custom properties on :root are overridden per-project by the
-   DESIGN.md theming task (ui/04); ship calm neutral defaults here. */
+/* cockpit SPA — "Night Flight" deep-space flight deck.
+   Design system: cockpit/skills/cockpit/DESIGN.md. Dark is the only theme
+   (space is dark). Surface is a tinted deep-space ramp (void → space → hull →
+   hull-2), one cool aurora accent carries navigation, one warm signal is held
+   in reserve for "your turn" (needs_your_call). OKLCH throughout; no #000/#fff. */
 :root {
-  --color-bg: #f7f8fa;
-  --color-surface: #ffffff;
-  --color-surface-2: #f0f2f5;
-  --color-fg: #1f2430;
-  --color-muted: #6b7280;
-  --color-border: #e3e6eb;
-  --accent: #3b82f6;
-  --accent-soft: rgba(59, 130, 246, 0.12);
-  --status-active: #22c55e;
-  --status-ended: #9ca3af;
+  /* Deep-space surface ramp */
+  --void: oklch(14% 0.028 278);
+  --space: oklch(18% 0.03 278);
+  --hull: oklch(22% 0.032 278);
+  --hull-2: oklch(27% 0.034 278);
+  --edge: oklch(36% 0.03 278);
+  --edge-soft: oklch(30% 0.028 278);
+
+  /* Ink — cool starlight, never pure white */
+  --starlight: oklch(95% 0.008 280);
+  --ink-muted: oklch(74% 0.018 280);
+  --ink-faint: oklch(58% 0.022 280);
+
+  /* Aurora — the cool navigation accent */
+  --aurora: oklch(80% 0.13 195);
+  --aurora-strong: oklch(72% 0.15 195);
+  --aurora-deep: oklch(60% 0.13 198);
+
+  /* Signal — the one warm reserve (needs_your_call / waiting) */
+  --signal: oklch(82% 0.14 70);
+  --signal-strong: oklch(75% 0.16 65);
+
+  /* Nebula — distant horizon glow, viewport only */
+  --nebula-violet: oklch(42% 0.13 300);
+  --nebula-indigo: oklch(30% 0.09 285);
+
+  /* Semantic state (LEDs read color + pulse, never hue alone) */
+  --engine: var(--aurora);
+  --idle: oklch(66% 0.055 200);
+  --ended: oklch(46% 0.02 280);
+  --positive: oklch(78% 0.13 165);
+  --danger: oklch(64% 0.19 25);
+
+  /* Legacy aliases — module-injected markup historically referenced these.
+     Mapped onto the Night Flight palette so nothing renders off-system. */
+  --color-bg: var(--space);
+  --color-surface: var(--hull);
+  --color-surface-2: var(--hull-2);
+  --color-fg: var(--starlight);
+  --color-muted: var(--ink-muted);
+  --color-border: var(--edge);
+  --accent: var(--aurora);
+  --accent-soft: color-mix(in oklch, var(--aurora) 16%, transparent);
+  --status-active: var(--engine);
+  --status-ended: var(--ended);
 
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
@@ -21,10 +58,11 @@
 
   --radius: 10px;
   --radius-sm: 6px;
-  --space: 16px;
+  --space-x: 16px;
   --space-sm: 8px;
-  --rail-width: 264px;
-  --goal-bar-height: 52px;
+  --viewport-height: clamp(168px, 26vh, 260px);
+
+  color-scheme: dark;
 }
 
 [v-cloak] {
@@ -43,10 +81,11 @@ body {
 
 body {
   font-family: var(--font-sans);
-  background: var(--color-bg);
-  color: var(--color-fg);
+  background: var(--void);
+  color: var(--starlight);
   font-size: 14px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 #app {
@@ -56,222 +95,667 @@ body {
   overflow: hidden;
 }
 
-/* ── Goal bar ───────────────────────────────────────────── */
-.goal-bar {
+/* Mono instrument readout + uppercase stencil legend — the cockpit voice. */
+.readout {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+.viewport__legend,
+.viewport__status,
+.manifest__legend,
+.instrument__legend,
+.info-modal__legend {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+:focus-visible {
+  outline: 2px solid var(--aurora);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Subtle dark scrollbars so the cabin stays quiet. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--edge);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--edge-soft);
+  background-clip: padding-box;
+}
+
+/* ── Viewport — forward window into deep space ──────────────
+   Void base, a slow-drifting starfield behind content, and a single nebula
+   glow at the lower edge. Atmosphere held low; only the heading LED pulses. */
+.viewport {
+  position: relative;
+  flex-shrink: 0;
+  height: var(--viewport-height);
+  overflow: hidden;
+  background: var(--void);
+  border-bottom: 1px solid var(--edge-soft);
+  isolation: isolate;
+  cursor: pointer;
+  transition:
+    height 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 460ms ease;
+}
+/* Collapsed — a slim bar with the barrier raised over the warp. */
+.viewport.is-collapsed {
+  height: 76px;
+  background: var(--space);
+}
+.viewport__warp,
+.viewport__nebula,
+.viewport__lead,
+.viewport__beacon {
+  transition: opacity 360ms ease;
+}
+.viewport.is-collapsed
+  :is(.viewport__warp, .viewport__nebula, .viewport__lead, .viewport__beacon) {
+  opacity: 0;
+}
+/* Stop the warp/beacon/lead motion when collapsed (canvas paused via JS). */
+.viewport.is-collapsed
+  :is(
+    .lead-underline,
+    .lead-connector,
+    .viewport__beacon-ring,
+    .viewport__beacon-core
+  ) {
+  animation-play-state: paused;
+}
+.viewport__warp,
+.viewport__nebula,
+.viewport__lead {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.viewport__warp {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.viewport__nebula {
+  background: radial-gradient(
+    135% 90% at 50% 138%,
+    color-mix(in oklch, var(--nebula-violet) 55%, transparent),
+    color-mix(in oklch, var(--nebula-indigo) 34%, transparent) 42%,
+    transparent 72%
+  );
+  opacity: 0.5;
+}
+/* Barrier — a bulkhead/blast-door surface revealed when collapsed: a hull
+   gradient with faint shutter slats + a center seam. Slides in from the top. */
+.viewport__barrier {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  translate: 0 -8%;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--void) 18%, transparent) 0 5px,
+      transparent 5px 10px
+    ),
+    linear-gradient(180deg, var(--hull-2), var(--space));
+  transition:
+    opacity 420ms ease,
+    translate 460ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.viewport__barrier::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 50%;
+  block-size: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--aurora) 32%, transparent),
+    transparent
+  );
+}
+.viewport.is-collapsed .viewport__barrier {
+  opacity: 1;
+  translate: 0 0;
+}
+/* Leader line — a thin aurora vector from the heading down to the beacon at
+   center, like a HUD pointing at the waypoint it's tracking. The SVG distorts
+   freely (preserveAspectRatio none); the stroke stays 1px via vector-effect. */
+.viewport__lead {
+  width: 100%;
+  height: 100%;
+}
+/* Underline (tracing the destination width) + connector (to the beacon) are
+   the same line: a dashed, slowly-flowing aurora vector. */
+.lead-underline,
+.lead-connector {
+  stroke: color-mix(in oklch, var(--aurora) 60%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 1 6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.6;
+  animation: lead-flow 2.6s linear infinite;
+}
+@keyframes lead-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+/* Beacon — the goal object at center: the waypoint you're flying toward. */
+.viewport__beacon {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 60px;
+  block-size: 60px;
+  translate: -50% -50%;
+  z-index: 0;
+  pointer-events: none;
+}
+.viewport__beacon-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in oklch, var(--aurora) 50%, transparent);
+  rotate: 45deg;
+  animation: beacon-spin 26s linear infinite;
+}
+.viewport__beacon-ring::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 28%, transparent);
+}
+.viewport__beacon-core {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 8px;
+  block-size: 8px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--aurora);
+  box-shadow:
+    0 0 0 4px color-mix(in oklch, var(--aurora) 20%, transparent),
+    0 0 16px 2px color-mix(in oklch, var(--aurora) 40%, transparent);
+  animation: beacon-pulse 2.4s ease-in-out infinite;
+}
+@keyframes beacon-spin {
+  to {
+    rotate: 405deg;
+  }
+}
+@keyframes beacon-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px color-mix(in oklch, var(--aurora) 20%, transparent),
+      0 0 16px 2px color-mix(in oklch, var(--aurora) 40%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px color-mix(in oklch, var(--aurora) 8%, transparent),
+      0 0 22px 3px color-mix(in oklch, var(--aurora) 28%, transparent);
+  }
+}
+
+/* ── HUD — heads-up readouts laid over the warp view ───────
+   Heading + small goal subtitle pinned top-left; telemetry pinned bottom-left.
+   The center belongs to the beacon. No corner brackets, no status badge. */
+.hud {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  padding: clamp(14px, 2.4vh, 22px) clamp(20px, 4vw, 48px);
+}
+.hud__heading {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  height: var(--goal-bar-height);
-  padding: 0 var(--space);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  gap: 10px;
+  min-width: 0;
+}
+.hud__tag {
   flex-shrink: 0;
-}
-.goal-bar__label {
-  font-size: 16px;
-}
-.goal-bar__project {
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--aurora);
 }
-.goal-bar__project:not(:empty)::after {
-  content: "·";
-  margin-left: var(--space-sm);
-  color: var(--color-muted);
-}
-.goal-bar__goal {
-  color: var(--color-muted);
+.viewport__project {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* ── Layout: rail + columns ─────────────────────────────── */
-.layout {
-  display: grid;
-  grid-template-columns: var(--rail-width) 1fr;
-  flex: 1;
-  min-height: 0;
+.viewport__destination {
+  margin: 6px 0 0;
+  width: fit-content;
+  max-width: min(56ch, 60%);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--starlight);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 0 18px color-mix(in oklch, var(--void) 78%, transparent);
+}
+.hud__telemetry {
+  position: absolute;
+  inset-block-end: clamp(14px, 2.4vh, 22px);
+  inset-inline-start: clamp(20px, 4vw, 48px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    inset-block-end 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hud__telemetry .readout {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+.hud__dot {
+  color: var(--ink-faint);
 }
 
-/* ── Side-rail ──────────────────────────────────────────── */
-.rail {
-  background: var(--color-surface-2);
-  border-right: 1px solid var(--color-border);
-  overflow-y: auto;
+/* Collapsed hero: tighten padding, single-line goal, telemetry to the right
+   so heading + goal (left) and telemetry (right) share the slim bar. */
+.viewport.is-collapsed .hud {
+  padding-block: 12px;
+}
+.viewport.is-collapsed .viewport__destination {
+  -webkit-line-clamp: 1;
+}
+.viewport.is-collapsed .hud__telemetry {
+  inset-block-end: 12px;
+  transform: translateX(var(--tele-shift, 40vw));
+}
+
+/* Parking alert — the warm "your turn" notification on the HUD, shown when the
+   selected session is parked on an open needs_your_call. Cold cabin, one warm
+   light. Pinned top-right; visible in both expanded and collapsed states. */
+.hud__alert {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: clamp(14px, 2.4vh, 22px);
+  inset-inline-end: clamp(20px, 4vw, 48px);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 4px 9px;
+  border-radius: 999px;
+  color: var(--signal);
+  background: color-mix(in oklch, var(--signal) 12%, var(--hull));
+  border: 1px solid color-mix(in oklch, var(--signal) 55%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in oklch, var(--signal) 40%, transparent);
+  animation: alert-pulse 2.2s ease-out infinite;
+}
+.viewport.is-collapsed .hud__alert {
+  inset-block-start: 12px;
+}
+.hud__alert-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+@keyframes alert-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--signal) 42%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px color-mix(in oklch, var(--signal) 0%, transparent);
+  }
+}
+/* When awaiting, warm the viewport's lower edge — a cold cabin lit by one warm
+   light. */
+.viewport.is-awaiting {
+  border-bottom-color: color-mix(in oklch, var(--signal) 60%, var(--edge));
+  box-shadow: inset 0 -40px 60px -40px
+    color-mix(in oklch, var(--signal) 30%, transparent);
+}
+
+/* ── Status LED — the signature instrument light ───────────
+   8px disc + a 3px ambient ring (the one sanctioned glow). State reads from
+   color AND pulse. Default = idle. */
+.status-led {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--idle);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--idle) 22%, transparent);
+}
+.status-led.active,
+.status-led.engine {
+  background: var(--engine);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--engine) 26%, transparent);
+  animation: led-pulse 1.3s ease-in-out infinite;
+}
+.status-led.idle {
+  background: var(--idle);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--idle) 20%, transparent);
+}
+.status-led.ended {
+  background: var(--ended);
+  box-shadow: none;
+}
+.status-led.waiting {
+  background: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--signal) 28%, transparent);
+  animation: led-wait 2.2s ease-out infinite;
+}
+@keyframes led-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--engine) 26%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--engine) 10%, transparent);
+  }
+}
+@keyframes led-wait {
+  0% {
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--signal) 40%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 7px color-mix(in oklch, var(--signal) 0%, transparent);
+  }
+}
+
+/* ── Manifest — collapsed drawer of flights (projects) + legs (sessions) ──
+   Closed by default to a single bar; the viewport already names the current
+   flight, so the list stays out of the way until opened. */
+.manifest {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  background: var(--space);
+  border-bottom: 1px solid var(--edge-soft);
+  max-block-size: 32vh;
 }
-.rail__header {
-  padding: var(--space-sm) var(--space);
+.manifest__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 9px clamp(20px, 4vw, 48px);
+  border: 0;
+  background: transparent;
+  color: var(--starlight);
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+.manifest__bar:hover .manifest__legend,
+.manifest__bar:hover .manifest__caret {
+  color: var(--aurora);
+}
+.manifest__caret {
+  font-size: 10px;
+  color: var(--aurora);
+  transition: rotate 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* affordance: a gentle aurora pulse hints the bar opens */
+  animation: caret-hint 2.4s ease-in-out infinite;
+}
+.manifest__caret.is-open {
+  rotate: 90deg;
+  animation: none;
+  color: var(--ink-muted);
+}
+@keyframes caret-hint {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.manifest__count {
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-  position: sticky;
-  top: 0;
-  background: var(--color-surface-2);
 }
-.rail__list {
+.manifest__hint {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.manifest__flights {
+  display: flex;
+  align-items: stretch;
   list-style: none;
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  max-block-size: 0;
+  opacity: 0;
+  border-top: 1px solid transparent;
+  transition:
+    max-block-size 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 300ms ease,
+    border-color 300ms ease;
 }
-/* ── Nested project → session rail ──────────────────────── */
-.project {
-  border-bottom: 1px solid var(--color-border);
+.manifest.is-open .manifest__flights {
+  max-block-size: 30vh;
+  opacity: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top-color: var(--edge-soft);
 }
-.project__header {
+.manifest__empty {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  place-items: center;
+  padding: var(--space-x);
+  color: var(--ink-faint);
+  font-style: italic;
+  white-space: nowrap;
+}
+.flight {
+  display: flex;
+  flex-direction: column;
+  inline-size: clamp(208px, 22vw, 272px);
+  padding: 10px 12px 12px;
+  border-right: 1px solid var(--edge-soft);
+}
+.flight__head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: var(--space-sm);
-  padding: 10px var(--space);
+}
+.flight__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--starlight);
+  font: inherit;
   cursor: pointer;
-  user-select: none;
+  text-align: start;
 }
-.project__header:hover {
-  background: var(--color-surface);
+.flight__caret {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--ink-faint);
 }
-.project__info-btn {
+.flight__name {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flight__counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flight__counts .readout {
+  font-size: 11px;
+}
+.flight__info {
   display: grid;
   place-items: center;
   inline-size: 22px;
   block-size: 22px;
   padding: 0;
-  border: none;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-muted);
-  font-size: 14px;
+  color: var(--ink-faint);
+  font-size: 13px;
   line-height: 1;
   cursor: pointer;
 }
-.project__info-btn:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
+.flight__info:hover {
+  background: color-mix(in oklch, var(--aurora) 14%, transparent);
+  color: var(--aurora);
 }
-.project__caret {
-  color: var(--color-muted);
-  font-size: 10px;
-  width: 12px;
-}
-.project__name {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.project__goal {
-  grid-column: 2;
-  grid-row: 2;
-  color: var(--color-muted);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.project__goal:empty {
-  display: none;
-}
-.project__counts {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.project__sessions {
+.flight__legs {
   list-style: none;
-  margin: 0;
+  margin: 10px 0 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
 }
-.project__sessions .rail__item {
-  padding-left: calc(var(--space) + 16px);
-}
-
-.rail__item {
+.leg {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 10px var(--space);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  border-left: 3px solid transparent;
 }
-.rail__item:hover {
-  background: var(--color-surface);
+.leg:hover {
+  background: var(--hull);
 }
-.rail__item.is-selected {
-  background: var(--color-surface);
-  border-left-color: var(--accent);
+.leg.is-selected {
+  background: color-mix(in oklch, var(--aurora) 14%, var(--hull));
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklch, var(--aurora) 50%, var(--edge));
 }
-.rail__item.is-ended {
-  opacity: 0.55;
+.leg.is-ended {
+  opacity: 0.5;
 }
-.rail__goal {
+.leg__goal {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.rail__empty {
-  padding: var(--space);
-  color: var(--color-muted);
-  font-style: italic;
+  font-size: 13px;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--status-ended);
-}
-.status-dot.active {
-  background: var(--status-active);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
-}
-.status-dot.ended {
-  background: var(--status-ended);
-}
-
-/* ── 3-column main area ─────────────────────────────────── */
-.columns {
+/* ── Instruments — the two gauges (comms feed + flight log) ── */
+.instruments {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
-  background: var(--color-border);
+  flex: 1;
   min-height: 0;
+  background: var(--edge-soft);
 }
-.column {
+.instrument {
+  position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
   min-height: 0;
   overflow: hidden;
+  background: var(--hull);
+  isolation: isolate;
 }
-.column__header {
-  padding: var(--space-sm) var(--space);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+/* Screen treatment: faint scanlines + an edge vignette so each panel reads as
+   a lit display. Held very low so it never fights the text. */
+.instrument::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklch, var(--void) 22%, transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    radial-gradient(
+      120% 80% at 50% 50%,
+      transparent 58%,
+      color-mix(in oklch, var(--void) 42%, transparent) 100%
+    );
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+}
+.instrument__head {
+  position: relative;
+  z-index: 3;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--space);
+  border-bottom: 1px solid var(--edge-soft);
 }
-.column__body {
+/* a small lit "power" tick beside the screen label */
+.instrument__head::before {
+  content: "";
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: var(--aurora);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--aurora) 22%, transparent);
+}
+.instrument__body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: var(--space);
+  padding: var(--space-x);
 }
 .placeholder {
-  color: var(--color-muted);
+  color: var(--ink-faint);
   font-style: italic;
 }
 
-/* ── Decision-log column ────────────────────────────────── */
+/* ── Decision-log instrument ────────────────────────────── */
 .decision-log {
   display: flex;
   flex-direction: column;
@@ -280,18 +764,19 @@ body {
 .decision-log__goal {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-sm) 12px;
-  background: var(--accent-soft);
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--hull-2);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
 }
 .decision-log__goal-label {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--aurora);
 }
 .decision-log__goal-text {
   font-weight: 600;
@@ -303,35 +788,39 @@ body {
 }
 
 .decision-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--hull);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  border-left: 3px solid transparent;
 }
+/* The Call Alert — the one warm surface: a light flicking on in a cold cabin. */
 .decision-card.is-call {
-  border-left-color: var(--accent);
-  background: var(--accent-soft);
+  background: color-mix(in oklch, var(--signal) 12%, var(--hull));
+  border-color: color-mix(in oklch, var(--signal) 45%, var(--edge));
 }
 .decision-card.is-resolved {
-  border-left-color: var(--status-active);
-  background: var(--color-surface);
+  background: var(--hull);
+  border-color: color-mix(in oklch, var(--positive) 30%, var(--edge));
 }
 .decision-card__badge {
   display: inline-block;
   margin-bottom: 6px;
   padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--color-surface);
-  border: 1px solid var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal);
+  background: color-mix(in oklch, var(--signal) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--signal) 55%, transparent);
   border-radius: 999px;
 }
 .decision-card.is-resolved .decision-card__badge {
-  color: var(--status-active);
-  border-color: var(--status-active);
-  opacity: 0.6;
+  color: var(--positive);
+  border-color: color-mix(in oklch, var(--positive) 55%, transparent);
+  background: color-mix(in oklch, var(--positive) 10%, transparent);
+  opacity: 0.7;
 }
 .decision-card__head {
   display: flex;
@@ -347,11 +836,13 @@ body {
 }
 .decision-card__time {
   flex-shrink: 0;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
 }
 .decision-card__reason {
-  color: var(--color-fg);
+  color: var(--starlight);
   margin-top: 2px;
 }
 .decision-card__reason :is(p) {
@@ -360,7 +851,7 @@ body {
 .decision-card__tradeoff {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
   font-style: italic;
 }
 .decision-card__files {
@@ -373,14 +864,14 @@ body {
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 1px 6px;
-  background: var(--color-surface-2);
+  background: var(--hull-2);
   border-radius: var(--radius-sm);
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 .decision-card__options {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: var(--color-fg);
+  color: var(--starlight);
 }
 .decision-card__options li {
   margin: 2px 0;
@@ -388,19 +879,17 @@ body {
 .decision-card__answer {
   margin-top: 8px;
   padding: 6px 10px;
-  background: var(--color-surface-2);
+  background: var(--hull-2);
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
 .decision-card__answer-label {
   font-weight: 700;
-  color: var(--status-active);
+  color: var(--positive);
   margin-right: 4px;
 }
 
-/* ── needs_your_call answer surface (bridge) ────────────────
-   Shown only for the latest open call in an active session. When present,
-   it replaces the read-only options list (which stays for ended/history). */
+/* ── needs_your_call answer surface (the warm respond controls) ── */
 .decision-card.is-answerable .decision-card__options {
   display: none;
 }
@@ -422,15 +911,15 @@ body {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
+  color: var(--signal);
+  background: color-mix(in oklch, var(--signal) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--signal) 55%, transparent);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .respond__opt:hover:not(:disabled) {
-  color: var(--color-surface);
-  background: var(--accent);
+  color: var(--void);
+  background: var(--signal);
 }
 .respond__free {
   display: flex;
@@ -442,25 +931,29 @@ body {
   padding: 5px 10px;
   font: inherit;
   font-size: 13px;
-  color: var(--color-fg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  color: var(--starlight);
+  background: var(--space);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
 }
 .respond__input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--signal);
+  box-shadow: 0 0 0 1px var(--signal);
 }
 .respond__send {
   padding: 5px 12px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-surface);
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  color: var(--void);
+  background: var(--signal-strong);
+  border: 1px solid var(--signal-strong);
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+.respond__send:hover:not(:disabled) {
+  background: var(--signal);
 }
 .respond__opt:disabled,
 .respond__send:disabled,
@@ -471,22 +964,23 @@ body {
 .respond__note {
   margin: 0;
   font-size: 12px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 .respond__note[hidden] {
   display: none;
 }
 
-/* ── Live-transcript column ─────────────────────────────────
-   Renderer lifted from token-atlas; classes (live-entry / live-seg /
-   live-code / live-diff / live-task-card) match its markup, restyled onto
-   cockpit's neutral tokens. */
+/* ── Live-transcript instrument ─────────────────────────────
+   Renderer shared with token-atlas (live-entry / live-seg / live-code /
+   live-diff / live-task-card); restyled onto the Night Flight tokens. Role
+   accents: user → aurora, assistant → positive, tool → signal, system →
+   nebula violet. */
 .transcript__body {
   display: flex;
   flex-direction: column;
 }
 .live-entry {
-  --entry-accent: var(--color-muted);
+  --entry-accent: var(--ink-muted);
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: var(--space-sm);
@@ -494,49 +988,49 @@ body {
   min-width: 0;
   max-width: 100%;
   padding: 10px 2px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--edge-soft);
 }
 .live-entry:first-child {
   border-top: 0;
 }
 .live-entry.is-user {
-  --entry-accent: var(--accent);
+  --entry-accent: var(--aurora);
 }
 .live-entry.is-assistant {
-  --entry-accent: var(--status-active);
+  --entry-accent: var(--positive);
 }
 .live-entry.is-system {
-  --entry-accent: #a855f7;
+  --entry-accent: var(--nebula-violet);
 }
 .live-entry.is-tool,
 .live-entry.is-tool-result,
 .live-entry.has-tool-segments {
-  --entry-accent: #f59e0b;
+  --entry-accent: var(--signal);
   margin-block: 6px;
-  border: 1px solid
-    color-mix(in oklab, var(--entry-accent) 28%, var(--color-border));
+  border: 1px solid color-mix(in oklab, var(--entry-accent) 28%, var(--edge));
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--entry-accent) 5%, transparent);
+  background: color-mix(in oklab, var(--entry-accent) 6%, transparent);
   padding: 10px;
 }
 .live-entry-role {
   width: max-content;
   max-width: 100%;
   padding: 1px 8px;
-  border: 1px solid color-mix(in oklab, var(--entry-accent) 24%, transparent);
+  border: 1px solid color-mix(in oklab, var(--entry-accent) 28%, transparent);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--entry-accent) 8%, transparent);
-  color: color-mix(in oklab, var(--entry-accent) 60%, var(--color-muted));
+  background: color-mix(in oklab, var(--entry-accent) 10%, transparent);
+  color: color-mix(in oklab, var(--entry-accent) 72%, var(--starlight));
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-align: center;
   text-transform: uppercase;
 }
 .live-entry-content {
   min-width: 0;
   max-width: 100%;
-  color: var(--color-fg);
+  color: var(--starlight);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -545,10 +1039,9 @@ body {
   width: fit-content;
   max-width: min(76ch, 100%);
   padding: 8px 12px;
-  border: 1px solid
-    color-mix(in oklab, var(--entry-accent) 24%, var(--color-border));
+  border: 1px solid color-mix(in oklab, var(--entry-accent) 24%, var(--edge));
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--entry-accent) 6%, var(--color-surface));
+  background: color-mix(in oklab, var(--entry-accent) 8%, var(--space));
 }
 .live-entry.has-wide-content .live-entry-content {
   width: 100%;
@@ -574,16 +1067,16 @@ body {
 .live-entry-content pre {
   overflow-x: auto;
   padding: 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  background: var(--space);
   white-space: pre;
 }
 .live-entry-content :not(pre) > code {
   padding: 0 0.25em;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  background: var(--space);
   font-size: 0.94em;
 }
 .live-entry-content table {
@@ -597,30 +1090,30 @@ body {
 .live-entry-content th,
 .live-entry-content td {
   padding: 4px 8px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--edge);
   text-align: start;
   white-space: nowrap;
 }
 .live-entry-content th {
-  background: var(--color-surface-2);
+  background: var(--space);
   font-weight: 700;
 }
 .live-entry-content a {
-  color: var(--accent);
+  color: var(--aurora);
 }
 
-/* "💭 thinking" and other labelled segments */
 .live-seg {
   margin-block: 4px;
 }
 .live-seg-label {
   margin-bottom: 2px;
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 700;
-  color: var(--color-muted);
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 .live-seg--note {
-  color: var(--color-muted);
+  color: var(--ink-muted);
   font-style: italic;
 }
 .live-seg--note .live-seg-label {
@@ -628,23 +1121,23 @@ body {
 }
 .live-seg summary {
   cursor: pointer;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 .live-seg-code.is-error {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
-/* Line-numbered Read result: gutter column + highlighted body */
 .live-code {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-sm);
   overflow-x: auto;
   padding: 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  background: var(--space);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
@@ -658,17 +1151,16 @@ body {
   white-space: pre;
 }
 .live-code-gutter {
-  color: var(--color-muted);
+  color: var(--ink-faint);
   text-align: right;
   user-select: none;
 }
 
-/* File-change inline diff */
 .live-file-change .live-file-path {
   margin: 4px 0;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 .live-diff {
   display: block;
@@ -681,31 +1173,31 @@ body {
   display: block;
 }
 .live-diff .is-add {
-  background: color-mix(in oklab, var(--status-active) 16%, transparent);
+  background: color-mix(in oklab, var(--positive) 18%, transparent);
 }
 .live-diff .is-remove {
-  background: color-mix(in oklab, #ef4444 16%, transparent);
+  background: color-mix(in oklab, var(--danger) 18%, transparent);
 }
 .live-diff .is-hunk,
 .live-diff .is-meta {
-  color: var(--color-muted);
+  color: var(--ink-faint);
 }
 
-/* Task / subagent notification cards */
 .live-task-card {
   display: grid;
   gap: var(--space-sm);
   padding: 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  background: var(--hull-2);
 }
 .live-task-kicker {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-faint);
 }
 .live-task-title {
   font-weight: 600;
@@ -713,44 +1205,45 @@ body {
 .live-task-meta {
   display: flex;
   gap: var(--space-sm);
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 
-/* minimal hljs token coloring on cockpit tokens */
+/* highlight.js token coloring mapped onto the space palette */
 .hljs-comment,
 .hljs-quote {
-  color: var(--color-muted);
+  color: var(--ink-faint);
   font-style: italic;
 }
 .hljs-keyword,
 .hljs-literal,
 .hljs-built_in,
 .hljs-selector-tag {
-  color: #a855f7;
+  color: var(--nebula-violet);
 }
 .hljs-string,
 .hljs-addition {
-  color: var(--status-active);
+  color: var(--positive);
 }
 .hljs-number,
 .hljs-symbol,
 .hljs-attr,
 .hljs-property {
-  color: #f59e0b;
+  color: var(--signal);
 }
 .hljs-title,
 .hljs-name,
 .hljs-section {
-  color: var(--accent);
+  color: var(--aurora);
 }
 
-/* ── Info column ────────────────────────────────────────── */
+/* ── Project Info modal ─────────────────────────────────── */
 .info-col {
   display: flex;
   flex-direction: column;
-  gap: var(--space);
-  padding: var(--space);
+  gap: var(--space-x);
+  padding: var(--space-x);
   overflow-y: auto;
 }
 .info-col__empty {
@@ -760,40 +1253,43 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: var(--space-sm) var(--space);
-  background: var(--accent-soft);
+  padding: 10px var(--space-x);
+  background: color-mix(in oklch, var(--aurora) 12%, var(--hull));
+  border: 1px solid color-mix(in oklch, var(--aurora) 40%, var(--edge));
   border-radius: var(--radius-sm);
-  border-left: 3px solid var(--accent);
 }
 .info-col__goal-label {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--aurora);
 }
 .info-col__goal-text {
   font-weight: 600;
 }
 .info-col__section {
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--edge-soft);
   padding-top: var(--space-sm);
 }
 .info-col__title {
   margin: 0 0 var(--space-sm);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 .info-col__claude > summary {
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-muted);
   margin-bottom: var(--space-sm);
 }
 .info-col__prose {
@@ -808,7 +1304,7 @@ body {
   margin-bottom: 0;
 }
 .info-col__prose pre {
-  background: var(--color-surface-2);
+  background: var(--space);
   padding: var(--space-sm);
   border-radius: var(--radius-sm);
   overflow-x: auto;
@@ -837,7 +1333,7 @@ body {
   inline-size: 28px;
   block-size: 28px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--edge);
 }
 .token-swatch__name {
   font-size: 12px;
@@ -846,7 +1342,7 @@ body {
 .token-swatch__value {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
   word-break: break-all;
 }
 .token-readouts {
@@ -862,11 +1358,12 @@ body {
   gap: var(--space-sm);
 }
 .token-readout dt {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-muted);
 }
 .token-readout dd {
   margin: 0;
@@ -880,30 +1377,27 @@ body {
   inline-size: 24px;
   block-size: 24px;
   flex: none;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
+  background: color-mix(in oklch, var(--aurora) 16%, transparent);
+  border: 1px solid var(--aurora);
 }
 
-/* Project Info modal */
 .info-modal {
   position: fixed;
   inset: 0;
   z-index: 50;
   display: grid;
   place-items: center;
-  padding: var(--space);
-  background: color-mix(in srgb, var(--color-fg) 45%, transparent);
+  padding: var(--space-x);
+  background: color-mix(in srgb, var(--void) 68%, transparent);
 }
 .info-modal__dialog {
   display: flex;
   flex-direction: column;
   inline-size: min(560px, 100%);
   max-block-size: min(80vh, 720px);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--hull);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  box-shadow: 0 24px 60px -20px
-    color-mix(in srgb, var(--color-fg) 50%, transparent);
   overflow: hidden;
 }
 .info-modal__header {
@@ -911,13 +1405,14 @@ body {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space);
-  border-bottom: 1px solid var(--color-border);
+  padding: 10px var(--space-x);
+  background: var(--space);
+  border-bottom: 1px solid var(--edge-soft);
 }
 .info-modal__name {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--color-muted);
+  color: var(--ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -931,22 +1426,38 @@ body {
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-muted);
+  color: var(--ink-muted);
   font-size: 14px;
   cursor: pointer;
 }
 .info-modal__close:hover {
-  background: var(--color-surface);
-  color: var(--color-fg);
+  background: var(--hull-2);
+  color: var(--starlight);
 }
 .info-modal__body {
   /* initInfo() adds .info-col here, which supplies padding + its own scroll */
   min-block-size: 0;
 }
 
+/* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .columns {
+  .instruments {
     grid-template-columns: 1fr;
     grid-auto-rows: minmax(200px, 1fr);
+  }
+}
+
+/* ── Reduced motion — freeze LED pulses + the caret hint ────
+   (The warp starfield freezes itself in starfield.js by rendering one static
+   frame.) */
+@media (prefers-reduced-motion: reduce) {
+  .status-led,
+  .manifest__caret,
+  .lead-underline,
+  .lead-connector,
+  .viewport__beacon-ring,
+  .viewport__beacon-core,
+  .hud__alert {
+    animation: none !important;
   }
 }
