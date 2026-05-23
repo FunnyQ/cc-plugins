@@ -458,6 +458,57 @@ body {
     color-mix(in oklch, var(--signal) 30%, transparent);
 }
 
+.design-toggle {
+  position: fixed;
+  z-index: 45;
+  inset-block-start: clamp(14px, 2.4vh, 22px);
+  inset-inline-end: clamp(20px, 4vw, 48px);
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 34%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--aurora) 10%, var(--hull));
+  color: var(--starlight);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.viewport.is-awaiting + .design-toggle {
+  inset-block-start: calc(clamp(14px, 2.4vh, 22px) + 42px);
+}
+.design-toggle:hover,
+.design-toggle:focus-visible {
+  background: color-mix(in oklch, var(--aurora) 16%, var(--hull));
+}
+.design-toggle__mark {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  inline-size: 14px;
+  block-size: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--aurora) 46%, var(--edge));
+  border-radius: 3px;
+}
+.design-toggle__mark span:nth-child(1) {
+  background: var(--void);
+}
+.design-toggle__mark span:nth-child(2) {
+  background: var(--aurora);
+}
+.design-toggle__mark span:nth-child(3) {
+  background: var(--signal);
+}
+.design-toggle__mark span:nth-child(4) {
+  background: var(--hull-2);
+}
+
 /* ── Status LED — the signature instrument light ───────────
    8px disc + a 3px ambient ring (the one sanctioned glow). State reads from
    color AND pulse. Default = idle. */
@@ -1451,6 +1502,209 @@ body {
 .info-modal__body {
   /* initInfo() adds .info-col here, which supplies padding + its own scroll */
   min-block-size: 0;
+}
+
+/* ── Cockpit design-system panel ─────────────────────────── */
+.design-panel {
+  position: fixed;
+  z-index: 55;
+  inset-block: var(--space-x);
+  inset-inline-end: var(--space-x);
+  display: flex;
+  flex-direction: column;
+  inline-size: min(460px, calc(100vw - 32px));
+  background: var(--hull);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: none;
+  transform: translateX(calc(100% + var(--space-x)));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease;
+}
+.design-panel.is-open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.design-panel__header {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-x);
+  background: var(--space);
+  border-bottom: 1px solid var(--edge-soft);
+}
+.design-panel__legend {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--aurora);
+}
+.design-panel__close {
+  display: grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.design-panel__close:hover {
+  background: var(--hull-2);
+  color: var(--starlight);
+}
+.design-panel__body {
+  min-block-size: 0;
+  overflow-y: auto;
+}
+.design-system {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-x);
+  padding: var(--space-x);
+}
+.design-system__intro {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 36%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--aurora) 8%, var(--hull));
+}
+.design-system__kicker,
+.design-system__title,
+.design-component__name,
+.design-rule__name {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.design-system__kicker {
+  color: var(--aurora);
+}
+.design-system__name {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+.design-system__description {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.design-system__section {
+  display: grid;
+  gap: var(--space-sm);
+  padding-block-start: var(--space-sm);
+  border-top: 1px solid var(--edge-soft);
+}
+.design-system__title,
+.design-component__name,
+.design-rule__name {
+  color: var(--ink-muted);
+}
+.design-system__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--space-sm);
+}
+.design-token {
+  min-width: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: var(--space);
+}
+.design-token--color {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-sm);
+  align-items: center;
+  padding: 8px;
+}
+.design-token__chip {
+  inline-size: 32px;
+  block-size: 32px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+}
+.design-token__meta,
+.design-token--compact,
+.design-token--type {
+  display: grid;
+  gap: 3px;
+}
+.design-token--compact,
+.design-token--type {
+  padding: 9px;
+}
+.design-token__name,
+.design-token__sample {
+  color: var(--starlight);
+  font-size: 12px;
+  font-weight: 650;
+}
+.design-token__value {
+  min-width: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.design-component,
+.design-rule {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: var(--space);
+}
+.design-component__readouts {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 0;
+}
+.design-component__readouts dt {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.design-component__readouts dd {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+.design-component__note,
+.design-rule__body {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.design-rules {
+  display: grid;
+  gap: var(--space-sm);
 }
 
 /* ── Responsive ─────────────────────────────────────────── */
