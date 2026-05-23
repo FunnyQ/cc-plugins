@@ -7,7 +7,7 @@
 >
 > **Depends on**: kernel/01
 > **Blocks**: server/02, server/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
