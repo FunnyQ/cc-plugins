@@ -4,7 +4,7 @@
 > - `../_context/shared.md`
 >
 > **Depends on**: ui/01, server/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 

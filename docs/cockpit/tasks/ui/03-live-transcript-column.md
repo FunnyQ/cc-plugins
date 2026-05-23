@@ -6,7 +6,7 @@
 >
 > **Depends on**: ui/01, server/04
 > **Blocks**: —
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 

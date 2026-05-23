@@ -51,21 +51,21 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 | Bucket | NN | Title | Status | Depends on |
 |---|---|---|---|---|
-| bridge | 01 | Broker endpoints | todo | server/01 |
-| bridge | 02 | cockpit wait & send CLIs | todo | bridge/01, kernel/02 |
-| bridge | 03 | UI respond buttons | todo | ui/02, bridge/01 |
-| kernel | 01 | Plugin scaffold | todo | — |
-| kernel | 02 | cockpit CLI (start \| log) | todo | kernel/01 |
-| kernel | 03 | /cockpit-start skill | todo | kernel/02 |
-| server | 01 | Daemon lifecycle | todo | kernel/01 |
-| server | 02 | Registry → projects & sessions API | todo | server/01, kernel/02 |
-| server | 03 | Decision-log SSE | todo | server/02 |
-| server | 04 | Live-transcript engine | todo | server/01 |
-| ui | 01 | SPA shell & 3-column layout | todo | server/02 |
-| ui | 02 | Decision-log column | todo | ui/01, server/03 |
-| ui | 03 | Live-transcript column | todo | ui/01, server/04 |
-| ui | 04 | Info column & DESIGN.md theming | todo | ui/01 |
-| ui | 05 | Multi-project nesting | todo | ui/01, server/02 |
+| bridge | 01 | Broker endpoints | done | server/01 |
+| bridge | 02 | cockpit wait & send CLIs | done | bridge/01, kernel/02 |
+| bridge | 03 | UI respond buttons | done | ui/02, bridge/01 |
+| kernel | 01 | Plugin scaffold | done | — |
+| kernel | 02 | cockpit CLI (start \| log) | done | kernel/01 |
+| kernel | 03 | /cockpit-start skill | done | kernel/02 |
+| server | 01 | Daemon lifecycle | done | kernel/01 |
+| server | 02 | Registry → projects & sessions API | done | server/01, kernel/02 |
+| server | 03 | Decision-log SSE | done | server/02 |
+| server | 04 | Live-transcript engine | done | server/01 |
+| ui | 01 | SPA shell & 3-column layout | done | server/02 |
+| ui | 02 | Decision-log column | done | ui/01, server/03 |
+| ui | 03 | Live-transcript column | done | ui/01, server/04 |
+| ui | 04 | Info column & DESIGN.md theming | done | ui/01 |
+| ui | 05 | Multi-project nesting | done | ui/01, server/02 |
 
 ## Dependency graphs
 

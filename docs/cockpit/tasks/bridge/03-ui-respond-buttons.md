@@ -5,7 +5,7 @@
 > - `../_context/data-model.md`
 >
 > **Depends on**: ui/02, bridge/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 

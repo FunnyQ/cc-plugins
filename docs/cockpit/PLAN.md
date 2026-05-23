@@ -1,6 +1,6 @@
 # Cockpit — 專案駕駛艙
 
-> **Status**: approved (blueprint) · **Owner**: Q · **Last updated**: 2026-05-23
+> **Status**: implemented (v1, all 15 tasks done) · **Owner**: Q · **Last updated**: 2026-05-23
 
 ## Overview
 
@@ -110,21 +110,21 @@ Tasks live under `tasks/<bucket>/`.
 
 | Bucket | NN | Title | Status | Depends on |
 |---|---|---|---|---|
-| kernel | 01 | plugin-scaffold | todo | — |
-| kernel | 02 | cockpit-cli | todo | kernel/01 |
-| kernel | 03 | cockpit-start-skill | todo | kernel/02 |
-| server | 01 | daemon-lifecycle | todo | kernel/01 |
-| server | 02 | registry-projects-api | todo | server/01, kernel/02 |
-| server | 03 | decision-log-sse | todo | server/02 |
-| server | 04 | live-transcript-engine | todo | server/01 |
-| bridge | 01 | broker-endpoints | todo | server/01 |
-| bridge | 02 | cockpit-wait-and-send | todo | bridge/01, kernel/02 |
-| bridge | 03 | ui-respond-buttons | todo | ui/02, bridge/01 |
-| ui | 01 | spa-shell-layout | todo | server/02 |
-| ui | 02 | decision-log-column | todo | ui/01, server/03 |
-| ui | 03 | live-transcript-column | todo | ui/01, server/04 |
-| ui | 04 | info-column-theming | todo | ui/01 |
-| ui | 05 | multi-project-nesting | todo | ui/01, server/02 |
+| kernel | 01 | plugin-scaffold | done | — |
+| kernel | 02 | cockpit-cli | done | kernel/01 |
+| kernel | 03 | cockpit-start-skill | done | kernel/02 |
+| server | 01 | daemon-lifecycle | done | kernel/01 |
+| server | 02 | registry-projects-api | done | server/01, kernel/02 |
+| server | 03 | decision-log-sse | done | server/02 |
+| server | 04 | live-transcript-engine | done | server/01 |
+| bridge | 01 | broker-endpoints | done | server/01 |
+| bridge | 02 | cockpit-wait-and-send | done | bridge/01, kernel/02 |
+| bridge | 03 | ui-respond-buttons | done | ui/02, bridge/01 |
+| ui | 01 | spa-shell-layout | done | server/02 |
+| ui | 02 | decision-log-column | done | ui/01, server/03 |
+| ui | 03 | live-transcript-column | done | ui/01, server/04 |
+| ui | 04 | info-column-theming | done | ui/01 |
+| ui | 05 | multi-project-nesting | done | ui/01, server/02 |
 
 (Mirrors the table in `tasks/README.md` — keep them in sync.)
 
@@ -145,8 +145,8 @@ server/02 ─→ ui/01 ─┬─→ ui/02 ◀─ server/03 ────┘
 
 ## Open questions
 
-1. **DESIGN.md token consumption format** — verify the `@google/design.md` CLI `export` output shape (or the spec saved in Obsidian `📥 inbox/2026-05-23-design-md-specification.md`) before building `ui/04` theming. Resolving may add a parser sub-task.
-2. **Heartbeat staleness window** — what mtime/heartbeat age flips a session `active → ended` (token-atlas uses 10 min for live sessions). Default to 10 min; confirm during `server/02`.
+1. **DESIGN.md token consumption format** — ✅ **resolved** (`ui/04`). The `@google/design.md` CLI isn't installed and the Obsidian spec note wasn't present, but real DESIGN.md files follow the Google open standard as **YAML frontmatter** (`colors:` / `typography:` / `rounded:` / `spacing:` maps). `project-info.ts` parses that frontmatter with native `Bun.YAML.parse` and maps semantic slots onto cockpit's CSS vars via name-priority regex + a luminance/chroma fallback (`colorBg`←paper/cream/bg or lightest; `colorFg`←ink/text or darkest; `accent`←accent/primary/brand or most-saturated; `fontSans`←typography.body; `radius`←rounded.md). Absent/unparseable → `tokens: null`, SPA keeps neutral defaults. Assumption documented in `project-info.ts`.
+2. **Heartbeat staleness window** — ✅ **confirmed** (`server/02`): 10 min (`STALE_MS = 10 * 60 * 1000`), using `max(lastHeartbeat, log-file mtime)` so a live session that appends without re-registering still reads `active`.
 
 ## Known gaps
 
