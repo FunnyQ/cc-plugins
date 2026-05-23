@@ -8,7 +8,7 @@
 // frontmatter with Bun.YAML and map a few semantic slots onto cockpit's tokens.
 // If DESIGN.md is absent or unparseable, tokens = null (SPA keeps its defaults).
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { readRegistry, readProjectGoal } from "./registry";
 
 export type ProjectTokens = {
@@ -53,12 +53,10 @@ function readClaudeMd(project: string): string | null {
   try {
     const realProject = realpathSync(project);
     const realFile = realpathSync(candidate);
-    // Confine: the resolved file must live directly inside the project root.
-    // A symlink pointing outside (traversal) resolves elsewhere → reject.
-    if (
-      realFile !== join(realProject, "CLAUDE.md") &&
-      !realFile.startsWith(realProject + sep)
-    ) {
+    // Confine: accept only the project root's own CLAUDE.md. If the entry is a
+    // symlink that resolves anywhere else (outside the root, or to a different
+    // in-project path), its realpath won't equal <root>/CLAUDE.md → reject.
+    if (realFile !== join(realProject, "CLAUDE.md")) {
       return null;
     }
     return readFileSync(realFile, "utf8");
