@@ -1,1 +1,4 @@
 .claude/handoffs/
+
+# cockpit runtime state (per-project meta + session logs)
+.cockpit/
