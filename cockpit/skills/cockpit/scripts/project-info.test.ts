@@ -123,6 +123,24 @@ describe("CLAUDE.md path confinement", () => {
       rmSync(outside, { recursive: true, force: true });
     }
   });
+
+  test("a CLAUDE.md symlinked to a different in-project path is rejected (null)", () => {
+    seedMeta(projectDir);
+    mkdirSync(join(projectDir, "docs"), { recursive: true });
+    writeFileSync(join(projectDir, "docs", "elsewhere.md"), "NOT THE ROOT");
+    // Symlink resolves inside the project but is not <root>/CLAUDE.md → reject.
+    symlinkSync(
+      join(projectDir, "docs", "elsewhere.md"),
+      join(projectDir, "CLAUDE.md"),
+    );
+    expect(buildProjectInfo(projectDir).claudeMd).toBeNull();
+  });
+
+  test("a real CLAUDE.md directly in the project root is returned", () => {
+    seedMeta(projectDir);
+    writeFileSync(join(projectDir, "CLAUDE.md"), "# root rules");
+    expect(buildProjectInfo(projectDir).claudeMd).toContain("root rules");
+  });
 });
 
 describe("parseDesignTokens", () => {
