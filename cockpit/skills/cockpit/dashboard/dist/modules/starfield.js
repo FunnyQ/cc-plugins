@@ -7,7 +7,7 @@
 
 const COUNT = 560;
 // z units travelled per millisecond — the warp speed. Small = slow cruise.
-const SPEED = 0.00018;
+const SPEED = 0.00023;
 // Canvas can't be trusted to parse oklch() across engines, so the two star
 // tints are pre-resolved to rgb (cool starlight + occasional aurora).
 const STARLIGHT = "236, 239, 247";
@@ -18,28 +18,28 @@ const TYPES = [
     weight: 0.5,
     size: [0.52, 1.18],
     alpha: [0.2, 0.5],
-    stretch: [0.4, 0.92],
+    stretch: [0.78, 1.45],
   },
   {
     name: "star",
     weight: 0.34,
     size: [0.82, 1.72],
     alpha: [0.3, 0.86],
-    stretch: [0.9, 1.58],
+    stretch: [1.4, 2.55],
   },
   {
     name: "glint",
     weight: 0.11,
     size: [0.95, 2.05],
     alpha: [0.42, 0.96],
-    stretch: [1.12, 2.1],
+    stretch: [1.85, 3.25],
   },
   {
     name: "courier",
     weight: 0.05,
     size: [0.7, 1.5],
     alpha: [0.36, 0.9],
-    stretch: [1.7, 3],
+    stretch: [2.6, 4.4],
   },
 ];
 
@@ -121,6 +121,20 @@ export function initStarfield(canvas) {
   const projX = (s) => cx + (s.x / s.z) * scale;
   const projY = (s) => cy + (s.y / s.z) * scale;
 
+  function drawTrail(x1, y1, x2, y2, tint, alpha, width) {
+    const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+    gradient.addColorStop(0, `rgba(${tint}, 0)`);
+    gradient.addColorStop(0.72, `rgba(${tint}, ${alpha * 0.38})`);
+    gradient.addColorStop(1, `rgba(${tint}, ${alpha})`);
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
   function frame(t) {
     const dt = Math.min(48, t - (last || t));
     last = t;
@@ -144,13 +158,11 @@ export function initStarfield(canvas) {
           shimmer,
       );
       const tint = s.type.name === "glint" ? AURORA : STARLIGHT;
-      ctx.strokeStyle = `rgba(${tint}, ${alpha})`;
-      ctx.lineWidth =
+      const width =
         s.type.size[0] + depth * (s.type.size[1] - s.type.size[0]) * s.twinkle;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(px + (nx - px) * s.stretch, py + (ny - py) * s.stretch);
-      ctx.stroke();
+      const hx = px + (nx - px) * s.stretch;
+      const hy = py + (ny - py) * s.stretch;
+      drawTrail(px, py, hx, hy, tint, alpha, width);
     }
     raf = requestAnimationFrame(frame);
   }
