@@ -1451,6 +1451,16 @@ body {
    (The warp starfield freezes itself in starfield.js by rendering one static
    frame.) */
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   .status-led,
   .manifest__caret,
   .lead-underline,

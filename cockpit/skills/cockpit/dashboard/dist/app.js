@@ -33,6 +33,9 @@ export const store = reactive({
   loaded: false,
   // selection-change subscribers (column modules register here)
   _subscribers: [],
+  // session-list subscribers (modules register when UI state depends on polled
+  // status changes, not just selected id changes).
+  _sessionSubscribers: [],
   // per-project expand/collapse overrides (project path → bool); persists
   // across the 3s poll because it lives on the store, not in the render.
   expandedOverrides: {},
@@ -113,6 +116,12 @@ export const store = reactive({
     else this._starfield.resume();
   },
 
+  onHeroKeydown(e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    this.toggleHero();
+  },
+
   isSelected(id) {
     return this.selectedSessionId === id;
   },
@@ -172,12 +181,26 @@ export const store = reactive({
     this._subscribers.push(fn);
   },
 
+  subscribeSessions(fn) {
+    this._sessionSubscribers.push(fn);
+  },
+
   _notify() {
     for (const fn of this._subscribers) {
       try {
         fn(this.selectedProject, this.selectedSessionId);
       } catch (e) {
         console.error("cockpit: subscriber error", e);
+      }
+    }
+  },
+
+  _notifySessions() {
+    for (const fn of this._sessionSubscribers) {
+      try {
+        fn(this.sessions);
+      } catch (e) {
+        console.error("cockpit: session subscriber error", e);
       }
     }
   },
@@ -197,6 +220,7 @@ export const store = reactive({
       const r = await fetch("/api/sessions");
       const j = await r.json();
       this.sessions = sortActiveFirst(j.sessions || []);
+      this._notifySessions();
       // First load only: default-select the top (active-first) session.
       if (!this.selectedSessionId && this.sessions.length) {
         this.selectSession(this.sessions[0]);

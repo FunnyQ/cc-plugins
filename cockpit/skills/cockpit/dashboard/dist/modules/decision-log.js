@@ -187,6 +187,20 @@ export function initDecisionLog(rootEl) {
     if (form) form.hidden = true;
   }
 
+  function refreshCallState() {
+    if (!lastOpenCall) {
+      store.awaitingCall = false;
+      return;
+    }
+    if (sessionActive()) {
+      showRespond(lastOpenCall);
+      store.awaitingCall = true;
+    } else {
+      hideRespond(lastOpenCall);
+      store.awaitingCall = false;
+    }
+  }
+
   function setFormDisabled(form, disabled) {
     form
       .querySelectorAll("button, input")
@@ -255,10 +269,7 @@ export function initDecisionLog(rootEl) {
       if (rec.needs_your_call) {
         if (lastOpenCall) hideRespond(lastOpenCall); // older call isn't latest
         lastOpenCall = card;
-        if (sessionActive()) {
-          showRespond(card); // active → answerable buttons
-          store.awaitingCall = true; // light the HUD "your turn" alert
-        }
+        refreshCallState();
       }
       if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
       return;
@@ -308,6 +319,7 @@ export function initDecisionLog(rootEl) {
   }, 15_000);
 
   store.subscribe((project, session) => open(project, session));
+  store.subscribeSessions(refreshCallState);
   // Open immediately for the current selection (set before this mounts).
   open(store.selectedProject, store.selectedSessionId);
 }
