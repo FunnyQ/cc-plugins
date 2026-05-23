@@ -3,7 +3,7 @@
 //   bun test cockpit/skills/cockpit/scripts/cockpit-bridge.test.ts
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Subprocess } from "bun";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,16 +25,32 @@ function freePort(): number {
   return p;
 }
 
-function runCli(args: string[], home = cockpitHome, cwd = projectDir) {
+function runCli(
+  args: string[],
+  home = cockpitHome,
+  cwd = projectDir,
+  extraEnv: Record<string, string> = {},
+) {
   const proc = Bun.spawnSync(["bun", CLI, ...args], {
     cwd,
-    env: { ...process.env, COCKPIT_HOME: home },
+    env: { ...process.env, COCKPIT_HOME: home, ...extraEnv },
   });
   return {
     code: proc.exitCode,
     stdout: proc.stdout.toString(),
     stderr: proc.stderr.toString(),
   };
+}
+
+// A COCKPIT_HOME whose daemon.json points at the real daemon port but carries a
+// bogus token — so the CLI talks to the live daemon and gets a 401.
+function badTokenHome(): string {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-badtok-")));
+  writeFileSync(
+    join(home, "daemon.json"),
+    JSON.stringify({ pid: process.pid, port, token: "deadbeefbadtoken" }),
+  );
+  return home;
 }
 
 async function waitForDaemon(p: number, timeoutMs = 8000) {
@@ -127,6 +143,45 @@ describe("cockpit wait + send round-trip", () => {
     expect(exitCode).toBe(0);
     expect(out.trim()).toBe("after timeout");
   }, 15000);
+});
+
+describe("auth / validation errors (non-2xx must not be misreported)", () => {
+  test("wait with a wrong token exits non-zero immediately (no spin)", () => {
+    const home = badTokenHome();
+    try {
+      const t0 = Date.now();
+      // Cap the wall clock so a regression (treating 401 as re-pollable) can't
+      // hang the suite — a correct impl exits on the 401 long before this.
+      const r = runCli(["wait", SID], home, projectDir, {
+        COCKPIT_WAIT_MAX_MS: "6000",
+      });
+      const elapsed = Date.now() - t0;
+      expect(r.code).not.toBe(0);
+      expect(r.stderr.toLowerCase()).toContain("unauthorized");
+      expect(elapsed).toBeLessThan(4000); // didn't loop to the ceiling
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 10000);
+
+  test("send with a wrong token exits non-zero, not delivered:false", () => {
+    const home = badTokenHome();
+    try {
+      const r = runCli(["send", SID, "x"], home);
+      expect(r.code).not.toBe(0);
+      expect(r.stderr.toLowerCase()).toContain("unauthorized");
+      expect(r.stdout).not.toContain("delivered");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("send with an invalid (non-uuid) session exits non-zero", () => {
+    const r = runCli(["send", "not-a-uuid", "x"]);
+    expect(r.code).not.toBe(0);
+    expect(r.stderr.toLowerCase()).toContain("invalid session");
+    expect(r.stdout).not.toContain("delivered");
+  });
 });
 
 describe("daemon down", () => {
