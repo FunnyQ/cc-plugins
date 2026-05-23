@@ -8,6 +8,7 @@
 const COUNT = 560;
 // z units travelled per millisecond — the warp speed. Small = slow cruise.
 const SPEED = 0.00023;
+const TRAIL_LENGTH = 1.65;
 // Canvas can't be trusted to parse oklch() across engines, so the two star
 // tints are pre-resolved to rgb (cool starlight + occasional aurora).
 const STARLIGHT = "236, 239, 247";
@@ -124,7 +125,8 @@ export function initStarfield(canvas) {
   function drawTrail(x1, y1, x2, y2, tint, alpha, width) {
     const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
     gradient.addColorStop(0, `rgba(${tint}, 0)`);
-    gradient.addColorStop(0.72, `rgba(${tint}, ${alpha * 0.38})`);
+    gradient.addColorStop(0.58, `rgba(${tint}, ${alpha * 0.28})`);
+    gradient.addColorStop(0.82, `rgba(${tint}, ${alpha * 0.5})`);
     gradient.addColorStop(1, `rgba(${tint}, ${alpha})`);
     ctx.strokeStyle = gradient;
     ctx.lineWidth = width;
@@ -160,8 +162,8 @@ export function initStarfield(canvas) {
       const tint = s.type.name === "glint" ? AURORA : STARLIGHT;
       const width =
         s.type.size[0] + depth * (s.type.size[1] - s.type.size[0]) * s.twinkle;
-      const hx = px + (nx - px) * s.stretch;
-      const hy = py + (ny - py) * s.stretch;
+      const hx = px + (nx - px) * s.stretch * TRAIL_LENGTH;
+      const hy = py + (ny - py) * s.stretch * TRAIL_LENGTH;
       drawTrail(px, py, hx, hy, tint, alpha, width);
     }
     raf = requestAnimationFrame(frame);
