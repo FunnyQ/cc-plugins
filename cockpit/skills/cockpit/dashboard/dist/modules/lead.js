@@ -48,6 +48,7 @@ export function initLead({ svg, viewport, dest, beacon, telemetry }) {
   ro.observe(viewport);
   ro.observe(dest);
   window.addEventListener("resize", update);
+  viewport.addEventListener("cockpit:warp-turn", update);
   // Initial pass once layout settles.
   requestAnimationFrame(update);
 

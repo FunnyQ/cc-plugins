@@ -294,8 +294,8 @@ body {
 /* Beacon — the goal object at center: the waypoint you're flying toward. */
 .viewport__beacon {
   position: absolute;
-  inset-block-start: 50%;
-  inset-inline-start: 50%;
+  inset-block-start: var(--beacon-y, 50%);
+  inset-inline-start: var(--beacon-x, 50%);
   inline-size: 60px;
   block-size: 60px;
   translate: -50% -50%;

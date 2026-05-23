@@ -5,34 +5,84 @@
 // not a launch sequence. No dependencies; pauses when the tab is hidden and
 // renders a single static frame under prefers-reduced-motion.
 
-const COUNT = 200;
+const COUNT = 360;
 // z units travelled per millisecond — the warp speed. Small = slow cruise.
 const SPEED = 0.00018;
 // Canvas can't be trusted to parse oklch() across engines, so the two star
 // tints are pre-resolved to rgb (cool starlight + occasional aurora).
 const STARLIGHT = "236, 239, 247";
 const AURORA = "125, 224, 228";
+const TYPES = [
+  {
+    name: "dust",
+    weight: 0.5,
+    size: [0.35, 0.9],
+    alpha: [0.08, 0.32],
+    stretch: [0.28, 0.7],
+  },
+  {
+    name: "star",
+    weight: 0.34,
+    size: [0.55, 1.3],
+    alpha: [0.14, 0.62],
+    stretch: [0.65, 1.25],
+  },
+  {
+    name: "glint",
+    weight: 0.11,
+    size: [0.6, 1.55],
+    alpha: [0.22, 0.78],
+    stretch: [0.85, 1.65],
+  },
+  {
+    name: "courier",
+    weight: 0.05,
+    size: [0.45, 1.15],
+    alpha: [0.18, 0.7],
+    stretch: [1.35, 2.5],
+  },
+];
 
 const rnd = (a, b) => a + Math.random() * (b - a);
-const makeStar = (z) => ({
-  x: rnd(-1, 1),
-  y: rnd(-1, 1),
-  z: z ?? rnd(0.05, 1),
-  warm: Math.random() < 0.1,
-});
+function pickType() {
+  let n = Math.random();
+  for (const type of TYPES) {
+    n -= type.weight;
+    if (n <= 0) return type;
+  }
+  return TYPES[0];
+}
+
+function makeStar(z) {
+  const type = pickType();
+  return {
+    x: rnd(-1, 1),
+    y: rnd(-1, 1),
+    z: z ?? rnd(0.05, 1),
+    type,
+    stretch: rnd(type.stretch[0], type.stretch[1]),
+    twinkle: rnd(0.85, 1.15),
+    phase: rnd(0, Math.PI * 2),
+  };
+}
 
 export function initStarfield(canvas) {
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+  const viewport = canvas.closest(".viewport");
   const reduce = window.matchMedia?.(
     "(prefers-reduced-motion: reduce)",
   ).matches;
 
   let w = 0;
   let h = 0;
+  let baseCx = 0;
+  let baseCy = 0;
   let cx = 0;
   let cy = 0;
+  let beaconCx = 0;
+  let beaconCy = 0;
   let scale = 1;
   let stars = Array.from({ length: COUNT }, () => makeStar());
   let raf = 0;
@@ -43,9 +93,28 @@ export function initStarfield(canvas) {
     const r = canvas.getBoundingClientRect();
     w = canvas.width = Math.max(1, Math.round(r.width));
     h = canvas.height = Math.max(1, Math.round(r.height));
-    cx = w / 2;
-    cy = h / 2;
+    baseCx = w / 2;
+    baseCy = h / 2;
+    setTurnCenter(0, 1);
     scale = Math.max(w, h) * 0.55;
+  }
+
+  function setTurnCenter(t, follow = 0.035) {
+    const turnX =
+      Math.sin(t * 0.00014) * w * 0.09 + Math.sin(t * 0.00006) * w * 0.035;
+    const turnY =
+      Math.cos(t * 0.00011) * h * 0.055 + Math.sin(t * 0.00005) * h * 0.025;
+    cx = baseCx + turnX;
+    cy = baseCy + turnY;
+    beaconCx += (cx - beaconCx) * follow;
+    beaconCy += (cy - beaconCy) * follow;
+    if (viewport) {
+      viewport.style.setProperty("--warp-x", `${(cx / w) * 100}%`);
+      viewport.style.setProperty("--warp-y", `${(cy / h) * 100}%`);
+      viewport.style.setProperty("--beacon-x", `${(beaconCx / w) * 100}%`);
+      viewport.style.setProperty("--beacon-y", `${(beaconCy / h) * 100}%`);
+      viewport.dispatchEvent(new CustomEvent("cockpit:warp-turn"));
+    }
   }
 
   // Perspective projection: nearer stars (small z) fling far from center.
@@ -55,6 +124,7 @@ export function initStarfield(canvas) {
   function frame(t) {
     const dt = Math.min(48, t - (last || t));
     last = t;
+    setTurnCenter(t);
     ctx.clearRect(0, 0, w, h);
     for (const s of stars) {
       const px = projX(s);
@@ -67,12 +137,19 @@ export function initStarfield(canvas) {
       const nx = projX(s);
       const ny = projY(s);
       const depth = 1 - s.z; // 0 far → 1 near
-      const alpha = Math.min(0.85, 0.12 + depth * 0.8);
-      ctx.strokeStyle = `rgba(${s.warm ? AURORA : STARLIGHT}, ${alpha})`;
-      ctx.lineWidth = 0.5 + depth * 1.4;
+      const shimmer = 0.88 + Math.sin(t * 0.0012 + s.phase) * 0.12;
+      const alpha = Math.min(
+        s.type.alpha[1],
+        (s.type.alpha[0] + depth * (s.type.alpha[1] - s.type.alpha[0])) *
+          shimmer,
+      );
+      const tint = s.type.name === "glint" ? AURORA : STARLIGHT;
+      ctx.strokeStyle = `rgba(${tint}, ${alpha})`;
+      ctx.lineWidth =
+        s.type.size[0] + depth * (s.type.size[1] - s.type.size[0]) * s.twinkle;
       ctx.beginPath();
       ctx.moveTo(px, py);
-      ctx.lineTo(nx, ny);
+      ctx.lineTo(px + (nx - px) * s.stretch, py + (ny - py) * s.stretch);
       ctx.stroke();
     }
     raf = requestAnimationFrame(frame);
@@ -82,9 +159,16 @@ export function initStarfield(canvas) {
     ctx.clearRect(0, 0, w, h);
     for (const s of stars) {
       const depth = 1 - s.z;
-      ctx.fillStyle = `rgba(${s.warm ? AURORA : STARLIGHT}, ${0.12 + depth * 0.6})`;
+      const tint = s.type.name === "glint" ? AURORA : STARLIGHT;
+      ctx.fillStyle = `rgba(${tint}, ${s.type.alpha[0] + depth * 0.45})`;
       ctx.beginPath();
-      ctx.arc(projX(s), projY(s), 0.5 + depth * 1.2, 0, Math.PI * 2);
+      ctx.arc(
+        projX(s),
+        projY(s),
+        s.type.size[0] + depth * (s.type.size[1] - s.type.size[0]),
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
     }
   }
