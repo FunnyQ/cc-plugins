@@ -1,19 +1,19 @@
 # Cockpit — 專案駕駛艙
 
-> **Status**: implemented (v1, all 15 tasks done) · **Owner**: Q · **Last updated**: 2026-05-23
+> **Status**: implemented (v1, all 15 tasks done) · **Owner**: Users · **Last updated**: 2026-05-23
 
 ## Overview
 
-A per-project local web **cockpit** (sibling plugin to token-atlas): open a session, set the goal, then watch the decision trail steer toward it in real time — keeping Q "in the loop and in control". token-atlas is the rear-view mirror (retrospective, global usage); cockpit is the windshield + control stick (present + goal, per-project).
+A per-project local web **cockpit** (sibling plugin to token-atlas): open a session, set the goal, then watch the decision trail steer toward it in real time — keeping users "in the loop and in control". token-atlas is the rear-view mirror (retrospective, global usage); cockpit is the windshield + control stick (present + goal, per-project).
 
 ## Goals
 
 - **Kernel (novel)**: capture a goal at session start and append a distilled decision log — the thing no tool in the ecosystem produces.
 - **Viewer**: a dashboard — multi-project side-rail (project → sessions) + 3-column session view (live transcript │ decision log │ project info), themed per-project from its DESIGN.md.
-- **Control loop**: at a `needs_your_call`, the UI presents the LLM's `options` as buttons; Q's pick is routed back to wake the parked session — true two-way "in control".
+- **Control loop**: at a `needs_your_call`, the UI presents the LLM's `options` as buttons; the user's pick is routed back to wake the parked session — true two-way "in control".
 - **End-to-end**: produce the data, show it, *and* steer it.
 
-> **Scope note**: this is **v1**, not a thin MVP. The earlier read-only cut grew, on Q's call, to include the bidirectional control loop (the `bridge` bucket) and multi-project nesting. Only token-atlas's live-view removal stays deferred.
+> **Scope note**: this is **v1**, not a thin MVP. The earlier read-only cut grew, on user feedback, to include the bidirectional control loop (the `bridge` bucket) and multi-project nesting. Only token-atlas's live-view removal stays deferred.
 
 ## Non-goals
 
@@ -38,8 +38,8 @@ The narrative / decision-trail document lives at `personal-assistant/project-pla
    - Acceptance: `cockpit start` creates both; `cockpit log` appends a valid 8-field decision record; a malformed line doesn't break parsing of others.
 2. **`cockpit` CLI** — `start` (write meta + session goal record + register/heartbeat), `log` (atomic append; `--file`/`--option` repeatable), plus `wait`/`send` for the control loop.
    - Acceptance: running each from a project dir produces the files above and a registry entry under `~/.cockpit/`.
-3. **`/cockpit-start` skill** — Claude proposes project+session goal, Q confirms/edits (human gate), then calls `cockpit start`.
-   - Acceptance: invoking the skill yields a written `project-meta.md` + goal record only after Q's confirmation.
+3. **`/cockpit-start` skill** — Claude proposes project+session goal, the user confirms/edits (human gate), then calls `cockpit start`.
+   - Acceptance: invoking the skill yields a written `project-meta.md` + goal record only after the user's confirmation.
 4. **Session discovery** — sessions self-register to `~/.cockpit/registry.json` with heartbeat; daemon watches only registered `.cockpit/logs/` dirs; active vs ended distinguished by heartbeat/mtime.
    - Acceptance: `GET /api/sessions` lists registered sessions with `active|ended` status.
 5. **Global daemon** — one Bun daemon (not per-project), PID-file reuse (`~/.cockpit/daemon.json` `{pid,port,token}`, `process.kill(pid,0)` probe), binds `127.0.0.1`, serves `dashboard/dist/` + APIs.
@@ -73,7 +73,7 @@ Freeze the choices that affect more than one task. These flow into `tasks/_conte
 ## Architecture
 
 ```
- /cockpit-start skill ──proposes goal, Q confirms──┐
+ /cockpit-start skill ──proposes goal, user confirms──┐
                                                     ▼
  cockpit CLI:  start ─→ <project>/.cockpit/project-meta.md + logs/<id>.jsonl (session goal record)
                start ─→ ~/.cockpit/registry.json (register + heartbeat)

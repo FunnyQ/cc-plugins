@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.4.2] - 2026-05-24
+
+### 📝 Documentation
+
+- **Cockpit needs-your-call guidance**: Clarified that when a Cockpit session is already running, any workflow that needs to ask the user should route that question through `needs_your_call` and wait for the cockpit answer.
+- **Shared user-facing wording**: Generalized Cockpit and Token Atlas product/skill wording from project-specific operator language to neutral `user` / `users` wording, while preserving author metadata, marketplace ids, install commands, and task-history docs.
+
+> Token Atlas runtime is unchanged in this release; the version bump keeps marketplace plugins aligned at 2.4.2.
+
 ## [2.4.1] - 2026-05-24
 
 ### ✨ New Features

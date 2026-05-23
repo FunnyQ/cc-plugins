@@ -10,7 +10,7 @@ Claude Code power users who want a local, private view of usage, cost, model mix
 
 ## Product Purpose
 
-The dashboard turns local Claude Code data into a scannable operational view. Success means Q can open it, understand the current usage window in seconds, compare models and projects without reading raw JSON, and trust that the numbers are local and practical.
+The dashboard turns local Claude Code data into a scannable operational view. Success means users can open it, understand the current usage window in seconds, compare models and projects without reading raw JSON, and trust that the numbers are local and practical.
 
 ## Brand Personality
 
