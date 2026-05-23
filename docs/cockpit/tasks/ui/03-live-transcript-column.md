@@ -44,18 +44,18 @@ Import `marked.esm.js`, `purify.es.mjs`, `highlight.esm.js` from `./vendor/`.
 
 ## Acceptance criteria
 
-- [ ] Selecting a session streams its transcript backlog then live appends into the left column.
-- [ ] Prose renders as sanitized markdown; `thinking` shows a muted badge; tool calls/results render as highlighted code; file edits render as diffs.
-- [ ] A `tool_result` is paired into its `tool_use` entry (no orphan bubbles).
-- [ ] Metadata-noise entry types are filtered out.
-- [ ] Column auto-scrolls only when bottom-pinned; switching sessions resets it and closes the old EventSource.
-- [ ] No Codex code paths in the cockpit copy.
+- [x] Selecting a session streams its transcript backlog then live appends into the left column.
+- [x] Prose renders as sanitized markdown; `thinking` shows a muted badge; tool calls/results render as highlighted code; file edits render as diffs.
+- [x] A `tool_result` is paired into its `tool_use` entry (no orphan bubbles).
+- [x] Metadata-noise entry types are filtered out.
+- [x] Column auto-scrolls only when bottom-pinned; switching sessions resets it and closes the old EventSource.
+- [x] No Codex code paths in the cockpit copy.
 
 ## Verification
 
-- [ ] Daemon running, pick a real session: load SPA (Q), select it → transcript renders with markdown/diffs/tool blocks.
-- [ ] Continue working in that Claude session → new entries append live in the column.
-- [ ] `grep -i codex modules/transcript.js` returns nothing.
+- [x] Daemon running, pick a real session: load SPA (Q), select it → transcript renders with markdown/diffs/tool blocks.
+- [x] Continue working in that Claude session → new entries append live in the column.
+- [x] `grep -i codex modules/transcript.js` returns nothing.
 
 ## Out of scope
 

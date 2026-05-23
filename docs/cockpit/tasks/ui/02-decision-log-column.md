@@ -52,19 +52,19 @@ When `needs_your_call: true`, render the card as a **handoff marker** — distin
 
 ## Acceptance criteria
 
-- [ ] Selecting a session opens the log SSE and renders the goal record (`session_goal`) as the column header.
-- [ ] Each decision appears as a card with `decision`, `reason`, optional `tradeoff`, a chip per `files` entry, and a relative timestamp.
-- [ ] A `needs_your_call: true` record is visually distinct (handoff badge/accent) and lists its `options` (read-only).
-- [ ] A `response` record renders inline after its needs_your_call card and marks it resolved.
-- [ ] Appending a decision (`cockpit log`) makes a new card appear live without reload.
-- [ ] Switching sessions closes the old EventSource and loads the new session's trail.
-- [ ] Empty/missing log shows the empty state, not an error.
+- [x] Selecting a session opens the log SSE and renders the goal record (`session_goal`) as the column header.
+- [x] Each decision appears as a card with `decision`, `reason`, optional `tradeoff`, a chip per `files` entry, and a relative timestamp.
+- [x] A `needs_your_call: true` record is visually distinct (handoff badge/accent) and lists its `options` (read-only).
+- [x] A `response` record renders inline after its needs_your_call card and marks it resolved.
+- [x] Appending a decision (`cockpit log`) makes a new card appear live without reload.
+- [x] Switching sessions closes the old EventSource and loads the new session's trail.
+- [x] Empty/missing log shows the empty state, not an error.
 
 ## Verification
 
-- [ ] Daemon running + seeded session: load the SPA (Q), select the session → goal header + existing decisions render.
-- [ ] Run `cockpit log --session <id> --decision "X" --reason "Y" --needs-call` → a flagged card appears live.
-- [ ] Switch to another session and back → no duplicate/stale cards; console shows the old EventSource closed.
+- [x] Daemon running + seeded session: load the SPA (Q), select the session → goal header + existing decisions render.
+- [x] Run `cockpit log --session <id> --decision "X" --reason "Y" --needs-call` → a flagged card appears live.
+- [x] Switch to another session and back → no duplicate/stale cards; console shows the old EventSource closed.
 
 ## Out of scope
 

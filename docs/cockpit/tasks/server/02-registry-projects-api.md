@@ -69,17 +69,17 @@ Use `jsonResponse` / `jsonError` (copied into the daemon from `live.ts`). Sort a
 
 ## Acceptance criteria
 
-- [ ] `GET /api/sessions` returns all registered sessions, each with `status` ∈ {`active`,`ended`}, sorted active-first.
-- [ ] A session whose `lastHeartbeat` + log mtime are both older than 10 min reports `ended`; a freshly-written one reports `active`.
-- [ ] Each session includes `sessionGoal`/`projectGoal` read from its goal record (or empty when absent).
-- [ ] `GET /api/projects` groups sessions by `project` with `activeCount`/`sessionCount` and a `projectGoal`.
-- [ ] Missing/corrupt `registry.json` yields `{ "sessions": [] }` / `{ "projects": [] }`, not a 500.
+- [x] `GET /api/sessions` returns all registered sessions, each with `status` ∈ {`active`,`ended`}, sorted active-first.
+- [x] A session whose `lastHeartbeat` + log mtime are both older than 10 min reports `ended`; a freshly-written one reports `active`.
+- [x] Each session includes `sessionGoal`/`projectGoal` read from its goal record (or empty when absent).
+- [x] `GET /api/projects` groups sessions by `project` with `activeCount`/`sessionCount` and a `projectGoal`.
+- [x] Missing/corrupt `registry.json` yields `{ "sessions": [] }` / `{ "projects": [] }`, not a 500.
 
 ## Verification
 
-- [ ] Seed via the cockpit CLI (`cockpit start` in two scratch projects), start the daemon, then `curl -s localhost:5858/api/sessions | jq '.sessions[].status'` shows `active`.
-- [ ] Hand-edit a registry entry's `lastHeartbeat` to >10 min ago and touch its log mtime back → that session reports `ended`.
-- [ ] `curl -s localhost:5858/api/projects | jq` shows the grouped projects with counts.
+- [x] Seed via the cockpit CLI (`cockpit start` in two scratch projects), start the daemon, then `curl -s localhost:5858/api/sessions | jq '.sessions[].status'` shows `active`.
+- [x] Hand-edit a registry entry's `lastHeartbeat` to >10 min ago and touch its log mtime back → that session reports `ended`.
+- [x] `curl -s localhost:5858/api/projects | jq` shows the grouped projects with counts.
 
 ## Out of scope
 

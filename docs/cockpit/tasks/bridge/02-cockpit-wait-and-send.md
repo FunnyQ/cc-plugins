@@ -46,16 +46,16 @@ print the {delivered} result
 
 ## Acceptance criteria
 
-- [ ] `cockpit wait <id>` blocks, and returns/prints the answer once a `respond` (UI or `cockpit send`) targets that session.
-- [ ] `cockpit wait` re-polls across the ~270s long-poll timeout without losing its place; it gives up after the wall-clock limit with a non-zero exit.
-- [ ] `cockpit send <id> "answer"` posts to `/api/respond` and reports `delivered: true/false`.
-- [ ] Both read `port`+`token` from `~/.cockpit/daemon.json` and error clearly if the daemon is down.
+- [x] `cockpit wait <id>` blocks, and returns/prints the answer once a `respond` (UI or `cockpit send`) targets that session.
+- [x] `cockpit wait` re-polls across the ~270s long-poll timeout without losing its place; it gives up after the wall-clock limit with a non-zero exit.
+- [x] `cockpit send <id> "answer"` posts to `/api/respond` and reports `delivered: true/false`.
+- [x] Both read `port`+`token` from `~/.cockpit/daemon.json` and error clearly if the daemon is down.
 
 ## Verification
 
-- [ ] Daemon running. Shell A: `bun cockpit/skills/cockpit/scripts/cockpit.ts wait <id>` (hangs). Shell B: `bun .../cockpit.ts send <id> "go with B"` → shell A prints `go with B` and exits 0; shell B reports `delivered: true`.
-- [ ] With nothing waiting: `bun .../cockpit.ts send <id> "x"` reports `delivered: false`.
-- [ ] Stop the daemon, run `cockpit wait <id>` → clear "daemon not running" error.
+- [x] Daemon running. Shell A: `bun cockpit/skills/cockpit/scripts/cockpit.ts wait <id>` (hangs). Shell B: `bun .../cockpit.ts send <id> "go with B"` → shell A prints `go with B` and exits 0; shell B reports `delivered: true`.
+- [x] With nothing waiting: `bun .../cockpit.ts send <id> "x"` reports `delivered: false`.
+- [x] Stop the daemon, run `cockpit wait <id>` → clear "daemon not running" error.
 
 ## Out of scope
 

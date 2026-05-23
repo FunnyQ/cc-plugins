@@ -47,16 +47,16 @@ Mirror the structure of other skills in this ecosystem (e.g. token-atlas `dashbo
 
 ## Acceptance criteria
 
-- [ ] `cockpit/skills/cockpit/SKILL.md` exists with valid frontmatter (name, description, trigger phrases) consistent with other skills in the repo.
-- [ ] The instructions make Claude propose goals and **wait for Q's confirmation** before writing (human gate is explicit).
-- [ ] The instructions invoke `cockpit.ts start` with `--session`, `--session-goal`, `--project-goal`.
-- [ ] The instructions explain post-start `cockpit log` usage including `--needs-call` for handoff moments.
-- [ ] The skill does not auto-trigger on every session (opt-in wording).
+- [x] `cockpit/skills/cockpit/SKILL.md` exists with valid frontmatter (name, description, trigger phrases) consistent with other skills in the repo.
+- [x] The instructions make Claude propose goals and **wait for Q's confirmation** before writing (human gate is explicit).
+- [x] The instructions invoke `cockpit.ts start` with `--session`, `--session-goal`, `--project-goal`.
+- [x] The instructions explain post-start `cockpit log` usage including `--needs-call` for handoff moments.
+- [x] The skill does not auto-trigger on every session (opt-in wording).
 
 ## Verification
 
-- [ ] Read SKILL.md back: confirm the propose→confirm→write order and that no write happens before confirmation.
-- [ ] Dry-run the documented `cockpit.ts start` command from a scratch dir → verifies the skill's command matches the cockpit CLI's actual `start` flags.
+- [x] Read SKILL.md back: confirm the propose→confirm→write order and that no write happens before confirmation.
+- [x] Dry-run the documented `cockpit.ts start` command from a scratch dir → verifies the skill's command matches the cockpit CLI's actual `start` flags.
 
 ## Out of scope
 

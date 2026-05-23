@@ -36,18 +36,18 @@ Only show live buttons when the selected session is `active` **and** the call is
 
 ## Acceptance criteria
 
-- [ ] An open `needs_your_call` card in an active session shows its `options` as buttons + a free-text answer field.
-- [ ] Clicking a button (or sending free text) POSTs `/api/respond` with the session id, answer, and token.
-- [ ] After a successful answer, a `response` record arrives via SSE and the card flips to answered (buttons gone).
-- [ ] `delivered: false` shows the "not listening" note instead of a success state.
-- [ ] Ended/read-only sessions show options as plain text with no buttons.
-- [ ] The token is fetched at runtime, never hardcoded.
+- [x] An open `needs_your_call` card in an active session shows its `options` as buttons + a free-text answer field.
+- [x] Clicking a button (or sending free text) POSTs `/api/respond` with the session id, answer, and token.
+- [x] After a successful answer, a `response` record arrives via SSE and the card flips to answered (buttons gone).
+- [x] `delivered: false` shows the "not listening" note instead of a success state.
+- [x] Ended/read-only sessions show options as plain text with no buttons.
+- [x] The token is fetched at runtime, never hardcoded.
 
 ## Verification
 
-- [ ] Daemon running; in a session, run `cockpit log --session <id> --needs-call --option "A" --option "B" --decision "pick path" --reason "ambiguous"` then `cockpit wait <id>` (background). In the SPA (Q): the card shows A / B buttons. Click "A" → `cockpit wait` returns "A", and a `response` card appears.
-- [ ] Free-text answer path: type a custom answer + Send → same round-trip.
-- [ ] Answer a session with no `wait` running → "not listening" note shows; a `response` record still appears.
+- [x] Daemon running; in a session, run `cockpit log --session <id> --needs-call --option "A" --option "B" --decision "pick path" --reason "ambiguous"` then `cockpit wait <id>` (background). In the SPA (Q): the card shows A / B buttons. Click "A" → `cockpit wait` returns "A", and a `response` card appears.
+- [x] Free-text answer path: type a custom answer + Send → same round-trip.
+- [x] Answer a session with no `wait` running → "not listening" note shows; a `response` record still appears.
 
 ## Out of scope
 

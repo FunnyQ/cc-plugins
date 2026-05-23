@@ -61,17 +61,17 @@ Map the standard tokens onto cockpit's CSS custom properties. If DESIGN.md is ab
 
 ## Acceptance criteria
 
-- [ ] `GET /api/project-info?project=<abs>` returns `projectGoal`, `meta`, `claudeMd` (or null), and `tokens` (or null).
-- [ ] The info column renders the goal, project-meta prose, and CLAUDE.md as sanitized read-only markdown.
-- [ ] When the selected project has a DESIGN.md, the cockpit's CSS variables change to its tokens; switching to a project without DESIGN.md restores neutral defaults.
-- [ ] CLAUDE.md path is confined to the project root (no traversal).
-- [ ] The renderer only displays prose — it does not parse/restructure it into custom widgets.
+- [x] `GET /api/project-info?project=<abs>` returns `projectGoal`, `meta`, `claudeMd` (or null), and `tokens` (or null).
+- [x] The info column renders the goal, project-meta prose, and CLAUDE.md as sanitized read-only markdown.
+- [x] When the selected project has a DESIGN.md, the cockpit's CSS variables change to its tokens; switching to a project without DESIGN.md restores neutral defaults.
+- [x] CLAUDE.md path is confined to the project root (no traversal).
+- [x] The renderer only displays prose — it does not parse/restructure it into custom widgets.
 
 ## Verification
 
-- [ ] In a project with a DESIGN.md + CLAUDE.md: daemon running, select it (Q) → info column shows goal/meta/CLAUDE.md and the theme colors shift to DESIGN.md's.
-- [ ] `curl -s "localhost:5858/api/project-info?project=<abs>" | jq '.tokens'` shows the parsed token map.
-- [ ] Select a project with no DESIGN.md → `tokens` is null and the UI uses defaults.
+- [x] In a project with a DESIGN.md + CLAUDE.md: daemon running, select it (Q) → info column shows goal/meta/CLAUDE.md and the theme colors shift to DESIGN.md's.
+- [x] `curl -s "localhost:5858/api/project-info?project=<abs>" | jq '.tokens'` shows the parsed token map.
+- [x] Select a project with no DESIGN.md → `tokens` is null and the UI uses defaults.
 
 ## Out of scope
 

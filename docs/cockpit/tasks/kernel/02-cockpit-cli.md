@@ -66,18 +66,18 @@ Read `~/.cockpit/registry.json` (`{ sessions: RegistryEntry[] }`, default `{ ses
 
 ## Acceptance criteria
 
-- [ ] `cockpit start --session <id> --session-goal X --project-goal Y` creates `.cockpit/project-meta.md` (frontmatter carries `project_goal: Y`) and `.cockpit/logs/<id>.jsonl` whose first line is a goal record containing `session_goal` but **no** `project_goal`.
-- [ ] A registry entry for the session appears in `~/.cockpit/registry.json` with a fresh `lastHeartbeat`.
-- [ ] `cockpit log --session <id> --decision D --reason R` appends exactly one line, a valid DecisionRecord with all 8 fields (`tradeoff` defaults to `""`, `needs_your_call` to `false`, `options`/`files` to `[]`).
-- [ ] `--needs-call` sets `needs_your_call: true`; repeated `--file a --file b` produces `files: ["a","b"]`; repeated `--option X --option Y` produces `options: ["X","Y"]`.
-- [ ] Running `log` twice appends two lines; existing lines are untouched (true append, not rewrite).
-- [ ] Each `start`/`log` updates that session's `lastHeartbeat`.
+- [x] `cockpit start --session <id> --session-goal X --project-goal Y` creates `.cockpit/project-meta.md` (frontmatter carries `project_goal: Y`) and `.cockpit/logs/<id>.jsonl` whose first line is a goal record containing `session_goal` but **no** `project_goal`.
+- [x] A registry entry for the session appears in `~/.cockpit/registry.json` with a fresh `lastHeartbeat`.
+- [x] `cockpit log --session <id> --decision D --reason R` appends exactly one line, a valid DecisionRecord with all 8 fields (`tradeoff` defaults to `""`, `needs_your_call` to `false`, `options`/`files` to `[]`).
+- [x] `--needs-call` sets `needs_your_call: true`; repeated `--file a --file b` produces `files: ["a","b"]`; repeated `--option X --option Y` produces `options: ["X","Y"]`.
+- [x] Running `log` twice appends two lines; existing lines are untouched (true append, not rewrite).
+- [x] Each `start`/`log` updates that session's `lastHeartbeat`.
 
 ## Verification
 
-- [ ] In a scratch dir: `bun cockpit/skills/cockpit/scripts/cockpit.ts start --session 11111111-1111-1111-1111-111111111111 --session-goal "test" --project-goal "scratch"` then `cat .cockpit/logs/11111111-*.jsonl | jq` shows `{type:"goal", session_goal:"test"}` with no `project_goal`.
-- [ ] `bun .../cockpit.ts log --session 1111... --decision "chose X" --reason "Y" --needs-call --option "A" --option "B" --file src/x.ts` → `tail -1 .cockpit/logs/1111*.jsonl | jq` shows all 8 fields, `needs_your_call: true`, `options: ["A","B"]`, `files: ["src/x.ts"]`.
-- [ ] `jq '.sessions[] | select(.sessionId=="1111...")' ~/.cockpit/registry.json` shows the entry.
+- [x] In a scratch dir: `bun cockpit/skills/cockpit/scripts/cockpit.ts start --session 11111111-1111-1111-1111-111111111111 --session-goal "test" --project-goal "scratch"` then `cat .cockpit/logs/11111111-*.jsonl | jq` shows `{type:"goal", session_goal:"test"}` with no `project_goal`.
+- [x] `bun .../cockpit.ts log --session 1111... --decision "chose X" --reason "Y" --needs-call --option "A" --option "B" --file src/x.ts` → `tail -1 .cockpit/logs/1111*.jsonl | jq` shows all 8 fields, `needs_your_call: true`, `options: ["A","B"]`, `files: ["src/x.ts"]`.
+- [x] `jq '.sessions[] | select(.sessionId=="1111...")' ~/.cockpit/registry.json` shows the entry.
 
 ## Out of scope
 
