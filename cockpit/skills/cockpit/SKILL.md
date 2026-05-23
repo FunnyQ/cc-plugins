@@ -155,11 +155,23 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
   Codex.
 - **Handoff (`--needs-call`)** marks the moment autopilot hands the stick back
   to Q. Supply the choices via `--option`, then immediately run
-  `cockpit wait <id>` as a background task to park for Q's answer:
+  `cockpit wait <id>` to park for Q's answer:
 
   ```bash
   bun <plugin-root>/skills/cockpit/scripts/cockpit.ts wait <id>
   ```
+
+  Harness policy:
+
+  - **Claude Code**: run `cockpit wait <id>` as a background task. Claude Code
+    surfaces completed background task output back into the conversation, so the
+    session can stay parked until Q answers in the dashboard.
+  - **Codex**: run `cockpit wait <id>` in the foreground as a blocking tool
+    call, and do not send the final response while it is waiting. The wait
+    stdout is the wake-up signal. When Q clicks a dashboard option, the command
+    prints the answer and this same turn should continue from that answer.
+  - **Other harnesses**: use foreground wait unless the harness is known to
+    resume the conversation from background task stdout.
 
   Requires the dashboard daemon (step 5) to be running. `cockpit send <id>
   <answer>` is the terminal twin of a UI option button — both are part of this
