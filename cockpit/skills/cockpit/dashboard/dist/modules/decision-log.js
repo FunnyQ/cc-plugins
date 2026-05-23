@@ -110,6 +110,7 @@ export function initDecisionLog(rootEl) {
   function reset() {
     seen.clear();
     lastOpenCall = null;
+    store.awaitingCall = false;
     goalEl.hidden = true;
     goalEl.innerHTML = "";
     cardsEl.innerHTML = "";
@@ -234,6 +235,7 @@ export function initDecisionLog(rootEl) {
     lastOpenCall.classList.remove("is-open");
     lastOpenCall.classList.add("is-resolved");
     lastOpenCall = null;
+    store.awaitingCall = false; // pilot answered → clear the HUD alert
   }
 
   function handle(rec) {
@@ -253,7 +255,10 @@ export function initDecisionLog(rootEl) {
       if (rec.needs_your_call) {
         if (lastOpenCall) hideRespond(lastOpenCall); // older call isn't latest
         lastOpenCall = card;
-        if (sessionActive()) showRespond(card); // active → answerable buttons
+        if (sessionActive()) {
+          showRespond(card); // active → answerable buttons
+          store.awaitingCall = true; // light the HUD "your turn" alert
+        }
       }
       if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
       return;
