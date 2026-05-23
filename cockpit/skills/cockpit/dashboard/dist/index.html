@@ -1,14 +1,97 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>cockpit</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cockpit · Project Driving View</title>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <h1>cockpit daemon running</h1>
-    <p>
-      The SPA is built by the ui tasks; this placeholder confirms the daemon
-      serves.
-    </p>
+    <div id="app" v-scope v-cloak>
+      <header class="goal-bar">
+        <span class="goal-bar__label">🎯</span>
+        <span class="goal-bar__project" v-text="selectedProjectName"></span>
+        <span
+          class="goal-bar__goal"
+          v-text="selectedProjectGoal || 'Select a session to begin'"
+        ></span>
+      </header>
+
+      <div class="layout">
+        <aside class="rail">
+          <div class="rail__header">Projects</div>
+          <ul class="rail__list">
+            <template v-for="g in projectGroups" :key="g.project">
+              <li class="project">
+                <div
+                  class="project__header"
+                  :class="{ 'is-collapsed': !isProjectExpanded(g) }"
+                  @click="toggleProject(g)"
+                >
+                  <span
+                    class="project__caret"
+                    v-text="isProjectExpanded(g) ? '▾' : '▸'"
+                  ></span>
+                  <span class="project__name" v-text="g.name"></span>
+                  <span
+                    class="project__goal"
+                    v-text="goalSnippet(g.goal)"
+                  ></span>
+                  <span class="project__counts">
+                    <span
+                      class="status-dot"
+                      :class="g.activeCount ? 'active' : 'ended'"
+                    ></span>
+                    <span
+                      v-text="g.activeCount + ' active / ' + g.sessionCount"
+                    ></span>
+                  </span>
+                </div>
+                <ul class="project__sessions" v-show="isProjectExpanded(g)">
+                  <template v-for="s in g.sessions" :key="s.sessionId">
+                    <li
+                      class="rail__item"
+                      :class="{ 'is-selected': isSelected(s.sessionId), 'is-ended': s.status === 'ended' }"
+                      @click="selectSession(s)"
+                    >
+                      <span class="status-dot" :class="s.status"></span>
+                      <span class="rail__goal" v-text="shortGoal(s)"></span>
+                    </li>
+                  </template>
+                </ul>
+              </li>
+            </template>
+            <li v-if="loaded && !sessions.length" class="rail__empty">
+              No sessions registered.
+            </li>
+          </ul>
+        </aside>
+
+        <main class="columns">
+          <section class="column" id="col-transcript">
+            <header class="column__header">Live Transcript</header>
+            <div class="column__body" data-column="transcript">
+              <p class="placeholder">No live transcript.</p>
+            </div>
+          </section>
+
+          <section class="column" id="col-decision">
+            <header class="column__header">Decision Log</header>
+            <div class="column__body" data-column="decision">
+              <p class="placeholder">No decisions logged yet.</p>
+            </div>
+          </section>
+
+          <section class="column" id="col-info">
+            <header class="column__header">Project Info</header>
+            <div class="column__body" data-column="info">
+              <p class="placeholder">Project goal, meta &amp; CLAUDE.md.</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
   </body>
 </html>
