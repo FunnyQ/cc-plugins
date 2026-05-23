@@ -176,6 +176,39 @@ describe("cockpit start", () => {
     expect(meta).toMatch(/log_language: zh-TW/);
   });
 
+  test("re-running start preserves the decision trail (only refreshes the goal)", () => {
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "g1",
+      "--project-goal",
+      "p",
+    ]);
+    run(["log", "--session", SID, "--decision", "A", "--reason", "ra"]);
+    run(["log", "--session", SID, "--decision", "B", "--reason", "rb"]);
+    expect(readLines(logPath).length).toBe(3);
+
+    // Re-run start on the SAME session — must not truncate the decisions.
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "g2",
+      "--project-goal",
+      "p",
+    ]);
+    const lines = readLines(logPath);
+    expect(lines.length).toBe(3);
+    expect(lines[0].type).toBe("goal");
+    expect(lines[0].session_goal).toBe("g2"); // goal refreshed
+    expect(lines[1].decision).toBe("A"); // decisions intact
+    expect(lines[2].decision).toBe("B");
+  });
+
   test("preserves log_language when start is re-run without the flag", () => {
     run([
       "start",
