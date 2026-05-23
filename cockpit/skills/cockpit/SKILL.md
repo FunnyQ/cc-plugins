@@ -164,8 +164,11 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
 Once a session has been started (Step 4) and the dashboard is up (Step 5), the
 cockpit is Q's single surface for being asked. While such a session is active,
 **route every question for Q through `needs_your_call` — not the harness
-question tool (e.g. `AskUserQuestion`) and not a bare chat prompt.** Two cases,
-one channel:
+question tool (e.g. `AskUserQuestion`) and not a bare chat prompt.** This rule
+also applies when another skill or workflow says to "ask Q": if Cockpit is
+started and running in this conversation, translate that ask into a
+`needs_your_call` log entry and wait for the cockpit answer instead of asking in
+chat. Two cases, one channel:
 
 - **A decision fork** — autopilot hit a branch and needs Q to pick a heading.
 - **Missing information** — you need a value, preference, or confirmation only Q
