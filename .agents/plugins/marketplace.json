@@ -1,0 +1,20 @@
+{
+  "name": "q-lab-marketplace",
+  "interface": {
+    "displayName": "Q Lab Marketplace"
+  },
+  "plugins": [
+    {
+      "name": "cockpit",
+      "source": {
+        "source": "local",
+        "path": "./cockpit"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
