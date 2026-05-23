@@ -53,6 +53,8 @@
             <span class="readout">SES</span>
             <span class="readout" v-text="sessionShortId"></span>
             <span class="hud__dot">·</span>
+            <span class="readout" v-text="selectedProviderLabel"></span>
+            <span class="hud__dot">·</span>
             <span
               class="readout"
               v-text="projectGroups.length + ' FLIGHTS'"
@@ -125,10 +127,14 @@
                 <template v-for="s in g.sessions" :key="s.sessionId">
                   <li
                     class="leg"
-                    :class="{ 'is-selected': isSelected(s.sessionId), 'is-ended': s.status === 'ended' }"
+                    :class="{ 'is-selected': isSelected(s), 'is-ended': s.status === 'ended' }"
                     @click="selectSession(s)"
                   >
                     <span class="status-led" :class="s.status"></span>
+                    <span
+                      class="provider-badge"
+                      v-text="(s.provider || 'claude').toUpperCase()"
+                    ></span>
                     <span class="leg__goal" v-text="shortGoal(s)"></span>
                   </li>
                 </template>

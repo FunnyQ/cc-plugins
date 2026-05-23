@@ -5,15 +5,19 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
 export type RegistryEntry = {
+  provider: Provider;
   project: string;
   sessionId: string;
   logPath: string;
   lastHeartbeat: string;
 };
 
+export type Provider = "claude" | "codex";
+
 export type SessionStatus = "active" | "ended";
 
 export type SessionView = {
+  provider: Provider;
   project: string;
   sessionId: string;
   logPath: string;
@@ -50,9 +54,12 @@ export function readRegistry(): RegistryEntry[] {
   try {
     const raw = JSON.parse(readFileSync(registryPath(), "utf8"));
     if (raw && Array.isArray(raw.sessions)) {
-      return raw.sessions.filter(
-        (s: any) => s && typeof s.sessionId === "string",
-      ) as RegistryEntry[];
+      return raw.sessions
+        .filter((s: any) => s && typeof s.sessionId === "string")
+        .map((s: any) => ({
+          ...s,
+          provider: s.provider === "codex" ? "codex" : "claude",
+        })) as RegistryEntry[];
     }
   } catch {
     // missing or corrupt → empty
@@ -122,6 +129,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
   return readRegistry()
     .map(
       (e): SessionView => ({
+        provider: e.provider,
         project: e.project,
         sessionId: e.sessionId,
         logPath: e.logPath,

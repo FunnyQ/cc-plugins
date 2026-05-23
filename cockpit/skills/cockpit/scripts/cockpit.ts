@@ -33,6 +33,7 @@ type DecisionRecord = {
 };
 
 type RegistryEntry = {
+  provider: Provider;
   project: string;
   sessionId: string;
   logPath: string;
@@ -40,6 +41,7 @@ type RegistryEntry = {
 };
 
 type Registry = { sessions: RegistryEntry[] };
+type Provider = "claude" | "codex";
 
 // ---------- Paths ----------
 
@@ -64,6 +66,7 @@ type Args = {
 };
 
 const SINGLE_FLAGS = new Set([
+  "provider",
   "session",
   "session-goal",
   "project-goal",
@@ -98,12 +101,26 @@ function parseArgs(argv: string[]): Args {
   return { single, repeated, flags };
 }
 
+function parseProvider(value: string | undefined): Provider {
+  if (!value || value === "claude") return "claude";
+  if (value === "codex") return "codex";
+  console.error(`cockpit: invalid provider "${value}"`);
+  process.exit(1);
+}
+
 // ---------- Registry ----------
 
 function readRegistry(): Registry {
   try {
     const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf8"));
-    if (raw && Array.isArray(raw.sessions)) return raw as Registry;
+    if (raw && Array.isArray(raw.sessions)) {
+      return {
+        sessions: raw.sessions.map((s: any) => ({
+          ...s,
+          provider: s?.provider === "codex" ? "codex" : "claude",
+        })),
+      };
+    }
   } catch {
     // missing or corrupt → start fresh
   }
@@ -119,7 +136,11 @@ function upsertSession(entry: RegistryEntry): void {
   writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
 }
 
-function refreshHeartbeat(project: string, sessionId: string): void {
+function refreshHeartbeat(
+  project: string,
+  sessionId: string,
+  provider: Provider = "claude",
+): void {
   const reg = readRegistry();
   const entry = reg.sessions.find((s) => s.sessionId === sessionId);
   const now = new Date().toISOString();
@@ -129,6 +150,7 @@ function refreshHeartbeat(project: string, sessionId: string): void {
     writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
   } else {
     upsertSession({
+      provider,
       project,
       sessionId,
       logPath: logPathFor(project, sessionId),
@@ -202,6 +224,7 @@ function writeGoalRecord(logPath: string, goal: GoalRecord): void {
 
 function cmdStart(args: Args): void {
   const project = process.cwd();
+  const provider = parseProvider(args.single["provider"]);
   const sessionId = args.single["session"] || crypto.randomUUID();
   const sessionGoal = args.single["session-goal"] || "";
   const projectGoal = args.single["project-goal"] || "";
@@ -220,6 +243,7 @@ function cmdStart(args: Args): void {
   writeGoalRecord(logPath, goal);
 
   upsertSession({
+    provider,
     project,
     sessionId,
     logPath,
@@ -235,6 +259,7 @@ function cmdStart(args: Args): void {
 
 function cmdLog(args: Args): void {
   const project = process.cwd();
+  const provider = parseProvider(args.single["provider"]);
   const sessionId = args.single["session"];
   if (!sessionId) {
     console.error("cockpit log: --session <id> is required");
@@ -255,7 +280,7 @@ function cmdLog(args: Args): void {
   const logPath = logPathFor(project, sessionId);
   mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
   appendFileSync(logPath, JSON.stringify(rec) + "\n");
-  refreshHeartbeat(project, sessionId);
+  refreshHeartbeat(project, sessionId, provider);
 
   console.log(`cockpit: logged decision for ${sessionId}`);
 }

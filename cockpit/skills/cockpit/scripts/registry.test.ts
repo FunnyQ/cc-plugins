@@ -77,6 +77,24 @@ describe("readRegistry", () => {
     writeFileSync(join(homeDir, "registry.json"), "{not json");
     expect(mod.readRegistry()).toEqual([]);
   });
+
+  test("legacy entries without provider default to claude", () => {
+    writeFileSync(
+      join(homeDir, "registry.json"),
+      JSON.stringify({
+        sessions: [
+          {
+            project: "/tmp/p",
+            sessionId: "88888888-8888-8888-8888-888888888888",
+            logPath:
+              "/tmp/p/.cockpit/logs/88888888-8888-8888-8888-888888888888.jsonl",
+            lastHeartbeat: new Date().toISOString(),
+          },
+        ],
+      }),
+    );
+    expect(mod.readRegistry()[0].provider).toBe("claude");
+  });
 });
 
 describe("statusOf", () => {
@@ -111,6 +129,7 @@ describe("goal readers", () => {
     const sid = "33333333-3333-3333-3333-333333333333";
     start(p, sid, "ship it", "the north star");
     const sessions = mod.buildSessions();
+    expect(sessions[0].provider).toBe("claude");
     expect(sessions[0].sessionGoal).toBe("ship it");
     expect(sessions[0].projectGoal).toBe("the north star");
   });

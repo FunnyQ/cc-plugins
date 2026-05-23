@@ -102,6 +102,17 @@ body {
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
 }
+.provider-badge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
 .viewport__legend,
 .viewport__status,
 .manifest__legend,

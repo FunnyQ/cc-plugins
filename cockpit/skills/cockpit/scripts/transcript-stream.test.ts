@@ -10,21 +10,28 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { Database } from "bun:sqlite";
 import {
   handleTranscriptStream,
+  isInsideCodexSessions,
   isInsideProjects,
   resolveClaudeTranscriptPath,
+  resolveCodexRolloutPath,
 } from "./transcript-stream";
 
 const SID = "22222222-2222-2222-2222-222222222222";
 
 let projectsDir: string;
+let codexDir: string;
+let codexSessionsDir: string;
 let logPath: string;
+let codexLogPath: string;
 
-function transcriptReq(session: string): Request {
+function transcriptReq(session: string, provider?: string): Request {
+  const suffix = provider ? `&provider=${provider}` : "";
   return new Request(
-    `http://127.0.0.1/api/transcript/stream?session=${session}`,
+    `http://127.0.0.1/api/transcript/stream?session=${session}${suffix}`,
   );
 }
 
@@ -71,7 +78,12 @@ async function collect(
 
 beforeEach(() => {
   projectsDir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-claude-")));
+  codexDir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-codex-")));
+  codexSessionsDir = join(codexDir, "sessions");
+  mkdirSync(codexSessionsDir, { recursive: true });
   process.env.COCKPIT_CLAUDE_PROJECTS_DIR = projectsDir;
+  process.env.COCKPIT_CODEX_DIR = codexDir;
+  process.env.COCKPIT_CODEX_SESSIONS_DIR = codexSessionsDir;
   const projectSub = join(projectsDir, "-Users-q-some-project");
   mkdirSync(projectSub, { recursive: true });
   logPath = join(projectSub, `${SID}.jsonl`);
@@ -93,11 +105,45 @@ beforeEach(() => {
       "",
     ].join("\n"),
   );
+
+  codexLogPath = join(codexSessionsDir, `${SID}.jsonl`);
+  writeFileSync(
+    codexLogPath,
+    [
+      JSON.stringify({
+        type: "response_item",
+        uuid: "c1",
+        payload: { type: "message", role: "assistant", content: "codex hi" },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        uuid: "c-noise",
+        payload: { type: "reasoning" },
+      }),
+      "",
+    ].join("\n"),
+  );
+  const db = new Database(join(codexDir, "state_5.sqlite"));
+  db.run(
+    `create table threads (
+      id text primary key,
+      rollout_path text not null,
+      archived integer not null default 0
+    )`,
+  );
+  db.run(`insert into threads (id, rollout_path, archived) values (?, ?, 0)`, [
+    SID,
+    relative(codexDir, codexLogPath),
+  ]);
+  db.close();
 });
 
 afterEach(() => {
   rmSync(projectsDir, { recursive: true, force: true });
+  rmSync(codexDir, { recursive: true, force: true });
   delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
+  delete process.env.COCKPIT_CODEX_DIR;
+  delete process.env.COCKPIT_CODEX_SESSIONS_DIR;
 });
 
 describe("transcript-stream backlog", () => {
@@ -132,6 +178,14 @@ describe("transcript-stream backlog", () => {
     });
     expect(buf).toContain("a2");
   });
+
+  test("codex provider streams response_item message frames", async () => {
+    const res = handleTranscriptStream(transcriptReq(SID, "codex"));
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+    const buf = await collect(res, (b) => b.includes("backlog-done"));
+    expect(buf).toContain("c1");
+    expect(buf).not.toContain("c-noise");
+  });
 });
 
 describe("transcript-stream validation", () => {
@@ -152,6 +206,11 @@ describe("transcript-stream validation", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  test("unknown provider → 400", async () => {
+    const res = handleTranscriptStream(transcriptReq(SID, "other"));
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("path helpers", () => {
@@ -168,5 +227,16 @@ describe("path helpers", () => {
       false,
     );
     expect(isInsideProjects("/etc/passwd")).toBe(false);
+  });
+
+  test("resolveCodexRolloutPath finds the fixture and confines to sessions root", () => {
+    expect(resolveCodexRolloutPath(SID)).toBe(codexLogPath);
+    expect(
+      resolveCodexRolloutPath("00000000-0000-0000-0000-000000000000"),
+    ).toBeUndefined();
+    expect(isInsideCodexSessions(codexLogPath)).toBe(true);
+    expect(isInsideCodexSessions(join(codexSessionsDir, "..", "escape"))).toBe(
+      false,
+    );
   });
 });
