@@ -47,18 +47,18 @@ function streamTranscript(/* id + SSE controller */)
 
 ## Acceptance criteria
 
-- [ ] `GET /api/transcript/stream?session=<uuid>` sends a backlog of recent transcript lines then a `backlog-done` marker.
-- [ ] New appends to the session's `~/.claude/projects/**/<id>.jsonl` push live frames.
-- [ ] Invalid/non-uuid `session` → error; a path resolving outside `~/.claude/projects` is rejected.
-- [ ] A session id with no transcript file → 404 (not a 500).
-- [ ] Cancelling closes the watcher.
-- [ ] No Codex code paths remain in the cockpit copy.
+- [x] `GET /api/transcript/stream?session=<uuid>` sends a backlog of recent transcript lines then a `backlog-done` marker.
+- [x] New appends to the session's `~/.claude/projects/**/<id>.jsonl` push live frames.
+- [x] Invalid/non-uuid `session` → error; a path resolving outside `~/.claude/projects` is rejected.
+- [x] A session id with no transcript file → 404 (not a 500).
+- [x] Cancelling closes the watcher.
+- [x] No Codex code paths remain in the cockpit copy.
 
 ## Verification
 
-- [ ] Pick a real recent session uuid from `~/.claude/projects`, start the daemon, then `curl -N "localhost:5858/api/transcript/stream?session=<uuid>"` shows backlog frames + `backlog-done`.
-- [ ] `curl -N ".../api/transcript/stream?session=00000000-0000-0000-0000-000000000000"` (nonexistent) → 404.
-- [ ] `grep -i codex transcript-stream.ts` returns nothing.
+- [x] Pick a real recent session uuid from `~/.claude/projects`, start the daemon, then `curl -N "localhost:5858/api/transcript/stream?session=<uuid>"` shows backlog frames + `backlog-done`.
+- [x] `curl -N ".../api/transcript/stream?session=00000000-0000-0000-0000-000000000000"` (nonexistent) → 404.
+- [x] `grep -i codex transcript-stream.ts` returns nothing.
 
 ## Out of scope
 

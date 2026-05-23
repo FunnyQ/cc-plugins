@@ -47,17 +47,17 @@ Return a `Response` with `Content-Type: text/event-stream`, `Cache-Control: no-c
 
 ## Acceptance criteria
 
-- [ ] Connecting emits one frame per existing record (goal + decisions), then a `backlog-done` marker.
-- [ ] Appending a record with `cockpit log` pushes a new frame to the connected client within ~1s.
-- [ ] A malformed line in the file is skipped; subsequent valid records still stream.
-- [ ] An invalid/non-uuid `session`, or a path resolving outside `<project>/.cockpit/logs/`, returns an error (no file read).
-- [ ] Cancelling the request closes the file watcher (no leaked watchers).
+- [x] Connecting emits one frame per existing record (goal + decisions), then a `backlog-done` marker.
+- [x] Appending a record with `cockpit log` pushes a new frame to the connected client within ~1s.
+- [x] A malformed line in the file is skipped; subsequent valid records still stream.
+- [x] An invalid/non-uuid `session`, or a path resolving outside `<project>/.cockpit/logs/`, returns an error (no file read).
+- [x] Cancelling the request closes the file watcher (no leaked watchers).
 
 ## Verification
 
-- [ ] Seed a log via the cockpit CLI, start daemon, then `curl -N "localhost:5858/api/log/stream?project=<abs>&session=<id>"` shows backlog frames + `backlog-done`.
-- [ ] While the curl is open, run `cockpit log ...` in that project → a new `data:` frame appears.
-- [ ] `curl -N ".../api/log/stream?session=not-a-uuid"` → error response, no crash.
+- [x] Seed a log via the cockpit CLI, start daemon, then `curl -N "localhost:5858/api/log/stream?project=<abs>&session=<id>"` shows backlog frames + `backlog-done`.
+- [x] While the curl is open, run `cockpit log ...` in that project → a new `data:` frame appears.
+- [x] `curl -N ".../api/log/stream?session=not-a-uuid"` → error response, no crash.
 
 ## Out of scope
 

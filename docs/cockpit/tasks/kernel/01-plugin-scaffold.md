@@ -74,17 +74,17 @@ cockpit/
 
 ## Acceptance criteria
 
-- [ ] `cockpit/.claude-plugin/plugin.json` exists with `name`, `version`, `description`.
-- [ ] `.claude-plugin/marketplace.json` lists both `token-atlas` and `cockpit`, and is valid JSON.
-- [ ] `cockpit` entry version in `marketplace.json` equals `plugin.json` version.
-- [ ] The 4 vendor libs are present under `cockpit/skills/cockpit/dashboard/dist/vendor/` (no `chart.umd.js`).
-- [ ] The directory skeleton above exists.
+- [x] `cockpit/.claude-plugin/plugin.json` exists with `name`, `version`, `description`.
+- [x] `.claude-plugin/marketplace.json` lists both `token-atlas` and `cockpit`, and is valid JSON.
+- [x] `cockpit` entry version in `marketplace.json` equals `plugin.json` version.
+- [x] The 4 vendor libs are present under `cockpit/skills/cockpit/dashboard/dist/vendor/` (no `chart.umd.js`).
+- [x] The directory skeleton above exists.
 
 ## Verification
 
-- [ ] `jq . cc-plugins/.claude-plugin/marketplace.json` parses without error and shows two plugins.
-- [ ] `jq -r '.version' cockpit/.claude-plugin/plugin.json` equals the cockpit entry's version in `marketplace.json`.
-- [ ] `ls cockpit/skills/cockpit/dashboard/dist/vendor/` lists exactly the 4 expected files.
+- [x] `jq . cc-plugins/.claude-plugin/marketplace.json` parses without error and shows two plugins.
+- [x] `jq -r '.version' cockpit/.claude-plugin/plugin.json` equals the cockpit entry's version in `marketplace.json`.
+- [x] `ls cockpit/skills/cockpit/dashboard/dist/vendor/` lists exactly the 4 expected files.
 
 ## Out of scope
 

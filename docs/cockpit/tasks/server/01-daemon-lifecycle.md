@@ -60,17 +60,17 @@ const server = Bun.serve({
 
 ## Acceptance criteria
 
-- [ ] `bun serve-dashboard.ts` binds `127.0.0.1:5858` and serves `dashboard/dist/index.html` at `/`.
-- [ ] `~/.cockpit/daemon.json` is written with `{pid, port, token}` after a successful bind.
-- [ ] Starting a second instance while the first is alive **reuses** it (prints URL, exits) rather than erroring on the port.
-- [ ] Killing the daemon then starting again rebinds (stale PID detected via `process.kill(pid,0)` throwing).
-- [ ] `--port` and `--no-open` flags work.
-- [ ] Unknown routes fall through to static serving, confined to `dashboard/dist/`.
+- [x] `bun serve-dashboard.ts` binds `127.0.0.1:5858` and serves `dashboard/dist/index.html` at `/`.
+- [x] `~/.cockpit/daemon.json` is written with `{pid, port, token}` after a successful bind.
+- [x] Starting a second instance while the first is alive **reuses** it (prints URL, exits) rather than erroring on the port.
+- [x] Killing the daemon then starting again rebinds (stale PID detected via `process.kill(pid,0)` throwing).
+- [x] `--port` and `--no-open` flags work.
+- [x] Unknown routes fall through to static serving, confined to `dashboard/dist/`.
 
 ## Verification
 
-- [ ] `bun .../serve-dashboard.ts --no-open &` then `curl -s -o /dev/null -w "%{http_code}" localhost:5858/` returns `200`; `jq . ~/.cockpit/daemon.json` shows the running pid/port/token. (Q runs/stops the daemon; sub-agent uses a short-lived run + curl.)
-- [ ] Run a second `bun .../serve-dashboard.ts --no-open` → it reports reuse and exits 0.
+- [x] `bun .../serve-dashboard.ts --no-open &` then `curl -s -o /dev/null -w "%{http_code}" localhost:5858/` returns `200`; `jq . ~/.cockpit/daemon.json` shows the running pid/port/token. (Q runs/stops the daemon; sub-agent uses a short-lived run + curl.)
+- [x] Run a second `bun .../serve-dashboard.ts --no-open` → it reports reuse and exits 0.
 
 ## Out of scope
 

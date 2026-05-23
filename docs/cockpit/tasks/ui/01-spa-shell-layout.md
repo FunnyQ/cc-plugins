@@ -51,18 +51,18 @@ A no-build petite-vue SPA shell: top project-goal bar, left session side-rail (a
 
 ## Acceptance criteria
 
-- [ ] Opening `/` renders the goal bar, a session side-rail, and three labeled columns.
-- [ ] Sessions load from `/api/sessions`, active ones listed first, ended ones visually muted.
-- [ ] Clicking a session highlights it and sets the selected session/project state.
-- [ ] `/api/sessions` is polled every 3s and pauses while the tab is hidden.
-- [ ] Project-goal bar shows the selected project's goal.
-- [ ] No build step — page works by opening the served `index.html`; vendor libs load from `./vendor/`.
+- [x] Opening `/` renders the goal bar, a session side-rail, and three labeled columns.
+- [x] Sessions load from `/api/sessions`, active ones listed first, ended ones visually muted.
+- [x] Clicking a session highlights it and sets the selected session/project state.
+- [x] `/api/sessions` is polled every 3s and pauses while the tab is hidden.
+- [x] Project-goal bar shows the selected project's goal.
+- [x] No build step — page works by opening the served `index.html`; vendor libs load from `./vendor/`.
 
 ## Verification
 
-- [ ] With the daemon running and at least one seeded session, load `localhost:5858/` in a browser (Q): side-rail shows the session, columns render as placeholders.
-- [ ] Toggle a session active→ended (stale heartbeat) → side-rail reflects the status on next poll.
-- [ ] Check the browser console: no module/load errors.
+- [x] With the daemon running and at least one seeded session, load `localhost:5858/` in a browser (Q): side-rail shows the session, columns render as placeholders.
+- [x] Toggle a session active→ended (stale heartbeat) → side-rail reflects the status on next poll.
+- [x] Check the browser console: no module/load errors.
 
 ## Out of scope
 

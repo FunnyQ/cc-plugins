@@ -47,17 +47,17 @@ Reuse the existing `/api/sessions` 3s poll; just regroup on each refresh. Preser
 
 ## Acceptance criteria
 
-- [ ] The rail shows projects as parents with their sessions nested beneath.
-- [ ] Projects with active sessions sort first and default to expanded; fully-ended projects default collapsed.
-- [ ] Each project row shows a goal snippet and active/total session counts.
-- [ ] Selecting any session under any project drives the 3-column detail and updates the goal bar.
-- [ ] Expand/collapse and selection survive the 3s poll refresh.
+- [x] The rail shows projects as parents with their sessions nested beneath.
+- [x] Projects with active sessions sort first and default to expanded; fully-ended projects default collapsed.
+- [x] Each project row shows a goal snippet and active/total session counts.
+- [x] Selecting any session under any project drives the 3-column detail and updates the goal bar.
+- [x] Expand/collapse and selection survive the 3s poll refresh.
 
 ## Verification
 
-- [ ] Seed two projects (each with a `cockpit start`), daemon running: the SPA rail (Q) shows both projects, each with its session(s) nested.
-- [ ] Collapse project A, wait through a poll → A stays collapsed.
-- [ ] Select a session in project B → goal bar shows B's goal and the columns load B's session.
+- [x] Seed two projects (each with a `cockpit start`), daemon running: the SPA rail (Q) shows both projects, each with its session(s) nested.
+- [x] Collapse project A, wait through a poll → A stays collapsed.
+- [x] Select a session in project B → goal bar shows B's goal and the columns load B's session.
 
 ## Out of scope
 

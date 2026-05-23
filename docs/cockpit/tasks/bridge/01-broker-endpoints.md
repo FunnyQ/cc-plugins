@@ -49,19 +49,19 @@ const pendingWaits = new Map<string /* sessionId */, (answer: string) => void>()
 
 ## Acceptance criteria
 
-- [ ] `GET /api/wait?session=<id>&token=<t>` holds the connection open and registers a `pendingWaits` entry.
-- [ ] `POST /api/respond {session,answer,token}` appends a `response` record to the session's log AND causes the open `/api/wait` to return `{ answer }`.
-- [ ] Two different sessions waiting concurrently each receive only their own answer (no cross-talk).
-- [ ] `respond` with no parked wait still appends the record and returns `{ delivered: false }`.
-- [ ] Missing/invalid `token` is rejected on both endpoints; invalid `session` uuid is rejected.
-- [ ] `/api/wait` times out (~270s) with a re-pollable sentinel and cleans up its map entry.
+- [x] `GET /api/wait?session=<id>&token=<t>` holds the connection open and registers a `pendingWaits` entry.
+- [x] `POST /api/respond {session,answer,token}` appends a `response` record to the session's log AND causes the open `/api/wait` to return `{ answer }`.
+- [x] Two different sessions waiting concurrently each receive only their own answer (no cross-talk).
+- [x] `respond` with no parked wait still appends the record and returns `{ delivered: false }`.
+- [x] Missing/invalid `token` is rejected on both endpoints; invalid `session` uuid is rejected.
+- [x] `/api/wait` times out (~270s) with a re-pollable sentinel and cleans up its map entry.
 
 ## Verification
 
-- [ ] Start the daemon. In one shell: `curl -s "localhost:5858/api/wait?session=<id>&token=<t>"` (hangs). In another: `curl -s -XPOST localhost:5858/api/respond -d '{"session":"<id>","answer":"yes","token":"<t>"}'` → the first curl returns `{"answer":"yes"}`.
-- [ ] `tail -1 <project>/.cockpit/logs/<id>.jsonl | jq` shows a `response` record with `answer:"yes"`.
-- [ ] `curl -s -XPOST .../api/respond -d '{"session":"<unparked-id>",...}'` returns `{"delivered":false}` and still appends the record.
-- [ ] Wrong token → rejected.
+- [x] Start the daemon. In one shell: `curl -s "localhost:5858/api/wait?session=<id>&token=<t>"` (hangs). In another: `curl -s -XPOST localhost:5858/api/respond -d '{"session":"<id>","answer":"yes","token":"<t>"}'` → the first curl returns `{"answer":"yes"}`.
+- [x] `tail -1 <project>/.cockpit/logs/<id>.jsonl | jq` shows a `response` record with `answer:"yes"`.
+- [x] `curl -s -XPOST .../api/respond -d '{"session":"<unparked-id>",...}'` returns `{"delivered":false}` and still appends the record.
+- [x] Wrong token → rejected.
 
 ## Out of scope
 
