@@ -175,6 +175,29 @@ function writeProjectMeta(
   writeFileSync(metaPath, body);
 }
 
+// Write the goal as line 1 of the log, preserving any records already there.
+// `start` may be re-run on an existing session (e.g. to refresh the goal or set
+// log_language) — it must NOT truncate the decision trail, so we replace only a
+// leading goal record and keep everything appended after it.
+function writeGoalRecord(logPath: string, goal: GoalRecord): void {
+  let rest: string[] = [];
+  if (existsSync(logPath)) {
+    const existing = readFileSync(logPath, "utf8")
+      .split("\n")
+      .filter((l) => l.trim());
+    if (existing.length) {
+      let from = 0;
+      try {
+        if (JSON.parse(existing[0])?.type === "goal") from = 1;
+      } catch {
+        // line 1 isn't valid JSON — keep all existing lines below the new goal
+      }
+      rest = existing.slice(from);
+    }
+  }
+  writeFileSync(logPath, [JSON.stringify(goal), ...rest].join("\n") + "\n");
+}
+
 // ---------- Subcommands ----------
 
 function cmdStart(args: Args): void {
@@ -194,7 +217,7 @@ function cmdStart(args: Args): void {
     session_goal: sessionGoal,
     ts: new Date().toISOString(),
   };
-  writeFileSync(logPath, JSON.stringify(goal) + "\n");
+  writeGoalRecord(logPath, goal);
 
   upsertSession({
     project,
