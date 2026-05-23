@@ -139,6 +139,70 @@ describe("cockpit start", () => {
     expect(created2).toBe(created1);
     expect(second).toMatch(/project_goal: p2/);
   });
+
+  test("defaults log_language to English when not given", () => {
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "a",
+      "--project-goal",
+      "p",
+    ]);
+    const meta = readFileSync(
+      join(projectDir, ".cockpit/project-meta.md"),
+      "utf8",
+    );
+    expect(meta).toMatch(/log_language: English/);
+  });
+
+  test("writes the given log_language", () => {
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "a",
+      "--project-goal",
+      "p",
+      "--log-language",
+      "zh-TW",
+    ]);
+    const meta = readFileSync(
+      join(projectDir, ".cockpit/project-meta.md"),
+      "utf8",
+    );
+    expect(meta).toMatch(/log_language: zh-TW/);
+  });
+
+  test("preserves log_language when start is re-run without the flag", () => {
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "a",
+      "--project-goal",
+      "p",
+      "--log-language",
+      "日本語",
+    ]);
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "b",
+      "--project-goal",
+      "p2",
+    ]);
+    const meta = readFileSync(
+      join(projectDir, ".cockpit/project-meta.md"),
+      "utf8",
+    );
+    expect(meta).toMatch(/log_language: 日本語/);
+  });
 });
 
 describe("cockpit log", () => {

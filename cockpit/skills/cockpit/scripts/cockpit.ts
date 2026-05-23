@@ -68,6 +68,7 @@ const SINGLE_FLAGS = new Set([
   "session-goal",
   "project-goal",
   "owner",
+  "log-language",
   "decision",
   "reason",
   "tradeoff",
@@ -138,9 +139,10 @@ function refreshHeartbeat(project: string, sessionId: string): void {
 
 // ---------- project-meta.md ----------
 
-function readCreated(metaPath: string): string | undefined {
+function readMetaField(metaPath: string, field: string): string | undefined {
   if (!existsSync(metaPath)) return undefined;
-  const m = readFileSync(metaPath, "utf8").match(/^created:\s*(\S+)\s*$/m);
+  const re = new RegExp(`^${field}:\\s*(.+?)\\s*$`, "m");
+  const m = readFileSync(metaPath, "utf8").match(re);
   return m?.[1];
 }
 
@@ -148,14 +150,22 @@ function writeProjectMeta(
   project: string,
   projectGoal: string,
   owner: string,
+  logLanguage: string,
 ): void {
   const metaPath = join(projectCockpitDir(project), "project-meta.md");
-  const created = readCreated(metaPath) || new Date().toISOString();
+  const created =
+    readMetaField(metaPath, "created") || new Date().toISOString();
+  // log_language steers the language of decision-log entries. Persist it per
+  // project: keep the existing value when start is re-run without an explicit
+  // --log-language, and default to English when nothing has ever been set.
+  const logLang =
+    logLanguage || readMetaField(metaPath, "log_language") || "English";
   const body = [
     "---",
     `project_goal: ${projectGoal}`,
     `created: ${created}`,
     `owner: ${owner}`,
+    `log_language: ${logLang}`,
     "---",
     "",
     "Longer prose describing the project's purpose, constraints, north star.",
@@ -173,9 +183,10 @@ function cmdStart(args: Args): void {
   const sessionGoal = args.single["session-goal"] || "";
   const projectGoal = args.single["project-goal"] || "";
   const owner = args.single["owner"] || "Q";
+  const logLanguage = args.single["log-language"] || "";
 
   mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
-  writeProjectMeta(project, projectGoal, owner);
+  writeProjectMeta(project, projectGoal, owner, logLanguage);
 
   const logPath = logPathFor(project, sessionId);
   const goal: GoalRecord = {

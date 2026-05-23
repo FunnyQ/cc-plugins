@@ -49,26 +49,39 @@ Draft two one-line goals from the conversation + repo state:
 
 Keep each to one line. Q reacts and edits; he doesn't write from scratch.
 
-### 3. Human gate — confirm before writing
+### 3. Human gate — confirm goals + log language
 
 Present both goals to Q with the **`AskUserQuestion`** tool (or ask plainly).
 Q confirms, edits, or rejects. **Do not run any `cockpit` command until Q
 confirms.** If Q rejects, stop — write nothing.
 
+In the same gate, settle the **decision-log language** (`log_language`) — the
+language you'll write decision/reason/tradeoff entries in:
+
+- If `project-meta.md` already has a `log_language`, **reuse it silently** — it's
+  a per-project setting, don't re-ask.
+- Otherwise ask with `AskUserQuestion`. Default to **English** (first/recommended
+  option), then add options inferred from context — the language Q is writing in
+  now, and any languages from `CLAUDE.md` / global instructions. `AskUserQuestion`
+  always offers a free-text "Other", so Q can type anything not listed.
+
 ### 4. Write (only after confirmation)
 
-Run, substituting the confirmed text and the session id:
+Run, substituting the confirmed text, the session id, and the chosen language
+(omit `--log-language` to keep an existing value / default to English):
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts start \
   --session <id> \
   --session-goal "<confirmed session goal>" \
-  --project-goal "<confirmed project goal>"
+  --project-goal "<confirmed project goal>" \
+  --log-language "<confirmed language>"
 ```
 
-This writes `<project>/.cockpit/project-meta.md` (frontmatter `project_goal`),
-appends the goal record as line 1 of `<project>/.cockpit/logs/<id>.jsonl`, and
-registers the session in `~/.cockpit/registry.json`.
+This writes `<project>/.cockpit/project-meta.md` (frontmatter `project_goal` +
+`log_language`), appends the goal record as line 1 of
+`<project>/.cockpit/logs/<id>.jsonl`, and registers the session in
+`~/.cockpit/registry.json`.
 
 ### 5. Start (or reuse) the dashboard daemon
 
@@ -105,7 +118,9 @@ One daemon serves every project's cockpit; you don't run a server per session.
 ## Logging decisions afterward
 
 During implementation, append decisions a **diff can't explain** (skip busywork
-like "created the User model"):
+like "created the User model"). Write `--decision` / `--reason` / `--tradeoff` in
+the project's **`log_language`** (the `project-meta.md` frontmatter set at start;
+default English) — read it back if you're unsure which language is in effect:
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts log \
