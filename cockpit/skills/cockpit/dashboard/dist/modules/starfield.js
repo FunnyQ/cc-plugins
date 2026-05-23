@@ -16,30 +16,30 @@ const TYPES = [
   {
     name: "dust",
     weight: 0.5,
-    size: [0.35, 0.9],
-    alpha: [0.08, 0.32],
-    stretch: [0.28, 0.7],
+    size: [0.45, 1.05],
+    alpha: [0.14, 0.42],
+    stretch: [0.34, 0.82],
   },
   {
     name: "star",
     weight: 0.34,
-    size: [0.55, 1.3],
-    alpha: [0.14, 0.62],
-    stretch: [0.65, 1.25],
+    size: [0.7, 1.55],
+    alpha: [0.22, 0.76],
+    stretch: [0.78, 1.42],
   },
   {
     name: "glint",
     weight: 0.11,
-    size: [0.6, 1.55],
-    alpha: [0.22, 0.78],
-    stretch: [0.85, 1.65],
+    size: [0.8, 1.85],
+    alpha: [0.32, 0.9],
+    stretch: [1, 1.9],
   },
   {
     name: "courier",
     weight: 0.05,
-    size: [0.45, 1.15],
-    alpha: [0.18, 0.7],
-    stretch: [1.35, 2.5],
+    size: [0.6, 1.35],
+    alpha: [0.28, 0.82],
+    stretch: [1.55, 2.8],
   },
 ];
 
@@ -160,7 +160,7 @@ export function initStarfield(canvas) {
     for (const s of stars) {
       const depth = 1 - s.z;
       const tint = s.type.name === "glint" ? AURORA : STARLIGHT;
-      ctx.fillStyle = `rgba(${tint}, ${s.type.alpha[0] + depth * 0.45})`;
+      ctx.fillStyle = `rgba(${tint}, ${s.type.alpha[0] + depth * 0.58})`;
       ctx.beginPath();
       ctx.arc(
         projX(s),
