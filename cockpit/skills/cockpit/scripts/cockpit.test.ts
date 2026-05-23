@@ -99,6 +99,7 @@ describe("cockpit start", () => {
     const entry = reg.sessions.find((s: any) => s.sessionId === SID);
     expect(entry).toBeTruthy();
     expect(entry.project).toBe(projectDir);
+    expect(entry.provider).toBe("claude");
     expect(entry.logPath).toBe(
       join(projectDir, ".cockpit/logs", `${SID}.jsonl`),
     );
@@ -235,6 +236,42 @@ describe("cockpit start", () => {
       "utf8",
     );
     expect(meta).toMatch(/log_language: 日本語/);
+  });
+
+  test("--provider codex registers a Codex-backed session", () => {
+    const r = run([
+      "start",
+      "--provider",
+      "codex",
+      "--session",
+      SID,
+      "--session-goal",
+      "a",
+      "--project-goal",
+      "p",
+    ]);
+    expect(r.code).toBe(0);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const entry = reg.sessions.find((s: any) => s.sessionId === SID);
+    expect(entry.provider).toBe("codex");
+  });
+
+  test("rejects unknown providers", () => {
+    const r = run([
+      "start",
+      "--provider",
+      "other",
+      "--session",
+      SID,
+      "--session-goal",
+      "a",
+      "--project-goal",
+      "p",
+    ]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("invalid provider");
   });
 });
 

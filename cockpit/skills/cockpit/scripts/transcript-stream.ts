@@ -1,8 +1,8 @@
 // cockpit live-transcript SSE — GET /api/transcript/stream?session=<uuid>
-// streams a Claude Code session transcript: a backlog of the most recent lines
+// streams a Claude Code or Codex transcript: a backlog of the most recent lines
 // (read backward in chunks, decoded once for UTF-8 safety), a backlog-done
 // marker, then live appends tailed via fs.watch. Adapted from token-atlas's
-// live.ts streamTranscript, trimmed to the Claude provider only.
+// live.ts streamTranscript.
 import {
   closeSync,
   existsSync,
@@ -13,8 +13,9 @@ import {
   watch,
   type FSWatcher,
 } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
+import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
@@ -23,6 +24,11 @@ const BACKLOG_READ_CHUNK_BYTES = 256 * 1024;
 const MAX_BACKLOG_READ_BYTES = 2 * 1024 * 1024;
 const WATCH_DEBOUNCE_MS = 80;
 const HEARTBEAT_MS = 25_000;
+type Provider = "claude" | "codex";
+
+type CodexThreadRow = {
+  rollout_path: string;
+};
 
 // Only conversation entries are streamed; everything else is session-metadata
 // bookkeeping (file-history-snapshot, queue-operation, last-prompt, …) that
@@ -36,6 +42,7 @@ const DISPLAY_ENTRY_TYPES = new Set([
   "tool",
   "tool_use",
   "tool_result",
+  "response_item",
 ]);
 
 // Claude transcripts live under ~/.claude/projects/**/<id>.jsonl. The base dir
@@ -48,9 +55,32 @@ function claudeProjectsDir(): string {
   );
 }
 
+function codexDir(): string {
+  return process.env.COCKPIT_CODEX_DIR || join(homedir(), ".codex");
+}
+
+function codexStateDb(): string {
+  return (
+    process.env.COCKPIT_CODEX_STATE_DB || join(codexDir(), "state_5.sqlite")
+  );
+}
+
+function codexSessionsDir(): string {
+  return process.env.COCKPIT_CODEX_SESSIONS_DIR || join(codexDir(), "sessions");
+}
+
 // Canonical projects root for the realpath-confinement check.
 function projectsReal(): string {
   const dir = claudeProjectsDir();
+  try {
+    return realpathSync(dir);
+  } catch {
+    return dir;
+  }
+}
+
+function codexSessionsReal(): string {
+  const dir = codexSessionsDir();
   try {
     return realpathSync(dir);
   } catch {
@@ -68,9 +98,65 @@ export function resolveClaudeTranscriptPath(id: string): string | undefined {
   return undefined;
 }
 
+export function resolveCodexRolloutPath(id: string): string | undefined {
+  const dbPath = codexStateDb();
+  if (!existsSync(dbPath)) return undefined;
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const row = db
+        .query(
+          `select rollout_path
+           from threads
+           where id = ? and archived = 0 and rollout_path != ''
+           limit 1`,
+        )
+        .get(id) as CodexThreadRow | null;
+      if (!row?.rollout_path) return undefined;
+      return isAbsolute(row.rollout_path)
+        ? row.rollout_path
+        : resolve(codexDir(), row.rollout_path);
+    } finally {
+      db.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 export function isInsideProjects(filePath: string): boolean {
   const rel = relative(projectsReal(), filePath);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+export function isInsideCodexSessions(filePath: string): boolean {
+  const rel = relative(codexSessionsReal(), filePath);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+function normalizeProvider(provider: string | null): Provider | null {
+  if (!provider || provider === "claude") return "claude";
+  if (provider === "codex") return "codex";
+  return null;
+}
+
+function resolveProviderTranscriptPath(
+  provider: Provider,
+  id: string,
+): string | undefined {
+  return provider === "codex"
+    ? resolveCodexRolloutPath(id)
+    : resolveClaudeTranscriptPath(id);
+}
+
+function isInsideProviderRoot(provider: Provider, filePath: string): boolean {
+  return provider === "codex"
+    ? isInsideCodexSessions(filePath)
+    : isInsideProjects(filePath);
+}
+
+function providerRootName(provider: Provider): string {
+  return provider === "codex" ? "Codex sessions" : "~/.claude/projects";
 }
 
 function jsonError(message: string, status = 400): Response {
@@ -108,6 +194,18 @@ function emitLines(enqueue: (chunk: string) => void, text: string): void {
       continue;
     }
     if (!entry || !DISPLAY_ENTRY_TYPES.has(entry.type ?? "")) continue;
+    if (entry.type === "response_item") {
+      const payloadType = (entry as { payload?: { type?: string } }).payload
+        ?.type;
+      if (
+        payloadType !== "message" &&
+        payloadType !== "function_call" &&
+        payloadType !== "function_call_output" &&
+        payloadType !== "custom_tool_call"
+      ) {
+        continue;
+      }
+    }
     enqueue(`data: ${JSON.stringify(entry)}\n\n`);
   }
 }
@@ -161,9 +259,11 @@ function readLinesEndingAt(
 export function handleTranscriptStream(req: Request): Response {
   const url = new URL(req.url);
   const session = url.searchParams.get("session") ?? "";
+  const provider = normalizeProvider(url.searchParams.get("provider"));
+  if (!provider) return jsonError("invalid provider");
   if (!UUID_RE.test(session)) return jsonError("invalid session id");
 
-  const resolved = resolveClaudeTranscriptPath(session);
+  const resolved = resolveProviderTranscriptPath(provider, session);
   if (!resolved) return jsonError("transcript not found", 404);
 
   let filePath: string;
@@ -172,8 +272,11 @@ export function handleTranscriptStream(req: Request): Response {
   } catch {
     return jsonError("transcript not found", 404);
   }
-  if (!isInsideProjects(filePath)) {
-    return jsonError("transcript path is outside ~/.claude/projects", 403);
+  if (!isInsideProviderRoot(provider, filePath)) {
+    return jsonError(
+      `transcript path is outside ${providerRootName(provider)}`,
+      403,
+    );
   }
 
   let watcher: FSWatcher | null = null;

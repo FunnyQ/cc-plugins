@@ -30,6 +30,7 @@ export const store = reactive({
   sessions: [],
   selectedProject: null,
   selectedSessionId: null,
+  selectedProvider: null,
   loaded: false,
   // selection-change subscribers (column modules register here)
   _subscribers: [],
@@ -78,8 +79,20 @@ export const store = reactive({
   get selectedSession() {
     if (!this.selectedSessionId) return null;
     return (
-      this.sessions.find((x) => x.sessionId === this.selectedSessionId) || null
+      this.sessions.find(
+        (x) =>
+          x.sessionId === this.selectedSessionId &&
+          (!this.selectedProvider || x.provider === this.selectedProvider),
+      ) || null
     );
+  },
+
+  get selectedProviderLabel() {
+    return (
+      this.selectedSession?.provider ||
+      this.selectedProvider ||
+      "claude"
+    ).toUpperCase();
   },
 
   get selectedSessionGoal() {
@@ -122,8 +135,11 @@ export const store = reactive({
     this.toggleHero();
   },
 
-  isSelected(id) {
-    return this.selectedSessionId === id;
+  isSelected(s) {
+    return (
+      this.selectedSessionId === s.sessionId &&
+      this.selectedProvider === (s.provider || "claude")
+    );
   },
 
   // Sessions grouped under their project, ordered active-first then by recency.
@@ -169,8 +185,14 @@ export const store = reactive({
   },
 
   selectSession(s) {
-    if (this.selectedSessionId === s.sessionId) return;
+    const provider = s.provider || "claude";
+    if (
+      this.selectedSessionId === s.sessionId &&
+      this.selectedProvider === provider
+    )
+      return;
     this.selectedSessionId = s.sessionId;
+    this.selectedProvider = provider;
     this.selectedProject = s.project;
     this._notify();
   },
@@ -188,7 +210,7 @@ export const store = reactive({
   _notify() {
     for (const fn of this._subscribers) {
       try {
-        fn(this.selectedProject, this.selectedSessionId);
+        fn(this.selectedProject, this.selectedSessionId, this.selectedProvider);
       } catch (e) {
         console.error("cockpit: subscriber error", e);
       }

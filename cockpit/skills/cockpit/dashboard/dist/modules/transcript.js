@@ -1,9 +1,9 @@
-// Live-transcript column — streams a Claude Code session transcript over SSE and
+// Live-transcript column — streams a Claude Code or Codex transcript over SSE and
 // renders it like token-atlas's live view: prose as Markdown, thinking as a
 // muted badge, tool calls/results as highlighted code, file edits as inline
 // diffs, Read results with a line-number gutter. Imperative (not petite-vue
 // reactive): each entry's HTML is built ONCE on receipt (cached on the entry)
-// and never re-run on store polls. Claude Code transcripts only.
+// and never re-run on store polls.
 import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
@@ -240,6 +240,30 @@ function langForPath(p) {
   return lang && hljs.getLanguage(lang) ? lang : null;
 }
 
+function parseJsonObject(value) {
+  if (!value || typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function firstCommandPath(cmd) {
+  if (typeof cmd !== "string") return "";
+  const patterns = [
+    /\bnl\s+(?:-[^\s]+\s+)*['"]?([^'"\s|;]+)['"]?/,
+    /\bcat\s+(?:-[^\s]+\s+)*['"]?([^'"\s|;]+)['"]?/,
+    /\bsed\s+(?:-[^\s]+\s+)*['"][^'"]+['"]\s+['"]?([^'"\s|;]+)['"]?/,
+  ];
+  for (const pattern of patterns) {
+    const match = cmd.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return "";
+}
+
 function commandResultOutput(text) {
   const output = String(text).match(/\nOutput:\n([\s\S]*)$/);
   if (!output) return String(text);
@@ -388,6 +412,81 @@ function claudeFileChangeSegment(part) {
   return null;
 }
 
+function patchSegment(name, input) {
+  if (name !== "apply_patch" || typeof input !== "string") return null;
+  const filePath =
+    input.match(/^\*\*\* Update File: (.+)$/m)?.[1] ??
+    input.match(/^\*\*\* Add File: (.+)$/m)?.[1] ??
+    input.match(/^\*\*\* Delete File: (.+)$/m)?.[1] ??
+    "";
+  return {
+    kind: "file-change",
+    label: filePath ? `apply_patch · ${filePath}` : "apply_patch",
+    filePath,
+    diffText: input,
+  };
+}
+
+function prettyJsonText(value) {
+  if (typeof value !== "string") return segText(value);
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return value;
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+function codexResultLang(name, args) {
+  if (!args || typeof args !== "object") return null;
+  if (name === "exec_command") return langForPath(firstCommandPath(args.cmd));
+  return langForPath(args.file_path ?? args.path ?? args.filename);
+}
+
+function codexPayloadSegments(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  if (payload.type === "message") return contentSegments(payload.content);
+  if (payload.type === "custom_tool_call") {
+    const patch = patchSegment(payload.name, payload.input);
+    if (patch) return [patch];
+    const args =
+      typeof payload.input === "string" ? parseJsonObject(payload.input) : null;
+    return [
+      {
+        kind: "code",
+        label: payload.name ?? "tool",
+        text: segText(payload.input ?? payload),
+        toolUseId: payload.call_id,
+        resultLang: codexResultLang(payload.name, args),
+      },
+    ];
+  }
+  if (payload.type === "function_call") {
+    const args = parseJsonObject(payload.arguments);
+    return [
+      {
+        kind: "code",
+        label: payload.name ?? "tool",
+        text: prettyJsonText(
+          payload.arguments ?? JSON.stringify(payload, null, 2),
+        ),
+        toolUseId: payload.call_id,
+        resultLang: codexResultLang(payload.name, args),
+      },
+    ];
+  }
+  if (payload.type === "function_call_output") {
+    return [
+      resultSegment({
+        content: payload.output ?? JSON.stringify(payload, null, 2),
+      }),
+    ];
+  }
+  return [];
+}
+
 function resultSegment(part, lang) {
   return {
     kind: "code",
@@ -467,6 +566,12 @@ function contentSegments(content) {
 }
 
 function streamEntrySegments(entry) {
+  if (entry?.type === "response_item") {
+    const segs = codexPayloadSegments(entry.payload);
+    return segs.length
+      ? segs
+      : [{ kind: "code", text: JSON.stringify(entry, null, 2) }];
+  }
   const content = entry?.message?.content ?? entry?.content ?? entry?.text;
   const segs = contentSegments(content);
   if (segs.length) return segs;
@@ -583,6 +688,14 @@ function buildEntryHtml(entry) {
 // The tool_result blocks of a pure tool-result entry (every block is a
 // tool_result). Mixed entries (real user text + a result) are left alone.
 function streamEntryToolResults(entry) {
+  if (entry?.payload?.type === "function_call_output") {
+    return [
+      {
+        content: entry.payload.output ?? JSON.stringify(entry.payload, null, 2),
+        tool_use_id: entry.payload.call_id,
+      },
+    ];
+  }
   const content = entry?.message?.content;
   if (!Array.isArray(content) || !content.length) return [];
   const results = content.filter((b) => b && b.type === "tool_result");
@@ -591,6 +704,12 @@ function streamEntryToolResults(entry) {
 }
 
 function streamEntryHasToolSegments(entry) {
+  if (
+    entry?.payload?.type === "function_call" ||
+    entry?.payload?.type === "custom_tool_call"
+  ) {
+    return true;
+  }
   const content = entry?.message?.content;
   return (
     Array.isArray(content) && content.some((b) => b && b.type === "tool_use")
@@ -600,6 +719,12 @@ function streamEntryHasToolSegments(entry) {
 function streamEntryRole(entry) {
   if (streamEntryToolResults(entry).length) return "tool result";
   if (streamEntryHasToolSegments(entry)) return "tool";
+  if (entry?.type === "response_item") {
+    if (entry.payload?.type === "message")
+      return entry.payload.role || "message";
+    if (entry.payload?.type === "function_call") return "tool";
+    if (entry.payload?.type === "function_call_output") return "tool result";
+  }
   return entry.type || "unknown";
 }
 
@@ -659,6 +784,9 @@ export function initTranscript(rootEl) {
   function reconcileToolResults() {
     const toolUseEntry = {};
     for (const e of entries) {
+      if (e?.payload?.type === "function_call" && e.payload.call_id) {
+        toolUseEntry[e.payload.call_id] = e;
+      }
       const content = e?.message?.content;
       if (!Array.isArray(content)) continue;
       for (const b of content) {
@@ -715,7 +843,7 @@ export function initTranscript(rootEl) {
     scheduleRender();
   }
 
-  function open(_project, session) {
+  function open(_project, session, provider = "claude") {
     if (es) {
       es.close();
       es = null;
@@ -723,7 +851,7 @@ export function initTranscript(rootEl) {
     reset();
     if (!session) return;
     es = new EventSource(
-      `/api/transcript/stream?session=${encodeURIComponent(session)}`,
+      `/api/transcript/stream?session=${encodeURIComponent(session)}&provider=${encodeURIComponent(provider || "claude")}`,
     );
     es.onmessage = (e) => {
       if (!e.data) return;
@@ -743,6 +871,8 @@ export function initTranscript(rootEl) {
     };
   }
 
-  store.subscribe((project, session) => open(project, session));
-  open(store.selectedProject, store.selectedSessionId);
+  store.subscribe((project, session, provider) =>
+    open(project, session, provider),
+  );
+  open(store.selectedProject, store.selectedSessionId, store.selectedProvider);
 }
