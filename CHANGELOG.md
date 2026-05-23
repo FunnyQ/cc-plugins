@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.4] - 2026-05-23
+
+### 💄 Improvements
+
+- **Larger live transcript text**: Bumped the streamed conversation prose to a larger font size for more comfortable reading of live transcripts.
+
+### 📝 Documentation
+
+- **Token Atlas design system reference**: Documented the Sunrise Atlas design language as a `DESIGN.md` color/typography spec and a machine-readable `DESIGN.json` token set (tonal ramps and color metadata) for the dashboard skill.
+
 ## [2.3.3] - 2026-05-23
 
 ### 🐛 Bug Fixes
