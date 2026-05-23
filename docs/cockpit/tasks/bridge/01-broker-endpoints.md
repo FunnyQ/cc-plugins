@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/01
 > **Blocks**: bridge/02, bridge/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 

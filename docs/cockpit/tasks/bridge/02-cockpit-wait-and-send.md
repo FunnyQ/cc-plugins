@@ -5,7 +5,7 @@
 > - `../_context/data-model.md`
 >
 > **Depends on**: bridge/01, kernel/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
