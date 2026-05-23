@@ -159,6 +159,26 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
   <answer>` is the terminal twin of a UI option button — both are part of this
   plugin's control-loop bridge between a parked session and Q's answer.
 
+## While a session is live — ask through the cockpit
+
+Once a session has been started (Step 4) and the dashboard is up (Step 5), the
+cockpit is Q's single surface for being asked. While such a session is active,
+**route every question for Q through `needs_your_call` — not the harness
+question tool (e.g. `AskUserQuestion`) and not a bare chat prompt.** Two cases,
+one channel:
+
+- **A decision fork** — autopilot hit a branch and needs Q to pick a heading.
+- **Missing information** — you need a value, preference, or confirmation only Q
+  can give before continuing.
+
+Both belong on the windshield: log the `--needs-call` (the `--decision` carries
+the question, one `--option` per suggested choice — options are optional, omit
+them for a pure free-text ask), then park `cockpit wait <id>` per your provider's
+wait policy. The ask surfaces as the warm "your turn" moment, Q answers in the
+dashboard (or via `cockpit send <id> <answer>`), and the question with its answer
+lands in the trail. Falling back to `AskUserQuestion` splits Q's attention off
+the cockpit and leaves the decision trail with a hole where a turn should be.
+
 ## Notes
 
 - Commands use **`<plugin-root>`**; your provider reference (Step 0) says how to

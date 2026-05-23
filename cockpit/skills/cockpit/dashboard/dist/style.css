@@ -113,6 +113,21 @@ body {
   letter-spacing: 0.06em;
   color: var(--ink-faint);
 }
+/* Provider identity — both held in the cool family (low chroma, off the
+   aurora accent and the warm signal), so a badge tags the harness without
+   reading as navigation or "your turn". */
+.provider-badge--claude {
+  --badge: oklch(80% 0.1 195); /* teal, dimmer than the aurora accent */
+}
+.provider-badge--codex {
+  --badge: oklch(78% 0.1 165); /* aurora-green, in the positive family */
+}
+.provider-badge--claude,
+.provider-badge--codex {
+  color: var(--badge);
+  border-color: color-mix(in oklch, var(--badge) 40%, var(--edge));
+  background: color-mix(in oklch, var(--badge) 10%, transparent);
+}
 .viewport__legend,
 .viewport__status,
 .manifest__legend,
@@ -570,53 +585,76 @@ body {
 }
 .manifest__bar {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-shrink: 0;
-  padding: 9px clamp(20px, 4vw, 48px);
+  padding: 10px clamp(20px, 4vw, 48px);
   border: 0;
   background: transparent;
   color: var(--starlight);
   font: inherit;
   cursor: pointer;
-  text-align: start;
+  text-align: center;
 }
-.manifest__bar:hover .manifest__legend,
-.manifest__bar:hover .manifest__caret {
-  color: var(--aurora);
+.manifest__bar:hover .manifest__legend {
+  color: var(--starlight);
 }
-.manifest__caret {
-  font-size: 10px;
-  color: var(--aurora);
-  transition: rotate 240ms cubic-bezier(0.22, 1, 0.36, 1);
-  /* affordance: a gentle aurora pulse hints the bar opens */
-  animation: caret-hint 2.4s ease-in-out infinite;
-}
-.manifest__caret.is-open {
-  rotate: 90deg;
-  animation: none;
+/* Centered HUD readout: PROJECTS between thin aurora brackets, a pulsing
+   waypoint triangle below it (replaces the old left caret + Open hint). */
+.manifest__bar .manifest__legend {
+  position: relative;
+  font-size: 11px;
+  letter-spacing: 0.16em;
   color: var(--ink-muted);
+  padding-inline: 18px;
+  transition: color 200ms ease;
 }
-@keyframes caret-hint {
+.manifest__bar .manifest__legend::before,
+.manifest__bar .manifest__legend::after {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--aurora-deep);
+  font-size: 12px;
+}
+.manifest__bar .manifest__legend::before {
+  content: "‹";
+  left: 2px;
+}
+.manifest__bar .manifest__legend::after {
+  content: "›";
+  right: 2px;
+}
+.manifest__beacon {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--aurora);
+  transition: rotate 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: manifest-beacon-pulse 1.4s ease-in-out infinite;
+}
+.manifest__beacon.is-open {
+  rotate: 180deg;
+  animation: none;
+  border-top-color: var(--ink-muted);
+}
+@keyframes manifest-beacon-pulse {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.5;
+    scale: 0.9;
   }
   50% {
     opacity: 1;
+    scale: 1.08;
   }
 }
 .manifest__count {
-  font-size: 11px;
-}
-.manifest__hint {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 9.5px;
   color: var(--ink-faint);
+  letter-spacing: 0.08em;
 }
 .manifest__flights {
   display: flex;
@@ -850,10 +888,13 @@ body {
 }
 
 .decision-card {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
   background: var(--hull);
   border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 14px;
 }
 /* The Call Alert — the one warm surface: a light flicking on in a cold cabin. */
 .decision-card.is-call {
@@ -892,35 +933,67 @@ body {
 }
 .decision-card__decision {
   font-weight: 600;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--starlight);
 }
 .decision-card__decision :is(p) {
   margin: 0;
 }
+/* Field-manual section labels — a mono stencil legend above each section so
+   every part (especially the tradeoff) reads as a findable, equal-weight row. */
+.decision-card__decision::before {
+  content: "DECISION";
+}
+.decision-card__decision::before,
+.decision-card__reason::before,
+.decision-card__tradeoff::before,
+.decision-card__files::before {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-bottom: 4px;
+}
 .decision-card__time {
   flex-shrink: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 .decision-card__reason {
   color: var(--starlight);
-  margin-top: 2px;
+  margin: 0;
+  line-height: 1.55;
 }
 .decision-card__reason :is(p) {
-  margin: 4px 0;
+  margin: 0;
+}
+.decision-card__reason::before {
+  content: "WHY";
 }
 .decision-card__tradeoff {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--ink-muted);
-  font-style: italic;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--starlight);
+}
+.decision-card__tradeoff::before {
+  content: "TRADEOFF";
 }
 .decision-card__files {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.decision-card__files::before {
+  content: "FILES";
+  flex-basis: 100%;
 }
 .decision-card__file {
   font-family: var(--font-mono);
@@ -1730,7 +1803,7 @@ body {
   }
 
   .status-led,
-  .manifest__caret,
+  .manifest__beacon,
   .lead-underline,
   .lead-connector,
   .viewport__beacon-ring,
