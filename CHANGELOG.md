@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.4.1] - 2026-05-24
+
+### ✨ New Features
+
+- **Cockpit Design System panel**: Added a dedicated dashboard panel for the Cockpit design system so `DESIGN.md` renders as its own focused reference surface instead of being buried in Project Info.
+- **Faster-feeling hero animation**: Increased the hero starfield density, added more visible star variants and gradient trails, lengthened the tails, and kept the moving beacon following the warped vanishing point for a stronger cockpit-in-motion feel.
+- **Automatic hero quieting**: The Cockpit hero now auto-collapses after 60 seconds and pauses the starfield animation, while still allowing manual reopening.
+
+### 💄 Improvements
+
+- **Cleaner dashboard chrome**: Removed the Project Info panel and flight-row toggle now that the Design System panel owns the design reference workflow.
+- **Quieter default panels**: `CLAUDE.md` and `AGENTS.md` Project Info sections now start collapsed by default when that legacy data path is used.
+
+### 🐛 Bug Fixes
+
+- **Clearer Design panel route failures**: The dashboard now distinguishes an unavailable design-system route from a missing design file, making stale daemon restarts easier to diagnose.
+
+> Token Atlas is unchanged in this release; the version bump keeps marketplace plugins aligned at 2.4.1.
+
 ## [2.4.0] - 2026-05-24
 
 ### ✨ New Features
