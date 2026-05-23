@@ -1,5 +1,6 @@
-// Tests for project-info (ui/04): meta/CLAUDE.md reading, DESIGN.md token
-// parsing, path confinement, and the /api/project-info handler's registry gate.
+// Tests for project-info (ui/04): meta/instruction file reading, DESIGN.md
+// token parsing, path confinement, and the /api/project-info handler's
+// registry gate.
 // Run: bun test cockpit/skills/cockpit/scripts/project-info.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -66,11 +67,15 @@ afterEach(() => {
 });
 
 describe("buildProjectInfo", () => {
-  test("populates goal, meta prose, CLAUDE.md and tokens when all present", () => {
+  test("populates goal, meta prose, instruction files and tokens when all present", () => {
     seedMeta(projectDir, "win");
     writeFileSync(
       join(projectDir, "CLAUDE.md"),
       "# Project rules\n\nbe surgical.",
+    );
+    writeFileSync(
+      join(projectDir, "AGENTS.md"),
+      "# Agent rules\n\nread the room.",
     );
     writeFileSync(join(projectDir, "DESIGN.md"), DESIGN_MD);
 
@@ -79,6 +84,7 @@ describe("buildProjectInfo", () => {
     expect(info.meta).toContain("north star");
     expect(info.meta).not.toMatch(/^---/); // frontmatter stripped
     expect(info.claudeMd).toContain("be surgical");
+    expect(info.agentsMd).toContain("read the room");
     expect(info.tokens).not.toBeNull();
     expect(info.tokens.colorBg).toBe("#f4efe6"); // cream → lightest/bg
     expect(info.tokens.colorFg).toBe("#1a1a1a"); // ink (not ink-soft)
@@ -100,11 +106,17 @@ describe("buildProjectInfo", () => {
     expect(buildProjectInfo(projectDir).claudeMd).toBeNull();
   });
 
+  test("agentsMd is null when absent", () => {
+    seedMeta(projectDir);
+    expect(buildProjectInfo(projectDir).agentsMd).toBeNull();
+  });
+
   test("missing meta is tolerated (empty goal + prose)", () => {
     const info = buildProjectInfo(projectDir);
     expect(info.projectGoal).toBe("");
     expect(info.meta).toBe("");
     expect(info.claudeMd).toBeNull();
+    expect(info.agentsMd).toBeNull();
     expect(info.tokens).toBeNull();
   });
 });
@@ -140,6 +152,28 @@ describe("CLAUDE.md path confinement", () => {
     seedMeta(projectDir);
     writeFileSync(join(projectDir, "CLAUDE.md"), "# root rules");
     expect(buildProjectInfo(projectDir).claudeMd).toContain("root rules");
+  });
+});
+
+describe("AGENTS.md path confinement", () => {
+  test("an AGENTS.md symlinked outside the project is rejected (null)", () => {
+    seedMeta(projectDir);
+    const outside = realpathSync(
+      mkdtempSync(join(tmpdir(), "cockpit-outside-")),
+    );
+    writeFileSync(join(outside, "secret.md"), "SECRET");
+    symlinkSync(join(outside, "secret.md"), join(projectDir, "AGENTS.md"));
+    try {
+      expect(buildProjectInfo(projectDir).agentsMd).toBeNull();
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  test("a real AGENTS.md directly in the project root is returned", () => {
+    seedMeta(projectDir);
+    writeFileSync(join(projectDir, "AGENTS.md"), "# codex rules");
+    expect(buildProjectInfo(projectDir).agentsMd).toContain("codex rules");
   });
 });
 

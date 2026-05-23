@@ -1293,7 +1293,7 @@ body {
   text-transform: uppercase;
   color: var(--ink-muted);
 }
-.info-col__claude > summary {
+.info-col__instructions > summary {
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1302,6 +1302,9 @@ body {
   text-transform: uppercase;
   color: var(--ink-muted);
   margin-bottom: var(--space-sm);
+}
+.info-col__instructions + .info-col__instructions {
+  margin-top: var(--space-md);
 }
 .info-col__prose {
   font-size: 13px;
