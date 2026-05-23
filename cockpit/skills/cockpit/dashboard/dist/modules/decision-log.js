@@ -36,8 +36,16 @@ function relTime(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function recordKey(rec, index) {
-  return `${rec.type}:${rec.timestamp || rec.ts || ""}:${index}`;
+// Stable, content-derived dedupe key — NOT receive order. The SSE server resends
+// the whole backlog on every reconnect, so a key must map a given record to the
+// same string each time it arrives or reconnects would duplicate every card.
+function recordKey(rec) {
+  if (rec.type === "goal") return "goal"; // one goal record per session (singleton)
+  if (rec.type === "decision")
+    return `decision|${rec.timestamp || ""}|${rec.decision || ""}`;
+  if (rec.type === "response")
+    return `response|${rec.ts || ""}|${rec.answer || ""}`;
+  return `${rec.type}|${rec.timestamp || rec.ts || ""}`;
 }
 
 // Daemon token for POST /api/respond — fetched once at runtime, never hardcoded.
@@ -56,8 +64,7 @@ export function initDecisionLog(rootEl) {
   if (!rootEl) return;
 
   let es = null;
-  let seq = 0;
-  const seen = new Set(); // dedupe reconnect resends by stable key
+  const seen = new Set(); // dedupe reconnect resends by stable content key
   let lastOpenCall = null; // most recent unresolved needs_your_call card
   let currentSession = null;
 
@@ -101,7 +108,6 @@ export function initDecisionLog(rootEl) {
     rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight < 48;
 
   function reset() {
-    seq = 0;
     seen.clear();
     lastOpenCall = null;
     goalEl.hidden = true;
@@ -231,7 +237,7 @@ export function initDecisionLog(rootEl) {
   }
 
   function handle(rec) {
-    const key = recordKey(rec, seq++);
+    const key = recordKey(rec);
     if (seen.has(key)) return;
     seen.add(key);
 
