@@ -13,6 +13,11 @@ import { extname, resolve, relative, isAbsolute, join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
+import { projectsPayload, sessionsPayload } from "./registry";
+import { handleLogStream } from "./log-stream";
+import { handleTranscriptStream } from "./transcript-stream";
+import { handleWait, handleRespond } from "./broker";
+import { handleProjectInfo } from "./project-info";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
@@ -118,6 +123,33 @@ function mimeFor(path: string): string {
   return MIME[extname(path).toLowerCase()] ?? "application/octet-stream";
 }
 
+// ---------- api handlers ----------
+
+function handleSessions(): Response {
+  try {
+    return jsonResponse(sessionsPayload());
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+function handleProjects(): Response {
+  try {
+    return jsonResponse(projectsPayload());
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+// The SPA needs the daemon token to POST /api/respond (bridge). Localhost-only
+// (the server binds 127.0.0.1), read fresh from daemon.json so it survives a
+// restart. Never hardcode it in the page.
+function handleToken(): Response {
+  const info = readDaemonInfo();
+  if (!info?.token) return jsonError("daemon token unavailable", 503);
+  return jsonResponse({ token: info.token });
+}
+
 // ---------- json helpers (copied from token-atlas live.ts) ----------
 
 function jsonResponse(payload: object, status = 200): Response {
@@ -175,13 +207,15 @@ const server = Bun.serve({
   hostname: "127.0.0.1",
   fetch(req) {
     const url = new URL(req.url);
-    // endpoints wired by later tasks:
-    // if (url.pathname === "/api/projects") return handleProjects()
-    // if (url.pathname === "/api/sessions") return handleSessions()
-    // if (url.pathname === "/api/log/stream") return handleLogStream(req)
-    // if (url.pathname === "/api/transcript/stream") return handleTranscriptStream(req)
-    // if (url.pathname === "/api/wait") return handleWait(req)
-    // if (url.pathname === "/api/respond") return handleRespond(req)
+    if (url.pathname === "/api/projects") return handleProjects();
+    if (url.pathname === "/api/token") return handleToken();
+    if (url.pathname === "/api/project-info") return handleProjectInfo(req);
+    if (url.pathname === "/api/sessions") return handleSessions();
+    if (url.pathname === "/api/log/stream") return handleLogStream(req);
+    if (url.pathname === "/api/transcript/stream")
+      return handleTranscriptStream(req);
+    if (url.pathname === "/api/wait") return handleWait(req);
+    if (url.pathname === "/api/respond") return handleRespond(req);
     return serveStatic(url.pathname);
   },
 });

@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
-// cockpit CLI — produces the kernel data: session goal + decision trail.
+// cockpit CLI — produces the kernel data: session goal + decision trail,
+// plus the control-loop client (wait/send) that talks to the daemon broker.
 //   cockpit start --session <id> --session-goal X --project-goal Y [--owner Q]
 //   cockpit log   --session <id> --decision D --reason R [--tradeoff T]
 //                 [--file p ...] [--option o ...] [--needs-call]
+//   cockpit wait  <sessionId>            # park (long-poll) until Q answers; prints the answer
+//   cockpit send  <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
 import {
   appendFileSync,
   existsSync,
@@ -41,6 +44,7 @@ type Registry = { sessions: RegistryEntry[] };
 
 const COCKPIT_HOME = process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
 const REGISTRY_PATH = join(COCKPIT_HOME, "registry.json");
+const DAEMON_PATH = join(COCKPIT_HOME, "daemon.json");
 
 function projectCockpitDir(project: string): string {
   return join(project, ".cockpit");
@@ -220,21 +224,131 @@ function cmdLog(args: Args): void {
   console.log(`cockpit: logged decision for ${sessionId}`);
 }
 
+// ---------- Daemon broker client (wait / send) ----------
+
+type DaemonInfo = { pid: number; port: number; token: string };
+
+function readDaemon(): DaemonInfo | null {
+  try {
+    const raw = JSON.parse(readFileSync(DAEMON_PATH, "utf8"));
+    if (typeof raw?.port === "number" && typeof raw?.token === "string") {
+      return raw as DaemonInfo;
+    }
+  } catch {
+    // missing or corrupt → treat as not running
+  }
+  return null;
+}
+
+function requireDaemon(): DaemonInfo {
+  const d = readDaemon();
+  if (!d) {
+    console.error("cockpit daemon not running — start the dashboard first");
+    process.exit(1);
+  }
+  return d;
+}
+
+function positionals(rest: string[]): string[] {
+  return rest.filter((t) => !t.startsWith("--"));
+}
+
+// `cockpit wait <sessionId>` — launched as a background task right after a
+// `--needs-call` log. Long-polls /api/wait; on the re-pollable timeout sentinel
+// it loops again, so a single connection drop doesn't lose Q's pending answer.
+async function cmdWait(rest: string[]): Promise<void> {
+  const sessionId = positionals(rest)[0];
+  if (!sessionId) {
+    console.error("cockpit wait: <sessionId> is required");
+    process.exit(1);
+  }
+  const d = requireDaemon();
+  const maxMs = (() => {
+    const v = parseInt(process.env.COCKPIT_WAIT_MAX_MS || "", 10);
+    return Number.isFinite(v) && v > 0 ? v : 6 * 60 * 60 * 1000; // 6h ceiling
+  })();
+  const url =
+    `http://127.0.0.1:${d.port}/api/wait` +
+    `?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(d.token)}`;
+
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    let data: any;
+    try {
+      const res = await fetch(url);
+      data = await res.json();
+    } catch (err) {
+      console.error(
+        `cockpit wait: lost connection to daemon (${(err as Error).message})`,
+      );
+      process.exit(1);
+    }
+    // A real answer (including the empty string) is a string; the timeout
+    // sentinel is { answer: null, timeout: true } → re-poll.
+    if (data && typeof data.answer === "string") {
+      console.log(data.answer);
+      process.exit(0);
+    }
+  }
+  console.error("cockpit wait: no answer received");
+  process.exit(1);
+}
+
+// `cockpit send <sessionId> <answer>` — the terminal twin of a UI option
+// button. POSTs the answer; reports whether a parked session was woken.
+async function cmdSend(rest: string[]): Promise<void> {
+  const pos = positionals(rest);
+  const sessionId = pos[0];
+  const answer = pos.slice(1).join(" ");
+  if (!sessionId) {
+    console.error("cockpit send: <sessionId> <answer> is required");
+    process.exit(1);
+  }
+  const d = requireDaemon();
+  let data: any;
+  try {
+    const res = await fetch(`http://127.0.0.1:${d.port}/api/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: sessionId, answer, token: d.token }),
+    });
+    data = await res.json();
+  } catch (err) {
+    console.error(
+      `cockpit send: lost connection to daemon (${(err as Error).message})`,
+    );
+    process.exit(1);
+  }
+  if (data?.delivered) {
+    console.log("delivered: true");
+  } else {
+    console.log("delivered: false");
+    console.log(
+      "  (answer logged, but the session isn't parked/listening right now)",
+    );
+  }
+}
+
 // ---------- Main ----------
 
-function main(): void {
+async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
-  const args = parseArgs(rest);
   switch (sub) {
     case "start":
-      cmdStart(args);
+      cmdStart(parseArgs(rest));
       break;
     case "log":
-      cmdLog(args);
+      cmdLog(parseArgs(rest));
+      break;
+    case "wait":
+      await cmdWait(rest);
+      break;
+    case "send":
+      await cmdSend(rest);
       break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
-      console.error("usage: cockpit <start|log> [flags]");
+      console.error("usage: cockpit <start|log|wait|send> [args]");
       process.exit(1);
   }
 }
