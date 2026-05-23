@@ -1,0 +1,10 @@
+{
+  "name": "cockpit",
+  "version": "0.1.0",
+  "description": "Per-project local web cockpit — set a goal, watch the decision trail steer toward it. Goal capture + distilled decision log + live session view.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": ["cockpit", "goal", "decision-log", "live-session", "claude-code"]
+}
