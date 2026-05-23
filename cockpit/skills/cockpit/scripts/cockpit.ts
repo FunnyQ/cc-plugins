@@ -273,15 +273,28 @@ async function cmdWait(rest: string[]): Promise<void> {
 
   const start = Date.now();
   while (Date.now() - start < maxMs) {
+    let res: Response;
+    try {
+      res = await fetch(url);
+    } catch {
+      // Transient (e.g. the daemon is restarting). Pause briefly and re-poll
+      // within the wall-clock ceiling rather than losing Q's pending answer.
+      await Bun.sleep(1000);
+      continue;
+    }
+    // A non-2xx is a permanent error (bad token → 401, invalid session → 400).
+    // Surface it and bail — do NOT spin retrying, and do NOT misreport it as a
+    // timeout/"nobody listening".
+    if (!res.ok) {
+      console.error(`cockpit wait: ${await errorText(res)}`);
+      process.exit(1);
+    }
     let data: any;
     try {
-      const res = await fetch(url);
       data = await res.json();
-    } catch (err) {
-      console.error(
-        `cockpit wait: lost connection to daemon (${(err as Error).message})`,
-      );
-      process.exit(1);
+    } catch {
+      await Bun.sleep(1000);
+      continue;
     }
     // A real answer (including the empty string) is a string; the timeout
     // sentinel is { answer: null, timeout: true } → re-poll.
@@ -292,6 +305,17 @@ async function cmdWait(rest: string[]): Promise<void> {
   }
   console.error("cockpit wait: no answer received");
   process.exit(1);
+}
+
+// Best-effort human-readable error from a non-ok daemon response.
+async function errorText(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    if (body?.error) return `${body.error} (HTTP ${res.status})`;
+  } catch {
+    // fall through to bare status
+  }
+  return `HTTP ${res.status}`;
 }
 
 // `cockpit send <sessionId> <answer>` — the terminal twin of a UI option
@@ -305,19 +329,31 @@ async function cmdSend(rest: string[]): Promise<void> {
     process.exit(1);
   }
   const d = requireDaemon();
-  let data: any;
+  let res: Response;
   try {
-    const res = await fetch(`http://127.0.0.1:${d.port}/api/respond`, {
+    res = await fetch(`http://127.0.0.1:${d.port}/api/respond`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session: sessionId, answer, token: d.token }),
     });
-    data = await res.json();
   } catch (err) {
     console.error(
       `cockpit send: lost connection to daemon (${(err as Error).message})`,
     );
     process.exit(1);
+  }
+  // A non-2xx (bad token → 401, invalid session → 400) is a real failure — not
+  // the same as a delivered:false. Surface it and exit non-zero so the caller
+  // isn't told the answer was "logged" when it wasn't.
+  if (!res.ok) {
+    console.error(`cockpit send: ${await errorText(res)}`);
+    process.exit(1);
+  }
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
   }
   if (data?.delivered) {
     console.log("delivered: true");
