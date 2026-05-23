@@ -27,8 +27,16 @@ mirrors `needs_your_call`: nothing is written until Q confirms.
 ### 1. Determine the session id
 
 Use the **current Claude Code session uuid** — the same id as the transcript at
-`~/.claude/projects/**/<id>.jsonl`. If it can't be determined, generate one
-(`crypto.randomUUID()`) and note which id you used.
+`~/.claude/projects/**/<id>.jsonl`. You usually can't read your own session id
+directly, so let the helper find it (it returns the most-recently-touched
+transcript for the project, which is this session):
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/find-session.ts
+```
+
+If it exits non-zero (no transcript yet), generate one (`crypto.randomUUID()`)
+and note which id you used.
 
 ### 2. Propose goals (don't write yet)
 
@@ -60,8 +68,39 @@ bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts start \
 
 This writes `<project>/.cockpit/project-meta.md` (frontmatter `project_goal`),
 appends the goal record as line 1 of `<project>/.cockpit/logs/<id>.jsonl`, and
-registers the session in `~/.cockpit/registry.json`. The skill's job ends here —
-displaying the trail is the dashboard's job (`/token-atlas`-style web view).
+registers the session in `~/.cockpit/registry.json`.
+
+### 5. Start (or reuse) the dashboard daemon
+
+The trail is only useful if Q can see it, so bring up the dashboard. Run it as a
+**background task** (`run_in_background: true`) — it's a long-lived server that
+would otherwise block:
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/serve-dashboard.ts
+```
+
+Then tell Q the URL it prints (default `http://localhost:5858`). See **The
+dashboard daemon** below for how it behaves — most importantly, it's a singleton,
+so running this when one is already up is harmless (it just reprints the URL).
+
+## The dashboard daemon
+
+One daemon serves every project's cockpit; you don't run a server per session.
+
+- **Singleton, idempotent.** A PID file at `~/.cockpit/daemon.json` tracks the
+  live instance. Starting it again detects the running daemon, prints its URL,
+  and exits `0` — so step 5 is always safe to run, even mid-session.
+- **Run it in the background.** It's a persistent process (`Bun.serve`). Launch
+  it with `run_in_background: true`; never block the foreground on it. You'll see
+  `cockpit → http://localhost:5858` (or `cockpit daemon already running → …`).
+- **Binds `127.0.0.1:5858`.** Override with `--port <n>`; pass `--no-open` to
+  skip auto-opening the browser.
+- **It will not kill a foreign process.** If port 5858 is held by something that
+  isn't a cockpit daemon, it exits `1` with a clear message — re-run with
+  `--port <n>` instead of trying to free the port.
+- **It powers `wait` / `send`.** The control loop talks to this daemon, so it
+  must be running before you park a `cockpit wait` (see below).
 
 ## Logging decisions afterward
 
@@ -83,10 +122,22 @@ bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts log \
   to Q. Supply the choices via `--option`, then **immediately run
   `cockpit wait <id>` as a background task** to park for Q's answer — the
   harness wakes you when Q picks an option (or types a reply) in the cockpit UI.
-  `cockpit wait` / `cockpit send` live in the bridge bucket of this plugin.
+
+  ```bash
+  bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts wait <id>
+  ```
+
+  Requires the dashboard daemon (step 5) to be running — `wait` exits `1` with
+  "daemon not running" otherwise. `cockpit send <id> <answer>` is the terminal
+  twin of a UI option button — both are part of this plugin's control-loop
+  bridge between a parked session and Q's answer.
 
 ## Notes
 
+- Commands use **`${CLAUDE_PLUGIN_ROOT}`** — the harness sets it to this plugin's
+  root when the skill runs as an installed plugin. If it's empty (e.g. you're
+  running from a dev checkout of the repo), substitute the path to the plugin
+  instead — e.g. `cockpit` from the repo root: `bun cockpit/skills/cockpit/scripts/…`.
 - One session = one log file; concurrent sessions never share a file.
 - The persistent **project** goal lives only in `project-meta.md` frontmatter
   (single source of truth) — it is *not* duplicated into the log. The log's goal
