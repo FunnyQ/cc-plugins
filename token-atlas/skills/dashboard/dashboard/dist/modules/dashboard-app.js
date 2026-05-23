@@ -1665,7 +1665,7 @@ export function App() {
     // every entry on each reactive update.
     buildEntryHtml(entry) {
       const results = entry.__toolResults || {};
-      return this.streamEntrySegments(entry)
+      const html = this.streamEntrySegments(entry)
         .map((seg) => {
           let html = this.renderStreamSegment(seg);
           // A tool_use renders with its paired result right below it once the
@@ -1678,6 +1678,12 @@ export function App() {
           return html;
         })
         .join("");
+      // Wide block children (tables, code blocks) can't scroll inside a
+      // shrink-wrapped (`width: fit-content`) bubble — their `max-width: 100%`
+      // resolves against a content-sized container and goes indefinite. Flag
+      // these so the bubble takes a definite width instead (see live.css).
+      entry.__wide = /<(?:table|pre)[\s>]/.test(html);
+      return html;
     },
 
     resultSegment(part, lang) {
@@ -2134,7 +2140,8 @@ export function App() {
       const toolClass = this.streamEntryHasToolSegments(entry)
         ? " has-tool-segments"
         : "";
-      return `live-entry is-${role}${toolClass}`;
+      const wideClass = entry.__wide ? " has-wide-content" : "";
+      return `live-entry is-${role}${toolClass}${wideClass}`;
     },
 
     lockPageScroll() {
