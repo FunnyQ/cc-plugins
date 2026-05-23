@@ -1,5 +1,5 @@
 // Info column — the project's locked settings: goal + project-meta prose +
-// CLAUDE.md, rendered read-only. A project's DESIGN.md tokens are *displayed*
+// instruction files, rendered read-only. A project's DESIGN.md tokens are *displayed*
 // here as swatches/readouts (they are NOT applied as a theme — the cockpit shell
 // keeps its own look across every project).
 import { marked } from "../vendor/marked.esm.js";
@@ -119,12 +119,18 @@ export function initInfo(rootEl) {
   }
 
   function render(info) {
-    const claude = info.claudeMd
-      ? `<details class="info-col__claude" open>
-           <summary>CLAUDE.md</summary>
-           <div class="info-col__prose markdown">${md(info.claudeMd)}</div>
-         </details>`
-      : "";
+    const instructionSections = [
+      ["AGENTS.md", info.agentsMd],
+      ["CLAUDE.md", info.claudeMd],
+    ]
+      .filter(([, body]) => body)
+      .map(
+        ([name, body]) => `<details class="info-col__instructions" open>
+           <summary>${esc(name)}</summary>
+           <div class="info-col__prose markdown">${md(body)}</div>
+         </details>`,
+      )
+      .join("");
     const metaProse = info.meta
       ? `<div class="info-col__prose markdown">${md(info.meta)}</div>`
       : "";
@@ -134,14 +140,14 @@ export function initInfo(rootEl) {
         <span class="info-col__goal-text">${esc(info.projectGoal || "(no project goal)")}</span>
       </div>
       ${metaProse ? `<section class="info-col__section"><h4 class="info-col__title">Project meta</h4>${metaProse}</section>` : ""}`;
-    // Design tokens render before CLAUDE.md (which can be long).
+    // Design tokens render before instruction files (which can be long).
     const tokensSection = buildTokensSection(info.tokens);
     if (tokensSection) rootEl.append(tokensSection);
-    if (claude) {
-      const claudeSection = document.createElement("section");
-      claudeSection.className = "info-col__section";
-      claudeSection.innerHTML = claude;
-      rootEl.append(claudeSection);
+    if (instructionSections) {
+      const instructionsSection = document.createElement("section");
+      instructionsSection.className = "info-col__section";
+      instructionsSection.innerHTML = instructionSections;
+      rootEl.append(instructionsSection);
     }
   }
 

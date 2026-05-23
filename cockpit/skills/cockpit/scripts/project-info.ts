@@ -1,6 +1,6 @@
 // cockpit project-info — reads a project's locked settings (goal + project-meta
-// prose + CLAUDE.md) and parses its DESIGN.md design tokens into a flat map the
-// SPA applies as CSS custom properties.
+// prose + assistant instruction files) and parses its DESIGN.md design tokens
+// into a flat map the SPA applies as CSS custom properties.
 //
 // DESIGN.md format assumption: the Google DESIGN.md open standard — a Markdown
 // file whose YAML frontmatter holds `colors:` / `typography:` / `rounded:` /
@@ -28,6 +28,7 @@ export type ProjectInfo = {
   projectGoal: string;
   meta: string; // prose body of project-meta.md (after frontmatter)
   claudeMd: string | null;
+  agentsMd: string | null;
   tokens: ProjectTokens | null;
 };
 
@@ -45,18 +46,21 @@ function readMetaBody(project: string): string {
   }
 }
 
-// ---------- CLAUDE.md (path-confined to the project root) ----------
+// ---------- instruction files (path-confined to the project root) ----------
 
-function readClaudeMd(project: string): string | null {
-  const candidate = join(project, "CLAUDE.md");
+function readRootMarkdown(
+  project: string,
+  filename: "CLAUDE.md" | "AGENTS.md",
+): string | null {
+  const candidate = join(project, filename);
   if (!existsSync(candidate)) return null;
   try {
     const realProject = realpathSync(project);
     const realFile = realpathSync(candidate);
-    // Confine: accept only the project root's own CLAUDE.md. If the entry is a
+    // Confine: accept only the project root's own file. If the entry is a
     // symlink that resolves anywhere else (outside the root, or to a different
-    // in-project path), its realpath won't equal <root>/CLAUDE.md → reject.
-    if (realFile !== join(realProject, "CLAUDE.md")) {
+    // in-project path), its realpath won't equal <root>/<filename> -> reject.
+    if (realFile !== join(realProject, filename)) {
       return null;
     }
     return readFileSync(realFile, "utf8");
@@ -233,7 +237,8 @@ export function buildProjectInfo(project: string): ProjectInfo {
   return {
     projectGoal: readProjectGoal(project),
     meta: readMetaBody(project),
-    claudeMd: readClaudeMd(project),
+    claudeMd: readRootMarkdown(project, "CLAUDE.md"),
+    agentsMd: readRootMarkdown(project, "AGENTS.md"),
     tokens: parseDesignTokens(project),
   };
 }
