@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.3] - 2026-05-23
+
+### 🐛 Bug Fixes
+
+- **Live transcript layout for wide content**: Wide blocks like tables and code blocks in the live transcript now scroll horizontally within their chat bubble instead of bursting out of the panel, and tool-segment entries line up cleanly with regular assistant and user messages.
+
 ## [2.3.2] - 2026-05-22
 
 ### 🐛 Bug Fixes
