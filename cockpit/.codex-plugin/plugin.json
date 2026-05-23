@@ -1,0 +1,32 @@
+{
+  "name": "cockpit",
+  "version": "0.2.0",
+  "description": "Per-project local web cockpit for Claude Code and Codex: goal capture, decision log, live transcript, and needs-your-call bridge.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "cockpit",
+    "goal",
+    "decision-log",
+    "live-session",
+    "claude-code",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cockpit",
+    "shortDescription": "Goal + decision cockpit for Claude Code and Codex.",
+    "longDescription": "A local dashboard and skill for setting a session goal, logging decisions that diffs cannot explain, streaming the live transcript, and handing needs_your_call choices back to Q.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Start a cockpit session for this project.",
+      "Log this decision in cockpit.",
+      "Wait for my cockpit answer."
+    ],
+    "brandColor": "#35CAD2"
+  }
+}

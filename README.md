@@ -1,20 +1,22 @@
 # cc-plugins
 
-A local Claude Code plugin marketplace. Private plugins for extending Claude Code with custom skills.
+A local Claude Code and Codex plugin marketplace. Private plugins for extending local AI coding workflows with custom skills and dashboards.
 
 ## Plugins
 
 | Plugin | Description |
 |--------|-------------|
 | [token-atlas](./token-atlas) | Local web dashboard for Claude Code & Codex usage — sessions, tokens, cost, model mix, project activity |
+| [cockpit](./cockpit) | Per-project cockpit for Claude Code & Codex — goal capture, decision log, live transcript, and needs-your-call bridge |
 
-## Installation
+## Claude Code Installation
 
 ### CLI
 
 ```bash
 claude plugins marketplace add FunnyQ/cc-plugins
 claude plugins install token-atlas@q-lab-marketplace
+claude plugins install cockpit@q-lab-marketplace
 ```
 
 ### TUI (interactive)
@@ -22,7 +24,7 @@ claude plugins install token-atlas@q-lab-marketplace
 1. Open Claude Code
 2. Type `/plugins` to open the plugin manager
 3. Select **Add Marketplace** → enter `FunnyQ/cc-plugins`
-4. Select **Install Plugin** → choose `token-atlas`
+4. Select **Install Plugin** → choose `token-atlas` or `cockpit`
 
 The skill runs a prerequisite check automatically before launching the dashboard, so there's no manual setup step. If something's missing, the hint will be surfaced — the most common case is `stats-cache.json` not yet existing; just run `/stats` once in Claude Code to seed it.
 
@@ -31,6 +33,23 @@ If you want to run the precheck yourself:
 ```bash
 bun $CLAUDE_PLUGIN_ROOT/skills/dashboard/scripts/install.ts
 ```
+
+## Codex Installation
+
+Codex reads its marketplace entry from `.agents/plugins/marketplace.json`.
+
+```bash
+codex plugin marketplace add FunnyQ/cc-plugins
+codex plugin add cockpit@q-lab-marketplace
+```
+
+Check the install:
+
+```bash
+codex plugin list | rg 'q-lab-marketplace|cockpit'
+```
+
+After installing a Codex plugin, start a new Codex session so the skill list is refreshed.
 
 ## token-atlas
 
@@ -87,11 +106,32 @@ Token costs are estimated using bundled defaults (`references/pricing-defaults.j
 }
 ```
 
+## cockpit
+
+Cockpit is a per-project dashboard and skill for active work. Start a session goal, keep a distilled decision log, stream the current Claude Code or Codex transcript, and park on `needs_your_call` so a button click in the dashboard wakes the session.
+
+### Quick Start
+
+In Claude Code or Codex, invoke the cockpit skill and confirm the proposed goals. From a dev checkout, the dashboard can also be started directly:
+
+```bash
+bun cockpit/skills/cockpit/scripts/serve-dashboard.ts
+```
+
+Opens `http://localhost:5858` in your default browser.
+
+### Provider Support
+
+- Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
+- Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and rollout files under `~/.codex/sessions`.
+- Decision logs, registry, and wait/send bridge are shared through `.cockpit/` and `~/.cockpit/`.
+
 ## Adding a New Plugin
 
-1. Create a directory with `.claude-plugin/plugin.json`
+1. Create a directory with `.claude-plugin/plugin.json` and/or `.codex-plugin/plugin.json`
 2. Add skills under `skills/<skill-name>/SKILL.md`
-3. Register in `.claude-plugin/marketplace.json`
+3. Register Claude plugins in `.claude-plugin/marketplace.json`
+4. Register Codex plugins in `.agents/plugins/marketplace.json`
 
 ## License
 

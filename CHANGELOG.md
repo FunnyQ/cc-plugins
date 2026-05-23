@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.4.0] - 2026-05-24
+
+### ✨ New Features
+
+- **New plugin: cockpit**: A new marketplace plugin that gives each project a live mission-control view of your coding agents. Capture a per-project goal and a running decision log behind a `/cockpit-start` human gate, then watch live transcripts, decisions, and "needs your call" prompts as your agents work — with respond-from-the-dashboard buttons that send your answer straight back to the waiting session.
+- **Claude Code and Codex sessions side by side**: Cockpit discovers and streams both Claude Code and Codex sessions, with provider badges and per-provider transcript streaming so you can supervise mixed-agent work from one dashboard.
+- **Per-project decision-log language**: `cockpit start` accepts a `--log-language` flag (asked for at start) so each project's decision trail can be recorded in your preferred language; the setting persists across re-runs.
+- **Project Info modal**: View a project's goal, metadata, `CLAUDE.md`, `AGENTS.md`, and `DESIGN.md` design tokens in a modal triggered from the project rail, with path-confined reads of the assistant instruction files.
+
+### 🎨 Design
+
+- **"Night Flight" deep-space flight deck**: Cockpit ships a distinctive deep-space dashboard — a HUD viewport with a forward warp starfield, rotating destination beacon, leader callouts, collapsible projects manifest, and screen-styled instrument panels for the live transcript and decision log. Deep-space OKLCH palette with a cool aurora navigation accent and a warm signal reserve held back for "needs your call" dock alerts.
+
+### 🐛 Bug Fixes
+
+- **Non-destructive start**: Re-running `cockpit start` on an existing session now refreshes only the leading goal record and preserves the full decision/response trail instead of wiping it.
+- **Robust wait/send bridge**: The wait/send commands now surface daemon errors (bad token, invalid session) instead of misreporting, fail fast on repeated stale-daemon connection failures, keep long-polls and SSE streams alive under the daemon idle timeout, and no longer kill a foreign process holding the port.
+- **Stable decision-log dedupe**: Decision-log cards are deduped by durable record id (content-based fallback for legacy logs) so EventSource reconnects no longer re-render the backlog as duplicates, and relative timestamps refresh periodically instead of freezing.
+- **Hardened security**: `CLAUDE.md` reads are confined to the exact project-root path, rejecting symlinks that resolve elsewhere inside the project.
+
+### 📝 Documentation
+
+- **Provider-neutral cockpit skill**: Refactored the cockpit skill into a shared, provider-neutral core with deltas-only `claude.md` / `codex.md` references (plugin-root resolution, find-session command, wait policy), documented the dashboard daemon lifecycle and a session-id discovery helper, and added Codex marketplace + install documentation.
+
+> Token Atlas is unchanged in this release; the version bump unifies all marketplace plugins at 2.4.0.
+
 ## [2.3.4] - 2026-05-23
 
 ### 💄 Improvements
