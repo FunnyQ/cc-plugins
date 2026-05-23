@@ -52,7 +52,7 @@ function seedMeta(dir: string, goal = "ship it") {
   mkdirSync(join(dir, ".cockpit"), { recursive: true });
   writeFileSync(
     join(dir, ".cockpit", "project-meta.md"),
-    `---\nproject_goal: ${goal}\ncreated: 2026-05-23T09:00:00Z\nowner: Q\n---\n\nThe north star prose.\n`,
+    `---\nproject_goal: ${goal}\ncreated: 2026-05-23T09:00:00Z\nowner: user\n---\n\nThe north star prose.\n`,
   );
 }
 

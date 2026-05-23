@@ -59,7 +59,7 @@ describe("cockpit start", () => {
     );
     expect(meta).toMatch(/^---\n/);
     expect(meta).toMatch(/project_goal: scratch/);
-    expect(meta).toMatch(/owner: Q/);
+    expect(meta).toMatch(/owner: user/);
     expect(meta).toMatch(/created: \d{4}-/);
   });
 
