@@ -1,0 +1,370 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-23T00:00:00.000Z",
+  "title": "Design System: Token Atlas",
+  "extensions": {
+    "colorMeta": {
+      "coral-accent": {
+        "role": "primary",
+        "displayName": "Coral Accent",
+        "canonical": "oklch(64% 0.18 30)",
+        "tonalRamp": [
+          "oklch(30% 0.1 30)",
+          "oklch(40% 0.14 30)",
+          "oklch(50% 0.18 30)",
+          "oklch(58% 0.22 28)",
+          "oklch(64% 0.18 30)",
+          "oklch(74% 0.13 32)",
+          "oklch(85% 0.08 34)",
+          "oklch(94% 0.04 36)"
+        ]
+      },
+      "dawn-paper": {
+        "role": "neutral",
+        "displayName": "Dawn Paper",
+        "canonical": "oklch(97% 0.008 60)",
+        "tonalRamp": [
+          "oklch(22% 0.012 60)",
+          "oklch(34% 0.014 58)",
+          "oklch(48% 0.017 55)",
+          "oklch(64% 0.014 52)",
+          "oklch(78% 0.012 52)",
+          "oklch(88% 0.01 55)",
+          "oklch(94.5% 0.014 55)",
+          "oklch(97% 0.008 60)"
+        ]
+      },
+      "dawn-ink": {
+        "role": "neutral",
+        "displayName": "Dawn Ink",
+        "canonical": "oklch(22% 0.012 60)",
+        "tonalRamp": [
+          "oklch(18% 0.012 60)",
+          "oklch(22% 0.012 60)",
+          "oklch(32% 0.014 58)",
+          "oklch(48% 0.017 50)",
+          "oklch(64% 0.014 50)",
+          "oklch(78% 0.012 52)",
+          "oklch(88% 0.01 55)",
+          "oklch(95% 0.008 60)"
+        ]
+      },
+      "sunrise-violet": {
+        "role": "secondary",
+        "displayName": "Sunrise Violet",
+        "canonical": "oklch(58% 0.2 305)",
+        "tonalRamp": [
+          "oklch(28% 0.12 305)",
+          "oklch(38% 0.16 305)",
+          "oklch(48% 0.19 305)",
+          "oklch(58% 0.2 305)",
+          "oklch(66% 0.18 308)",
+          "oklch(76% 0.13 312)",
+          "oklch(86% 0.08 315)",
+          "oklch(94% 0.04 318)"
+        ]
+      },
+      "sunrise-magenta": {
+        "role": "secondary",
+        "displayName": "Sunrise Magenta",
+        "canonical": "oklch(62% 0.22 340)",
+        "tonalRamp": [
+          "oklch(30% 0.13 340)",
+          "oklch(40% 0.17 340)",
+          "oklch(52% 0.21 340)",
+          "oklch(62% 0.22 340)",
+          "oklch(70% 0.18 342)",
+          "oklch(80% 0.12 345)",
+          "oklch(88% 0.07 348)",
+          "oklch(95% 0.035 350)"
+        ]
+      },
+      "sunrise-coral": {
+        "role": "secondary",
+        "displayName": "Sunrise Coral",
+        "canonical": "oklch(64% 0.2 25)",
+        "tonalRamp": [
+          "oklch(30% 0.11 25)",
+          "oklch(42% 0.15 25)",
+          "oklch(54% 0.19 25)",
+          "oklch(64% 0.2 25)",
+          "oklch(72% 0.16 28)",
+          "oklch(82% 0.11 30)",
+          "oklch(90% 0.06 32)",
+          "oklch(95% 0.03 34)"
+        ]
+      },
+      "sunrise-orange": {
+        "role": "secondary",
+        "displayName": "Sunrise Orange",
+        "canonical": "oklch(72% 0.18 50)",
+        "tonalRamp": [
+          "oklch(34% 0.1 50)",
+          "oklch(46% 0.14 50)",
+          "oklch(58% 0.17 50)",
+          "oklch(72% 0.18 50)",
+          "oklch(80% 0.15 54)",
+          "oklch(87% 0.1 58)",
+          "oklch(92% 0.06 62)",
+          "oklch(96% 0.03 66)"
+        ]
+      },
+      "sunrise-amber": {
+        "role": "secondary",
+        "displayName": "Sunrise Amber",
+        "canonical": "oklch(82% 0.16 75)",
+        "tonalRamp": [
+          "oklch(40% 0.09 75)",
+          "oklch(54% 0.12 75)",
+          "oklch(68% 0.15 75)",
+          "oklch(82% 0.16 75)",
+          "oklch(88% 0.13 78)",
+          "oklch(92% 0.09 82)",
+          "oklch(95% 0.05 86)",
+          "oklch(97% 0.03 90)"
+        ]
+      },
+      "sunrise-sky": {
+        "role": "secondary",
+        "displayName": "Sunrise Sky",
+        "canonical": "oklch(82% 0.07 220)",
+        "tonalRamp": [
+          "oklch(40% 0.06 220)",
+          "oklch(52% 0.07 220)",
+          "oklch(64% 0.08 220)",
+          "oklch(82% 0.07 220)",
+          "oklch(87% 0.06 222)",
+          "oklch(91% 0.04 224)",
+          "oklch(94% 0.03 226)",
+          "oklch(97% 0.015 228)"
+        ]
+      },
+      "positive": {
+        "role": "tertiary",
+        "displayName": "Positive Green",
+        "canonical": "oklch(64% 0.16 152)",
+        "tonalRamp": [
+          "oklch(32% 0.09 152)",
+          "oklch(44% 0.12 152)",
+          "oklch(54% 0.15 152)",
+          "oklch(64% 0.16 152)",
+          "oklch(74% 0.14 152)",
+          "oklch(83% 0.1 154)",
+          "oklch(90% 0.06 156)",
+          "oklch(95% 0.03 158)"
+        ]
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Warn Amber",
+        "canonical": "oklch(75% 0.16 75)",
+        "tonalRamp": [
+          "oklch(38% 0.09 75)",
+          "oklch(50% 0.12 75)",
+          "oklch(63% 0.15 75)",
+          "oklch(75% 0.16 75)",
+          "oklch(83% 0.13 78)",
+          "oklch(89% 0.09 82)",
+          "oklch(93% 0.05 86)",
+          "oklch(97% 0.03 90)"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Danger Red",
+        "canonical": "oklch(58% 0.21 25)",
+        "tonalRamp": [
+          "oklch(30% 0.12 25)",
+          "oklch(40% 0.16 25)",
+          "oklch(50% 0.2 25)",
+          "oklch(58% 0.21 25)",
+          "oklch(68% 0.17 28)",
+          "oklch(80% 0.11 30)",
+          "oklch(89% 0.06 32)",
+          "oklch(95% 0.03 34)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display (Hero Metric)",
+        "purpose": "The single hero cost number. SF Pro Rounded for dawn-warm curves, tabular numerals."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Fraunces serif. Brand h1 in the hero band, largest section voice."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Fraunces serif. Panel headings (.panel-head h2), tight letter-spacing."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "System sans. Default reading text; transcript prose steps up to 16px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "System sans, UPPERCASE, 0.06em tracking. Badges, table headers, status pills, role chips."
+      }
+    },
+    "shadows": [
+      {
+        "name": "none",
+        "value": "0 0 0 transparent",
+        "purpose": "There are no shadows in this system. All shadow tokens (--theme-shadow, --shadow-soft, --shadow-inset) resolve to transparent. Depth comes from tonal layering and spacing."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default exponential ease-out for state transitions, hover fills, button press."
+      },
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Hero entrance (hero-rise). No bounce, no elastic."
+      },
+      {
+        "name": "bloom-fade",
+        "value": "opacity 240ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Cursor-tracked panel bloom fade-in on hover (0 to 1); 200ms to 0.85 on focus-visible."
+      },
+      {
+        "name": "hero-wave-drift",
+        "value": "22s linear infinite",
+        "purpose": "Seamless one-wavelength slide of the hero SVG mask for the looping wave."
+      }
+    ],
+    "breakpoints": [{ "name": "app-max", "value": "1480px" }]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Default control. Warm coral-soft wash on a flat surface, 1px warm edge, deepens on hover, 1px physical press on active.",
+      "html": "<button class=\"ds-btn\">This week</button>",
+      "css": ".ds-btn { min-height: 36px; padding: 0 13px; border: 1px solid oklch(86% 0.014 50); border-radius: 6px; background: color-mix(in oklch, oklch(92% 0.045 35) 26%, oklch(97% 0.008 60)); color: oklch(22% 0.012 60); font-size: 13px; font-family: -apple-system, system-ui, sans-serif; cursor: pointer; transition: background-color 160ms cubic-bezier(0.16,1,0.3,1), border-color 160ms cubic-bezier(0.16,1,0.3,1), transform 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { background: color-mix(in oklch, oklch(92% 0.045 35) 42%, oklch(94.5% 0.014 55)); border-color: color-mix(in oklch, oklch(64% 0.18 30) 18%, oklch(86% 0.014 50)); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid oklch(64% 0.18 30); outline-offset: 2px; }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "nav",
+      "refersTo": "segmented-active",
+      "description": "Range/scope toggle. Flat track holds pill segments; the active segment fills coral with near-white text.",
+      "html": "<div class=\"ds-seg\"><button>Day</button><button class=\"is-active\">Week</button><button>Month</button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 2px; min-height: 34px; padding: 3px; border: 1px solid oklch(86% 0.014 50); border-radius: 6px; background: color-mix(in oklch, oklch(92% 0.045 35) 22%, oklch(95% 0.012 55)); } .ds-seg button { min-width: 66px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: oklch(48% 0.017 50); font-family: -apple-system, system-ui, sans-serif; font-size: 12px; font-weight: 620; cursor: pointer; transition: background-color 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1); } .ds-seg button:hover:not(.is-active) { background: color-mix(in oklch, oklch(92% 0.045 35) 30%, transparent); color: oklch(22% 0.012 60); } .ds-seg button.is-active { background: oklch(64% 0.18 30); color: oklch(99% 0.005 60); }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Overview metric container. Flat Warm Ash fill, no border, no shadow; settles to Warm Sink on hover. Carries the cursor-tracked sunrise bloom.",
+      "html": "<div class=\"ds-card\"><span class=\"ds-card-label\">TOTAL COST</span><strong class=\"ds-card-value\">$128.40</strong></div>",
+      "css": ".ds-card { position: relative; min-height: 126px; padding: 22px 24px 20px; border: 0; border-radius: 10px; background: oklch(94.5% 0.014 55); overflow: hidden; isolation: isolate; transition: background-color 180ms cubic-bezier(0.16,1,0.3,1); } .ds-card::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(420px circle at var(--bloom-x,50%) var(--bloom-y,50%), oklch(82% 0.16 75 / 0.18) 0%, oklch(64% 0.2 25 / 0.06) 42%, transparent 72%); transition: opacity 320ms cubic-bezier(0.16,1,0.3,1); } .ds-card:hover { background: oklch(91.5% 0.022 50); } .ds-card:hover::before { opacity: 1; transition-duration: 240ms; } .ds-card-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: oklch(48% 0.017 50); } .ds-card-value { display: block; margin-top: 8px; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: oklch(22% 0.012 60); }"
+    },
+    {
+      "name": "Provider Badge",
+      "kind": "chip",
+      "refersTo": "badge-claude",
+      "description": "Tiny uppercase pill marking a session's provider. Claude wears coral, Codex wears violet; each is a 10% tint of its hue.",
+      "html": "<span class=\"ds-badge ds-badge-claude\">CLAUDE</span> <span class=\"ds-badge ds-badge-codex\">CODEX</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 7px; font-family: -apple-system, system-ui, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid transparent; } .ds-badge-claude { border-color: color-mix(in oklch, oklch(64% 0.2 25) 38%, transparent); background: color-mix(in oklch, oklch(64% 0.2 25) 10%, oklch(94.5% 0.014 55)); color: oklch(64% 0.2 25); } .ds-badge-codex { border-color: color-mix(in oklch, oklch(58% 0.2 305) 38%, transparent); background: color-mix(in oklch, oklch(58% 0.2 305) 10%, oklch(94.5% 0.014 55)); color: oklch(58% 0.2 305); }"
+    },
+    {
+      "name": "Status Dot",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Live-session state indicator. 10px circle with a 3px ambient ring; busy pulses with scale, waiting pulses with an expanding glow.",
+      "html": "<span class=\"ds-dot is-busy\"></span><span class=\"ds-dot is-idle\"></span><span class=\"ds-dot is-waiting\"></span>",
+      "css": ".ds-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: oklch(64% 0.014 50); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(64% 0.014 50) 18%, transparent); } .ds-dot.is-busy { background: oklch(64% 0.2 25); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(64% 0.2 25) 18%, transparent); animation: ds-busy 1.35s cubic-bezier(0.16,1,0.3,1) infinite; } .ds-dot.is-idle { background: oklch(64% 0.16 152); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(64% 0.16 152) 18%, transparent); } .ds-dot.is-waiting { background: oklch(75% 0.16 75); animation: ds-waiting 2.2s cubic-bezier(0.16,1,0.3,1) infinite; } @keyframes ds-busy { 50% { transform: scale(1.18); } } @keyframes ds-waiting { 0%,100% { box-shadow: 0 0 0 3px color-mix(in oklch, oklch(75% 0.16 75) 22%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in oklch, oklch(75% 0.16 75) 10%, transparent), 0 0 18px color-mix(in oklch, oklch(75% 0.16 75) 42%, transparent); } }"
+    },
+    {
+      "name": "Transcript Entry (Assistant)",
+      "kind": "custom",
+      "refersTo": "live-entry-assistant",
+      "description": "One streamed transcript line. Two-column grid: a role chip tinted by the entry accent (assistant=positive green), then the content bubble. 16px prose for long-session legibility.",
+      "html": "<div class=\"ds-entry\"><span class=\"ds-entry-role\">ASSISTANT</span><div class=\"ds-entry-content\">Done. The font-size now resolves to 16px.</div></div>",
+      "css": ".ds-entry { --accent: oklch(64% 0.16 152); display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 12px; align-items: start; border-block-start: 1px solid color-mix(in oklch, var(--accent) 16%, oklch(91% 0.012 55)); padding: 12px 4px; } .ds-entry-role { width: max-content; border: 1px solid color-mix(in oklch, var(--accent) 24%, transparent); border-radius: 999px; background: color-mix(in oklch, var(--accent) 8%, transparent); padding: 1px 8px; color: color-mix(in oklch, var(--accent) 62%, oklch(48% 0.017 50)); font-family: -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 740; letter-spacing: 0.04em; text-transform: uppercase; } .ds-entry-content { width: fit-content; max-width: min(76ch,100%); border: 1px solid color-mix(in oklch, var(--accent) 24%, oklch(91% 0.012 55)); border-radius: 6px; background: color-mix(in oklch, oklch(97% 0.008 60) 88%, oklch(92.5% 0.016 55)); padding: 10px 12px; color: oklch(22% 0.012 60); font-size: 16px; line-height: 1.5; }"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "Top-projects style table. Uppercase coral-tinted headers, hairline warm row borders, coral cost figures, tabular numeric columns. Tight density.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Project</th><th class=\"num\">Tokens</th><th class=\"num\">Cost</th></tr></thead><tbody><tr><td>cc-plugins</td><td class=\"num\">1.2M</td><td class=\"num cost\">$4.10</td></tr></tbody></table>",
+      "css": ".ds-table { width: 100%; border-collapse: collapse; font-family: -apple-system, system-ui, sans-serif; font-size: 13px; } .ds-table th, .ds-table td { padding: 10px; text-align: left; border-bottom: 1px solid color-mix(in oklch, oklch(64% 0.18 30) 7%, oklch(91% 0.012 55)); } .ds-table th { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in oklch, oklch(58% 0.22 28) 32%, oklch(64% 0.014 50)); } .ds-table tbody tr { transition: background-color 140ms cubic-bezier(0.16,1,0.3,1); } .ds-table tbody tr:hover { background: color-mix(in oklch, oklch(92% 0.045 35) 22%, transparent); } .ds-table .num { text-align: right; font-variant-numeric: tabular-nums; } .ds-table .cost { color: oklch(58% 0.22 28); font-weight: 700; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Kept Ledger at Dawn",
+    "overview": "Token Atlas is a private ledger that someone keeps by hand and reviews each morning. The numbers are exact, the columns are honest, the entries are traceable, but the whole thing sits under first light instead of fluorescent tube glare. Sunrise color crowns the page in a single bold horizon band; everything below it settles into a calm, paper-warm working surface. The system is Committed on color and strictly flat on surface: the sunrise spectrum carries 30-60% of the visual weight through two reserved channels (the hero band and data encodings), while chrome, cards, dividers, and text stay flat single-color. No shadows, no glass, no bevels. Depth comes from tonal layering of warm neutrals, spacing, and one signature touch: a cursor-tracked radial bloom that warms each panel as you move across it.",
+    "keyCharacteristics": [
+      "Bold sunrise horizon band over a calm warm-off-white working surface.",
+      "Strictly flat: zero shadows, zero glass, separation by spacing and tonal layering only.",
+      "Sunrise spectrum reserved for hero + data encoding; UI chrome stays flat single-color.",
+      "Coral is the lone semantic accent (buttons, links, focus, active states).",
+      "OKLCH everywhere; every neutral tinted warm; never #000 or #fff.",
+      "Editorial serif (Fraunces) for headings, system sans for body, SF Pro Rounded for the hero metric."
+    ],
+    "rules": [
+      {
+        "name": "The Reserved Spectrum Rule",
+        "body": "The sunrise spectrum is allowed in exactly two places: the hero band and data encodings (chart ramps, status accents, transcript role colors). Everywhere else, chrome is flat single-color.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Accent Rule",
+        "body": "Coral is the only semantic accent. Buttons, links, focus rings, and active states all speak coral. Reaching for a second accent on UI chrome is rainbow puke.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Tint Rule",
+        "body": "Never #000 or #fff. Every neutral carries chroma 0.008-0.022 toward hue 50-60. A cold gray anywhere is a regression toward the retired Nordic palette.",
+        "section": "colors"
+      },
+      {
+        "name": "The Serif-Heads-Only Rule",
+        "body": "Fraunces appears on h1-h4 and nowhere else. Body, controls, tables, and data figures stay on the system sans (or SF Pro Rounded at hero scale).",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Number Rule",
+        "body": "Every figure that can change uses font-variant-numeric: tabular-nums so columns stay aligned and numbers don't jitter as they update.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-Surface Rule",
+        "body": "Surfaces never cast shadows and never use glass. If depth is needed, step the tonal ramp (Paper to Ash to Well to Sink) or add spacing.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Bloom-Is-Light Rule",
+        "body": "The only response to hover/focus on a panel is the radial sunrise bloom fading in over 240ms. It is light warming paper, not a lifted card. Register new panels in both the bloom CSS list and the JS SELECTOR constant.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the sunrise spectrum to the hero band and data encodings only (charts, status accents, transcript roles). Everywhere else, one flat color.",
+      "Do use coral as the single semantic accent for buttons, links, focus rings, and active states.",
+      "Do convey depth through the warm tonal ramp (Dawn Paper to Warm Ash to Warm Well to Warm Sink) and spacing, never shadows.",
+      "Do tint every neutral warm (chroma 0.008-0.022, hue ~50-60).",
+      "Do keep Fraunces on headings only; body, controls, tables, and numerals stay on the system sans.",
+      "Do use tabular-nums on every figure that can change.",
+      "Do register any new panel-shaped surface in both the bloom CSS selector list and the JS SELECTOR constant.",
+      "Do put the working question first: the hero is bold, the answers below it stay calm."
+    ],
+    "donts": [
+      "Don't apply decorative gradients to everything. The sunrise gradient is reserved for the hero band and sequential chart encodings.",
+      "Don't commit rainbow puke: never wear the full sunrise spectrum on UI chrome where one accent would do.",
+      "Don't use glassmorphism, drop shadows, bevels, or skeuomorphism.",
+      "Don't use gradient text. The hero number is solid Hero White or deep warm near-black, never background-clip: text.",
+      "Don't drift into a pastel-everything wellness-app mood.",
+      "Don't reintroduce any Nordic-mythology vestige: no runes, world-trees, saga copy, frost/iron/slate language, or cold hue-224 blue tokens.",
+      "Don't use literal sun icons, mountain illustrations, beach photography, or weather metaphors in copy.",
+      "Don't use border-left/border-right greater than 1px as a colored accent stripe.",
+      "Don't reach for a modal as the first thought. Exhaust inline and progressive-disclosure alternatives first.",
+      "Don't use em dashes in UI copy."
+    ]
+  }
+}
