@@ -6,7 +6,7 @@
 >
 > **Depends on**: kernel/02
 > **Blocks**: —
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
