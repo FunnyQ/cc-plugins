@@ -13,8 +13,8 @@
     {
       "name": "cockpit",
       "source": "./cockpit",
-      "description": "Per-project driving cockpit — goal + decision log + live session view.",
-      "version": "0.1.0"
+      "description": "Per-project driving cockpit for Claude Code and Codex — goal + decision log + live session view.",
+      "version": "0.2.0"
     }
   ]
 }
