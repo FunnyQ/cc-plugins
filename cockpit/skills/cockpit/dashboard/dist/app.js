@@ -34,6 +34,10 @@ export const store = reactive({
   // per-project expand/collapse overrides (project path → bool); persists
   // across the 3s poll because it lives on the store, not in the render.
   expandedOverrides: {},
+  // Project Info modal: the project path whose info is open (null = closed).
+  infoModalProject: null,
+  // Set by initInfo() so openInfo() can drive the modal's content on demand.
+  _loadInfo: null,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -67,6 +71,25 @@ export const store = reactive({
   isProjectExpanded(group) {
     const o = this.expandedOverrides[group.project];
     return o === undefined ? defaultExpanded(group) : o;
+  },
+
+  get infoModalName() {
+    if (!this.infoModalProject) return "";
+    return (
+      this.infoModalProject.split("/").filter(Boolean).pop() ||
+      this.infoModalProject
+    );
+  },
+
+  // Open the Project Info modal for a rail group (info button is @click.stop so
+  // it never toggles the project's collapse).
+  openInfo(group) {
+    this.infoModalProject = group.project;
+    if (this._loadInfo) this._loadInfo(group.project);
+  },
+
+  closeInfo() {
+    this.infoModalProject = null;
   },
 
   toggleProject(group) {
@@ -157,4 +180,12 @@ startPolling();
 // Mount the imperative columns (they read the store + subscribe to selection).
 initTranscript(document.querySelector('[data-column="transcript"]'));
 initDecisionLog(document.querySelector('[data-column="decision"]'));
-initInfo(document.querySelector('[data-column="info"]'));
+// Project Info is modal-driven now: initInfo returns a load(project) the store
+// calls from openInfo() instead of following the session selection.
+const info = initInfo(document.querySelector('[data-column="info"]'));
+store._loadInfo = info && info.load;
+
+// Escape closes the Project Info modal.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && store.infoModalProject) store.closeInfo();
+});

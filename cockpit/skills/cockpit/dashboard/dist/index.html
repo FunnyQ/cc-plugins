@@ -46,6 +46,15 @@
                       v-text="g.activeCount + ' active / ' + g.sessionCount"
                     ></span>
                   </span>
+                  <button
+                    class="project__info-btn"
+                    type="button"
+                    title="Project info"
+                    aria-label="Project info"
+                    @click.stop="openInfo(g)"
+                  >
+                    ⓘ
+                  </button>
                 </div>
                 <ul class="project__sessions" v-show="isProjectExpanded(g)">
                   <template v-for="s in g.sessions" :key="s.sessionId">
@@ -81,14 +90,32 @@
               <p class="placeholder">No decisions logged yet.</p>
             </div>
           </section>
-
-          <section class="column" id="col-info">
-            <header class="column__header">Project Info</header>
-            <div class="column__body" data-column="info">
-              <p class="placeholder">Project goal, meta &amp; CLAUDE.md.</p>
-            </div>
-          </section>
         </main>
+      </div>
+
+      <div class="info-modal" v-show="infoModalProject" @click="closeInfo()">
+        <div
+          class="info-modal__dialog"
+          role="dialog"
+          aria-modal="true"
+          @click.stop
+        >
+          <header class="info-modal__header">
+            <span class="column__header">Project Info</span>
+            <span class="info-modal__name" v-text="infoModalName"></span>
+            <button
+              class="info-modal__close"
+              type="button"
+              aria-label="Close"
+              @click="closeInfo()"
+            >
+              ✕
+            </button>
+          </header>
+          <div class="info-modal__body" data-column="info">
+            <p class="placeholder">Project goal, meta &amp; CLAUDE.md.</p>
+          </div>
+        </div>
       </div>
     </div>
 
