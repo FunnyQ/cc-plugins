@@ -1,0 +1,6 @@
+{
+  "files": ["cockpit/skills/cockpit/dashboard/dist/index.html"],
+  "insertBefore": "</body>",
+  "commentSyntax": "html",
+  "cspChecked": true
+}

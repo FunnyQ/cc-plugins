@@ -143,7 +143,7 @@ export function initDecisionLog(rootEl) {
         <time class="decision-card__time" datetime="${esc(rec.timestamp || "")}">${relTime(rec.timestamp)}</time>
       </header>
       <div class="decision-card__reason">${md(rec.reason)}</div>
-      ${rec.tradeoff ? `<p class="decision-card__tradeoff">tradeoff: ${esc(rec.tradeoff)}</p>` : ""}
+      ${rec.tradeoff ? `<p class="decision-card__tradeoff">${esc(rec.tradeoff)}</p>` : ""}
       ${files ? `<div class="decision-card__files">${files}</div>` : ""}
       ${options ? `<ul class="decision-card__options">${options}</ul>` : ""}
       ${rec.needs_your_call ? respondForm(rec) : ""}
