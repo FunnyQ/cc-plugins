@@ -1,5 +1,5 @@
 ---
-name: dashboard
+name: usage-dashboard
 description: >-
   Launch a local web dashboard that visualizes Claude Code and Codex usage from
   ~/.claude/ and ~/.codex/. Shows overview cards (sessions, interactions,
@@ -22,9 +22,15 @@ A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP serve
 Always run the precheck first; only launch the dashboard if it exits 0.
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/install.ts \
-  && bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/atlas-server.ts
+bun <plugin-root>/skills/usage-dashboard/scripts/install.ts \
+  && bun <plugin-root>/skills/usage-dashboard/scripts/atlas-server.ts
 ```
+
+**`<plugin-root>`** resolves per runtime: under Claude Code use
+`${CLAUDE_PLUGIN_ROOT}`; under Codex resolve it from the installed skill root that
+contains this skill. In a development checkout of this repository,
+`${CLAUDE_PLUGIN_ROOT}` is empty, so substitute `packages/monitor` from the repo
+root — e.g. `bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
 
 The precheck (`install.ts`) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps — typically `history.jsonl` missing because the user hasn't used Claude Code chat yet — do **not** block the dashboard; the affected sections will just show empty.
 
@@ -62,7 +68,7 @@ user with the `AskUserQuestion` tool** whether they want it set up automatically
 — don't silently edit their global config. Offer these options:
 
 - **Set it up for me** — run
-  `bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/setup-statusline.ts`, then
+  `bun ${CLAUDE_PLUGIN_ROOT}/skills/usage-dashboard/scripts/setup-statusline.ts`, then
   relay its output. The script edits `~/.claude/settings.json`, backs it up to
   `settings.json.bak` first, preserves any existing status line by wrapping it
   via `TOKEN_ATLAS_STATUSLINE_COMMAND`, is idempotent, and refuses to touch the
@@ -107,7 +113,7 @@ External (non-Anthropic) models without dedicated cache pricing have cache token
 ## File layout
 
 ```
-dashboard/
+usage-dashboard/
 ├── SKILL.md
 ├── scripts/
 │   ├── install.ts            # diagnostic

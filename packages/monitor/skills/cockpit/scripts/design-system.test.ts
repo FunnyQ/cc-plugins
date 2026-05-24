@@ -1,5 +1,5 @@
 // Tests for cockpit design-system: DESIGN.md frontmatter parsing and API shape.
-// Run: bun test cockpit/skills/cockpit/scripts/design-system.test.ts
+// Run: bun test packages/monitor/skills/cockpit/scripts/design-system.test.ts
 import { describe, expect, test } from "bun:test";
 import { handleDesignSystem, parseCockpitDesignSystem } from "./design-system";
 
