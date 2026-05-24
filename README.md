@@ -79,7 +79,7 @@ A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and v
 ### Quick Start
 
 ```bash
-bun token-atlas/skills/dashboard/scripts/serve-dashboard.ts
+bun token-atlas/skills/dashboard/scripts/atlas-server.ts
 ```
 
 Opens `http://localhost:5938` in your default browser.
@@ -118,7 +118,7 @@ Cockpit is a per-project dashboard and skill for active work. Start with a sessi
 In Claude Code or Codex, invoke the cockpit skill and confirm the proposed goals. From a development checkout, the dashboard can also be started directly:
 
 ```bash
-bun cockpit/skills/cockpit/scripts/serve-dashboard.ts
+bun cockpit/skills/cockpit/scripts/cockpit-server.ts
 ```
 
 Opens `http://localhost:5858` in your default browser.

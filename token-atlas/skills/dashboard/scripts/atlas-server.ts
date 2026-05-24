@@ -3,7 +3,12 @@ import { statSync, existsSync } from "node:fs";
 import { extname, resolve, relative, isAbsolute } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
-import { getLiveSessions, jsonResponse, jsonError } from "./live.ts";
+import {
+  getLiveSessions,
+  isCockpitDaemonUp,
+  jsonResponse,
+  jsonError,
+} from "./live.ts";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
@@ -95,7 +100,10 @@ async function handleStats(): Promise<Response> {
 
 function handleLive(): Response {
   try {
-    return jsonResponse({ sessions: getLiveSessions() });
+    return jsonResponse({
+      sessions: getLiveSessions(),
+      cockpitUp: isCockpitDaemonUp(),
+    });
   } catch (err) {
     return jsonError(err);
   }

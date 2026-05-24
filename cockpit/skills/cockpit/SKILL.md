@@ -104,7 +104,7 @@ The trail is only useful if the user can see it, so bring up the dashboard. Run 
 background task — it's a long-lived server that would otherwise block:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/serve-dashboard.ts
+bun <plugin-root>/skills/cockpit/scripts/cockpit-server.ts
 ```
 
 Then tell the user the URL it prints (default `http://localhost:5858`). See **The
