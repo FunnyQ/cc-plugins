@@ -1237,6 +1237,8 @@ body {
 }
 
 .live-seg {
+  min-width: 0;
+  max-width: 100%;
   margin-block: 4px;
 }
 .live-seg-label {
@@ -1290,21 +1292,36 @@ body {
   user-select: none;
 }
 
+.live-file-change {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
 .live-file-change .live-file-path {
   margin: 4px 0;
+  max-width: 100%;
+  overflow: hidden;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .live-diff {
+  box-sizing: border-box;
   display: block;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 12px;
-  white-space: pre;
 }
+/* Soft-wrap long diff lines instead of overflowing — an unwrapped line would
+   widen the column and clip the +/- gutter on the left (matches token-atlas). */
 .live-diff span {
   display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .live-diff .is-add {
   background: color-mix(in oklab, var(--positive) 18%, transparent);
