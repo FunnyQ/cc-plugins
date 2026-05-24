@@ -16,6 +16,7 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { findSession } from "./find-session";
+import { latestOpenCallId } from "./call-log";
 
 // ---------- Types ----------
 
@@ -76,6 +77,7 @@ const SINGLE_FLAGS = new Set([
   "decision",
   "reason",
   "tradeoff",
+  "call",
 ]);
 const REPEATED_FLAGS = new Set(["file", "option"]);
 const BOOL_FLAGS = new Set(["needs-call"]);
@@ -284,10 +286,34 @@ function cmdLog(args: Args): void {
 
   const logPath = logPathFor(project, sessionId);
   mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
-  appendFileSync(logPath, JSON.stringify(rec) + "\n");
+  const line = JSON.stringify(rec);
+  appendFileSync(logPath, line + "\n");
+
+  // Read-back guard: a successful append must be observable. If our entry isn't
+  // the log's tail, surface it loudly instead of reporting a phantom success —
+  // a silently dropped needs_your_call leaves the user with no card to answer
+  // while the session parks a wait that can never be woken.
+  let persisted: string | undefined;
+  try {
+    persisted = readFileSync(logPath, "utf8")
+      .split("\n")
+      .filter((l) => l.trim())
+      .at(-1);
+  } catch {
+    persisted = undefined;
+  }
+  if (persisted !== line) {
+    console.error(`cockpit log: entry did not persist to ${logPath}`);
+    process.exit(1);
+  }
+
   refreshHeartbeat(project, sessionId, provider);
 
   console.log(`cockpit: logged decision for ${sessionId}`);
+  // Surface the callId so a caller can park `cockpit wait` on this exact call.
+  // (wait/send also auto-resolve the open call from the log, so this is just an
+  // explicit handle for scripted flows.)
+  if (rec.needs_your_call) console.log(`  call:  ${rec.id}`);
 }
 
 // ---------- Daemon broker client (wait / send) ----------
@@ -326,7 +352,40 @@ function requireDaemon(): DaemonInfo {
 }
 
 function positionals(rest: string[]): string[] {
-  return rest.filter((t) => !t.startsWith("--"));
+  const out: string[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i].startsWith("--")) {
+      i++; // skip this flag's value too
+      continue;
+    }
+    out.push(rest[i]);
+  }
+  return out;
+}
+
+function flagValue(rest: string[], name: string): string | undefined {
+  const i = rest.indexOf(`--${name}`);
+  return i >= 0 ? rest[i + 1] : undefined;
+}
+
+// The callId to bind a wait/send to: an explicit --call wins, otherwise resolve
+// the session's currently open needs_your_call from its log (via the registry's
+// recorded logPath). null when the session isn't registered or has no open call
+// — in which case routing falls back to session-only (legacy) behavior.
+function resolveCallId(
+  sessionId: string,
+  explicit: string | undefined,
+): string | null {
+  if (explicit) return explicit;
+  const logPath = readRegistry().sessions.find(
+    (s) => s.sessionId === sessionId,
+  )?.logPath;
+  if (!logPath) return null;
+  try {
+    return latestOpenCallId(readFileSync(logPath, "utf8").split("\n"));
+  } catch {
+    return null;
+  }
 }
 
 // `cockpit wait <sessionId>` — launched as a background task right after a
@@ -339,13 +398,17 @@ async function cmdWait(rest: string[]): Promise<void> {
     process.exit(1);
   }
   const d = requireDaemon();
+  // Bind this park to a specific call so an answer to a different (stale) card
+  // can't wake it. Resolved from the log when --call isn't given explicitly.
+  const callId = resolveCallId(sessionId, flagValue(rest, "call"));
   const maxMs = (() => {
     const v = parseInt(process.env.COCKPIT_WAIT_MAX_MS || "", 10);
     return Number.isFinite(v) && v > 0 ? v : 6 * 60 * 60 * 1000; // 6h ceiling
   })();
   const url =
     `http://127.0.0.1:${d.port}/api/wait` +
-    `?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(d.token)}`;
+    `?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(d.token)}` +
+    (callId ? `&call=${encodeURIComponent(callId)}` : "");
 
   const start = Date.now();
   let connectionFailures = 0;
@@ -392,6 +455,13 @@ async function cmdWait(rest: string[]): Promise<void> {
       console.log(data.answer);
       process.exit(0);
     }
+    // This call is no longer open (answered elsewhere, or a newer needs_your_call
+    // superseded it). Stop cleanly rather than re-poll a moot question — exit 3
+    // so the caller can tell "no answer for this call" from a delivered answer.
+    if (data && data.superseded === true) {
+      console.error("cockpit wait: call is no longer open (superseded)");
+      process.exit(3);
+    }
   }
   console.error("cockpit wait: no answer received");
   process.exit(1);
@@ -419,12 +489,20 @@ async function cmdSend(rest: string[]): Promise<void> {
     process.exit(1);
   }
   const d = requireDaemon();
+  // Tag the answer with the call it resolves so the broker wakes the matching
+  // parked wait (not a stale one). Auto-resolved from the log unless --call given.
+  const callId = resolveCallId(sessionId, flagValue(rest, "call"));
   let res: Response;
   try {
     res = await fetch(`http://127.0.0.1:${d.port}/api/respond`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session: sessionId, answer, token: d.token }),
+      body: JSON.stringify({
+        session: sessionId,
+        answer,
+        call: callId,
+        token: d.token,
+      }),
     });
   } catch (err) {
     console.error(

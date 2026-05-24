@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 // cockpit daemon — one global Bun server on 127.0.0.1, serves the no-build SPA
-// and the cockpit APIs. Reuses an already-running instance via a PID file
-// (~/.cockpit/daemon.json) so starting twice never double-binds.
+// and the cockpit APIs. A PID file (~/.cockpit/daemon.json) records the running
+// instance's pid/port/token/root: starting twice from the same install reuses it
+// (never double-binds), but a launcher from a moved or updated install supersedes
+// the stale daemon (whose served paths would 404). See daemon-lifecycle.ts.
 import {
   statSync,
   existsSync,
@@ -23,11 +25,13 @@ import { handleWait, handleRespond } from "./broker";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
 import { jsonResponse, jsonError } from "./http";
+import { decideStartup, type DaemonInfo } from "./daemon-lifecycle";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
-
-type DaemonInfo = { pid: number; port: number; token: string };
+// Identifies this install in daemon.json so a moved/updated launcher can tell a
+// stale daemon (different root) from a real running singleton (same root).
+const ROOT = import.meta.dir;
 
 // ---------- central dir (overridable for tests) ----------
 
@@ -84,14 +88,48 @@ function writeDaemonInfo(info: DaemonInfo): void {
   writeFileSync(daemonInfoPath(), JSON.stringify(info, null, 2) + "\n");
 }
 
-// If a live daemon already owns the PID file, print its URL and exit (reuse).
-function reuseIfRunning(): void {
-  const info = readDaemonInfo();
-  if (info && isAlive(info.pid)) {
+// Block until `pid` is gone (so it releases the port), up to `timeoutMs`.
+function waitForExit(pid: number, timeoutMs: number): void {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isAlive(pid)) return;
+    Bun.sleepSync(50);
+  }
+}
+
+// Decide reuse / supersede / start against the recorded daemon. On reuse, print
+// the URL and exit. On supersede (the running daemon is from a moved or
+// out-of-date install — its served paths are stale), terminate it and fall
+// through to bind fresh. On start, just fall through.
+function startupGuard(): void {
+  const decision = decideStartup(readDaemonInfo(), ROOT, isAlive);
+  if (decision.action === "reuse") {
+    const { info } = decision;
     console.log(
       `cockpit daemon already running → http://localhost:${info.port} (pid ${info.pid})`,
     );
     process.exit(0);
+  }
+  if (decision.action === "supersede") {
+    const { info } = decision;
+    console.log(
+      `superseding stale cockpit daemon (pid ${info.pid}, root ${info.root ?? "unknown"}) — this install is ${ROOT}`,
+    );
+    try {
+      process.kill(info.pid, "SIGTERM");
+    } catch {
+      // already gone
+    }
+    waitForExit(info.pid, 1500);
+    if (isAlive(info.pid)) {
+      try {
+        process.kill(info.pid, "SIGKILL");
+      } catch {
+        // already gone
+      }
+      waitForExit(info.pid, 1000);
+    }
+    Bun.sleepSync(100); // let the socket fully release before we bind
   }
 }
 
@@ -171,7 +209,7 @@ function serveStatic(pathname: string): Response {
 
 // ---------- server ----------
 
-reuseIfRunning();
+startupGuard();
 
 const port = parsePort();
 
@@ -203,7 +241,7 @@ function buildServer() {
   });
 }
 
-// reuseIfRunning() already exited if a live cockpit daemon owns the PID file.
+// startupGuard() already exited (reuse) or cleared a stale daemon (supersede).
 // If we're here the port should be free; if some *other* process holds it, do
 // NOT kill it (it isn't ours) — fail with a clear message instead.
 let server: ReturnType<typeof Bun.serve>;
@@ -223,6 +261,7 @@ writeDaemonInfo({
   pid: process.pid,
   port: server.port,
   token: randomBytes(16).toString("hex"),
+  root: ROOT,
 });
 
 const url = `http://localhost:${server.port}`;
