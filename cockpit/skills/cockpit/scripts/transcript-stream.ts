@@ -9,6 +9,7 @@ import {
   openSync,
   readSync,
   realpathSync,
+  statSync,
 } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
@@ -20,6 +21,7 @@ import {
   splitCompleteLines,
   type ResolveResult,
 } from "./sse-tailer";
+import { jsonResponse } from "./http";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const BACKLOG_LINES = 50;
@@ -160,6 +162,26 @@ function providerRootName(provider: Provider): string {
   return provider === "codex" ? "Codex sessions" : "~/.claude/projects";
 }
 
+// True when an entry is a displayable conversation line (not metadata noise).
+// Shared by the SSE tail (emitLines) and the history page (parseEntries) so both
+// filter identically.
+function isDisplayEntry(entry: { type?: string } | null): boolean {
+  if (!entry || !DISPLAY_ENTRY_TYPES.has(entry.type ?? "")) return false;
+  if (entry.type === "response_item") {
+    const payloadType = (entry as { payload?: { type?: string } }).payload
+      ?.type;
+    if (
+      payloadType !== "message" &&
+      payloadType !== "function_call" &&
+      payloadType !== "function_call_output" &&
+      payloadType !== "custom_tool_call"
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Emit each conversation entry in `text` as its own SSE data frame; skip blank,
 // malformed, and metadata-noise lines so one bad line never kills the stream.
 function emitLines(enqueue: (chunk: string) => void, text: string): void {
@@ -172,32 +194,40 @@ function emitLines(enqueue: (chunk: string) => void, text: string): void {
     } catch {
       continue;
     }
-    if (!entry || !DISPLAY_ENTRY_TYPES.has(entry.type ?? "")) continue;
-    if (entry.type === "response_item") {
-      const payloadType = (entry as { payload?: { type?: string } }).payload
-        ?.type;
-      if (
-        payloadType !== "message" &&
-        payloadType !== "function_call" &&
-        payloadType !== "function_call_output" &&
-        payloadType !== "custom_tool_call"
-      ) {
-        continue;
-      }
-    }
+    if (!isDisplayEntry(entry)) continue;
     enqueue(`data: ${JSON.stringify(entry)}\n\n`);
   }
 }
 
+// Parse + filter JSONL lines into displayable entry objects (oldest first), for
+// the history page. Mirrors emitLines' filter but returns objects, not frames.
+function parseEntries(lines: string[]): unknown[] {
+  const out: unknown[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry: { type?: string };
+    try {
+      entry = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (isDisplayEntry(entry)) out.push(entry);
+  }
+  return out;
+}
+
 // Read up to `maxLines` complete lines ending at byte offset `endOffset`,
 // scanning backward in chunks. Decodes once so multi-byte chars spanning a
-// chunk boundary aren't corrupted. Returns lines oldest-first plus the trailing
-// partial after the last newline (meaningful only when endOffset is EOF).
+// chunk boundary aren't corrupted. Returns lines oldest-first, the trailing
+// partial after the last newline (meaningful only when endOffset is EOF), and
+// `startOffset` — the byte offset where the first returned line begins, used as
+// the cursor for loading still-older history (0 means start-of-file reached).
 function readLinesEndingAt(
   filePath: string,
   endOffset: number,
   maxLines: number,
-): { lines: string[]; partial: string } {
+): { lines: string[]; partial: string; startOffset: number } {
   let start = endOffset;
   let newlineCount = 0;
   const chunks: Buffer[] = [];
@@ -232,7 +262,11 @@ function readLinesEndingAt(
   }
   const { complete, partial } = splitCompleteLines(body);
   const lines = complete ? complete.split("\n").slice(-maxLines) : [];
-  return { lines, partial };
+  // Byte distance from the first returned line to endOffset = the returned lines
+  // (each followed by "\n") plus the trailing partial.
+  const tailText = lines.length ? `${lines.join("\n")}\n${partial}` : partial;
+  const startOffset = Math.max(0, endOffset - Buffer.byteLength(tailText));
+  return { lines, partial, startOffset };
 }
 
 export function handleTranscriptStream(req: Request): Response {
@@ -268,9 +302,70 @@ export function handleTranscriptStream(req: Request): Response {
     resolve,
     readBacklog: (path, size) => {
       // the most recent BACKLOG_LINES, read backward
-      const { lines, partial } = readLinesEndingAt(path, size, BACKLOG_LINES);
-      return { complete: lines.join("\n"), partial };
+      const { lines, partial, startOffset } = readLinesEndingAt(
+        path,
+        size,
+        BACKLOG_LINES,
+      );
+      return {
+        complete: lines.join("\n"),
+        partial,
+        // Ship the reverse-scroll cursor so the client can page older history.
+        backlogMeta: { historyStart: startOffset, hasMore: startOffset > 0 },
+      };
     },
     emit: emitLines,
   });
+}
+
+// Older-history page for the transcript modal's reverse-scroll. Returns the
+// displayable entries immediately before byte offset `before`, plus the next
+// cursor — GET /api/transcript/history?session=&provider=&before=&limit=.
+const MAX_HISTORY_LIMIT = 200;
+
+export function handleTranscriptHistory(req: Request): Response {
+  const url = new URL(req.url);
+  const session = url.searchParams.get("session") ?? "";
+  const provider = normalizeProvider(url.searchParams.get("provider"));
+  const before = Number(url.searchParams.get("before"));
+  const limit = Number(url.searchParams.get("limit"));
+  if (!provider) return jsonError("invalid provider");
+  if (!UUID_RE.test(session)) return jsonError("invalid session id");
+
+  const empty = { entries: [], historyStart: 0, hasMore: false };
+  if (!Number.isFinite(before) || before <= 0) return jsonResponse(empty);
+
+  const resolved = resolveProviderTranscriptPath(provider, session);
+  if (!resolved) return jsonResponse(empty);
+  let filePath: string;
+  try {
+    filePath = realpathSync(resolved);
+  } catch {
+    return jsonResponse(empty);
+  }
+  if (!isInsideProviderRoot(provider, filePath)) {
+    return jsonError(
+      `transcript path is outside ${providerRootName(provider)}`,
+      403,
+    );
+  }
+
+  try {
+    // Clamp to the live size in case the file was truncated/rotated since the
+    // cursor was issued, so we never read past EOF into uninitialized bytes.
+    const size = statSync(filePath).size;
+    const endOffset = Math.min(before, size);
+    const cap = Math.min(
+      Math.max(1, limit || BACKLOG_LINES),
+      MAX_HISTORY_LIMIT,
+    );
+    const { lines, startOffset } = readLinesEndingAt(filePath, endOffset, cap);
+    return jsonResponse({
+      entries: parseEntries(lines),
+      historyStart: startOffset,
+      hasMore: startOffset > 0,
+    });
+  } catch {
+    return jsonError("failed to read transcript history", 500);
+  }
 }

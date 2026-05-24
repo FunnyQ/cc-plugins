@@ -19,6 +19,10 @@ let projectsRoot: string;
 
 function setEnv() {
   process.env.COCKPIT_HOME = homeDir;
+  // Neutralise live-session detection so buildSessions/buildProjects depend only
+  // on the fixture registry — point at paths that don't exist → no live merge.
+  process.env.COCKPIT_CLAUDE_SESSIONS_DIR = join(homeDir, "no-sessions");
+  process.env.COCKPIT_CODEX_STATE_DB = join(homeDir, "no-state.sqlite");
 }
 
 function start(
@@ -66,6 +70,8 @@ afterEach(() => {
   rmSync(homeDir, { recursive: true, force: true });
   rmSync(projectsRoot, { recursive: true, force: true });
   delete process.env.COCKPIT_HOME;
+  delete process.env.COCKPIT_CLAUDE_SESSIONS_DIR;
+  delete process.env.COCKPIT_CODEX_STATE_DB;
 });
 
 describe("readRegistry", () => {
@@ -171,5 +177,83 @@ describe("buildProjects", () => {
     expect(entry.sessionCount).toBe(2);
     expect(entry.activeCount).toBe(2);
     expect(entry.projectGoal).toBe("shared goal");
+  });
+});
+
+describe("buildSessions live merge", () => {
+  // Point live-session detection at a temp ~/.claude/sessions and drop a session
+  // file in it. Returns the dir so the test can clean up.
+  function liveClaudeSession(
+    sid: string,
+    cwd: string,
+    updatedAtMs = Date.now(),
+  ) {
+    const sessDir = realpathSync(mkdtempSync(join(tmpdir(), "ck-sess-")));
+    process.env.COCKPIT_CLAUDE_SESSIONS_DIR = sessDir;
+    writeFileSync(
+      join(sessDir, `${sid}.json`),
+      JSON.stringify({
+        sessionId: sid,
+        cwd,
+        startedAt: updatedAtMs,
+        updatedAt: updatedAtMs,
+      }),
+    );
+    return sessDir;
+  }
+
+  test("a running session with no registry entry appears as untracked + active", () => {
+    const sid = "88888888-8888-8888-8888-888888888888";
+    const sessDir = liveClaudeSession(sid, "/Users/q/Projects/other");
+    try {
+      const s = mod.buildSessions().find((x) => x.sessionId === sid)!;
+      expect(s).toBeTruthy();
+      expect(s.tracked).toBe(false);
+      expect(s.status).toBe("active");
+      expect(s.project).toBe("/Users/q/Projects/other");
+      expect(s.sessionGoal).toBe("");
+    } finally {
+      rmSync(sessDir, { recursive: true, force: true });
+    }
+  });
+
+  test("a registered session that is live shows active even with a stale log, no duplicate", () => {
+    const p = mkProject("livereg");
+    const sid = "99999999-9999-9999-9999-999999999999";
+    start(p, sid, "g", "pg");
+    // Age heartbeat + log so statusOf() alone would report "ended".
+    const regPath = join(homeDir, "registry.json");
+    const reg = JSON.parse(readFileSync(regPath, "utf8"));
+    const entry = reg.sessions.find((s: any) => s.sessionId === sid);
+    const old = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    entry.lastHeartbeat = old;
+    writeFileSync(regPath, JSON.stringify(reg));
+    const past = new Date(Date.now() - 20 * 60 * 1000);
+    utimesSync(entry.logPath, past, past);
+    const sessDir = liveClaudeSession(sid, p);
+    try {
+      const matches = mod.buildSessions().filter((x) => x.sessionId === sid);
+      expect(matches).toHaveLength(1); // not duplicated as untracked
+      expect(matches[0].tracked).toBe(true);
+      expect(matches[0].status).toBe("active");
+    } finally {
+      rmSync(sessDir, { recursive: true, force: true });
+    }
+  });
+
+  test("a stale session file is not surfaced", () => {
+    const sid = "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1";
+    const sessDir = liveClaudeSession(
+      sid,
+      "/Users/q/Projects/stale",
+      Date.now() - 20 * 60 * 1000,
+    );
+    try {
+      expect(
+        mod.buildSessions().find((x) => x.sessionId === sid),
+      ).toBeUndefined();
+    } finally {
+      rmSync(sessDir, { recursive: true, force: true });
+    }
   });
 });

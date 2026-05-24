@@ -10,13 +10,13 @@ description: >-
   and watch the decision trail steer toward it in the cockpit dashboard.
 ---
 
-# /cockpit-start
+# /cockpit
 
 Capture a goal at session start and open a decision trail for this project —
 the data the cockpit dashboard visualizes. This sets the heading: where we're
 going, then the turns a diff can't explain.
 
-**Opt-in.** Only run when the user invokes it (`/cockpit-start`, "設定這次的目標", …).
+**Opt-in.** Only run when the user invokes it (`/cockpit`, "設定這次的目標", …).
 Never auto-start on session open — not every session deserves a goal.
 
 This skill serves both **Claude Code** and **Codex**. The cockpit storage,
@@ -104,7 +104,7 @@ The trail is only useful if the user can see it, so bring up the dashboard. Run 
 background task — it's a long-lived server that would otherwise block:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/serve-dashboard.ts
+bun <plugin-root>/skills/cockpit/scripts/cockpit-server.ts
 ```
 
 Then tell the user the URL it prints (default `http://localhost:5858`). See **The

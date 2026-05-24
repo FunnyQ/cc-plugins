@@ -78,23 +78,42 @@
 
       <!-- MANIFEST — collapsed by default; the viewport already names the flight -->
       <nav class="manifest" :class="{ 'is-open': manifestOpen }">
-        <button
-          class="manifest__bar"
-          type="button"
-          :aria-expanded="manifestOpen ? 'true' : 'false'"
-          @click="toggleManifest()"
-        >
-          <span class="manifest__legend">Projects</span>
-          <span
-            class="manifest__beacon"
-            :class="{ 'is-open': manifestOpen }"
-            aria-hidden="true"
-          ></span>
-          <span
-            class="manifest__count readout"
-            v-text="projectGroups.length + ' flights'"
-          ></span>
-        </button>
+        <div class="manifest__bar">
+          <button
+            class="manifest__nav"
+            type="button"
+            :disabled="!canNavigate"
+            @click="stepSession(-1)"
+            aria-label="Previous active session"
+            title="Previous active session (←)"
+          >
+            ‹
+          </button>
+          <button
+            class="manifest__toggle"
+            type="button"
+            :aria-expanded="manifestOpen ? 'true' : 'false'"
+            @click="toggleManifest()"
+          >
+            <span class="manifest__legend">Projects</span>
+            <span
+              class="manifest__beacon"
+              :class="{ 'is-open': manifestOpen }"
+              aria-hidden="true"
+            ></span>
+            <span class="manifest__count readout" v-text="navLabel"></span>
+          </button>
+          <button
+            class="manifest__nav"
+            type="button"
+            :disabled="!canNavigate"
+            @click="stepSession(1)"
+            aria-label="Next active session"
+            title="Next active session (→)"
+          >
+            ›
+          </button>
+        </div>
 
         <ul class="manifest__flights">
           <template v-for="g in projectGroups" :key="g.project">
@@ -138,6 +157,12 @@
                       :class="'provider-badge--' + (s.provider || 'claude')"
                       v-text="(s.provider || 'claude').toUpperCase()"
                     ></span>
+                    <span
+                      v-if="s.tracked === false"
+                      class="leg__tag"
+                      title="Running, but not a cockpit session (no decision trail)"
+                      >untracked</span
+                    >
                     <span class="leg__goal" v-text="shortGoal(s)"></span>
                   </li>
                 </template>

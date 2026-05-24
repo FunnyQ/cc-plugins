@@ -582,13 +582,22 @@ body {
   border-bottom: 1px solid var(--edge-soft);
   max-block-size: 32vh;
 }
+/* The bar is a row: prev arrow · toggle (legend/beacon/count) · next arrow. */
 .manifest__bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 20px);
+  flex-shrink: 0;
+}
+.manifest__toggle {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding: 10px clamp(20px, 4vw, 48px);
+  padding: 10px clamp(12px, 3vw, 32px);
   border: 0;
   background: transparent;
   color: var(--starlight);
@@ -596,34 +605,38 @@ body {
   cursor: pointer;
   text-align: center;
 }
-.manifest__bar:hover .manifest__legend {
+.manifest__toggle:hover .manifest__legend {
   color: var(--starlight);
 }
-/* Centered HUD readout: PROJECTS between thin aurora brackets, a pulsing
-   waypoint triangle below it (replaces the old left caret + Open hint). */
-.manifest__bar .manifest__legend {
-  position: relative;
+/* Centered HUD readout: PROJECTS legend over a pulsing waypoint triangle. */
+.manifest__toggle .manifest__legend {
   font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--ink-muted);
-  padding-inline: 18px;
   transition: color 200ms ease;
 }
-.manifest__bar .manifest__legend::before,
-.manifest__bar .manifest__legend::after {
-  position: absolute;
-  top: 50%;
-  translate: 0 -50%;
-  color: var(--aurora-deep);
-  font-size: 12px;
+/* prev/next session arrows — real controls in place of the old decorative
+   aurora brackets; disabled (≤1 active session) renders muted and inert. */
+.manifest__nav {
+  border: 0;
+  background: transparent;
+  color: var(--aurora);
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition:
+    color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.manifest__bar .manifest__legend::before {
-  content: "‹";
-  left: 2px;
+.manifest__nav:hover:not(:disabled) {
+  color: var(--starlight);
+  background: color-mix(in oklch, var(--aurora) 16%, transparent);
 }
-.manifest__bar .manifest__legend::after {
-  content: "›";
-  right: 2px;
+.manifest__nav:disabled {
+  color: var(--ink-faint);
+  cursor: default;
 }
 .manifest__beacon {
   width: 0;
@@ -764,11 +777,28 @@ body {
   white-space: nowrap;
   font-size: 13px;
 }
+/* A live session with no cockpit registry entry: dashed (not anchored) + muted,
+   so it reads as "running, but no decision trail" without competing with the
+   provider badge or the active LED. */
+.leg__tag {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px dashed color-mix(in oklch, var(--ink-faint) 50%, var(--edge));
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
 
 /* ── Instruments — the two gauges (comms feed + flight log) ── */
 .instruments {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) — a bare 1fr keeps min-width:auto, so a wide <pre> (long
+     single-line JSON) would blow the column out instead of scrolling inside. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1px;
   flex: 1;
   min-height: 0;
@@ -827,6 +857,7 @@ body {
 }
 .instrument__body {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-x);
@@ -866,6 +897,50 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+}
+/* Untracked-session invite — replaces the bland empty state when the selected
+   session has no cockpit decision trail; a gentle nudge toward /cockpit. */
+.decision-log__invite {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: clamp(20px, 7vh, 56px) auto 0;
+  max-width: 42ch;
+  padding: 22px 24px;
+  text-align: center;
+  /* Tonal lift + a hairline of the aurora navigation accent (the invite points
+     you toward /cockpit). Nebula is reserved for the viewport, so not here. */
+  border: 1px solid color-mix(in oklab, var(--aurora) 22%, var(--edge));
+  border-radius: var(--radius);
+  background: var(--hull-2);
+}
+.decision-log__invite-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--aurora);
+}
+.decision-log__invite-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--starlight);
+}
+.decision-log__invite-body,
+.decision-log__invite-cta {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.decision-log__invite-cta code {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklab, var(--aurora) 38%, var(--edge));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--aurora) 12%, var(--space));
+  color: color-mix(in oklab, var(--aurora) 80%, var(--starlight));
+  font-family: var(--font-mono);
+  font-size: 0.92em;
 }
 
 .decision-card {
@@ -1136,6 +1211,9 @@ body {
 .live-entry.is-system {
   --entry-accent: var(--nebula-violet);
 }
+.live-entry.is-subagent {
+  --entry-accent: oklch(72% 0.15 315);
+}
 .live-entry.is-tool,
 .live-entry.is-tool-result,
 .live-entry.has-tool-segments {
@@ -1237,6 +1315,8 @@ body {
 }
 
 .live-seg {
+  min-width: 0;
+  max-width: 100%;
   margin-block: 4px;
 }
 .live-seg-label {
@@ -1290,21 +1370,36 @@ body {
   user-select: none;
 }
 
+.live-file-change {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
 .live-file-change .live-file-path {
   margin: 4px 0;
+  max-width: 100%;
+  overflow: hidden;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .live-diff {
+  box-sizing: border-box;
   display: block;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 12px;
-  white-space: pre;
 }
+/* Soft-wrap long diff lines instead of overflowing — an unwrapped line would
+   widen the column and clip the +/- gutter on the left (matches token-atlas). */
 .live-diff span {
   display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .live-diff .is-add {
   background: color-mix(in oklab, var(--positive) 18%, transparent);
@@ -1319,6 +1414,8 @@ body {
 
 .live-task-card {
   display: grid;
+  /* bound the single column so a wide result <pre> scrolls, not overflows */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-sm);
   padding: 10px;
   border: 1px solid var(--edge);
@@ -1342,6 +1439,15 @@ body {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-muted);
+}
+/* A subagent notification: tint its card with the subagent accent so it reads
+   as a delegated agent, not a neutral block. */
+.live-entry.is-subagent .live-task-card {
+  border-color: color-mix(in oklab, var(--entry-accent) 30%, var(--edge));
+  background: color-mix(in oklab, var(--entry-accent) 7%, var(--hull-2));
+}
+.live-entry.is-subagent .live-task-kicker {
+  color: color-mix(in oklab, var(--entry-accent) 70%, var(--starlight));
 }
 
 /* highlight.js token coloring mapped onto the space palette */
