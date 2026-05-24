@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "monitor",
-      "source": "./monitor",
+      "source": "./packages/monitor",
       "description": "Monitor your Claude Code and Codex sessions — a usage dashboard (sessions, tokens, cost, model mix) plus a per-project cockpit (goal + decision log + live session view).",
       "version": "3.0.0"
     }

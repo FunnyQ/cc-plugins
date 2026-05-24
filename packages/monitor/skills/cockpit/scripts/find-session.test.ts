@@ -1,5 +1,5 @@
 // Tests for current-session discovery.
-// Run: bun test monitor/skills/cockpit/scripts/find-session.test.ts
+// Run: bun test packages/monitor/skills/cockpit/scripts/find-session.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   mkdirSync,
