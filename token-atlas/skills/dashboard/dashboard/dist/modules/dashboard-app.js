@@ -54,6 +54,7 @@ export function App() {
     liveSessions: [],
     liveError: null,
     cockpitUp: true,
+    cockpitPort: 5858,
     livePollTimer: null,
     liveTickTimer: null,
     liveVisibilityHandler: null,
@@ -131,6 +132,8 @@ export function App() {
         this.liveSessions = data.sessions ?? [];
         // Missing field (older server) → assume up so we never nag wrongly.
         this.cockpitUp = data.cockpitUp !== false;
+        // Cockpit can bind a custom port; open the one daemon.json reported.
+        this.cockpitPort = data.cockpitPort || 5858;
         this.liveError = null;
       } catch (err) {
         this.liveError = err.message ?? String(err);
@@ -1132,7 +1135,11 @@ export function App() {
         provider: session.provider || "claude",
         project: session.cwd || "",
       });
-      window.open(`http://localhost:5858/?${params}`, "_blank", "noopener");
+      window.open(
+        `http://localhost:${this.cockpitPort}/?${params}`,
+        "_blank",
+        "noopener",
+      );
     },
 
     lockPageScroll() {

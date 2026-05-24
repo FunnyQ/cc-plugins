@@ -5,7 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
 import {
   getLiveSessions,
-  isCockpitDaemonUp,
+  cockpitDaemonPort,
   jsonResponse,
   jsonError,
 } from "./live.ts";
@@ -100,9 +100,11 @@ async function handleStats(): Promise<Response> {
 
 function handleLive(): Response {
   try {
+    const cockpitPort = cockpitDaemonPort();
     return jsonResponse({
       sessions: getLiveSessions(),
-      cockpitUp: isCockpitDaemonUp(),
+      cockpitUp: cockpitPort !== null,
+      cockpitPort,
     });
   } catch (err) {
     return jsonError(err);
