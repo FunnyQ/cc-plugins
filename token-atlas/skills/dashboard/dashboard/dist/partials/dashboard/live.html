@@ -14,7 +14,8 @@
 
   <p v-if="!cockpitUp && !liveError" class="live-notice" role="status">
     <strong>Cockpit isn’t running.</strong>
-    Start its dashboard (port 5858) to open a session’s transcript.
+    Run <code>/cockpit</code> in Claude Code or Codex to start it, then open a
+    session’s transcript here.
   </p>
 
   <p v-if="liveError" class="live-error" role="status">{{ liveError }}</p>
