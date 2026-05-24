@@ -16,6 +16,32 @@ const UUID_RE = /^[0-9a-f-]{36}$/;
 // parked sessions (they re-poll), so no persistence is needed.
 const pendingWaits = new Map<string, (answer: string | null) => void>();
 
+// Answers that arrived before any wait was parked. The `cockpit wait` background
+// task cold-starts a few seconds after the needs_your_call is logged, but the
+// needs-call card appears in the dashboard immediately — so the user can answer
+// faster than the wait can register its long-poll. Without this, that answer is
+// logged but never delivered, and the wait parks afterward and hangs. Stash it
+// per session so the next wait hop drains it instead. Only an open needs_your_call
+// stashes (see handleRespond), and the entry is TTL-bounded, so a stale answer
+// can't be mis-delivered to a later, unrelated call.
+const stashedAnswers = new Map<string, { answer: string; expires: number }>();
+
+function stashTtlMs(): number {
+  const v = parseInt(process.env.COCKPIT_STASH_TTL_MS || "", 10);
+  return Number.isFinite(v) && v > 0 ? v : 60_000;
+}
+
+function stashAnswer(session: string, answer: string): void {
+  stashedAnswers.set(session, { answer, expires: Date.now() + stashTtlMs() });
+}
+
+function takeStashedAnswer(session: string): string | null {
+  const e = stashedAnswers.get(session);
+  if (!e) return null;
+  stashedAnswers.delete(session);
+  return e.expires > Date.now() ? e.answer : null;
+}
+
 // ---------- central dir (overridable for tests) ----------
 
 function cockpitHome(): string {
@@ -48,6 +74,33 @@ function logPathFor(sessionId: string): string | null {
   return readRegistry().find((e) => e.sessionId === sessionId)?.logPath ?? null;
 }
 
+// Is the session's most recent needs_your_call still unanswered? Scans the
+// decision log from the end: the first response record means the latest call is
+// already answered (no open call); a needs_your_call decision reached first means
+// it's still open. Responds are human-paced and these logs are small, so reading
+// the file here is cheap.
+function hasOpenCall(logPath: string): boolean {
+  let lines: string[];
+  try {
+    lines = readFileSync(logPath, "utf8").split("\n");
+  } catch {
+    return false;
+  }
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    let rec: any;
+    try {
+      rec = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (rec.type === "response") return false; // latest call already answered
+    if (rec.type === "decision" && rec.needs_your_call === true) return true;
+  }
+  return false;
+}
+
 // ---------- GET /api/wait?session=<uuid>&token=<t> ----------
 
 export function handleWait(req: Request): Response | Promise<Response> {
@@ -56,6 +109,11 @@ export function handleWait(req: Request): Response | Promise<Response> {
   const token = url.searchParams.get("token") || "";
   if (token !== daemonToken()) return json({ error: "unauthorized" }, 401);
   if (!UUID_RE.test(session)) return json({ error: "invalid session" }, 400);
+
+  // An answer may have arrived before this wait parked (the cold-start race) —
+  // deliver it immediately instead of parking and hanging on it.
+  const stashed = takeStashedAnswer(session);
+  if (stashed !== null) return json({ answer: stashed });
 
   // Replace any stale resolver for this session — only one park at a time.
   pendingWaits.get(session)?.(null);
@@ -97,8 +155,14 @@ export async function handleRespond(req: Request): Promise<Response> {
   }
   const answer = typeof body.answer === "string" ? body.answer : "";
 
-  // Append a durable response record (streams to the UI via the log SSE).
+  // Decide whether this answer is worth stashing BEFORE we append the response
+  // record (which would otherwise make the call look answered). Only an open
+  // needs_your_call earns a stash — a stray send to an idle session must not
+  // pre-load the next, unrelated wait.
   const logPath = logPathFor(session);
+  const open = logPath ? hasOpenCall(logPath) : false;
+
+  // Append a durable response record (streams to the UI via the log SSE).
   if (logPath) {
     const rec = {
       id: crypto.randomUUID(),
@@ -113,12 +177,15 @@ export async function handleRespond(req: Request): Promise<Response> {
     }
   }
 
-  // Wake the parked wait if one exists; otherwise the answer is logged only.
+  // Wake the parked wait if one exists; otherwise, for an open call, stash the
+  // answer so the next wait hop delivers it (the wait may still be cold-starting)
+  // instead of losing it. The response is already durably logged above.
   const resolver = pendingWaits.get(session);
   if (resolver) {
     pendingWaits.delete(session);
     resolver(answer);
     return json({ delivered: true });
   }
+  if (open) stashAnswer(session, answer);
   return json({ delivered: false });
 }
