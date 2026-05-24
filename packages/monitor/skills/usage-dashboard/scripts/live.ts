@@ -4,6 +4,15 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
+import {
+  buildClaudeLiveSessions,
+  buildCodexLiveSessions,
+  parseCockpitKeys,
+  sortLiveSessions,
+  type LiveSession,
+} from "./live-sessions";
+
+export type { LiveSession } from "./live-sessions";
 
 const CLAUDE_DIR = join(homedir(), ".claude");
 const SESSIONS_DIR = join(CLAUDE_DIR, "sessions");
@@ -27,8 +36,6 @@ const CODEX_SESSIONS_REAL = (() => {
     return CODEX_SESSIONS_DIR;
   }
 })();
-const STALE_CUTOFF_MS = 10 * 60 * 1000;
-const CODEX_BUSY_CUTOFF_MS = 60 * 1000;
 const TRANSCRIPT_INDEX_TTL_MS = 5_000;
 
 type ClaudeSessionFile = {
@@ -55,27 +62,6 @@ type CodexThreadRow = {
   model: string | null;
 };
 
-export type LiveSession = {
-  provider: "claude" | "codex";
-  id: string;
-  projectName: string;
-  cwd: string;
-  status: "busy" | "idle" | "waiting" | string;
-  statusSource:
-    | "claude-session-file"
-    | "codex-app-server"
-    | "codex-sqlite-rollout";
-  updatedAt: string;
-  ageMs: number;
-  isStale: boolean;
-  transcriptPath?: string;
-  model?: string;
-  version?: string;
-  // true when this live session is also a registered cockpit session (has a
-  // decision trail) — surfaced as a badge so you know it's worth opening there.
-  cockpit?: boolean;
-};
-
 function readSessionFiles(): ClaudeSessionFile[] {
   if (!existsSync(SESSIONS_DIR)) return [];
   const out: ClaudeSessionFile[] = [];
@@ -96,10 +82,6 @@ function readSessionFiles(): ClaudeSessionFile[] {
     }
   }
   return out;
-}
-
-function projectNameFor(cwd: string): string {
-  return cwd.split("/").filter(Boolean).at(-1) ?? cwd;
 }
 
 export function resolveClaudeTranscriptPath(id: string): string | undefined {
@@ -158,15 +140,6 @@ function readCodexThreadRow(id: string): CodexThreadRow | null {
   }
 }
 
-function codexUpdatedAtMs(row: CodexThreadRow): number {
-  return (
-    row.updated_at_ms ||
-    (row.updated_at ? row.updated_at * 1000 : 0) ||
-    row.created_at_ms ||
-    row.created_at * 1000
-  );
-}
-
 function resolveCodexRolloutPath(id: string): string | undefined {
   const row = readCodexThreadRow(id);
   if (!row?.rollout_path) return undefined;
@@ -222,23 +195,11 @@ const COCKPIT_REGISTRY = join(
 
 function cockpitSessionKeys(): Set<string> {
   try {
-    const raw = JSON.parse(readFileSync(COCKPIT_REGISTRY, "utf8"));
-    if (raw && Array.isArray(raw.sessions)) {
-      return new Set<string>(
-        raw.sessions
-          .filter(
-            (s: { sessionId?: unknown }) => typeof s?.sessionId === "string",
-          )
-          .map(
-            (s: { provider?: string; sessionId: string }) =>
-              `${s.provider === "codex" ? "codex" : "claude"}:${s.sessionId}`,
-          ),
-      );
-    }
+    return parseCockpitKeys(readFileSync(COCKPIT_REGISTRY, "utf8"));
   } catch {
-    // registry missing or corrupt — no cockpit tags
+    // registry missing — no cockpit tags
+    return new Set<string>();
   }
-  return new Set<string>();
 }
 
 // Companion read of cockpit's daemon PID file (same machine, same author). The
@@ -274,70 +235,23 @@ export function cockpitDaemonPort(): number | null {
   }
 }
 
-function statusRank(status: string): number {
-  if (status === "busy" || status === "active-inferred") return 0;
-  if (status === "waiting") return 1;
-  if (status === "recent") return 2;
-  if (status === "idle") return 3;
-  return 4;
-}
-
 export function getLiveSessions(): LiveSession[] {
   const now = Date.now();
   const index = getTranscriptIndex();
   const cockpitKeys = cockpitSessionKeys();
-  const claudeSessions = readSessionFiles()
-    .map((session) => {
-      const updatedAtMs = session.updatedAt ?? session.startedAt;
-      const ageMs = Math.max(0, now - updatedAtMs);
-      return {
-        provider: "claude",
-        id: session.sessionId,
-        projectName: projectNameFor(session.cwd),
-        cwd: session.cwd,
-        status: session.status,
-        statusSource: "claude-session-file",
-        updatedAt: new Date(updatedAtMs).toISOString(),
-        ageMs,
-        isStale: ageMs > STALE_CUTOFF_MS,
-        transcriptPath: index.get(session.sessionId),
-        version: session.version,
-        cockpit: cockpitKeys.has(`claude:${session.sessionId}`),
-      } satisfies LiveSession;
-    })
-    .filter((session) => !session.isStale);
-
-  const codexSessions = readCodexThreadRows()
-    .map((row) => {
-      const updatedAtMs = codexUpdatedAtMs(row);
-      const ageMs = Math.max(0, now - updatedAtMs);
-      return {
-        provider: "codex",
-        id: row.id,
-        projectName: projectNameFor(row.cwd),
-        cwd: row.cwd,
-        status: ageMs <= CODEX_BUSY_CUTOFF_MS ? "active-inferred" : "recent",
-        statusSource: "codex-sqlite-rollout",
-        updatedAt: new Date(updatedAtMs).toISOString(),
-        ageMs,
-        isStale: ageMs > STALE_CUTOFF_MS,
-        transcriptPath: row.rollout_path || undefined,
-        model: row.model ?? undefined,
-        cockpit: cockpitKeys.has(`codex:${row.id}`),
-      } satisfies LiveSession;
-    })
-    .filter(
-      (session) =>
-        !session.isStale &&
-        !!session.transcriptPath &&
-        existsSync(session.transcriptPath),
-    );
-
-  return [...claudeSessions, ...codexSessions].sort((a, b) => {
-    const statusDelta = statusRank(a.status) - statusRank(b.status);
-    if (statusDelta !== 0) return statusDelta;
-    return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-  });
+  const claudeSessions = buildClaudeLiveSessions(
+    readSessionFiles(),
+    cockpitKeys,
+    index,
+    now,
+  );
+  const codexSessions = buildCodexLiveSessions(
+    readCodexThreadRows(),
+    cockpitKeys,
+    now,
+    existsSync,
+  );
+  return sortLiveSessions([...claudeSessions, ...codexSessions]);
 }
 
 export function jsonResponse(payload: object, status = 200): Response {

@@ -3,16 +3,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { buildRateLimitsRecord } from "./rate-limits-cache";
 
 const CACHE_DIR = join(homedir(), ".cache", "token-atlas");
 const RATE_LIMITS_CACHE = join(CACHE_DIR, "rate-limits.json");
 const STATUSLINE_COMMAND =
   process.env.TOKEN_ATLAS_STATUSLINE_COMMAND?.trim() ||
   "bunx -y ccstatusline@latest";
-
-type StatuslinePayload = {
-  rate_limits?: unknown;
-};
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -25,32 +22,12 @@ async function readStdin(): Promise<string> {
 }
 
 function cacheRateLimits(payload: string): void {
-  let parsed: StatuslinePayload;
-
-  try {
-    parsed = JSON.parse(payload) as StatuslinePayload;
-  } catch {
-    return;
-  }
-
-  if (!parsed.rate_limits) {
-    return;
-  }
+  const record = buildRateLimitsRecord(payload);
+  if (!record) return;
 
   try {
     mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(
-      RATE_LIMITS_CACHE,
-      JSON.stringify(
-        {
-          capturedAt: new Date().toISOString(),
-          capturedAtEpochMs: Date.now(),
-          rate_limits: parsed.rate_limits,
-        },
-        null,
-        2,
-      ),
-    );
+    writeFileSync(RATE_LIMITS_CACHE, JSON.stringify(record, null, 2));
   } catch {
     // Statusline rendering should not fail because telemetry cache failed.
   }
