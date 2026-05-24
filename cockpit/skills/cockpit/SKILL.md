@@ -135,7 +135,7 @@ default English) — read it back if you're unsure which language is in effect:
 
 ```bash
 bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
-  --session <id> \
+  [--session <id>] \
   --decision "what was decided / done" \
   --reason   "why — the part a diff can't show" \
   [--tradeoff "what was given up"] \
@@ -143,6 +143,10 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
   [--needs-call --option "A" --option "B"]
 ```
 
+- `--session` is optional: when omitted, `log` resolves the current session
+  itself (Claude via `CLAUDE_CODE_SESSION_ID`, Codex via its state DB), so a
+  decision can't be misfiled to the wrong or a stale session. Pass it explicitly
+  only when logging for a session other than the live one.
 - `--file` and `--option` are repeatable.
 - `log` does not need `--provider` after `start`; the existing registry entry
   keeps the provider. If logging before `start`, include `--provider <provider>`.

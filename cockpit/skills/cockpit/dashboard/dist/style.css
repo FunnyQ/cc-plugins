@@ -1004,6 +1004,10 @@ body {
   color: var(--positive);
   margin-right: 4px;
 }
+.decision-card__answer-detail {
+  color: var(--ink-muted);
+  margin-right: 4px;
+}
 
 /* ── needs_your_call answer surface (the warm respond controls) ── */
 .decision-card.is-answerable .decision-card__options {
