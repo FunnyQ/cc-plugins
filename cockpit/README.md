@@ -5,7 +5,7 @@ A per-project local web **cockpit** (sibling plugin to token-atlas): open a Clau
 Run the dashboard:
 
 ```bash
-bun cockpit/skills/cockpit/scripts/serve-dashboard.ts
+bun cockpit/skills/cockpit/scripts/cockpit-server.ts
 ```
 
 Provider support:

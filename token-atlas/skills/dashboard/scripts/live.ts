@@ -1,16 +1,5 @@
 #!/usr/bin/env bun
-import {
-  closeSync,
-  existsSync,
-  openSync,
-  readFileSync,
-  readSync,
-  readdirSync,
-  realpathSync,
-  statSync,
-  watch,
-  type FSWatcher,
-} from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { Database } from "bun:sqlite";
@@ -40,30 +29,7 @@ const CODEX_SESSIONS_REAL = (() => {
 })();
 const STALE_CUTOFF_MS = 10 * 60 * 1000;
 const CODEX_BUSY_CUTOFF_MS = 60 * 1000;
-const UUID_RE = /^[0-9a-f-]{36}$/;
-const BACKLOG_LINES = 50;
-const BACKLOG_READ_CHUNK_BYTES = 256 * 1024;
-const MAX_BACKLOG_READ_BYTES = 2 * 1024 * 1024;
-const HEARTBEAT_MS = 10_000;
-const RESOLVE_POLL_MS = 2_000;
 const TRANSCRIPT_INDEX_TTL_MS = 5_000;
-// Only conversation entries are streamed. Tool calls/results live inside the
-// content of `user`/`assistant` entries, so this allowlist still carries them.
-// Everything excluded is session-metadata bookkeeping (progress, file-history-
-// snapshot, queue-operation, last-prompt, ai-title, agent-name, permission-mode,
-// pr-link, …) — not conversation, and it repeats in the file, which otherwise
-// piles up duplicate noise in the modal. An allowlist is used (not a denylist)
-// because new metadata types keep appearing; conversation types do not.
-const DISPLAY_ENTRY_TYPES = new Set([
-  "user",
-  "assistant",
-  "system",
-  "tool",
-  "tool_use",
-  "tool_result",
-  "response_item",
-]);
-const WATCH_DEBOUNCE_MS = 80;
 
 type ClaudeSessionFile = {
   pid: number;
@@ -105,6 +71,9 @@ export type LiveSession = {
   transcriptPath?: string;
   model?: string;
   version?: string;
+  // true when this live session is also a registered cockpit session (has a
+  // decision trail) — surfaced as a badge so you know it's worth opening there.
+  cockpit?: boolean;
 };
 
 function readSessionFiles(): ClaudeSessionFile[] {
@@ -243,6 +212,68 @@ export function isInsideCodexSessions(filePath: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
+// Companion read of cockpit's registry (same machine, same author) so we can
+// tag which live sessions have a cockpit decision trail. Membership only — we
+// don't touch cockpit's transcript/rendering internals. Missing/corrupt → none.
+const COCKPIT_REGISTRY = join(
+  process.env.COCKPIT_HOME || join(homedir(), ".cockpit"),
+  "registry.json",
+);
+
+function cockpitSessionKeys(): Set<string> {
+  try {
+    const raw = JSON.parse(readFileSync(COCKPIT_REGISTRY, "utf8"));
+    if (raw && Array.isArray(raw.sessions)) {
+      return new Set<string>(
+        raw.sessions
+          .filter(
+            (s: { sessionId?: unknown }) => typeof s?.sessionId === "string",
+          )
+          .map(
+            (s: { provider?: string; sessionId: string }) =>
+              `${s.provider === "codex" ? "codex" : "claude"}:${s.sessionId}`,
+          ),
+      );
+    }
+  } catch {
+    // registry missing or corrupt — no cockpit tags
+  }
+  return new Set<string>();
+}
+
+// Companion read of cockpit's daemon PID file (same machine, same author). The
+// Live panel's rows open a session's transcript in cockpit (port 5858), so a
+// dead daemon means a dead tab — surface it as a notice instead. Mirrors
+// cockpit-server.ts's own liveness check (PID file + signal-0 probe).
+const COCKPIT_DAEMON = join(
+  process.env.COCKPIT_HOME || join(homedir(), ".cockpit"),
+  "daemon.json",
+);
+
+// The live cockpit daemon's port, or null when it isn't running. Cockpit can
+// bind a custom --port, and daemon.json records the real one — the Live panel
+// must open that port, not a hardcoded 5858, or a custom-port cockpit opens a
+// dead tab despite reading as up.
+export function cockpitDaemonPort(): number | null {
+  try {
+    const info = JSON.parse(readFileSync(COCKPIT_DAEMON, "utf8"));
+    if (typeof info?.pid !== "number") return null;
+    let alive = false;
+    try {
+      process.kill(info.pid, 0);
+      alive = true;
+    } catch (err) {
+      // ESRCH → no such process (dead); EPERM → exists but not ours (alive).
+      alive = (err as NodeJS.ErrnoException)?.code === "EPERM";
+    }
+    if (!alive) return null;
+    return typeof info.port === "number" ? info.port : 5858;
+  } catch {
+    // daemon.json missing or corrupt — treat as not running
+    return null;
+  }
+}
+
 function statusRank(status: string): number {
   if (status === "busy" || status === "active-inferred") return 0;
   if (status === "waiting") return 1;
@@ -254,6 +285,7 @@ function statusRank(status: string): number {
 export function getLiveSessions(): LiveSession[] {
   const now = Date.now();
   const index = getTranscriptIndex();
+  const cockpitKeys = cockpitSessionKeys();
   const claudeSessions = readSessionFiles()
     .map((session) => {
       const updatedAtMs = session.updatedAt ?? session.startedAt;
@@ -270,6 +302,7 @@ export function getLiveSessions(): LiveSession[] {
         isStale: ageMs > STALE_CUTOFF_MS,
         transcriptPath: index.get(session.sessionId),
         version: session.version,
+        cockpit: cockpitKeys.has(`claude:${session.sessionId}`),
       } satisfies LiveSession;
     })
     .filter((session) => !session.isStale);
@@ -290,6 +323,7 @@ export function getLiveSessions(): LiveSession[] {
         isStale: ageMs > STALE_CUTOFF_MS,
         transcriptPath: row.rollout_path || undefined,
         model: row.model ?? undefined,
+        cockpit: cockpitKeys.has(`codex:${row.id}`),
       } satisfies LiveSession;
     })
     .filter(
@@ -321,370 +355,17 @@ export function jsonError(err: unknown, status = 500): Response {
   return jsonResponse({ error: msg }, status);
 }
 
-function sse(controller: ReadableStreamDefaultController, payload: object) {
-  controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`);
-}
-
-// Parse JSONL lines into displayable entries, skipping blank/malformed lines
-// and the noise types. Shared by the SSE stream and the history endpoint.
-function parseEntries(lines: string[]): object[] {
-  const out: object[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let entry: { type?: string };
-    try {
-      entry = JSON.parse(trimmed);
-    } catch {
-      continue; // skip malformed / partially-written JSONL entries
-    }
-    if (!entry || !DISPLAY_ENTRY_TYPES.has(entry.type ?? "")) continue;
-    if (entry.type === "response_item") {
-      const payloadType = (entry as { payload?: { type?: string } }).payload
-        ?.type;
-      if (
-        payloadType !== "message" &&
-        payloadType !== "function_call" &&
-        payloadType !== "function_call_output" &&
-        payloadType !== "custom_tool_call"
-      ) {
-        continue;
-      }
-    }
-    out.push(entry);
-  }
-  return out;
-}
-
-function emitLines(
-  controller: ReadableStreamDefaultController,
-  text: string,
-): void {
-  for (const entry of parseEntries(text.split("\n"))) sse(controller, entry);
-}
-
-function splitCompleteLines(text: string): {
-  complete: string;
-  partial: string;
-} {
-  const lastNewline = text.lastIndexOf("\n");
-  if (lastNewline < 0) return { complete: "", partial: text };
-  return {
-    complete: text.slice(0, lastNewline),
-    partial: text.slice(lastNewline + 1),
-  };
-}
-
-// Read up to `maxLines` complete JSONL lines ending at byte offset `endOffset`,
-// scanning backward in chunks. Returns the lines (oldest first), the trailing
-// partial text after the last newline (only meaningful when endOffset is EOF),
-// and `startOffset` — the byte offset where the first returned line begins, used
-// as the cursor for loading still-older history. startOffset 0 means we reached
-// the start of the file. Decodes once so multi-byte chars spanning a chunk
-// boundary aren't corrupted.
-function readLinesEndingAt(
-  filePath: string,
-  endOffset: number,
-  maxLines: number,
-): { lines: string[]; partial: string; startOffset: number } {
-  let start = endOffset;
-  let newlineCount = 0;
-  const chunks: Buffer[] = [];
-  const fd = openSync(filePath, "r");
-  try {
-    while (start > 0 && endOffset - start < MAX_BACKLOG_READ_BYTES) {
-      const nextStart = Math.max(0, start - BACKLOG_READ_CHUNK_BYTES);
-      const length = start - nextStart;
-      const buf = Buffer.allocUnsafe(length);
-      readSync(fd, buf, 0, length, nextStart);
-      chunks.unshift(buf);
-      start = nextStart;
-      // Native scan for "\n" (0x0A) — never a UTF-8 continuation byte, so safe
-      // on raw bytes and far faster than iterating each byte in JS.
-      for (
-        let nl = buf.indexOf(0x0a);
-        nl !== -1;
-        nl = buf.indexOf(0x0a, nl + 1)
-      ) {
-        newlineCount++;
-      }
-      if (newlineCount >= maxLines) break;
-    }
-  } finally {
-    closeSync(fd);
-  }
-  let body = Buffer.concat(chunks).toString("utf-8");
-  if (start > 0) {
-    // Began mid-file, so the first line is probably partial — drop it.
-    const firstNewline = body.indexOf("\n");
-    body = firstNewline >= 0 ? body.slice(firstNewline + 1) : "";
-  }
-  const { complete, partial } = splitCompleteLines(body);
-  const lines = complete ? complete.split("\n").slice(-maxLines) : [];
-  // Byte distance from the first returned line to endOffset = the returned
-  // lines (each followed by "\n") plus the trailing partial.
-  const tailText = lines.length ? `${lines.join("\n")}\n${partial}` : partial;
-  const startOffset = Math.max(0, endOffset - Buffer.byteLength(tailText));
-  return { lines, partial, startOffset };
-}
-
-type LiveProvider = "claude" | "codex";
-
-function normalizeProvider(provider: string | null): LiveProvider | null {
-  if (!provider || provider === "claude") return "claude";
-  if (provider === "codex") return "codex";
-  return null;
-}
-
-function resolveProviderTranscriptPath(
-  provider: LiveProvider,
-  id: string,
-): string | undefined {
-  return provider === "codex"
-    ? resolveCodexRolloutPath(id)
-    : resolveClaudeTranscriptPath(id);
-}
-
-function isInsideProviderRoot(
-  provider: LiveProvider,
-  filePath: string,
-): boolean {
-  return provider === "codex"
-    ? isInsideCodexSessions(filePath)
-    : isInsideProjects(filePath);
-}
-
-function providerRootName(provider: LiveProvider): string {
-  return provider === "codex" ? "Codex sessions" : "projects";
-}
-
-export function streamTranscript(
-  sessionId: string | null,
-  providerParam: string | null = "claude",
-): Response {
-  const provider = normalizeProvider(providerParam);
-  if (!provider) return jsonResponse({ error: "invalid provider" }, 400);
-  if (!sessionId || !UUID_RE.test(sessionId)) {
-    return jsonResponse({ error: "invalid session id" }, 400);
-  }
-
-  let initialPath: string | undefined = resolveProviderTranscriptPath(
-    provider,
-    sessionId,
-  );
-  if (initialPath) {
-    try {
-      initialPath = realpathSync(initialPath);
-    } catch {
-      initialPath = undefined;
-    }
-    if (initialPath && !isInsideProviderRoot(provider, initialPath)) {
-      return jsonResponse(
-        { error: `transcript path is outside ${providerRootName(provider)}` },
-        403,
-      );
-    }
-  }
-
-  let watcher: FSWatcher | null = null;
-  let heartbeat: ReturnType<typeof setInterval> | null = null;
-  let resolvePoll: ReturnType<typeof setInterval> | null = null;
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let closed = false;
-  let filePath = initialPath;
-  let offset = 0;
-  let partial = "";
-
-  function cleanup(): void {
-    closed = true;
-    watcher?.close();
-    watcher = null;
-    if (heartbeat) clearInterval(heartbeat);
-    if (resolvePoll) clearInterval(resolvePoll);
-    if (debounceTimer) clearTimeout(debounceTimer);
-  }
-
-  function safeEnqueue(
-    controller: ReadableStreamDefaultController,
-    chunk: string,
-  ): void {
-    if (closed) return;
-    try {
-      controller.enqueue(chunk);
-    } catch {
-      cleanup();
-    }
-  }
-
-  function readBacklog(controller: ReadableStreamDefaultController): void {
-    if (!filePath || closed) return;
-    let historyStart = 0;
-    try {
-      const size = statSync(filePath).size;
-      const {
-        lines,
-        partial: trailing,
-        startOffset,
-      } = readLinesEndingAt(filePath, size, BACKLOG_LINES);
-      emitLines(controller, lines.join("\n"));
-      partial = trailing;
-      offset = size;
-      historyStart = startOffset;
-    } catch {
-      // File vanished/rotated between resolve and read; the next poll retries.
-    }
-    sse(controller, {
-      kind: "backlog-done",
-      historyStart,
-      hasMore: historyStart > 0,
-    });
-  }
-
-  function readTail(controller: ReadableStreamDefaultController): void {
-    if (!filePath || closed) return;
-    try {
-      const size = statSync(filePath).size;
-      if (size < offset) {
-        offset = 0;
-        partial = "";
-      }
-      if (size <= offset) return;
-      // Read only the appended [offset, size) slice — re-reading the whole
-      // (potentially multi-MB) transcript on every append is O(filesize) per line.
-      const length = size - offset;
-      const buf = Buffer.allocUnsafe(length);
-      const fd = openSync(filePath, "r");
-      try {
-        readSync(fd, buf, 0, length, offset);
-      } finally {
-        closeSync(fd);
-      }
-      offset = size;
-      const lines = splitCompleteLines(partial + buf.toString("utf-8"));
-      partial = lines.partial;
-      emitLines(controller, lines.complete);
-    } catch {
-      // The file may be rotating or mid-write; the next watch/poll can retry.
-    }
-  }
-
-  function scheduleTail(controller: ReadableStreamDefaultController): void {
-    if (debounceTimer) return;
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null;
-      readTail(controller);
-    }, WATCH_DEBOUNCE_MS);
-  }
-
-  function startWatching(
-    controller: ReadableStreamDefaultController,
-    resolvedPath: string,
-  ): void {
-    if (closed || watcher) return;
-    filePath = resolvedPath;
-    readBacklog(controller);
-    try {
-      watcher = watch(filePath, () => scheduleTail(controller));
-    } catch {
-      filePath = undefined;
-    }
-  }
-
-  const stream = new ReadableStream({
-    start(controller) {
-      safeEnqueue(controller, ": connected\n\n");
-      if (filePath) startWatching(controller, filePath);
-
-      resolvePoll = setInterval(() => {
-        if (closed || watcher) return;
-        const resolved = resolveProviderTranscriptPath(provider, sessionId);
-        if (!resolved) return;
-        let realPath: string;
-        try {
-          realPath = realpathSync(resolved);
-        } catch {
-          // Resolved then vanished before realpath; wait for the next tick.
-          return;
-        }
-        if (!isInsideProviderRoot(provider, realPath)) {
-          safeEnqueue(
-            controller,
-            `data: ${JSON.stringify({ error: `transcript path is outside ${providerRootName(provider)}` })}\n\n`,
-          );
-          cleanup();
-          controller.close();
-          return;
-        }
-        startWatching(controller, realPath);
-      }, RESOLVE_POLL_MS);
-
-      heartbeat = setInterval(() => {
-        safeEnqueue(controller, ": ping\n\n");
-      }, HEARTBEAT_MS);
-    },
-    cancel() {
-      cleanup();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-store",
-      Connection: "keep-alive",
-    },
-  });
-}
-
-// Older-history page for the streaming modal's reverse-scroll. Returns the
-// entries immediately before byte offset `before`, plus the next cursor.
-export function getTranscriptHistory(
-  sessionId: string | null,
-  before: number,
-  limit: number,
-  providerParam: string | null = "claude",
-): Response {
-  const provider = normalizeProvider(providerParam);
-  if (!provider) return jsonResponse({ error: "invalid provider" }, 400);
-  if (!sessionId || !UUID_RE.test(sessionId)) {
-    return jsonResponse({ error: "invalid session id" }, 400);
-  }
-  const empty = { entries: [], historyStart: 0, hasMore: false };
-  if (!Number.isFinite(before) || before <= 0) return jsonResponse(empty);
-
-  let path = resolveProviderTranscriptPath(provider, sessionId);
-  if (!path) return jsonResponse(empty);
-  try {
-    path = realpathSync(path);
-  } catch {
-    return jsonResponse(empty);
-  }
-  if (!isInsideProviderRoot(provider, path)) {
-    return jsonResponse(
-      { error: `transcript path is outside ${providerRootName(provider)}` },
-      403,
-    );
-  }
-
-  try {
-    // Clamp to the live size in case the file was truncated/rotated since the
-    // cursor was issued, so we never read past EOF into uninitialized bytes.
-    const size = statSync(path).size;
-    const endOffset = Math.min(before, size);
-    const cap = Math.min(Math.max(1, limit || BACKLOG_LINES), 200);
-    const { lines, startOffset } = readLinesEndingAt(path, endOffset, cap);
-    return jsonResponse({
-      entries: parseEntries(lines),
-      historyStart: startOffset,
-      hasMore: startOffset > 0,
-    });
-  } catch (err) {
-    return jsonError(err);
-  }
-}
-
 if (import.meta.main) {
+  const cockpitPort = cockpitDaemonPort();
   process.stdout.write(
-    JSON.stringify({ sessions: getLiveSessions() }, null, 2),
+    JSON.stringify(
+      {
+        sessions: getLiveSessions(),
+        cockpitUp: cockpitPort !== null,
+        cockpitPort,
+      },
+      null,
+      2,
+    ),
   );
 }

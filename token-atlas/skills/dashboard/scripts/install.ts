@@ -134,6 +134,6 @@ if (optionalFailed) {
     "All required checks passed (some optional data missing — dashboard will still launch).",
   );
 } else {
-  console.log("All checks passed. Run: bun run scripts/serve-dashboard.ts");
+  console.log("All checks passed. Run: bun run scripts/atlas-server.ts");
 }
 process.exit(0);

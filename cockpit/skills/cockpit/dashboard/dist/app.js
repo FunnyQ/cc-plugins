@@ -195,6 +195,59 @@ export const store = reactive({
     this._notify();
   },
 
+  // --- session navigator -------------------------------------------------
+  // The manifest bar's ‹ › arrows are a remote control for the hero: they
+  // step the selection through the *active* (flying) sessions, in the same
+  // order the manifest lists them. Ended sessions are skipped.
+  get navSessions() {
+    const out = [];
+    for (const g of this.projectGroups) {
+      for (const s of g.sessions) {
+        if (s.status === "active") out.push(s);
+      }
+    }
+    return out;
+  },
+
+  get navTotal() {
+    return this.navSessions.length;
+  },
+
+  get navIndex() {
+    return this.navSessions.findIndex((s) => this.isSelected(s));
+  },
+
+  // Arrows only mean something with more than one session to move between.
+  get canNavigate() {
+    return this.navTotal > 1;
+  },
+
+  // Bar readout: position among active sessions while navigable ("2 / 3", an
+  // instrument gauge), else the project (flight) count. "–" when the selection
+  // isn't one of the active sessions.
+  get navLabel() {
+    if (this.navTotal > 1) {
+      const pos = this.navIndex >= 0 ? this.navIndex + 1 : "–";
+      return `${pos} / ${this.navTotal}`;
+    }
+    return `${this.projectGroups.length} flights`;
+  },
+
+  // Step by ±1 through active sessions, wrapping at the ends. If the current
+  // selection isn't an active session, enter the list from the matching edge.
+  stepSession(delta) {
+    const list = this.navSessions;
+    if (!list.length) return;
+    const cur = this.navIndex;
+    const next =
+      cur < 0
+        ? delta > 0
+          ? 0
+          : list.length - 1
+        : (cur + delta + list.length) % list.length;
+    this.selectSession(list[next]);
+  },
+
   // Column modules call this to be told when the active session changes.
   // Returns the current selection immediately is the caller's job.
   subscribe(fn) {
@@ -274,6 +327,20 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+// Deep-link: token-atlas's "Live now" panel links here with
+// ?session=&provider=&project= so cockpit opens straight onto that session's
+// transcript. Pre-setting the selection makes fetchSessions skip its
+// default-select-top, and the transcript column streams by id — so even a
+// session cockpit never tracked shows its transcript (its decision log just
+// stays on the empty state, since no log file exists for it).
+const deepLink = new URLSearchParams(location.search);
+const deepLinkSession = deepLink.get("session");
+if (deepLinkSession && /^[0-9a-f-]{36}$/i.test(deepLinkSession)) {
+  store.selectedSessionId = deepLinkSession;
+  store.selectedProvider = deepLink.get("provider") || "claude";
+  store.selectedProject = deepLink.get("project") || null;
+}
+
 await store.fetchProjects();
 await store.fetchSessions();
 createApp(store).mount("#app");
@@ -305,7 +372,20 @@ const designSystem = initDesignSystem(
 );
 store._loadDesignSystem = designSystem && designSystem.load;
 
-// Escape closes drawer overlays.
+// Escape closes drawer overlays; ←/→ step through active sessions.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && store.designSystemOpen) store.closeDesignSystem();
+  if (e.key === "Escape" && store.designSystemOpen) {
+    store.closeDesignSystem();
+    return;
+  }
+  // Don't hijack arrows while typing or with a modifier held.
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target?.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || e.target?.isContentEditable)
+    return;
+  if (e.key === "ArrowLeft") {
+    store.stepSession(-1);
+  } else if (e.key === "ArrowRight") {
+    store.stepSession(1);
+  }
 });

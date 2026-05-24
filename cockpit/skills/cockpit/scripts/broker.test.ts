@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const CLI = join(import.meta.dir, "cockpit.ts");
-const DAEMON = join(import.meta.dir, "serve-dashboard.ts");
+const DAEMON = join(import.meta.dir, "cockpit-server.ts");
 const SID_A = "aaaaaaaa-1111-1111-1111-111111111111";
 const SID_B = "bbbbbbbb-2222-2222-2222-222222222222";
 const SID_C = "cccccccc-3333-3333-3333-333333333333";

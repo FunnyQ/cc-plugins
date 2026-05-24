@@ -1,5 +1,6 @@
 <section
   class="panel live-panel"
+  :class="{ 'is-cockpit-down': !cockpitUp }"
   aria-label="Live sessions"
   v-if="liveSessions.length || liveError"
 >
@@ -11,6 +12,11 @@
     <span class="live-count">{{ liveSessions.length }} active</span>
   </header>
 
+  <p v-if="!cockpitUp && !liveError" class="live-notice" role="status">
+    <strong>Cockpit isn’t running.</strong>
+    Start its dashboard (port 5858) to open a session’s transcript.
+  </p>
+
   <p v-if="liveError" class="live-error" role="status">{{ liveError }}</p>
 
   <ul v-else class="live-list">
@@ -20,8 +26,9 @@
       class="live-row"
       role="button"
       tabindex="0"
-      @click="openStream(s)"
-      @keydown.enter="openStream(s)"
+      @click="openInCockpit(s)"
+      @keydown.enter="openInCockpit(s)"
+      :title="cockpitUp ? 'Open in cockpit' : 'Start cockpit to open transcripts'"
     >
       <span
         :class="liveStatusClass(s.status)"
@@ -35,8 +42,16 @@
         </span>
         <span class="live-path">{{ s.cwd }}</span>
       </span>
-      <span class="live-status-label">{{ s.status }}</span>
-      <span class="live-ago">{{ liveAgo(s.updatedAt) }}</span>
+      <span class="live-status-cluster">
+        <span
+          v-if="s.cockpit"
+          class="live-cockpit-tag"
+          title="Tracked in cockpit — has a decision trail"
+          >cockpit</span
+        >
+        <span class="live-status-label">{{ s.status }}</span>
+        <span class="live-ago">{{ liveAgo(s.updatedAt) }}</span>
+      </span>
     </li>
   </ul>
 </section>

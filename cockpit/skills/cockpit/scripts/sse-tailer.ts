@@ -49,12 +49,16 @@ export type TailSource = {
   // Re-evaluated until it yields a confined, existing file path.
   resolve: () => ResolveResult;
   // Read the backlog to emit on attach. The cursor then advances to `size`.
+  // `backlogMeta`, when returned, becomes the JSON payload of the `backlog-done`
+  // frame — the transcript stream uses it to ship the reverse-scroll cursor
+  // (historyStart/hasMore); the decision-log stream omits it (stays `{}`).
   readBacklog: (
     path: string,
     size: number,
   ) => {
     complete: string;
     partial: string;
+    backlogMeta?: Record<string, unknown>;
   };
   // Provider-specific parse + filter of newly appended text into SSE frames.
   emit: (enqueue: (chunk: string) => void, completeText: string) => void;
@@ -194,19 +198,24 @@ export function createTailStream(source: TailSource): Response {
         }
 
         // backlog
+        let backlogMeta: Record<string, unknown> = {};
         try {
           const size = statSync(path).size;
-          const { complete, partial: trailing } = source.readBacklog(
-            path,
-            size,
-          );
+          const {
+            complete,
+            partial: trailing,
+            backlogMeta: meta,
+          } = source.readBacklog(path, size);
           source.emit(enqueue, complete);
           partial = trailing;
           offset = size;
+          if (meta) backlogMeta = meta;
         } catch {
           // vanished between resolve and read — backlog stays empty
         }
-        enqueue("event: backlog-done\ndata: {}\n\n");
+        enqueue(
+          `event: backlog-done\ndata: ${JSON.stringify(backlogMeta)}\n\n`,
+        );
 
         attachFileWatcher();
         // Parent-dir watch catches create/rename/atomic-replace that a file

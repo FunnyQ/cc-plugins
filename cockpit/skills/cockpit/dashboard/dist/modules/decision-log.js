@@ -152,6 +152,30 @@ export function initDecisionLog(rootEl) {
   const isPinned = () =>
     rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight < 48;
 
+  // A live session that cockpit never tracked (tracked === false, the same flag
+  // the manifest pill reads) has no decision log at all. Rather than the bland
+  // "No decisions logged yet.", invite the pilot to bring it onto the cockpit.
+  const isUntracked = () => {
+    const s = store.sessions.find((x) => x.sessionId === currentSession);
+    return !!s && s.tracked === false;
+  };
+
+  function renderEmptyState() {
+    if (isUntracked()) {
+      emptyEl.classList.remove("placeholder");
+      emptyEl.classList.add("decision-log__invite");
+      emptyEl.innerHTML = `
+        <span class="decision-log__invite-badge">Off the cockpit</span>
+        <span class="decision-log__invite-title">Flying without a flight plan</span>
+        <span class="decision-log__invite-body">This session isn’t tracked by cockpit, so there’s no decision trail to show.</span>
+        <span class="decision-log__invite-cta">Run <code>/cockpit</code> to set a goal. From there, every decision worth remembering lands here.</span>`;
+    } else {
+      emptyEl.classList.remove("decision-log__invite");
+      emptyEl.classList.add("placeholder");
+      emptyEl.textContent = "No decisions logged yet.";
+    }
+  }
+
   function reset() {
     seen.clear();
     lastOpenCall = null;
@@ -328,7 +352,7 @@ export function initDecisionLog(rootEl) {
       );
     } catch {
       note.hidden = false;
-      note.textContent = "Failed to send — try again.";
+      note.textContent = "Failed to send. Try again.";
       delete card.dataset.responseState;
       setFormDisabled(form, false);
       updateSendState(card);
@@ -397,6 +421,7 @@ export function initDecisionLog(rootEl) {
     }
     reset();
     currentSession = session;
+    renderEmptyState();
     if (!project || !session) return;
     const url = `/api/log/stream?project=${encodeURIComponent(project)}&session=${encodeURIComponent(session)}`;
     es = new EventSource(url);
@@ -433,6 +458,11 @@ export function initDecisionLog(rootEl) {
 
   store.subscribe((project, session) => open(project, session));
   store.subscribeSessions(refreshCallState);
+  // A deep-linked session may only appear in the list after a poll — refresh the
+  // empty-state copy so its untracked invite resolves once the flag arrives.
+  store.subscribeSessions(() => {
+    if (!emptyEl.hidden) renderEmptyState();
+  });
   // Open immediately for the current selection (set before this mounts).
   open(store.selectedProject, store.selectedSessionId);
 }

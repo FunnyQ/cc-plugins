@@ -5,8 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
 import {
   getLiveSessions,
-  streamTranscript,
-  getTranscriptHistory,
+  cockpitDaemonPort,
   jsonResponse,
   jsonError,
 } from "./live.ts";
@@ -101,28 +100,15 @@ async function handleStats(): Promise<Response> {
 
 function handleLive(): Response {
   try {
-    return jsonResponse({ sessions: getLiveSessions() });
+    const cockpitPort = cockpitDaemonPort();
+    return jsonResponse({
+      sessions: getLiveSessions(),
+      cockpitUp: cockpitPort !== null,
+      cockpitPort,
+    });
   } catch (err) {
     return jsonError(err);
   }
-}
-
-function handleStream(req: Request): Response {
-  const url = new URL(req.url);
-  return streamTranscript(
-    url.searchParams.get("id") ?? url.searchParams.get("session"),
-    url.searchParams.get("provider"),
-  );
-}
-
-function handleTranscript(req: Request): Response {
-  const url = new URL(req.url);
-  return getTranscriptHistory(
-    url.searchParams.get("id") ?? url.searchParams.get("session"),
-    Number(url.searchParams.get("before")),
-    Number(url.searchParams.get("limit")),
-    url.searchParams.get("provider"),
-  );
 }
 
 // ---------- server ----------
@@ -137,8 +123,6 @@ const server = Bun.serve({
     const url = new URL(req.url);
     if (url.pathname === "/api/stats") return handleStats();
     if (url.pathname === "/api/live") return handleLive();
-    if (url.pathname === "/api/stream") return handleStream(req);
-    if (url.pathname === "/api/transcript") return handleTranscript(req);
     return serveStatic(url.pathname);
   },
 });

@@ -23,7 +23,7 @@ Always run the precheck first; only launch the dashboard if it exits 0.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/install.ts \
-  && bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/serve-dashboard.ts
+  && bun ${CLAUDE_PLUGIN_ROOT}/skills/dashboard/scripts/atlas-server.ts
 ```
 
 The precheck (`install.ts`) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps — typically `history.jsonl` missing because the user hasn't used Claude Code chat yet — do **not** block the dashboard; the affected sections will just show empty.
@@ -112,7 +112,7 @@ dashboard/
 ├── scripts/
 │   ├── install.ts            # diagnostic
 │   ├── api.ts                # data engine (also CLI: prints JSON)
-│   ├── serve-dashboard.ts    # HTTP server + auto-open
+│   ├── atlas-server.ts       # HTTP server + auto-open
 │   ├── statusline-collector.ts # captures live rate_limits and chains ccstatusline
 │   └── setup-statusline.ts   # wires the collector into settings.json (user-approved)
 ├── dashboard/dist/           # static frontend (no build step)
