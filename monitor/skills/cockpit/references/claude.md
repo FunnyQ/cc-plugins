@@ -9,8 +9,8 @@ three Claude-specific bits below. Everything else is shared.
 
 Use `${CLAUDE_PLUGIN_ROOT}` when installed as a plugin. In a development checkout
 of this repository, `${CLAUDE_PLUGIN_ROOT}` is empty (and is also empty in an
-ad-hoc shell), so substitute `cockpit` from the repo root instead, for example
-`bun cockpit/skills/cockpit/scripts/...`.
+ad-hoc shell), so substitute `monitor` from the repo root instead, for example
+`bun monitor/skills/cockpit/scripts/...`.
 
 ## Session id (Step 1)
 

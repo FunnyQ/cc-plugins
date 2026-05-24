@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.0] - 2026-05-24
+
+### ⚠️ Breaking
+
+- **Token Atlas and Cockpit are now one plugin: `monitor`**: The two separate plugins have merged into a single `monitor` plugin that ships both as skills (`usage-dashboard` + `cockpit`). **You must reinstall** — remove the old `token-atlas` and `cockpit` plugins, then install `monitor@q-lab-marketplace` (Claude Code) / `monitor@q-lab-marketplace` (Codex). One install, one version line, one marketplace card.
+- **Skill rename**: `dashboard` → `usage-dashboard`. Invocation namespaces are now `monitor:usage-dashboard` and `monitor:cockpit`; the in-skill trigger phrases (e.g. `/token-atlas`, `/cockpit`) still work.
+
+### ♻️ Internal
+
+- **Both skills now ship to Codex**: previously only Cockpit was on the Codex marketplace; `monitor` exposes both skills (`skills: "./skills/"` auto-discovers them). The `usage-dashboard` skill's run paths were made runtime-neutral (`<plugin-root>`) so they resolve under Codex as well as Claude Code.
+- **Packaging-only merge**: the two web servers stay independent (usage-dashboard on 5938, cockpit daemon on 5858) — no runtime/daemon merge in this release.
+
 ## [2.6.1] - 2026-05-24
 
 ### 💄 Polish
