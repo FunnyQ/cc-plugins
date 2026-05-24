@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { findSession } from "./find-session";
 
 // ---------- Types ----------
 
@@ -260,9 +261,13 @@ function cmdStart(args: Args): void {
 function cmdLog(args: Args): void {
   const project = process.cwd();
   const provider = parseProvider(args.single["provider"]);
-  const sessionId = args.single["session"];
+  // Prefer an explicit --session, but fall back to the live session id so a
+  // decision can't be misfiled to the wrong (or a stale) session.
+  const sessionId = args.single["session"] || findSession(provider, project);
   if (!sessionId) {
-    console.error("cockpit log: --session <id> is required");
+    console.error(
+      "cockpit log: --session <id> is required (could not auto-resolve the current session)",
+    );
     process.exit(1);
   }
   const rec: DecisionRecord = {

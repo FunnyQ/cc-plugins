@@ -41,6 +41,28 @@ afterEach(() => {
   rmSync(codexDir, { recursive: true, force: true });
 });
 
+describe("find-session --provider claude", () => {
+  test("trusts CLAUDE_CODE_SESSION_ID over any transcript-mtime guess", () => {
+    const live = "abcdef00-1111-2222-3333-444455556666";
+    // No transcript fixtures: the env var alone must decide the answer.
+    const result = run(["--provider", "claude"], {
+      CLAUDE_CODE_SESSION_ID: live,
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe(live);
+  });
+
+  test("falls back to the transcript scan when the env var is absent", () => {
+    // Empty env var → not authoritative → fall through to the mtime scan, which
+    // finds no transcript dir for this throwaway project and exits non-zero.
+    const result = run(["--provider", "claude"], {
+      CLAUDE_CODE_SESSION_ID: "",
+    });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("no transcript dir");
+  });
+});
+
 describe("find-session --provider codex", () => {
   test("returns newest Codex thread for cwd", () => {
     const db = new Database(join(codexDir, "state_5.sqlite"));
