@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.4.4] - 2026-05-24
+
+### ✨ New Features
+
+- **Safer Cockpit call responses**: `needs_your_call` options now select first instead of sending immediately, so the final answer is only delivered when Send is pressed.
+- **Additional instructions field**: Replaced the custom-answer input with a one-line auto-growing textarea, allowing `Shift+Enter` line breaks and optional comments to be sent alongside a selected option.
+
+> Token Atlas runtime is unchanged in this release; the version bump keeps marketplace plugins aligned at 2.4.4.
+
 ## [2.4.3] - 2026-05-24
 
 ### 📝 Documentation

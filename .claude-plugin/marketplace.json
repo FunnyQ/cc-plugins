@@ -8,13 +8,13 @@
       "name": "token-atlas",
       "source": "./token-atlas",
       "description": "Local web dashboard for Claude Code and Codex usage — sessions, tokens, cost, model mix, project activity.",
-      "version": "2.4.3"
+      "version": "2.4.4"
     },
     {
       "name": "cockpit",
       "source": "./cockpit",
       "description": "Per-project driving cockpit for Claude Code and Codex — goal + decision log + live session view.",
-      "version": "2.4.3"
+      "version": "2.4.4"
     }
   ]
 }
