@@ -7,6 +7,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readRegistry } from "./registry";
+import { jsonResponse as json } from "./http";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -45,16 +46,6 @@ function waitTimeoutMs(): number {
 
 function logPathFor(sessionId: string): string | null {
   return readRegistry().find((e) => e.sessionId === sessionId)?.logPath ?? null;
-}
-
-function json(payload: object, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
 }
 
 // ---------- GET /api/wait?session=<uuid>&token=<t> ----------
