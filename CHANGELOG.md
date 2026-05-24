@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.6.0] - 2026-05-24
+
+### ✨ New Features
+
+- **Cockpit is the single live transcript view**: Token Atlas's "Live now" rows now open the running session straight in Cockpit (deep-linked by URL) instead of rendering a transcript in-app, and Cockpit can open any running session — tracked or not. One transcript renderer, no drift between the two dashboards.
+- **Live sessions across every project in the Cockpit manifest**: The manifest mirrors what's actually running (from `~/.claude/sessions` and the Codex state DB), so genuinely-live sessions show up even from projects you never ran `/cockpit` in; sessions without a goal trail appear as "untracked".
+- **Session prev/next navigator**: The Cockpit manifest bar's ‹ › are now real controls that step the selection through active sessions (wrapping, cross-project), with keyboard ←/→ support and a "2 / 3" position readout.
+- **Know which sessions are worth opening in Cockpit**: Token Atlas tags live sessions that already have a Cockpit decision trail with a "cockpit" badge, and flags when the Cockpit daemon isn't running so clicking a row never opens a dead tab.
+- **A `/cockpit` invite for untracked sessions**: Opening a session Cockpit isn't tracking now shows a gentle Decision Log card inviting you to run `/cockpit` and start a trail, instead of a blank "No decisions logged yet."
+- **Scroll-to-top history in the Cockpit transcript**: The live transcript reverse-paginates older entries as you scroll up, keeping the viewport anchored where you were reading.
+- **Subagent notifications read as their own role**: Agent and task completion messages render with a distinct subagent role and accent instead of looking like one of your own messages.
+
+### 🐛 Bug Fixes
+
+- **Live rows open Cockpit's real port**: Token Atlas opens transcripts on the port Cockpit actually bound (read from `daemon.json`) rather than a hardcoded 5858, so a Cockpit started on a custom `--port` no longer opens a dead tab.
+- **Wide code no longer overflows the transcript**: Long single-line JSON and code blocks scroll within their column instead of spilling past it and being clipped.
+- **Diff lines wrap again**: Long diff lines soft-wrap in the Cockpit transcript instead of widening the column and clipping the +/- gutter.
+
+### 💄 Polish
+
+- **Cockpit dashboard aligned to the Night Flight design system**: the untracked-session invite drops the reserved nebula color for a tonal card with an aurora accent, the navigator arrows use an on-scale radius and the standard ease-out curve, and em dashes were removed from UI copy.
+
+### ♻️ Internal
+
+- **Distinct dashboard server filenames**: Cockpit's and Token Atlas's servers were renamed to `cockpit-server.ts` and `atlas-server.ts`, so a `pkill -f "serve-dashboard.ts"` can no longer take down both daemons at once.
+
+### 📝 Documentation
+
+- **`/cockpit-start` is now `/cockpit`**: the cockpit skill's invocation was shortened.
+- **Marketplace docs cover both plugins**: CLAUDE.md now describes Token Atlas and Cockpit as siblings, documents the dynamic Cockpit port, and corrects the release process to the three version files that must be bumped together.
+
 ## [2.5.1] - 2026-05-24
 
 ### 🐛 Bug Fixes
