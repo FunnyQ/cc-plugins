@@ -1,13 +1,13 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace. Private plugins for extending local AI coding workflows with custom skills and dashboards.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships private plugins that turn local traces into useful dashboards: token-atlas is the rear-view mirror for usage history, and cockpit is the windshield for the session currently in flight.
 
 ## Plugins
 
 | Plugin | Description |
 |--------|-------------|
-| [token-atlas](./token-atlas) | Local web dashboard for Claude Code & Codex usage — sessions, tokens, cost, model mix, project activity |
-| [cockpit](./cockpit) | Per-project cockpit for Claude Code & Codex — goal capture, decision log, live transcript, and needs-your-call bridge |
+| [token-atlas](./token-atlas) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
+| [cockpit](./cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, and needs-your-call bridge |
 
 ## Claude Code Installation
 
@@ -19,14 +19,14 @@ claude plugins install token-atlas@q-lab-marketplace
 claude plugins install cockpit@q-lab-marketplace
 ```
 
-### TUI (interactive)
+### TUI
 
 1. Open Claude Code
 2. Type `/plugins` to open the plugin manager
 3. Select **Add Marketplace** → enter `FunnyQ/cc-plugins`
 4. Select **Install Plugin** → choose `token-atlas` or `cockpit`
 
-The skill runs a prerequisite check automatically before launching the dashboard, so there's no manual setup step. If something's missing, the hint will be surfaced — the most common case is `stats-cache.json` not yet existing; just run `/stats` once in Claude Code to seed it.
+token-atlas runs a prerequisite check automatically before launching the dashboard, so there's no manual setup step. If something is missing, the hint is surfaced in the terminal. The most common case is `stats-cache.json` not existing yet; run `/stats` once in Claude Code to seed it.
 
 If you want to run the precheck yourself:
 
@@ -36,7 +36,7 @@ bun $CLAUDE_PLUGIN_ROOT/skills/dashboard/scripts/install.ts
 
 ## Codex Installation
 
-Codex reads its marketplace entry from `.agents/plugins/marketplace.json`.
+Codex reads this marketplace from `.agents/plugins/marketplace.json`. At the moment, the Codex marketplace entry installs `cockpit`.
 
 ```bash
 codex plugin marketplace add FunnyQ/cc-plugins
@@ -53,9 +53,9 @@ After installing a Codex plugin, start a new Codex session so the skill list is 
 
 ## token-atlas
 
-A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data and visualizes it in a browser. No telemetry, no cloud — everything stays on your machine.
+A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and visualizes usage in a browser. No telemetry, no cloud; everything stays on your machine.
 
-![Token Atlas dashboard preview](./assets/token-atlas-dashboard.jpg)
+![Token Atlas dashboard preview](./assets/token-atlas-dashboard.png)
 
 ### Features
 
@@ -73,7 +73,8 @@ A single-page dashboard that reads your local `~/.claude/` and `~/.codex/` data 
 ### Prerequisites
 
 - [Bun](https://bun.sh) runtime
-- At least one Claude Code session (run `/stats` once to seed `stats-cache.json`)
+- At least one Claude Code session
+- For Claude usage totals, run `/stats` once to seed `stats-cache.json`
 
 ### Quick Start
 
@@ -108,11 +109,13 @@ Token costs are estimated using bundled defaults (`references/pricing-defaults.j
 
 ## cockpit
 
-Cockpit is a per-project dashboard and skill for active work. Start a session goal, keep a distilled decision log, stream the current Claude Code or Codex transcript, and park on `needs_your_call` so a button click in the dashboard wakes the session.
+Cockpit is a per-project dashboard and skill for active work. Start with a session goal, keep a distilled decision log, stream the current Claude Code or Codex transcript, and park on `needs_your_call` so a button click in the dashboard wakes the session.
+
+![Cockpit dashboard preview](./assets/cockpit-dashboard.png)
 
 ### Quick Start
 
-In Claude Code or Codex, invoke the cockpit skill and confirm the proposed goals. From a dev checkout, the dashboard can also be started directly:
+In Claude Code or Codex, invoke the cockpit skill and confirm the proposed goals. From a development checkout, the dashboard can also be started directly:
 
 ```bash
 bun cockpit/skills/cockpit/scripts/serve-dashboard.ts
