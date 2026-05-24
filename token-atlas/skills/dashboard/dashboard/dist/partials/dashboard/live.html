@@ -20,8 +20,9 @@
       class="live-row"
       role="button"
       tabindex="0"
-      @click="openStream(s)"
-      @keydown.enter="openStream(s)"
+      @click="openInCockpit(s)"
+      @keydown.enter="openInCockpit(s)"
+      title="Open in cockpit"
     >
       <span
         :class="liveStatusClass(s.status)"
