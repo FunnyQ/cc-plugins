@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
+import { getLiveSessions } from "./live-sessions";
 
 export type RegistryEntry = {
   provider: Provider;
@@ -32,6 +33,9 @@ export type SessionView = {
   lastHeartbeat: string;
   sessionGoal: string;
   projectGoal: string;
+  // false for a session that's running but was never /cockpit-start'd: it shows
+  // in the manifest (transcript streams by id) but has no goal/decision trail.
+  tracked: boolean;
 };
 
 export type ProjectView = {
@@ -161,20 +165,51 @@ export function buildSessions(now = Date.now()): SessionView[] {
     }
     return g;
   };
-  return readRegistry()
-    .map(
-      (e): SessionView => ({
-        provider: e.provider,
-        project: e.project,
-        sessionId: e.sessionId,
-        logPath: e.logPath,
-        status: statusOf(e, now),
-        lastHeartbeat: e.lastHeartbeat,
-        sessionGoal: readSessionGoal(e.logPath),
-        projectGoal: projectGoal(e.project),
-      }),
-    )
-    .sort(activeFirst);
+  // Sessions actually running right now (across all projects, tracked or not),
+  // keyed provider:id. A registered session that's live is forced "active"; a
+  // live session with no registry entry is appended so the manifest mirrors
+  // what's live — not just what was /cockpit-start'd.
+  const liveByKey = new Map(
+    getLiveSessions(now).map((l) => [`${l.provider}:${l.id}`, l]),
+  );
+  const seen = new Set<string>();
+
+  const tracked = readRegistry().map((e): SessionView => {
+    const key = `${e.provider}:${e.sessionId}`;
+    seen.add(key);
+    const live = liveByKey.has(key);
+    return {
+      provider: e.provider,
+      project: e.project,
+      sessionId: e.sessionId,
+      logPath: e.logPath,
+      status: live || statusOf(e, now) === "active" ? "active" : "ended",
+      lastHeartbeat: e.lastHeartbeat,
+      sessionGoal: readSessionGoal(e.logPath),
+      projectGoal: projectGoal(e.project),
+      tracked: true,
+    };
+  });
+
+  const untracked: SessionView[] = [];
+  for (const l of liveByKey.values()) {
+    const key = `${l.provider}:${l.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    untracked.push({
+      provider: l.provider,
+      project: l.cwd,
+      sessionId: l.id,
+      logPath: "",
+      status: "active",
+      lastHeartbeat: new Date(l.updatedAtMs).toISOString(),
+      sessionGoal: "",
+      projectGoal: projectGoal(l.cwd),
+      tracked: false,
+    });
+  }
+
+  return [...tracked, ...untracked].sort(activeFirst);
 }
 
 export function buildProjects(now = Date.now()): ProjectView[] {
