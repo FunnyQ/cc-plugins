@@ -3,13 +3,7 @@ import { statSync, existsSync } from "node:fs";
 import { extname, resolve, relative, isAbsolute } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { buildStats } from "./api.ts";
-import {
-  getLiveSessions,
-  streamTranscript,
-  getTranscriptHistory,
-  jsonResponse,
-  jsonError,
-} from "./live.ts";
+import { getLiveSessions, jsonResponse, jsonError } from "./live.ts";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
@@ -107,24 +101,6 @@ function handleLive(): Response {
   }
 }
 
-function handleStream(req: Request): Response {
-  const url = new URL(req.url);
-  return streamTranscript(
-    url.searchParams.get("id") ?? url.searchParams.get("session"),
-    url.searchParams.get("provider"),
-  );
-}
-
-function handleTranscript(req: Request): Response {
-  const url = new URL(req.url);
-  return getTranscriptHistory(
-    url.searchParams.get("id") ?? url.searchParams.get("session"),
-    Number(url.searchParams.get("before")),
-    Number(url.searchParams.get("limit")),
-    url.searchParams.get("provider"),
-  );
-}
-
 // ---------- server ----------
 
 const port = parsePort();
@@ -137,8 +113,6 @@ const server = Bun.serve({
     const url = new URL(req.url);
     if (url.pathname === "/api/stats") return handleStats();
     if (url.pathname === "/api/live") return handleLive();
-    if (url.pathname === "/api/stream") return handleStream(req);
-    if (url.pathname === "/api/transcript") return handleTranscript(req);
     return serveStatic(url.pathname);
   },
 });
