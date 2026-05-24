@@ -625,20 +625,18 @@ body {
   line-height: 1;
   padding: 8px 10px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    opacity 160ms ease;
+    color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .manifest__nav:hover:not(:disabled) {
   color: var(--starlight);
-  background: color-mix(in oklch, var(--aurora) 18%, transparent);
+  background: color-mix(in oklch, var(--aurora) 16%, transparent);
 }
 .manifest__nav:disabled {
   color: var(--ink-faint);
   cursor: default;
-  opacity: 0.5;
 }
 .manifest__beacon {
   width: 0;
@@ -910,15 +908,11 @@ body {
   max-width: 42ch;
   padding: 22px 24px;
   text-align: center;
-  border: 1px solid color-mix(in oklab, var(--nebula-violet) 28%, var(--edge));
+  /* Tonal lift + a hairline of the aurora navigation accent (the invite points
+     you toward /cockpit). Nebula is reserved for the viewport, so not here. */
+  border: 1px solid color-mix(in oklab, var(--aurora) 22%, var(--edge));
   border-radius: var(--radius);
-  background:
-    radial-gradient(
-      120% 120% at 50% 0%,
-      color-mix(in oklab, var(--nebula-violet) 12%, transparent),
-      transparent 70%
-    ),
-    var(--hull-2);
+  background: var(--hull-2);
 }
 .decision-log__invite-badge {
   font-family: var(--font-mono);
@@ -926,7 +920,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--nebula-violet) 70%, var(--starlight));
+  color: var(--aurora);
 }
 .decision-log__invite-title {
   font-size: 15px;

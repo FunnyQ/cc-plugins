@@ -168,7 +168,7 @@ export function initDecisionLog(rootEl) {
         <span class="decision-log__invite-badge">Off the cockpit</span>
         <span class="decision-log__invite-title">Flying without a flight plan</span>
         <span class="decision-log__invite-body">This session isn’t tracked by cockpit, so there’s no decision trail to show.</span>
-        <span class="decision-log__invite-cta">Run <code>/cockpit</code> to set a goal — from there, every decision worth remembering lands here.</span>`;
+        <span class="decision-log__invite-cta">Run <code>/cockpit</code> to set a goal. From there, every decision worth remembering lands here.</span>`;
     } else {
       emptyEl.classList.remove("decision-log__invite");
       emptyEl.classList.add("placeholder");
@@ -352,7 +352,7 @@ export function initDecisionLog(rootEl) {
       );
     } catch {
       note.hidden = false;
-      note.textContent = "Failed to send — try again.";
+      note.textContent = "Failed to send. Try again.";
       delete card.dataset.responseState;
       setFormDisabled(form, false);
       updateSendState(card);

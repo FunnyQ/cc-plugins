@@ -222,6 +222,17 @@ export const store = reactive({
     return this.navTotal > 1;
   },
 
+  // Bar readout: position among active sessions while navigable ("2 / 3", an
+  // instrument gauge), else the project (flight) count. "–" when the selection
+  // isn't one of the active sessions.
+  get navLabel() {
+    if (this.navTotal > 1) {
+      const pos = this.navIndex >= 0 ? this.navIndex + 1 : "–";
+      return `${pos} / ${this.navTotal}`;
+    }
+    return `${this.projectGroups.length} flights`;
+  },
+
   // Step by ±1 through active sessions, wrapping at the ends. If the current
   // selection isn't an active session, enter the list from the matching edge.
   stepSession(delta) {
