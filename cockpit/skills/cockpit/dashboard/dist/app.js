@@ -283,7 +283,9 @@ startPolling();
 // hero toggle can pause/resume it.
 store._starfield = initStarfield(document.querySelector(".viewport__warp"));
 window.setTimeout(() => {
-  if (!store.heroCollapsed) store.setHeroCollapsed(true);
+  // Don't lower the barrier over an open needs_your_call — the pilot's turn
+  // keeps the viewport raised until they answer (see decision-log hero hooks).
+  if (!store.heroCollapsed && !store.awaitingCall) store.setHeroCollapsed(true);
 }, HERO_AUTO_COLLAPSE_MS);
 
 // The HUD leader line (underline under the destination → connector to beacon).
