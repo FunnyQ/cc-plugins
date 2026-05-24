@@ -10,13 +10,13 @@ description: >-
   and watch the decision trail steer toward it in the cockpit dashboard.
 ---
 
-# /cockpit-start
+# /cockpit
 
 Capture a goal at session start and open a decision trail for this project —
 the data the cockpit dashboard visualizes. This sets the heading: where we're
 going, then the turns a diff can't explain.
 
-**Opt-in.** Only run when the user invokes it (`/cockpit-start`, "設定這次的目標", …).
+**Opt-in.** Only run when the user invokes it (`/cockpit`, "設定這次的目標", …).
 Never auto-start on session open — not every session deserves a goal.
 
 This skill serves both **Claude Code** and **Codex**. The cockpit storage,

@@ -59,7 +59,7 @@ A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and v
 
 ### Features
 
-- **Live now (Claude + Codex)** — a panel of your currently-active Claude and Codex sessions with live status; click one to open a real-time transcript that streams as the session is written, with scroll-to-top history loading, GFM Markdown rendering, syntax-highlighted code blocks, inline color-coded file diffs, and collapsible tool calls/results
+- **Live now (Claude + Codex)** — a panel of your currently-active Claude and Codex sessions with live status; click one to open it in cockpit's live transcript view (token-atlas links out rather than rendering transcripts itself). When cockpit's daemon isn't running the panel says so and the rows stay inert, so a click never opens a dead tab
 - **Cost + usage overview** — sessions, interactions, tokens, estimated spend, daily burn, and monthly budget projection
 - **Model analysis** — daily trend, model distribution, and per-model token/cost breakdown
 - **Project insights** — project rankings with drilldown details for model mix and cost
