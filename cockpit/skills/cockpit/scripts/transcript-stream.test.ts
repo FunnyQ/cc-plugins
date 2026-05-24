@@ -7,12 +7,14 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { Database } from "bun:sqlite";
 import {
+  handleTranscriptHistory,
   handleTranscriptStream,
   isInsideCodexSessions,
   isInsideProjects,
@@ -190,6 +192,103 @@ describe("transcript-stream backlog", () => {
     const buf = await collect(res, (b) => b.includes("backlog-done"));
     expect(buf).toContain("c1");
     expect(buf).not.toContain("c-noise");
+  });
+});
+
+describe("transcript-stream backlog cursor", () => {
+  test("backlog-done frame carries historyStart + hasMore; a fully-covered file reports no more", async () => {
+    const res = handleTranscriptStream(transcriptReq(SID));
+    const buf = await collect(res, (b) => b.includes("backlog-done"));
+    // The frame after the `event: backlog-done` line is its JSON data payload.
+    const frame = buf.split("\n\n").find((f) => f.includes("backlog-done"));
+    expect(frame).toBeDefined();
+    const dataLine = frame!.split("\n").find((l) => l.startsWith("data:"));
+    const meta = JSON.parse(dataLine!.replace(/^data:\s*/, ""));
+    expect(typeof meta.historyStart).toBe("number");
+    expect(typeof meta.hasMore).toBe("boolean");
+    // The tiny fixture fits entirely in the backlog window, so we reached the
+    // start of the file: cursor 0, nothing older to page.
+    expect(meta.historyStart).toBe(0);
+    expect(meta.hasMore).toBe(false);
+  });
+});
+
+describe("transcript-stream history (reverse pagination)", () => {
+  const HID = "44444444-4444-4444-4444-444444444444";
+  let histPath: string;
+
+  function historyReq(
+    session: string,
+    before: number,
+    limit?: number,
+    provider?: string,
+  ): Request {
+    const lim = limit != null ? `&limit=${limit}` : "";
+    const prov = provider ? `&provider=${provider}` : "";
+    return new Request(
+      `http://127.0.0.1/api/transcript/history?session=${session}&before=${before}${lim}${prov}`,
+    );
+  }
+
+  beforeEach(() => {
+    histPath = join(projectsDir, "-Users-q-some-project", `${HID}.jsonl`);
+    writeFileSync(
+      histPath,
+      Array.from({ length: 6 }, (_, i) =>
+        JSON.stringify({
+          type: "assistant",
+          uuid: `h${i}`,
+          message: { content: `line ${i}` },
+        }),
+      ).join("\n") + "\n",
+    );
+  });
+
+  test("before<=0 returns an empty page (no read)", async () => {
+    const res = handleTranscriptHistory(historyReq(HID, 0));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ entries: [], historyStart: 0, hasMore: false });
+  });
+
+  test("pages backward from EOF: limit caps the page, cursor advances, hasMore set", async () => {
+    const size = statSync(histPath).size;
+    const first = await handleTranscriptHistory(
+      historyReq(HID, size, 2),
+    ).json();
+    expect(first.entries.map((e: { uuid: string }) => e.uuid)).toEqual([
+      "h4",
+      "h5",
+    ]); // last 2, oldest-first
+    expect(first.hasMore).toBe(true);
+    expect(first.historyStart).toBeGreaterThan(0);
+    expect(first.historyStart).toBeLessThan(size);
+
+    // Next page using the returned cursor yields the entries just before.
+    const second = await handleTranscriptHistory(
+      historyReq(HID, first.historyStart, 2),
+    ).json();
+    expect(second.entries.map((e: { uuid: string }) => e.uuid)).toEqual([
+      "h2",
+      "h3",
+    ]);
+  });
+
+  test("reaching the start of file reports hasMore:false, cursor 0", async () => {
+    const size = statSync(histPath).size;
+    const all = await handleTranscriptHistory(historyReq(HID, size, 50)).json();
+    expect(all.entries).toHaveLength(6);
+    expect(all.historyStart).toBe(0);
+    expect(all.hasMore).toBe(false);
+  });
+
+  test("invalid session / provider → 400", async () => {
+    expect(handleTranscriptHistory(historyReq("not-a-uuid", 100)).status).toBe(
+      400,
+    );
+    expect(
+      handleTranscriptHistory(historyReq(HID, 100, 10, "other")).status,
+    ).toBe(400);
   });
 });
 
