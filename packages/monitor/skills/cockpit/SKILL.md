@@ -128,26 +128,108 @@ One daemon serves every project's cockpit; you don't run a server per session.
 
 ## Logging decisions afterward
 
-During implementation, append decisions a **diff can't explain** (skip busywork
-like "created the User model"). Write `--decision` / `--reason` / `--tradeoff` in
-the project's **`log_language`** (the `project-meta.md` frontmatter set at start;
-default English) — read it back if you're unsure which language is in effect:
+A decision card exists to carry what a `git diff` throws away: **the thinking
+behind the change, not the change itself.** The diff already shows *what* the
+code does — your job here is to record *why it ended up this way*, so a future
+reader (or you, six months from now) doesn't have to reverse-engineer it.
+
+The filter for whether to log at all: **would someone reading the diff later ask
+"why was it done this way?"** If yes, log it. If the diff explains itself
+("created the User model", "renamed a variable"), skip it — a card that only
+restates the diff is noise in the trail.
+
+Write `--decision` / `--reason` / `--tradeoff` in the project's
+**`log_language`** (the `project-meta.md` frontmatter set at start; default
+English) — read it back if you're unsure which is in effect:
 
 ```bash
 bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
   [--session <id>] \
-  --decision "what was decided / done" \
-  --reason   "why — the part a diff can't show" \
-  [--tradeoff "what was given up"] \
+  --decision "what you chose / did — the one-line headline" \
+  --reason   "why this path, in a sentence or two" \
+  [--facet "LABEL: a distinct dimension of the thinking" ...] \
+  [--tradeoff "what it costs — what you gave up or are now assuming"] \
   [--file path/a.ts --file path/b.ts] \
   [--needs-call --option "A" --option "B"]
 ```
+
+**What each field carries:**
+
+- `--decision` — *what* you chose or did, in one line.
+- `--reason` — the lead: *why this path and not another,* in prose. The core
+  narrative of the call.
+- `--facet "LABEL: text"` (**repeatable**) — break out a distinct dimension of the
+  reasoning into its own labeled row. **You choose the label** — pick the one that
+  fits *this* decision, because no two decisions involve the same dimensions. A
+  suggested vocabulary (use it loosely, don't force it, invent a label when none
+  fit):
+  - `PROBLEM` — what you understood the task to be, when it isn't obvious from the code.
+  - `CONSTRAINT` — the limit that ruled out the cleaner option (perf, an API shape, compat, a deadline).
+  - `REJECTED` — the approach a reader would expect, and why you didn't take it. Often the most useful row.
+  - `ASSUMPTION` — what you're now leaning on that, if it changed, would break this.
+  - `PRIOR-ART` — the existing pattern/decision you're following (or deliberately not).
+
+  Reach only for the facets that *actually apply* — a card with one sharp `REJECTED`
+  beats one padded with five hollow rows. Each facet renders as its own stencil row
+  in the dashboard, so the card reads like a field manual of how the call was made.
+- `--tradeoff` — what the choice *costs*: what you gave up. (A forward-looking risk
+  often reads better as an `ASSUMPTION` or `RISK` facet — use whichever frames it best.)
+
+`--reason` and each `--facet` body render as Markdown in the dashboard.
+
+**Example 1 — shallow vs. with the thinking, facets pulling their weight:**
+
+```bash
+# ❌ Shallow — just echoes the diff
+--decision "Dedup transcript entries by requestId:messageId"
+--reason   "To avoid duplicate entries"
+
+# ✅ Reason carries the narrative; facets break out the dimensions
+--decision "Dedup transcript entries by requestId:messageId"
+--reason   "Streamed assistant turns get re-emitted on reconnect, so the same usage
+            was counted twice and cost showed ~2x."
+--facet    "CONSTRAINT: requestId alone collides across a multi-message turn; messageId
+            alone repeats across requests — only the pair is unique per billable unit."
+--facet    "ASSUMPTION: holds every seen key in memory for the session — fine at current
+            log sizes, would need an LRU if a session ran for days."
+```
+
+The ✅ version lets a reader reconstruct *why the pair*, *what bug it fixes*, and
+*when it stops working* — each on its own scannable row.
+
+**Example 2 — the whole call turns on the alternative you rejected:**
+
+```bash
+--decision "One dashboard daemon serves every project, not a server per session"
+--reason   "A singleton keyed by a PID file (~/.cockpit/daemon.json) starts once;
+            every session's SSE just subscribes to it."
+--facet    "REJECTED: spawning a server on each `cockpit start` — sessions open and
+            close constantly, so per-session servers mean port churn and orphaned
+            processes nobody reaps."
+--facet    "RISK: all projects share port 5858 — if the daemon crashes, every project's
+            live view goes dark with it."
+```
+
+The `REJECTED` row is the fork a future reader would otherwise have to rediscover by
+trial — now it's a labeled line they can scan to in a second.
+
+**Example 3 — a `needs_your_call`, where the decision is the question itself:**
+
+```bash
+--decision "Persist pricing overrides — per-project or one global file?"
+--reason   "Codex and Claude share a machine but rates differ per workspace; unclear
+            whether you want one source of truth or per-repo control."
+--needs-call --option "Global ~/.config" --option "Per-project .cockpit/"
+```
+
+The `--reason` still earns its place: it tells the user *why the fork exists* before
+they pick, so the answer lands in the trail with its context intact.
 
 - `--session` is optional: when omitted, `log` resolves the current session
   itself (Claude via `CLAUDE_CODE_SESSION_ID`, Codex via its state DB), so a
   decision can't be misfiled to the wrong or a stale session. Pass it explicitly
   only when logging for a session other than the live one.
-- `--file` and `--option` are repeatable.
+- `--facet`, `--file`, and `--option` are repeatable.
 - `log` does not need `--provider` after `start`; the existing registry entry
   keeps the provider. If logging before `start`, include `--provider <provider>`.
 - **Handoff (`--needs-call`)** marks the moment autopilot hands the stick back
