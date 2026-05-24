@@ -40,6 +40,24 @@ describe("latestOpenCallId", () => {
     expect(latestOpenCallId(lines)).toBeNull();
   });
 
+  test("answering an older (superseded) call leaves the latest call open", () => {
+    // c2 supersedes c1; a stray answer to c1 (e.g. `send --call c1`) must not
+    // close c2 nor be misread as "no open call".
+    const lines = [goal, call("c1"), call("c2"), response("c1")];
+    expect(latestOpenCallId(lines)).toBe("c2");
+  });
+
+  test("answering the latest call does NOT reopen the older superseded one", () => {
+    // Once c2 supersedes c1, answering c2 closes the trail — c1 never reopens.
+    const lines = [goal, call("c1"), call("c2"), response("c2")];
+    expect(latestOpenCallId(lines)).toBeNull();
+  });
+
+  test("a legacy response without a call closes the latest open call", () => {
+    const lines = [goal, call("c1"), call("c2"), response(null)];
+    expect(latestOpenCallId(lines)).toBeNull();
+  });
+
   test("skips blank and malformed lines", () => {
     expect(latestOpenCallId(["", "  ", "not json", call("c1")])).toBe("c1");
   });
