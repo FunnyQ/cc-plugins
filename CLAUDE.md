@@ -20,7 +20,7 @@ cc-plugins/
         ├── scripts/
         │   ├── api.ts               # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
         │   ├── live.ts              # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
-        │   ├── serve-dashboard.ts   # Bun HTTP server (static + /api/stats + /api/live)
+        │   ├── atlas-server.ts      # Bun HTTP server (static + /api/stats + /api/live)
         │   └── install.ts           # prerequisite checker
         ├── dashboard/dist/          # static SPA (petite-vue + Chart.js, no build step)
         └── references/
@@ -31,7 +31,7 @@ cc-plugins/
 
 1. `api.ts` reads local files: `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/**/*.jsonl`, `~/.codex/state_5.sqlite`, `~/.codex/sessions/`
 2. Pricing: defaults → OpenRouter live fetch (3s timeout, silent fail) → user override at `~/.config/cc-dashboard/pricing.json`
-3. `serve-dashboard.ts` exposes `GET /api/stats` (calls `buildStats()`) and serves `dashboard/dist/` statically
+3. `atlas-server.ts` exposes `GET /api/stats` (calls `buildStats()`) and serves `dashboard/dist/` statically
 4. Frontend fetches `/api/stats` on load, renders with petite-vue + Chart.js
 
 ### Live sessions ("Live now" panel)
@@ -57,10 +57,10 @@ token-atlas does **not** render transcripts — it's the rear-view (usage analyt
 
 ```bash
 # Run the dashboard (port 5938, auto-opens browser)
-bun token-atlas/skills/dashboard/scripts/serve-dashboard.ts
+bun token-atlas/skills/dashboard/scripts/atlas-server.ts
 
 # Run with custom port / no auto-open
-bun token-atlas/skills/dashboard/scripts/serve-dashboard.ts --port 9000 --no-open
+bun token-atlas/skills/dashboard/scripts/atlas-server.ts --port 9000 --no-open
 
 # Run install checks (verifies bun, data sources, vendor files)
 bun token-atlas/skills/dashboard/scripts/install.ts

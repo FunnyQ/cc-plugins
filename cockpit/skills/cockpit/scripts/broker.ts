@@ -62,7 +62,7 @@ function daemonToken(): string | null {
 }
 
 // Single-hop long-poll budget. Kept under the daemon's 255s idleTimeout (see
-// serve-dashboard.ts) so the hop resolves with a re-pollable sentinel before
+// cockpit-server.ts) so the hop resolves with a re-pollable sentinel before
 // Bun can drop the idle socket; cockpit wait simply re-polls. Overridable so
 // tests don't wait minutes.
 function waitTimeoutMs(): number {
