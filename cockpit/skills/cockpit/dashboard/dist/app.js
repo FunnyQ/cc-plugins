@@ -274,6 +274,20 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+// Deep-link: token-atlas's "Live now" panel links here with
+// ?session=&provider=&project= so cockpit opens straight onto that session's
+// transcript. Pre-setting the selection makes fetchSessions skip its
+// default-select-top, and the transcript column streams by id — so even a
+// session cockpit never tracked shows its transcript (its decision log just
+// stays on the empty state, since no log file exists for it).
+const deepLink = new URLSearchParams(location.search);
+const deepLinkSession = deepLink.get("session");
+if (deepLinkSession && /^[0-9a-f-]{36}$/i.test(deepLinkSession)) {
+  store.selectedSessionId = deepLinkSession;
+  store.selectedProvider = deepLink.get("provider") || "claude";
+  store.selectedProject = deepLink.get("project") || null;
+}
+
 await store.fetchProjects();
 await store.fetchSessions();
 createApp(store).mount("#app");
