@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code plugin marketplace (`q-lab-marketplace`) containing local plugins. Currently ships one plugin: **token-atlas** — a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
+A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing local plugins. It ships two sibling plugins:
+
+- **token-atlas** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
+- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, and a `needs_your_call` wait/send bridge). Its dashboard daemon owns the live transcript view that token-atlas's "Live now" rows link into.
+
+This file documents token-atlas in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `cockpit/skills/cockpit/`.
 
 ## Architecture
 
@@ -12,7 +17,7 @@ A Claude Code plugin marketplace (`q-lab-marketplace`) containing local plugins.
 cc-plugins/
 ├── .claude-plugin/marketplace.json   # marketplace registry (lists plugins)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
-└── token-atlas/                      # plugin: usage dashboard
+├── token-atlas/                      # plugin: usage dashboard
     ├── .claude-plugin/plugin.json    # plugin manifest
     └── skills/dashboard/             # the skill that powers /token-atlas
         ├── SKILL.md                  # skill trigger config & docs
@@ -25,6 +30,12 @@ cc-plugins/
         ├── dashboard/dist/          # static SPA (petite-vue + Chart.js, no build step)
         └── references/
             └── pricing-defaults.json
+└── cockpit/                          # plugin: per-project session cockpit (own SKILL/PRODUCT/DESIGN)
+    ├── .claude-plugin/plugin.json    # plugin manifest (version must match marketplace.json)
+    └── skills/cockpit/
+        ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json): decision-log SSE + transcript stream + wait/send broker
+        ├── scripts/cockpit.ts        # CLI: start / log / wait / send
+        └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
 ```
 
 ### Data Flow
@@ -40,7 +51,7 @@ Purely additive — the `/api/stats` snapshot is untouched. `live.ts` powers one
 
 1. `GET /api/live` — active sessions from both providers: Claude from `~/.claude/sessions/*.json` (status `busy`/`idle`/`waiting`, stale-filtered at 10 min) and Codex from the `threads` table in `~/.codex/state_5.sqlite` (status `active-inferred`/`recent`). Drives the "Live now" panel, polled every 3s (paused while the tab is hidden).
 
-token-atlas does **not** render transcripts — it's the rear-view (usage analytics). Clicking a Live-now row calls `openInCockpit(session)`, which opens `http://localhost:5858/?session=<id>&provider=<p>&project=<cwd>` in a new tab: cockpit (the live windshield) owns the transcript view. The transcript renderer + `marked`/`DOMPurify`/`highlight.js` vendors were removed here to avoid maintaining two copies — cockpit's `transcript-stream.ts` + `modules/transcript.js` are the single source.
+token-atlas does **not** render transcripts — it's the rear-view (usage analytics). Clicking a Live-now row calls `openInCockpit(session)`, which opens `http://localhost:<cockpitPort>/?session=<id>&provider=<p>&project=<cwd>` in a new tab: cockpit (the live windshield) owns the transcript view. The port comes from `/api/live`'s `cockpitPort` (read from cockpit's `~/.cockpit/daemon.json`, so a custom-`--port` cockpit still resolves), falling back to `5858`; rows are inert when `cockpitUp` is false so a dead daemon never opens a broken tab. The transcript renderer + `marked`/`DOMPurify`/`highlight.js` vendors were removed here to avoid maintaining two copies — cockpit's `transcript-stream.ts` + `modules/transcript.js` are the single source.
 
 ### Key Design Decisions
 
@@ -85,9 +96,10 @@ curl -s localhost:5938/api/live | jq
 
 ## Releasing
 
-⚠️ **Two version files must be bumped together** — they drift easily, and the marketplace shows the wrong version if they disagree:
+⚠️ **Three version files must be bumped together** — they drift easily, and the marketplace shows the wrong version if they disagree:
 
-- `.claude-plugin/marketplace.json` → `plugins[].version`
+- `.claude-plugin/marketplace.json` → both `plugins[].version` (token-atlas **and** cockpit)
 - `token-atlas/.claude-plugin/plugin.json` → `version`
+- `cockpit/.claude-plugin/plugin.json` → `version`
 
-`/odin-git:release` only auto-detects `marketplace.json`, so **manually bump `plugin.json` to match** before finishing any release, then add the matching `CHANGELOG.md` entry.
+`/odin-git:release` only auto-detects `marketplace.json`, so **manually bump both `plugin.json` files to match** before finishing any release, then add the matching `CHANGELOG.md` entry.
