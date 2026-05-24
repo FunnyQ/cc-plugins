@@ -12,11 +12,22 @@ export type CallLogRecord = {
 
 // The id of the latest still-open needs_your_call, or null when none is open.
 //
-// Scan from the end: the first `response` reached means the latest call is
-// already answered (no open call); a `needs_your_call` decision reached first
-// means it's still open. Every needs_your_call decision carries an `id`
-// (cockpit log always stamps one), so an open call always has a resolvable id.
+// Only the *latest* needs_your_call can be open: logging a newer call supersedes
+// any older one (mirrors handleWait's superseded check), so an older call never
+// reopens — not even when the newer one is later answered. We therefore scan
+// from the end, gather the responses that come *after* the latest call, then
+// stop at that call and decide:
+//   - a `response` carrying `call === <id>` answers that specific call;
+//   - a legacy `response` without a `call` (older logs / session-only routing)
+//     closes whatever the latest open call is.
+// The latest call is open unless one of those closed it. Responses that answer
+// an *older* (already-superseded) call are irrelevant and don't reopen it.
+//
+// Every needs_your_call decision carries an `id` (cockpit log always stamps
+// one), so an open call has a resolvable id.
 export function latestOpenCallId(lines: string[]): string | null {
+  const answeredCalls = new Set<string>();
+  let sawLegacyResponse = false;
   for (let i = lines.length - 1; i >= 0; i--) {
     const trimmed = lines[i].trim();
     if (!trimmed) continue;
@@ -26,9 +37,18 @@ export function latestOpenCallId(lines: string[]): string | null {
     } catch {
       continue;
     }
-    if (rec.type === "response") return null; // latest call already answered
+    if (rec.type === "response") {
+      if (typeof rec.call === "string") answeredCalls.add(rec.call);
+      else sawLegacyResponse = true;
+      continue;
+    }
     if (rec.type === "decision" && rec.needs_your_call === true) {
-      return typeof rec.id === "string" ? rec.id : null;
+      const id = typeof rec.id === "string" ? rec.id : null;
+      // The latest call is closed by a legacy (call-less) response or by a
+      // response explicitly naming it. Either way → nothing open.
+      if (sawLegacyResponse) return null;
+      if (id !== null && answeredCalls.has(id)) return null;
+      return id;
     }
   }
   return null;
