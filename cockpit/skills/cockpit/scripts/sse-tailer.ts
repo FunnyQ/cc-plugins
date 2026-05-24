@@ -24,6 +24,7 @@ import {
   type FSWatcher,
 } from "node:fs";
 import { dirname } from "node:path";
+import { jsonResponse } from "./http";
 
 const WATCH_DEBOUNCE_MS = 80;
 const HEARTBEAT_MS = 25_000;
@@ -62,14 +63,11 @@ export type TailSource = {
   watch?: WatchFn;
 };
 
+// Stream param-validation error: a 400 by default (bad request), distinct from
+// the generic 500 in http.ts. Re-exported here so the stream handlers keep
+// importing it from the tailer.
 export function jsonError(message: string, status = 400): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
+  return jsonResponse({ error: message }, status);
 }
 
 export function splitCompleteLines(text: string): {

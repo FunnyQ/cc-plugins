@@ -1,6 +1,13 @@
 // cockpit registry — reads ~/.cockpit/registry.json, derives active/ended
 // status per session, and builds the /api/sessions + /api/projects payloads.
-import { existsSync, readFileSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -85,9 +92,26 @@ export function statusOf(e: RegistryEntry, now = Date.now()): SessionStatus {
 
 // ---------- goal readers ----------
 
+// The goal record is line 1 of the log, so we only need the file's head — not
+// the whole (ever-growing) JSONL, which /api/sessions would otherwise re-read in
+// full every poll. Read a bounded prefix and scan it for the first non-empty
+// line; a goal record is far shorter than HEAD_BYTES, so it's always complete.
+const HEAD_BYTES = 64 * 1024;
+
+function readHead(path: string): string {
+  const fd = openSync(path, "r");
+  try {
+    const buf = Buffer.allocUnsafe(HEAD_BYTES);
+    const bytesRead = readSync(fd, buf, 0, HEAD_BYTES, 0);
+    return buf.toString("utf-8", 0, bytesRead);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export function readSessionGoal(logPath: string): string {
   try {
-    const first = readFileSync(logPath, "utf8")
+    const first = readHead(logPath)
       .split("\n")
       .find((l) => l.trim());
     if (!first) return "";
@@ -126,6 +150,17 @@ function activeFirst<
 }
 
 export function buildSessions(now = Date.now()): SessionView[] {
+  // Sessions sharing a project read the same project-meta.md; cache per build
+  // pass so it's read once per project, not once per session.
+  const goalCache = new Map<string, string>();
+  const projectGoal = (project: string): string => {
+    let g = goalCache.get(project);
+    if (g === undefined) {
+      g = readProjectGoal(project);
+      goalCache.set(project, g);
+    }
+    return g;
+  };
   return readRegistry()
     .map(
       (e): SessionView => ({
@@ -136,7 +171,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
         status: statusOf(e, now),
         lastHeartbeat: e.lastHeartbeat,
         sessionGoal: readSessionGoal(e.logPath),
-        projectGoal: readProjectGoal(e.project),
+        projectGoal: projectGoal(e.project),
       }),
     )
     .sort(activeFirst);
@@ -160,7 +195,9 @@ export function buildProjects(now = Date.now()): ProjectView[] {
     projects.push({
       project,
       name: basename(project),
-      projectGoal: readProjectGoal(project),
+      // every session in the group carries the same project goal (already read
+      // in buildSessions) — reuse it rather than re-reading project-meta.md.
+      projectGoal: group[0]?.projectGoal ?? "",
       activeCount,
       sessionCount: group.length,
       lastHeartbeat,

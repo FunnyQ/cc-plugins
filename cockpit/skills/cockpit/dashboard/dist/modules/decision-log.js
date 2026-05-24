@@ -14,6 +14,9 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   }
 });
 
+// Grace period before the hero collapses again after the pilot answers a call.
+const HERO_RECOLLAPSE_MS = 60_000;
+
 const md = (t) =>
   DOMPurify.sanitize(marked.parse(t || "", { gfm: true, breaks: true }));
 const mdInline = (t) =>
@@ -67,6 +70,29 @@ export function initDecisionLog(rootEl) {
   const seen = new Set(); // dedupe reconnect resends by stable record key
   let lastOpenCall = null; // most recent unresolved needs_your_call card
   let currentSession = null;
+  let heroCollapseTimer = null;
+  // The hero (viewport) reacts to the pilot's turn: a needs_your_call raises the
+  // barrier, answering lowers it again after a grace period. `live` gates both
+  // so replaying a session's backlog never moves the hero — only real-time
+  // activation/resolution does. It flips true on the backlog-done marker.
+  let live = false;
+
+  function raiseHeroForCall() {
+    if (heroCollapseTimer) {
+      clearTimeout(heroCollapseTimer);
+      heroCollapseTimer = null;
+    }
+    store.setHeroCollapsed(false);
+  }
+
+  function scheduleHeroCollapse() {
+    if (heroCollapseTimer) clearTimeout(heroCollapseTimer);
+    heroCollapseTimer = setTimeout(() => {
+      heroCollapseTimer = null;
+      // a newer call may have arrived while we waited — keep it raised then
+      if (!store.awaitingCall) store.setHeroCollapsed(true);
+    }, HERO_RECOLLAPSE_MS);
+  }
 
   // Only the selected session's *active* status makes a call answerable —
   // an ended/idle session has no live `cockpit wait` to wake.
@@ -130,6 +156,11 @@ export function initDecisionLog(rootEl) {
     seen.clear();
     lastOpenCall = null;
     store.awaitingCall = false;
+    live = false;
+    if (heroCollapseTimer) {
+      clearTimeout(heroCollapseTimer);
+      heroCollapseTimer = null;
+    }
     goalEl.hidden = true;
     goalEl.innerHTML = "";
     cardsEl.innerHTML = "";
@@ -316,6 +347,9 @@ export function initDecisionLog(rootEl) {
     card.classList.add("is-resolved");
     if (lastOpenCall === card) lastOpenCall = null;
     store.awaitingCall = false; // pilot answered → clear the HUD alert
+    // Pilot answered → lower the barrier again after a grace period (skipped on
+    // backlog replay of an already-answered call).
+    if (live) scheduleHeroCollapse();
   }
 
   function appendResponse(rec) {
@@ -342,6 +376,9 @@ export function initDecisionLog(rootEl) {
         if (lastOpenCall) hideRespond(lastOpenCall); // older call isn't latest
         lastOpenCall = card;
         refreshCallState();
+        // Live call on the pilot's active session → raise the barrier so the
+        // "your turn" moment can't be missed behind a collapsed hero.
+        if (live && store.awaitingCall) raiseHeroForCall();
       }
       if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
       return;
@@ -375,6 +412,10 @@ export function initDecisionLog(rootEl) {
     };
     es.addEventListener("backlog-done", () => {
       rootEl.scrollTop = rootEl.scrollHeight;
+      // Backlog replayed — from here on, call transitions are real-time.
+      live = true;
+      // A call already open when we tuned in is the pilot's turn now.
+      if (store.awaitingCall) raiseHeroForCall();
     });
     es.onerror = () => {
       // EventSource auto-reconnects; dedupe guards against backlog resends.
