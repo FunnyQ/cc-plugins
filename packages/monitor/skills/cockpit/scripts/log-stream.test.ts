@@ -1,5 +1,5 @@
 // Tests for the decision-log SSE handler (server/03).
-// Run: bun test cockpit/skills/cockpit/scripts/log-stream.test.ts
+// Run: bun test packages/monitor/skills/cockpit/scripts/log-stream.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

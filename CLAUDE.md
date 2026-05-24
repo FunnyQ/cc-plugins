@@ -4,38 +4,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing local plugins. It ships two sibling plugins:
+A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing one local plugin, **monitor**, which bundles two sibling skills:
 
-- **token-atlas** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
-- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, and a `needs_your_call` wait/send bridge). Its dashboard daemon owns the live transcript view that token-atlas's "Live now" rows link into.
+- **usage-dashboard** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
+- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, and a `needs_your_call` wait/send bridge). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into.
 
-This file documents token-atlas in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `cockpit/skills/cockpit/`.
+This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The two skills still run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
 
 ## Architecture
 
 ```
 cc-plugins/
-├── .claude-plugin/marketplace.json   # marketplace registry (lists plugins)
+├── .claude-plugin/marketplace.json   # Claude marketplace registry (one plugin: monitor)
+├── .agents/plugins/marketplace.json  # Codex marketplace registry (one plugin: monitor)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
-├── token-atlas/                      # plugin: usage dashboard
-    ├── .claude-plugin/plugin.json    # plugin manifest
-    └── skills/dashboard/             # the skill that powers /token-atlas
-        ├── SKILL.md                  # skill trigger config & docs
-        ├── PRODUCT.md                # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
-        ├── scripts/
-        │   ├── api.ts               # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
-        │   ├── live.ts              # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
-        │   ├── atlas-server.ts      # Bun HTTP server (static + /api/stats + /api/live)
-        │   └── install.ts           # prerequisite checker
-        ├── dashboard/dist/          # static SPA (petite-vue + Chart.js, no build step)
-        └── references/
-            └── pricing-defaults.json
-└── cockpit/                          # plugin: per-project session cockpit (own SKILL/PRODUCT/DESIGN)
-    ├── .claude-plugin/plugin.json    # plugin manifest (version must match marketplace.json)
-    └── skills/cockpit/
-        ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json): decision-log SSE + transcript stream + wait/send broker
-        ├── scripts/cockpit.ts        # CLI: start / log / wait / send
-        └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
+└── packages/monitor/                 # the only plugin (monorepo layout: packages/<plugin>)
+    ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json)
+    ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered)
+    └── skills/
+        ├── usage-dashboard/          # skill: usage dashboard (the rear-view)
+        │   ├── SKILL.md              # skill trigger config & docs
+        │   ├── PRODUCT.md            # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
+        │   ├── scripts/
+        │   │   ├── api.ts            # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
+        │   │   ├── live.ts           # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
+        │   │   ├── atlas-server.ts   # Bun HTTP server (static + /api/stats + /api/live), port 5938
+        │   │   └── install.ts        # prerequisite checker
+        │   ├── dashboard/dist/       # static SPA (petite-vue + Chart.js, no build step)
+        │   └── references/
+        │       └── pricing-defaults.json
+        └── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
+            ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker
+            ├── scripts/cockpit.ts        # CLI: start / log / wait / send
+            └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
 ```
 
 ### Data Flow
@@ -51,7 +52,7 @@ Purely additive — the `/api/stats` snapshot is untouched. `live.ts` powers one
 
 1. `GET /api/live` — active sessions from both providers: Claude from `~/.claude/sessions/*.json` (status `busy`/`idle`/`waiting`, stale-filtered at 10 min) and Codex from the `threads` table in `~/.codex/state_5.sqlite` (status `active-inferred`/`recent`). Drives the "Live now" panel, polled every 3s (paused while the tab is hidden).
 
-token-atlas does **not** render transcripts — it's the rear-view (usage analytics). Clicking a Live-now row calls `openInCockpit(session)`, which opens `http://localhost:<cockpitPort>/?session=<id>&provider=<p>&project=<cwd>` in a new tab: cockpit (the live windshield) owns the transcript view. The port comes from `/api/live`'s `cockpitPort` (read from cockpit's `~/.cockpit/daemon.json`, so a custom-`--port` cockpit still resolves), falling back to `5858`; rows are inert when `cockpitUp` is false so a dead daemon never opens a broken tab. The transcript renderer + `marked`/`DOMPurify`/`highlight.js` vendors were removed here to avoid maintaining two copies — cockpit's `transcript-stream.ts` + `modules/transcript.js` are the single source.
+usage-dashboard does **not** render transcripts — it's the rear-view (usage analytics). Clicking a Live-now row calls `openInCockpit(session)`, which opens `http://localhost:<cockpitPort>/?session=<id>&provider=<p>&project=<cwd>` in a new tab: cockpit (the live windshield) owns the transcript view. The port comes from `/api/live`'s `cockpitPort` (read from cockpit's `~/.cockpit/daemon.json`, so a custom-`--port` cockpit still resolves), falling back to `5858`; rows are inert when `cockpitUp` is false so a dead daemon never opens a broken tab. The transcript renderer + `marked`/`DOMPurify`/`highlight.js` vendors were removed here to avoid maintaining two copies — cockpit's `transcript-stream.ts` + `modules/transcript.js` are the single source.
 
 ### Key Design Decisions
 
@@ -62,28 +63,34 @@ token-atlas does **not** render transcripts — it's the rear-view (usage analyt
 - **Theme** — light + dark via `[data-theme]` on `<html>`; tokens defined twice in `style.css`; toggle uses the View Transitions API for a cross-fade
 - **Sunrise Bloom delight** — `.panel` / `.card` / `.budget-panel` / `.data-health-panel` use an `::before` (or `::after`) radial-gradient bloom. JS `installBloomTracker()` in `app.js` lerps `--bloom-x/--bloom-y` toward cursor each frame for the trailing effect. Add new panel-shaped classes to **both** the CSS selector list and the JS `SELECTOR` constant
 - **Hero wave** — `.hero-band` uses a 200%-wide SVG `mask-image` containing two identical wave cycles; `hero-wave-drift` animation slides `mask-position-x` one wavelength for a seamless loop
-- **Live-now panel** — the `.live-panel` is registered in both the bloom CSS list and the JS `SELECTOR`. Rows link out to cockpit (`openInCockpit`); token-atlas itself renders no transcript.
+- **Live-now panel** — the `.live-panel` is registered in both the bloom CSS list and the JS `SELECTOR`. Rows link out to cockpit (`openInCockpit`); usage-dashboard itself renders no transcript.
 
 ## Commands
 
 ```bash
 # Run the dashboard (port 5938, auto-opens browser)
-bun token-atlas/skills/dashboard/scripts/atlas-server.ts
+bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts
 
 # Run with custom port / no auto-open
-bun token-atlas/skills/dashboard/scripts/atlas-server.ts --port 9000 --no-open
+bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts --port 9000 --no-open
 
 # Run install checks (verifies bun, data sources, vendor files)
-bun token-atlas/skills/dashboard/scripts/install.ts
+bun packages/monitor/skills/usage-dashboard/scripts/install.ts
 
 # Get stats as JSON (CLI mode of api.ts)
-bun token-atlas/skills/dashboard/scripts/api.ts
+bun packages/monitor/skills/usage-dashboard/scripts/api.ts
 
 # Get active live sessions as JSON (CLI mode of live.ts)
-bun token-atlas/skills/dashboard/scripts/live.ts
+bun packages/monitor/skills/usage-dashboard/scripts/live.ts
 
 # Inspect the live-sessions endpoint against a running server
 curl -s localhost:5938/api/live | jq
+
+# Run the cockpit daemon (port 5858)
+bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
+
+# Run the cockpit test suite
+bun test packages/monitor/skills/cockpit/scripts/
 ```
 
 ## Code Conventions
@@ -96,10 +103,10 @@ curl -s localhost:5938/api/live | jq
 
 ## Releasing
 
-⚠️ **Three version files must be bumped together** — they drift easily, and the marketplace shows the wrong version if they disagree:
+⚠️ **Three version fields must be bumped together** — they drift easily, and the marketplace shows the wrong version if they disagree:
 
-- `.claude-plugin/marketplace.json` → both `plugins[].version` (token-atlas **and** cockpit)
-- `token-atlas/.claude-plugin/plugin.json` → `version`
-- `cockpit/.claude-plugin/plugin.json` → `version`
+- `.claude-plugin/marketplace.json` → `plugins[].version` (the single `monitor` entry)
+- `packages/monitor/.claude-plugin/plugin.json` → `version`
+- `packages/monitor/.codex-plugin/plugin.json` → `version`
 
 `/odin-git:release` only auto-detects `marketplace.json`, so **manually bump both `plugin.json` files to match** before finishing any release, then add the matching `CHANGELOG.md` entry.

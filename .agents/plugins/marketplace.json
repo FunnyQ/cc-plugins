@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "cockpit",
+      "name": "monitor",
       "source": {
         "source": "local",
-        "path": "./cockpit"
+        "path": "./packages/monitor"
       },
       "policy": {
         "installation": "AVAILABLE",

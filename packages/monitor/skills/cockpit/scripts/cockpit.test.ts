@@ -1,5 +1,5 @@
 // Tests for the `cockpit` CLI (kernel/02 + bridge/02).
-// Run: bun test cockpit/skills/cockpit/scripts/cockpit.test.ts
+// Run: bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

@@ -1,6 +1,6 @@
 // Tests for the `cockpit` control-loop CLIs (bridge/02): wait + send,
 // driven against a real daemon broker. Run:
-//   bun test cockpit/skills/cockpit/scripts/cockpit-bridge.test.ts
+//   bun test packages/monitor/skills/cockpit/scripts/cockpit-bridge.test.ts
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Subprocess } from "bun";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
