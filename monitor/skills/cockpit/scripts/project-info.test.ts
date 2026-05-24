@@ -1,7 +1,7 @@
 // Tests for project-info (ui/04): meta/instruction file reading, DESIGN.md
 // token parsing, path confinement, and the /api/project-info handler's
 // registry gate.
-// Run: bun test cockpit/skills/cockpit/scripts/project-info.test.ts
+// Run: bun test monitor/skills/cockpit/scripts/project-info.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   mkdirSync,

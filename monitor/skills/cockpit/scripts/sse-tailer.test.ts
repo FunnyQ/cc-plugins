@@ -2,7 +2,7 @@
 // with a synthetic line-based source so the three resilience guarantees can be
 // exercised in isolation: file appears later, watch() throws (poll fallback),
 // and the file is atomically replaced then appended.
-// Run: bun test cockpit/skills/cockpit/scripts/sse-tailer.test.ts
+// Run: bun test monitor/skills/cockpit/scripts/sse-tailer.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   appendFileSync,
