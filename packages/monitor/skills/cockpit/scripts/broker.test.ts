@@ -241,3 +241,90 @@ describe("timeout sentinel", () => {
     expect(res).toEqual({ answer: null, timeout: true });
   }, 5000);
 });
+
+// Bind a wait to a specific callId so an answer to one card can never wake a
+// wait parked on a different (stale) card — the cross-talk bug this fixes.
+describe("callId binding", () => {
+  // Log a needs_your_call and return its callId (printed by `cockpit log`).
+  function logCall(decision: string): string {
+    const r = Bun.spawnSync(
+      [
+        "bun",
+        CLI,
+        "log",
+        "--session",
+        SID_A,
+        "--decision",
+        decision,
+        "--needs-call",
+        "--option",
+        "x",
+      ],
+      { cwd: projA, env: { ...process.env, COCKPIT_HOME: cockpitHome } },
+    );
+    if (r.exitCode !== 0) throw new Error("log failed: " + r.stderr.toString());
+    const m = r.stdout.toString().match(/call:\s+([0-9a-f-]{36})/);
+    if (!m) throw new Error("no call id in: " + r.stdout.toString());
+    return m[1];
+  }
+
+  test("the response record carries the callId it answers", async () => {
+    const callId = logCall("pick A");
+    await fetch(`${BASE}/api/respond`, {
+      method: "POST",
+      body: JSON.stringify({
+        session: SID_A,
+        answer: "a",
+        call: callId,
+        token,
+      }),
+    });
+    const last = logLines(projA, SID_A).at(-1);
+    expect(last.type).toBe("response");
+    expect(last.call).toBe(callId);
+  });
+
+  test("an answer to a different call does NOT wake a wait parked on this call", async () => {
+    const callId = logCall("real question");
+    const waitP = fetch(
+      `${BASE}/api/wait?session=${SID_A}&call=${callId}&token=${token}`,
+    ).then((r) => r.json());
+    await Bun.sleep(150); // register the park
+
+    // A stray answer tagged with a different call must not wake our wait.
+    const stray = await fetch(`${BASE}/api/respond`, {
+      method: "POST",
+      body: JSON.stringify({
+        session: SID_A,
+        answer: "wrong",
+        call: "ffffffff-0000-0000-0000-000000000000",
+        token,
+      }),
+    }).then((r) => r.json());
+    expect(stray).toEqual({ delivered: false });
+
+    // The correct answer wakes it.
+    const right = await fetch(`${BASE}/api/respond`, {
+      method: "POST",
+      body: JSON.stringify({
+        session: SID_A,
+        answer: "right",
+        call: callId,
+        token,
+      }),
+    }).then((r) => r.json());
+    expect(right).toEqual({ delivered: true });
+    expect(await waitP).toEqual({ answer: "right" });
+  });
+
+  test("a wait whose call was superseded by a newer call gets the superseded sentinel", async () => {
+    const stale = logCall("old question"); // opens, then…
+    logCall("new question"); // …a newer call supersedes it as the open one.
+    // A wait that arrives for the stale call is told to stop, not parked — no
+    // answer was ever stashed for it, so it can't be a cold-start delivery.
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_A}&call=${stale}&token=${token}`,
+    ).then((r) => r.json());
+    expect(res).toEqual({ answer: null, superseded: true });
+  }, 5000);
+});
