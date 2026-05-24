@@ -11,12 +11,14 @@ const CLI = join(import.meta.dir, "cockpit.ts");
 const DAEMON = join(import.meta.dir, "serve-dashboard.ts");
 const SID_A = "aaaaaaaa-1111-1111-1111-111111111111";
 const SID_B = "bbbbbbbb-2222-2222-2222-222222222222";
+const SID_C = "cccccccc-3333-3333-3333-333333333333";
 const PORT = 6000 + Math.floor(Math.random() * 800);
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let cockpitHome: string;
 let projA: string;
 let projB: string;
+let projC: string;
 let daemon: Subprocess;
 let token: string;
 
@@ -69,8 +71,10 @@ beforeAll(async () => {
   cockpitHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-home-")));
   projA = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projA-")));
   projB = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projB-")));
+  projC = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projC-")));
   seed(projA, SID_A);
   seed(projB, SID_B);
+  seed(projC, SID_C);
   daemon = Bun.spawn(["bun", DAEMON, "--no-open", "--port", String(PORT)], {
     env: {
       ...process.env,
@@ -91,6 +95,7 @@ afterAll(() => {
   rmSync(cockpitHome, { recursive: true, force: true });
   rmSync(projA, { recursive: true, force: true });
   rmSync(projB, { recursive: true, force: true });
+  rmSync(projC, { recursive: true, force: true });
 });
 
 describe("wait + respond round-trip", () => {
@@ -153,6 +158,57 @@ describe("unparked respond", () => {
     });
     expect(lines.at(-1).id).toMatch(/^[0-9a-f-]{36}$/);
   });
+});
+
+describe("respond before wait (cold-start race)", () => {
+  test("an answer that arrives before any wait is parked is delivered to the next wait", async () => {
+    // Only an open needs_your_call earns a stash — log one first.
+    const log = Bun.spawnSync(
+      [
+        "bun",
+        CLI,
+        "log",
+        "--session",
+        SID_C,
+        "--decision",
+        "pick a path",
+        "--needs-call",
+        "--option",
+        "early",
+      ],
+      { cwd: projC, env: { ...process.env, COCKPIT_HOME: cockpitHome } },
+    );
+    if (log.exitCode !== 0)
+      throw new Error("log failed: " + log.stderr.toString());
+
+    // The user answers in the dashboard before `cockpit wait` has registered its
+    // long-poll. The respond can't wake anyone yet — but it must not be lost.
+    const resp = await fetch(`${BASE}/api/respond`, {
+      method: "POST",
+      body: JSON.stringify({ session: SID_C, answer: "early", token }),
+    }).then((r) => r.json());
+    expect(resp).toEqual({ delivered: false });
+    // still durably logged
+    expect(logLines(projC, SID_C).at(-1)).toMatchObject({
+      type: "response",
+      answer: "early",
+    });
+
+    // The wait parks moments later — and drains the stash immediately instead of
+    // hanging until its long-poll ceiling.
+    const woken = await fetch(
+      `${BASE}/api/wait?session=${SID_C}&token=${token}`,
+    ).then((r) => r.json());
+    expect(woken).toEqual({ answer: "early" });
+  });
+
+  test("the stash is single-use — a later wait no longer sees the stale answer", async () => {
+    // stash already drained above → this wait parks and resolves to the sentinel
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_C}&token=${token}`,
+    ).then((r) => r.json());
+    expect(res).toEqual({ answer: null, timeout: true });
+  }, 5000);
 });
 
 describe("auth + validation", () => {

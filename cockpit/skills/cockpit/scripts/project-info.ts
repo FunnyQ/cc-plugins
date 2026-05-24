@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { readRegistry, readProjectGoal } from "./registry";
+import { jsonResponse as json } from "./http";
 
 export type ProjectTokens = {
   colorBg?: string;
@@ -244,16 +245,6 @@ export function buildProjectInfo(project: string): ProjectInfo {
 }
 
 // ---------- HTTP handler ----------
-
-function json(payload: object, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
-}
 
 export function handleProjectInfo(req: Request): Response {
   try {

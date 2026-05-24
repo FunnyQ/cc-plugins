@@ -13,8 +13,8 @@ description: >-
 # /cockpit-start
 
 Capture a goal at session start and open a decision trail for this project —
-the data the cockpit dashboard visualizes. This is the windshield: set where
-we're going, then log the turns a diff can't explain.
+the data the cockpit dashboard visualizes. This sets the heading: where we're
+going, then the turns a diff can't explain.
 
 **Opt-in.** Only run when the user invokes it (`/cockpit-start`, "設定這次的目標", …).
 Never auto-start on session open — not every session deserves a goal.
@@ -178,7 +178,7 @@ chat. Two cases, one channel:
 - **Missing information** — you need a value, preference, or confirmation only the user
   can give before continuing.
 
-Both belong on the windshield: log the `--needs-call` (the `--decision` carries
+Both belong in the cockpit: log the `--needs-call` (the `--decision` carries
 the question, one `--option` per suggested choice — options are optional, omit
 them for a pure free-text ask), then park `cockpit wait <id>` per your provider's
 wait policy. The ask surfaces as the warm "your turn" moment, the user answers in the

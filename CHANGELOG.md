@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.5.1] - 2026-05-24
+
+### 🐛 Bug Fixes
+
+- **No more missed Cockpit call answers on cold start**: The broker now stashes a `needs_your_call` answer that arrives before the agent has parked its wait, so responses sent during the startup race are delivered instead of lost. Stashed answers are single-use and time-bounded so they can't leak into an unrelated later call.
+- **Hero stays raised while you're being asked**: The cockpit hero viewport no longer collapses while a session is awaiting your input — it holds open on an open `needs_your_call`, stays raised for a 60-second grace period after you answer, and skips viewport moves during backlog replay so it only reacts to live activity.
+
+### ⚡ Performance
+
+- **Faster Cockpit dashboard loads**: Registry log files are now read with a bounded 64KB head instead of being slurped whole, and each project's goal metadata is read once per build (cached across sessions and projects) instead of repeatedly — cutting redundant file I/O on busy projects.
+
+### ♻️ Internal
+
+- **Shared HTTP response helpers**: Duplicate `jsonResponse()` / `jsonError()` helpers across the broker, project-info, dashboard server, and SSE tailer were consolidated into a single `http.ts` module.
+
+### 📝 Documentation
+
+- **Lighter Cockpit terminology**: Dropped the "windshield" metaphor from the cockpit skill docs in favor of plainer "heading" / "cockpit" wording.
+
 ## [2.5.0] - 2026-05-24
 
 ### ✨ New Features
