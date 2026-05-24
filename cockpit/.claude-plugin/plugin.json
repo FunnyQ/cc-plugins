@@ -1,6 +1,6 @@
 {
   "name": "cockpit",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Per-project local web cockpit for Claude Code and Codex — set a goal, watch the decision trail steer toward it. Goal capture + distilled decision log + live session view.",
   "author": {
     "name": "Q"
