@@ -71,6 +71,9 @@ export type LiveSession = {
   transcriptPath?: string;
   model?: string;
   version?: string;
+  // true when this live session is also a registered cockpit session (has a
+  // decision trail) — surfaced as a badge so you know it's worth opening there.
+  cockpit?: boolean;
 };
 
 function readSessionFiles(): ClaudeSessionFile[] {
@@ -209,6 +212,35 @@ export function isInsideCodexSessions(filePath: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
+// Companion read of cockpit's registry (same machine, same author) so we can
+// tag which live sessions have a cockpit decision trail. Membership only — we
+// don't touch cockpit's transcript/rendering internals. Missing/corrupt → none.
+const COCKPIT_REGISTRY = join(
+  process.env.COCKPIT_HOME || join(homedir(), ".cockpit"),
+  "registry.json",
+);
+
+function cockpitSessionKeys(): Set<string> {
+  try {
+    const raw = JSON.parse(readFileSync(COCKPIT_REGISTRY, "utf8"));
+    if (raw && Array.isArray(raw.sessions)) {
+      return new Set<string>(
+        raw.sessions
+          .filter(
+            (s: { sessionId?: unknown }) => typeof s?.sessionId === "string",
+          )
+          .map(
+            (s: { provider?: string; sessionId: string }) =>
+              `${s.provider === "codex" ? "codex" : "claude"}:${s.sessionId}`,
+          ),
+      );
+    }
+  } catch {
+    // registry missing or corrupt — no cockpit tags
+  }
+  return new Set<string>();
+}
+
 function statusRank(status: string): number {
   if (status === "busy" || status === "active-inferred") return 0;
   if (status === "waiting") return 1;
@@ -220,6 +252,7 @@ function statusRank(status: string): number {
 export function getLiveSessions(): LiveSession[] {
   const now = Date.now();
   const index = getTranscriptIndex();
+  const cockpitKeys = cockpitSessionKeys();
   const claudeSessions = readSessionFiles()
     .map((session) => {
       const updatedAtMs = session.updatedAt ?? session.startedAt;
@@ -236,6 +269,7 @@ export function getLiveSessions(): LiveSession[] {
         isStale: ageMs > STALE_CUTOFF_MS,
         transcriptPath: index.get(session.sessionId),
         version: session.version,
+        cockpit: cockpitKeys.has(`claude:${session.sessionId}`),
       } satisfies LiveSession;
     })
     .filter((session) => !session.isStale);
@@ -256,6 +290,7 @@ export function getLiveSessions(): LiveSession[] {
         isStale: ageMs > STALE_CUTOFF_MS,
         transcriptPath: row.rollout_path || undefined,
         model: row.model ?? undefined,
+        cockpit: cockpitKeys.has(`codex:${row.id}`),
       } satisfies LiveSession;
     })
     .filter(

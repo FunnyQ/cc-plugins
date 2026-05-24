@@ -36,8 +36,16 @@
         </span>
         <span class="live-path">{{ s.cwd }}</span>
       </span>
-      <span class="live-status-label">{{ s.status }}</span>
-      <span class="live-ago">{{ liveAgo(s.updatedAt) }}</span>
+      <span class="live-status-cluster">
+        <span
+          v-if="s.cockpit"
+          class="live-cockpit-tag"
+          title="Tracked in cockpit — has a decision trail"
+          >cockpit</span
+        >
+        <span class="live-status-label">{{ s.status }}</span>
+        <span class="live-ago">{{ liveAgo(s.updatedAt) }}</span>
+      </span>
     </li>
   </ul>
 </section>
