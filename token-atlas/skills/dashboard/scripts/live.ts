@@ -241,6 +241,32 @@ function cockpitSessionKeys(): Set<string> {
   return new Set<string>();
 }
 
+// Companion read of cockpit's daemon PID file (same machine, same author). The
+// Live panel's rows open a session's transcript in cockpit (port 5858), so a
+// dead daemon means a dead tab — surface it as a notice instead. Mirrors
+// cockpit-server.ts's own liveness check (PID file + signal-0 probe).
+const COCKPIT_DAEMON = join(
+  process.env.COCKPIT_HOME || join(homedir(), ".cockpit"),
+  "daemon.json",
+);
+
+export function isCockpitDaemonUp(): boolean {
+  try {
+    const info = JSON.parse(readFileSync(COCKPIT_DAEMON, "utf8"));
+    if (typeof info?.pid !== "number") return false;
+    try {
+      process.kill(info.pid, 0);
+      return true;
+    } catch (err) {
+      // ESRCH → no such process (dead); EPERM → exists but not ours (alive).
+      return (err as NodeJS.ErrnoException)?.code === "EPERM";
+    }
+  } catch {
+    // daemon.json missing or corrupt — treat as not running
+    return false;
+  }
+}
+
 function statusRank(status: string): number {
   if (status === "busy" || status === "active-inferred") return 0;
   if (status === "waiting") return 1;
@@ -324,6 +350,10 @@ export function jsonError(err: unknown, status = 500): Response {
 
 if (import.meta.main) {
   process.stdout.write(
-    JSON.stringify({ sessions: getLiveSessions() }, null, 2),
+    JSON.stringify(
+      { sessions: getLiveSessions(), cockpitUp: isCockpitDaemonUp() },
+      null,
+      2,
+    ),
   );
 }
