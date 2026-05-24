@@ -19,6 +19,7 @@ import { handleTranscriptStream } from "./transcript-stream";
 import { handleWait, handleRespond } from "./broker";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
+import { jsonResponse, jsonError } from "./http";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
@@ -135,23 +136,6 @@ function handleToken(): Response {
   const info = readDaemonInfo();
   if (!info?.token) return jsonError("daemon token unavailable", 503);
   return jsonResponse({ token: info.token });
-}
-
-// ---------- json helpers (copied from token-atlas live.ts) ----------
-
-function jsonResponse(payload: object, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
-function jsonError(err: unknown, status = 500): Response {
-  const msg = err instanceof Error ? err.message : String(err);
-  return jsonResponse({ error: msg }, status);
 }
 
 // ---------- static serving ----------
