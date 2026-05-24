@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.0.1] - 2026-05-25
+
+### 🐛 Bug Fixes
+
+- **Cockpit `needs_your_call` answers no longer cross-talk between cards**: Each wait is now bound to its specific call, so answering one decision card can never wake a wait parked on a different (stale) card. Only the latest open call is ever active — answering an older, superseded call no longer reopens it.
+- **Stale cockpit daemon paths resolved after a plugin move or update**: The daemon now records where it was launched from and only reuses an existing daemon when the paths match; a moved or updated install supersedes the old one instead of serving stale files (404 static, 200 API).
+- **`cockpit log` verifies entries persisted**: A read-back guard catches silent drops so logged decisions are durable.
+
+### ♻️ Internal
+
+- **usage-dashboard internals refactored into testable pure modules**: The filesystem/network-bound scripts now delegate their logic (billing dedup, per-project cost, daily activity merge, live-session enrichment, statusline decisions) to pure modules. Behavior is unchanged, verified end-to-end.
+- **usage-dashboard now has a test suite (0 → 56 tests)**: Covers the newly extracted modules plus `api.ts` helpers (cost, token/key/date math), bringing the full monitor suite to 167 passing.
+
 ## [3.0.0] - 2026-05-24
 
 ### ⚠️ Breaking

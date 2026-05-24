@@ -201,6 +201,9 @@ export function initDecisionLog(rootEl) {
   function decisionCard(rec) {
     const card = document.createElement("article");
     card.className = "decision-card";
+    // Tag the card with its callId so answers route to this exact call and a
+    // streamed response resolves the right card (not just the latest open one).
+    if (rec.id) card.dataset.callId = rec.id;
     if (rec.needs_your_call) card.classList.add("is-call", "is-open");
 
     const files = (rec.files || [])
@@ -338,7 +341,12 @@ export function initDecisionLog(rootEl) {
       const r = await fetch("/api/respond", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session: currentSession, answer, token }),
+        body: JSON.stringify({
+          session: currentSession,
+          answer,
+          call: card.dataset.callId || null,
+          token,
+        }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || "respond failed");
@@ -377,9 +385,17 @@ export function initDecisionLog(rootEl) {
   }
 
   function appendResponse(rec) {
-    // Resolve the most recent open needs_your_call card.
-    if (!lastOpenCall) return;
-    resolveCallCard(lastOpenCall, rec.answer);
+    // Prefer the card this response names (rec.call); fall back to the latest
+    // open call for legacy responses that carry no callId.
+    let card = null;
+    if (rec.call) {
+      card =
+        cardsEl.querySelector(`.decision-card[data-call-id="${rec.call}"]`) ||
+        null;
+    }
+    card = card || lastOpenCall;
+    if (!card) return;
+    resolveCallCard(card, rec.answer);
   }
 
   function handle(rec) {
