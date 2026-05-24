@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.6.1] - 2026-05-24
+
+### 💄 Polish
+
+- **The "Live now" cockpit-down notice points at the command**: When Cockpit's daemon isn't running, Token Atlas now tells you to run `/cockpit` to start it, instead of a raw port hint.
+
 ## [2.6.0] - 2026-05-24
 
 ### ✨ New Features
