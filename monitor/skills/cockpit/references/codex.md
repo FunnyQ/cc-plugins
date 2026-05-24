@@ -8,8 +8,8 @@ three Codex-specific bits below. Everything else is shared.
 ## Plugin root
 
 Resolve `<plugin-root>` from the installed skill root that contains this skill.
-In a development checkout of this repository, substitute `cockpit` from the repo
-root, for example `bun cockpit/skills/cockpit/scripts/...`.
+In a development checkout of this repository, substitute `monitor` from the repo
+root, for example `bun monitor/skills/cockpit/scripts/...`.
 
 ## Session id (Step 1)
 
