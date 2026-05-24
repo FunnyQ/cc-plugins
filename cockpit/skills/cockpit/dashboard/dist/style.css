@@ -1037,20 +1037,34 @@ body {
   color: var(--void);
   background: var(--signal);
 }
+.respond__opt.is-selected {
+  color: var(--void);
+  background: var(--signal-strong);
+  border-color: var(--signal-strong);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--signal) 55%, transparent),
+    0 0 18px color-mix(in oklch, var(--signal) 24%, transparent);
+}
 .respond__free {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 6px;
 }
 .respond__input {
-  flex: 1;
   min-width: 0;
+  min-height: 30px;
+  max-height: 130px;
   padding: 5px 10px;
   font: inherit;
   font-size: 13px;
+  line-height: 18px;
   color: var(--starlight);
   background: var(--space);
   border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
+  resize: none;
+  overflow: hidden;
 }
 .respond__input:focus {
   outline: none;
