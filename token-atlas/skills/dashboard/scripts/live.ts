@@ -250,20 +250,27 @@ const COCKPIT_DAEMON = join(
   "daemon.json",
 );
 
-export function isCockpitDaemonUp(): boolean {
+// The live cockpit daemon's port, or null when it isn't running. Cockpit can
+// bind a custom --port, and daemon.json records the real one — the Live panel
+// must open that port, not a hardcoded 5858, or a custom-port cockpit opens a
+// dead tab despite reading as up.
+export function cockpitDaemonPort(): number | null {
   try {
     const info = JSON.parse(readFileSync(COCKPIT_DAEMON, "utf8"));
-    if (typeof info?.pid !== "number") return false;
+    if (typeof info?.pid !== "number") return null;
+    let alive = false;
     try {
       process.kill(info.pid, 0);
-      return true;
+      alive = true;
     } catch (err) {
       // ESRCH → no such process (dead); EPERM → exists but not ours (alive).
-      return (err as NodeJS.ErrnoException)?.code === "EPERM";
+      alive = (err as NodeJS.ErrnoException)?.code === "EPERM";
     }
+    if (!alive) return null;
+    return typeof info.port === "number" ? info.port : 5858;
   } catch {
     // daemon.json missing or corrupt — treat as not running
-    return false;
+    return null;
   }
 }
 
@@ -349,9 +356,14 @@ export function jsonError(err: unknown, status = 500): Response {
 }
 
 if (import.meta.main) {
+  const cockpitPort = cockpitDaemonPort();
   process.stdout.write(
     JSON.stringify(
-      { sessions: getLiveSessions(), cockpitUp: isCockpitDaemonUp() },
+      {
+        sessions: getLiveSessions(),
+        cockpitUp: cockpitPort !== null,
+        cockpitPort,
+      },
       null,
       2,
     ),
