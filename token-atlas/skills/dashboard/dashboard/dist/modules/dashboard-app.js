@@ -53,6 +53,7 @@ export function App() {
     modalScrollY: 0,
     liveSessions: [],
     liveError: null,
+    cockpitUp: true,
     livePollTimer: null,
     liveTickTimer: null,
     liveVisibilityHandler: null,
@@ -128,6 +129,8 @@ export function App() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         this.liveSessions = data.sessions ?? [];
+        // Missing field (older server) → assume up so we never nag wrongly.
+        this.cockpitUp = data.cockpitUp !== false;
         this.liveError = null;
       } catch (err) {
         this.liveError = err.message ?? String(err);
@@ -1119,13 +1122,16 @@ export function App() {
     },
 
     openInCockpit(session) {
+      // The Live now panel is a launcher into cockpit, which renders the full
+      // transcript; cockpit runs its own daemon (default port 5858). If that
+      // daemon is down, opening would land on a dead tab — the panel already
+      // shows a notice telling the user to start it, so bail quietly here.
+      if (!this.cockpitUp) return;
       const params = new URLSearchParams({
         session: session.id,
         provider: session.provider || "claude",
         project: session.cwd || "",
       });
-      // The Live now panel is a launcher into cockpit, which renders the full
-      // transcript; cockpit runs its own daemon (default port 5858).
       window.open(`http://localhost:5858/?${params}`, "_blank", "noopener");
     },
 

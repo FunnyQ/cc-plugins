@@ -1,5 +1,6 @@
 <section
   class="panel live-panel"
+  :class="{ 'is-cockpit-down': !cockpitUp }"
   aria-label="Live sessions"
   v-if="liveSessions.length || liveError"
 >
@@ -10,6 +11,11 @@
     </div>
     <span class="live-count">{{ liveSessions.length }} active</span>
   </header>
+
+  <p v-if="!cockpitUp && !liveError" class="live-notice" role="status">
+    <strong>Cockpit isn’t running.</strong>
+    Start its dashboard (port 5858) to open a session’s transcript.
+  </p>
 
   <p v-if="liveError" class="live-error" role="status">{{ liveError }}</p>
 
@@ -22,7 +28,7 @@
       tabindex="0"
       @click="openInCockpit(s)"
       @keydown.enter="openInCockpit(s)"
-      title="Open in cockpit"
+      :title="cockpitUp ? 'Open in cockpit' : 'Start cockpit to open transcripts'"
     >
       <span
         :class="liveStatusClass(s.status)"

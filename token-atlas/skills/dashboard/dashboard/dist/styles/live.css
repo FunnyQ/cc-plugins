@@ -180,6 +180,33 @@
   font-size: var(--fs-sm);
 }
 
+/* Cockpit daemon down — its rows open transcripts there, so flag it. */
+.live-notice {
+  margin: 0;
+  border: 1px solid color-mix(in oklch, var(--warn) 38%, var(--edge-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--warn) 9%, transparent);
+  padding: var(--s-10);
+  color: color-mix(in oklch, var(--warn) 72%, var(--text));
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.live-notice strong {
+  color: color-mix(in oklch, var(--warn) 88%, var(--text));
+}
+
+/* Without cockpit, a row click can't open anything — soften the affordance. */
+.live-panel.is-cockpit-down .live-row {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.live-panel.is-cockpit-down .live-row:hover {
+  border-color: var(--edge-soft);
+  background: color-mix(in oklch, var(--surface-3) 54%, transparent);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .live-dot.is-busy {
     animation: live-busy-pulse 1.35s var(--ease-out) infinite;
