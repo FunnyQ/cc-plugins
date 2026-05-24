@@ -12,6 +12,9 @@ import {
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { dedupKey } from "./dedup";
+import { aggregateProjectCosts } from "./project-cost";
+import { mergeDailyActivity } from "./daily-activity";
 
 const HOME = homedir();
 const CLAUDE_DIR = join(HOME, ".claude");
@@ -52,13 +55,13 @@ const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ---------- Types ----------
 
-type ModelPrice = {
+export type ModelPrice = {
   input: number;
   output: number;
   cacheRead: number;
   cacheWrite: number;
 };
-type PricingTable = {
+export type PricingTable = {
   models: Record<string, ModelPrice>;
   fallback: ModelPrice;
   externalModelPrefixes: string[];
@@ -167,7 +170,7 @@ type DataHealth = {
   };
 };
 
-type ModelUsage = {
+export type ModelUsage = {
   inputTokens: number;
   outputTokens: number;
   cacheReadInputTokens: number;
@@ -177,7 +180,7 @@ type ModelUsage = {
   costUSD?: number;
 };
 
-type Provider = "claude" | "codex";
+export type Provider = "claude" | "codex";
 type LedgerCostBasis = "usage" | "thread_tokens" | "unavailable";
 type LedgerRow = {
   id: string;
@@ -258,7 +261,7 @@ type HistoryEntry = {
   project?: string;
   sessionId?: string;
 };
-type TranscriptUsage = {
+export type TranscriptUsage = {
   input_tokens?: number;
   output_tokens?: number;
   cache_read_input_tokens?: number;
@@ -308,11 +311,11 @@ function readJSONWithError<T>(path: string): {
   }
 }
 
-function isAnthropicModel(model: string): boolean {
+export function isAnthropicModel(model: string): boolean {
   return model.startsWith("claude-") || model.startsWith("anthropic/claude-");
 }
 
-function isExternal(model: string, prefixes: string[]): boolean {
+export function isExternal(model: string, prefixes: string[]): boolean {
   return !isAnthropicModel(model) || prefixes.some((p) => model.startsWith(p));
 }
 
@@ -431,7 +434,7 @@ function loadBudgetConfig(): BudgetMeta {
   };
 }
 
-function coerceNumber(
+export function coerceNumber(
   value: number | string | null | undefined,
 ): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -441,7 +444,7 @@ function coerceNumber(
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function buildUsageLimitWindow(
+export function buildUsageLimitWindow(
   bucket: RateLimitBucket | null | undefined,
   durationMs: number,
   nowMs: number,
@@ -827,7 +830,10 @@ async function loadPricing(): Promise<PricingTable> {
   return (await loadPricingWithMeta()).table;
 }
 
-function pricingModelAliases(model: string, table: PricingTable): string[] {
+export function pricingModelAliases(
+  model: string,
+  table: PricingTable,
+): string[] {
   const raw = rawModelFromKey(model);
   const aliases = new Set([raw, `openai/${raw}`]);
   for (const prefix of table.externalModelPrefixes ?? []) {
@@ -836,7 +842,7 @@ function pricingModelAliases(model: string, table: PricingTable): string[] {
   return [...aliases];
 }
 
-function priceFor(model: string, table: PricingTable): ModelPrice {
+export function priceFor(model: string, table: PricingTable): ModelPrice {
   for (const key of pricingModelAliases(model, table)) {
     if (table.models[key]) return table.models[key];
   }
@@ -882,7 +888,7 @@ function pricingMetaForModels(
   };
 }
 
-function calcCost(
+export function calcCost(
   usage: ModelUsage,
   model: string,
   table: PricingTable,
@@ -1028,7 +1034,7 @@ function parseSessions(): Array<{
   return out;
 }
 
-function emptyModelUsage(): ModelUsage {
+export function emptyModelUsage(): ModelUsage {
   return {
     inputTokens: 0,
     outputTokens: 0,
@@ -1038,14 +1044,14 @@ function emptyModelUsage(): ModelUsage {
   };
 }
 
-function addUsage(target: ModelUsage, usage: TranscriptUsage): void {
+export function addUsage(target: ModelUsage, usage: TranscriptUsage): void {
   target.inputTokens += usage.input_tokens ?? 0;
   target.outputTokens += usage.output_tokens ?? 0;
   target.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
   target.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
 }
 
-function usageTokenTotal(usage: TranscriptUsage): number {
+export function usageTokenTotal(usage: TranscriptUsage): number {
   return (
     (usage.input_tokens ?? 0) +
     (usage.output_tokens ?? 0) +
@@ -1054,19 +1060,19 @@ function usageTokenTotal(usage: TranscriptUsage): number {
   );
 }
 
-function modelKey(provider: Provider, model: string): string {
+export function modelKey(provider: Provider, model: string): string {
   return `${provider}:${model}`;
 }
 
-function providerFromModelKey(key: string): Provider {
+export function providerFromModelKey(key: string): Provider {
   return key.startsWith("codex:") ? "codex" : "claude";
 }
 
-function rawModelFromKey(key: string): string {
+export function rawModelFromKey(key: string): string {
   return key.replace(/^(claude|codex):/, "");
 }
 
-function addModelUsage(target: ModelUsage, source: ModelUsage): void {
+export function addModelUsage(target: ModelUsage, source: ModelUsage): void {
   target.inputTokens += source.inputTokens ?? 0;
   target.outputTokens += source.outputTokens ?? 0;
   target.cacheReadInputTokens += source.cacheReadInputTokens ?? 0;
@@ -1075,7 +1081,7 @@ function addModelUsage(target: ModelUsage, source: ModelUsage): void {
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens ?? 0);
 }
 
-function modelUsageTotal(usage: ModelUsage): number {
+export function modelUsageTotal(usage: ModelUsage): number {
   return (
     usage.inputTokens +
     usage.outputTokens +
@@ -1237,13 +1243,9 @@ function parseTranscriptUsage(): {
       if (entry.type !== "assistant" || !model || !usage) continue;
       if (model === "<synthetic>" || usageTokenTotal(usage) === 0) continue;
 
-      // Claude Code can persist multiple snapshots for one API request
-      // (thinking/text/tool_use). Billing usage is identical on those lines,
-      // so count a request only once.
-      const key =
-        entry.requestId && entry.message.id
-          ? `${entry.requestId}:${entry.message.id}`
-          : (entry.uuid ?? `${file}:${seen.size}`);
+      // Dedup billing: Claude Code persists multiple snapshots per API request
+      // with identical usage — count each request once (see dedup.ts).
+      const key = dedupKey(entry, file, seen.size);
       if (seen.has(key)) continue;
       seen.add(key);
 
@@ -1638,7 +1640,7 @@ function parseCodexUsage(): {
 
 // ---------- Compose ----------
 
-function fmtDate(ms: number): string {
+export function fmtDate(ms: number): string {
   if (!ms) return "";
   // Local date — keeps day-of-week / hour-of-day semantics consistent with
   // the activity heatmap which also uses local time.
@@ -1649,7 +1651,7 @@ function fmtDate(ms: number): string {
   return `${y}-${m}-${day}`;
 }
 
-function projectName(path: string): string {
+export function projectName(path: string): string {
   // Last non-empty path segment
   const parts = path.split("/").filter(Boolean);
   return parts[parts.length - 1] ?? path;
@@ -1728,20 +1730,13 @@ export async function buildStats() {
     .sort((a, b) => a.localeCompare(b))
     .at(-1);
 
-  // Merge daily activity with daily model tokens
-  const activityByDate = new Map(dailyActivity.map((d) => [d.date, d]));
-  const supplementalHistoryDates: string[] = [];
-  for (const [date, historyActivity] of dailyHistory.entries()) {
-    if (activityByDate.has(date)) continue;
-    if (lastCachedActivityDate && date <= lastCachedActivityDate) continue;
-    activityByDate.set(date, {
-      date,
-      messageCount: historyActivity.messageCount,
-      sessionCount: historyActivity.sessionIds.size,
-      toolCallCount: 0,
-    });
-    supplementalHistoryDates.push(date);
-  }
+  // Merge daily activity with daily model tokens (see daily-activity.ts: the
+  // cache wins for the days it covers; history only supplements newer days).
+  const { activityByDate, supplementalHistoryDates } = mergeDailyActivity(
+    dailyActivity,
+    dailyHistory,
+    lastCachedActivityDate,
+  );
   const tokensByDate = new Map<string, Record<string, number>>();
   for (const d of dailyModelTokens) {
     tokensByDate.set(
@@ -1927,26 +1922,15 @@ export async function buildStats() {
     totalReasoningTokens;
   const estimatedCostUSD = byModel.reduce((s, m) => s + m.costUSD, 0);
 
-  // Projects
-  const projectCost = new Map<string, number>();
-  const claudeProjectCost = new Map<string, number>();
-  const codexProjectCost = new Map<string, number>();
-  for (const [path, byModel] of transcriptUsage.projectModelUsage.entries()) {
-    let costUSD = 0;
-    for (const [model, usage] of byModel.entries()) {
-      costUSD += calcCost(usage, model, pricing);
-    }
-    claudeProjectCost.set(path, costUSD);
-    projectCost.set(path, costUSD);
-  }
-  for (const [path, byModel] of codexUsage.projectModelUsage.entries()) {
-    let costUSD = 0;
-    for (const [model, usage] of byModel.entries()) {
-      costUSD += calcCost(usage, rawModelFromKey(model), pricing);
-    }
-    codexProjectCost.set(path, costUSD);
-    projectCost.set(path, (projectCost.get(path) ?? 0) + costUSD);
-  }
+  // Projects — sum each model's cost per project, combining both providers
+  // (codex model keys are namespaced, so strip the prefix before pricing).
+  const { projectCost, claudeProjectCost, codexProjectCost } =
+    aggregateProjectCosts(
+      transcriptUsage.projectModelUsage,
+      codexUsage.projectModelUsage,
+      (model, usage) => calcCost(usage, model, pricing),
+      (model, usage) => calcCost(usage, rawModelFromKey(model), pricing),
+    );
 
   const projectPaths = new Set([
     ...Array.from(byProject.keys()),

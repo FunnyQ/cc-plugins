@@ -6,6 +6,7 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
 
 const HOME = homedir();
 const SETTINGS = join(HOME, ".claude", "settings.json");
@@ -28,35 +29,29 @@ if (existsSync(SETTINGS)) {
   }
 }
 
-const statusLine = (settings.statusLine ?? {}) as Record<string, unknown>;
-const existing =
-  typeof statusLine.command === "string" ? statusLine.command : null;
-const referencedCollector =
-  existing?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
+const statusLine = (settings.statusLine ?? {}) as StatusLineConfig;
+const decision = decideStatusLine(statusLine, COLLECTOR_COMMAND, existsSync);
 
-if (referencedCollector && existsSync(referencedCollector)) {
+if (decision.action === "skip") {
   console.log("✓ statusLine already runs the collector — nothing to do.");
   process.exit(0);
 }
-
-// Preserve a non-collector statusline by running it as the collector's inner
-// command; otherwise fall back to the collector's own default (ccstatusline).
-const command =
-  existing && !referencedCollector
-    ? `TOKEN_ATLAS_STATUSLINE_COMMAND='${existing}' ${COLLECTOR_COMMAND}`
-    : COLLECTOR_COMMAND;
 
 if (existsSync(SETTINGS)) {
   copyFileSync(SETTINGS, `${SETTINGS}.bak`);
 }
 
-const padding = typeof statusLine.padding === "number" ? statusLine.padding : 0;
-settings.statusLine = { ...statusLine, type: "command", command, padding };
+settings.statusLine = {
+  ...statusLine,
+  type: "command",
+  command: decision.command,
+  padding: decision.padding,
+};
 writeFileSync(SETTINGS, `${JSON.stringify(settings, null, 2)}\n`);
 
 console.log(`✓ Wired statusLine collector into ${SETTINGS}`);
-if (existing) {
-  console.log(`  Preserved your existing line: ${existing}`);
+if (decision.preserved) {
+  console.log(`  Preserved your existing line: ${decision.preserved}`);
   console.log(`  (re-runs it via TOKEN_ATLAS_STATUSLINE_COMMAND)`);
 }
 console.log(`  Backup: ${SETTINGS}.bak`);
