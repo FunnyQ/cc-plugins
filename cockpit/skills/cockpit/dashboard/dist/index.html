@@ -101,10 +101,7 @@
               :class="{ 'is-open': manifestOpen }"
               aria-hidden="true"
             ></span>
-            <span
-              class="manifest__count readout"
-              v-text="navTotal > 1 ? (navIndex + 1) + ' / ' + navTotal + ' live' : projectGroups.length + ' flights'"
-            ></span>
+            <span class="manifest__count readout" v-text="navLabel"></span>
           </button>
           <button
             class="manifest__nav"
@@ -163,7 +160,7 @@
                     <span
                       v-if="s.tracked === false"
                       class="leg__tag"
-                      title="Running, but not a cockpit session — no decision trail"
+                      title="Running, but not a cockpit session (no decision trail)"
                       >untracked</span
                     >
                     <span class="leg__goal" v-text="shortGoal(s)"></span>
