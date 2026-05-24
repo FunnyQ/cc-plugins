@@ -582,13 +582,22 @@ body {
   border-bottom: 1px solid var(--edge-soft);
   max-block-size: 32vh;
 }
+/* The bar is a row: prev arrow · toggle (legend/beacon/count) · next arrow. */
 .manifest__bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 20px);
+  flex-shrink: 0;
+}
+.manifest__toggle {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding: 10px clamp(20px, 4vw, 48px);
+  padding: 10px clamp(12px, 3vw, 32px);
   border: 0;
   background: transparent;
   color: var(--starlight);
@@ -596,34 +605,40 @@ body {
   cursor: pointer;
   text-align: center;
 }
-.manifest__bar:hover .manifest__legend {
+.manifest__toggle:hover .manifest__legend {
   color: var(--starlight);
 }
-/* Centered HUD readout: PROJECTS between thin aurora brackets, a pulsing
-   waypoint triangle below it (replaces the old left caret + Open hint). */
-.manifest__bar .manifest__legend {
-  position: relative;
+/* Centered HUD readout: PROJECTS legend over a pulsing waypoint triangle. */
+.manifest__toggle .manifest__legend {
   font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--ink-muted);
-  padding-inline: 18px;
   transition: color 200ms ease;
 }
-.manifest__bar .manifest__legend::before,
-.manifest__bar .manifest__legend::after {
-  position: absolute;
-  top: 50%;
-  translate: 0 -50%;
-  color: var(--aurora-deep);
-  font-size: 12px;
+/* prev/next session arrows — real controls in place of the old decorative
+   aurora brackets; disabled (≤1 active session) renders muted and inert. */
+.manifest__nav {
+  border: 0;
+  background: transparent;
+  color: var(--aurora);
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    opacity 160ms ease;
 }
-.manifest__bar .manifest__legend::before {
-  content: "‹";
-  left: 2px;
+.manifest__nav:hover:not(:disabled) {
+  color: var(--starlight);
+  background: color-mix(in oklch, var(--aurora) 18%, transparent);
 }
-.manifest__bar .manifest__legend::after {
-  content: "›";
-  right: 2px;
+.manifest__nav:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+  opacity: 0.5;
 }
 .manifest__beacon {
   width: 0;
@@ -763,6 +778,21 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+}
+/* A live session with no cockpit registry entry: dashed (not anchored) + muted,
+   so it reads as "running, but no decision trail" without competing with the
+   provider badge or the active LED. */
+.leg__tag {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px dashed color-mix(in oklch, var(--ink-faint) 50%, var(--edge));
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 /* ── Instruments — the two gauges (comms feed + flight log) ── */

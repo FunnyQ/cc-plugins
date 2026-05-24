@@ -178,10 +178,7 @@ export const store = reactive({
   },
 
   shortGoal(s) {
-    // Untracked = running but never /cockpit-start'd, so it has no goal/trail.
-    const fallback =
-      s.tracked === false ? "(live · untracked)" : "(no session goal)";
-    const g = (s.sessionGoal || "").trim() || fallback;
+    const g = (s.sessionGoal || "").trim() || "(no session goal)";
     return g.length > 64 ? g.slice(0, 61) + "…" : g;
   },
 
@@ -196,6 +193,48 @@ export const store = reactive({
     this.selectedProvider = provider;
     this.selectedProject = s.project;
     this._notify();
+  },
+
+  // --- session navigator -------------------------------------------------
+  // The manifest bar's ‹ › arrows are a remote control for the hero: they
+  // step the selection through the *active* (flying) sessions, in the same
+  // order the manifest lists them. Ended sessions are skipped.
+  get navSessions() {
+    const out = [];
+    for (const g of this.projectGroups) {
+      for (const s of g.sessions) {
+        if (s.status === "active") out.push(s);
+      }
+    }
+    return out;
+  },
+
+  get navTotal() {
+    return this.navSessions.length;
+  },
+
+  get navIndex() {
+    return this.navSessions.findIndex((s) => this.isSelected(s));
+  },
+
+  // Arrows only mean something with more than one session to move between.
+  get canNavigate() {
+    return this.navTotal > 1;
+  },
+
+  // Step by ±1 through active sessions, wrapping at the ends. If the current
+  // selection isn't an active session, enter the list from the matching edge.
+  stepSession(delta) {
+    const list = this.navSessions;
+    if (!list.length) return;
+    const cur = this.navIndex;
+    const next =
+      cur < 0
+        ? delta > 0
+          ? 0
+          : list.length - 1
+        : (cur + delta + list.length) % list.length;
+    this.selectSession(list[next]);
   },
 
   // Column modules call this to be told when the active session changes.
@@ -322,7 +361,20 @@ const designSystem = initDesignSystem(
 );
 store._loadDesignSystem = designSystem && designSystem.load;
 
-// Escape closes drawer overlays.
+// Escape closes drawer overlays; ←/→ step through active sessions.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && store.designSystemOpen) store.closeDesignSystem();
+  if (e.key === "Escape" && store.designSystemOpen) {
+    store.closeDesignSystem();
+    return;
+  }
+  // Don't hijack arrows while typing or with a modifier held.
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target?.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || e.target?.isContentEditable)
+    return;
+  if (e.key === "ArrowLeft") {
+    store.stepSession(-1);
+  } else if (e.key === "ArrowRight") {
+    store.stepSession(1);
+  }
 });
