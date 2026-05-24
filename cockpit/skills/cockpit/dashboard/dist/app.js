@@ -178,7 +178,10 @@ export const store = reactive({
   },
 
   shortGoal(s) {
-    const g = (s.sessionGoal || "").trim() || "(no session goal)";
+    // Untracked = running but never /cockpit-start'd, so it has no goal/trail.
+    const fallback =
+      s.tracked === false ? "(live · untracked)" : "(no session goal)";
+    const g = (s.sessionGoal || "").trim() || fallback;
     return g.length > 64 ? g.slice(0, 61) + "…" : g;
   },
 
