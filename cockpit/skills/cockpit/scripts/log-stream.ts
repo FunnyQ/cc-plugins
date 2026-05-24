@@ -8,26 +8,17 @@ import {
   openSync,
   readSync,
   realpathSync,
-  statSync,
-  watch,
-  type FSWatcher,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { readRegistry } from "./registry";
+import {
+  createTailStream,
+  jsonError,
+  splitCompleteLines,
+  type ResolveResult,
+} from "./sse-tailer";
 
 const SESSION_RE = /^[0-9a-f-]{36}$/;
-const WATCH_DEBOUNCE_MS = 80;
-const HEARTBEAT_MS = 25_000;
-
-function jsonError(message: string, status = 400): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
-}
 
 function isInside(root: string, child: string): boolean {
   const rel = relative(root, child);
@@ -70,18 +61,6 @@ export function resolveLogPath(
   return logPath;
 }
 
-function splitCompleteLines(text: string): {
-  complete: string;
-  partial: string;
-} {
-  const lastNewline = text.lastIndexOf("\n");
-  if (lastNewline < 0) return { complete: "", partial: text };
-  return {
-    complete: text.slice(0, lastNewline),
-    partial: text.slice(lastNewline + 1),
-  };
-}
-
 // Emit each valid JSON record in `text` as its own SSE data frame; skip blank
 // and malformed lines so one bad line never kills the stream.
 function emitLines(enqueue: (chunk: string) => void, text: string): void {
@@ -103,111 +82,29 @@ export function handleLogStream(req: Request): Response {
   const project = url.searchParams.get("project") ?? "";
   const session = url.searchParams.get("session") ?? "";
 
-  const logPath = resolveLogPath(project, session);
-  if (!logPath) return jsonError("invalid project/session");
+  // resolveLogPath returns the computed path even before the file exists; the
+  // tailer waits for it to appear. Re-run per poll so a symlinked logs dir is
+  // re-confined once the target materialises.
+  const resolve = (): ResolveResult => {
+    const logPath = resolveLogPath(project, session);
+    return logPath
+      ? { kind: "ready", path: logPath }
+      : { kind: "fail", message: "invalid project/session", status: 400 };
+  };
 
-  let watcher: FSWatcher | null = null;
-  let heartbeat: ReturnType<typeof setInterval> | null = null;
-  let debounce: ReturnType<typeof setTimeout> | null = null;
-  let closed = false;
-  let offset = 0;
-  let partial = "";
-
-  function cleanup(): void {
-    closed = true;
-    watcher?.close();
-    watcher = null;
-    if (heartbeat) clearInterval(heartbeat);
-    if (debounce) clearTimeout(debounce);
-  }
-
-  const stream = new ReadableStream({
-    start(controller) {
-      const enqueue = (chunk: string) => {
-        if (closed) return;
-        try {
-          controller.enqueue(chunk);
-        } catch {
-          cleanup();
-        }
-      };
-
-      enqueue(": connected\n\n");
-
-      // backlog — read the whole (small) log once
-      if (existsSync(logPath)) {
-        try {
-          const size = statSync(logPath).size;
-          const buf = Buffer.allocUnsafe(size);
-          const fd = openSync(logPath, "r");
-          try {
-            readSync(fd, buf, 0, size, 0);
-          } finally {
-            closeSync(fd);
-          }
-          const text = buf.toString("utf-8");
-          const split = splitCompleteLines(text);
-          emitLines(enqueue, split.complete);
-          partial = split.partial;
-          offset = size;
-        } catch {
-          // file vanished between resolve and read — backlog stays empty
-        }
-      }
-
-      enqueue("event: backlog-done\ndata: {}\n\n");
-
-      const readTail = () => {
-        if (closed || !existsSync(logPath)) return;
-        try {
-          const size = statSync(logPath).size;
-          if (size < offset) {
-            offset = 0;
-            partial = "";
-          }
-          if (size <= offset) return;
-          const length = size - offset;
-          const buf = Buffer.allocUnsafe(length);
-          const fd = openSync(logPath, "r");
-          try {
-            readSync(fd, buf, 0, length, offset);
-          } finally {
-            closeSync(fd);
-          }
-          offset = size;
-          const split = splitCompleteLines(partial + buf.toString("utf-8"));
-          partial = split.partial;
-          emitLines(enqueue, split.complete);
-        } catch {
-          // mid-write/rotating — next watch tick retries
-        }
-      };
-
+  return createTailStream({
+    resolve,
+    readBacklog: (path, size) => {
+      // read the whole (small) log once
+      const buf = Buffer.allocUnsafe(size);
+      const fd = openSync(path, "r");
       try {
-        watcher = watch(logPath, () => {
-          if (debounce) return;
-          debounce = setTimeout(() => {
-            debounce = null;
-            readTail();
-          }, WATCH_DEBOUNCE_MS);
-        });
-      } catch {
-        // file not yet present; the goal record is written at start, so this is
-        // rare. The client can re-open if needed.
+        readSync(fd, buf, 0, size, 0);
+      } finally {
+        closeSync(fd);
       }
-
-      heartbeat = setInterval(() => enqueue(": ping\n\n"), HEARTBEAT_MS);
+      return splitCompleteLines(buf.toString("utf-8"));
     },
-    cancel() {
-      cleanup();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
+    emit: emitLines,
   });
 }

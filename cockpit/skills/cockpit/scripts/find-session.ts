@@ -1,15 +1,17 @@
 #!/usr/bin/env bun
 // Find the current Claude Code or Codex session id for a project.
 //
-// Claude Code stores each session's transcript at
+// Claude Code: the running session exposes its id in CLAUDE_CODE_SESSION_ID —
+// that env var is authoritative, so we trust it first. Only when it's absent
+// (e.g. an older CLI, or invoked outside a session) do we fall back to the
+// most-recently-modified transcript under
 //   ~/.claude/projects/<encoded-project-path>/<session-uuid>.jsonl
-// where the project path is encoded by replacing "/" and "." with "-".
-// The *current* session is the most-recently-modified transcript in that dir —
-// and because invoking this script writes a tool-use line into the live
-// transcript, that file is reliably the newest at the moment we look.
+// (path encoded by replacing "/" and "." with "-"). The mtime guess is
+// fragile — a concurrent session or sub-agent writing its own transcript can be
+// newer than ours — which is exactly why the env var is preferred.
 //
 // Prints the uuid to stdout (exit 0), or a message to stderr (exit 1) when no
-// transcript is found — in which case the caller should generate a fresh uuid.
+// session is found — in which case the caller should generate a fresh uuid.
 //
 // Usage: bun find-session.ts [--provider claude|codex] [projectPath]
 // Defaults: provider=claude, projectPath=cwd.
@@ -23,6 +25,8 @@ type Provider = "claude" | "codex";
 type CodexThreadRow = {
   id: string;
 };
+
+const UUID_RE = /^[0-9a-f-]{36}$/;
 
 function parseArgs(argv: string[]): { provider: Provider; project: string } {
   let provider: Provider = "claude";
@@ -44,6 +48,10 @@ function parseArgs(argv: string[]): { provider: Provider; project: string } {
 }
 
 function findClaude(project: string): string | null {
+  // Authoritative: the live session sets this. No mtime guessing needed.
+  const fromEnv = process.env.CLAUDE_CODE_SESSION_ID?.trim();
+  if (fromEnv && UUID_RE.test(fromEnv)) return fromEnv;
+
   const encoded = project.replace(/[/.]/g, "-");
   const dir = join(homedir(), ".claude", "projects", encoded);
 
@@ -113,9 +121,21 @@ function findCodex(project: string): string | null {
   }
 }
 
-const { provider, project } = parseArgs(process.argv.slice(2));
-const id = provider === "codex" ? findCodex(project) : findClaude(project);
-if (!id) {
-  process.exit(1);
+// Reusable resolver: returns the current session id, or null when none is found.
+export function findSession(
+  provider: Provider,
+  project: string,
+): string | null {
+  return provider === "codex" ? findCodex(project) : findClaude(project);
 }
-console.log(id);
+
+// CLI entry — only runs when executed directly, so importers can reuse
+// findSession() without triggering arg parsing or a process.exit.
+if (import.meta.main) {
+  const { provider, project } = parseArgs(process.argv.slice(2));
+  const id = findSession(provider, project);
+  if (!id) {
+    process.exit(1);
+  }
+  console.log(id);
+}

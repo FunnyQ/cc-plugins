@@ -85,6 +85,9 @@ beforeEach(() => {
   projectDir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-log-proj-")));
   cockpitHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-log-home-")));
   process.env.COCKPIT_HOME = cockpitHome;
+  // snappy polling so resilience cases settle within test timeouts
+  process.env.COCKPIT_RESOLVE_POLL_MS = "100";
+  process.env.COCKPIT_TAIL_POLL_MS = "100";
   logPath = join(projectDir, ".cockpit", "logs", `${SID}.jsonl`);
   cli([
     "start",
@@ -99,6 +102,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.COCKPIT_HOME;
+  delete process.env.COCKPIT_RESOLVE_POLL_MS;
+  delete process.env.COCKPIT_TAIL_POLL_MS;
   rmSync(projectDir, { recursive: true, force: true });
   rmSync(cockpitHome, { recursive: true, force: true });
 });
@@ -145,6 +150,35 @@ describe("handleLogStream", () => {
       .filter((r) => r.type === "decision")
       .map((r) => r.decision);
     expect(decisions).toEqual(["good1", "good2"]);
+  });
+
+  // Resilience case 1: a stream may open before the session's log file exists.
+  // It must wait (not error) and start streaming once the file is written.
+  test("a log file created after connect still streams", async () => {
+    const lateSid = "33333333-3333-3333-3333-333333333333";
+    const u = new URL("http://localhost/api/log/stream");
+    u.searchParams.set("project", projectDir);
+    u.searchParams.set("session", lateSid);
+    const res = handleLogStream(new Request(u.toString()));
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+    const framesP = collect(
+      res,
+      (f) => dataFrames(f).some((r) => r.type === "goal"),
+      4000,
+    );
+    setTimeout(() => {
+      cli([
+        "start",
+        "--session",
+        lateSid,
+        "--session-goal",
+        "late",
+        "--project-goal",
+        "p",
+      ]);
+    }, 200);
+    const frames = await framesP;
+    expect(dataFrames(frames).some((r) => r.type === "goal")).toBe(true);
   });
 
   test("invalid/non-uuid session returns an error, no crash", async () => {

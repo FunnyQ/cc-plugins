@@ -84,6 +84,9 @@ beforeEach(() => {
   process.env.COCKPIT_CLAUDE_PROJECTS_DIR = projectsDir;
   process.env.COCKPIT_CODEX_DIR = codexDir;
   process.env.COCKPIT_CODEX_SESSIONS_DIR = codexSessionsDir;
+  // snappy polling so resilience cases settle within test timeouts
+  process.env.COCKPIT_RESOLVE_POLL_MS = "100";
+  process.env.COCKPIT_TAIL_POLL_MS = "100";
   const projectSub = join(projectsDir, "-Users-q-some-project");
   mkdirSync(projectSub, { recursive: true });
   logPath = join(projectSub, `${SID}.jsonl`);
@@ -144,6 +147,8 @@ afterEach(() => {
   delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
   delete process.env.COCKPIT_CODEX_DIR;
   delete process.env.COCKPIT_CODEX_SESSIONS_DIR;
+  delete process.env.COCKPIT_RESOLVE_POLL_MS;
+  delete process.env.COCKPIT_TAIL_POLL_MS;
 });
 
 describe("transcript-stream backlog", () => {
@@ -188,6 +193,37 @@ describe("transcript-stream backlog", () => {
   });
 });
 
+describe("transcript-stream resilience", () => {
+  // Resilience case 1: a transcript can be selected before its file exists
+  // (Claude/Codex create it moments later). The stream must stay open — not
+  // 404 — and start streaming once the file appears.
+  test("a transcript that appears after connect still streams", async () => {
+    const lateId = "33333333-3333-3333-3333-333333333333";
+    const res = handleTranscriptStream(transcriptReq(lateId));
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+    const buf = await collect(
+      res,
+      (b) => {
+        if (!b.includes("late1")) {
+          // file did not exist at connect; create it now
+          writeFileSync(
+            join(projectsDir, "-Users-q-some-project", `${lateId}.jsonl`),
+            JSON.stringify({
+              type: "assistant",
+              uuid: "late1",
+              message: { content: "arrived" },
+            }) + "\n",
+          );
+        }
+        return b.includes("backlog-done");
+      },
+      4000,
+    );
+    expect(buf).toContain("late1");
+    expect(buf).toContain("backlog-done");
+  });
+});
+
 describe("transcript-stream validation", () => {
   test("non-uuid session → 400, no stream", async () => {
     const res = handleTranscriptStream(transcriptReq("not-a-uuid"));
@@ -198,13 +234,6 @@ describe("transcript-stream validation", () => {
   test("path-traversal session string is rejected by the uuid gate → 400", async () => {
     const res = handleTranscriptStream(transcriptReq("..%2f..%2fetc%2fpasswd"));
     expect(res.status).toBe(400);
-  });
-
-  test("valid uuid with no transcript file → 404", async () => {
-    const res = handleTranscriptStream(
-      transcriptReq("00000000-0000-0000-0000-000000000000"),
-    );
-    expect(res.status).toBe(404);
   });
 
   test("unknown provider → 400", async () => {

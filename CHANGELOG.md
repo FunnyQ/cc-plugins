@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.5.0] - 2026-05-24
+
+### ✨ New Features
+
+- **Resilient Cockpit live streams**: The log and transcript SSE streams now share a watch-first, poll-backed tailer that waits for a not-yet-created file instead of dead-ending on a 404, falls back to polling when `fs.watch` never fires, and re-binds watchers after atomic file replacement (inode change) — no more blank or stale live panels.
+- **Authoritative Cockpit session resolution**: Session lookup now trusts the live `CLAUDE_CODE_SESSION_ID` first and only falls back to the most-recently-modified transcript when it's absent, so decisions are no longer misfiled to a stale or concurrent session. `cockpit log` auto-resolves the current session when `--session` is omitted.
+
+### 🐛 Bug Fixes
+
+- **No duplicate call responses**: A `needs_your_call` card is marked resolved immediately after a successful dashboard response, and the Send control stays disabled to guard against duplicate click or Enter submits.
+
 ## [2.4.4] - 2026-05-24
 
 ### ✨ New Features

@@ -18,10 +18,11 @@ ad-hoc shell), so substitute `cockpit` from the repo root instead, for example
 bun <plugin-root>/skills/cockpit/scripts/find-session.ts --provider claude
 ```
 
-Finds the most-recently-touched transcript under
-`~/.claude/projects/**/<id>.jsonl` for this project's cwd. If it exits non-zero
-(no transcript yet), generate one with `crypto.randomUUID()` and note which id
-you used.
+Returns the live session id from `CLAUDE_CODE_SESSION_ID` (authoritative —
+set by the running session). Only when that env var is absent does it fall back
+to the most-recently-touched transcript under `~/.claude/projects/**/<id>.jsonl`
+for this project's cwd. If it exits non-zero (no session found), generate one
+with `crypto.randomUUID()` and note which id you used.
 
 ## Wait policy (needs_your_call)
 

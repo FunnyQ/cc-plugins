@@ -9,21 +9,22 @@ import {
   openSync,
   readSync,
   realpathSync,
-  statSync,
-  watch,
-  type FSWatcher,
 } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
+import {
+  createTailStream,
+  jsonError,
+  splitCompleteLines,
+  type ResolveResult,
+} from "./sse-tailer";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const BACKLOG_LINES = 50;
 const BACKLOG_READ_CHUNK_BYTES = 256 * 1024;
 const MAX_BACKLOG_READ_BYTES = 2 * 1024 * 1024;
-const WATCH_DEBOUNCE_MS = 80;
-const HEARTBEAT_MS = 25_000;
 type Provider = "claude" | "codex";
 
 type CodexThreadRow = {
@@ -159,28 +160,6 @@ function providerRootName(provider: Provider): string {
   return provider === "codex" ? "Codex sessions" : "~/.claude/projects";
 }
 
-function jsonError(message: string, status = 400): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
-function splitCompleteLines(text: string): {
-  complete: string;
-  partial: string;
-} {
-  const lastNewline = text.lastIndexOf("\n");
-  if (lastNewline < 0) return { complete: "", partial: text };
-  return {
-    complete: text.slice(0, lastNewline),
-    partial: text.slice(lastNewline + 1),
-  };
-}
-
 // Emit each conversation entry in `text` as its own SSE data frame; skip blank,
 // malformed, and metadata-noise lines so one bad line never kills the stream.
 function emitLines(enqueue: (chunk: string) => void, text: string): void {
@@ -263,117 +242,35 @@ export function handleTranscriptStream(req: Request): Response {
   if (!provider) return jsonError("invalid provider");
   if (!UUID_RE.test(session)) return jsonError("invalid session id");
 
-  const resolved = resolveProviderTranscriptPath(provider, session);
-  if (!resolved) return jsonError("transcript not found", 404);
-
-  let filePath: string;
-  try {
-    filePath = realpathSync(resolved);
-  } catch {
-    return jsonError("transcript not found", 404);
-  }
-  if (!isInsideProviderRoot(provider, filePath)) {
-    return jsonError(
-      `transcript path is outside ${providerRootName(provider)}`,
-      403,
-    );
-  }
-
-  let watcher: FSWatcher | null = null;
-  let heartbeat: ReturnType<typeof setInterval> | null = null;
-  let debounce: ReturnType<typeof setTimeout> | null = null;
-  let closed = false;
-  let offset = 0;
-  let partial = "";
-
-  function cleanup(): void {
-    closed = true;
-    watcher?.close();
-    watcher = null;
-    if (heartbeat) clearInterval(heartbeat);
-    if (debounce) clearTimeout(debounce);
-  }
-
-  const stream = new ReadableStream({
-    start(controller) {
-      const enqueue = (chunk: string) => {
-        if (closed) return;
-        try {
-          controller.enqueue(chunk);
-        } catch {
-          cleanup();
-        }
+  // A Claude/Codex transcript can be created moments after the session is
+  // selected, so "not found" is a transient `wait`, not a 404 — the tailer keeps
+  // the connection open and re-resolves until it appears.
+  const resolve = (): ResolveResult => {
+    const resolved = resolveProviderTranscriptPath(provider, session);
+    if (!resolved) return { kind: "wait" };
+    let filePath: string;
+    try {
+      filePath = realpathSync(resolved);
+    } catch {
+      return { kind: "wait" };
+    }
+    if (!isInsideProviderRoot(provider, filePath)) {
+      return {
+        kind: "fail",
+        message: `transcript path is outside ${providerRootName(provider)}`,
+        status: 403,
       };
+    }
+    return { kind: "ready", path: filePath };
+  };
 
-      enqueue(": connected\n\n");
-
-      // backlog — the most recent BACKLOG_LINES, read backward
-      try {
-        const size = statSync(filePath).size;
-        const { lines, partial: trailing } = readLinesEndingAt(
-          filePath,
-          size,
-          BACKLOG_LINES,
-        );
-        emitLines(enqueue, lines.join("\n"));
-        partial = trailing;
-        offset = size;
-      } catch {
-        // file vanished/rotated between resolve and read — backlog stays empty
-      }
-
-      enqueue("event: backlog-done\ndata: {}\n\n");
-
-      const readTail = () => {
-        if (closed || !existsSync(filePath)) return;
-        try {
-          const size = statSync(filePath).size;
-          if (size < offset) {
-            offset = 0;
-            partial = "";
-          }
-          if (size <= offset) return;
-          const length = size - offset;
-          const buf = Buffer.allocUnsafe(length);
-          const fd = openSync(filePath, "r");
-          try {
-            readSync(fd, buf, 0, length, offset);
-          } finally {
-            closeSync(fd);
-          }
-          offset = size;
-          const split = splitCompleteLines(partial + buf.toString("utf-8"));
-          partial = split.partial;
-          emitLines(enqueue, split.complete);
-        } catch {
-          // mid-write/rotating — next watch tick retries
-        }
-      };
-
-      try {
-        watcher = watch(filePath, () => {
-          if (debounce) return;
-          debounce = setTimeout(() => {
-            debounce = null;
-            readTail();
-          }, WATCH_DEBOUNCE_MS);
-        });
-      } catch {
-        // file disappeared right after resolve; the client can re-open
-      }
-
-      heartbeat = setInterval(() => enqueue(": ping\n\n"), HEARTBEAT_MS);
+  return createTailStream({
+    resolve,
+    readBacklog: (path, size) => {
+      // the most recent BACKLOG_LINES, read backward
+      const { lines, partial } = readLinesEndingAt(path, size, BACKLOG_LINES);
+      return { complete: lines.join("\n"), partial };
     },
-    cancel() {
-      cleanup();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
+    emit: emitLines,
   });
 }
