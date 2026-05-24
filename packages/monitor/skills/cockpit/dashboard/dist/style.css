@@ -37,6 +37,18 @@
   --positive: oklch(78% 0.13 165);
   --danger: oklch(64% 0.19 25);
 
+  /* Lit readout — the one light surface in the cabin: a plain autopilot decision
+     reads as an illuminated strip. Still hue 278, never #fff; inks run dark
+     enough to clear WCAG AA on --lit. The warm call cards stay dark. */
+  --lit: oklch(85% 0.105 292);
+  --lit-fill: oklch(80% 0.115 292);
+  --lit-edge: oklch(74% 0.12 292);
+  --lit-edge-soft: oklch(72% 0.11 292);
+  --lit-ink: oklch(26% 0.07 292);
+  --lit-ink-muted: oklch(37% 0.06 292);
+  --lit-ink-faint: oklch(39% 0.06 292);
+  --lit-glyph: oklch(50% 0.13 198);
+
   /* Legacy aliases — module-injected markup historically referenced these.
      Mapped onto the Night Flight palette so nothing renders off-system. */
   --color-bg: var(--space);
@@ -897,6 +909,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  position: relative;
+  padding-left: 24px;
+}
+/* The flight path — one continuous hairline route the decisions are plotted
+   along, fading in and out at the ends so it reads as a continuing course, not a
+   boxed list. left:11px puts its center (11.5) under each card's waypoint. */
+.decision-log__cards:not(:empty)::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  translate: -8px 0;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklch, var(--aurora) 32%, var(--edge)) 7%,
+    color-mix(in oklch, var(--aurora) 32%, var(--edge)) 93%,
+    transparent
+  );
 }
 /* Untracked-session invite — replaces the bland empty state when the selected
    session has no cockpit decision trail; a gentle nudge toward /cockpit. */
@@ -944,6 +977,7 @@ body {
 }
 
 .decision-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 13px;
@@ -952,14 +986,99 @@ body {
   border-radius: var(--radius-sm);
   padding: 14px;
 }
+/* Waypoint — the decision's node on the flight path. A diamond echoing the
+   viewport beacon, sitting on the rail (the cards container's ::before) with a
+   hull gap punched around it so the route reads as passing behind. Its center
+   (-17.5px + 4 from the card's padding box at container x=25 → x=11.5) matches
+   the rail center (left 11px + 0.5), so they align by construction. Cool =
+   autopilot plotted it. */
+.decision-card::before {
+  content: "";
+  position: absolute;
+  left: -17.5px;
+  translate: -8px 0;
+  top: 17px;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  background: var(--aurora);
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 4px var(--hull);
+}
 /* The Call Alert — the one warm surface: a light flicking on in a cold cabin. */
 .decision-card.is-call {
   background: color-mix(in oklch, var(--signal) 12%, var(--hull));
   border-color: color-mix(in oklch, var(--signal) 45%, var(--edge));
 }
+/* Warm waypoint: the agent has handed you the stick at this point on the route. */
+.decision-card.is-call::before {
+  background: var(--signal);
+}
+/* While the call is still open, the waypoint pulses like the waiting LED. */
+.decision-card.is-call.is-open::before {
+  box-shadow:
+    0 0 0 4px var(--hull),
+    0 0 0 5px color-mix(in oklch, var(--signal) 45%, transparent);
+  animation: waypoint-wait 2.2s ease-in-out infinite;
+}
+@keyframes waypoint-wait {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px var(--hull),
+      0 0 0 5px color-mix(in oklch, var(--signal) 45%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px var(--hull),
+      0 0 0 10px color-mix(in oklch, var(--signal) 0%, transparent);
+  }
+}
 .decision-card.is-resolved {
   background: var(--hull);
   border-color: color-mix(in oklch, var(--positive) 30%, var(--edge));
+}
+/* Answered: the waypoint cools to positive (aurora-green), warmth retreats. */
+.decision-card.is-resolved::before {
+  background: var(--positive);
+}
+
+/* Lit readout — a plain autopilot decision reads as an illuminated strip in the
+   dark cabin: a cool-tinted light surface with dark cool ink (still hue 278,
+   never pure #fff/#000). The warm call cards stay dark, so cold/warm holds. */
+.decision-card.is-lit {
+  background: var(--lit);
+  border-color: var(--lit-edge);
+}
+.decision-card.is-lit .decision-card__decision,
+.decision-card.is-lit .decision-card__reason,
+.decision-card.is-lit .decision-card__tradeoff {
+  color: var(--lit-ink);
+}
+.decision-card.is-lit .decision-card__decision::before,
+.decision-card.is-lit .decision-card__reason::before,
+.decision-card.is-lit .decision-card__tradeoff::before,
+.decision-card.is-lit .decision-card__files::before,
+.decision-card.is-lit .decision-card__time {
+  color: var(--lit-ink-faint);
+}
+.decision-card.is-lit .decision-card__facet {
+  color: var(--lit-ink-muted);
+}
+.decision-card.is-lit .decision-card__facets {
+  border-left-color: var(--lit-edge-soft);
+}
+.decision-card.is-lit .decision-card__facet-label {
+  color: var(--lit-ink-muted);
+  background: var(--lit-fill);
+  border-color: var(--lit-edge-soft);
+}
+.decision-card.is-lit .decision-card__facet-glyph {
+  color: var(--lit-glyph);
+}
+.decision-card.is-lit .decision-card__file {
+  background: var(--lit-fill);
+  color: var(--lit-ink-muted);
 }
 .decision-card__badge {
   display: inline-block;
@@ -1039,6 +1158,54 @@ body {
 }
 .decision-card__tradeoff::before {
   content: "TRADEOFF";
+}
+/* Self-labeled reasoning facets — a second tier under WHY, not peers of the
+   DECISION/WHY/TRADEOFF backbone. The whole set is one ruled-margin block (a 1px
+   hairline, the sanctioned kind — never a >1px accent stripe) so it reads as an
+   indented flight-log, subordinate to the reason above it. */
+.decision-card__facets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-left: 12px;
+  border-left: 1px solid var(--edge-soft);
+}
+.decision-card__facet {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--ink-muted);
+}
+.decision-card__facet :is(p) {
+  display: inline;
+  margin: 0;
+}
+/* Run-in instrument tag: the stencil-legend voice in a small chip, so each facet
+   reads as a labeled gauge on the branch rather than plain prose. Caller-chosen
+   text, uppercased here so any casing reads as a stencil. */
+.decision-card__facet-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+  padding: 1px 8px 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: var(--hull-2);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+/* The type glyph — a faint aurora tick, tying the facet to the route's waypoints
+   without spending the accent loudly. */
+.decision-card__facet-glyph {
+  font-size: 10px;
+  line-height: 1;
+  color: color-mix(in oklch, var(--aurora) 65%, var(--ink-muted));
 }
 .decision-card__files {
   display: flex;
@@ -1709,7 +1876,8 @@ body {
   .lead-connector,
   .viewport__beacon-ring,
   .viewport__beacon-core,
-  .hud__alert {
+  .hud__alert,
+  .decision-card.is-call.is-open::before {
     animation: none !important;
   }
 }

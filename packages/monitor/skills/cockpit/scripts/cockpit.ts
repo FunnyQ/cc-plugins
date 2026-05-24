@@ -3,7 +3,7 @@
 // plus the control-loop client (wait/send) that talks to the daemon broker.
 //   cockpit start --session <id> --session-goal X --project-goal Y [--owner user]
 //   cockpit log   --session <id> --decision D --reason R [--tradeoff T]
-//                 [--file p ...] [--option o ...] [--needs-call]
+//                 [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--needs-call]
 //   cockpit wait  <sessionId>            # park (long-poll) until the user answers; prints the answer
 //   cockpit send  <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
 import {
@@ -22,12 +22,19 @@ import { latestOpenCallId } from "./call-log";
 
 type GoalRecord = { type: "goal"; session_goal: string; ts: string };
 
+// An open, self-labeled dimension of a decision's reasoning. Rather than a fixed
+// set of fields (problem/rejected/risk), the caller picks the label that fits the
+// case — REJECTED, CONSTRAINT, ASSUMPTION, PRIOR-ART, … — so a card can express
+// whatever thinking that particular decision actually involved.
+type Facet = { label: string; text: string };
+
 type DecisionRecord = {
   id: string;
   type: "decision";
   decision: string;
   reason: string;
   tradeoff: string;
+  facets: Facet[];
   needs_your_call: boolean;
   options: string[];
   files: string[];
@@ -79,7 +86,7 @@ const SINGLE_FLAGS = new Set([
   "tradeoff",
   "call",
 ]);
-const REPEATED_FLAGS = new Set(["file", "option"]);
+const REPEATED_FLAGS = new Set(["file", "option", "facet"]);
 const BOOL_FLAGS = new Set(["needs-call"]);
 
 function parseArgs(argv: string[]): Args {
@@ -102,6 +109,22 @@ function parseArgs(argv: string[]): Args {
     }
   }
   return { single, repeated, flags };
+}
+
+// `--facet "LABEL: free text"` → { label, text }. Split on the first colon so the
+// body can contain colons freely. A facet with no colon is kept as unlabeled text
+// (label ""), and blank entries are dropped — never emit an empty stencil row.
+function parseFacets(raw: string[]): Facet[] {
+  return raw
+    .map((entry) => {
+      const i = entry.indexOf(":");
+      if (i === -1) return { label: "", text: entry.trim() };
+      return {
+        label: entry.slice(0, i).trim(),
+        text: entry.slice(i + 1).trim(),
+      };
+    })
+    .filter((f) => f.text || f.label);
 }
 
 function parseProvider(value: string | undefined): Provider {
@@ -278,6 +301,7 @@ function cmdLog(args: Args): void {
     decision: args.single["decision"] || "",
     reason: args.single["reason"] || "",
     tradeoff: args.single["tradeoff"] || "",
+    facets: parseFacets(args.repeated["facet"] || []),
     needs_your_call: args.flags.has("needs-call"),
     options: args.repeated["option"] || [],
     files: args.repeated["file"] || [],

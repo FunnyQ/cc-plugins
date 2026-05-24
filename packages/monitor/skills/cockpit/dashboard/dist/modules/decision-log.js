@@ -27,6 +27,27 @@ const esc = (t) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
   );
 
+// A small geometric glyph per facet kind, so a chip reads as an instrument tag
+// rather than plain text. Labels are caller-chosen, so map the suggested
+// vocabulary and fall back to a diamond (the waypoint mark) for anything else —
+// every facet still gets a marker, none looks broken.
+const FACET_GLYPHS = {
+  PROBLEM: "?",
+  CONSTRAINT: "⊏",
+  REJECTED: "✕",
+  ASSUMPTION: "≈",
+  RISK: "△",
+  PRIORART: "⊚",
+  RECOMMEND: "★",
+  OPTION: "◈",
+};
+function facetGlyph(label) {
+  const key = String(label || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+  return FACET_GLYPHS[key] || "◇";
+}
+
 function relTime(iso) {
   const ms = Date.now() - new Date(iso).getTime();
   if (!Number.isFinite(ms)) return "";
@@ -204,11 +225,32 @@ export function initDecisionLog(rootEl) {
     // Tag the card with its callId so answers route to this exact call and a
     // streamed response resolves the right card (not just the latest open one).
     if (rec.id) card.dataset.callId = rec.id;
+    // needs_your_call → the warm dark surface; a plain autopilot decision → the
+    // lit readout (light surface, dark cool ink). The cold/warm axis still holds:
+    // a call is the one warm card, and it never gets the lit treatment.
     if (rec.needs_your_call) card.classList.add("is-call", "is-open");
+    else card.classList.add("is-lit");
 
     const files = (rec.files || [])
       .map((f) => `<code class="decision-card__file">${esc(f)}</code>`)
       .join("");
+    // Self-labeled reasoning facets — a second tier *under* WHY, not peers of it.
+    // Each is a run-in row (inline stencil label + inline body) grouped in one
+    // ruled-margin block, so a card can carry whatever dimensions (REJECTED /
+    // CONSTRAINT / ASSUMPTION / …) it involved without flattening into a stack of
+    // equal-weight headings. Bodies are short → inline Markdown, like the decision.
+    const facetRows = (rec.facets || [])
+      .filter((f) => f && (f.text || f.label))
+      .map((f) => {
+        const label = f.label
+          ? `<span class="decision-card__facet-label"><span class="decision-card__facet-glyph">${esc(facetGlyph(f.label))}</span>${esc(f.label)}</span>`
+          : "";
+        return `<p class="decision-card__facet">${label}<span class="decision-card__facet-text">${mdInline(f.text)}</span></p>`;
+      })
+      .join("");
+    const facets = facetRows
+      ? `<div class="decision-card__facets">${facetRows}</div>`
+      : "";
     const options = (rec.options || [])
       .map((o) => `<li>${esc(o)}</li>`)
       .join("");
@@ -220,6 +262,7 @@ export function initDecisionLog(rootEl) {
         <time class="decision-card__time" datetime="${esc(rec.timestamp || "")}">${relTime(rec.timestamp)}</time>
       </header>
       <div class="decision-card__reason">${md(rec.reason)}</div>
+      ${facets}
       ${rec.tradeoff ? `<p class="decision-card__tradeoff">${esc(rec.tradeoff)}</p>` : ""}
       ${files ? `<div class="decision-card__files">${files}</div>` : ""}
       ${options ? `<ul class="decision-card__options">${options}</ul>` : ""}

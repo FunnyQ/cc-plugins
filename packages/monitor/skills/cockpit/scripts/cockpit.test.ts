@@ -305,6 +305,7 @@ describe("cockpit log", () => {
     expect(Object.keys(rec).sort()).toEqual(
       [
         "decision",
+        "facets",
         "files",
         "id",
         "needs_your_call",
@@ -323,7 +324,37 @@ describe("cockpit log", () => {
     expect(rec.needs_your_call).toBe(false);
     expect(rec.options).toEqual([]);
     expect(rec.files).toEqual([]);
+    expect(rec.facets).toEqual([]);
     expect(rec.timestamp).toBeTruthy();
+  });
+
+  test("repeated --facet parses into {label, text}, splitting on the first colon", () => {
+    run([
+      "log",
+      "--session",
+      SID,
+      "--decision",
+      "chose X",
+      "--reason",
+      "Y",
+      "--facet",
+      "REJECTED: per-session servers churn ports",
+      "--facet",
+      "RISK: assumes single-writer registry: breaks on a 2nd daemon",
+      "--facet",
+      "an unlabeled note",
+    ]);
+    const rec = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`)).at(
+      -1,
+    );
+    expect(rec.facets).toEqual([
+      { label: "REJECTED", text: "per-session servers churn ports" },
+      {
+        label: "RISK",
+        text: "assumes single-writer registry: breaks on a 2nd daemon",
+      },
+      { label: "", text: "an unlabeled note" },
+    ]);
   });
 
   test("--needs-call, repeated --option and --file populate the arrays", () => {
