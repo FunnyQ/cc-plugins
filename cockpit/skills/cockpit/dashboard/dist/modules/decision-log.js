@@ -86,21 +86,38 @@ export function initDecisionLog(rootEl) {
   const emptyEl = rootEl.querySelector(".decision-log__empty");
 
   // One delegated listener (cardsEl survives innerHTML resets). Only the latest
-  // open call is answerable; a click resolves to either a picked option or the
-  // free-text value.
+  // open call is answerable; options are selected first, then the Send button
+  // submits the selected option plus any extra instruction text.
   cardsEl.addEventListener("click", (e) => {
     const card = e.target.closest(".decision-card");
     if (!card || card !== lastOpenCall || !sessionActive()) return;
-    let answer = null;
     if (e.target.matches(".respond__opt")) {
-      answer = e.target.dataset.answer;
+      selectOption(card, e.target);
     } else if (e.target.matches(".respond__send")) {
-      const input = card.querySelector(".respond__input");
-      answer = input ? input.value.trim() : "";
+      const answer = composeAnswer(card);
       if (!answer) return;
+      submitAnswer(card, answer);
     } else {
       return;
     }
+  });
+
+  cardsEl.addEventListener("input", (e) => {
+    if (!e.target.matches(".respond__input")) return;
+    const card = e.target.closest(".decision-card");
+    if (!card || card !== lastOpenCall) return;
+    autosizeInput(e.target);
+    updateSendState(card);
+  });
+
+  cardsEl.addEventListener("keydown", (e) => {
+    if (!e.target.matches(".respond__input")) return;
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const card = e.target.closest(".decision-card");
+    if (!card || card !== lastOpenCall || !sessionActive()) return;
+    const answer = composeAnswer(card);
+    if (!answer) return;
+    e.preventDefault();
     submitAnswer(card, answer);
   });
 
@@ -159,15 +176,15 @@ export function initDecisionLog(rootEl) {
     const btns = (rec.options || [])
       .map(
         (o) =>
-          `<button type="button" class="respond__opt" data-answer="${esc(o)}">${esc(o)}</button>`,
+          `<button type="button" class="respond__opt" data-answer="${esc(o)}" aria-pressed="false">${esc(o)}</button>`,
       )
       .join("");
     return `
       <div class="decision-card__respond" hidden>
         ${btns ? `<div class="respond__opts">${btns}</div>` : ""}
         <div class="respond__free">
-          <input type="text" class="respond__input" placeholder="Type a custom answer…" />
-          <button type="button" class="respond__send">Send</button>
+          <textarea rows="1" class="respond__input" placeholder="Add instructions or type a custom answer…"></textarea>
+          <button type="button" class="respond__send" disabled>Send</button>
         </div>
         <p class="respond__note" hidden></p>
       </div>`;
@@ -177,7 +194,12 @@ export function initDecisionLog(rootEl) {
     if (!card) return;
     card.classList.add("is-answerable");
     const form = card.querySelector(".decision-card__respond");
-    if (form) form.hidden = false;
+    if (form) {
+      form.hidden = false;
+      const input = form.querySelector(".respond__input");
+      if (input) autosizeInput(input);
+      updateSendState(card);
+    }
   }
 
   function hideRespond(card) {
@@ -203,8 +225,43 @@ export function initDecisionLog(rootEl) {
 
   function setFormDisabled(form, disabled) {
     form
-      .querySelectorAll("button, input")
+      .querySelectorAll("button, textarea")
       .forEach((el) => (el.disabled = disabled));
+  }
+
+  function selectOption(card, button) {
+    const form = card.querySelector(".decision-card__respond");
+    for (const opt of form.querySelectorAll(".respond__opt")) {
+      const selected = opt === button;
+      opt.classList.toggle("is-selected", selected);
+      opt.setAttribute("aria-pressed", selected ? "true" : "false");
+    }
+    card.dataset.selectedAnswer = button.dataset.answer || "";
+    updateSendState(card);
+  }
+
+  function composeAnswer(card) {
+    const selected = (card.dataset.selectedAnswer || "").trim();
+    const input = card.querySelector(".respond__input");
+    const comment = input ? input.value.trim() : "";
+    if (selected && comment) {
+      return `Selected option: ${selected}\n\nAdditional instructions:\n${comment}`;
+    }
+    return selected || comment;
+  }
+
+  function updateSendState(card) {
+    const send = card.querySelector(".respond__send");
+    if (!send) return;
+    send.disabled = !composeAnswer(card);
+  }
+
+  function autosizeInput(input) {
+    input.style.height = "auto";
+    const max = Math.round(parseFloat(getComputedStyle(input).lineHeight) * 6);
+    const next = Math.min(input.scrollHeight, max);
+    input.style.height = `${next}px`;
+    input.style.overflowY = input.scrollHeight > max ? "auto" : "hidden";
   }
 
   async function submitAnswer(card, answer) {
