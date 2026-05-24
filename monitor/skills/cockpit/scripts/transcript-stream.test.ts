@@ -1,5 +1,5 @@
 // Tests for the live-transcript SSE engine (server/04).
-// Run: bun test cockpit/skills/cockpit/scripts/transcript-stream.test.ts
+// Run: bun test monitor/skills/cockpit/scripts/transcript-stream.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   appendFileSync,

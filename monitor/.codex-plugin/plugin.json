@@ -1,0 +1,36 @@
+{
+  "name": "monitor",
+  "version": "3.0.0",
+  "description": "Monitor your Claude Code and Codex sessions: a usage dashboard plus a per-project cockpit (goal capture, decision log, live transcript, and needs-your-call bridge).",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dashboard",
+    "stats",
+    "usage",
+    "cockpit",
+    "goal",
+    "decision-log",
+    "live-session",
+    "claude-code",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Monitor",
+    "shortDescription": "Usage dashboard + session cockpit for Claude Code and Codex.",
+    "longDescription": "Two skills in one plugin: a usage dashboard that visualizes Claude Code and Codex sessions, tokens, cost, and model mix; and a per-project cockpit for setting a session goal, logging decisions that diffs cannot explain, streaming the live transcript, and handing needs_your_call choices back to the user.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Show my Claude Code usage dashboard.",
+      "Start a cockpit session for this project.",
+      "Log this decision in cockpit.",
+      "Wait for my cockpit answer."
+    ],
+    "brandColor": "#35CAD2"
+  }
+}

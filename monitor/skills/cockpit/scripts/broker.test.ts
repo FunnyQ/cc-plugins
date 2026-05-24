@@ -1,6 +1,6 @@
 // Tests for the cockpit broker (bridge/01): GET /api/wait long-poll +
 // POST /api/respond, keyed per-session so concurrent sessions never cross-talk.
-// Run: bun test cockpit/skills/cockpit/scripts/broker.test.ts
+// Run: bun test monitor/skills/cockpit/scripts/broker.test.ts
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Subprocess } from "bun";
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
