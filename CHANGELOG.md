@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.1.0] - 2026-05-25
+
+### ✨ New Features
+
+- **Decision cards now carry self-labeled reasoning "facets"**: A new repeatable `--facet "LABEL: text"` flag on `cockpit log` lets you attach distinct reasoning dimensions to a decision (e.g. `REJECTED`, `CONSTRAINT`, `ASSUMPTION`, `RISK`, `PRIOR-ART`). Each facet renders in the dashboard as a labeled instrument chip with a type glyph, so the *why* behind a call is captured alongside the call itself.
+
+### 💄 Polish
+
+- **The decision log is now a "flight path"**: Decisions are laid out along a vertical aurora route, each with its own waypoint node — cool for autopilot, warm-pulse for `needs_your_call`, green for resolved — making the shape of a session readable at a glance.
+- **Plain autopilot decisions get a "lit readout" card**: Routine autopilot entries now render on a calm light-purple surface, visually distinct from the warmer `needs_your_call` cards.
+
 ## [3.0.1] - 2026-05-25
 
 ### 🐛 Bug Fixes
