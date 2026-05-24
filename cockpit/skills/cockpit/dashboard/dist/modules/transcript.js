@@ -670,7 +670,14 @@ function renderStreamSegment(seg) {
 // paired result right below it once the result arrives.
 function buildEntryHtml(entry) {
   const results = entry.__toolResults || {};
-  const html = streamEntrySegments(entry)
+  const segs = streamEntrySegments(entry);
+  // A task/subagent completion arrives as a "user" message; flag it so the
+  // entry reads as a subagent (its own role + accent) rather than a USER bubble.
+  entry.__agentNote = segs.some(
+    (seg) =>
+      seg.kind === "task-notification" || seg.kind === "subagent-notification",
+  );
+  const html = segs
     .map((seg) => {
       let segHtml = renderStreamSegment(seg);
       if (seg.toolUseId && results[seg.toolUseId]) {
@@ -717,6 +724,7 @@ function streamEntryHasToolSegments(entry) {
 }
 
 function streamEntryRole(entry) {
+  if (entry.__agentNote) return "subagent";
   if (streamEntryToolResults(entry).length) return "tool result";
   if (streamEntryHasToolSegments(entry)) return "tool";
   if (entry?.type === "response_item") {

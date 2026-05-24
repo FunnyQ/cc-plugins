@@ -1136,6 +1136,9 @@ body {
 .live-entry.is-system {
   --entry-accent: var(--nebula-violet);
 }
+.live-entry.is-subagent {
+  --entry-accent: oklch(72% 0.15 315);
+}
 .live-entry.is-tool,
 .live-entry.is-tool-result,
 .live-entry.has-tool-segments {
@@ -1359,6 +1362,15 @@ body {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-muted);
+}
+/* A subagent notification: tint its card with the subagent accent so it reads
+   as a delegated agent, not a neutral block. */
+.live-entry.is-subagent .live-task-card {
+  border-color: color-mix(in oklab, var(--entry-accent) 30%, var(--edge));
+  background: color-mix(in oklab, var(--entry-accent) 7%, var(--hull-2));
+}
+.live-entry.is-subagent .live-task-kicker {
+  color: color-mix(in oklab, var(--entry-accent) 70%, var(--starlight));
 }
 
 /* highlight.js token coloring mapped onto the space palette */
