@@ -745,6 +745,14 @@ export function initTranscript(rootEl) {
   let entries = [];
   const seen = Object.create(null); // dedupe reconnect resends by uuid
   let renderQueued = false;
+  // Reverse-scroll history: cursor (byte offset where the loaded window starts),
+  // whether older entries remain, an in-flight guard, and the current selection
+  // (needed to build the history fetch URL).
+  let historyStart = 0;
+  let hasMore = false;
+  let loadingOlder = false;
+  let curSession = null;
+  let curProvider = "claude";
 
   rootEl.classList.add("transcript");
   rootEl.innerHTML = `
@@ -764,6 +772,9 @@ export function initTranscript(rootEl) {
     for (const k of Object.keys(seen)) delete seen[k];
     bodyEl.innerHTML = "";
     emptyEl.hidden = false;
+    historyStart = 0;
+    hasMore = false;
+    loadingOlder = false;
   }
 
   // Stamp a stable key + dedupe on uuid (a reconnect resends the same uuids).
@@ -813,6 +824,22 @@ export function initTranscript(rootEl) {
     }
   }
 
+  // Rebuild the entry stack from `entries`. Scroll position is managed by the
+  // caller (scheduleRender pins to bottom; loadOlder anchors to keep the
+  // viewport steady while prepending).
+  function paint() {
+    bodyEl.innerHTML = entries
+      .map(
+        (e) =>
+          `<div class="${liveEntryClass(e)}">` +
+          `<div class="live-entry-role">${escapeHtml(streamEntryRole(e))}</div>` +
+          `<div class="live-entry-content">${e.__html}</div>` +
+          `</div>`,
+      )
+      .join("");
+    emptyEl.hidden = entries.length > 0;
+  }
+
   function scheduleRender() {
     if (renderQueued) return;
     renderQueued = true;
@@ -820,20 +847,57 @@ export function initTranscript(rootEl) {
       renderQueued = false;
       const pinned = isPinned();
       const prevTop = rootEl.scrollTop;
-      bodyEl.innerHTML = entries
-        .map(
-          (e) =>
-            `<div class="${liveEntryClass(e)}">` +
-            `<div class="live-entry-role">${escapeHtml(streamEntryRole(e))}</div>` +
-            `<div class="live-entry-content">${e.__html}</div>` +
-            `</div>`,
-        )
-        .join("");
-      emptyEl.hidden = entries.length > 0;
+      paint();
       if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
       else rootEl.scrollTop = prevTop;
     });
   }
+
+  // Prepend an older page when the user scrolls near the top. The fetched page
+  // is tagged + reconciled like live entries, then painted with the scroll
+  // anchored on total height delta so the previously-visible content stays put.
+  async function loadOlder() {
+    if (loadingOlder || !hasMore || !curSession || historyStart <= 0) return;
+    loadingOlder = true;
+    try {
+      const url =
+        `/api/transcript/history?session=${encodeURIComponent(curSession)}` +
+        `&provider=${encodeURIComponent(curProvider || "claude")}` +
+        `&before=${historyStart}&limit=50`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      const older = Array.isArray(data?.entries) ? data.entries : [];
+      const tagged = [];
+      for (const entry of older) {
+        const t = tagEntry(entry);
+        if (t) tagged.push(t);
+      }
+      historyStart = Number(data?.historyStart) || 0;
+      hasMore = !!data?.hasMore && historyStart > 0;
+      if (!tagged.length) return;
+      const prevHeight = rootEl.scrollHeight;
+      const prevTop = rootEl.scrollTop;
+      entries = [...tagged, ...entries];
+      reconcileToolResults();
+      paint();
+      // Keep the anchor row in place: the stack grew by (newHeight - prevHeight)
+      // above the old top, so shift scrollTop down by the same delta.
+      rootEl.scrollTop = rootEl.scrollHeight - prevHeight + prevTop;
+    } catch {
+      // transient (network / rotated file) — the next scroll retries
+    } finally {
+      // Clear in rAF so the anchor-restore scroll above isn't read back as a
+      // fresh user scroll that would immediately trigger another load.
+      requestAnimationFrame(() => {
+        loadingOlder = false;
+      });
+    }
+  }
+
+  rootEl.addEventListener("scroll", () => {
+    if (!loadingOlder && hasMore && rootEl.scrollTop < 80) loadOlder();
+  });
 
   function ingest(entry) {
     const tagged = tagEntry(entry);
@@ -849,6 +913,8 @@ export function initTranscript(rootEl) {
       es = null;
     }
     reset();
+    curSession = session || null;
+    curProvider = provider || "claude";
     if (!session) return;
     es = new EventSource(
       `/api/transcript/stream?session=${encodeURIComponent(session)}&provider=${encodeURIComponent(provider || "claude")}`,
@@ -863,7 +929,17 @@ export function initTranscript(rootEl) {
       }
       ingest(entry);
     };
-    es.addEventListener("backlog-done", () => {
+    es.addEventListener("backlog-done", (e) => {
+      // The frame carries the reverse-scroll cursor: where the backlog window
+      // starts and whether older entries remain to page in.
+      try {
+        const meta = e.data ? JSON.parse(e.data) : {};
+        historyStart = Number(meta.historyStart) || 0;
+        hasMore = !!meta.hasMore && historyStart > 0;
+      } catch {
+        historyStart = 0;
+        hasMore = false;
+      }
       rootEl.scrollTop = rootEl.scrollHeight;
     });
     es.onerror = () => {

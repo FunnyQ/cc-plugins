@@ -15,7 +15,10 @@ import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { projectsPayload, sessionsPayload } from "./registry";
 import { handleLogStream } from "./log-stream";
-import { handleTranscriptStream } from "./transcript-stream";
+import {
+  handleTranscriptHistory,
+  handleTranscriptStream,
+} from "./transcript-stream";
 import { handleWait, handleRespond } from "./broker";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
@@ -191,6 +194,8 @@ function buildServer() {
       if (url.pathname === "/api/log/stream") return handleLogStream(req);
       if (url.pathname === "/api/transcript/stream")
         return handleTranscriptStream(req);
+      if (url.pathname === "/api/transcript/history")
+        return handleTranscriptHistory(req);
       if (url.pathname === "/api/wait") return handleWait(req);
       if (url.pathname === "/api/respond") return handleRespond(req);
       return serveStatic(url.pathname);
