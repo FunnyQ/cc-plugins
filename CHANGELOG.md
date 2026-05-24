@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.3] - 2026-05-24
+
+### 📝 Documentation
+
+- **Marketplace README refresh**: Clarified the positioning of Token Atlas as the usage-history view and Cockpit as the active-session control surface, and tightened install notes for the current Claude Code and Codex marketplace entries.
+- **Demo dashboard previews**: Replaced README screenshots with demo/fake-data previews for both plugins, so the above-the-fold screenshots show key features without exposing local usage traces.
+- **Sharper preview assets**: Switched dashboard previews to PNG assets to keep UI text, labels, and fine lines crisp in README rendering.
+
+> Runtime behavior is unchanged in this release; the version bump keeps marketplace plugins aligned at 2.4.3.
+
 ## [2.4.2] - 2026-05-24
 
 ### 📝 Documentation
