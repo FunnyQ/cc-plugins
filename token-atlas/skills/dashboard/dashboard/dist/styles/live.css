@@ -39,7 +39,7 @@
 
 .live-row {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) max-content max-content;
+  grid-template-columns: 12px minmax(0, 1fr) max-content;
   gap: var(--s-10);
   align-items: center;
   min-height: 44px;
@@ -112,6 +112,30 @@
 
 .live-project-line .badge {
   justify-self: start;
+}
+
+/* cockpit tag + status + ago share one centred grid column, so they line up
+   on the row's vertical centre regardless of how tall live-main (project +
+   path) is. */
+.live-status-cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--s-10);
+}
+
+/* This live session is also a cockpit session — solid accent pill (the inverse
+   of cockpit's dashed "untracked" tag): it has a decision trail worth opening. */
+.live-cockpit-tag {
+  border: 1px solid color-mix(in oklch, var(--accent) 42%, var(--edge-soft));
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  padding: var(--s-2) var(--s-8);
+  color: color-mix(in oklch, var(--accent) 72%, var(--text));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
 }
 
 .live-project {
@@ -200,20 +224,17 @@
   }
 
   .live-row {
-    grid-template-columns: 12px minmax(0, 1fr) max-content;
+    grid-template-columns: 12px minmax(0, 1fr);
     gap: var(--s-8) var(--s-10);
   }
 
+  /* stack: project/path on line 1, the status cluster on line 2 (left-aligned) */
   .live-main {
-    grid-column: 2 / 4;
-  }
-
-  .live-status-label {
     grid-column: 2;
-    width: max-content;
   }
 
-  .live-ago {
-    grid-column: 3;
+  .live-status-cluster {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }
