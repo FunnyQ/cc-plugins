@@ -94,6 +94,7 @@ export function initDecisionLog(rootEl) {
     if (e.target.matches(".respond__opt")) {
       selectOption(card, e.target);
     } else if (e.target.matches(".respond__send")) {
+      if (card.dataset.responseState === "sent") return;
       const answer = composeAnswer(card);
       if (!answer) return;
       submitAnswer(card, answer);
@@ -115,6 +116,7 @@ export function initDecisionLog(rootEl) {
     if (e.key !== "Enter" || e.shiftKey) return;
     const card = e.target.closest(".decision-card");
     if (!card || card !== lastOpenCall || !sessionActive()) return;
+    if (card.dataset.responseState === "sent") return;
     const answer = composeAnswer(card);
     if (!answer) return;
     e.preventDefault();
@@ -253,7 +255,8 @@ export function initDecisionLog(rootEl) {
   function updateSendState(card) {
     const send = card.querySelector(".respond__send");
     if (!send) return;
-    send.disabled = !composeAnswer(card);
+    send.disabled =
+      card.dataset.responseState === "sent" || !composeAnswer(card);
   }
 
   function autosizeInput(input) {
@@ -267,6 +270,7 @@ export function initDecisionLog(rootEl) {
   async function submitAnswer(card, answer) {
     const form = card.querySelector(".decision-card__respond");
     const note = form.querySelector(".respond__note");
+    if (card.dataset.responseState === "sent") return;
     setFormDisabled(form, true); // optimistic
     const token = await getToken();
     if (!token) {
@@ -282,31 +286,42 @@ export function initDecisionLog(rootEl) {
         body: JSON.stringify({ session: currentSession, answer, token }),
       });
       const j = await r.json();
-      if (j && j.delivered === false) {
-        note.hidden = false;
-        note.textContent =
-          "Logged, but this session isn't listening right now.";
-      }
-      // delivered:true → stay disabled; the authoritative `response` record
-      // arrives over the log SSE and flips the card to resolved.
+      if (!r.ok) throw new Error(j?.error || "respond failed");
+      card.dataset.responseState = "sent";
+      resolveCallCard(
+        card,
+        answer,
+        j && j.delivered === false
+          ? "logged, session not listening right now"
+          : "",
+      );
     } catch {
       note.hidden = false;
       note.textContent = "Failed to send — try again.";
+      delete card.dataset.responseState;
       setFormDisabled(form, false);
+      updateSendState(card);
     }
+  }
+
+  function resolveCallCard(card, answer, detail = "") {
+    hideRespond(card); // answered → retire the buttons
+    const slot = card.querySelector(".decision-card__answer");
+    slot.hidden = false;
+    const suffix = detail
+      ? ` <span class="decision-card__answer-detail">(${esc(detail)})</span>`
+      : "";
+    slot.innerHTML = `<span class="decision-card__answer-label">✅ answered</span>${suffix} ${esc(answer)}`;
+    card.classList.remove("is-open");
+    card.classList.add("is-resolved");
+    if (lastOpenCall === card) lastOpenCall = null;
+    store.awaitingCall = false; // pilot answered → clear the HUD alert
   }
 
   function appendResponse(rec) {
     // Resolve the most recent open needs_your_call card.
     if (!lastOpenCall) return;
-    hideRespond(lastOpenCall); // answered → retire the buttons
-    const slot = lastOpenCall.querySelector(".decision-card__answer");
-    slot.hidden = false;
-    slot.innerHTML = `<span class="decision-card__answer-label">✅ answered</span> ${esc(rec.answer)}`;
-    lastOpenCall.classList.remove("is-open");
-    lastOpenCall.classList.add("is-resolved");
-    lastOpenCall = null;
-    store.awaitingCall = false; // pilot answered → clear the HUD alert
+    resolveCallCard(lastOpenCall, rec.answer);
   }
 
   function handle(rec) {
