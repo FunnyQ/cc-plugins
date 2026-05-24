@@ -8,7 +8,7 @@
       "name": "monitor",
       "source": {
         "source": "local",
-        "path": "./monitor"
+        "path": "./packages/monitor"
       },
       "policy": {
         "installation": "AVAILABLE",

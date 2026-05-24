@@ -29,8 +29,8 @@ bun <plugin-root>/skills/usage-dashboard/scripts/install.ts \
 **`<plugin-root>`** resolves per runtime: under Claude Code use
 `${CLAUDE_PLUGIN_ROOT}`; under Codex resolve it from the installed skill root that
 contains this skill. In a development checkout of this repository,
-`${CLAUDE_PLUGIN_ROOT}` is empty, so substitute `monitor` from the repo root —
-e.g. `bun monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
+`${CLAUDE_PLUGIN_ROOT}` is empty, so substitute `packages/monitor` from the repo
+root — e.g. `bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
 
 The precheck (`install.ts`) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps — typically `history.jsonl` missing because the user hasn't used Claude Code chat yet — do **not** block the dashboard; the affected sections will just show empty.
 

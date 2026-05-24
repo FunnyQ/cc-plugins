@@ -1,5 +1,5 @@
 // Tests for registry status derivation + payload building (server/02).
-// Run: bun test monitor/skills/cockpit/scripts/registry.test.ts
+// Run: bun test packages/monitor/skills/cockpit/scripts/registry.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   mkdtempSync,

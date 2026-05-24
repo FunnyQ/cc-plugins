@@ -8,8 +8,8 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 
 | Skill | Description |
 |-------|-------------|
-| [usage-dashboard](./monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
-| [cockpit](./monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, and needs-your-call bridge |
+| [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
+| [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, and needs-your-call bridge |
 
 ## Claude Code Installation
 
@@ -80,7 +80,7 @@ A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and v
 ### Quick Start
 
 ```bash
-bun monitor/skills/usage-dashboard/scripts/atlas-server.ts
+bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts
 ```
 
 Opens `http://localhost:5938` in your default browser.
@@ -119,7 +119,7 @@ Cockpit is a per-project dashboard and skill for active work. Start with a sessi
 In Claude Code or Codex, invoke the cockpit skill and confirm the proposed goals. From a development checkout, the dashboard can also be started directly:
 
 ```bash
-bun monitor/skills/cockpit/scripts/cockpit-server.ts
+bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
 ```
 
 Opens `http://localhost:5858` in your default browser.
