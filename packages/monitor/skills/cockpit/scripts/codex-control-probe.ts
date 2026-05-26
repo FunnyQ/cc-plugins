@@ -192,6 +192,17 @@ function defaultDeps(): ProbeDeps {
   };
 }
 
+export function directDeps(): ProbeDeps {
+  return {
+    cliVersion: defaultCliVersion,
+    startRemoteControl: () => {
+      throw new Error("remote-control skipped");
+    },
+    createProxyTransport: defaultCreateTransport,
+    createDirectTransport: defaultCreateDirectTransport,
+  };
+}
+
 function initializeParams() {
   return {
     clientInfo: {
@@ -306,6 +317,47 @@ export async function runProbe(
   } finally {
     transport?.close();
   }
+}
+
+export function runDirectProbe(opts: ProbeOptions): Promise<ProbeReport> {
+  const report: ProbeReport = {
+    ok: false,
+    daemonReady: false,
+    controlMode: "direct-app-server",
+    rpcReady: false,
+    threadId: opts.threadId,
+    threadResolved: false,
+    warnings: [],
+    errors: [],
+  };
+
+  if (opts.sendText && !opts.threadId) {
+    report.errors.push("--send requires --thread");
+    return Promise.resolve(report);
+  }
+
+  try {
+    report.codexCliVersion = defaultCliVersion();
+  } catch (err) {
+    report.errors.push(`codex --version failed: ${errorMessage(err)}`);
+  }
+
+  return defaultCreateDirectTransport()
+    .then(async (transport) => {
+      try {
+        await executeProbeRequests(transport, opts, report);
+        return report;
+      } catch (err) {
+        report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
+        return report;
+      } finally {
+        transport.close();
+      }
+    })
+    .catch((err) => {
+      report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
+      return report;
+    });
 }
 
 export function formatHumanReport(report: ProbeReport): string {

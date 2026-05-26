@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   formatHumanReport,
   parseArgs,
+  directDeps,
   runProbe,
   type JsonRpcTransport,
 } from "./codex-control-probe";
@@ -232,6 +233,11 @@ describe("codex control probe", () => {
       "initialize",
       "thread/loaded/list",
     ]);
+  });
+
+  test("direct deps skip remote-control and use direct app-server", async () => {
+    const deps = directDeps();
+    expect(() => deps.startRemoteControl()).toThrow("remote-control skipped");
   });
 });
 
