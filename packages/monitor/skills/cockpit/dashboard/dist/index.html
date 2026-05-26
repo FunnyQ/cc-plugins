@@ -240,32 +240,34 @@
                 ></span>
               </button>
             </div>
-            <template v-else>
-              <form class="channel-send" @submit.prevent="sendChannelMessage()">
-                <textarea
-                  class="channel-send__input"
-                  v-model="channelMessage"
-                  rows="4"
-                  :disabled="!canUseChannel || channelSending"
-                  :title="channelDisabledTitle"
-                  :placeholder="channelPlaceholder"
-                  @keydown="onChannelKeydown($event)"
-                ></textarea>
-                <button
-                  class="channel-send__button"
-                  type="submit"
-                  :disabled="channelSendDisabled"
-                  :title="channelDisabledTitle"
-                >
-                  Send
-                </button>
-              </form>
-              <p
-                class="channel-send__error"
-                v-if="channelError"
-                v-text="channelError"
-              ></p>
-            </template>
+            <form
+              class="channel-send"
+              v-if="!channelNeedsRelaunch"
+              @submit.prevent="sendChannelMessage()"
+            >
+              <textarea
+                class="channel-send__input"
+                v-model="channelMessage"
+                rows="4"
+                :disabled="!canUseChannel || channelSending"
+                :title="channelDisabledTitle"
+                :placeholder="channelPlaceholder"
+                @keydown="onChannelKeydown($event)"
+              ></textarea>
+              <button
+                class="channel-send__button"
+                type="submit"
+                :disabled="channelSendDisabled"
+                :title="channelDisabledTitle"
+              >
+                Send
+              </button>
+            </form>
+            <p
+              class="channel-send__error"
+              v-if="!channelNeedsRelaunch && channelError"
+              v-text="channelError"
+            ></p>
           </div>
         </section>
       </main>
