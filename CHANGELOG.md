@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.4.1] - 2026-05-27
+
+### ♻️ Internal
+
+- **The cockpit-channel is now packaged in the plugin manifest**: instead of a hand-written `~/.claude.json` entry, the cockpit-channel MCP server is declared directly in `.claude-plugin/plugin.json` (`mcpServers` + `channels`), so it ships with the plugin and registers automatically. `monitor-up.ts` now references the packaged channel via `plugin:monitor@q-lab-marketplace` rather than `server:cockpit-channel`.
+- **`monitor:install` no longer fresh-wires the channel**: the install/setup flow only cleans up stale hand-wired channel entries left by older versions, never registering the channel itself (the manifest handles that now). The `--apply-channel` flag was removed; `--apply` now covers statusline wiring plus stale-channel cleanup.
+
+### 📝 Documentation
+
+- **Updated install skill docs and tests** to reflect the manifest-packaged channel and the cleanup-only install flow.
+
 ## [3.4.0] - 2026-05-27
 
 ### ✨ New Features
