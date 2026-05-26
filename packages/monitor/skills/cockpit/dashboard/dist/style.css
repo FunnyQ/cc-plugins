@@ -1068,6 +1068,129 @@ body {
   font-style: italic;
 }
 
+/* Channel console — the live two-way cockpit channel for Claude sessions. */
+.channel-console {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--edge-soft);
+  background: color-mix(in oklch, var(--aurora) 5%, var(--space));
+}
+.reply-strip {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.reply-strip__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reply-strip__legend {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--aurora);
+}
+.reply-strip__count {
+  margin-inline-start: auto;
+  font-size: 10px;
+}
+.reply-strip__list {
+  display: grid;
+  gap: 4px;
+  max-block-size: 118px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.reply-strip__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 24%, var(--edge-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--engine) 7%, var(--space));
+}
+.reply-strip__time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+.reply-strip__text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--starlight);
+}
+.reply-strip__empty {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.channel-send {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.channel-send__input {
+  min-width: 0;
+  min-height: 42px;
+  max-height: 120px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--starlight);
+  background: var(--space);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+.channel-send__input:focus {
+  outline: none;
+  border-color: var(--aurora);
+  box-shadow: 0 0 0 1px var(--aurora);
+}
+.channel-send__input:disabled {
+  color: var(--ink-faint);
+  background: color-mix(in oklch, var(--void) 20%, var(--space));
+  cursor: not-allowed;
+}
+.channel-send__button {
+  min-block-size: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--aurora-strong);
+  border-radius: var(--radius-sm);
+  background: var(--aurora-strong);
+  color: var(--void);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.channel-send__button:hover:not(:disabled) {
+  background: var(--aurora);
+}
+.channel-send__button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+.channel-send__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+}
+
 /* ── Decision-log instrument ────────────────────────────── */
 .decision-log {
   display: flex;
