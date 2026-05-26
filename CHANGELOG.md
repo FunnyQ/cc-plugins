@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.4.5] - 2026-05-27
+
+### ♻️ Internal
+
+- **The cockpit channel no longer force-starts the usage dashboard**: the channel MCP server now ensures only the cockpit daemon (its real dependency — it owns `/api/inbox`), not the 5938 usage dashboard. The dashboard is independent of the channel and is started on demand by its own skill, so a channel-flagged session no longer spins up a dashboard server the user may not want.
+
+### 💄 Polish
+
+- **Re-running a server now always opens the browser**: both the cockpit daemon and the usage dashboard open the browser on reuse (an already-running instance), not just on a fresh start — so re-invoking the skill reliably lands you on the page even when the daemon was started headless (e.g. by the channel MCP). Honors `--no-open`.
+
+### 📝 Documentation
+
+- **Skills reframed as "ensure + open"** and a dev note added for running an isolated daemon (`--port` + `COCKPIT_HOME`) when a live channel session is respawning the cached daemon.
+
 ## [3.4.3] - 2026-05-27
 
 ### 🐛 Bug Fixes
