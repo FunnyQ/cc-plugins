@@ -1,6 +1,6 @@
-// Count a Claude session's in-flight subagent delegations.
+// Count a session's in-flight subagent delegations.
 //
-// Why not the parent transcript: a *background* Agent gets an immediate
+// Claude: why not the parent transcript: a *background* Agent gets an immediate
 // synthetic "Async agent launched" tool_result at spawn (51ms after the
 // tool_use), and its real completion is never written back as a matching
 // tool_result — so a launch/result pairing always reads as closed and misses
@@ -8,8 +8,9 @@
 // transcript: `<session-dir>/subagents/agent-<id>.jsonl`. A delegation is DONE
 // when that file's last conversation entry is an assistant turn that stopped on
 // `end_turn` (its final answer); until then it's still running.
-//
-// Claude-only: Codex has no Agent/Task tool, so its count is always 0.
+// Codex: spawned child threads are recorded in state_5.sqlite's
+// thread_spawn_edges table. The edge status can remain "open" after completion,
+// so open edges are cross-checked against the child rollout's task_complete tail.
 import {
   closeSync,
   existsSync,
@@ -18,8 +19,12 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
+import { Database } from "bun:sqlite";
 import { resolveClaudeTranscriptPath } from "./transcript-stream";
+
+export type Provider = "claude" | "codex";
 
 // A crashed/abandoned agent can leave a sidechain that never reaches end_turn;
 // without a ceiling it would read "running" forever. Past this since its last
@@ -37,6 +42,19 @@ type SidechainEntry = {
   type?: string;
   message?: { stop_reason?: string | null; content?: ContentBlock[] };
   data?: { hookEvent?: string };
+};
+
+type CodexRolloutEntry = {
+  type?: string;
+  payload?: { type?: string };
+};
+
+type CodexSpawnRow = {
+  child_thread_id: string;
+  status: string;
+  rollout_path: string;
+  updated_at: number;
+  updated_at_ms: number | null;
 };
 
 // A `progress` entry that records the SubagentStop hook firing — the most
@@ -124,6 +142,45 @@ function subagentsDirFor(sessionId: string): string | undefined {
   return join(tx.slice(0, -".jsonl".length), "subagents");
 }
 
+function codexDir(): string {
+  return process.env.COCKPIT_CODEX_DIR || join(homedir(), ".codex");
+}
+
+function codexStateDb(): string {
+  return (
+    process.env.COCKPIT_CODEX_STATE_DB || join(codexDir(), "state_5.sqlite")
+  );
+}
+
+function resolveCodexRolloutPath(path: string): string {
+  return isAbsolute(path) ? path : resolve(codexDir(), path);
+}
+
+export function codexRolloutIsDone(lines: string[]): boolean {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    let entry: CodexRolloutEntry;
+    try {
+      entry = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (entry.type === "event_msg" && entry.payload?.type === "task_complete") {
+      return true;
+    }
+  }
+  return false;
+}
+
+function readCodexRolloutDone(rolloutPath: string): boolean {
+  try {
+    return codexRolloutIsDone(readTailLines(rolloutPath));
+  } catch {
+    return false;
+  }
+}
+
 // Running-delegation count for a Claude session: each `agent-*.jsonl` that
 // hasn't reached `end_turn` and was written within the staleness window.
 export function subagentCountForClaude(
@@ -144,4 +201,50 @@ export function subagentCountForClaude(
     if (!sidechainIsDone(readTailLines(path))) running++;
   }
   return running;
+}
+
+export function subagentCountForCodex(
+  sessionId: string,
+  now = Date.now(),
+): number {
+  const dbPath = codexStateDb();
+  if (!existsSync(dbPath)) return 0;
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const rows = db
+        .query(
+          `select e.child_thread_id, e.status, t.rollout_path, t.updated_at, t.updated_at_ms
+           from thread_spawn_edges e
+           join threads t on t.id = e.child_thread_id
+           where e.parent_thread_id = ?
+             and t.archived = 0`,
+        )
+        .all(sessionId) as CodexSpawnRow[];
+      let running = 0;
+      for (const row of rows) {
+        if (row.status === "closed") continue;
+        const updatedAtMs = row.updated_at_ms ?? row.updated_at * 1000;
+        if (now - updatedAtMs > SUBAGENT_STALE_MS) continue;
+        const rolloutPath = resolveCodexRolloutPath(row.rollout_path);
+        if (!existsSync(rolloutPath)) continue;
+        if (!readCodexRolloutDone(rolloutPath)) running++;
+      }
+      return running;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return 0;
+  }
+}
+
+export function subagentCountFor(
+  provider: Provider,
+  sessionId: string,
+  now = Date.now(),
+): number {
+  return provider === "codex"
+    ? subagentCountForCodex(sessionId, now)
+    : subagentCountForClaude(sessionId, now);
 }

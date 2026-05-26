@@ -12,7 +12,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
-import { subagentCountForClaude } from "./subagents";
+import { subagentCountFor } from "./subagents";
 
 export type RegistryEntry = {
   provider: Provider;
@@ -152,17 +152,16 @@ function hasOpenCall(logPath: string): boolean {
   }
 }
 
-// In-flight subagent count, gated to where it can be non-zero: only an active
-// Claude session has a readable transcript with running Agent/Task delegations.
-// Skipping ended/Codex sessions avoids a needless transcript read every poll.
+// In-flight delegation count. Skipping ended sessions avoids a needless
+// transcript/DB read every poll; provider-specific details live in subagents.ts.
 function subagentsFor(
   active: boolean,
   provider: Provider,
   sessionId: string,
   now: number,
 ): number {
-  if (!active || provider !== "claude") return 0;
-  return subagentCountForClaude(sessionId, now);
+  if (!active) return 0;
+  return subagentCountFor(provider, sessionId, now);
 }
 
 // ---------- goal readers ----------
