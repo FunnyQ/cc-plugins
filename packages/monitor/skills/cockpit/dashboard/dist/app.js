@@ -110,6 +110,17 @@ export const store = reactive({
     return this.selectedStatus === "active" ? "Flying" : "Arrived";
   },
 
+  // Fine-grained status of the selected session (registry.ts LiveStatus) —
+  // drives the transcript panel's breathing status bar. "ended" when nothing is
+  // selected or the field is absent, so the bar rests dim rather than glowing.
+  get selectedLiveStatus() {
+    return this.selectedSession?.liveStatus || "ended";
+  },
+
+  get statusPillLabel() {
+    return this.legStatusLabel(this.selectedSession || {});
+  },
+
   // Short session id for the HUD telemetry readout (first uuid segment).
   get sessionShortId() {
     return this.selectedSessionId
@@ -180,6 +191,21 @@ export const store = reactive({
   shortGoal(s) {
     const g = (s.sessionGoal || "").trim() || "(no session goal)";
     return g.length > 64 ? g.slice(0, 61) + "…" : g;
+  },
+
+  // Human label for a leg's fine-grained status (see registry.ts LiveStatus).
+  // Falls back to the coarse active/ended for any unexpected value.
+  legStatusLabel(s) {
+    return (
+      {
+        working: "Working",
+        waiting: "Waiting",
+        "your-call": "Your call",
+        idle: "Idle",
+        shell: "Shell",
+        ended: "Ended",
+      }[s.liveStatus] ?? (s.status === "active" ? "Active" : "Ended")
+    );
   },
 
   selectSession(s) {
