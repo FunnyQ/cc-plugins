@@ -14,6 +14,8 @@ type JsonRpcMessage =
     }
   | { jsonrpc: "2.0"; method: string; params?: unknown };
 
+type JsonRpcNotification = Extract<JsonRpcMessage, { method: string }>;
+
 export type ProbeOptions = {
   threadId?: string;
   sendText?: string;
@@ -30,13 +32,21 @@ export type ProbeReport = {
   threadId?: string;
   threadResolved: boolean;
   resumeOk?: boolean;
+  turnId?: string;
   turnStartOk?: boolean;
+  turnSteerOk?: boolean;
+  turnCompletedOk?: boolean;
+  turnStatus?: string;
   warnings: string[];
   errors: string[];
 };
 
 export type JsonRpcTransport = {
   request(method: string, params?: unknown): Promise<unknown>;
+  waitForNotification?: (
+    predicate: (message: JsonRpcNotification) => boolean,
+    timeoutMs: number,
+  ) => Promise<JsonRpcNotification>;
   close(): void;
 };
 
@@ -90,6 +100,12 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
     number,
     { resolve: (value: unknown) => void; reject: (err: Error) => void }
   >();
+  private notificationWaiters = new Set<{
+    predicate: (message: JsonRpcNotification) => boolean;
+    resolve: (message: JsonRpcNotification) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
 
   constructor(private proc: ChildProcessWithoutNullStreams) {
     proc.stdout.setEncoding("utf8");
@@ -100,6 +116,8 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
       );
       for (const p of this.pending.values()) p.reject(err);
       this.pending.clear();
+      for (const waiter of this.notificationWaiters) waiter.reject(err);
+      this.notificationWaiters.clear();
     });
   }
 
@@ -121,6 +139,33 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
     this.proc.kill();
   }
 
+  waitForNotification(
+    predicate: (message: JsonRpcNotification) => boolean,
+    timeoutMs: number,
+  ): Promise<JsonRpcNotification> {
+    return new Promise((resolve, reject) => {
+      const waiter = {
+        predicate,
+        resolve: (message: JsonRpcNotification) => {
+          clearTimeout(waiter.timer);
+          this.notificationWaiters.delete(waiter);
+          resolve(message);
+        },
+        reject: (err: Error) => {
+          clearTimeout(waiter.timer);
+          this.notificationWaiters.delete(waiter);
+          reject(err);
+        },
+        timer: setTimeout(() => {
+          this.notificationWaiters.delete(waiter);
+          reject(new Error("turn completion timed out"));
+        }, timeoutMs),
+      };
+      waiter.timer.unref();
+      this.notificationWaiters.add(waiter);
+    });
+  }
+
   private handleData(chunk: string): void {
     this.buffer += chunk;
     for (;;) {
@@ -140,7 +185,10 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
     } catch {
       return;
     }
-    if (!("id" in message)) return;
+    if (!("id" in message)) {
+      this.handleNotification(message);
+      return;
+    }
     const pending = this.pending.get(message.id);
     if (!pending) return;
     this.pending.delete(message.id);
@@ -148,6 +196,12 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
       pending.reject(new Error(message.error.message || "JSON-RPC error"));
     } else {
       pending.resolve(message.result);
+    }
+  }
+
+  private handleNotification(message: JsonRpcNotification): void {
+    for (const waiter of [...this.notificationWaiters]) {
+      if (waiter.predicate(message)) waiter.resolve(message);
     }
   }
 }
@@ -222,6 +276,65 @@ function userTextInput(text: string) {
   return [{ type: "text", text, text_elements: [] }];
 }
 
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function activeTurnId(resumeResult: unknown): string | null {
+  const root = objectValue(resumeResult);
+  const thread = objectValue(root?.thread);
+  const status = objectValue(thread?.status);
+  if (status?.type !== "active") return null;
+  const turns = Array.isArray(thread?.turns) ? thread.turns : [];
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = objectValue(turns[i]);
+    if (turn?.status === "inProgress") return stringValue(turn.id);
+  }
+  return null;
+}
+
+function startedTurnId(startResult: unknown): string | null {
+  const root = objectValue(startResult);
+  return stringValue(objectValue(root?.turn)?.id);
+}
+
+async function waitForTurnCompletion(
+  transport: JsonRpcTransport,
+  threadId: string,
+  turnId: string,
+): Promise<string | null> {
+  if (!transport.waitForNotification) return null;
+  const notification = await transport.waitForNotification(
+    (message) => {
+      const params = objectValue(message.params);
+      if (params?.threadId !== threadId) return false;
+      if (message.method === "turn/completed") {
+        return objectValue(params.turn)?.id === turnId;
+      }
+      if (message.method === "error") return params.turnId === turnId;
+      return false;
+    },
+    30 * 60 * 1000,
+  );
+
+  const params = objectValue(notification.params);
+  if (notification.method === "error") {
+    const error = objectValue(params?.error);
+    const message =
+      stringValue(error?.message) ||
+      stringValue(error?.type) ||
+      "Codex turn failed";
+    throw new Error(message);
+  }
+  return stringValue(objectValue(params?.turn)?.status);
+}
+
 async function executeProbeRequests(
   transport: JsonRpcTransport,
   opts: ProbeOptions,
@@ -236,16 +349,41 @@ async function executeProbeRequests(
     return;
   }
 
-  await transport.request("thread/resume", { threadId: opts.threadId });
+  const resumeResult = await transport.request("thread/resume", {
+    threadId: opts.threadId,
+  });
   report.threadResolved = true;
   report.resumeOk = true;
 
   if (opts.sendText) {
-    await transport.request("turn/start", {
-      threadId: opts.threadId,
-      input: userTextInput(opts.sendText),
-    });
-    report.turnStartOk = true;
+    const activeTurn = activeTurnId(resumeResult);
+    if (activeTurn) {
+      const steerResult = await transport.request("turn/steer", {
+        threadId: opts.threadId,
+        input: userTextInput(opts.sendText),
+        expectedTurnId: activeTurn,
+      });
+      report.turnId =
+        stringValue(objectValue(steerResult)?.turnId) || activeTurn;
+      report.turnSteerOk = true;
+    } else {
+      const startResult = await transport.request("turn/start", {
+        threadId: opts.threadId,
+        input: userTextInput(opts.sendText),
+      });
+      report.turnId = startedTurnId(startResult) || undefined;
+      report.turnStartOk = true;
+    }
+
+    if (report.turnId) {
+      const status = await waitForTurnCompletion(
+        transport,
+        opts.threadId,
+        report.turnId,
+      );
+      if (status) report.turnStatus = status;
+      report.turnCompletedOk = true;
+    }
   }
 
   report.ok = true;
@@ -373,6 +511,12 @@ export function formatHumanReport(report: ProbeReport): string {
   if (report.resumeOk !== undefined) lines.push(`resumeOk: ${report.resumeOk}`);
   if (report.turnStartOk !== undefined)
     lines.push(`turnStartOk: ${report.turnStartOk}`);
+  if (report.turnSteerOk !== undefined)
+    lines.push(`turnSteerOk: ${report.turnSteerOk}`);
+  if (report.turnCompletedOk !== undefined)
+    lines.push(`turnCompletedOk: ${report.turnCompletedOk}`);
+  if (report.turnStatus !== undefined)
+    lines.push(`turnStatus: ${report.turnStatus}`);
   if (report.warnings.length) {
     lines.push("warnings:");
     for (const warning of report.warnings) lines.push(`- ${warning}`);

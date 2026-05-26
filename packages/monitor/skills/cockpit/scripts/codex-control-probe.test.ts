@@ -10,12 +10,20 @@ import {
 class FakeTransport implements JsonRpcTransport {
   calls: Array<{ method: string; params: unknown }> = [];
 
-  constructor(private responses: Record<string, unknown> = {}) {}
+  constructor(
+    private responses: Record<string, unknown> = {},
+    private notification?: { method: string; params?: unknown },
+  ) {}
 
   async request(method: string, params?: unknown): Promise<unknown> {
     this.calls.push({ method, params });
     if (method in this.responses) return this.responses[method];
     return {};
+  }
+
+  async waitForNotification(): Promise<{ method: string; params?: unknown }> {
+    if (!this.notification) throw new Error("missing notification");
+    return this.notification;
   }
 
   close(): void {}
@@ -99,10 +107,16 @@ describe("codex control probe", () => {
   });
 
   test("starts a turn only when send text is explicit", async () => {
-    const transport = new FakeTransport({
-      "thread/resume": { thread: { id: "t1" } },
-      "turn/start": { turn: { id: "turn1" } },
-    });
+    const transport = new FakeTransport(
+      {
+        "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
+        "turn/start": { turn: { id: "turn1" } },
+      },
+      {
+        method: "turn/completed",
+        params: { threadId: "t1", turn: { id: "turn1", status: "completed" } },
+      },
+    );
     const report = await runProbe(
       { threadId: "t1", sendText: "hello" },
       {
@@ -118,11 +132,64 @@ describe("codex control probe", () => {
       threadResolved: true,
       resumeOk: true,
       turnStartOk: true,
+      turnCompletedOk: true,
+      turnStatus: "completed",
     });
     const turnStart = transport.calls.find((c) => c.method === "turn/start");
     expect(turnStart?.params).toEqual({
       threadId: "t1",
       input: [{ type: "text", text: "hello", text_elements: [] }],
+    });
+  });
+
+  test("steers an active turn instead of starting a competing turn", async () => {
+    const transport = new FakeTransport(
+      {
+        "thread/resume": {
+          thread: {
+            id: "t1",
+            status: { type: "active", activeFlags: [] },
+            turns: [
+              { id: "old", status: "completed" },
+              { id: "turn1", status: "inProgress" },
+            ],
+          },
+        },
+        "turn/steer": { turnId: "turn1" },
+      },
+      {
+        method: "turn/completed",
+        params: { threadId: "t1", turn: { id: "turn1", status: "completed" } },
+      },
+    );
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello" },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      threadResolved: true,
+      resumeOk: true,
+      turnId: "turn1",
+      turnSteerOk: true,
+      turnCompletedOk: true,
+    });
+    expect(transport.calls.map((c) => c.method)).toEqual([
+      "initialize",
+      "thread/resume",
+      "turn/steer",
+    ]);
+    const turnSteer = transport.calls.find((c) => c.method === "turn/steer");
+    expect(turnSteer?.params).toEqual({
+      threadId: "t1",
+      input: [{ type: "text", text: "hello", text_elements: [] }],
+      expectedTurnId: "turn1",
     });
   });
 
