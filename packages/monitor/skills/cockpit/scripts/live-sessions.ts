@@ -16,11 +16,19 @@ export type LiveSession = {
   id: string;
   cwd: string;
   updatedAtMs: number;
+  // Raw harness status. Claude writes this per-session (busy/idle/waiting/shell/
+  // …); Codex has no equivalent, so we infer busy/idle from how recently the
+  // thread row was touched. registry.ts maps this onto the display vocabulary.
+  status: string;
 };
 
 // A session counts as live if it signalled within this window — matches the
 // stale cutoff token-atlas uses for the same panel.
 const STALE_MS = 10 * 60 * 1000;
+
+// Codex emits no live status; a thread touched within this window is treated as
+// actively working, otherwise idle. Mirrors token-atlas's active-inferred cutoff.
+const CODEX_BUSY_MS = 60 * 1000;
 
 // Dirs/DB are env-overridable so tests can point at fixtures (mirrors the
 // overrides transcript-stream.ts already honours).
@@ -43,6 +51,7 @@ type ClaudeSessionFile = {
   cwd: string;
   startedAt: number;
   updatedAt?: number;
+  status?: string;
 };
 
 // Claude writes a JSON file per running session under ~/.claude/sessions/; an
@@ -72,6 +81,7 @@ function readClaudeLive(now: number): LiveSession[] {
         id: d.sessionId,
         cwd: d.cwd,
         updatedAtMs,
+        status: typeof d.status === "string" ? d.status : "idle",
       });
     } catch {
       // skip malformed / partially-written file
@@ -109,7 +119,13 @@ function readCodexLive(now: number): LiveSession[] {
         if (typeof r.id !== "string" || typeof r.cwd !== "string") continue;
         const updatedAtMs = r.updated_at_ms ?? r.updated_at * 1000;
         if (now - updatedAtMs > STALE_MS) continue;
-        out.push({ provider: "codex", id: r.id, cwd: r.cwd, updatedAtMs });
+        out.push({
+          provider: "codex",
+          id: r.id,
+          cwd: r.cwd,
+          updatedAtMs,
+          status: now - updatedAtMs <= CODEX_BUSY_MS ? "busy" : "idle",
+        });
       }
       return out;
     } finally {

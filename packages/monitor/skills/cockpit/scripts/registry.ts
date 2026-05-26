@@ -11,6 +11,7 @@ import {
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
+import { latestOpenCallId } from "./call-log";
 
 export type RegistryEntry = {
   provider: Provider;
@@ -24,12 +25,26 @@ export type Provider = "claude" | "codex";
 
 export type SessionStatus = "active" | "ended";
 
+// The fine-grained status the rail's LED + label render. `status` (active/ended)
+// still drives sort/counts/expand; this is purely the display vocabulary,
+// derived from the live harness status with two cockpit-native overlays:
+// `your-call` (parked on an unanswered needs_your_call) wins over any working
+// state, and a stale session always reads `ended`.
+export type LiveStatus =
+  | "working"
+  | "waiting"
+  | "your-call"
+  | "idle"
+  | "shell"
+  | "ended";
+
 export type SessionView = {
   provider: Provider;
   project: string;
   sessionId: string;
   logPath: string;
   status: SessionStatus;
+  liveStatus: LiveStatus;
   lastHeartbeat: string;
   sessionGoal: string;
   projectGoal: string;
@@ -92,6 +107,45 @@ export function statusOf(e: RegistryEntry, now = Date.now()): SessionStatus {
   const hb = Date.parse(e.lastHeartbeat);
   const lastSignal = Math.max(Number.isNaN(hb) ? 0 : hb, logMtime(e.logPath));
   return now - lastSignal < STALE_MS ? "active" : "ended";
+}
+
+// Map a session to its display status. Priority is deliberate:
+//   1. not active → `ended` (process gone; a stale "your turn" would mislead)
+//   2. parked on an open needs_your_call → `your-call` (the cockpit's own
+//      handoff outranks whatever the harness is nominally doing)
+//   3. otherwise the live harness status, normalised to the vocabulary
+// `harnessStatus` is undefined when a session reads active by heartbeat but has
+// no live session file (the brief gap after the file goes but before staleness)
+// — treat that as `idle` rather than inventing activity.
+export function deriveLiveStatus(opts: {
+  active: boolean;
+  openCall: boolean;
+  harnessStatus?: string;
+}): LiveStatus {
+  if (!opts.active) return "ended";
+  if (opts.openCall) return "your-call";
+  switch (opts.harnessStatus) {
+    case "busy":
+      return "working";
+    case "waiting":
+      return "waiting";
+    case "shell":
+      return "shell";
+    default:
+      return "idle";
+  }
+}
+
+// True when the session's log ends on an unanswered needs_your_call. Reused from
+// the broker's seam so the rail agrees with the wait/send loop on "your turn".
+// Best-effort: an unreadable log is simply "no open call".
+function hasOpenCall(logPath: string): boolean {
+  if (!logPath) return false;
+  try {
+    return latestOpenCallId(readFileSync(logPath, "utf8").split("\n")) !== null;
+  } catch {
+    return false;
+  }
 }
 
 // ---------- goal readers ----------
@@ -177,13 +231,21 @@ export function buildSessions(now = Date.now()): SessionView[] {
   const tracked = readRegistry().map((e): SessionView => {
     const key = `${e.provider}:${e.sessionId}`;
     seen.add(key);
-    const live = liveByKey.has(key);
+    const live = liveByKey.get(key);
+    const active = !!live || statusOf(e, now) === "active";
     return {
       provider: e.provider,
       project: e.project,
       sessionId: e.sessionId,
       logPath: e.logPath,
-      status: live || statusOf(e, now) === "active" ? "active" : "ended",
+      status: active ? "active" : "ended",
+      liveStatus: deriveLiveStatus({
+        active,
+        // Only an active session can be parked on a live "your turn"; skip the
+        // log read entirely for ended ones.
+        openCall: active && hasOpenCall(e.logPath),
+        harnessStatus: live?.status,
+      }),
       lastHeartbeat: e.lastHeartbeat,
       sessionGoal: readSessionGoal(e.logPath),
       projectGoal: projectGoal(e.project),
@@ -202,6 +264,13 @@ export function buildSessions(now = Date.now()): SessionView[] {
       sessionId: l.id,
       logPath: "",
       status: "active",
+      // No cockpit log, so no needs_your_call to be parked on — just the harness
+      // status. (`l` is in liveByKey, so it's live by definition.)
+      liveStatus: deriveLiveStatus({
+        active: true,
+        openCall: false,
+        harnessStatus: l.status,
+      }),
       lastHeartbeat: new Date(l.updatedAtMs).toISOString(),
       sessionGoal: "",
       projectGoal: projectGoal(l.cwd),

@@ -74,6 +74,58 @@ afterEach(() => {
   delete process.env.COCKPIT_CODEX_STATE_DB;
 });
 
+describe("deriveLiveStatus", () => {
+  test("stale session → ended, regardless of harness/openCall", () => {
+    expect(
+      mod.deriveLiveStatus({
+        active: false,
+        openCall: true,
+        harnessStatus: "busy",
+      }),
+    ).toBe("ended");
+  });
+
+  test("open needs_your_call outranks the harness working state", () => {
+    expect(
+      mod.deriveLiveStatus({
+        active: true,
+        openCall: true,
+        harnessStatus: "busy",
+      }),
+    ).toBe("your-call");
+  });
+
+  test("maps harness statuses onto the vocabulary", () => {
+    const map = {
+      busy: "working",
+      waiting: "waiting",
+      shell: "shell",
+    } as const;
+    for (const [harness, expected] of Object.entries(map)) {
+      expect(
+        mod.deriveLiveStatus({
+          active: true,
+          openCall: false,
+          harnessStatus: harness,
+        }),
+      ).toBe(expected);
+    }
+  });
+
+  test("active but no/unknown harness status → idle (no invented activity)", () => {
+    expect(mod.deriveLiveStatus({ active: true, openCall: false })).toBe(
+      "idle",
+    );
+    expect(
+      mod.deriveLiveStatus({
+        active: true,
+        openCall: false,
+        harnessStatus: "something-new",
+      }),
+    ).toBe("idle");
+  });
+});
+
 describe("readRegistry", () => {
   test("missing registry → []", () => {
     expect(mod.readRegistry()).toEqual([]);
