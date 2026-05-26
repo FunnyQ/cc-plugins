@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.2.0] - 2026-05-26
+
+### ✨ New Features
+
+- **Cockpit reads each session's live status at a glance**: sessions now surface a fine-grained live state (working, waiting on you, idle, …) rendered as LED variants, a status pill, and a breathing activity bar — so a quick look tells you what every session is actually doing, not just "busy / idle".
+- **The "⊕ N agents" badge now counts live sub-agent delegations — for both Claude and Codex**: cockpit detects in-flight Agent/Task delegations and shows how many are running. Claude is read from the sub-agent sidechain transcript; Codex from its spawn-edge table, cross-checked against each child's completion so finished delegations drop off.
+- **Answer a `needs_your_call` straight from chat**: if you reply in the agent UI/chat while a session is parked on a `needs_your_call`, that message is now recorded as the answer through the cockpit bridge and the card is closed — no need to repeat it in the dashboard.
+
+### 🐛 Bug Fixes
+
+- **Codex sub-agent threads no longer masquerade as separate sessions**: spawned child threads are excluded from the live rail and the session picker, so a delegation counts only under its parent's badge instead of cluttering the list.
+
+### ♻️ Internal
+
+- **Shared Codex DB helpers**: access to Codex's `state_5.sqlite` (spawn-edge filtering and friends) was extracted into one module reused by live-sessions, find-session, and the delegation counter.
+
 ## [3.1.0] - 2026-05-25
 
 ### ✨ New Features
