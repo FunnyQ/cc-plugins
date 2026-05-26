@@ -152,19 +152,63 @@ function processField(pid: number, field: "ppid" | "command"): string | null {
   }
 }
 
-function sessionIdFromAncestors(startPid = process.ppid): string | null {
+// Walk up our ancestor process chain (max 8 hops), returning the first non-null
+// extraction. The channel MCP server is spawned by the Claude CLI process, so an
+// ancestor pid identifies our host session.
+function walkAncestors(
+  startPid: number,
+  extract: (pid: number) => string | null,
+): string | null {
   let pid = startPid;
   for (let i = 0; i < 8 && pid > 1; i++) {
-    const command = processField(pid, "command");
-    if (command) {
-      const id = sessionIdFromCommand(command);
-      if (id) return id;
-    }
+    const found = extract(pid);
+    if (found) return found;
     const parent = Number(processField(pid, "ppid"));
     if (!Number.isFinite(parent) || parent === pid) return null;
     pid = parent;
   }
   return null;
+}
+
+function sessionIdFromAncestors(startPid = process.ppid): string | null {
+  return walkAncestors(startPid, (pid) => {
+    const command = processField(pid, "command");
+    return command ? sessionIdFromCommand(command) : null;
+  });
+}
+
+function claudeSessionsDir(): string {
+  return (
+    process.env.COCKPIT_CLAUDE_SESSIONS_DIR ||
+    join(homedir(), ".claude", "sessions")
+  );
+}
+
+// Claude writes ~/.claude/sessions/<pid>.json per running session, keyed by the
+// CLI process pid and carrying its authoritative sessionId. Matching an ancestor
+// pid to its file yields the real session id — unlike the newest-mtime transcript
+// guess, which races sibling sessions in the same project (and silently latches
+// the wrong id, leaving the cockpit send box disabled).
+function sessionIdFromSessionFile(pid: number): string | null {
+  try {
+    const d = JSON.parse(
+      readFileSync(join(claudeSessionsDir(), `${pid}.json`), "utf8"),
+    ) as { pid?: unknown; sessionId?: unknown };
+    if (
+      d?.pid === pid &&
+      typeof d.sessionId === "string" &&
+      UUID_RE.test(d.sessionId)
+    ) {
+      return d.sessionId;
+    }
+  } catch {
+    // no file for this pid, or malformed — keep walking ancestors
+  }
+  return null;
+}
+
+function sessionIdFromAncestorFiles(startPid = process.ppid): string | null {
+  return walkAncestors(startPid, sessionIdFromSessionFile);
 }
 
 export async function resolveClaudeSessionId(
@@ -173,10 +217,16 @@ export async function resolveClaudeSessionId(
     timeoutMs?: number;
     finder?: (provider: "claude", project: string) => string | null;
     ancestorFinder?: () => string | null;
+    sessionFileFinder?: () => string | null;
   } = {},
 ): Promise<string | null> {
   const fromEnv = process.env.CLAUDE_CODE_SESSION_ID?.trim();
   if (fromEnv && UUID_RE.test(fromEnv)) return fromEnv;
+
+  const fromSessionFile = (
+    opts.sessionFileFinder ?? sessionIdFromAncestorFiles
+  )();
+  if (fromSessionFile) return fromSessionFile;
 
   const fromAncestors = (opts.ancestorFinder ?? sessionIdFromAncestors)();
   if (fromAncestors) return fromAncestors;
