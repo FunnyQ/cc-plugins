@@ -31,22 +31,13 @@ Provider behavior differs:
   remote-control is unavailable.
 
 Channels require Claude Code 2.1.80 or later and are still behind the research
-preview development flag. Register the channel once in `~/.claude.json`:
+preview development flag. The channel is packaged in the plugin manifest
+(`mcpServers` + `channels` in `.claude-plugin/plugin.json`), so Claude Code
+auto-loads it when the `monitor` plugin is enabled — no manual `~/.claude.json`
+entry is needed. (Older versions wired it by hand; `monitor:install` removes any
+such stale entry to avoid double registration.)
 
-```json
-{
-  "mcpServers": {
-    "cockpit-channel": {
-      "command": "bun",
-      "args": [
-        "/Users/funnyq/Projects/q-lab/cc-plugins/packages/monitor/skills/cockpit/scripts/cockpit-channel.ts"
-      ]
-    }
-  }
-}
-```
-
-Then launch an opted-in session with:
+Launch an opted-in session with:
 
 ```bash
 bun packages/monitor/skills/cockpit/scripts/monitor-up.ts
