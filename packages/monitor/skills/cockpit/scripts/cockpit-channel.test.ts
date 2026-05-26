@@ -6,6 +6,7 @@ import {
   channelNotification,
   ensureServer,
   isUp,
+  nextReconnectDelayMs,
   postReply,
   readDaemonCoords,
   readProcessInfo,
@@ -71,6 +72,14 @@ describe("daemon coords", () => {
         options: { detached: true, stdio: "ignore" },
       },
     ]);
+  });
+
+  test("reconnect backoff grows and caps", () => {
+    expect(nextReconnectDelayMs(0)).toBe(1000);
+    expect(nextReconnectDelayMs(1)).toBe(2000);
+    expect(nextReconnectDelayMs(2)).toBe(4000);
+    expect(nextReconnectDelayMs(3)).toBe(8000);
+    expect(nextReconnectDelayMs(99)).toBe(30000);
   });
 });
 

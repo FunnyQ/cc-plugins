@@ -19,7 +19,8 @@ function daemonToken(): string | null {
 }
 ```
 
-- GET endpoints take `token` as a query param; POST endpoints take it in the JSON body.
+- Long-poll GET endpoints take `token` as a query param; POST endpoints take it in the JSON body.
+- Browser SSE streams do **not** put the daemon token in the URL. The dashboard first POSTs for a short-lived ticket, then opens the EventSource with that ticket.
 - Mismatch → `401 { error: "unauthorized" }`. Invalid/absent session → `400 { error: "invalid session" }`.
 - `sessionId` is a UUID; validate with `/^[0-9a-f-]{36}$/` (same as `broker.ts`).
 
@@ -49,11 +50,21 @@ The channel's `reply` tool posts the agent's message for the UI.
 
 - Fan `text` to all subscribers of the reply SSE for `session` (ephemeral — no file written).
 - `200 { delivered: <n subscribers> }`. No subscribers is fine (`delivered: 0`).
+- A broken/closed subscriber must be removed without failing the POST or blocking other subscribers.
 
-### `GET /api/reply/stream?session=<uuid>&token=<t>`
+### `POST /api/reply-ticket  { session, token }`
+
+Mint a short-lived ticket for one browser SSE connection.
+
+- Validates daemon token + session.
+- Returns `200 { ticket, expiresAt }`.
+- The ticket is scoped to one session and consumed by `/api/reply/stream`.
+
+### `GET /api/reply/stream?session=<uuid>&ticket=<ticket>`
 
 SSE the UI subscribes to for live agent replies.
 
+- Validates session and consumes the short-lived ticket. The daemon token never appears in this URL.
 - Emits `data: {"text": "..."}\n\n` per reply; a comment ping (`: ping\n\n`) every ~25s to keep the socket alive under the 255s idleTimeout.
 - Content-Type `text/event-stream`, `Cache-Control: no-cache`.
 

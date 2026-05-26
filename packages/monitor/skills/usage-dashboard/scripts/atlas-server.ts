@@ -52,7 +52,11 @@ function readAtlasInfo(): AtlasInfo | null {
   try {
     const raw = readFileSync(atlasInfoPath(), "utf8");
     const parsed = JSON.parse(raw);
-    if (typeof parsed?.pid === "number" && typeof parsed?.port === "number") {
+    if (
+      typeof parsed?.pid === "number" &&
+      typeof parsed?.port === "number" &&
+      typeof parsed?.root === "string"
+    ) {
       return parsed as AtlasInfo;
     }
   } catch {

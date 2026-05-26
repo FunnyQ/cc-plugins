@@ -358,6 +358,21 @@ export const store = reactive({
     this.replyStreamStatus = "idle";
   },
 
+  scheduleReplyStreamReconnect(sessionId, provider, refreshToken = false) {
+    if (refreshToken) resetToken();
+    this.replyStreamStatus = "reconnecting";
+    if (this._replyStreamRetry) clearTimeout(this._replyStreamRetry);
+    this._replyStreamRetry = window.setTimeout(() => {
+      this._replyStreamRetry = null;
+      if (
+        this.selectedSessionId === sessionId &&
+        (this.selectedProvider || "claude") === provider
+      ) {
+        this.openReplyStream(true);
+      }
+    }, 1500);
+  },
+
   async openReplyStream(force = false) {
     const sessionId = this.selectedSessionId;
     const provider = this.selectedProvider || "claude";
@@ -371,10 +386,48 @@ export const store = reactive({
     this.closeReplyStream();
     if (!force) this.channelReplies = [];
     const token = await getToken();
-    if (!token || this.selectedSessionId !== sessionId) return;
+    if (this.selectedSessionId !== sessionId) return;
+    if (!token) {
+      this.scheduleReplyStreamReconnect(sessionId, provider, true);
+      return;
+    }
+    let ticketRes;
+    try {
+      ticketRes = await fetch("/api/reply-ticket", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session: sessionId, token }),
+      });
+    } catch {
+      this.scheduleReplyStreamReconnect(sessionId, provider, true);
+      return;
+    }
+    if (ticketRes.status === 401) {
+      this.scheduleReplyStreamReconnect(sessionId, provider, true);
+      return;
+    }
+    if (this.selectedSessionId !== sessionId) return;
+    if (!ticketRes.ok) {
+      if (ticketRes.status >= 500) {
+        this.scheduleReplyStreamReconnect(sessionId, provider, true);
+      }
+      return;
+    }
+    let ticket = "";
+    try {
+      const body = await ticketRes.json();
+      ticket = typeof body.ticket === "string" ? body.ticket : "";
+    } catch {
+      this.scheduleReplyStreamReconnect(sessionId, provider, true);
+      return;
+    }
+    if (ticket === "") {
+      this.scheduleReplyStreamReconnect(sessionId, provider, true);
+      return;
+    }
     this.replyStreamStatus = "connecting";
     const es = new EventSource(
-      `/api/reply/stream?session=${sessionId}&token=${encodeURIComponent(token)}`,
+      `/api/reply/stream?session=${sessionId}&ticket=${encodeURIComponent(ticket)}`,
     );
     this._replyStream = es;
     this._replyStreamKey = key;
@@ -408,18 +461,7 @@ export const store = reactive({
       es.close();
       this._replyStream = null;
       this._replyStreamKey = "";
-      this.replyStreamStatus = "reconnecting";
-      resetToken();
-      if (this._replyStreamRetry) clearTimeout(this._replyStreamRetry);
-      this._replyStreamRetry = window.setTimeout(() => {
-        this._replyStreamRetry = null;
-        if (
-          this.selectedSessionId === sessionId &&
-          (this.selectedProvider || "claude") === provider
-        ) {
-          this.openReplyStream(true);
-        }
-      }, 1500);
+      this.scheduleReplyStreamReconnect(sessionId, provider, true);
     };
   },
 
