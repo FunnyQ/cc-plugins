@@ -3,21 +3,30 @@ import { describe, expect, test } from "bun:test";
 import { decideStatusLine } from "./statusline-decision";
 
 const COLLECTOR = "bun /plugin/scripts/statusline-collector.ts";
-const always = () => true;
-const never = () => false;
 
 describe("decideStatusLine", () => {
-  test("skips when the current command already runs an existing collector", () => {
-    const d = decideStatusLine(
-      { command: "bun /old/scripts/statusline-collector.ts" },
-      COLLECTOR,
-      always,
-    );
+  test("skips only when already pointing at the exact live collector path", () => {
+    const d = decideStatusLine({ command: COLLECTOR }, COLLECTOR);
     expect(d).toEqual({ action: "skip" });
   });
 
+  test("re-points a drifted/old collector path to the current one", () => {
+    // A different collector path (e.g. an older cache version that still
+    // exists) must be rewritten — not skipped, not wrapped.
+    const d = decideStatusLine(
+      { command: "bun /old/monitor/3.1.0/scripts/statusline-collector.ts" },
+      COLLECTOR,
+    );
+    expect(d).toEqual({
+      action: "write",
+      command: COLLECTOR,
+      padding: 0,
+      preserved: null,
+    });
+  });
+
   test("wires fresh when there is no existing statusLine", () => {
-    const d = decideStatusLine({}, COLLECTOR, never);
+    const d = decideStatusLine({}, COLLECTOR);
     expect(d).toEqual({
       action: "write",
       command: COLLECTOR,
@@ -30,7 +39,6 @@ describe("decideStatusLine", () => {
     const d = decideStatusLine(
       { command: "starship prompt", padding: 2 },
       COLLECTOR,
-      never,
     );
     expect(d).toEqual({
       action: "write",
@@ -40,27 +48,8 @@ describe("decideStatusLine", () => {
     });
   });
 
-  test("replaces a stale collector reference outright (does not wrap it)", () => {
-    // References a collector, but the file no longer exists → rewire, don't wrap.
-    const d = decideStatusLine(
-      { command: "bun /gone/scripts/statusline-collector.ts" },
-      COLLECTOR,
-      never,
-    );
-    expect(d).toEqual({
-      action: "write",
-      command: COLLECTOR,
-      padding: 0,
-      preserved: null,
-    });
-  });
-
   test("defaults padding to 0 when not a number", () => {
-    const d = decideStatusLine(
-      { command: "x", padding: "nope" },
-      COLLECTOR,
-      never,
-    );
+    const d = decideStatusLine({ command: "x", padding: "nope" }, COLLECTOR);
     expect(d.action).toBe("write");
     if (d.action === "write") expect(d.padding).toBe(0);
   });

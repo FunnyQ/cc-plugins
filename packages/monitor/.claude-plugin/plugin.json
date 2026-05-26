@@ -16,5 +16,19 @@
     "live-session",
     "claude-code",
     "codex"
-  ]
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts\" --session-check",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
 }

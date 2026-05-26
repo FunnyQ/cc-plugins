@@ -31,12 +31,14 @@ const COLLECTOR_SCRIPT = resolve(
 );
 
 let home: string;
+let dataDir: string;
 
-// Run setup.ts as a subprocess with a controlled HOME so reads/writes land in
-// a tmpdir, never the real ~/.claude. This exercises the actual CLI entrypoint.
+// Run setup.ts as a subprocess with a controlled HOME (and CLAUDE_PLUGIN_DATA)
+// so reads/writes land in a tmpdir, never the real ~/.claude. This exercises
+// the actual CLI entrypoint.
 function run(args: string[] = []): { code: number; stdout: string } {
   const proc = Bun.spawnSync(["bun", SCRIPT, ...args], {
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir },
   });
   return {
     code: proc.exitCode ?? 0,
@@ -59,6 +61,7 @@ function names(dir: string): string[] {
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "monitor-setup-"));
   mkdirSync(join(home, ".claude"), { recursive: true });
+  dataDir = mkdtempSync(join(tmpdir(), "monitor-data-"));
   // Seed the one required HOME-dependent dashboard prerequisite so --check can
   // pass; vendor/pricing resolve to the real committed repo assets.
   writeFileSync(join(home, ".claude", "stats-cache.json"), "{}");
@@ -66,6 +69,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true });
 });
 
 describe("versionGte", () => {
@@ -199,6 +203,149 @@ describe("single-piece flags", () => {
     run(["--apply-statusline"]);
     expect(settingsJson().statusLine).toBeDefined();
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
+  });
+});
+
+describe("version drift", () => {
+  // An old plugin-cache path whose version segment differs from the current one.
+  const OLD_COLLECTOR =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+  const OLD_CHANNEL =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/cockpit/scripts/cockpit-channel.ts";
+
+  test("--check flags a drifted statusline path with the version mismatch", () => {
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: {
+          type: "command",
+          command: `bun ${OLD_COLLECTOR}`,
+          padding: 0,
+        },
+      }),
+    );
+    const { stdout } = run();
+    expect(stdout).toContain("○ live usage limits");
+    expect(stdout).toContain("monitor 3.1.0");
+  });
+
+  test("--apply re-points a drifted statusline to the current path", () => {
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: {
+          type: "command",
+          command: `bun ${OLD_COLLECTOR}`,
+          padding: 0,
+        },
+      }),
+    );
+    run(["--apply-statusline"]);
+    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
+  });
+
+  test("--apply re-points a drifted cockpit-channel to the current path", () => {
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [OLD_CHANNEL] },
+        },
+      }),
+    );
+    run(["--apply-channel"]);
+    expect(claudeJson().mcpServers["cockpit-channel"].args).toEqual([
+      CHANNEL_SCRIPT,
+    ]);
+  });
+});
+
+describe("--migrate (re-point only, never fresh-wire)", () => {
+  const OLD_COLLECTOR =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+
+  test("re-points a drifted statusline but leaves an unconfigured channel alone", () => {
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: {
+          type: "command",
+          command: `bun ${OLD_COLLECTOR}`,
+          padding: 0,
+        },
+      }),
+    );
+    const { stdout } = run(["--migrate"]);
+    expect(stdout).toContain("Re-pointed: statusline collector");
+    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
+    // Channel was never configured — migrate must NOT create it.
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+  });
+
+  test("does nothing when nothing is configured", () => {
+    const { stdout } = run(["--migrate"]);
+    expect(stdout).toContain("Nothing to migrate");
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+    expect(existsSync(join(home, ".claude", "settings.json"))).toBe(false);
+  });
+});
+
+describe("--session-check (marker-gated)", () => {
+  const OLD_CHANNEL =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/cockpit/scripts/cockpit-channel.ts";
+
+  test("migrates a drift on first run and writes the version marker", () => {
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [OLD_CHANNEL] },
+        },
+      }),
+    );
+    const { code } = run(["--session-check"]);
+    expect(code).toBe(0);
+    expect(claudeJson().mcpServers["cockpit-channel"].args).toEqual([
+      CHANNEL_SCRIPT,
+    ]);
+    expect(existsSync(join(dataDir, ".wired-version"))).toBe(true);
+  });
+
+  test("is a no-op once the marker matches the current version", () => {
+    // First run reconciles and stamps the marker.
+    run(["--session-check"]);
+    const marker = join(dataDir, ".wired-version");
+    expect(existsSync(marker)).toBe(true);
+    // Now drift the channel again; a second run should NOT touch it, because the
+    // marker already records this version (the gate skips the migrate).
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [OLD_CHANNEL] },
+        },
+      }),
+    );
+    run(["--session-check"]);
+    expect(claudeJson().mcpServers["cockpit-channel"].args).toEqual([
+      OLD_CHANNEL,
+    ]);
+  });
+
+  test("never fresh-wires on a clean install", () => {
+    run(["--session-check"]);
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+    expect(existsSync(join(home, ".claude", "settings.json"))).toBe(false);
+  });
+
+  test("nudges the user to run /monitor:install once when nothing is wired", () => {
+    const first = run(["--session-check"]);
+    expect(first.stdout).toContain("/monitor:install");
+    // Write-free: the nudge must not create any config.
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+    // Second run is gated by the marker — no repeat nag.
+    const second = run(["--session-check"]);
+    expect(second.stdout).not.toContain("/monitor:install");
   });
 });
 
