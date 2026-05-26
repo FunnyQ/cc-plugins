@@ -19,9 +19,9 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { join } from "node:path";
 import { Database } from "bun:sqlite";
+import { codexStateDb, resolveCodexPath } from "./codex-db";
 import { resolveClaudeTranscriptPath } from "./transcript-stream";
 
 export type Provider = "claude" | "codex";
@@ -142,20 +142,6 @@ function subagentsDirFor(sessionId: string): string | undefined {
   return join(tx.slice(0, -".jsonl".length), "subagents");
 }
 
-function codexDir(): string {
-  return process.env.COCKPIT_CODEX_DIR || join(homedir(), ".codex");
-}
-
-function codexStateDb(): string {
-  return (
-    process.env.COCKPIT_CODEX_STATE_DB || join(codexDir(), "state_5.sqlite")
-  );
-}
-
-function resolveCodexRolloutPath(path: string): string {
-  return isAbsolute(path) ? path : resolve(codexDir(), path);
-}
-
 export function codexRolloutIsDone(lines: string[]): boolean {
   for (let i = lines.length - 1; i >= 0; i--) {
     const trimmed = lines[i].trim();
@@ -226,7 +212,7 @@ export function subagentCountForCodex(
         if (row.status === "closed") continue;
         const updatedAtMs = row.updated_at_ms ?? row.updated_at * 1000;
         if (now - updatedAtMs > SUBAGENT_STALE_MS) continue;
-        const rolloutPath = resolveCodexRolloutPath(row.rollout_path);
+        const rolloutPath = resolveCodexPath(row.rollout_path);
         if (!existsSync(rolloutPath)) continue;
         if (!readCodexRolloutDone(rolloutPath)) running++;
       }

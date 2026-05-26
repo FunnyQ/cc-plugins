@@ -19,6 +19,7 @@ import { readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
+import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
 
 type Provider = "claude" | "codex";
 
@@ -77,28 +78,6 @@ function findClaude(project: string): string | null {
   return newest.id;
 }
 
-function codexDir(): string {
-  return process.env.COCKPIT_CODEX_DIR || join(homedir(), ".codex");
-}
-
-function codexStateDb(): string {
-  return (
-    process.env.COCKPIT_CODEX_STATE_DB || join(codexDir(), "state_5.sqlite")
-  );
-}
-
-function hasCodexSpawnEdges(db: Database): boolean {
-  const row = db
-    .query(
-      `select 1 as ok
-       from sqlite_master
-       where type = 'table' and name = 'thread_spawn_edges'
-       limit 1`,
-    )
-    .get() as { ok: number } | null;
-  return row !== null;
-}
-
 function findCodex(project: string): string | null {
   const dbPath = codexStateDb();
   if (!existsSync(dbPath)) {
@@ -108,13 +87,7 @@ function findCodex(project: string): string | null {
   try {
     const db = new Database(dbPath, { readonly: true });
     try {
-      const excludeSpawnedChildren = hasCodexSpawnEdges(db)
-        ? `and not exists (
-             select 1
-             from thread_spawn_edges e
-             where e.child_thread_id = threads.id
-           )`
-        : "";
+      const excludeSpawnedChildren = excludeCodexSpawnedChildrenSql(db);
       const row = db
         .query(
           `select id

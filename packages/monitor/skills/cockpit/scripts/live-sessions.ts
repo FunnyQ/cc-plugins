@@ -8,6 +8,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
+import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
 
 export type Provider = "claude" | "codex";
 
@@ -36,13 +37,6 @@ function claudeSessionsDir(): string {
   return (
     process.env.COCKPIT_CLAUDE_SESSIONS_DIR ||
     join(homedir(), ".claude", "sessions")
-  );
-}
-
-function codexStateDb(): string {
-  return (
-    process.env.COCKPIT_CODEX_STATE_DB ||
-    join(homedir(), ".codex", "state_5.sqlite")
   );
 }
 
@@ -97,18 +91,6 @@ type CodexThreadRow = {
   updated_at_ms: number | null;
 };
 
-function hasCodexSpawnEdges(db: Database): boolean {
-  const row = db
-    .query(
-      `select 1 as ok
-       from sqlite_master
-       where type = 'table' and name = 'thread_spawn_edges'
-       limit 1`,
-    )
-    .get() as { ok: number } | null;
-  return row !== null;
-}
-
 // Codex has no per-session file; the `threads` table's most-recent rows stand in
 // for "recently active". Same cutoff keeps the two providers consistent. Spawned
 // child threads are excluded here so subagents only appear as the parent
@@ -119,13 +101,7 @@ function readCodexLive(now: number): LiveSession[] {
   try {
     const db = new Database(dbPath, { readonly: true });
     try {
-      const excludeSpawnedChildren = hasCodexSpawnEdges(db)
-        ? `and not exists (
-             select 1
-             from thread_spawn_edges e
-             where e.child_thread_id = threads.id
-           )`
-        : "";
+      const excludeSpawnedChildren = excludeCodexSpawnedChildrenSql(db);
       const rows = db
         .query(
           `select id, cwd, updated_at, updated_at_ms
