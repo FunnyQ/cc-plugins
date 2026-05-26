@@ -31,16 +31,47 @@ const SUBAGENT_STALE_MS = 10 * 60 * 1000;
 // need the end of the file, not a multi-MB history every poll.
 const TAIL_BYTES = 64 * 1024;
 
+type ContentBlock = { type?: string };
+
 type SidechainEntry = {
   type?: string;
-  message?: { stop_reason?: string | null };
+  message?: { stop_reason?: string | null; content?: ContentBlock[] };
+  data?: { hookEvent?: string };
 };
 
-// True when a sidechain's last conversation entry is the agent's final answer
-// (assistant turn stopped on `end_turn`). Intermediate turns that call a tool
-// stop on `tool_use`, so they don't read as done. Blank/metadata lines (e.g. the
-// leading `fork-context-ref`) are skipped from the end. An empty/unreadable
-// sidechain is treated as NOT done — a just-spawned agent shouldn't vanish.
+// A `progress` entry that records the SubagentStop hook firing — the most
+// authoritative completion marker, written when the subagent actually stops.
+// (Nested under `data.hookEvent`, not the entry's top level.) Only present when
+// the user has a SubagentStop hook configured, so it's a strong DONE signal when
+// seen, never a RUNNING signal by its absence.
+function isSubagentStop(entry: SidechainEntry): boolean {
+  return entry.type === "progress" && entry.data?.hookEvent === "SubagentStop";
+}
+
+// An assistant turn is terminal (nothing follows) UNLESS it's waiting on a tool.
+// Framed as a denylist, not an allowlist of stop reasons: a turn that called a
+// tool (stop_reason "tool_use", or a `tool_use` content block) has a result
+// coming, so it's still running. Every other ending — "end_turn", null,
+// "stop_sequence", "max_tokens", … (all seen in real transcripts, varying by
+// version) — means the turn finished, so the agent is done. This is what keeps a
+// null- or stop_sequence-stopped final answer from being misread as running.
+function assistantIsTerminal(entry: SidechainEntry): boolean {
+  if (entry.message?.stop_reason === "tool_use") return false;
+  const content = entry.message?.content;
+  if (Array.isArray(content) && content.some((b) => b?.type === "tool_use")) {
+    return false;
+  }
+  return true;
+}
+
+// True when a sidechain shows the agent has finished. Scans from the end:
+//   - a SubagentStop hook_progress → done (authoritative, sits at the very tail);
+//   - the last conversation turn: a terminal assistant answer → done, a user
+//     turn (awaiting the next assistant) → running.
+// Other bookkeeping (fork-context-ref, attachment, non-stop progress, …) is
+// skipped. An empty/unreadable sidechain is NOT done — a just-spawned agent
+// shouldn't vanish. The SubagentStop check is what fixes version variants whose
+// final assistant stops on null rather than end_turn.
 export function sidechainIsDone(lines: string[]): boolean {
   for (let i = lines.length - 1; i >= 0; i--) {
     const trimmed = lines[i].trim();
@@ -51,11 +82,8 @@ export function sidechainIsDone(lines: string[]): boolean {
     } catch {
       continue;
     }
-    // Only assistant/user conversation turns settle done-ness; skip bookkeeping
-    // entries (fork-context-ref, attachment, queue-operation, …).
-    if (entry.type === "assistant") {
-      return entry.message?.stop_reason === "end_turn";
-    }
+    if (isSubagentStop(entry)) return true;
+    if (entry.type === "assistant") return assistantIsTerminal(entry);
     if (entry.type === "user") return false; // awaiting the next assistant turn
   }
   return false;
