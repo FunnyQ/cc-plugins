@@ -1068,90 +1068,28 @@ body {
   font-style: italic;
 }
 
-/* Channel console — the live two-way cockpit channel for Claude sessions. */
+/* Channel console — the send box for talking into a live Claude session. Sits
+   at the bottom of the Decision Log column, so the border reads along its top. */
 .channel-console {
   position: relative;
   z-index: 3;
   display: grid;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--edge-soft);
+  border-top: 1px solid var(--edge-soft);
   background: color-mix(in oklch, var(--aurora) 5%, var(--space));
-}
-.reply-strip {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-.reply-strip__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.reply-strip__legend {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--aurora);
-}
-.reply-strip__count {
-  margin-inline-start: auto;
-  font-size: 10px;
-}
-.reply-strip__count.is-reconnecting {
-  color: var(--signal);
-}
-.reply-strip__count.is-listening {
-  color: var(--aurora);
-}
-.reply-strip__list {
-  display: grid;
-  gap: 4px;
-  max-block-size: 118px;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-}
-.reply-strip__item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
-  align-items: baseline;
-  padding: 6px 8px;
-  border: 1px solid color-mix(in oklch, var(--aurora) 24%, var(--edge-soft));
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--engine) 7%, var(--space));
-}
-.reply-strip__time {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-faint);
-}
-.reply-strip__text {
-  min-width: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--starlight);
-}
-.reply-strip__empty {
-  margin: 0;
-  color: var(--ink-faint);
-  font-size: 12px;
 }
 .channel-send {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: center;
   gap: 8px;
 }
 .channel-send__input {
   min-width: 0;
-  min-height: 42px;
-  max-height: 120px;
+  /* ~4 lines: 4 × line-height (18px) + vertical padding (14px). */
+  min-height: 86px;
+  max-height: 160px;
   padding: 7px 10px;
   font: inherit;
   font-size: 13px;

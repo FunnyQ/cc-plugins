@@ -15,7 +15,6 @@ import { initDesignSystem } from "./modules/design-system.js";
 
 const POLL_MS = 3000;
 const HERO_AUTO_COLLAPSE_MS = 60_000;
-const REPLY_LIMIT = 50;
 
 let _tokenPromise = null;
 function getToken(force = false) {
@@ -27,10 +26,6 @@ function getToken(force = false) {
       .catch(() => null);
   }
   return _tokenPromise;
-}
-
-function resetToken() {
-  _tokenPromise = null;
 }
 
 function sortActiveFirst(sessions) {
@@ -76,11 +71,6 @@ export const store = reactive({
   channelMessage: "",
   channelSending: false,
   channelError: "",
-  channelReplies: [],
-  replyStreamStatus: "idle",
-  _replyStream: null,
-  _replyStreamKey: "",
-  _replyStreamRetry: null,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -166,25 +156,6 @@ export const store = reactive({
     if (s.provider === "codex") return "Codex has no channel, observe only";
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
-  },
-
-  get replyStripCountLabel() {
-    if (this.channelReplies.length) return `${this.channelReplies.length} live`;
-    if (this.replyStreamStatus === "reconnecting") return "reconnecting";
-    if (this.replyStreamStatus === "connecting") return "connecting";
-    if (this.selectedSessionId) return "listening";
-    return "standby";
-  },
-
-  get replyStripEmptyLabel() {
-    if (!this.selectedSessionId) return "Select a session.";
-    if (this.replyStreamStatus === "reconnecting") {
-      return "Reconnecting to cockpit replies.";
-    }
-    if (this.replyStreamStatus === "connecting") {
-      return "Connecting to cockpit replies.";
-    }
-    return "No cockpit replies.";
   },
 
   get channelSendDisabled() {
@@ -345,126 +316,6 @@ export const store = reactive({
     this.sendChannelMessage();
   },
 
-  closeReplyStream() {
-    if (this._replyStreamRetry) {
-      clearTimeout(this._replyStreamRetry);
-      this._replyStreamRetry = null;
-    }
-    if (this._replyStream) {
-      this._replyStream.close();
-      this._replyStream = null;
-    }
-    this._replyStreamKey = "";
-    this.replyStreamStatus = "idle";
-  },
-
-  scheduleReplyStreamReconnect(sessionId, provider, refreshToken = false) {
-    if (refreshToken) resetToken();
-    this.replyStreamStatus = "reconnecting";
-    if (this._replyStreamRetry) clearTimeout(this._replyStreamRetry);
-    this._replyStreamRetry = window.setTimeout(() => {
-      this._replyStreamRetry = null;
-      if (
-        this.selectedSessionId === sessionId &&
-        (this.selectedProvider || "claude") === provider
-      ) {
-        this.openReplyStream(true);
-      }
-    }, 1500);
-  },
-
-  async openReplyStream(force = false) {
-    const sessionId = this.selectedSessionId;
-    const provider = this.selectedProvider || "claude";
-    const key = sessionId ? `${provider}:${sessionId}` : "";
-    if (!sessionId) {
-      this.closeReplyStream();
-      this.channelReplies = [];
-      return;
-    }
-    if (!force && this._replyStreamKey === key) return;
-    this.closeReplyStream();
-    if (!force) this.channelReplies = [];
-    const token = await getToken();
-    if (this.selectedSessionId !== sessionId) return;
-    if (!token) {
-      this.scheduleReplyStreamReconnect(sessionId, provider, true);
-      return;
-    }
-    let ticketRes;
-    try {
-      ticketRes = await fetch("/api/reply-ticket", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session: sessionId, token }),
-      });
-    } catch {
-      this.scheduleReplyStreamReconnect(sessionId, provider, true);
-      return;
-    }
-    if (ticketRes.status === 401) {
-      this.scheduleReplyStreamReconnect(sessionId, provider, true);
-      return;
-    }
-    if (this.selectedSessionId !== sessionId) return;
-    if (!ticketRes.ok) {
-      if (ticketRes.status >= 500) {
-        this.scheduleReplyStreamReconnect(sessionId, provider, true);
-      }
-      return;
-    }
-    let ticket = "";
-    try {
-      const body = await ticketRes.json();
-      ticket = typeof body.ticket === "string" ? body.ticket : "";
-    } catch {
-      this.scheduleReplyStreamReconnect(sessionId, provider, true);
-      return;
-    }
-    if (ticket === "") {
-      this.scheduleReplyStreamReconnect(sessionId, provider, true);
-      return;
-    }
-    this.replyStreamStatus = "connecting";
-    const es = new EventSource(
-      `/api/reply/stream?session=${sessionId}&ticket=${encodeURIComponent(ticket)}`,
-    );
-    this._replyStream = es;
-    this._replyStreamKey = key;
-    es.onopen = () => {
-      if (this._replyStreamKey === key) this.replyStreamStatus = "listening";
-    };
-    es.onmessage = (e) => {
-      try {
-        const { text } = JSON.parse(e.data);
-        if (typeof text !== "string" || text.trim() === "") return;
-        this.channelReplies.push({
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          text,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        });
-        if (this.channelReplies.length > REPLY_LIMIT) {
-          this.channelReplies.splice(
-            0,
-            this.channelReplies.length - REPLY_LIMIT,
-          );
-        }
-      } catch {
-        // ignore malformed stream events
-      }
-    };
-    es.onerror = () => {
-      if (this._replyStream !== es) return;
-      es.close();
-      this._replyStream = null;
-      this._replyStreamKey = "";
-      this.scheduleReplyStreamReconnect(sessionId, provider, true);
-    };
-  },
-
   // --- session navigator -------------------------------------------------
   // The manifest bar's ‹ › arrows are a remote control for the hero: they
   // step the selection through the *active* (flying) sessions, in the same
@@ -568,7 +419,6 @@ export const store = reactive({
       if (!this.selectedSessionId && this.sessions.length) {
         this.selectSession(this.sessions[0]);
       }
-      this.openReplyStream();
       this.loaded = true;
     } catch (e) {
       console.error("cockpit: fetchSessions failed", e);
@@ -642,9 +492,6 @@ const designSystem = initDesignSystem(
   document.querySelector('[data-column="design-system"]'),
 );
 store._loadDesignSystem = designSystem && designSystem.load;
-store.subscribe(() => store.openReplyStream());
-store.openReplyStream();
-window.addEventListener("beforeunload", () => store.closeReplyStream());
 
 // Escape closes drawer overlays; ←/→ step through active sessions.
 document.addEventListener("keydown", (e) => {
