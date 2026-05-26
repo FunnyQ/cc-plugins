@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.4.2] - 2026-05-27
+
+### 🐛 Bug Fixes
+
+- **Cockpit send box stays disabled even when launched with the channel flag**: the channel server was resolving its own session id by guessing the newest-mtime transcript in the project — a guess latched once at MCP startup that races sibling sessions in the same project, so it would silently poll the wrong session's inbox and the real session never lit up (`channel: false`). It now resolves the id authoritatively by walking ancestor pids to `~/.claude/sessions/<pid>.json` (keyed by the Claude CLI pid that spawned the channel), falling back to the mtime guess only when no session file matches.
+
 ## [3.4.1] - 2026-05-27
 
 ### ♻️ Internal

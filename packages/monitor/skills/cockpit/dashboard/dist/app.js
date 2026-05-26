@@ -207,7 +207,7 @@ export const store = reactive({
   },
 
   get channelRelaunchCommand() {
-    return "claude --dangerously-load-development-channels server:cockpit-channel";
+    return "claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace";
   },
 
   get agentBadgeLabel() {
