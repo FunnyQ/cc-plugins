@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.4.0] - 2026-05-27
+
+### ✨ New Features
+
+- **Send cockpit messages to Codex sessions, not just Claude**: the cockpit send box now works for Codex too — messages start a real Codex turn through the managed remote-control socket (falling back to direct app-server mode when needed), so Codex is no longer observe-only. The box is gated on a real resume-readiness probe, so it only lights up when the session can actually receive a message.
+- **Relaunch hint for sessions missing a live channel**: when a Claude session lacks a cockpit channel attachment, the dashboard now shows a copyable relaunch command (with the right channel flags) in place of the send form — one click to copy, with a brief "Copied" confirmation — so you can reconnect a stranded session.
+- **Self-healing install paths**: `monitor:install` now treats a config as "wired" only when it points at the *exact* current plugin version path, so version drift (old cache dirs like `monitor/3.1.0/…` lingering after an update) is detected and re-pointed. A `SessionStart` hook runs a marker-gated `--session-check` once per version to silently re-point drift, or nudge a fresh install to run `/monitor:install` — it never fresh-wires, so initial opt-in stays manual. Adds `setup.ts --migrate` to re-point drift on demand.
+
+### 🐛 Bug Fixes
+
+- **Codex turns no longer get cut off**: cockpit now waits for turn completion before closing the app-server transport, routes active threads through turn/steer with the expected turn id, and acknowledges sends after submit instead of blocking on completion — so messages aren't dropped, resubmitted, or left hanging.
+
+### ♻️ Internal
+
+- **Install logic consolidated into a dedicated `install` skill**: `install.ts`, `setup-statusline.ts`, and `statusline-decision.ts` moved out of usage-dashboard into a new `install` skill with a unified `setup.ts` entry point that checks both skills and wires both configs (cockpit-channel MCP + statusline collector). Tests consolidated to remove duplication.
+- **Codex control probe** added for the remote-control send path, kept separate from the runtime send.
+
+### 📝 Documentation
+
+- **Updated cockpit docs** to reflect that `send` now supports both Claude (via the channel MCP) and Codex (via managed remote-control), with setup notes and readiness gating. Removed completed spike/task-planning docs for the cockpit-channel and Codex-control work.
+
 ## [3.3.0] - 2026-05-26
 
 ### ✨ New Features
