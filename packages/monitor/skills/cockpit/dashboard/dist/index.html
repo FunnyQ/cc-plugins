@@ -201,6 +201,12 @@
               :class="'is-' + selectedLiveStatus"
               v-text="statusPillLabel"
             ></span>
+            <span
+              class="agent-pill"
+              v-if="selectedSubagents > 0"
+              v-text="agentBadgeLabel"
+              title="Subagent delegations running in this session"
+            ></span>
           </header>
           <div class="instrument__body" data-column="transcript">
             <p class="placeholder">No live transcript.</p>

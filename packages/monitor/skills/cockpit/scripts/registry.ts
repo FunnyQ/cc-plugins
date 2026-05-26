@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
+import { subagentCountForClaude } from "./subagents";
 
 export type RegistryEntry = {
   provider: Provider;
@@ -45,6 +46,9 @@ export type SessionView = {
   logPath: string;
   status: SessionStatus;
   liveStatus: LiveStatus;
+  // In-flight Agent/Task delegations (Claude only) — drives the "⊕ N agents"
+  // badge. 0 for ended sessions, Codex, or when the transcript can't be read.
+  subagents: number;
   lastHeartbeat: string;
   sessionGoal: string;
   projectGoal: string;
@@ -148,6 +152,19 @@ function hasOpenCall(logPath: string): boolean {
   }
 }
 
+// In-flight subagent count, gated to where it can be non-zero: only an active
+// Claude session has a readable transcript with running Agent/Task delegations.
+// Skipping ended/Codex sessions avoids a needless transcript read every poll.
+function subagentsFor(
+  active: boolean,
+  provider: Provider,
+  sessionId: string,
+  now: number,
+): number {
+  if (!active || provider !== "claude") return 0;
+  return subagentCountForClaude(sessionId, now);
+}
+
 // ---------- goal readers ----------
 
 // The goal record is line 1 of the log, so we only need the file's head — not
@@ -246,6 +263,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
         openCall: active && hasOpenCall(e.logPath),
         harnessStatus: live?.status,
       }),
+      subagents: subagentsFor(active, e.provider, e.sessionId, now),
       lastHeartbeat: e.lastHeartbeat,
       sessionGoal: readSessionGoal(e.logPath),
       projectGoal: projectGoal(e.project),
@@ -271,6 +289,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
         openCall: false,
         harnessStatus: l.status,
       }),
+      subagents: subagentsFor(true, l.provider, l.id, now),
       lastHeartbeat: new Date(l.updatedAtMs).toISOString(),
       sessionGoal: "",
       projectGoal: projectGoal(l.cwd),
