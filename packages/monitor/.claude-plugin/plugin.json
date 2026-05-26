@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "description": "Monitor your Claude Code and Codex sessions — a usage dashboard (sessions, tokens, cost, model mix, project activity) plus a per-project cockpit (goal capture, decision log, live session view).",
   "author": {
     "name": "Q"
@@ -16,6 +16,20 @@
     "live-session",
     "claude-code",
     "codex"
+  ],
+  "mcpServers": {
+    "cockpit-channel": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit-channel.ts"
+      ]
+    }
+  },
+  "channels": [
+    {
+      "server": "cockpit-channel"
+    }
   ],
   "hooks": {
     "SessionStart": [

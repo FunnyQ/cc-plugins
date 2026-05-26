@@ -1,9 +1,16 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process";
 
+// The cockpit channel is packaged in the plugin manifest (mcpServers + channels),
+// so it's referenced by plugin coordinates, not the raw `server:<name>` form.
+const CHANNEL = "plugin:monitor@q-lab-marketplace";
+
+// Channels are still a research preview, so activating one needs the dev flag.
+// GA-day change: swap `--dangerously-load-development-channels` for `--channels`
+// (the CHANNEL argument stays the same).
 const args = [
   "--dangerously-load-development-channels",
-  "server:cockpit-channel",
+  CHANNEL,
   ...process.argv.slice(2),
 ];
 
