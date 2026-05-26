@@ -19,6 +19,7 @@ type JsonRpcNotification = Extract<JsonRpcMessage, { method: string }>;
 export type ProbeOptions = {
   threadId?: string;
   sendText?: string;
+  waitForCompletion?: boolean;
   json?: boolean;
   help?: boolean;
 };
@@ -69,6 +70,8 @@ export function parseArgs(argv: string[]): ProbeOptions {
       out.help = true;
     } else if (arg === "--json") {
       out.json = true;
+    } else if (arg === "--wait") {
+      out.waitForCompletion = true;
     } else if (arg === "--thread") {
       const value = argv[++i];
       if (!value) throw new Error("missing value for --thread");
@@ -86,10 +89,11 @@ export function parseArgs(argv: string[]): ProbeOptions {
 
 export function usage(): string {
   return [
-    "Usage: bun codex-control-probe.ts [--json] [--thread <id>] [--send <text>]",
+    "Usage: bun codex-control-probe.ts [--json] [--thread <id>] [--send <text>] [--wait]",
     "",
     "Dry-run by default: starts/checks Codex remote-control and probes JSON-RPC.",
     "A real Codex turn is created only when --thread and --send are both present.",
+    "--wait waits for turn completion after submitting a Codex turn.",
   ].join("\n");
 }
 
@@ -110,6 +114,7 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
   constructor(private proc: ChildProcessWithoutNullStreams) {
     proc.stdout.setEncoding("utf8");
     proc.stdout.on("data", (chunk: string) => this.handleData(chunk));
+    proc.stderr.resume();
     proc.on("close", (code) => {
       const err = new Error(
         `codex app-server proxy closed (${code ?? "signal"})`,
@@ -339,14 +344,14 @@ async function executeProbeRequests(
   transport: JsonRpcTransport,
   opts: ProbeOptions,
   report: ProbeReport,
-): Promise<void> {
+): Promise<{ keepTransportOpen: boolean }> {
   await transport.request("initialize", initializeParams());
   report.rpcReady = true;
 
   if (!opts.threadId) {
     await transport.request("thread/loaded/list", { limit: 10 });
     report.ok = true;
-    return;
+    return { keepTransportOpen: false };
   }
 
   const resumeResult = await transport.request("thread/resume", {
@@ -376,17 +381,41 @@ async function executeProbeRequests(
     }
 
     if (report.turnId) {
-      const status = await waitForTurnCompletion(
-        transport,
-        opts.threadId,
-        report.turnId,
-      );
-      if (status) report.turnStatus = status;
-      report.turnCompletedOk = true;
+      if (opts.waitForCompletion) {
+        const status = await waitForTurnCompletion(
+          transport,
+          opts.threadId,
+          report.turnId,
+        );
+        if (status) report.turnStatus = status;
+        report.turnCompletedOk = true;
+      } else if (transport.waitForNotification) {
+        void waitForTurnCompletion(transport, opts.threadId, report.turnId)
+          .catch(() => undefined)
+          .finally(() => transport.close());
+        report.ok = true;
+        return { keepTransportOpen: true };
+      }
     }
   }
 
   report.ok = true;
+  return { keepTransportOpen: false };
+}
+
+function turnSubmitted(report: ProbeReport): boolean {
+  return !!(report.turnId || report.turnStartOk || report.turnSteerOk);
+}
+
+function resetRpcAttempt(report: ProbeReport): void {
+  report.rpcReady = false;
+  report.threadResolved = false;
+  report.resumeOk = undefined;
+  report.turnId = undefined;
+  report.turnStartOk = undefined;
+  report.turnSteerOk = undefined;
+  report.turnCompletedOk = undefined;
+  report.turnStatus = undefined;
 }
 
 export async function runProbe(
@@ -428,11 +457,21 @@ export async function runProbe(
   let transport: JsonRpcTransport | null = null;
   try {
     transport = await createTransport();
-    await executeProbeRequests(transport, opts, report);
+    const result = await executeProbeRequests(transport, opts, report);
+    if (!result.keepTransportOpen) transport.close();
     return report;
   } catch (err) {
+    if (turnSubmitted(report)) {
+      report.ok = false;
+      report.errors.push(
+        `${report.controlMode ?? "Codex control"} failed after Codex turn was submitted: ${errorMessage(err)}`,
+      );
+      transport?.close();
+      return report;
+    }
     if (report.controlMode !== "remote-control") {
       report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
+      transport?.close();
       return report;
     }
     report.warnings.push(`remote-control proxy failed: ${errorMessage(err)}`);
@@ -441,13 +480,11 @@ export async function runProbe(
   }
 
   report.controlMode = "direct-app-server";
-  report.rpcReady = false;
-  report.threadResolved = false;
-  report.resumeOk = undefined;
-  report.turnStartOk = undefined;
+  resetRpcAttempt(report);
   try {
     transport = await deps.createDirectTransport();
-    await executeProbeRequests(transport, opts, report);
+    const result = await executeProbeRequests(transport, opts, report);
+    if (result.keepTransportOpen) transport = null;
     return report;
   } catch (err) {
     report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
@@ -482,14 +519,23 @@ export function runDirectProbe(opts: ProbeOptions): Promise<ProbeReport> {
 
   return defaultCreateDirectTransport()
     .then(async (transport) => {
+      let shouldClose = true;
       try {
-        await executeProbeRequests(transport, opts, report);
+        const result = await executeProbeRequests(transport, opts, report);
+        shouldClose = !result.keepTransportOpen;
         return report;
       } catch (err) {
+        if (turnSubmitted(report)) {
+          report.ok = false;
+          report.errors.push(
+            `direct app-server failed after Codex turn was submitted: ${errorMessage(err)}`,
+          );
+          return report;
+        }
         report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
         return report;
       } finally {
-        transport.close();
+        if (shouldClose) transport.close();
       }
     })
     .catch((err) => {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { handleSendCodexMessage } from "./codex-send";
+import { handleCodexControlStatus, handleSendCodexMessage } from "./codex-send";
 import type { ProbeReport } from "./codex-control-probe";
 
 const SID = "019e64f1-2115-7f43-8aa7-12b3b46b3904";
@@ -109,5 +109,72 @@ describe("handleSendCodexMessage", () => {
       error: "direct app-server failed: nope",
       warnings: [],
     });
+  });
+});
+
+describe("handleCodexControlStatus", () => {
+  test("reports ready when the Codex thread can be resumed", async () => {
+    const calls: any[] = [];
+    const r = await handleCodexControlStatus(
+      new Request(
+        `http://127.0.0.1/api/codex-control/status?session=${SID}&token=${TOKEN}`,
+      ),
+      async (opts) => {
+        calls.push(opts);
+        return report();
+      },
+    );
+
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      ready: true,
+      controlMode: "direct-app-server",
+      warnings: [],
+      errors: [],
+    });
+    expect(calls).toEqual([{ threadId: SID }]);
+  });
+
+  test("reports not ready when Codex resume fails", async () => {
+    const r = await handleCodexControlStatus(
+      new Request(
+        `http://127.0.0.1/api/codex-control/status?session=${SID}&token=${TOKEN}`,
+      ),
+      async () =>
+        report({
+          ok: false,
+          resumeOk: undefined,
+          errors: ["direct app-server failed: nope"],
+        }),
+    );
+
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      ready: false,
+      controlMode: "direct-app-server",
+      warnings: [],
+      errors: ["direct app-server failed: nope"],
+    });
+  });
+
+  test("rejects unauthorized and invalid sessions", async () => {
+    expect(
+      (
+        await handleCodexControlStatus(
+          new Request(
+            `http://127.0.0.1/api/codex-control/status?session=${SID}&token=bad`,
+          ),
+        )
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await handleCodexControlStatus(
+          new Request(
+            `http://127.0.0.1/api/codex-control/status?session=bad&token=${TOKEN}`,
+          ),
+        )
+      ).status,
+    ).toBe(400);
   });
 });
