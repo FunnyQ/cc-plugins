@@ -208,6 +208,53 @@
               title="Subagent delegations running in this session"
             ></span>
           </header>
+          <div class="channel-console">
+            <div class="reply-strip" aria-live="polite">
+              <div class="reply-strip__head">
+                <span class="reply-strip__legend">Agent → Cockpit</span>
+                <span
+                  class="reply-strip__count readout"
+                  v-text="channelReplies.length ? channelReplies.length + ' live' : 'standby'"
+                ></span>
+              </div>
+              <ol class="reply-strip__list" v-if="channelReplies.length">
+                <li
+                  class="reply-strip__item"
+                  v-for="reply in channelReplies"
+                  :key="reply.id"
+                >
+                  <time class="reply-strip__time" v-text="reply.time"></time>
+                  <span class="reply-strip__text" v-text="reply.text"></span>
+                </li>
+              </ol>
+              <p class="reply-strip__empty" v-else>No cockpit replies.</p>
+            </div>
+
+            <form class="channel-send" @submit.prevent="sendChannelMessage()">
+              <textarea
+                class="channel-send__input"
+                v-model="channelMessage"
+                rows="2"
+                :disabled="!canUseChannel || channelSending"
+                :title="channelDisabledTitle"
+                :placeholder="canUseChannel ? 'Message this Claude session' : channelDisabledTitle"
+                @keydown="onChannelKeydown($event)"
+              ></textarea>
+              <button
+                class="channel-send__button"
+                type="submit"
+                :disabled="channelSendDisabled"
+                :title="channelDisabledTitle"
+              >
+                Send
+              </button>
+            </form>
+            <p
+              class="channel-send__error"
+              v-if="channelError"
+              v-text="channelError"
+            ></p>
+          </div>
           <div class="instrument__body" data-column="transcript">
             <p class="placeholder">No live transcript.</p>
           </div>

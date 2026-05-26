@@ -15,6 +15,18 @@ import { initDesignSystem } from "./modules/design-system.js";
 
 const POLL_MS = 3000;
 const HERO_AUTO_COLLAPSE_MS = 60_000;
+const REPLY_LIMIT = 50;
+
+let _tokenPromise = null;
+function getToken() {
+  if (!_tokenPromise) {
+    _tokenPromise = fetch("/api/token")
+      .then((r) => r.json())
+      .then((j) => j.token)
+      .catch(() => null);
+  }
+  return _tokenPromise;
+}
 
 function sortActiveFirst(sessions) {
   return [...sessions].sort((a, b) => {
@@ -56,6 +68,12 @@ export const store = reactive({
   manifestOpen: false,
   designSystemOpen: false,
   _loadDesignSystem: null,
+  channelMessage: "",
+  channelSending: false,
+  channelError: "",
+  channelReplies: [],
+  _replyStream: null,
+  _replyStreamKey: "",
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -124,6 +142,27 @@ export const store = reactive({
   // In-flight subagent delegations on the selected session (0 when none/ended).
   get selectedSubagents() {
     return this.selectedSession?.subagents || 0;
+  },
+
+  get canUseChannel() {
+    const s = this.selectedSession;
+    return !!s && s.provider === "claude" && s.channel === true;
+  },
+
+  get channelDisabledTitle() {
+    const s = this.selectedSession;
+    if (!s) return "Select a Claude session";
+    if (s.provider === "codex") return "Codex has no channel, observe only";
+    if (!s.channel) return "Launch this session with the cockpit channel";
+    return "Send to cockpit channel";
+  },
+
+  get channelSendDisabled() {
+    return (
+      !this.canUseChannel ||
+      this.channelSending ||
+      this.channelMessage.trim() === ""
+    );
   },
 
   get agentBadgeLabel() {
@@ -229,6 +268,89 @@ export const store = reactive({
     this.selectedProvider = provider;
     this.selectedProject = s.project;
     this._notify();
+  },
+
+  async sendChannelMessage() {
+    if (this.channelSendDisabled) return;
+    const text = this.channelMessage.trim();
+    this.channelSending = true;
+    this.channelError = "";
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("token unavailable");
+      const r = await fetch("/api/send-message", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          session: this.selectedSessionId,
+          text,
+          token,
+        }),
+      });
+      if (!r.ok) throw new Error(`send failed: ${r.status}`);
+      this.channelMessage = "";
+    } catch (e) {
+      this.channelError = (e && e.message) || "Send failed";
+    } finally {
+      this.channelSending = false;
+    }
+  },
+
+  onChannelKeydown(e) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    this.sendChannelMessage();
+  },
+
+  closeReplyStream() {
+    if (this._replyStream) {
+      this._replyStream.close();
+      this._replyStream = null;
+    }
+    this._replyStreamKey = "";
+  },
+
+  async openReplyStream() {
+    const sessionId = this.selectedSessionId;
+    const provider = this.selectedProvider || "claude";
+    const key = sessionId ? `${provider}:${sessionId}` : "";
+    if (!sessionId) {
+      this.closeReplyStream();
+      this.channelReplies = [];
+      return;
+    }
+    if (this._replyStreamKey === key) return;
+    this.closeReplyStream();
+    this.channelReplies = [];
+    const token = await getToken();
+    if (!token || this.selectedSessionId !== sessionId) return;
+    const es = new EventSource(
+      `/api/reply/stream?session=${sessionId}&token=${encodeURIComponent(token)}`,
+    );
+    this._replyStream = es;
+    this._replyStreamKey = key;
+    es.onmessage = (e) => {
+      try {
+        const { text } = JSON.parse(e.data);
+        if (typeof text !== "string" || text.trim() === "") return;
+        this.channelReplies.push({
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          text,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        });
+        if (this.channelReplies.length > REPLY_LIMIT) {
+          this.channelReplies.splice(
+            0,
+            this.channelReplies.length - REPLY_LIMIT,
+          );
+        }
+      } catch {
+        // ignore malformed stream events
+      }
+    };
   },
 
   // --- session navigator -------------------------------------------------
@@ -407,6 +529,9 @@ const designSystem = initDesignSystem(
   document.querySelector('[data-column="design-system"]'),
 );
 store._loadDesignSystem = designSystem && designSystem.load;
+store.subscribe(() => store.openReplyStream());
+store.openReplyStream();
+window.addEventListener("beforeunload", () => store.closeReplyStream());
 
 // Escape closes drawer overlays; ←/→ step through active sessions.
 document.addEventListener("keydown", (e) => {
