@@ -1,5 +1,39 @@
 # Changelog
 
+## [3.3.0] - 2026-05-26
+
+### ✨ New Features
+
+- **Talk to a running session straight from the cockpit dashboard**: the Decision Log column now ends in a send box, so you can drop a note or steer the agent without leaving the cockpit. The agent's replies show up inline in the live transcript — one place to watch and one place to type.
+
+### 🐛 Bug Fixes
+
+- **The cockpit send box no longer flickers**: channel presence is now held across the gaps between inbox polls (a short TTL window) instead of dropping to "no channel" for a beat, so the send box stays put rather than blinking in and out while a session is connected.
+
+### ♻️ Internal
+
+- **The live transcript is now the single source for agent→UI output**: the separate channel reply tool and its SSE fan-out / ticket-auth subsystem were retired. Agents write to the session log directly and the dashboard reads the transcript, removing a whole duplicate path and the reply strip that went with it.
+
+### 📝 Documentation
+
+- **Clearer `needs_your_call` guidance**: the cockpit skill now states that autonomous decision-making is the default and `needs_your_call` is reserved for genuine forks only you can settle — with a caution against turning every decision into a question (which buries the reasoning trail).
+
+## [3.2.0] - 2026-05-26
+
+### ✨ New Features
+
+- **Cockpit reads each session's live status at a glance**: sessions now surface a fine-grained live state (working, waiting on you, idle, …) rendered as LED variants, a status pill, and a breathing activity bar — so a quick look tells you what every session is actually doing, not just "busy / idle".
+- **The "⊕ N agents" badge now counts live sub-agent delegations — for both Claude and Codex**: cockpit detects in-flight Agent/Task delegations and shows how many are running. Claude is read from the sub-agent sidechain transcript; Codex from its spawn-edge table, cross-checked against each child's completion so finished delegations drop off.
+- **Answer a `needs_your_call` straight from chat**: if you reply in the agent UI/chat while a session is parked on a `needs_your_call`, that message is now recorded as the answer through the cockpit bridge and the card is closed — no need to repeat it in the dashboard.
+
+### 🐛 Bug Fixes
+
+- **Codex sub-agent threads no longer masquerade as separate sessions**: spawned child threads are excluded from the live rail and the session picker, so a delegation counts only under its parent's badge instead of cluttering the list.
+
+### ♻️ Internal
+
+- **Shared Codex DB helpers**: access to Codex's `state_5.sqlite` (spawn-edge filtering and friends) was extracted into one module reused by live-sessions, find-session, and the delegation counter.
+
 ## [3.1.0] - 2026-05-25
 
 ### ✨ New Features

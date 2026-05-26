@@ -1,7 +1,14 @@
 #!/usr/bin/env bun
-import { statSync, existsSync } from "node:fs";
-import { extname, resolve, relative, isAbsolute } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import {
+  statSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "node:fs";
+import { extname, resolve, relative, isAbsolute, join } from "node:path";
+import { homedir } from "node:os";
+import { spawn } from "node:child_process";
 import { buildStats } from "./api.ts";
 import {
   getLiveSessions,
@@ -9,9 +16,21 @@ import {
   jsonResponse,
   jsonError,
 } from "./live.ts";
+import { decideStartup, type AtlasInfo } from "./atlas-lifecycle";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
+const ROOT = import.meta.dir;
+
+// ---------- central dir ----------
+
+function cockpitHome(): string {
+  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
+}
+
+function atlasInfoPath(): string {
+  return join(cockpitHome(), "atlas.json");
+}
 
 // ---------- args ----------
 
@@ -27,18 +46,79 @@ function parsePort(): number {
 
 const NO_OPEN = process.argv.includes("--no-open");
 
-function killPort(port: number): void {
-  if (process.platform === "win32") return;
-  const lsof = spawnSync("lsof", ["-ti", `tcp:${port}`], { encoding: "utf8" });
-  const pids = (lsof.stdout ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (pids.length === 0) return;
-  console.log(`Port ${port} in use by PID(s) ${pids.join(", ")} — killing.`);
-  spawnSync("kill", ["-9", ...pids]);
-  // brief settle so the next bind doesn't EADDRINUSE
-  spawnSync("sleep", ["0.2"]);
+// ---------- PID-file reuse ----------
+
+function readAtlasInfo(): AtlasInfo | null {
+  try {
+    const raw = readFileSync(atlasInfoPath(), "utf8");
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed?.pid === "number" &&
+      typeof parsed?.port === "number" &&
+      typeof parsed?.root === "string"
+    ) {
+      return parsed as AtlasInfo;
+    }
+  } catch {
+    // missing or corrupt — treat as no atlas server
+  }
+  return null;
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // ESRCH → no such process (dead); EPERM → exists but not ours (alive).
+    return (err as NodeJS.ErrnoException)?.code === "EPERM";
+  }
+}
+
+function writeAtlasInfo(info: AtlasInfo): void {
+  const home = cockpitHome();
+  if (!existsSync(home)) mkdirSync(home, { recursive: true });
+  writeFileSync(atlasInfoPath(), JSON.stringify(info, null, 2) + "\n");
+}
+
+function waitForExit(pid: number, timeoutMs: number): void {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isAlive(pid)) return;
+    Bun.sleepSync(50);
+  }
+}
+
+function startupGuard(): void {
+  const decision = decideStartup(readAtlasInfo(), ROOT, isAlive);
+  if (decision.action === "reuse") {
+    const { info } = decision;
+    console.log(
+      `Claude Stats Dashboard already running → http://localhost:${info.port} (pid ${info.pid})`,
+    );
+    process.exit(0);
+  }
+  if (decision.action === "supersede") {
+    const { info } = decision;
+    console.log(
+      `superseding stale atlas server (pid ${info.pid}, root ${info.root ?? "unknown"}) — this install is ${ROOT}`,
+    );
+    try {
+      process.kill(info.pid, "SIGTERM");
+    } catch {
+      // already gone
+    }
+    waitForExit(info.pid, 1500);
+    if (isAlive(info.pid)) {
+      try {
+        process.kill(info.pid, "SIGKILL");
+      } catch {
+        // already gone
+      }
+      waitForExit(info.pid, 1000);
+    }
+    Bun.sleepSync(100);
+  }
 }
 
 // ---------- mime ----------
@@ -114,17 +194,34 @@ function handleLive(): Response {
 // ---------- server ----------
 
 const port = parsePort();
-killPort(port);
+startupGuard();
 
-const server = Bun.serve({
-  port,
-  hostname: "127.0.0.1",
-  async fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === "/api/stats") return handleStats();
-    if (url.pathname === "/api/live") return handleLive();
-    return serveStatic(url.pathname);
-  },
+let server: ReturnType<typeof Bun.serve>;
+try {
+  server = Bun.serve({
+    port,
+    hostname: "127.0.0.1",
+    async fetch(req) {
+      const url = new URL(req.url);
+      if (url.pathname === "/api/stats") return handleStats();
+      if (url.pathname === "/api/live") return handleLive();
+      return serveStatic(url.pathname);
+    },
+  });
+} catch (err) {
+  if ((err as { code?: string }).code === "EADDRINUSE") {
+    console.error(
+      `atlas: port ${port} is in use by another process — stop it or pass --port <n>.`,
+    );
+    process.exit(1);
+  }
+  throw err;
+}
+
+writeAtlasInfo({
+  pid: process.pid,
+  port: server.port,
+  root: ROOT,
 });
 
 const url = `http://localhost:${server.port}`;

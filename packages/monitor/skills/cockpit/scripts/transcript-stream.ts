@@ -11,10 +11,11 @@ import {
   realpathSync,
   statSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
+import { codexDir, codexStateDb, resolveCodexPath } from "./codex-db";
 import {
   createTailStream,
   jsonError,
@@ -55,16 +56,6 @@ function claudeProjectsDir(): string {
   return (
     process.env.COCKPIT_CLAUDE_PROJECTS_DIR ||
     join(homedir(), ".claude", "projects")
-  );
-}
-
-function codexDir(): string {
-  return process.env.COCKPIT_CODEX_DIR || join(homedir(), ".codex");
-}
-
-function codexStateDb(): string {
-  return (
-    process.env.COCKPIT_CODEX_STATE_DB || join(codexDir(), "state_5.sqlite")
   );
 }
 
@@ -116,9 +107,7 @@ export function resolveCodexRolloutPath(id: string): string | undefined {
         )
         .get(id) as CodexThreadRow | null;
       if (!row?.rollout_path) return undefined;
-      return isAbsolute(row.rollout_path)
-        ? row.rollout_path
-        : resolve(codexDir(), row.rollout_path);
+      return resolveCodexPath(row.rollout_path);
     } finally {
       db.close();
     }

@@ -22,6 +22,7 @@ import {
   handleTranscriptStream,
 } from "./transcript-stream";
 import { handleWait, handleRespond } from "./broker";
+import { handleInbox, handleSendMessage } from "./inbox";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
 import { jsonResponse, jsonError } from "./http";
@@ -236,6 +237,8 @@ function buildServer() {
         return handleTranscriptHistory(req);
       if (url.pathname === "/api/wait") return handleWait(req);
       if (url.pathname === "/api/respond") return handleRespond(req);
+      if (url.pathname === "/api/inbox") return handleInbox(req);
+      if (url.pathname === "/api/send-message") return handleSendMessage(req);
       return serveStatic(url.pathname);
     },
   });

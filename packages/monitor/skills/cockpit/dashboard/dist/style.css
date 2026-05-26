@@ -565,6 +565,28 @@ body {
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--signal) 28%, transparent);
   animation: led-wait 2.2s ease-out infinite;
 }
+/* working: the model is generating / running a tool — same live engine glow as
+   the coarse "active". */
+.status-led.working {
+  background: var(--engine);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--engine) 26%, transparent);
+  animation: led-pulse 1.3s ease-in-out infinite;
+}
+/* your-call: parked on an unanswered needs_your_call — the warm "your turn"
+   violet (--lit), pulsing on the same cadence as the HUD wait beacon so the two
+   read as the same event. */
+.status-led.your-call {
+  background: var(--lit-fill);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--lit-fill) 30%, transparent);
+  animation: led-wait 2.2s ease-out infinite;
+}
+/* shell: the pilot is in a shell command — a calm nebula violet, no pulse (it's
+   a passive state, not the model working). */
+.status-led.shell {
+  background: var(--nebula-violet);
+  box-shadow: 0 0 0 3px
+    color-mix(in oklch, var(--nebula-violet) 30%, transparent);
+}
 @keyframes led-pulse {
   0%,
   100% {
@@ -789,6 +811,43 @@ body {
   white-space: nowrap;
   font-size: 13px;
 }
+/* Fine-grained status pill beside the LED: a compact mono chip tinted to the
+   same token as its LED, so the word reinforces the colour rather than adding a
+   second vocabulary. `--chip` is the single hue source (border + tinted fill +
+   text all read it); each `.is-*` just reassigns it. Default = idle. */
+.leg__status {
+  --chip: var(--idle);
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in oklch, var(--chip) 45%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--chip) 12%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--chip);
+}
+.leg__status.is-active,
+.leg__status.is-working {
+  --chip: var(--engine);
+}
+.leg__status.is-waiting {
+  --chip: var(--signal);
+}
+.leg__status.is-your-call {
+  --chip: var(--lit-fill);
+}
+.leg__status.is-idle {
+  --chip: var(--idle);
+}
+.leg__status.is-shell {
+  --chip: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
+}
+.leg__status.is-ended {
+  --chip: var(--ended);
+}
 /* A live session with no cockpit registry entry: dashed (not anchored) + muted,
    so it reads as "running, but no decision trail" without competing with the
    provider badge or the active LED. */
@@ -867,6 +926,136 @@ body {
   background: var(--aurora);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--aurora) 22%, transparent);
 }
+/* Status pill — a compact caption in the transcript head echoing the selected
+   session's live status, tinted to the same token as the breathing bar below. */
+.status-pill {
+  margin-inline-start: auto;
+  padding: 1px 7px;
+  border: 1px solid
+    color-mix(in oklch, var(--bar, var(--idle)) 45%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--bar, var(--idle)) 12%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bar, var(--idle));
+}
+/* Agent pill — a separate dimension from status (a session can be "working"
+   AND delegating), so it carries its own fixed aurora accent rather than the
+   status hue, and breathes gently to read as live work in flight. */
+.agent-pill {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 50%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--aurora) 14%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--aurora);
+  animation: agent-breathe 2.6s ease-in-out infinite;
+}
+@keyframes agent-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--aurora) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 8px 0 color-mix(in oklch, var(--aurora) 40%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-pill {
+    animation: none;
+  }
+}
+
+/* Status bar — a full-width glow strip under the transcript head that breathes
+   in the selected session's status colour. `--bar` is the single source of the
+   hue (pill + strip + glow all read it); each `.is-*` just reassigns it. Live
+   states breathe; `ended` rests dim and still. */
+.status-bar {
+  --bar: var(--ended);
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  block-size: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--bar) 35%, transparent) 18%,
+    var(--bar) 50%,
+    color-mix(in oklch, var(--bar) 35%, transparent) 82%,
+    transparent 100%
+  );
+  box-shadow: 0 0 10px 0 color-mix(in oklch, var(--bar) 45%, transparent);
+  animation: status-breathe 3.4s ease-in-out infinite;
+}
+.status-bar.is-working {
+  --bar: var(--engine);
+}
+.status-bar.is-waiting {
+  --bar: var(--signal);
+}
+.status-bar.is-your-call {
+  --bar: var(--lit-fill);
+}
+.status-bar.is-idle {
+  --bar: var(--idle);
+}
+.status-bar.is-shell {
+  --bar: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
+}
+/* Ended: no live signal — hold a faint static line, no breathing. */
+.status-bar.is-ended,
+.status-pill.is-ended {
+  --bar: var(--ended);
+}
+.status-bar.is-ended {
+  animation: none;
+  opacity: 0.55;
+  box-shadow: none;
+}
+.status-pill.is-working {
+  --bar: var(--engine);
+}
+.status-pill.is-waiting {
+  --bar: var(--signal);
+}
+.status-pill.is-your-call {
+  --bar: var(--lit-fill);
+}
+.status-pill.is-idle {
+  --bar: var(--idle);
+}
+.status-pill.is-shell {
+  --bar: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
+}
+/* Breathing: the strip swells and brightens, then settles — a slow lung, not a
+   blink. your-call gets a tighter, more insistent pulse via animation-duration. */
+.status-bar.is-your-call {
+  animation-duration: 2.2s;
+}
+@keyframes status-breathe {
+  0%,
+  100% {
+    opacity: 0.62;
+    box-shadow: 0 0 7px 0 color-mix(in oklch, var(--bar) 32%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 16px 1px color-mix(in oklch, var(--bar) 60%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-bar {
+    animation: none;
+  }
+}
+
 .instrument__body {
   flex: 1;
   min-width: 0;
@@ -877,6 +1066,83 @@ body {
 .placeholder {
   color: var(--ink-faint);
   font-style: italic;
+}
+
+/* Channel console — the send box for talking into a live Claude session. Sits
+   at the bottom of the Decision Log column, so the border reads along its top. */
+.channel-console {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--edge-soft);
+  background: color-mix(in oklch, var(--aurora) 5%, var(--space));
+}
+.channel-send {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.channel-send__input {
+  min-width: 0;
+  /* ~4 lines: 4 × line-height (18px) + vertical padding (14px). */
+  min-height: 86px;
+  max-height: 160px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--starlight);
+  background: var(--space);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  /* Cool aurora focus, matching .respond__input's warm signal ring. */
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.channel-send__input::placeholder {
+  color: var(--ink-faint);
+}
+.channel-send__input:focus {
+  outline: none;
+  border-color: color-mix(in oklch, var(--aurora) 75%, var(--edge));
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--aurora) 30%, transparent),
+    0 0 16px 1px color-mix(in oklch, var(--aurora) 24%, transparent);
+}
+.channel-send__input:disabled {
+  color: var(--ink-faint);
+  background: color-mix(in oklch, var(--void) 20%, var(--space));
+  cursor: not-allowed;
+}
+.channel-send__button {
+  min-block-size: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--aurora-strong);
+  border-radius: var(--radius-sm);
+  background: var(--aurora-strong);
+  color: var(--void);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.channel-send__button:hover:not(:disabled) {
+  background: var(--aurora);
+}
+.channel-send__button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+.channel-send__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
 }
 
 /* ── Decision-log instrument ────────────────────────────── */
@@ -1234,6 +1500,24 @@ body {
 .decision-card__options li {
   margin: 2px 0;
 }
+/* Resolved call: the option the pilot picked pops with a positive tick (the
+   warmth retreats once answered), and the options not taken recede. */
+.decision-card.is-resolved .decision-card__options li:not(.is-chosen) {
+  color: var(--ink-faint);
+}
+.decision-card__options li.is-chosen {
+  list-style: none;
+  font-weight: 600;
+  color: var(--starlight);
+}
+.decision-card__options li.is-chosen::before {
+  content: "✓";
+  display: inline-block;
+  width: 18px;
+  margin-left: -18px;
+  color: var(--positive);
+  font-weight: 700;
+}
 .decision-card__answer {
   margin-top: 8px;
   padding: 6px 10px;
@@ -1311,11 +1595,16 @@ body {
   border-radius: var(--radius-sm);
   resize: none;
   overflow: hidden;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 .respond__input:focus {
   outline: none;
-  border-color: var(--signal);
-  box-shadow: 0 0 0 1px var(--signal);
+  border-color: color-mix(in oklch, var(--signal) 75%, var(--edge));
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--signal) 30%, transparent),
+    0 0 16px 1px color-mix(in oklch, var(--signal) 24%, transparent);
 }
 .respond__send {
   padding: 5px 12px;
