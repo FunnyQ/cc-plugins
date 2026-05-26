@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   execFileSync,
   spawn,
@@ -37,10 +37,6 @@ function cockpitHome(): string {
 
 function daemonInfoPath(): string {
   return join(cockpitHome(), "daemon.json");
-}
-
-function atlasInfoPath(): string {
-  return join(cockpitHome(), "atlas.json");
 }
 
 export function readDaemonCoords(path = daemonInfoPath()): DaemonCoords | null {
@@ -263,16 +259,8 @@ export function createMcpServer(): ChannelServer {
   return mcp;
 }
 
-function monitorScript(relativeFromMonitor: string): string {
-  return resolve(import.meta.dir, "..", "..", relativeFromMonitor);
-}
-
 function cockpitServerScript(): string {
   return join(import.meta.dir, "cockpit-server.ts");
-}
-
-function atlasServerScript(): string {
-  return monitorScript("usage-dashboard/scripts/atlas-server.ts");
 }
 
 async function waitForDaemonCoords(
@@ -287,9 +275,12 @@ async function waitForDaemonCoords(
   return isUp(daemonInfoPath()) ? readDaemonCoords() : null;
 }
 
-async function ensureMonitorServers(): Promise<DaemonCoords | null> {
+// The channel's only hard dependency is the cockpit daemon (it owns /api/inbox).
+// The usage dashboard (atlas) is not needed for the channel to work, so it's left
+// to the usage-dashboard skill to start on demand — we don't force a 5938 server
+// onto every channel-flagged session.
+async function ensureCockpitDaemon(): Promise<DaemonCoords | null> {
   ensureServer(cockpitServerScript(), daemonInfoPath());
-  ensureServer(atlasServerScript(), atlasInfoPath());
   return await waitForDaemonCoords();
 }
 
@@ -351,7 +342,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const initialCoords = await ensureMonitorServers();
+  const initialCoords = await ensureCockpitDaemon();
   if (!initialCoords) {
     console.error(
       "cockpit-channel: cockpit daemon unavailable; retrying in loop",
@@ -366,7 +357,7 @@ async function main(): Promise<void> {
     mcp,
     sessionId,
     coords: readDaemonCoords,
-    ensure: ensureMonitorServers,
+    ensure: ensureCockpitDaemon,
   });
 }
 
