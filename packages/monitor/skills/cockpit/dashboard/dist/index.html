@@ -228,7 +228,7 @@
                 rows="4"
                 :disabled="!canUseChannel || channelSending"
                 :title="channelDisabledTitle"
-                :placeholder="canUseChannel ? 'Message this Claude session' : channelDisabledTitle"
+                :placeholder="channelPlaceholder"
                 @keydown="onChannelKeydown($event)"
               ></textarea>
               <button

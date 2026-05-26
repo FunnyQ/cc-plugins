@@ -143,7 +143,9 @@ export const store = reactive({
 
   get canUseChannel() {
     const s = this.selectedSession;
-    return !!s && s.provider === "claude" && s.channel === true;
+    if (!s) return false;
+    if (s.provider === "codex") return true;
+    return s.provider === "claude" && s.channel === true;
   },
 
   get channelDisabledTitle() {
@@ -151,11 +153,19 @@ export const store = reactive({
     if (!s) {
       return this.selectedSessionId
         ? "Session is not in cockpit manifest"
-        : "Select a Claude session";
+        : "Select a session";
     }
-    if (s.provider === "codex") return "Codex has no channel, observe only";
+    if (s.provider === "codex") return "Send to Codex thread";
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
+  },
+
+  get channelPlaceholder() {
+    const s = this.selectedSession;
+    if (!this.canUseChannel) return this.channelDisabledTitle;
+    return s?.provider === "codex"
+      ? "Message this Codex thread"
+      : "Message this Claude session";
   },
 
   get channelSendDisabled() {
@@ -279,7 +289,11 @@ export const store = reactive({
     try {
       let token = await getToken();
       if (!token) throw new Error("token unavailable");
-      let r = await fetch("/api/send-message", {
+      const endpoint =
+        this.selectedSession?.provider === "codex"
+          ? "/api/send-codex-message"
+          : "/api/send-message";
+      let r = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -291,7 +305,7 @@ export const store = reactive({
       if (r.status === 401) {
         token = await getToken(true);
         if (!token) throw new Error("token unavailable");
-        r = await fetch("/api/send-message", {
+        r = await fetch(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
