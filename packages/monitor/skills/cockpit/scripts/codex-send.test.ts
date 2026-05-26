@@ -21,7 +21,7 @@ function report(overrides: Partial<ProbeReport> = {}): ProbeReport {
   return {
     ok: true,
     daemonReady: false,
-    controlMode: "direct-app-server",
+    controlMode: "remote-control",
     rpcReady: true,
     threadId: SID,
     threadResolved: true,
@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 describe("handleSendCodexMessage", () => {
-  test("sends a Codex turn through direct app-server mode", async () => {
+  test("sends a Codex turn through remote-control mode", async () => {
     const calls: any[] = [];
     const r = await handleSendCodexMessage(
       req({ session: SID, text: "hello", token: TOKEN }),
@@ -61,7 +61,7 @@ describe("handleSendCodexMessage", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({
       delivered: true,
-      controlMode: "direct-app-server",
+      controlMode: "remote-control",
       warnings: [],
     });
     expect(calls).toEqual([{ threadId: SID, sendText: "hello" }]);
@@ -128,7 +128,7 @@ describe("handleCodexControlStatus", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({
       ready: true,
-      controlMode: "direct-app-server",
+      controlMode: "remote-control",
       warnings: [],
       errors: [],
     });
@@ -151,7 +151,7 @@ describe("handleCodexControlStatus", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({
       ready: false,
-      controlMode: "direct-app-server",
+      controlMode: "remote-control",
       warnings: [],
       errors: ["direct app-server failed: nope"],
     });
