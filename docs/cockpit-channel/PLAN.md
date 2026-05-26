@@ -126,10 +126,11 @@ Roots (no deps, parallelizable): `backend/01`, `backend/02`, `launch/01`.
 
 ## Open questions
 
-1. **Reply display vs transcript** — `ui/02` shows reply-tool messages in a
-   dedicated strip via the reply SSE. If the transcript already renders them
-   acceptably (verified in `launch/02`), the strip may be downgraded to a filter
-   over the existing transcript stream. Resolve after `launch/02`.
+1. ~~**Reply display vs transcript**~~ — **RESOLVED (2026-05-26)**: the `reply`
+   tool and its fan-out subsystem were retired in favour of the transcript as the
+   single source of truth. The dedicated reply strip was dropped entirely — agent
+   output is read in the Live Transcript column; the send box is now a plain
+   textarea relocated to the bottom of the Decision Log column.
 
 ## Known gaps
 

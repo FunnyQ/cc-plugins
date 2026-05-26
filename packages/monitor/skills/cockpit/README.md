@@ -17,8 +17,10 @@ Provider support:
 ## Cockpit channel
 
 The cockpit channel is Claude-only. It lets a cockpit dashboard send text into a
-running Claude Code session and lets the agent reply back into the dashboard.
-Codex has no channel hook, so Codex sessions stay observe-only.
+running Claude Code session; the agent's answers come back through the
+transcript, which the dashboard already renders (the send box's "Agent" strip is
+just the transcript's text tail). Codex has no channel hook, so Codex sessions
+stay observe-only.
 
 Channels require Claude Code 2.1.80 or later and are still behind the research
 preview development flag. Register the channel once in `~/.claude.json`:
