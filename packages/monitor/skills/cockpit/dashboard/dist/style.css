@@ -1144,6 +1144,55 @@ body {
   color: var(--danger);
   font-size: 12px;
 }
+.channel-relaunch {
+  display: grid;
+  gap: 6px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in oklch, var(--signal) 38%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--signal) 10%, var(--space));
+}
+.channel-relaunch__note {
+  margin: 0;
+  color: color-mix(in oklch, var(--signal) 22%, var(--ink-faint));
+  font-size: 12px;
+  line-height: 1.5;
+}
+/* The command is a full-width button so the whole row is click-to-copy. */
+.channel-relaunch__cmd {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklch, var(--signal) 30%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--signal) 6%, var(--space));
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+.channel-relaunch__cmd:hover {
+  border-color: color-mix(in oklch, var(--signal) 60%, var(--edge));
+  background: color-mix(in oklch, var(--signal) 12%, var(--space));
+}
+.channel-relaunch__cmd code {
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  color: color-mix(in oklch, var(--signal) 30%, var(--starlight));
+  white-space: nowrap;
+}
+.channel-relaunch__copy {
+  color: var(--signal);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
 
 /* ── Decision-log instrument ────────────────────────────── */
 .decision-log {

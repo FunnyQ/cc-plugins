@@ -72,6 +72,7 @@ export const store = reactive({
   channelSending: false,
   channelError: "",
   codexControl: {},
+  relaunchCopied: false,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -194,6 +195,19 @@ export const store = reactive({
       this.channelSending ||
       this.channelMessage.trim() === ""
     );
+  },
+
+  // A Claude session in the manifest but without a live channel was launched
+  // without --dangerously-load-development-channels. The channel can't
+  // retro-attach, so the only fix is to relaunch via the channel-aware
+  // launcher — surfaced as an inline hint with a copyable command.
+  get channelNeedsRelaunch() {
+    const s = this.selectedSession;
+    return !!s && s.provider === "claude" && s.channel !== true;
+  },
+
+  get channelRelaunchCommand() {
+    return "claude --dangerously-load-development-channels server:cockpit-channel";
   },
 
   get agentBadgeLabel() {
@@ -394,6 +408,20 @@ export const store = reactive({
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
     this.sendChannelMessage();
+  },
+
+  async copyRelaunchCommand() {
+    const cmd = this.channelRelaunchCommand;
+    if (!cmd) return;
+    try {
+      await navigator.clipboard.writeText(cmd);
+      this.relaunchCopied = true;
+      setTimeout(() => {
+        this.relaunchCopied = false;
+      }, 2000);
+    } catch (e) {
+      console.error("cockpit: copy relaunch command failed", e);
+    }
   },
 
   // --- session navigator -------------------------------------------------
