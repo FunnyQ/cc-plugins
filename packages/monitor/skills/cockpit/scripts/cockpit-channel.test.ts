@@ -102,6 +102,7 @@ describe("session resolution", () => {
     const resolved = await resolveClaudeSessionId({
       project: "/tmp/project",
       timeoutMs: 1,
+      sessionFileFinder: () => null,
       ancestorFinder: () => null,
       finder: (provider, project) => {
         expect(provider).toBe("claude");
@@ -124,7 +125,18 @@ describe("session resolution", () => {
   test("ancestor session id outranks transcript fallback", async () => {
     delete process.env.CLAUDE_CODE_SESSION_ID;
     const resolved = await resolveClaudeSessionId({
+      sessionFileFinder: () => null,
       ancestorFinder: () => SID,
+      finder: () => "dddddddd-4444-4444-4444-444444444444",
+    });
+    expect(resolved).toBe(SID);
+  });
+
+  test("session file outranks both ancestor command and transcript", async () => {
+    delete process.env.CLAUDE_CODE_SESSION_ID;
+    const resolved = await resolveClaudeSessionId({
+      sessionFileFinder: () => SID,
+      ancestorFinder: () => "cccccccc-3333-3333-3333-333333333333",
       finder: () => "dddddddd-4444-4444-4444-444444444444",
     });
     expect(resolved).toBe(SID);
