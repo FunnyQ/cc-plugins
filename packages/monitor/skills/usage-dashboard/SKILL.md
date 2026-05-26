@@ -22,7 +22,7 @@ A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP serve
 Always run the precheck first; only launch the dashboard if it exits 0.
 
 ```bash
-bun <plugin-root>/skills/usage-dashboard/scripts/install.ts \
+bun <plugin-root>/skills/install/scripts/install.ts \
   && bun <plugin-root>/skills/usage-dashboard/scripts/atlas-server.ts
 ```
 
@@ -32,7 +32,7 @@ contains this skill. In a development checkout of this repository,
 `${CLAUDE_PLUGIN_ROOT}` is empty, so substitute `packages/monitor` from the repo
 root — e.g. `bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
 
-The precheck (`install.ts`) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps — typically `history.jsonl` missing because the user hasn't used Claude Code chat yet — do **not** block the dashboard; the affected sections will just show empty.
+The precheck (`install.ts`, owned by the sibling `install` skill) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps — typically `history.jsonl` missing because the user hasn't used Claude Code chat yet — do **not** block the dashboard; the affected sections will just show empty.
 
 If the precheck exits non-zero, surface the failed `✗` lines and their `→ hint` to the user verbatim and stop. Do **not** attempt to auto-fix (no `bun install`, no file fetches) — the hints are actionable steps the user takes themselves (e.g. installing bun, running `/stats` once in Claude Code to seed `stats-cache.json`).
 
@@ -68,7 +68,7 @@ user with the `AskUserQuestion` tool** whether they want it set up automatically
 — don't silently edit their global config. Offer these options:
 
 - **Set it up for me** — run
-  `bun ${CLAUDE_PLUGIN_ROOT}/skills/usage-dashboard/scripts/setup-statusline.ts`, then
+  `bun ${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup-statusline.ts`, then
   relay its output. The script edits `~/.claude/settings.json`, backs it up to
   `settings.json.bak` first, preserves any existing status line by wrapping it
   via `TOKEN_ATLAS_STATUSLINE_COMMAND`, is idempotent, and refuses to touch the
@@ -116,11 +116,10 @@ External (non-Anthropic) models without dedicated cache pricing have cache token
 usage-dashboard/
 ├── SKILL.md
 ├── scripts/
-│   ├── install.ts            # diagnostic
 │   ├── api.ts                # data engine (also CLI: prints JSON)
 │   ├── atlas-server.ts       # HTTP server + auto-open
-│   ├── statusline-collector.ts # captures live rate_limits and chains ccstatusline
-│   └── setup-statusline.ts   # wires the collector into settings.json (user-approved)
+│   └── statusline-collector.ts # captures live rate_limits and chains ccstatusline
+│                             # (precheck install.ts + setup-statusline.ts now live in the install skill)
 ├── dashboard/dist/           # static frontend (no build step)
 │   ├── index.html
 │   ├── app.js

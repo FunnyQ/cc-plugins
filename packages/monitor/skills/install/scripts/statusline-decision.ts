@@ -22,27 +22,32 @@ export type StatusLineDecision =
 
 // Decide how to wire `collectorCommand` into `statusLine`.
 //
-// - If the current command already references a collector script that still
-//   exists on disk (per `collectorExists`), there's nothing to do.
-// - Otherwise wire the collector, preserving any non-collector command by
-//   running it as the collector's inner command (via the env var the collector
-//   reads); a stale collector reference is replaced outright (not preserved).
+// - If the current command already points at the *exact* live collector path,
+//   there's nothing to do.
+// - Any other collector reference — a path that no longer exists, or an older
+//   plugin-cache version like `.../monitor/3.1.0/...` — is re-pointed to the
+//   live collector (dropped, not wrapped). This is what fixes version drift:
+//   the old cache dir may still exist on disk, so an existence check isn't
+//   enough; only an exact match to the current path counts as wired.
+// - A non-collector command is preserved by running it as the collector's inner
+//   command (via the env var the collector reads).
 export function decideStatusLine(
   statusLine: StatusLineConfig,
   collectorCommand: string,
-  collectorExists: (path: string) => boolean,
 ): StatusLineDecision {
   const existing =
     typeof statusLine.command === "string" ? statusLine.command : null;
+  const liveCollector =
+    collectorCommand.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
   const referencedCollector =
     existing?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
 
-  if (referencedCollector && collectorExists(referencedCollector)) {
+  if (referencedCollector && referencedCollector === liveCollector) {
     return { action: "skip" };
   }
 
   // Preserve a non-collector statusline by running it as the collector's inner
-  // command; a stale collector reference is dropped (don't re-wrap it).
+  // command; any collector reference (stale or drifted) is dropped.
   const preserved = existing && !referencedCollector ? existing : null;
   const command = preserved
     ? `TOKEN_ATLAS_STATUSLINE_COMMAND='${preserved}' ${collectorCommand}`

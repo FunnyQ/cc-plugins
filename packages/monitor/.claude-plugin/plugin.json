@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Monitor your Claude Code and Codex sessions — a usage dashboard (sessions, tokens, cost, model mix, project activity) plus a per-project cockpit (goal capture, decision log, live session view).",
   "author": {
     "name": "Q"
@@ -16,5 +16,19 @@
     "live-session",
     "claude-code",
     "codex"
-  ]
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts\" --session-check",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
 }

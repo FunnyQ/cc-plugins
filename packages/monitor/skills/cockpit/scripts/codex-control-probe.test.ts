@@ -1,0 +1,397 @@
+import { describe, expect, test } from "bun:test";
+import {
+  formatHumanReport,
+  parseArgs,
+  directDeps,
+  runProbe,
+  type JsonRpcTransport,
+} from "./codex-control-probe";
+
+type FakeNotification =
+  | { method: string; params?: unknown }
+  | "pending"
+  | undefined;
+
+class FakeTransport implements JsonRpcTransport {
+  calls: Array<{ method: string; params: unknown }> = [];
+  closeCount = 0;
+  waitCount = 0;
+
+  constructor(
+    private responses: Record<string, unknown> = {},
+    private notification?: FakeNotification,
+  ) {}
+
+  async request(method: string, params?: unknown): Promise<unknown> {
+    this.calls.push({ method, params });
+    if (method in this.responses) return this.responses[method];
+    return {};
+  }
+
+  async waitForNotification(): Promise<{ method: string; params?: unknown }> {
+    this.waitCount += 1;
+    if (this.notification === "pending") return new Promise(() => {});
+    if (!this.notification) throw new Error("missing notification");
+    return this.notification;
+  }
+
+  close(): void {
+    this.closeCount += 1;
+  }
+}
+
+describe("codex control probe args", () => {
+  test("parses thread, send, wait, and json flags", () => {
+    expect(
+      parseArgs(["--thread", "abc", "--send", "hello", "--wait", "--json"]),
+    ).toEqual({
+      threadId: "abc",
+      sendText: "hello",
+      waitForCompletion: true,
+      json: true,
+      help: false,
+    });
+  });
+
+  test("rejects missing flag values", () => {
+    expect(() => parseArgs(["--thread"])).toThrow("missing value for --thread");
+    expect(() => parseArgs(["--send"])).toThrow("missing value for --send");
+  });
+});
+
+describe("codex control probe", () => {
+  test("dry run initializes and lists threads without starting a turn", async () => {
+    const transport = new FakeTransport({
+      "thread/loaded/list": { threads: [] },
+    });
+    const report = await runProbe(
+      {},
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      codexCliVersion: "codex 1.2.3",
+      daemonReady: true,
+      controlMode: "remote-control",
+      rpcReady: true,
+      threadResolved: false,
+      warnings: [],
+      errors: [],
+    });
+    expect(transport.calls.map((c) => c.method)).toEqual([
+      "initialize",
+      "thread/loaded/list",
+    ]);
+  });
+
+  test("resumes a selected thread without starting a turn in dry run", async () => {
+    const transport = new FakeTransport({
+      "thread/loaded/list": { threads: [] },
+      "thread/resume": { thread: { id: "t1" } },
+    });
+    const report = await runProbe(
+      { threadId: "t1" },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      threadId: "t1",
+      threadResolved: true,
+      resumeOk: true,
+    });
+    expect(report.turnStartOk).toBeUndefined();
+    expect(transport.calls.map((c) => c.method)).toEqual([
+      "initialize",
+      "thread/resume",
+    ]);
+  });
+
+  test("submits a turn without waiting for completion by default", async () => {
+    const transport = new FakeTransport(
+      {
+        "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
+        "turn/start": { turn: { id: "turn1" } },
+      },
+      "pending",
+    );
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello" },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      threadResolved: true,
+      resumeOk: true,
+      turnId: "turn1",
+      turnStartOk: true,
+    });
+    expect(report.turnCompletedOk).toBeUndefined();
+    expect(report.turnStatus).toBeUndefined();
+    expect(transport.waitCount).toBe(1);
+    expect(transport.closeCount).toBe(0);
+    const turnStart = transport.calls.find((c) => c.method === "turn/start");
+    expect(turnStart?.params).toEqual({
+      threadId: "t1",
+      input: [{ type: "text", text: "hello", text_elements: [] }],
+    });
+  });
+
+  test("waits for completion only when --wait is explicit", async () => {
+    const transport = new FakeTransport(
+      {
+        "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
+        "turn/start": { turn: { id: "turn1" } },
+      },
+      {
+        method: "turn/completed",
+        params: { threadId: "t1", turn: { id: "turn1", status: "completed" } },
+      },
+    );
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello", waitForCompletion: true },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      turnId: "turn1",
+      turnStartOk: true,
+      turnCompletedOk: true,
+      turnStatus: "completed",
+    });
+    expect(transport.waitCount).toBe(1);
+    expect(transport.closeCount).toBe(1);
+  });
+
+  test("steers an active turn instead of starting a competing turn", async () => {
+    const transport = new FakeTransport(
+      {
+        "thread/resume": {
+          thread: {
+            id: "t1",
+            status: { type: "active", activeFlags: [] },
+            turns: [
+              { id: "old", status: "completed" },
+              { id: "turn1", status: "inProgress" },
+            ],
+          },
+        },
+        "turn/steer": { turnId: "turn1" },
+      },
+      {
+        method: "turn/completed",
+        params: { threadId: "t1", turn: { id: "turn1", status: "completed" } },
+      },
+    );
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello" },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      threadResolved: true,
+      resumeOk: true,
+      turnId: "turn1",
+      turnSteerOk: true,
+    });
+    expect(report.turnCompletedOk).toBeUndefined();
+    expect(transport.calls.map((c) => c.method)).toEqual([
+      "initialize",
+      "thread/resume",
+      "turn/steer",
+    ]);
+    const turnSteer = transport.calls.find((c) => c.method === "turn/steer");
+    expect(turnSteer?.params).toEqual({
+      threadId: "t1",
+      input: [{ type: "text", text: "hello", text_elements: [] }],
+      expectedTurnId: "turn1",
+    });
+  });
+
+  test("send without thread is rejected before RPC", async () => {
+    let created = false;
+    const report = await runProbe(
+      { sendText: "hello" },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => {
+          created = true;
+          return new FakeTransport();
+        },
+        createDirectTransport: async () => {
+          created = true;
+          return new FakeTransport();
+        },
+      },
+    );
+
+    expect(created).toBe(false);
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(["--send requires --thread"]);
+  });
+
+  test("reports daemon startup failure", async () => {
+    const report = await runProbe(
+      {},
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => {
+          throw new Error("no daemon");
+        },
+        createProxyTransport: async () => new FakeTransport(),
+        createDirectTransport: async () => {
+          throw new Error("no direct");
+        },
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: false,
+      daemonReady: false,
+      rpcReady: false,
+      threadResolved: false,
+      warnings: ["remote-control start failed: no daemon"],
+      errors: ["direct app-server failed: no direct"],
+    });
+  });
+
+  test("falls back to direct app-server when remote-control is unavailable", async () => {
+    const proxy = new FakeTransport();
+    const direct = new FakeTransport();
+    const report = await runProbe(
+      {},
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => {
+          throw new Error("standalone missing");
+        },
+        createProxyTransport: async () => proxy,
+        createDirectTransport: async () => direct,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      daemonReady: false,
+      controlMode: "direct-app-server",
+      rpcReady: true,
+      warnings: ["remote-control start failed: standalone missing"],
+      errors: [],
+    });
+    expect(proxy.calls).toEqual([]);
+    expect(direct.calls.map((c) => c.method)).toEqual([
+      "initialize",
+      "thread/loaded/list",
+    ]);
+  });
+
+  test("falls back to direct app-server when remote-control proxy hangs", async () => {
+    const direct = new FakeTransport();
+    const report = await runProbe(
+      {},
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => ({
+          request: async () => {
+            throw new Error("initialize timed out");
+          },
+          close() {},
+        }),
+        createDirectTransport: async () => direct,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      daemonReady: true,
+      controlMode: "direct-app-server",
+      rpcReady: true,
+      warnings: ["remote-control proxy failed: initialize timed out"],
+      errors: [],
+    });
+    expect(direct.calls.map((c) => c.method)).toEqual([
+      "initialize",
+      "thread/loaded/list",
+    ]);
+  });
+
+  test("does not fall back and resend after a turn was submitted", async () => {
+    const proxy = new FakeTransport({
+      "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
+      "turn/start": { turn: { id: "turn1" } },
+    });
+    const direct = new FakeTransport();
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello", waitForCompletion: true },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => proxy,
+        createDirectTransport: async () => direct,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: false,
+      turnId: "turn1",
+      turnStartOk: true,
+    });
+    expect(report.errors).toEqual([
+      "remote-control failed after Codex turn was submitted: missing notification",
+    ]);
+    expect(direct.calls).toEqual([]);
+  });
+
+  test("direct deps skip remote-control and use direct app-server", async () => {
+    const deps = directDeps();
+    expect(() => deps.startRemoteControl()).toThrow("remote-control skipped");
+  });
+});
+
+describe("codex control probe output", () => {
+  test("formats a compact human report", () => {
+    expect(
+      formatHumanReport({
+        ok: true,
+        codexCliVersion: "codex 1.2.3",
+        daemonReady: true,
+        controlMode: "remote-control",
+        rpcReady: true,
+        threadResolved: false,
+        warnings: [],
+        errors: [],
+      }),
+    ).toContain("ok: true");
+  });
+});

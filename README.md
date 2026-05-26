@@ -9,7 +9,7 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 | Skill | Description |
 |-------|-------------|
 | [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
-| [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, and needs-your-call bridge |
+| [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
 
 ## Claude Code Installation
 
@@ -32,7 +32,7 @@ The usage-dashboard skill runs a prerequisite check automatically before launchi
 If you want to run the precheck yourself:
 
 ```bash
-bun $CLAUDE_PLUGIN_ROOT/skills/usage-dashboard/scripts/install.ts
+bun $CLAUDE_PLUGIN_ROOT/skills/install/scripts/install.ts
 ```
 
 ## Codex Installation
@@ -129,6 +129,43 @@ Opens `http://localhost:5858` in your default browser.
 - Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
 - Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and rollout files under `~/.codex/sessions`.
 - Decision logs, registry, and wait/send bridge are shared through `.cockpit/` and `~/.cockpit/`.
+
+### Channel (send box)
+
+The send box at the bottom of the Decision Log column can send text into a running session.
+
+- **Claude Code** uses the cockpit channel MCP server. The agent's answer comes back through the live transcript.
+- **Codex** uses the managed Codex remote-control daemon. Cockpit connects to the local app-server control socket, resumes the selected thread, and submits or steers a turn. Direct app-server is only a fallback when remote-control is unavailable.
+
+Channels require Claude Code 2.1.80 or later and are still behind the research-preview development flag. Register the channel MCP server once in `~/.claude.json`, pointing at the installed plugin's `cockpit-channel.ts` (note: `~/.claude.json` does not expand `$CLAUDE_PLUGIN_ROOT`, so use an absolute path):
+
+```json
+{
+  "mcpServers": {
+    "cockpit-channel": {
+      "command": "bun",
+      "args": ["/absolute/path/to/monitor/skills/cockpit/scripts/cockpit-channel.ts"]
+    }
+  }
+}
+```
+
+Then launch an opted-in session — the channel only attaches to sessions started with the development channel flag and cannot retro-attach to an already-running session:
+
+```bash
+bun packages/monitor/skills/cockpit/scripts/monitor-up.ts
+```
+
+Extra arguments pass through to `claude` (e.g. `monitor-up.ts --resume`). See the [cockpit skill README](./packages/monitor/skills/cockpit) for the full setup.
+
+For Codex send support, install and enable the managed standalone Codex remote-control daemon:
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+codex app-server daemon enable-remote-control
+```
+
+Cockpit checks `/api/codex-control/status` before enabling the Codex send box, so stale or non-resumable threads stay disabled instead of failing only after send.
 
 ## Adding a New Plugin
 

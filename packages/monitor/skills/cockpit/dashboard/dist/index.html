@@ -221,30 +221,51 @@
             <p class="placeholder">No decisions logged yet.</p>
           </div>
           <div class="channel-console">
-            <form class="channel-send" @submit.prevent="sendChannelMessage()">
-              <textarea
-                class="channel-send__input"
-                v-model="channelMessage"
-                rows="4"
-                :disabled="!canUseChannel || channelSending"
-                :title="channelDisabledTitle"
-                :placeholder="canUseChannel ? 'Message this Claude session' : channelDisabledTitle"
-                @keydown="onChannelKeydown($event)"
-              ></textarea>
+            <div class="channel-relaunch" v-if="channelNeedsRelaunch">
+              <p class="channel-relaunch__note">
+                This session started without the cockpit channel. It can't
+                attach to a running session — restart Claude with the cockpit
+                channel flags:
+              </p>
               <button
-                class="channel-send__button"
-                type="submit"
-                :disabled="channelSendDisabled"
-                :title="channelDisabledTitle"
+                type="button"
+                class="channel-relaunch__cmd"
+                @click="copyRelaunchCommand()"
+                :title="relaunchCopied ? 'Copied' : 'Click to copy'"
               >
-                Send
+                <code v-text="channelRelaunchCommand"></code>
+                <span
+                  class="channel-relaunch__copy"
+                  v-text="relaunchCopied ? 'Copied' : 'Copy'"
+                ></span>
               </button>
-            </form>
-            <p
-              class="channel-send__error"
-              v-if="channelError"
-              v-text="channelError"
-            ></p>
+            </div>
+            <template v-else>
+              <form class="channel-send" @submit.prevent="sendChannelMessage()">
+                <textarea
+                  class="channel-send__input"
+                  v-model="channelMessage"
+                  rows="4"
+                  :disabled="!canUseChannel || channelSending"
+                  :title="channelDisabledTitle"
+                  :placeholder="channelPlaceholder"
+                  @keydown="onChannelKeydown($event)"
+                ></textarea>
+                <button
+                  class="channel-send__button"
+                  type="submit"
+                  :disabled="channelSendDisabled"
+                  :title="channelDisabledTitle"
+                >
+                  Send
+                </button>
+              </form>
+              <p
+                class="channel-send__error"
+                v-if="channelError"
+                v-text="channelError"
+              ></p>
+            </template>
           </div>
         </section>
       </main>

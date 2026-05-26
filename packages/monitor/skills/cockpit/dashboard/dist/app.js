@@ -71,6 +71,8 @@ export const store = reactive({
   channelMessage: "",
   channelSending: false,
   channelError: "",
+  codexControl: {},
+  relaunchCopied: false,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -143,7 +145,21 @@ export const store = reactive({
 
   get canUseChannel() {
     const s = this.selectedSession;
-    return !!s && s.provider === "claude" && s.channel === true;
+    if (!s) return false;
+    if (s.provider === "codex") {
+      return s.status === "active" && this.selectedCodexControlReady;
+    }
+    return s.provider === "claude" && s.channel === true;
+  },
+
+  get selectedCodexControl() {
+    const s = this.selectedSession;
+    if (!s || s.provider !== "codex") return null;
+    return this.codexControl[this.codexControlKey(s)] || null;
+  },
+
+  get selectedCodexControlReady() {
+    return this.selectedCodexControl?.ready === true;
   },
 
   get channelDisabledTitle() {
@@ -151,11 +167,26 @@ export const store = reactive({
     if (!s) {
       return this.selectedSessionId
         ? "Session is not in cockpit manifest"
-        : "Select a Claude session";
+        : "Select a session";
     }
-    if (s.provider === "codex") return "Codex has no channel, observe only";
+    if (s.provider === "codex") {
+      if (s.status !== "active") return "Codex thread is not active";
+      const control = this.selectedCodexControl;
+      if (!control) return "Checking Codex control";
+      if (control.checking) return "Checking Codex control";
+      if (!control.ready) return control.error || "Codex control unavailable";
+      return "Send to Codex thread";
+    }
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
+  },
+
+  get channelPlaceholder() {
+    const s = this.selectedSession;
+    if (!this.canUseChannel) return this.channelDisabledTitle;
+    return s?.provider === "codex"
+      ? "Message this Codex thread"
+      : "Message this Claude session";
   },
 
   get channelSendDisabled() {
@@ -164,6 +195,19 @@ export const store = reactive({
       this.channelSending ||
       this.channelMessage.trim() === ""
     );
+  },
+
+  // A Claude session in the manifest but without a live channel was launched
+  // without --dangerously-load-development-channels. The channel can't
+  // retro-attach, so the only fix is to relaunch via the channel-aware
+  // launcher — surfaced as an inline hint with a copyable command.
+  get channelNeedsRelaunch() {
+    const s = this.selectedSession;
+    return !!s && s.provider === "claude" && s.channel !== true;
+  },
+
+  get channelRelaunchCommand() {
+    return "claude --dangerously-load-development-channels server:cockpit-channel";
   },
 
   get agentBadgeLabel() {
@@ -269,6 +313,52 @@ export const store = reactive({
     this.selectedProvider = provider;
     this.selectedProject = s.project;
     this._notify();
+    this.ensureCodexControl(s);
+  },
+
+  codexControlKey(s) {
+    return `${s.provider || "claude"}:${s.sessionId}`;
+  },
+
+  async ensureCodexControl(s = this.selectedSession, force = false) {
+    if (!s || s.provider !== "codex") return;
+    const key = this.codexControlKey(s);
+    const existing = this.codexControl[key];
+    if (!force && (existing?.ready || existing?.checking)) return;
+    this.codexControl = {
+      ...this.codexControl,
+      [key]: { ready: false, checking: true, error: "" },
+    };
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("token unavailable");
+      const params = new URLSearchParams({
+        session: s.sessionId,
+        token,
+      });
+      const r = await fetch(`/api/codex-control/status?${params}`);
+      if (!r.ok) throw new Error(`Codex control check failed: ${r.status}`);
+      const j = await r.json();
+      const error =
+        Array.isArray(j.errors) && j.errors.length ? j.errors.join("; ") : "";
+      this.codexControl = {
+        ...this.codexControl,
+        [key]: {
+          ready: j.ready === true,
+          checking: false,
+          error: j.ready === true ? "" : error || "Codex control unavailable",
+        },
+      };
+    } catch (e) {
+      this.codexControl = {
+        ...this.codexControl,
+        [key]: {
+          ready: false,
+          checking: false,
+          error: (e && e.message) || "Codex control unavailable",
+        },
+      };
+    }
   },
 
   async sendChannelMessage() {
@@ -279,7 +369,11 @@ export const store = reactive({
     try {
       let token = await getToken();
       if (!token) throw new Error("token unavailable");
-      let r = await fetch("/api/send-message", {
+      const endpoint =
+        this.selectedSession?.provider === "codex"
+          ? "/api/send-codex-message"
+          : "/api/send-message";
+      let r = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -291,7 +385,7 @@ export const store = reactive({
       if (r.status === 401) {
         token = await getToken(true);
         if (!token) throw new Error("token unavailable");
-        r = await fetch("/api/send-message", {
+        r = await fetch(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
@@ -314,6 +408,20 @@ export const store = reactive({
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
     this.sendChannelMessage();
+  },
+
+  async copyRelaunchCommand() {
+    const cmd = this.channelRelaunchCommand;
+    if (!cmd) return;
+    try {
+      await navigator.clipboard.writeText(cmd);
+      this.relaunchCopied = true;
+      setTimeout(() => {
+        this.relaunchCopied = false;
+      }, 2000);
+    } catch (e) {
+      console.error("cockpit: copy relaunch command failed", e);
+    }
   },
 
   // --- session navigator -------------------------------------------------
@@ -415,6 +523,9 @@ export const store = reactive({
       const j = await r.json();
       this.sessions = sortActiveFirst(j.sessions || []);
       this._notifySessions();
+      if (this.selectedSession?.provider === "codex") {
+        this.ensureCodexControl(this.selectedSession);
+      }
       // First load only: default-select the top (active-first) session.
       if (!this.selectedSessionId && this.sessions.length) {
         this.selectSession(this.sessions[0]);

@@ -23,6 +23,7 @@ import {
 } from "./transcript-stream";
 import { handleWait, handleRespond } from "./broker";
 import { handleInbox, handleSendMessage } from "./inbox";
+import { handleCodexControlStatus, handleSendCodexMessage } from "./codex-send";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
 import { jsonResponse, jsonError } from "./http";
@@ -239,6 +240,10 @@ function buildServer() {
       if (url.pathname === "/api/respond") return handleRespond(req);
       if (url.pathname === "/api/inbox") return handleInbox(req);
       if (url.pathname === "/api/send-message") return handleSendMessage(req);
+      if (url.pathname === "/api/codex-control/status")
+        return handleCodexControlStatus(req);
+      if (url.pathname === "/api/send-codex-message")
+        return handleSendCodexMessage(req);
       return serveStatic(url.pathname);
     },
   });

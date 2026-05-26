@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing one local plugin, **monitor**, which bundles two sibling skills:
+A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing one local plugin, **monitor**, which bundles three sibling skills:
 
 - **usage-dashboard** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
-- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a **channel** send box that types into a running Claude session). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool); Codex has no channel hook, so Codex sessions are observe-only.
+- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a send box for running sessions). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. Claude Code sends use the cockpit channel MCP server; Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool).
+- **install** — one-stop setup (command-triggered): the canonical home for all prerequisite checks and config wiring for the whole plugin. `setup.ts` checks both skills and wires the two configs a non-dev user can't easily edit by hand (the cockpit-channel MCP in `~/.claude.json` and the statusline collector in `~/.claude/settings.json`). The dashboard precheck (`install.ts`) and statusline wiring (`setup-statusline.ts` + pure `statusline-decision.ts`) live here; usage-dashboard imports them rather than owning copies. A **`SessionStart` hook** (in `.claude-plugin/plugin.json`) runs `setup.ts --session-check` — marker-gated via `$CLAUDE_PLUGIN_DATA/.wired-version`, so once per version it silently re-points version-drifted paths (the cache encodes the version, e.g. `.../monitor/3.1.0/...`, and old dirs linger so "wired" means *exact current path*, not mere existence) or, on a fresh install, prints one write-free nudge to run `/monitor:install`. It never fresh-wires — initial opt-in stays manual.
 
-This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The two skills still run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
+This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The dashboard and cockpit run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
 
 ## Architecture
 
@@ -19,8 +20,8 @@ cc-plugins/
 ├── .agents/plugins/marketplace.json  # Codex marketplace registry (one plugin: monitor)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
 └── packages/monitor/                 # the only plugin (monorepo layout: packages/<plugin>)
-    ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json)
-    ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered)
+    ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hook → setup.ts --session-check
+    ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)
     └── skills/
         ├── usage-dashboard/          # skill: usage dashboard (the rear-view)
         │   ├── SKILL.md              # skill trigger config & docs
@@ -29,15 +30,22 @@ cc-plugins/
         │   │   ├── api.ts            # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
         │   │   ├── live.ts           # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
         │   │   ├── atlas-server.ts   # Bun HTTP server (static + /api/stats + /api/live), port 5938
-        │   │   └── install.ts        # prerequisite checker
+        │   │   └── statusline-collector.ts # captures live rate_limits, chains ccstatusline
         │   ├── dashboard/dist/       # static SPA (petite-vue + Chart.js, no build step)
         │   └── references/
         │       └── pricing-defaults.json
-        └── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
-            ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + channel inbox/send
-            ├── scripts/cockpit.ts        # CLI: start / log / wait / send
-            ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
-            └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
+        ├── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
+        │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + Claude inbox/send + Codex remote-control send
+        │   ├── scripts/cockpit.ts        # CLI: start / log / wait / send
+        │   ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
+        │   ├── scripts/codex-control-probe.ts # Codex app-server control client: managed remote-control websocket first, direct app-server fallback
+        │   └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
+        └── install/                  # skill: one-stop setup/precheck for the whole plugin (command-triggered)
+            └── scripts/
+                ├── setup.ts          # monitor:install engine — checks both skills + wires configs (--check/--dry-run/--apply); --migrate re-points drift; --session-check is the marker-gated hook entry
+                ├── install.ts        # canonical dashboard precheck (exports dashboardChecks/printReport; CLI too)
+                ├── setup-statusline.ts   # statusline wiring (exports applyStatusline; CLI too)
+                └── statusline-decision.ts # pure wrap/stale/skip decision (unit-tested)
 ```
 
 ### Data Flow
@@ -75,8 +83,13 @@ bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts
 # Run with custom port / no auto-open
 bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts --port 9000 --no-open
 
-# Run install checks (verifies bun, data sources, vendor files)
-bun packages/monitor/skills/usage-dashboard/scripts/install.ts
+# Run the full monitor:install engine — checks both skills + wires configs
+bun packages/monitor/skills/install/scripts/setup.ts            # --check (default)
+bun packages/monitor/skills/install/scripts/setup.ts --dry-run  # preview writes
+bun packages/monitor/skills/install/scripts/setup.ts --apply    # wire both pieces
+
+# Run only the dashboard precheck (verifies bun, data sources, vendor files)
+bun packages/monitor/skills/install/scripts/install.ts
 
 # Get stats as JSON (CLI mode of api.ts)
 bun packages/monitor/skills/usage-dashboard/scripts/api.ts
@@ -92,6 +105,9 @@ bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
 
 # Run the cockpit test suite
 bun test packages/monitor/skills/cockpit/scripts/
+
+# Run the install skill test suite
+bun test packages/monitor/skills/install/scripts/
 ```
 
 ## Code Conventions
