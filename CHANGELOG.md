@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.4.3] - 2026-05-27
+
+### 🐛 Bug Fixes
+
+- **Cockpit dashboard crashes when stepping between sessions**: the channel send form used `<template v-else>` / `<template v-if>` siblings, which made petite-vue throw `insertBefore: s is null` (and a downstream TDZ on `s`) while re-rendering, blanking the cockpit. The conditionals are now flattened to sibling elements each carrying an independent `v-if` (`!channelNeedsRelaunch`), so the send form and relaunch hint render without the template-block crash.
+
 ## [3.4.2] - 2026-05-27
 
 ### 🐛 Bug Fixes
