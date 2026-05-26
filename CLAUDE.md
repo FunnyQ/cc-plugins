@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing one local plugin, **monitor**, which bundles two sibling skills:
 
 - **usage-dashboard** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
-- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, and a `needs_your_call` wait/send bridge). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into.
+- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a **channel** send box that types into a running Claude session). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool); Codex has no channel hook, so Codex sessions are observe-only.
 
 This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The two skills still run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
 
@@ -34,8 +34,9 @@ cc-plugins/
         │   └── references/
         │       └── pricing-defaults.json
         └── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
-            ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker
+            ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + channel inbox/send
             ├── scripts/cockpit.ts        # CLI: start / log / wait / send
+            ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
             └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
 ```
 

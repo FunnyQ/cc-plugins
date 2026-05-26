@@ -1099,11 +1099,20 @@ body {
   border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
   resize: vertical;
+  /* Cool aurora focus, matching .respond__input's warm signal ring. */
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.channel-send__input::placeholder {
+  color: var(--ink-faint);
 }
 .channel-send__input:focus {
   outline: none;
-  border-color: var(--aurora);
-  box-shadow: 0 0 0 1px var(--aurora);
+  border-color: color-mix(in oklch, var(--aurora) 75%, var(--edge));
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--aurora) 30%, transparent),
+    0 0 16px 1px color-mix(in oklch, var(--aurora) 24%, transparent);
 }
 .channel-send__input:disabled {
   color: var(--ink-faint);
@@ -1121,6 +1130,7 @@ body {
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
+  transition: background-color 160ms ease;
 }
 .channel-send__button:hover:not(:disabled) {
   background: var(--aurora);
@@ -1490,6 +1500,24 @@ body {
 .decision-card__options li {
   margin: 2px 0;
 }
+/* Resolved call: the option the pilot picked pops with a positive tick (the
+   warmth retreats once answered), and the options not taken recede. */
+.decision-card.is-resolved .decision-card__options li:not(.is-chosen) {
+  color: var(--ink-faint);
+}
+.decision-card__options li.is-chosen {
+  list-style: none;
+  font-weight: 600;
+  color: var(--starlight);
+}
+.decision-card__options li.is-chosen::before {
+  content: "✓";
+  display: inline-block;
+  width: 18px;
+  margin-left: -18px;
+  color: var(--positive);
+  font-weight: 700;
+}
 .decision-card__answer {
   margin-top: 8px;
   padding: 6px 10px;
@@ -1567,11 +1595,16 @@ body {
   border-radius: var(--radius-sm);
   resize: none;
   overflow: hidden;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 .respond__input:focus {
   outline: none;
-  border-color: var(--signal);
-  box-shadow: 0 0 0 1px var(--signal);
+  border-color: color-mix(in oklch, var(--signal) 75%, var(--edge));
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--signal) 30%, transparent),
+    0 0 16px 1px color-mix(in oklch, var(--signal) 24%, transparent);
 }
 .respond__send {
   padding: 5px 12px;
