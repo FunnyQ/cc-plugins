@@ -36,7 +36,7 @@ The precheck (`install.ts`, owned by the sibling `install` skill) verifies `bun`
 
 If the precheck exits non-zero, surface the failed `✗` lines and their `→ hint` to the user verbatim and stop. Do **not** attempt to auto-fix (no `bun install`, no file fetches) — the hints are actionable steps the user takes themselves (e.g. installing bun, running `/stats` once in Claude Code to seed `stats-cache.json`).
 
-Default port `5938`. Opens `http://localhost:5938` in the default browser automatically. If the port is already in use (e.g. a previous dashboard instance), the script kills the existing process first so you don't accumulate stale servers.
+Default port `5938`. This is an idempotent **ensure + open**: a PID file tracks the live instance, so re-running reuses an already-running dashboard (or supersedes a stale one from an out-of-date install) and opens `http://localhost:5938` in the default browser either way — fresh start or reuse. The dashboard is independent of the cockpit channel; nothing else starts it for you, so this skill owns its lifecycle.
 
 Flags:
 - `--port <n>` — pick a different port

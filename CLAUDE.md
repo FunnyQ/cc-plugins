@@ -103,6 +103,12 @@ curl -s localhost:5938/api/live | jq
 # Run the cockpit daemon (port 5858)
 bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
 
+# Dev: a live channel-flagged Claude session keeps respawning the cached daemon
+# (the channel MCP's reconnect loop calls ensureCockpitDaemon when the daemon
+# dies), so a repo-root daemon loses the supersede war for port 5858. To test
+# working-tree changes against an isolated daemon, run it on its own port + home:
+COCKPIT_HOME=/tmp/cockpit-dev bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts --port 5999
+
 # Run the cockpit test suite
 bun test packages/monitor/skills/cockpit/scripts/
 
