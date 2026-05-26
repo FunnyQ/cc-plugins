@@ -38,7 +38,7 @@ export function applyStatusline(): ApplyResult {
   }
 
   const statusLine = (settings.statusLine ?? {}) as StatusLineConfig;
-  const decision = decideStatusLine(statusLine, COLLECTOR_COMMAND, existsSync);
+  const decision = decideStatusLine(statusLine, COLLECTOR_COMMAND);
   if (decision.action === "skip") {
     return { ok: true, skipped: true, preserved: null, backup: null };
   }

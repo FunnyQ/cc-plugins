@@ -16,6 +16,31 @@ const HOME = homedir();
 const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
 const COLLECTOR_SCRIPT = join(DASH, "scripts", "statusline-collector.ts");
 const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
+// The plugin manifest sits three levels up from skills/install/scripts/.
+const PLUGIN_JSON = resolve(
+  import.meta.dir,
+  "..",
+  "..",
+  "..",
+  ".claude-plugin",
+  "plugin.json",
+);
+
+// Current plugin version from the manifest (null if unreadable).
+export function pluginVersion(): string | null {
+  try {
+    return JSON.parse(readFileSync(PLUGIN_JSON, "utf-8")).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Extract the version segment from a plugin-cache path, else null. Installed
+// plugins live at `.../plugins/cache/<marketplace>/<plugin>/<version>/...`, so a
+// configured path encodes the version it was wired at.
+export function cachePathVersion(p: string): string | null {
+  return p.match(/\/plugins\/cache\/[^/]+\/[^/]+\/([^/]+)\//)?.[1] ?? null;
+}
 
 // All read-only checks the dashboard cares about: bun, Claude data, committed
 // vendor/pricing assets, and whether the statusline collector is wired.
@@ -77,21 +102,25 @@ export function dashboardChecks(): Check[] {
     settingsReadable = false;
   }
   // Installed plugins live at version-pinned cache paths, so a configured path
-  // can go stale after `claude plugin update`. Treat it as wired only if the
-  // referenced collector file still exists; otherwise re-suggest the live path.
+  // can drift after `claude plugin update` — and the old cache dir often still
+  // exists, so existence isn't enough. Treat it as wired only if it points at
+  // the *exact* live collector path.
   const referencedCollector =
     statuslineCommand?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
-  const collectorWired = referencedCollector
-    ? existsSync(referencedCollector)
-    : false;
+  const collectorWired = referencedCollector === COLLECTOR_SCRIPT;
 
   let usageHint: string | undefined;
   if (!settingsReadable) {
     usageHint = `Couldn't parse ${settingsPath} — fix it, then add a statusLine command running: ${COLLECTOR_COMMAND}`;
-  } else if (referencedCollector) {
+  } else if (referencedCollector && referencedCollector !== COLLECTOR_SCRIPT) {
+    const pathVer = cachePathVersion(referencedCollector);
+    const cur = pluginVersion();
     usageHint =
-      `statusLine points at a collector path that no longer exists (likely an older plugin version).\n` +
-      `   Update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`;
+      pathVer && cur && pathVer !== cur
+        ? `statusLine points at monitor ${pathVer} but the current version is ${cur}.\n` +
+          `   Re-run setup to update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`
+        : `statusLine points at a different/stale collector path.\n` +
+          `   Update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`;
   } else if (statuslineCommand) {
     usageHint =
       `statusLine is set but doesn't run the collector, so live rate_limits aren't captured.\n` +

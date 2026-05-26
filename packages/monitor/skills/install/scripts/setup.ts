@@ -19,7 +19,13 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { type Check, dashboardChecks, printReport } from "./install";
+import {
+  cachePathVersion,
+  type Check,
+  dashboardChecks,
+  pluginVersion,
+  printReport,
+} from "./install";
 import { applyStatusline } from "./setup-statusline";
 import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
 
@@ -33,7 +39,15 @@ const CHANNEL_SCRIPT = resolve(
   "scripts",
   "cockpit-channel.ts",
 );
-const COLLECTOR_COMMAND = `bun ${resolve(import.meta.dir, "..", "..", "usage-dashboard", "scripts", "statusline-collector.ts")}`;
+const COLLECTOR_SCRIPT = resolve(
+  import.meta.dir,
+  "..",
+  "..",
+  "usage-dashboard",
+  "scripts",
+  "statusline-collector.ts",
+);
+const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
 const CLAUDE_JSON = join(HOME, ".claude.json");
 const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 const MIN_CLAUDE_VERSION = "2.1.80"; // channels research-preview floor
@@ -75,10 +89,32 @@ export function versionGte(a: string, b: string): boolean {
   return true;
 }
 
-function channelRegistered(): boolean {
+// The cockpit-channel script path currently configured in ~/.claude.json, or
+// null if the server isn't registered at all.
+function channelConfiguredPath(): string | null {
   const { data } = readJson(CLAUDE_JSON);
   const args = data?.mcpServers?.["cockpit-channel"]?.args;
-  return Array.isArray(args) && args.includes(CHANNEL_SCRIPT);
+  if (!Array.isArray(args)) return null;
+  return (
+    args.find(
+      (a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"),
+    ) ?? null
+  );
+}
+
+// Registered correctly only when it points at the exact live script path — a
+// drifted older-version cache path counts as not-current (and gets re-pointed).
+function channelRegistered(): boolean {
+  return channelConfiguredPath() === CHANNEL_SCRIPT;
+}
+
+// The collector script path currently referenced by statusLine.command, or null
+// if the statusline isn't running a collector at all.
+function statuslineReferencedCollector(): string | null {
+  const { data } = readJson(SETTINGS_JSON);
+  const cmd = data?.statusLine?.command;
+  if (typeof cmd !== "string") return null;
+  return cmd.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
 }
 
 // --- cockpit channel checks (the piece this skill owns) ---------------------
@@ -112,11 +148,23 @@ function channelChecks(): Check[] {
     "required",
     `Expected at ${CHANNEL_SCRIPT}`,
   );
+  const configured = channelConfiguredPath();
+  let channelHint: string;
+  if (configured && configured !== CHANNEL_SCRIPT) {
+    const pathVer = cachePathVersion(configured);
+    const cur = pluginVersion();
+    channelHint =
+      pathVer && cur && pathVer !== cur
+        ? `cockpit-channel points at monitor ${pathVer} but the current version is ${cur}.\n   Run: bun ${import.meta.path} --apply-channel to update.`
+        : `cockpit-channel points at a different path.\n   Run: bun ${import.meta.path} --apply-channel to update.`;
+  } else {
+    channelHint = `Run: bun ${import.meta.path} --apply-channel`;
+  }
   add(
     "cockpit-channel registered in ~/.claude.json",
     channelRegistered(),
     "optional",
-    `Run: bun ${import.meta.path} --apply-channel`,
+    channelHint,
   );
   return checks;
 }
@@ -194,10 +242,85 @@ function applyStatuslinePiece(dryRun: boolean): boolean {
   return true;
 }
 
+// --- migrate: re-point only already-wired pieces that drifted ---------------
+// Never fresh-wires — that's the initial opt-in, which stays manual. Only acts
+// on a piece that is already configured but points somewhere other than the
+// current live path (e.g. an older plugin-cache version after an update).
+function migrate(): string[] {
+  const changed: string[] = [];
+
+  const ch = channelConfiguredPath();
+  if (ch && ch !== CHANNEL_SCRIPT && applyChannel(false)) {
+    changed.push("cockpit-channel");
+  }
+
+  const sl = statuslineReferencedCollector();
+  if (sl && sl !== COLLECTOR_SCRIPT && applyStatuslinePiece(false)) {
+    changed.push("statusline collector");
+  }
+
+  return changed;
+}
+
+// --- session-check: marker-gated migrate for the SessionStart hook ----------
+// Runs at most once per plugin version: compares the current version against a
+// marker in $CLAUDE_PLUGIN_DATA and only migrates when it changed (or on first
+// run). Keeps per-session cost to a fast string compare after the first launch.
+function sessionCheck(): void {
+  const dataDir = process.env.CLAUDE_PLUGIN_DATA;
+  const version = pluginVersion();
+  // No data dir or unknown version → can't gate safely; do nothing.
+  if (!dataDir || !version) return;
+
+  const marker = join(dataDir, ".wired-version");
+  let last: string | null = null;
+  try {
+    if (existsSync(marker)) last = readFileSync(marker, "utf-8").trim();
+  } catch {
+    last = null;
+  }
+  if (last === version) return; // already reconciled for this version
+
+  const changed = migrate();
+  if (changed.length) {
+    console.log(
+      `monitor: updated ${changed.join(" + ")} to v${version} after a plugin update.`,
+    );
+  } else if (!channelConfiguredPath() && !statuslineReferencedCollector()) {
+    // Nothing wired yet (fresh install). One gentle, write-free nudge per
+    // version — the marker below keeps it from repeating every session.
+    console.log(
+      "monitor: not set up yet — run the /monitor:install skill to enable the cockpit send box and live usage limits.",
+    );
+  }
+  try {
+    writeFileSync(marker, `${version}\n`);
+  } catch {
+    // Best-effort marker; if the data dir isn't writable we just retry next session.
+  }
+}
+
 // --- main -------------------------------------------------------------------
 function main() {
   const flags = new Set(process.argv.slice(2));
   const dryRun = flags.has("--dry-run");
+
+  // SessionStart hook entry — quiet, marker-gated, never fresh-wires.
+  if (flags.has("--session-check")) {
+    sessionCheck();
+    process.exit(0);
+  }
+
+  // Re-point drifted pieces now (no version gate); used manually too.
+  if (flags.has("--migrate")) {
+    const changed = migrate();
+    console.log(
+      changed.length
+        ? `Re-pointed: ${changed.join(" + ")} → current version.`
+        : "Nothing to migrate — configured paths are current.",
+    );
+    process.exit(0);
+  }
 
   if (
     flags.has("--apply") ||

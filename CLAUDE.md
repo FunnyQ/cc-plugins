@@ -8,7 +8,7 @@ A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing on
 
 - **usage-dashboard** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
 - **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a **channel** send box that types into a running Claude session). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool); Codex has no channel hook, so Codex sessions are observe-only.
-- **install** — one-stop setup (command-triggered): the canonical home for all prerequisite checks and config wiring for the whole plugin. `setup.ts` checks both skills and wires the two configs a non-dev user can't easily edit by hand (the cockpit-channel MCP in `~/.claude.json` and the statusline collector in `~/.claude/settings.json`). The dashboard precheck (`install.ts`) and statusline wiring (`setup-statusline.ts` + pure `statusline-decision.ts`) live here; usage-dashboard imports them rather than owning copies.
+- **install** — one-stop setup (command-triggered): the canonical home for all prerequisite checks and config wiring for the whole plugin. `setup.ts` checks both skills and wires the two configs a non-dev user can't easily edit by hand (the cockpit-channel MCP in `~/.claude.json` and the statusline collector in `~/.claude/settings.json`). The dashboard precheck (`install.ts`) and statusline wiring (`setup-statusline.ts` + pure `statusline-decision.ts`) live here; usage-dashboard imports them rather than owning copies. A **`SessionStart` hook** (in `.claude-plugin/plugin.json`) runs `setup.ts --session-check` — marker-gated via `$CLAUDE_PLUGIN_DATA/.wired-version`, so once per version it silently re-points version-drifted paths (the cache encodes the version, e.g. `.../monitor/3.1.0/...`, and old dirs linger so "wired" means *exact current path*, not mere existence) or, on a fresh install, prints one write-free nudge to run `/monitor:install`. It never fresh-wires — initial opt-in stays manual.
 
 This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The dashboard and cockpit run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
 
@@ -20,8 +20,8 @@ cc-plugins/
 ├── .agents/plugins/marketplace.json  # Codex marketplace registry (one plugin: monitor)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
 └── packages/monitor/                 # the only plugin (monorepo layout: packages/<plugin>)
-    ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json)
-    ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered)
+    ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hook → setup.ts --session-check
+    ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)
     └── skills/
         ├── usage-dashboard/          # skill: usage dashboard (the rear-view)
         │   ├── SKILL.md              # skill trigger config & docs
@@ -41,7 +41,7 @@ cc-plugins/
         │   └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
         └── install/                  # skill: one-stop setup/precheck for the whole plugin (command-triggered)
             └── scripts/
-                ├── setup.ts          # monitor:install engine — checks both skills + wires the two configs (--check/--dry-run/--apply)
+                ├── setup.ts          # monitor:install engine — checks both skills + wires configs (--check/--dry-run/--apply); --migrate re-points drift; --session-check is the marker-gated hook entry
                 ├── install.ts        # canonical dashboard precheck (exports dashboardChecks/printReport; CLI too)
                 ├── setup-statusline.ts   # statusline wiring (exports applyStatusline; CLI too)
                 └── statusline-decision.ts # pure wrap/stale/skip decision (unit-tested)
