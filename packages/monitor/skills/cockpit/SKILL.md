@@ -245,14 +245,25 @@ they pick, so the answer lands in the trail with its context intact.
   <answer>` is the terminal twin of a UI option button — both are part of this
   plugin's control-loop bridge between a parked session and the user's answer.
 
-## While a session is live — ask through the cockpit
+## While a session is live — decide in the open, ask through the cockpit
 
-Once a session has been started (Step 4) and the dashboard is up (Step 5), the
-cockpit is the user's single surface for being asked. While such a session is active,
-**route every question for the user through `needs_your_call` — not the harness
-question tool (e.g. `AskUserQuestion`) and not a bare chat prompt.** This rule
-also applies when another skill or workflow says to "ask the user": if Cockpit is
-started and running in this conversation, translate that ask into a
+**First decide whether this even needs a question.** The decision trail should be
+*predominantly your own autonomous calls* — the reasoning a `git diff` can't
+show. Log those as plain `log` cards (decision / reason / facets / tradeoff)
+whenever a future reader would ask "why was it done this way?" That is the bulk
+of a healthy trail. `needs_your_call` is the **exception, not the default**:
+reserve it for a genuine **fork only the user can settle** (which heading to take)
+or **information only they have**. Do not turn a call you can make yourself into a
+question — gating what you could have decided inverts the trail into a list of
+prompts and buries your reasoning, leaving the user feeling they made every
+decision and you made none. If you can decide and explain, decide and log it;
+gate only when you genuinely cannot proceed without them.
+
+When you do need the user, the cockpit is their single surface for being asked.
+While a session is active, **route that question through `needs_your_call` — not
+the harness question tool (e.g. `AskUserQuestion`) and not a bare chat prompt.**
+This also applies when another skill or workflow says to "ask the user": if
+Cockpit is started and running in this conversation, translate that ask into a
 `needs_your_call` log entry and wait for the cockpit answer instead of asking in
 chat. Two cases, one channel:
 
