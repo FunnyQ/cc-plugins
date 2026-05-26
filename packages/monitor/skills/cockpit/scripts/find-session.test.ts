@@ -99,6 +99,54 @@ describe("find-session --provider codex", () => {
     expect(result.stdout).toBe(SID_NEW);
   });
 
+  test("ignores spawned child threads when choosing current Codex session", () => {
+    const db = new Database(join(codexDir, "state_5.sqlite"));
+    db.run(
+      `create table threads (
+        id text primary key,
+        cwd text not null,
+        rollout_path text not null,
+        archived integer not null default 0,
+        created_at integer not null,
+        updated_at integer not null,
+        created_at_ms integer,
+        updated_at_ms integer
+      )`,
+    );
+    db.run(
+      `create table thread_spawn_edges (
+        parent_thread_id text not null,
+        child_thread_id text not null primary key,
+        status text not null
+      )`,
+    );
+    db.run(
+      `insert into threads
+       (id, cwd, rollout_path, archived, created_at, updated_at, created_at_ms, updated_at_ms)
+       values (?, ?, ?, 0, 1, 1, 1000, 1000)`,
+      [SID_OLD, projectDir, "sessions/parent.jsonl"],
+    );
+    db.run(
+      `insert into threads
+       (id, cwd, rollout_path, archived, created_at, updated_at, created_at_ms, updated_at_ms)
+       values (?, ?, ?, 0, 2, 2, 2000, 2000)`,
+      [SID_NEW, projectDir, "sessions/child.jsonl"],
+    );
+    db.run(
+      `insert into thread_spawn_edges
+       (parent_thread_id, child_thread_id, status)
+       values (?, ?, 'open')`,
+      [SID_OLD, SID_NEW],
+    );
+    db.close();
+
+    const result = run(["--provider", "codex"], {
+      COCKPIT_CODEX_DIR: codexDir,
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe(SID_OLD);
+  });
+
   test("missing Codex DB exits non-zero", () => {
     const result = run(["--provider", "codex"], {
       COCKPIT_CODEX_DIR: codexDir,

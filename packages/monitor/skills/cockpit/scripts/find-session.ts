@@ -87,6 +87,18 @@ function codexStateDb(): string {
   );
 }
 
+function hasCodexSpawnEdges(db: Database): boolean {
+  const row = db
+    .query(
+      `select 1 as ok
+       from sqlite_master
+       where type = 'table' and name = 'thread_spawn_edges'
+       limit 1`,
+    )
+    .get() as { ok: number } | null;
+  return row !== null;
+}
+
 function findCodex(project: string): string | null {
   const dbPath = codexStateDb();
   if (!existsSync(dbPath)) {
@@ -96,11 +108,19 @@ function findCodex(project: string): string | null {
   try {
     const db = new Database(dbPath, { readonly: true });
     try {
+      const excludeSpawnedChildren = hasCodexSpawnEdges(db)
+        ? `and not exists (
+             select 1
+             from thread_spawn_edges e
+             where e.child_thread_id = threads.id
+           )`
+        : "";
       const row = db
         .query(
           `select id
            from threads
            where cwd = ? and archived = 0 and rollout_path != ''
+             ${excludeSpawnedChildren}
            order by coalesce(updated_at_ms, updated_at * 1000, created_at_ms, created_at * 1000) desc
            limit 1`,
         )

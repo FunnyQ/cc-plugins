@@ -46,8 +46,8 @@ export type SessionView = {
   logPath: string;
   status: SessionStatus;
   liveStatus: LiveStatus;
-  // In-flight Agent/Task delegations (Claude only) — drives the "⊕ N agents"
-  // badge. 0 for ended sessions, Codex, or when the transcript can't be read.
+  // In-flight Agent/Task delegations — drives the "⊕ N agents" badge.
+  // 0 for ended sessions or when the provider-specific source can't be read.
   subagents: number;
   lastHeartbeat: string;
   sessionGoal: string;

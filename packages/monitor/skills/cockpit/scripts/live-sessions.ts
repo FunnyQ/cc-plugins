@@ -97,19 +97,41 @@ type CodexThreadRow = {
   updated_at_ms: number | null;
 };
 
+function hasCodexSpawnEdges(db: Database): boolean {
+  const row = db
+    .query(
+      `select 1 as ok
+       from sqlite_master
+       where type = 'table' and name = 'thread_spawn_edges'
+       limit 1`,
+    )
+    .get() as { ok: number } | null;
+  return row !== null;
+}
+
 // Codex has no per-session file; the `threads` table's most-recent rows stand in
-// for "recently active". Same cutoff keeps the two providers consistent.
+// for "recently active". Same cutoff keeps the two providers consistent. Spawned
+// child threads are excluded here so subagents only appear as the parent
+// session's `subagents` count, not as separate untracked sessions in the rail.
 function readCodexLive(now: number): LiveSession[] {
   const dbPath = codexStateDb();
   if (!existsSync(dbPath)) return [];
   try {
     const db = new Database(dbPath, { readonly: true });
     try {
+      const excludeSpawnedChildren = hasCodexSpawnEdges(db)
+        ? `and not exists (
+             select 1
+             from thread_spawn_edges e
+             where e.child_thread_id = threads.id
+           )`
+        : "";
       const rows = db
         .query(
           `select id, cwd, updated_at, updated_at_ms
            from threads
            where archived = 0 and rollout_path != ''
+             ${excludeSpawnedChildren}
            order by coalesce(updated_at_ms, updated_at * 1000) desc
            limit 24`,
         )
