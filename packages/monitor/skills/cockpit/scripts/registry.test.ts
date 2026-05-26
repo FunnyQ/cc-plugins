@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
+import { handleInbox, handleSendMessage } from "./inbox";
 
 const CLI = join(import.meta.dir, "cockpit.ts");
 
@@ -24,6 +25,13 @@ function setEnv() {
   // on the fixture registry — point at paths that don't exist → no live merge.
   process.env.COCKPIT_CLAUDE_SESSIONS_DIR = join(homeDir, "no-sessions");
   process.env.COCKPIT_CODEX_STATE_DB = join(homeDir, "no-state.sqlite");
+}
+
+function writeDaemonToken(token: string) {
+  writeFileSync(
+    join(homeDir, "daemon.json"),
+    JSON.stringify({ pid: process.pid, port: 5858, token }),
+  );
 }
 
 function start(
@@ -216,6 +224,34 @@ describe("buildSessions", () => {
     expect(sessions[0].status).toBe("active");
     expect(sessions[0].sessionId).toBe(sidActive);
     expect(sessions[1].status).toBe("ended");
+  });
+
+  test("includes channel flag when an inbox poll is parked", async () => {
+    const p = mkProject("channel");
+    const sid = "12121212-1212-1212-1212-121212121212";
+    const token = "channel-token";
+    start(p, sid, "g", "pg");
+    writeDaemonToken(token);
+    process.env.COCKPIT_WAIT_TIMEOUT_MS = "1000";
+    const wait = handleInbox(
+      new Request(`http://127.0.0.1/api/inbox?session=${sid}&token=${token}`),
+    );
+    await Bun.sleep(10);
+    try {
+      const session = mod.buildSessions().find((s) => s.sessionId === sid)!;
+      expect(session.channel).toBe(true);
+    } finally {
+      await handleSendMessage(
+        new Request("http://127.0.0.1/api/send-message", {
+          method: "POST",
+          body: JSON.stringify({ session: sid, text: "done", token }),
+        }),
+      );
+      await wait;
+      delete process.env.COCKPIT_WAIT_TIMEOUT_MS;
+    }
+    const session = mod.buildSessions().find((s) => s.sessionId === sid)!;
+    expect(session.channel).toBe(false);
   });
 });
 

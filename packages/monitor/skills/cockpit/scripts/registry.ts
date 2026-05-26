@@ -13,6 +13,7 @@ import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
 import { subagentCountFor } from "./subagents";
+import { hasChannel } from "./inbox";
 
 export type RegistryEntry = {
   provider: Provider;
@@ -49,6 +50,8 @@ export type SessionView = {
   // In-flight Agent/Task delegations — drives the "⊕ N agents" badge.
   // 0 for ended sessions or when the provider-specific source can't be read.
   subagents: number;
+  // True when a live cockpit channel client is parked on /api/inbox.
+  channel: boolean;
   lastHeartbeat: string;
   sessionGoal: string;
   projectGoal: string;
@@ -263,6 +266,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
         harnessStatus: live?.status,
       }),
       subagents: subagentsFor(active, e.provider, e.sessionId, now),
+      channel: hasChannel(e.sessionId),
       lastHeartbeat: e.lastHeartbeat,
       sessionGoal: readSessionGoal(e.logPath),
       projectGoal: projectGoal(e.project),
@@ -289,6 +293,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
         harnessStatus: l.status,
       }),
       subagents: subagentsFor(true, l.provider, l.id, now),
+      channel: hasChannel(l.id),
       lastHeartbeat: new Date(l.updatedAtMs).toISOString(),
       sessionGoal: "",
       projectGoal: projectGoal(l.cwd),
