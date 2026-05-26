@@ -208,38 +208,24 @@
               title="Subagent delegations running in this session"
             ></span>
           </header>
-          <div class="channel-console">
-            <div class="reply-strip" aria-live="polite">
-              <div class="reply-strip__head">
-                <span class="reply-strip__legend">Agent → Cockpit</span>
-                <span
-                  class="reply-strip__count readout"
-                  :class="'is-' + replyStreamStatus"
-                  v-text="replyStripCountLabel"
-                ></span>
-              </div>
-              <ol class="reply-strip__list" v-if="channelReplies.length">
-                <li
-                  class="reply-strip__item"
-                  v-for="reply in channelReplies"
-                  :key="reply.id"
-                >
-                  <time class="reply-strip__time" v-text="reply.time"></time>
-                  <span class="reply-strip__text" v-text="reply.text"></span>
-                </li>
-              </ol>
-              <p
-                class="reply-strip__empty"
-                v-else
-                v-text="replyStripEmptyLabel"
-              ></p>
-            </div>
+          <div class="instrument__body" data-column="transcript">
+            <p class="placeholder">No live transcript.</p>
+          </div>
+        </section>
 
+        <section class="instrument" id="col-decision">
+          <header class="instrument__head">
+            <span class="instrument__legend">Decision Log</span>
+          </header>
+          <div class="instrument__body" data-column="decision">
+            <p class="placeholder">No decisions logged yet.</p>
+          </div>
+          <div class="channel-console">
             <form class="channel-send" @submit.prevent="sendChannelMessage()">
               <textarea
                 class="channel-send__input"
                 v-model="channelMessage"
-                rows="2"
+                rows="4"
                 :disabled="!canUseChannel || channelSending"
                 :title="channelDisabledTitle"
                 :placeholder="canUseChannel ? 'Message this Claude session' : channelDisabledTitle"
@@ -259,18 +245,6 @@
               v-if="channelError"
               v-text="channelError"
             ></p>
-          </div>
-          <div class="instrument__body" data-column="transcript">
-            <p class="placeholder">No live transcript.</p>
-          </div>
-        </section>
-
-        <section class="instrument" id="col-decision">
-          <header class="instrument__head">
-            <span class="instrument__legend">Decision Log</span>
-          </header>
-          <div class="instrument__body" data-column="decision">
-            <p class="placeholder">No decisions logged yet.</p>
           </div>
         </section>
       </main>
