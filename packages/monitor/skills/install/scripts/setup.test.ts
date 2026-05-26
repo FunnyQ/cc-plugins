@@ -90,9 +90,23 @@ describe("--check", () => {
     expect(stdout).toContain("✓ bun runtime");
     expect(stdout).toContain("stats-cache.json");
     expect(stdout).toContain("live usage limits (statusline collector)");
-    // cockpit side
+    // cockpit side — channel is plugin-packaged; with no stale entry it's green
     expect(stdout).toContain("cockpit-channel script exists");
-    expect(stdout).toContain("○ cockpit-channel registered");
+    expect(stdout).toContain("✓ no stale cockpit-channel entry");
+  });
+
+  test("flags a stale hand-wired cockpit-channel entry", () => {
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
+    );
+    const { stdout } = run();
+    expect(stdout).toContain("○ no stale cockpit-channel entry");
+    expect(stdout).toContain("--migrate");
   });
 
   test("fails required when a dashboard prerequisite is missing", () => {
@@ -104,36 +118,52 @@ describe("--check", () => {
 });
 
 describe("--dry-run", () => {
-  test("prints intended writes without touching files", () => {
+  test("prints intended statusline write without touching files", () => {
     const { code, stdout } = run(["--dry-run"]);
     expect(code).toBe(0);
-    expect(stdout).toContain(`Would write to ${join(home, ".claude.json")}`);
-    expect(stdout).toContain("cockpit-channel");
     expect(stdout).toContain("Would set statusLine.command");
+    // no stale channel entry → nothing to remove, no .claude.json created
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
     // settings.json was never created (only stats-cache was seeded)
     expect(existsSync(join(home, ".claude", "settings.json"))).toBe(false);
   });
+
+  test("previews removing a stale channel entry without writing", () => {
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
+    );
+    const { stdout } = run(["--dry-run"]);
+    expect(stdout).toContain("Would remove the stale cockpit-channel entry");
+    // still present — dry-run wrote nothing
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
+  });
 });
 
 describe("--apply", () => {
-  test("registers channel, wires statusline, and reports done", () => {
+  test("wires statusline, leaves no channel entry, and reports done", () => {
     const { code, stdout } = run(["--apply"]);
     expect(code).toBe(0);
-    expect(stdout).toContain("✓ Registered cockpit-channel");
     expect(stdout).toContain("✓ Wired statusline collector");
 
-    expect(claudeJson().mcpServers["cockpit-channel"]).toEqual({
-      command: "bun",
-      args: [CHANNEL_SCRIPT],
-    });
+    // channel is plugin-packaged now — apply never writes one into ~/.claude.json
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
     expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
   });
 
-  test("preserves existing mcpServers and wraps an existing statusline", () => {
+  test("removes a stale channel entry but preserves other mcpServers", () => {
     writeFileSync(
       join(home, ".claude.json"),
-      JSON.stringify({ mcpServers: { other: { command: "x" } } }),
+      JSON.stringify({
+        mcpServers: {
+          other: { command: "x" },
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
     );
     writeFileSync(
       join(home, ".claude", "settings.json"),
@@ -143,11 +173,12 @@ describe("--apply", () => {
       }),
     );
 
-    expect(run(["--apply"]).code).toBe(0);
+    const { stdout } = run(["--apply"]);
+    expect(stdout).toContain("✓ Removed stale cockpit-channel");
 
     const cj = claudeJson();
     expect(cj.mcpServers.other).toEqual({ command: "x" });
-    expect(cj.mcpServers["cockpit-channel"].args).toEqual([CHANNEL_SCRIPT]);
+    expect(cj.mcpServers["cockpit-channel"]).toBeUndefined();
 
     const sj = settingsJson();
     expect(sj.theme).toBe("dark");
@@ -156,10 +187,14 @@ describe("--apply", () => {
     );
   });
 
-  test("backs up both files before overwriting", () => {
+  test("backs up both files before changing them", () => {
     writeFileSync(
       join(home, ".claude.json"),
-      JSON.stringify({ mcpServers: {} }),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
     );
     writeFileSync(
       join(home, ".claude", "settings.json"),
@@ -179,30 +214,34 @@ describe("--apply", () => {
   test("is idempotent — a second apply writes nothing new", () => {
     run(["--apply"]);
     const { stdout } = run(["--apply"]);
-    expect(stdout).toContain("cockpit-channel already registered");
     expect(stdout).toContain("statusline collector already wired");
+    // no channel entry was ever written, so nothing to remove on either pass
+    expect(stdout).not.toContain("Removed stale cockpit-channel");
   });
 
   test("re-check is all green after apply", () => {
     run(["--apply"]);
     const { code, stdout } = run();
     expect(code).toBe(0);
-    expect(stdout).toContain("✓ cockpit-channel registered");
+    expect(stdout).toContain("✓ no stale cockpit-channel entry");
     expect(stdout).toContain("✓ live usage limits (statusline collector)");
   });
 });
 
 describe("single-piece flags", () => {
-  test("--apply-channel wires only the channel", () => {
-    run(["--apply-channel"]);
-    expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
-    expect(existsSync(join(home, ".claude", "settings.json"))).toBe(false);
-  });
-
-  test("--apply-statusline wires only the statusline", () => {
+  test("--apply-statusline wires only the statusline (no channel cleanup)", () => {
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
+    );
     run(["--apply-statusline"]);
     expect(settingsJson().statusLine).toBeDefined();
-    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+    // statusline-only must not touch ~/.claude.json
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
   });
 });
 
@@ -244,7 +283,7 @@ describe("version drift", () => {
     expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
   });
 
-  test("--apply re-points a drifted cockpit-channel to the current path", () => {
+  test("--apply removes a drifted cockpit-channel entry instead of re-pointing", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -253,10 +292,8 @@ describe("version drift", () => {
         },
       }),
     );
-    run(["--apply-channel"]);
-    expect(claudeJson().mcpServers["cockpit-channel"].args).toEqual([
-      CHANNEL_SCRIPT,
-    ]);
+    run(["--apply"]);
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeUndefined();
   });
 });
 
@@ -282,6 +319,20 @@ describe("--migrate (re-point only, never fresh-wire)", () => {
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
   });
 
+  test("removes a stale hand-wired channel entry", () => {
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
+    );
+    const { stdout } = run(["--migrate"]);
+    expect(stdout).toContain("Re-pointed: cockpit-channel cleanup");
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeUndefined();
+  });
+
   test("does nothing when nothing is configured", () => {
     const { stdout } = run(["--migrate"]);
     expect(stdout).toContain("Nothing to migrate");
@@ -291,23 +342,18 @@ describe("--migrate (re-point only, never fresh-wire)", () => {
 });
 
 describe("--session-check (marker-gated)", () => {
-  const OLD_CHANNEL =
-    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/cockpit/scripts/cockpit-channel.ts";
-
-  test("migrates a drift on first run and writes the version marker", () => {
+  test("removes a stale channel entry on first run and writes the version marker", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
         mcpServers: {
-          "cockpit-channel": { command: "bun", args: [OLD_CHANNEL] },
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
         },
       }),
     );
     const { code } = run(["--session-check"]);
     expect(code).toBe(0);
-    expect(claudeJson().mcpServers["cockpit-channel"].args).toEqual([
-      CHANNEL_SCRIPT,
-    ]);
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeUndefined();
     expect(existsSync(join(dataDir, ".wired-version"))).toBe(true);
   });
 
@@ -316,20 +362,18 @@ describe("--session-check (marker-gated)", () => {
     run(["--session-check"]);
     const marker = join(dataDir, ".wired-version");
     expect(existsSync(marker)).toBe(true);
-    // Now drift the channel again; a second run should NOT touch it, because the
-    // marker already records this version (the gate skips the migrate).
+    // Now plant a stale channel entry; a second run should NOT remove it, because
+    // the marker already records this version (the gate skips the migrate).
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
         mcpServers: {
-          "cockpit-channel": { command: "bun", args: [OLD_CHANNEL] },
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
         },
       }),
     );
     run(["--session-check"]);
-    expect(claudeJson().mcpServers["cockpit-channel"].args).toEqual([
-      OLD_CHANNEL,
-    ]);
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
   });
 
   test("never fresh-wires on a clean install", () => {
@@ -350,9 +394,9 @@ describe("--session-check (marker-gated)", () => {
 });
 
 describe("malformed config", () => {
-  test("refuses to write when ~/.claude.json is invalid JSON", () => {
+  test("reports a parse error and leaves an invalid ~/.claude.json untouched", () => {
     writeFileSync(join(home, ".claude.json"), "{ not json");
-    const { code, stdout } = run(["--apply-channel"]);
+    const { code, stdout } = run(["--apply"]);
     expect(code).toBe(1);
     expect(stdout).toContain("Couldn't parse");
     expect(readFileSync(join(home, ".claude.json"), "utf-8")).toBe(

@@ -1,26 +1,27 @@
 #!/usr/bin/env bun
 //
 // monitor:install engine — the single entry that checks every prerequisite for
-// both skills and wires the two configs a non-dev user otherwise edits by hand:
-//   1. cockpit-channel MCP server in ~/.claude.json (absolute path, since that
-//      file does NOT expand $CLAUDE_PLUGIN_ROOT)
-//   2. usage-dashboard statusline collector in ~/.claude/settings.json
+// both skills and wires the one config a non-dev user otherwise edits by hand:
+//   the usage-dashboard statusline collector in ~/.claude/settings.json.
 //
-// Checks reuse install.ts (dashboard) + the channel checks here; the statusline
-// write reuses setup-statusline.ts. Only the cockpit-channel piece is owned here.
+// The cockpit channel is now packaged in the plugin manifest (mcpServers +
+// channels), so it no longer needs a hand-written ~/.claude.json entry. This
+// engine only CLEANS UP a stale entry left by older versions — otherwise the
+// channel would register twice once the packaged one loads.
+//
+// Checks reuse install.ts (dashboard) + the channel prerequisites here; the
+// statusline write reuses setup-statusline.ts.
 //
 // Modes:
 //   (default) / --check   read-only status report, exit 1 if a required check fails
 //   --dry-run             print exactly what --apply would change, write nothing
-//   --apply               apply both pieces
-//   --apply-channel       apply only the cockpit-channel MCP registration
+//   --apply               wire the statusline + remove any stale channel entry
 //   --apply-statusline    apply only the statusline collector wiring
 //
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
-  cachePathVersion,
   type Check,
   dashboardChecks,
   pluginVersion,
@@ -89,8 +90,9 @@ export function versionGte(a: string, b: string): boolean {
   return true;
 }
 
-// The cockpit-channel script path currently configured in ~/.claude.json, or
-// null if the server isn't registered at all.
+// A stale cockpit-channel entry in ~/.claude.json from an older version that
+// hand-wired the channel, or null if there's none. The channel is plugin-
+// packaged now, so any such entry should be removed to avoid double registration.
 function channelConfiguredPath(): string | null {
   const { data } = readJson(CLAUDE_JSON);
   const args = data?.mcpServers?.["cockpit-channel"]?.args;
@@ -100,12 +102,6 @@ function channelConfiguredPath(): string | null {
       (a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"),
     ) ?? null
   );
-}
-
-// Registered correctly only when it points at the exact live script path — a
-// drifted older-version cache path counts as not-current (and gets re-pointed).
-function channelRegistered(): boolean {
-  return channelConfiguredPath() === CHANNEL_SCRIPT;
 }
 
 // The collector script path currently referenced by statusLine.command, or null
@@ -148,63 +144,45 @@ function channelChecks(): Check[] {
     "required",
     `Expected at ${CHANNEL_SCRIPT}`,
   );
-  const configured = channelConfiguredPath();
-  let channelHint: string;
-  if (configured && configured !== CHANNEL_SCRIPT) {
-    const pathVer = cachePathVersion(configured);
-    const cur = pluginVersion();
-    channelHint =
-      pathVer && cur && pathVer !== cur
-        ? `cockpit-channel points at monitor ${pathVer} but the current version is ${cur}.\n   Run: bun ${import.meta.path} --apply-channel to update.`
-        : `cockpit-channel points at a different path.\n   Run: bun ${import.meta.path} --apply-channel to update.`;
-  } else {
-    channelHint = `Run: bun ${import.meta.path} --apply-channel`;
-  }
+  // The channel is packaged in the plugin manifest now; a leftover hand-wired
+  // entry would register it twice. Flag it for cleanup.
   add(
-    "cockpit-channel registered in ~/.claude.json",
-    channelRegistered(),
+    "no stale cockpit-channel entry in ~/.claude.json",
+    channelConfiguredPath() === null,
     "optional",
-    channelHint,
+    `Found a hand-wired cockpit-channel in ~/.claude.json — the channel is plugin-packaged now.\n   Run: bun ${import.meta.path} --migrate to remove it.`,
   );
   return checks;
 }
 
-// --- apply: cockpit-channel MCP ---------------------------------------------
-function applyChannel(dryRun: boolean): boolean {
-  if (channelRegistered()) {
-    console.log("○ cockpit-channel already registered — nothing to do.");
-    return true;
-  }
+// --- cleanup: remove a stale hand-wired cockpit-channel from ~/.claude.json --
+// Older versions wrote the channel here; it's plugin-packaged now, so a leftover
+// entry would register the channel twice. "removed" when it deleted one, "none"
+// when there was nothing to do, "error" when the file couldn't be parsed.
+function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   const { data, readable } = readJson(CLAUDE_JSON);
   if (!readable) {
     console.log(`✗ Couldn't parse ${CLAUDE_JSON} — fix it first.`);
-    return false;
+    return "error";
   }
-  const next = { ...data };
-  next.mcpServers = { ...(next.mcpServers ?? {}) };
-  next.mcpServers["cockpit-channel"] = {
-    command: "bun",
-    args: [CHANNEL_SCRIPT],
-  };
-
+  const args = data?.mcpServers?.["cockpit-channel"]?.args;
+  const hasEntry =
+    Array.isArray(args) &&
+    args.some((a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"));
+  if (!hasEntry) return "none";
   if (dryRun) {
-    console.log(`Would write to ${CLAUDE_JSON}:`);
     console.log(
-      JSON.stringify(
-        {
-          mcpServers: { "cockpit-channel": next.mcpServers["cockpit-channel"] },
-        },
-        null,
-        2,
-      ),
+      `Would remove the stale cockpit-channel entry from ${CLAUDE_JSON}.`,
     );
-    return true;
+    return "removed";
   }
+  const next = { ...data, mcpServers: { ...(data.mcpServers ?? {}) } };
+  delete next.mcpServers["cockpit-channel"];
   const bak = backup(CLAUDE_JSON);
   writeFileSync(CLAUDE_JSON, `${JSON.stringify(next, null, 2)}\n`);
-  console.log(`✓ Registered cockpit-channel in ${CLAUDE_JSON}`);
+  console.log(`✓ Removed stale cockpit-channel from ${CLAUDE_JSON}`);
   if (bak) console.log(`   (backup: ${bak})`);
-  return true;
+  return "removed";
 }
 
 // --- apply: statusline collector (delegates to setup-statusline) ------------
@@ -242,16 +220,15 @@ function applyStatuslinePiece(dryRun: boolean): boolean {
   return true;
 }
 
-// --- migrate: re-point only already-wired pieces that drifted ---------------
-// Never fresh-wires — that's the initial opt-in, which stays manual. Only acts
-// on a piece that is already configured but points somewhere other than the
-// current live path (e.g. an older plugin-cache version after an update).
+// --- migrate: re-point drifted pieces + clean up the stale channel entry ----
+// Never fresh-wires the statusline — that's the initial opt-in, which stays
+// manual. It only re-points an already-wired statusline that drifted to an older
+// plugin-cache path, and removes a stale hand-wired channel entry (now packaged).
 function migrate(): string[] {
   const changed: string[] = [];
 
-  const ch = channelConfiguredPath();
-  if (ch && ch !== CHANNEL_SCRIPT && applyChannel(false)) {
-    changed.push("cockpit-channel");
+  if (unwireChannel(false) === "removed") {
+    changed.push("cockpit-channel cleanup");
   }
 
   const sl = statuslineReferencedCollector();
@@ -286,7 +263,7 @@ function sessionCheck(): void {
     console.log(
       `monitor: updated ${changed.join(" + ")} to v${version} after a plugin update.`,
     );
-  } else if (!channelConfiguredPath() && !statuslineReferencedCollector()) {
+  } else if (!statuslineReferencedCollector()) {
     // Nothing wired yet (fresh install). One gentle, write-free nudge per
     // version — the marker below keeps it from repeating every session.
     console.log(
@@ -322,21 +299,17 @@ function main() {
     process.exit(0);
   }
 
-  if (
-    flags.has("--apply") ||
-    flags.has("--apply-channel") ||
-    flags.has("--apply-statusline") ||
-    dryRun
-  ) {
-    const wantChannel =
-      flags.has("--apply") || flags.has("--apply-channel") || dryRun;
+  if (flags.has("--apply") || flags.has("--apply-statusline") || dryRun) {
     const wantStatusline =
       flags.has("--apply") || flags.has("--apply-statusline") || dryRun;
     let ok = true;
-    if (wantChannel) ok = applyChannel(dryRun) && ok;
+    // --apply / --dry-run also clean up a stale hand-wired channel entry.
+    if (flags.has("--apply") || dryRun) {
+      ok = unwireChannel(dryRun) !== "error" && ok;
+    }
     if (wantStatusline) ok = applyStatuslinePiece(dryRun) && ok;
     console.log();
-    if (!dryRun && ok && (wantChannel || wantStatusline)) {
+    if (!dryRun && ok && wantStatusline) {
       console.log("Done. Launch an opted-in session with:");
       console.log(
         `   bun ${resolve(import.meta.dir, "..", "..", "cockpit", "scripts", "monitor-up.ts")}`,
@@ -356,7 +329,9 @@ function main() {
     process.exit(1);
   }
   console.log("Required checks passed. To wire config, run:");
-  console.log(`   bun ${import.meta.path} --apply        # both pieces`);
+  console.log(
+    `   bun ${import.meta.path} --apply        # statusline + cleanup`,
+  );
   console.log(
     `   bun ${import.meta.path} --dry-run      # preview without writing`,
   );
