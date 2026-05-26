@@ -4,6 +4,11 @@ import {
   spawn,
   type ChildProcessWithoutNullStreams,
 } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { createConnection, type Socket } from "node:net";
 
 type JsonRpcMessage =
   | {
@@ -211,6 +216,230 @@ class StdioJsonRpcTransport implements JsonRpcTransport {
   }
 }
 
+class UnixWebSocketJsonRpcTransport implements JsonRpcTransport {
+  private nextId = 1;
+  private buffer = Buffer.alloc(0);
+  private handshakeDone = false;
+  private pending = new Map<
+    number,
+    { resolve: (value: unknown) => void; reject: (err: Error) => void }
+  >();
+  private notificationWaiters = new Set<{
+    predicate: (message: JsonRpcNotification) => boolean;
+    resolve: (message: JsonRpcNotification) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
+  private ready: Promise<void>;
+
+  constructor(private socket: Socket) {
+    socket.on("data", (chunk: Buffer) => this.handleData(chunk));
+    socket.on("close", () =>
+      this.rejectAll(new Error("Codex remote-control socket closed")),
+    );
+    socket.on("error", (err) => this.rejectAll(err));
+    this.ready = this.handshake();
+  }
+
+  async request(method: string, params?: unknown): Promise<unknown> {
+    await this.ready;
+    const id = this.nextId++;
+    this.socket.write(this.encodeFrame(JSON.stringify({ id, method, params })));
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      setTimeout(() => {
+        if (!this.pending.has(id)) return;
+        this.pending.delete(id);
+        reject(new Error(`${method} timed out`));
+      }, 10_000).unref();
+    });
+  }
+
+  close(): void {
+    this.socket.destroy();
+  }
+
+  waitForNotification(
+    predicate: (message: JsonRpcNotification) => boolean,
+    timeoutMs: number,
+  ): Promise<JsonRpcNotification> {
+    return new Promise((resolve, reject) => {
+      const waiter = {
+        predicate,
+        resolve: (message: JsonRpcNotification) => {
+          clearTimeout(waiter.timer);
+          this.notificationWaiters.delete(waiter);
+          resolve(message);
+        },
+        reject: (err: Error) => {
+          clearTimeout(waiter.timer);
+          this.notificationWaiters.delete(waiter);
+          reject(err);
+        },
+        timer: setTimeout(() => {
+          this.notificationWaiters.delete(waiter);
+          reject(new Error("turn completion timed out"));
+        }, timeoutMs),
+      };
+      waiter.timer.unref();
+      this.notificationWaiters.add(waiter);
+    });
+  }
+
+  private handshake(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const key = randomBytes(16).toString("base64");
+      const timer = setTimeout(() => {
+        reject(new Error("remote-control websocket handshake timed out"));
+      }, 10_000);
+      timer.unref();
+      const onData = () => {
+        const idx = this.buffer.indexOf("\r\n\r\n");
+        if (idx === -1) return;
+        const head = this.buffer.subarray(0, idx + 4).toString("utf8");
+        this.buffer = this.buffer.subarray(idx + 4);
+        if (!head.startsWith("HTTP/1.1 101")) {
+          clearTimeout(timer);
+          reject(new Error("remote-control websocket upgrade failed"));
+          return;
+        }
+        this.handshakeDone = true;
+        clearTimeout(timer);
+        this.socket.off("data", onData);
+        this.decodeBufferedFrames();
+        resolve();
+      };
+      this.socket.on("data", onData);
+      this.socket.write(
+        [
+          "GET / HTTP/1.1",
+          "Host: localhost",
+          "Upgrade: websocket",
+          "Connection: Upgrade",
+          `Sec-WebSocket-Key: ${key}`,
+          "Sec-WebSocket-Version: 13",
+          "",
+          "",
+        ].join("\r\n"),
+      );
+    });
+  }
+
+  private handleData(chunk: Buffer): void {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    if (this.handshakeDone) this.decodeBufferedFrames();
+  }
+
+  private decodeBufferedFrames(): void {
+    for (;;) {
+      if (this.buffer.length < 2) return;
+      const start = 0;
+      let offset = 2;
+      const opcode = this.buffer[0] & 0x0f;
+      let len = this.buffer[1] & 0x7f;
+      if (len === 126) {
+        if (this.buffer.length < offset + 2) return;
+        len = this.buffer.readUInt16BE(offset);
+        offset += 2;
+      } else if (len === 127) {
+        if (this.buffer.length < offset + 8) return;
+        const bigLen = this.buffer.readBigUInt64BE(offset);
+        offset += 8;
+        if (bigLen > BigInt(Number.MAX_SAFE_INTEGER)) {
+          this.rejectAll(new Error("remote-control frame too large"));
+          this.close();
+          return;
+        }
+        len = Number(bigLen);
+      }
+      const masked = (this.buffer[1] & 0x80) !== 0;
+      let mask: Buffer | null = null;
+      if (masked) {
+        if (this.buffer.length < offset + 4) return;
+        mask = this.buffer.subarray(offset, offset + 4);
+        offset += 4;
+      }
+      if (this.buffer.length < offset + len) return;
+      const payload = Buffer.from(this.buffer.subarray(offset, offset + len));
+      this.buffer = this.buffer.subarray(offset + len);
+      if (mask) {
+        for (let i = 0; i < payload.length; i++) payload[i] ^= mask[i % 4];
+      }
+      if (opcode === 8) {
+        this.close();
+        return;
+      }
+      if (opcode !== 1) continue;
+      this.handleLine(payload.toString("utf8"));
+      if (this.buffer.length === start) return;
+    }
+  }
+
+  private encodeFrame(text: string): Buffer {
+    const payload = Buffer.from(text);
+    const mask = randomBytes(4);
+    const header: number[] = [0x81];
+    if (payload.length < 126) {
+      header.push(0x80 | payload.length);
+    } else if (payload.length < 65536) {
+      header.push(0x80 | 126, payload.length >> 8, payload.length & 0xff);
+    } else {
+      header.push(
+        0x80 | 127,
+        0,
+        0,
+        0,
+        0,
+        (payload.length / 0x1000000) & 0xff,
+        (payload.length / 0x10000) & 0xff,
+        (payload.length / 0x100) & 0xff,
+        payload.length & 0xff,
+      );
+    }
+    const out = Buffer.alloc(header.length + mask.length + payload.length);
+    Buffer.from(header).copy(out, 0);
+    mask.copy(out, header.length);
+    for (let i = 0; i < payload.length; i++) {
+      out[header.length + mask.length + i] = payload[i] ^ mask[i % 4];
+    }
+    return out;
+  }
+
+  private handleLine(line: string): void {
+    let message: JsonRpcMessage;
+    try {
+      message = JSON.parse(line) as JsonRpcMessage;
+    } catch {
+      return;
+    }
+    if (!("id" in message)) {
+      this.handleNotification(message);
+      return;
+    }
+    const pending = this.pending.get(message.id);
+    if (!pending) return;
+    this.pending.delete(message.id);
+    if (message.error) {
+      pending.reject(new Error(message.error.message || "JSON-RPC error"));
+    } else {
+      pending.resolve(message.result);
+    }
+  }
+
+  private handleNotification(message: JsonRpcNotification): void {
+    for (const waiter of [...this.notificationWaiters]) {
+      if (waiter.predicate(message)) waiter.resolve(message);
+    }
+  }
+
+  private rejectAll(err: Error): void {
+    for (const p of this.pending.values()) p.reject(err);
+    this.pending.clear();
+    for (const waiter of this.notificationWaiters) waiter.reject(err);
+    this.notificationWaiters.clear();
+  }
+}
+
 function defaultCliVersion(): string {
   return execFileSync("codex", ["--version"], {
     encoding: "utf8",
@@ -227,11 +456,16 @@ function defaultStartRemoteControl(): unknown {
 }
 
 async function defaultCreateTransport(): Promise<JsonRpcTransport> {
-  return new StdioJsonRpcTransport(
-    spawn("codex", ["app-server", "proxy"], {
-      stdio: ["pipe", "pipe", "pipe"],
-    }),
+  const socketPath = join(
+    homedir(),
+    ".codex",
+    "app-server-control",
+    "app-server-control.sock",
   );
+  if (!existsSync(socketPath)) {
+    throw new Error(`remote-control socket not found at ${socketPath}`);
+  }
+  return new UnixWebSocketJsonRpcTransport(createConnection(socketPath));
 }
 
 async function defaultCreateDirectTransport(): Promise<JsonRpcTransport> {

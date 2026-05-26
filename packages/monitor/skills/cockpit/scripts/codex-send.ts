@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { jsonResponse as json } from "./http";
 import {
-  runDirectProbe,
+  runProbe,
   type ProbeOptions,
   type ProbeReport,
 } from "./codex-control-probe";
@@ -29,7 +29,7 @@ function daemonToken(): string | null {
 
 export async function handleSendCodexMessage(
   req: Request,
-  sendCodexTurn: SendCodexTurn = runDirectProbe,
+  sendCodexTurn: SendCodexTurn = runProbe,
 ): Promise<Response> {
   let body: any;
   try {
@@ -69,7 +69,7 @@ export async function handleSendCodexMessage(
 
 export async function handleCodexControlStatus(
   req: Request,
-  probeCodexThread: SendCodexTurn = runDirectProbe,
+  probeCodexThread: SendCodexTurn = runProbe,
 ): Promise<Response> {
   const url = new URL(req.url);
   const session = url.searchParams.get("session");
