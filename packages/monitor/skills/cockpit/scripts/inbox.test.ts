@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { handleInbox, handleSendMessage } from "./inbox";
+import { handleInbox, handleSendMessage, hasChannel } from "./inbox";
 
 const SID = "aaaaaaaa-1111-1111-1111-111111111111";
 const TOKEN = "test-token";
@@ -32,6 +32,7 @@ afterEach(() => {
   delete process.env.COCKPIT_HOME;
   delete process.env.COCKPIT_WAIT_TIMEOUT_MS;
   delete process.env.COCKPIT_STASH_TTL_MS;
+  delete process.env.COCKPIT_CHANNEL_TTL_MS;
   rmSync(cockpitHome, { recursive: true, force: true });
 });
 
@@ -99,5 +100,34 @@ describe("inbox broker", () => {
       req(`/api/inbox?session=${SID}&token=${TOKEN}`),
     );
     expect(await json(res)).toEqual({ message: null, timeout: true });
+  });
+});
+
+describe("channel presence (hasChannel TTL)", () => {
+  const PSID = "bbbbbbbb-2222-2222-2222-222222222222";
+
+  test("stays true across the gap after a poll resolves, within TTL", async () => {
+    process.env.COCKPIT_CHANNEL_TTL_MS = "200";
+    // While parked, presence is true.
+    const inbox = handleInbox(req(`/api/inbox?session=${PSID}&token=${TOKEN}`));
+    await Bun.sleep(10);
+    expect(hasChannel(PSID)).toBe(true);
+    // After the poll times out, presence must NOT flicker false in the re-park gap.
+    await json(await inbox);
+    expect(hasChannel(PSID)).toBe(true);
+  });
+
+  test("goes false once the TTL lapses with no further polls", async () => {
+    process.env.COCKPIT_CHANNEL_TTL_MS = "40";
+    await json(
+      await handleInbox(req(`/api/inbox?session=${PSID}&token=${TOKEN}`)),
+    );
+    expect(hasChannel(PSID)).toBe(true);
+    await Bun.sleep(60);
+    expect(hasChannel(PSID)).toBe(false);
+  });
+
+  test("unknown session has no channel", () => {
+    expect(hasChannel("ffffffff-9999-9999-9999-999999999999")).toBe(false);
   });
 });
