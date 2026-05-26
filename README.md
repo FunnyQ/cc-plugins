@@ -32,7 +32,7 @@ The usage-dashboard skill runs a prerequisite check automatically before launchi
 If you want to run the precheck yourself:
 
 ```bash
-bun $CLAUDE_PLUGIN_ROOT/skills/usage-dashboard/scripts/install.ts
+bun $CLAUDE_PLUGIN_ROOT/skills/install/scripts/install.ts
 ```
 
 ## Codex Installation
@@ -129,6 +129,31 @@ Opens `http://localhost:5858` in your default browser.
 - Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
 - Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and rollout files under `~/.codex/sessions`.
 - Decision logs, registry, and wait/send bridge are shared through `.cockpit/` and `~/.cockpit/`.
+
+### Channel (send box)
+
+The send box at the bottom of the Decision Log column types text straight into a running Claude Code session. The channel is Claude-only; Codex sessions stay observe-only.
+
+Channels require Claude Code 2.1.80 or later and are still behind the research-preview development flag. Register the channel MCP server once in `~/.claude.json`, pointing at the installed plugin's `cockpit-channel.ts` (note: `~/.claude.json` does not expand `$CLAUDE_PLUGIN_ROOT`, so use an absolute path):
+
+```json
+{
+  "mcpServers": {
+    "cockpit-channel": {
+      "command": "bun",
+      "args": ["/absolute/path/to/monitor/skills/cockpit/scripts/cockpit-channel.ts"]
+    }
+  }
+}
+```
+
+Then launch an opted-in session — the channel only attaches to sessions started with the development channel flag and cannot retro-attach to an already-running session:
+
+```bash
+bun packages/monitor/skills/cockpit/scripts/monitor-up.ts
+```
+
+Extra arguments pass through to `claude` (e.g. `monitor-up.ts --resume`). See the [cockpit skill README](./packages/monitor/skills/cockpit) for the full setup.
 
 ## Adding a New Plugin
 

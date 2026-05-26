@@ -1,4 +1,4 @@
-// Run: bun test packages/monitor/skills/usage-dashboard/scripts/statusline-decision.test.ts
+// Run: bun test packages/monitor/skills/install/scripts/statusline-decision.test.ts
 import { describe, expect, test } from "bun:test";
 import { decideStatusLine } from "./statusline-decision";
 
