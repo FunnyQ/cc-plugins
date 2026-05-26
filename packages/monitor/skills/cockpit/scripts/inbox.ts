@@ -8,6 +8,11 @@ const UUID_RE = /^[0-9a-f-]{36}$/;
 type ParkedInbox = { resolve: (message: string | null) => void };
 const pendingInbox = new Map<string, ParkedInbox>();
 const stashed = new Map<string, { text: string; expires: number }>();
+// Last time the channel server polled this session's inbox. Presence is "polled
+// recently", not "a poll is parked this instant" — between one poll resolving
+// (timeout/message) and the next re-parking, the channel is still attached, so
+// `hasChannel` must not flicker false in that gap.
+const channelSeen = new Map<string, number>();
 
 function cockpitHome(): string {
   return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
@@ -34,6 +39,11 @@ function stashTtlMs(): number {
   return Number.isFinite(v) && v > 0 ? v : 60_000;
 }
 
+function channelTtlMs(): number {
+  const v = parseInt(process.env.COCKPIT_CHANNEL_TTL_MS || "", 10);
+  return Number.isFinite(v) && v > 0 ? v : 5_000;
+}
+
 function takeStashed(session: string): string | null {
   const e = stashed.get(session);
   if (!e) return null;
@@ -42,7 +52,9 @@ function takeStashed(session: string): string | null {
 }
 
 export function hasChannel(sessionId: string): boolean {
-  return pendingInbox.has(sessionId);
+  if (pendingInbox.has(sessionId)) return true;
+  const seen = channelSeen.get(sessionId);
+  return seen !== undefined && Date.now() - seen < channelTtlMs();
 }
 
 export function handleInbox(req: Request): Response | Promise<Response> {
@@ -51,6 +63,8 @@ export function handleInbox(req: Request): Response | Promise<Response> {
   const token = url.searchParams.get("token") || "";
   if (token !== daemonToken()) return json({ error: "unauthorized" }, 401);
   if (!UUID_RE.test(session)) return json({ error: "invalid session" }, 400);
+
+  channelSeen.set(session, Date.now());
 
   const stashedText = takeStashed(session);
   if (stashedText !== null) return json({ message: stashedText });
@@ -62,6 +76,9 @@ export function handleInbox(req: Request): Response | Promise<Response> {
     const resolver = (message: string | null) => {
       if (settled) return;
       settled = true;
+      // Refresh presence at resolution so the gap before the next re-park stays
+      // inside the TTL window (a poll can sit parked for the full budget).
+      channelSeen.set(session, Date.now());
       clearTimeout(timer);
       if (pendingInbox.get(session)?.resolve === resolver)
         pendingInbox.delete(session);

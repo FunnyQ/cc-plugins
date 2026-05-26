@@ -233,6 +233,7 @@ describe("buildSessions", () => {
     start(p, sid, "g", "pg");
     writeDaemonToken(token);
     process.env.COCKPIT_WAIT_TIMEOUT_MS = "1000";
+    process.env.COCKPIT_CHANNEL_TTL_MS = "60";
     const wait = handleInbox(
       new Request(`http://127.0.0.1/api/inbox?session=${sid}&token=${token}`),
     );
@@ -250,8 +251,16 @@ describe("buildSessions", () => {
       await wait;
       delete process.env.COCKPIT_WAIT_TIMEOUT_MS;
     }
-    const session = mod.buildSessions().find((s) => s.sessionId === sid)!;
-    expect(session.channel).toBe(false);
+    // Presence persists through the re-park gap (within TTL)...
+    expect(mod.buildSessions().find((s) => s.sessionId === sid)!.channel).toBe(
+      true,
+    );
+    // ...and only drops once the channel stops polling past the TTL.
+    await Bun.sleep(80);
+    expect(mod.buildSessions().find((s) => s.sessionId === sid)!.channel).toBe(
+      false,
+    );
+    delete process.env.COCKPIT_CHANNEL_TTL_MS;
   });
 });
 

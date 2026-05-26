@@ -129,6 +129,23 @@ export function channelNotification(text: string) {
   };
 }
 
+// Injecting a channel message (`mcp.notification`) is coupled to the session's
+// turn — its await can hang for the whole time the agent is WORKING. If the
+// inbox loop awaited it inline, it would stop re-parking the `/api/inbox`
+// long-poll for that entire turn, and `hasChannel` (which only sees a parked
+// poll) would read false → the UI send box disables mid-turn. So delivery runs
+// off a serialized side-chain: the loop fires-and-forgets, re-parks the poll
+// immediately, and notifications still arrive in order.
+export function createSerialNotifier(
+  notify: (text: string) => Promise<void>,
+  onError: (err: unknown) => void = () => {},
+): (text: string) => void {
+  let chain: Promise<void> = Promise.resolve();
+  return (text: string) => {
+    chain = chain.then(() => notify(text)).catch(onError);
+  };
+}
+
 export function sessionIdFromCommand(command: string): string | null {
   const parts = command.match(/(?:[^\s"']+|["'][^"']*["'])+/g) ?? [];
   for (let i = 0; i < parts.length; i++) {
@@ -297,6 +314,14 @@ async function pullInboxLoop(opts: {
   const fetchImpl = opts.fetchImpl ?? fetch;
   let coords = opts.coords();
   let failures = 0;
+  // Fire-and-forget delivery: never blocks the loop from re-parking the poll.
+  const deliver = createSerialNotifier(
+    (text) => opts.mcp.notification(channelNotification(text)),
+    (err) =>
+      console.error(
+        `cockpit-channel: notification failed (${(err as Error).message})`,
+      ),
+  );
   while (true) {
     if (!coords) coords = await opts.ensure();
     if (!coords) {
@@ -316,7 +341,7 @@ async function pullInboxLoop(opts: {
       const body = (await r.json()) as { message?: unknown };
       failures = 0;
       if (typeof body.message === "string" && body.message !== "") {
-        await opts.mcp.notification(channelNotification(body.message));
+        deliver(body.message);
       }
     } catch (err) {
       const delay = nextReconnectDelayMs(failures++);

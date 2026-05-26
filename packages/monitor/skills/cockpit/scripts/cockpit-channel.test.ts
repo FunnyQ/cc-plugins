@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   channelNotification,
+  createSerialNotifier,
   ensureServer,
   isUp,
   nextReconnectDelayMs,
@@ -145,6 +146,56 @@ describe("protocol framing", () => {
       method: "notifications/claude/channel",
       params: { content: "hi", meta: { source: "cockpit" } },
     });
+  });
+});
+
+describe("serial notifier", () => {
+  test("returns synchronously without awaiting the slow notify", () => {
+    let resolved = false;
+    const deliver = createSerialNotifier(
+      () =>
+        new Promise<void>((r) =>
+          setTimeout(() => ((resolved = true), r()), 50),
+        ),
+    );
+    deliver("a");
+    // The call must not block on the in-flight notification.
+    expect(resolved).toBe(false);
+  });
+
+  test("delivers messages in order even when notify resolves out of order", async () => {
+    const order: string[] = [];
+    const deliver = createSerialNotifier(
+      (text) =>
+        new Promise<void>((r) => {
+          // "a" resolves slower than "b" — serialization must still keep order.
+          const delay = text === "a" ? 30 : 5;
+          setTimeout(() => (order.push(text), r()), delay);
+        }),
+    );
+    deliver("a");
+    deliver("b");
+    deliver("c");
+    await Bun.sleep(80);
+    expect(order).toEqual(["a", "b", "c"]);
+  });
+
+  test("a failing notify does not break the chain and reaches onError", async () => {
+    const order: string[] = [];
+    const errors: unknown[] = [];
+    const deliver = createSerialNotifier(
+      (text) =>
+        text === "boom"
+          ? Promise.reject(new Error("boom"))
+          : (order.push(text), Promise.resolve()),
+      (err) => errors.push(err),
+    );
+    deliver("one");
+    deliver("boom");
+    deliver("two");
+    await Bun.sleep(20);
+    expect(order).toEqual(["one", "two"]);
+    expect((errors[0] as Error).message).toBe("boom");
   });
 });
 
