@@ -66,3 +66,24 @@ export async function handleSendCodexMessage(
     warnings: report.warnings,
   });
 }
+
+export async function handleCodexControlStatus(
+  req: Request,
+  probeCodexThread: SendCodexTurn = runDirectProbe,
+): Promise<Response> {
+  const url = new URL(req.url);
+  const session = url.searchParams.get("session");
+  const token = url.searchParams.get("token");
+  if (token !== daemonToken()) return json({ error: "unauthorized" }, 401);
+  if (typeof session !== "string" || !UUID_RE.test(session)) {
+    return json({ error: "invalid session" }, 400);
+  }
+
+  const report = await probeCodexThread({ threadId: session });
+  return json({
+    ready: !!(report.ok && report.resumeOk),
+    controlMode: report.controlMode,
+    warnings: report.warnings,
+    errors: report.errors,
+  });
+}

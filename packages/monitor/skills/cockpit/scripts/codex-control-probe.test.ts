@@ -7,12 +7,19 @@ import {
   type JsonRpcTransport,
 } from "./codex-control-probe";
 
+type FakeNotification =
+  | { method: string; params?: unknown }
+  | "pending"
+  | undefined;
+
 class FakeTransport implements JsonRpcTransport {
   calls: Array<{ method: string; params: unknown }> = [];
+  closeCount = 0;
+  waitCount = 0;
 
   constructor(
     private responses: Record<string, unknown> = {},
-    private notification?: { method: string; params?: unknown },
+    private notification?: FakeNotification,
   ) {}
 
   async request(method: string, params?: unknown): Promise<unknown> {
@@ -22,23 +29,28 @@ class FakeTransport implements JsonRpcTransport {
   }
 
   async waitForNotification(): Promise<{ method: string; params?: unknown }> {
+    this.waitCount += 1;
+    if (this.notification === "pending") return new Promise(() => {});
     if (!this.notification) throw new Error("missing notification");
     return this.notification;
   }
 
-  close(): void {}
+  close(): void {
+    this.closeCount += 1;
+  }
 }
 
 describe("codex control probe args", () => {
-  test("parses thread, send, and json flags", () => {
-    expect(parseArgs(["--thread", "abc", "--send", "hello", "--json"])).toEqual(
-      {
-        threadId: "abc",
-        sendText: "hello",
-        json: true,
-        help: false,
-      },
-    );
+  test("parses thread, send, wait, and json flags", () => {
+    expect(
+      parseArgs(["--thread", "abc", "--send", "hello", "--wait", "--json"]),
+    ).toEqual({
+      threadId: "abc",
+      sendText: "hello",
+      waitForCompletion: true,
+      json: true,
+      help: false,
+    });
   });
 
   test("rejects missing flag values", () => {
@@ -106,16 +118,13 @@ describe("codex control probe", () => {
     ]);
   });
 
-  test("starts a turn only when send text is explicit", async () => {
+  test("submits a turn without waiting for completion by default", async () => {
     const transport = new FakeTransport(
       {
         "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
         "turn/start": { turn: { id: "turn1" } },
       },
-      {
-        method: "turn/completed",
-        params: { threadId: "t1", turn: { id: "turn1", status: "completed" } },
-      },
+      "pending",
     );
     const report = await runProbe(
       { threadId: "t1", sendText: "hello" },
@@ -131,15 +140,50 @@ describe("codex control probe", () => {
       ok: true,
       threadResolved: true,
       resumeOk: true,
+      turnId: "turn1",
       turnStartOk: true,
-      turnCompletedOk: true,
-      turnStatus: "completed",
     });
+    expect(report.turnCompletedOk).toBeUndefined();
+    expect(report.turnStatus).toBeUndefined();
+    expect(transport.waitCount).toBe(1);
+    expect(transport.closeCount).toBe(0);
     const turnStart = transport.calls.find((c) => c.method === "turn/start");
     expect(turnStart?.params).toEqual({
       threadId: "t1",
       input: [{ type: "text", text: "hello", text_elements: [] }],
     });
+  });
+
+  test("waits for completion only when --wait is explicit", async () => {
+    const transport = new FakeTransport(
+      {
+        "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
+        "turn/start": { turn: { id: "turn1" } },
+      },
+      {
+        method: "turn/completed",
+        params: { threadId: "t1", turn: { id: "turn1", status: "completed" } },
+      },
+    );
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello", waitForCompletion: true },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => transport,
+        createDirectTransport: async () => transport,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      turnId: "turn1",
+      turnStartOk: true,
+      turnCompletedOk: true,
+      turnStatus: "completed",
+    });
+    expect(transport.waitCount).toBe(1);
+    expect(transport.closeCount).toBe(1);
   });
 
   test("steers an active turn instead of starting a competing turn", async () => {
@@ -178,8 +222,8 @@ describe("codex control probe", () => {
       resumeOk: true,
       turnId: "turn1",
       turnSteerOk: true,
-      turnCompletedOk: true,
     });
+    expect(report.turnCompletedOk).toBeUndefined();
     expect(transport.calls.map((c) => c.method)).toEqual([
       "initialize",
       "thread/resume",
@@ -300,6 +344,33 @@ describe("codex control probe", () => {
       "initialize",
       "thread/loaded/list",
     ]);
+  });
+
+  test("does not fall back and resend after a turn was submitted", async () => {
+    const proxy = new FakeTransport({
+      "thread/resume": { thread: { id: "t1", status: { type: "idle" } } },
+      "turn/start": { turn: { id: "turn1" } },
+    });
+    const direct = new FakeTransport();
+    const report = await runProbe(
+      { threadId: "t1", sendText: "hello", waitForCompletion: true },
+      {
+        cliVersion: () => "codex 1.2.3",
+        startRemoteControl: () => ({}),
+        createProxyTransport: async () => proxy,
+        createDirectTransport: async () => direct,
+      },
+    );
+
+    expect(report).toMatchObject({
+      ok: false,
+      turnId: "turn1",
+      turnStartOk: true,
+    });
+    expect(report.errors).toEqual([
+      "remote-control failed after Codex turn was submitted: missing notification",
+    ]);
+    expect(direct.calls).toEqual([]);
   });
 
   test("direct deps skip remote-control and use direct app-server", async () => {
