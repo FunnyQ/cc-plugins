@@ -942,6 +942,36 @@ body {
   text-transform: uppercase;
   color: var(--bar, var(--idle));
 }
+/* Agent pill — a separate dimension from status (a session can be "working"
+   AND delegating), so it carries its own fixed aurora accent rather than the
+   status hue, and breathes gently to read as live work in flight. */
+.agent-pill {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 50%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--aurora) 14%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--aurora);
+  animation: agent-breathe 2.6s ease-in-out infinite;
+}
+@keyframes agent-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--aurora) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 8px 0 color-mix(in oklch, var(--aurora) 40%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-pill {
+    animation: none;
+  }
+}
 
 /* Status bar — a full-width glow strip under the transcript head that breathes
    in the selected session's status colour. `--bar` is the single source of the

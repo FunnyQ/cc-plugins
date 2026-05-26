@@ -121,6 +121,16 @@ export const store = reactive({
     return this.legStatusLabel(this.selectedSession || {});
   },
 
+  // In-flight subagent delegations on the selected session (0 when none/ended).
+  get selectedSubagents() {
+    return this.selectedSession?.subagents || 0;
+  },
+
+  get agentBadgeLabel() {
+    const n = this.selectedSubagents;
+    return `⊕ ${n} ${n === 1 ? "AGENT" : "AGENTS"}`;
+  },
+
   // Short session id for the HUD telemetry readout (first uuid segment).
   get sessionShortId() {
     return this.selectedSessionId
