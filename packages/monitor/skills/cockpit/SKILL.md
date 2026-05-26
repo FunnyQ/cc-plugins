@@ -98,28 +98,33 @@ This writes `<project>/.cockpit/project-meta.md` (frontmatter `project_goal` +
 `<project>/.cockpit/logs/<id>.jsonl`, and registers the session in
 `~/.cockpit/registry.json` with its provider.
 
-### 5. Start (or reuse) the dashboard daemon
+### 5. Open the cockpit
 
-The trail is only useful if the user can see it, so bring up the dashboard. Run it as a
-background task — it's a long-lived server that would otherwise block:
+The trail is only useful if the user can see it, so open the dashboard. When this
+session was launched with the cockpit channel, the daemon is **already running** —
+the channel MCP starts it (headless, no browser). Either way, run:
 
 ```bash
 bun <plugin-root>/skills/cockpit/scripts/cockpit-server.ts
 ```
 
-Then tell the user the URL it prints (default `http://localhost:5858`). See **The
-dashboard daemon** below for how it behaves — most importantly, it's a singleton,
-so running this when one is already up is harmless (it just reprints the URL).
+This is an idempotent **ensure + open**: if the daemon is already up it just
+opens the browser and exits; if it isn't (a Codex session, or Claude launched
+without the channel flag) it starts the daemon and opens the browser. Run it as a
+background task — on a cold start the daemon is long-lived and would otherwise
+block. Then tell the user the URL (default `http://localhost:5858`). See **The
+dashboard daemon** below.
 
 ## The dashboard daemon
 
 One daemon serves every project's cockpit; you don't run a server per session.
 
 - **Singleton, idempotent.** A PID file at `~/.cockpit/daemon.json` tracks the
-  live instance. Starting it again detects the running daemon, prints its URL,
-  and exits `0`.
+  live instance. Starting it again detects the running daemon, opens the browser,
+  prints its URL, and exits `0` — so re-running always lands the user on the
+  cockpit, even when the daemon was started headless by the channel MCP.
 - **Binds `127.0.0.1:5858`.** Override with `--port <n>`; pass `--no-open` to
-  skip auto-opening the browser.
+  skip opening the browser (the channel MCP starts the daemon this way).
 - **It will not kill a foreign process.** If port 5858 is held by something that
   isn't a cockpit daemon, it exits `1` with a clear message — re-run with
   `--port <n>`.

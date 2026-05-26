@@ -46,6 +46,25 @@ function parsePort(): number {
 
 const NO_OPEN = process.argv.includes("--no-open");
 
+// Open the URL in the default browser. Called both on a fresh bind and when we
+// reuse an already-running server, so re-running the skill always lands the user
+// on the dashboard even when the daemon was started headless (e.g. --no-open).
+function openBrowser(url: string): void {
+  if (NO_OPEN) return;
+  const opener =
+    process.platform === "darwin"
+      ? "open"
+      : process.platform === "win32"
+        ? "cmd"
+        : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  try {
+    spawn(opener, args, { detached: true, stdio: "ignore" }).unref();
+  } catch {
+    // ignore — URL already printed
+  }
+}
+
 // ---------- PID-file reuse ----------
 
 function readAtlasInfo(): AtlasInfo | null {
@@ -96,6 +115,7 @@ function startupGuard(): void {
     console.log(
       `Claude Stats Dashboard already running → http://localhost:${info.port} (pid ${info.pid})`,
     );
+    openBrowser(`http://localhost:${info.port}`);
     process.exit(0);
   }
   if (decision.action === "supersede") {
@@ -226,18 +246,4 @@ writeAtlasInfo({
 
 const url = `http://localhost:${server.port}`;
 console.log(`Claude Stats Dashboard → ${url}`);
-
-if (!NO_OPEN) {
-  const opener =
-    process.platform === "darwin"
-      ? "open"
-      : process.platform === "win32"
-        ? "cmd"
-        : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
-  try {
-    spawn(opener, args, { detached: true, stdio: "ignore" }).unref();
-  } catch {
-    // ignore — URL already printed
-  }
-}
+openBrowser(url);
