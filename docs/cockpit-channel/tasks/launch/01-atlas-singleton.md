@@ -51,17 +51,17 @@ duplicate the small helpers.
 
 ## Acceptance criteria
 
-- [ ] Starting `atlas-server.ts` twice from the same install: the second prints the running URL and exits 0 (no double-bind, no kill).
-- [ ] A stale PID (dead process) → starts fresh.
-- [ ] A live instance from a different `root` → supersedes (terminates old, binds).
-- [ ] A foreign (non-atlas) process on port 5938 → exits 1 with a clear message (does not kill it).
-- [ ] `--port` / `--no-open` still work.
-- [ ] `~/.cockpit/atlas.json` is written on bind.
+- [x] Starting `atlas-server.ts` twice from the same install: the second prints the running URL and exits 0 (no double-bind, no kill).
+- [x] A stale PID (dead process) → starts fresh.
+- [x] A live instance from a different `root` → supersedes (terminates old, binds).
+- [x] A foreign (non-atlas) process on port 5938 → exits 1 with a clear message (does not kill it).
+- [x] `--port` / `--no-open` still work.
+- [x] `~/.cockpit/atlas.json` is written on bind.
 
 ## Verification
 
-- [ ] If you extracted `atlas-lifecycle.ts`: `bun test packages/monitor/skills/usage-dashboard/scripts/atlas-lifecycle.test.ts` green (mirror `daemon-lifecycle` tests if cockpit has them).
-- [ ] Manual: `bun .../atlas-server.ts --no-open` then again in another shell → second exits 0 with "already running"; `cat ~/.cockpit/atlas.json` shows pid/port.
+- [x] If you extracted `atlas-lifecycle.ts`: `bun test packages/monitor/skills/usage-dashboard/scripts/atlas-lifecycle.test.ts` green (mirror `daemon-lifecycle` tests if cockpit has them).
+- [x] Manual: `bun .../atlas-server.ts --no-open` then again in another shell → second exits 0 with "already running"; `cat ~/.cockpit/atlas.json` shows pid/port.
 
 ## Out of scope
 

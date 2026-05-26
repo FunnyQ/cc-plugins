@@ -2,16 +2,28 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import {
+  execFileSync,
+  spawn,
+  type ChildProcess,
+  type SpawnOptions,
+} from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { findSession } from "./find-session";
 
 export type DaemonCoords = { port: number; token: string };
 export type ProcessInfo = { pid: number; port: number };
+type SpawnImpl = (
+  command: string,
+  args: string[],
+  options: SpawnOptions,
+) => ChildProcess;
+const UUID_RE = /^[0-9a-f-]{36}$/;
 type ChannelServer = Server & {
   notification(input: {
     method: string;
@@ -95,9 +107,10 @@ export function ensureServer(
   scriptPath: string,
   infoPath: string,
   alive: (pid: number) => boolean = isAlive,
+  spawnImpl: SpawnImpl = spawn,
 ): boolean {
   if (isUp(infoPath, alive)) return false;
-  spawn("bun", [scriptPath, "--no-open"], {
+  spawnImpl("bun", [scriptPath, "--no-open"], {
     detached: true,
     stdio: "ignore",
   }).unref();
@@ -109,6 +122,72 @@ export function channelNotification(text: string) {
     method: "notifications/claude/channel",
     params: { content: text, meta: { source: "cockpit" } },
   };
+}
+
+export function sessionIdFromCommand(command: string): string | null {
+  const parts = command.match(/(?:[^\s"']+|["'][^"']*["'])+/g) ?? [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i].replace(/^["']|["']$/g, "");
+    if (part === "--session-id") {
+      const next = (parts[i + 1] || "").replace(/^["']|["']$/g, "");
+      return UUID_RE.test(next) ? next : null;
+    }
+    const m = part.match(/^--session-id=([0-9a-f-]{36})$/);
+    if (m && UUID_RE.test(m[1])) return m[1];
+  }
+  return null;
+}
+
+function processField(pid: number, field: "ppid" | "command"): string | null {
+  try {
+    return execFileSync("ps", ["-o", `${field}=`, "-p", String(pid)], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function sessionIdFromAncestors(startPid = process.ppid): string | null {
+  let pid = startPid;
+  for (let i = 0; i < 8 && pid > 1; i++) {
+    const command = processField(pid, "command");
+    if (command) {
+      const id = sessionIdFromCommand(command);
+      if (id) return id;
+    }
+    const parent = Number(processField(pid, "ppid"));
+    if (!Number.isFinite(parent) || parent === pid) return null;
+    pid = parent;
+  }
+  return null;
+}
+
+export async function resolveClaudeSessionId(
+  opts: {
+    project?: string;
+    timeoutMs?: number;
+    finder?: (provider: "claude", project: string) => string | null;
+    ancestorFinder?: () => string | null;
+  } = {},
+): Promise<string | null> {
+  const fromEnv = process.env.CLAUDE_CODE_SESSION_ID?.trim();
+  if (fromEnv && UUID_RE.test(fromEnv)) return fromEnv;
+
+  const fromAncestors = (opts.ancestorFinder ?? sessionIdFromAncestors)();
+  if (fromAncestors) return fromAncestors;
+
+  const project =
+    opts.project ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+  const finder = opts.finder ?? findSession;
+  const deadline = Date.now() + (opts.timeoutMs ?? 3000);
+  while (Date.now() < deadline) {
+    const found = finder("claude", project);
+    if (found) return found;
+    await Bun.sleep(100);
+  }
+  return finder("claude", project);
 }
 
 export async function postReply(opts: {
@@ -158,7 +237,7 @@ export function createMcpServer(opts: {
     const args = (req.params.arguments ?? {}) as { text?: unknown };
     const text = typeof args.text === "string" ? args.text.trim() : "";
     if (!text) throw new Error("reply.text is required");
-    if (!opts.sessionId) throw new Error("CLAUDE_CODE_SESSION_ID is missing");
+    if (!opts.sessionId) throw new Error("Claude session id is unavailable");
     const coords = opts.coords();
     if (!coords) throw new Error("cockpit daemon is unavailable");
     await postReply({
@@ -190,11 +269,11 @@ async function waitForDaemonCoords(
 ): Promise<DaemonCoords | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const coords = readDaemonCoords();
+    const coords = isUp(daemonInfoPath()) ? readDaemonCoords() : null;
     if (coords) return coords;
     await Bun.sleep(100);
   }
-  return readDaemonCoords();
+  return isUp(daemonInfoPath()) ? readDaemonCoords() : null;
 }
 
 async function ensureMonitorServers(): Promise<DaemonCoords | null> {
@@ -239,10 +318,10 @@ async function pullInboxLoop(opts: {
 }
 
 async function main(): Promise<void> {
-  const sessionId = process.env.CLAUDE_CODE_SESSION_ID || null;
+  const sessionId = await resolveClaudeSessionId();
   if (!sessionId) {
     console.error(
-      "cockpit-channel: CLAUDE_CODE_SESSION_ID is missing; channel will stay idle",
+      "cockpit-channel: could not resolve a Claude session id; channel will stay idle",
     );
   }
 

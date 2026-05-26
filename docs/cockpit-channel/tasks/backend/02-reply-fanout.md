@@ -55,16 +55,16 @@ if (url.pathname === "/api/reply/stream") return handleReplyStream(req);
 
 ## Acceptance criteria
 
-- [ ] `POST /api/reply` fans `text` to every open `/api/reply/stream` subscriber for that session and returns `{ delivered: <count> }`.
-- [ ] A reply with no subscribers returns `{ delivered: 0 }` and does not error.
-- [ ] The SSE removes its subscriber on client disconnect (no leak).
-- [ ] Token/session validation matches the contract (401/400).
-- [ ] No file is created anywhere by this path.
+- [x] `POST /api/reply` fans `text` to every open `/api/reply/stream` subscriber for that session and returns `{ delivered: <count> }`.
+- [x] A reply with no subscribers returns `{ delivered: 0 }` and does not error.
+- [x] The SSE removes its subscriber on client disconnect (no leak).
+- [x] Token/session validation matches the contract (401/400).
+- [x] No file is created anywhere by this path.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/reply-fanout.test.ts` green (a test can register a fake sub via the exported handler and assert it receives the text).
-- [ ] Manual: `curl -N 'localhost:5858/api/reply/stream?session=<uuid>&token=<t>'` then `curl -XPOST localhost:5858/api/reply -d '{"session":"<uuid>","text":"hello","token":"<t>"}'` → the first stream prints `data: {"text":"hello"}`.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/reply-fanout.test.ts` green (a test can register a fake sub via the exported handler and assert it receives the text).
+- [x] Manual: `curl -N 'localhost:5858/api/reply/stream?session=<uuid>&token=<t>'` then `curl -XPOST localhost:5858/api/reply -d '{"session":"<uuid>","text":"hello","token":"<t>"}'` → the first stream prints `data: {"text":"hello"}`.
 
 ## Out of scope
 

@@ -52,15 +52,15 @@ inbox map, so no provider special-casing is needed here.
 
 ## Acceptance criteria
 
-- [ ] `sessionsPayload()` items include `channel: boolean`.
-- [ ] `channel` is `true` exactly when that session has a parked inbox poll, `false` otherwise.
-- [ ] The `SessionView` type documents the field.
-- [ ] Existing registry tests still pass; a new test covers `channel` true/false.
+- [x] `sessionsPayload()` items include `channel: boolean`.
+- [x] `channel` is `true` exactly when that session has a parked inbox poll, `false` otherwise.
+- [x] The `SessionView` type documents the field.
+- [x] Existing registry tests still pass; a new test covers `channel` true/false.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/registry.test.ts` green.
-- [ ] Manual: with a parked `/api/inbox` poll for a known session, `curl -s localhost:5858/api/sessions | jq '.sessions[] | {sessionId, channel}'` shows `channel: true` for it.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/registry.test.ts` green.
+- [x] Manual: with a parked `/api/inbox` poll for a known session, `curl -s localhost:5858/api/sessions | jq '.sessions[] | {sessionId, channel}'` shows `channel: true` for it.
 
 ## Out of scope
 

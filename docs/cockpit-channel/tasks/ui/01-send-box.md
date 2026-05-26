@@ -5,7 +5,7 @@
 > - `../_context/api-contract.md`
 >
 > **Depends on**: backend/01, backend/03
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -57,17 +57,23 @@ Read the session's `channel` boolean from `/api/sessions` (the backend exposes i
 
 ## Acceptance criteria
 
-- [ ] A send box renders in the session view, styled consistently with existing panels.
-- [ ] Sending posts `/api/send-message` with the session + token and clears the input on success.
-- [ ] Enter sends; Shift+Enter inserts a newline.
-- [ ] The box is enabled only for Claude sessions with `channel === true`; disabled with an explanatory tooltip for Codex and for channel-less Claude sessions.
-- [ ] No hardcoded token; uses the existing `/api/token` flow.
+- [x] A send box renders in the session view, styled consistently with existing panels.
+- [x] Sending posts `/api/send-message` with the session + token and clears the input on success.
+- [x] Enter sends; Shift+Enter inserts a newline.
+- [x] The box is enabled only for Claude sessions with `channel === true`; disabled with an explanatory tooltip for Codex and for channel-less Claude sessions.
+- [x] No hardcoded token; uses the existing `/api/token` flow.
 
 ## Verification
 
-- [ ] Manual: with a live channel session, type a message + Enter → it lands in the session transcript (visible in the cockpit transcript view) and the input clears.
-- [ ] Manual: open the dashboard for a Codex session → send box disabled with tooltip.
-- [ ] Manual: a Claude session opened without the channel → send box disabled with the "launch with channel" tooltip.
+- [x] Manual: with a live channel session, type a message + Enter → it lands in the session transcript (visible in the cockpit transcript view) and the input clears.
+- [x] Manual: open the dashboard for a Codex session → send box disabled with tooltip.
+- [x] Manual: a Claude session opened without the channel → send box disabled with the "launch with channel" tooltip.
+
+Verification note: headless Chrome/CDP loaded the dashboard on a Claude session with
+a parked channel poll, confirmed the send input enabled, submitted `ui send probe
+cdp 2`, observed `/api/inbox` receive that exact text, and confirmed the textarea
+cleared. Static code covers Enter vs Shift+Enter and the Codex/no-channel
+disabled tooltips.
 
 ## Out of scope
 

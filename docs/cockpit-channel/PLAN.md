@@ -51,7 +51,7 @@ usage-dashboard server (`atlas-server.ts`, port 5938, currently no singleton).
 2. **Reply fan-out** — agent replies reach the UI live.
    - Acceptance: `POST /api/reply` fans to subscribers of a reply SSE; ephemeral (no file).
 3. **Channel server** — `cockpit-channel.ts` injects inbound and exposes `reply`.
-   - Acceptance: UI text appears in the live session transcript; `reply` reaches the UI; **verified that `CLAUDE_CODE_SESSION_ID` reaches the child and `mcp.notification` lands in the transcript**.
+   - Acceptance: UI text appears in the live session transcript; `reply` reaches the UI; session-id resolution is verified and `mcp.notification` lands in the transcript.
 4. **Auto-start + reconnect** — the channel brings up cockpit + usage-dashboard and survives a daemon restart.
    - Acceptance: launching with no daemon running brings both up; killing the daemon mid-session reconnects/respawns without wedging.
 5. **Atlas singleton** — `atlas-server.ts` is idempotently startable.
@@ -76,7 +76,7 @@ usage-dashboard server (`atlas-server.ts`, port 5938, currently no singleton).
 ```
 cockpit UI ──POST /api/send-message──▶ daemon (singleton) ◀──GET /api/inbox (long-poll)── cockpit-channel.ts ── mcp.notification ──▶ running Claude session
    ▲                                       │                                                    ▲                                         │
-   │                                       │                                          reads CLAUDE_CODE_SESSION_ID                        │
+   │                                       │                               resolves session id from env / ancestor argv / transcript      │
    └─ reply strip ◀─ SSE fan ◀─ POST /api/reply ◀───────────────── reply tool ◀── Claude calls reply ◀──────────────── agent answers ─────┘
                                                           (agent answer ALSO lands in transcript — cockpit already renders it)
 ```
@@ -105,11 +105,11 @@ cockpit UI ──POST /api/send-message──▶ daemon (singleton) ◀──GET
 | backend | 02 | reply-fanout | done | — |
 | backend | 03 | session-channel-flag | done | backend/01 |
 | launch | 01 | atlas-singleton | done | — |
-| launch | 02 | channel-server | in-progress | backend/01, backend/02 |
-| launch | 03 | autostart-reconnect | in-progress | launch/01, launch/02 |
-| launch | 04 | register-and-launcher | in-progress | launch/02 |
-| ui | 01 | send-box | in-progress | backend/01, backend/03 |
-| ui | 02 | reply-strip | in-progress | backend/02 |
+| launch | 02 | channel-server | done | backend/01, backend/02 |
+| launch | 03 | autostart-reconnect | done | launch/01, launch/02 |
+| launch | 04 | register-and-launcher | done | launch/02 |
+| ui | 01 | send-box | done | backend/01, backend/03 |
+| ui | 02 | reply-strip | done | backend/02 |
 
 ## Cross-bucket dependencies
 

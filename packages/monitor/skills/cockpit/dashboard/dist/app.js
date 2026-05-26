@@ -18,7 +18,8 @@ const HERO_AUTO_COLLAPSE_MS = 60_000;
 const REPLY_LIMIT = 50;
 
 let _tokenPromise = null;
-function getToken() {
+function getToken(force = false) {
+  if (force) _tokenPromise = null;
   if (!_tokenPromise) {
     _tokenPromise = fetch("/api/token")
       .then((r) => r.json())
@@ -26,6 +27,10 @@ function getToken() {
       .catch(() => null);
   }
   return _tokenPromise;
+}
+
+function resetToken() {
+  _tokenPromise = null;
 }
 
 function sortActiveFirst(sessions) {
@@ -72,8 +77,10 @@ export const store = reactive({
   channelSending: false,
   channelError: "",
   channelReplies: [],
+  replyStreamStatus: "idle",
   _replyStream: null,
   _replyStreamKey: "",
+  _replyStreamRetry: null,
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -151,10 +158,33 @@ export const store = reactive({
 
   get channelDisabledTitle() {
     const s = this.selectedSession;
-    if (!s) return "Select a Claude session";
+    if (!s) {
+      return this.selectedSessionId
+        ? "Session is not in cockpit manifest"
+        : "Select a Claude session";
+    }
     if (s.provider === "codex") return "Codex has no channel, observe only";
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
+  },
+
+  get replyStripCountLabel() {
+    if (this.channelReplies.length) return `${this.channelReplies.length} live`;
+    if (this.replyStreamStatus === "reconnecting") return "reconnecting";
+    if (this.replyStreamStatus === "connecting") return "connecting";
+    if (this.selectedSessionId) return "listening";
+    return "standby";
+  },
+
+  get replyStripEmptyLabel() {
+    if (!this.selectedSessionId) return "Select a session.";
+    if (this.replyStreamStatus === "reconnecting") {
+      return "Reconnecting to cockpit replies.";
+    }
+    if (this.replyStreamStatus === "connecting") {
+      return "Connecting to cockpit replies.";
+    }
+    return "No cockpit replies.";
   },
 
   get channelSendDisabled() {
@@ -276,9 +306,9 @@ export const store = reactive({
     this.channelSending = true;
     this.channelError = "";
     try {
-      const token = await getToken();
+      let token = await getToken();
       if (!token) throw new Error("token unavailable");
-      const r = await fetch("/api/send-message", {
+      let r = await fetch("/api/send-message", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -287,6 +317,19 @@ export const store = reactive({
           token,
         }),
       });
+      if (r.status === 401) {
+        token = await getToken(true);
+        if (!token) throw new Error("token unavailable");
+        r = await fetch("/api/send-message", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            session: this.selectedSessionId,
+            text,
+            token,
+          }),
+        });
+      }
       if (!r.ok) throw new Error(`send failed: ${r.status}`);
       this.channelMessage = "";
     } catch (e) {
@@ -303,14 +346,19 @@ export const store = reactive({
   },
 
   closeReplyStream() {
+    if (this._replyStreamRetry) {
+      clearTimeout(this._replyStreamRetry);
+      this._replyStreamRetry = null;
+    }
     if (this._replyStream) {
       this._replyStream.close();
       this._replyStream = null;
     }
     this._replyStreamKey = "";
+    this.replyStreamStatus = "idle";
   },
 
-  async openReplyStream() {
+  async openReplyStream(force = false) {
     const sessionId = this.selectedSessionId;
     const provider = this.selectedProvider || "claude";
     const key = sessionId ? `${provider}:${sessionId}` : "";
@@ -319,16 +367,20 @@ export const store = reactive({
       this.channelReplies = [];
       return;
     }
-    if (this._replyStreamKey === key) return;
+    if (!force && this._replyStreamKey === key) return;
     this.closeReplyStream();
-    this.channelReplies = [];
+    if (!force) this.channelReplies = [];
     const token = await getToken();
     if (!token || this.selectedSessionId !== sessionId) return;
+    this.replyStreamStatus = "connecting";
     const es = new EventSource(
       `/api/reply/stream?session=${sessionId}&token=${encodeURIComponent(token)}`,
     );
     this._replyStream = es;
     this._replyStreamKey = key;
+    es.onopen = () => {
+      if (this._replyStreamKey === key) this.replyStreamStatus = "listening";
+    };
     es.onmessage = (e) => {
       try {
         const { text } = JSON.parse(e.data);
@@ -350,6 +402,24 @@ export const store = reactive({
       } catch {
         // ignore malformed stream events
       }
+    };
+    es.onerror = () => {
+      if (this._replyStream !== es) return;
+      es.close();
+      this._replyStream = null;
+      this._replyStreamKey = "";
+      this.replyStreamStatus = "reconnecting";
+      resetToken();
+      if (this._replyStreamRetry) clearTimeout(this._replyStreamRetry);
+      this._replyStreamRetry = window.setTimeout(() => {
+        this._replyStreamRetry = null;
+        if (
+          this.selectedSessionId === sessionId &&
+          (this.selectedProvider || "claude") === provider
+        ) {
+          this.openReplyStream(true);
+        }
+      }, 1500);
     };
   },
 
@@ -456,6 +526,7 @@ export const store = reactive({
       if (!this.selectedSessionId && this.sessions.length) {
         this.selectSession(this.sessions[0]);
       }
+      this.openReplyStream();
       this.loaded = true;
     } catch (e) {
       console.error("cockpit: fetchSessions failed", e);

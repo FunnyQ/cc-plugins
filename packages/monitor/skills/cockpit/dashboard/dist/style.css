@@ -1100,6 +1100,12 @@ body {
   margin-inline-start: auto;
   font-size: 10px;
 }
+.reply-strip__count.is-reconnecting {
+  color: var(--signal);
+}
+.reply-strip__count.is-listening {
+  color: var(--aurora);
+}
 .reply-strip__list {
   display: grid;
   gap: 4px;

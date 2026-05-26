@@ -5,7 +5,7 @@
 > - `../_context/api-contract.md`
 >
 > **Depends on**: launch/01, launch/02
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -59,17 +59,17 @@ one binds; the rest `reuse`), and atlas's singleton guard does the same. So
 
 ## Acceptance criteria
 
-- [ ] Launching a session with the channel while **no** daemon is running brings up both cockpit (5858) and usage-dashboard (5938) automatically.
-- [ ] With daemons already up, the channel does **not** spawn duplicates (reuse path).
-- [ ] Killing the cockpit daemon mid-session: the pull loop reconnects (re-ensures + re-reads coords) and resumes without manual intervention; no busy-spin (backoff present).
-- [ ] A rotated daemon token (after supersede) is picked up on reconnect.
-- [ ] `--no-open` is passed so auto-start doesn't spam browser tabs.
+- [x] Launching a session with the channel while **no** daemon is running brings up both cockpit (5858) and usage-dashboard (5938) automatically.
+- [x] With daemons already up, the channel does **not** spawn duplicates (reuse path).
+- [x] Killing the cockpit daemon mid-session: the pull loop reconnects (re-ensures + re-reads coords) and resumes without manual intervention; no busy-spin (backoff present).
+- [x] A rotated daemon token (after supersede) is picked up on reconnect.
+- [x] `--no-open` is passed so auto-start doesn't spam browser tabs.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/cockpit-channel.test.ts` green (the `isUp` / coord-read logic).
-- [ ] Manual: with nothing running, launch `claude --dangerously-load-development-channels server:cockpit-channel`; confirm `curl -s localhost:5858/api/sessions` and `curl -s localhost:5938/api/stats` both respond.
-- [ ] Manual: `kill` the cockpit daemon pid mid-session, send a UI message a few seconds later → it still gets delivered (channel respawned/reconnected).
+- [x] `bun test packages/monitor/skills/cockpit/scripts/cockpit-channel.test.ts` green (the `isUp` / coord-read logic).
+- [x] Manual: with nothing running, launch `claude --dangerously-load-development-channels server:cockpit-channel`; confirm `curl -s localhost:5858/api/sessions` and `curl -s localhost:5938/api/stats` both respond.
+- [x] Manual: `kill` the cockpit daemon pid mid-session, send a UI message a few seconds later → it still gets delivered (channel respawned/reconnected). Observed pid/token rotation from `68335`/`2c14...` to `69019`/`3541...`; the first post-restart send was stashed during reconnect and then appeared in the transcript, and the next send returned `{"delivered":true}`.
 
 ## Out of scope
 

@@ -214,7 +214,8 @@
                 <span class="reply-strip__legend">Agent → Cockpit</span>
                 <span
                   class="reply-strip__count readout"
-                  v-text="channelReplies.length ? channelReplies.length + ' live' : 'standby'"
+                  :class="'is-' + replyStreamStatus"
+                  v-text="replyStripCountLabel"
                 ></span>
               </div>
               <ol class="reply-strip__list" v-if="channelReplies.length">
@@ -227,7 +228,11 @@
                   <span class="reply-strip__text" v-text="reply.text"></span>
                 </li>
               </ol>
-              <p class="reply-strip__empty" v-else>No cockpit replies.</p>
+              <p
+                class="reply-strip__empty"
+                v-else
+                v-text="replyStripEmptyLabel"
+              ></p>
             </div>
 
             <form class="channel-send" @submit.prevent="sendChannelMessage()">

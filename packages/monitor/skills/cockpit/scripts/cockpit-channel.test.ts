@@ -4,11 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   channelNotification,
+  ensureServer,
   isUp,
   postReply,
   readDaemonCoords,
   readProcessInfo,
   REPLY_TOOL,
+  resolveClaudeSessionId,
+  sessionIdFromCommand,
 } from "./cockpit-channel";
 
 const SID = "cccccccc-3333-3333-3333-333333333333";
@@ -42,6 +45,81 @@ describe("daemon coords", () => {
     expect(readProcessInfo(path)).toEqual({ pid: 123, port: 5938 });
     expect(isUp(path, (pid) => pid === 123)).toBe(true);
     expect(isUp(path, () => false)).toBe(false);
+  });
+
+  test("ensureServer reuses live process and spawns stale process with --no-open", () => {
+    const path = join(dir, "daemon.json");
+    writeFileSync(path, JSON.stringify({ pid: 123, port: 5858 }));
+    const calls: any[] = [];
+    const spawnImpl = (command: string, args: string[], options: any) => {
+      calls.push({ command, args, options });
+      return { unref() {} } as any;
+    };
+
+    expect(ensureServer("/tmp/server.ts", path, () => true, spawnImpl)).toBe(
+      false,
+    );
+    expect(calls).toEqual([]);
+
+    expect(ensureServer("/tmp/server.ts", path, () => false, spawnImpl)).toBe(
+      true,
+    );
+    expect(calls).toEqual([
+      {
+        command: "bun",
+        args: ["/tmp/server.ts", "--no-open"],
+        options: { detached: true, stdio: "ignore" },
+      },
+    ]);
+  });
+});
+
+describe("session resolution", () => {
+  test("uses CLAUDE_CODE_SESSION_ID when present", async () => {
+    process.env.CLAUDE_CODE_SESSION_ID = SID;
+    try {
+      const resolved = await resolveClaudeSessionId({
+        finder: () => {
+          throw new Error("finder should not run");
+        },
+      });
+      expect(resolved).toBe(SID);
+    } finally {
+      delete process.env.CLAUDE_CODE_SESSION_ID;
+    }
+  });
+
+  test("falls back to the Claude session finder", async () => {
+    delete process.env.CLAUDE_CODE_SESSION_ID;
+    const resolved = await resolveClaudeSessionId({
+      project: "/tmp/project",
+      timeoutMs: 1,
+      ancestorFinder: () => null,
+      finder: (provider, project) => {
+        expect(provider).toBe("claude");
+        expect(project).toBe("/tmp/project");
+        return SID;
+      },
+    });
+    expect(resolved).toBe(SID);
+  });
+
+  test("parses --session-id from command text", () => {
+    expect(sessionIdFromCommand(`claude --session-id ${SID} --debug`)).toBe(
+      SID,
+    );
+    expect(sessionIdFromCommand(`claude --session-id=${SID} --debug`)).toBe(
+      SID,
+    );
+  });
+
+  test("ancestor session id outranks transcript fallback", async () => {
+    delete process.env.CLAUDE_CODE_SESSION_ID;
+    const resolved = await resolveClaudeSessionId({
+      ancestorFinder: () => SID,
+      finder: () => "dddddddd-4444-4444-4444-444444444444",
+    });
+    expect(resolved).toBe(SID);
   });
 });
 

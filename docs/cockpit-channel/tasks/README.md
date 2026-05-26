@@ -58,11 +58,11 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 | backend | 02 | Reply fan-out (agent → UI) | done | — |
 | backend | 03 | Session `channel` flag | done | backend/01 |
 | launch | 01 | usage-dashboard singleton guard | done | — |
-| launch | 02 | Channel MCP server | in-progress | backend/01, backend/02 |
-| launch | 03 | Auto-start daemons + reconnect | in-progress | launch/01, launch/02 |
-| launch | 04 | Registration + launcher | in-progress | launch/02 |
-| ui | 01 | Send box (UI → agent) | in-progress | backend/01, backend/03 |
-| ui | 02 | Reply strip (agent → UI) | in-progress | backend/02 |
+| launch | 02 | Channel MCP server | done | backend/01, backend/02 |
+| launch | 03 | Auto-start daemons + reconnect | done | launch/01, launch/02 |
+| launch | 04 | Registration + launcher | done | launch/02 |
+| ui | 01 | Send box (UI → agent) | done | backend/01, backend/03 |
+| ui | 02 | Reply strip (agent → UI) | done | backend/02 |
 
 ## Dependency graphs
 
@@ -105,19 +105,20 @@ ui/02  <-  (start)
 
 <!-- Human-authored. List unresolved decisions or upstream blockers here. -->
 
-1. **Env-var reach (verify in `launch/02`)** — the whole design assumes
-   `CLAUDE_CODE_SESSION_ID` is present in the channel child's env when Claude Code
-   spawns it. If it isn't, the channel can't know which session it serves and we
-   need an alternate handle. This is the single biggest risk; verify first.
-2. **Transcript serialization shape (verify in `launch/02`)** — we assume a
-   `<channel>` injection and a `reply` tool call appear in the session transcript
-   jsonl in a shape the existing transcript renderer handles. Note the observed
-   shape; it informs whether `ui/02`'s reply strip can/should fall back to
-   filtering the transcript stream.
+1. **Env-var reach (verified in `launch/02`)** — Claude Code `2.1.150` does not
+   expose `CLAUDE_CODE_SESSION_ID` to the channel child. The channel now resolves
+   the session from ancestor process commands (`--session-id`) before falling back
+   to the local transcript finder.
+2. **Transcript serialization shape (verified in `launch/02`)** — channel
+   injections appear as a `type:"user"` transcript entry whose message string is
+   `<channel source="cockpit-channel" source="cockpit">...</channel>`. Agent
+   replies appear as an assistant `tool_use` named `mcp__cockpit-channel__reply`.
 3. **Reply display vs transcript (open question)** — `ui/02` defaults to a
-   dedicated reply SSE strip. Pending the `launch/02` finding above, it may be
-   downgraded to a transcript filter. Not a blocker; default stands.
+   dedicated reply SSE strip. The transcript also records the reply tool call,
+   but the focused SSE strip remains the primary UI until product feedback says
+   transcript filtering is enough.
 4. **Research preview volatility** — channels require Claude Code ≥ 2.1.80 and can
    change/break while in preview. Pinned, not worked around.
-5. **Daemon death mid-session** — `launch/03` must reconnect/respawn without
-   wedging the pull loop; covered there, flagged here for visibility.
+5. **Daemon death mid-session (verified in `launch/03`)** — killing the cockpit
+   daemon while a channel session was active caused the channel to respawn it,
+   pick up the rotated token, drain a stashed send, and accept the next live send.
