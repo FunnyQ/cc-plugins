@@ -412,12 +412,50 @@ export function initDecisionLog(rootEl) {
 
   function resolveCallCard(card, answer, detail = "") {
     hideRespond(card); // answered → retire the buttons
+
+    // Split the stored answer into the picked option and any extra free-text.
+    // composeAnswer encodes the combined case ("Selected option: …\n\nAdditional
+    // instructions:\n…"); an option-only answer is the bare option string;
+    // anything else is a pure free-text answer.
+    const opts = card.querySelector(".decision-card__options");
+    const lis = opts ? [...opts.querySelectorAll("li")] : [];
+    let option = "";
+    let instructions = "";
+    const combined = (answer || "").match(
+      /^Selected option:\s*([\s\S]*?)\n\nAdditional instructions:\n([\s\S]*)$/,
+    );
+    if (combined) {
+      option = combined[1].trim();
+      instructions = combined[2].trim();
+    } else {
+      const a = (answer || "").trim();
+      if (lis.some((li) => li.textContent.trim() === a)) option = a;
+      else instructions = a;
+    }
+
+    // The picked option pops in the read-only list with a positive tick — the
+    // warmth retreats once the pilot has acted.
+    if (option) {
+      const pick = lis.find((li) => li.textContent.trim() === option);
+      if (pick) pick.classList.add("is-chosen");
+    }
+
+    // The answer box only earns its space when it carries something the
+    // highlighted option can't: extra instructions, a free-text answer, or a
+    // delivery note. A bare option pick is conveyed by the tick alone.
     const slot = card.querySelector(".decision-card__answer");
-    slot.hidden = false;
-    const suffix = detail
-      ? ` <span class="decision-card__answer-detail">(${esc(detail)})</span>`
-      : "";
-    slot.innerHTML = `<span class="decision-card__answer-label">✅ answered</span>${suffix} ${esc(answer)}`;
+    if (instructions || detail) {
+      slot.hidden = false;
+      const suffix = detail
+        ? ` <span class="decision-card__answer-detail">(${esc(detail)})</span>`
+        : "";
+      const body = instructions ? ` ${esc(instructions)}` : "";
+      slot.innerHTML = `<span class="decision-card__answer-label">💬</span>${suffix}${body}`;
+    } else {
+      slot.hidden = true;
+      slot.innerHTML = "";
+    }
+
     card.classList.remove("is-open");
     card.classList.add("is-resolved");
     if (lastOpenCall === card) lastOpenCall = null;
