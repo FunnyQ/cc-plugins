@@ -20,7 +20,12 @@ export function decideStartup(
   myRoot: string,
   isAlive: (pid: number) => boolean,
 ): StartupDecision {
-  if (!info || typeof info.pid !== "number" || !isAlive(info.pid)) {
+  if (
+    !info ||
+    typeof info.pid !== "number" ||
+    typeof info.root !== "string" ||
+    !isAlive(info.pid)
+  ) {
     return { action: "start" };
   }
   const full = info as AtlasInfo;

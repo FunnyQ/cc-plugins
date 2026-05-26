@@ -117,6 +117,11 @@ export function ensureServer(
   return true;
 }
 
+export function nextReconnectDelayMs(failureCount: number): number {
+  const capped = Math.min(Math.max(failureCount, 0), 5);
+  return Math.min(1000 * 2 ** capped, 30_000);
+}
+
 export function channelNotification(text: string) {
   return {
     method: "notifications/claude/channel",
@@ -291,10 +296,15 @@ async function pullInboxLoop(opts: {
 }): Promise<void> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   let coords = opts.coords();
+  let failures = 0;
   while (true) {
     if (!coords) coords = await opts.ensure();
     if (!coords) {
-      await Bun.sleep(1000);
+      const delay = nextReconnectDelayMs(failures++);
+      console.error(
+        `cockpit-channel: cockpit daemon unavailable; retrying in ${delay}ms`,
+      );
+      await Bun.sleep(delay);
       continue;
     }
 
@@ -304,15 +314,17 @@ async function pullInboxLoop(opts: {
       );
       if (!r.ok) throw new Error(`inbox failed: ${r.status}`);
       const body = (await r.json()) as { message?: unknown };
+      failures = 0;
       if (typeof body.message === "string" && body.message !== "") {
         await opts.mcp.notification(channelNotification(body.message));
       }
     } catch (err) {
+      const delay = nextReconnectDelayMs(failures++);
       console.error(
-        `cockpit-channel: inbox poll failed (${(err as Error).message}); reconnecting`,
+        `cockpit-channel: inbox poll failed (${(err as Error).message}); reconnecting in ${delay}ms`,
       );
       coords = await opts.ensure();
-      await Bun.sleep(1000);
+      await Bun.sleep(delay);
     }
   }
 }

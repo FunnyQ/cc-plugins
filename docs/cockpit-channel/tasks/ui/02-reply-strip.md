@@ -27,9 +27,14 @@ near the send box ("agent → you"), distinct from the dense transcript.
 ### Subscribe to the reply SSE
 
 ```js
-function openReplyStream(sessionId) {
+async function openReplyStream(sessionId) {
   const token = currentToken;               // from the existing /api/token flow
-  const es = new EventSource(`/api/reply/stream?session=${sessionId}&token=${token}`);
+  const { ticket } = await fetch("/api/reply-ticket", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session: sessionId, token }),
+  }).then((r) => r.json());
+  const es = new EventSource(`/api/reply/stream?session=${sessionId}&ticket=${ticket}`);
   es.onmessage = (e) => {
     const { text } = JSON.parse(e.data);    // { text: "..." }
     appendReply(text);
@@ -38,9 +43,9 @@ function openReplyStream(sessionId) {
 }
 ```
 
-- `EventSource` can't set headers, so the token goes in the query string (the endpoint accepts it there — see api-contract). The daemon is loopback-only.
+- `EventSource` can't set headers, so the UI uses the existing token flow only to POST for a short-lived `/api/reply-ticket`; the EventSource URL carries that ticket, not the daemon token.
 - Append each reply with a timestamp; keep a bounded list (e.g. last ~50) so a long session doesn't grow unbounded in the DOM.
-- Close the stream when the user navigates away from the session (avoid leaking EventSources, mirror how the transcript/log streams are opened/closed in `app.js`).
+- Close the stream when the user navigates away from the session (avoid leaking EventSources, mirror how the transcript/log streams are opened/closed in `app.js`). On stream errors, refresh the daemon token and mint a new ticket before reconnecting.
 
 ### Relationship to the transcript
 

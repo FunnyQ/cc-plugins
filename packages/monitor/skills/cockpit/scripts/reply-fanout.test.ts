@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   handleReply,
+  handleReplyTicket,
   handleReplyStream,
   subscriberCount,
 } from "./reply-fanout";
@@ -38,8 +39,14 @@ afterEach(() => {
 describe("reply fan-out", () => {
   test("reply fans out to an open SSE subscriber", async () => {
     const ac = new AbortController();
+    const ticket = await handleReplyTicket(
+      req("/api/reply-ticket", {
+        method: "POST",
+        body: JSON.stringify({ session: SID, token: TOKEN }),
+      }),
+    ).then(json);
     const streamRes = handleReplyStream(
-      req(`/api/reply/stream?session=${SID}&token=${TOKEN}`, {
+      req(`/api/reply/stream?session=${SID}&ticket=${ticket.ticket}`, {
         signal: ac.signal,
       }),
     );
@@ -65,6 +72,81 @@ describe("reply fan-out", () => {
     expect(subscriberCount(SID)).toBe(0);
   });
 
+  test("reply stream rejects daemon token in the URL and accepts a short-lived ticket", async () => {
+    expect(
+      handleReplyStream(req(`/api/reply/stream?session=${SID}&token=${TOKEN}`))
+        .status,
+    ).toBe(401);
+
+    const ticket = await handleReplyTicket(
+      req("/api/reply-ticket", {
+        method: "POST",
+        body: JSON.stringify({ session: SID, token: TOKEN }),
+      }),
+    ).then(json);
+    expect(typeof ticket.ticket).toBe("string");
+    expect(ticket.ticket.length).toBeGreaterThan(20);
+
+    const ac = new AbortController();
+    const streamRes = handleReplyStream(
+      req(`/api/reply/stream?session=${SID}&ticket=${ticket.ticket}`, {
+        signal: ac.signal,
+      }),
+    );
+    expect(streamRes.status).toBe(200);
+    ac.abort();
+    await Bun.sleep(10);
+  });
+
+  test("one broken subscriber does not fail the reply or block healthy subscribers", async () => {
+    const brokenAc = new AbortController();
+    const firstTicket = await handleReplyTicket(
+      req("/api/reply-ticket", {
+        method: "POST",
+        body: JSON.stringify({ session: SID, token: TOKEN }),
+      }),
+    ).then(json);
+    const brokenRes = handleReplyStream(
+      req(`/api/reply/stream?session=${SID}&ticket=${firstTicket.ticket}`, {
+        signal: brokenAc.signal,
+      }),
+    );
+    const brokenReader = brokenRes.body!.getReader();
+    await brokenReader.read();
+    await brokenReader.cancel();
+
+    const secondTicket = await handleReplyTicket(
+      req("/api/reply-ticket", {
+        method: "POST",
+        body: JSON.stringify({ session: SID, token: TOKEN }),
+      }),
+    ).then(json);
+    const healthyAc = new AbortController();
+    const healthyRes = handleReplyStream(
+      req(`/api/reply/stream?session=${SID}&ticket=${secondTicket.ticket}`, {
+        signal: healthyAc.signal,
+      }),
+    );
+    const healthyReader = healthyRes.body!.getReader();
+    await healthyReader.read();
+
+    const reply = await handleReply(
+      req("/api/reply", {
+        method: "POST",
+        body: JSON.stringify({ session: SID, text: "hello", token: TOKEN }),
+      }),
+    );
+    expect(reply.status).toBe(200);
+    expect(await json(reply)).toEqual({ delivered: 1 });
+    const chunk = await healthyReader.read();
+    expect(new TextDecoder().decode(chunk.value)).toBe(
+      'data: {"text":"hello"}\n\n',
+    );
+    brokenAc.abort();
+    healthyAc.abort();
+    await Bun.sleep(10);
+  });
+
   test("reply with no subscribers returns delivered zero", async () => {
     const reply = await handleReply(
       req("/api/reply", {
@@ -77,11 +159,27 @@ describe("reply fan-out", () => {
 
   test("validates token, session, and text", async () => {
     expect(
-      handleReplyStream(req(`/api/reply/stream?session=${SID}&token=nope`))
+      await handleReplyTicket(
+        req("/api/reply-ticket", {
+          method: "POST",
+          body: JSON.stringify({ session: SID, token: "nope" }),
+        }),
+      ).then((r) => r.status),
+    ).toBe(401);
+    expect(
+      await handleReplyTicket(
+        req("/api/reply-ticket", {
+          method: "POST",
+          body: JSON.stringify({ session: "bad", token: TOKEN }),
+        }),
+      ).then((r) => r.status),
+    ).toBe(400);
+    expect(
+      handleReplyStream(req(`/api/reply/stream?session=${SID}&ticket=nope`))
         .status,
     ).toBe(401);
     expect(
-      handleReplyStream(req(`/api/reply/stream?session=bad&token=${TOKEN}`))
+      handleReplyStream(req(`/api/reply/stream?session=bad&ticket=nope`))
         .status,
     ).toBe(400);
     const empty = await handleReply(

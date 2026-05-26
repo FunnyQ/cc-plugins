@@ -39,9 +39,9 @@ describe("decideStartup", () => {
     expect(d.action).toBe("supersede");
   });
 
-  test("alive atlas with no root field -> supersede", () => {
+  test("alive atlas with no root field -> start fresh, not supersede", () => {
     const { root, ...legacy } = info();
     const d = decideStartup(legacy, ROOT, alive);
-    expect(d.action).toBe("supersede");
+    expect(d.action).toBe("start");
   });
 });
