@@ -5,7 +5,7 @@
 > - `../_context/api-contract.md`
 >
 > **Depends on**: backend/02
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -52,17 +52,24 @@ dedicated reply SSE, which is simplest and matches the backend reply-fanout endp
 
 ## Acceptance criteria
 
-- [ ] A reply strip renders in the session view, visually distinct from the transcript, styled consistently.
-- [ ] It subscribes to `/api/reply/stream` for the current session and appends each `{ text }` live.
-- [ ] The EventSource is closed when switching away from the session (no leak).
-- [ ] The list is bounded (old entries dropped past a cap).
-- [ ] Uses the existing token flow; no hardcoded token.
+- [x] A reply strip renders in the session view, visually distinct from the transcript, styled consistently.
+- [x] It subscribes to `/api/reply/stream` for the current session and appends each `{ text }` live.
+- [x] The EventSource is closed when switching away from the session (no leak).
+- [x] The list is bounded (old entries dropped past a cap).
+- [x] Uses the existing token flow; no hardcoded token.
 
 ## Verification
 
-- [ ] Manual: with a channel session, get the agent to call `reply` (e.g. send it a UI message asking it to reply) → the text appears in the strip within ~1s.
-- [ ] Manual: `curl -XPOST localhost:5858/api/reply -d '{"session":"<id>","text":"ping","token":"<t>"}'` → "ping" appears in the strip.
-- [ ] Switch sessions in the UI and back → no duplicate/leaked streams (check the network panel).
+- [x] Manual: with a channel session, get the agent to call `reply` (e.g. send it a UI message asking it to reply) → the text appears in the strip within ~1s.
+- [x] Manual: `curl -XPOST localhost:5858/api/reply -d '{"session":"<id>","text":"ping","token":"<t>"}'` → "ping" appears in the strip.
+- [x] Switch sessions in the UI and back → no duplicate/leaked streams (check the network panel).
+
+Verification note: real Claude channel testing called `mcp__cockpit-channel__reply`
+successfully, and a headless Chrome/CDP dashboard run POSTed `reply strip probe
+cdp 2` to `/api/reply` and observed it render in `.reply-strip__text`. The store
+closes the active EventSource on selection change/beforeunload, keys streams by
+provider/session to avoid duplicates, caps replies at 50, and refreshes the
+daemon token on stream errors.
 
 ## Out of scope
 

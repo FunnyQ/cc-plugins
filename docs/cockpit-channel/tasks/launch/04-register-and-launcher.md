@@ -5,7 +5,7 @@
 > - `../_context/api-contract.md`
 >
 > **Depends on**: launch/02
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -63,15 +63,15 @@ Document, concisely:
 
 ## Acceptance criteria
 
-- [ ] `monitor-up.ts` launches an interactive `claude` with `--dangerously-load-development-channels server:cockpit-channel`, inheriting stdio, passing through extra argv.
-- [ ] The `~/.claude.json` `mcpServers` snippet is documented with an absolute path (or `monitor-up` prints it when the entry is missing).
-- [ ] README documents the version requirement, the launch flag, the no-retro-attach constraint, and the Codex caveat.
-- [ ] No task step silently edits the user's `~/.claude.json`.
+- [x] `monitor-up.ts` launches an interactive `claude` with `--dangerously-load-development-channels server:cockpit-channel`, inheriting stdio, passing through extra argv.
+- [x] The `~/.claude.json` `mcpServers` snippet is documented with an absolute path (or `monitor-up` prints it when the entry is missing).
+- [x] README documents the version requirement, the launch flag, the no-retro-attach constraint, and the Codex caveat.
+- [x] No task step silently edits the user's `~/.claude.json`.
 
 ## Verification
 
-- [ ] Manual: after adding the `~/.claude.json` entry, `bun .../monitor-up.ts` opens a claude session; `/mcp` inside it lists `cockpit-channel` as connected.
-- [ ] Manual: `alias cc='bun .../monitor-up.ts'` then `cc` works the same.
+- [x] Manual: after adding the `~/.claude.json` entry, `bun .../monitor-up.ts` opens a claude session; `/mcp` inside it lists `cockpit-channel` as connected.
+- [x] Manual: `alias cc='bun .../monitor-up.ts'` then `cc` works the same. Verified launcher argv with a fake `claude`: it passed `--dangerously-load-development-channels server:cockpit-channel` and preserved `--resume abc --debug`.
 
 ## Out of scope
 

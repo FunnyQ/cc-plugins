@@ -62,17 +62,17 @@ Use `jsonResponse` / `jsonError` from `http.ts`. Tests override `COCKPIT_HOME` (
 
 ## Acceptance criteria
 
-- [ ] `POST /api/send-message` with a valid token wakes a parked `GET /api/inbox` for the same session, which resolves with `{ message: text }`.
-- [ ] A send with no parked poll stashes; the next `GET /api/inbox` drains it immediately (cold-start race covered).
-- [ ] A second `GET /api/inbox` for a session replaces the first (only one park per session).
-- [ ] Bad/absent token → 401; non-UUID session → 400; empty `text` → 400.
-- [ ] Inbox poll resolves with `{ message: null, timeout: true }` after the (test-shortened) budget.
-- [ ] Routes reachable through `cockpit-server.ts`.
+- [x] `POST /api/send-message` with a valid token wakes a parked `GET /api/inbox` for the same session, which resolves with `{ message: text }`.
+- [x] A send with no parked poll stashes; the next `GET /api/inbox` drains it immediately (cold-start race covered).
+- [x] A second `GET /api/inbox` for a session replaces the first (only one park per session).
+- [x] Bad/absent token → 401; non-UUID session → 400; empty `text` → 400.
+- [x] Inbox poll resolves with `{ message: null, timeout: true }` after the (test-shortened) budget.
+- [x] Routes reachable through `cockpit-server.ts`.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/inbox.test.ts` green.
-- [ ] Manual: start the daemon, `curl -s 'localhost:5858/api/inbox?session=<uuid>&token=<t>'` parks; in another shell `curl -XPOST localhost:5858/api/send-message -d '{"session":"<uuid>","text":"hi","token":"<t>"}'` returns `{"delivered":true}` and the first curl returns `{"message":"hi"}`.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/inbox.test.ts` green.
+- [x] Manual: start the daemon, `curl -s 'localhost:5858/api/inbox?session=<uuid>&token=<t>'` parks; in another shell `curl -XPOST localhost:5858/api/send-message -d '{"session":"<uuid>","text":"hi","token":"<t>"}'` returns `{"delivered":true}` and the first curl returns `{"message":"hi"}`.
 
 ## Out of scope
 

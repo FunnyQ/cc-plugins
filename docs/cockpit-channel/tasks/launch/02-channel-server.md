@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/01, backend/02
 > **Blocks**: launch/03, launch/04
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -28,7 +28,7 @@ notification call, and reply-tool schema. Key wiring:
 
 ### Lifecycle
 
-1. Read `process.env.CLAUDE_CODE_SESSION_ID` → `sessionId`. If absent, log a clear stderr line and **still connect** (so the failure is visible in `/mcp` and the debug log) but treat as no-session (don't poll). **This is the assumption to verify — see Acceptance.**
+1. Resolve `sessionId` from `process.env.CLAUDE_CODE_SESSION_ID` when present; otherwise inspect ancestor process commands for Claude's `--session-id`, then fall back to the local transcript finder. If absent, log a clear stderr line and **still connect** (so the failure is visible in `/mcp` and the debug log) but treat as no-session (don't poll). Manual verification on Claude Code `2.1.150` found the env var is **not** present in channel children, so the ancestor argv fallback is required.
 2. Read `~/.cockpit/daemon.json` → `{ port, token }`. If missing: for this task, log and stay idle (auto-starting the daemon is a later launch task).
 3. `await mcp.connect(new StdioServerTransport())`.
 4. Start the inbox pull loop (below).
@@ -68,19 +68,19 @@ So this can be loaded with `claude --dangerously-load-development-channels serve
 
 ## Acceptance criteria
 
-- [ ] `cockpit-channel.ts` starts as an MCP stdio server with `experimental['claude/channel']` + `tools` capabilities and the cockpit `instructions`.
-- [ ] **VERIFIED: `CLAUDE_CODE_SESSION_ID` is present in the channel child's env** when spawned by Claude Code (the #1 risk). Record the finding in the task's commit message / `tasks/README.md` Known gaps.
-- [ ] **VERIFIED: a `mcp.notification('notifications/claude/channel', …)` lands in the live session and appears in its transcript jsonl** (note the exact entry shape observed — the reply-strip UI task may reuse it).
-- [ ] Pull loop injects each `/api/inbox` message and re-polls on the timeout sentinel; survives a transient fetch error with backoff.
-- [ ] The `reply` tool POSTs `/api/reply` with the session + token and returns a success content block.
-- [ ] No own HTTP port is opened (channel is a daemon client).
+- [x] `cockpit-channel.ts` starts as an MCP stdio server with `experimental['claude/channel']` + `tools` capabilities and the cockpit `instructions`.
+- [x] **VERIFIED: `CLAUDE_CODE_SESSION_ID` is absent in the channel child's env** when spawned by Claude Code `2.1.150`; `--session-id` is available in an ancestor command and is now the primary fallback.
+- [x] **VERIFIED: a `mcp.notification('notifications/claude/channel', …)` lands in the live session and appears in its transcript jsonl** as a `type:"user"` message string containing `<channel source="cockpit-channel" source="cockpit">...</channel>`.
+- [x] Pull loop injects each `/api/inbox` message and re-polls on the timeout sentinel; survives a transient fetch error with backoff.
+- [x] The `reply` tool POSTs `/api/reply` with the session + token and returns a success content block.
+- [x] No own HTTP port is opened (channel is a daemon client).
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/cockpit-channel.test.ts` green (pure parts).
-- [ ] Manual end-to-end (the real proof): register the server (temp `.mcp.json`), run `claude --dangerously-load-development-channels server:cockpit-channel` with the cockpit daemon up; `curl -XPOST localhost:5858/api/send-message -d '{"session":"<id>","text":"hi from cockpit","token":"<t>"}'` → "hi from cockpit" appears in the session as a `<channel>` message and the agent reacts.
-- [ ] In that session, get the agent to call `reply` → a `curl -N .../api/reply/stream?...` shows the text.
-- [ ] `grep` the session transcript jsonl to confirm both the injection and the reply tool call are recorded; note their shapes.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/cockpit-channel.test.ts` green (pure parts).
+- [x] Manual end-to-end (the real proof): register the server (temp `.mcp.json`), run `claude --dangerously-load-development-channels server:cockpit-channel` with the cockpit daemon up; `curl -XPOST localhost:5858/api/send-message -d '{"session":"<id>","text":"hi from cockpit","token":"<t>"}'` → "hi from cockpit" appears in the session as a `<channel>` message and the agent reacts.
+- [x] In that session, get the agent to call `reply` → the reply tool posts successfully and the daemon reply stream receives the text.
+- [x] `grep`/parse the session transcript jsonl to confirm both the injection and the reply tool call are recorded; channel injection is a user message string, and the reply is an assistant `tool_use` named `mcp__cockpit-channel__reply`.
 
 ## Out of scope
 
