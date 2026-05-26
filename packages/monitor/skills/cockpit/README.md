@@ -16,11 +16,19 @@ Provider support:
 
 ## Cockpit channel
 
-The cockpit channel is Claude-only. The send box at the bottom of the Decision
-Log column delivers text into a running Claude Code session; the agent's answers
-come back through the Live Transcript, which the dashboard already renders — the
-transcript is the single source of truth, so there is no separate reply tool or
-strip. Codex has no channel hook, so Codex sessions stay observe-only.
+The send box at the bottom of the Decision Log column delivers text into a
+running session. The agent's answers come back through the Live Transcript,
+which the dashboard already renders — the transcript is the single source of
+truth, so there is no separate reply tool or strip.
+
+Provider behavior differs:
+
+- **Claude Code** uses the cockpit channel MCP server and only attaches to
+  sessions launched with the development channel flag.
+- **Codex** uses the managed Codex remote-control daemon. Cockpit connects to
+  the local app-server control socket, resumes the selected thread, and submits
+  or steers a turn. Direct app-server is kept only as a fallback when
+  remote-control is unavailable.
 
 Channels require Claude Code 2.1.80 or later and are still behind the research
 preview development flag. Register the channel once in `~/.claude.json`:
@@ -52,5 +60,16 @@ foreground interactive behavior. For a shorter command:
 alias cc='bun /Users/funnyq/Projects/q-lab/cc-plugins/packages/monitor/skills/cockpit/scripts/monitor-up.ts'
 ```
 
-The channel only attaches to sessions launched with the development channel
-flag. It cannot retro-attach to an already-running Claude Code session.
+The Claude channel only attaches to sessions launched with the development
+channel flag. It cannot retro-attach to an already-running Claude Code session.
+
+For Codex, install and enable the managed standalone Codex remote-control
+daemon:
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+codex app-server daemon enable-remote-control
+```
+
+Cockpit probes `/api/codex-control/status` before enabling the Codex send box,
+so stale or non-resumable threads stay disabled.
