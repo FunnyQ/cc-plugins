@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing one local plugin, **monitor**, which bundles three sibling skills:
 
 - **usage-dashboard** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
-- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a **channel** send box that types into a running Claude session). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool); Codex has no channel hook, so Codex sessions are observe-only.
+- **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a send box for running sessions). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. Claude Code sends use the cockpit channel MCP server; Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool).
 - **install** — one-stop setup (command-triggered): the canonical home for all prerequisite checks and config wiring for the whole plugin. `setup.ts` checks both skills and wires the two configs a non-dev user can't easily edit by hand (the cockpit-channel MCP in `~/.claude.json` and the statusline collector in `~/.claude/settings.json`). The dashboard precheck (`install.ts`) and statusline wiring (`setup-statusline.ts` + pure `statusline-decision.ts`) live here; usage-dashboard imports them rather than owning copies. A **`SessionStart` hook** (in `.claude-plugin/plugin.json`) runs `setup.ts --session-check` — marker-gated via `$CLAUDE_PLUGIN_DATA/.wired-version`, so once per version it silently re-points version-drifted paths (the cache encodes the version, e.g. `.../monitor/3.1.0/...`, and old dirs linger so "wired" means *exact current path*, not mere existence) or, on a fresh install, prints one write-free nudge to run `/monitor:install`. It never fresh-wires — initial opt-in stays manual.
 
 This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The dashboard and cockpit run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
@@ -35,9 +35,10 @@ cc-plugins/
         │   └── references/
         │       └── pricing-defaults.json
         ├── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
-        │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + channel inbox/send
+        │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + Claude inbox/send + Codex remote-control send
         │   ├── scripts/cockpit.ts        # CLI: start / log / wait / send
         │   ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
+        │   ├── scripts/codex-control-probe.ts # Codex app-server control client: managed remote-control websocket first, direct app-server fallback
         │   └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
         └── install/                  # skill: one-stop setup/precheck for the whole plugin (command-triggered)
             └── scripts/
