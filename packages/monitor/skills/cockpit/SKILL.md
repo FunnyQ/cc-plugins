@@ -268,6 +268,22 @@ dashboard (or via `cockpit send <id> <answer>`), and the question with its answe
 lands in the trail. Falling back to `AskUserQuestion` splits the user's attention off
 the cockpit and leaves the decision trail with a hole where a turn should be.
 
+If the session is already parked on a `needs_your_call` and the user answers in
+the agent UI/chat instead of the cockpit dashboard, treat that message as the
+answer to the open call — do not ask them to repeat it in cockpit. Immediately
+record it through the same bridge:
+
+```bash
+bun <plugin-root>/skills/cockpit/scripts/cockpit.ts send <id> "<answer from chat>"
+```
+
+Use `--call <callId>` if you have the call id from the preceding `log`
+command; otherwise `send` resolves the latest open call from the session log.
+Then continue from the delivered answer and mention briefly that the chat reply
+was recorded in the cockpit trail. This keeps the `needs_your_call` card's log
+state closed with a durable `response` record, even when the user answers from
+the harness UI rather than the dashboard.
+
 ## Notes
 
 - Commands use **`<plugin-root>`**; your provider reference (Step 0) says how to
