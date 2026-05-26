@@ -48,7 +48,7 @@ export async function handleSendCodexMessage(
   if (text === "") return json({ error: "empty text" }, 400);
 
   const report = await sendCodexTurn({ threadId: session, sendText: text });
-  if (!report.ok || !report.turnStartOk) {
+  if (!report.ok || (!report.turnStartOk && !report.turnSteerOk)) {
     return json(
       {
         error: report.errors.join("; ") || "Codex send failed",
@@ -61,6 +61,8 @@ export async function handleSendCodexMessage(
   return json({
     delivered: true,
     controlMode: report.controlMode,
+    turnId: report.turnId,
+    turnStatus: report.turnStatus,
     warnings: report.warnings,
   });
 }
