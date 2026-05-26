@@ -8,10 +8,8 @@ import {
   ensureServer,
   isUp,
   nextReconnectDelayMs,
-  postReply,
   readDaemonCoords,
   readProcessInfo,
-  REPLY_TOOL,
   resolveClaudeSessionId,
   sessionIdFromCommand,
 } from "./cockpit-channel";
@@ -134,13 +132,6 @@ describe("session resolution", () => {
 });
 
 describe("protocol framing", () => {
-  test("declares reply tool schema", () => {
-    expect(REPLY_TOOL).toMatchObject({
-      name: "reply",
-      inputSchema: { required: ["text"] },
-    });
-  });
-
   test("frames inbox messages as Claude channel notifications", () => {
     expect(channelNotification("hi")).toEqual({
       method: "notifications/claude/channel",
@@ -196,36 +187,5 @@ describe("serial notifier", () => {
     await Bun.sleep(20);
     expect(order).toEqual(["one", "two"]);
     expect((errors[0] as Error).message).toBe("boom");
-  });
-});
-
-describe("reply POST", () => {
-  test("posts session, text, and token to /api/reply", async () => {
-    let seen: any = null;
-    const server = Bun.serve({
-      port: 0,
-      hostname: "127.0.0.1",
-      async fetch(req) {
-        seen = {
-          url: new URL(req.url).pathname,
-          body: await req.json(),
-        };
-        return Response.json({ delivered: 2 });
-      },
-    });
-    try {
-      const delivered = await postReply({
-        coords: { port: server.port, token: "tok" },
-        sessionId: SID,
-        text: "hello",
-      });
-      expect(delivered).toBe(2);
-      expect(seen).toEqual({
-        url: "/api/reply",
-        body: { session: SID, text: "hello", token: "tok" },
-      });
-    } finally {
-      server.stop(true);
-    }
   });
 });

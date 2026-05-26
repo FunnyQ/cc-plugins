@@ -10,10 +10,7 @@ import {
 } from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { findSession } from "./find-session";
 
 export type DaemonCoords = { port: number; token: string };
@@ -32,23 +29,7 @@ type ChannelServer = Server & {
 };
 
 export const CHANNEL_INSTRUCTIONS =
-  'Messages from the cockpit dashboard arrive as <channel source="cockpit">...</channel>. ' +
-  "When you want to address the user in the cockpit UI directly, call the reply tool with your message.";
-
-export const REPLY_TOOL = {
-  name: "reply",
-  description: "Send a message to the cockpit dashboard UI",
-  inputSchema: {
-    type: "object",
-    properties: {
-      text: {
-        type: "string",
-        description: "Message to show in cockpit",
-      },
-    },
-    required: ["text"],
-  },
-};
+  'Messages from the cockpit dashboard arrive as <channel source="cockpit">...</channel>.';
 
 function cockpitHome(): string {
   return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
@@ -212,32 +193,10 @@ export async function resolveClaudeSessionId(
   return finder("claude", project);
 }
 
-export async function postReply(opts: {
-  coords: DaemonCoords;
-  sessionId: string;
-  text: string;
-  fetchImpl?: typeof fetch;
-}): Promise<number> {
-  const fetchImpl = opts.fetchImpl ?? fetch;
-  const r = await fetchImpl(`http://127.0.0.1:${opts.coords.port}/api/reply`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      session: opts.sessionId,
-      text: opts.text,
-      token: opts.coords.token,
-    }),
-  });
-  if (!r.ok) throw new Error(`reply failed: ${r.status}`);
-  const body = (await r.json()) as { delivered?: unknown };
-  return typeof body.delivered === "number" ? body.delivered : 0;
-}
-
-export function createMcpServer(opts: {
-  sessionId: string | null;
-  coords: () => DaemonCoords | null;
-  fetchImpl?: typeof fetch;
-}): ChannelServer {
+// The channel exposes no tools — agent→UI output rides the transcript, which
+// cockpit already renders. We still declare an (empty) tools capability and a
+// ListTools handler so a client's tools/list resolves cleanly to an empty set.
+export function createMcpServer(): ChannelServer {
   const mcp = new Server(
     { name: "cockpit-channel", version: "0.0.1" },
     {
@@ -249,27 +208,7 @@ export function createMcpServer(opts: {
     },
   ) as ChannelServer;
 
-  mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [REPLY_TOOL],
-  }));
-  mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
-    if (req.params.name !== "reply") {
-      throw new Error(`unknown tool: ${req.params.name}`);
-    }
-    const args = (req.params.arguments ?? {}) as { text?: unknown };
-    const text = typeof args.text === "string" ? args.text.trim() : "";
-    if (!text) throw new Error("reply.text is required");
-    if (!opts.sessionId) throw new Error("Claude session id is unavailable");
-    const coords = opts.coords();
-    if (!coords) throw new Error("cockpit daemon is unavailable");
-    await postReply({
-      coords,
-      sessionId: opts.sessionId,
-      text,
-      fetchImpl: opts.fetchImpl,
-    });
-    return { content: [{ type: "text", text: "sent" }] };
-  });
+  mcp.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [] }));
 
   return mcp;
 }
@@ -369,10 +308,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const mcp = createMcpServer({
-    sessionId,
-    coords: readDaemonCoords,
-  });
+  const mcp = createMcpServer();
   await mcp.connect(new StdioServerTransport());
 
   if (!sessionId) return;
