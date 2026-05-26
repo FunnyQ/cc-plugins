@@ -19,6 +19,7 @@ import { readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
+import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
 
 type Provider = "claude" | "codex";
 
@@ -77,16 +78,6 @@ function findClaude(project: string): string | null {
   return newest.id;
 }
 
-function codexDir(): string {
-  return process.env.COCKPIT_CODEX_DIR || join(homedir(), ".codex");
-}
-
-function codexStateDb(): string {
-  return (
-    process.env.COCKPIT_CODEX_STATE_DB || join(codexDir(), "state_5.sqlite")
-  );
-}
-
 function findCodex(project: string): string | null {
   const dbPath = codexStateDb();
   if (!existsSync(dbPath)) {
@@ -96,11 +87,13 @@ function findCodex(project: string): string | null {
   try {
     const db = new Database(dbPath, { readonly: true });
     try {
+      const excludeSpawnedChildren = excludeCodexSpawnedChildrenSql(db);
       const row = db
         .query(
           `select id
            from threads
            where cwd = ? and archived = 0 and rollout_path != ''
+             ${excludeSpawnedChildren}
            order by coalesce(updated_at_ms, updated_at * 1000, created_at_ms, created_at * 1000) desc
            limit 1`,
         )

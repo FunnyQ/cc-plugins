@@ -151,7 +151,15 @@
                     :class="{ 'is-selected': isSelected(s), 'is-ended': s.status === 'ended' }"
                     @click="selectSession(s)"
                   >
-                    <span class="status-led" :class="s.status"></span>
+                    <span
+                      class="status-led"
+                      :class="s.liveStatus || s.status"
+                    ></span>
+                    <span
+                      class="leg__status"
+                      :class="'is-' + (s.liveStatus || s.status)"
+                      v-text="legStatusLabel(s)"
+                    ></span>
                     <span
                       class="provider-badge"
                       :class="'provider-badge--' + (s.provider || 'claude')"
@@ -175,11 +183,30 @@
         </ul>
       </nav>
 
+      <!-- Full-width status strip: breathes in the selected session's live
+           status colour, spanning both instrument columns. -->
+      <div
+        class="status-bar"
+        :class="'is-' + selectedLiveStatus"
+        aria-hidden="true"
+      ></div>
+
       <!-- INSTRUMENTS — two display screens: comms feed + flight log -->
       <main class="instruments">
         <section class="instrument" id="col-transcript">
           <header class="instrument__head">
             <span class="instrument__legend">Live Transcript</span>
+            <span
+              class="status-pill"
+              :class="'is-' + selectedLiveStatus"
+              v-text="statusPillLabel"
+            ></span>
+            <span
+              class="agent-pill"
+              v-if="selectedSubagents > 0"
+              v-text="agentBadgeLabel"
+              title="Subagent delegations running in this session"
+            ></span>
           </header>
           <div class="instrument__body" data-column="transcript">
             <p class="placeholder">No live transcript.</p>
@@ -192,6 +219,32 @@
           </header>
           <div class="instrument__body" data-column="decision">
             <p class="placeholder">No decisions logged yet.</p>
+          </div>
+          <div class="channel-console">
+            <form class="channel-send" @submit.prevent="sendChannelMessage()">
+              <textarea
+                class="channel-send__input"
+                v-model="channelMessage"
+                rows="4"
+                :disabled="!canUseChannel || channelSending"
+                :title="channelDisabledTitle"
+                :placeholder="canUseChannel ? 'Message this Claude session' : channelDisabledTitle"
+                @keydown="onChannelKeydown($event)"
+              ></textarea>
+              <button
+                class="channel-send__button"
+                type="submit"
+                :disabled="channelSendDisabled"
+                :title="channelDisabledTitle"
+              >
+                Send
+              </button>
+            </form>
+            <p
+              class="channel-send__error"
+              v-if="channelError"
+              v-text="channelError"
+            ></p>
           </div>
         </section>
       </main>

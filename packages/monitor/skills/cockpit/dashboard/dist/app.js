@@ -16,6 +16,18 @@ import { initDesignSystem } from "./modules/design-system.js";
 const POLL_MS = 3000;
 const HERO_AUTO_COLLAPSE_MS = 60_000;
 
+let _tokenPromise = null;
+function getToken(force = false) {
+  if (force) _tokenPromise = null;
+  if (!_tokenPromise) {
+    _tokenPromise = fetch("/api/token")
+      .then((r) => r.json())
+      .then((j) => j.token)
+      .catch(() => null);
+  }
+  return _tokenPromise;
+}
+
 function sortActiveFirst(sessions) {
   return [...sessions].sort((a, b) => {
     if (a.status !== b.status) return a.status === "active" ? -1 : 1;
@@ -56,6 +68,9 @@ export const store = reactive({
   manifestOpen: false,
   designSystemOpen: false,
   _loadDesignSystem: null,
+  channelMessage: "",
+  channelSending: false,
+  channelError: "",
 
   get selectedProjectName() {
     if (!this.selectedProject) return "";
@@ -108,6 +123,52 @@ export const store = reactive({
 
   get statusLabel() {
     return this.selectedStatus === "active" ? "Flying" : "Arrived";
+  },
+
+  // Fine-grained status of the selected session (registry.ts LiveStatus) —
+  // drives the transcript panel's breathing status bar. "ended" when nothing is
+  // selected or the field is absent, so the bar rests dim rather than glowing.
+  get selectedLiveStatus() {
+    return this.selectedSession?.liveStatus || "ended";
+  },
+
+  get statusPillLabel() {
+    return this.legStatusLabel(this.selectedSession || {});
+  },
+
+  // In-flight subagent delegations on the selected session (0 when none/ended).
+  get selectedSubagents() {
+    return this.selectedSession?.subagents || 0;
+  },
+
+  get canUseChannel() {
+    const s = this.selectedSession;
+    return !!s && s.provider === "claude" && s.channel === true;
+  },
+
+  get channelDisabledTitle() {
+    const s = this.selectedSession;
+    if (!s) {
+      return this.selectedSessionId
+        ? "Session is not in cockpit manifest"
+        : "Select a Claude session";
+    }
+    if (s.provider === "codex") return "Codex has no channel, observe only";
+    if (!s.channel) return "Launch this session with the cockpit channel";
+    return "Send to cockpit channel";
+  },
+
+  get channelSendDisabled() {
+    return (
+      !this.canUseChannel ||
+      this.channelSending ||
+      this.channelMessage.trim() === ""
+    );
+  },
+
+  get agentBadgeLabel() {
+    const n = this.selectedSubagents;
+    return `⊕ ${n} ${n === 1 ? "AGENT" : "AGENTS"}`;
   },
 
   // Short session id for the HUD telemetry readout (first uuid segment).
@@ -182,6 +243,21 @@ export const store = reactive({
     return g.length > 64 ? g.slice(0, 61) + "…" : g;
   },
 
+  // Human label for a leg's fine-grained status (see registry.ts LiveStatus).
+  // Falls back to the coarse active/ended for any unexpected value.
+  legStatusLabel(s) {
+    return (
+      {
+        working: "Working",
+        waiting: "Waiting",
+        "your-call": "Your call",
+        idle: "Idle",
+        shell: "Shell",
+        ended: "Ended",
+      }[s.liveStatus] ?? (s.status === "active" ? "Active" : "Ended")
+    );
+  },
+
   selectSession(s) {
     const provider = s.provider || "claude";
     if (
@@ -193,6 +269,51 @@ export const store = reactive({
     this.selectedProvider = provider;
     this.selectedProject = s.project;
     this._notify();
+  },
+
+  async sendChannelMessage() {
+    if (this.channelSendDisabled) return;
+    const text = this.channelMessage.trim();
+    this.channelSending = true;
+    this.channelError = "";
+    try {
+      let token = await getToken();
+      if (!token) throw new Error("token unavailable");
+      let r = await fetch("/api/send-message", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          session: this.selectedSessionId,
+          text,
+          token,
+        }),
+      });
+      if (r.status === 401) {
+        token = await getToken(true);
+        if (!token) throw new Error("token unavailable");
+        r = await fetch("/api/send-message", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            session: this.selectedSessionId,
+            text,
+            token,
+          }),
+        });
+      }
+      if (!r.ok) throw new Error(`send failed: ${r.status}`);
+      this.channelMessage = "";
+    } catch (e) {
+      this.channelError = (e && e.message) || "Send failed";
+    } finally {
+      this.channelSending = false;
+    }
+  },
+
+  onChannelKeydown(e) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    this.sendChannelMessage();
   },
 
   // --- session navigator -------------------------------------------------

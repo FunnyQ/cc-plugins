@@ -11,6 +11,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
+import { handleInbox, handleSendMessage } from "./inbox";
 
 const CLI = join(import.meta.dir, "cockpit.ts");
 
@@ -23,6 +25,13 @@ function setEnv() {
   // on the fixture registry — point at paths that don't exist → no live merge.
   process.env.COCKPIT_CLAUDE_SESSIONS_DIR = join(homeDir, "no-sessions");
   process.env.COCKPIT_CODEX_STATE_DB = join(homeDir, "no-state.sqlite");
+}
+
+function writeDaemonToken(token: string) {
+  writeFileSync(
+    join(homeDir, "daemon.json"),
+    JSON.stringify({ pid: process.pid, port: 5858, token }),
+  );
 }
 
 function start(
@@ -72,6 +81,58 @@ afterEach(() => {
   delete process.env.COCKPIT_HOME;
   delete process.env.COCKPIT_CLAUDE_SESSIONS_DIR;
   delete process.env.COCKPIT_CODEX_STATE_DB;
+});
+
+describe("deriveLiveStatus", () => {
+  test("stale session → ended, regardless of harness/openCall", () => {
+    expect(
+      mod.deriveLiveStatus({
+        active: false,
+        openCall: true,
+        harnessStatus: "busy",
+      }),
+    ).toBe("ended");
+  });
+
+  test("open needs_your_call outranks the harness working state", () => {
+    expect(
+      mod.deriveLiveStatus({
+        active: true,
+        openCall: true,
+        harnessStatus: "busy",
+      }),
+    ).toBe("your-call");
+  });
+
+  test("maps harness statuses onto the vocabulary", () => {
+    const map = {
+      busy: "working",
+      waiting: "waiting",
+      shell: "shell",
+    } as const;
+    for (const [harness, expected] of Object.entries(map)) {
+      expect(
+        mod.deriveLiveStatus({
+          active: true,
+          openCall: false,
+          harnessStatus: harness,
+        }),
+      ).toBe(expected);
+    }
+  });
+
+  test("active but no/unknown harness status → idle (no invented activity)", () => {
+    expect(mod.deriveLiveStatus({ active: true, openCall: false })).toBe(
+      "idle",
+    );
+    expect(
+      mod.deriveLiveStatus({
+        active: true,
+        openCall: false,
+        harnessStatus: "something-new",
+      }),
+    ).toBe("idle");
+  });
 });
 
 describe("readRegistry", () => {
@@ -164,6 +225,43 @@ describe("buildSessions", () => {
     expect(sessions[0].sessionId).toBe(sidActive);
     expect(sessions[1].status).toBe("ended");
   });
+
+  test("includes channel flag when an inbox poll is parked", async () => {
+    const p = mkProject("channel");
+    const sid = "12121212-1212-1212-1212-121212121212";
+    const token = "channel-token";
+    start(p, sid, "g", "pg");
+    writeDaemonToken(token);
+    process.env.COCKPIT_WAIT_TIMEOUT_MS = "1000";
+    process.env.COCKPIT_CHANNEL_TTL_MS = "60";
+    const wait = handleInbox(
+      new Request(`http://127.0.0.1/api/inbox?session=${sid}&token=${token}`),
+    );
+    await Bun.sleep(10);
+    try {
+      const session = mod.buildSessions().find((s) => s.sessionId === sid)!;
+      expect(session.channel).toBe(true);
+    } finally {
+      await handleSendMessage(
+        new Request("http://127.0.0.1/api/send-message", {
+          method: "POST",
+          body: JSON.stringify({ session: sid, text: "done", token }),
+        }),
+      );
+      await wait;
+      delete process.env.COCKPIT_WAIT_TIMEOUT_MS;
+    }
+    // Presence persists through the re-park gap (within TTL)...
+    expect(mod.buildSessions().find((s) => s.sessionId === sid)!.channel).toBe(
+      true,
+    );
+    // ...and only drops once the channel stops polling past the TTL.
+    await Bun.sleep(80);
+    expect(mod.buildSessions().find((s) => s.sessionId === sid)!.channel).toBe(
+      false,
+    );
+    delete process.env.COCKPIT_CHANNEL_TTL_MS;
+  });
 });
 
 describe("buildProjects", () => {
@@ -254,6 +352,75 @@ describe("buildSessions live merge", () => {
       ).toBeUndefined();
     } finally {
       rmSync(sessDir, { recursive: true, force: true });
+    }
+  });
+
+  test("Codex spawned child threads are counted as subagents, not sessions", () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "ck-codex-live-")));
+    const dbPath = join(dir, "state_5.sqlite");
+    process.env.COCKPIT_CODEX_STATE_DB = dbPath;
+    const parent = "019e6361-1d58-7f03-8fe3-34a525cbde31";
+    const child = "019e63b0-83f5-7c03-a024-3e30d9144c3a";
+    const parentRollout = join(dir, "parent.jsonl");
+    const childRollout = join(dir, "child.jsonl");
+    writeFileSync(parentRollout, JSON.stringify({ type: "response_item" }));
+    writeFileSync(childRollout, JSON.stringify({ type: "response_item" }));
+    const now = Date.now();
+    const db = new Database(dbPath);
+    try {
+      db.run(
+        `create table threads (
+          id text primary key,
+          cwd text not null,
+          rollout_path text not null,
+          updated_at integer not null,
+          updated_at_ms integer,
+          archived integer not null default 0
+        )`,
+      );
+      db.run(
+        `create table thread_spawn_edges (
+          parent_thread_id text not null,
+          child_thread_id text not null primary key,
+          status text not null
+        )`,
+      );
+      const insertThread = db.query(
+        `insert into threads
+         (id, cwd, rollout_path, updated_at, updated_at_ms, archived)
+         values (?, ?, ?, ?, ?, 0)`,
+      );
+      insertThread.run(
+        parent,
+        "/Users/q/Projects/app",
+        parentRollout,
+        now / 1000,
+        now,
+      );
+      insertThread.run(
+        child,
+        "/Users/q/Projects/app",
+        childRollout,
+        now / 1000,
+        now,
+      );
+      db.query(
+        `insert into thread_spawn_edges
+         (parent_thread_id, child_thread_id, status)
+         values (?, ?, 'open')`,
+      ).run(parent, child);
+    } finally {
+      db.close();
+    }
+
+    try {
+      const sessions = mod.buildSessions(now);
+      const ids = sessions.map((s) => s.sessionId);
+      expect(ids).toContain(parent);
+      expect(ids).not.toContain(child);
+      expect(sessions.find((s) => s.sessionId === parent)?.subagents).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
