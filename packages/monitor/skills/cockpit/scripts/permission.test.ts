@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +15,7 @@ import {
   handlePermissionStream,
   handlePermissionVerdict,
   hasPendingRequest,
+  isForwardProgress,
 } from "./permission";
 
 const TOKEN = "test-token";
@@ -304,6 +311,285 @@ describe("permission-resolved (best-effort elsewhere)", () => {
       }),
     );
     expect(await json(res)).toEqual({ resolved: false });
+  });
+});
+
+describe("supersede on a new request", () => {
+  test("a new request closes the old card + wakes the parked pull with abandoned", async () => {
+    // First request, with a UI tab subscribed.
+    await handlePermissionRequest(
+      post("/api/permission-request", {
+        session: SID,
+        token: TOKEN,
+        request_id: "aaaaa",
+        tool_name: "Bash",
+        description: "",
+        input_preview: "",
+      }),
+    );
+    const stream = handlePermissionStream(
+      req(`/api/permission-stream?session=${SID}&token=${TOKEN}`),
+    );
+    // frames: [0] replayed request(aaaaa), [1] resolved(aaaaa,elsewhere),
+    //         [2] request(bbbbb)
+    const frames = readFrames(stream, 3);
+
+    // Channel parks a pull waiting on the first request's verdict.
+    const pull = handlePermissionPull(
+      req(`/api/permission-pull?session=${SID}&token=${TOKEN}`),
+    );
+    await Bun.sleep(10);
+
+    // A NEW request lands for the same session → supersede.
+    await handlePermissionRequest(
+      post("/api/permission-request", {
+        session: SID,
+        token: TOKEN,
+        request_id: "bbbbb",
+        tool_name: "Write",
+        description: "",
+        input_preview: "",
+      }),
+    );
+
+    // The parked pull is woken with {abandoned:true}.
+    expect(await json(await pull)).toEqual({ abandoned: true });
+
+    const got = await frames;
+    expect(got[1]).toEqual({
+      type: "resolved",
+      request_id: "aaaaa",
+      source: "elsewhere",
+    });
+    expect(got[2]).toMatchObject({ type: "request", request_id: "bbbbb" });
+    // The new request is now the pending one.
+    expect(hasPendingRequest(SID)).toBe(true);
+  });
+});
+
+describe("transcript forward-progress pure decision", () => {
+  test("inside the guard window never counts, even if the file grew", () => {
+    expect(
+      isForwardProgress({
+        registeredAt: 1000,
+        registeredSize: 50,
+        now: 1500, // 500ms < 1000ms guard
+        newSize: 80,
+        guardMs: 1000,
+      }),
+    ).toBe(false);
+  });
+
+  test("past the guard window + a forward append counts as progress", () => {
+    expect(
+      isForwardProgress({
+        registeredAt: 1000,
+        registeredSize: 50,
+        now: 2200, // 1200ms > 1000ms guard
+        newSize: 80,
+        guardMs: 1000,
+      }),
+    ).toBe(true);
+  });
+
+  test("past the guard window but no growth (touch/truncate) does not count", () => {
+    expect(
+      isForwardProgress({
+        registeredAt: 1000,
+        registeredSize: 50,
+        now: 2200,
+        newSize: 50,
+        guardMs: 1000,
+      }),
+    ).toBe(false);
+    expect(
+      isForwardProgress({
+        registeredAt: 1000,
+        registeredSize: 50,
+        now: 2200,
+        newSize: 30, // shrank
+        guardMs: 1000,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("transcript-resolve closes a ghost modal", () => {
+  test("a forward append after the guard closes the card + wakes the pull", async () => {
+    // Lay down a fake transcript for SID under a temp projects dir.
+    const projectsDir = mkdtempSync(join(tmpdir(), "cockpit-proj-"));
+    const projDir = join(projectsDir, "-tmp-proj");
+    mkdirSync(projDir, { recursive: true });
+    const transcript = join(projDir, `${SID}.jsonl`);
+    writeFileSync(transcript, '{"type":"user"}\n');
+    process.env.COCKPIT_CLAUDE_PROJECTS_DIR = projectsDir;
+    process.env.COCKPIT_TRANSCRIPT_GUARD_MS = "50"; // short guard for the test
+    // The pull's wait budget must outlast the guard + fs.watch latency below,
+    // else the long-poll times out (re-pollable sentinel) before the watcher
+    // fires. beforeEach sets a tiny 80ms budget for the timeout-path test.
+    process.env.COCKPIT_WAIT_TIMEOUT_MS = "3000";
+
+    try {
+      await handlePermissionRequest(
+        post("/api/permission-request", {
+          session: SID,
+          token: TOKEN,
+          request_id: RID,
+          tool_name: "Bash",
+          description: "",
+          input_preview: "",
+        }),
+      );
+      const stream = handlePermissionStream(
+        req(`/api/permission-stream?session=${SID}&token=${TOKEN}`),
+      );
+      const frames = readFrames(stream, 2); // replay request + resolved
+      const pull = handlePermissionPull(
+        req(`/api/permission-pull?session=${SID}&token=${TOKEN}`),
+      );
+
+      // Wait past the guard, then append a forward line (the resolution).
+      await Bun.sleep(120);
+      appendFileSync(transcript, '{"type":"assistant"}\n');
+
+      expect(await json(await pull)).toEqual({ abandoned: true });
+      expect((await frames)[1]).toEqual({
+        type: "resolved",
+        request_id: RID,
+        source: "elsewhere",
+      });
+      expect(hasPendingRequest(SID)).toBe(false);
+    } finally {
+      delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
+      delete process.env.COCKPIT_TRANSCRIPT_GUARD_MS;
+      rmSync(projectsDir, { recursive: true, force: true });
+    }
+  });
+
+  test("an append INSIDE the guard window does NOT close the card", async () => {
+    const projectsDir = mkdtempSync(join(tmpdir(), "cockpit-proj-"));
+    const projDir = join(projectsDir, "-tmp-proj");
+    mkdirSync(projDir, { recursive: true });
+    const transcript = join(projDir, `${SID}.jsonl`);
+    writeFileSync(transcript, '{"type":"user"}\n');
+    process.env.COCKPIT_CLAUDE_PROJECTS_DIR = projectsDir;
+    process.env.COCKPIT_TRANSCRIPT_GUARD_MS = "5000"; // long guard
+
+    try {
+      await handlePermissionRequest(
+        post("/api/permission-request", {
+          session: SID,
+          token: TOKEN,
+          request_id: RID,
+          tool_name: "Bash",
+          description: "",
+          input_preview: "",
+        }),
+      );
+      // The triggering tool_use line is written ~simultaneously — simulate it.
+      appendFileSync(transcript, '{"type":"assistant","tool_use":1}\n');
+      await Bun.sleep(60);
+      // Still pending: the in-guard event was ignored.
+      expect(hasPendingRequest(SID)).toBe(true);
+    } finally {
+      delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
+      delete process.env.COCKPIT_TRANSCRIPT_GUARD_MS;
+      rmSync(projectsDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("watcher teardown on every resolution path", () => {
+  // A leaked watcher keeps the temp transcript's inode open; we assert teardown
+  // indirectly: after a resolution, a later forward append must NOT fire another
+  // resolved frame (the watcher is gone, so nothing reacts to the file).
+  async function setupWatchedRequest(): Promise<{
+    transcript: string;
+    projectsDir: string;
+  }> {
+    const projectsDir = mkdtempSync(join(tmpdir(), "cockpit-proj-"));
+    const projDir = join(projectsDir, "-tmp-proj");
+    mkdirSync(projDir, { recursive: true });
+    const transcript = join(projDir, `${SID}.jsonl`);
+    writeFileSync(transcript, '{"type":"user"}\n');
+    process.env.COCKPIT_CLAUDE_PROJECTS_DIR = projectsDir;
+    process.env.COCKPIT_TRANSCRIPT_GUARD_MS = "30";
+    await handlePermissionRequest(
+      post("/api/permission-request", {
+        session: SID,
+        token: TOKEN,
+        request_id: RID,
+        tool_name: "Bash",
+        description: "",
+        input_preview: "",
+      }),
+    );
+    return { transcript, projectsDir };
+  }
+
+  async function teardownEnv(projectsDir: string): Promise<void> {
+    delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
+    delete process.env.COCKPIT_TRANSCRIPT_GUARD_MS;
+    rmSync(projectsDir, { recursive: true, force: true });
+  }
+
+  test("a UI verdict tears down the watcher (no later ghost resolve)", async () => {
+    const { transcript, projectsDir } = await setupWatchedRequest();
+    try {
+      const verdict = await handlePermissionVerdict(
+        post("/api/permission-verdict", {
+          session: SID,
+          token: TOKEN,
+          request_id: RID,
+          behavior: "allow",
+        }),
+      );
+      expect(verdict.status).toBe(200);
+      // Subscribe AFTER the verdict; a now-torn-down watcher must emit nothing.
+      const stream = handlePermissionStream(
+        req(`/api/permission-stream?session=${SID}&token=${TOKEN}`),
+      );
+      const frames = readFrames(stream, 1);
+      await Bun.sleep(60);
+      appendFileSync(transcript, '{"type":"assistant"}\n');
+      await Bun.sleep(60);
+      // Race the read against a short timer — no frame should arrive.
+      const got = await Promise.race([
+        frames,
+        new Promise<string>((r) => setTimeout(() => r("none"), 80)),
+      ]);
+      expect(got).toBe("none");
+    } finally {
+      await teardownEnv(projectsDir);
+    }
+  });
+
+  test("permission-resolved tears down the watcher", async () => {
+    const { transcript, projectsDir } = await setupWatchedRequest();
+    try {
+      await handlePermissionResolved(
+        post("/api/permission-resolved", {
+          session: SID,
+          token: TOKEN,
+          request_id: RID,
+        }),
+      );
+      expect(hasPendingRequest(SID)).toBe(false);
+      // The watcher is gone; a forward append must not resurrect anything.
+      const stream = handlePermissionStream(
+        req(`/api/permission-stream?session=${SID}&token=${TOKEN}`),
+      );
+      const frames = readFrames(stream, 1);
+      await Bun.sleep(60);
+      appendFileSync(transcript, '{"type":"assistant"}\n');
+      const got = await Promise.race([
+        frames,
+        new Promise<string>((r) => setTimeout(() => r("none"), 80)),
+      ]);
+      expect(got).toBe("none");
+    } finally {
+      await teardownEnv(projectsDir);
+    }
   });
 });
 

@@ -15,14 +15,25 @@
 //     hook / timeout — undocumented), so the UI's modal closes promptly.
 // A restarted daemon simply has no pending requests; clients re-poll. Same
 // cockpitHome()/daemonToken()/UUID_RE/env-override helpers as broker.ts/inbox.ts.
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync, watch, type FSWatcher } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { jsonResponse as json } from "./http";
+import { resolveClaudeTranscriptPath } from "./transcript-stream";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
 type Behavior = "allow" | "deny";
+
+// The parked-pull wake contract (see protocol.md): a pull resolves with EITHER a
+// real verdict {requestId, behavior}, OR null (re-pollable timeout sentinel),
+// OR {abandoned:true} when the request was resolved elsewhere (superseded by a
+// newer request, or the transcript advanced past the blocking turn). The channel
+// treats {abandoned:true} like an abort — it stops pulling without echoing a
+// verdict.
+type PullResult =
+  | { requestId: string; behavior: Behavior }
+  | { abandoned: true };
 
 type PendingRequest = {
   requestId: string;
@@ -30,6 +41,13 @@ type PendingRequest = {
   description: string;
   inputPreview: string;
   expires: number;
+  // Transcript watcher torn down on ANY resolution path (verdict / supersede /
+  // transcript-progress / TTL) so no watcher leaks past the request it guards.
+  watcher: FSWatcher | null;
+  // Proactive expiry timer: fires at `expires` to actively sweep an orphan
+  // request (no UI pull, no verdict, fs.watch missed progress) so the watcher
+  // never leaks waiting for a passive takePending() that may never come.
+  expiryTimer: ReturnType<typeof setTimeout> | null;
 };
 // One in-flight request per session (Claude serializes tool prompts). Holds the
 // stash for a UI tab that subscribes just after the request fans out.
@@ -49,11 +67,22 @@ type StashedVerdict = {
 const verdictStash = new Map<string, StashedVerdict>();
 
 // At most one parked channel pull per session. Re-parking resolves any stale
-// resolver first.
+// resolver first. A resolver accepts a real verdict, null (timeout sentinel), or
+// {abandoned:true} (resolved-elsewhere — supersede or transcript progress).
 type ParkedPull = {
-  resolve: (v: { requestId: string; behavior: Behavior } | null) => void;
+  resolve: (v: PullResult | null) => void;
 };
 const pendingPulls = new Map<string, ParkedPull>();
+
+// Wake a session's parked pull (if any) with {abandoned:true}, so the channel
+// stops waiting on a request that was resolved outside cockpit.
+function abandonParkedPull(session: string): void {
+  const parked = pendingPulls.get(session);
+  if (parked) {
+    pendingPulls.delete(session);
+    parked.resolve({ abandoned: true });
+  }
+}
 
 // ---------- central dir + token (overridable for tests) ----------
 
@@ -88,13 +117,57 @@ function stashTtlMs(): number {
 
 const HEARTBEAT_MS = 25_000;
 
+// Ignore transcript events for this long after registration: the tool_use line
+// that TRIGGERED the permission prompt is written ~simultaneously, so an event
+// inside this window is the request's own line, not the resolution that follows.
+function transcriptGuardMs(): number {
+  const v = parseInt(process.env.COCKPIT_TRANSCRIPT_GUARD_MS || "", 10);
+  return Number.isFinite(v) && v > 0 ? v : 1000;
+}
+
 // ---------- pure helpers (unit-tested) ----------
+
+// Pure decision: does a transcript file event count as "the turn moved forward"
+// (⇒ the blocking permission was resolved elsewhere)? A pending permission
+// BLOCKS the turn, so the first FORWARD append after the guard window proves
+// resolution. We require BOTH: past the guard window (so the triggering
+// tool_use line doesn't count) AND the file grew beyond its registration size
+// (a forward append, not a truncate/touch).
+export function isForwardProgress(args: {
+  registeredAt: number;
+  registeredSize: number;
+  now: number;
+  newSize: number;
+  guardMs: number;
+}): boolean {
+  if (args.now - args.registeredAt < args.guardMs) return false;
+  return args.newSize > args.registeredSize;
+}
+
+// Tear down a pending request's transcript watcher + proactive expiry timer
+// (idempotent). Called by every resolution path before the entry is dropped.
+function teardownWatcher(pending: PendingRequest | undefined | null): void {
+  if (pending?.watcher) {
+    try {
+      pending.watcher.close();
+    } catch {
+      // already closed — ignore
+    }
+    pending.watcher = null;
+  }
+  if (pending?.expiryTimer) {
+    clearTimeout(pending.expiryTimer);
+    pending.expiryTimer = null;
+  }
+}
 
 // True iff the pending request (if any) is still within its TTL.
 export function takePending(sessionId: string): PendingRequest | null {
   const e = pendingBySession.get(sessionId);
   if (!e) return null;
   if (e.expires <= Date.now()) {
+    // TTL elapsed — clear it AND tear down its watcher so nothing leaks.
+    teardownWatcher(e);
     pendingBySession.delete(sessionId);
     return null;
   }
@@ -132,6 +205,69 @@ function broadcast(session: string, frame: object): void {
   }
 }
 
+// Mark a pending request resolved-elsewhere: tear down its watcher, clear it,
+// broadcast a {resolved, source:"elsewhere"} frame, and wake any parked pull
+// with {abandoned:true}. Shared by supersede and transcript-progress. No-op if
+// the session's pending request no longer matches (already resolved).
+function resolveElsewhere(session: string, requestId: string): boolean {
+  const pending = pendingBySession.get(session);
+  if (!pending || pending.requestId !== requestId) return false;
+  teardownWatcher(pending);
+  pendingBySession.delete(session);
+  broadcast(session, {
+    type: "resolved",
+    request_id: requestId,
+    source: "elsewhere",
+  });
+  abandonParkedPull(session);
+  return true;
+}
+
+// Watch a session's transcript file for forward progress. Because a pending
+// permission BLOCKS the turn, the first forward append after the guard window
+// means the prompt was answered outside cockpit (TUI or auto-approve hook) — so
+// we resolve-elsewhere. Returns the watcher (or null if the transcript can't be
+// found / watch can't start). Errors are swallowed: a missing watcher just means
+// the UI falls back to its TTL, which is still correct.
+function watchTranscriptForProgress(
+  session: string,
+  requestId: string,
+): FSWatcher | null {
+  const path = resolveClaudeTranscriptPath(session);
+  if (!path) return null;
+  let registeredSize: number;
+  try {
+    registeredSize = statSync(path).size;
+  } catch {
+    return null;
+  }
+  const registeredAt = Date.now();
+  const guardMs = transcriptGuardMs();
+  try {
+    return watch(path, () => {
+      let newSize: number;
+      try {
+        newSize = statSync(path).size;
+      } catch {
+        return; // transcript vanished — let the TTL handle it
+      }
+      if (
+        isForwardProgress({
+          registeredAt,
+          registeredSize,
+          now: Date.now(),
+          newSize,
+          guardMs,
+        })
+      ) {
+        resolveElsewhere(session, requestId);
+      }
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ---------- POST /api/permission-request ----------
 // { session, token, request_id, tool_name, description, input_preview }
 
@@ -158,12 +294,23 @@ export async function handlePermissionRequest(req: Request): Promise<Response> {
   const inputPreview =
     typeof body.input_preview === "string" ? body.input_preview : "";
 
+  // Supersede: if a DIFFERENT request is already pending for this session, the
+  // arrival of a new one proves the old resolved elsewhere (Claude serializes
+  // tool prompts). Close the old card + wake its parked pull before storing the
+  // new request. resolveElsewhere() tears down the prior watcher.
+  const prior = pendingBySession.get(session);
+  if (prior && prior.requestId !== requestId) {
+    resolveElsewhere(session, prior.requestId);
+  }
+
   pendingBySession.set(session, {
     requestId,
     toolName,
     description,
     inputPreview,
     expires: Date.now() + stashTtlMs(),
+    watcher: null,
+    expiryTimer: null,
   });
 
   broadcast(session, {
@@ -173,6 +320,27 @@ export async function handlePermissionRequest(req: Request): Promise<Response> {
     description,
     input_preview: inputPreview,
   });
+
+  // Primary lone-ghost fix: watch the transcript so a TUI/hook resolution closes
+  // the card without waiting for the UI TTL. Re-read the entry to attach (it may
+  // have just been swept by a concurrent TTL takePending — unlikely but safe).
+  const entry = pendingBySession.get(session);
+  if (entry && entry.requestId === requestId) {
+    entry.watcher = watchTranscriptForProgress(session, requestId);
+    // Proactive backstop: actively sweep this entry at its TTL so the watcher
+    // can't leak on an orphan request that no verdict/supersede/progress ever
+    // resolves. Guarded by reference equality so a superseding request that
+    // already replaced this entry isn't clobbered. unref() so a pending timer
+    // never keeps the daemon (or a test process) alive.
+    const timer = setTimeout(() => {
+      if (pendingBySession.get(session) === entry) {
+        teardownWatcher(entry);
+        pendingBySession.delete(session);
+      }
+    }, stashTtlMs());
+    (timer as { unref?: () => void }).unref?.();
+    entry.expiryTimer = timer;
+  }
 
   return json({ ok: true });
 }
@@ -284,7 +452,9 @@ export async function handlePermissionVerdict(req: Request): Promise<Response> {
     return json({ error: "stale request" }, 409);
   }
 
-  // The request is being answered — clear it so a duplicate verdict is rejected.
+  // The request is being answered — tear down its transcript watcher and clear
+  // it so a duplicate verdict is rejected and no watcher leaks.
+  teardownWatcher(pending);
   pendingBySession.delete(session);
 
   // Deliver to a parked channel pull, else stash for the next pull (the channel
@@ -312,8 +482,9 @@ export async function handlePermissionVerdict(req: Request): Promise<Response> {
 
 // ---------- GET /api/permission-pull?session=<uuid>&token=<t> ----------
 // Channel long-polls for the verdict. Drains the stash first; else parks (one
-// per session) under the wait budget; resolves with {request_id, behavior} or a
-// re-pollable {verdict:null, timeout:true}. Aborts on req.signal.
+// per session) under the wait budget; resolves with {request_id, behavior}, a
+// re-pollable {verdict:null, timeout:true}, or {abandoned:true} (resolved
+// elsewhere — supersede / transcript progress). Aborts on req.signal.
 
 export function handlePermissionPull(
   req: Request,
@@ -336,17 +507,19 @@ export function handlePermissionPull(
 
   return new Promise<Response>((resolve) => {
     let settled = false;
-    const resolver = (v: { requestId: string; behavior: Behavior } | null) => {
+    const resolver = (v: PullResult | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (pendingPulls.get(session)?.resolve === resolver)
         pendingPulls.delete(session);
-      resolve(
-        v === null
-          ? json({ verdict: null, timeout: true }) // re-pollable sentinel
-          : json({ request_id: v.requestId, behavior: v.behavior }),
-      );
+      if (v === null) {
+        resolve(json({ verdict: null, timeout: true })); // re-pollable sentinel
+      } else if ("abandoned" in v) {
+        resolve(json({ abandoned: true })); // resolved elsewhere — stop pulling
+      } else {
+        resolve(json({ request_id: v.requestId, behavior: v.behavior }));
+      }
     };
     const timer = setTimeout(() => resolver(null), waitTimeoutMs());
     pendingPulls.set(session, { resolve: resolver });
@@ -382,16 +555,7 @@ export async function handlePermissionResolved(
   }
 
   // Only clear/broadcast if it matches the still-pending request; a no-op
-  // otherwise (already resolved or superseded).
-  const pending = takePending(session);
-  if (pending && pending.requestId === requestId) {
-    pendingBySession.delete(session);
-    broadcast(session, {
-      type: "resolved",
-      request_id: requestId,
-      source: "elsewhere",
-    });
-    return json({ resolved: true });
-  }
-  return json({ resolved: false });
+  // otherwise (already resolved or superseded). resolveElsewhere() tears down the
+  // watcher and wakes any parked pull with {abandoned:true}.
+  return json({ resolved: resolveElsewhere(session, requestId) });
 }
