@@ -250,7 +250,7 @@ const TOKEN_BUCKETS = [
 ];
 const ALLOWED_PREFS = {
   providerKey: ["all", "claude", "codex"],
-  rangeKey: ["7", "30", "90", "all"],
+  rangeKey: ["24h", "7", "30", "90", "all"],
   trendMode: ["tokens", "cost"],
   trendModelScope: ["all", "top5"],
   topProjectMode: ["tokens", "cost"],
