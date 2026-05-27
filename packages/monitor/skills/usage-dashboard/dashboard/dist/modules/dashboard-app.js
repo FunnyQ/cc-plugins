@@ -33,6 +33,22 @@ import {
 // any object property, but Chart.js stores Maps internally which crashes its
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
+const STATS_REFRESH_TIMEOUT_MS = 20_000;
+const LIVE_REFRESH_TIMEOUT_MS = 8_000;
+
+async function fetchJsonWithTimeout(path, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(path, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 export function App() {
   const initialPrefs = normalizePrefs(loadStoredPrefs());
@@ -58,6 +74,7 @@ export function App() {
     livePollTimer: null,
     liveTickTimer: null,
     liveVisibilityHandler: null,
+    liveFetchInFlight: false,
     nowTick: Date.now(),
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
@@ -82,7 +99,9 @@ export function App() {
       this.startLivePolling();
       this.startLiveClock();
       this.liveVisibilityHandler = () => {
-        if (!document.hidden) this.fetchLive();
+        if (document.hidden) return;
+        this.refresh({ quiet: true });
+        this.fetchLive();
       };
       document.addEventListener("visibilitychange", this.liveVisibilityHandler);
     },
@@ -123,12 +142,13 @@ export function App() {
     },
 
     async fetchLive() {
-      if (document.hidden) return;
+      if (document.hidden || this.liveFetchInFlight) return;
+      this.liveFetchInFlight = true;
       try {
-        const res = await fetch("/api/live");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        const data = await fetchJsonWithTimeout(
+          "/api/live",
+          LIVE_REFRESH_TIMEOUT_MS,
+        );
         this.liveSessions = data.sessions ?? [];
         // Missing field (older server) → assume up so we never nag wrongly.
         this.cockpitUp = data.cockpitUp !== false;
@@ -137,6 +157,8 @@ export function App() {
         this.liveError = null;
       } catch (err) {
         this.liveError = err.message ?? String(err);
+      } finally {
+        this.liveFetchInFlight = false;
       }
     },
 
@@ -166,10 +188,10 @@ export function App() {
       if (!quiet) this.loading = true;
       if (!quiet) this.error = null;
       try {
-        const res = await fetch("/api/stats");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        const data = await fetchJsonWithTimeout(
+          "/api/stats",
+          STATS_REFRESH_TIMEOUT_MS,
+        );
         this.stats = data;
         this.reconcileSelectedModels();
         this.reconcileSelectedProject();
