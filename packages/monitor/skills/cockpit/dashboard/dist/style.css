@@ -879,6 +879,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-block-size: 44px;
   padding: 10px 16px;
   background: var(--space);
   border-bottom: 1px solid var(--edge-soft);
