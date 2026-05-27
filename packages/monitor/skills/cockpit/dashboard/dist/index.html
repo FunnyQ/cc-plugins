@@ -211,15 +211,6 @@
           <div class="instrument__body" data-column="transcript">
             <p class="placeholder">No live transcript.</p>
           </div>
-        </section>
-
-        <section class="instrument" id="col-decision">
-          <header class="instrument__head">
-            <span class="instrument__legend">Decision Log</span>
-          </header>
-          <div class="instrument__body" data-column="decision">
-            <p class="placeholder">No decisions logged yet.</p>
-          </div>
           <div class="channel-console">
             <div class="channel-relaunch" v-if="channelNeedsRelaunch">
               <p class="channel-relaunch__note">
@@ -268,6 +259,15 @@
               v-if="!channelNeedsRelaunch && channelError"
               v-text="channelError"
             ></p>
+          </div>
+        </section>
+
+        <section class="instrument" id="col-decision">
+          <header class="instrument__head">
+            <span class="instrument__legend">Decision Log</span>
+          </header>
+          <div class="instrument__body" data-column="decision">
+            <p class="placeholder">No decisions logged yet.</p>
           </div>
         </section>
       </main>
