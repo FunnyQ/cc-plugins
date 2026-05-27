@@ -262,7 +262,7 @@ export const store = reactive({
 
   isProjectExpanded(group) {
     const o = this.expandedOverrides[group.project];
-    return o === undefined ? defaultExpanded(group) : o;
+    return o === undefined ? defaultExpanded() : o;
   },
 
   openDesignSystem() {
