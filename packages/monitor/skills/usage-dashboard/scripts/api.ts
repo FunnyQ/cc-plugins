@@ -195,8 +195,23 @@ type LedgerRow = {
   tokens: number;
   costUSD: number | null;
   costBasis: LedgerCostBasis;
+  usageByModel?: Record<string, SerializedModelUsage>;
 };
 type InternalLedgerRow = Omit<LedgerRow, "costUSD"> & {
+  usageByModel: Map<string, ModelUsage>;
+};
+type SerializedModelUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  reasoningTokens: number;
+  costUSD: number;
+  provider: Provider;
+  isExternal: boolean;
+};
+type HourlyUsageBucket = {
+  timestampMs: number;
   usageByModel: Map<string, ModelUsage>;
 };
 
@@ -225,6 +240,7 @@ type CodexSessionSummary = {
   cwd: string;
   model: string | null;
   tokenUsage: CodexTokenUsage | null;
+  tokenEvents: Array<{ timestampMs: number; usage: CodexTokenUsage }>;
   userMessages: number;
   toolCalls: number;
 };
@@ -1081,6 +1097,32 @@ export function addModelUsage(target: ModelUsage, source: ModelUsage): void {
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens ?? 0);
 }
 
+function hourStartMs(timestampMs: number): number {
+  const d = new Date(timestampMs);
+  d.setMinutes(0, 0, 0);
+  return d.getTime();
+}
+
+function addHourlyUsage(
+  buckets: Map<number, HourlyUsageBucket>,
+  timestampMs: number,
+  model: string,
+  usage: ModelUsage,
+): void {
+  if (!timestampMs) return;
+  const hourMs = hourStartMs(timestampMs);
+  const bucket =
+    buckets.get(hourMs) ??
+    ({
+      timestampMs: hourMs,
+      usageByModel: new Map<string, ModelUsage>(),
+    } satisfies HourlyUsageBucket);
+  const current = bucket.usageByModel.get(model) ?? emptyModelUsage();
+  addModelUsage(current, usage);
+  bucket.usageByModel.set(model, current);
+  buckets.set(hourMs, bucket);
+}
+
 export function modelUsageTotal(usage: ModelUsage): number {
   return (
     usage.inputTokens +
@@ -1161,6 +1203,7 @@ function countClaudeToolCalls(content: unknown): number {
 function parseTranscriptUsage(): {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
+  hourlyUsage: Map<number, HourlyUsageBucket>;
   projectTokens: Map<string, number>;
   projectModelUsage: Map<string, Map<string, ModelUsage>>;
   ledger: InternalLedgerRow[];
@@ -1168,6 +1211,7 @@ function parseTranscriptUsage(): {
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const hourlyUsage = new Map<number, HourlyUsageBucket>();
   const projectTokens = new Map<string, number>();
   const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
   const ledgerBySession = new Map<
@@ -1250,13 +1294,21 @@ function parseTranscriptUsage(): {
       seen.add(key);
 
       const tokenTotal = usageTokenTotal(usage);
-      const ledgerUsage = ledger.usageByModel.get(model) ?? emptyModelUsage();
+      const ledgerModel = modelKey("claude", model);
+      const ledgerUsage =
+        ledger.usageByModel.get(ledgerModel) ?? emptyModelUsage();
       addUsage(ledgerUsage, usage);
-      ledger.usageByModel.set(model, ledgerUsage);
+      ledger.usageByModel.set(ledgerModel, ledgerUsage);
+      addHourlyUsage(hourlyUsage, timestampMs, modelKey("claude", model), {
+        inputTokens: usage.input_tokens ?? 0,
+        outputTokens: usage.output_tokens ?? 0,
+        cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
+        cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+        reasoningOutputTokens: 0,
+      });
       ledger.tokens += tokenTotal;
       ledger.costBasis = "usage";
-      ledger.model =
-        ledger.usageByModel.size === 1 ? modelKey("claude", model) : "mixed";
+      ledger.model = ledger.usageByModel.size === 1 ? ledgerModel : "mixed";
 
       modelUsage[model] ??= emptyModelUsage();
       addUsage(modelUsage[model], usage);
@@ -1292,6 +1344,7 @@ function parseTranscriptUsage(): {
   return {
     modelUsage,
     dailyModelUsage,
+    hourlyUsage,
     projectTokens,
     projectModelUsage,
     ledger: Array.from(ledgerBySession.values())
@@ -1321,6 +1374,8 @@ function readCodexSession(file: string): CodexSessionSummary | null {
   let responseUserMessages = 0;
   let eventUserMessages = 0;
   let toolCalls = 0;
+  const tokenEvents: Array<{ timestampMs: number; usage: CodexTokenUsage }> =
+    [];
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     let entry: {
@@ -1334,7 +1389,10 @@ function readCodexSession(file: string): CodexSessionSummary | null {
         type?: string;
         role?: string;
         message?: { role?: string };
-        info?: { total_token_usage?: CodexTokenUsage };
+        info?: {
+          total_token_usage?: CodexTokenUsage;
+          last_token_usage?: CodexTokenUsage;
+        };
       };
     };
     try {
@@ -1372,6 +1430,13 @@ function readCodexSession(file: string): CodexSessionSummary | null {
         entry.payload.info?.total_token_usage
       ) {
         latest = entry.payload.info.total_token_usage;
+        const eventTimestamp = entry.timestamp
+          ? Date.parse(entry.timestamp)
+          : 0;
+        const totalUsage = entry.payload.info.total_token_usage;
+        if (Number.isFinite(eventTimestamp) && eventTimestamp && totalUsage) {
+          tokenEvents.push({ timestampMs: eventTimestamp, usage: totalUsage });
+        }
       }
     }
   }
@@ -1381,8 +1446,51 @@ function readCodexSession(file: string): CodexSessionSummary | null {
     cwd,
     model,
     tokenUsage: latest,
+    tokenEvents,
     userMessages: Math.max(responseUserMessages, eventUserMessages),
     toolCalls,
+  };
+}
+
+function codexUsageFromTokenUsage(usage: CodexTokenUsage): ModelUsage {
+  const cachedInput = usage.cached_input_tokens ?? 0;
+  const input = Math.max(0, (usage.input_tokens ?? 0) - cachedInput);
+  return {
+    inputTokens: input,
+    outputTokens: usage.output_tokens ?? 0,
+    cacheReadInputTokens: cachedInput,
+    cacheCreationInputTokens: 0,
+    reasoningOutputTokens: usage.reasoning_output_tokens ?? 0,
+  };
+}
+
+function codexTokenUsageDelta(
+  current: CodexTokenUsage,
+  previous: CodexTokenUsage | null,
+): CodexTokenUsage {
+  if (!previous) return current;
+  return {
+    input_tokens: Math.max(
+      0,
+      (current.input_tokens ?? 0) - (previous.input_tokens ?? 0),
+    ),
+    cached_input_tokens: Math.max(
+      0,
+      (current.cached_input_tokens ?? 0) - (previous.cached_input_tokens ?? 0),
+    ),
+    output_tokens: Math.max(
+      0,
+      (current.output_tokens ?? 0) - (previous.output_tokens ?? 0),
+    ),
+    reasoning_output_tokens: Math.max(
+      0,
+      (current.reasoning_output_tokens ?? 0) -
+        (previous.reasoning_output_tokens ?? 0),
+    ),
+    total_tokens: Math.max(
+      0,
+      (current.total_tokens ?? 0) - (previous.total_tokens ?? 0),
+    ),
   };
 }
 
@@ -1401,20 +1509,13 @@ function codexUsageFromThread(
     };
   }
 
-  const cachedInput = usage.cached_input_tokens ?? 0;
-  const input = Math.max(0, (usage.input_tokens ?? 0) - cachedInput);
-  return {
-    inputTokens: input,
-    outputTokens: usage.output_tokens ?? 0,
-    cacheReadInputTokens: cachedInput,
-    cacheCreationInputTokens: 0,
-    reasoningOutputTokens: usage.reasoning_output_tokens ?? 0,
-  };
+  return codexUsageFromTokenUsage(usage);
 }
 
 function parseCodexUsage(): {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
+  hourlyUsage: Map<number, HourlyUsageBucket>;
   projectTokens: Map<string, number>;
   projectModelUsage: Map<string, Map<string, ModelUsage>>;
   projectActivity: Map<
@@ -1444,6 +1545,7 @@ function parseCodexUsage(): {
 } {
   const modelUsage: Record<string, ModelUsage> = {};
   const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const hourlyUsage = new Map<number, HourlyUsageBucket>();
   const projectTokens = new Map<string, number>();
   const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
   const projectActivity = new Map<
@@ -1520,6 +1622,21 @@ function parseCodexUsage(): {
 
     modelUsage[key] ??= emptyModelUsage();
     addModelUsage(modelUsage[key], usage);
+    if (session?.tokenEvents.length) {
+      let previousUsage: CodexTokenUsage | null = null;
+      for (const event of session.tokenEvents) {
+        const delta = codexTokenUsageDelta(event.usage, previousUsage);
+        previousUsage = event.usage;
+        addHourlyUsage(
+          hourlyUsage,
+          event.timestampMs,
+          key,
+          codexUsageFromTokenUsage(delta),
+        );
+      }
+    } else {
+      addHourlyUsage(hourlyUsage, updatedMs || createdMs, key, usage);
+    }
 
     let byModel = dailyModelUsage.get(date);
     if (!byModel) {
@@ -1603,6 +1720,7 @@ function parseCodexUsage(): {
     const usage = codexUsageFromThread({ tokens_used: row.tokens_used }, null);
     const timestampMs = (row.updated_at || row.created_at) * 1000;
     if (!timestampMs) continue;
+    addHourlyUsage(hourlyUsage, timestampMs, key, usage);
     ledger.push({
       id: `codex:${row.id}`,
       provider: "codex",
@@ -1622,6 +1740,7 @@ function parseCodexUsage(): {
   return {
     modelUsage,
     dailyModelUsage,
+    hourlyUsage,
     projectTokens,
     projectModelUsage,
     projectActivity,
@@ -1683,9 +1802,68 @@ function serializeLedgerRows(
         tokens: row.tokens,
         costUSD,
         costBasis: row.costBasis,
+        usageByModel: serializeUsageByModel(row.usageByModel, pricing),
       };
     })
     .sort((a, b) => b.timestampMs - a.timestampMs);
+}
+
+function serializeUsageByModel(
+  usageByModel: Map<string, ModelUsage>,
+  pricing: PricingTable,
+): Record<string, SerializedModelUsage> {
+  return Object.fromEntries(
+    Array.from(usageByModel.entries()).map(([model, usage]) => [
+      model,
+      {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadInputTokens,
+        cacheCreationTokens: usage.cacheCreationInputTokens,
+        reasoningTokens: usage.reasoningOutputTokens ?? 0,
+        costUSD: calcCost(usage, rawModelFromKey(model), pricing),
+        provider: providerFromModelKey(model),
+        isExternal: isExternal(
+          rawModelFromKey(model),
+          pricing.externalModelPrefixes,
+        ),
+      },
+    ]),
+  );
+}
+
+function serializeHourlyUsage(
+  buckets: Map<number, HourlyUsageBucket>,
+  pricing: PricingTable,
+) {
+  return Array.from(buckets.values())
+    .map((bucket) => {
+      const tokensByModel = Object.fromEntries(
+        Array.from(bucket.usageByModel.entries()).map(([model, usage]) => [
+          model,
+          modelUsageTotal(usage),
+        ]),
+      );
+      const usageByModel = serializeUsageByModel(bucket.usageByModel, pricing);
+      return {
+        timestampMs: bucket.timestampMs,
+        date: fmtDate(bucket.timestampMs),
+        messages: 0,
+        sessions: 0,
+        toolCalls: 0,
+        tokens: Object.values(tokensByModel).reduce(
+          (sum, value) => sum + value,
+          0,
+        ),
+        tokensByModel,
+        usageByModel,
+        costUSD: Object.values(usageByModel).reduce(
+          (sum, usage) => sum + usage.costUSD,
+          0,
+        ),
+      };
+    })
+    .sort((a, b) => a.timestampMs - b.timestampMs);
 }
 
 export async function buildStats() {
@@ -2032,6 +2210,14 @@ export async function buildStats() {
     [...transcriptUsage.ledger, ...codexUsage.ledger],
     pricing,
   );
+  const hourlyUsage = new Map<number, HourlyUsageBucket>();
+  for (const source of [transcriptUsage.hourlyUsage, codexUsage.hourlyUsage]) {
+    for (const bucket of source.values()) {
+      for (const [model, usage] of bucket.usageByModel.entries()) {
+        addHourlyUsage(hourlyUsage, bucket.timestampMs, model, usage);
+      }
+    }
+  }
 
   return {
     period: { from: periodFrom, to: periodTo },
@@ -2069,6 +2255,7 @@ export async function buildStats() {
     dataHealth,
     daily,
     ledger,
+    hourlyUsage: serializeHourlyUsage(hourlyUsage, pricing),
     activityDays: Array.from(activityByDate.entries())
       .map(([date, activity]) => ({
         date,

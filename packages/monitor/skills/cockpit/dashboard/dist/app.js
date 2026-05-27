@@ -262,7 +262,7 @@ export const store = reactive({
 
   isProjectExpanded(group) {
     const o = this.expandedOverrides[group.project];
-    return o === undefined ? defaultExpanded(group) : o;
+    return o === undefined ? defaultExpanded() : o;
   },
 
   openDesignSystem() {
@@ -443,6 +443,10 @@ export const store = reactive({
     return this.navSessions.length;
   },
 
+  get activeProjectCount() {
+    return this.projectGroups.filter((g) => g.activeCount > 0).length;
+  },
+
   get navIndex() {
     return this.navSessions.findIndex((s) => this.isSelected(s));
   },
@@ -453,14 +457,15 @@ export const store = reactive({
   },
 
   // Bar readout: position among active sessions while navigable ("2 / 3", an
-  // instrument gauge), else the project (flight) count. "–" when the selection
-  // isn't one of the active sessions.
+  // instrument gauge), else the active project (flight) count. Ended-only
+  // projects are intentionally filtered out.
   get navLabel() {
     if (this.navTotal > 1) {
       const pos = this.navIndex >= 0 ? this.navIndex + 1 : "–";
       return `${pos} / ${this.navTotal}`;
     }
-    return `${this.projectGroups.length} flights`;
+    const n = this.activeProjectCount;
+    return `${n} ${n === 1 ? "flight" : "flights"}`;
   },
 
   // Step by ±1 through active sessions, wrapping at the ends. If the current

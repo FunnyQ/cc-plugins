@@ -1,5 +1,30 @@
 # Changelog
 
+## [3.5.1] - 2026-05-27
+
+### ✨ Added
+
+- **Token Atlas "Last 24 hours" range**: the usage dashboard now offers a rolling 24-hour view alongside the existing ranges. Its overview cards, model mix, heatmap, and the previous-period comparison are all aggregated over the same rolling window.
+- **Hourly trend chart for the 24h range**: when "Last 24 hours" is active, the trend chart breaks down into 24 hourly buckets (with hourly chart title and aria labels), so you can see usage shape across the day instead of a single daily total.
+- **Cockpit "jump to latest" controls**: live transcript and decision-log panes now show a floating jump-to-bottom control when new content arrives while you're scrolled away, with a CRT-style reveal animation. One shared pinned threshold keeps both columns consistent.
+
+### 🐛 Fixed
+
+- **Atlas 24h totals now agree across the page**: overview tokens, cost, model totals, and the trend chart are all built from the same hourly usage buckets, so the summary cards and the chart no longer disagree. Session, message, and tool-call counts stay deduped from the rolling ledger window.
+- **Codex hourly usage matches thread totals**: Codex token-count events are now stored as cumulative snapshots and hourly buckets are derived from adjacent deltas, so the hourly trend sums to the same token semantics as the thread totals.
+- **No more double-minus deltas**: summary delta percentages are formatted from absolute values with the sign driven only by direction, fixing the doubled negative sign on declines.
+- **Atlas auto-refresh stays recoverable**: stats and live fetches now have timeouts, overlapping live polls no longer stack up, and stats refresh immediately when the tab returns to the foreground — so a stalled fetch no longer wedges the dashboard.
+- **Cockpit active-project / active-session counts**: the manifest readout now counts only projects and sessions that are actually active, so ended sessions no longer inflate the displayed flight count.
+
+### 💄 Polish
+
+- **Cockpit mobile layout**: on narrow screens the decision log sits above the live transcript, stays compact by default so the latest card is visible, and expands to half the viewport after you scroll or touch it.
+- **Cockpit dashboard refinements**: stabilized Atlas selected-project cards (non-layout corner indicator + inset rings), aligned instrument header heights, enlarged and clarified project-rail carets, made the whole projects bar a toggle target, simplified session rows, and moved the send box under the Live Transcript column.
+
+### 📝 Documentation
+
+- **Cockpit backlog & enhancement roadmap** added (`packages/monitor/skills/cockpit/BACKLOG.md`): `@`-file mentions in the send box, a skill-list panel, spawning new sessions from cockpit, and a note on slash-command constraints — captured from Permission Relay testing.
+
 ## [3.5.0] - 2026-05-27
 
 ### ✨ Added

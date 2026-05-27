@@ -33,6 +33,23 @@ import {
 // any object property, but Chart.js stores Maps internally which crashes its
 // reactive Proxy creation (`new Proxy(map, null)`).
 const charts = { trend: null, donut: null };
+const STATS_REFRESH_TIMEOUT_MS = 20_000;
+const LIVE_REFRESH_TIMEOUT_MS = 8_000;
+const ROLLING_24H_MS = 24 * 60 * 60 * 1000;
+
+async function fetchJsonWithTimeout(path, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(path, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 export function App() {
   const initialPrefs = normalizePrefs(loadStoredPrefs());
@@ -43,7 +60,7 @@ export function App() {
     refreshInFlight: false,
     refreshTimer: null,
     error: null,
-    rangeKey: initialPrefs.rangeKey ?? "7",
+    rangeKey: initialPrefs.rangeKey ?? "24h",
     providerKey: initialPrefs.providerKey ?? "all",
     trendMode: initialPrefs.trendMode ?? "tokens",
     trendModelScope: initialPrefs.trendModelScope ?? "all",
@@ -58,6 +75,7 @@ export function App() {
     livePollTimer: null,
     liveTickTimer: null,
     liveVisibilityHandler: null,
+    liveFetchInFlight: false,
     nowTick: Date.now(),
     ledgerSortKey: "date",
     ledgerVisibleCount: LEDGER_INITIAL_VISIBLE,
@@ -82,7 +100,9 @@ export function App() {
       this.startLivePolling();
       this.startLiveClock();
       this.liveVisibilityHandler = () => {
-        if (!document.hidden) this.fetchLive();
+        if (document.hidden) return;
+        this.refresh({ quiet: true });
+        this.fetchLive();
       };
       document.addEventListener("visibilitychange", this.liveVisibilityHandler);
     },
@@ -123,12 +143,13 @@ export function App() {
     },
 
     async fetchLive() {
-      if (document.hidden) return;
+      if (document.hidden || this.liveFetchInFlight) return;
+      this.liveFetchInFlight = true;
       try {
-        const res = await fetch("/api/live");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        const data = await fetchJsonWithTimeout(
+          "/api/live",
+          LIVE_REFRESH_TIMEOUT_MS,
+        );
         this.liveSessions = data.sessions ?? [];
         // Missing field (older server) → assume up so we never nag wrongly.
         this.cockpitUp = data.cockpitUp !== false;
@@ -137,6 +158,8 @@ export function App() {
         this.liveError = null;
       } catch (err) {
         this.liveError = err.message ?? String(err);
+      } finally {
+        this.liveFetchInFlight = false;
       }
     },
 
@@ -166,10 +189,10 @@ export function App() {
       if (!quiet) this.loading = true;
       if (!quiet) this.error = null;
       try {
-        const res = await fetch("/api/stats");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        const data = await fetchJsonWithTimeout(
+          "/api/stats",
+          STATS_REFRESH_TIMEOUT_MS,
+        );
         this.stats = data;
         this.reconcileSelectedModels();
         this.reconcileSelectedProject();
@@ -301,6 +324,7 @@ export function App() {
 
     get filteredDaily() {
       if (!this.stats) return [];
+      if (this.rangeKey === "24h") return [this.hourlyWindowDay("24h")];
       const all = this.stats.daily;
       const providerFiltered = all.map((d) => this.filterDayByProvider(d));
       if (this.rangeKey === "all") return providerFiltered;
@@ -314,6 +338,9 @@ export function App() {
 
     get comparisonDaily() {
       if (!this.stats || this.rangeKey === "all") return [];
+      if (this.rangeKey === "24h") {
+        return [this.hourlyWindowDay("previous-24h", 2, 1)];
+      }
       const days = parseInt(this.rangeKey, 10);
       if (!Number.isFinite(days) || days <= 0) return [];
       const providerFiltered = this.stats.daily.map((d) =>
@@ -334,7 +361,18 @@ export function App() {
 
     get previousTrendLabel() {
       if (this.rangeKey === "all") return "";
+      if (this.rangeKey === "24h") return "Previous 24h";
       return `Previous ${this.rangeKey}d`;
+    },
+
+    get trendChartTitle() {
+      return this.rangeKey === "24h" ? "Hourly trend" : "Daily trend";
+    },
+
+    get trendChartAriaLabel() {
+      return this.rangeKey === "24h"
+        ? "Hourly usage trend chart"
+        : "Daily usage trend chart";
     },
 
     get comparisonSummary() {
@@ -427,6 +465,173 @@ export function App() {
         }
       }
       return { messages, sessions, toolCalls, tokens, cost };
+    },
+
+    rollingLedgerRows(fromHoursAgo = 1, toHoursAgo = 0) {
+      if (!this.stats?.ledger) return [];
+      const now = Date.now();
+      const start = now - fromHoursAgo * ROLLING_24H_MS;
+      const end = now - toHoursAgo * ROLLING_24H_MS;
+      return this.stats.ledger.filter((row) => {
+        if (this.providerKey !== "all" && row.provider !== this.providerKey) {
+          return false;
+        }
+        const ts = Number(row.timestampMs);
+        return Number.isFinite(ts) && ts >= start && ts < end;
+      });
+    },
+
+    dayFromLedgerRows(date, fromHoursAgo = 1, toHoursAgo = 0) {
+      const rows = this.rollingLedgerRows(fromHoursAgo, toHoursAgo);
+      return this.aggregateLedgerRows(date, rows);
+    },
+
+    hourlyWindowDay(date, fromHoursAgo = 1, toHoursAgo = 0) {
+      const hourly = this.aggregateLedgerRows(
+        date,
+        this.hourlyLedgerBuckets(fromHoursAgo, toHoursAgo),
+      );
+      const activity = this.dayFromLedgerRows(date, fromHoursAgo, toHoursAgo);
+      return {
+        ...hourly,
+        messages: activity.messages,
+        sessions: activity.sessions,
+        toolCalls: activity.toolCalls,
+        providers: activity.providers,
+      };
+    },
+
+    aggregateLedgerRows(date, rows) {
+      const usageByModel = {};
+      const tokensByModel = {};
+      const providers = {
+        claude: { messages: 0, sessions: 0, toolCalls: 0 },
+        codex: { messages: 0, sessions: 0, toolCalls: 0 },
+      };
+      let messages = 0;
+      let sessions = 0;
+      let toolCalls = 0;
+      let tokens = 0;
+      let costUSD = 0;
+      const seenSessions = new Set();
+
+      for (const row of rows) {
+        const provider = row.provider ?? providerForModel(row.model ?? "");
+        const model = row.model || `${provider}:unknown`;
+        const rowTokens = row.tokens ?? 0;
+        const rowCost = row.costUSD ?? 0;
+        const rowMessages = row.interactions ?? 0;
+        const rowToolCalls = row.toolCalls ?? 0;
+        messages += rowMessages;
+        toolCalls += rowToolCalls;
+        tokens += rowTokens;
+        costUSD += rowCost;
+        if (!seenSessions.has(row.id)) {
+          seenSessions.add(row.id);
+          sessions += 1;
+        }
+        if (providers[provider]) {
+          providers[provider].messages += rowMessages;
+          providers[provider].toolCalls += rowToolCalls;
+          providers[provider].sessions += 1;
+        }
+        const sourceUsageByModel = row.usageByModel ?? {
+          [model]: {
+            inputTokens: rowTokens,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 0,
+            reasoningTokens: 0,
+            costUSD: rowCost,
+            provider,
+            isExternal: provider !== "claude",
+          },
+        };
+        for (const [usageModel, sourceUsage] of Object.entries(
+          sourceUsageByModel,
+        )) {
+          const usageProvider =
+            sourceUsage.provider ?? providerForModel(usageModel);
+          if (
+            this.providerKey !== "all" &&
+            usageProvider !== this.providerKey
+          ) {
+            continue;
+          }
+          const usage = usageByModel[usageModel] ?? {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 0,
+            reasoningTokens: 0,
+            costUSD: 0,
+            provider: usageProvider,
+            isExternal: usageProvider !== "claude",
+          };
+          usage.inputTokens += sourceUsage.inputTokens ?? 0;
+          usage.outputTokens += sourceUsage.outputTokens ?? 0;
+          usage.cacheReadTokens += sourceUsage.cacheReadTokens ?? 0;
+          usage.cacheCreationTokens += sourceUsage.cacheCreationTokens ?? 0;
+          usage.reasoningTokens += sourceUsage.reasoningTokens ?? 0;
+          usage.costUSD += sourceUsage.costUSD ?? 0;
+          usage.isExternal = usage.isExternal || sourceUsage.isExternal;
+          usageByModel[usageModel] = usage;
+          tokensByModel[usageModel] =
+            (tokensByModel[usageModel] ?? 0) +
+            (sourceUsage.inputTokens ?? 0) +
+            (sourceUsage.outputTokens ?? 0) +
+            (sourceUsage.cacheReadTokens ?? 0) +
+            (sourceUsage.cacheCreationTokens ?? 0) +
+            (sourceUsage.reasoningTokens ?? 0);
+        }
+      }
+
+      return {
+        date,
+        messages,
+        sessions,
+        toolCalls,
+        tokens,
+        tokensByModel,
+        usageByModel,
+        costUSD,
+        providers,
+      };
+    },
+
+    hourlyLedgerBuckets(fromHoursAgo = 1, toHoursAgo = 0) {
+      const now = Date.now();
+      const windowStart = now - fromHoursAgo * ROLLING_24H_MS;
+      const windowEnd = now - toHoursAgo * ROLLING_24H_MS;
+      const endHour = new Date(windowEnd);
+      endHour.setMinutes(0, 0, 0);
+      const endHourMs = endHour.getTime();
+      const startHourMs = endHourMs - 23 * 60 * 60 * 1000;
+      const buckets = Array.from({ length: 24 }, (_, index) => {
+        const bucketMs = startHourMs + index * 60 * 60 * 1000;
+        return {
+          key: bucketMs,
+          rows: [],
+        };
+      });
+      const bucketByMs = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+      const rows =
+        this.stats?.hourlyUsage ??
+        this.rollingLedgerRows(fromHoursAgo, toHoursAgo);
+      for (const row of rows) {
+        const ts = Number(row.timestampMs);
+        if (!Number.isFinite(ts)) continue;
+        if (ts < windowStart || ts >= windowEnd) continue;
+        const hour = new Date(ts);
+        hour.setMinutes(0, 0, 0);
+        const bucket = bucketByMs.get(hour.getTime());
+        if (bucket) bucket.rows.push(row);
+      }
+
+      return buckets.map((bucket) =>
+        this.aggregateLedgerRows(this.hourBucketLabel(bucket.key), bucket.rows),
+      );
     },
 
     get filteredByModel() {
@@ -702,11 +907,13 @@ export function App() {
     },
 
     get activeWindowLabel() {
+      if (this.rangeKey === "24h") return "last 24 hours";
       if (this.rangeKey === "all") return "all time";
       return `last ${this.rangeKey} days`;
     },
 
     get activeDateRangeLabel() {
+      if (this.rangeKey === "24h") return "Rolling 24 hours";
       const daily = this.filteredDaily;
       if (!daily.length) return "";
       const first = this.parseDate(daily[0].date);
@@ -863,6 +1070,11 @@ export function App() {
 
     get filteredLedger() {
       if (!this.stats?.ledger) return [];
+      if (this.rangeKey === "24h") {
+        return this.rollingLedgerRows().sort((a, b) =>
+          this.compareLedgerRows(a, b),
+        );
+      }
       const dates = this.filteredDaily;
       const firstDate = this.rangeKey === "all" ? null : dates[0]?.date;
       const lastDate =
@@ -935,7 +1147,15 @@ export function App() {
     get heatmapCells() {
       if (!this.stats) return [];
       let matrix;
-      if (this.rangeKey === "all" || !this.stats.dailyHourCounts) {
+      if (this.rangeKey === "24h") {
+        matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
+        for (const row of this.rollingLedgerRows()) {
+          const ts = Number(row.timestampMs);
+          if (!Number.isFinite(ts)) continue;
+          const d = new Date(ts);
+          matrix[d.getDay()][d.getHours()] += row.interactions ?? 0;
+        }
+      } else if (this.rangeKey === "all" || !this.stats.dailyHourCounts) {
         matrix = this.stats.weekHourMatrix;
       } else {
         matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
@@ -1434,7 +1654,8 @@ export function App() {
       }
 
       const delta = current - previous;
-      const windowLabel = `previous ${this.rangeKey}d`;
+      const windowLabel =
+        this.rangeKey === "24h" ? "previous 24h" : `previous ${this.rangeKey}d`;
       if (previous === 0) {
         return {
           available: true,
@@ -1455,10 +1676,10 @@ export function App() {
         };
       }
 
-      const pct = (delta / previous) * 100;
+      const pct = Math.abs((delta / previous) * 100);
       const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
       const formattedDelta = this.formatDeltaValue(metric, Math.abs(delta));
-      const formattedPct = `${sign}${pct.toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%`;
+      const formattedPct = `${sign}${pct.toFixed(pct >= 10 ? 0 : 1)}%`;
       return {
         available: true,
         state: delta > 0 ? "increase" : delta < 0 ? "decrease" : "neutral",
@@ -1557,6 +1778,13 @@ export function App() {
       });
       if (first.getTime() === last.getTime()) return fmt.format(first);
       return `${fmt.format(first)} - ${fmt.format(last)}`;
+    },
+
+    hourBucketLabel(timestampMs) {
+      return new Date(timestampMs).toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     },
 
     formatDateTime(value) {
@@ -1791,12 +2019,17 @@ export function App() {
       if (!window.Chart || !this.stats) return;
       const ctx = this.$refs.trendCanvas?.getContext("2d");
       if (!ctx) return;
-      const daily = this.filteredDaily;
-      const labels = daily.map((d) => d.date);
+      const trendBuckets =
+        this.rangeKey === "24h"
+          ? this.hourlyLedgerBuckets()
+          : this.filteredDaily;
+      const labels = trendBuckets.map((d) => d.date);
       const isCost = this.trendMode === "cost";
       const activeModels = this.activeTrendModels;
-      const previousDaily = this.previousTrendAvailable
-        ? this.comparisonDaily
+      const previousBuckets = this.previousTrendAvailable
+        ? this.rangeKey === "24h"
+          ? this.hourlyLedgerBuckets(2, 1)
+          : this.comparisonDaily
         : [];
 
       if (charts.trend) {
@@ -1814,7 +2047,7 @@ export function App() {
       const datasets = activeModels.map((m) => ({
         label: shortModel(m),
         provider: providerForModel(m),
-        data: daily.map((d) =>
+        data: trendBuckets.map((d) =>
           isCost
             ? (d.usageByModel?.[m]?.costUSD ?? 0)
             : (d.tokensByModel?.[m] ?? 0),
@@ -1828,11 +2061,11 @@ export function App() {
         barPercentage: 0.82,
       }));
 
-      if (previousDaily.length) {
+      if (previousBuckets.length) {
         datasets.push({
           type: "line",
           label: this.previousTrendLabel,
-          data: previousDaily.map((d) =>
+          data: previousBuckets.map((d) =>
             this.trendDayValue(d, activeModels, isCost),
           ),
           borderColor: cssVar("--accent"),
@@ -1850,8 +2083,8 @@ export function App() {
 
       const maxTrendValue = Math.max(
         0,
-        ...daily.map((d) => this.trendDayValue(d, activeModels, isCost)),
-        ...previousDaily.map((d) =>
+        ...trendBuckets.map((d) => this.trendDayValue(d, activeModels, isCost)),
+        ...previousBuckets.map((d) =>
           this.trendDayValue(d, activeModels, isCost),
         ),
       );

@@ -66,8 +66,8 @@ export function orderProjects(groups) {
   });
 }
 
-// Default expansion: open projects that have an active session, collapse
-// fully-ended ones. The store overrides this per user toggle (persisted).
-export function defaultExpanded(group) {
-  return group.activeCount > 0;
+// Default expansion: keep project groups open so ended-only projects still show
+// their history at a glance. The store overrides this per user toggle.
+export function defaultExpanded() {
+  return true;
 }

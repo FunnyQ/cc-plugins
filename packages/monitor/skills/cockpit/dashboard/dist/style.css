@@ -624,6 +624,10 @@ body {
   justify-content: center;
   gap: clamp(8px, 2vw, 20px);
   flex-shrink: 0;
+  cursor: pointer;
+}
+.manifest__bar:hover .manifest__legend {
+  color: var(--starlight);
 }
 .manifest__toggle {
   display: flex;
@@ -636,11 +640,8 @@ body {
   background: transparent;
   color: var(--starlight);
   font: inherit;
-  cursor: pointer;
+  cursor: inherit;
   text-align: center;
-}
-.manifest__toggle:hover .manifest__legend {
-  color: var(--starlight);
 }
 /* Centered HUD readout: PROJECTS legend over a pulsing waypoint triangle. */
 .manifest__toggle .manifest__legend {
@@ -760,7 +761,9 @@ body {
 }
 .flight__caret {
   flex-shrink: 0;
-  font-size: 10px;
+  inline-size: 20px;
+  font-size: 24px;
+  line-height: 1;
   color: var(--ink-faint);
 }
 .flight__name {
@@ -810,43 +813,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
-}
-/* Fine-grained status pill beside the LED: a compact mono chip tinted to the
-   same token as its LED, so the word reinforces the colour rather than adding a
-   second vocabulary. `--chip` is the single hue source (border + tinted fill +
-   text all read it); each `.is-*` just reassigns it. Default = idle. */
-.leg__status {
-  --chip: var(--idle);
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border: 1px solid color-mix(in oklch, var(--chip) 45%, var(--edge));
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--chip) 12%, transparent);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chip);
-}
-.leg__status.is-active,
-.leg__status.is-working {
-  --chip: var(--engine);
-}
-.leg__status.is-waiting {
-  --chip: var(--signal);
-}
-.leg__status.is-your-call {
-  --chip: var(--lit-fill);
-}
-.leg__status.is-idle {
-  --chip: var(--idle);
-}
-.leg__status.is-shell {
-  --chip: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
-}
-.leg__status.is-ended {
-  --chip: var(--ended);
 }
 /* A live session with no cockpit registry entry: dashed (not anchored) + muted,
    so it reads as "running, but no decision trail" without competing with the
@@ -913,6 +879,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-block-size: 44px;
   padding: 10px 16px;
   background: var(--space);
   border-bottom: 1px solid var(--edge-soft);
@@ -1057,19 +1024,122 @@ body {
 }
 
 .instrument__body {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-x);
 }
+.instrument__body.has-jump-latest {
+  padding-bottom: calc(var(--space-x) + 44px);
+}
 .placeholder {
   color: var(--ink-faint);
   font-style: italic;
 }
+.jump-latest {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  transform: translateX(-50%) translateY(0) scale(1);
+  padding: 6px 10px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 52%, var(--edge));
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--aurora) 18%, var(--space));
+  color: var(--starlight);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 0 18px 0 color-mix(in oklch, var(--aurora) 18%, transparent);
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  will-change: clip-path, opacity, transform;
+}
+.jump-latest:hover {
+  background: color-mix(in oklch, var(--aurora) 28%, var(--space));
+}
+.jump-latest.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.jump-latest.is-entering {
+  animation: jump-latest-crt-in 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.jump-latest.is-leaving {
+  animation: jump-latest-float-out 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
+.jump-latest[hidden] {
+  display: none;
+}
+@keyframes jump-latest-crt-in {
+  0% {
+    clip-path: inset(45% 48% 45% 48% round 999px);
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.08);
+    filter: brightness(2.4) saturate(1.6);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--aurora) 80%, transparent),
+      0 0 36px 10px color-mix(in oklch, var(--aurora) 34%, transparent);
+  }
+  18% {
+    clip-path: inset(43% 46% 43% 46% round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(4px) scale(0.36);
+    filter: brightness(2.8) saturate(1.7);
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--aurora) 82%, transparent),
+      0 0 42px 14px color-mix(in oklch, var(--aurora) 42%, transparent);
+  }
+  46% {
+    clip-path: inset(46% 5% 46% 5% round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scaleX(1.08) scaleY(0.18);
+    filter: brightness(2.1) saturate(1.45);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--aurora) 74%, transparent),
+      0 0 34px 8px color-mix(in oklch, var(--aurora) 34%, transparent);
+  }
+  68% {
+    clip-path: inset(0 0 0 0 round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scaleX(1.05) scaleY(1.16);
+    filter: brightness(1.35) saturate(1.18);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--aurora) 60%, transparent),
+      0 0 26px 4px color-mix(in oklch, var(--aurora) 26%, transparent);
+  }
+  100% {
+    clip-path: inset(0 0 0 0 round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 18px 0 color-mix(in oklch, var(--aurora) 18%, transparent);
+  }
+}
+@keyframes jump-latest-float-out {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-34px) scale(0.86);
+    filter: brightness(1.35) blur(1px);
+  }
+}
 
-/* Channel console — the send box for talking into a live Claude session. Sits
-   at the bottom of the Decision Log column, so the border reads along its top. */
+/* Channel console — the send box for talking into a live session. Sits at the
+   bottom of the Live Transcript column, so the border reads along its top. */
 .channel-console {
   position: relative;
   z-index: 3;
@@ -2329,8 +2399,43 @@ body {
 
 @media (max-width: 1100px) {
   .instruments {
+    --transcript-mobile-reserve: 164px;
+    --decision-row-block-size: clamp(230px, 34svh, 320px);
     grid-template-columns: 1fr;
-    grid-auto-rows: minmax(200px, 1fr);
+    grid-template-rows: var(--decision-row-block-size) minmax(0, 1fr);
+    overflow: hidden;
+    transition: grid-template-rows 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  #col-decision {
+    order: 1;
+    block-size: auto;
+    min-block-size: 0;
+  }
+
+  .instruments.is-decision-expanded {
+    grid-template-rows:
+      min(50svh, calc(100% - var(--transcript-mobile-reserve)))
+      minmax(0, 1fr);
+  }
+
+  #col-transcript {
+    order: 2;
+    min-block-size: 0;
+  }
+
+  .channel-console {
+    flex-shrink: 0;
+    padding: 8px 12px;
+  }
+
+  .channel-send {
+    align-items: end;
+  }
+
+  .channel-send__input {
+    min-height: 52px;
+    max-height: 96px;
   }
 }
 
