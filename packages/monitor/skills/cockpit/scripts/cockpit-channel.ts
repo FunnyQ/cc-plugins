@@ -376,22 +376,44 @@ async function ensureCockpitDaemon(): Promise<DaemonCoords | null> {
   return await waitForDaemonCoords();
 }
 
+// Overall wall-clock budget for a single permission relay's verdict pull. The
+// daemon's per-hop sentinel re-poll has no natural end, so without this a pull
+// for a request answered in the TUI (which never produces a UI verdict, and may
+// not be superseded by a follow-up request) would loop forever, wedging the
+// serialized relay chain behind it. Generous enough to outlast a real human
+// deliberation in cockpit.
+const PULL_BUDGET_MS = 5 * 60_000;
+
+// Sentinel: the pull was abandoned (aborted by a newer request, budget elapsed,
+// or the daemon reported the request resolved elsewhere). handleRequest must NOT
+// echo a verdict on this — there is no decision to send back.
+export const ABANDONED = Symbol("permission-pull-abandoned");
+export type PullOutcome = PermissionVerdict | typeof ABANDONED | null;
+
 // Long-poll the daemon for a verdict, re-polling on the {verdict:null,
 // timeout:true} sentinel (mirrors the inbox re-park pattern) until a real
-// {request_id, behavior} arrives. Independent of the inbox poll. Returns null if
-// coords are unavailable / the daemon stays unreachable past the retry budget.
-async function pullVerdict(opts: {
+// {request_id, behavior} arrives. Bounded by an overall wall-clock budget AND an
+// AbortSignal: on abort or budget-exceeded it returns ABANDONED instead of
+// looping forever (a TUI/hook resolution never produces a UI verdict). The
+// daemon may also resolve the parked pull with {abandoned:true} (supersede /
+// transcript progress) — treated like an abort. Returns null only if coords are
+// unavailable / the daemon stays unreachable past the retry budget.
+export async function pullVerdict(opts: {
   sessionId: string;
   coords: () => DaemonCoords | null;
   ensure: () => Promise<DaemonCoords | null>;
   fetchImpl?: typeof fetch;
   maxFailures?: number;
-}): Promise<PermissionVerdict | null> {
+  signal?: AbortSignal;
+  budgetMs?: number;
+}): Promise<PullOutcome> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxFailures = opts.maxFailures ?? 6;
+  const deadline = Date.now() + (opts.budgetMs ?? PULL_BUDGET_MS);
   let coords = opts.coords();
   let failures = 0;
   while (true) {
+    if (opts.signal?.aborted || Date.now() >= deadline) return ABANDONED;
     if (!coords) coords = await opts.ensure();
     if (!coords) {
       if (failures >= maxFailures) return null;
@@ -401,6 +423,7 @@ async function pullVerdict(opts: {
     try {
       const r = await fetchImpl(
         `http://127.0.0.1:${coords.port}/api/permission-pull?session=${opts.sessionId}&token=${coords.token}`,
+        { signal: opts.signal },
       );
       if (!r.ok) throw new Error(`permission-pull failed: ${r.status}`);
       const body = (await r.json()) as {
@@ -408,9 +431,12 @@ async function pullVerdict(opts: {
         behavior?: unknown;
         verdict?: unknown;
         timeout?: unknown;
+        abandoned?: unknown;
       };
       failures = 0;
-      // Re-pollable sentinel — keep waiting.
+      // Resolved elsewhere — stop pulling, send no verdict.
+      if (body.abandoned === true) return ABANDONED;
+      // Re-pollable sentinel — keep waiting (re-check budget/abort at loop top).
       if (body.timeout === true) continue;
       if (
         typeof body.request_id === "string" &&
@@ -420,6 +446,8 @@ async function pullVerdict(opts: {
       }
       // Unexpected shape — re-poll rather than echo a bogus verdict.
     } catch (err) {
+      // An aborted fetch is expected on supersede — surface it as ABANDONED.
+      if (opts.signal?.aborted) return ABANDONED;
       if (failures >= maxFailures) return null;
       const delay = nextReconnectDelayMs(failures++);
       console.error(
@@ -445,6 +473,11 @@ export function registerPermissionRelay(opts: {
 }): void {
   const fetchImpl = opts.fetchImpl ?? fetch;
   let chain: Promise<void> = Promise.resolve();
+  // The current in-flight relay's AbortController. Claude serializes tool
+  // prompts, so a NEW permission_request proves the previous one resolved
+  // (in the TUI / by a hook, with no UI verdict ever coming) — abort its pull so
+  // the chained next request can proceed instead of waiting out the budget.
+  let inFlight: AbortController | null = null;
   const onError = (err: unknown) =>
     console.error(
       `cockpit-channel: permission relay failed (${(err as Error).message})`,
@@ -466,25 +499,38 @@ export function registerPermissionRelay(opts: {
     if (!r.ok) throw new Error(`${path} failed: ${r.status}`);
   };
 
-  const handleRequest = async (params?: Record<string, unknown>) => {
+  const handleRequest = async (
+    params: Record<string, unknown> | undefined,
+    signal: AbortSignal,
+  ) => {
     await post("/api/permission-request", (coords) =>
       permissionRequestPayload(opts.sessionId, coords.token, params),
     );
-    const verdict = await pullVerdict({
+    const outcome = await pullVerdict({
       sessionId: opts.sessionId,
       coords: opts.coords,
       ensure: opts.ensure,
       fetchImpl,
+      signal,
     });
-    if (!verdict) return; // gave up; terminal dialog still resolves locally
-    await opts.mcp.notification(permissionVerdictNotification(verdict));
+    // ABANDONED (aborted by a newer request / budget / resolved-elsewhere) or
+    // null (gave up) → send no verdict; the terminal dialog resolved it locally.
+    if (outcome === ABANDONED || outcome === null) return;
+    await opts.mcp.notification(permissionVerdictNotification(outcome));
   };
 
   opts.mcp.setNotificationHandler(PermissionRequestSchema, (notification) => {
     const params = notification.params as Record<string, unknown> | undefined;
+    // A new request proves the previous one resolved — abort its in-flight pull
+    // so the chain doesn't wedge behind a forever-parked long-poll.
+    inFlight?.abort();
+    const controller = new AbortController();
+    inFlight = controller;
     // Fire-and-forget on a serialized chain — never block the SDK's notification
     // dispatch (which shares the read loop with the inbox poll's re-parking).
-    chain = chain.then(() => handleRequest(params)).catch(onError);
+    chain = chain
+      .then(() => handleRequest(params, controller.signal))
+      .catch(onError);
   });
 
   // Defensive: if Claude ever notifies the channel that a request was resolved
