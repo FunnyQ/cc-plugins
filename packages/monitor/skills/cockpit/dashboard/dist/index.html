@@ -156,11 +156,6 @@
                       :class="s.liveStatus || s.status"
                     ></span>
                     <span
-                      class="leg__status"
-                      :class="'is-' + (s.liveStatus || s.status)"
-                      v-text="legStatusLabel(s)"
-                    ></span>
-                    <span
                       class="provider-badge"
                       :class="'provider-badge--' + (s.provider || 'claude')"
                       v-text="(s.provider || 'claude').toUpperCase()"
