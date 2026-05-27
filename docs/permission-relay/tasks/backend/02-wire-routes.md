@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/01
 > **Blocks**: channel/01, ui/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -48,17 +48,17 @@ or binding changes — the server already binds `127.0.0.1`.
 
 ## Acceptance criteria
 
-- [ ] All five permission endpoints are routed in `cockpit-server.ts`.
-- [ ] The routes sit before the static-file fallback so they aren't shadowed.
-- [ ] No existing route is altered or reordered in a way that changes behavior.
+- [x] All five permission endpoints are routed in `cockpit-server.ts`.
+- [x] The routes sit before the static-file fallback so they aren't shadowed.
+- [x] No existing route is altered or reordered in a way that changes behavior.
 
 ## Verification
 
-- [ ] Start the daemon: `bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts`.
-- [ ] `curl -s "localhost:5858/api/permission-stream?session=<uuid>&token=<bad>"`
+- [x] Start the daemon: `bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts`.
+- [x] `curl -s "localhost:5858/api/permission-stream?session=<uuid>&token=<bad>"`
       returns a 401 JSON body (proves the route is wired and auth runs), where the
       token is read from `~/.cockpit/daemon.json`.
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/` stays green.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/` stays green.
 
 ## Out of scope
 

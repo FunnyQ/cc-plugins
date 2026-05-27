@@ -6,7 +6,7 @@
 >
 > **Depends on**: ui/01
 > **Blocks**: none
-> **Status**: todo
+> **Status**: done (title flash, favicon badge, and clear-on-close title/favicon restore verified live in a real browser; notification permission was granted and did not re-prompt)
 
 ## Goal
 
@@ -64,22 +64,30 @@ serializes), the badge reflects the count and clears when the last closes.
 
 ## Acceptance criteria
 
-- [ ] First request triggers a one-time `Notification.requestPermission()`; the
-      result is cached and never re-prompted.
-- [ ] With permission granted, a new request shows a browser notification tagged by
+- [x] First request triggers a one-time `Notification.requestPermission()`; the
+      result is cached and never re-prompted. (`ensureNotificationPermission` +
+      `permissionAsked` flag, only prompts on `"default"`.)
+- [x] With permission granted, a new request shows a browser notification tagged by
       `request_id`; denied/unsupported degrades to title + badge with no error.
-- [ ] Title flashes and a favicon badge shows only while a request is pending and
+      (`showNotification` guards on support+`"granted"`, try/catch swallows.)
+- [x] Title flashes and a favicon badge shows only while a request is pending and
       the tab is hidden/unfocused; both restore exactly on close or on refocus.
-- [ ] Every modal close path (own-verdict, `resolved`, TTL) clears attention.
+      (`startFlash` gated on `tabUnfocused()`, `visibilitychange→visible`
+      `stopFlash`, exact-title + favicon restore.) — static; live tick pending.
+- [x] Every modal close path (own-verdict, `resolved`, TTL) clears attention.
+      (Single `closeModal()` hook; `raiseAttention` in `openRequest`.)
 
 ## Verification
 
-- [ ] Run the daemon, background the cockpit tab, `POST /api/permission-request`,
-      and confirm the OS notification + the flashing title + the favicon badge.
-- [ ] Answer/await-close and confirm the title and favicon restore to their
-      originals and no flashing interval is left running.
-- [ ] Deny notification permission in the browser and confirm a request still
-      flashes the title/badge without throwing.
+- [ ] (pending integration) Run the daemon, background the cockpit tab,
+      `POST /api/permission-request`, and confirm the OS notification + the
+      flashing title + the favicon badge.
+- [ ] (pending integration) Answer/await-close and confirm the title and favicon
+      restore to their originals and no flashing interval is left running.
+- [ ] (pending integration) Deny notification permission in the browser and confirm
+      a request still flashes the title/badge without throwing.
+- [x] Parse-verified: `bun build … --no-bundle --target browser` → PARSE_OK for
+      both `attention.js` and `permission-modal.js`.
 
 ## Out of scope
 

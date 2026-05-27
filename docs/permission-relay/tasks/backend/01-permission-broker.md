@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: backend/02, channel/01, ui/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -110,22 +110,22 @@ export function hasPendingRequest(sessionId: string): boolean;
 
 ## Acceptance criteria
 
-- [ ] `permission.ts` exports the six handlers above plus any pure helpers.
-- [ ] `POST /api/permission-request` fans a `request` SSE frame to a subscribed
+- [x] `permission.ts` exports the six handlers above plus any pure helpers.
+- [x] `POST /api/permission-request` fans a `request` SSE frame to a subscribed
       `GET /api/permission-stream`, and a tab subscribing just after still receives
       the pending request (stash replay).
-- [ ] `POST /api/permission-verdict` wakes a parked `GET /api/permission-pull` with
+- [x] `POST /api/permission-verdict` wakes a parked `GET /api/permission-pull` with
       `{request_id, behavior}` and emits a `resolved` SSE frame.
-- [ ] A verdict arriving before the pull parks is stashed and delivered on the next pull.
-- [ ] A verdict with a mismatched/stale `request_id` is rejected and resolves nothing.
-- [ ] Every handler returns 401 on a bad token and 400 on a bad session id.
+- [x] A verdict arriving before the pull parks is stashed and delivered on the next pull.
+- [x] A verdict with a mismatched/stale `request_id` is rejected and resolves nothing.
+- [x] Every handler returns 401 on a bad token and 400 on a bad session id.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/permission.test.ts` passes,
+- [x] `bun test packages/monitor/skills/cockpit/scripts/permission.test.ts` passes,
       covering: request→stream fan-out, verdict→pull wake, cold-start stash,
       stale-request-id rejection, and auth/validation failures.
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/` (full suite) stays green.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/` (full suite) stays green.
 
 ## Out of scope
 

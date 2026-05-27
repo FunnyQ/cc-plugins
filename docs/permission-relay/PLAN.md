@@ -154,11 +154,11 @@ IF one exists; the UI also TTL-dismisses as a guaranteed fallback.
 
 | Bucket | NN | Title | Status | Depends on |
 |---|---|---|---|---|
-| backend | 01 | permission-broker | todo | — |
-| backend | 02 | wire-routes | todo | backend/01 |
-| channel | 01 | permission-relay | todo | backend/01 |
-| ui | 01 | permission-modal | todo | backend/01 |
-| ui | 02 | attention | todo | ui/01 |
+| backend | 01 | permission-broker | done | — |
+| backend | 02 | wire-routes | done | backend/01 |
+| channel | 01 | permission-relay | done | backend/01 |
+| ui | 01 | permission-modal | done | backend/01 |
+| ui | 02 | attention | done | ui/01 |
 
 ## Cross-bucket dependencies
 
@@ -171,19 +171,35 @@ backend/01 ─┬─▶ backend/02
 Root (no deps): `backend/01`. Once it lands, `backend/02`, `channel/01`, and
 `ui/01` can all proceed in parallel.
 
-## Open questions
+## Open questions — RESOLVED (2026-05-27, live)
 
 1. **Does Claude Code notify the channel when a `permission_request` is resolved
-   elsewhere?** The Channels reference says a terminal answer "drops the pending
-   remote request" but is silent on whether the channel is told. No documented
-   `permission_cancel` / `permission_resolved` method. Resolve empirically during
-   `channel/01`; if one exists, wire it for an instant auto-close (the UI's TTL
-   fallback covers the case where it doesn't).
+   elsewhere?** **NO.** Live testing showed a TUI/hook resolution drops the
+   pending remote request silently — the channel is never told, no
+   `permission_cancel`/`permission_resolved` method fires. ⇒ no instant-close
+   path exists to wire; the UI's 90s TTL fallback is the sole closer for
+   resolved-elsewhere modals. (The `Later` "instant resolved-elsewhere close"
+   item is moot.)
 2. **Does a `PreToolUse` auto-approve hook suppress the channel
-   `permission_request`?** Hook-vs-channel ordering is undocumented. If the hook
-   short-circuits the prompt, no modal ever appears (best case). If both fire, the
-   auto-close lifecycle handles the stale modal. Confirm empirically during
-   `channel/01`.
+   `permission_request`?** **Mode-dependent.** Headless `claude -p`: the hook
+   short-circuits the prompt, no request reaches the channel (best case).
+   Interactive TUI: a modal can still surface and then go stale. See
+   `tasks/channel/01-permission-relay.md` Findings.
+
+### Follow-up (new, from the live findings) — ghost modals under auto-approve
+
+Because (1) there is no cancel signal and (2) Q runs an LLM auto-approve hook that
+resolves most prompts outside cockpit within ~1–2s, an auto-approve user will see
+**stale "ghost" modals lingering up to the full 90s TTL**. The MVP is correct per
+spec (TTL guarantees no zombie), but the UX is poor for this usage. Candidate
+mitigations (not yet built; decide before polishing):
+- **Shorten the TTL** — trades off against genuinely-pending prompts that wait on
+  a human (a short TTL could dismiss a real ask mid-decision).
+- **Supersede-on-next-request** — Claude serializes tool prompts, so the arrival
+  of request N+1 for a session proves request N resolved; the daemon could emit a
+  `resolved{source:"elsewhere"}` for the prior pending when a new request lands.
+  Reliable and free, but only helps when prompts keep coming.
+- Combination: supersede-on-next-request + a shorter "probably resolved" dim.
 
 ## Known gaps
 

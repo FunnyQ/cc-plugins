@@ -65,18 +65,21 @@ request. A verdict for an unknown/already-resolved id is ignored.
 
 - The **local terminal dialog stays open** the whole time. Terminal and remote
   (cockpit) race; **whichever answers first wins**, and the other is dropped.
-- **Undocumented**: whether Claude Code sends any follow-up notification to the
-  channel when a request is resolved elsewhere (terminal answer, hook, timeout).
-  The docs say the pending remote request "is dropped" but do **not** state that
-  the channel is told. There is **no documented** `permission_cancel` /
-  `permission_resolved` method. Treat a cancel notification as *possibly present* —
-  handle it defensively if it arrives, but never depend on it.
-- **Undocumented**: whether a `PreToolUse` auto-approve hook that allows/denies a
-  tool suppresses the `permission_request` to the channel. Likely it short-circuits
-  the prompt (so no notification fires), but the ordering is not documented.
+- **RESOLVED empirically (2026-05-27)**: Claude Code does **NOT** send any
+  follow-up notification to the channel when a request is resolved elsewhere
+  (TUI answer or auto-approve hook). The pending remote request is dropped
+  silently — no `permission_cancel` / `permission_resolved` method is ever sent.
+  The channel's defensive cancel handlers therefore never fire; closure of a
+  resolved-elsewhere modal relies entirely on the UI's TTL fallback.
+- **RESOLVED empirically (2026-05-27), mode-dependent**: a `PreToolUse`
+  auto-approve hook short-circuits the prompt in headless `claude -p` (no
+  `permission_request` reaches the channel), but in the interactive TUI a modal
+  can still surface and then go stale. Net effect for an auto-approve user: ghost
+  modals that linger until the TTL.
 
-Because of these two unknowns, the UI must close the modal via a **guaranteed
-fallback (TTL)** in addition to any `resolved` signal — see `ui/01`.
+Because Claude Code sends no cancel/resolved signal, the UI **must** close the
+modal via a **guaranteed fallback (TTL)** — there is no instant-close path to
+wire (the `Later` item in the PLAN is therefore moot). See `ui/01`.
 
 ## Scope of the relay
 
