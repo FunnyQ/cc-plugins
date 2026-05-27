@@ -4,12 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   channelNotification,
+  createMcpServer,
   createSerialNotifier,
   ensureServer,
   isUp,
   nextReconnectDelayMs,
+  PERMISSION_VERDICT_METHOD,
+  permissionRequestPayload,
+  permissionResolvedPayload,
+  permissionVerdictNotification,
   readDaemonCoords,
   readProcessInfo,
+  registerPermissionRelay,
   resolveClaudeSessionId,
   sessionIdFromCommand,
 } from "./cockpit-channel";
@@ -199,5 +205,196 @@ describe("serial notifier", () => {
     await Bun.sleep(20);
     expect(order).toEqual(["one", "two"]);
     expect((errors[0] as Error).message).toBe("boom");
+  });
+});
+
+describe("permission relay — pure mappings", () => {
+  test("request params → POST payload carries all four fields plus session/token", () => {
+    expect(
+      permissionRequestPayload(SID, "tok", {
+        request_id: "abcde",
+        tool_name: "Bash",
+        description: "Run a command",
+        input_preview: '{"command":"ls -la"}',
+      }),
+    ).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "abcde",
+      tool_name: "Bash",
+      description: "Run a command",
+      input_preview: '{"command":"ls -la"}',
+    });
+  });
+
+  test("request payload coerces missing/non-string fields to empty strings", () => {
+    expect(permissionRequestPayload(SID, "tok", undefined)).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "",
+      tool_name: "",
+      description: "",
+      input_preview: "",
+    });
+    expect(
+      permissionRequestPayload(SID, "tok", { request_id: 42, tool_name: null }),
+    ).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "",
+      tool_name: "",
+      description: "",
+      input_preview: "",
+    });
+  });
+
+  test("verdict → outbound notification echoes request_id verbatim", () => {
+    expect(
+      permissionVerdictNotification({ request_id: "qweas", behavior: "allow" }),
+    ).toEqual({
+      method: "notifications/claude/channel/permission",
+      params: { request_id: "qweas", behavior: "allow" },
+    });
+    expect(
+      permissionVerdictNotification({ request_id: "zzzzz", behavior: "deny" }),
+    ).toEqual({
+      method: "notifications/claude/channel/permission",
+      params: { request_id: "zzzzz", behavior: "deny" },
+    });
+  });
+
+  test("resolved payload carries session/token + request_id (coerced)", () => {
+    expect(
+      permissionResolvedPayload(SID, "tok", { request_id: "abcde" }),
+    ).toEqual({ session: SID, token: "tok", request_id: "abcde" });
+    expect(permissionResolvedPayload(SID, "tok", undefined)).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "",
+    });
+  });
+});
+
+describe("permission relay — registration & round-trip", () => {
+  test("createMcpServer declares the claude/channel/permission capability", () => {
+    const mcp = createMcpServer();
+    expect((mcp as any)._capabilities?.experimental).toEqual({
+      "claude/channel": {},
+      "claude/channel/permission": {},
+    });
+  });
+
+  test("registers a permission_request handler (and defensive cancel handlers)", () => {
+    const mcp = createMcpServer();
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl: (async () => new Response("{}")) as any,
+    });
+    const methods = [...(mcp as any)._notificationHandlers.keys()];
+    expect(methods).toContain(
+      "notifications/claude/channel/permission_request",
+    );
+    expect(typeof (mcp as any).fallbackNotificationHandler).toBe("function");
+  });
+
+  test("a permission_request POSTs the request, pulls the verdict, then notifies", async () => {
+    const mcp = createMcpServer();
+    const calls: { url: string; body?: any }[] = [];
+    const sent: any[] = [];
+    (mcp as any).notification = async (n: any) => {
+      sent.push(n);
+    };
+    let pulls = 0;
+    const fetchImpl = (async (url: string, init?: any) => {
+      const body = init?.body ? JSON.parse(init.body) : undefined;
+      calls.push({ url, body });
+      if (url.includes("/api/permission-request")) return new Response("{}");
+      if (url.includes("/api/permission-pull")) {
+        pulls++;
+        // First pull returns the re-pollable timeout sentinel; second returns
+        // the verdict — exercises the re-poll loop.
+        return pulls === 1
+          ? new Response(JSON.stringify({ verdict: null, timeout: true }))
+          : new Response(
+              JSON.stringify({ request_id: "abcde", behavior: "allow" }),
+            );
+      }
+      return new Response("{}", { status: 404 });
+    }) as any;
+
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl,
+    });
+
+    const handler = (mcp as any)._notificationHandlers.get(
+      "notifications/claude/channel/permission_request",
+    );
+    await handler({
+      method: "notifications/claude/channel/permission_request",
+      params: {
+        request_id: "abcde",
+        tool_name: "Bash",
+        description: "Run ls",
+        input_preview: '{"command":"ls"}',
+      },
+    });
+    // Let the fire-and-forget chain settle (timeout sentinel → re-poll).
+    await Bun.sleep(50);
+
+    const reqCall = calls.find((c) =>
+      c.url.includes("/api/permission-request"),
+    );
+    expect(reqCall?.body).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "abcde",
+      tool_name: "Bash",
+      description: "Run ls",
+      input_preview: '{"command":"ls"}',
+    });
+    expect(pulls).toBe(2);
+    expect(sent).toEqual([
+      {
+        method: PERMISSION_VERDICT_METHOD,
+        params: { request_id: "abcde", behavior: "allow" },
+      },
+    ]);
+  });
+
+  test("a defensive cancel notification POSTs /api/permission-resolved", async () => {
+    const mcp = createMcpServer();
+    const calls: { url: string; body?: any }[] = [];
+    const fetchImpl = (async (url: string, init?: any) => {
+      calls.push({ url, body: init?.body ? JSON.parse(init.body) : undefined });
+      return new Response("{}");
+    }) as any;
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl,
+    });
+    // Unknown-but-permission-shaped method → caught by the fallback handler.
+    await (mcp as any).fallbackNotificationHandler({
+      method: "notifications/claude/channel/permission_done",
+      params: { request_id: "abcde" },
+    });
+    await Bun.sleep(20);
+    const resolved = calls.find((c) =>
+      c.url.includes("/api/permission-resolved"),
+    );
+    expect(resolved?.body).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "abcde",
+    });
   });
 });

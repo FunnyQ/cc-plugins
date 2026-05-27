@@ -10,7 +10,11 @@ import {
 } from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ListToolsRequestSchema,
+  NotificationSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 import { findSession } from "./find-session";
 
 export type DaemonCoords = { port: number; token: string };
@@ -103,6 +107,91 @@ export function channelNotification(text: string) {
   return {
     method: "notifications/claude/channel",
     params: { content: text, meta: { source: "cockpit" } },
+  };
+}
+
+// --- Permission relay (see docs/permission-relay/tasks/_context/protocol.md) ---
+
+// Inbound: the session asks the channel to approve/deny a tool use.
+export const PERMISSION_REQUEST_METHOD =
+  "notifications/claude/channel/permission_request";
+// Outbound: the channel returns the verdict.
+export const PERMISSION_VERDICT_METHOD =
+  "notifications/claude/channel/permission";
+// Best-effort, UNDOCUMENTED: a follow-up if a request is resolved elsewhere
+// (terminal/hook/timeout). The real method name is unconfirmed; we register a
+// couple of plausible spellings defensively and also catch unknown permission
+// notifications via the fallback handler. Never depended upon.
+export const PERMISSION_CANCEL_METHODS = [
+  "notifications/claude/channel/permission_cancel",
+  "notifications/claude/channel/permission_resolved",
+  "notifications/claude/channel/permission_cancelled",
+] as const;
+
+export const PermissionRequestSchema = NotificationSchema.extend({
+  method: z.literal(PERMISSION_REQUEST_METHOD),
+});
+
+export type PermissionRequestParams = {
+  request_id: string;
+  tool_name: string;
+  description: string;
+  input_preview: string;
+};
+
+export type PermissionVerdict = {
+  request_id: string;
+  behavior: "allow" | "deny";
+};
+
+// Pure: map an inbound permission_request's params + the channel's identity into
+// the POST body for /api/permission-request. Missing string fields coerce to ""
+// so a partial notification still forwards cleanly (the broker validates).
+export function permissionRequestPayload(
+  sessionId: string,
+  token: string,
+  params: Record<string, unknown> | undefined,
+): {
+  session: string;
+  token: string;
+  request_id: string;
+  tool_name: string;
+  description: string;
+  input_preview: string;
+} {
+  const str = (v: unknown): string => (typeof v === "string" ? v : "");
+  return {
+    session: sessionId,
+    token,
+    request_id: str(params?.request_id),
+    tool_name: str(params?.tool_name),
+    description: str(params?.description),
+    input_preview: str(params?.input_preview),
+  };
+}
+
+// Pure: map a verdict pulled from the daemon into the outbound notification the
+// SDK sends back into the session. request_id is echoed VERBATIM — Claude only
+// accepts a verdict whose request_id matches a pending request.
+export function permissionVerdictNotification(verdict: PermissionVerdict) {
+  return {
+    method: PERMISSION_VERDICT_METHOD,
+    params: { request_id: verdict.request_id, behavior: verdict.behavior },
+  };
+}
+
+// Pure: build the POST body the channel sends IF it ever observes a
+// cancel/resolved notification (best-effort; see protocol.md).
+export function permissionResolvedPayload(
+  sessionId: string,
+  token: string,
+  params: Record<string, unknown> | undefined,
+): { session: string; token: string; request_id: string } {
+  const rid = params?.request_id;
+  return {
+    session: sessionId,
+    token,
+    request_id: typeof rid === "string" ? rid : "",
   };
 }
 
@@ -247,7 +336,10 @@ export function createMcpServer(): ChannelServer {
     { name: "cockpit-channel", version: "0.0.1" },
     {
       capabilities: {
-        experimental: { "claude/channel": {} },
+        experimental: {
+          "claude/channel": {},
+          "claude/channel/permission": {},
+        },
         tools: {},
       },
       instructions: CHANNEL_INSTRUCTIONS,
@@ -282,6 +374,159 @@ async function waitForDaemonCoords(
 async function ensureCockpitDaemon(): Promise<DaemonCoords | null> {
   ensureServer(cockpitServerScript(), daemonInfoPath());
   return await waitForDaemonCoords();
+}
+
+// Long-poll the daemon for a verdict, re-polling on the {verdict:null,
+// timeout:true} sentinel (mirrors the inbox re-park pattern) until a real
+// {request_id, behavior} arrives. Independent of the inbox poll. Returns null if
+// coords are unavailable / the daemon stays unreachable past the retry budget.
+async function pullVerdict(opts: {
+  sessionId: string;
+  coords: () => DaemonCoords | null;
+  ensure: () => Promise<DaemonCoords | null>;
+  fetchImpl?: typeof fetch;
+  maxFailures?: number;
+}): Promise<PermissionVerdict | null> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const maxFailures = opts.maxFailures ?? 6;
+  let coords = opts.coords();
+  let failures = 0;
+  while (true) {
+    if (!coords) coords = await opts.ensure();
+    if (!coords) {
+      if (failures >= maxFailures) return null;
+      await Bun.sleep(nextReconnectDelayMs(failures++));
+      continue;
+    }
+    try {
+      const r = await fetchImpl(
+        `http://127.0.0.1:${coords.port}/api/permission-pull?session=${opts.sessionId}&token=${coords.token}`,
+      );
+      if (!r.ok) throw new Error(`permission-pull failed: ${r.status}`);
+      const body = (await r.json()) as {
+        request_id?: unknown;
+        behavior?: unknown;
+        verdict?: unknown;
+        timeout?: unknown;
+      };
+      failures = 0;
+      // Re-pollable sentinel — keep waiting.
+      if (body.timeout === true) continue;
+      if (
+        typeof body.request_id === "string" &&
+        (body.behavior === "allow" || body.behavior === "deny")
+      ) {
+        return { request_id: body.request_id, behavior: body.behavior };
+      }
+      // Unexpected shape — re-poll rather than echo a bogus verdict.
+    } catch (err) {
+      if (failures >= maxFailures) return null;
+      const delay = nextReconnectDelayMs(failures++);
+      console.error(
+        `cockpit-channel: permission-pull failed (${(err as Error).message}); retrying in ${delay}ms`,
+      );
+      coords = await opts.ensure();
+      await Bun.sleep(delay);
+    }
+  }
+}
+
+// Register the permission relay on the MCP server: forward inbound requests to
+// the daemon, pull the verdict, and echo it back into the session. The verdict
+// round-trip runs off a fire-and-forget serialized chain so a slow wait NEVER
+// blocks the inbox loop (the inbox poll must keep re-parking — hasChannel depends
+// on it). Verdict pulls are independent of the inbox poll.
+export function registerPermissionRelay(opts: {
+  mcp: ChannelServer;
+  sessionId: string;
+  coords: () => DaemonCoords | null;
+  ensure: () => Promise<DaemonCoords | null>;
+  fetchImpl?: typeof fetch;
+}): void {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  let chain: Promise<void> = Promise.resolve();
+  const onError = (err: unknown) =>
+    console.error(
+      `cockpit-channel: permission relay failed (${(err as Error).message})`,
+    );
+
+  // POST a JSON body whose shape depends on the fresh daemon token (the body
+  // carries the auth token, so we resolve coords first, then build the body).
+  const post = async (
+    path: string,
+    buildBody: (coords: DaemonCoords) => unknown,
+  ): Promise<void> => {
+    const coords = opts.coords() ?? (await opts.ensure());
+    if (!coords) throw new Error("cockpit daemon unavailable");
+    const r = await fetchImpl(`http://127.0.0.1:${coords.port}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(buildBody(coords)),
+    });
+    if (!r.ok) throw new Error(`${path} failed: ${r.status}`);
+  };
+
+  const handleRequest = async (params?: Record<string, unknown>) => {
+    await post("/api/permission-request", (coords) =>
+      permissionRequestPayload(opts.sessionId, coords.token, params),
+    );
+    const verdict = await pullVerdict({
+      sessionId: opts.sessionId,
+      coords: opts.coords,
+      ensure: opts.ensure,
+      fetchImpl,
+    });
+    if (!verdict) return; // gave up; terminal dialog still resolves locally
+    await opts.mcp.notification(permissionVerdictNotification(verdict));
+  };
+
+  opts.mcp.setNotificationHandler(PermissionRequestSchema, (notification) => {
+    const params = notification.params as Record<string, unknown> | undefined;
+    // Fire-and-forget on a serialized chain — never block the SDK's notification
+    // dispatch (which shares the read loop with the inbox poll's re-parking).
+    chain = chain.then(() => handleRequest(params)).catch(onError);
+  });
+
+  // Defensive: if Claude ever notifies the channel that a request was resolved
+  // elsewhere (UNDOCUMENTED — see protocol.md), forward it so the UI can close
+  // instantly. The exact method is unconfirmed; register a few plausible names
+  // AND a fallback that sniffs any unhandled "permission"-shaped notification.
+  const handleCancel = (params?: Record<string, unknown>) => {
+    chain = chain
+      .then(() =>
+        post("/api/permission-resolved", (coords) =>
+          permissionResolvedPayload(opts.sessionId, coords.token, params),
+        ),
+      )
+      .catch(onError);
+  };
+  for (const method of PERMISSION_CANCEL_METHODS) {
+    const schema = NotificationSchema.extend({ method: z.literal(method) });
+    opts.mcp.setNotificationHandler(schema, (notification) =>
+      handleCancel(notification.params as Record<string, unknown> | undefined),
+    );
+  }
+
+  // Catch-all for the unknown spelling: forward only permission-cancel-shaped
+  // methods we don't already handle; never touch the inbox/verdict methods.
+  const prior = opts.mcp.fallbackNotificationHandler;
+  opts.mcp.fallbackNotificationHandler = async (notification) => {
+    const method = notification.method;
+    if (
+      typeof method === "string" &&
+      method.startsWith("notifications/claude/channel/permission") &&
+      method !== PERMISSION_REQUEST_METHOD &&
+      method !== PERMISSION_VERDICT_METHOD &&
+      !(PERMISSION_CANCEL_METHODS as readonly string[]).includes(method)
+    ) {
+      console.error(
+        `cockpit-channel: observed undocumented permission notification "${method}" — forwarding as resolved`,
+      );
+      handleCancel(notification.params as Record<string, unknown> | undefined);
+      return;
+    }
+    if (prior) await prior(notification);
+  };
 }
 
 async function pullInboxLoop(opts: {
@@ -350,6 +595,18 @@ async function main(): Promise<void> {
   }
 
   const mcp = createMcpServer();
+
+  if (sessionId) {
+    // Relay handlers must be registered BEFORE connect so an early
+    // permission_request isn't dropped by the SDK's default fallback.
+    registerPermissionRelay({
+      mcp,
+      sessionId,
+      coords: readDaemonCoords,
+      ensure: ensureCockpitDaemon,
+    });
+  }
+
   await mcp.connect(new StdioServerTransport());
 
   if (!sessionId) return;
