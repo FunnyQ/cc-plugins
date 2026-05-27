@@ -78,12 +78,12 @@
 
       <!-- MANIFEST — collapsed by default; the viewport already names the flight -->
       <nav class="manifest" :class="{ 'is-open': manifestOpen }">
-        <div class="manifest__bar">
+        <div class="manifest__bar" @click="toggleManifest()">
           <button
             class="manifest__nav"
             type="button"
             :disabled="!canNavigate"
-            @click="stepSession(-1)"
+            @click.stop="stepSession(-1)"
             aria-label="Previous active session"
             title="Previous active session (←)"
           >
@@ -93,7 +93,6 @@
             class="manifest__toggle"
             type="button"
             :aria-expanded="manifestOpen ? 'true' : 'false'"
-            @click="toggleManifest()"
           >
             <span class="manifest__legend">Projects</span>
             <span
@@ -107,7 +106,7 @@
             class="manifest__nav"
             type="button"
             :disabled="!canNavigate"
-            @click="stepSession(1)"
+            @click.stop="stepSession(1)"
             aria-label="Next active session"
             title="Next active session (→)"
           >

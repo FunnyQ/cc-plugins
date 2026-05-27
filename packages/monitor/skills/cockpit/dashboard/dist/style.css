@@ -624,6 +624,10 @@ body {
   justify-content: center;
   gap: clamp(8px, 2vw, 20px);
   flex-shrink: 0;
+  cursor: pointer;
+}
+.manifest__bar:hover .manifest__legend {
+  color: var(--starlight);
 }
 .manifest__toggle {
   display: flex;
@@ -636,11 +640,8 @@ body {
   background: transparent;
   color: var(--starlight);
   font: inherit;
-  cursor: pointer;
+  cursor: inherit;
   text-align: center;
-}
-.manifest__toggle:hover .manifest__legend {
-  color: var(--starlight);
 }
 /* Centered HUD readout: PROJECTS legend over a pulsing waypoint triangle. */
 .manifest__toggle .manifest__legend {
