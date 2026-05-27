@@ -186,27 +186,34 @@ Root (no deps): `backend/01`. Once it lands, `backend/02`, `channel/01`, and
    Interactive TUI: a modal can still surface and then go stale. See
    `tasks/channel/01-permission-relay.md` Findings.
 
-### Follow-up (new, from the live findings) — ghost modals under auto-approve
+### Follow-up — ghost modals under auto-approve — RESOLVED (2026-05-27, live)
 
-Because (1) there is no cancel signal and (2) Q runs an LLM auto-approve hook that
-resolves most prompts outside cockpit within ~1–2s, an auto-approve user will see
-**stale "ghost" modals lingering up to the full 90s TTL**. The MVP is correct per
-spec (TTL guarantees no zombie), but the UX is poor for this usage. Candidate
-mitigations (not yet built; decide before polishing):
-- **Shorten the TTL** — trades off against genuinely-pending prompts that wait on
-  a human (a short TTL could dismiss a real ask mid-decision).
-- **Supersede-on-next-request** — Claude serializes tool prompts, so the arrival
-  of request N+1 for a session proves request N resolved; the daemon could emit a
-  `resolved{source:"elsewhere"}` for the prior pending when a new request lands.
-  Reliable and free, but only helps when prompts keep coming.
-- Combination: supersede-on-next-request + a shorter "probably resolved" dim.
+Live testing surfaced two coupled bugs in the resolved-elsewhere path: (1) a
+**relay deadlock** — `pullVerdict` looped without a budget and relays were
+serialized, so a TUI/hook-resolved request's pull hung forever and blocked every
+subsequent request from reaching the daemon (new modals stopped showing); and (2)
+the **ghost modal** lingered to the 90s TTL because no cancel signal exists. Fixed
+with three coordinated mechanisms (TTL kept at 90s as the final backstop):
+- **Channel abort** — a new `permission_request` aborts the previous in-flight
+  pull (Claude serializes prompts, so a new one proves the prior resolved);
+  `pullVerdict` gained an overall budget + an `{abandoned:true}` daemon response.
+- **Daemon supersede** — a new request for a session with a different pending
+  request broadcasts `resolved{source:"elsewhere"}` for the old one and wakes its
+  parked pull with `{abandoned:true}` before storing the new request.
+- **Daemon transcript-resolve** (primary lone-ghost fix) — a pending permission
+  **blocks the turn**, so the first forward transcript append (past a ~1s guard)
+  proves the request resolved elsewhere; the daemon then broadcasts `resolved` +
+  wakes the parked pull, closing the ghost in ~1–2s instead of 90s. A proactive
+  expiry timer sweeps any orphan watcher at the stash TTL (no fs.watch leak).
 
 ## Known gaps
 
-- If no cancel notification exists (Open question 1), a request resolved in the
-  terminal / by a hook leaves the channel's verdict long-poll waiting until its
-  budget elapses — a minor in-flight fetch leak per orphaned request, not a
-  correctness bug. The UI still closes via TTL.
+- A lone orphaned request (resolved elsewhere with no follow-up prompt and no
+  transcript progress the daemon can see) leaves the channel's verdict long-poll
+  waiting until its budget elapses — a bounded in-flight fetch, not a correctness
+  bug. In practice the daemon's transcript-resolve closes it in ~1–2s and the
+  proactive expiry timer sweeps the watcher at the stash TTL; the UI's 90s TTL is
+  the final backstop. (See the resolved Follow-up above.)
 
 ## References
 
