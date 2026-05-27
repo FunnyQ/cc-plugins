@@ -68,6 +68,6 @@ export function orderProjects(groups) {
 
 // Default expansion: keep project groups open so ended-only projects still show
 // their history at a glance. The store overrides this per user toggle.
-export function defaultExpanded(group) {
+export function defaultExpanded() {
   return true;
 }
