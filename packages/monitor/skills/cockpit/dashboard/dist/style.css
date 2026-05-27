@@ -760,8 +760,8 @@ body {
 }
 .flight__caret {
   flex-shrink: 0;
-  inline-size: 14px;
-  font-size: 16px;
+  inline-size: 20px;
+  font-size: 24px;
   line-height: 1;
   color: var(--ink-faint);
 }
