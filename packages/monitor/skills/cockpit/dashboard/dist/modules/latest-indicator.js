@@ -9,7 +9,7 @@ export function createLatestIndicator(rootEl, labels) {
   button.type = "button";
   button.className = "jump-latest";
   button.hidden = true;
-  rootEl.appendChild(button);
+  document.body.appendChild(button);
 
   let unread = 0;
   let enabled = false;
@@ -23,8 +23,16 @@ export function createLatestIndicator(rootEl, labels) {
     return `${unread} ${labels.plural}`;
   }
 
+  function position() {
+    const rect = rootEl.getBoundingClientRect();
+    button.style.left = `${rect.left + rect.width / 2}px`;
+    button.style.bottom = `${window.innerHeight - rect.bottom + 12}px`;
+    button.style.maxWidth = `${Math.max(rect.width - 32, 120)}px`;
+  }
+
   function update() {
     button.hidden = unread <= 0;
+    if (!button.hidden) position();
     button.textContent = `${label()} · Jump`;
   }
 
@@ -45,6 +53,10 @@ export function createLatestIndicator(rootEl, labels) {
 
   rootEl.addEventListener("scroll", () => {
     if (atBottom()) clear();
+    else if (!button.hidden) position();
+  });
+  window.addEventListener("resize", () => {
+    if (!button.hidden) position();
   });
 
   return {

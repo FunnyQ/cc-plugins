@@ -771,8 +771,8 @@ export function initTranscript(rootEl) {
   const bodyEl = rootEl.querySelector(".transcript__body");
   const emptyEl = rootEl.querySelector(".transcript__empty");
   const latest = createLatestIndicator(rootEl, {
-    single: "New transcript",
-    plural: "new transcript entries",
+    single: "New",
+    plural: "new",
   });
 
   function reset() {
