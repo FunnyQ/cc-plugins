@@ -324,7 +324,7 @@ export function App() {
 
     get filteredDaily() {
       if (!this.stats) return [];
-      if (this.rangeKey === "24h") return [this.dayFromLedgerRows("24h")];
+      if (this.rangeKey === "24h") return [this.hourlyWindowDay("24h")];
       const all = this.stats.daily;
       const providerFiltered = all.map((d) => this.filterDayByProvider(d));
       if (this.rangeKey === "all") return providerFiltered;
@@ -339,7 +339,7 @@ export function App() {
     get comparisonDaily() {
       if (!this.stats || this.rangeKey === "all") return [];
       if (this.rangeKey === "24h") {
-        return [this.dayFromLedgerRows("previous-24h", 2, 1)];
+        return [this.hourlyWindowDay("previous-24h", 2, 1)];
       }
       const days = parseInt(this.rangeKey, 10);
       if (!Number.isFinite(days) || days <= 0) return [];
@@ -484,6 +484,21 @@ export function App() {
     dayFromLedgerRows(date, fromHoursAgo = 1, toHoursAgo = 0) {
       const rows = this.rollingLedgerRows(fromHoursAgo, toHoursAgo);
       return this.aggregateLedgerRows(date, rows);
+    },
+
+    hourlyWindowDay(date, fromHoursAgo = 1, toHoursAgo = 0) {
+      const hourly = this.aggregateLedgerRows(
+        date,
+        this.hourlyLedgerBuckets(fromHoursAgo, toHoursAgo),
+      );
+      const activity = this.dayFromLedgerRows(date, fromHoursAgo, toHoursAgo);
+      return {
+        ...hourly,
+        messages: activity.messages,
+        sessions: activity.sessions,
+        toolCalls: activity.toolCalls,
+        providers: activity.providers,
+      };
     },
 
     aggregateLedgerRows(date, rows) {
