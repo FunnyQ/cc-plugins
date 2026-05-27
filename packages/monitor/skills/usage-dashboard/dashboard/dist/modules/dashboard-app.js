@@ -365,6 +365,16 @@ export function App() {
       return `Previous ${this.rangeKey}d`;
     },
 
+    get trendChartTitle() {
+      return this.rangeKey === "24h" ? "Hourly trend" : "Daily trend";
+    },
+
+    get trendChartAriaLabel() {
+      return this.rangeKey === "24h"
+        ? "Hourly usage trend chart"
+        : "Daily usage trend chart";
+    },
+
     get comparisonSummary() {
       return this.summarizeDaily(this.comparisonDaily);
     },
@@ -473,6 +483,10 @@ export function App() {
 
     dayFromLedgerRows(date, fromHoursAgo = 1, toHoursAgo = 0) {
       const rows = this.rollingLedgerRows(fromHoursAgo, toHoursAgo);
+      return this.aggregateLedgerRows(date, rows);
+    },
+
+    aggregateLedgerRows(date, rows) {
       const usageByModel = {};
       const tokensByModel = {};
       const providers = {
@@ -535,6 +549,35 @@ export function App() {
         costUSD,
         providers,
       };
+    },
+
+    hourlyLedgerBuckets(fromHoursAgo = 1, toHoursAgo = 0) {
+      const windowEnd = Date.now() - toHoursAgo * ROLLING_24H_MS;
+      const endHour = new Date(windowEnd);
+      endHour.setMinutes(0, 0, 0);
+      const endHourMs = endHour.getTime();
+      const startHourMs = endHourMs - 23 * 60 * 60 * 1000;
+      const buckets = Array.from({ length: 24 }, (_, index) => {
+        const bucketMs = startHourMs + index * 60 * 60 * 1000;
+        return {
+          key: bucketMs,
+          rows: [],
+        };
+      });
+      const bucketByMs = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+      for (const row of this.rollingLedgerRows(fromHoursAgo, toHoursAgo)) {
+        const ts = Number(row.timestampMs);
+        if (!Number.isFinite(ts)) continue;
+        const hour = new Date(ts);
+        hour.setMinutes(0, 0, 0);
+        const bucket = bucketByMs.get(hour.getTime());
+        if (bucket) bucket.rows.push(row);
+      }
+
+      return buckets.map((bucket) =>
+        this.aggregateLedgerRows(this.hourBucketLabel(bucket.key), bucket.rows),
+      );
     },
 
     get filteredByModel() {
@@ -1683,6 +1726,13 @@ export function App() {
       return `${fmt.format(first)} - ${fmt.format(last)}`;
     },
 
+    hourBucketLabel(timestampMs) {
+      return new Date(timestampMs).toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
     formatDateTime(value) {
       if (!value) return "n/a";
       return new Date(value).toLocaleString();
@@ -1915,12 +1965,17 @@ export function App() {
       if (!window.Chart || !this.stats) return;
       const ctx = this.$refs.trendCanvas?.getContext("2d");
       if (!ctx) return;
-      const daily = this.filteredDaily;
-      const labels = daily.map((d) => d.date);
+      const trendBuckets =
+        this.rangeKey === "24h"
+          ? this.hourlyLedgerBuckets()
+          : this.filteredDaily;
+      const labels = trendBuckets.map((d) => d.date);
       const isCost = this.trendMode === "cost";
       const activeModels = this.activeTrendModels;
-      const previousDaily = this.previousTrendAvailable
-        ? this.comparisonDaily
+      const previousBuckets = this.previousTrendAvailable
+        ? this.rangeKey === "24h"
+          ? this.hourlyLedgerBuckets(2, 1)
+          : this.comparisonDaily
         : [];
 
       if (charts.trend) {
@@ -1938,7 +1993,7 @@ export function App() {
       const datasets = activeModels.map((m) => ({
         label: shortModel(m),
         provider: providerForModel(m),
-        data: daily.map((d) =>
+        data: trendBuckets.map((d) =>
           isCost
             ? (d.usageByModel?.[m]?.costUSD ?? 0)
             : (d.tokensByModel?.[m] ?? 0),
@@ -1952,11 +2007,11 @@ export function App() {
         barPercentage: 0.82,
       }));
 
-      if (previousDaily.length) {
+      if (previousBuckets.length) {
         datasets.push({
           type: "line",
           label: this.previousTrendLabel,
-          data: previousDaily.map((d) =>
+          data: previousBuckets.map((d) =>
             this.trendDayValue(d, activeModels, isCost),
           ),
           borderColor: cssVar("--accent"),
@@ -1974,8 +2029,8 @@ export function App() {
 
       const maxTrendValue = Math.max(
         0,
-        ...daily.map((d) => this.trendDayValue(d, activeModels, isCost)),
-        ...previousDaily.map((d) =>
+        ...trendBuckets.map((d) => this.trendDayValue(d, activeModels, isCost)),
+        ...previousBuckets.map((d) =>
           this.trendDayValue(d, activeModels, isCost),
         ),
       );
