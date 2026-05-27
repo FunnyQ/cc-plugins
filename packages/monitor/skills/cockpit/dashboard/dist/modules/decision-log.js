@@ -133,8 +133,8 @@ export function initDecisionLog(rootEl) {
   const cardsEl = rootEl.querySelector(".decision-log__cards");
   const emptyEl = rootEl.querySelector(".decision-log__empty");
   const latest = createLatestIndicator(rootEl, {
-    single: "New decision",
-    plural: "new decision updates",
+    single: "New",
+    plural: "new",
   });
 
   // One delegated listener (cardsEl survives innerHTML resets). Only the latest
