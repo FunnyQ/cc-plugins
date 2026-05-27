@@ -35,6 +35,7 @@ import {
 const charts = { trend: null, donut: null };
 const STATS_REFRESH_TIMEOUT_MS = 20_000;
 const LIVE_REFRESH_TIMEOUT_MS = 8_000;
+const ROLLING_24H_MS = 24 * 60 * 60 * 1000;
 
 async function fetchJsonWithTimeout(path, timeoutMs) {
   const ctrl = new AbortController();
@@ -59,7 +60,7 @@ export function App() {
     refreshInFlight: false,
     refreshTimer: null,
     error: null,
-    rangeKey: initialPrefs.rangeKey ?? "7",
+    rangeKey: initialPrefs.rangeKey ?? "24h",
     providerKey: initialPrefs.providerKey ?? "all",
     trendMode: initialPrefs.trendMode ?? "tokens",
     trendModelScope: initialPrefs.trendModelScope ?? "all",
@@ -323,6 +324,7 @@ export function App() {
 
     get filteredDaily() {
       if (!this.stats) return [];
+      if (this.rangeKey === "24h") return [this.dayFromLedgerRows("24h")];
       const all = this.stats.daily;
       const providerFiltered = all.map((d) => this.filterDayByProvider(d));
       if (this.rangeKey === "all") return providerFiltered;
@@ -336,6 +338,9 @@ export function App() {
 
     get comparisonDaily() {
       if (!this.stats || this.rangeKey === "all") return [];
+      if (this.rangeKey === "24h") {
+        return [this.dayFromLedgerRows("previous-24h", 2, 1)];
+      }
       const days = parseInt(this.rangeKey, 10);
       if (!Number.isFinite(days) || days <= 0) return [];
       const providerFiltered = this.stats.daily.map((d) =>
@@ -356,6 +361,7 @@ export function App() {
 
     get previousTrendLabel() {
       if (this.rangeKey === "all") return "";
+      if (this.rangeKey === "24h") return "Previous 24h";
       return `Previous ${this.rangeKey}d`;
     },
 
@@ -449,6 +455,86 @@ export function App() {
         }
       }
       return { messages, sessions, toolCalls, tokens, cost };
+    },
+
+    rollingLedgerRows(fromHoursAgo = 1, toHoursAgo = 0) {
+      if (!this.stats?.ledger) return [];
+      const now = Date.now();
+      const start = now - fromHoursAgo * ROLLING_24H_MS;
+      const end = now - toHoursAgo * ROLLING_24H_MS;
+      return this.stats.ledger.filter((row) => {
+        if (this.providerKey !== "all" && row.provider !== this.providerKey) {
+          return false;
+        }
+        const ts = Number(row.timestampMs);
+        return Number.isFinite(ts) && ts >= start && ts < end;
+      });
+    },
+
+    dayFromLedgerRows(date, fromHoursAgo = 1, toHoursAgo = 0) {
+      const rows = this.rollingLedgerRows(fromHoursAgo, toHoursAgo);
+      const usageByModel = {};
+      const tokensByModel = {};
+      const providers = {
+        claude: { messages: 0, sessions: 0, toolCalls: 0 },
+        codex: { messages: 0, sessions: 0, toolCalls: 0 },
+      };
+      let messages = 0;
+      let sessions = 0;
+      let toolCalls = 0;
+      let tokens = 0;
+      let costUSD = 0;
+      const seenSessions = new Set();
+
+      for (const row of rows) {
+        const provider = row.provider ?? providerForModel(row.model ?? "");
+        const model = row.model || `${provider}:unknown`;
+        const rowTokens = row.tokens ?? 0;
+        const rowCost = row.costUSD ?? 0;
+        const rowMessages = row.interactions ?? 0;
+        const rowToolCalls = row.toolCalls ?? 0;
+        messages += rowMessages;
+        toolCalls += rowToolCalls;
+        tokens += rowTokens;
+        costUSD += rowCost;
+        if (!seenSessions.has(row.id)) {
+          seenSessions.add(row.id);
+          sessions += 1;
+        }
+        if (providers[provider]) {
+          providers[provider].messages += rowMessages;
+          providers[provider].toolCalls += rowToolCalls;
+          providers[provider].sessions += 1;
+        }
+        tokensByModel[model] = (tokensByModel[model] ?? 0) + rowTokens;
+        const usage = usageByModel[model] ?? {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          reasoningTokens: 0,
+          costUSD: 0,
+          provider,
+          isExternal: provider !== "claude",
+        };
+        // Ledger rows expose total tokens, not the original bucket breakdown.
+        // Keep the 24h range honest by aggregating totals into inputTokens.
+        usage.inputTokens += rowTokens;
+        usage.costUSD += rowCost;
+        usageByModel[model] = usage;
+      }
+
+      return {
+        date,
+        messages,
+        sessions,
+        toolCalls,
+        tokens,
+        tokensByModel,
+        usageByModel,
+        costUSD,
+        providers,
+      };
     },
 
     get filteredByModel() {
@@ -724,11 +810,13 @@ export function App() {
     },
 
     get activeWindowLabel() {
+      if (this.rangeKey === "24h") return "last 24 hours";
       if (this.rangeKey === "all") return "all time";
       return `last ${this.rangeKey} days`;
     },
 
     get activeDateRangeLabel() {
+      if (this.rangeKey === "24h") return "Rolling 24 hours";
       const daily = this.filteredDaily;
       if (!daily.length) return "";
       const first = this.parseDate(daily[0].date);
@@ -885,6 +973,11 @@ export function App() {
 
     get filteredLedger() {
       if (!this.stats?.ledger) return [];
+      if (this.rangeKey === "24h") {
+        return this.rollingLedgerRows().sort((a, b) =>
+          this.compareLedgerRows(a, b),
+        );
+      }
       const dates = this.filteredDaily;
       const firstDate = this.rangeKey === "all" ? null : dates[0]?.date;
       const lastDate =
@@ -957,7 +1050,15 @@ export function App() {
     get heatmapCells() {
       if (!this.stats) return [];
       let matrix;
-      if (this.rangeKey === "all" || !this.stats.dailyHourCounts) {
+      if (this.rangeKey === "24h") {
+        matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
+        for (const row of this.rollingLedgerRows()) {
+          const ts = Number(row.timestampMs);
+          if (!Number.isFinite(ts)) continue;
+          const d = new Date(ts);
+          matrix[d.getDay()][d.getHours()] += row.interactions ?? 0;
+        }
+      } else if (this.rangeKey === "all" || !this.stats.dailyHourCounts) {
         matrix = this.stats.weekHourMatrix;
       } else {
         matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
@@ -1456,7 +1557,8 @@ export function App() {
       }
 
       const delta = current - previous;
-      const windowLabel = `previous ${this.rangeKey}d`;
+      const windowLabel =
+        this.rangeKey === "24h" ? "previous 24h" : `previous ${this.rangeKey}d`;
       if (previous === 0) {
         return {
           available: true,
