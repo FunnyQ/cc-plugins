@@ -1068,8 +1068,8 @@ body {
   font-style: italic;
 }
 
-/* Channel console — the send box for talking into a live Claude session. Sits
-   at the bottom of the Decision Log column, so the border reads along its top. */
+/* Channel console — the send box for talking into a live session. Sits at the
+   bottom of the Live Transcript column, so the border reads along its top. */
 .channel-console {
   position: relative;
   z-index: 3;
