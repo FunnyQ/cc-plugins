@@ -1045,7 +1045,7 @@ body {
   align-items: center;
   justify-content: center;
   width: max-content;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(0) scale(1);
   padding: 6px 10px;
   border: 1px solid color-mix(in oklch, var(--aurora) 52%, var(--edge));
   border-radius: 999px;
@@ -1057,13 +1057,85 @@ body {
   letter-spacing: 0.02em;
   cursor: pointer;
   box-shadow: 0 0 18px 0 color-mix(in oklch, var(--aurora) 18%, transparent);
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
   white-space: nowrap;
+  will-change: clip-path, opacity, transform;
 }
 .jump-latest:hover {
   background: color-mix(in oklch, var(--aurora) 28%, var(--space));
 }
+.jump-latest.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.jump-latest.is-entering {
+  animation: jump-latest-crt-in 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.jump-latest.is-leaving {
+  animation: jump-latest-float-out 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
 .jump-latest[hidden] {
   display: none;
+}
+@keyframes jump-latest-crt-in {
+  0% {
+    clip-path: inset(45% 48% 45% 48% round 999px);
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.08);
+    filter: brightness(2.4) saturate(1.6);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--aurora) 80%, transparent),
+      0 0 36px 10px color-mix(in oklch, var(--aurora) 34%, transparent);
+  }
+  18% {
+    clip-path: inset(43% 46% 43% 46% round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(4px) scale(0.36);
+    filter: brightness(2.8) saturate(1.7);
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--aurora) 82%, transparent),
+      0 0 42px 14px color-mix(in oklch, var(--aurora) 42%, transparent);
+  }
+  46% {
+    clip-path: inset(46% 5% 46% 5% round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scaleX(1.08) scaleY(0.18);
+    filter: brightness(2.1) saturate(1.45);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--aurora) 74%, transparent),
+      0 0 34px 8px color-mix(in oklch, var(--aurora) 34%, transparent);
+  }
+  68% {
+    clip-path: inset(0 0 0 0 round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scaleX(1.05) scaleY(1.16);
+    filter: brightness(1.35) saturate(1.18);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--aurora) 60%, transparent),
+      0 0 26px 4px color-mix(in oklch, var(--aurora) 26%, transparent);
+  }
+  100% {
+    clip-path: inset(0 0 0 0 round 999px);
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 18px 0 color-mix(in oklch, var(--aurora) 18%, transparent);
+  }
+}
+@keyframes jump-latest-float-out {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-34px) scale(0.86);
+    filter: brightness(1.35) blur(1px);
+  }
 }
 
 /* Channel console — the send box for talking into a live session. Sits at the
