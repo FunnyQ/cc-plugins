@@ -302,8 +302,11 @@ the harness UI rather than the dashboard.
 
 ## Notes
 
-- Commands use **`<plugin-root>`**; your provider reference (Step 0) says how to
-  resolve it.
+- Commands use **`<plugin-root>`** — an **absolute filesystem path**, never an
+  environment variable. Your provider reference (Step 0) says how to resolve it.
+  Substitute the resolved absolute path into each command — never type a `${...}`
+  placeholder (e.g. `${CLAUDE_PLUGIN_ROOT}`) into a Bash command; it is empty in
+  the shell and collapses the path to a broken `/skills/...`.
 - One session = one log file; concurrent sessions never share a file.
 - The persistent **project** goal lives only in `project-meta.md` frontmatter
   (single source of truth). It is not duplicated into the log. The log's goal

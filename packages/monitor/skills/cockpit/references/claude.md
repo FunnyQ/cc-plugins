@@ -7,10 +7,22 @@ three Claude-specific bits below. Everything else is shared.
 
 ## Plugin root
 
-Use `${CLAUDE_PLUGIN_ROOT}` when installed as a plugin. In a development checkout
-of this repository, `${CLAUDE_PLUGIN_ROOT}` is empty (and is also empty in an
-ad-hoc shell), so substitute `packages/monitor` from the repo root instead, for
-example `bun packages/monitor/skills/cockpit/scripts/...`.
+`<plugin-root>` is the plugin's install directory, used as an **absolute
+filesystem path** in every command. When this skill loads, Claude Code prints:
+
+```text
+Base directory for this skill: <abs>/skills/cockpit
+```
+
+`<plugin-root>` is that printed path with the trailing `/skills/cockpit`
+removed — substitute the absolute `<abs>` literally into each command.
+
+Do **not** write `${CLAUDE_PLUGIN_ROOT}` into a Bash command. That variable is
+substituted only inside the SKILL.md body the harness injects at load — never in
+this reference (you read it with the Read tool) and never in the shell, where it
+is empty, so a bare `${CLAUDE_PLUGIN_ROOT}/skills/...` collapses to a broken
+`/skills/...`. In a development checkout of this repository, use `packages/monitor`
+from the repo root instead.
 
 ## Session id (Step 1)
 
