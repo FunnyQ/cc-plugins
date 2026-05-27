@@ -811,43 +811,6 @@ body {
   white-space: nowrap;
   font-size: 13px;
 }
-/* Fine-grained status pill beside the LED: a compact mono chip tinted to the
-   same token as its LED, so the word reinforces the colour rather than adding a
-   second vocabulary. `--chip` is the single hue source (border + tinted fill +
-   text all read it); each `.is-*` just reassigns it. Default = idle. */
-.leg__status {
-  --chip: var(--idle);
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border: 1px solid color-mix(in oklch, var(--chip) 45%, var(--edge));
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--chip) 12%, transparent);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chip);
-}
-.leg__status.is-active,
-.leg__status.is-working {
-  --chip: var(--engine);
-}
-.leg__status.is-waiting {
-  --chip: var(--signal);
-}
-.leg__status.is-your-call {
-  --chip: var(--lit-fill);
-}
-.leg__status.is-idle {
-  --chip: var(--idle);
-}
-.leg__status.is-shell {
-  --chip: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
-}
-.leg__status.is-ended {
-  --chip: var(--ended);
-}
 /* A live session with no cockpit registry entry: dashed (not anchored) + muted,
    so it reads as "running, but no decision trail" without competing with the
    provider badge or the active LED. */
