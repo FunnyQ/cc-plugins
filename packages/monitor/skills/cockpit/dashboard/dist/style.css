@@ -1034,6 +1034,33 @@ body {
   color: var(--ink-faint);
   font-style: italic;
 }
+.jump-latest {
+  position: sticky;
+  z-index: 5;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  margin: 8px auto 0;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in oklch, var(--aurora) 52%, var(--edge));
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--aurora) 18%, var(--space));
+  color: var(--starlight);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 0 18px 0 color-mix(in oklch, var(--aurora) 18%, transparent);
+}
+.jump-latest:hover {
+  background: color-mix(in oklch, var(--aurora) 28%, var(--space));
+}
+.jump-latest[hidden] {
+  display: none;
+}
 
 /* Channel console — the send box for talking into a live session. Sits at the
    bottom of the Live Transcript column, so the border reads along its top. */
