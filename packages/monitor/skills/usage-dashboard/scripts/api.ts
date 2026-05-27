@@ -1433,9 +1433,9 @@ function readCodexSession(file: string): CodexSessionSummary | null {
         const eventTimestamp = entry.timestamp
           ? Date.parse(entry.timestamp)
           : 0;
-        const lastUsage = entry.payload.info.last_token_usage;
-        if (Number.isFinite(eventTimestamp) && eventTimestamp && lastUsage) {
-          tokenEvents.push({ timestampMs: eventTimestamp, usage: lastUsage });
+        const totalUsage = entry.payload.info.total_token_usage;
+        if (Number.isFinite(eventTimestamp) && eventTimestamp && totalUsage) {
+          tokenEvents.push({ timestampMs: eventTimestamp, usage: totalUsage });
         }
       }
     }
@@ -1461,6 +1461,36 @@ function codexUsageFromTokenUsage(usage: CodexTokenUsage): ModelUsage {
     cacheReadInputTokens: cachedInput,
     cacheCreationInputTokens: 0,
     reasoningOutputTokens: usage.reasoning_output_tokens ?? 0,
+  };
+}
+
+function codexTokenUsageDelta(
+  current: CodexTokenUsage,
+  previous: CodexTokenUsage | null,
+): CodexTokenUsage {
+  if (!previous) return current;
+  return {
+    input_tokens: Math.max(
+      0,
+      (current.input_tokens ?? 0) - (previous.input_tokens ?? 0),
+    ),
+    cached_input_tokens: Math.max(
+      0,
+      (current.cached_input_tokens ?? 0) - (previous.cached_input_tokens ?? 0),
+    ),
+    output_tokens: Math.max(
+      0,
+      (current.output_tokens ?? 0) - (previous.output_tokens ?? 0),
+    ),
+    reasoning_output_tokens: Math.max(
+      0,
+      (current.reasoning_output_tokens ?? 0) -
+        (previous.reasoning_output_tokens ?? 0),
+    ),
+    total_tokens: Math.max(
+      0,
+      (current.total_tokens ?? 0) - (previous.total_tokens ?? 0),
+    ),
   };
 }
 
@@ -1593,12 +1623,15 @@ function parseCodexUsage(): {
     modelUsage[key] ??= emptyModelUsage();
     addModelUsage(modelUsage[key], usage);
     if (session?.tokenEvents.length) {
+      let previousUsage: CodexTokenUsage | null = null;
       for (const event of session.tokenEvents) {
+        const delta = codexTokenUsageDelta(event.usage, previousUsage);
+        previousUsage = event.usage;
         addHourlyUsage(
           hourlyUsage,
           event.timestampMs,
           key,
-          codexUsageFromTokenUsage(event.usage),
+          codexUsageFromTokenUsage(delta),
         );
       }
     } else {
