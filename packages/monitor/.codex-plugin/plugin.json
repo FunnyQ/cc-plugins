@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "description": "Monitor your Claude Code and Codex sessions: a usage dashboard plus a per-project cockpit (goal capture, decision log, live transcript, and needs-your-call bridge).",
   "author": {
     "name": "Q"
