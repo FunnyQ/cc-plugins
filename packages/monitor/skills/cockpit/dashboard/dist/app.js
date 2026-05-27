@@ -443,6 +443,10 @@ export const store = reactive({
     return this.navSessions.length;
   },
 
+  get activeProjectCount() {
+    return this.projectGroups.filter((g) => g.activeCount > 0).length;
+  },
+
   get navIndex() {
     return this.navSessions.findIndex((s) => this.isSelected(s));
   },
@@ -452,13 +456,16 @@ export const store = reactive({
     return this.navTotal > 1;
   },
 
-  // Bar readout: active-session position ("2 / 3"). Keep the denominator tied
-  // to sessions even when arrows are disabled, so ended projects don't inflate
-  // the count.
+  // Bar readout: position among active sessions while navigable ("2 / 3", an
+  // instrument gauge), else the active project (flight) count. Ended-only
+  // projects are intentionally filtered out.
   get navLabel() {
-    if (this.navTotal === 0) return "0 / 0";
-    const pos = this.navIndex >= 0 ? this.navIndex + 1 : "–";
-    return `${pos} / ${this.navTotal}`;
+    if (this.navTotal > 1) {
+      const pos = this.navIndex >= 0 ? this.navIndex + 1 : "–";
+      return `${pos} / ${this.navTotal}`;
+    }
+    const n = this.activeProjectCount;
+    return `${n} ${n === 1 ? "flight" : "flights"}`;
   },
 
   // Step by ±1 through active sessions, wrapping at the ends. If the current
