@@ -295,6 +295,11 @@
           <p class="placeholder">Design tokens and component rules.</p>
         </div>
       </aside>
+
+      <!-- PERMISSION MODAL — reusable overlay; mounted/driven imperatively by
+           modules/permission-modal.js (content-agnostic shell, permission relay
+           binding). Lives outside the columns so it overlays the whole deck. -->
+      <div id="permission-modal"></div>
     </div>
 
     <script type="module" src="./app.js"></script>
