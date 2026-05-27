@@ -1661,10 +1661,10 @@ export function App() {
         };
       }
 
-      const pct = (delta / previous) * 100;
+      const pct = Math.abs((delta / previous) * 100);
       const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
       const formattedDelta = this.formatDeltaValue(metric, Math.abs(delta));
-      const formattedPct = `${sign}${pct.toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%`;
+      const formattedPct = `${sign}${pct.toFixed(pct >= 10 ? 0 : 1)}%`;
       return {
         available: true,
         state: delta > 0 ? "increase" : delta < 0 ? "decrease" : "neutral",
