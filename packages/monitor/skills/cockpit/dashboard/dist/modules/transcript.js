@@ -8,6 +8,7 @@ import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
 import hljs from "../vendor/highlight.esm.js";
+import { createLatestIndicator } from "./latest-indicator.js";
 
 // Code/tool-result blocks taller than this collapse into a <details> by default.
 const STREAM_COLLAPSE_LINES = 10;
@@ -753,6 +754,7 @@ export function initTranscript(rootEl) {
   let entries = [];
   const seen = Object.create(null); // dedupe reconnect resends by uuid
   let renderQueued = false;
+  let pendingNewCount = 0;
   // Reverse-scroll history: cursor (byte offset where the loaded window starts),
   // whether older entries remain, an in-flight guard, and the current selection
   // (needed to build the history fetch URL).
@@ -768,21 +770,22 @@ export function initTranscript(rootEl) {
     <p class="transcript__empty placeholder">No live transcript.</p>`;
   const bodyEl = rootEl.querySelector(".transcript__body");
   const emptyEl = rootEl.querySelector(".transcript__empty");
-
-  // rootEl (.column__body) is the scroll container — same as the decision-log
-  // column. The inner __body just holds the entry stack.
-  const isPinned = () =>
-    rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight < 96;
+  const latest = createLatestIndicator(rootEl, {
+    single: "New",
+    plural: "new",
+  });
 
   function reset() {
     keySeq = 0;
     entries = [];
+    pendingNewCount = 0;
     for (const k of Object.keys(seen)) delete seen[k];
     bodyEl.innerHTML = "";
     emptyEl.hidden = false;
     historyStart = 0;
     hasMore = false;
     loadingOlder = false;
+    latest.reset();
   }
 
   // Stamp a stable key + dedupe on uuid (a reconnect resends the same uuids).
@@ -853,11 +856,13 @@ export function initTranscript(rootEl) {
     renderQueued = true;
     requestAnimationFrame(() => {
       renderQueued = false;
-      const pinned = isPinned();
+      const pinned = latest.atBottom();
       const prevTop = rootEl.scrollTop;
+      const count = pendingNewCount;
+      pendingNewCount = 0;
       paint();
-      if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
-      else rootEl.scrollTop = prevTop;
+      if (!pinned) rootEl.scrollTop = prevTop;
+      latest.notify(pinned, count);
     });
   }
 
@@ -912,6 +917,7 @@ export function initTranscript(rootEl) {
     if (!tagged) return;
     entries.push(tagged);
     reconcileToolResults();
+    pendingNewCount += 1;
     scheduleRender();
   }
 
@@ -948,7 +954,8 @@ export function initTranscript(rootEl) {
         historyStart = 0;
         hasMore = false;
       }
-      rootEl.scrollTop = rootEl.scrollHeight;
+      latest.scrollToBottom(false);
+      latest.setEnabled(true);
     });
     es.onerror = () => {
       // EventSource auto-reconnects; uuid dedupe guards against backlog resends.

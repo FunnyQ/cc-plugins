@@ -5,6 +5,7 @@
 import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
+import { createLatestIndicator } from "./latest-indicator.js";
 
 // new-tab-safe links (matches token-atlas)
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -92,6 +93,12 @@ export function initDecisionLog(rootEl) {
   let lastOpenCall = null; // most recent unresolved needs_your_call card
   let currentSession = null;
   let heroCollapseTimer = null;
+  const instrumentsEl = rootEl.closest(".instruments");
+  const decisionInstrumentEl = rootEl.closest(".instrument");
+  const mobileLayout = window.matchMedia("(max-width: 1100px)");
+  let touchStartY = 0;
+  let decisionExpanded = false;
+  let lastScrollTop = 0;
   // The hero (viewport) reacts to the pilot's turn: a needs_your_call raises the
   // barrier, answering lowers it again after a grace period. `live` gates both
   // so replaying a session's backlog never moves the hero — only real-time
@@ -131,6 +138,136 @@ export function initDecisionLog(rootEl) {
   const goalEl = rootEl.querySelector(".decision-log__goal");
   const cardsEl = rootEl.querySelector(".decision-log__cards");
   const emptyEl = rootEl.querySelector(".decision-log__empty");
+  const latest = createLatestIndicator(rootEl, {
+    single: "New",
+    plural: "new",
+  });
+
+  function updateCompactDecisionSize() {
+    if (!decisionInstrumentEl || !mobileLayout.matches) return;
+    const latestCard = cardsEl.lastElementChild;
+    if (!latestCard) {
+      instrumentsEl?.style.removeProperty("--decision-row-block-size");
+      return;
+    }
+
+    const headEl = decisionInstrumentEl.querySelector(".instrument__head");
+    const rootStyle = getComputedStyle(rootEl);
+    const cardsStyle = getComputedStyle(cardsEl);
+    const padding =
+      parseFloat(rootStyle.paddingBlockStart || rootStyle.paddingTop || "0") +
+      parseFloat(rootStyle.paddingBlockEnd || rootStyle.paddingBottom || "0");
+    const gap = parseFloat(cardsStyle.rowGap || cardsStyle.gap || "0") || 0;
+    const headHeight = headEl?.getBoundingClientRect().height || 0;
+    const cardHeight = latestCard.getBoundingClientRect().height;
+    const reserve = instrumentsEl
+      ? parseFloat(
+          getComputedStyle(instrumentsEl).getPropertyValue(
+            "--transcript-mobile-reserve",
+          ),
+        ) || 0
+      : 0;
+    const min = 230;
+    const containerCap = instrumentsEl
+      ? instrumentsEl.getBoundingClientRect().height - reserve
+      : 0;
+    const max = Math.max(min, Math.min(window.innerHeight * 0.5, containerCap));
+    const next = Math.min(
+      max,
+      Math.max(min, headHeight + padding + gap + cardHeight),
+    );
+    instrumentsEl?.style.setProperty(
+      "--decision-row-block-size",
+      `${Math.round(next)}px`,
+    );
+  }
+
+  function setDecisionExpanded(expanded) {
+    decisionExpanded = expanded && mobileLayout.matches;
+    instrumentsEl?.classList.toggle("is-decision-expanded", decisionExpanded);
+    if (!decisionExpanded) requestAnimationFrame(updateCompactDecisionSize);
+  }
+
+  function expandDecisionPanel() {
+    lastScrollTop = rootEl.scrollTop;
+    setDecisionExpanded(true);
+  }
+
+  function atLayoutBottom() {
+    return rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight <= 2;
+  }
+
+  function pinDecisionToBottom(duration = 320) {
+    const end = performance.now() + duration;
+    const pin = () => {
+      rootEl.scrollTop = rootEl.scrollHeight;
+      lastScrollTop = rootEl.scrollTop;
+      if (performance.now() < end) requestAnimationFrame(pin);
+    };
+    requestAnimationFrame(pin);
+  }
+
+  function collapseDecisionPanelToBottom() {
+    updateCompactDecisionSize();
+    setDecisionExpanded(false);
+    store.setHeroCollapsed(true);
+    latest.scrollToBottom(false);
+    pinDecisionToBottom();
+  }
+
+  function handleWheel(e) {
+    if (!mobileLayout.matches) return;
+    if (decisionExpanded && e.deltaY > 0 && atLayoutBottom()) {
+      collapseDecisionPanelToBottom();
+      return;
+    }
+    if (e.deltaY < 0) expandDecisionPanel();
+  }
+
+  function handleTouchStart(e) {
+    touchStartY = e.touches?.[0]?.clientY || 0;
+  }
+
+  function handleTouchMove(e) {
+    if (!mobileLayout.matches) return;
+    const y = e.touches?.[0]?.clientY || touchStartY;
+    const movingTowardHistory = y > touchStartY;
+    const movingTowardBottom = y < touchStartY;
+    if (decisionExpanded && movingTowardBottom && atLayoutBottom()) {
+      collapseDecisionPanelToBottom();
+      touchStartY = y;
+      return;
+    }
+    if (movingTowardHistory) expandDecisionPanel();
+    touchStartY = y;
+  }
+
+  function fitDecisionPanelOnScroll() {
+    const scrollTop = rootEl.scrollTop;
+    const movingDown = scrollTop > lastScrollTop;
+    const movingUp = scrollTop < lastScrollTop;
+    lastScrollTop = scrollTop;
+    if (!mobileLayout.matches) return;
+    if (movingUp) {
+      expandDecisionPanel();
+      return;
+    }
+    if (!decisionExpanded || !movingDown) return;
+    if (!atLayoutBottom()) return;
+    collapseDecisionPanelToBottom();
+  }
+
+  mobileLayout.addEventListener("change", () => {
+    setDecisionExpanded(false);
+  });
+
+  rootEl.addEventListener("wheel", handleWheel, { passive: true });
+  rootEl.addEventListener("touchstart", handleTouchStart, { passive: true });
+  rootEl.addEventListener("touchmove", handleTouchMove, { passive: true });
+  rootEl.addEventListener("scroll", fitDecisionPanelOnScroll, {
+    passive: true,
+  });
+  window.addEventListener("resize", updateCompactDecisionSize);
 
   // One delegated listener (cardsEl survives innerHTML resets). Only the latest
   // open call is answerable; options are selected first, then the Send button
@@ -170,9 +307,6 @@ export function initDecisionLog(rootEl) {
     submitAnswer(card, answer);
   });
 
-  const isPinned = () =>
-    rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight < 48;
-
   // A live session that cockpit never tracked (tracked === false, the same flag
   // the manifest pill reads) has no decision log at all. Rather than the bland
   // "No decisions logged yet.", invite the pilot to bring it onto the cockpit.
@@ -202,6 +336,8 @@ export function initDecisionLog(rootEl) {
     lastOpenCall = null;
     store.awaitingCall = false;
     live = false;
+    setDecisionExpanded(false);
+    instrumentsEl?.style.removeProperty("--decision-row-block-size");
     if (heroCollapseTimer) {
       clearTimeout(heroCollapseTimer);
       heroCollapseTimer = null;
@@ -210,6 +346,7 @@ export function initDecisionLog(rootEl) {
     goalEl.innerHTML = "";
     cardsEl.innerHTML = "";
     emptyEl.hidden = false;
+    latest.reset();
   }
 
   function renderGoal(rec) {
@@ -460,6 +597,7 @@ export function initDecisionLog(rootEl) {
     card.classList.add("is-resolved");
     if (lastOpenCall === card) lastOpenCall = null;
     store.awaitingCall = false; // pilot answered → clear the HUD alert
+    requestAnimationFrame(updateCompactDecisionSize);
     // Pilot answered → lower the barrier again after a grace period (skipped on
     // backlog replay of an already-answered call).
     if (live) scheduleHeroCollapse();
@@ -475,8 +613,9 @@ export function initDecisionLog(rootEl) {
         null;
     }
     card = card || lastOpenCall;
-    if (!card) return;
+    if (!card) return false;
     resolveCallCard(card, rec.answer);
+    return true;
   }
 
   function handle(rec) {
@@ -489,10 +628,11 @@ export function initDecisionLog(rootEl) {
       return;
     }
     if (rec.type === "decision") {
-      const pinned = isPinned();
+      const pinned = latest.atBottom();
       const card = decisionCard(rec);
       cardsEl.appendChild(card);
       emptyEl.hidden = true;
+      requestAnimationFrame(updateCompactDecisionSize);
       if (rec.needs_your_call) {
         if (lastOpenCall) hideRespond(lastOpenCall); // older call isn't latest
         lastOpenCall = card;
@@ -501,13 +641,15 @@ export function initDecisionLog(rootEl) {
         // "your turn" moment can't be missed behind a collapsed hero.
         if (live && store.awaitingCall) raiseHeroForCall();
       }
-      if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
+      latest.notify(pinned);
       return;
     }
     if (rec.type === "response") {
-      const pinned = isPinned();
-      appendResponse(rec);
-      if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
+      const pinned = latest.atBottom();
+      if (appendResponse(rec)) {
+        requestAnimationFrame(updateCompactDecisionSize);
+        latest.notify(pinned);
+      }
     }
   }
 
@@ -533,7 +675,12 @@ export function initDecisionLog(rootEl) {
       handle(rec);
     };
     es.addEventListener("backlog-done", () => {
-      rootEl.scrollTop = rootEl.scrollHeight;
+      latest.scrollToBottom(false);
+      latest.setEnabled(true);
+      requestAnimationFrame(() => {
+        updateCompactDecisionSize();
+        setDecisionExpanded(false);
+      });
       // Backlog replayed — from here on, call transitions are real-time.
       live = true;
       // A call already open when we tuned in is the pilot's turn now.

@@ -2,7 +2,7 @@
         <section class="row activity-row">
           <div class="panel wide trend-command-panel">
             <div class="panel-head">
-              <h2>Daily trend</h2>
+              <h2>{{ trendChartTitle }}</h2>
               <div class="trend-controls">
                 <div
                   class="segmented-control"
@@ -71,7 +71,7 @@
               <canvas
                 ref="trendCanvas"
                 role="img"
-                aria-label="Daily usage trend chart"
+                :aria-label="trendChartAriaLabel"
               ></canvas>
               <div v-if="!activeTrendModels.length" class="empty-state">
                 {{ trendModels.length ? 'Select at least one model.' : 'No model
