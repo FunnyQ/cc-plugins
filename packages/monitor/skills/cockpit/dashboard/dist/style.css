@@ -760,7 +760,9 @@ body {
 }
 .flight__caret {
   flex-shrink: 0;
-  font-size: 10px;
+  inline-size: 14px;
+  font-size: 16px;
+  line-height: 1;
   color: var(--ink-faint);
 }
 .flight__name {
