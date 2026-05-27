@@ -23,6 +23,13 @@ import {
 } from "./transcript-stream";
 import { handleWait, handleRespond } from "./broker";
 import { handleInbox, handleSendMessage } from "./inbox";
+import {
+  handlePermissionRequest,
+  handlePermissionStream,
+  handlePermissionVerdict,
+  handlePermissionPull,
+  handlePermissionResolved,
+} from "./permission";
 import { handleCodexControlStatus, handleSendCodexMessage } from "./codex-send";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
@@ -265,6 +272,16 @@ function buildServer() {
         return handleCodexControlStatus(req);
       if (url.pathname === "/api/send-codex-message")
         return handleSendCodexMessage(req);
+      if (url.pathname === "/api/permission-request")
+        return handlePermissionRequest(req);
+      if (url.pathname === "/api/permission-stream")
+        return handlePermissionStream(req);
+      if (url.pathname === "/api/permission-verdict")
+        return handlePermissionVerdict(req);
+      if (url.pathname === "/api/permission-pull")
+        return handlePermissionPull(req);
+      if (url.pathname === "/api/permission-resolved")
+        return handlePermissionResolved(req);
       return serveStatic(url.pathname);
     },
   });
