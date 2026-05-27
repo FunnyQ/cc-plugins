@@ -32,6 +32,7 @@ export function createLatestIndicator(rootEl, labels) {
 
   function update() {
     button.hidden = unread <= 0;
+    rootEl.classList.toggle("has-jump-latest", !button.hidden);
     if (!button.hidden) position();
     button.textContent = `${label()} · Jump`;
   }

@@ -1030,6 +1030,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-x);
+}
+.instrument__body.has-jump-latest {
   padding-bottom: calc(var(--space-x) + 44px);
 }
 .placeholder {
