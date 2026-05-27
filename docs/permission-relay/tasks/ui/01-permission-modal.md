@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/01
 > **Blocks**: ui/02
-> **Status**: todo
+> **Status**: done (modal render, Allow→verdict round-trip, resolved-elsewhere dim+note+close, and 90s TTL arm all verified live in a real browser against an isolated daemon). Post-fix: the always-mounted `.perm-overlay` (position:fixed; inset:0) blocked all clicks when idle — fixed with `pointer-events:none` default + `auto` on `.is-shown`; click-through regression-verified via hit-testing.
 
 ## Goal
 
