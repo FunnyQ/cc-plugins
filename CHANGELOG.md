@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.5.0] - 2026-05-27
+
+### ✨ Added
+
+- **Permission Relay — answer permission prompts from the cockpit**: when a running Claude Code session hits a tool-permission prompt (e.g. "Allow this Bash command?"), the cockpit dashboard now surfaces it as a modal with **Allow / Deny** buttons, so you can decide right there in the windshield without switching back to the terminal. The verdict is relayed back to the running session through the cockpit channel.
+  - A new **permission broker** in the cockpit daemon fans inbound permission requests out to the UI and rounds the verdict back to the waiting session.
+  - The cockpit channel carries the permission prompts inbound and the Allow/Deny verdicts outbound.
+  - The permission modal **auto-dismisses on a TTL** so a stale prompt doesn't linger after the session has moved on.
+- **Attention cues for permission prompts**: a new attention module raises a **browser notification**, **flashes the tab title**, and **badges the favicon** when a permission prompt is waiting, so you notice it even when the cockpit tab is in the background.
+
+### 🐛 Fixed
+
+- **Ghost permission modals and a wedged relay**: rapid or superseded permission prompts could leave a "ghost" modal hanging and deadlock the relay. The channel now aborts the prior in-flight pull when a new request arrives and enforces a bounded pull budget; the daemon supersedes the old pending request and resolves it from transcript progress, waking the parked pull with `{abandoned: true}`; and a proactive expiry timer sweeps orphaned watchers.
+
+### 📝 Documentation
+
+- **Permission Relay feature spec + task system** added under `docs/permission-relay/` (PLAN, layered backend/channel/UI tasks, shared context, and the wire protocol), with live findings recorded and tasks marked done.
+- **`<plugin-root>` resolution clarified**: it must be derived from the skill's load-time base-directory banner, not the `${CLAUDE_PLUGIN_ROOT}` env var (which is never available in shell commands).
+
 ## [3.4.5] - 2026-05-27
 
 ### ♻️ Internal
