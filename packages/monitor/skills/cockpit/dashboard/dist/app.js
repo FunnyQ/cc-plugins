@@ -12,6 +12,7 @@ import { initTranscript } from "./modules/transcript.js";
 import { initStarfield } from "./modules/starfield.js";
 import { initLead } from "./modules/lead.js";
 import { initDesignSystem } from "./modules/design-system.js";
+import { initPermissionModal } from "./modules/permission-modal.js";
 
 const POLL_MS = 3000;
 const HERO_AUTO_COLLAPSE_MS = 60_000;
@@ -603,6 +604,12 @@ const designSystem = initDesignSystem(
   document.querySelector('[data-column="design-system"]'),
 );
 store._loadDesignSystem = designSystem && designSystem.load;
+
+// Permission relay overlay — subscribes to /api/permission-stream for the
+// selected session and drives the reusable modal (own DOM, outside the columns).
+store._permissionModal = initPermissionModal(
+  document.querySelector("#permission-modal"),
+);
 
 // Escape closes drawer overlays; ←/→ step through active sessions.
 document.addEventListener("keydown", (e) => {
