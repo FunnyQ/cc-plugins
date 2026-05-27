@@ -13,6 +13,7 @@ export function createLatestIndicator(rootEl, labels) {
 
   let unread = 0;
   let enabled = false;
+  let hideTimer = null;
 
   const atBottom = () =>
     rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight <
@@ -31,10 +32,34 @@ export function createLatestIndicator(rootEl, labels) {
   }
 
   function update() {
-    button.hidden = unread <= 0;
-    rootEl.classList.toggle("has-jump-latest", !button.hidden);
-    if (!button.hidden) position();
-    button.textContent = `${label()} · Jump`;
+    const shouldShow = unread > 0;
+    rootEl.classList.toggle("has-jump-latest", shouldShow);
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    if (shouldShow) {
+      const wasHidden = button.hidden;
+      button.hidden = false;
+      button.classList.remove("is-leaving");
+      button.classList.add("is-visible");
+      if (wasHidden) {
+        button.classList.remove("is-entering");
+        void button.offsetWidth;
+        button.classList.add("is-entering");
+      }
+      position();
+      button.textContent = `${label()} · Jump`;
+      return;
+    }
+    if (button.hidden) return;
+    button.classList.remove("is-visible", "is-entering");
+    button.classList.add("is-leaving");
+    hideTimer = setTimeout(() => {
+      button.hidden = true;
+      button.classList.remove("is-leaving");
+      hideTimer = null;
+    }, 380);
   }
 
   function clear() {
