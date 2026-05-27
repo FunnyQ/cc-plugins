@@ -520,22 +520,55 @@ export function App() {
           providers[provider].toolCalls += rowToolCalls;
           providers[provider].sessions += 1;
         }
-        tokensByModel[model] = (tokensByModel[model] ?? 0) + rowTokens;
-        const usage = usageByModel[model] ?? {
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheReadTokens: 0,
-          cacheCreationTokens: 0,
-          reasoningTokens: 0,
-          costUSD: 0,
-          provider,
-          isExternal: provider !== "claude",
+        const sourceUsageByModel = row.usageByModel ?? {
+          [model]: {
+            inputTokens: rowTokens,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 0,
+            reasoningTokens: 0,
+            costUSD: rowCost,
+            provider,
+            isExternal: provider !== "claude",
+          },
         };
-        // Ledger rows expose total tokens, not the original bucket breakdown.
-        // Keep the 24h range honest by aggregating totals into inputTokens.
-        usage.inputTokens += rowTokens;
-        usage.costUSD += rowCost;
-        usageByModel[model] = usage;
+        for (const [usageModel, sourceUsage] of Object.entries(
+          sourceUsageByModel,
+        )) {
+          const usageProvider =
+            sourceUsage.provider ?? providerForModel(usageModel);
+          if (
+            this.providerKey !== "all" &&
+            usageProvider !== this.providerKey
+          ) {
+            continue;
+          }
+          const usage = usageByModel[usageModel] ?? {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 0,
+            reasoningTokens: 0,
+            costUSD: 0,
+            provider: usageProvider,
+            isExternal: usageProvider !== "claude",
+          };
+          usage.inputTokens += sourceUsage.inputTokens ?? 0;
+          usage.outputTokens += sourceUsage.outputTokens ?? 0;
+          usage.cacheReadTokens += sourceUsage.cacheReadTokens ?? 0;
+          usage.cacheCreationTokens += sourceUsage.cacheCreationTokens ?? 0;
+          usage.reasoningTokens += sourceUsage.reasoningTokens ?? 0;
+          usage.costUSD += sourceUsage.costUSD ?? 0;
+          usage.isExternal = usage.isExternal || sourceUsage.isExternal;
+          usageByModel[usageModel] = usage;
+          tokensByModel[usageModel] =
+            (tokensByModel[usageModel] ?? 0) +
+            (sourceUsage.inputTokens ?? 0) +
+            (sourceUsage.outputTokens ?? 0) +
+            (sourceUsage.cacheReadTokens ?? 0) +
+            (sourceUsage.cacheCreationTokens ?? 0) +
+            (sourceUsage.reasoningTokens ?? 0);
+        }
       }
 
       return {
@@ -552,7 +585,9 @@ export function App() {
     },
 
     hourlyLedgerBuckets(fromHoursAgo = 1, toHoursAgo = 0) {
-      const windowEnd = Date.now() - toHoursAgo * ROLLING_24H_MS;
+      const now = Date.now();
+      const windowStart = now - fromHoursAgo * ROLLING_24H_MS;
+      const windowEnd = now - toHoursAgo * ROLLING_24H_MS;
       const endHour = new Date(windowEnd);
       endHour.setMinutes(0, 0, 0);
       const endHourMs = endHour.getTime();
@@ -566,9 +601,13 @@ export function App() {
       });
       const bucketByMs = new Map(buckets.map((bucket) => [bucket.key, bucket]));
 
-      for (const row of this.rollingLedgerRows(fromHoursAgo, toHoursAgo)) {
+      const rows =
+        this.stats?.hourlyUsage ??
+        this.rollingLedgerRows(fromHoursAgo, toHoursAgo);
+      for (const row of rows) {
         const ts = Number(row.timestampMs);
         if (!Number.isFinite(ts)) continue;
+        if (ts < windowStart || ts >= windowEnd) continue;
         const hour = new Date(ts);
         hour.setMinutes(0, 0, 0);
         const bucket = bucketByMs.get(hour.getTime());
