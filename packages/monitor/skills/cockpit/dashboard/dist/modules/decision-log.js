@@ -5,6 +5,7 @@
 import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
+import { createLatestIndicator } from "./latest-indicator.js";
 
 // new-tab-safe links (matches token-atlas)
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -131,6 +132,10 @@ export function initDecisionLog(rootEl) {
   const goalEl = rootEl.querySelector(".decision-log__goal");
   const cardsEl = rootEl.querySelector(".decision-log__cards");
   const emptyEl = rootEl.querySelector(".decision-log__empty");
+  const latest = createLatestIndicator(rootEl, {
+    single: "New decision",
+    plural: "new decision updates",
+  });
 
   // One delegated listener (cardsEl survives innerHTML resets). Only the latest
   // open call is answerable; options are selected first, then the Send button
@@ -170,9 +175,6 @@ export function initDecisionLog(rootEl) {
     submitAnswer(card, answer);
   });
 
-  const isPinned = () =>
-    rootEl.scrollHeight - rootEl.scrollTop - rootEl.clientHeight < 48;
-
   // A live session that cockpit never tracked (tracked === false, the same flag
   // the manifest pill reads) has no decision log at all. Rather than the bland
   // "No decisions logged yet.", invite the pilot to bring it onto the cockpit.
@@ -210,6 +212,7 @@ export function initDecisionLog(rootEl) {
     goalEl.innerHTML = "";
     cardsEl.innerHTML = "";
     emptyEl.hidden = false;
+    latest.reset();
   }
 
   function renderGoal(rec) {
@@ -475,8 +478,9 @@ export function initDecisionLog(rootEl) {
         null;
     }
     card = card || lastOpenCall;
-    if (!card) return;
+    if (!card) return false;
     resolveCallCard(card, rec.answer);
+    return true;
   }
 
   function handle(rec) {
@@ -489,7 +493,7 @@ export function initDecisionLog(rootEl) {
       return;
     }
     if (rec.type === "decision") {
-      const pinned = isPinned();
+      const pinned = latest.atBottom();
       const card = decisionCard(rec);
       cardsEl.appendChild(card);
       emptyEl.hidden = true;
@@ -501,13 +505,12 @@ export function initDecisionLog(rootEl) {
         // "your turn" moment can't be missed behind a collapsed hero.
         if (live && store.awaitingCall) raiseHeroForCall();
       }
-      if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
+      latest.notify(pinned);
       return;
     }
     if (rec.type === "response") {
-      const pinned = isPinned();
-      appendResponse(rec);
-      if (pinned) rootEl.scrollTop = rootEl.scrollHeight;
+      const pinned = latest.atBottom();
+      if (appendResponse(rec)) latest.notify(pinned);
     }
   }
 
@@ -533,7 +536,8 @@ export function initDecisionLog(rootEl) {
       handle(rec);
     };
     es.addEventListener("backlog-done", () => {
-      rootEl.scrollTop = rootEl.scrollHeight;
+      latest.scrollToBottom(false);
+      latest.setEnabled(true);
       // Backlog replayed — from here on, call transitions are real-time.
       live = true;
       // A call already open when we tuned in is the pilot's turn now.
