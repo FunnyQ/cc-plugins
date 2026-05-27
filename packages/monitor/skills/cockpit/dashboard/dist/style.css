@@ -2187,6 +2187,146 @@ body {
 }
 
 /* ── Responsive ─────────────────────────────────────────── */
+/* ── Permission modal — reusable overlay ───────────────────
+   A content-agnostic dialog (kicker / title / body slot / actions). Echoes the
+   warm "your turn" signal of the awaiting HUD (it's a pilot-action moment) but
+   owns its own DOM. Driven imperatively by modules/permission-modal.js. */
+.perm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: var(--space-x);
+  /* Idle, the overlay still spans the viewport — let clicks fall through to the
+     UI underneath until a request actually shows it. */
+  pointer-events: none;
+}
+.perm-overlay.is-shown {
+  pointer-events: auto;
+}
+.perm-overlay__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--void) 72%, transparent);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.perm-overlay.is-shown .perm-overlay__scrim {
+  opacity: 1;
+}
+.perm-modal {
+  position: relative;
+  inline-size: min(440px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: var(--hull);
+  border: 1px solid color-mix(in oklch, var(--signal) 50%, var(--edge));
+  border-radius: var(--radius);
+  box-shadow:
+    0 24px 60px -24px color-mix(in oklch, var(--void) 80%, transparent),
+    inset 0 0 40px -32px color-mix(in oklch, var(--signal) 60%, transparent);
+  transform: translateY(8px) scale(0.98);
+  opacity: 0;
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease;
+}
+.perm-overlay.is-shown .perm-modal {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+.perm-overlay.is-dimmed .perm-modal {
+  filter: saturate(0.7) brightness(0.86);
+  border-color: var(--edge);
+}
+.perm-modal__head {
+  display: grid;
+  gap: 4px;
+}
+.perm-modal__kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+.perm-modal__title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.25;
+  color: var(--starlight);
+  word-break: break-word;
+}
+.perm-modal__desc {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.perm-modal__preview {
+  margin: 0;
+  max-block-size: 220px;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--space);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.perm-modal__note {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--signal);
+}
+.perm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+.perm-btn {
+  min-block-size: 32px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--edge);
+  background: var(--hull-2);
+  color: var(--starlight);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease;
+}
+.perm-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.perm-btn--allow {
+  border-color: color-mix(in oklch, var(--aurora) 50%, var(--edge));
+  background: color-mix(in oklch, var(--aurora) 16%, var(--hull));
+}
+.perm-btn--allow:not(:disabled):hover {
+  background: color-mix(in oklch, var(--aurora) 26%, var(--hull));
+}
+.perm-btn--deny {
+  border-color: color-mix(in oklch, var(--danger) 46%, var(--edge));
+  color: color-mix(in oklch, var(--danger) 30%, var(--starlight));
+}
+.perm-btn--deny:not(:disabled):hover {
+  background: color-mix(in oklch, var(--danger) 16%, var(--hull));
+}
+
 @media (max-width: 1100px) {
   .instruments {
     grid-template-columns: 1fr;
@@ -2215,7 +2355,9 @@ body {
   .viewport__beacon-ring,
   .viewport__beacon-core,
   .hud__alert,
-  .decision-card.is-call.is-open::before {
+  .decision-card.is-call.is-open::before,
+  .perm-overlay__scrim,
+  .perm-modal {
     animation: none !important;
   }
 }

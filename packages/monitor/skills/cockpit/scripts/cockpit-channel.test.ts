@@ -3,13 +3,21 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  ABANDONED,
   channelNotification,
+  createMcpServer,
   createSerialNotifier,
   ensureServer,
   isUp,
   nextReconnectDelayMs,
+  PERMISSION_VERDICT_METHOD,
+  permissionRequestPayload,
+  permissionResolvedPayload,
+  permissionVerdictNotification,
+  pullVerdict,
   readDaemonCoords,
   readProcessInfo,
+  registerPermissionRelay,
   resolveClaudeSessionId,
   sessionIdFromCommand,
 } from "./cockpit-channel";
@@ -199,5 +207,352 @@ describe("serial notifier", () => {
     await Bun.sleep(20);
     expect(order).toEqual(["one", "two"]);
     expect((errors[0] as Error).message).toBe("boom");
+  });
+});
+
+describe("permission relay — pure mappings", () => {
+  test("request params → POST payload carries all four fields plus session/token", () => {
+    expect(
+      permissionRequestPayload(SID, "tok", {
+        request_id: "abcde",
+        tool_name: "Bash",
+        description: "Run a command",
+        input_preview: '{"command":"ls -la"}',
+      }),
+    ).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "abcde",
+      tool_name: "Bash",
+      description: "Run a command",
+      input_preview: '{"command":"ls -la"}',
+    });
+  });
+
+  test("request payload coerces missing/non-string fields to empty strings", () => {
+    expect(permissionRequestPayload(SID, "tok", undefined)).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "",
+      tool_name: "",
+      description: "",
+      input_preview: "",
+    });
+    expect(
+      permissionRequestPayload(SID, "tok", { request_id: 42, tool_name: null }),
+    ).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "",
+      tool_name: "",
+      description: "",
+      input_preview: "",
+    });
+  });
+
+  test("verdict → outbound notification echoes request_id verbatim", () => {
+    expect(
+      permissionVerdictNotification({ request_id: "qweas", behavior: "allow" }),
+    ).toEqual({
+      method: "notifications/claude/channel/permission",
+      params: { request_id: "qweas", behavior: "allow" },
+    });
+    expect(
+      permissionVerdictNotification({ request_id: "zzzzz", behavior: "deny" }),
+    ).toEqual({
+      method: "notifications/claude/channel/permission",
+      params: { request_id: "zzzzz", behavior: "deny" },
+    });
+  });
+
+  test("resolved payload carries session/token + request_id (coerced)", () => {
+    expect(
+      permissionResolvedPayload(SID, "tok", { request_id: "abcde" }),
+    ).toEqual({ session: SID, token: "tok", request_id: "abcde" });
+    expect(permissionResolvedPayload(SID, "tok", undefined)).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "",
+    });
+  });
+});
+
+describe("permission relay — registration & round-trip", () => {
+  test("createMcpServer declares the claude/channel/permission capability", () => {
+    const mcp = createMcpServer();
+    expect((mcp as any)._capabilities?.experimental).toEqual({
+      "claude/channel": {},
+      "claude/channel/permission": {},
+    });
+  });
+
+  test("registers a permission_request handler (and defensive cancel handlers)", () => {
+    const mcp = createMcpServer();
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl: (async () => new Response("{}")) as any,
+    });
+    const methods = [...(mcp as any)._notificationHandlers.keys()];
+    expect(methods).toContain(
+      "notifications/claude/channel/permission_request",
+    );
+    expect(typeof (mcp as any).fallbackNotificationHandler).toBe("function");
+  });
+
+  test("a permission_request POSTs the request, pulls the verdict, then notifies", async () => {
+    const mcp = createMcpServer();
+    const calls: { url: string; body?: any }[] = [];
+    const sent: any[] = [];
+    (mcp as any).notification = async (n: any) => {
+      sent.push(n);
+    };
+    let pulls = 0;
+    const fetchImpl = (async (url: string, init?: any) => {
+      const body = init?.body ? JSON.parse(init.body) : undefined;
+      calls.push({ url, body });
+      if (url.includes("/api/permission-request")) return new Response("{}");
+      if (url.includes("/api/permission-pull")) {
+        pulls++;
+        // First pull returns the re-pollable timeout sentinel; second returns
+        // the verdict — exercises the re-poll loop.
+        return pulls === 1
+          ? new Response(JSON.stringify({ verdict: null, timeout: true }))
+          : new Response(
+              JSON.stringify({ request_id: "abcde", behavior: "allow" }),
+            );
+      }
+      return new Response("{}", { status: 404 });
+    }) as any;
+
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl,
+    });
+
+    const handler = (mcp as any)._notificationHandlers.get(
+      "notifications/claude/channel/permission_request",
+    );
+    await handler({
+      method: "notifications/claude/channel/permission_request",
+      params: {
+        request_id: "abcde",
+        tool_name: "Bash",
+        description: "Run ls",
+        input_preview: '{"command":"ls"}',
+      },
+    });
+    // Let the fire-and-forget chain settle (timeout sentinel → re-poll).
+    await Bun.sleep(50);
+
+    const reqCall = calls.find((c) =>
+      c.url.includes("/api/permission-request"),
+    );
+    expect(reqCall?.body).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "abcde",
+      tool_name: "Bash",
+      description: "Run ls",
+      input_preview: '{"command":"ls"}',
+    });
+    expect(pulls).toBe(2);
+    expect(sent).toEqual([
+      {
+        method: PERMISSION_VERDICT_METHOD,
+        params: { request_id: "abcde", behavior: "allow" },
+      },
+    ]);
+  });
+
+  test("a defensive cancel notification POSTs /api/permission-resolved", async () => {
+    const mcp = createMcpServer();
+    const calls: { url: string; body?: any }[] = [];
+    const fetchImpl = (async (url: string, init?: any) => {
+      calls.push({ url, body: init?.body ? JSON.parse(init.body) : undefined });
+      return new Response("{}");
+    }) as any;
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl,
+    });
+    // Unknown-but-permission-shaped method → caught by the fallback handler.
+    await (mcp as any).fallbackNotificationHandler({
+      method: "notifications/claude/channel/permission_done",
+      params: { request_id: "abcde" },
+    });
+    await Bun.sleep(20);
+    const resolved = calls.find((c) =>
+      c.url.includes("/api/permission-resolved"),
+    );
+    expect(resolved?.body).toEqual({
+      session: SID,
+      token: "tok",
+      request_id: "abcde",
+    });
+  });
+});
+
+describe("pullVerdict — abandon / abort sentinel", () => {
+  const coords = () => ({ port: 5858, token: "tok" });
+  const ensure = async () => ({ port: 5858, token: "tok" });
+
+  test("returns ABANDONED when the daemon reports {abandoned:true}", async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ abandoned: true }))) as any;
+    const out = await pullVerdict({
+      sessionId: SID,
+      coords,
+      ensure,
+      fetchImpl,
+    });
+    expect(out).toBe(ABANDONED);
+  });
+
+  test("returns ABANDONED when the budget elapses on repeated timeout sentinels", async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ verdict: null, timeout: true }))) as any;
+    const out = await pullVerdict({
+      sessionId: SID,
+      coords,
+      ensure,
+      fetchImpl,
+      budgetMs: 30, // tiny budget — a couple of sentinel re-polls then give up
+    });
+    expect(out).toBe(ABANDONED);
+  });
+
+  test("returns ABANDONED when the signal is already aborted", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    let called = false;
+    const fetchImpl = (async () => {
+      called = true;
+      return new Response("{}");
+    }) as any;
+    const out = await pullVerdict({
+      sessionId: SID,
+      coords,
+      ensure,
+      fetchImpl,
+      signal: ac.signal,
+    });
+    expect(out).toBe(ABANDONED);
+    expect(called).toBe(false); // bailed before fetching
+  });
+
+  test("returns ABANDONED when aborted mid-flight (fetch rejects)", async () => {
+    const ac = new AbortController();
+    const fetchImpl = (async (_url: string, init?: any) => {
+      // Simulate an abort that rejects the in-flight fetch.
+      ac.abort();
+      const err = new Error("aborted");
+      (err as any).name = "AbortError";
+      if (init?.signal?.aborted) throw err;
+      throw err;
+    }) as any;
+    const out = await pullVerdict({
+      sessionId: SID,
+      coords,
+      ensure,
+      fetchImpl,
+      signal: ac.signal,
+    });
+    expect(out).toBe(ABANDONED);
+  });
+
+  test("still returns a real verdict on the happy path", async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        JSON.stringify({ request_id: "abcde", behavior: "deny" }),
+      )) as any;
+    const out = await pullVerdict({
+      sessionId: SID,
+      coords,
+      ensure,
+      fetchImpl,
+    });
+    expect(out).toEqual({ request_id: "abcde", behavior: "deny" });
+  });
+});
+
+describe("permission relay — supersede aborts the prior in-flight pull", () => {
+  test("a new request aborts the prior pull; the abandoned pull sends no verdict", async () => {
+    const mcp = createMcpServer();
+    const sent: any[] = [];
+    (mcp as any).notification = async (n: any) => {
+      sent.push(n);
+    };
+
+    // Track each pull's signal so we can assert the first was aborted.
+    const pullSignals: (AbortSignal | undefined)[] = [];
+    const fetchImpl = (async (url: string, init?: any) => {
+      if (url.includes("/api/permission-request")) return new Response("{}");
+      if (url.includes("/api/permission-pull")) {
+        const signal: AbortSignal | undefined = init?.signal;
+        pullSignals.push(signal);
+        const idx = pullSignals.length;
+        if (idx === 1) {
+          // First pull: park forever until aborted, then surface the abort.
+          return await new Promise<Response>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              const err = new Error("aborted");
+              (err as any).name = "AbortError";
+              reject(err);
+            });
+          });
+        }
+        // Second pull (new request): resolve with a real verdict.
+        return new Response(
+          JSON.stringify({ request_id: "bbbbb", behavior: "allow" }),
+        );
+      }
+      return new Response("{}", { status: 404 });
+    }) as any;
+
+    registerPermissionRelay({
+      mcp,
+      sessionId: SID,
+      coords: () => ({ port: 5858, token: "tok" }),
+      ensure: async () => ({ port: 5858, token: "tok" }),
+      fetchImpl,
+    });
+
+    const handler = (mcp as any)._notificationHandlers.get(
+      "notifications/claude/channel/permission_request",
+    );
+
+    // Request 1 — parks a pull that will hang until aborted.
+    await handler({
+      method: "notifications/claude/channel/permission_request",
+      params: { request_id: "aaaaa", tool_name: "Bash" },
+    });
+    await Bun.sleep(20);
+    expect(pullSignals[0]?.aborted).toBe(false);
+
+    // Request 2 — must abort request 1's pull, then run to a real verdict.
+    await handler({
+      method: "notifications/claude/channel/permission_request",
+      params: { request_id: "bbbbb", tool_name: "Write" },
+    });
+    await Bun.sleep(50);
+
+    // Request 1's pull was aborted (so it sent NO verdict).
+    expect(pullSignals[0]?.aborted).toBe(true);
+    // Only request 2's verdict was emitted.
+    expect(sent).toEqual([
+      {
+        method: PERMISSION_VERDICT_METHOD,
+        params: { request_id: "bbbbb", behavior: "allow" },
+      },
+    ]);
   });
 });
