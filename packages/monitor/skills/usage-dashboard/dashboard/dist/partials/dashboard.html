@@ -1,8 +1,52 @@
-<div id="app" v-scope="App()" @vue:mounted="mounted()" v-cloak>
+<div
+  id="app"
+  v-scope="App()"
+  @vue:mounted="mounted()"
+  @vue:unmounted="unmounted()"
+  v-cloak
+>
   <a class="skip-link" href="#main-content">Skip to dashboard</a>
 
   <div data-partial="/partials/dashboard/loading.html"></div>
   <div data-partial="/partials/dashboard/hero.html"></div>
+  <div
+    v-if="stats && rangeKey !== 'all'"
+    class="floating-window-controls"
+    :aria-label="'Usage window: ' + activeDateRangeLabel"
+  >
+    <button
+      type="button"
+      class="floating-window-arrow floating-window-arrow--prev"
+      :class="{ 'is-key-active': rangeKeyPulse === 'prev' }"
+      @click="moveRangeWindow(1)"
+      :disabled="!canShiftRangeBack"
+      aria-label="Show previous usage window"
+      title="Previous window"
+    >
+      <span class="floating-window-arrow-glyph" aria-hidden="true">‹</span>
+    </button>
+    <button
+      type="button"
+      class="floating-window-arrow floating-window-arrow--next"
+      :class="{ 'is-key-active': rangeKeyPulse === 'next' }"
+      @click="moveRangeWindow(-1)"
+      :disabled="!canShiftRangeForward"
+      aria-label="Show next usage window"
+      title="Next window"
+    >
+      <span class="floating-window-arrow-glyph" aria-hidden="true">›</span>
+    </button>
+    <button
+      type="button"
+      class="floating-window-pill"
+      @click="resetRangeWindow"
+      :disabled="!canShiftRangeForward"
+      :aria-label="'Usage window: ' + activeDateRangeLabel + '. Return to current window.'"
+      :title="activeDateRangeLabel"
+    >
+      {{ floatingRangeLabel }}
+    </button>
+  </div>
   <div data-partial="/partials/dashboard/project-detail.html"></div>
   <div data-partial="/partials/dashboard/error.html"></div>
 
