@@ -376,6 +376,9 @@
 .floating-window-arrow:disabled,
 .floating-window-pill:disabled {
   cursor: default;
+}
+
+.floating-window-arrow:disabled .floating-window-arrow-glyph {
   opacity: 0.38;
 }
 
