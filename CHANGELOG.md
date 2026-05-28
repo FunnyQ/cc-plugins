@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.5.2] - 2026-05-28
+
+### ✨ Added
+
+- **Token Atlas window navigation**: the usage dashboard now supports movable rolling usage windows. A floating side control panel and a bottom range pill let you pan the visible period forward and backward. Keyboard navigation (arrow keys) is supported with synchronized droplet motion on the timeline.
+
+### 🐛 Fixed
+
+- **Atlas window navigation hardened**: window offsets are reset when switching providers, range bounds are now provider-aware for sparse daily data, provider ledger bounds are cached for reliable keyboard navigation, global event listeners are cleaned up on unmount, and duplicate range pill hover styles are removed.
+
+### 💄 Polish
+
+- **Atlas navigator glass preserved on disabled state**: floating navigator buttons retain their glass styling when disabled (at the boundary of available data).
+- **Atlas navigator buttons positioned farther out**: floating side controls are tucked further outside the chart area to reduce overlap with content.
+
 ## [3.5.1] - 2026-05-27
 
 ### ✨ Added
