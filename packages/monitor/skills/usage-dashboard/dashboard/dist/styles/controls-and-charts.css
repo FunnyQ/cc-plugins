@@ -241,11 +241,6 @@
   animation: range-drop-next-glyph-pulse 920ms var(--ease-out) both;
 }
 
-.floating-window-pill:not(:disabled):hover {
-  border-color: color-mix(in oklch, oklch(99% 0.005 60) 18%, transparent);
-  background: color-mix(in oklch, var(--surface) 28%, transparent);
-}
-
 .floating-window-arrow--prev:active::before {
   transform: translate(max(var(--s-18), env(safe-area-inset-left)), -50%)
     scale(0.97, 0.5);
