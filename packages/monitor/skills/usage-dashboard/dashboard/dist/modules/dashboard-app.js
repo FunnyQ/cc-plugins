@@ -57,6 +57,8 @@ export function App() {
 
   return {
     stats: null,
+    ledgerEarliestByProvider: {},
+    dailyUsageIndexesByProvider: {},
     loading: false,
     refreshInFlight: false,
     refreshTimer: null,
@@ -112,6 +114,28 @@ export function App() {
       document.addEventListener("visibilitychange", this.liveVisibilityHandler);
       this.rangeKeydownHandler = (event) => this.onRangeKeydown(event);
       window.addEventListener("keydown", this.rangeKeydownHandler);
+    },
+
+    unmounted() {
+      if (this.refreshTimer) window.clearInterval(this.refreshTimer);
+      if (this.livePollTimer) window.clearInterval(this.livePollTimer);
+      if (this.liveTickTimer) window.clearInterval(this.liveTickTimer);
+      if (this.rangeKeyPulseTimer) window.clearTimeout(this.rangeKeyPulseTimer);
+      if (this.liveVisibilityHandler) {
+        document.removeEventListener(
+          "visibilitychange",
+          this.liveVisibilityHandler,
+        );
+      }
+      if (this.rangeKeydownHandler) {
+        window.removeEventListener("keydown", this.rangeKeydownHandler);
+      }
+      this.refreshTimer = null;
+      this.livePollTimer = null;
+      this.liveTickTimer = null;
+      this.rangeKeyPulseTimer = null;
+      this.liveVisibilityHandler = null;
+      this.rangeKeydownHandler = null;
     },
 
     applyTheme(mode) {
@@ -201,6 +225,9 @@ export function App() {
           STATS_REFRESH_TIMEOUT_MS,
         );
         this.stats = data;
+        this.ledgerEarliestByProvider = this.buildLedgerEarliestByProvider();
+        this.dailyUsageIndexesByProvider =
+          this.buildDailyUsageIndexesByProvider();
         this.clampRangeOffset();
         this.reconcileSelectedModels();
         this.reconcileSelectedProject();
@@ -245,7 +272,6 @@ export function App() {
       const next = Math.max(0, this.rangeOffset + direction);
       if (next === this.rangeOffset) return;
       this.rangeOffset = next;
-      this.clampRangeOffset();
       this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
       this.$nextTick(() => {
         this.renderTrend();
@@ -290,6 +316,7 @@ export function App() {
 
     onProviderChange(provider) {
       this.providerKey = provider;
+      this.rangeOffset = 0;
       this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
       this.reconcileSelectedModels();
       this.savePrefs();
@@ -514,16 +541,7 @@ export function App() {
 
     get canShiftRangeBack() {
       if (!this.stats || this.rangeKey === "all") return false;
-      if (this.rangeKey === "24h") {
-        const earliest = this.earliestLedgerTimestamp();
-        if (earliest == null) return false;
-        const { to } = this.hourlyWindowBounds(this.rangeOffset + 1);
-        return Date.now() - to * ROLLING_24H_MS > earliest;
-      }
-      const totalDays = this.stats.daily?.length ?? 0;
-      const days = this.rangeDayCount();
-      if (!Number.isFinite(days) || days <= 0) return false;
-      return totalDays - days * (this.rangeOffset + 1) > 0;
+      return this.rangeWindowWithinDataBounds(this.rangeOffset + 1);
     },
 
     get canShiftRangeForward() {
@@ -568,17 +586,40 @@ export function App() {
       return offset === 0 ? "24h" : `${offset + 1}-${offset}d ago`;
     },
 
-    earliestLedgerTimestamp() {
-      let earliest = null;
+    buildLedgerEarliestByProvider() {
+      const earliestByProvider = { all: null };
       for (const row of this.stats?.ledger ?? []) {
-        if (this.providerKey !== "all" && row.provider !== this.providerKey) {
-          continue;
-        }
         const ts = Number(row.timestampMs);
         if (!Number.isFinite(ts)) continue;
-        earliest = earliest == null ? ts : Math.min(earliest, ts);
+        const provider = row.provider ?? "unknown";
+        earliestByProvider.all =
+          earliestByProvider.all == null
+            ? ts
+            : Math.min(earliestByProvider.all, ts);
+        earliestByProvider[provider] =
+          earliestByProvider[provider] == null
+            ? ts
+            : Math.min(earliestByProvider[provider], ts);
       }
-      return earliest;
+      return earliestByProvider;
+    },
+
+    buildDailyUsageIndexesByProvider() {
+      const indexesByProvider = { all: [] };
+      const daily = this.stats?.daily ?? [];
+      daily.forEach((day, index) => {
+        indexesByProvider.all.push(index);
+        for (const provider of ["claude", "codex"]) {
+          if (!this.dayHasUsageForProvider(day, provider)) continue;
+          indexesByProvider[provider] = indexesByProvider[provider] ?? [];
+          indexesByProvider[provider].push(index);
+        }
+      });
+      return indexesByProvider;
+    },
+
+    earliestLedgerTimestamp() {
+      return this.ledgerEarliestByProvider[this.providerKey] ?? null;
     },
 
     clampRangeOffset() {
@@ -586,22 +627,92 @@ export function App() {
         this.rangeOffset = 0;
         return;
       }
-      while (this.rangeOffset > 0 && !this.currentRangeWithinDataBounds()) {
-        this.rangeOffset -= 1;
+      if (this.rangeKey === "24h") {
+        this.rangeOffset = Math.min(
+          this.rangeOffset,
+          this.maxHourlyRangeOffset(),
+        );
+      } else {
+        this.rangeOffset = this.nearestDailyRangeOffset(this.rangeOffset);
       }
     },
 
-    currentRangeWithinDataBounds() {
+    rangeWindowWithinDataBounds(offset) {
       if (!this.stats) return true;
       if (this.rangeKey === "24h") {
-        const earliest = this.earliestLedgerTimestamp();
-        if (earliest == null) return false;
-        const { to } = this.hourlyWindowBounds(this.rangeOffset);
-        return Date.now() - to * ROLLING_24H_MS > earliest;
+        return offset <= this.maxHourlyRangeOffset();
       }
-      return (
-        this.dailyWindow(this.stats.daily ?? [], this.rangeOffset).length > 0
-      );
+      return this.dailyWindowHasProviderUsage(offset);
+    },
+
+    maxHourlyRangeOffset() {
+      const earliest = this.earliestLedgerTimestamp();
+      if (earliest == null) return 0;
+      const windowAge = (Date.now() - earliest) / ROLLING_24H_MS;
+      return Math.max(0, Math.ceil(windowAge) - 1);
+    },
+
+    maxDailyRangeOffset() {
+      const days = this.rangeDayCount();
+      if (!Number.isFinite(days) || days <= 0) return 0;
+      const daily = this.stats?.daily ?? [];
+      if (!daily.length) return 0;
+      const indexes =
+        this.dailyUsageIndexesByProvider[this.providerKey] ??
+        this.dailyUsageIndexesByProvider.all ??
+        [];
+      let maxOffset = 0;
+      for (const index of indexes) {
+        const windowsBack = Math.floor((daily.length - 1 - index) / days);
+        maxOffset = Math.max(maxOffset, windowsBack);
+      }
+      return maxOffset;
+    },
+
+    nearestDailyRangeOffset(offset) {
+      if (this.dailyWindowHasProviderUsage(offset)) return offset;
+      const maxOffset = Math.min(offset, this.maxDailyRangeOffset());
+      for (let candidate = maxOffset; candidate > 0; candidate -= 1) {
+        if (this.dailyWindowHasProviderUsage(candidate)) return candidate;
+      }
+      return 0;
+    },
+
+    dailyWindowHasProviderUsage(offset) {
+      const days = this.rangeDayCount();
+      if (!Number.isFinite(days) || days <= 0) return false;
+      const daily = this.stats?.daily ?? [];
+      const end = Math.max(0, daily.length - days * offset);
+      const start = Math.max(0, end - days);
+      if (end <= start) return false;
+      if (this.providerKey === "all") return true;
+      const indexes = this.dailyUsageIndexesByProvider[this.providerKey] ?? [];
+      return indexes.some((index) => index >= start && index < end);
+    },
+
+    dayHasUsageForProvider(day, providerKey) {
+      const provider = day.providers?.[providerKey];
+      const hasProviderActivity =
+        (provider?.messages ?? 0) > 0 ||
+        (provider?.sessions ?? 0) > 0 ||
+        (provider?.toolCalls ?? 0) > 0;
+      const keep = (model) => providerForModel(model) === providerKey;
+      const hasModelUsage =
+        Object.entries(day.tokensByModel ?? {}).some(
+          ([model, tokens]) => keep(model) && (tokens ?? 0) > 0,
+        ) ||
+        Object.entries(day.usageByModel ?? {}).some(
+          ([model, usage]) =>
+            keep(model) &&
+            ((usage.inputTokens ?? 0) +
+              (usage.outputTokens ?? 0) +
+              (usage.cacheReadTokens ?? 0) +
+              (usage.cacheCreationTokens ?? 0) +
+              (usage.reasoningTokens ?? 0) >
+              0 ||
+              (usage.costUSD ?? 0) > 0),
+        );
+      return hasProviderActivity || hasModelUsage;
     },
 
     summarizeDaily(daily) {
@@ -1445,7 +1556,7 @@ export function App() {
 
     isTypingTarget(target) {
       if (!(target instanceof Element)) return false;
-      if (target.closest("input, textarea, select, button")) return true;
+      if (target.closest("input, textarea, select")) return true;
       return target.closest("[contenteditable='true']") !== null;
     },
 
