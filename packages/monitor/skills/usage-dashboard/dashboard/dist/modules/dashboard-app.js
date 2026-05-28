@@ -36,6 +36,7 @@ const charts = { trend: null, donut: null };
 const STATS_REFRESH_TIMEOUT_MS = 20_000;
 const LIVE_REFRESH_TIMEOUT_MS = 8_000;
 const ROLLING_24H_MS = 24 * 60 * 60 * 1000;
+const RANGE_KEY_PULSE_HOLD_MS = 1_840;
 
 async function fetchJsonWithTimeout(path, timeoutMs) {
   const ctrl = new AbortController();
@@ -61,6 +62,7 @@ export function App() {
     refreshTimer: null,
     error: null,
     rangeKey: initialPrefs.rangeKey ?? "24h",
+    rangeOffset: 0,
     providerKey: initialPrefs.providerKey ?? "all",
     trendMode: initialPrefs.trendMode ?? "tokens",
     trendModelScope: initialPrefs.trendModelScope ?? "all",
@@ -75,6 +77,9 @@ export function App() {
     livePollTimer: null,
     liveTickTimer: null,
     liveVisibilityHandler: null,
+    rangeKeydownHandler: null,
+    rangeKeyPulse: null,
+    rangeKeyPulseTimer: null,
     liveFetchInFlight: false,
     nowTick: Date.now(),
     ledgerSortKey: "date",
@@ -105,6 +110,8 @@ export function App() {
         this.fetchLive();
       };
       document.addEventListener("visibilitychange", this.liveVisibilityHandler);
+      this.rangeKeydownHandler = (event) => this.onRangeKeydown(event);
+      window.addEventListener("keydown", this.rangeKeydownHandler);
     },
 
     applyTheme(mode) {
@@ -194,6 +201,7 @@ export function App() {
           STATS_REFRESH_TIMEOUT_MS,
         );
         this.stats = data;
+        this.clampRangeOffset();
         this.reconcileSelectedModels();
         this.reconcileSelectedProject();
         await this.$nextTick();
@@ -221,12 +229,63 @@ export function App() {
 
     onRangeChange() {
       // Overview, trend, distribution, and per-model table are windowed.
+      this.rangeOffset = 0;
       this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
       this.savePrefs();
       this.$nextTick(() => {
         this.renderTrend();
         this.renderDonut();
       });
+    },
+
+    moveRangeWindow(direction) {
+      if (this.rangeKey === "all") return;
+      if (direction > 0 && !this.canShiftRangeBack) return;
+      if (direction < 0 && !this.canShiftRangeForward) return;
+      const next = Math.max(0, this.rangeOffset + direction);
+      if (next === this.rangeOffset) return;
+      this.rangeOffset = next;
+      this.clampRangeOffset();
+      this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
+      this.$nextTick(() => {
+        this.renderTrend();
+        this.renderDonut();
+      });
+    },
+
+    resetRangeWindow() {
+      if (this.rangeOffset === 0) return;
+      this.rangeOffset = 0;
+      this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
+      this.$nextTick(() => {
+        this.renderTrend();
+        this.renderDonut();
+      });
+    },
+
+    onRangeKeydown(event) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey) return;
+      if (event.altKey || event.shiftKey || this.rangeKey === "all") return;
+      const target = event.target;
+      if (this.isTypingTarget(target)) return;
+      if (event.key === "ArrowLeft" && this.canShiftRangeBack) {
+        event.preventDefault();
+        this.pulseRangeNavigator("prev");
+        this.moveRangeWindow(1);
+      } else if (event.key === "ArrowRight" && this.canShiftRangeForward) {
+        event.preventDefault();
+        this.pulseRangeNavigator("next");
+        this.moveRangeWindow(-1);
+      }
+    },
+
+    pulseRangeNavigator(direction) {
+      this.rangeKeyPulse = direction;
+      if (this.rangeKeyPulseTimer) window.clearTimeout(this.rangeKeyPulseTimer);
+      this.rangeKeyPulseTimer = window.setTimeout(() => {
+        this.rangeKeyPulse = null;
+        this.rangeKeyPulseTimer = null;
+      }, RANGE_KEY_PULSE_HOLD_MS);
     },
 
     onProviderChange(provider) {
@@ -324,12 +383,20 @@ export function App() {
 
     get filteredDaily() {
       if (!this.stats) return [];
-      if (this.rangeKey === "24h") return [this.hourlyWindowDay("24h")];
+      if (this.rangeKey === "24h") {
+        const { from, to } = this.hourlyWindowBounds(this.rangeOffset);
+        return [
+          this.hourlyWindowDay(
+            this.hourlyWindowLabel(this.rangeOffset),
+            from,
+            to,
+          ),
+        ];
+      }
       const all = this.stats.daily;
       const providerFiltered = all.map((d) => this.filterDayByProvider(d));
       if (this.rangeKey === "all") return providerFiltered;
-      const days = parseInt(this.rangeKey, 10);
-      return providerFiltered.slice(-days);
+      return this.dailyWindow(providerFiltered, this.rangeOffset);
     },
 
     get filtered() {
@@ -339,16 +406,20 @@ export function App() {
     get comparisonDaily() {
       if (!this.stats || this.rangeKey === "all") return [];
       if (this.rangeKey === "24h") {
-        return [this.hourlyWindowDay("previous-24h", 2, 1)];
+        const previousOffset = this.rangeOffset + 1;
+        const { from, to } = this.hourlyWindowBounds(previousOffset);
+        return [
+          this.hourlyWindowDay(
+            this.hourlyWindowLabel(previousOffset),
+            from,
+            to,
+          ),
+        ];
       }
-      const days = parseInt(this.rangeKey, 10);
-      if (!Number.isFinite(days) || days <= 0) return [];
       const providerFiltered = this.stats.daily.map((d) =>
         this.filterDayByProvider(d),
       );
-      const currentStart = Math.max(0, providerFiltered.length - days);
-      const previousStart = Math.max(0, currentStart - days);
-      return providerFiltered.slice(previousStart, currentStart);
+      return this.dailyWindow(providerFiltered, this.rangeOffset + 1);
     },
 
     get previousTrendAvailable() {
@@ -439,6 +510,98 @@ export function App() {
         })
         .join(" ");
       return { points, max, hasData: true };
+    },
+
+    get canShiftRangeBack() {
+      if (!this.stats || this.rangeKey === "all") return false;
+      if (this.rangeKey === "24h") {
+        const earliest = this.earliestLedgerTimestamp();
+        if (earliest == null) return false;
+        const { to } = this.hourlyWindowBounds(this.rangeOffset + 1);
+        return Date.now() - to * ROLLING_24H_MS > earliest;
+      }
+      const totalDays = this.stats.daily?.length ?? 0;
+      const days = this.rangeDayCount();
+      if (!Number.isFinite(days) || days <= 0) return false;
+      return totalDays - days * (this.rangeOffset + 1) > 0;
+    },
+
+    get canShiftRangeForward() {
+      return this.rangeKey !== "all" && this.rangeOffset > 0;
+    },
+
+    get rangeNavigationLabel() {
+      if (this.rangeKey === "all") return "All time";
+      if (this.rangeOffset === 0) return "Current window";
+      return `${this.rangeOffset} window${this.rangeOffset === 1 ? "" : "s"} back`;
+    },
+
+    get floatingRangeLabel() {
+      if (this.rangeKey === "all") return "All time";
+      if (this.rangeKey === "24h") {
+        if (this.rangeOffset === 0) return "Last 24 hours";
+        return `${this.rangeOffset + 1} days ago · 24h`;
+      }
+      return this.activeDateRangeLabel || this.activeWindowLabel;
+    },
+
+    rangeDayCount() {
+      return parseInt(this.rangeKey, 10);
+    },
+
+    dailyWindow(daily, offset = 0) {
+      const days = this.rangeDayCount();
+      if (!Number.isFinite(days) || days <= 0) return [];
+      const end = Math.max(0, daily.length - days * offset);
+      const start = Math.max(0, end - days);
+      return daily.slice(start, end);
+    },
+
+    hourlyWindowBounds(offset = 0) {
+      return {
+        from: offset + 1,
+        to: offset,
+      };
+    },
+
+    hourlyWindowLabel(offset = 0) {
+      return offset === 0 ? "24h" : `${offset + 1}-${offset}d ago`;
+    },
+
+    earliestLedgerTimestamp() {
+      let earliest = null;
+      for (const row of this.stats?.ledger ?? []) {
+        if (this.providerKey !== "all" && row.provider !== this.providerKey) {
+          continue;
+        }
+        const ts = Number(row.timestampMs);
+        if (!Number.isFinite(ts)) continue;
+        earliest = earliest == null ? ts : Math.min(earliest, ts);
+      }
+      return earliest;
+    },
+
+    clampRangeOffset() {
+      if (this.rangeKey === "all") {
+        this.rangeOffset = 0;
+        return;
+      }
+      while (this.rangeOffset > 0 && !this.currentRangeWithinDataBounds()) {
+        this.rangeOffset -= 1;
+      }
+    },
+
+    currentRangeWithinDataBounds() {
+      if (!this.stats) return true;
+      if (this.rangeKey === "24h") {
+        const earliest = this.earliestLedgerTimestamp();
+        if (earliest == null) return false;
+        const { to } = this.hourlyWindowBounds(this.rangeOffset);
+        return Date.now() - to * ROLLING_24H_MS > earliest;
+      }
+      return (
+        this.dailyWindow(this.stats.daily ?? [], this.rangeOffset).length > 0
+      );
     },
 
     summarizeDaily(daily) {
@@ -907,13 +1070,21 @@ export function App() {
     },
 
     get activeWindowLabel() {
-      if (this.rangeKey === "24h") return "last 24 hours";
       if (this.rangeKey === "all") return "all time";
-      return `last ${this.rangeKey} days`;
+      if (this.rangeOffset === 0) {
+        if (this.rangeKey === "24h") return "last 24 hours";
+        return `last ${this.rangeKey} days`;
+      }
+      return this.activeDateRangeLabel || this.rangeNavigationLabel;
     },
 
     get activeDateRangeLabel() {
-      if (this.rangeKey === "24h") return "Rolling 24 hours";
+      if (this.rangeKey === "24h") {
+        const { from, to } = this.hourlyWindowBounds(this.rangeOffset);
+        const end = new Date(Date.now() - to * ROLLING_24H_MS);
+        const start = new Date(Date.now() - from * ROLLING_24H_MS);
+        return this.formatDateTimeRange(start, end);
+      }
       const daily = this.filteredDaily;
       if (!daily.length) return "";
       const first = this.parseDate(daily[0].date);
@@ -1071,7 +1242,8 @@ export function App() {
     get filteredLedger() {
       if (!this.stats?.ledger) return [];
       if (this.rangeKey === "24h") {
-        return this.rollingLedgerRows().sort((a, b) =>
+        const { from, to } = this.hourlyWindowBounds(this.rangeOffset);
+        return this.rollingLedgerRows(from, to).sort((a, b) =>
           this.compareLedgerRows(a, b),
         );
       }
@@ -1149,7 +1321,8 @@ export function App() {
       let matrix;
       if (this.rangeKey === "24h") {
         matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
-        for (const row of this.rollingLedgerRows()) {
+        const { from, to } = this.hourlyWindowBounds(this.rangeOffset);
+        for (const row of this.rollingLedgerRows(from, to)) {
           const ts = Number(row.timestampMs);
           if (!Number.isFinite(ts)) continue;
           const d = new Date(ts);
@@ -1269,6 +1442,12 @@ export function App() {
     modelMarkClass,
     providerBadgeClass,
     dayLabel: (i) => DAYS[i],
+
+    isTypingTarget(target) {
+      if (!(target instanceof Element)) return false;
+      if (target.closest("input, textarea, select, button")) return true;
+      return target.closest("[contenteditable='true']") !== null;
+    },
 
     loadPrefs() {
       return normalizePrefs(loadStoredPrefs());
@@ -1460,6 +1639,7 @@ export function App() {
         filters: {
           provider: this.providerKey,
           range: this.rangeKey,
+          rangeOffset: this.rangeOffset,
           dateRange: this.activeDateRangeLabel,
         },
         summary: this.filtered.summary,
@@ -1523,7 +1703,8 @@ export function App() {
 
     exportFilename(kind, extension) {
       const date = this.formatDate(new Date());
-      return `token-atlas-${this.providerKey}-${this.rangeKey}-${kind}-${date}.${extension}`;
+      const offset = this.rangeOffset > 0 ? `-${this.rangeOffset}back` : "";
+      return `token-atlas-${this.providerKey}-${this.rangeKey}${offset}-${kind}-${date}.${extension}`;
     },
 
     downloadBlob(filename, content, mimeType) {
@@ -1780,6 +1961,27 @@ export function App() {
       return `${fmt.format(first)} - ${fmt.format(last)}`;
     },
 
+    formatDateTimeRange(first, last) {
+      const sameDay = this.formatDate(first) === this.formatDate(last);
+      const dateFmt = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      const timeFmt = new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      if (sameDay) {
+        return `${dateFmt.format(first)}, ${timeFmt.format(first)} - ${timeFmt.format(
+          last,
+        )}`;
+      }
+      return `${dateFmt.format(first)}, ${timeFmt.format(first)} - ${dateFmt.format(
+        last,
+      )}, ${timeFmt.format(last)}`;
+    },
+
     hourBucketLabel(timestampMs) {
       return new Date(timestampMs).toLocaleTimeString(undefined, {
         hour: "2-digit",
@@ -2019,16 +2221,18 @@ export function App() {
       if (!window.Chart || !this.stats) return;
       const ctx = this.$refs.trendCanvas?.getContext("2d");
       if (!ctx) return;
+      const { from, to } = this.hourlyWindowBounds(this.rangeOffset);
+      const previous = this.hourlyWindowBounds(this.rangeOffset + 1);
       const trendBuckets =
         this.rangeKey === "24h"
-          ? this.hourlyLedgerBuckets()
+          ? this.hourlyLedgerBuckets(from, to)
           : this.filteredDaily;
       const labels = trendBuckets.map((d) => d.date);
       const isCost = this.trendMode === "cost";
       const activeModels = this.activeTrendModels;
       const previousBuckets = this.previousTrendAvailable
         ? this.rangeKey === "24h"
-          ? this.hourlyLedgerBuckets(2, 1)
+          ? this.hourlyLedgerBuckets(previous.from, previous.to)
           : this.comparisonDaily
         : [];
 
