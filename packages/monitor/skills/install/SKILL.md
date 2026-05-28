@@ -45,7 +45,7 @@ so there is one source of truth for setup logic.
 Always run the read-only check first and show the user the result:
 
 ```bash
-bun "$CLAUDE_PLUGIN_ROOT/skills/install/scripts/setup.ts"
+bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts"
 ```
 
 `✓` already set, `○` optional/can be wired, `✗` a required prerequisite is
@@ -72,11 +72,11 @@ existing-key preservation.
 
 ```bash
 # statusline + stale-channel cleanup
-bun "$CLAUDE_PLUGIN_ROOT/skills/install/scripts/setup.ts" --apply
+bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts" --apply
 # preview only, writes nothing
-bun "$CLAUDE_PLUGIN_ROOT/skills/install/scripts/setup.ts" --dry-run
+bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts" --dry-run
 # statusline only (skips channel cleanup)
-bun "$CLAUDE_PLUGIN_ROOT/skills/install/scripts/setup.ts" --apply-statusline
+bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts" --apply-statusline
 ```
 
 ### 4. Tell the user what's next
@@ -88,7 +88,7 @@ bun "$CLAUDE_PLUGIN_ROOT/skills/install/scripts/setup.ts" --apply-statusline
   it can't retro-attach. Launch an opted-in session with:
 
   ```bash
-  bun "$CLAUDE_PLUGIN_ROOT/skills/cockpit/scripts/monitor-up.ts"
+  bun "${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/monitor-up.ts"
   ```
 
   (This passes `--dangerously-load-development-channels plugin:monitor@q-lab-marketplace`.
