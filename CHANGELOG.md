@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.5.3] - 2026-05-29
+
+### 📝 Documentation
+
+- **Install command examples use explicit Bash expansion**: the install skill's documentation now uses `${CLAUDE_PLUGIN_ROOT}` instead of `$CLAUDE_PLUGIN_ROOT` across all code examples, for clearer and more defensive variable expansion.
+
 ## [3.5.2] - 2026-05-28
 
 ### ✨ Added
