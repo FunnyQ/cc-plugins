@@ -243,9 +243,237 @@
     min-height: 36px;
   }
 
+  .floating-window-arrow {
+    width: 44px;
+    height: 68px;
+  }
+
   .model-toggles label {
     min-height: 36px;
     padding-inline: var(--s-12);
+  }
+}
+
+@media (max-width: 720px) {
+  .floating-window-arrow {
+    top: auto;
+    bottom: max(74px, calc(env(safe-area-inset-bottom) + 74px));
+    width: 74px;
+    height: 82px;
+    font-size: 28px;
+  }
+
+  .floating-window-arrow::before {
+    width: 42px;
+    height: 74px;
+  }
+
+  .floating-window-arrow--prev {
+    left: 0;
+  }
+
+  .floating-window-arrow--prev::before {
+    transform: translate(-24px, -50%) scaleX(0.9);
+  }
+
+  .floating-window-arrow--prev .floating-window-arrow-glyph {
+    left: -3px;
+    transform: translate(-50%, -50%);
+  }
+
+  .floating-window-arrow--next {
+    right: 0;
+  }
+
+  .floating-window-arrow--next::before {
+    transform: translate(24px, -50%) scaleX(0.9);
+  }
+
+  .floating-window-arrow--next .floating-window-arrow-glyph {
+    right: -3px;
+    transform: translate(50%, -50%);
+  }
+
+  .floating-window-arrow--prev:not(:disabled):hover::before,
+  .floating-window-arrow--prev:focus-visible::before,
+  .floating-window-arrow--prev.is-key-active::before {
+    transform: translate(max(var(--s-12), env(safe-area-inset-left)), -50%)
+      scaleY(0.57);
+  }
+
+  .floating-window-arrow--prev:not(:disabled):hover
+    .floating-window-arrow-glyph,
+  .floating-window-arrow--prev:focus-visible .floating-window-arrow-glyph,
+  .floating-window-arrow--prev.is-key-active .floating-window-arrow-glyph {
+    transform: translate(
+      calc(max(var(--s-12), env(safe-area-inset-left)) + 24px - 50%),
+      -50%
+    );
+  }
+
+  .floating-window-arrow--next:not(:disabled):hover::before,
+  .floating-window-arrow--next:focus-visible::before,
+  .floating-window-arrow--next.is-key-active::before {
+    transform: translate(
+        calc(-1 * max(var(--s-12), env(safe-area-inset-right))),
+        -50%
+      )
+      scaleY(0.57);
+  }
+
+  .floating-window-arrow--next:not(:disabled):hover
+    .floating-window-arrow-glyph,
+  .floating-window-arrow--next:focus-visible .floating-window-arrow-glyph,
+  .floating-window-arrow--next.is-key-active .floating-window-arrow-glyph {
+    transform: translate(
+      calc(50% - max(var(--s-12), env(safe-area-inset-right)) - 24px),
+      -50%
+    );
+  }
+
+  .floating-window-arrow--prev.is-key-active::before {
+    animation-name: range-drop-mobile-prev-pulse;
+  }
+
+  .floating-window-arrow--prev.is-key-active .floating-window-arrow-glyph {
+    animation-name: range-drop-mobile-prev-glyph-pulse;
+  }
+
+  .floating-window-arrow--next.is-key-active::before {
+    animation-name: range-drop-mobile-next-pulse;
+  }
+
+  .floating-window-arrow--next.is-key-active .floating-window-arrow-glyph {
+    animation-name: range-drop-mobile-next-glyph-pulse;
+  }
+
+  .floating-window-arrow--prev:active::before {
+    transform: translate(max(var(--s-12), env(safe-area-inset-left)), -50%)
+      scale(0.97, 0.55);
+  }
+
+  .floating-window-arrow--next:active::before {
+    transform: translate(
+        calc(-1 * max(var(--s-12), env(safe-area-inset-right))),
+        -50%
+      )
+      scale(0.97, 0.55);
+  }
+
+  @keyframes range-drop-mobile-prev-pulse {
+    0% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 14%, transparent);
+      background: color-mix(in oklch, var(--surface) 20%, transparent);
+      border-radius: 0 76% 76% 0 / 0 50% 50% 0;
+      transform: translate(-24px, -50%) scaleX(0.9);
+    }
+    28%,
+    68% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 22%, transparent);
+      background: color-mix(in oklch, var(--surface) 30%, transparent);
+      border-radius: 50%;
+      transform: translate(max(var(--s-12), env(safe-area-inset-left)), -50%)
+        scaleY(0.57);
+    }
+    44% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 34%, transparent);
+      background: color-mix(in oklch, var(--surface) 36%, transparent);
+      border-radius: 50%;
+      transform: translate(max(var(--s-12), env(safe-area-inset-left)), -50%)
+        scale(1.04, 0.6);
+    }
+    100% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 14%, transparent);
+      background: color-mix(in oklch, var(--surface) 20%, transparent);
+      border-radius: 0 76% 76% 0 / 0 50% 50% 0;
+      transform: translate(-24px, -50%) scaleX(0.9);
+    }
+  }
+
+  @keyframes range-drop-mobile-next-pulse {
+    0% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 14%, transparent);
+      background: color-mix(in oklch, var(--surface) 20%, transparent);
+      border-radius: 76% 0 0 76% / 50% 0 0 50%;
+      transform: translate(24px, -50%) scaleX(0.9);
+    }
+    28%,
+    68% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 22%, transparent);
+      background: color-mix(in oklch, var(--surface) 30%, transparent);
+      border-radius: 50%;
+      transform: translate(
+          calc(-1 * max(var(--s-12), env(safe-area-inset-right))),
+          -50%
+        )
+        scaleY(0.57);
+    }
+    44% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 34%, transparent);
+      background: color-mix(in oklch, var(--surface) 36%, transparent);
+      border-radius: 50%;
+      transform: translate(
+          calc(-1 * max(var(--s-12), env(safe-area-inset-right))),
+          -50%
+        )
+        scale(1.04, 0.6);
+    }
+    100% {
+      border-color: color-mix(in oklch, oklch(99% 0.005 60) 14%, transparent);
+      background: color-mix(in oklch, var(--surface) 20%, transparent);
+      border-radius: 76% 0 0 76% / 50% 0 0 50%;
+      transform: translate(24px, -50%) scaleX(0.9);
+    }
+  }
+
+  @keyframes range-drop-mobile-prev-glyph-pulse {
+    0% {
+      transform: translate(-50%, -50%);
+    }
+    28%,
+    68% {
+      transform: translate(
+        calc(max(var(--s-12), env(safe-area-inset-left)) + 24px - 50%),
+        -50%
+      );
+    }
+    44% {
+      transform: translate(
+        calc(max(var(--s-12), env(safe-area-inset-left)) + 26px - 50%),
+        -50%
+      );
+    }
+    100% {
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  @keyframes range-drop-mobile-next-glyph-pulse {
+    0% {
+      transform: translate(50%, -50%);
+    }
+    28%,
+    68% {
+      transform: translate(
+        calc(50% - max(var(--s-12), env(safe-area-inset-right)) - 24px),
+        -50%
+      );
+    }
+    44% {
+      transform: translate(
+        calc(50% - max(var(--s-12), env(safe-area-inset-right)) - 26px),
+        -50%
+      );
+    }
+    100% {
+      transform: translate(50%, -50%);
+    }
+  }
+
+  .floating-window-pill {
+    min-height: 36px;
+    max-width: calc(100dvw - 112px);
+    padding: 0 var(--s-14);
   }
 }
 
