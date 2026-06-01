@@ -86,7 +86,7 @@ Rubric judge (Opus) ─ scores each ## Eval rubric dimension, runs score-task --
 Score gate (inline arithmetic in the orchestrator) ─ weighted avg + veto
    ├─ fail → loop back to Dev with the judge's rationale
    ▼ pass
-done → Status: done   (next wave's next-ready will see it)
+done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes   (next wave's next-ready will see it)
 ```
 
 The `Final review` task (`> **Final review**: true`) depends transitively on every other task, so the wave loop **naturally schedules it last** — it only becomes ready once everything else is `done`. No special phase needed; just bump its Dev and judge to Opus (the orchestrator detects the marker).
@@ -144,6 +144,7 @@ autopilot ships no scripts of its own — it reuses flightplan's, which are sibl
 
 - `next-ready.ts <tasks-dir>` — the per-wave ready-set scout.
 - `score-task.ts <task> <scores.json> [--log <file>] [--attempt N] [--agent <label>]` — `scoreTask(rubric, scores)` exported; the inline orchestrator gate mirrors it. `--log` persists the verdict to the flightlog.
+- `mark-done.ts <task>` — the done-transition: sets `Status: done` and ticks every `## Acceptance criteria` / `## Verification` checkbox. Run when a task passes the gate.
 - `flightlog.ts log|report` — narrative entries + `RUNLOG.md`.
 - `lint-task.ts <tasks-dir>` — run during scout if `next-ready` reports a malformed tree.
 

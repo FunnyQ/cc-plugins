@@ -154,6 +154,7 @@ Reach for these instead of doing the mechanical work by hand. Each one has a tes
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
 - `scripts/next-ready.ts` — lists tasks whose dependencies are all `done` (executor-session helper)
 - `scripts/score-task.ts` — for the executor side: feed `{ dimension: score }` JSON, get a deterministic weighted-average + hard-fail verdict against the task's own rubric (`scoreTask(rubric, scores)` exported). This is the gate a dev→review→rate loop scores against. `--log <file>` appends the verdict to an audit trail.
+- `scripts/mark-done.ts` — the done-transition for a passed task: sets `> **Status**: done` and ticks every checkbox in `## Acceptance criteria` and `## Verification` (`markDone(content)` exported). Used by the `autopilot` skill.
 - `scripts/flightlog.ts` — executor audit trail: `log` appends an agent narrative entry, `report` renders `RUNLOG.md`. Logs live in `docs/<slug>/.flightlog/`, self-gitignored. The `autopilot` skill drives these during a run.
 
 ## Automatic hook
