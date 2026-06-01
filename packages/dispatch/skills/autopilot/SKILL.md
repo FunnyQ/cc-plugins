@@ -142,7 +142,7 @@ Each entry records an `agentLabel` so a suspicious verdict can be traced back to
 
 autopilot ships no scripts of its own — it reuses flightplan's, which are siblings under `skills/flightplan/scripts/`:
 
-- `next-ready.ts <tasks-dir>` — the per-wave ready-set scout.
+- `next-ready.ts <tasks-dir> [--json]` — the per-wave ready-set scout. `--json` emits `[{ref,finalReview}]` (or `[]` when none ready); the scout echoes it verbatim so an empty set can't be misread as "everything is ready".
 - `score-task.ts <task> <scores.json> [--log <file>] [--attempt N] [--agent <label>]` — `scoreTask(rubric, scores)` exported; the inline orchestrator gate mirrors it. `--log` persists the verdict to the flightlog.
 - `mark-done.ts <task>` — the done-transition: sets `Status: done` and ticks every `## Acceptance criteria` / `## Verification` checkbox. Run when a task passes the gate.
 - `flightlog.ts log|report` — narrative entries + `RUNLOG.md`.
