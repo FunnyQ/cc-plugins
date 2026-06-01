@@ -1,8 +1,8 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships a single plugin, **monitor**, that turns local traces into useful dashboards: the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships two plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop.
 
-## Plugin
+## Plugins
 
 **monitor** bundles two skills:
 
@@ -10,6 +10,14 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 |-------|-------------|
 | [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
 | [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
+
+**dispatch** bundles three skills:
+
+| Skill | Description |
+|-------|-------------|
+| [preflight](./packages/dispatch/skills/preflight) | Lightweight interviewer that gathers requirements into a single in-conversation plan to approve and execute |
+| [flightplan](./packages/dispatch/skills/flightplan) | Heavyweight interviewer that writes a multi-file blueprint to disk — `PLAN.md` + a `tasks/` tree of self-contained task files for sub-agents |
+| [autopilot](./packages/dispatch/skills/autopilot) | Executes a flightplan tree via a dev→verify→judge→score loop gated on each task's Eval rubric, then the closing final-review gate, leaving an audit trail |
 
 ## Claude Code Installation
 
@@ -166,6 +174,28 @@ codex app-server daemon enable-remote-control
 ```
 
 Cockpit checks `/api/codex-control/status` before enabling the Codex send box, so stale or non-resumable threads stay disabled instead of failing only after send.
+
+## dispatch
+
+Interview-driven planning you can execute. Three skills form one arc — gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop.
+
+![Dispatch flow: preflight → flightplan → autopilot → final review → ship](./assets/dispatch-flow.svg)
+
+- **preflight** — a lightweight interview that produces a single in-conversation plan. Best when you'll execute now, in one session.
+- **flightplan** — a thorough interview that writes `docs/<slug>/PLAN.md` plus a `tasks/` tree of self-contained task files (each with its own `## Eval rubric`). Best when the work spans sessions or hands off to sub-agents.
+- **autopilot** — executes that tree. For each ready task it runs Dev → an independent binary gate (re-runs the task's Verification) → a rubric judge → a deterministic score gate, retrying until the task passes its rubric, then runs the closing `Final review` task as the whole-tree gate. Every verdict lands in a self-gitignored `docs/<slug>/.flightlog/` audit trail (`RUNLOG.md`).
+
+### Installation
+
+```bash
+# Claude Code
+claude plugins install dispatch@q-lab-marketplace
+
+# Codex
+codex plugin add dispatch@q-lab-marketplace
+```
+
+(Add the marketplace first if you haven't — see the monitor install steps above.)
 
 ## Adding a New Plugin
 

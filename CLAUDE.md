@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing one local plugin, **monitor**, which bundles three sibling skills:
+A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing two local plugins:
+
+- **monitor** — usage dashboard + per-project cockpit (documented in depth below).
+- **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
+
+**monitor** bundles three sibling skills:
 
 - **usage-dashboard** — the rear-view mirror: a local web dashboard that visualizes Claude Code and Codex usage (sessions, tokens, cost, model mix, project activity).
 - **cockpit** — the windshield: a per-project session cockpit (goal capture, distilled decision log, live transcript, a `needs_your_call` wait/send bridge, and a send box for running sessions). Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. Claude Code sends use the cockpit channel MCP server; Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool).
@@ -16,10 +21,19 @@ This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`
 
 ```
 cc-plugins/
-├── .claude-plugin/marketplace.json   # Claude marketplace registry (one plugin: monitor)
-├── .agents/plugins/marketplace.json  # Codex marketplace registry (one plugin: monitor)
+├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch)
+├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
-└── packages/monitor/                 # the only plugin (monorepo layout: packages/<plugin>)
+├── packages/dispatch/                # plugin: interview-driven planning + execution (preflight + flightplan + autopilot)
+│   ├── .claude-plugin/plugin.json    # Claude manifest + PostToolUse hook → flightplan-lint.sh
+│   ├── .codex-plugin/plugin.json     # Codex manifest (skills only; no hooks)
+│   ├── hooks/flightplan-lint.sh      # lints flightplan task files on Edit/Write (path + content gated)
+│   └── skills/
+│       ├── preflight/                # skill: lightweight in-conversation spec (← odin probe)
+│       ├── flightplan/               # skill: multi-file PLAN.md + tasks/ blueprint (← odin probe-deep)
+│       │                             #   scripts/ also home autopilot's shared tools: next-ready / score-task (--log) / flightlog
+│       └── autopilot/                # skill: execute the tree via Workflow (wave loop + dev→verify→judge→score gate); see references/orchestrator.md
+└── packages/monitor/                 # plugin: usage dashboard + cockpit (monorepo layout: packages/<plugin>)
     ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hook → setup.ts --session-check
     ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)
     └── skills/
