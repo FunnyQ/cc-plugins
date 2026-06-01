@@ -16,6 +16,7 @@ Each task file is `docs/<topic>/tasks/<bucket>/NN-<slug>.md`. NN is two-digit ze
 > **Depends on**: <bucket>/NN, <bucket>/NN  (or "none — foundation task")
 > **Blocks**: <bucket>/NN  (optional — useful for parallel planning)
 > **Status**: todo | in-progress | done | blocked
+> **Final review**: true  (ONLY on the one closing review task — omit on every other task)
 
 ## Goal
 
@@ -91,6 +92,14 @@ export function foo(bar: Bar): Baz
 - `blocked` — waiting on a decision, upstream task, or external resource
 
 Status is mutated in-place. Sub-agents update this when they pick up or finish a task.
+
+### `Final review` (the closing gate — exactly one per plan)
+
+Every plan ends with **one terminal task that reviews the whole deliverable**. Mark it `> **Final review**: true`, and make its `Depends on` reach every other task (directly or transitively) so it cannot start until all the work is done. `lint-task.ts` enforces both: a plan with no marked task, or a marked task that misses some branch, fails the whole-tree lint.
+
+This is the holistic gate — per-task rubrics catch per-task quality; the final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes (e.g. **整合性 / does it compose**, **達成 PLAN 目標 / meets the goal**, **一致性 / consistency**, **無 regression**), not re-score individual tasks.
+
+A plan with a single task is exempt (it's its own terminal). Don't mark more than one task — keep one unambiguous closing gate.
 
 ### `Eval rubric` (required, machine-parseable)
 

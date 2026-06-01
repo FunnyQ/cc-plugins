@@ -2,7 +2,27 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { lintFile, collectTaskFiles, inferRefFromPath } from "./lint-task";
+import {
+  lintFile,
+  collectTaskFiles,
+  inferRefFromPath,
+  checkFinalReview,
+} from "./lint-task";
+import type { ParsedTask } from "./lib/parse-task";
+
+// Minimal ParsedTask for graph checks — bucket/nn/dependsOn/finalReview read.
+const mk = (
+  bucket: string,
+  nn: string,
+  deps: Array<[string, string]> = [],
+  finalReview = false,
+): ParsedTask =>
+  ({
+    bucket,
+    nn,
+    dependsOn: deps.map(([b, n]) => ({ bucket: b, nn: n })),
+    finalReview,
+  }) as unknown as ParsedTask;
 
 const VALID_TASK = `# UI-01: Fixture state shell
 
@@ -322,6 +342,74 @@ describe("lintFile", () => {
       violations.some((v) => v.rule === "rubric" && /scale/.test(v.detail)),
     ).toBe(true);
     await rm(root, { recursive: true });
+  });
+});
+
+describe("checkFinalReview", () => {
+  test("single task is exempt", () => {
+    expect(checkFinalReview([mk("work", "01")], "t")).toEqual([]);
+  });
+
+  test("marked task depending on all others → ok", () => {
+    const tasks = [
+      mk("ui", "01"),
+      mk("backend", "01"),
+      mk(
+        "review",
+        "01",
+        [
+          ["ui", "01"],
+          ["backend", "01"],
+        ],
+        true,
+      ),
+    ];
+    expect(checkFinalReview(tasks, "t")).toEqual([]);
+  });
+
+  test("marked task reaching all leaves transitively → ok", () => {
+    const tasks = [
+      mk("ui", "01"),
+      mk("ui", "02", [["ui", "01"]]),
+      mk("backend", "01"),
+      mk("backend", "02", [["backend", "01"]]),
+      mk(
+        "review",
+        "01",
+        [
+          ["ui", "02"],
+          ["backend", "02"],
+        ],
+        true,
+      ),
+    ];
+    expect(checkFinalReview(tasks, "t")).toEqual([]);
+  });
+
+  test("no marked task → violation (even if a task covers all)", () => {
+    const tasks = [
+      mk("ui", "01"),
+      mk("backend", "01"),
+      mk("review", "01", [
+        ["ui", "01"],
+        ["backend", "01"],
+      ]), // covers all but NOT marked
+    ];
+    const v = checkFinalReview(tasks, "t");
+    expect(v.length).toBe(1);
+    expect(v[0].rule).toBe("final-review");
+    expect(v[0].detail).toMatch(/Final review/);
+  });
+
+  test("marked but missing a branch → violation lists what it misses", () => {
+    const tasks = [
+      mk("ui", "01"),
+      mk("ingestion", "01"),
+      mk("review", "01", [["ui", "01"]], true), // misses ingestion/01
+    ];
+    const v = checkFinalReview(tasks, "t");
+    expect(v.length).toBe(1);
+    expect(v[0].detail).toMatch(/ingestion\/01/);
   });
 });
 

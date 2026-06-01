@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency.
 - `build-readme.ts` — the generated task index gains a **Pass 線** column showing
   each task's rubric pass threshold.
+- **flightplan: every plan must end with one final review task.** A terminal task
+  marked `> **Final review**: true` whose `Depends on` transitively reaches every
+  other task — the holistic closing gate (integration, meets-goal, consistency,
+  regressions) on top of the per-task rubrics. `parse-task.ts` reads the marker;
+  `lint-task.ts` enforces marker + full coverage as a whole-tree check (single-task
+  plans exempt). The per-file write hook is unaffected.
 
 ### Changed
 
