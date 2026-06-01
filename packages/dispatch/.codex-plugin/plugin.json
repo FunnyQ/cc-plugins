@@ -1,0 +1,35 @@
+{
+  "name": "dispatch",
+  "version": "0.2.0",
+  "description": "Plan before you fly — interview-driven specs. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint to disk for later execution.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "preflight",
+    "flightplan",
+    "interview",
+    "spec",
+    "blueprint",
+    "planning",
+    "requirements",
+    "tasks"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dispatch",
+    "shortDescription": "Interview-driven planning: lightweight in-conversation specs and multi-file blueprints for sub-agents.",
+    "longDescription": "Two skills in one plugin. preflight is a lightweight interviewer that gathers requirements through systematic questioning and writes a single in-conversation plan to approve and execute. flightplan is the heavyweight sibling: it interviews thoroughly, then commits a complete blueprint to disk — PLAN.md plus a tasks/ tree with shared _context/ files and self-contained task files a different session or sub-agent can pick up and execute independently.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Interview me to spec this out before we build.",
+      "Help me think through this idea.",
+      "Fully spec this out and break it into task files.",
+      "Draft a PLAN.md and tasks for sub-agents."
+    ],
+    "brandColor": "#35CAD2"
+  }
+}

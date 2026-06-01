@@ -1,0 +1,33 @@
+{
+  "name": "dispatch",
+  "version": "0.2.0",
+  "description": "Plan before you fly — interview-driven specs. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk for sub-agents to execute later.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "preflight",
+    "flightplan",
+    "interview",
+    "spec",
+    "blueprint",
+    "planning",
+    "requirements",
+    "tasks"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/flightplan-lint.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
