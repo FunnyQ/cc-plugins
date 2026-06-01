@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.6.2] - 2026-06-02
+
+### Fixed
+
+- **autopilot**: corrected the flightplan scripts path in SKILL.md — it used `${CLAUDE_PLUGIN_ROOT}/../flightplan/scripts/` (which resolved outside the installed plugin) instead of `${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/`, so the scout step (next-ready.ts) and flightlog report failed to locate the scripts.
+
 ## [3.6.1] - 2026-06-02
 
 ### 📝 Documentation
