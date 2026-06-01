@@ -24,12 +24,12 @@ function parseAll(headers: string[]): ParsedTask[] {
 const RUBRIC_BLOCK = `
 ## Eval rubric
 
-> 各項 0–5,加權平均 > 4.0 通過。
+> Each dimension 0–5; weighted average > 4.0 to pass.
 
-| 維度 | 權重 | 4–5(過關) |
+| Dimension | Weight | 4–5 (pass) |
 |---|---|---|
-| 正確性 | ×3 | ok |
-| 測試涵蓋 | ×1 | ok |
+| Correctness | ×3 | ok |
+| Test coverage | ×1 | ok |
 `;
 
 const HEADER = (

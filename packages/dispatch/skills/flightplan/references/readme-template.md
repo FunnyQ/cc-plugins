@@ -2,7 +2,7 @@
 
 `tasks/README.md` is the entry point for any executor (human or sub-agent). It explains how to read the tree, the status conventions, the dependency graph, and known gaps.
 
-**Most of this file is generated.** `scripts/build-readme.ts` parses every task header and regenerates the task index (Bucket / NN / Title / Status / **Pass 線** / Depends on — the Pass 線 column shows each task's Eval-rubric pass threshold, e.g. `> 4`, or `—` if the rubric is unparseable), per-bucket dep graphs, and cross-bucket dep table between the markers:
+**Most of this file is generated.** `scripts/build-readme.ts` parses every task header and regenerates the task index (Bucket / NN / Title / Status / **Pass line** / Depends on — the Pass line column shows each task's Eval-rubric pass threshold, e.g. `> 4`, or `—` if the rubric is unparseable), per-bucket dep graphs, and cross-bucket dep table between the markers:
 
 ```
 <!-- flightplan:generated:start -->

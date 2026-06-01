@@ -28,12 +28,12 @@ One sentence.
 
 ## Eval rubric
 
-> 各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。
+> Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| 維度 | 權重 | 4–5(過關) |
+| Dimension | Weight | 4–5 (pass) |
 |---|---|---|
-| 正確性 | ×3 | 算對 |
-| 測試涵蓋 | ×1 | 含邊界 |
+| Correctness | ×3 | correct |
+| Test coverage | ×1 | covers edges |
 `;
 
 type HookRun = {

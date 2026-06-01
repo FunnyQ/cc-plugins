@@ -53,14 +53,14 @@ export function foo(bar: Bar): Baz
 
 ## Eval rubric
 
-> 尺度與通用維度見 `../_context/rubric.md`。各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。
+> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| 維度 | 權重 | 0–1(不及格) | 2–3(未達標) | 4–5(過關) |
+| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|
-| 正確性 | ×3 | <算錯 / 對不上 spec> | <happy path 對但邊界偏差> | <完全吻合、邊界都顧> |
-| 測試涵蓋 | ×2 | <無測試> | <只測 happy path> | <含邊界、失敗路徑> |
-| 介面與可讀性 | ×1 | <夾帶 I/O / 命名混亂> | <堪用但型別不清> | <純函式、型別清楚、易串接> |
-| 假設與文件 | ×1 | <無註記魔術數字> | <有假設無說明> | <假設標 TODO、來源清楚> |
+| Correctness | ×3 | <wrong result / doesn't match spec> | <happy path works but edge cases drift> | <fully matches, edge cases handled> |
+| Test coverage | ×2 | <no tests> | <happy path only> | <covers edges + failure paths> |
+| Interface & readability | ×1 | <smuggles I/O / messy naming> | <usable but types unclear> | <pure function, clear types, easy to compose> |
+| Assumptions & docs | ×1 | <unmarked magic numbers> | <assumptions made, not explained> | <assumptions flagged TODO, sources clear> |
 
 ## Out of scope
 
@@ -97,7 +97,7 @@ Status is mutated in-place. Sub-agents update this when they pick up or finish a
 
 Every plan ends with **one terminal task that reviews the whole deliverable**. Mark it `> **Final review**: true`, and make its `Depends on` reach every other task (directly or transitively) so it cannot start until all the work is done. `lint-task.ts` enforces both: a plan with no marked task, or a marked task that misses some branch, fails the whole-tree lint.
 
-This is the holistic gate — per-task rubrics catch per-task quality; the final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes (e.g. **整合性 / does it compose**, **達成 PLAN 目標 / meets the goal**, **一致性 / consistency**, **無 regression**), not re-score individual tasks.
+This is the holistic gate — per-task rubrics catch per-task quality; the final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes (e.g. **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, **No regressions**), not re-score individual tasks.
 
 A plan with a single task is exempt (it's its own terminal). Don't mark more than one task — keep one unambiguous closing gate.
 
@@ -108,8 +108,8 @@ Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary g
 `lint-task.ts` enforces a parseable shape; `score-task.ts` consumes it. The contract is **operator-anchored**, so it works in any language:
 
 - **Threshold line** — a `>`-quoted line carrying the pass operator + number. `> 4.0` / `≥ 4` / `>= 4` all parse. State the scale (`0–5`) on the same line so the linter can range-check the threshold.
-- **Hard-fail veto (optional)** — `<dimension> < N` (`<` or `≤`) anywhere on the threshold line, e.g. `正確性 < 4 一票否決`. The named dimension must match a row in the table.
-- **Dimension table** — header must include a `權重` / `weight` column; each row's weight is written `×N`. Rows without a positive weight (or the `|---|` separator) are ignored.
+- **Hard-fail veto (optional)** — `<dimension> < N` (`<` or `≤`) anywhere on the threshold line, e.g. `Correctness < 4 is an automatic veto`. The named dimension must match a row in the table.
+- **Dimension table** — header must include a `Weight` column; each row's weight is written `×N`. Rows without a positive weight (or the `|---|` separator) are ignored.
 
 Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–scaleMax scale. A task passes when the average meets the threshold **and** no veto fires. Customize the anchors per task; keep the threshold line + weighted table shape.
 

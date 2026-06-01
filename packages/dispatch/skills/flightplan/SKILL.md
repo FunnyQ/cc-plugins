@@ -60,7 +60,7 @@ See `references/interview-guide.md` for the canonical walking-the-tree examples,
 - **Bucketing** — `ui/backend/api`, by phase, by feature, or single-bucket `work/` for short plans.
 - **Cross-bucket dependencies** — which task in bucket A unblocks which task in bucket B.
 - **Acceptance criteria & verification** — for every requirement, how it gets validated.
-- **Eval rubric** — the graded quality bar for each task (dimensions, weights, pass line, hard-fail veto) on top of the binary acceptance gate. Recommend the defaults (`正確性 ×3 / 測試涵蓋 ×2 / 介面與可讀性 ×1 / 假設與文件 ×1`, pass `> 4.0`, `正確性 < 4` veto) and adapt. A shared bar goes in `_context/rubric.md`. See `references/interview-guide.md` → "Eval rubric (ask per task)".
+- **Eval rubric** — the graded quality bar for each task (dimensions, weights, pass line, hard-fail veto) on top of the binary acceptance gate. Recommend the defaults (`Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1`, pass `> 4.0`, `Correctness < 4` veto) and adapt. A shared bar goes in `_context/rubric.md`. See `references/interview-guide.md` → "Eval rubric (ask per task)".
 - **Final review** — every plan ends with one terminal task marked `> **Final review**: true` that depends (transitively) on every other task. It's the holistic gate: integration, consistency, regressions, and whether the PLAN goal was actually met — scored by its own rubric on those axes, not a re-score of individual tasks. `lint-task.ts` requires it (single-task plans exempt).
 - **Conventions worth freezing** — commit style, code style, file layout, naming (these become `_context/shared.md`).
 - **Failure modes & rollback** — what could go wrong; how to recover.

@@ -167,11 +167,11 @@ A required dimension across **every** topic. Acceptance criteria answers "is it 
 
 For each task (or each bucket, if the bar is uniform), settle:
 
-- **Dimensions** — what quality axes matter here? Default four, adapt freely: **正確性 / correctness**, **測試涵蓋 / test coverage**, **介面與可讀性 / interface & readability**, **假設與文件 / assumptions & docs**.
+- **Dimensions** — what quality axes matter here? Default four, adapt freely: **Correctness**, **Test coverage**, **Interface & readability**, **Assumptions & docs**.
 - **Weights** — which axis dominates? Default `×3 / ×2 / ×1 / ×1`. Correctness usually leads.
 - **Pass line** — weighted average threshold. Default `> 4.0` on a 0–5 scale.
-- **Hard-fail veto** — any axis that fails the whole task regardless of average? Default `正確性 < 4 一票否決` (a wrong answer can't be redeemed by style).
-- **Anchors** — for the axes that matter most, what does a 0–1 vs 2–3 vs 4–5 concretely look like *for this task*? (e.g. "基準容積算不出 5,264" = 0–1.) Concrete anchors are what make the score reproducible.
+- **Hard-fail veto** — any axis that fails the whole task regardless of average? Default `Correctness < 4 is an automatic veto` (a wrong answer can't be redeemed by style).
+- **Anchors** — for the axes that matter most, what does a 0–1 vs 2–3 vs 4–5 concretely look like *for this task*? (e.g. "the computed total doesn't match the spec's 5,264" = 0–1.) Concrete anchors are what make the score reproducible.
 
 Recommend these defaults via `AskUserQuestion` (first option, `(Recommended)`), and only dig deeper when the user wants a different bar. Capture the result in each task's `## Eval rubric` per `task-template.md`; if the bar is shared, also write `_context/rubric.md` and have tasks reference it.
 

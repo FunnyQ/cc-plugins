@@ -164,7 +164,7 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
   } else if (task.rubric === null) {
     push(
       "rubric",
-      "`## Eval rubric` is present but unparseable — need a `>`-quoted pass line (e.g. `加權平均 > 4.0 通過`) and a weighted dimension table (`| 維度 | 權重 | … |` with `×N` weights)",
+      "`## Eval rubric` is present but unparseable — need a `>`-quoted pass line (e.g. `weighted average > 4.0 to pass`) and a weighted dimension table (`| Dimension | Weight | … |` with `×N` weights)",
     );
   } else if (
     task.rubric.passThreshold <= 0 ||

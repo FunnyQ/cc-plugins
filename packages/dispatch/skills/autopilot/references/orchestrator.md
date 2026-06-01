@@ -120,7 +120,7 @@ const JUDGE_SCHEMA = {
       },
       required: ['passThreshold', 'passOp', 'dimensions'],
     },
-    scores: { type: 'object', additionalProperties: { type: 'number' } },  // { 正確性: 5, ... }
+    scores: { type: 'object', additionalProperties: { type: 'number' } },  // { Correctness: 5, ... }
     rationale: { type: 'string' },
   },
   required: ['rubric', 'scores', 'rationale'],

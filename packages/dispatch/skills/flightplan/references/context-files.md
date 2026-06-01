@@ -155,8 +155,8 @@ When tasks share one quality bar — the common case. Each task's `## Eval rubri
 Contents:
 
 - **Scoring scale** — what 0–1 / 2–3 / 4–5 mean in general (the bands every task reuses).
-- **Generic dimensions** — what `正確性` / `測試涵蓋` / `介面與可讀性` / `假設與文件` look at, so per-task tables only need the task-specific anchors.
-- **Scoring & pass line** — the weighted-average formula, the default pass threshold (`> 4.0`), and the hard-fail convention (`正確性 < 4 一票否決`).
+- **Generic dimensions** — what `Correctness` / `Test coverage` / `Interface & readability` / `Assumptions & docs` look at, so per-task tables only need the task-specific anchors.
+- **Scoring & pass line** — the weighted-average formula, the default pass threshold (`> 4.0`), and the hard-fail convention (`Correctness < 4 is an automatic veto`).
 
 Per-task rubrics still carry their own threshold line + weighted table (self-contained for the linter); this file just saves them from redefining the scale. See `task-template.md` → "`Eval rubric`" for the parseable contract.
 
