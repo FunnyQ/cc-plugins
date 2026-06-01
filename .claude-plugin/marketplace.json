@@ -8,13 +8,13 @@
       "name": "monitor",
       "source": "./packages/monitor",
       "description": "Monitor your Claude Code and Codex sessions — a usage dashboard (sessions, tokens, cost, model mix) plus a per-project cockpit (goal + decision log + live session view).",
-      "version": "3.5.3"
+      "version": "3.6.0"
     },
     {
       "name": "dispatch",
       "source": "./packages/dispatch",
       "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk; autopilot flies the tree with a dev→verify→judge→score quality loop and a closing final-review gate.",
-      "version": "0.2.0"
+      "version": "3.6.0"
     }
   ]
 }
