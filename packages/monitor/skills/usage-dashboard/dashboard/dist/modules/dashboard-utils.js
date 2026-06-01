@@ -43,17 +43,36 @@ const CODEX_PALETTE = [
 ];
 
 const OTHER_COLOR = "oklch(64% 0.014 50)";
+const CLAUDE_FAMILY_COLORS = {
+  haiku: "oklch(78% 0.16 78)",
+  sonnet: "oklch(66% 0.20 25)",
+  opus: "oklch(60% 0.20 330)",
+};
 
 const colorCache = new Map();
 function colorFor(model) {
   if (model === "__other__") return OTHER_COLOR;
   if (!colorCache.has(model)) {
-    const palette =
-      providerForModel(model) === "codex" ? CODEX_PALETTE : CLAUDE_PALETTE;
-    const idx = hashString(rawModel(model)) % palette.length;
-    colorCache.set(model, palette[idx]);
+    const familyColor = claudeFamilyColor(model);
+    if (familyColor) {
+      colorCache.set(model, familyColor);
+    } else {
+      const palette =
+        providerForModel(model) === "codex" ? CODEX_PALETTE : CLAUDE_PALETTE;
+      const idx = hashString(rawModel(model)) % palette.length;
+      colorCache.set(model, palette[idx]);
+    }
   }
   return colorCache.get(model);
+}
+
+function claudeFamilyColor(model) {
+  if (providerForModel(model) !== "claude") return null;
+  const raw = rawModel(model).toLowerCase();
+  if (raw.includes("haiku")) return CLAUDE_FAMILY_COLORS.haiku;
+  if (raw.includes("sonnet")) return CLAUDE_FAMILY_COLORS.sonnet;
+  if (raw.includes("opus")) return CLAUDE_FAMILY_COLORS.opus;
+  return null;
 }
 
 function hashString(value) {
