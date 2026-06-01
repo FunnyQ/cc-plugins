@@ -54,12 +54,21 @@ Show a one-screen brief and get a go: the slug, how many tasks, `MAX_ATTEMPTS`, 
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
-Adapt `references/orchestrator.md` — it is the canonical script. Pass the scouted values via Workflow's `args`:
+Adapt `references/orchestrator.md` — it is the canonical script. **Bake the scouted values into the `CFG` block at the top of the script as literals; do NOT rely on the Workflow `args` global** (it does not reliably reach the orchestrator — an unset value surfaces as `undefined`, e.g. `bun undefined/next-ready.ts`, which fails the scout and silently looks like "no work to do"). You already know every value from Step 1's scout, so write them in directly:
 
+```javascript
+const CFG = {
+  slug:        '<slug>',
+  tasksDir:    'docs/<slug>/tasks',
+  planPath:    'docs/<slug>/PLAN.md',
+  logFile:     'docs/<slug>/.flightlog/run.jsonl',
+  planGoal:    '<one line from PLAN.md>',
+  maxAttempts: 3,
+  scriptsDir:  '<abs path to skills/flightplan/scripts, from the skill load-time base dir>',
+}
 ```
-args: { slug, tasksDir: "docs/<slug>/tasks", planPath: "docs/<slug>/PLAN.md",
-        logFile: "docs/<slug>/.flightlog/run.jsonl", maxAttempts: 3, planGoal: "<one line from PLAN.md>" }
-```
+
+Then call `Workflow({ script: <the adapted script> })` — no `args` needed.
 
 The orchestrator runs a **wave loop**: each wave asks an agent to run `next-ready.ts` (status changes only happen *inside* the run, so the ready set must be re-scouted every wave — a static list misses tasks unblocked mid-flight), then executes the wave's ready tasks **in parallel**. Each task is a retry pipeline:
 

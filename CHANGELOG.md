@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.6.3] - 2026-06-02
+
+### Fixed
+
+- **autopilot**: the orchestrator now bakes its config (slug, paths, scriptsDir, plan goal) into a CFG literal block instead of relying on the Workflow `args` global, which didn't reach the script — previously the scout ran `bun undefined/next-ready.ts` and the run silently completed with no work done. Scout failures now escalate instead of breaking silently.
+
 ## [3.6.2] - 2026-06-02
 
 ### Fixed
