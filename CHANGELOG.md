@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.6.0] - 2026-06-02
+
+### ✨ Added
+
+- **Dispatch `autopilot` skill — fly a flightplan task tree end to end**: autopilot takes a blueprint written by flightplan (`PLAN.md` + a `tasks/` tree) and executes it with a multi-agent Workflow. A wave-loop scout finds every ready task, runs them in parallel, and drives each one through a dev → verify → judge → score quality gate that retries until the task's own acceptance criteria and rubric pass — grounding correctness on real verification evidence rather than vibe. Blocked tasks park and continue once you unblock them, and the closing **final-review** task gates the whole tree before ship.
+- **Flightlog audit layer**: every autopilot verdict is now recorded to a self-gitignored audit trail under `docs/<slug>/.flightlog/` (created automatically, never committed). `flightlog.ts` provides `log` (agent narratives) and `report` (a `RUNLOG.md` summary), and `score-task --log` persists rubric verdicts deterministically into the trail.
+- **Final-review closing gate for flightplan**: each plan must end with one task marked `Final review: true` whose transitive `Depends on` reaches every other task, so the whole tree is gated before a final review can begin. lint-task enforces this at the tree level (single-task plans are exempt; cherry-picked files skip the check).
+
+### 📝 Documentation
+
+- **Dispatch registered and documented in the README**: the README now covers the full dispatch pipeline (preflight → flightplan → autopilot → final review → ship) with a three-skill overview and installation instructions for both Claude Code and Codex. The `dispatch-flow.svg` pipeline diagram moved into a shared `assets/` directory.
+
 ## [3.5.3] - 2026-05-29
 
 ### 📝 Documentation
