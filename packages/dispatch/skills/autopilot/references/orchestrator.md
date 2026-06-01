@@ -170,7 +170,9 @@ Then persist the verdict to the flightlog (use the SAME scores):
   bun ${S}/score-task.ts <task-file> /tmp/scores-${ref.replace('/','-')}.json --log ${CFG.logFile} --attempt <attempt> --agent "<your label>"`
 
 const markDonePrompt = (ref) => `
-Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${CFG.tasksDir}) to: done. Change nothing else.`
+Finalize flightplan task ${ref} (under ${CFG.tasksDir}): locate its file (<bucket>/NN-*.md matching ${ref}) and run:
+  bun ${S}/mark-done.ts <task-file>
+That deterministically sets "> **Status**: done" AND ticks every checkbox in the task's ## Acceptance criteria and ## Verification sections (the task passed the gate, so all hold). Change nothing else by hand.`
 
 const markBlockedPrompt = (ref, reason) => `
 Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${CFG.tasksDir}) to: blocked. Change nothing else. (Parked by autopilot: ${reason})`
