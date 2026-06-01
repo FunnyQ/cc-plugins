@@ -2,21 +2,21 @@
 
 This is the script the `autopilot` skill adapts and passes to the **Workflow** tool. Read the three hard constraints in `SKILL.md` first; they explain every awkward-looking choice here.
 
-The main agent scouts inline, then calls `Workflow({ script: <this>, args: {...} })`. Pass the scouted values via `args`:
+The main agent scouts inline, then calls `Workflow({ script: <this> })` — **with the scouted values baked into the `CFG` block at the top of the script as literals.** Do NOT rely on the Workflow `args` global: in practice it does not reliably reach the orchestrator (an unset `args` surfaces as `undefined`, e.g. `bun undefined/next-ready.ts`, which fails the scout and silently looks like "no work to do"). Since the main agent already knows every value from the inline scout, write them in directly:
 
-```
-args = {
-  slug:        "my-plan",
-  tasksDir:    "docs/my-plan/tasks",
-  planPath:    "docs/my-plan/PLAN.md",
-  logFile:     "docs/my-plan/.flightlog/run.jsonl",
-  planGoal:    "<one-line goal copied from PLAN.md>",
+```javascript
+const CFG = {
+  slug:        'my-plan',
+  tasksDir:    'docs/my-plan/tasks',
+  planPath:    'docs/my-plan/PLAN.md',
+  logFile:     'docs/my-plan/.flightlog/run.jsonl',
+  planGoal:    '<one-line goal copied from PLAN.md>',
   maxAttempts: 3,
-  scriptsDir:  "<abs path to skills/flightplan/scripts>"   // from the skill's load-time base dir
+  scriptsDir:  '<abs path to skills/flightplan/scripts>',  // from the skill's load-time base dir
 }
 ```
 
-> **Why `scriptsDir` is passed in:** `CLAUDE_PLUGIN_ROOT` does not reach agent Bash, and the orchestrator can't resolve paths itself. The main agent knows the skill's base directory at load time — resolve `skills/flightplan/scripts` from it and pass the absolute path in `args` so the workflow's agents can call `next-ready.ts` / `score-task.ts` / `flightlog.ts`.
+> **Why `scriptsDir` is a literal:** `CLAUDE_PLUGIN_ROOT` does not reach agent Bash, and the orchestrator can't resolve paths itself. The main agent knows the skill's base directory at load time — resolve `skills/flightplan/scripts` from it (the load-time "Base directory for this skill" banner) and write the absolute path into `CFG.scriptsDir` so the workflow's agents can call `next-ready.ts` / `score-task.ts` / `flightlog.ts`. Baking it in (rather than passing via `args`) is what makes the run reliable.
 
 ## The script
 
@@ -29,10 +29,24 @@ export const meta = {
   ],
 }
 
+// ── Config — BAKE THESE IN (do not rely on the Workflow `args` global) ──────
+// The main agent fills these from its inline scout. `args` does not reliably
+// reach the orchestrator; an unset value surfaces as `undefined` and silently
+// fails the scout. Literals here = a reliable run.
+const CFG = {
+  slug:        'my-plan',
+  tasksDir:    'docs/my-plan/tasks',
+  planPath:    'docs/my-plan/PLAN.md',
+  logFile:     'docs/my-plan/.flightlog/run.jsonl',
+  planGoal:    '<one-line goal copied from PLAN.md>',
+  maxAttempts: 3,
+  scriptsDir:  '<abs path to skills/flightplan/scripts>',
+}
+
 // ── Model policy (tune here — one place) ───────────────────────────────────
 const MODEL = { dev: 'sonnet', devEscalated: 'opus', verify: 'haiku', judge: 'opus' }
-const MAX = args.maxAttempts ?? 3
-const S = args.scriptsDir   // abs path to flightplan/scripts
+const MAX = CFG.maxAttempts ?? 3
+const S = CFG.scriptsDir   // abs path to flightplan/scripts
 
 // ── Inline score gate ───────────────────────────────────────────────────────
 // MUST mirror scoreTask() in score-task.ts exactly. We can't import it (the
@@ -128,17 +142,17 @@ const JUDGE_SCHEMA = {
 
 // ── Prompts ───────────────────────────────────────────────────────────────
 const devPrompt = (ref, attempt, feedback, finalReview) => `
-You are implementing flightplan task ${ref} in the tree at ${args.tasksDir}.
-Read the task file (find it under ${args.tasksDir}/<bucket>/NN-*.md matching ${ref}) and every file in its "Required reading".
-${finalReview ? 'This is the FINAL REVIEW task: review the whole deliverable for integration, consistency, regressions, and whether the PLAN goal was met ("' + args.planGoal + '"). Make fixes if needed.' : 'Implement the task fully: create/modify the listed files, follow Implementation notes.'}
+You are implementing flightplan task ${ref} in the tree at ${CFG.tasksDir}.
+Read the task file (find it under ${CFG.tasksDir}/<bucket>/NN-*.md matching ${ref}) and every file in its "Required reading".
+${finalReview ? 'This is the FINAL REVIEW task: review the whole deliverable for integration, consistency, regressions, and whether the PLAN goal was met ("' + CFG.planGoal + '"). Make fixes if needed.' : 'Implement the task fully: create/modify the listed files, follow Implementation notes.'}
 ${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nAddress that specifically.' : ''}
 When done: set the task header "> **Status**:" to in-progress while working. Run the task's ## Verification yourself first.
 Then log a narrative note:
-  bun ${S}/flightlog.ts log ${args.logFile} --task ${ref} --role ${finalReview ? 'final-review' : 'dev'} --attempt ${attempt} --agent "<your label>" --message "<what you changed>"
+  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${finalReview ? 'final-review' : 'dev'} --attempt ${attempt} --agent "<your label>" --message "<what you changed>"
 Return a one-paragraph summary of what you did.`
 
 const verifyPrompt = (ref) => `
-You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${args.tasksDir}).
+You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
 Do NOT trust the dev's claims. Open the task file, then:
   1. Run every concrete command in its ## Verification section yourself.
   2. Check every box in ## Acceptance criteria against the actual code/output.
@@ -146,20 +160,20 @@ Report passed=true ONLY if all verification commands succeed AND all acceptance 
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.`
 
 const judgePrompt = (ref, gateSummary) => `
-You are the rubric judge for flightplan task ${ref} (tree: ${args.tasksDir}).
+You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
 The independent binary gate already PASSED with this evidence:
 ${gateSummary}
 Open the task file and its ## Eval rubric. Score EACH dimension 0–scaleMax based on the real code and the verification evidence above — ground the correctness dimension in that evidence, not opinion.
 Return the parsed rubric (passThreshold, passOp, hardFail, dimensions[{name,weight}]), your per-dimension scores keyed by dimension name, and a rationale.
 Then persist the verdict to the flightlog (use the SAME scores):
   echo '<scores-json>' > /tmp/scores-${ref.replace('/','-')}.json
-  bun ${S}/score-task.ts <task-file> /tmp/scores-${ref.replace('/','-')}.json --log ${args.logFile} --attempt <attempt> --agent "<your label>"`
+  bun ${S}/score-task.ts <task-file> /tmp/scores-${ref.replace('/','-')}.json --log ${CFG.logFile} --attempt <attempt> --agent "<your label>"`
 
 const markDonePrompt = (ref) => `
-Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${args.tasksDir}) to: done. Change nothing else.`
+Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${CFG.tasksDir}) to: done. Change nothing else.`
 
 const markBlockedPrompt = (ref, reason) => `
-Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${args.tasksDir}) to: blocked. Change nothing else. (Parked by autopilot: ${reason})`
+Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${CFG.tasksDir}) to: blocked. Change nothing else. (Parked by autopilot: ${reason})`
 
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item, wave) {
@@ -207,13 +221,21 @@ let wave = 0
 while (true) {
   wave++
   const scout = await agent(
-    `Run: bun ${S}/next-ready.ts ${args.tasksDir}\n`
+    `Run: bun ${S}/next-ready.ts ${CFG.tasksDir}\n`
     + `For each ready ref it prints, open that task file and check whether its header carries "> **Final review**: true".\n`
     + `Return { refs: [{ref, finalReview}], error? }. If the command exits non-zero, return refs:[] and the stderr in error.`,
     { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: READY_SCHEMA })
 
-  if (scout?.error) { log(`Wave ${wave} scout failed: ${scout.error}`); break }
-  const fresh = (scout?.refs ?? []).filter(i => !parked.has(i.ref))
+  // A scout failure is NOT "no work to do" — surface it as an escalation so the
+  // run can't silently return empty (the classic `bun undefined/next-ready.ts`
+  // trap). Only a clean scout with zero fresh refs means the tree is drained.
+  if (!scout || scout.error) {
+    const reason = `next-ready scout failed in wave ${wave}: ${scout?.error ?? 'no result'}`
+    log(reason)
+    escalations.push({ task: '(scout)', attempt: 0, reason })
+    break
+  }
+  const fresh = (scout.refs ?? []).filter(i => !parked.has(i.ref))
   if (fresh.length === 0) break
 
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
@@ -227,7 +249,7 @@ while (true) {
   if (!results.some(r => r.passed)) break
 }
 
-return { slug: args.slug, completed, escalations }
+return { slug: CFG.slug, completed, escalations }
 ```
 
 ## What the main agent does with the result
