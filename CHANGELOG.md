@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.6.5] - 2026-06-02
+
+### 💄 Polish
+
+- **Token Atlas model colors**: Claude Haiku, Sonnet, and Opus now use distinct, stable colors across charts, legends, toggles, and ledger markers, making model mix easier to scan at a glance.
+
 ## [3.6.4] - 2026-06-02
 
 ### ✨ Added
