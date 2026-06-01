@@ -125,50 +125,56 @@
   <text class="ctitle ink" x="624" y="334">autopilot — loop per ready task</text>
   <text class="note mut" x="624" y="354">next-ready finds tasks with all deps done ↻</text>
 
-  <!-- pipeline nodes -->
-  <rect x="628" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
-  <text class="nlbl ink" x="688" y="410" text-anchor="middle">Dev (implement)</text>
-  <line class="ln" x1="750" y1="405" x2="788" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <!-- pipeline nodes: Dev → Binary gate → Rubric judge → score gate -->
+  <rect x="628" y="378" width="116" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="686" y="409" text-anchor="middle">Dev</text>
+  <line class="ln" x1="746" y1="405" x2="770" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
-  <rect x="790" y="378" width="168" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
-  <text class="nlbl ink" x="874" y="402" text-anchor="middle">Review</text>
-  <text class="nsub mut" x="874" y="419" text-anchor="middle">judge scores each rubric dim</text>
-  <line class="ln" x1="960" y1="405" x2="998" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <rect x="772" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="832" y="402" text-anchor="middle">Binary gate</text>
+  <text class="nsub mut" x="832" y="419" text-anchor="middle">re-run verify + accept</text>
+  <line class="ln" x1="894" y1="405" x2="918" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
-  <rect x="1000" y="378" width="150" height="54" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="1075" y="402" text-anchor="middle">score-task gate</text>
-  <text class="nsub" fill="#B5701E" x="1075" y="419" text-anchor="middle">weighted avg + hard-fail</text>
+  <rect x="920" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="980" y="402" text-anchor="middle">Rubric judge</text>
+  <text class="nsub mut" x="980" y="419" text-anchor="middle">scores rubric dims</text>
+  <line class="ln" x1="1042" y1="405" x2="1066" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+
+  <rect x="1068" y="378" width="120" height="54" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="1128" y="402" text-anchor="middle">score gate</text>
+  <text class="nsub" fill="#B5701E" x="1128" y="419" text-anchor="middle">weighted avg + veto</text>
 
   <!-- score -> diamond -->
-  <line class="ln" x1="1075" y1="432" x2="1075" y2="470" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <line class="ln" x1="1128" y1="432" x2="1128" y2="470" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
   <!-- decision diamond -->
-  <polygon points="1075,470 1138,508 1075,546 1012,508" fill="#fff" stroke="#9AB0BD"/>
-  <text class="nlbl ink" x="1075" y="513" text-anchor="middle">pass?</text>
+  <polygon points="1128,470 1191,508 1128,546 1065,508" fill="#fff" stroke="#9AB0BD"/>
+  <text class="nlbl ink" x="1128" y="513" text-anchor="middle">pass?</text>
 
-  <!-- fail -> feedback -> back to Dev -->
-  <path class="ln" d="M1012,508 L688,508 L688,434" stroke="#C9603F" marker-end="url(#ah-red)"/>
-  <text class="note" fill="#C9603F" x="724" y="500">fail → feedback ↺ (redo low-scoring dims)</text>
+  <!-- fail -> feedback -> back to Dev (binary gate fail OR low rubric score) -->
+  <path class="ln" d="M1065,508 L686,508 L686,434" stroke="#C9603F" marker-end="url(#ah-red)"/>
+  <text class="note" fill="#C9603F" x="700" y="500">fail → feedback ↺ (verify fail or low score)</text>
 
   <!-- pass -> done -->
-  <line class="ln" x1="1075" y1="546" x2="1075" y2="576" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <rect x="1010" y="576" width="130" height="38" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="chip" fill="#2F9C70" x="1075" y="600" text-anchor="middle">Status: done ✓</text>
-  <text class="note" fill="#2F9C70" x="1148" y="599">pass</text>
+  <line class="ln" x1="1128" y1="546" x2="1128" y2="576" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <rect x="1063" y="576" width="130" height="38" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="chip" fill="#2F9C70" x="1128" y="600" text-anchor="middle">Status: done ✓</text>
+  <text class="note" fill="#2F9C70" x="1201" y="599">pass</text>
 
   <text class="note mut" x="624" y="566">loop has MAX_ATTEMPTS; on cap → needs_your_call hands back to you</text>
 
   <!-- all done -> final review -> ship -->
-  <path class="ln" d="M1010,595 L900,595 L900,632" stroke="#33485A" marker-end="url(#ah-ink)"/>
-  <text class="note mut" x="912" y="624">all tasks done</text>
+  <path class="ln" d="M1063,595 L900,595 L900,626" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <text class="note mut" x="912" y="620">all tasks done</text>
 
-  <rect x="624" y="636" width="300" height="46" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="774" y="657" text-anchor="middle">🏁 Final review</text>
-  <text class="nsub" fill="#B5701E" x="774" y="673" text-anchor="middle">integration · goal · consistency · no regressions</text>
+  <rect x="624" y="630" width="300" height="62" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="774" y="650" text-anchor="middle">🏁 Final review</text>
+  <text class="nsub" fill="#B5701E" x="774" y="667" text-anchor="middle">🤖 codex + 4 /simplify lenses → Opus fixer · cross-vendor</text>
+  <text class="nsub" fill="#B5701E" x="774" y="683" text-anchor="middle">integration · goal · consistency · no regressions</text>
 
-  <line class="ln" x1="924" y1="659" x2="1006" y2="659" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <rect x="1008" y="636" width="140" height="46" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="nlbl" fill="#2F9C70" x="1078" y="664" text-anchor="middle">🚀 Ship</text>
+  <line class="ln" x1="924" y1="661" x2="1006" y2="661" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <rect x="1008" y="638" width="140" height="46" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="nlbl" fill="#2F9C70" x="1078" y="666" text-anchor="middle">🚀 Ship</text>
 
   <!-- legend -->
   <text class="note mut" x="624" y="710">green = gate passed / ship · amber = rubric scoring / final review · red = failed, sent back</text>
