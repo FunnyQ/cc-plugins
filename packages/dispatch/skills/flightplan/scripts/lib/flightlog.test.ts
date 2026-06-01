@@ -30,8 +30,8 @@ const SCORE: ScoreEntry = {
   threshold: 4.0,
   passOp: ">",
   breakdown: [
-    { name: "正確性", weight: 3, score: 5 },
-    { name: "測試涵蓋", weight: 2, score: 4 },
+    { name: "Correctness", weight: 3, score: 5 },
+    { name: "Test coverage", weight: 2, score: 4 },
   ],
 };
 
@@ -93,7 +93,7 @@ describe("renderRunlog", () => {
     };
     const md = renderRunlog([failed], { slug: "demo" });
     expect(md).toMatch(/FAIL/i);
-    expect(md).toMatch(/veto|否決/i);
+    expect(md).toMatch(/veto/i);
   });
 
   test("separates multiple tasks under their own headings", () => {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.6.1] - 2026-06-02
+
+### 📝 Documentation
+
+- **Dispatch plugin is now fully English**: the rubric system (dimensions, pass-line phrasing, table headers), reference templates, SKILL docs, test fixtures, and the dispatch-flow diagram were translated from Chinese. No behavior change, all tests green.
+
 ## [3.6.0] - 2026-06-02
 
 ### ✨ Added

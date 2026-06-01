@@ -99,7 +99,7 @@ export function renderGenerated(input: {
   sections.push("");
   sections.push("## Task index");
   sections.push("");
-  sections.push("| Bucket | NN | Title | Status | Pass 線 | Depends on |");
+  sections.push("| Bucket | NN | Title | Status | Pass line | Depends on |");
   sections.push("|---|---|---|---|---|---|");
   for (const bucket of [...byBucket.keys()].sort()) {
     for (const t of byBucket.get(bucket)!) {
