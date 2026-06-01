@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="820" viewBox="0 0 1320 820" font-family="'Helvetica Neue', Arial, 'PingFang TC', 'Microsoft JhengHei', sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBFDFE"/>
+      <stop offset="1" stop-color="#ECF3F6"/>
+    </linearGradient>
+    <linearGradient id="runway" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#35CAD2" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#35CAD2" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#34A879" stop-opacity="0.18"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#21455A" flood-opacity="0.14"/>
+    </filter>
+    <marker id="ah-ink" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#33485A"/></marker>
+    <marker id="ah-teal" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#1FA7B0"/></marker>
+    <marker id="ah-green" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#2F9C70"/></marker>
+    <marker id="ah-amber" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#D9852E"/></marker>
+    <marker id="ah-red" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#C9603F"/></marker>
+    <style>
+      .ink{fill:#1B2A36}.mut{fill:#5E7686}.wt{fill:#fff}
+      .h1{font-size:26px;font-weight:700}
+      .sub{font-size:13px}
+      .ctitle{font-size:15px;font-weight:700}
+      .ntitle{font-size:19px;font-weight:700}
+      .role{font-size:13.5px}.role2{font-size:12.5px}
+      .nlbl{font-size:13px;font-weight:600}.nsub{font-size:10.5px}
+      .tag{font-size:11px;font-weight:600}
+      .chip{font-size:12px;font-weight:600}
+      .note{font-size:11.5px}
+      .ln{stroke-width:2;fill:none}
+    </style>
+  </defs>
+
+  <rect width="1320" height="820" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text class="h1 ink" x="60" y="48">Dispatch — 從點子到出貨的完整航程</text>
+  <text class="sub mut" x="61" y="74">preflight 釐清 → flightplan 寫成藍圖 → autopilot 自動執行（每個 task 過 rubric 閘）→ final review 總審 → ship</text>
+
+  <!-- through-line behind top tier -->
+  <rect x="60" y="166" width="1185" height="8" rx="4" fill="url(#runway)"/>
+
+  <!-- ===== TOP TIER: the 3-skill arc ===== -->
+  <!-- arrows between cards -->
+  <line class="ln" x1="362" y1="170" x2="466" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <line class="ln" x1="772" y1="170" x2="876" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <line class="ln" x1="1182" y1="170" x2="1196" y2="170" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+
+  <!-- Card P: preflight -->
+  <g filter="url(#soft)"><rect x="60" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="60" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
+  <circle cx="92" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="92" y="143" text-anchor="middle">1</text>
+  <text class="ntitle ink" x="118" y="144">preflight</text>
+  <rect x="118" y="156" width="86" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="161" y="170" text-anchor="middle">輕量 · light</text>
+  <text class="role ink" x="80" y="202">訪談釐清需求</text>
+  <text class="role2 mut" x="80" y="223">→ 對話內單一 plan，批准即執行</text>
+
+  <!-- Card F: flightplan -->
+  <g filter="url(#soft)"><rect x="470" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="470" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
+  <circle cx="502" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="502" y="143" text-anchor="middle">2</text>
+  <text class="ntitle ink" x="528" y="144">flightplan</text>
+  <rect x="528" y="156" width="92" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="574" y="170" text-anchor="middle">規劃 · heavy</text>
+  <text class="role ink" x="490" y="202">訪談 → 寫成磁碟藍圖</text>
+  <text class="role2 mut" x="490" y="223">→ PLAN.md ＋ _context ＋ tasks 樹</text>
+
+  <!-- Card A: autopilot -->
+  <g filter="url(#soft)"><rect x="880" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="880" y="104" width="6" height="132" rx="3" fill="#34A879"/>
+  <circle cx="912" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="912" y="143" text-anchor="middle">3</text>
+  <text class="ntitle ink" x="938" y="144">autopilot</text>
+  <rect x="938" y="156" width="86" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="981" y="170" text-anchor="middle">執行 · auto</text>
+  <text class="role ink" x="900" y="202">自動照飛每個 task</text>
+  <text class="role2 mut" x="900" y="223">→ 逐一過 rubric 閘 → 總審 → ship</text>
+
+  <!-- Ship -->
+  <g filter="url(#soft)"><circle cx="1248" cy="170" r="46" fill="#fff" stroke="#34A879"/></g>
+  <text font-size="26" x="1248" y="170" text-anchor="middle">🚀</text>
+  <text class="nlbl" fill="#2F9C70" x="1248" y="200" text-anchor="middle">shipped</text>
+
+  <!-- connectors from F and A down into the detail boxes -->
+  <path class="ln" d="M620,236 L620,268 L310,268 L310,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <text class="note mut" x="330" y="262">寫出</text>
+  <path class="ln" d="M1030,236 L1030,268 L930,268 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <text class="note mut" x="948" y="262">讀取並執行</text>
+
+  <!-- ===== LEFT: flightplan artifact tree ===== -->
+  <g filter="url(#soft)"><rect x="60" y="300" width="500" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <text class="ctitle ink" x="84" y="334">flightplan 寫出的藍圖（自包含 task 樹）</text>
+
+  <rect x="84" y="350" width="200" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
+  <text class="chip ink" x="98" y="372">📄 PLAN.md — 真相來源</text>
+  <rect x="84" y="396" width="452" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
+  <text class="chip ink" x="98" y="418">📁 _context/ — shared.md · rubric.md（共用尺度/維度）</text>
+
+  <!-- bucket A -->
+  <text class="note mut" x="86" y="456">tasks/&lt;bucket-a&gt;/</text>
+  <g>
+    <rect x="84" y="464" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="484">01 ⓡ</text>
+    <rect x="178" y="464" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="484">02 ⓡ</text>
+    <rect x="272" y="464" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="288" y="484">03 ⓡ</text>
+  </g>
+  <!-- bucket B -->
+  <text class="note mut" x="86" y="520">tasks/&lt;bucket-b&gt;/</text>
+  <g>
+    <rect x="84" y="528" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="548">01 ⓡ</text>
+    <rect x="178" y="528" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="548">02 ⓡ</text>
+  </g>
+
+  <!-- final review task -->
+  <rect x="84" y="582" width="452" height="42" rx="9" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="chip" fill="#B5701E" x="100" y="608">🏁 final-review · Final review: true · 依賴所有 task</text>
+
+  <text class="note mut" x="84" y="652">ⓡ = 該 task 自帶 ## Eval rubric（維度×權重＋通過線＋hard-fail）</text>
+  <text class="note mut" x="84" y="672">lint 強制：每 task 有 rubric；總審須遞移涵蓋全部 task</text>
+  <text class="note mut" x="84" y="700">執行順序由依賴圖決定 → next-ready 找「依賴皆 done」的 task</text>
+
+  <!-- feed arrow tree -> loop -->
+  <path class="ln" d="M540,470 L598,470" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <text class="note mut" x="544" y="461">ready</text>
+
+  <!-- ===== RIGHT: autopilot per-task loop ===== -->
+  <g filter="url(#soft)"><rect x="600" y="300" width="660" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <text class="ctitle ink" x="624" y="334">autopilot — 每個 ready task 跑迴圈</text>
+  <text class="note mut" x="624" y="354">next-ready 找出依賴皆 done 的 task ↻</text>
+
+  <!-- pipeline nodes -->
+  <rect x="628" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="688" y="410" text-anchor="middle">Dev 實作</text>
+  <line class="ln" x1="750" y1="405" x2="788" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+
+  <rect x="790" y="378" width="168" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="874" y="402" text-anchor="middle">Review</text>
+  <text class="nsub mut" x="874" y="419" text-anchor="middle">judge 依 rubric 評各維度</text>
+  <line class="ln" x1="960" y1="405" x2="998" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+
+  <rect x="1000" y="378" width="150" height="54" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="1075" y="402" text-anchor="middle">score-task 閘</text>
+  <text class="nsub" fill="#B5701E" x="1075" y="419" text-anchor="middle">加權平均 ＋ hard-fail</text>
+
+  <!-- score -> diamond -->
+  <line class="ln" x1="1075" y1="432" x2="1075" y2="470" stroke="#33485A" marker-end="url(#ah-ink)"/>
+
+  <!-- decision diamond -->
+  <polygon points="1075,470 1138,508 1075,546 1012,508" fill="#fff" stroke="#9AB0BD"/>
+  <text class="nlbl ink" x="1075" y="513" text-anchor="middle">pass?</text>
+
+  <!-- fail -> feedback -> back to Dev -->
+  <path class="ln" d="M1012,508 L688,508 L688,434" stroke="#C9603F" marker-end="url(#ah-red)"/>
+  <text class="note" fill="#C9603F" x="724" y="500">fail → feedback ↺（重做低分維度）</text>
+
+  <!-- pass -> done -->
+  <line class="ln" x1="1075" y1="546" x2="1075" y2="576" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <rect x="1010" y="576" width="130" height="38" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="chip" fill="#2F9C70" x="1075" y="600" text-anchor="middle">Status: done ✓</text>
+  <text class="note" fill="#2F9C70" x="1148" y="599">pass</text>
+
+  <text class="note mut" x="624" y="600">迴圈設 MAX_ATTEMPTS；觸頂 → needs_your_call 交還操縱桿給你</text>
+
+  <!-- all done -> final review -> ship -->
+  <path class="ln" d="M1010,595 L900,595 L900,632" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <text class="note mut" x="912" y="624">全部 task done</text>
+
+  <rect x="624" y="636" width="300" height="46" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="774" y="657" text-anchor="middle">🏁 Final review（總審）</text>
+  <text class="nsub" fill="#B5701E" x="774" y="673" text-anchor="middle">整合 · 達成 PLAN 目標 · 一致性 · 無 regression（自己也過 rubric）</text>
+
+  <line class="ln" x1="924" y1="659" x2="1006" y2="659" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <rect x="1008" y="636" width="140" height="46" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="nlbl" fill="#2F9C70" x="1078" y="664" text-anchor="middle">🚀 Ship</text>
+
+  <!-- legend -->
+  <text class="note mut" x="624" y="710">綠＝過閘 / 出貨　·　琥珀＝rubric 評分 / 總審　·　紅＝未過退回重做</text>
+</svg>

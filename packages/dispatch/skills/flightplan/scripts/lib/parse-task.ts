@@ -39,6 +39,8 @@ export type ParsedTask = {
   blocks: TaskRef[];
   /** Status value, lowercased. */
   status: TaskStatus | null;
+  /** True if the header carries `> **Final review**: true` — the closing gate. */
+  finalReview: boolean;
   /** Section headings present in the body (e.g. ["Goal", "Acceptance criteria"]). */
   sections: string[];
   /** Body text after the header blockquote, used by self-containment checks. */
@@ -131,6 +133,7 @@ export function parseTask(
       dependsOn: extractRefs(quote, "Depends on"),
       blocks: extractRefs(quote, "Blocks"),
       status: extractStatus(quote),
+      finalReview: extractFinalReview(quote),
       sections: extractSections(lines.slice(quoteEnd)),
       body: lines.slice(quoteEnd).join("\n"),
       rubric: parseRubric(lines.slice(quoteEnd).join("\n")),
@@ -295,6 +298,16 @@ function extractStatus(quote: string): TaskStatus | null {
     }
   }
   return null;
+}
+
+function extractFinalReview(quote: string): boolean {
+  const lines = quote.split("\n").map((l) => l.replace(/^>\s?/, ""));
+  for (const line of lines) {
+    if (/^\*\*Final review\*\*\s*:\s*(true|yes)\s*$/i.test(line.trim())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function extractSections(bodyLines: string[]): string[] {

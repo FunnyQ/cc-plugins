@@ -26,7 +26,7 @@
  */
 import { readFile, access, stat, readdir } from "node:fs/promises";
 import { basename, dirname, resolve, relative, sep } from "node:path";
-import { parseTask } from "./lib/parse-task";
+import { parseTask, refToString, type ParsedTask } from "./lib/parse-task";
 
 export type Violation = {
   file: string;
@@ -179,6 +179,77 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
   return violations;
 }
 
+/**
+ * Tree-level check (whole-tree lint only): the plan must have a declared final
+ * review that gates the whole deliverable. Two conditions, together:
+ *
+ *   1. **marker** — at least one task carries `> **Final review**: true`.
+ *   2. **coverage** — one such marked task's transitive `Depends on` closure
+ *      reaches every other task, so the review can't start until all the work
+ *      is done and it sees the whole deliverable.
+ *
+ * The marker says "this is the review" (not just a task that happens to be
+ * terminal); coverage proves it actually reviews all results. Plans with one
+ * task are exempt (nothing to gate). Naming-agnostic — reads the marker + graph,
+ * not bucket names.
+ */
+export function checkFinalReview(
+  tasks: ParsedTask[],
+  label: string,
+): Violation[] {
+  if (tasks.length <= 1) return [];
+
+  const ref = (t: ParsedTask) => `${t.bucket}/${t.nn}`;
+  const byRef = new Map(tasks.map((t) => [ref(t), t] as const));
+
+  // Transitive dependency closure of a task (cycle-safe).
+  const closureOf = (t: ParsedTask): Set<string> => {
+    const seen = new Set<string>();
+    const stack = t.dependsOn.map(refToString);
+    while (stack.length > 0) {
+      const r = stack.pop()!;
+      if (seen.has(r)) continue;
+      seen.add(r);
+      const dep = byRef.get(r);
+      if (dep) stack.push(...dep.dependsOn.map(refToString));
+    }
+    return seen;
+  };
+
+  const marked = tasks.filter((t) => t.finalReview);
+  if (marked.length === 0) {
+    return [
+      {
+        file: label,
+        rule: "final-review",
+        detail:
+          "no final review task — mark the closing task with `> **Final review**: true` in its header. It must depend (transitively) on every other task so it reviews the whole deliverable.",
+      },
+    ];
+  }
+
+  // At least one marked task must cover everything else.
+  const missingFor = (t: ParsedTask): string[] => {
+    const closure = closureOf(t);
+    return tasks.map(ref).filter((r) => r !== ref(t) && !closure.has(r));
+  };
+  const covering = marked.find((t) => missingFor(t).length === 0);
+  if (!covering) {
+    // Report the marked task that comes closest, with what it misses.
+    const best = marked
+      .map((t) => ({ t, missing: missingFor(t) }))
+      .sort((a, b) => a.missing.length - b.missing.length)[0];
+    return [
+      {
+        file: label,
+        rule: "final-review",
+        detail: `final review task ${ref(best.t)} does not reach all results — its \`Depends on\` is missing: ${best.missing.join(", ")}. Add these (directly or transitively) so it reviews the whole deliverable.`,
+      },
+    ];
+  }
+  return [];
+}
+
 /** Derive bucket + NN from a path like `.../tasks/ui/01-foo.md`. */
 export function inferRefFromPath(
   filePath: string,
@@ -225,24 +296,28 @@ export async function collectTaskFiles(tasksDir: string): Promise<string[]> {
   return out;
 }
 
-async function resolveInputs(args: string[]): Promise<string[]> {
-  const out: string[] = [];
+async function resolveInputs(
+  args: string[],
+): Promise<{ files: string[]; treeRoots: string[] }> {
+  const files: string[] = [];
+  const treeRoots: string[] = [];
   for (const arg of args) {
     let info;
     try {
       info = await stat(arg);
     } catch {
       // Treat as a missing path — main() will surface read errors per-file.
-      out.push(arg);
+      files.push(arg);
       continue;
     }
     if (info.isDirectory()) {
-      out.push(...(await collectTaskFiles(arg)));
+      treeRoots.push(arg);
+      files.push(...(await collectTaskFiles(arg)));
     } else {
-      out.push(arg);
+      files.push(arg);
     }
   }
-  return out;
+  return { files, treeRoots };
 }
 
 async function main() {
@@ -252,22 +327,37 @@ async function main() {
     process.exit(2);
   }
 
-  const files = await resolveInputs(args);
+  const { files, treeRoots } = await resolveInputs(args);
   if (files.length === 0) {
     console.error("No task files found.");
     process.exit(2);
   }
 
   let total = 0;
-  for (const file of files) {
-    const violations = await lintFile(file);
-    if (violations.length > 0) {
-      total += violations.length;
-      for (const v of violations) {
-        const rel = relative(process.cwd(), v.file) || v.file;
-        console.error(`${rel}  [${v.rule}] ${v.detail}`);
-      }
+  const reportAll = (violations: Violation[]) => {
+    for (const v of violations) {
+      const rel = relative(process.cwd(), v.file) || v.file;
+      console.error(`${rel}  [${v.rule}] ${v.detail}`);
     }
+    total += violations.length;
+  };
+
+  const parsed: ParsedTask[] = [];
+  for (const file of files) {
+    reportAll(await lintFile(file));
+    // Collect parsed tasks for the tree-level pass below.
+    try {
+      const p = parseTask(await readFile(file, "utf-8"));
+      if (p.ok) parsed.push(p.task);
+    } catch {
+      /* per-file read errors already reported by lintFile */
+    }
+  }
+
+  // Tree-level checks only run when a tasks/ directory was given (whole-tree
+  // mode) — a cherry-picked file list is too partial to judge the final gate.
+  if (treeRoots.length > 0) {
+    reportAll(checkFinalReview(parsed, treeRoots[0]));
   }
 
   if (total > 0) {

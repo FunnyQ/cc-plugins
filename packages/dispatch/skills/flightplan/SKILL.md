@@ -61,6 +61,7 @@ See `references/interview-guide.md` for the canonical walking-the-tree examples,
 - **Cross-bucket dependencies** — which task in bucket A unblocks which task in bucket B.
 - **Acceptance criteria & verification** — for every requirement, how it gets validated.
 - **Eval rubric** — the graded quality bar for each task (dimensions, weights, pass line, hard-fail veto) on top of the binary acceptance gate. Recommend the defaults (`正確性 ×3 / 測試涵蓋 ×2 / 介面與可讀性 ×1 / 假設與文件 ×1`, pass `> 4.0`, `正確性 < 4` veto) and adapt. A shared bar goes in `_context/rubric.md`. See `references/interview-guide.md` → "Eval rubric (ask per task)".
+- **Final review** — every plan ends with one terminal task marked `> **Final review**: true` that depends (transitively) on every other task. It's the holistic gate: integration, consistency, regressions, and whether the PLAN goal was actually met — scored by its own rubric on those axes, not a re-score of individual tasks. `lint-task.ts` requires it (single-task plans exempt).
 - **Conventions worth freezing** — commit style, code style, file layout, naming (these become `_context/shared.md`).
 - **Failure modes & rollback** — what could go wrong; how to recover.
 
@@ -94,7 +95,7 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
    - First: PLAN.md and every `_context/*.md` (especially `_context/shared.md`).
    - Then: each `tasks/<bucket>/NN-<slug>.md`.
 
-   Use the four reference templates listed under "Additional resources". Do not improvise structure. **Every task file must carry a `## Eval rubric`** (threshold line + weighted dimension table) — `lint-task.ts` rejects tasks without a parseable one. If the quality bar is shared, write `_context/rubric.md` first and have each task's rubric reference it.
+   Use the four reference templates listed under "Additional resources". Do not improvise structure. **Every task file must carry a `## Eval rubric`** (threshold line + weighted dimension table) — `lint-task.ts` rejects tasks without a parseable one. If the quality bar is shared, write `_context/rubric.md` first and have each task's rubric reference it. **End the tree with one terminal task marked `> **Final review**: true`** whose `Depends on` reaches every other task — the closing holistic gate (see `references/task-template.md` → "`Final review`").
 
    **Automatic lint hook**: every time a task file is written, the `flightplan-lint.sh` hook runs `lint-task.ts` on just that file. Violations are surfaced as stderr feedback (exit 2). The hook skips files that don't match flightplan's path + content signature, so it won't false-positive on unrelated Edit/Write calls.
 
@@ -102,7 +103,7 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
    ```bash
    bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/lint-task.ts docs/<slug>/tasks
    ```
-   Pass the **tasks directory** (not a glob) — the script walks bucket dirs and auto-skips `_context/` and any `README.md`. If any violation is reported (PLAN.md refs in any casing, sibling-task refs, missing sections, missing/unparseable `## Eval rubric` or a pass threshold outside the scale, broken Required reading paths, H1-vs-path mismatch, bad Status), fix and re-run. Do not finish with violations outstanding.
+   Pass the **tasks directory** (not a glob) — the script walks bucket dirs and auto-skips `_context/` and any `README.md`. If any violation is reported (PLAN.md refs in any casing, sibling-task refs, missing sections, missing/unparseable `## Eval rubric` or a pass threshold outside the scale, no final-review task or one that doesn't reach every task, broken Required reading paths, H1-vs-path mismatch, bad Status), fix and re-run. Do not finish with violations outstanding.
 
 4. **Generate `tasks/README.md`** from the task headers — index, dep graphs, cross-bucket table:
    ```bash

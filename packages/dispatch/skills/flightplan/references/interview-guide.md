@@ -15,6 +15,7 @@ Stop when **all** of these hold:
 - A `topic-slug` is agreed.
 - Every requirement has writable acceptance criteria.
 - Every task has a quality bar captured as an Eval rubric (dimensions + weights + pass line). See **Eval rubric (ask per task)** below.
+- The plan ends with one **final review task** (marked `Final review: true`) that depends on all leaf tasks — the holistic closing gate. Confirm what it reviews (integration, meets-goal, consistency, regressions). Single-task plans are exempt.
 - MVP vs later is explicit, with a one-line reason for each "later".
 - Bucketing has been decided (`ui/backend/api`, by phase, by feature, or single-bucket `work/`) with a clear reason. Task files always live one level deep under `tasks/<bucket>/` — never flat under `tasks/`.
 - Cross-bucket dependencies, if any, are mapped.

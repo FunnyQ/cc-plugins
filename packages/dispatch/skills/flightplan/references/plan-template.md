@@ -85,8 +85,9 @@ Tasks live under `tasks/<bucket>/`. Bucketing strategy and rationale:
 | ui | 02 | <slug> | todo | > 4.0 | ui/01 |
 | backend | 01 | <slug> | todo | > 4.0 | — |
 | api | 01 | <slug> | todo | > 4.0 | ui/02, backend/01 |
+| review | 01 | final review 🏁 | todo | > 4.0 | api/01, ui/02, backend/01 |
 
-(Mirrors the table in `tasks/README.md` — keep them in sync.)
+(Mirrors the table in `tasks/README.md` — keep them in sync. The last row is the **final review** task, marked `> **Final review**: true` in its file; its `Depends on` must reach every other task.)
 
 ## Cross-bucket dependencies
 

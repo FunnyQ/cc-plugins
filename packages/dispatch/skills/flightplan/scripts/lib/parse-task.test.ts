@@ -124,6 +124,24 @@ describe("parseTask", () => {
     expect(result.task.status).toBeNull();
   });
 
+  test("finalReview defaults to false", () => {
+    const result = parseTask(VALID);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.task.finalReview).toBe(false);
+  });
+
+  test("parses `Final review: true` from the header", () => {
+    const src = VALID.replace(
+      "> **Status**: todo",
+      "> **Status**: todo\n> **Final review**: true",
+    );
+    const result = parseTask(src);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.task.finalReview).toBe(true);
+  });
+
   test("Blocks omitted is ok", () => {
     const src = VALID.replace("> **Blocks**: ui/05\n", "");
     const result = parseTask(src);
