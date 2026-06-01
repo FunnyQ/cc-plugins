@@ -6,27 +6,27 @@ import { scoreTask, buildScoreEntry, type ScoreResult } from "./score-task";
 import { parseLog } from "./lib/flightlog";
 import type { Rubric } from "./lib/parse-task";
 
-// Mirrors the urban-renewal rubric: 0–5, pass > 4.0, 正確性 < 4 vetoes.
+// Mirrors a typical rubric: 0–5, pass > 4.0, Correctness < 4 vetoes.
 const RUBRIC: Rubric = {
   passThreshold: 4.0,
   passOp: ">",
   scaleMax: 5,
-  hardFail: { dimension: "正確性", op: "<", value: 4 },
+  hardFail: { dimension: "Correctness", op: "<", value: 4 },
   dimensions: [
-    { name: "正確性", weight: 3 },
-    { name: "測試涵蓋", weight: 2 },
-    { name: "介面與可讀性", weight: 1 },
-    { name: "假設與文件", weight: 1 },
+    { name: "Correctness", weight: 3 },
+    { name: "Test coverage", weight: 2 },
+    { name: "Interface & readability", weight: 1 },
+    { name: "Assumptions & docs", weight: 1 },
   ],
 };
 
 describe("scoreTask", () => {
   test("all 5s → passes", () => {
     const r = scoreTask(RUBRIC, {
-      正確性: 5,
-      測試涵蓋: 5,
-      介面與可讀性: 5,
-      假設與文件: 5,
+      Correctness: 5,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+      "Assumptions & docs": 5,
     });
     expect(r.weighted).toBe(5);
     expect(r.passed).toBe(true);
@@ -36,22 +36,22 @@ describe("scoreTask", () => {
   test("weighted average uses the weights", () => {
     // (4×3 + 5×2 + 4×1 + 4×1) / 7 = 30/7 ≈ 4.2857
     const r = scoreTask(RUBRIC, {
-      正確性: 4,
-      測試涵蓋: 5,
-      介面與可讀性: 4,
-      假設與文件: 4,
+      Correctness: 4,
+      "Test coverage": 5,
+      "Interface & readability": 4,
+      "Assumptions & docs": 4,
     });
     expect(r.weighted).toBeCloseTo(30 / 7, 5);
     expect(r.passed).toBe(true);
   });
 
-  test("hard-fail veto: 正確性 < 4 fails despite a high average", () => {
+  test("hard-fail veto: Correctness < 4 fails despite a high average", () => {
     // (3×3 + 5×2 + 5×1 + 5×1) / 7 = 29/7 ≈ 4.14 — above 4.0, but vetoed.
     const r = scoreTask(RUBRIC, {
-      正確性: 3,
-      測試涵蓋: 5,
-      介面與可讀性: 5,
-      假設與文件: 5,
+      Correctness: 3,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+      "Assumptions & docs": 5,
     });
     expect(r.weighted).toBeCloseTo(29 / 7, 5);
     expect(r.hardFailed).toBe(true);
@@ -60,10 +60,10 @@ describe("scoreTask", () => {
 
   test("pass line is strict ('>'): exactly on the line fails", () => {
     const r = scoreTask(RUBRIC, {
-      正確性: 4,
-      測試涵蓋: 4,
-      介面與可讀性: 4,
-      假設與文件: 4,
+      Correctness: 4,
+      "Test coverage": 4,
+      "Interface & readability": 4,
+      "Assumptions & docs": 4,
     });
     expect(r.weighted).toBe(4);
     expect(r.passed).toBe(false);
@@ -72,26 +72,35 @@ describe("scoreTask", () => {
   test(">= operator passes when exactly on the line", () => {
     const r = scoreTask(
       { ...RUBRIC, passOp: ">=" },
-      { 正確性: 4, 測試涵蓋: 4, 介面與可讀性: 4, 假設與文件: 4 },
+      {
+        Correctness: 4,
+        "Test coverage": 4,
+        "Interface & readability": 4,
+        "Assumptions & docs": 4,
+      },
     );
     expect(r.passed).toBe(true);
   });
 
   test("missing a dimension → cannot pass, reported", () => {
-    const r = scoreTask(RUBRIC, { 正確性: 5, 測試涵蓋: 5, 介面與可讀性: 5 });
-    expect(r.missing).toEqual(["假設與文件"]);
+    const r = scoreTask(RUBRIC, {
+      Correctness: 5,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+    });
+    expect(r.missing).toEqual(["Assumptions & docs"]);
     expect(r.passed).toBe(false);
   });
 
   test("breakdown reports per-dimension contributions", () => {
     const r = scoreTask(RUBRIC, {
-      正確性: 5,
-      測試涵蓋: 4,
-      介面與可讀性: 3,
-      假設與文件: 2,
+      Correctness: 5,
+      "Test coverage": 4,
+      "Interface & readability": 3,
+      "Assumptions & docs": 2,
     });
     expect(r.breakdown).toContainEqual({
-      name: "正確性",
+      name: "Correctness",
       weight: 3,
       score: 5,
       contribution: 15,
@@ -102,10 +111,10 @@ describe("scoreTask", () => {
 describe("buildScoreEntry", () => {
   test("maps a verdict + metadata to a flightlog score entry", () => {
     const result: ScoreResult = scoreTask(RUBRIC, {
-      正確性: 5,
-      測試涵蓋: 4,
-      介面與可讀性: 4,
-      假設與文件: 4,
+      Correctness: 5,
+      "Test coverage": 4,
+      "Interface & readability": 4,
+      "Assumptions & docs": 4,
     });
     const entry = buildScoreEntry(result, {
       task: "ui/03",
@@ -118,15 +127,19 @@ describe("buildScoreEntry", () => {
     expect(entry.attempt).toBe(2);
     expect(entry.passed).toBe(result.passed);
     // breakdown is trimmed to name/weight/score (no contribution noise)
-    expect(entry.breakdown[0]).toEqual({ name: "正確性", weight: 3, score: 5 });
+    expect(entry.breakdown[0]).toEqual({
+      name: "Correctness",
+      weight: 3,
+      score: 5,
+    });
   });
 
   test("defaults attempt to 1 when unspecified", () => {
     const result = scoreTask(RUBRIC, {
-      正確性: 5,
-      測試涵蓋: 5,
-      介面與可讀性: 5,
-      假設與文件: 5,
+      Correctness: 5,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+      "Assumptions & docs": 5,
     });
     const entry = buildScoreEntry(result, {
       task: "ui/03",
@@ -150,14 +163,14 @@ Do the thing.
 
 ## Eval rubric
 
-> 各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。
+> Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| 維度 | 權重 | 0–1 | 2–3 | 4–5 |
+| Dimension | Weight | 0–1 | 2–3 | 4–5 |
 |---|---|---|---|---|
-| 正確性 | ×3 | a | b | c |
-| 測試涵蓋 | ×2 | a | b | c |
-| 介面與可讀性 | ×1 | a | b | c |
-| 假設與文件 | ×1 | a | b | c |
+| Correctness | ×3 | a | b | c |
+| Test coverage | ×2 | a | b | c |
+| Interface & readability | ×1 | a | b | c |
+| Assumptions & docs | ×1 | a | b | c |
 `;
 
 describe("score-task CLI --log", () => {
@@ -170,10 +183,10 @@ describe("score-task CLI --log", () => {
     await writeFile(
       scoresFile,
       JSON.stringify({
-        正確性: 5,
-        測試涵蓋: 4,
-        介面與可讀性: 4,
-        假設與文件: 4,
+        Correctness: 5,
+        "Test coverage": 4,
+        "Interface & readability": 4,
+        "Assumptions & docs": 4,
       }),
     );
 

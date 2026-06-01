@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { parseTask, parseRubric, refToString } from "./parse-task";
 
-// Lifted verbatim from urban-renewal-proposer engine/03-base-volume-engine.md —
-// the real-world format flightplan rubrics must stay compatible with.
+// Mirrors a real-world engine task rubric — the format flightplan rubrics
+// must stay compatible with.
 const REAL_RUBRIC = `## Eval rubric
 
-> 尺度與通用維度見 \`../_context/rubric.md\`。各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。
+> Scale and shared dimensions: see \`../_context/rubric.md\`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| 維度 | 權重 | 0–1(不及格) | 2–3(未達標) | 4–5(過關) |
+| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|
-| 正確性 | ×3 | 基準容積對錦新算不出 5,264 | 基準對但建蔽 611 偏差過大 | 基準完全吻合 |
-| 測試涵蓋 | ×2 | 無測試 | 只測基準容積 | 含建蔽、邊界值 |
-| 介面與可讀性 | ×1 | 非純函式或夾帶 I/O | 堪用但命名/型別不清 | 純函式、型別清楚 |
-| 假設與文件 | ×1 | 免計預設是無註記魔術數字 | 有預設無說明 | 預設標 TODO 待校正 |
+| Correctness | ×3 | base volume can't compute 5,264 | base matches but coverage 611 drifts too far | base fully matches |
+| Test coverage | ×2 | no tests | only the base volume tested | covers coverage ratio + boundary values |
+| Interface & readability | ×1 | not pure or smuggles I/O | usable but naming/types unclear | pure function, clear types |
+| Assumptions & docs | ×1 | exemption default is an unmarked magic number | default present, not explained | default flagged TODO for review |
 `;
 
 const VALID = `# UI-01: Fixture state shell
@@ -152,7 +152,7 @@ describe("parseTask", () => {
 });
 
 describe("parseRubric", () => {
-  test("parses the real urban-renewal rubric format", () => {
+  test("parses the real-world rubric format", () => {
     const rubric = parseRubric(REAL_RUBRIC);
     expect(rubric).not.toBeNull();
     if (!rubric) return;
@@ -160,29 +160,29 @@ describe("parseRubric", () => {
     expect(rubric.passOp).toBe(">");
     expect(rubric.scaleMax).toBe(5);
     expect(rubric.hardFail).toEqual({
-      dimension: "正確性",
+      dimension: "Correctness",
       op: "<",
       value: 4,
     });
     expect(rubric.dimensions).toEqual([
-      { name: "正確性", weight: 3 },
-      { name: "測試涵蓋", weight: 2 },
-      { name: "介面與可讀性", weight: 1 },
-      { name: "假設與文件", weight: 1 },
+      { name: "Correctness", weight: 3 },
+      { name: "Test coverage", weight: 2 },
+      { name: "Interface & readability", weight: 1 },
+      { name: "Assumptions & docs", weight: 1 },
     ]);
   });
 
   test("accepts ≥ and >= as the pass operator", () => {
-    const a = parseRubric(REAL_RUBRIC.replace("> 4.0 通過", "≥ 4 通過"));
+    const a = parseRubric(REAL_RUBRIC.replace("> 4.0 to pass", "≥ 4 to pass"));
     expect(a?.passOp).toBe(">=");
     expect(a?.passThreshold).toBe(4);
-    const b = parseRubric(REAL_RUBRIC.replace("> 4.0 通過", ">= 4 通過"));
+    const b = parseRubric(REAL_RUBRIC.replace("> 4.0 to pass", ">= 4 to pass"));
     expect(b?.passOp).toBe(">=");
   });
 
-  test("language-neutral: English dimension veto", () => {
+  test("veto dimension name is read verbatim from the threshold line", () => {
     const src = REAL_RUBRIC.replace(
-      "正確性 < 4 一票否決",
+      "Correctness < 4 is an automatic veto",
       "correctness < 4 veto",
     );
     const rubric = parseRubric(src);
@@ -194,7 +194,10 @@ describe("parseRubric", () => {
   });
 
   test("hard fail is optional", () => {
-    const src = REAL_RUBRIC.replace(";正確性 < 4 一票否決", "");
+    const src = REAL_RUBRIC.replace(
+      "; Correctness < 4 is an automatic veto",
+      "",
+    );
     const rubric = parseRubric(src);
     expect(rubric).not.toBeNull();
     expect(rubric?.hardFail).toBeNull();
@@ -206,8 +209,8 @@ describe("parseRubric", () => {
 
   test("returns null when the pass-threshold line is missing", () => {
     const src = REAL_RUBRIC.replace(
-      "> 尺度與通用維度見 `../_context/rubric.md`。各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。",
-      "> 尺度見 `../_context/rubric.md`。",
+      "> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.",
+      "> Scale: see `../_context/rubric.md`.",
     );
     expect(parseRubric(src)).toBeNull();
   });
@@ -215,7 +218,7 @@ describe("parseRubric", () => {
   test("returns null when the dimension table has no weighted rows", () => {
     const src = `## Eval rubric
 
-> 加權平均 > 4.0 通過。
+> weighted average > 4.0 to pass.
 
 prose only, no table.
 `;
@@ -225,15 +228,15 @@ prose only, no table.
   test("ignores the separator row and unweighted rows", () => {
     const src = `## Eval rubric
 
-> 各項 0–5,加權平均 > 4.0 通過。
+> Each dimension 0–5; weighted average > 4.0 to pass.
 
-| 維度 | 權重 | 說明 |
+| Dimension | Weight | Notes |
 |---|---|---|
-| 正確性 | ×2 | a |
-| 備註 | — | not a weighted dimension |
+| Correctness | ×2 | a |
+| Notes | — | not a weighted dimension |
 `;
     const rubric = parseRubric(src);
-    expect(rubric?.dimensions).toEqual([{ name: "正確性", weight: 2 }]);
+    expect(rubric?.dimensions).toEqual([{ name: "Correctness", weight: 2 }]);
   });
 });
 

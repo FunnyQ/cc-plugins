@@ -79,7 +79,7 @@ Tasks live under `tasks/<bucket>/`. Bucketing strategy and rationale:
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass 線 | Depends on |
+| Bucket | NN | Title | Status | Pass line | Depends on |
 |---|---|---|---|---|---|
 | ui | 01 | <slug> | todo | > 4.0 | — |
 | ui | 02 | <slug> | todo | > 4.0 | ui/01 |

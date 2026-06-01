@@ -46,12 +46,12 @@ One sentence.
 
 ## Eval rubric
 
-> 各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。
+> Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| 維度 | 權重 | 4–5(過關) |
+| Dimension | Weight | 4–5 (pass) |
 |---|---|---|
-| 正確性 | ×3 | 算對 |
-| 測試涵蓋 | ×1 | 含邊界 |
+| Correctness | ×3 | correct |
+| Test coverage | ×1 | covers edges |
 `;
 
 async function writeTree(files: Record<string, string>): Promise<string> {
@@ -315,8 +315,8 @@ describe("lintFile", () => {
 
   test("Eval rubric present but unparseable → violation", async () => {
     const bad = VALID_TASK.replace(
-      "> 各項 0–5,加權平均 > 4.0 通過;正確性 < 4 一票否決。",
-      "> 看著辦,差不多就好。",
+      "> Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.",
+      "> Just eyeball it, close enough is fine.",
     );
     const root = await writeTree({
       "tasks/_context/shared.md": "# Shared\n",
@@ -332,7 +332,10 @@ describe("lintFile", () => {
   });
 
   test("pass threshold out of scale → violation", async () => {
-    const bad = VALID_TASK.replace("加權平均 > 4.0 通過", "加權平均 > 9 通過");
+    const bad = VALID_TASK.replace(
+      "weighted average > 4.0 to pass",
+      "weighted average > 9 to pass",
+    );
     const root = await writeTree({
       "tasks/_context/shared.md": "# Shared\n",
       "tasks/ui/01-foo.md": bad,

@@ -35,8 +35,8 @@
   <rect width="1320" height="820" fill="url(#bg)"/>
 
   <!-- Title -->
-  <text class="h1 ink" x="60" y="48">Dispatch — 從點子到出貨的完整航程</text>
-  <text class="sub mut" x="61" y="74">preflight 釐清 → flightplan 寫成藍圖 → autopilot 自動執行（每個 task 過 rubric 閘）→ final review 總審 → ship</text>
+  <text class="h1 ink" x="60" y="48">Dispatch — the full arc from idea to ship</text>
+  <text class="sub mut" x="61" y="74">preflight clarifies → flightplan writes the blueprint → autopilot executes (every task clears its rubric gate) → final review → ship</text>
 
   <!-- through-line behind top tier -->
   <rect x="60" y="166" width="1185" height="8" rx="4" fill="url(#runway)"/>
@@ -52,27 +52,27 @@
   <rect x="60" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
   <circle cx="92" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="92" y="143" text-anchor="middle">1</text>
   <text class="ntitle ink" x="118" y="144">preflight</text>
-  <rect x="118" y="156" width="86" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="161" y="170" text-anchor="middle">輕量 · light</text>
-  <text class="role ink" x="80" y="202">訪談釐清需求</text>
-  <text class="role2 mut" x="80" y="223">→ 對話內單一 plan，批准即執行</text>
+  <rect x="118" y="156" width="86" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="161" y="170" text-anchor="middle">light</text>
+  <text class="role ink" x="80" y="202">Interview to clarify needs</text>
+  <text class="role2 mut" x="80" y="223">→ one in-conversation plan, approve &amp; run</text>
 
   <!-- Card F: flightplan -->
   <g filter="url(#soft)"><rect x="470" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
   <rect x="470" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
   <circle cx="502" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="502" y="143" text-anchor="middle">2</text>
   <text class="ntitle ink" x="528" y="144">flightplan</text>
-  <rect x="528" y="156" width="92" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="574" y="170" text-anchor="middle">規劃 · heavy</text>
-  <text class="role ink" x="490" y="202">訪談 → 寫成磁碟藍圖</text>
-  <text class="role2 mut" x="490" y="223">→ PLAN.md ＋ _context ＋ tasks 樹</text>
+  <rect x="528" y="156" width="92" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="574" y="170" text-anchor="middle">heavy</text>
+  <text class="role ink" x="490" y="202">Interview → blueprint to disk</text>
+  <text class="role2 mut" x="490" y="223">→ PLAN.md + _context + tasks tree</text>
 
   <!-- Card A: autopilot -->
   <g filter="url(#soft)"><rect x="880" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
   <rect x="880" y="104" width="6" height="132" rx="3" fill="#34A879"/>
   <circle cx="912" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="912" y="143" text-anchor="middle">3</text>
   <text class="ntitle ink" x="938" y="144">autopilot</text>
-  <rect x="938" y="156" width="86" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="981" y="170" text-anchor="middle">執行 · auto</text>
-  <text class="role ink" x="900" y="202">自動照飛每個 task</text>
-  <text class="role2 mut" x="900" y="223">→ 逐一過 rubric 閘 → 總審 → ship</text>
+  <rect x="938" y="156" width="86" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="981" y="170" text-anchor="middle">auto</text>
+  <text class="role ink" x="900" y="202">Auto-fly every task</text>
+  <text class="role2 mut" x="900" y="223">→ each clears rubric → final review → ship</text>
 
   <!-- Ship -->
   <g filter="url(#soft)"><circle cx="1248" cy="170" r="46" fill="#fff" stroke="#34A879"/></g>
@@ -81,18 +81,18 @@
 
   <!-- connectors from F and A down into the detail boxes -->
   <path class="ln" d="M620,236 L620,268 L310,268 L310,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <text class="note mut" x="330" y="262">寫出</text>
+  <text class="note mut" x="330" y="262">writes</text>
   <path class="ln" d="M1030,236 L1030,268 L930,268 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <text class="note mut" x="948" y="262">讀取並執行</text>
+  <text class="note mut" x="948" y="262">reads &amp; runs</text>
 
   <!-- ===== LEFT: flightplan artifact tree ===== -->
   <g filter="url(#soft)"><rect x="60" y="300" width="500" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <text class="ctitle ink" x="84" y="334">flightplan 寫出的藍圖（自包含 task 樹）</text>
+  <text class="ctitle ink" x="84" y="334">flightplan's blueprint (self-contained task tree)</text>
 
-  <rect x="84" y="350" width="200" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
-  <text class="chip ink" x="98" y="372">📄 PLAN.md — 真相來源</text>
+  <rect x="84" y="350" width="240" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
+  <text class="chip ink" x="98" y="372">📄 PLAN.md — source of truth</text>
   <rect x="84" y="396" width="452" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
-  <text class="chip ink" x="98" y="418">📁 _context/ — shared.md · rubric.md（共用尺度/維度）</text>
+  <text class="chip ink" x="98" y="418">📁 _context/ — shared.md · rubric.md (shared scale/dims)</text>
 
   <!-- bucket A -->
   <text class="note mut" x="86" y="456">tasks/&lt;bucket-a&gt;/</text>
@@ -110,11 +110,11 @@
 
   <!-- final review task -->
   <rect x="84" y="582" width="452" height="42" rx="9" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="chip" fill="#B5701E" x="100" y="608">🏁 final-review · Final review: true · 依賴所有 task</text>
+  <text class="chip" fill="#B5701E" x="100" y="608">🏁 final-review · Final review: true · depends on all tasks</text>
 
-  <text class="note mut" x="84" y="652">ⓡ = 該 task 自帶 ## Eval rubric（維度×權重＋通過線＋hard-fail）</text>
-  <text class="note mut" x="84" y="672">lint 強制：每 task 有 rubric；總審須遞移涵蓋全部 task</text>
-  <text class="note mut" x="84" y="700">執行順序由依賴圖決定 → next-ready 找「依賴皆 done」的 task</text>
+  <text class="note mut" x="84" y="652">ⓡ = task carries its ## Eval rubric (dims×weight + pass line + hard-fail)</text>
+  <text class="note mut" x="84" y="672">lint enforces: every task has a rubric; final review covers all tasks</text>
+  <text class="note mut" x="84" y="700">dependency graph sets order → next-ready finds tasks with all deps done</text>
 
   <!-- feed arrow tree -> loop -->
   <path class="ln" d="M540,470 L598,470" stroke="#2F9C70" marker-end="url(#ah-green)"/>
@@ -122,22 +122,22 @@
 
   <!-- ===== RIGHT: autopilot per-task loop ===== -->
   <g filter="url(#soft)"><rect x="600" y="300" width="660" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <text class="ctitle ink" x="624" y="334">autopilot — 每個 ready task 跑迴圈</text>
-  <text class="note mut" x="624" y="354">next-ready 找出依賴皆 done 的 task ↻</text>
+  <text class="ctitle ink" x="624" y="334">autopilot — loop per ready task</text>
+  <text class="note mut" x="624" y="354">next-ready finds tasks with all deps done ↻</text>
 
   <!-- pipeline nodes -->
   <rect x="628" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
-  <text class="nlbl ink" x="688" y="410" text-anchor="middle">Dev 實作</text>
+  <text class="nlbl ink" x="688" y="410" text-anchor="middle">Dev (implement)</text>
   <line class="ln" x1="750" y1="405" x2="788" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
   <rect x="790" y="378" width="168" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
   <text class="nlbl ink" x="874" y="402" text-anchor="middle">Review</text>
-  <text class="nsub mut" x="874" y="419" text-anchor="middle">judge 依 rubric 評各維度</text>
+  <text class="nsub mut" x="874" y="419" text-anchor="middle">judge scores each rubric dim</text>
   <line class="ln" x1="960" y1="405" x2="998" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
   <rect x="1000" y="378" width="150" height="54" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="1075" y="402" text-anchor="middle">score-task 閘</text>
-  <text class="nsub" fill="#B5701E" x="1075" y="419" text-anchor="middle">加權平均 ＋ hard-fail</text>
+  <text class="nlbl" fill="#B5701E" x="1075" y="402" text-anchor="middle">score-task gate</text>
+  <text class="nsub" fill="#B5701E" x="1075" y="419" text-anchor="middle">weighted avg + hard-fail</text>
 
   <!-- score -> diamond -->
   <line class="ln" x1="1075" y1="432" x2="1075" y2="470" stroke="#33485A" marker-end="url(#ah-ink)"/>
@@ -148,7 +148,7 @@
 
   <!-- fail -> feedback -> back to Dev -->
   <path class="ln" d="M1012,508 L688,508 L688,434" stroke="#C9603F" marker-end="url(#ah-red)"/>
-  <text class="note" fill="#C9603F" x="724" y="500">fail → feedback ↺（重做低分維度）</text>
+  <text class="note" fill="#C9603F" x="724" y="500">fail → feedback ↺ (redo low-scoring dims)</text>
 
   <!-- pass -> done -->
   <line class="ln" x1="1075" y1="546" x2="1075" y2="576" stroke="#2F9C70" marker-end="url(#ah-green)"/>
@@ -156,20 +156,20 @@
   <text class="chip" fill="#2F9C70" x="1075" y="600" text-anchor="middle">Status: done ✓</text>
   <text class="note" fill="#2F9C70" x="1148" y="599">pass</text>
 
-  <text class="note mut" x="624" y="600">迴圈設 MAX_ATTEMPTS；觸頂 → needs_your_call 交還操縱桿給你</text>
+  <text class="note mut" x="624" y="566">loop has MAX_ATTEMPTS; on cap → needs_your_call hands back to you</text>
 
   <!-- all done -> final review -> ship -->
   <path class="ln" d="M1010,595 L900,595 L900,632" stroke="#33485A" marker-end="url(#ah-ink)"/>
-  <text class="note mut" x="912" y="624">全部 task done</text>
+  <text class="note mut" x="912" y="624">all tasks done</text>
 
   <rect x="624" y="636" width="300" height="46" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="774" y="657" text-anchor="middle">🏁 Final review（總審）</text>
-  <text class="nsub" fill="#B5701E" x="774" y="673" text-anchor="middle">整合 · 達成 PLAN 目標 · 一致性 · 無 regression（自己也過 rubric）</text>
+  <text class="nlbl" fill="#B5701E" x="774" y="657" text-anchor="middle">🏁 Final review</text>
+  <text class="nsub" fill="#B5701E" x="774" y="673" text-anchor="middle">integration · goal · consistency · no regressions</text>
 
   <line class="ln" x1="924" y1="659" x2="1006" y2="659" stroke="#2F9C70" marker-end="url(#ah-green)"/>
   <rect x="1008" y="636" width="140" height="46" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
   <text class="nlbl" fill="#2F9C70" x="1078" y="664" text-anchor="middle">🚀 Ship</text>
 
   <!-- legend -->
-  <text class="note mut" x="624" y="710">綠＝過閘 / 出貨　·　琥珀＝rubric 評分 / 總審　·　紅＝未過退回重做</text>
+  <text class="note mut" x="624" y="710">green = gate passed / ship · amber = rubric scoring / final review · red = failed, sent back</text>
 </svg>
