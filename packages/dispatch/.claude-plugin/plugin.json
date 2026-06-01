@@ -1,7 +1,7 @@
 {
   "name": "dispatch",
   "version": "0.2.0",
-  "description": "Plan before you fly — interview-driven specs. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk for sub-agents to execute later.",
+  "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk; autopilot flies the tree with a dev→verify→judge→score quality loop and a closing final-review gate.",
   "author": {
     "name": "Q"
   },
@@ -9,12 +9,14 @@
   "keywords": [
     "preflight",
     "flightplan",
+    "autopilot",
     "interview",
     "spec",
     "blueprint",
     "planning",
     "requirements",
-    "tasks"
+    "tasks",
+    "execute"
   ],
   "hooks": {
     "PostToolUse": [

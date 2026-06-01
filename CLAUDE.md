@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing two local plugins:
 
 - **monitor** — usage dashboard + per-project cockpit (documented in depth below).
-- **dispatch** — interview-driven planning: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
+- **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
 
 **monitor** bundles three sibling skills:
 
@@ -24,13 +24,15 @@ cc-plugins/
 ├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch)
 ├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
-├── packages/dispatch/                # plugin: interview-driven planning (preflight + flightplan)
+├── packages/dispatch/                # plugin: interview-driven planning + execution (preflight + flightplan + autopilot)
 │   ├── .claude-plugin/plugin.json    # Claude manifest + PostToolUse hook → flightplan-lint.sh
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills only; no hooks)
 │   ├── hooks/flightplan-lint.sh      # lints flightplan task files on Edit/Write (path + content gated)
 │   └── skills/
 │       ├── preflight/                # skill: lightweight in-conversation spec (← odin probe)
-│       └── flightplan/               # skill: multi-file PLAN.md + tasks/ blueprint (← odin probe-deep)
+│       ├── flightplan/               # skill: multi-file PLAN.md + tasks/ blueprint (← odin probe-deep)
+│       │                             #   scripts/ also home autopilot's shared tools: next-ready / score-task (--log) / flightlog
+│       └── autopilot/                # skill: execute the tree via Workflow (wave loop + dev→verify→judge→score gate); see references/orchestrator.md
 └── packages/monitor/                 # plugin: usage dashboard + cockpit (monorepo layout: packages/<plugin>)
     ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hook → setup.ts --session-check
     ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)

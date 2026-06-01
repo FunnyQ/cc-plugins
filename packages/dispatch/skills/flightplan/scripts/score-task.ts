@@ -12,13 +12,17 @@
  * was scored.
  *
  * Usage:
- *   bun score-task.ts <task-file> <scores.json>
+ *   bun score-task.ts <task-file> <scores.json> [--log <file>] [--attempt N] [--agent <label>]
  *     scores.json: { "正確性": 5, "測試涵蓋": 4, ... } keyed by dimension name
+ *     --log <file>: append the verdict to a flightlog JSONL trail (auto-creates
+ *                   the dir + a self-ignore when logging into `.flightlog/`).
+ *     --attempt / --agent: metadata stamped onto the logged entry.
  *
  * Exits 0 if passed, 1 if not, 2 on usage / unparseable-rubric errors.
  */
 import { readFile } from "node:fs/promises";
-import { parseTask, type Rubric } from "./lib/parse-task";
+import { parseTask, refToString, type Rubric } from "./lib/parse-task";
+import { appendEntry, type ScoreEntry } from "./lib/flightlog";
 
 export type DimensionScore = {
   name: string;
@@ -97,10 +101,49 @@ export function scoreTask(
   };
 }
 
+/** Build a flightlog score entry from a verdict + run metadata (pure). */
+export function buildScoreEntry(
+  result: ScoreResult,
+  meta: { task: string; ts: string; attempt?: number; agentLabel?: string },
+): ScoreEntry {
+  return {
+    kind: "score",
+    ts: meta.ts,
+    task: meta.task,
+    attempt: meta.attempt ?? 1,
+    agentLabel: meta.agentLabel,
+    weighted: result.weighted,
+    passed: result.passed,
+    hardFailed: result.hardFailed,
+    missing: result.missing,
+    threshold: result.passThreshold,
+    passOp: result.passOp,
+    breakdown: result.breakdown.map((d) => ({
+      name: d.name,
+      weight: d.weight,
+      score: d.score,
+    })),
+  };
+}
+
+function flagValue(argv: string[], name: string): string | undefined {
+  const i = argv.indexOf(name);
+  return i !== -1 ? argv[i + 1] : undefined;
+}
+
 async function main() {
-  const [taskFile, scoresFile] = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  const positional = argv.filter(
+    (a, i) => !a.startsWith("--") && !argv[i - 1]?.startsWith("--"),
+  );
+  const [taskFile, scoresFile] = positional;
+  const logFile = flagValue(argv, "--log");
+  const attemptRaw = flagValue(argv, "--attempt");
+  const agentLabel = flagValue(argv, "--agent");
   if (!taskFile || !scoresFile) {
-    console.error("Usage: bun score-task.ts <task-file> <scores.json>");
+    console.error(
+      "Usage: bun score-task.ts <task-file> <scores.json> [--log <file>] [--attempt N] [--agent <label>]",
+    );
     process.exit(2);
   }
 
@@ -126,6 +169,17 @@ async function main() {
   }
 
   const result = scoreTask(parsed.task.rubric, scores);
+
+  if (logFile) {
+    const entry = buildScoreEntry(result, {
+      task: refToString(parsed.task),
+      ts: new Date().toISOString(),
+      attempt: attemptRaw ? parseInt(attemptRaw, 10) : undefined,
+      agentLabel,
+    });
+    await appendEntry(logFile, entry);
+  }
+
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.passed ? 0 : 1);
 }
