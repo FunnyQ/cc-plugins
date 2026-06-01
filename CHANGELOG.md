@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.4] - 2026-06-02
+
+### ✨ Added
+
+- **autopilot — closing multi-lens Final review**: the Final-review round now fans out 5 parallel reviewers — `codex /codex review` for cross-vendor bug review plus the four `/simplify` lenses (reuse / simplification / efficiency / altitude) — each writing independent findings to `.flightlog/review/`, after which an Opus fixer applies them. The round re-loops until clean, bounded by a default of 2 attempts.
+- **flightplan — `mark-done.ts`**: a deterministic done-transition that sets a task's `Status: done` and ticks every checkbox in its `## Acceptance criteria` and `## Verification` sections when the task passes. autopilot now uses it instead of editing status by hand.
+- **flightplan — `next-ready.ts --json` mode**: the scout can now emit structured JSON (`[{ref,finalReview}]`, or `[]` when nothing is ready) so a per-wave run can't misread empty output as "everything ready", and it surfaces the `finalReview` flag per task.
+
 ## [3.6.3] - 2026-06-02
 
 ### Fixed
