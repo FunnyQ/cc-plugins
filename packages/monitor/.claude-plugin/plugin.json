@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "3.6.3",
+  "version": "3.6.4",
   "description": "Monitor your Claude Code and Codex sessions — a usage dashboard (sessions, tokens, cost, model mix, project activity) plus a per-project cockpit (goal capture, decision log, live session view).",
   "author": {
     "name": "Q"
