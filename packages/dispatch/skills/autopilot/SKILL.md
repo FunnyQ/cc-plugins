@@ -39,18 +39,24 @@ Three hard constraints shape the design — internalize them:
 
 Before touching Workflow, gather the work-list in the main conversation:
 
-1. Resolve the plan dir. The user names a slug or path; the tree lives at `docs/<slug>/tasks/`.
-2. Read `docs/<slug>/PLAN.md` for the overall goal and the bucketing — the Final review task scores against "did we meet the PLAN goal", so the orchestrator needs the goal in hand.
-3. Confirm there is ready work:
+1. **Resolve the scripts path once.** autopilot reuses flightplan's scripts (siblings under the plugin). `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash — so don't `${CLAUDE_PLUGIN_ROOT}/...` your way to them. Take the skill's load-time *"Base directory for this skill"* banner and resolve `<base>/../flightplan/scripts` to an absolute path; call it `$SCRIPTS` and use it in every `bun` command below. (This is the same value you'll bake into `CFG.scriptsDir` in Step 3.)
+2. Resolve the plan dir. The user names a slug or path; the tree lives at `docs/<slug>/tasks/`.
+3. Read `docs/<slug>/PLAN.md` for the overall goal and the bucketing — the Final review task scores against "did we meet the PLAN goal", so the orchestrator needs the goal in hand.
+4. Confirm there is ready work:
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/next-ready.ts docs/<slug>/tasks
+   bun $SCRIPTS/next-ready.ts docs/<slug>/tasks
    ```
-   (autopilot reuses flightplan's scripts — they are siblings under `skills/`.) If it errors, the tree is malformed; run `lint-task.ts` and fix before flying. If it prints nothing and no task is `in-progress`, the tree is already done.
-4. Decide `MAX_ATTEMPTS` (default **3**) and confirm the model policy below with the user only if they want to change it.
+   If it errors, the tree is malformed; run `lint-task.ts` and fix before flying. If it prints nothing and no task is `in-progress`, the tree is already done.
+5. Decide `maxAttempts` (default **3**, the per-task cap) and `finalReviewMaxAttempts` (default **2**, the Final review round's cap). Confirm the model policy below with the user only if they want to change it.
+6. Confirm the cross-vendor reviewer is available — the Final review round shells out to it:
+   ```bash
+   codex --version   # the closing review round runs `/codex review`; if codex is missing the final-review task will fail (by design, not silently)
+   ```
+   If codex isn't installed, tell the user before flying (the per-task work still runs; only the closing review round needs it).
 
 ## Step 2 — Confirm the flight with the user
 
-Show a one-screen brief and get a go: the slug, how many tasks, `MAX_ATTEMPTS`, the model policy, and that capped tasks will be parked + escalated (not silently skipped). This is real compute and real edits — get an explicit go before calling Workflow.
+Show a one-screen brief and get a go: the slug, how many tasks, the two caps (`maxAttempts` / `finalReviewMaxAttempts`), the model policy, that capped tasks will be parked + escalated (not silently skipped), and that the closing Final review round runs `/codex review` — which **sends the branch diff to an external service (OpenAI)**. This is real compute, real edits, and an external code review — get an explicit go before calling Workflow.
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
@@ -58,13 +64,14 @@ Adapt `references/orchestrator.md` — it is the canonical script. **Bake the sc
 
 ```javascript
 const CFG = {
-  slug:        '<slug>',
-  tasksDir:    'docs/<slug>/tasks',
-  planPath:    'docs/<slug>/PLAN.md',
-  logFile:     'docs/<slug>/.flightlog/run.jsonl',
-  planGoal:    '<one line from PLAN.md>',
-  maxAttempts: 3,
-  scriptsDir:  '<abs path to skills/flightplan/scripts, from the skill load-time base dir>',
+  slug:                  '<slug>',
+  tasksDir:              'docs/<slug>/tasks',
+  planPath:              'docs/<slug>/PLAN.md',
+  logFile:               'docs/<slug>/.flightlog/run.jsonl',
+  planGoal:              '<one line from PLAN.md>',
+  maxAttempts:           3,
+  finalReviewMaxAttempts: 2,   // the closing cross-vendor review round loops at most this many times
+  scriptsDir:            '<abs path to skills/flightplan/scripts, from the skill load-time base dir>',
 }
 ```
 
@@ -89,7 +96,44 @@ Score gate (inline arithmetic in the orchestrator) ─ weighted avg + veto
 done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes   (next wave's next-ready will see it)
 ```
 
-The `Final review` task (`> **Final review**: true`) depends transitively on every other task, so the wave loop **naturally schedules it last** — it only becomes ready once everything else is `done`. No special phase needed; just bump its Dev and judge to Opus (the orchestrator detects the marker).
+The `Final review` task (`> **Final review**: true`) depends transitively on every other task, so the wave loop **naturally schedules it last** — it only becomes ready once everything else is `done`. No special phase needed. Its dev step is **not** a Claude self-review: the orchestrator runs a **multi-lens review fan-out** (see below). The binary gate, rubric judge, and score gate are identical to every other task — they grade that round against the Final review task's own `## Eval rubric`.
+
+### The closing multi-lens review round
+
+The dev and rubric judge are both Claude, so they share blind spots. The Final review's "dev" step instead fans out **independent review lenses**, then a single Opus **fixer** reads all their findings and applies them. On the `finalReview` marker the orchestrator runs (capped at `finalReviewMaxAttempts`, default **2**):
+
+```
+parallel reviewers — each writes findings to .flightlog/review/attempt-N/<lens>.md, edits nothing
+   ├─ codex          → /codex review (Skill → codex CLI over Bash): cross-vendor bug/correctness
+   ├─ reuse          → duplicated logic, missed reuse of existing helpers     ┐
+   ├─ simplification → dead code, needless complexity, clearer equivalents     │ the four
+   ├─ efficiency     → redundant passes, N+1s, recomputation, allocations      │ /simplify
+   └─ altitude       → over-/under-engineering (wrong abstraction level)       ┘ lenses
+   │
+   ▼
+Opus fixer — reads every findings file, applies the real fixes (Edit/Write), re-runs ## Verification
+   │
+   ▼
+the normal binary gate + rubric judge + score gate
+   ├─ rubric fail → re-loop (fresh review fan-out + fixes), up to finalReviewMaxAttempts
+   ▼ pass
+done
+```
+
+**Why this exact shape** — it's dictated by what a **Workflow agent** can do (verified empirically): it has `Skill` + `Bash` (the codex CLI is reachable) but **no `Agent` tool**, so a single agent can't fan out reviewers itself, and fan-out skills like `/simplify` and Claude's own `/code-review` can't run inside it. The orchestrator sidesteps both: it issues one `agent()` **per lens** via `parallel()`, recovering the `/codex review` + `/simplify` multi-agent power at the orchestrator level. **codex owns bugs** (where a non-Claude vendor catches what an all-Claude pipeline can't); **the four Claude lenses own quality** (they are exactly `/simplify`'s reuse / simplification / efficiency / altitude axes, one agent each). Splitting reviewers (record-only) from the fixer (edits) keeps the fixer **≠** the judge, so the dev≠judge anti-bias split still holds. If codex is unreachable its reviewer writes `CODEX UNREACHABLE` instead of findings, so the fixer flags it and the gate fails the task rather than rubber-stamping an un-reviewed deliverable.
+
+## Step 4 — Report
+
+After the workflow returns:
+
+1. Run the flightlog report to render the audit trail (`$SCRIPTS` is the path you resolved in Step 1):
+   ```bash
+   bun $SCRIPTS/flightlog.ts report docs/<slug>/.flightlog/run.jsonl
+   ```
+   This writes `docs/<slug>/.flightlog/RUNLOG.md` — every attempt, every verdict, each linked to its agent label for drill-down.
+2. Tell the user: tasks completed, tasks escalated (with why), and where `RUNLOG.md` lives. If everything passed including Final review, say so plainly and point at what to verify/ship.
+
+The rest of this doc is reference — model policy, scoring, escalation handling, the flightlog, and the shared scripts.
 
 ## Model policy
 
@@ -100,7 +144,9 @@ Encoded as a constant table at the top of the orchestrator so it's tunable in on
 | **Dev** | Sonnet → **Opus on the last attempt** | Workhorse coder. On the final attempt before the cap, escalate to Opus — a model that failed N times rarely clears it by retrying as itself; the last shot gets the stronger model before we bother the user. |
 | **Binary gate (Acceptance / Verification)** | Haiku | Mechanical: re-run the task's concrete `## Verification` commands and report pass/fail + raw output. Keep its job narrow — *run and report*, never subjective judgement. Runs first as a cheap filter so Opus never scores code that doesn't even build/test. |
 | **Rubric judge** | Opus | The graded gate that decides loop-or-pass; judgement quality is paramount (a weak judge ships bad code or loops forever). |
-| **Final review** | Opus (dev + judge) | Highest-stakes holistic gate: integration, consistency, regressions, did we meet the PLAN goal. |
+| **Final review — codex lens** | Haiku | Only *drives* the `/codex review` CLI and records its output — the review intelligence lives in codex itself, so a cheap model to invoke + capture is all that's needed. |
+| **Final review — /simplify lenses** | Opus × 4 (parallel) | reuse / simplification / efficiency / altitude. These must genuinely *understand* the code to judge quality, so they get the strongest model. They only *record* findings; they don't edit. |
+| **Final review — fixer** | Opus | Reads every lens's findings and applies them; highest-stakes holistic gate (integration, consistency, regressions, met the PLAN goal). Capped at `finalReviewMaxAttempts` (default 2). |
 
 ## Grounding the score (do not skip)
 
@@ -108,25 +154,14 @@ The **correctness** dimension must be grounded in **real verification**, not the
 
 ## Escalation — park & continue, then resume
 
-When a task exhausts `MAX_ATTEMPTS`:
+When a task exhausts its cap (`maxAttempts`, or `finalReviewMaxAttempts` for the Final review):
 
 1. The orchestrator **parks** it (records an escalation; the dev agent sets its `Status: blocked` so the parked state is visible) and **keeps flying** the other independent tasks. Dependents of a parked task simply never become ready, so they wait.
-2. When the workflow returns, it hands back `{ completed: [...], escalations: [{ task, attempt, reason, lastVerdict }] }`.
-3. **You** (the main agent) surface the escalations to the user. In an active cockpit session, hand the stick back via `needs_your_call` + `cockpit wait`; otherwise use `AskUserQuestion`. Show the task, the last verdict, and the judge's rationale.
+2. When the workflow returns, it hands back `{ slug, completed: [...], escalations: [{ task, attempt, reason }] }`. The `reason` string already embeds the last verdict — the judge's rationale, or the binary gate's output, or the scout error.
+3. **You** (the main agent) surface the escalations to the user. In an active cockpit session, hand the stick back via `needs_your_call` + `cockpit wait`; otherwise use `AskUserQuestion`. Show the task and its `reason`.
 4. After the user unblocks it (a decision, a spec fix, a manual nudge), **resume**: reset the parked task's `Status` to `todo` and re-run autopilot. The wave loop picks up where it left off — completed tasks stay `done`, so `next-ready` only re-offers the unblocked work.
 
 The orchestrator never asks the user anything mid-run — Workflow can't pause for input. Escalation is always post-return.
-
-## Step 4 — Report
-
-After the workflow returns:
-
-1. Run the flightlog report to render the audit trail:
-   ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/flightlog.ts report docs/<slug>/.flightlog/run.jsonl
-   ```
-   This writes `docs/<slug>/.flightlog/RUNLOG.md` — every attempt, every verdict, each linked to its agent label for drill-down.
-2. Tell the user: tasks completed, tasks escalated (with why), and where `RUNLOG.md` lives. If everything passed including Final review, say so plainly and point at what to verify/ship.
 
 ## The flightlog (audit trail)
 
@@ -134,6 +169,7 @@ Everything lands in `docs/<slug>/.flightlog/`, **gitignored** via a self-ignore 
 
 - **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label>`. Deterministic, guaranteed each cycle.
 - **Narrative** — Dev / judge / final-review agents run `flightlog.ts log <run.jsonl> --task <ref> --role <role> --attempt N --agent <label> --message "..."` to record what they did.
+- **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (codex / reuse / simplification / efficiency / altitude). These persist as the artifact behind each closing-round verdict.
 - **Report** — `flightlog.ts report <run.jsonl>` renders `RUNLOG.md`, grouped by task in chronological order.
 
 Each entry records an `agentLabel` so a suspicious verdict can be traced back to that agent's raw `agent-<id>.jsonl` in the harness transcript.
