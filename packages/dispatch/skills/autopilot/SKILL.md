@@ -43,7 +43,7 @@ Before touching Workflow, gather the work-list in the main conversation:
 2. Read `docs/<slug>/PLAN.md` for the overall goal and the bucketing — the Final review task scores against "did we meet the PLAN goal", so the orchestrator needs the goal in hand.
 3. Confirm there is ready work:
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/../flightplan/scripts/next-ready.ts docs/<slug>/tasks
+   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/next-ready.ts docs/<slug>/tasks
    ```
    (autopilot reuses flightplan's scripts — they are siblings under `skills/`.) If it errors, the tree is malformed; run `lint-task.ts` and fix before flying. If it prints nothing and no task is `in-progress`, the tree is already done.
 4. Decide `MAX_ATTEMPTS` (default **3**) and confirm the model policy below with the user only if they want to change it.
@@ -114,7 +114,7 @@ After the workflow returns:
 
 1. Run the flightlog report to render the audit trail:
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/../flightplan/scripts/flightlog.ts report docs/<slug>/.flightlog/run.jsonl
+   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/flightlog.ts report docs/<slug>/.flightlog/run.jsonl
    ```
    This writes `docs/<slug>/.flightlog/RUNLOG.md` — every attempt, every verdict, each linked to its agent label for drill-down.
 2. Tell the user: tasks completed, tasks escalated (with why), and where `RUNLOG.md` lives. If everything passed including Final review, say so plainly and point at what to verify/ship.
