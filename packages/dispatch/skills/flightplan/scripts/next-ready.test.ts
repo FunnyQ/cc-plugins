@@ -2,8 +2,32 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadAllTasks, findReady } from "./next-ready";
+import { loadAllTasks, findReady, findReadyDetailed } from "./next-ready";
 import { refToString } from "./lib/parse-task";
+
+const FINAL_TASK = (
+  bucket: string,
+  nn: string,
+  deps: string,
+  status: string,
+) => `# ${bucket.toUpperCase()}-${nn}: Final review
+
+> **Required reading**:
+> - \`../_context/shared.md\`
+>
+> **Depends on**: ${deps}
+> **Status**: ${status}
+> **Final review**: true
+
+## Goal
+Holistic gate.
+
+## Acceptance criteria
+- [ ] Integrates
+
+## Verification
+- [ ] Check
+`;
 
 const TASK = (
   bucket: string,
@@ -106,6 +130,65 @@ describe("findReady", () => {
     const { byRef } = await loadAllTasks(join(root, "tasks"));
     const ready = findReady(byRef).map(refToString);
     expect(ready).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+});
+
+describe("findReadyDetailed", () => {
+  test("carries the finalReview flag per ready ref", async () => {
+    const root = await writeScenario({
+      "ui/01.md": TASK("ui", "01", "none", "done"),
+      "ui/02-final.md": FINAL_TASK("ui", "02", "ui/01", "todo"),
+    });
+    const { byRef } = await loadAllTasks(join(root, "tasks"));
+    expect(findReadyDetailed(byRef)).toEqual([
+      { ref: "ui/02", finalReview: true },
+    ]);
+    await rm(root, { recursive: true });
+  });
+
+  test("is empty when nothing is ready (the all-done case)", async () => {
+    const root = await writeScenario({
+      "ui/01.md": TASK("ui", "01", "none", "done"),
+      "ui/02.md": TASK("ui", "02", "ui/01", "done"),
+    });
+    const { byRef } = await loadAllTasks(join(root, "tasks"));
+    expect(findReadyDetailed(byRef)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+});
+
+describe("--json CLI", () => {
+  const run = async (tasksDir: string) => {
+    const proc = Bun.spawn(
+      ["bun", join(import.meta.dir, "next-ready.ts"), tasksDir, "--json"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const out = await new Response(proc.stdout).text();
+    const code = await proc.exited;
+    return { out: out.trim(), code };
+  };
+
+  test("prints `[]` (not blank) when every task is done", async () => {
+    const root = await writeScenario({
+      "ui/01.md": TASK("ui", "01", "none", "done"),
+      "ui/02.md": TASK("ui", "02", "none", "done"),
+    });
+    const { out, code } = await run(join(root, "tasks"));
+    expect(code).toBe(0);
+    expect(out).toBe("[]");
+    expect(JSON.parse(out)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
+  test("prints ready refs with finalReview flags", async () => {
+    const root = await writeScenario({
+      "ui/01.md": TASK("ui", "01", "none", "todo"),
+      "ui/02-final.md": FINAL_TASK("ui", "02", "ui/01", "todo"),
+    });
+    const { out, code } = await run(join(root, "tasks"));
+    expect(code).toBe(0);
+    expect(JSON.parse(out)).toEqual([{ ref: "ui/01", finalReview: false }]);
     await rm(root, { recursive: true });
   });
 });

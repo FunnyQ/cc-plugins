@@ -67,6 +67,26 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
   return { byRef, errors };
 }
 
+/** A ready task ref plus whether it is the closing final-review task. */
+export type ReadyRef = { ref: string; finalReview: boolean };
+
+/**
+ * Same ready set as `findReady`, but each entry carries its `finalReview`
+ * flag and is pre-stringified. This is what the `--json` mode emits so an
+ * executor (e.g. autopilot's scout) can consume the ready set verbatim —
+ * without re-deriving `finalReview` by opening files (and without an LLM
+ * having to interpret line-oriented output, where empty = "no ready tasks"
+ * is easy to get wrong).
+ */
+export function findReadyDetailed(
+  byRef: Record<string, ParsedTask>,
+): ReadyRef[] {
+  return findReady(byRef).map((r) => {
+    const ref = refToString(r);
+    return { ref, finalReview: byRef[ref]?.finalReview ?? false };
+  });
+}
+
 export function findReady(byRef: Record<string, ParsedTask>): TaskRef[] {
   const ready: TaskRef[] = [];
   for (const task of Object.values(byRef)) {
@@ -86,9 +106,11 @@ export function findReady(byRef: Record<string, ParsedTask>): TaskRef[] {
 }
 
 async function main() {
-  const tasksDir = process.argv[2];
+  const argv = process.argv.slice(2);
+  const jsonMode = argv.includes("--json");
+  const tasksDir = argv.find((a) => !a.startsWith("--"));
   if (!tasksDir) {
-    console.error("Usage: bun next-ready.ts <tasks-dir>");
+    console.error("Usage: bun next-ready.ts <tasks-dir> [--json]");
     process.exit(2);
   }
   const { byRef, errors } = await loadAllTasks(tasksDir);
@@ -103,9 +125,14 @@ async function main() {
     process.exit(1);
   }
 
-  const ready = findReady(byRef);
-  for (const ref of ready) {
-    console.log(refToString(ref));
+  if (jsonMode) {
+    // Always valid JSON — an empty ready set prints `[]`, never blank, so a
+    // consumer can't mistake "done" for "everything is ready".
+    console.log(JSON.stringify(findReadyDetailed(byRef)));
+  } else {
+    for (const ref of findReady(byRef)) {
+      console.log(refToString(ref));
+    }
   }
 }
 

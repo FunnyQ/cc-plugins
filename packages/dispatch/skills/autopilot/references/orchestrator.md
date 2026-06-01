@@ -223,9 +223,12 @@ let wave = 0
 while (true) {
   wave++
   const scout = await agent(
-    `Run: bun ${S}/next-ready.ts ${CFG.tasksDir}\n`
-    + `For each ready ref it prints, open that task file and check whether its header carries "> **Final review**: true".\n`
-    + `Return { refs: [{ref, finalReview}], error? }. If the command exits non-zero, return refs:[] and the stderr in error.`,
+    `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --json\n`
+    + `It prints a JSON array of the ready tasks (each with its finalReview flag), e.g.\n`
+    + `  [{"ref":"ui/03","finalReview":false},{"ref":"api/02","finalReview":false}]\n`
+    + `or exactly [] when NOTHING is ready (all tasks done/blocked). An empty array means there is no work — that is the normal end state.\n`
+    + `Return { refs: <the printed array, VERBATIM> }. If it printed [], return refs: []. Do NOT open task files, infer, or enumerate any task the command did not print — echo only what it printed.\n`
+    + `If the command exits non-zero, return refs: [] and put the stderr in error.`,
     { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: READY_SCHEMA })
 
   // A scout failure is NOT "no work to do" — surface it as an escalation so the
@@ -237,7 +240,11 @@ while (true) {
     escalations.push({ task: '(scout)', attempt: 0, reason })
     break
   }
-  const fresh = (scout.refs ?? []).filter(i => !parked.has(i.ref))
+  // Exclude both parked AND already-completed refs. next-ready won't re-offer a
+  // done task, but this is defense-in-depth: even a misbehaving scout that
+  // re-lists finished tasks can never trigger an infinite re-run of done work.
+  const fresh = (scout.refs ?? []).filter(
+    i => !parked.has(i.ref) && !completed.includes(i.ref))
   if (fresh.length === 0) break
 
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
@@ -264,6 +271,7 @@ return { slug: CFG.slug, completed, escalations }
 ## Notes / gotchas
 
 - **Wave re-scout is non-negotiable.** Statuses change only inside the run, so the ready set must be recomputed each wave. A task unblocked by a wave-N completion is picked up in wave N+1.
+- **The scout echoes `next-ready.ts --json` verbatim — it does not interpret.** Use the `--json` mode (emits `[{ref,finalReview}]`, or `[]` when none ready) and have the agent return that array as-is. An earlier line-oriented scout had a fatal blind spot: when `next-ready` printed nothing (all tasks done), the agent didn't map "empty" → `[]` and instead re-listed every task as ready, causing the whole tree to re-run. `[]` from `--json` is unambiguous; the `!completed.includes` filter is the backstop.
 - **The inline gate and `score-task --log` must use the same scores.** The orchestrator decides loop/pass from `scoreInline`; the judge agent persists via the CLI. If you change the formula, change it in both `score-task.ts` and `scoreInline` here.
 - **Final review needs no special phase.** Its transitive `Depends on` reaches every task, so `next-ready` only offers it once all else is `done`. The orchestrator just bumps its dev+judge to Opus via the `finalReview` flag.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`); passing a wide wave is safe — excess tasks queue.
