@@ -13,7 +13,7 @@
  *
  * Usage:
  *   bun score-task.ts <task-file> <scores.json> [--log <file>] [--attempt N] [--agent <label>]
- *     scores.json: { "正確性": 5, "測試涵蓋": 4, ... } keyed by dimension name
+ *     scores.json: { "Correctness": 5, "Test coverage": 4, ... } keyed by dimension name
  *     --log <file>: append the verdict to a flightlog JSONL trail (auto-creates
  *                   the dir + a self-ignore when logging into `.flightlog/`).
  *     --attempt / --agent: metadata stamped onto the logged entry.

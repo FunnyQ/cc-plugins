@@ -50,7 +50,7 @@ export type ParsedTask = {
 };
 
 export type RubricDimension = {
-  /** Dimension name as written, e.g. "正確性" / "correctness". */
+  /** Dimension name as written, e.g. "Correctness". */
   name: string;
   /** Weight multiplier (the `×N` value). Always > 0. */
   weight: number;
@@ -203,9 +203,9 @@ function parseRubricTable(section: string): RubricDimension[] {
       .map((c) => c.trim());
 
   const header = cells(rows[0]);
-  const weightCol = header.findIndex((c) => /權重|weight/i.test(c));
+  const weightCol = header.findIndex((c) => /weight/i.test(c));
   if (weightCol === -1) return [];
-  const nameColGuess = header.findIndex((c) => /維度|dimension/i.test(c));
+  const nameColGuess = header.findIndex((c) => /dimension/i.test(c));
   const nameCol = nameColGuess === -1 ? 0 : nameColGuess;
 
   const dims: RubricDimension[] = [];

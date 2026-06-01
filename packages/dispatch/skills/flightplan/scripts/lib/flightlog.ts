@@ -124,7 +124,7 @@ function renderLine(e: FlightlogEntry): string {
     return `- ${attempt}${e.role} — ${e.message}${agent}`;
   }
   const verdict = e.passed ? "PASS ✅" : "FAIL ❌";
-  const veto = e.hardFailed ? " · hard-fail veto (一票否決)" : "";
+  const veto = e.hardFailed ? " · hard-fail veto" : "";
   const miss = e.missing.length ? ` · missing: ${e.missing.join(", ")}` : "";
   return `- ${attempt}judge — score ${e.weighted.toFixed(2)} ${e.passOp} ${e.threshold} → ${verdict}${veto}${miss}${agent}`;
 }
