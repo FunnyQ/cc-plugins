@@ -18,8 +18,6 @@ flightplan → multi-file blueprint to disk (PLAN.md + tasks/)
 autopilot  → execute the tree with a quality loop   ← you are here
 ```
 
-See `../../dispatch-flow.svg` for the full diagram.
-
 ## When to use vs doing it by hand
 
 - A `docs/<slug>/tasks/` tree exists and you want it executed with a real quality gate, possibly many tasks in parallel → **autopilot**.
