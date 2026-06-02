@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
 // cockpit CLI — produces the kernel data: session goal + decision trail,
 // plus the control-loop client (wait/send) that talks to the daemon broker.
-//   cockpit start --session <id> --session-goal X --project-goal Y [--owner user]
-//   cockpit log   --session <id> --decision D --reason R [--tradeoff T]
-//                 [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--needs-call]
-//   cockpit wait  <sessionId>            # park (long-poll) until the user answers; prints the answer
-//   cockpit send  <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
+//   cockpit start  --session <id> --session-goal X --project-goal Y [--owner user]
+//   cockpit log    --session <id> --decision D --reason R [--tradeoff T]
+//                  [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--needs-call]
+//   cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--session <id>]
+//   cockpit scribe --recent [N]
+//   cockpit wait   <sessionId>            # park (long-poll) until the user answers; prints the answer
+//   cockpit send   <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
 import {
   appendFileSync,
   existsSync,
@@ -28,9 +30,23 @@ type GoalRecord = { type: "goal"; session_goal: string; ts: string };
 // whatever thinking that particular decision actually involved.
 type Facet = { label: string; text: string };
 
+// The lens axis: what kind of decision-trail entry is this?
+// Defaults to "decision" when absent (backward compat — old logs have no field).
+// Single source of truth: VALID_KINDS is the whitelist, DecisionKind is derived
+// from it so the runtime list and the type can't drift. Keep in sync with the
+// dashboard copy (decision-log.js KINDS) and the CSS per-kind selectors.
+const VALID_KINDS = ["decision", "rationale", "learning", "caveat"] as const;
+type DecisionKind = (typeof VALID_KINDS)[number];
+
+// Who wrote the entry? "agent" = cockpit log (hand-authored), "scribe" = cockpit scribe (auto-written by thoughtful mode).
+// Defaults to "agent" when absent (backward compat).
+type DecisionSource = "agent" | "scribe";
+
 type DecisionRecord = {
   id: string;
   type: "decision";
+  kind?: DecisionKind; // NEW — lens axis; default "decision" when absent
+  source?: DecisionSource; // NEW — who wrote it; default "agent" when absent
   decision: string;
   reason: string;
   tradeoff: string;
@@ -85,6 +101,9 @@ const SINGLE_FLAGS = new Set([
   "reason",
   "tradeoff",
   "call",
+  "type",
+  "text",
+  "title",
 ]);
 const REPEATED_FLAGS = new Set(["file", "option", "facet"]);
 const BOOL_FLAGS = new Set(["needs-call"]);
@@ -99,6 +118,16 @@ function parseArgs(argv: string[]): Args {
     const name = tok.slice(2);
     if (BOOL_FLAGS.has(name)) {
       flags.add(name);
+    } else if (name === "recent") {
+      // --recent takes an optional numeric value. Only consume the next token if
+      // it looks like a plain integer — otherwise leave it for the next iteration
+      // so flags like `--recent --provider codex` stay intact.
+      flags.add("recent");
+      const next = argv[i + 1];
+      if (next !== undefined && /^\d+$/.test(next)) {
+        single["recent"] = next;
+        i++;
+      }
     } else if (REPEATED_FLAGS.has(name)) {
       (repeated[name] ||= []).push(argv[++i]);
     } else if (SINGLE_FLAGS.has(name)) {
@@ -246,6 +275,30 @@ function writeGoalRecord(logPath: string, goal: GoalRecord): void {
   writeFileSync(logPath, [JSON.stringify(goal), ...rest].join("\n") + "\n");
 }
 
+// Read a decision-log jsonl into parsed decision records. Side-effect-free:
+// drops blank and unparseable lines, returns only `type:"decision"` records, and
+// yields [] on any read error. The single parse path so the "skip bad lines"
+// policy lives in one place (recent-mode reader + scribe persistence guard).
+function readDecisionRecords(logPath: string): DecisionRecord[] {
+  let raw: string;
+  try {
+    raw = readFileSync(logPath, "utf8");
+  } catch {
+    return [];
+  }
+  return raw
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => {
+      try {
+        return JSON.parse(l) as DecisionRecord;
+      } catch {
+        return null;
+      }
+    })
+    .filter((r): r is DecisionRecord => r !== null && r.type === "decision");
+}
+
 // ---------- Subcommands ----------
 
 function cmdStart(args: Args): void {
@@ -298,6 +351,8 @@ function cmdLog(args: Args): void {
   const rec: DecisionRecord = {
     id: crypto.randomUUID(),
     type: "decision",
+    kind: "decision", // explicit — hand-authored entries are always "decision"
+    source: "agent", // explicit — cmdLog is the agent/manual path
     decision: args.single["decision"] || "",
     reason: args.single["reason"] || "",
     tradeoff: args.single["tradeoff"] || "",
@@ -338,6 +393,117 @@ function cmdLog(args: Args): void {
   // (wait/send also auto-resolve the open call from the log, so this is just an
   // explicit handle for scripted flows.)
   if (rec.needs_your_call) console.log(`  call:  ${rec.id}`);
+}
+
+function cmdScribe(args: Args): void {
+  const project = process.cwd();
+  const provider = parseProvider(args.single["provider"]);
+  const isRecent = args.flags.has("recent");
+  const hasType = !!args.single["type"];
+
+  // ---- Recent mode: list last N scribe entries for dedup ----
+  if (isRecent && !hasType) {
+    const n = args.single["recent"] ? parseInt(args.single["recent"], 10) : 8;
+    const sessionId =
+      args.single["session"] || findSession(provider, project) || null;
+    if (!sessionId) {
+      // No session in scope — nothing to list; exit cleanly
+      process.exit(0);
+    }
+    const logPath = logPathFor(project, sessionId);
+    if (!existsSync(logPath)) process.exit(0);
+    const lines = readDecisionRecords(logPath);
+    // Keep only scribe-sourced entries; old entries without source default to "agent"
+    const scribeLines = lines.filter((r) => (r.source ?? "agent") === "scribe");
+    const recent = scribeLines.slice(-n);
+    for (const r of recent) {
+      const title = r.decision || "(untitled)";
+      const kind = r.kind ?? "decision";
+      console.log(`${kind} · ${title} · ${r.timestamp}`);
+    }
+    process.exit(0);
+  }
+
+  // ---- Write mode ----
+  if (!hasType) {
+    console.error(
+      "cockpit scribe: --type <kind> is required (or use --recent to list recent entries)",
+    );
+    process.exit(1);
+  }
+
+  // Validate --type against the single-source whitelist. Validate the raw string
+  // and only narrow to DecisionKind after the guard (no pre-validation cast).
+  const rawKind = args.single["type"];
+  if (!(VALID_KINDS as readonly string[]).includes(rawKind)) {
+    console.error(
+      `cockpit scribe: invalid --type "${rawKind}" — must be one of: ${VALID_KINDS.join(", ")}`,
+    );
+    process.exit(1);
+  }
+  const kind = rawKind as DecisionKind;
+
+  // Require --text
+  if (!args.single["text"]) {
+    console.error("cockpit scribe: --text <body> is required");
+    process.exit(1);
+  }
+
+  // Resolve session — explicit or live; error if unresolved
+  const sessionId = args.single["session"] || findSession(provider, project);
+  if (!sessionId) {
+    console.error(
+      "cockpit scribe: --session <id> is required (could not auto-resolve the current session)",
+    );
+    process.exit(1);
+  }
+
+  const rec: DecisionRecord = {
+    id: crypto.randomUUID(),
+    type: "decision",
+    kind,
+    source: "scribe",
+    decision: args.single["title"] || "",
+    reason: args.single["text"] || "",
+    tradeoff: "",
+    facets: [],
+    needs_your_call: false,
+    options: [],
+    files: args.repeated["file"] || [],
+    timestamp: new Date().toISOString(),
+  };
+
+  const logPath = logPathFor(project, sessionId);
+
+  // Auto-register before write so the session becomes tracked:true in the dashboard.
+  // We do NOT write a goal record and do NOT touch project-meta.md.
+  upsertSession({
+    provider,
+    project,
+    sessionId,
+    logPath,
+    lastHeartbeat: new Date().toISOString(),
+  });
+
+  mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
+  const line = JSON.stringify(rec);
+  appendFileSync(logPath, line + "\n");
+
+  // Concurrency-safe persistence guard: confirm the record by id anywhere in
+  // the file — NOT a tail check. Background forks from /thoughtful can interleave
+  // writes, so the tail may belong to a later writer; checking id-anywhere means
+  // both writers confirm their own record correctly.
+  const confirmed = readDecisionRecords(logPath).some((r) => r.id === rec.id);
+  if (!confirmed) {
+    console.error(`cockpit scribe: entry did not persist to ${logPath}`);
+    process.exit(1);
+  }
+
+  // No trailing refreshHeartbeat — the upsertSession above already wrote a fresh
+  // lastHeartbeat in the same invocation; a second registry read-write would be
+  // pure redundant IO.
+
+  console.log(`cockpit: scribed ${kind} for ${sessionId}`);
 }
 
 // ---------- Daemon broker client (wait / send) ----------
@@ -568,6 +734,9 @@ async function main(): Promise<void> {
     case "log":
       cmdLog(parseArgs(rest));
       break;
+    case "scribe":
+      cmdScribe(parseArgs(rest));
+      break;
     case "wait":
       await cmdWait(rest);
       break;
@@ -576,7 +745,7 @@ async function main(): Promise<void> {
       break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
-      console.error("usage: cockpit <start|log|wait|send> [args]");
+      console.error("usage: cockpit <start|log|scribe|wait|send> [args]");
       process.exit(1);
   }
 }

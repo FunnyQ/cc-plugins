@@ -1,7 +1,13 @@
 // Tests for the `cockpit` CLI (kernel/02 + bridge/02).
 // Run: bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -308,14 +314,18 @@ describe("cockpit log", () => {
         "facets",
         "files",
         "id",
+        "kind",
         "needs_your_call",
         "options",
         "reason",
+        "source",
         "timestamp",
         "tradeoff",
         "type",
       ].sort(),
     );
+    expect(rec.kind).toBe("decision");
+    expect(rec.source).toBe("agent");
     expect(rec.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(rec.type).toBe("decision");
     expect(rec.decision).toBe("chose X");
@@ -435,5 +445,302 @@ describe("cockpit log", () => {
       (s: any) => s.sessionId === SID,
     ).lastHeartbeat;
     expect(new Date(hb2).getTime()).toBeGreaterThan(new Date(hb1).getTime());
+  });
+});
+
+describe("cockpit scribe", () => {
+  // Note: no cockpit start is called — scribe auto-registers on first write.
+
+  test("write mode: creates log file and record with correct shape", () => {
+    const r = run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "learning",
+      "--title",
+      "Why fork",
+      "--text",
+      "cache-warm",
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(`scribed learning for ${SID}`);
+
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    const lines = readLines(logPath);
+    expect(lines.length).toBe(1);
+    const rec = lines[0];
+    expect(rec.type).toBe("decision");
+    expect(rec.kind).toBe("learning");
+    expect(rec.source).toBe("scribe");
+    expect(rec.decision).toBe("Why fork");
+    expect(rec.reason).toBe("cache-warm");
+    expect(rec.needs_your_call).toBe(false);
+    expect(rec.tradeoff).toBe("");
+    expect(rec.facets).toEqual([]);
+    expect(rec.options).toEqual([]);
+    expect(rec.files).toEqual([]);
+    expect(rec.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(rec.timestamp).toBeTruthy();
+  });
+
+  test("auto-registers the session so it becomes tracked", () => {
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "rationale",
+      "--title",
+      "T",
+      "--text",
+      "X",
+    ]);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const entry = reg.sessions.find((s: any) => s.sessionId === SID);
+    expect(entry).toBeTruthy();
+    expect(entry.project).toBe(projectDir);
+    expect(entry.sessionId).toBe(SID);
+    expect(entry.logPath).toBe(
+      join(projectDir, ".cockpit/logs", `${SID}.jsonl`),
+    );
+  });
+
+  test("does not write a goal record on first scribe", () => {
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "caveat",
+      "--title",
+      "T",
+      "--text",
+      "X",
+    ]);
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    const lines = readLines(logPath);
+    expect(lines.every((r: any) => r.type !== "goal")).toBe(true);
+  });
+
+  test("rejects invalid --type with non-zero exit and error message", () => {
+    const r = run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "bogus",
+      "--text",
+      "X",
+    ]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("invalid --type");
+    // No log file should be created
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    expect(() => readFileSync(logPath, "utf8")).toThrow();
+  });
+
+  test("rejects missing --text with non-zero exit", () => {
+    const r = run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "learning",
+      "--title",
+      "T",
+    ]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("--text");
+  });
+
+  test("--recent with no prior log exits 0 and prints nothing", () => {
+    const r = run(["scribe", "--session", SID, "--recent"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout.trim()).toBe("");
+  });
+
+  test("--recent prints only scribe entries (not agent/goal records)", () => {
+    // Write a manual log entry (agent source) via cockpit start + log
+    run([
+      "start",
+      "--session",
+      SID,
+      "--session-goal",
+      "test",
+      "--project-goal",
+      "p",
+    ]);
+    run([
+      "log",
+      "--session",
+      SID,
+      "--decision",
+      "agent-entry",
+      "--reason",
+      "r",
+    ]);
+    // Write a scribe entry
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "rationale",
+      "--title",
+      "scribe-entry",
+      "--text",
+      "body",
+    ]);
+
+    const r = run(["scribe", "--session", SID, "--recent"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("scribe-entry");
+    expect(r.stdout).not.toContain("agent-entry");
+  });
+
+  test("--recent defaults to N=8 and respects N=3 override", () => {
+    // Write 10 scribe entries
+    for (let i = 0; i < 10; i++) {
+      run([
+        "scribe",
+        "--session",
+        SID,
+        "--type",
+        "learning",
+        "--title",
+        `entry-${i}`,
+        "--text",
+        `body-${i}`,
+      ]);
+    }
+    const r8 = run(["scribe", "--session", SID, "--recent"]);
+    expect(r8.code).toBe(0);
+    const lines8 = r8.stdout
+      .trim()
+      .split("\n")
+      .filter((l) => l.trim());
+    expect(lines8.length).toBe(8);
+
+    const r3 = run(["scribe", "--session", SID, "--recent", "3"]);
+    expect(r3.code).toBe(0);
+    const lines3 = r3.stdout
+      .trim()
+      .split("\n")
+      .filter((l) => l.trim());
+    expect(lines3.length).toBe(3);
+  });
+
+  test("--recent --provider does not consume --provider as N", () => {
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "learning",
+      "--title",
+      "T",
+      "--text",
+      "X",
+    ]);
+    // --recent --provider codex: N must stay 8 (not NaN/error), --provider properly parsed
+    const r = run([
+      "scribe",
+      "--session",
+      SID,
+      "--recent",
+      "--provider",
+      "codex",
+    ]);
+    // Should exit 0 (not crash trying to parse "--provider" as a number)
+    expect(r.code).toBe(0);
+    // The single entry should still be printed (N=8 means all 1 entries show)
+    expect(r.stdout).toContain("learning");
+  });
+
+  test("backward-compat: old log lines without kind/source do not crash --recent", () => {
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    // Manually write a "old" decision record without kind/source
+    const oldRec = {
+      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      type: "decision",
+      decision: "old-decision",
+      reason: "old-reason",
+      tradeoff: "",
+      facets: [],
+      needs_your_call: false,
+      options: [],
+      files: [],
+      timestamp: new Date().toISOString(),
+    };
+    // Ensure log dir exists
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "caveat",
+      "--title",
+      "new-entry",
+      "--text",
+      "body",
+    ]);
+    // Now append the old-style record (appendFileSync imported at top of file)
+    appendFileSync(logPath, JSON.stringify(oldRec) + "\n");
+
+    const r = run(["scribe", "--session", SID, "--recent"]);
+    expect(r.code).toBe(0);
+    // Only scribe-sourced entries appear; old agent entry is filtered out
+    expect(r.stdout).toContain("new-entry");
+    expect(r.stdout).not.toContain("old-decision");
+  });
+
+  test("concurrency guard: two near-simultaneous writes both succeed and both ids persist", () => {
+    const SID2 = "22222222-2222-2222-2222-222222222222";
+    // Launch two scribe writes concurrently using spawnSync (they run sequentially
+    // in Bun.spawnSync but we verify both ids end up in the log regardless of order)
+    const proc1 = Bun.spawnSync(
+      [
+        "bun",
+        CLI,
+        "scribe",
+        "--session",
+        SID2,
+        "--type",
+        "learning",
+        "--title",
+        "write-one",
+        "--text",
+        "body-one",
+      ],
+      { cwd: projectDir, env: { ...process.env, COCKPIT_HOME: cockpitHome } },
+    );
+    const proc2 = Bun.spawnSync(
+      [
+        "bun",
+        CLI,
+        "scribe",
+        "--session",
+        SID2,
+        "--type",
+        "rationale",
+        "--title",
+        "write-two",
+        "--text",
+        "body-two",
+      ],
+      { cwd: projectDir, env: { ...process.env, COCKPIT_HOME: cockpitHome } },
+    );
+    expect(proc1.exitCode).toBe(0);
+    expect(proc2.exitCode).toBe(0);
+
+    const logPath = join(projectDir, ".cockpit/logs", `${SID2}.jsonl`);
+    const lines = readLines(logPath);
+    expect(lines.length).toBe(2);
+    const decisions = lines.map((r: any) => r.decision);
+    expect(decisions).toContain("write-one");
+    expect(decisions).toContain("write-two");
   });
 });
