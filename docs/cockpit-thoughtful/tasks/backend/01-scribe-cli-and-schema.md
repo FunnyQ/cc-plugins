@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: skills/01, ui/01, release/01
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -98,22 +98,22 @@ Add `case "scribe": cmdScribe(parseArgs(rest)); break;` to `main()`'s switch and
 
 ## Acceptance criteria
 
-- [ ] `DecisionRecord` has optional `kind` + `source`; `DecisionKind`/`DecisionSource` unions defined.
-- [ ] `cmdLog` records now include `kind:"decision"`, `source:"agent"`.
-- [ ] `cockpit scribe --type learning --title T --text X` on a never-started session creates the log file, the entry has `kind:"learning"`/`source:"scribe"`/`needs_your_call:false`, and `decision===T`/`reason===X`.
-- [ ] After that scribe write, the session has a registry entry (would render `tracked:true`).
-- [ ] `cockpit scribe --type bogus --text X` exits non-zero with a clear error and writes nothing.
-- [ ] `cockpit scribe --recent` prints only `source:"scribe"` entries (skips manual/agent + goal records), newest-bounded to N (default 8), exit 0 even when the log is missing.
-- [ ] `--recent` parsing handles all three: `--recent` (N=8), `--recent 3` (N=3), `--recent --provider codex` (N=8, `--provider` preserved).
-- [ ] **Concurrency-safe persistence guard**: confirms the record by `id` existing in the file (not by tail). Two near-simultaneous scribe writes to the same log both succeed and both records persist.
-- [ ] Old log lines without `kind`/`source` still parse (no crash in recent mode).
+- [x] `DecisionRecord` has optional `kind` + `source`; `DecisionKind`/`DecisionSource` unions defined.
+- [x] `cmdLog` records now include `kind:"decision"`, `source:"agent"`.
+- [x] `cockpit scribe --type learning --title T --text X` on a never-started session creates the log file, the entry has `kind:"learning"`/`source:"scribe"`/`needs_your_call:false`, and `decision===T`/`reason===X`.
+- [x] After that scribe write, the session has a registry entry (would render `tracked:true`).
+- [x] `cockpit scribe --type bogus --text X` exits non-zero with a clear error and writes nothing.
+- [x] `cockpit scribe --recent` prints only `source:"scribe"` entries (skips manual/agent + goal records), newest-bounded to N (default 8), exit 0 even when the log is missing.
+- [x] `--recent` parsing handles all three: `--recent` (N=8), `--recent 3` (N=3), `--recent --provider codex` (N=8, `--provider` preserved).
+- [x] **Concurrency-safe persistence guard**: confirms the record by `id` existing in the file (not by tail). Two near-simultaneous scribe writes to the same log both succeed and both records persist.
+- [x] Old log lines without `kind`/`source` still parse (no crash in recent mode).
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts` passes, including new scribe cases (temp `projectDir` + `COCKPIT_HOME`, `Bun.spawnSync`, `readLines` helper — match existing patterns). Tests pass an explicit `--session <uuid>` (no live harness session in tests).
-- [ ] Test the concurrency guard: launch two `scribe` writes to the same `--session` without awaiting between them; assert both exit 0 and both ids are in the log.
-- [ ] Manual: `COCKPIT_HOME=/tmp/x bun .../cockpit.ts scribe --session 11111111-1111-1111-1111-111111111111 --type rationale --title "Why fork" --text "cache-warm"` → inspect `<cwd>/.cockpit/logs/<id>.jsonl` and `/tmp/x/registry.json`.
-- [ ] Manual: `cockpit scribe --session <uuid> --recent 3` after a few writes shows the compact list.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts` passes, including new scribe cases (temp `projectDir` + `COCKPIT_HOME`, `Bun.spawnSync`, `readLines` helper — match existing patterns). Tests pass an explicit `--session <uuid>` (no live harness session in tests).
+- [x] Test the concurrency guard: launch two `scribe` writes to the same `--session` without awaiting between them; assert both exit 0 and both ids are in the log.
+- [x] Manual: `COCKPIT_HOME=/tmp/x bun .../cockpit.ts scribe --session 11111111-1111-1111-1111-111111111111 --type rationale --title "Why fork" --text "cache-warm"` → inspect `<cwd>/.cockpit/logs/<id>.jsonl` and `/tmp/x/registry.json`.
+- [x] Manual: `cockpit scribe --session <uuid> --recent 3` after a few writes shows the compact list.
 
 ## Eval rubric
 
