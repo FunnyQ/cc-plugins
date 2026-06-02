@@ -18,6 +18,11 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 // Grace period before the hero collapses again after the pilot answers a call.
 const HERO_RECOLLAPSE_MS = 60_000;
 
+// Valid decision-trail kinds. Keep in sync with cockpit.ts DecisionKind /
+// VALID_KINDS (no-build-step SPA can't import the TS source). Module-level so
+// the array isn't re-allocated on every card render.
+const KINDS = ["decision", "rationale", "learning", "caveat"];
+
 const md = (t) =>
   DOMPurify.sanitize(marked.parse(t || "", { gfm: true, breaks: true }));
 const mdInline = (t) =>
@@ -323,7 +328,7 @@ export function initDecisionLog(rootEl) {
         <span class="decision-log__invite-badge">Off the cockpit</span>
         <span class="decision-log__invite-title">Flying without a flight plan</span>
         <span class="decision-log__invite-body">This session isn’t tracked by cockpit, so there’s no decision trail to show.</span>
-        <span class="decision-log__invite-cta">Run <code>/cockpit</code> to set a goal. From there, every decision worth remembering lands here.</span>`;
+        <span class="decision-log__invite-cta">Run <code>/cockpit</code> to set a goal, or <code>/thoughtful</code> to auto-log as you work. Either way, decisions worth remembering land here.</span>`;
     } else {
       emptyEl.classList.remove("decision-log__invite");
       emptyEl.classList.add("placeholder");
@@ -367,6 +372,10 @@ export function initDecisionLog(rootEl) {
     // a call is the one warm card, and it never gets the lit treatment.
     if (rec.needs_your_call) card.classList.add("is-call", "is-open");
     else card.classList.add("is-lit");
+    // Whitelist kind values before passing to classList to prevent
+    // InvalidCharacterError from malformed/space-containing values.
+    const kind = KINDS.includes(rec.kind) ? rec.kind : "decision";
+    card.classList.add("is-kind-" + kind);
 
     const files = (rec.files || [])
       .map((f) => `<code class="decision-card__file">${esc(f)}</code>`)
@@ -394,6 +403,7 @@ export function initDecisionLog(rootEl) {
 
     card.innerHTML = `
       ${rec.needs_your_call ? '<div class="decision-card__badge">🕹 needs your call</div>' : ""}
+      ${rec.source === "scribe" ? '<div class="decision-card__source-badge is-scribe">✍ scribe</div>' : ""}
       <header class="decision-card__head">
         <div class="decision-card__decision">${mdInline(rec.decision)}</div>
         <time class="decision-card__time" datetime="${esc(rec.timestamp || "")}">${relTime(rec.timestamp)}</time>

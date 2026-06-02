@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.7.0] - 2026-06-02
+
+### ✨ Added
+
+- **Cockpit "thoughtful" auto-logging mode**: a new opt-in mode that keeps the cockpit decision trail flowing without manual logging. Turn it on with `/thoughtful` and the main agent will, at natural decision points, fork a lightweight background `cockpit-scribe` pass that captures what was decided and why — keeping you in the loop with minimal ceremony and zero blocking of the work in progress.
+- **`cockpit-scribe` skill**: the background scribe that powers thoughtful mode. It gathers `diff` and diff-vs-branch context, dedupes against recent entries before writing, and records high-signal, typed decision entries asynchronously so the main agent never stalls.
+- **`cockpit scribe` CLI + typed decision records**: a new `cockpit scribe` subcommand logs decision records with a `kind` (decision / rationale / learning / caveat) and `source: scribe`, auto-registers the session on first write, supports a `--recent` flag for dedup lookups, and adds a concurrency-safe persistence guard. The `DecisionRecord` schema stays backward compatible — `kind` and `source` are optional.
+
+### 💄 Polish
+
+- **Decision-card kind badges + scribe source indicator**: cockpit decision cards now show per-kind accent badges (decision / rationale / learning / caveat) and a distinct visual marker for auto-logged (scribe) entries, so you can tell at a glance what each entry is and where it came from. The empty-state CTA now points to `/thoughtful` for the automated logging mode.
+
 ## [3.6.5] - 2026-06-02
 
 ### 💄 Polish
