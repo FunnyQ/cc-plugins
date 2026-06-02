@@ -1485,6 +1485,32 @@ body {
   background: color-mix(in oklch, var(--positive) 10%, transparent);
   opacity: 0.7;
 }
+/* Kind accents — a left-border tint per lens. decision (baseline) is untouched
+   so legacy / default records look exactly as before. */
+.decision-card.is-kind-rationale {
+  border-left: 3px solid var(--aurora);
+}
+.decision-card.is-kind-learning {
+  border-left: 3px solid var(--positive);
+}
+.decision-card.is-kind-caveat {
+  border-left: 3px solid var(--danger);
+}
+/* Scribe source badge — sits next to the needs_your_call badge slot. Uses the
+   same pill shape as .decision-card__badge but dimmed (ink-muted / edge) since
+   it's informational, not actionable. */
+.decision-card__source-badge {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+}
 .decision-card__head {
   display: flex;
   align-items: baseline;
@@ -1504,6 +1530,17 @@ body {
    every part (especially the tradeoff) reads as a findable, equal-weight row. */
 .decision-card__decision::before {
   content: "DECISION";
+}
+/* Per-kind label overrides — reuse the existing ::before mechanism so cards
+   never get a double header. decision kind keeps the default "DECISION" label. */
+.decision-card.is-kind-rationale .decision-card__decision::before {
+  content: "RATIONALE";
+}
+.decision-card.is-kind-learning .decision-card__decision::before {
+  content: "LEARNING";
+}
+.decision-card.is-kind-caveat .decision-card__decision::before {
+  content: "CAVEAT";
 }
 .decision-card__decision::before,
 .decision-card__reason::before,
