@@ -1506,16 +1506,26 @@ body {
    same pill shape as .decision-card__badge but dimmed (ink-muted / edge) since
    it's informational, not actionable. */
 .decision-card__source-badge {
-  display: inline-block;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
   margin-bottom: 6px;
   padding: 2px 8px;
   font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--ink-muted);
-  border: 1px solid var(--edge);
+  color: color-mix(in oklch, var(--aurora) 82%, var(--starlight));
+  background: color-mix(in oklch, var(--aurora) 10%, var(--hull));
+  border: 1px solid color-mix(in oklch, var(--aurora) 36%, var(--edge));
   border-radius: 999px;
+}
+.decision-card.is-lit .decision-card__source-badge {
+  color: var(--lit-ink);
+  background: color-mix(in oklch, var(--aurora) 12%, var(--lit-fill));
+  border-color: color-mix(in oklch, var(--aurora) 34%, var(--lit-edge));
 }
 .decision-card__head {
   display: flex;
@@ -1559,6 +1569,34 @@ body {
   letter-spacing: 0.1em;
   color: var(--ink-faint);
   margin-bottom: 4px;
+}
+/* Kind label pill — overrides the shared block display above.
+   Only the decision/kind label becomes a pill; WHY/TRADEOFF/FILES stay plain. */
+.decision-card__decision::before {
+  display: block;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid var(--edge);
+  margin-bottom: 8px;
+}
+.decision-card.is-kind-rationale .decision-card__decision::before {
+  color: color-mix(in oklch, var(--aurora) 82%, var(--starlight));
+  background: color-mix(in oklch, var(--aurora) 10%, var(--hull));
+  border-color: color-mix(in oklch, var(--aurora) 36%, var(--edge));
+}
+.decision-card.is-kind-learning .decision-card__decision::before {
+  color: color-mix(in oklch, var(--positive) 82%, var(--starlight));
+  background: color-mix(in oklch, var(--positive) 10%, var(--hull));
+  border-color: color-mix(in oklch, var(--positive) 36%, var(--edge));
+}
+.decision-card.is-kind-caveat .decision-card__decision::before {
+  color: color-mix(in oklch, var(--danger) 82%, var(--starlight));
+  background: color-mix(in oklch, var(--danger) 10%, var(--hull));
+  border-color: color-mix(in oklch, var(--danger) 36%, var(--edge));
 }
 .decision-card__time {
   flex-shrink: 0;
