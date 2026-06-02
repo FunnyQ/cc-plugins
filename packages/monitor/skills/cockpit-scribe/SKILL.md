@@ -86,6 +86,28 @@ diff is fully described by existing entries, skip to Step 6.
 
 ## Step 4 — Choose lenses and write entries
 
+### First: sweep all four lenses
+
+Before you write anything, walk the chunk of work through **each** lens once —
+do not stop at the first one that fits. `decision` is the easiest framing to
+reach for, so it crowds out the others unless you deliberately check the rest:
+
+- **decision** — Did I pick between real alternatives? What got rejected and why?
+- **rationale** — Is any implementation non-obvious on purpose? What would the
+  next reader "fix" that is actually load-bearing?
+- **learning** — Did anything teach a reusable pattern, or overturn an
+  assumption I started with? What would I tell someone hitting this next time?
+- **caveat** — Did I trip on a sharp edge, precondition, or ordering trap? What
+  will silently break if it's forgotten?
+
+A typical worthy chunk yields entries across **two or three** lenses, not one.
+If only `decision` survives the sweep, that's a valid outcome — but it should be
+the result of honestly asking all four, not of never asking. Lenses are
+independent: a single piece of work can warrant a `decision` *and* a `caveat`
+*and* a `learning`.
+
+### Then: write each surviving entry
+
 For each insight that is genuinely worth recording and not yet covered, pick a
 `kind` and call:
 
@@ -95,12 +117,16 @@ bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdo
 
 ### Kind values and when to use them
 
-| `kind` | Use when |
-|---|---|
-| `decision` | A choice was made between real alternatives — something the diff alone can't explain. |
-| `rationale` | A non-obvious implementation is the way it is for a specific reason; answers "why not the obvious alternative?" |
-| `learning` | A teachable result or pattern the pilot should take away — something reusable beyond this task. |
-| `caveat` | A trap, precondition, or sharp edge to remember — something that will bite you if you forget it. |
+| `kind` | Use when | Tell-tale phrase |
+|---|---|---|
+| `decision` | A choice was made between real alternatives — something the diff alone can't explain. | "chose X over Y because…" |
+| `rationale` | A non-obvious implementation is the way it is for a specific reason; answers "why not the obvious alternative?" | "this looks wrong but it's deliberate because…" |
+| `learning` | A teachable result or pattern the pilot should take away — something reusable beyond this task. | "turns out…", "next time, …" |
+| `caveat` | A trap, precondition, or sharp edge to remember — something that will bite you if you forget it. | "watch out — if you…", "must happen before…" |
+
+`learning` and `caveat` are not consolation prizes for when there's no
+decision — they are the highest-value entries for a future reader, because they
+transfer beyond this one task. Reach for them actively.
 
 These four values are the only valid `--type` arguments. Any other value will
 be rejected by the CLI with a non-zero exit.
@@ -147,10 +173,13 @@ fork inherits this from the spawning context.
 
 ## Step 6 — Consolidate; end quietly
 
-**Bias toward fewer entries.** Aim for a few high-signal entries per logical
-chunk of work — NOT one entry per file changed, per step taken, or per command
-run. If nothing in the diff meets the bar (e.g., purely mechanical changes
-with no non-obvious decisions or traps), write nothing and end.
+**Dedup across lenses — don't collapse to one.** The bar is per-*insight*, not
+per-entry-count. Cut entries that repeat each other or restate the diff
+mechanically; do NOT cut a genuine `caveat` or `learning` just to keep the total
+low. A few high-signal entries spanning two or three lenses is the target — NOT
+one entry per file/step/command, and NOT a single lonely `decision` when the
+work also taught something or hid a trap. If the sweep in Step 4 truly surfaced
+nothing worth keeping (e.g., purely mechanical changes), write nothing and end.
 
 This is a fire-and-forget fork. The side effect is the written log. No summary
 or confirmation message is needed.
