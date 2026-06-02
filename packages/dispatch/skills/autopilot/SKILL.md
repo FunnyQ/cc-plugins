@@ -47,7 +47,12 @@ Before touching Workflow, gather the work-list in the main conversation:
    bun $SCRIPTS/next-ready.ts docs/<slug>/tasks
    ```
    If it errors, the tree is malformed; run `lint-task.ts` and fix before flying. If it prints nothing and no task is `in-progress`, the tree is already done.
-5. Decide `maxAttempts` (default **3**, the per-task cap) and `finalReviewMaxAttempts` (default **2**, the Final review round's cap). Confirm the model policy below with the user only if they want to change it.
+5. **Capture the base ref** for the Final review diff scope:
+   ```bash
+   git rev-parse HEAD
+   ```
+   Bake this as `CFG.baseRef` — the Final review lenses use `git diff <baseRef>..HEAD` to see all committed task changes, rather than the working-tree diff (which would be empty after inter-wave commits).
+6. Decide `maxAttempts` (default **3**, the per-task cap) and `finalReviewMaxAttempts` (default **2**, the Final review round's cap). Confirm the model policy below with the user only if they want to change it.
 6. Confirm the cross-vendor reviewer is available — the Final review round shells out to it:
    ```bash
    codex --version   # the closing review round runs `/codex review`; if codex is missing the final-review task will fail (by design, not silently)
@@ -72,6 +77,8 @@ const CFG = {
   maxAttempts:           3,
   finalReviewMaxAttempts: 2,   // the closing cross-vendor review round loops at most this many times
   scriptsDir:            '<abs path to skills/flightplan/scripts, from the skill load-time base dir>',
+  baseRef:               '<output of `git rev-parse HEAD` captured in Step 1>',
+  commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
 }
 ```
 
@@ -94,6 +101,13 @@ Score gate (inline arithmetic in the orchestrator) ─ weighted avg + veto
    ├─ fail → loop back to Dev with the judge's rationale
    ▼ pass
 done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes   (next wave's next-ready will see it)
+
+[between waves, wave > 1 — inside the scout agent before next-ready.ts runs]
+   atomic-commit (odin-git:atomic-commit Skill) ─ commits all changes from the completed wave
+   │   (CFG.commitBetweenWaves must be true; skipped for wave 1 — nothing to commit yet)
+   ▼
+[post-loop — after the wave loop exits]
+   final atomic-commit ─ commits Final review's changes (or any tail changes from the last wave)
 ```
 
 The `Final review` task (`> **Final review**: true`) depends transitively on every other task, so the wave loop **naturally schedules it last** — it only becomes ready once everything else is `done`. No special phase needed. Its dev step is **not** a Claude self-review: the orchestrator runs a **multi-lens review fan-out** (see below). The binary gate, rubric judge, and score gate are identical to every other task — they grade that round against the Final review task's own `## Eval rubric`.
@@ -144,6 +158,7 @@ Encoded as a constant table at the top of the orchestrator so it's tunable in on
 | **Dev** | Sonnet → **Opus on the last attempt** | Workhorse coder. On the final attempt before the cap, escalate to Opus — a model that failed N times rarely clears it by retrying as itself; the last shot gets the stronger model before we bother the user. |
 | **Binary gate (Acceptance / Verification)** | Haiku | Mechanical: re-run the task's concrete `## Verification` commands and report pass/fail + raw output. Keep its job narrow — *run and report*, never subjective judgement. Runs first as a cheap filter so Opus never scores code that doesn't even build/test. |
 | **Rubric judge** | Opus | The graded gate that decides loop-or-pass; judgement quality is paramount (a weak judge ships bad code or loops forever). |
+| **Commit (inter-wave + post-loop)** | Haiku | Runs the `odin-git:atomic-commit` skill — just invoking a Skill tool, so a cheap model suffices. |
 | **Final review — codex lens** | Haiku | Only *drives* the `/codex review` CLI and records its output — the review intelligence lives in codex itself, so a cheap model to invoke + capture is all that's needed. |
 | **Final review — /simplify lenses** | Opus × 4 (parallel) | reuse / simplification / efficiency / altitude. These must genuinely *understand* the code to judge quality, so they get the strongest model. They only *record* findings; they don't edit. |
 | **Final review — fixer** | Opus | Reads every lens's findings and applies them; highest-stakes holistic gate (integration, consistency, regressions, met the PLAN goal). Capped at `finalReviewMaxAttempts` (default 2). |

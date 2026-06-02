@@ -122,8 +122,8 @@
 
   <!-- ===== RIGHT: autopilot per-task loop ===== -->
   <g filter="url(#soft)"><rect x="600" y="300" width="660" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <text class="ctitle ink" x="624" y="334">autopilot — loop per ready task</text>
-  <text class="note mut" x="624" y="354">next-ready finds tasks with all deps done ↻</text>
+  <text class="ctitle ink" x="624" y="334">autopilot — wave loop (ready tasks run in parallel)</text>
+  <text class="note mut" x="624" y="354">next-ready re-scouts each wave → run in parallel → atomic-commit between waves ↻</text>
 
   <!-- pipeline nodes: Dev → Binary gate → Rubric judge → score gate -->
   <rect x="628" y="378" width="116" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
@@ -160,6 +160,11 @@
   <rect x="1063" y="576" width="130" height="38" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
   <text class="chip" fill="#2F9C70" x="1128" y="600" text-anchor="middle">Status: done ✓</text>
   <text class="note" fill="#2F9C70" x="1201" y="599">pass</text>
+
+  <!-- inter-wave atomic commit on the done → next-wave cycle -->
+  <path class="ln" d="M1063,582 L902,532" stroke="#2F9C70" stroke-dasharray="4 3" marker-end="url(#ah-green)"/>
+  <rect x="676" y="516" width="224" height="26" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="chip" fill="#2F9C70" x="788" y="534" text-anchor="middle">🔖 atomic-commit between waves</text>
 
   <text class="note mut" x="624" y="566">loop has MAX_ATTEMPTS; on cap → needs_your_call hands back to you</text>
 

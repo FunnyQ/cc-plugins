@@ -14,6 +14,8 @@ const CFG = {
   maxAttempts:           3,
   finalReviewMaxAttempts: 2,                              // bounded re-loop for the cross-vendor review round
   scriptsDir:            '<abs path to skills/flightplan/scripts>',  // from the skill's load-time base dir
+  baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
+  commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
 }
 ```
 
@@ -43,6 +45,8 @@ const CFG = {
   maxAttempts:           3,
   finalReviewMaxAttempts: 2,   // bounded re-loop for the closing cross-vendor review round
   scriptsDir:            '<abs path to skills/flightplan/scripts>',
+  baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
+  commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
 }
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
@@ -52,7 +56,7 @@ const CFG = {
 //   reviewLens  (Opus)  — the four /simplify lenses must truly *understand* the
 //     code to judge reuse/complexity/efficiency/altitude, so they get Opus.
 //   fix (Opus) — reads every finding and applies the changes.
-const MODEL = { dev: 'sonnet', devEscalated: 'opus', verify: 'haiku', judge: 'opus', reviewCodex: 'haiku', reviewLens: 'opus', fix: 'opus' }
+const MODEL = { dev: 'sonnet', devEscalated: 'opus', verify: 'haiku', judge: 'opus', reviewCodex: 'haiku', reviewLens: 'opus', fix: 'opus', commit: 'haiku' }
 const MAX = CFG.maxAttempts ?? 3
 const FINAL_MAX = CFG.finalReviewMaxAttempts ?? 2   // the Final review round loops at most this many times before parking
 const S = CFG.scriptsDir   // abs path to flightplan/scripts
@@ -194,8 +198,12 @@ const REVIEW_LENSES = [
 const reviewDir = (attempt) => `${CFG.logFile.replace(/\/[^/]+$/, '')}/review/attempt-${attempt}`
 
 const reviewPrompt = (ref, lens, attempt) => `
-You are the ${lens.key.toUpperCase()} reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). Review the WHOLE working-tree diff — the accumulated uncommitted changes from every task (use \`git status\` and \`git diff\` to see them) — through ONE lens only:
+You are the ${lens.key.toUpperCase()} reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). Review the WHOLE autopilot diff — all changes committed during this run — through ONE lens only:
 ${lens.focus}
+Get the full diff with BOTH commands:
+  git diff ${CFG.baseRef}..HEAD   # committed task changes from this run
+  git diff                         # uncommitted edits (a previous Final review fixer retry may have left changes in the working tree)
+Combine both outputs — the working-tree diff covers any retry attempt's edits that are not yet committed.
 Write your findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first) as a short markdown bullet list — each finding carries file:line and the concrete fix. If nothing is material, write exactly "No findings.". You are a REVIEWER: do NOT edit any source file — only record. Return a one-line count of your findings.`
 
 const fixPrompt = (ref, attempt, feedback) => `
@@ -295,11 +303,26 @@ const completed = []
 const escalations = []
 const parked = new Set()
 let wave = 0
+let prevWaveHadEscalations = false   // guard: don't commit if previous wave left blocked tasks with dirty edits
 
 while (true) {
   wave++
+  // Commit previous wave's changes before scouting the next ready set — but ONLY
+  // if the previous wave had no escalations. A wave with a mix of passed and failed
+  // tasks leaves the failed tasks' edits (plus Status: blocked) in the working tree.
+  // Committing those would bake incomplete/rejected code into history before the user
+  // can unblock them. Skip the commit for any wave that produced escalations.
+  const commitPreamble = (wave > 1 && CFG.commitBetweenWaves && !prevWaveHadEscalations)
+    ? `First, commit all changes from the previous wave using the atomic-commit skill:\n`
+      + `  Use the Skill tool with skill "odin-git:atomic-commit" to create well-organized atomic commits.\n`
+      + `  If the working tree is already clean (nothing to commit), skip gracefully.\n`
+      + `  Wait for it to complete before proceeding to the next step.\n`
+      + `Then: `
+    : ``
+
   const scout = await agent(
-    `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --json\n`
+    commitPreamble
+    + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --json\n`
     + `It prints a JSON array of the ready tasks (each with its finalReview flag), e.g.\n`
     + `  [{"ref":"ui/03","finalReview":false},{"ref":"api/02","finalReview":false}]\n`
     + `or exactly [] when NOTHING is ready (all tasks done/blocked). An empty array means there is no work — that is the normal end state.\n`
@@ -330,8 +353,22 @@ while (true) {
     if (r.passed) completed.push(r.task)
     else { escalations.push(r); parked.add(r.task) }
   }
+  prevWaveHadEscalations = results.some(r => !r.passed)
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
   if (!results.some(r => r.passed)) break
+}
+
+// ── Post-loop commit ────────────────────────────────────────────────────────
+// The last wave (typically Final review) has no subsequent scout to trigger a
+// commit. Run one final atomic-commit here to capture those remaining changes.
+// Only commit when the whole run finished cleanly (no escalations) — same guard
+// as the inter-wave commits: don't commit a run that has blocked/dirty task edits.
+if (CFG.commitBetweenWaves && escalations.length === 0) {
+  await agent(
+    `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes) `
+    + `using the atomic-commit skill: use the Skill tool with skill "odin-git:atomic-commit". `
+    + `If the working tree is already clean, skip gracefully.`,
+    { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit })
 }
 
 return { slug: CFG.slug, completed, escalations }
