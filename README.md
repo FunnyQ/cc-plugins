@@ -17,7 +17,7 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 |-------|-------------|
 | [preflight](./packages/dispatch/skills/preflight) | Lightweight interviewer that gathers requirements into a single in-conversation plan to approve and execute |
 | [flightplan](./packages/dispatch/skills/flightplan) | Heavyweight interviewer that writes a multi-file blueprint to disk — `PLAN.md` + a `tasks/` tree of self-contained task files for sub-agents |
-| [autopilot](./packages/dispatch/skills/autopilot) | Executes a flightplan tree via a dev→verify→judge→score loop gated on each task's Eval rubric, then the closing final-review gate, leaving an audit trail |
+| [autopilot](./packages/dispatch/skills/autopilot) | Executes a flightplan tree in parallel waves — a dev→verify→judge→score loop gated on each task's Eval rubric, an atomic commit between waves, then the closing final-review gate, leaving an audit trail |
 
 ## Claude Code Installation
 
@@ -183,7 +183,7 @@ Interview-driven planning you can execute. Three skills form one arc — gather 
 
 - **preflight** — a lightweight interview that produces a single in-conversation plan. Best when you'll execute now, in one session.
 - **flightplan** — a thorough interview that writes `docs/<slug>/PLAN.md` plus a `tasks/` tree of self-contained task files (each with its own `## Eval rubric`). Best when the work spans sessions or hands off to sub-agents.
-- **autopilot** — executes that tree. For each ready task it runs Dev → an independent binary gate (re-runs the task's Verification) → a rubric judge → a deterministic score gate, retrying until the task passes its rubric, then runs the closing `Final review` task as the whole-tree gate. Every verdict lands in a self-gitignored `docs/<slug>/.flightlog/` audit trail (`RUNLOG.md`).
+- **autopilot** — executes that tree in **waves**. Each wave re-scouts the ready set (`next-ready`) and runs those tasks in parallel; for each task it runs Dev → an independent binary gate (re-runs the task's Verification) → a rubric judge → a deterministic score gate, retrying until the task passes its rubric. Between waves it makes an **atomic commit** of the completed work, so the run leaves a clean per-wave history rather than one giant diff. The `Final review` task depends transitively on every other task, so the wave loop naturally schedules it last as the whole-tree gate — a closing multi-lens review round (cross-vendor `codex` + four `/simplify` lenses → an Opus fixer), followed by a final commit of its fixes. Every verdict lands in a self-gitignored `docs/<slug>/.flightlog/` audit trail (`RUNLOG.md`).
 
 ### Installation
 
