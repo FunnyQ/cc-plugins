@@ -1279,6 +1279,12 @@ body {
   border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
 }
+/* author display:flex above defeats the UA [hidden] display:none, so without
+   this the empty goal bar still renders when there's no goal record (the
+   /thoughtful case). Same guard the respond/jump-latest boxes already carry. */
+.decision-log__goal[hidden] {
+  display: none;
+}
 .decision-log__goal-label {
   font-family: var(--font-mono);
   font-size: 10px;
