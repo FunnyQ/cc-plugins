@@ -403,7 +403,6 @@ export function initDecisionLog(rootEl) {
 
     card.innerHTML = `
       ${rec.needs_your_call ? '<div class="decision-card__badge">🕹 needs your call</div>' : ""}
-      ${rec.source === "scribe" ? '<div class="decision-card__source-badge is-scribe">✍ scribe</div>' : ""}
       <header class="decision-card__head">
         <div class="decision-card__decision">${mdInline(rec.decision)}</div>
         <time class="decision-card__time" datetime="${esc(rec.timestamp || "")}">${relTime(rec.timestamp)}</time>
