@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.7.2] - 2026-06-03
+
+### ✨ Added
+
+- **Autopilot commits as it flies**: autopilot now runs as a true wave loop and makes an atomic commit between waves, plus a closing commit after the final review. Instead of one giant end-of-run diff, a flight leaves a clean, reviewable per-wave history — and the final-review lenses diff against the captured base ref, so they see every committed task change rather than an empty working tree.
+
+### 💄 Polish
+
+- **Cockpit decision cards refresh**: refined decision-card styling and source-badge presentation in the cockpit decision trail, so kind and origin read more clearly at a glance.
+
+### 📖 Docs
+
+- **Dispatch README + flow diagram updated**: the README and the dispatch-flow SVG now document autopilot's wave loop and its inter-wave / post-loop atomic commits.
+
 ## [3.7.1] - 2026-06-02
 
 ### 💄 Polish
