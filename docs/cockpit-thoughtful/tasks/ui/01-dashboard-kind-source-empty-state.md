@@ -7,7 +7,7 @@
 >
 > **Depends on**: backend/01
 > **Blocks**: release/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -80,20 +80,20 @@ In `renderEmptyState()`'s `isUntracked()` branch, update only the CTA line (keep
 
 ## Acceptance criteria
 
-- [ ] `decisionCard()` adds `is-kind-<kind>` (defaulting to `decision`) for every card.
-- [ ] A scribe entry renders a `✍ scribe` source badge; an agent/default entry renders no source badge (unchanged look).
-- [ ] `style.css` has `is-kind-rationale/learning/caveat` accents using existing tokens and a `.decision-card__source-badge` rule; `is-kind-decision` keeps the current appearance.
-- [ ] Non-decision kinds show a visible lens label; decision kind does not.
-- [ ] Empty-state CTA mentions both `/cockpit` and `/thoughtful`; badge/title/body unchanged.
-- [ ] Old records (no `kind`/`source`) render identically to before (regression-free).
-- [ ] A record with a malformed `kind` (e.g. unexpected/space-containing value) does NOT throw — it falls back to `decision` and still renders.
-- [ ] No double kind-label: confirmed against the existing `::before` (if any) before adding a label.
+- [x] `decisionCard()` adds `is-kind-<kind>` (defaulting to `decision`) for every card.
+- [x] A scribe entry renders a `✍ scribe` source badge; an agent/default entry renders no source badge (unchanged look).
+- [x] `style.css` has `is-kind-rationale/learning/caveat` accents using existing tokens and a `.decision-card__source-badge` rule; `is-kind-decision` keeps the current appearance.
+- [x] Non-decision kinds show a visible lens label; decision kind does not.
+- [x] Empty-state CTA mentions both `/cockpit` and `/thoughtful`; badge/title/body unchanged.
+- [x] Old records (no `kind`/`source`) render identically to before (regression-free).
+- [x] A record with a malformed `kind` (e.g. unexpected/space-containing value) does NOT throw — it falls back to `decision` and still renders.
+- [x] No double kind-label: confirmed against the existing `::before` (if any) before adding a label.
 
 ## Verification
 
-- [ ] Run the daemon on an isolated port (`COCKPIT_HOME=/tmp/cockpit-dev bun .../cockpit-server.ts --port 5999`), hand-append a few records to a log (one each `kind`, one `source:"scribe"`, one legacy with neither), open the dashboard, confirm accents + badge + legacy parity.
-- [ ] Confirm the untracked empty-state shows the new CTA (view a live session that was never `cockpit start`'d / scribed).
-- [ ] Grep the two files to confirm no other decision-card behavior changed.
+- [x] Run the daemon on an isolated port (`COCKPIT_HOME=/tmp/cockpit-dev bun .../cockpit-server.ts --port 5999`), hand-append a few records to a log (one each `kind`, one `source:"scribe"`, one legacy with neither), open the dashboard, confirm accents + badge + legacy parity.
+- [x] Confirm the untracked empty-state shows the new CTA (view a live session that was never `cockpit start`'d / scribed).
+- [x] Grep the two files to confirm no other decision-card behavior changed.
 
 ## Eval rubric
 

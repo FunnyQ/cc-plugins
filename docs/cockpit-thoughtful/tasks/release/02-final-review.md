@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: release/01
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -37,17 +37,17 @@ This is the holistic gate — per-task rubrics already scored each piece; this c
 
 ## Acceptance criteria
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/` is green (no regressions).
-- [ ] End-to-end path (steps 1–4) works: auto-register, typed scribe entry, dedup list, dashboard kind+badge, legacy parity, empty-state copy.
-- [ ] Both SKILL.md files are self-consistent with the actual `cockpit scribe` surface and with each other (`/thoughtful` → `/cockpit-scribe`).
-- [ ] Manual `cockpit log` path unbroken and now labeled `source:"agent"`.
-- [ ] Three version fields identical + matching CHANGELOG entry.
-- [ ] The PLAN goal is met: a pilot can run `/thoughtful` with no goal and get an auto-populated, visually-distinguished decision trail.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/` is green (no regressions).
+- [x] End-to-end path (steps 1–4) works: auto-register, typed scribe entry, dedup list, dashboard kind+badge, legacy parity, empty-state copy.
+- [x] Both SKILL.md files are self-consistent with the actual `cockpit scribe` surface and with each other (`/thoughtful` → `/cockpit-scribe`).
+- [x] Manual `cockpit log` path unbroken and now labeled `source:"agent"`.
+- [x] Three version fields identical + matching CHANGELOG entry.
+- [x] The PLAN goal is met: a pilot can run `/thoughtful` with no goal and get an auto-populated, visually-distinguished decision trail.
 
 ## Verification
 
-- [ ] Run the full test suite and the end-to-end steps above; record pass/fail per acceptance item.
-- [ ] If any item fails, name the owning area (backend CLI, a skill, the dashboard, the version bump) for the fix — do not silently patch here.
+- [x] Run the full test suite and the end-to-end steps above; record pass/fail per acceptance item.
+- [x] If any item fails, name the owning area (backend CLI, a skill, the dashboard, the version bump) for the fix — do not silently patch here.
 
 ## Eval rubric
 

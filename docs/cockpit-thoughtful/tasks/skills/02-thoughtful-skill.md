@@ -7,7 +7,7 @@
 >
 > **Depends on**: skills/01
 > **Blocks**: release/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -59,19 +59,19 @@ description: >-
 
 ## Acceptance criteria
 
-- [ ] `packages/monitor/skills/thoughtful/SKILL.md` exists; frontmatter marks it explicit opt-in (no auto-fire) with the trigger phrases above.
-- [ ] WHEN criteria list both the "log this" cases and the explicit skip cases, plus the one-per-chunk bias.
-- [ ] HOW specifies the **Claude** path (Agent tool, **omit `subagent_type`** → fork/inherit, background fire-and-forget, one-line `/cockpit-scribe` prompt, "don't wait").
-- [ ] HOW includes a **Codex** branch: background spawn with `fork_context: true` and no `agent_type` (context-inheriting), fire-and-forget.
-- [ ] States the no-`cockpit start` / auto-register behavior and that `/cockpit` is the separate goal path.
-- [ ] States the best-effort/persistence caveat honestly.
-- [ ] Does not duplicate `/cockpit-scribe`'s internal procedure (it only points at it).
+- [x] `packages/monitor/skills/thoughtful/SKILL.md` exists; frontmatter marks it explicit opt-in (no auto-fire) with the trigger phrases above.
+- [x] WHEN criteria list both the "log this" cases and the explicit skip cases, plus the one-per-chunk bias.
+- [x] HOW specifies the **Claude** path (Agent tool, **omit `subagent_type`** → fork/inherit, background fire-and-forget, one-line `/cockpit-scribe` prompt, "don't wait").
+- [x] HOW includes a **Codex** branch: background spawn with `fork_context: true` and no `agent_type` (context-inheriting), fire-and-forget.
+- [x] States the no-`cockpit start` / auto-register behavior and that `/cockpit` is the separate goal path.
+- [x] States the best-effort/persistence caveat honestly.
+- [x] Does not duplicate `/cockpit-scribe`'s internal procedure (it only points at it).
 
 ## Verification
 
-- [ ] Read-through: a main agent that reads this skill knows exactly when to act and the exact Agent-tool call to make.
-- [ ] Confirm the spawn instruction says **omit `subagent_type`** (a custom subagent_type would lose the cache-warm context inheritance — the whole cost argument).
-- [ ] Self-contained: a main agent needs only this file plus the `_context/` files.
+- [x] Read-through: a main agent that reads this skill knows exactly when to act and the exact Agent-tool call to make.
+- [x] Confirm the spawn instruction says **omit `subagent_type`** (a custom subagent_type would lose the cache-warm context inheritance — the whole cost argument).
+- [x] Self-contained: a main agent needs only this file plus the `_context/` files.
 
 ## Eval rubric
 

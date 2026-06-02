@@ -7,7 +7,7 @@
 >
 > **Depends on**: backend/01
 > **Blocks**: skills/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -64,20 +64,20 @@ Entries are for a future reader skimming the decision trail: concrete, terse, no
 
 ## Acceptance criteria
 
-- [ ] `packages/monitor/skills/cockpit-scribe/SKILL.md` exists with valid frontmatter (`name: cockpit-scribe`, a description marking it fork-invoked / not for direct human use).
-- [ ] The procedure tells the fork to run `git diff`/`git log` for the code lens.
-- [ ] The procedure runs `cockpit scribe --recent` for dedup BEFORE writing.
-- [ ] All four `kind` values are defined with when-to-use guidance.
-- [ ] The write step uses the exact `cockpit scribe --type … --title … --text …` surface from `../_context/log-schema.md`.
-- [ ] CLI-path resolution is spelled out (no reliance on `CLAUDE_PLUGIN_ROOT`).
-- [ ] Consolidation bias ("a few per chunk, skip if nothing worthy") is explicit.
-- [ ] log_language handling is stated (meta → default English).
+- [x] `packages/monitor/skills/cockpit-scribe/SKILL.md` exists with valid frontmatter (`name: cockpit-scribe`, a description marking it fork-invoked / not for direct human use).
+- [x] The procedure tells the fork to run `git diff`/`git log` for the code lens.
+- [x] The procedure runs `cockpit scribe --recent` for dedup BEFORE writing.
+- [x] All four `kind` values are defined with when-to-use guidance.
+- [x] The write step uses the exact `cockpit scribe --type … --title … --text …` surface from `../_context/log-schema.md`.
+- [x] CLI-path resolution is spelled out (no reliance on `CLAUDE_PLUGIN_ROOT`).
+- [x] Consolidation bias ("a few per chunk, skip if nothing worthy") is explicit.
+- [x] log_language handling is stated (meta → default English).
 
 ## Verification
 
-- [ ] Read-through: a fresh fork following the SKILL.md verbatim could resolve the CLI, dedup, and write a valid entry with no missing step.
-- [ ] Cross-check every `cockpit scribe` invocation in the SKILL.md against `../_context/log-schema.md` — flag names and `kind` values match exactly.
-- [ ] Self-contained: a fork needs only this file plus the `_context/` files.
+- [x] Read-through: a fresh fork following the SKILL.md verbatim could resolve the CLI, dedup, and write a valid entry with no missing step.
+- [x] Cross-check every `cockpit scribe` invocation in the SKILL.md against `../_context/log-schema.md` — flag names and `kind` values match exactly.
+- [x] Self-contained: a fork needs only this file plus the `_context/` files.
 
 ## Eval rubric
 

@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: backend/01, skills/02, ui/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -31,15 +31,15 @@ Keep wording customer-friendly, not implementation jargon. Do not run `/odin-git
 
 ## Acceptance criteria
 
-- [ ] All three version fields hold the identical new version string.
-- [ ] `CHANGELOG.md` has a matching entry under that version with an `### Added` section covering `/thoughtful`, `cockpit scribe`, and the dashboard kind/source rendering.
-- [ ] No other version-like fields in those files were touched.
-- [ ] The changelog wording is user-facing (no "fork inherits context" internals).
+- [x] All three version fields hold the identical new version string.
+- [x] `CHANGELOG.md` has a matching entry under that version with an `### Added` section covering `/thoughtful`, `cockpit scribe`, and the dashboard kind/source rendering.
+- [x] No other version-like fields in those files were touched.
+- [x] The changelog wording is user-facing (no "fork inherits context" internals).
 
 ## Verification
 
-- [ ] `grep -n '"version"' packages/monitor/.claude-plugin/plugin.json packages/monitor/.codex-plugin/plugin.json` and the `monitor` entry in `.claude-plugin/marketplace.json` all show the same value.
-- [ ] `CHANGELOG.md` top entry matches that version.
+- [x] `grep -n '"version"' packages/monitor/.claude-plugin/plugin.json packages/monitor/.codex-plugin/plugin.json` and the `monitor` entry in `.claude-plugin/marketplace.json` all show the same value.
+- [x] `CHANGELOG.md` top entry matches that version.
 
 ## Eval rubric
 
