@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.7.1] - 2026-06-02
+
+### 💄 Polish
+
+- **Thoughtful logging now uses all four lenses**: in practice `/thoughtful` and `cockpit-scribe` were biasing toward `decision` entries, so `rationale`, `learning`, and `caveat` rarely showed up in the decision trail. The scribe now sweeps all four lenses before writing, treats `learning`/`caveat` as first-class (not consolation prizes for when there's no decision), and dedups across lenses instead of collapsing to a single entry — so the trail reflects the full reasoning, not just the choices made.
+
 ## [3.7.0] - 2026-06-02
 
 ### ✨ Added
