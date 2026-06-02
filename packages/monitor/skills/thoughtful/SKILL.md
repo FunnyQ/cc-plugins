@@ -17,10 +17,16 @@ From now on, log the interesting parts of this session automatically — no `coc
 ## WHEN to log
 
 **Log when you have just:**
-- Made a non-obvious decision between real alternatives
-- Solved a tricky problem or debugged something subtle
-- Hit a sharp edge, precondition, or caveat the pilot should remember
-- Produced a result that teaches a pattern or principle worth keeping
+- Made a non-obvious decision between real alternatives → a **decision**
+- Wrote something that looks wrong but is deliberate → a **rationale**
+- Solved a tricky problem, debugged something subtle, or overturned an
+  assumption → a **learning**
+- Hit a sharp edge, precondition, or ordering trap the pilot must remember → a
+  **caveat**
+
+These four lenses are independent — a single chunk of work often deserves two or
+three of them at once, not just the decision. The fork (`/cockpit-scribe`)
+sweeps all four; your job here is only to notice the moment is worth a fork.
 
 **Skip (do not spawn a fork):**
 - Typo fixes, single-line edits, pure formatting
