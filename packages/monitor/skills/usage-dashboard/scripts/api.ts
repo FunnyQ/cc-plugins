@@ -1183,7 +1183,9 @@ export function addModelUsage(target: ModelUsage, source: ModelUsage): void {
   target.cacheCreationInputTokens += source.cacheCreationInputTokens ?? 0;
   target.reasoningOutputTokens =
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens ?? 0);
-  target.costUSD = (target.costUSD ?? 0) + (source.costUSD ?? 0);
+  if (source.costUSD !== undefined || target.costUSD !== undefined) {
+    target.costUSD = (target.costUSD ?? 0) + (source.costUSD ?? 0);
+  }
 }
 
 function hourStartMs(timestampMs: number): number {
@@ -1242,7 +1244,7 @@ function serializeProjectModelUsage(
         cacheReadTokens: usage.cacheReadInputTokens,
         cacheCreationTokens: usage.cacheCreationInputTokens,
         reasoningTokens: usage.reasoningOutputTokens ?? 0,
-        costUSD: usage.costUSD ?? calcCost(usage, rawModel, pricing),
+        costUSD: usageCost(usage, rawModel, pricing),
         isExternal: isExternal(rawModel, pricing.externalModelPrefixes),
       };
     })
@@ -1264,7 +1266,9 @@ function usageCost(
   model: string,
   pricing: PricingTable,
 ): number {
-  return usage.costUSD ?? calcCost(usage, model, pricing);
+  return usage.costUSD && usage.costUSD > 0
+    ? usage.costUSD
+    : calcCost(usage, model, pricing);
 }
 
 function walkJsonlFiles(dir: string, out: string[] = []): string[] {
@@ -2297,8 +2301,7 @@ function serializeLedgerRows(
       if (row.usageByModel.size > 0 && row.costBasis !== "unavailable") {
         costUSD = 0;
         for (const [model, usage] of row.usageByModel.entries()) {
-          costUSD +=
-            usage.costUSD ?? calcCost(usage, rawModelFromKey(model), pricing);
+          costUSD += usageCost(usage, rawModelFromKey(model), pricing);
         }
       }
       return {
@@ -2333,8 +2336,7 @@ function serializeUsageByModel(
         cacheReadTokens: usage.cacheReadInputTokens,
         cacheCreationTokens: usage.cacheCreationInputTokens,
         reasoningTokens: usage.reasoningOutputTokens ?? 0,
-        costUSD:
-          usage.costUSD ?? calcCost(usage, rawModelFromKey(model), pricing),
+        costUSD: usageCost(usage, rawModelFromKey(model), pricing),
         provider: providerFromModelKey(model),
         isExternal: isExternal(
           rawModelFromKey(model),
