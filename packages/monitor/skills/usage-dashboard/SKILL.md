@@ -1,10 +1,11 @@
 ---
 name: usage-dashboard
 description: >-
-  Launch a local web dashboard that visualizes Claude Code and Codex usage from
-  ~/.claude/ and ~/.codex/. Shows overview cards (sessions, interactions,
-  tokens, cost), daily token trend chart, model distribution donut, activity
-  heatmap, top projects, and recent activity. Trigger phrases include:
+  Launch a local web dashboard that visualizes Claude Code, Codex, and OpenCode
+  usage from ~/.claude/, ~/.codex/, and ~/.local/share/opencode/. Shows
+  overview cards (sessions, interactions, tokens, cost), daily token trend
+  chart, model distribution donut, activity heatmap, top projects, and recent
+  activity. Trigger phrases include:
   "/token-atlas", "/cc-dashboard", "/stats-dashboard", "show my claude stats",
   "claude usage dashboard", "open token atlas", "open stats dashboard",
   "查看 claude 用量", "claude code 統計", "顯示我的 claude 使用情形",
@@ -15,7 +16,7 @@ description: >-
 
 # AI Code Stats Dashboard
 
-A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP server. Reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, and `~/.codex/sessions/` — no telemetry, no network access required (OpenRouter is consulted opportunistically for live pricing but failures are silent).
+A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP server. Reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, `~/.codex/sessions/`, and OpenCode data under `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` with legacy JSON fallback from `storage/` plus `project/*/storage/` — no telemetry, no network access required (OpenRouter is consulted opportunistically for live pricing but failures are silent).
 
 ## Run
 
@@ -80,7 +81,7 @@ user with the `AskUserQuestion` tool** whether they want it set up automatically
 
 ## Sections
 
-- **Provider switch** — All / Claude / Codex, with All as the combined default
+- **Provider switch** — All / Claude / Codex / OpenCode, with All as the combined default
 - **Overview cards** — sessions, interactions, tokens, estimated cost from local usage (filtered by date range)
 - **Daily trend** — line chart per provider model with Tokens/Cost switch and multi-select toggle
 - **Model distribution** — donut chart filtered by date range and provider

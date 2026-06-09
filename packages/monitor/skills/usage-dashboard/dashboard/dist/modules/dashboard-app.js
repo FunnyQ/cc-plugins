@@ -24,6 +24,7 @@ import {
   normalizePrefs,
   providerBadgeClass,
   providerForModel,
+  providerLabel,
   saveStoredPrefs,
   saveStoredTheme,
   shortModel,
@@ -408,6 +409,19 @@ export function App() {
         .sort();
     },
 
+    get providerOptions() {
+      return ["all", "claude", "codex", "opencode"].map((key) => ({
+        key,
+        label: providerLabel(key),
+      }));
+    },
+
+    get sourceProviderKeys() {
+      return this.providerOptions
+        .map((provider) => provider.key)
+        .filter((key) => key !== "all");
+    },
+
     get filteredDaily() {
       if (!this.stats) return [];
       if (this.rangeKey === "24h") {
@@ -609,7 +623,7 @@ export function App() {
       const daily = this.stats?.daily ?? [];
       daily.forEach((day, index) => {
         indexesByProvider.all.push(index);
-        for (const provider of ["claude", "codex"]) {
+        for (const provider of this.sourceProviderKeys) {
           if (!this.dayHasUsageForProvider(day, provider)) continue;
           indexesByProvider[provider] = indexesByProvider[provider] ?? [];
           indexesByProvider[provider].push(index);
@@ -778,10 +792,12 @@ export function App() {
     aggregateLedgerRows(date, rows) {
       const usageByModel = {};
       const tokensByModel = {};
-      const providers = {
-        claude: { messages: 0, sessions: 0, toolCalls: 0 },
-        codex: { messages: 0, sessions: 0, toolCalls: 0 },
-      };
+      const providers = Object.fromEntries(
+        this.sourceProviderKeys.map((provider) => [
+          provider,
+          { messages: 0, sessions: 0, toolCalls: 0 },
+        ]),
+      );
       let messages = 0;
       let sessions = 0;
       let toolCalls = 0;
@@ -1126,6 +1142,15 @@ export function App() {
     get selectedProjectProviderSummary() {
       const project = this.selectedProject;
       if (!project) return null;
+      const providerTotals = project.providers?.[this.providerKey];
+      if (providerTotals) {
+        return {
+          label: providerLabel(this.providerKey),
+          messages: providerTotals.messages ?? 0,
+          tokens: providerTotals.tokens ?? 0,
+          costUSD: providerTotals.costUSD ?? 0,
+        };
+      }
       if (this.providerKey === "claude") {
         return {
           label: "Claude",
@@ -1140,6 +1165,14 @@ export function App() {
           messages: project.codexMessages ?? 0,
           tokens: project.codexTokens ?? 0,
           costUSD: project.codexCostUSD ?? 0,
+        };
+      }
+      if (this.providerKey === "opencode") {
+        return {
+          label: "OpenCode",
+          messages: project.openCodeMessages ?? 0,
+          tokens: project.openCodeTokens ?? 0,
+          costUSD: project.openCodeCostUSD ?? 0,
         };
       }
       return {
@@ -1269,7 +1302,9 @@ export function App() {
         error: config?.error ?? null,
         source: config?.source ?? "~/.config/cc-dashboard/budget.json",
         providerLabel:
-          this.providerKey === "all" ? "Claude + Codex" : this.providerKey,
+          this.providerKey === "all"
+            ? "Claude + Codex + OpenCode"
+            : providerLabel(this.providerKey),
         monthlyBudgetUSD,
         monthToDateCostUSD,
         projectedMonthEndCostUSD,
@@ -1346,6 +1381,22 @@ export function App() {
         {
           label: "Codex thread rows",
           value: counts.codexThreadRows ?? 0,
+        },
+        {
+          label: "OpenCode sessions",
+          value: counts.openCodeSessionFiles ?? 0,
+        },
+        {
+          label: "OpenCode messages",
+          value: counts.openCodeMessageFiles ?? 0,
+        },
+        {
+          label: "OpenCode DB sessions",
+          value: counts.openCodeSessionRows ?? 0,
+        },
+        {
+          label: "OpenCode DB messages",
+          value: counts.openCodeMessageRows ?? 0,
         },
       ];
     },
@@ -1773,24 +1824,34 @@ export function App() {
 
     projectExportRow(project) {
       const provider = this.providerKey;
-      const messages =
-        provider === "claude"
+      const providerTotals = project.providers?.[provider];
+      const messages = providerTotals
+        ? (providerTotals.messages ?? 0)
+        : provider === "claude"
           ? (project.claudeMessages ?? 0)
           : provider === "codex"
             ? (project.codexMessages ?? 0)
-            : (project.messageCount ?? 0);
-      const tokens =
-        provider === "claude"
+            : provider === "opencode"
+              ? (project.openCodeMessages ?? 0)
+              : (project.messageCount ?? 0);
+      const tokens = providerTotals
+        ? (providerTotals.tokens ?? 0)
+        : provider === "claude"
           ? (project.claudeTokens ?? 0)
           : provider === "codex"
             ? (project.codexTokens ?? 0)
-            : (project.tokens ?? 0);
-      const costUSD =
-        provider === "claude"
+            : provider === "opencode"
+              ? (project.openCodeTokens ?? 0)
+              : (project.tokens ?? 0);
+      const costUSD = providerTotals
+        ? (providerTotals.costUSD ?? 0)
+        : provider === "claude"
           ? (project.claudeCostUSD ?? 0)
           : provider === "codex"
             ? (project.codexCostUSD ?? 0)
-            : (project.costUSD ?? 0);
+            : provider === "opencode"
+              ? (project.openCodeCostUSD ?? 0)
+              : (project.costUSD ?? 0);
       return {
         name: project.name ?? "",
         path: project.path ?? "",
@@ -1803,10 +1864,15 @@ export function App() {
         codexMessages: project.codexMessages ?? 0,
         codexThreads: project.codexThreads ?? 0,
         codexToolCalls: project.codexToolCalls ?? 0,
+        openCodeMessages: project.openCodeMessages ?? 0,
+        openCodeSessions: project.openCodeSessions ?? 0,
+        openCodeToolCalls: project.openCodeToolCalls ?? 0,
         claudeTokens: project.claudeTokens ?? 0,
         codexTokens: project.codexTokens ?? 0,
+        openCodeTokens: project.openCodeTokens ?? 0,
         claudeCostUSD: this.formatCSVNumber(project.claudeCostUSD ?? 0),
         codexCostUSD: this.formatCSVNumber(project.codexCostUSD ?? 0),
+        openCodeCostUSD: this.formatCSVNumber(project.openCodeCostUSD ?? 0),
         firstSeen: project.firstSeen ?? "",
         lastSeen: project.lastSeen ?? "",
       };
