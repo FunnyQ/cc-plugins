@@ -29,7 +29,7 @@ Each task file is `docs/<topic>/tasks/<bucket>/NN-<slug>.md`. NN is two-digit ze
 
 ## Implementation notes
 
-<Everything an executor needs that isn't already in `_context/`. Inline signatures, schemas, sample data, key decisions specific to this task.>
+<Everything an executor needs that isn't already in `_context/`. Inline signatures, schemas, sample data, key decisions specific to this task. Refer to the *thing* (the API client, the user schema), never another task id — `frontend/01`-style refs fail the linter.>
 
 ### <Sub-heading per area>
 
@@ -112,6 +112,17 @@ Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary g
 - **Dimension table** — header must include a `Weight` column; each row's weight is written `×N`. Rows without a positive weight (or the `|---|` separator) are ignored.
 
 Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–scaleMax scale. A task passes when the average meets the threshold **and** no veto fires. Customize the anchors per task; keep the threshold line + weighted table shape.
+
+## Referring to other tasks — name the thing, not the id
+
+The most common lint failure: writing a sibling task id (`frontend/01`) into the body out of habit, because you just used it in `Depends on`. Don't. The dependency graph lives in the header; the body must never make the executor open another task.
+
+- ❌ `Built on the client from frontend/01.`
+- ✅ ``Built on the API client (`apiFetch(path): Promise<Res>` — signature below).``
+- ❌ `See ui/02 for the validation rules.`
+- ✅ Inline the rules here, or put them in `../_context/validation.md` and list that file in Required reading.
+
+`lint-task.ts` rejects any `bucket/NN`, `bucket/NN-slug`, or `bucket/NN-slug.md` reference in the body (your own file excluded). If it's a real dependency, capture it in `Depends on` — not in prose.
 
 ## Self-containment checklist
 
