@@ -1,6 +1,6 @@
 {
   "name": "dispatch",
-  "version": "3.7.2",
+  "version": "3.7.3",
   "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint to disk; autopilot flies the tree with a dev→verify→judge→score quality loop.",
   "author": {
     "name": "Q"

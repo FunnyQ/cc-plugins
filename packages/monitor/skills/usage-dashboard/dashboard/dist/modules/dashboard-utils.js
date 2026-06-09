@@ -42,6 +42,17 @@ const CODEX_PALETTE = [
   "oklch(60% 0.16 290)",
 ];
 
+const OPENCODE_PALETTE = [
+  "oklch(62% 0.18 165)",
+  "oklch(58% 0.16 185)",
+  "oklch(68% 0.14 145)",
+  "oklch(54% 0.18 205)",
+  "oklch(72% 0.12 175)",
+  "oklch(60% 0.15 135)",
+  "oklch(66% 0.16 195)",
+  "oklch(56% 0.14 155)",
+];
+
 const OTHER_COLOR = "oklch(64% 0.014 50)";
 const CLAUDE_FAMILY_COLORS = {
   haiku: "oklch(78% 0.16 78)",
@@ -57,8 +68,13 @@ function colorFor(model) {
     if (familyColor) {
       colorCache.set(model, familyColor);
     } else {
+      const provider = providerForModel(model);
       const palette =
-        providerForModel(model) === "codex" ? CODEX_PALETTE : CLAUDE_PALETTE;
+        provider === "codex"
+          ? CODEX_PALETTE
+          : provider === "opencode"
+            ? OPENCODE_PALETTE
+            : CLAUDE_PALETTE;
       const idx = hashString(rawModel(model)) % palette.length;
       colorCache.set(model, palette[idx]);
     }
@@ -114,19 +130,21 @@ function shortModel(m) {
     .replace("claude-", "");
   const compact = raw.includes("/") ? raw.split("/").pop() : raw;
   if (provider === "codex") return `Codex · ${compact}`;
+  if (provider === "opencode") return `OpenCode · ${compact}`;
   if (provider === "claude") return `Claude · ${compact}`;
   return compact;
 }
 
 function providerForModel(m) {
   if (m.startsWith("codex:")) return "codex";
+  if (m.startsWith("opencode:")) return "opencode";
   if (m.startsWith("claude:")) return "claude";
   return "claude";
 }
 
 function rawModel(m) {
   return m
-    .replace(/^(claude|codex):/, "")
+    .replace(/^(claude|codex|opencode):/, "")
     .replace("anthropic/", "")
     .replace(/-\d{8}$/, "")
     .replace("claude-", "");
@@ -136,6 +154,7 @@ function modelMarkClass(model) {
   return {
     dot: true,
     "dot--codex": providerForModel(model) === "codex",
+    "dot--opencode": providerForModel(model) === "opencode",
     "dot--claude": providerForModel(model) === "claude",
   };
 }
@@ -145,7 +164,19 @@ function providerBadgeClass(provider) {
     badge: true,
     "badge--claude": provider === "claude",
     "badge--codex": provider === "codex",
+    "badge--opencode": provider === "opencode",
   };
+}
+
+function providerLabel(provider) {
+  return (
+    {
+      all: "All",
+      claude: "Claude",
+      codex: "Codex",
+      opencode: "OpenCode",
+    }[provider] ?? provider
+  );
 }
 
 function cssVar(name) {
@@ -233,10 +264,15 @@ const PROJECT_EXPORT_HEADERS = [
   "codexMessages",
   "codexThreads",
   "codexToolCalls",
+  "openCodeMessages",
+  "openCodeSessions",
+  "openCodeToolCalls",
   "claudeTokens",
   "codexTokens",
+  "openCodeTokens",
   "claudeCostUSD",
   "codexCostUSD",
+  "openCodeCostUSD",
   "firstSeen",
   "lastSeen",
 ];
@@ -268,7 +304,7 @@ const TOKEN_BUCKETS = [
   },
 ];
 const ALLOWED_PREFS = {
-  providerKey: ["all", "claude", "codex"],
+  providerKey: ["all", "claude", "codex", "opencode"],
   rangeKey: ["24h", "7", "30", "90", "all"],
   trendMode: ["tokens", "cost"],
   trendModelScope: ["all", "top5"],
@@ -315,11 +351,52 @@ function normalizePrefs(raw) {
 }
 
 function enrichProjectRow(p, value, claudeValue, codexValue, total, fmt) {
-  const providerTotal = claudeValue + codexValue || value || 1;
+  const isCost = Math.abs(value - (p.costUSD ?? Number.NaN)) < 0.000001;
+  const providerValues = [
+    {
+      key: "claude",
+      label: "Claude",
+      value: p.providers?.claude
+        ? isCost
+          ? (p.providers.claude.costUSD ?? 0)
+          : (p.providers.claude.tokens ?? 0)
+        : claudeValue,
+    },
+    {
+      key: "codex",
+      label: "Codex",
+      value: p.providers?.codex
+        ? isCost
+          ? (p.providers.codex.costUSD ?? 0)
+          : (p.providers.codex.tokens ?? 0)
+        : codexValue,
+    },
+    {
+      key: "opencode",
+      label: "OpenCode",
+      value: p.providers?.opencode
+        ? isCost
+          ? (p.providers.opencode.costUSD ?? 0)
+          : (p.providers.opencode.tokens ?? 0)
+        : isCost
+          ? (p.openCodeCostUSD ?? 0)
+          : (p.openCodeTokens ?? 0),
+    },
+  ].filter((provider) => provider.value > 0);
+  const providerTotal =
+    providerValues.reduce((sum, provider) => sum + provider.value, 0) ||
+    value ||
+    1;
   return {
     ...p,
     displayLabel: fmt(value),
     pct: ((value / total) * 100).toFixed(1),
+    providerSegments: providerValues.map((provider) => ({
+      ...provider,
+      pct: ((provider.value / providerTotal) * 100).toFixed(1),
+      display: fmt(provider.value),
+      className: `project-rank-meter-segment--${provider.key}`,
+    })),
     claudePct: ((claudeValue / providerTotal) * 100).toFixed(1),
     codexPct: ((codexValue / providerTotal) * 100).toFixed(1),
     hasClaude: claudeValue > 0,
@@ -336,6 +413,7 @@ export {
   fmtTokens,
   fmtUSD,
   shortModel,
+  providerLabel,
   providerForModel,
   rawModel,
   modelMarkClass,

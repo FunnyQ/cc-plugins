@@ -495,3 +495,10 @@
 .dot--claude {
   border-radius: 50%;
 }
+
+.dot--opencode {
+  border-radius: 1px;
+  box-shadow:
+    0 0 0 2px oklch(100% 0.005 50 / 0.04),
+    0 0 0 1px color-mix(in oklch, var(--positive) 35%, transparent);
+}

@@ -35,28 +35,14 @@
           aria-label="Usage source"
         >
           <button
+            v-for="provider in providerOptions"
+            :key="provider.key"
             type="button"
-            :class="{ active: providerKey === 'all' }"
-            :aria-pressed="providerKey === 'all'"
-            @click="onProviderChange('all')"
+            :class="{ active: providerKey === provider.key }"
+            :aria-pressed="providerKey === provider.key"
+            @click="onProviderChange(provider.key)"
           >
-            All
-          </button>
-          <button
-            type="button"
-            :class="{ active: providerKey === 'claude' }"
-            :aria-pressed="providerKey === 'claude'"
-            @click="onProviderChange('claude')"
-          >
-            Claude
-          </button>
-          <button
-            type="button"
-            :class="{ active: providerKey === 'codex' }"
-            :aria-pressed="providerKey === 'codex'"
-            @click="onProviderChange('codex')"
-          >
-            Codex
+            {{ provider.label }}
           </button>
         </div>
         <select
