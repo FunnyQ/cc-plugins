@@ -580,6 +580,10 @@
   background: var(--sunrise-violet);
 }
 
+.project-rank-meter-segment--opencode {
+  background: var(--positive);
+}
+
 .top-cost-panel {
   border-color: color-mix(in oklch, var(--violet) 12%, var(--edge));
   background:

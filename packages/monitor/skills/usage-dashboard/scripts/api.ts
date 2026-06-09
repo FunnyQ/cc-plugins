@@ -19,6 +19,11 @@ import { mergeDailyActivity } from "./daily-activity";
 const HOME = homedir();
 const CLAUDE_DIR = join(HOME, ".claude");
 const CODEX_DIR = join(HOME, ".codex");
+const OPENCODE_DIR =
+  process.env.OPENCODE_DATA_DIR || join(HOME, ".local", "share", "opencode");
+const OPENCODE_STORAGE_DIR = join(OPENCODE_DIR, "storage");
+const OPENCODE_PROJECT_DIR = join(OPENCODE_DIR, "project");
+const OPENCODE_DB = join(OPENCODE_DIR, "opencode.db");
 const CODEX_STATE_DB = join(CODEX_DIR, "state_5.sqlite");
 const CODEX_SESSIONS_DIR = join(CODEX_DIR, "sessions");
 const STATS_CACHE = join(CLAUDE_DIR, "stats-cache.json");
@@ -167,6 +172,10 @@ type DataHealth = {
     claudeTranscriptFiles: number;
     codexSessionFiles: number;
     codexThreadRows: number;
+    openCodeSessionFiles: number;
+    openCodeMessageFiles: number;
+    openCodeSessionRows: number;
+    openCodeMessageRows: number;
   };
 };
 
@@ -180,7 +189,7 @@ export type ModelUsage = {
   costUSD?: number;
 };
 
-export type Provider = "claude" | "codex";
+export type Provider = "claude" | "codex" | "opencode";
 type LedgerCostBasis = "usage" | "thread_tokens" | "unavailable";
 type LedgerRow = {
   id: string;
@@ -245,6 +254,64 @@ type CodexSessionSummary = {
   toolCalls: number;
 };
 
+type OpenCodeTokenUsage = {
+  input?: number;
+  output?: number;
+  reasoning?: number;
+  cache?: {
+    read?: number;
+    write?: number;
+  };
+};
+
+type OpenCodeSession = {
+  id?: string;
+  directory?: string;
+  time?: {
+    created?: number;
+    updated?: number;
+  };
+  title?: string;
+};
+
+type OpenCodeMessage = {
+  id?: string;
+  sessionID?: string;
+  role?: string;
+  time?: {
+    created?: number;
+    completed?: number;
+  };
+  modelID?: string;
+  providerID?: string;
+  path?: {
+    cwd?: string;
+    root?: string;
+  };
+  cost?: number;
+  tokens?: OpenCodeTokenUsage;
+};
+
+type OpenCodeStoredMessage = {
+  info?: OpenCodeMessage;
+  parts?: Array<{ type?: string }>;
+} & OpenCodeMessage;
+
+type OpenCodeSessionRow = {
+  id: string;
+  directory: string;
+  time_created: number;
+  time_updated: number;
+};
+
+type OpenCodeMessageRow = {
+  id: string;
+  session_id: string;
+  time_created: number;
+  time_updated: number;
+  data: string;
+};
+
 type StatsCache = {
   version?: number;
   lastComputedDate?: string;
@@ -304,6 +371,14 @@ type TranscriptEntry = {
 function safeReadJSON<T>(path: string): T | null {
   const result = readJSONWithError<T>(path);
   return result.data;
+}
+
+function safeParseJSON<T>(value: string): T | null {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
 }
 
 function readJSONWithError<T>(path: string): {
@@ -398,6 +473,17 @@ function buildDataHealth(counts: DataHealth["counts"]): DataHealth {
         "Codex usage cache",
         CODEX_USAGE_CACHE,
         "optional live limit cache",
+      ),
+      sourceHealth(
+        "OpenCode storage",
+        OPENCODE_STORAGE_DIR,
+        "optional root storage",
+      ),
+      sourceHealth("OpenCode database", OPENCODE_DB, "optional SQLite usage"),
+      sourceHealth(
+        "OpenCode projects",
+        OPENCODE_PROJECT_DIR,
+        "optional project storage",
       ),
       sourceHealth(
         "Pricing override",
@@ -1081,11 +1167,13 @@ export function modelKey(provider: Provider, model: string): string {
 }
 
 export function providerFromModelKey(key: string): Provider {
-  return key.startsWith("codex:") ? "codex" : "claude";
+  if (key.startsWith("codex:")) return "codex";
+  if (key.startsWith("opencode:")) return "opencode";
+  return "claude";
 }
 
 export function rawModelFromKey(key: string): string {
-  return key.replace(/^(claude|codex):/, "");
+  return key.replace(/^(claude|codex|opencode):/, "");
 }
 
 export function addModelUsage(target: ModelUsage, source: ModelUsage): void {
@@ -1095,6 +1183,7 @@ export function addModelUsage(target: ModelUsage, source: ModelUsage): void {
   target.cacheCreationInputTokens += source.cacheCreationInputTokens ?? 0;
   target.reasoningOutputTokens =
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens ?? 0);
+  target.costUSD = (target.costUSD ?? 0) + (source.costUSD ?? 0);
 }
 
 function hourStartMs(timestampMs: number): number {
@@ -1153,7 +1242,7 @@ function serializeProjectModelUsage(
         cacheReadTokens: usage.cacheReadInputTokens,
         cacheCreationTokens: usage.cacheCreationInputTokens,
         reasoningTokens: usage.reasoningOutputTokens ?? 0,
-        costUSD: calcCost(usage, rawModel, pricing),
+        costUSD: usage.costUSD ?? calcCost(usage, rawModel, pricing),
         isExternal: isExternal(rawModel, pricing.externalModelPrefixes),
       };
     })
@@ -1168,6 +1257,14 @@ function serializeProjectModelUsage(
         0,
     )
     .sort((a, b) => b.costUSD - a.costUSD);
+}
+
+function usageCost(
+  usage: ModelUsage,
+  model: string,
+  pricing: PricingTable,
+): number {
+  return usage.costUSD ?? calcCost(usage, model, pricing);
 }
 
 function walkJsonlFiles(dir: string, out: string[] = []): string[] {
@@ -1187,6 +1284,37 @@ function walkJsonlFiles(dir: string, out: string[] = []): string[] {
     }
   }
   return out;
+}
+
+function walkJsonFiles(dir: string, out: string[] = []): string[] {
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    let stat;
+    try {
+      stat = statSync(path);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
+      walkJsonFiles(path, out);
+    } else if (stat.isFile() && path.endsWith(".json")) {
+      out.push(path);
+    }
+  }
+  return out;
+}
+
+function openCodeStorageRoots(): string[] {
+  const roots = new Set<string>();
+  if (existsSync(OPENCODE_STORAGE_DIR)) roots.add(OPENCODE_STORAGE_DIR);
+  if (existsSync(OPENCODE_PROJECT_DIR)) {
+    for (const name of readdirSync(OPENCODE_PROJECT_DIR)) {
+      const storage = join(OPENCODE_PROJECT_DIR, name, "storage");
+      if (existsSync(storage)) roots.add(storage);
+    }
+  }
+  return [...roots];
 }
 
 function countClaudeToolCalls(content: unknown): number {
@@ -1757,6 +1885,389 @@ function parseCodexUsage(): {
   };
 }
 
+function normalizeOpenCodeTimestampMs(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return value < 1_000_000_000_000 ? value * 1000 : value;
+}
+
+function openCodeMessageInfo(stored: OpenCodeStoredMessage): OpenCodeMessage {
+  return stored.info ?? stored;
+}
+
+export function openCodeUsageFromTokens(
+  tokens: OpenCodeTokenUsage,
+): ModelUsage {
+  return {
+    inputTokens: tokens.input ?? 0,
+    outputTokens: tokens.output ?? 0,
+    cacheReadInputTokens: tokens.cache?.read ?? 0,
+    cacheCreationInputTokens: tokens.cache?.write ?? 0,
+    reasoningOutputTokens: tokens.reasoning ?? 0,
+  };
+}
+
+function countOpenCodeToolCalls(parts: Array<{ type?: string }> | undefined) {
+  if (!Array.isArray(parts)) return 0;
+  return parts.filter((part) => part?.type === "tool").length;
+}
+
+function parseOpenCodeUsage(): {
+  modelUsage: Record<string, ModelUsage>;
+  dailyModelUsage: Map<string, Map<string, ModelUsage>>;
+  hourlyUsage: Map<number, HourlyUsageBucket>;
+  projectTokens: Map<string, number>;
+  projectModelUsage: Map<string, Map<string, ModelUsage>>;
+  projectActivity: Map<
+    string,
+    {
+      sessionCount: number;
+      interactionCount: number;
+      toolCallCount: number;
+      firstSeen: number;
+      lastSeen: number;
+      path: string;
+    }
+  >;
+  dailyActivity: Map<
+    string,
+    { sessionCount: number; interactionCount: number; toolCallCount: number }
+  >;
+  weekHourMatrix: number[][];
+  dailyHourCounts: Map<string, number[]>;
+  totalSessions: number;
+  totalInteractions: number;
+  totalToolCalls: number;
+  ledger: InternalLedgerRow[];
+  openCodeSessionFileCount: number;
+  openCodeMessageFileCount: number;
+  openCodeSessionRowCount: number;
+  openCodeMessageRowCount: number;
+} {
+  const modelUsage: Record<string, ModelUsage> = {};
+  const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const hourlyUsage = new Map<number, HourlyUsageBucket>();
+  const projectTokens = new Map<string, number>();
+  const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const projectActivity = new Map<
+    string,
+    {
+      sessionCount: number;
+      interactionCount: number;
+      toolCallCount: number;
+      firstSeen: number;
+      lastSeen: number;
+      path: string;
+    }
+  >();
+  const dailyActivity = new Map<
+    string,
+    { sessionCount: number; interactionCount: number; toolCallCount: number }
+  >();
+  const dailyHourCounts = new Map<string, number[]>();
+  const ledgerBySession = new Map<
+    string,
+    InternalLedgerRow & {
+      projectFirstSeen: number;
+      userMessageIds: Set<string>;
+    }
+  >();
+  const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
+    Array(24).fill(0),
+  );
+
+  const storageRoots = openCodeStorageRoots();
+  const sessionFiles = storageRoots.flatMap((root) =>
+    walkJsonFiles(join(root, "session")),
+  );
+  const messageFiles = storageRoots.flatMap((root) =>
+    walkJsonFiles(join(root, "message")),
+  );
+  const sessionsById = new Map<string, OpenCodeSession>();
+  const toolCallsByMessageId = new Map<string, number>();
+
+  for (const file of sessionFiles) {
+    const session = safeReadJSON<OpenCodeSession>(file);
+    if (session?.id) sessionsById.set(session.id, session);
+  }
+
+  let openCodeSessionRowCount = 0;
+  let openCodeMessageRowCount = 0;
+  if (existsSync(OPENCODE_DB)) {
+    let db: Database | null = null;
+    try {
+      db = new Database(OPENCODE_DB, { readonly: true });
+      const sessionRows = db
+        .query<
+          OpenCodeSessionRow,
+          []
+        >("select id, directory, time_created, time_updated from session")
+        .all();
+      openCodeSessionRowCount = sessionRows.length;
+      for (const row of sessionRows) {
+        sessionsById.set(row.id, {
+          id: row.id,
+          directory: row.directory,
+          time: {
+            created: row.time_created,
+            updated: row.time_updated,
+          },
+        });
+      }
+
+      const toolRows = db
+        .query<
+          { message_id: string; tool_calls: number },
+          []
+        >("select message_id, count(*) as tool_calls from part where json_extract(data, '$.type') = 'tool' group by message_id")
+        .all();
+      for (const row of toolRows) {
+        toolCallsByMessageId.set(row.message_id, row.tool_calls);
+      }
+
+      const messageRows = db
+        .query<
+          OpenCodeMessageRow,
+          []
+        >("select id, session_id, time_created, time_updated, data from message")
+        .all();
+      openCodeMessageRowCount = messageRows.length;
+      for (const row of messageRows) {
+        const info = safeParseJSON<OpenCodeMessage>(row.data);
+        if (!info) continue;
+        ingestOpenCodeMessage({
+          info: {
+            ...info,
+            id: row.id,
+            sessionID: row.session_id,
+            time: {
+              created: info.time?.created ?? row.time_created,
+              completed: info.time?.completed ?? row.time_updated,
+            },
+          },
+          sessionId: row.session_id,
+          session: sessionsById.get(row.session_id),
+          fallbackTimestampMs: row.time_updated || row.time_created,
+          toolCalls: toolCallsByMessageId.get(row.id) ?? 0,
+        });
+      }
+    } catch {
+      // OpenCode JSON storage below remains a best-effort fallback.
+    } finally {
+      db?.close();
+    }
+  }
+
+  function ingestOpenCodeMessage({
+    info,
+    sessionId,
+    session,
+    fallbackTimestampMs,
+    toolCalls,
+  }: {
+    info: OpenCodeMessage;
+    sessionId: string;
+    session: OpenCodeSession | undefined;
+    fallbackTimestampMs: number;
+    toolCalls: number;
+    fallbackMessageId?: string;
+  }) {
+    const createdMs =
+      normalizeOpenCodeTimestampMs(info.time?.created) ||
+      normalizeOpenCodeTimestampMs(session?.time?.created) ||
+      normalizeOpenCodeTimestampMs(fallbackTimestampMs);
+    const completedMs =
+      normalizeOpenCodeTimestampMs(info.time?.completed) ||
+      normalizeOpenCodeTimestampMs(session?.time?.updated) ||
+      createdMs;
+    const timestampMs = completedMs || createdMs;
+    if (!timestampMs) return;
+
+    const cwd = info.path?.cwd ?? session?.directory ?? "";
+    const ledger =
+      ledgerBySession.get(sessionId) ??
+      ({
+        id: `opencode:${sessionId}`,
+        provider: "opencode",
+        timestampMs,
+        date: fmtDate(timestampMs),
+        projectPath: cwd,
+        projectName: cwd ? projectName(cwd) : "n/a",
+        model: "n/a",
+        interactions: 0,
+        toolCalls: 0,
+        tokens: 0,
+        costBasis: "unavailable",
+        usageByModel: new Map<string, ModelUsage>(),
+        projectFirstSeen: timestampMs,
+        userMessageIds: new Set<string>(),
+      } satisfies InternalLedgerRow & {
+        projectFirstSeen: number;
+        userMessageIds: Set<string>;
+      });
+    ledgerBySession.set(sessionId, ledger);
+    ledger.timestampMs = Math.max(ledger.timestampMs, timestampMs);
+    ledger.date = fmtDate(ledger.timestampMs);
+    ledger.projectFirstSeen = Math.min(ledger.projectFirstSeen, timestampMs);
+    if (!ledger.projectPath && cwd) {
+      ledger.projectPath = cwd;
+      ledger.projectName = projectName(cwd);
+    }
+
+    if (info.role === "user") {
+      const messageId =
+        info.id ?? fallbackMessageId ?? `${sessionId}:${timestampMs}`;
+      if (!ledger.userMessageIds.has(messageId)) {
+        ledger.userMessageIds.add(messageId);
+        ledger.interactions += 1;
+      }
+      return;
+    }
+
+    if (info.role !== "assistant" || !info.tokens) return;
+    const model = info.modelID || "unknown";
+    const key = modelKey("opencode", model);
+    const usage = openCodeUsageFromTokens(info.tokens);
+    if (typeof info.cost === "number" && Number.isFinite(info.cost)) {
+      usage.costUSD = info.cost;
+    }
+    const tokenTotal = modelUsageTotal(usage);
+    if (tokenTotal <= 0 && !(info.cost && info.cost > 0)) return;
+
+    const ledgerUsage = ledger.usageByModel.get(key) ?? emptyModelUsage();
+    addModelUsage(ledgerUsage, usage);
+    ledger.usageByModel.set(key, ledgerUsage);
+    ledger.tokens += tokenTotal;
+    ledger.costBasis = "usage";
+    ledger.model = ledger.usageByModel.size === 1 ? key : "mixed";
+    ledger.toolCalls += toolCalls;
+
+    modelUsage[key] ??= emptyModelUsage();
+    addModelUsage(modelUsage[key], usage);
+    addHourlyUsage(hourlyUsage, timestampMs, key, usage);
+
+    const date = fmtDate(timestampMs);
+    let dayByModel = dailyModelUsage.get(date);
+    if (!dayByModel) {
+      dayByModel = new Map();
+      dailyModelUsage.set(date, dayByModel);
+    }
+    const dayUsage = dayByModel.get(key) ?? emptyModelUsage();
+    addModelUsage(dayUsage, usage);
+    dayByModel.set(key, dayUsage);
+
+    if (cwd) {
+      projectTokens.set(cwd, (projectTokens.get(cwd) ?? 0) + tokenTotal);
+      let projectByModel = projectModelUsage.get(cwd);
+      if (!projectByModel) {
+        projectByModel = new Map();
+        projectModelUsage.set(cwd, projectByModel);
+      }
+      const projectUsage = projectByModel.get(key) ?? emptyModelUsage();
+      addModelUsage(projectUsage, usage);
+      projectByModel.set(key, projectUsage);
+    }
+  }
+
+  if (openCodeMessageRowCount === 0) {
+    for (const file of messageFiles) {
+      const stored = safeReadJSON<OpenCodeStoredMessage>(file);
+      if (!stored) continue;
+      const info = openCodeMessageInfo(stored);
+      const sessionId =
+        info.sessionID ?? stored.sessionID ?? file.split("/").at(-2) ?? file;
+      ingestOpenCodeMessage({
+        info,
+        sessionId,
+        session: sessionsById.get(sessionId),
+        fallbackTimestampMs: 0,
+        toolCalls: countOpenCodeToolCalls(stored.parts),
+        fallbackMessageId: file,
+      });
+    }
+  }
+
+  let totalInteractions = 0;
+  let totalToolCalls = 0;
+  const activeLedgerRows: InternalLedgerRow[] = [];
+  for (const ledger of ledgerBySession.values()) {
+    if (
+      ledger.timestampMs <= 0 ||
+      (ledger.interactions <= 0 && ledger.tokens <= 0 && ledger.toolCalls <= 0)
+    ) {
+      continue;
+    }
+
+    const {
+      projectFirstSeen: _projectFirstSeen,
+      userMessageIds: _ids,
+      ...row
+    } = ledger;
+    activeLedgerRows.push(row);
+    totalInteractions += ledger.interactions;
+    totalToolCalls += ledger.toolCalls;
+    const d = new Date(ledger.timestampMs);
+    const date = fmtDate(ledger.timestampMs);
+    const daily = dailyActivity.get(date) ?? {
+      sessionCount: 0,
+      interactionCount: 0,
+      toolCallCount: 0,
+    };
+    daily.sessionCount += 1;
+    daily.interactionCount += ledger.interactions;
+    daily.toolCallCount += ledger.toolCalls;
+    dailyActivity.set(date, daily);
+    weekHourMatrix[d.getDay()][d.getHours()] += ledger.interactions;
+    const hourBuckets = dailyHourCounts.get(date) ?? new Array(24).fill(0);
+    hourBuckets[d.getHours()] += ledger.interactions;
+    dailyHourCounts.set(date, hourBuckets);
+
+    if (ledger.projectPath) {
+      const current = projectActivity.get(ledger.projectPath);
+      if (current) {
+        current.sessionCount += 1;
+        current.interactionCount += ledger.interactions;
+        current.toolCallCount += ledger.toolCalls;
+        current.firstSeen = Math.min(
+          current.firstSeen,
+          ledger.projectFirstSeen,
+        );
+        current.lastSeen = Math.max(current.lastSeen, ledger.timestampMs);
+      } else {
+        projectActivity.set(ledger.projectPath, {
+          sessionCount: 1,
+          interactionCount: ledger.interactions,
+          toolCallCount: ledger.toolCalls,
+          firstSeen: ledger.projectFirstSeen,
+          lastSeen: ledger.timestampMs,
+          path: ledger.projectPath,
+        });
+      }
+    }
+  }
+
+  return {
+    modelUsage,
+    dailyModelUsage,
+    hourlyUsage,
+    projectTokens,
+    projectModelUsage,
+    projectActivity,
+    dailyActivity,
+    weekHourMatrix,
+    dailyHourCounts,
+    totalSessions: activeLedgerRows.length,
+    totalInteractions,
+    totalToolCalls,
+    ledger: activeLedgerRows,
+    openCodeSessionFileCount: sessionFiles.length,
+    openCodeMessageFileCount: messageFiles.length,
+    openCodeSessionRowCount,
+    openCodeMessageRowCount,
+  };
+}
+
 // ---------- Compose ----------
 
 export function fmtDate(ms: number): string {
@@ -1786,7 +2297,8 @@ function serializeLedgerRows(
       if (row.usageByModel.size > 0 && row.costBasis !== "unavailable") {
         costUSD = 0;
         for (const [model, usage] of row.usageByModel.entries()) {
-          costUSD += calcCost(usage, rawModelFromKey(model), pricing);
+          costUSD +=
+            usage.costUSD ?? calcCost(usage, rawModelFromKey(model), pricing);
         }
       }
       return {
@@ -1821,7 +2333,8 @@ function serializeUsageByModel(
         cacheReadTokens: usage.cacheReadInputTokens,
         cacheCreationTokens: usage.cacheCreationInputTokens,
         reasoningTokens: usage.reasoningOutputTokens ?? 0,
-        costUSD: calcCost(usage, rawModelFromKey(model), pricing),
+        costUSD:
+          usage.costUSD ?? calcCost(usage, rawModelFromKey(model), pricing),
         provider: providerFromModelKey(model),
         isExternal: isExternal(
           rawModelFromKey(model),
@@ -1884,10 +2397,15 @@ export async function buildStats() {
   const usageLimits = readUsageLimits();
   const transcriptUsage = parseTranscriptUsage();
   const codexUsage = parseCodexUsage();
+  const openCodeUsage = parseOpenCodeUsage();
   const dataHealth = buildDataHealth({
     claudeTranscriptFiles: transcriptUsage.transcriptFileCount,
     codexSessionFiles: codexUsage.codexSessionFileCount,
     codexThreadRows: codexUsage.codexThreadRowCount,
+    openCodeSessionFiles: openCodeUsage.openCodeSessionFileCount,
+    openCodeMessageFiles: openCodeUsage.openCodeMessageFileCount,
+    openCodeSessionRows: openCodeUsage.openCodeSessionRowCount,
+    openCodeMessageRows: openCodeUsage.openCodeMessageRowCount,
   });
 
   const claudeModelUsage =
@@ -1899,6 +2417,9 @@ export async function buildStats() {
     modelUsage[modelKey("claude", model)] = usage;
   }
   for (const [model, usage] of Object.entries(codexUsage.modelUsage)) {
+    modelUsage[model] = usage;
+  }
+  for (const [model, usage] of Object.entries(openCodeUsage.modelUsage)) {
     modelUsage[model] = usage;
   }
   const dailyActivity = cache.dailyActivity ?? [];
@@ -1964,6 +2485,19 @@ export async function buildStats() {
     }
     tokensByDate.set(date, dayTokens);
   }
+  for (const [date, usageByModel] of openCodeUsage.dailyModelUsage.entries()) {
+    let combined = combinedDailyModelUsage.get(date);
+    if (!combined) {
+      combined = new Map();
+      combinedDailyModelUsage.set(date, combined);
+    }
+    const dayTokens = tokensByDate.get(date) ?? {};
+    for (const [model, usage] of usageByModel.entries()) {
+      combined.set(model, usage);
+      dayTokens[model] = (dayTokens[model] ?? 0) + modelUsageTotal(usage);
+    }
+    tokensByDate.set(date, dayTokens);
+  }
   for (const [date, activity] of codexUsage.dailyActivity.entries()) {
     const current = activityByDate.get(date);
     if (current) {
@@ -1977,12 +2511,26 @@ export async function buildStats() {
       });
     }
   }
+  for (const [date, activity] of openCodeUsage.dailyActivity.entries()) {
+    const current = activityByDate.get(date);
+    if (current) {
+      current.sessionCount += activity.sessionCount;
+    } else {
+      activityByDate.set(date, {
+        date,
+        messageCount: 0,
+        sessionCount: activity.sessionCount,
+        toolCallCount: 0,
+      });
+    }
+  }
   const dailyDates = new Set([
     ...dailyActivity.map((d) => d.date),
     ...supplementalHistoryDates,
     ...tokensByDate.keys(),
     ...combinedDailyModelUsage.keys(),
     ...codexUsage.dailyActivity.keys(),
+    ...openCodeUsage.dailyActivity.keys(),
   ]);
 
   const daily = Array.from(dailyDates)
@@ -1994,7 +2542,7 @@ export async function buildStats() {
       let costUSD = 0;
       if (usageByModel) {
         for (const [model, usage] of usageByModel.entries()) {
-          costUSD += calcCost(usage, rawModelFromKey(model), pricing);
+          costUSD += usageCost(usage, rawModelFromKey(model), pricing);
         }
       }
       const usageByModelRows = usageByModel
@@ -2007,7 +2555,7 @@ export async function buildStats() {
                 cacheReadTokens: usage.cacheReadInputTokens,
                 cacheCreationTokens: usage.cacheCreationInputTokens,
                 reasoningTokens: usage.reasoningOutputTokens ?? 0,
-                costUSD: calcCost(usage, rawModelFromKey(model), pricing),
+                costUSD: usageCost(usage, rawModelFromKey(model), pricing),
                 provider: providerFromModelKey(model),
                 isExternal: isExternal(
                   rawModelFromKey(model),
@@ -2018,9 +2566,11 @@ export async function buildStats() {
           )
         : {};
       const codexThreads = codexUsage.dailyActivity.get(date)?.threadCount ?? 0;
+      const openCodeSessions =
+        openCodeUsage.dailyActivity.get(date)?.sessionCount ?? 0;
       const claudeSessions = Math.max(
         0,
-        (activity?.sessionCount ?? 0) - codexThreads,
+        (activity?.sessionCount ?? 0) - codexThreads - openCodeSessions,
       );
       const providerDaily = {
         claude: {
@@ -2035,13 +2585,25 @@ export async function buildStats() {
           sessions: codexThreads,
           toolCalls: codexUsage.dailyActivity.get(date)?.toolCallCount ?? 0,
         },
+        opencode: {
+          messages:
+            openCodeUsage.dailyActivity.get(date)?.interactionCount ?? 0,
+          sessions: openCodeSessions,
+          toolCalls: openCodeUsage.dailyActivity.get(date)?.toolCallCount ?? 0,
+        },
       };
+      const providerValues = Object.values(providerDaily);
       return {
         date,
-        messages: providerDaily.claude.messages + providerDaily.codex.messages,
+        messages: providerValues.reduce(
+          (sum, provider) => sum + provider.messages,
+          0,
+        ),
         sessions: activity?.sessionCount ?? 0,
-        toolCalls:
-          providerDaily.claude.toolCalls + providerDaily.codex.toolCalls,
+        toolCalls: providerValues.reduce(
+          (sum, provider) => sum + provider.toolCalls,
+          0,
+        ),
         tokens,
         tokensByModel,
         usageByModel: usageByModelRows,
@@ -2061,7 +2623,7 @@ export async function buildStats() {
       cacheReadTokens: usage.cacheReadInputTokens,
       cacheCreationTokens: usage.cacheCreationInputTokens,
       reasoningTokens: usage.reasoningOutputTokens ?? 0,
-      costUSD: calcCost(usage, rawModelFromKey(model), pricing),
+      costUSD: usageCost(usage, rawModelFromKey(model), pricing),
       isExternal: isExternal(
         rawModelFromKey(model),
         pricing.externalModelPrefixes,
@@ -2106,18 +2668,29 @@ export async function buildStats() {
     aggregateProjectCosts(
       transcriptUsage.projectModelUsage,
       codexUsage.projectModelUsage,
-      (model, usage) => calcCost(usage, model, pricing),
-      (model, usage) => calcCost(usage, rawModelFromKey(model), pricing),
+      (model, usage) => usageCost(usage, model, pricing),
+      (model, usage) => usageCost(usage, rawModelFromKey(model), pricing),
     );
+  const openCodeProjectCost = new Map<string, number>();
+  for (const [path, byModel] of openCodeUsage.projectModelUsage.entries()) {
+    let costUSD = 0;
+    for (const [model, usage] of byModel.entries()) {
+      costUSD += usageCost(usage, rawModelFromKey(model), pricing);
+    }
+    openCodeProjectCost.set(path, costUSD);
+    projectCost.set(path, (projectCost.get(path) ?? 0) + costUSD);
+  }
 
   const projectPaths = new Set([
     ...Array.from(byProject.keys()),
     ...Array.from(codexUsage.projectActivity.keys()),
+    ...Array.from(openCodeUsage.projectActivity.keys()),
   ]);
   const projects = Array.from(projectPaths)
     .map((path) => {
       const claude = byProject.get(path);
       const codex = codexUsage.projectActivity.get(path);
+      const openCode = openCodeUsage.projectActivity.get(path);
       const models = [
         ...serializeProjectModelUsage(
           "claude",
@@ -2129,29 +2702,71 @@ export async function buildStats() {
           codexUsage.projectModelUsage.get(path),
           pricing,
         ),
+        ...serializeProjectModelUsage(
+          "opencode",
+          openCodeUsage.projectModelUsage.get(path),
+          pricing,
+        ),
       ].sort((a, b) => b.costUSD - a.costUSD);
       const firstSeen = Math.min(
         claude?.firstSeen ?? Number.POSITIVE_INFINITY,
         codex?.firstSeen ?? Number.POSITIVE_INFINITY,
+        openCode?.firstSeen ?? Number.POSITIVE_INFINITY,
       );
-      const lastSeen = Math.max(claude?.lastSeen ?? 0, codex?.lastSeen ?? 0);
+      const lastSeen = Math.max(
+        claude?.lastSeen ?? 0,
+        codex?.lastSeen ?? 0,
+        openCode?.lastSeen ?? 0,
+      );
+      const providerTotals = {
+        claude: {
+          messages: claude?.messageCount ?? 0,
+          sessions: 0,
+          toolCalls: 0,
+          tokens: transcriptUsage.projectTokens.get(path) ?? 0,
+          costUSD: claudeProjectCost.get(path) ?? 0,
+        },
+        codex: {
+          messages: codex?.interactionCount ?? 0,
+          sessions: codex?.threadCount ?? 0,
+          toolCalls: codex?.toolCallCount ?? 0,
+          tokens: codexUsage.projectTokens.get(path) ?? 0,
+          costUSD: codexProjectCost.get(path) ?? 0,
+        },
+        opencode: {
+          messages: openCode?.interactionCount ?? 0,
+          sessions: openCode?.sessionCount ?? 0,
+          toolCalls: openCode?.toolCallCount ?? 0,
+          tokens: openCodeUsage.projectTokens.get(path) ?? 0,
+          costUSD: openCodeProjectCost.get(path) ?? 0,
+        },
+      };
       return {
         name: projectName(path),
         path,
         messageCount:
-          (claude?.messageCount ?? 0) + (codex?.interactionCount ?? 0),
+          providerTotals.claude.messages +
+          providerTotals.codex.messages +
+          providerTotals.opencode.messages,
         claudeMessages: claude?.messageCount ?? 0,
         codexMessages: codex?.interactionCount ?? 0,
         codexThreads: codex?.threadCount ?? 0,
         codexToolCalls: codex?.toolCallCount ?? 0,
+        openCodeMessages: openCode?.interactionCount ?? 0,
+        openCodeSessions: openCode?.sessionCount ?? 0,
+        openCodeToolCalls: openCode?.toolCallCount ?? 0,
         claudeTokens: transcriptUsage.projectTokens.get(path) ?? 0,
         codexTokens: codexUsage.projectTokens.get(path) ?? 0,
+        openCodeTokens: openCodeUsage.projectTokens.get(path) ?? 0,
         tokens:
           (transcriptUsage.projectTokens.get(path) ?? 0) +
-          (codexUsage.projectTokens.get(path) ?? 0),
+          (codexUsage.projectTokens.get(path) ?? 0) +
+          (openCodeUsage.projectTokens.get(path) ?? 0),
         claudeCostUSD: claudeProjectCost.get(path) ?? 0,
         codexCostUSD: codexProjectCost.get(path) ?? 0,
+        openCodeCostUSD: openCodeProjectCost.get(path) ?? 0,
         costUSD: projectCost.get(path) ?? 0,
+        providers: providerTotals,
         models,
         firstSeen: Number.isFinite(firstSeen) ? fmtDate(firstSeen) : "",
         lastSeen: fmtDate(lastSeen),
@@ -2181,7 +2796,10 @@ export async function buildStats() {
   }, null);
   const combinedWeekHourMatrix = weekHourMatrix.map((row, dow) =>
     row.map(
-      (value, hour) => value + (codexUsage.weekHourMatrix[dow]?.[hour] ?? 0),
+      (value, hour) =>
+        value +
+        (codexUsage.weekHourMatrix[dow]?.[hour] ?? 0) +
+        (openCodeUsage.weekHourMatrix[dow]?.[hour] ?? 0),
     ),
   );
   const combinedDailyHourCounts: Record<string, number[]> = {};
@@ -2196,9 +2814,22 @@ export async function buildStats() {
       combinedDailyHourCounts[date] = [...counts];
     }
   }
-  const totalSessions = (cache.totalSessions ?? 0) + codexUsage.totalThreads;
+  for (const [date, counts] of openCodeUsage.dailyHourCounts) {
+    const existing = combinedDailyHourCounts[date];
+    if (existing) {
+      for (let h = 0; h < 24; h++) existing[h] += counts[h] ?? 0;
+    } else {
+      combinedDailyHourCounts[date] = [...counts];
+    }
+  }
+  const totalSessions =
+    (cache.totalSessions ?? 0) +
+    codexUsage.totalThreads +
+    openCodeUsage.totalSessions;
   const totalMessages =
-    (cache.totalMessages ?? 0) + codexUsage.totalInteractions;
+    (cache.totalMessages ?? 0) +
+    codexUsage.totalInteractions +
+    openCodeUsage.totalInteractions;
   const averageMessagesPerSession = totalSessions
     ? totalMessages / totalSessions
     : 0;
@@ -2207,11 +2838,15 @@ export async function buildStats() {
   const periodFrom = daily[0]?.date ?? "";
   const periodTo = daily[daily.length - 1]?.date ?? "";
   const ledger = serializeLedgerRows(
-    [...transcriptUsage.ledger, ...codexUsage.ledger],
+    [...transcriptUsage.ledger, ...codexUsage.ledger, ...openCodeUsage.ledger],
     pricing,
   );
   const hourlyUsage = new Map<number, HourlyUsageBucket>();
-  for (const source of [transcriptUsage.hourlyUsage, codexUsage.hourlyUsage]) {
+  for (const source of [
+    transcriptUsage.hourlyUsage,
+    codexUsage.hourlyUsage,
+    openCodeUsage.hourlyUsage,
+  ]) {
     for (const bucket of source.values()) {
       for (const [model, usage] of bucket.usageByModel.entries()) {
         addHourlyUsage(hourlyUsage, bucket.timestampMs, model, usage);
@@ -2241,6 +2876,11 @@ export async function buildStats() {
           totalSessions: codexUsage.totalThreads,
           totalMessages: codexUsage.totalInteractions,
           totalToolCalls: codexUsage.totalToolCalls,
+        },
+        opencode: {
+          totalSessions: openCodeUsage.totalSessions,
+          totalMessages: openCodeUsage.totalInteractions,
+          totalToolCalls: openCodeUsage.totalToolCalls,
         },
       },
     },
