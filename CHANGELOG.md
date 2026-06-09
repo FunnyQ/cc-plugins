@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.7.3] - 2026-06-09
+
+### ✨ Added
+
+- **OpenCode integration in usage dashboard**: ingest OpenCode sessions and messages from JSON storage (`~/.local/share/opencode/`) and SQLite (`opencode.db`); add OpenCode to the provider filter (All / Claude / Codex / OpenCode); parse token usage and cost data; extend project detail modal and CSV export with OpenCode fields; add color palette and styling for the OpenCode provider.
+- **flightplan `review-plan` script**: collects all plan files (PLAN.md, `_context/*.md`, `tasks/**/*.md`) and pipes them to `codex review` for content-quality assessment. Exports `collectPlanFiles()` and `buildReviewPrompt()` as pure functions. SKILL.md updated to document Step 6: mandatory Codex review gate after lint passes.
+
+### 🐛 Fixed
+
+- **OpenCode zero-cost fallback**: preserve absent recorded costs so the pricing fallback can run; use recorded costs only when greater than zero; cover mixed recorded-and-computed cost aggregation.
+
 ## [3.7.2] - 2026-06-03
 
 ### ✨ Added
