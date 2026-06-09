@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.7.4] - 2026-06-10
+
+### 🐛 Fixed
+
+- **Autopilot inter-wave commits now actually run**: the wave loop called the `odin-git:atomic-commit` skill, but a Workflow agent has no `Agent` tool — the skill's `vör`/`bragi` sub-agents couldn't spawn, and its analysis script (in a different plugin's cache) was unresolvable. The atomic-commit contract — grouping principles + the full commit-message template (emoji/type subject, English body, zh-TW summary) — is now inlined into the orchestrator as a `COMMIT_INSTRUCTIONS` prompt, so each wave commits over plain git.
+- **flightplan lint false positive**: the sibling-task-reference check no longer misflags deeper file paths like `src/images/02` or `foo-bar/01` as task references (added a path-aware lookbehind).
+
+### 💄 Polish
+
+- **flightplan self-containment guidance**: lint violations now spell out how to fix them (it's a dependency → `Depends on`; the executor needs it → inline or move to `_context/`), and the task template gains a sharp ❌/✅ on naming the *thing* (the API client, the schema) instead of a sibling task id like `frontend/01`.
+
 ## [3.7.3] - 2026-06-09
 
 ### ✨ Added

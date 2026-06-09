@@ -197,6 +197,22 @@ describe("lintFile", () => {
     await rm(root, { recursive: true });
   });
 
+  test("body with a deeper file path (not a sibling ref) → no violation", async () => {
+    // `assets/icons/03-logo.svg` has a bucket-like middle segment but is a real
+    // asset path, not a sibling task — the lookbehind must keep it off the radar.
+    const ok = VALID_TASK.replace(
+      "One sentence.",
+      "Render the sprite from `assets/icons/03-logo.svg`.",
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": ok,
+    });
+    const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+    expect(violations.filter((v) => v.rule === "self-containment")).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
   test("H1 bucket/NN mismatches file path → violation", async () => {
     // File path says ui/01 but H1 claims API-99
     const bad = VALID_TASK.replace(
