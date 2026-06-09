@@ -79,10 +79,13 @@ const CFG = {
   scriptsDir:            '<abs path to skills/flightplan/scripts, from the skill load-time base dir>',
   baseRef:               '<output of `git rev-parse HEAD` captured in Step 1>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
+  devEngine:             'claude',  // 'claude' (default) or 'codex' — see "Dev engine" below
 }
 ```
 
 Then call `Workflow({ script: <the adapted script> })` — no `args` needed.
+
+**Dev engine (`CFG.devEngine`).** Default `'claude'` writes code with Sonnet (→ Opus on the last attempt). Set it to `'codex'` to delegate each task's implementation to the OpenAI **codex** CLI: the dev step becomes a cheap Haiku *driver* that invokes `/codex delegate` (`codex exec -s workspace-write`, reachable from a Workflow agent's Bash — the same path the closing codex review lens uses), so codex does the coding. The independent verify → judge → score pipeline stays Claude, turning the dev≠judge split into a **cross-vendor** one (codex writes, Claude-Opus judges). The last attempt before the cap still falls back to Claude-Opus — a final cross-vendor try before the task is parked — and if codex is unreachable the driver reports failure rather than fabricating, so the gate fails the attempt cleanly. Only the dev step changes; the finalReview round and everything else are identical.
 
 The orchestrator runs a **wave loop**: each wave asks an agent to run `next-ready.ts` (status changes only happen *inside* the run, so the ready set must be re-scouted every wave — a static list misses tasks unblocked mid-flight), then executes the wave's ready tasks **in parallel**. Each task is a retry pipeline:
 
@@ -156,6 +159,7 @@ Encoded as a constant table at the top of the orchestrator so it's tunable in on
 | Role | Model | Why |
 |---|---|---|
 | **Dev** | Sonnet → **Opus on the last attempt** | Workhorse coder. On the final attempt before the cap, escalate to Opus — a model that failed N times rarely clears it by retrying as itself; the last shot gets the stronger model before we bother the user. |
+| **Dev — codex engine** (`CFG.devEngine: 'codex'`) | Haiku driver → **Opus on the last attempt** | When the codex engine is on, the dev step is a cheap Haiku driver that delegates the implementation to the codex CLI via `/codex delegate` — the coding intelligence is codex's, so the driver just invokes + verifies. The last attempt still falls back to Claude-Opus (a cross-vendor final try). |
 | **Binary gate (Acceptance / Verification)** | Haiku | Mechanical: re-run the task's concrete `## Verification` commands and report pass/fail + raw output. Keep its job narrow — *run and report*, never subjective judgement. Runs first as a cheap filter so Opus never scores code that doesn't even build/test. |
 | **Rubric judge** | Opus | The graded gate that decides loop-or-pass; judgement quality is paramount (a weak judge ships bad code or loops forever). |
 | **Commit (inter-wave + post-loop)** | Haiku | Commits the wave's changes with **inline git** (the `COMMIT_INSTRUCTIONS` block — atomic principles + commit template baked into the prompt), NOT the `odin-git:atomic-commit` skill: a Workflow agent has no `Agent` tool, so that skill's vör/bragi sub-agents can't spawn. A wave's changes are usually one coherent set, so grouping + message-writing is within Haiku's reach. |
