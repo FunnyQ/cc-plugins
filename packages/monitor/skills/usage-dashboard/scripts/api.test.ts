@@ -90,6 +90,13 @@ describe("token aggregation", () => {
     addModelUsage(t, usage({ inputTokens: 4, reasoningOutputTokens: 8 }));
     expect(t.inputTokens).toBe(5);
     expect(t.reasoningOutputTokens).toBe(10);
+    expect(t.costUSD).toBeUndefined();
+  });
+  test("addModelUsage accumulates recorded costs only when present", () => {
+    const t = usage({ inputTokens: 1, costUSD: 0.5 });
+    addModelUsage(t, usage({ inputTokens: 4 }));
+    addModelUsage(t, usage({ inputTokens: 4, costUSD: 0.25 }));
+    expect(t.costUSD).toBeCloseTo(0.75, 5);
   });
   test("modelUsageTotal includes reasoning tokens", () => {
     expect(
