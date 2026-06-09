@@ -111,7 +111,21 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
    ```
    The script fails loudly on malformed or duplicate-ref tasks rather than silently dropping them. It preserves human-authored prologue/epilogue (e.g. "Known gaps") between the generated markers. Fill the Known gaps section manually if any surfaced during the interview.
 
-### Step 6 — Stop. Do not execute.
+### Step 6 — Codex review of the written artifact
+
+After all files pass lint, run a Codex review over the whole plan tree. This is a **mandatory content-quality gate** — a different lens from the structural/schema checks `lint-task.ts` does. Codex is sharp: treat its findings seriously. Cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects, not minor notes.
+
+Use the bundled script (it adds a flightplan-specific review prompt so Codex focuses on planning quality, not generic code style):
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug>
+```
+
+The script reads all plan files and passes them as an inline content bundle to `codex review -` (stdin). Review scope is exactly the plan tree, regardless of other uncommitted changes in the repo. If `codex` is not installed, the script exits 0 with a warning — skip the review, note it as a Known gap in `tasks/README.md`, and proceed to Step 7.
+
+**Act on findings** — rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on:` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Only skip a finding when it conflicts with an intentional design decision already recorded — if you skip one, add it as a Known gap in `tasks/README.md` with the reason.
+
+### Step 7 — Stop. Do not execute.
 
 Tell the user where the files live and which task to start from. Do not start implementing. The whole point is that execution happens elsewhere with fresh context.
 
@@ -149,6 +163,7 @@ Four hard rules. Details for each live in the referenced template.
 
 Reach for these instead of doing the mechanical work by hand. Each one has a tested pure function exported for unit testing.
 
+- `scripts/review-plan.ts` — focused Codex review of a written plan tree (`--uncommitted` + flightplan-specific prompt); exit code mirrors codex so callers can gate on it
 - `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
 - `scripts/lint-task.ts` — validates one or more task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
