@@ -297,6 +297,38 @@ async function executeTask(item, wave) {
   return { task: ref, passed: false, attempt: cap, reason: feedback }
 }
 
+// ── Inline atomic-commit instructions ───────────────────────────────────────
+// A Workflow agent has Bash + Read but NO Agent tool, so it CANNOT run the
+// odin-git:atomic-commit skill — that skill spawns the vör + bragi sub-agents
+// and would die mid-run. It also can't resolve that skill's scripts (they live
+// in a *different* plugin's cache, and CLAUDE_PLUGIN_ROOT never reaches agent
+// Bash). So we inline the skill's contract here — same atomic principles, same
+// commit-message template — and let the agent commit over plain git itself.
+// Self-contained on purpose: no Skill tool, no sub-agent, no cross-plugin path.
+const COMMIT_INSTRUCTIONS =
+  'Commit the current working-tree changes as one or more ATOMIC commits using plain git over Bash. '
+  + 'Do NOT use the Skill tool and do NOT spawn any sub-agent — do it yourself with git commands.\n'
+  + '1. Run `git status --porcelain`. If it prints nothing, the tree is clean — skip committing and continue.\n'
+  + '2. Run `git diff` and `git diff --cached` to see every change. Group the files into atomic commits — each commit does ONE thing (single responsibility, independently revertable). Keep related code + its tests + its docs together; split unrelated changes apart.\n'
+  + '3. For each group, in a sensible order: stage exactly that group by name (`git add <file>...`; never `git add -A`, never the interactive `git add -p`), then commit with the template below.\n'
+  + '4. After all commits, run `git log --oneline -n <count>` to confirm.\n'
+  + '\n'
+  + 'Commit message template (MUST follow):\n'
+  + '  Subject: `<emoji> <type>: <imperative summary>` — lowercase, no trailing period, <=50 chars.\n'
+  + '  Then a blank line, an English markdown-bullet body (WHAT changed and WHY; omit for a trivial commit), then a line containing only `---`, then a one-line zh-TW summary (include only when there is a body).\n'
+  + '  Emoji/type map: ✨ feat · 🐛 fix · 📦 refactor · ✅ test · 📖 docs · 🎨 style · 🔧 chore · 🔥 remove · ⚡️ perf · 🔒 security.\n'
+  + '  Use a quoted heredoc so the body + summary survive newlines:\n'
+  + "    git commit -m \"$(cat <<'EOF'\n"
+  + '    ✨ feat: add the thing\n'
+  + '\n'
+  + '    - what changed and why\n'
+  + '\n'
+  + '    ---\n'
+  + '\n'
+  + '    繁體中文一句摘要\n'
+  + '    EOF\n'
+  + '    )"'
+
 // ── Wave loop ───────────────────────────────────────────────────────────────
 phase('Execute')
 const completed = []
@@ -313,11 +345,7 @@ while (true) {
   // Committing those would bake incomplete/rejected code into history before the user
   // can unblock them. Skip the commit for any wave that produced escalations.
   const commitPreamble = (wave > 1 && CFG.commitBetweenWaves && !prevWaveHadEscalations)
-    ? `First, commit all changes from the previous wave using the atomic-commit skill:\n`
-      + `  Use the Skill tool with skill "odin-git:atomic-commit" to create well-organized atomic commits.\n`
-      + `  If the working tree is already clean (nothing to commit), skip gracefully.\n`
-      + `  Wait for it to complete before proceeding to the next step.\n`
-      + `Then: `
+    ? `First, commit all changes from the previous wave.\n${COMMIT_INSTRUCTIONS}\n\nThen: `
     : ``
 
   const scout = await agent(
@@ -365,9 +393,8 @@ while (true) {
 // as the inter-wave commits: don't commit a run that has blocked/dirty task edits.
 if (CFG.commitBetweenWaves && escalations.length === 0) {
   await agent(
-    `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes) `
-    + `using the atomic-commit skill: use the Skill tool with skill "odin-git:atomic-commit". `
-    + `If the working tree is already clean, skip gracefully.`,
+    `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes).\n`
+    + COMMIT_INSTRUCTIONS,
     { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit })
 }
 
@@ -389,5 +416,6 @@ return { slug: CFG.slug, completed, escalations }
 - **Final review needs no special phase.** Its transitive `Depends on` reaches every task, so `next-ready` only offers it once all else is `done`. When the `finalReview` flag is set the orchestrator runs `runFinalReview` instead of a single dev agent (the multi-lens fan-out below) and uses the smaller `FINAL_MAX` cap; the binary gate + rubric judge + score gate are unchanged — they evaluate the round's output against the Final review task's own `## Eval rubric` (integration / consistency / no regressions / meets PLAN goal).
 - **The review fan-out is done by the *orchestrator*, not by one agent.** A Workflow agent has `Skill` + `Bash` (codex CLI reachable) but **no `Agent` tool**, so it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that: `runFinalReview` issues one `agent()` per lens via `parallel()` — codex (cross-vendor bug review, run through `/codex review` over Bash) plus the four `/simplify` lenses (reuse / simplification / efficiency / altitude), each Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing; a single Opus **fixer** then reads all the files and applies the changes. codex is the deliberate cross-*vendor* signal the all-Claude dev+judge can't produce; if it's unreachable the codex reviewer writes `CODEX UNREACHABLE` so the fixer flags it and the gate fails the task rather than passing an un-reviewed deliverable.
 - **The fixer is not the judge.** Reviewers + fixer are the "dev" side of the Final review; the binary gate + rubric judge stay independent, so the dev≠judge anti-self-grading split still holds even though the round is more elaborate.
+- **Commits are inline git, not the atomic-commit skill — same `no Agent tool` constraint.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`: that skill spawns the vör + bragi sub-agents, which a Workflow agent can't do, and its analysis script lives in a *different* plugin's cache that the agent can't resolve (no `CLAUDE_PLUGIN_ROOT` in agent Bash). The `COMMIT_INSTRUCTIONS` constant inlines the skill's whole contract — atomic grouping principles + the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary) — so the agent commits over plain git, self-contained. Edit the template in that one constant if the commit convention changes.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`); passing a wide wave is safe — excess tasks queue.
 - If tasks mutate shared files and could conflict in parallel, give `executeTask`'s dev agent `isolation: 'worktree'` — only if real conflicts occur (it's expensive).

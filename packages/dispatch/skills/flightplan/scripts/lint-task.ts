@@ -37,8 +37,10 @@ export type Violation = {
 // Case-insensitive — catches "PLAN.md", "plan.md", "Plan.md".
 const PLAN_REF_REGEX = /\bplan\.md\b/i;
 // Sibling-task references: bucket/NN, bucket/NN-slug, bucket/NN-slug.md.
+// The lookbehind keeps us off the middle of deeper paths (`src/images/02`,
+// `foo-bar/01`) — only a bucket-like token NOT preceded by a path char counts.
 const SIBLING_TASK_REGEX =
-  /\b([a-z][a-z0-9]*)\/(\d{2})(?:-([a-z0-9-]+))?(?:\.md)?\b/g;
+  /(?<![\w/.-])([a-z][a-z0-9]*)\/(\d{2})(?:-([a-z0-9-]+))?(?:\.md)?\b/g;
 // Required reading must be exactly ../_context/<name>.md (sibling _context).
 const REQUIRED_READING_REGEX = /^\.\.\/_context\/[a-z0-9_-]+\.md$/;
 
@@ -115,7 +117,7 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
   if (PLAN_REF_REGEX.test(task.body)) {
     push(
       "self-containment",
-      "body references PLAN.md — task files must be self-contained",
+      "body references PLAN.md — task files must be self-contained. Inline whatever the executor needs here (or move it into ../_context/ and list it in Required reading); never point at PLAN.md.",
     );
   }
   const ownRef = `${task.bucket}/${task.nn}`;
@@ -133,7 +135,7 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
   if (siblings.size > 0) {
     push(
       "self-containment",
-      `body references sibling task file(s): ${[...siblings].join(", ")}`,
+      `body references sibling task file(s): ${[...siblings].join(", ")}. Task files must be self-contained — fix one of two ways: (1) if it's a dependency, it already belongs in the \`Depends on\` header, so delete the inline pointer; (2) if the executor needs that detail, inline it here (or move it into ../_context/). Refer to the thing (the API client, the schema), not the task id.`,
     );
   }
 
