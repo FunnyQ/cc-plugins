@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.8.0] - 2026-06-10
+
+### ✨ Added
+
+- **Autopilot codex dev engine (`CFG.devEngine`)**: a new opt-in option to delegate each task's dev step to the OpenAI codex CLI. Default stays `'claude'` (Sonnet→Opus). Set `CFG.devEngine: 'codex'` and the dev step becomes a cheap Haiku driver that runs `/codex delegate` (`codex exec -s workspace-write`) so codex writes the implementation, while the verify→judge→score pipeline stays Claude — turning the dev≠judge split into a cross-vendor one. The last attempt before the cap still falls back to Claude-Opus, and if codex is unreachable the driver reports failure rather than fabricating code.
+
 ## [3.7.4] - 2026-06-10
 
 ### 🐛 Fixed
