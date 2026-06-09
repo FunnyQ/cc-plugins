@@ -14,6 +14,7 @@ import {
   isExternal,
   modelKey,
   modelUsageTotal,
+  openCodeUsageFromTokens,
   priceFor,
   pricingModelAliases,
   projectName,
@@ -42,14 +43,17 @@ const table: PricingTable = {
 describe("model key helpers", () => {
   test("modelKey namespaces provider:model", () => {
     expect(modelKey("codex", "o3")).toBe("codex:o3");
+    expect(modelKey("opencode", "gpt-4.1")).toBe("opencode:gpt-4.1");
   });
   test("providerFromModelKey reads the prefix", () => {
     expect(providerFromModelKey("codex:o3")).toBe("codex");
+    expect(providerFromModelKey("opencode:gpt-4.1")).toBe("opencode");
     expect(providerFromModelKey("claude:opus")).toBe("claude");
     expect(providerFromModelKey("opus")).toBe("claude"); // default
   });
   test("rawModelFromKey strips a known provider prefix only", () => {
     expect(rawModelFromKey("codex:o3")).toBe("o3");
+    expect(rawModelFromKey("opencode:gpt-4.1")).toBe("gpt-4.1");
     expect(rawModelFromKey("claude:opus")).toBe("opus");
     expect(rawModelFromKey("gpt-4o")).toBe("gpt-4o");
   });
@@ -86,6 +90,13 @@ describe("token aggregation", () => {
     addModelUsage(t, usage({ inputTokens: 4, reasoningOutputTokens: 8 }));
     expect(t.inputTokens).toBe(5);
     expect(t.reasoningOutputTokens).toBe(10);
+    expect(t.costUSD).toBeUndefined();
+  });
+  test("addModelUsage accumulates recorded costs only when present", () => {
+    const t = usage({ inputTokens: 1, costUSD: 0.5 });
+    addModelUsage(t, usage({ inputTokens: 4 }));
+    addModelUsage(t, usage({ inputTokens: 4, costUSD: 0.25 }));
+    expect(t.costUSD).toBeCloseTo(0.75, 5);
   });
   test("modelUsageTotal includes reasoning tokens", () => {
     expect(
@@ -99,6 +110,22 @@ describe("token aggregation", () => {
         }),
       ),
     ).toBe(15);
+  });
+  test("openCodeUsageFromTokens maps official token buckets", () => {
+    expect(
+      openCodeUsageFromTokens({
+        input: 10,
+        output: 5,
+        reasoning: 3,
+        cache: { read: 2, write: 1 },
+      }),
+    ).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadInputTokens: 2,
+      cacheCreationInputTokens: 1,
+      reasoningOutputTokens: 3,
+    });
   });
 });
 
