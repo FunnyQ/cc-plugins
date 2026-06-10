@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.9.0] - 2026-06-10
+
+### ✨ Added
+
+- **Autopilot now asks which dev engine to fly with**: before calling Workflow, autopilot prompts you to pick **Claude** (default — Sonnet→Opus) or **Codex** (the OpenAI codex CLI writes each task, Claude judges) instead of silently defaulting to Claude. Picking Codex makes the `codex --version` check load-bearing for every task, with an offer to fall back to Claude if codex is unreachable.
+- **`codex-run.ts` wrapper** (in `flightplan/scripts/`): a thin wrapper over the `codex` CLI used by both the codex dev engine and the closing codex review lens. `delegate` runs `codex exec -s workspace-write` and appends a `git status --short`; `review` runs `codex exec -s read-only`. It captures codex's clean last message, prints it, and deletes its own scratch — so the driver reads one deterministic stdout and there is **no temp transcript left to mine**.
+- **Flightplan Codex review now iterates to convergence**: Step 6 is a review → fix → re-review loop instead of a single pass. The first pass catches the loud problems; the revised plan then exposes deeper issues, and Codex (non-deterministic) surfaces different findings each run. Floor of 2 cycles, keep going while passes yield material findings, stop when a pass comes back clean, ceiling ~4–5 (remaining items banked as Known gaps).
+
+### 🐛 Fixed
+
+- **Codex dev step no longer fully depends on the odin-codex plugin**: the dev engine and review lens now shell out to the `codex` CLI directly via `codex-run.ts` rather than the `/codex delegate` and `/codex review` skills — only the `codex` binary is required (already version-checked in scouting).
+- **No more lingering codex scratch files**: the Haiku driver used to search codex's `/tmp/odin/codex-skill/` output to reconstruct what changed. The wrapper prints the result and cleans up after itself, so there is nothing to search.
+- **Correct codex flags + clean exits** (caught by a real end-to-end smoke test): dropped the invalid `-a never` flag (`codex exec` is already non-interactive in current codex), fixed a scratch-dir leak on the error path (cleanup now always runs), and switched the changed-files summary from `git diff --stat` to `git status --short` so newly-created files show up.
+
 ## [3.8.0] - 2026-06-10
 
 ### ✨ Added
