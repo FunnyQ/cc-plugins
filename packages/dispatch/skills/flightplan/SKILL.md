@@ -111,19 +111,28 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
    ```
    The script fails loudly on malformed or duplicate-ref tasks rather than silently dropping them. It preserves human-authored prologue/epilogue (e.g. "Known gaps") between the generated markers. Fill the Known gaps section manually if any surfaced during the interview.
 
-### Step 6 — Codex review of the written artifact
+### Step 6 — Codex review of the written artifact (iterate to convergence)
 
-After all files pass lint, run a Codex review over the whole plan tree. This is a **mandatory content-quality gate** — a different lens from the structural/schema checks `lint-task.ts` does. Codex is sharp: treat its findings seriously. Cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects, not minor notes.
+After all files pass lint, run a Codex review over the whole plan tree — then **loop**: review → act on findings → re-review. This is a **mandatory content-quality gate**, a different lens from the structural/schema checks `lint-task.ts` does. Codex is sharp: cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects, not minor notes.
 
-Use the bundled script (it adds a flightplan-specific review prompt so Codex focuses on planning quality, not generic code style):
+**Why loop, not one pass.** A single review isn't enough. The first pass catches the loud problems; once you fix them, the *revised* plan exposes deeper issues the big ones were masking — and Codex, being non-deterministic, surfaces different things each run. Iterating is where most of the quality comes from. The loop only works because you **apply fixes between passes** — re-reviewing unchanged files just repeats the same findings.
+
+Each pass (it adds a flightplan-specific prompt so Codex focuses on planning quality, not generic code style):
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug>
 ```
 
-The script reads all plan files and passes them as an inline content bundle to `codex review -` (stdin). Review scope is exactly the plan tree, regardless of other uncommitted changes in the repo. If `codex` is not installed, the script exits 0 with a warning — skip the review, note it as a Known gap in `tasks/README.md`, and proceed to Step 7.
+The script bundles all plan files to `codex review -` (stdin); scope is exactly the plan tree, regardless of other uncommitted changes. If `codex` is not installed it exits 0 with a warning — skip the gate entirely, note it as a Known gap in `tasks/README.md`, and go to Step 7.
 
-**Act on findings** — rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on:` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Only skip a finding when it conflicts with an intentional design decision already recorded — if you skip one, add it as a Known gap in `tasks/README.md` with the reason.
+**Act on findings between every pass** — rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on:` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Only skip a finding when it conflicts with an intentional design decision already recorded; if you skip one, add it as a Known gap in `tasks/README.md` with the reason — and don't "re-fix" it when a later pass raises it again.
+
+**How many passes — you decide, within bounds:**
+
+- **Run at least 2** full review→fix cycles. Never stop after one — the second pass, on the improved plan, is the high-value one.
+- **Keep going** while a pass still surfaces *material* findings (anything worth changing the plan for). Three or four passes are fine if they keep paying off.
+- **Stop when a pass comes back clean** — no new material findings, only nitpicks or things already recorded as intentional. That's the "plan is complete" signal.
+- **Ceiling ~4–5 passes.** If findings still trickle at that point it's usually over-polishing or Codex nitpicking — stop, bank any remaining real items as Known gaps in `tasks/README.md`, and move on. Don't loop forever.
 
 ### Step 7 — Stop. Do not execute.
 
@@ -163,7 +172,7 @@ Four hard rules. Details for each live in the referenced template.
 
 Reach for these instead of doing the mechanical work by hand. Each one has a tested pure function exported for unit testing.
 
-- `scripts/review-plan.ts` — focused Codex review of a written plan tree (`--uncommitted` + flightplan-specific prompt); exit code mirrors codex so callers can gate on it
+- `scripts/review-plan.ts` — focused Codex review of a written plan tree (`--uncommitted` + flightplan-specific prompt); exit code mirrors codex so callers can gate on it. Run it iteratively (Step 6): review → fix → re-review until a pass is materially clean.
 - `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
 - `scripts/lint-task.ts` — validates one or more task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
