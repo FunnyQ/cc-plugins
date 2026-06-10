@@ -1,6 +1,6 @@
 ---
 name: flightplan
-version: 0.3.0
+version: 0.4.0
 description: Heavyweight interviewer that writes a multi-file specification artifact to disk — `docs/<topic>/PLAN.md` plus a `tasks/` tree with shared `_context/` files and self-contained task files that sub-agents can pick up in later sessions. AUTO-TRIGGER when the user asks to "fully spec out", "break this down into tasks", "decompose into task files", "prep this for sub-agents", "write PLAN.md and tasks", "draft a project blueprint", "interview me thoroughly", or asks for a multi-file spec artifact written to disk for later execution. Also trigger when the user explicitly says "/flightplan" or mentions they will execute the work in a different session. Do NOT trigger when the user wants a lightweight in-conversation spec (use preflight instead), or when they give a clear, actionable instruction that can be executed directly.
 ---
 
@@ -138,6 +138,8 @@ The script bundles all plan files to `codex review -` (stdin); scope is exactly 
 
 Tell the user where the files live and which task to start from. Do not start implementing. The whole point is that execution happens elsewhere with fresh context.
 
+**Hand back a quick review summary in the user's reply language** (the files stay English — only this recap is localized; for a zh-TW user, write it in zh-TW). Keep it to a glance: the goal in one line, the buckets and how many tasks each, the suggested execution order / first task, and any Known gaps. The point is to let the user sanity-check the plan's shape without opening every file — not to re-paste the plan.
+
 For the next executor: there is a helper they can run to ask "what should I work on?" — it lists tasks whose dependencies are all `done`:
 
 ```bash
@@ -146,12 +148,13 @@ bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/next-ready.ts docs/<slug>/ta
 
 ## Core principles for the artifacts
 
-Four hard rules. Details for each live in the referenced template.
+Five hard rules. Details for each live in the referenced template.
 
 1. **Task files are self-contained** — an executor needs only `_context/` + the task file. Never reference PLAN.md or other task files. See `references/task-template.md`.
 2. **PLAN.md is source of truth; `_context/` mirrors it** — when a decision changes, update PLAN.md and `_context/`, not the task files. See `references/context-files.md`.
 3. **Bucket directory is always required** — never write task files directly under `tasks/`. Short plans use a single bucket like `tasks/work/`. This keeps every `Required reading` path identical (`../_context/shared.md`).
 4. **Mark unknowns explicitly** — unresolved decisions go into `tasks/README.md` as Known gaps, not into vague tasks. See `references/readme-template.md`.
+5. **Write the artifacts in English** — PLAN.md, `_context/`, and task files are an execution blueprint a sub-agent picks up cold, so English keeps them portable and consistent regardless of the language the interview was held in. (Exception: a writing-topic plan whose deliverable is in another language may use that language for content samples.) Conduct the interview in whatever language the user prefers — only the written files are English. Always hand the user a short summary in their own reply language at handoff (see Step 7).
 
 ## File-writing rules
 
