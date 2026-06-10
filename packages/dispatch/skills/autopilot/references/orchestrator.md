@@ -16,7 +16,7 @@ const CFG = {
   scriptsDir:            '<abs path to skills/flightplan/scripts>',  // from the skill's load-time base dir
   baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
-  devEngine:             'claude',  // 'claude' (default) or 'codex' — who writes code in the dev step; 'codex' delegates each task to the codex CLI via /codex delegate (last attempt before the cap still falls back to Claude-Opus)
+  devEngine:             'claude',  // 'claude' (default) or 'codex' — who writes code in the dev step; 'codex' has each task written by the codex CLI via the codex-run.ts wrapper (last attempt before the cap still falls back to Claude-Opus)
 }
 ```
 
@@ -48,7 +48,7 @@ const CFG = {
   scriptsDir:            '<abs path to skills/flightplan/scripts>',
   baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
-  devEngine:             'claude',  // 'claude' (default) or 'codex' — who writes code in the dev step; 'codex' delegates each task to the codex CLI via /codex delegate (last attempt before the cap still falls back to Claude-Opus)
+  devEngine:             'claude',  // 'claude' (default) or 'codex' — who writes code in the dev step; 'codex' has each task written by the codex CLI via the codex-run.ts wrapper (last attempt before the cap still falls back to Claude-Opus)
 }
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
@@ -59,8 +59,8 @@ const CFG = {
 //     code to judge reuse/complexity/efficiency/altitude, so they get Opus.
 //   fix (Opus) — reads every finding and applies the changes.
 //   devCodex (Haiku) — only used when CFG.devEngine === 'codex': a cheap driver
-//     that delegates the implementation to the codex CLI (/codex delegate) and
-//     verifies. The coding intelligence lives in codex, so the driver just
+//     that has the codex CLI write the implementation (via codex-run.ts delegate)
+//     and verifies. The coding intelligence lives in codex, so the driver just
 //     invokes + checks. The last attempt before the cap still escalates to
 //     Claude-Opus (devEscalated) — a cross-vendor last shot before parking.
 const MODEL = { dev: 'sonnet', devEscalated: 'opus', devCodex: 'haiku', verify: 'haiku', judge: 'opus', reviewCodex: 'haiku', reviewLens: 'opus', fix: 'opus', commit: 'haiku' }
@@ -172,22 +172,26 @@ Then log a narrative note:
 Return a one-paragraph summary of what you did.`
 
 // Codex dev driver — used only when CFG.devEngine === 'codex'. The agent does NOT
-// hand-write the implementation; it delegates to the OpenAI codex CLI via the
-// /codex delegate skill (codex exec -s workspace-write, reachable from a Workflow
-// agent's Bash — same path the codex review lens uses) and then verifies. The
+// hand-write the implementation; it has the OpenAI codex CLI write it via our thin
+// wrapper `codex-run.ts delegate` (which runs `codex exec -s workspace-write -a
+// never`, reachable from a Workflow agent's Bash) and then verifies. The wrapper
+// prints codex's summary + a `git status --short` and leaves NO scratch behind, so
+// the driver reads one clean stdout — it never mines codex's transcript. The
 // driver feeds codex the full task context so codex never needs to pause for
 // clarification (it runs non-interactively). If codex is unreachable the driver
 // must NOT fabricate code — it reports failure so the binary gate fails the
 // attempt and the loop proceeds (the last attempt falls back to Claude-Opus).
 const devCodexPrompt = (ref, attempt, feedback) => `
-You are the CODEX DEV DRIVER for flightplan task ${ref} (tree: ${CFG.tasksDir}). You do NOT write the implementation yourself — you delegate it to the OpenAI codex CLI and then verify.
+You are the CODEX DEV DRIVER for flightplan task ${ref} (tree: ${CFG.tasksDir}). You do NOT write the implementation yourself — you have the OpenAI codex CLI write it, then you verify.
 1. Locate and read the task file (${CFG.tasksDir}/<bucket>/NN-*.md matching ${ref}) and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
 2. Set the task header "> **Status**:" to in-progress.
-3. Delegate the implementation to codex: invoke the Skill tool with skill "codex" and the "delegate" subcommand. Follow the skill (it runs \`codex exec -s workspace-write\` over Bash, verified reachable from here). Build the delegate task from the task file — pass codex the exact files to create/modify plus the full Goal, Implementation notes, and Acceptance criteria, so it has EVERYTHING and never needs to ask you anything (it runs non-interactively). Tell codex to implement the task fully and stay within the listed files.
-${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\\n' + feedback + '\\nFold this feedback into what you delegate so codex fixes exactly that.' : ''}
-4. If codex is UNREACHABLE or the delegation fails, do NOT hand-write the implementation yourself. Log the failure (step 6) and return a summary stating codex was unreachable — the binary gate will then fail this attempt and the loop moves on (the final attempt escalates to Claude-Opus automatically).
-5. After codex returns, run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
-6. Log a narrative note:
+3. Build the codex instruction from the task file — the exact files to create/modify plus the full Goal, Implementation notes, and Acceptance criteria, telling codex to implement the task fully and stay strictly within the listed files. It runs non-interactively, so give it EVERYTHING up front; it can never ask you anything.${attempt > 1 ? ' This is retry attempt ' + attempt + '. The previous attempt was rejected:\\n' + feedback + '\\nFold this feedback into the instruction so codex fixes exactly that.' : ''}
+4. Write that instruction to a temp file, then run:
+  bun ${S}/codex-run.ts delegate --prompt-file <your-instruction-file>
+   It runs \`codex exec -s workspace-write\` (codex edits the working tree directly), then prints codex's summary plus a \`git status --short\` of what changed, and cleans up its own scratch. Read that stdout — do NOT go looking for any temp/transcript files; the printed status list IS the record of what changed.
+5. If the wrapper exits non-zero or its output begins with "CODEX UNREACHABLE", do NOT hand-write the implementation yourself. Log the failure (step 7) and return a summary stating codex was unreachable — the binary gate will then fail this attempt and the loop moves on (the final attempt escalates to Claude-Opus automatically).
+6. Run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
+7. Log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "codex-delegate" --message "<what codex changed, or 'codex unreachable'>"
 Return a one-paragraph summary: what codex implemented and your verification result.`
 
@@ -198,9 +202,9 @@ Return a one-paragraph summary: what codex implemented and your verification res
 // their findings and applies them. The fan-out happens HERE in the orchestrator
 // (parallel agent() calls), NOT inside one agent — a Workflow agent has no Agent
 // tool, so it can't spawn reviewers itself, but the orchestrator can. This
-// recovers the /codex review + /simplify multi-agent power we otherwise couldn't
+// recovers the cross-vendor codex review + /simplify multi-agent power we couldn't
 // run from inside a single workflow agent. Lenses:
-//   - codex         : cross-vendor (OpenAI) bug/correctness review via /codex review
+//   - codex         : cross-vendor (OpenAI) bug/correctness review via codex-run.ts review
 //   - reuse         : duplicated logic, missed reuse of existing helpers   ┐
 //   - simplification: dead code, needless complexity, clearer equivalents   │ the four
 //   - efficiency    : wasteful work, N+1s, redundant passes/allocations     │ /simplify
@@ -210,7 +214,7 @@ Return a one-paragraph summary: what codex implemented and your verification res
 // Opus fixer edits code. The fixer ≠ judge, so the dev≠judge anti-bias split holds.
 const REVIEW_LENSES = [
   { key: 'codex', codex: true, model: MODEL.reviewCodex, focus:
-    'CROSS-VENDOR bug & correctness review. Invoke the Skill tool with skill "codex" and the "review" subcommand so OpenAI codex reviews the whole working-tree diff. Follow the skill (it runs the codex CLI over Bash, verified reachable). Record codex\'s findings. If codex is UNREACHABLE or the review cannot run, write exactly "CODEX UNREACHABLE" as the first line of your findings file — do NOT skip silently (a missing cross-vendor pass must fail this task, not pass it quietly).' },
+    'CROSS-VENDOR bug & correctness review — driven through codex-run.ts (see the codex-specific prompt branch).' },
   { key: 'reuse', model: MODEL.reviewLens, focus:
     'REUSE. Find duplicated logic and code that reinvents something the codebase already provides (existing helpers, utils, types, patterns). Each finding: file:line, what duplicates what, the reuse to apply.' },
   { key: 'simplification', model: MODEL.reviewLens, focus:
@@ -224,7 +228,15 @@ const REVIEW_LENSES = [
 // findings live under the flightlog dir (self-gitignored) → audit artifact
 const reviewDir = (attempt) => `${CFG.logFile.replace(/\/[^/]+$/, '')}/review/attempt-${attempt}`
 
-const reviewPrompt = (ref, lens, attempt) => `
+// The codex lens drives the codex CLI through our wrapper (cross-vendor signal);
+// the four Claude lenses review the diff themselves. Branch on lens.codex.
+const reviewPrompt = (ref, lens, attempt) => lens.codex ? `
+You are the CODEX (cross-vendor) reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). You do NOT review the code yourself — you have OpenAI codex review it and you record its findings.
+1. Write a review instruction to a temp file: tell codex to review THIS run's changes for BUGS & CORRECTNESS (logic errors, broken edge cases, regressions, security) — it should inspect both \`git diff ${CFG.baseRef}..HEAD\` (committed task changes) and \`git diff\` (uncommitted fixer edits) and report each issue with file:line and the concrete fix.
+2. Run: bun ${S}/codex-run.ts review --prompt-file <your-instruction-file>
+   It runs \`codex exec -s read-only\` (codex reads the repo + diffs itself), prints codex's findings, and leaves no scratch. Read that stdout — don't look for any temp/transcript files.
+3. Write codex's printed findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first). If the wrapper exits non-zero or its output begins with "CODEX UNREACHABLE", write exactly "CODEX UNREACHABLE" as the first line of that file — do NOT skip silently (a missing cross-vendor pass must fail this task, not pass it quietly).
+You are a REVIEWER: do NOT edit any source file — only record. Return a one-line count of findings.` : `
 You are the ${lens.key.toUpperCase()} reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). Review the WHOLE autopilot diff — all changes committed during this run — through ONE lens only:
 ${lens.focus}
 Get the full diff with BOTH commands:
@@ -450,9 +462,9 @@ return { slug: CFG.slug, completed, escalations }
 - **The scout echoes `next-ready.ts --json` verbatim — it does not interpret.** Use the `--json` mode (emits `[{ref,finalReview}]`, or `[]` when none ready) and have the agent return that array as-is. An earlier line-oriented scout had a fatal blind spot: when `next-ready` printed nothing (all tasks done), the agent didn't map "empty" → `[]` and instead re-listed every task as ready, causing the whole tree to re-run. `[]` from `--json` is unambiguous; the `!completed.includes` filter is the backstop.
 - **The inline gate and `score-task --log` must use the same scores.** The orchestrator decides loop/pass from `scoreInline`; the judge agent persists via the CLI. If you change the formula, change it in both `score-task.ts` and `scoreInline` here.
 - **Final review needs no special phase.** Its transitive `Depends on` reaches every task, so `next-ready` only offers it once all else is `done`. When the `finalReview` flag is set the orchestrator runs `runFinalReview` instead of a single dev agent (the multi-lens fan-out below) and uses the smaller `FINAL_MAX` cap; the binary gate + rubric judge + score gate are unchanged — they evaluate the round's output against the Final review task's own `## Eval rubric` (integration / consistency / no regressions / meets PLAN goal).
-- **The review fan-out is done by the *orchestrator*, not by one agent.** A Workflow agent has `Skill` + `Bash` (codex CLI reachable) but **no `Agent` tool**, so it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that: `runFinalReview` issues one `agent()` per lens via `parallel()` — codex (cross-vendor bug review, run through `/codex review` over Bash) plus the four `/simplify` lenses (reuse / simplification / efficiency / altitude), each Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing; a single Opus **fixer** then reads all the files and applies the changes. codex is the deliberate cross-*vendor* signal the all-Claude dev+judge can't produce; if it's unreachable the codex reviewer writes `CODEX UNREACHABLE` so the fixer flags it and the gate fails the task rather than passing an un-reviewed deliverable.
+- **The review fan-out is done by the *orchestrator*, not by one agent.** A Workflow agent has `Skill` + `Bash` (codex CLI reachable) but **no `Agent` tool**, so it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that: `runFinalReview` issues one `agent()` per lens via `parallel()` — codex (cross-vendor bug review, driven through the `codex-run.ts review` wrapper over Bash) plus the four `/simplify` lenses (reuse / simplification / efficiency / altitude), each Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing; a single Opus **fixer** then reads all the files and applies the changes. codex is the deliberate cross-*vendor* signal the all-Claude dev+judge can't produce; if it's unreachable the codex reviewer writes `CODEX UNREACHABLE` so the fixer flags it and the gate fails the task rather than passing an un-reviewed deliverable.
 - **The fixer is not the judge.** Reviewers + fixer are the "dev" side of the Final review; the binary gate + rubric judge stay independent, so the dev≠judge anti-self-grading split still holds even though the round is more elaborate.
-- **`CFG.devEngine: 'codex'` delegates the dev step to the codex CLI.** Default is `'claude'` (Sonnet→Opus). When set to `'codex'`, each non-finalReview task's dev step becomes a cheap Haiku *driver* that runs `/codex delegate` (`codex exec -s workspace-write`, reachable from a Workflow agent's Bash — the same path the codex review lens uses), so OpenAI codex writes the implementation. The verify → judge → score pipeline stays Claude, which *strengthens* the dev≠judge split into a cross-vendor one (codex writes, Claude-Opus judges). The last attempt before the cap still falls back to Claude-Opus, so a task codex can't clear gets one strong Claude try before parking; if codex is unreachable the driver reports failure (never fabricates), the binary gate fails the attempt, and the loop reaches that Opus fallback. Only the dev step changes — finalReview's multi-lens round and everything else are untouched.
+- **`CFG.devEngine: 'codex'` hands the dev step to the codex CLI.** Default is `'claude'` (Sonnet→Opus). When set to `'codex'`, each non-finalReview task's dev step becomes a cheap Haiku *driver* that runs the `codex-run.ts delegate` wrapper (`codex exec -s workspace-write`, reachable from a Workflow agent's Bash — the same wrapper the codex review lens uses), so OpenAI codex writes the implementation. The wrapper prints codex's summary + a `git status --short` and cleans up its own scratch, so the driver reads one clean stdout instead of mining a transcript. The verify → judge → score pipeline stays Claude, which *strengthens* the dev≠judge split into a cross-vendor one (codex writes, Claude-Opus judges). The last attempt before the cap still falls back to Claude-Opus, so a task codex can't clear gets one strong Claude try before parking; if codex is unreachable the wrapper exits non-zero (the driver never fabricates), the binary gate fails the attempt, and the loop reaches that Opus fallback. Only the dev step changes — finalReview's multi-lens round and everything else are untouched.
 - **Commits are inline git, not the atomic-commit skill — same `no Agent tool` constraint.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`: that skill spawns the vör + bragi sub-agents, which a Workflow agent can't do, and its analysis script lives in a *different* plugin's cache that the agent can't resolve (no `CLAUDE_PLUGIN_ROOT` in agent Bash). The `COMMIT_INSTRUCTIONS` constant inlines the skill's whole contract — atomic grouping principles + the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary) — so the agent commits over plain git, self-contained. Edit the template in that one constant if the commit convention changes.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`); passing a wide wave is safe — excess tasks queue.
 - If tasks mutate shared files and could conflict in parallel, give `executeTask`'s dev agent `isolation: 'worktree'` — only if real conflicts occur (it's expensive).
