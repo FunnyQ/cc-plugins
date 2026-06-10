@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.9.1] - 2026-06-11
+
+### ✨ Added
+
+- **Flightplan artifacts are written in English, with a localized review summary**: PLAN.md, `_context/`, and task files are now an explicit English-by-default execution blueprint (a sub-agent picks them up cold, so English keeps them portable) — the interview can still be held in any language, and writing-topic plans whose deliverable is another language may use it for content samples. At handoff (Step 7), the agent hands back a quick summary in the user's reply language (zh-TW for a zh-TW user) — goal, buckets/task counts, execution order, Known gaps — so you can sanity-check the plan's shape without opening every file.
+
 ## [3.9.0] - 2026-06-10
 
 ### ✨ Added
