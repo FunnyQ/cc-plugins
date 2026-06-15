@@ -1,6 +1,6 @@
 ---
 name: autopilot
-version: 0.4.0
+version: 0.5.0
 description: Execute a flightplan task tree end-to-end with a multi-agent quality loop. For each ready task it runs Dev → an independent binary gate → a rubric judge → a deterministic score gate, retrying until the task passes its own `## Eval rubric`, then runs the closing `Final review` task as the whole-tree gate. AUTO-TRIGGER when the user says "/autopilot", "execute the flightplan", "run the task tree", "build out docs/<slug>", "work through the tasks", "fly the plan", or points at a `docs/<slug>/tasks/` tree and asks to implement it. Do NOT trigger when there is no flightplan on disk (use flightplan first), or when the user wants to do a single task by hand.
 ---
 
@@ -52,18 +52,24 @@ Before touching Workflow, gather the work-list in the main conversation:
    git rev-parse HEAD
    ```
    Bake this as `CFG.baseRef` — the Final review lenses use `git diff <baseRef>..HEAD` to see all committed task changes, rather than the working-tree diff (which would be empty after inter-wave commits).
-6. Decide `maxAttempts` (default **3**, the per-task cap) and `finalReviewMaxAttempts` (default **2**, the Final review round's cap). The dev engine (Claude vs codex) is chosen with the user in Step 2; confirm the rest of the model policy only if they want to change it.
-6. Confirm the cross-vendor reviewer is available — the Final review round shells out to it:
+6. Decide `maxAttempts` (default **3**, the per-task cap) and `finalReviewMaxAttempts` (default **2**, the Final review round's cap). The dev engine (Claude / codex / opencode) is chosen with the user in Step 2; confirm the rest of the model policy only if they want to change it.
+6. Confirm the selected external CLI(s) are available — the dev step (when its engine is external) and the closing cross-vendor review round shell out to them. Version-check whichever engines Step 2 will offer or the user picks:
    ```bash
-   codex --version   # the dev step (codex engine) and the closing review round both shell out to the codex CLI; if codex is missing those steps fail (by design, not silently)
+   codex --version      # needed if devEngine or reviewEngine is 'codex'
+   opencode --version   # needed if devEngine or reviewEngine is 'opencode'
    ```
-   If codex isn't installed, tell the user before flying (the per-task work still runs; only the closing review round needs it).
+   If a selected engine isn't installed, tell the user before flying (the per-task Claude work still runs; the external dev engine and the closing cross-vendor review round are what need it).
 
 ## Step 2 — Confirm the flight with the user
 
-**Ask which dev engine to fly with — don't silently default.** Use `AskUserQuestion` with two options: **Claude** (`CFG.devEngine: 'claude'`, the default — Sonnet writes, Opus on the last attempt) and **Codex** (`CFG.devEngine: 'codex'` — the OpenAI codex CLI writes each task via the `codex-run.ts` wrapper, Claude still judges, giving a cross-vendor dev≠judge split). The user's pick sets `CFG.devEngine` in Step 3. If they pick **Codex**, the `codex --version` check from Step 1 is now load-bearing for *every* task (not just the closing review) — if codex is unreachable, say so and offer to fall back to Claude before flying.
+**Ask which dev engine and which cross-vendor reviewer to fly with — don't silently default.** These are two **independent** choices; use `AskUserQuestion`:
 
-Then show a one-screen brief and get a go: the slug, how many tasks, the chosen dev engine, the two caps (`maxAttempts` / `finalReviewMaxAttempts`), the model policy, that capped tasks will be parked + escalated (not silently skipped), and that the closing Final review round runs a codex CLI review — which **sends the branch diff to an external service (OpenAI)**. This is real compute, real edits, and an external code review — get an explicit go before calling Workflow.
+- **Dev engine** (`CFG.devEngine`) — **Claude** (default; Sonnet writes, Opus on the last attempt), **Codex** (`'codex'` — the OpenAI codex CLI writes each task via `codex-run.ts`), or **OpenCode** (`'opencode'` — the opencode CLI writes each task via `opencode-run.ts`). With Codex/OpenCode the dev step is a cheap Haiku driver and Claude still judges, giving a cross-vendor dev≠judge split.
+- **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
+
+The picks set `CFG.devEngine` + `CFG.reviewEngine` in Step 3. Whichever external engines get chosen make their `--version` check from Step 1 load-bearing — if a picked engine is unreachable, say so and offer to fall back before flying (Claude for the dev engine; the other CLI for the reviewer).
+
+Then show a one-screen brief and get a go: the slug, how many tasks, the chosen dev engine + cross-vendor reviewer, the two caps (`maxAttempts` / `finalReviewMaxAttempts`), the model policy, that capped tasks will be parked + escalated (not silently skipped), and that the closing Final review round runs the chosen external CLI review — which **sends the branch diff to an external service** (OpenAI for codex; the configured opencode provider for opencode). This is real compute, real edits, and an external code review — get an explicit go before calling Workflow.
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
@@ -81,13 +87,18 @@ const CFG = {
   scriptsDir:            '<abs path to skills/flightplan/scripts>',  // ABSOLUTE, from the skill load-time base dir
   baseRef:               '<output of `git rev-parse HEAD` captured in Step 1>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
-  devEngine:             'claude',  // 'claude' (default) or 'codex' — see "Dev engine" below
+  devEngine:             'claude',  // 'claude' (default), 'codex', or 'opencode' — see "Dev engine" below
+  reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — cross-vendor reviewer in the Final review
+  opencodeDevModel:      '',        // optional opencode model for the dev engine (empty → default opencode-go/kimi-k2.7-code); opencode-only
+  opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → default opencode-go/qwen3.7-max); opencode-only
 }
 ```
 
 Then call `Workflow({ script: <the adapted script> })` — no `args` needed.
 
-**Dev engine (`CFG.devEngine`).** Default `'claude'` writes code with Sonnet (→ Opus on the last attempt). Set it to `'codex'` to hand each task's implementation to the OpenAI **codex** CLI: the dev step becomes a cheap Haiku *driver* that runs the `codex-run.ts delegate` wrapper (`codex exec -s workspace-write`, reachable from a Workflow agent's Bash — the same wrapper the closing codex review lens uses), so codex does the coding. The wrapper prints codex's summary + a `git status --short` and cleans up its own scratch, so the driver never mines a transcript. The independent verify → judge → score pipeline stays Claude, turning the dev≠judge split into a **cross-vendor** one (codex writes, Claude-Opus judges). The last attempt before the cap still falls back to Claude-Opus — a final cross-vendor try before the task is parked — and if codex is unreachable the wrapper exits non-zero (the driver never fabricates), so the gate fails the attempt cleanly. Only the dev step changes; the finalReview round and everything else are identical.
+**Dev engine (`CFG.devEngine`) + cross-vendor reviewer (`CFG.reviewEngine`) — two independent axes.** Default dev engine `'claude'` writes code with Sonnet (→ Opus on the last attempt). Set it to `'codex'` or `'opencode'` to hand each task's implementation to that external CLI: the dev step becomes a cheap Haiku *driver* that runs the `<engine>-run.ts delegate` wrapper (reachable from a Workflow agent's Bash — the same wrapper the closing cross-vendor review lens uses), so the external CLI does the coding. The wrapper prints the CLI's summary + a `git status --short` and cleans up its own scratch, so the driver never mines a transcript. The independent verify → judge → score pipeline stays Claude, turning the dev≠judge split into a **cross-vendor** one (the external CLI writes, Claude-Opus judges). The last attempt before the cap still falls back to Claude-Opus — a final try before the task is parked — and if the CLI is unreachable the wrapper exits non-zero (the driver never fabricates), so the gate fails the attempt cleanly. `CFG.reviewEngine` (`'codex'` default, or `'opencode'`) **independently** picks the external bug/correctness lens in the closing Final review — so you can have opencode write and codex review, or any mix. Only the dev step changes with `devEngine`; the finalReview round's other lenses and everything else are identical. (codex review is sandbox-enforced read-only; opencode review is prompt-enforced read-only — its wrapper prepends a hard "analyze only" guard, since opencode has no `-s read-only` equivalent yet.)
+
+**Picking the opencode model.** opencode requires a `-m provider/model`. Leave `CFG.opencodeDevModel` / `CFG.opencodeReviewModel` empty to use the wrapper defaults (`opencode-go/kimi-k2.7-code` for dev, `opencode-go/qwen3.7-max` for review); set either to override just that role (the orchestrator threads it through as `opencode-run.ts … --model <value>`). These are **opencode-only** — codex uses its own configured model and ignores `-m`, so they have no effect when an engine is codex. When the user names a specific opencode model in Step 2, bake it into the matching field; otherwise leave them empty.
 
 The orchestrator runs a **wave loop**: each wave asks an agent to run `next-ready.ts` (status changes only happen *inside* the run, so the ready set must be re-scouted every wave — a static list misses tasks unblocked mid-flight), then executes the wave's ready tasks **in parallel**. Each task is a retry pipeline:
 
@@ -123,7 +134,7 @@ The dev and rubric judge are both Claude, so they share blind spots. The Final r
 
 ```
 parallel reviewers — each writes findings to .flightlog/review/attempt-N/<lens>.md, edits nothing
-   ├─ codex          → codex-run.ts review (codex CLI over Bash): cross-vendor bug/correctness
+   ├─ <reviewEngine> → <engine>-run.ts review (codex/opencode CLI over Bash): cross-vendor bug/correctness
    ├─ reuse          → duplicated logic, missed reuse of existing helpers     ┐
    ├─ simplification → dead code, needless complexity, clearer equivalents     │ the four
    ├─ efficiency     → redundant passes, N+1s, recomputation, allocations      │ /simplify
@@ -139,7 +150,7 @@ the normal binary gate + rubric judge + score gate
 done
 ```
 
-**Why this exact shape** — it's dictated by what a **Workflow agent** can do (verified empirically): it has `Skill` + `Bash` (the codex CLI is reachable) but **no `Agent` tool**, so a single agent can't fan out reviewers itself, and fan-out skills like `/simplify` and Claude's own `/code-review` can't run inside it. The orchestrator sidesteps both: it issues one `agent()` **per lens** via `parallel()`, recovering the cross-vendor codex review + `/simplify` multi-agent power at the orchestrator level. **codex owns bugs** (where a non-Claude vendor catches what an all-Claude pipeline can't); **the four Claude lenses own quality** (they are exactly `/simplify`'s reuse / simplification / efficiency / altitude axes, one agent each). Splitting reviewers (record-only) from the fixer (edits) keeps the fixer **≠** the judge, so the dev≠judge anti-bias split still holds. If codex is unreachable its reviewer writes `CODEX UNREACHABLE` instead of findings, so the fixer flags it and the gate fails the task rather than rubber-stamping an un-reviewed deliverable.
+**Why this exact shape** — it's dictated by what a **Workflow agent** can do (verified empirically): it has `Skill` + `Bash` (the external CLI is reachable) but **no `Agent` tool**, so a single agent can't fan out reviewers itself, and fan-out skills like `/simplify` and Claude's own `/code-review` can't run inside it. The orchestrator sidesteps both: it issues one `agent()` **per lens** via `parallel()`, recovering the cross-vendor external review + `/simplify` multi-agent power at the orchestrator level. **The external engine (codex/opencode) owns bugs** (where a non-Claude vendor catches what an all-Claude pipeline can't); **the four Claude lenses own quality** (they are exactly `/simplify`'s reuse / simplification / efficiency / altitude axes, one agent each). Splitting reviewers (record-only) from the fixer (edits) keeps the fixer **≠** the judge, so the dev≠judge anti-bias split still holds. If the external CLI is unreachable its reviewer writes its `<ENGINE> UNREACHABLE` token instead of findings, so the fixer flags it and the gate fails the task rather than rubber-stamping an un-reviewed deliverable.
 
 ## Step 4 — Report
 
@@ -161,11 +172,11 @@ Encoded as a constant table at the top of the orchestrator so it's tunable in on
 | Role | Model | Why |
 |---|---|---|
 | **Dev** | Sonnet → **Opus on the last attempt** | Workhorse coder. On the final attempt before the cap, escalate to Opus — a model that failed N times rarely clears it by retrying as itself; the last shot gets the stronger model before we bother the user. |
-| **Dev — codex engine** (`CFG.devEngine: 'codex'`) | Haiku driver → **Opus on the last attempt** | When the codex engine is on, the dev step is a cheap Haiku driver that runs the `codex-run.ts delegate` wrapper to have the codex CLI write the code — the coding intelligence is codex's, so the driver just invokes + verifies. The last attempt still falls back to Claude-Opus (a cross-vendor final try). |
+| **Dev — external engine** (`CFG.devEngine: 'codex'`/`'opencode'`) | Haiku driver → **Opus on the last attempt** | When an external dev engine is on, the dev step is a cheap Haiku driver that runs the `<engine>-run.ts delegate` wrapper to have that CLI write the code — the coding intelligence is the external CLI's, so the driver just invokes + verifies. The last attempt still falls back to Claude-Opus (a cross-vendor final try). |
 | **Binary gate (Acceptance / Verification)** | Haiku | Mechanical: re-run the task's concrete `## Verification` commands and report pass/fail + raw output. Keep its job narrow — *run and report*, never subjective judgement. Runs first as a cheap filter so Opus never scores code that doesn't even build/test. |
 | **Rubric judge** | Opus | The graded gate that decides loop-or-pass; judgement quality is paramount (a weak judge ships bad code or loops forever). |
 | **Commit (inter-wave + post-loop)** | Haiku | Commits the wave's changes with **inline git** (the `COMMIT_INSTRUCTIONS` block — atomic principles + commit template baked into the prompt), NOT the `odin-git:atomic-commit` skill: a Workflow agent has no `Agent` tool, so that skill's vör/bragi sub-agents can't spawn. A wave's changes are usually one coherent set, so grouping + message-writing is within Haiku's reach. |
-| **Final review — codex lens** | Haiku | Only *drives* the codex CLI (via `codex-run.ts review`) and records its output — the review intelligence lives in codex itself, so a cheap model to invoke + capture is all that's needed. |
+| **Final review — cross-vendor lens** (`CFG.reviewEngine`) | Haiku | Only *drives* the chosen external CLI (codex or opencode, via `<engine>-run.ts review`) and records its output — the review intelligence lives in that CLI, so a cheap model to invoke + capture is all that's needed. |
 | **Final review — /simplify lenses** | Opus × 4 (parallel) | reuse / simplification / efficiency / altitude. These must genuinely *understand* the code to judge quality, so they get the strongest model. They only *record* findings; they don't edit. |
 | **Final review — fixer** | Opus | Reads every lens's findings and applies them; highest-stakes holistic gate (integration, consistency, regressions, met the PLAN goal). Capped at `finalReviewMaxAttempts` (default 2). |
 
@@ -190,7 +201,7 @@ Everything lands in `docs/<slug>/.flightlog/`, **gitignored** via a self-ignore 
 
 - **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label>`. Deterministic, guaranteed each cycle.
 - **Narrative** — Dev / judge / final-review agents run `flightlog.ts log <run.jsonl> --task <ref> --role <role> --attempt N --agent <label> --message "..."` to record what they did.
-- **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (codex / reuse / simplification / efficiency / altitude). These persist as the artifact behind each closing-round verdict.
+- **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (`<reviewEngine>` / reuse / simplification / efficiency / altitude). These persist as the artifact behind each closing-round verdict.
 - **Report** — `flightlog.ts report <run.jsonl>` renders `RUNLOG.md`, grouped by task in chronological order.
 
 Each entry records an `agentLabel` so a suspicious verdict can be traced back to that agent's raw `agent-<id>.jsonl` in the harness transcript.
@@ -204,7 +215,8 @@ autopilot ships no scripts of its own — it reuses flightplan's, which are sibl
 - `mark-done.ts <task>` — the done-transition: sets `Status: done` and ticks every `## Acceptance criteria` / `## Verification` checkbox. Run when a task passes the gate.
 - `flightlog.ts log|report` — narrative entries + `RUNLOG.md`.
 - `lint-task.ts <tasks-dir>` — run during scout if `next-ready` reports a malformed tree.
-- `codex-run.ts <delegate|review> [--prompt-file <path>]` — thin wrapper over the `codex` CLI used by the codex dev engine + the closing codex review lens. `delegate` runs `codex exec -s workspace-write` and appends a `git status --short`; `review` runs `codex exec -s read-only`. Captures codex's clean last message, prints it, and deletes its own scratch (no temp left to mine). Exits non-zero with a `CODEX UNREACHABLE` stderr line when the CLI is missing/fails. Prompt from `--prompt-file` or stdin.
+- `codex-run.ts <delegate|review> [--prompt-file <path>]` — thin wrapper over the `codex` CLI used by the codex dev engine + the codex review lens. `delegate` runs `codex exec -s workspace-write` and appends a `git status --short`; `review` runs `codex exec -s read-only`. Captures codex's clean last message, prints it, and deletes its own scratch (no temp left to mine). Exits non-zero with a `CODEX UNREACHABLE` stderr line when the CLI is missing/fails. Prompt from `--prompt-file` or stdin.
+- `opencode-run.ts <delegate|review> [--prompt-file <path>] [--model <m>]` — the opencode counterpart of `codex-run.ts`, used when `devEngine`/`reviewEngine` is `'opencode'`. `delegate` runs `opencode run -m <model> --format json` (write-capable) and appends a `git status --short`; `review` prepends a hard read-only guard (opencode has no sandbox read-only). Parses the JSONL `text` parts, prints the clean answer, exits non-zero with an `OPENCODE UNREACHABLE` stderr line when the CLI is missing/fails. Model: `--model` > `OPENCODE_MODEL` env > per-mode default (delegate `opencode-go/kimi-k2.7-code`, review `opencode-go/qwen3.7-max`). Prompt from `--prompt-file` or stdin.
 
 ## Additional resources
 

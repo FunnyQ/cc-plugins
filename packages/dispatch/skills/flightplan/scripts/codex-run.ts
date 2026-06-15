@@ -11,10 +11,10 @@
  * so the calling agent has a single deterministic stdout to read and **nothing
  * left in /tmp to go spelunking through**.
  *
- *   delegate — codex writes code. `codex exec -s workspace-write -a never`.
+ *   delegate — codex writes code. `codex exec -s workspace-write`.
  *              Edits land directly in the working tree; we append a
- *              `git diff --stat` so the driver sees what changed without reading
- *              codex's transcript.
+ *              `git status --short` so the driver sees what changed (including
+ *              newly-created files) without reading codex's transcript.
  *   review   — codex critiques the diff, read-only. `codex exec -s read-only`.
  *              Edits nothing; prints codex's findings.
  *

@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.10.1] - 2026-06-15
+
+### ✨ Added
+
+- **Autopilot can fly with OpenCode** as its dev engine and/or its cross-vendor review lens, alongside the existing Claude and Codex options. Dev engine (`CFG.devEngine`) and cross-vendor reviewer (`CFG.reviewEngine`) are now **two independent axes** — you can have OpenCode write and Codex review, or any mix. A new `opencode-run.ts` wrapper (the OpenCode counterpart of `codex-run.ts`) drives the `opencode` CLI: `delegate` writes code, `review` runs prompt-enforced read-only (OpenCode has no sandbox read-only, so the wrapper prepends a hard "analyze only" guard). Pick the OpenCode model per role via `CFG.opencodeDevModel` / `CFG.opencodeReviewModel` (default `opencode-go/kimi-k2.7-code` for dev, `opencode-go/qwen3.7-max` for review).
+
+### ♻️ Changed
+
+- **Autopilot's external-engine plumbing generalized** behind an `ENGINES` map, so codex and opencode share one parametrized dev-driver and review-lens path; adding a future engine is a single entry. (Internal to the orchestrator; no change to the Claude default flight.)
+
+### 🐛 Fixed
+
+- **`codex-run.ts` docstring** corrected to match the code — it described the long-removed `-a never` flag and a `git diff --stat` summary, but the wrapper drops `-a never` (codex ≥ 0.139) and prints `git status --short` (so newly-created files show up).
+
 ## [relay 0.2.0] - 2026-06-15
 
 _relay is independently versioned; this entry tracks the `relay-v0.2.0` tag._
