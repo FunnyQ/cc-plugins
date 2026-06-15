@@ -196,6 +196,11 @@ function openCodeTimestampIso(value: number): string | undefined {
   return new Date(ms).toISOString();
 }
 
+function compactOpenCodePath(path: string): string {
+  const parts = path.split("/").filter(Boolean);
+  return parts.slice(-3).join("/") || path;
+}
+
 function openCodePartContent(part: unknown): unknown | null {
   if (!part || typeof part !== "object") return null;
   const p = part as {
@@ -204,6 +209,7 @@ function openCodePartContent(part: unknown): unknown | null {
     content?: string;
     name?: string;
     input?: unknown;
+    files?: unknown;
   };
   if (p.type === "text" && typeof p.text === "string") {
     return { type: "text", text: p.text };
@@ -218,12 +224,21 @@ function openCodePartContent(part: unknown): unknown | null {
       input: p.input ?? part,
     };
   }
-  if (
-    p.type === "patch" ||
-    p.type === "step-start" ||
-    p.type === "step-finish"
-  ) {
-    return { type: "text", text: JSON.stringify(part, null, 2) };
+  if (p.type === "step-start" || p.type === "step-finish") {
+    return null;
+  }
+  if (p.type === "patch") {
+    const files = Array.isArray(p.files)
+      ? p.files.filter((file): file is string => typeof file === "string")
+      : [];
+    if (!files.length) return null;
+    return {
+      type: "text",
+      text: [
+        "Changed files:",
+        ...files.map((file) => `- \`${compactOpenCodePath(file)}\``),
+      ].join("\n"),
+    };
   }
   const text = p.text ?? p.content;
   if (typeof text === "string") return { type: "text", text };

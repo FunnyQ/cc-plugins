@@ -191,12 +191,52 @@ beforeEach(() => {
     `insert into part (id, message_id, session_id, time_created, time_updated, data)
      values (?, ?, ?, ?, ?, ?)`,
     [
+      "part_step_start",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({ type: "step-start", snapshot: "abc123" }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
       "part_text",
       "msg_assistant",
       "ses_test",
       1_700_000_000_002,
       1_700_000_000_003,
       JSON.stringify({ type: "text", text: "hi from opencode" }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_patch",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({
+        type: "patch",
+        hash: "abc123",
+        files: ["/tmp/project/app.ts", "/tmp/project/app.test.ts"],
+      }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_step_finish",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({ type: "step-finish", reason: "stop" }),
     ],
   );
   odb.close();
@@ -262,6 +302,11 @@ describe("transcript-stream backlog", () => {
     expect(buf).toContain("hello opencode");
     expect(buf).toContain("msg_assistant");
     expect(buf).toContain("hi from opencode");
+    expect(buf).toContain("Changed files:");
+    expect(buf).toContain("app.ts");
+    expect(buf).toContain("app.test.ts");
+    expect(buf).not.toContain("step-start");
+    expect(buf).not.toContain("step-finish");
   });
 });
 
