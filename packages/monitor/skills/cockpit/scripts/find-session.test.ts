@@ -155,3 +155,52 @@ describe("find-session --provider codex", () => {
     expect(result.stderr).toContain("no Codex state database");
   });
 });
+
+describe("find-session --provider opencode", () => {
+  test("trusts OPENCODE_SESSION_ID over the database", () => {
+    const result = run(["--provider", "opencode"], {
+      OPENCODE_SESSION_ID: "ses_live",
+      COCKPIT_OPENCODE_DB: join(codexDir, "missing.db"),
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe("ses_live");
+  });
+
+  test("returns newest OpenCode session for cwd", () => {
+    const dbPath = join(codexDir, "opencode.db");
+    const db = new Database(dbPath);
+    db.run(
+      `create table session (
+        id text primary key,
+        directory text not null,
+        time_updated integer not null,
+        time_archived integer
+      )`,
+    );
+    db.run(
+      `insert into session (id, directory, time_updated, time_archived)
+       values (?, ?, ?, null)`,
+      ["ses_old", projectDir, 1000],
+    );
+    db.run(
+      `insert into session (id, directory, time_updated, time_archived)
+       values (?, ?, ?, null)`,
+      ["ses_new", projectDir, 2000],
+    );
+    db.close();
+
+    const result = run(["--provider", "opencode"], {
+      COCKPIT_OPENCODE_DB: dbPath,
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe("ses_new");
+  });
+
+  test("missing OpenCode DB exits non-zero", () => {
+    const result = run(["--provider", "opencode"], {
+      COCKPIT_OPENCODE_DB: join(codexDir, "missing.db"),
+    });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("no OpenCode database");
+  });
+});

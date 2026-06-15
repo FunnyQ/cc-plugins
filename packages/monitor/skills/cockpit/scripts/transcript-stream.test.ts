@@ -27,6 +27,7 @@ const SID = "22222222-2222-2222-2222-222222222222";
 let projectsDir: string;
 let codexDir: string;
 let codexSessionsDir: string;
+let openCodeDb: string;
 let logPath: string;
 let codexLogPath: string;
 
@@ -86,6 +87,8 @@ beforeEach(() => {
   process.env.COCKPIT_CLAUDE_PROJECTS_DIR = projectsDir;
   process.env.COCKPIT_CODEX_DIR = codexDir;
   process.env.COCKPIT_CODEX_SESSIONS_DIR = codexSessionsDir;
+  openCodeDb = join(codexDir, "opencode.db");
+  process.env.COCKPIT_OPENCODE_DB = openCodeDb;
   // snappy polling so resilience cases settle within test timeouts
   process.env.COCKPIT_RESOLVE_POLL_MS = "100";
   process.env.COCKPIT_TAIL_POLL_MS = "100";
@@ -141,6 +144,140 @@ beforeEach(() => {
     relative(codexDir, codexLogPath),
   ]);
   db.close();
+
+  const odb = new Database(openCodeDb);
+  odb.run(
+    `create table message (
+      id text primary key,
+      session_id text not null,
+      time_created integer not null,
+      time_updated integer not null,
+      data text not null
+    )`,
+  );
+  odb.run(
+    `create table part (
+      id text primary key,
+      message_id text not null,
+      session_id text not null,
+      time_created integer not null,
+      time_updated integer not null,
+      data text not null
+    )`,
+  );
+  odb.run(
+    `insert into message (id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?)`,
+    [
+      "msg_user",
+      "ses_test",
+      1_700_000_000_000,
+      1_700_000_000_001,
+      JSON.stringify({ role: "user", text: "hello opencode" }),
+    ],
+  );
+  odb.run(
+    `insert into message (id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?)`,
+    [
+      "msg_empty",
+      "ses_test",
+      1_700_000_000_001,
+      1_700_000_000_001,
+      JSON.stringify({ role: "assistant", content: "" }),
+    ],
+  );
+  odb.run(
+    `insert into message (id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?)`,
+    [
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({ role: "assistant" }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_step_start",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({ type: "step-start", snapshot: "abc123" }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_text",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({ type: "text", text: "hi from opencode" }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_read",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({
+        type: "tool",
+        tool: "read",
+        state: {
+          input: { filePath: "/tmp/project/inbox.ts" },
+          metadata: {
+            display: {
+              path: "/tmp/project/inbox.ts",
+              text: "export function inbox() {}",
+              lineStart: 1,
+              lineEnd: 1,
+              totalLines: 1,
+            },
+          },
+        },
+      }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_patch",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({
+        type: "patch",
+        hash: "abc123",
+        files: ["/tmp/project/app.ts", "/tmp/project/app.test.ts"],
+      }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
+      "part_step_finish",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({ type: "step-finish", reason: "stop" }),
+    ],
+  );
+  odb.close();
 });
 
 afterEach(() => {
@@ -149,6 +286,7 @@ afterEach(() => {
   delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
   delete process.env.COCKPIT_CODEX_DIR;
   delete process.env.COCKPIT_CODEX_SESSIONS_DIR;
+  delete process.env.COCKPIT_OPENCODE_DB;
   delete process.env.COCKPIT_RESOLVE_POLL_MS;
   delete process.env.COCKPIT_TAIL_POLL_MS;
 });
@@ -192,6 +330,25 @@ describe("transcript-stream backlog", () => {
     const buf = await collect(res, (b) => b.includes("backlog-done"));
     expect(buf).toContain("c1");
     expect(buf).not.toContain("c-noise");
+  });
+
+  test("opencode provider streams messages from the local database", async () => {
+    const res = handleTranscriptStream(transcriptReq("ses_test", "opencode"));
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+    const buf = await collect(res, (b) => b.includes("backlog-done"));
+    expect(buf).toContain("msg_user");
+    expect(buf).toContain("hello opencode");
+    expect(buf).not.toContain("msg_empty");
+    expect(buf).toContain("msg_assistant");
+    expect(buf).toContain("hi from opencode");
+    expect(buf).toContain("Read · tmp/project/inbox.ts");
+    expect(buf).toContain("export function inbox() {}");
+    expect(buf).not.toContain('"tool":"read"');
+    expect(buf).toContain("Changed files:");
+    expect(buf).toContain("app.ts");
+    expect(buf).toContain("app.test.ts");
+    expect(buf).not.toContain("step-start");
+    expect(buf).not.toContain("step-finish");
   });
 });
 
@@ -337,6 +494,11 @@ describe("transcript-stream validation", () => {
 
   test("unknown provider → 400", async () => {
     const res = handleTranscriptStream(transcriptReq(SID, "other"));
+    expect(res.status).toBe(400);
+  });
+
+  test("opencode rejects unsafe session ids", async () => {
+    const res = handleTranscriptStream(transcriptReq("../bad", "opencode"));
     expect(res.status).toBe(400);
   });
 });

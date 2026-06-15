@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildClaudeLiveSessions,
   buildCodexLiveSessions,
+  buildOpenCodeLiveSessions,
   codexUpdatedAtMs,
   parseCockpitKeys,
   projectNameFor,
@@ -12,6 +13,7 @@ import {
   CODEX_BUSY_CUTOFF_MS,
   type CodexRowInput,
   type LiveSession,
+  type OpenCodeRowInput,
 } from "./live-sessions";
 
 const NOW = 1_700_000_000_000;
@@ -76,12 +78,13 @@ describe("parseCockpitKeys", () => {
     const raw = JSON.stringify({
       sessions: [
         { sessionId: "a", provider: "codex" },
+        { sessionId: "o", provider: "opencode" },
         { sessionId: "b" }, // no provider → claude
         { provider: "codex" }, // no sessionId → dropped
       ],
     });
     const keys = parseCockpitKeys(raw);
-    expect([...keys].sort()).toEqual(["claude:b", "codex:a"]);
+    expect([...keys].sort()).toEqual(["claude:b", "codex:a", "opencode:o"]);
   });
   test("returns an empty set on corrupt / non-array input", () => {
     expect(parseCockpitKeys("not json").size).toBe(0);
@@ -187,6 +190,67 @@ describe("buildCodexLiveSessions", () => {
       new Set(),
       NOW,
       () => true,
+    );
+    expect(out).toHaveLength(0);
+  });
+});
+
+describe("buildOpenCodeLiveSessions", () => {
+  const row = (over: Partial<OpenCodeRowInput> = {}): OpenCodeRowInput => ({
+    id: "o1",
+    directory: "/Users/q/proj",
+    time_created: NOW - 2000,
+    time_updated: NOW - 1000,
+    ...over,
+  });
+
+  test("maps a fresh OpenCode session", () => {
+    const out = buildOpenCodeLiveSessions(
+      [row()],
+      new Set(["opencode:o1"]),
+      NOW,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      provider: "opencode",
+      id: "o1",
+      projectName: "proj",
+      status: "active-inferred",
+      statusSource: "opencode-sqlite-session",
+      cockpit: true,
+      isStale: false,
+    });
+  });
+
+  test("marks older-but-fresh sessions as recent", () => {
+    const out = buildOpenCodeLiveSessions(
+      [row({ time_updated: NOW - CODEX_BUSY_CUTOFF_MS - 1000 })],
+      new Set(),
+      NOW,
+    );
+    expect(out[0].status).toBe("recent");
+  });
+
+  test("normalizes second-based timestamps", () => {
+    const out = buildOpenCodeLiveSessions(
+      [
+        row({
+          time_created: Math.floor((NOW - 2000) / 1000),
+          time_updated: Math.floor((NOW - 1000) / 1000),
+        }),
+      ],
+      new Set(),
+      NOW,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].ageMs).toBe(1000);
+  });
+
+  test("drops stale sessions past the cutoff", () => {
+    const out = buildOpenCodeLiveSessions(
+      [row({ time_updated: NOW - STALE_CUTOFF_MS - 1 })],
+      new Set(),
+      NOW,
     );
     expect(out).toHaveLength(0);
   });

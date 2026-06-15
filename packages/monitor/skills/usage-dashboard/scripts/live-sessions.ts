@@ -1,10 +1,12 @@
 // Pure shaping for the "Live now" panel: turn already-read raw rows (Claude
-// session files, Codex thread rows, the cockpit registry) into the sorted,
-// stale-filtered, cockpit-tagged LiveSession list. The filesystem/SQLite reads
-// stay in live.ts; everything testable without I/O lives here.
+// session files, Codex thread rows, OpenCode session rows, the cockpit registry)
+// into the sorted, stale-filtered, cockpit-tagged LiveSession list. The
+// filesystem/SQLite reads stay in live.ts; everything testable without I/O lives
+// here.
+import { openCodeTimestampMs } from "../../shared/scripts/opencode";
 
 export type LiveSession = {
-  provider: "claude" | "codex";
+  provider: "claude" | "codex" | "opencode";
   id: string;
   projectName: string;
   cwd: string;
@@ -12,7 +14,8 @@ export type LiveSession = {
   statusSource:
     | "claude-session-file"
     | "codex-app-server"
-    | "codex-sqlite-rollout";
+    | "codex-sqlite-rollout"
+    | "opencode-sqlite-session";
   updatedAt: string;
   ageMs: number;
   isStale: boolean;
@@ -42,6 +45,13 @@ export type CodexRowInput = {
   updated_at: number;
   created_at_ms?: number | null;
   created_at: number;
+};
+
+export type OpenCodeRowInput = {
+  id: string;
+  directory: string;
+  time_created: number;
+  time_updated: number;
 };
 
 export const STALE_CUTOFF_MS = 10 * 60 * 1000;
@@ -83,10 +93,13 @@ export function parseCockpitKeys(raw: string): Set<string> {
           .filter(
             (s: { sessionId?: unknown }) => typeof s?.sessionId === "string",
           )
-          .map(
-            (s: { provider?: string; sessionId: string }) =>
-              `${s.provider === "codex" ? "codex" : "claude"}:${s.sessionId}`,
-          ),
+          .map((s: { provider?: string; sessionId: string }) => {
+            const provider =
+              s.provider === "codex" || s.provider === "opencode"
+                ? s.provider
+                : "claude";
+            return `${provider}:${s.sessionId}`;
+          }),
       );
     }
   } catch {
@@ -156,6 +169,33 @@ export function buildCodexLiveSessions(
         !!session.transcriptPath &&
         transcriptExists(session.transcriptPath),
     );
+}
+
+export function buildOpenCodeLiveSessions(
+  rows: OpenCodeRowInput[],
+  cockpitKeys: Set<string>,
+  now: number,
+): LiveSession[] {
+  return rows
+    .map((row) => {
+      const updatedAtMs =
+        openCodeTimestampMs(row.time_updated) ||
+        openCodeTimestampMs(row.time_created);
+      const ageMs = Math.max(0, now - updatedAtMs);
+      return {
+        provider: "opencode",
+        id: row.id,
+        projectName: projectNameFor(row.directory),
+        cwd: row.directory,
+        status: ageMs <= CODEX_BUSY_CUTOFF_MS ? "active-inferred" : "recent",
+        statusSource: "opencode-sqlite-session",
+        updatedAt: new Date(updatedAtMs).toISOString(),
+        ageMs,
+        isStale: ageMs > STALE_CUTOFF_MS,
+        cockpit: cockpitKeys.has(`opencode:${row.id}`),
+      } satisfies LiveSession;
+    })
+    .filter((session) => !session.isStale);
 }
 
 // Merge + order both providers' sessions: status bucket first, then most

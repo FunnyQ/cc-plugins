@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// Find the current Claude Code or Codex session id for a project.
+// Find the current Claude Code, Codex, or OpenCode session id for a project.
 //
 // Claude Code: the running session exposes its id in CLAUDE_CODE_SESSION_ID —
 // that env var is authoritative, so we trust it first. Only when it's absent
@@ -13,17 +13,22 @@
 // Prints the uuid to stdout (exit 0), or a message to stderr (exit 1) when no
 // session is found — in which case the caller should generate a fresh uuid.
 //
-// Usage: bun find-session.ts [--provider claude|codex] [projectPath]
+// Usage: bun find-session.ts [--provider claude|codex|opencode] [projectPath]
 // Defaults: provider=claude, projectPath=cwd.
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
 import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
+import { openCodeDb } from "../../shared/scripts/opencode";
 
-type Provider = "claude" | "codex";
+type Provider = "claude" | "codex" | "opencode";
 
 type CodexThreadRow = {
+  id: string;
+};
+
+type OpenCodeSessionRow = {
   id: string;
 };
 
@@ -36,8 +41,9 @@ function parseArgs(argv: string[]): { provider: Provider; project: string } {
     const tok = argv[i];
     if (tok === "--provider") {
       const value = argv[++i];
-      if (value === "claude" || value === "codex") provider = value;
-      else {
+      if (value === "claude" || value === "codex" || value === "opencode") {
+        provider = value;
+      } else {
         console.error(`find-session: invalid provider "${value}"`);
         process.exit(1);
       }
@@ -114,12 +120,53 @@ function findCodex(project: string): string | null {
   }
 }
 
+function findOpenCode(project: string): string | null {
+  const fromEnv =
+    process.env.OPENCODE_SESSION_ID?.trim() ||
+    process.env.OPENCODE_SESSION?.trim();
+  if (fromEnv) return fromEnv;
+
+  const dbPath = openCodeDb();
+  if (!existsSync(dbPath)) {
+    console.error(`find-session: no OpenCode database at ${dbPath}`);
+    return null;
+  }
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const row = db
+        .query(
+          `select id
+           from session
+           where directory = ? and time_archived is null
+           order by time_updated desc
+           limit 1`,
+        )
+        .get(project) as OpenCodeSessionRow | null;
+      if (!row?.id) {
+        console.error(`find-session: no OpenCode session for ${project}`);
+        return null;
+      }
+      return row.id;
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error(
+      `find-session: could not read OpenCode database (${(err as Error).message})`,
+    );
+    return null;
+  }
+}
+
 // Reusable resolver: returns the current session id, or null when none is found.
 export function findSession(
   provider: Provider,
   project: string,
 ): string | null {
-  return provider === "codex" ? findCodex(project) : findClaude(project);
+  if (provider === "codex") return findCodex(project);
+  if (provider === "opencode") return findOpenCode(project);
+  return findClaude(project);
 }
 
 // CLI entry — only runs when executed directly, so importers can reuse

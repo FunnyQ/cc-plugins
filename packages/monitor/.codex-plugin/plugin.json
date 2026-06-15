@@ -1,7 +1,7 @@
 {
   "name": "monitor",
-  "version": "3.10.2",
-  "description": "Monitor your Claude Code and Codex sessions: a usage dashboard plus a per-project cockpit (goal capture, decision log, live transcript, and needs-your-call bridge).",
+  "version": "3.10.3",
+  "description": "Monitor your Claude Code, Codex, and OpenCode sessions: a usage dashboard plus a per-project cockpit (goal capture, decision log, live transcript, and needs-your-call bridge).",
   "author": {
     "name": "Q"
   },
@@ -15,13 +15,14 @@
     "decision-log",
     "live-session",
     "claude-code",
-    "codex"
+    "codex",
+    "opencode"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Monitor",
-    "shortDescription": "Usage dashboard + session cockpit for Claude Code and Codex.",
-    "longDescription": "Two skills in one plugin: a usage dashboard that visualizes Claude Code and Codex sessions, tokens, cost, and model mix; and a per-project cockpit for setting a session goal, logging decisions that diffs cannot explain, streaming the live transcript, and handing needs_your_call choices back to the user.",
+    "shortDescription": "Usage dashboard for Claude Code, Codex, and OpenCode + session cockpit.",
+    "longDescription": "Two skills in one plugin: a usage dashboard that visualizes Claude Code, Codex, and OpenCode sessions, tokens, cost, and model mix; and a per-project cockpit for setting a session goal, logging decisions that diffs cannot explain, streaming Claude/Codex live transcripts, and handing needs_your_call choices back to the user.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],

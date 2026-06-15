@@ -66,7 +66,7 @@ type RegistryEntry = {
 };
 
 type Registry = { sessions: RegistryEntry[] };
-type Provider = "claude" | "codex";
+type Provider = "claude" | "codex" | "opencode";
 
 // ---------- Paths ----------
 
@@ -159,6 +159,7 @@ function parseFacets(raw: string[]): Facet[] {
 function parseProvider(value: string | undefined): Provider {
   if (!value || value === "claude") return "claude";
   if (value === "codex") return "codex";
+  if (value === "opencode") return "opencode";
   console.error(`cockpit: invalid provider "${value}"`);
   process.exit(1);
 }
@@ -172,7 +173,10 @@ function readRegistry(): Registry {
       return {
         sessions: raw.sessions.map((s: any) => ({
           ...s,
-          provider: s?.provider === "codex" ? "codex" : "claude",
+          provider:
+            s?.provider === "codex" || s?.provider === "opencode"
+              ? s.provider
+              : "claude",
         })),
       };
     }

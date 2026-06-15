@@ -264,6 +264,26 @@ describe("cockpit start", () => {
     expect(entry.provider).toBe("codex");
   });
 
+  test("--provider opencode registers an OpenCode-backed session", () => {
+    const r = run([
+      "start",
+      "--provider",
+      "opencode",
+      "--session",
+      "ses_test",
+      "--session-goal",
+      "a",
+      "--project-goal",
+      "p",
+    ]);
+    expect(r.code).toBe(0);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const entry = reg.sessions.find((s: any) => s.sessionId === "ses_test");
+    expect(entry.provider).toBe("opencode");
+  });
+
   test("rejects unknown providers", () => {
     const r = run([
       "start",
