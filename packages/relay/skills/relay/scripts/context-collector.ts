@@ -2,6 +2,7 @@
 
 import { readFileSync, existsSync, statSync } from "fs";
 import { resolve, extname } from "path";
+import { parseCsv } from "./shared";
 
 type Options = {
   files: string[];
@@ -18,10 +19,7 @@ function parseArgs(argv: string[]): Options {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--files" && i + 1 < args.length) {
-      options.files = args[++i]
-        .split(",")
-        .map((f) => f.trim())
-        .filter(Boolean);
+      options.files = parseCsv(args[++i]);
     } else if (arg === "--no-git") {
       options.gitScope = "none";
     } else if (arg === "--git-scope" && i + 1 < args.length) {
