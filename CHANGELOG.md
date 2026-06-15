@@ -1,5 +1,21 @@
 # Changelog
 
+## [relay 0.2.0] - 2026-06-15
+
+_relay is independently versioned; this entry tracks the `relay-v0.2.0` tag._
+
+### 🔄 Changed
+
+- **Consolidated relay's slash commands around the `relay:relay` skill**: removed the standalone `/relay` command — the generic entry is now the `relay:relay` skill, and the three backend aliases (`/relay:codex`, `/relay:opencode`, `/relay:claude`) forward to it via `/relay:relay <backend> …`. One source of truth for the routing logic and fewer command files to keep in sync.
+
+### 🐛 Fixed
+
+- **Relay script path now resolves for installed users**: `SKILL.md` previously hard-coded `bun packages/relay/skills/relay/scripts/relay.ts`, which only exists inside the source repo and broke for anyone running relay as an installed plugin. It now resolves `relay.ts` from the skill's load-time "Base directory for this skill" banner (the repo's `$SKILL_DIR` convention) with a file guard, and documents why `${CLAUDE_PLUGIN_ROOT}` isn't relied on (not reliably set in agent Bash, empty under Codex).
+
+### 📖 Documentation
+
+- **`/relay` → `/relay:relay` throughout**: SKILL.md and the backends reference now consistently use the actual slash entry after the command consolidation.
+
 ## [3.10.0] - 2026-06-15
 
 ### ✨ Added
