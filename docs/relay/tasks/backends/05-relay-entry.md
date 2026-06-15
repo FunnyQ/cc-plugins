@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: backends/01, backends/02, backends/03, backends/04, core/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -65,18 +65,18 @@ Note: `relay.ts` must go through `getBackend` + `capabilityGate` only — it mus
 
 ## Acceptance criteria
 
-- [ ] `parseFlags` exported + pure; extracts raw `<backend> <mode>` strings + trailing positional text (→ task/image-prompt/focus by mode, flags win) + all listed flags — it does NOT hardcode the valid backend set.
-- [ ] Unknown backend is rejected at dispatch with a message listing `Object.keys(BACKENDS)` (adding a backend needs no parser edit); unknown mode rejected against the `Mode` union.
-- [ ] Capability gate runs before any spawn; `relay opencode image` exits non-zero with the gate message and never spawns.
-- [ ] Single-step: `relay <backend> delegate --task "x"` builds the prompt internally (via `buildPromptFile`) and runs — no pre-built `--prompt-file` required; `--prompt-file` works as an override.
-- [ ] strategy=prompt obtains the prompt file (override or built); strategy=native uses scope/focus; selection comes from `b.strategy`, not a name check.
-- [ ] Output contract: a successful run writes `last.md` under `/tmp/relay/...` and prints identical text to stdout.
-- [ ] No `if (backend === ...)` branching in dispatch — verified by reading the file.
+- [x] `parseFlags` exported + pure; extracts raw `<backend> <mode>` strings + trailing positional text (→ task/image-prompt/focus by mode, flags win) + all listed flags — it does NOT hardcode the valid backend set.
+- [x] Unknown backend is rejected at dispatch with a message listing `Object.keys(BACKENDS)` (adding a backend needs no parser edit); unknown mode rejected against the `Mode` union.
+- [x] Capability gate runs before any spawn; `relay opencode image` exits non-zero with the gate message and never spawns.
+- [x] Single-step: `relay <backend> delegate --task "x"` builds the prompt internally (via `buildPromptFile`) and runs — no pre-built `--prompt-file` required; `--prompt-file` works as an override.
+- [x] strategy=prompt obtains the prompt file (override or built); strategy=native uses scope/focus; selection comes from `b.strategy`, not a name check.
+- [x] Output contract: a successful run writes `last.md` under `/tmp/relay/...` and prints identical text to stdout.
+- [x] No `if (backend === ...)` branching in dispatch — verified by reading the file.
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/relay.test.ts` passes.
-- [ ] Tests cover: `parseFlags` for each mode + bad input; gate rejection path (no spawn); strategy selection per (backend, mode) using the real backends. Spawning is mocked/avoided (test the pure dispatch decisions).
+- [x] `bun test packages/relay/skills/relay/scripts/relay.test.ts` passes.
+- [x] Tests cover: `parseFlags` for each mode + bad input; gate rejection path (no spawn); strategy selection per (backend, mode) using the real backends. Spawning is mocked/avoided (test the pure dispatch decisions).
 
 ## Eval rubric
 
