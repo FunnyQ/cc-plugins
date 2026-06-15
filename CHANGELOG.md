@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.10.3] - 2026-06-16
+
+### ✨ Added
+
+- **OpenCode sessions now appear in the live dashboard.** The usage dashboard's "Live now" panel discovers recent OpenCode sessions from the local SQLite store, so active OpenCode work shows up alongside Claude and Codex sessions in real time.
+- **Cockpit can view OpenCode transcripts.** OpenCode sessions are now fully supported in cockpit — click any live OpenCode session row to open its transcript, powered by the existing DB-backed transcript viewer.
+- **Cockpit can send messages to OpenCode.** The cockpit send box is now enabled for reachable OpenCode sessions. A new bridge layer discovers a running `opencode serve` instance (or starts one) and delivers messages via the official `/session/:id/prompt_async` API. Authenticated servers (with `OPENCODE_SERVER_PASSWORD`) and TUI-mode control (via `/tui/append-prompt` + `/tui/submit-prompt`) are both supported.
+
+### 🐛 Fixed
+
+- **OpenCode transcript shows file reads correctly.** `Read` tool parts are now converted into transcript tool-result entries with proper file labels and syntax highlighting inferred from the file path — no more raw JSON blobs in the transcript.
+- **Empty OpenCode messages are filtered out.** Assistant rows with no parts or usable fallback content are silently dropped, keeping the cockpit backlog clean.
+- **OpenCode deep links work in cockpit.** Cockpit now accepts OpenCode session IDs in `?session=…&provider=opencode` deep links (e.g. from the dashboard "Live now" panel) and validates the provider query param before selecting a session.
+- **OpenCode transcript no longer shows internal step metadata.** Step lifecycle events (start/end markers) are hidden from cockpit transcripts; patch parts are rendered as compact changed-file summaries instead of raw diff blobs.
+- **OpenCode bridge auth is stable.** A 401 from the bridge now triggers a token refresh and retry. Basic auth headers are forwarded when `OPENCODE_SERVER_PASSWORD` is set. TUI bridge requests are covered by tests.
+- **OpenCode sends route to the TUI correctly.** Messages are delivered through the `/tui/append-prompt` + `/tui/submit-prompt` path. Fixed-port TUI processes are discovered while ignoring headless `serve`/`web` backends that aren't visible control targets.
+- **OpenCode bridge uses the official prompt API shape.** Delivery was switched from a custom payload to `/session/:id/prompt_async` with `parts`-structured text, matching the documented OpenCode server and SDK interface. Servers are probed via `/global/health`; sessions via `/session/:id`.
+
 ## [3.10.2] - 2026-06-16
 
 ### ✨ Added
