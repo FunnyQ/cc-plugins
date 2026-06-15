@@ -407,7 +407,13 @@ export const store = reactive({
         session: s.sessionId,
         token,
       });
-      const r = await fetch(`/api/opencode-control/status?${params}`);
+      let r = await fetch(`/api/opencode-control/status?${params}`);
+      if (r.status === 401) {
+        const freshToken = await getToken(true);
+        if (!freshToken) throw new Error("token unavailable");
+        params.set("token", freshToken);
+        r = await fetch(`/api/opencode-control/status?${params}`);
+      }
       if (!r.ok) throw new Error(`OpenCode bridge check failed: ${r.status}`);
       const j = await r.json();
       const error =

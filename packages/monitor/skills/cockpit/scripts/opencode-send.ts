@@ -53,9 +53,22 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+function openCodeHeaders(
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const headers = { ...extra };
+  const password = process.env.OPENCODE_SERVER_PASSWORD;
+  if (password) {
+    const username = process.env.OPENCODE_SERVER_USERNAME || "opencode";
+    headers.authorization = `Basic ${btoa(`${username}:${password}`)}`;
+  }
+  return headers;
+}
+
 async function isOpenCodeServer(url: string): Promise<boolean> {
   try {
     const r = await fetch(`${url}/global/health`, {
+      headers: openCodeHeaders(),
       signal: AbortSignal.timeout(1_000),
     });
     if (!r.ok) return false;
@@ -131,7 +144,10 @@ async function checkOpenCodeSession(
   try {
     const r = await fetch(
       `${serverUrl}/session/${encodeURIComponent(sessionId)}`,
-      { signal: AbortSignal.timeout(2_000) },
+      {
+        headers: openCodeHeaders(),
+        signal: AbortSignal.timeout(2_000),
+      },
     );
     if (r.status === 404) {
       errors.push("OpenCode session not found");
@@ -187,7 +203,7 @@ export async function sendOpenCodePrompt({
     }
     const append = await fetch(appendUrl, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: openCodeHeaders({ "content-type": "application/json" }),
       body: JSON.stringify({ text }),
       signal: AbortSignal.timeout(5_000),
     });
@@ -208,6 +224,7 @@ export async function sendOpenCodePrompt({
 
     const submit = await fetch(submitUrl, {
       method: "POST",
+      headers: openCodeHeaders(),
       signal: AbortSignal.timeout(5_000),
     });
     const submitJson: any = await submit.json().catch(() => ({}));
