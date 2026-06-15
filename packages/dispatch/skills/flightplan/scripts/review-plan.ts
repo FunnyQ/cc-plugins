@@ -97,6 +97,45 @@ export async function buildReviewPrompt(files: string[]): Promise<string> {
   return sections.join("\n");
 }
 
+export function collapseDuplicateReviewOutput(output: string): string {
+  const marker = "Full review comments:";
+  if (!output.includes(marker)) return output;
+
+  const trimmed = output.trimEnd();
+  const trailing = output.slice(trimmed.length);
+  const lines = trimmed.split("\n");
+
+  for (let count = Math.floor(lines.length / 2); count > 0; count--) {
+    const suffixStart = lines.length - count;
+    const previousStart = suffixStart - count;
+    let hasMarker = false;
+    let matches = true;
+
+    for (let offset = 0; offset < count; offset++) {
+      const suffixLine = lines[suffixStart + offset];
+      if (suffixLine.includes(marker)) hasMarker = true;
+      if (lines[previousStart + offset] !== suffixLine) {
+        matches = false;
+        break;
+      }
+    }
+
+    if (hasMarker && matches) {
+      return `${lines.slice(0, suffixStart).join("\n")}${trailing}`;
+    }
+  }
+
+  return output;
+}
+
+export function formatCodexReviewOutput(
+  stdout: string,
+  stderr: string,
+): string {
+  const output = stdout.trim().length > 0 ? stdout : stderr;
+  return collapseDuplicateReviewOutput(output);
+}
+
 async function main() {
   const planDir = process.argv[2];
   if (!planDir) {
@@ -118,8 +157,9 @@ async function main() {
 
   const result = spawnSync("codex", ["review", "-"], {
     input: prompt,
-    stdio: ["pipe", "inherit", "inherit"],
+    stdio: ["pipe", "pipe", "pipe"],
     encoding: "utf-8",
+    maxBuffer: 50 * 1024 * 1024,
   });
 
   if (result.error) {
@@ -129,6 +169,9 @@ async function main() {
     );
     process.exit(0);
   }
+
+  const output = formatCodexReviewOutput(result.stdout, result.stderr);
+  if (output.length > 0) process.stdout.write(output);
 
   process.exit(result.status ?? 1);
 }

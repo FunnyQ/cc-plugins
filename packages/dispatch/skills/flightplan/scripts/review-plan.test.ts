@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { buildReviewPrompt, collectPlanFiles } from "./review-plan";
+import {
+  buildReviewPrompt,
+  collapseDuplicateReviewOutput,
+  collectPlanFiles,
+  formatCodexReviewOutput,
+} from "./review-plan";
 
 async function newRoot(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "flightplan-review-"));
@@ -128,5 +133,67 @@ describe("buildReviewPrompt", () => {
     expect(firstIndex).toBeGreaterThan(secondIndex);
 
     await rm(root, { recursive: true });
+  });
+});
+
+describe("collapseDuplicateReviewOutput", () => {
+  test("removes an adjacent duplicated full review block", () => {
+    const review = [
+      "The plan needs two fixes.",
+      "",
+      "Full review comments:",
+      "",
+      "- [P2] Fix one - file.md:1",
+      "  Details.",
+      "",
+    ].join("\n");
+
+    const result = collapseDuplicateReviewOutput(`codex\n${review}${review}`);
+    expect(result).toBe(`codex\n${review}`);
+  });
+
+  test("leaves non-duplicated review output unchanged", () => {
+    const output = [
+      "The plan needs two fixes.",
+      "",
+      "Full review comments:",
+      "",
+      "- [P2] Fix one - file.md:1",
+      "  Details.",
+      "",
+      "Follow-up note.",
+      "",
+    ].join("\n");
+
+    expect(collapseDuplicateReviewOutput(output)).toBe(output);
+  });
+});
+
+describe("formatCodexReviewOutput", () => {
+  test("prefers stdout over stderr transcript output", () => {
+    const stdout = [
+      "The plan needs one fix.",
+      "",
+      "Full review comments:",
+      "",
+      "- [P2] Fix one - file.md:1",
+      "  Details.",
+      "",
+    ].join("\n");
+    const stderr = [
+      "OpenAI Codex v0.139.0",
+      "--------",
+      "user",
+      "transcript",
+      stdout,
+    ].join("\n");
+
+    expect(formatCodexReviewOutput(stdout, stderr)).toBe(stdout);
+  });
+
+  test("falls back to stderr when stdout is empty", () => {
+    expect(formatCodexReviewOutput("", "error details\n")).toBe(
+      "error details\n",
+    );
   });
 });
