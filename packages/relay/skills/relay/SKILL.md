@@ -1,7 +1,7 @@
 ---
 name: relay
 description: >-
-  Use when the user invokes `/relay <codex|opencode|claude> <delegate|review|image>` to
+  Use when the user invokes `/relay:relay <codex|opencode|claude> <delegate|review|image>` to
   delegate a task to another harness's CLI. Slash-command only; do NOT auto-trigger on "ask codex".
 version: 0.1.0
 ---
@@ -11,9 +11,9 @@ version: 0.1.0
 Wraps the local `codex`, `opencode`, and `claude` CLIs to delegate tasks across harnesses. All output is reported in zh-TW.
 
 ```
-/relay <codex|opencode|claude> delegate <task>
-/relay <codex|opencode|claude> review [scope]
-/relay codex image [prompt] [--out <path>]
+/relay:relay <codex|opencode|claude> delegate <task>
+/relay:relay <codex|opencode|claude> review [scope]
+/relay:relay codex image [prompt] [--out <path>]
 ```
 
 **Choosing between modes:**
@@ -28,7 +28,22 @@ If the user says "生圖", "畫圖", "Generate image" → use `image` (codex onl
 
 ---
 
-## `/relay <backend> delegate <task>`
+## Running the relay script
+
+Every command below runs the bundled `scripts/relay.ts`. `${CLAUDE_PLUGIN_ROOT}` is Claude Code's official plugin-root variable, but it is **not reliably set inside an agent Bash call** (and is empty under Codex) — so don't depend on it, and don't use a `packages/relay/...` repo-relative path (that only exists inside the source repo). Resolve the script from the load-time **"Base directory for this skill"** banner Claude Code prints when the skill loads:
+
+```bash
+# Substitute the real banner path for <BANNER_PATH>
+SKILL_DIR="<BANNER_PATH>"            # e.g. ~/.claude/plugins/cache/.../skills/relay
+RELAY="$SKILL_DIR/scripts/relay.ts"
+test -f "$RELAY" || { echo "relay.ts not found at $RELAY" >&2; exit 1; }
+```
+
+For brevity the examples below write `relay.ts <backend> <mode> …` as shorthand for `bun "$RELAY" <backend> <mode> …`. Run it from the user's current project directory — `relay.ts` invokes the backend CLIs against that working tree's git context.
+
+---
+
+## `/relay:relay <backend> delegate <task>`
 
 For non-review tasks: implementing features, refactoring, suggesting an approach, debugging.
 
@@ -39,31 +54,31 @@ For non-review tasks: implementing features, refactoring, suggesting an approach
 2. Run relay in a single step:
 
    ```bash
-   bun packages/relay/skills/relay/scripts/relay.ts <backend> delegate --task "<task>" --files <file1,file2,...>
+   relay.ts <backend> delegate --task "<task>" --files <file1,file2,...>
    ```
 
    where `<backend>` ∈ `{codex, opencode, claude}`.
 
    Examples:
    ```bash
-   bun packages/relay/skills/relay/scripts/relay.ts codex delegate --task "add error handling to api.ts" --files api.ts
-   bun packages/relay/skills/relay/scripts/relay.ts opencode delegate --task "refactor the auth flow" --files auth.ts,middleware.ts
-   bun packages/relay/skills/relay/scripts/relay.ts claude delegate --task "implement the feature" --files main.ts
+   relay.ts codex delegate --task "add error handling to api.ts" --files api.ts
+   relay.ts opencode delegate --task "refactor the auth flow" --files auth.ts,middleware.ts
+   relay.ts claude delegate --task "implement the feature" --files main.ts
    ```
 
 3. Inspect the backend's result, run available verification (lint/types/tests), then write the report. Apply additional local fixes only when they are required to complete the delegated task and remain inside the agreed scope.
 
 ---
 
-## `/relay <backend> review [scope]`
+## `/relay:relay <backend> review [scope]`
 
 For code analysis: ask a backend for an opinion on existing code.
 
 **No scope** — review uncommitted working tree changes:
 
 ```bash
-bun packages/relay/skills/relay/scripts/relay.ts codex review --scope uncommitted
-bun packages/relay/skills/relay/scripts/relay.ts claude review --focus high
+relay.ts codex review --scope uncommitted
+relay.ts claude review --focus high
 ```
 
 **Scope names a git reference** — call the backend's native review:
@@ -82,7 +97,7 @@ bun packages/relay/skills/relay/scripts/relay.ts claude review --focus high
 2. Run relay with a prompt:
 
    ```bash
-   bun packages/relay/skills/relay/scripts/relay.ts <backend> review --files <file1,file2,...> --focus "<user's specific concern>"
+   relay.ts <backend> review --files <file1,file2,...> --focus "<user's specific concern>"
    ```
 
    Supported backends: codex, opencode, claude.
@@ -91,7 +106,7 @@ bun packages/relay/skills/relay/scripts/relay.ts claude review --focus high
 
 ---
 
-## `/relay codex image [prompt] [--out <path>]`
+## `/relay:relay codex image [prompt] [--out <path>]`
 
 Generate an image via codex (gpt-image-2). **Image mode is codex-only.**
 
@@ -106,7 +121,7 @@ If **--out** is missing, ask the user (offer default: `./generated/image.png`).
 Once both are known, run:
 
 ```bash
-bun packages/relay/skills/relay/scripts/relay.ts codex image "<prompt>" --out <path>
+relay.ts codex image "<prompt>" --out <path>
 ```
 
 The script auto-adds a timestamp suffix to the filename (e.g., `./foo.png` → `./foo_20260430-1708.png`) and returns the final path.
@@ -142,7 +157,7 @@ When the user passes an explicit `--model` flag:
 
 1. Run relay with the specified model:
    ```bash
-   bun packages/relay/skills/relay/scripts/relay.ts <backend> <mode> --model "<provider/model>" ...
+   relay.ts <backend> <mode> --model "<provider/model>" ...
    ```
 
 2. After a successful run, ask via AskUserQuestion:
@@ -177,7 +192,7 @@ If the script exits non-zero or returns empty output, report the failure in zh-T
 - Relevant stderr summary
 - Suggested next step
 
-Capability gates (e.g., `/relay opencode image` → unsupported) fail fast with a clear error message before any CLI runs.
+Capability gates (e.g., `/relay:relay opencode image` → unsupported) fail fast with a clear error message before any CLI runs.
 
 ---
 

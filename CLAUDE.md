@@ -64,11 +64,10 @@ cc-plugins/
 └── packages/relay/                # plugin: cross-harness task delegation (relay)
     ├── .claude-plugin/plugin.json        # Claude manifest, version 0.1.0
     ├── .codex-plugin/plugin.json         # Codex manifest, skills: "./skills/", version 0.1.0
-    ├── commands/                        # slash commands (auto-discovered at plugin root)
-    │   ├── relay.md                     # the canonical /relay entry
-    │   ├── codex.md                     # alias: /codex → /relay codex
-    │   ├── opencode.md                  # alias: /opencode → /relay opencode
-    │   └── claude.md                    # alias: /claude → /relay claude
+    ├── commands/                        # backend-fixed alias commands (auto-discovered; generic entry is the relay:relay skill)
+    │   ├── codex.md                     # alias: /relay:codex → /relay:relay codex $ARGUMENTS
+    │   ├── opencode.md                  # alias: /relay:opencode → /relay:relay opencode $ARGUMENTS
+    │   └── claude.md                    # alias: /relay:claude → /relay:relay claude $ARGUMENTS
     └── skills/relay/
         ├── SKILL.md                      # orchestration, smart-apply, report formats, install docs
         ├── references/backends.md        # per-CLI flags + headless output + opencode symlink install
