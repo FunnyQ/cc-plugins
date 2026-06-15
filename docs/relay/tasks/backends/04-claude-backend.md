@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: core/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -56,16 +56,16 @@ Same prompt-text seam as the opencode backend: delegate needs the prompt **text*
 
 ## Acceptance criteria
 
-- [ ] `claudeBackend.supports` = `{delegate, review}` (no image).
-- [ ] `strategy` = `native` for review, `prompt` for delegate.
-- [ ] delegate argv: `claude -p <text> --output-format json`.
-- [ ] review argv: `claude -p "/code-review <effort> [focus]"`; never includes `--fix`; default effort `high`.
-- [ ] `parseOutput` follows the documented extraction order (`.result` → `.text`/`content[0].text` → raw) and falls back to raw stdout on parse failure (no throw).
+- [x] `claudeBackend.supports` = `{delegate, review}` (no image).
+- [x] `strategy` = `native` for review, `prompt` for delegate.
+- [x] delegate argv: `claude -p <text> --output-format json`.
+- [x] review argv: `claude -p "/code-review <effort> [focus]"`; never includes `--fix`; default effort `high`.
+- [x] `parseOutput` follows the documented extraction order (`.result` → `.text`/`content[0].text` → raw) and falls back to raw stdout on parse failure (no throw).
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/backends/claude.test.ts` passes.
-- [ ] Tests cover: delegate argv; review argv with default + explicit effort + focus; `parseOutput` on valid JSON and on non-JSON (fallback). No real `claude` spawn.
+- [x] `bun test packages/relay/skills/relay/scripts/backends/claude.test.ts` passes.
+- [x] Tests cover: delegate argv; review argv with default + explicit effort + focus; `parseOutput` on valid JSON and on non-JSON (fallback). No real `claude` spawn.
 
 ## Eval rubric
 

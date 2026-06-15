@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: core/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -44,16 +44,16 @@ Read-only guarantee for review is **prompt-based only** (the builder's "Analyze 
 
 ## Acceptance criteria
 
-- [ ] `opencodeBackend.supports` = `{delegate, review}` (no image).
-- [ ] `strategy()` always returns `"prompt"`.
-- [ ] delegate argv carries `-m opencode-go/kimi-k2.7-code`; review carries `-m opencode-go/qwen3.7-max`; `opts.model` overrides both.
-- [ ] `parseOutput` trims formatted stdout; `parseJsonl` concatenates `text` parts and ignores malformed/absent terminal events.
-- [ ] A comment flags the prompt-based (non-enforced) read-only review and bug #26855.
+- [x] `opencodeBackend.supports` = `{delegate, review}` (no image).
+- [x] `strategy()` always returns `"prompt"`.
+- [x] delegate argv carries `-m opencode-go/kimi-k2.7-code`; review carries `-m opencode-go/qwen3.7-max`; `opts.model` overrides both.
+- [x] `parseOutput` trims formatted stdout; `parseJsonl` concatenates `text` parts and ignores malformed/absent terminal events.
+- [x] A comment flags the prompt-based (non-enforced) read-only review and bug #26855.
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/backends/opencode.test.ts` passes.
-- [ ] Tests cover: model default per mode + `--model` override; `parseJsonl` with multiple text parts, a malformed line, and missing `step_finish`. No real `opencode` spawn.
+- [x] `bun test packages/relay/skills/relay/scripts/backends/opencode.test.ts` passes.
+- [x] Tests cover: model default per mode + `--model` override; `parseJsonl` with multiple text parts, a malformed line, and missing `step_finish`. No real `opencode` spawn.
 
 ## Eval rubric
 
