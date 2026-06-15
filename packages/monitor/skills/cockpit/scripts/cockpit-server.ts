@@ -31,6 +31,10 @@ import {
   handlePermissionResolved,
 } from "./permission";
 import { handleCodexControlStatus, handleSendCodexMessage } from "./codex-send";
+import {
+  handleOpenCodeControlStatus,
+  handleSendOpenCodeMessage,
+} from "./opencode-send";
 import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
 import { jsonResponse, jsonError } from "./http";
@@ -272,6 +276,10 @@ function buildServer() {
         return handleCodexControlStatus(req);
       if (url.pathname === "/api/send-codex-message")
         return handleSendCodexMessage(req);
+      if (url.pathname === "/api/opencode-control/status")
+        return handleOpenCodeControlStatus(req);
+      if (url.pathname === "/api/send-opencode-message")
+        return handleSendOpenCodeMessage(req);
       if (url.pathname === "/api/permission-request")
         return handlePermissionRequest(req);
       if (url.pathname === "/api/permission-stream")
