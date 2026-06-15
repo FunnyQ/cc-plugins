@@ -1,16 +1,10 @@
-import { spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { jsonResponse as json } from "./http";
 
 const OPENCODE_SESSION_RE = /^ses_[A-Za-z0-9_-]{8,160}$/;
-const DEFAULT_OPENCODE_PORT = 9124;
-const SERVER_CANDIDATES = [
-  "http://127.0.0.1:4096",
-  "http://127.0.0.1:9123",
-  `http://127.0.0.1:${DEFAULT_OPENCODE_PORT}`,
-];
 
 type SendOpenCodePromptOptions = {
   sessionId: string;
@@ -25,7 +19,7 @@ export type OpenCodeSendReport = {
   delivered: boolean;
   sessionDirectory?: string;
   inputId?: string;
-  delivery?: "async";
+  delivery?: "tui";
   warnings: string[];
   errors: string[];
 };
@@ -35,8 +29,6 @@ type SendOpenCodePrompt = (
 ) => Promise<OpenCodeSendReport>;
 
 type CheckOpenCodeSession = (sessionId: string) => Promise<OpenCodeSendReport>;
-
-let startedServer = false;
 
 function cockpitHome(): string {
   return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
@@ -74,19 +66,38 @@ async function isOpenCodeServer(url: string): Promise<boolean> {
   }
 }
 
-async function waitForServer(url: string): Promise<boolean> {
-  for (let i = 0; i < 30; i++) {
-    if (await isOpenCodeServer(url)) return true;
-    await Bun.sleep(200);
+function discoverOpenCodeTuiProcessUrls(): string[] {
+  try {
+    const out = execFileSync("ps", ["-axo", "command"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => /(^|[/\s])opencode(\s|$)/.test(line))
+      .filter((line) => !/\bopencode\s+(serve|web|attach)\b/.test(line))
+      .map((line) => {
+        const port =
+          line.match(/--port(?:=|\s+)(\d{1,5})/)?.[1] ||
+          line.match(/-p\s+(\d{1,5})/)?.[1];
+        if (!port) return null;
+        const hostname =
+          line.match(/--hostname(?:=|\s+)(\S+)/)?.[1] || "127.0.0.1";
+        return `http://${hostname}:${port}`;
+      })
+      .filter((url): url is string => !!url);
+  } catch {
+    return [];
   }
-  return false;
 }
 
 async function discoverOpenCodeServer(): Promise<string | null> {
-  const envUrl = process.env.OPENCODE_SERVER_URL;
+  const envUrl =
+    process.env.OPENCODE_TUI_SERVER_URL || process.env.OPENCODE_SERVER_URL;
   const candidates = [
     ...(envUrl ? [normalizeServerUrl(envUrl)] : []),
-    ...SERVER_CANDIDATES,
+    ...discoverOpenCodeTuiProcessUrls(),
   ];
   for (const url of candidates) {
     if (await isOpenCodeServer(url)) return url;
@@ -95,25 +106,7 @@ async function discoverOpenCodeServer(): Promise<string | null> {
 }
 
 async function ensureOpenCodeServer(): Promise<string | null> {
-  const existing = await discoverOpenCodeServer();
-  if (existing) return existing;
-  if (!startedServer) {
-    startedServer = true;
-    const proc = spawn(
-      "opencode",
-      [
-        "serve",
-        "--hostname",
-        "127.0.0.1",
-        "--port",
-        String(DEFAULT_OPENCODE_PORT),
-      ],
-      { stdio: "ignore" },
-    );
-    proc.unref();
-  }
-  const url = `http://127.0.0.1:${DEFAULT_OPENCODE_PORT}`;
-  return (await waitForServer(url)) ? url : null;
+  return await discoverOpenCodeServer();
 }
 
 async function checkOpenCodeSession(
@@ -129,7 +122,9 @@ async function checkOpenCodeSession(
       sessionFound: false,
       delivered: false,
       warnings,
-      errors: ["OpenCode server unavailable"],
+      errors: [
+        "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.",
+      ],
     };
   }
 
@@ -184,27 +179,44 @@ export async function sendOpenCodePrompt({
   if (!ready.ok || !ready.serverUrl) return ready;
 
   try {
-    const url = new URL(
-      `${ready.serverUrl}/session/${encodeURIComponent(sessionId)}/prompt_async`,
-    );
+    const appendUrl = new URL(`${ready.serverUrl}/tui/append-prompt`);
+    const submitUrl = new URL(`${ready.serverUrl}/tui/submit-prompt`);
     if (ready.sessionDirectory) {
-      url.searchParams.set("directory", ready.sessionDirectory);
+      appendUrl.searchParams.set("directory", ready.sessionDirectory);
+      submitUrl.searchParams.set("directory", ready.sessionDirectory);
     }
-    const r = await fetch(url, {
+    const append = await fetch(appendUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        parts: [{ type: "text", text }],
-      }),
+      body: JSON.stringify({ text }),
       signal: AbortSignal.timeout(5_000),
     });
-    const j: any = await r.json().catch(() => ({}));
-    if (!r.ok) {
+    const appendJson: any = await append.json().catch(() => ({}));
+    if (!append.ok || appendJson !== true) {
       const message =
-        j?.data?.message ||
-        j?.message ||
-        j?.error ||
-        `OpenCode prompt failed: ${r.status}`;
+        appendJson?.data?.message ||
+        appendJson?.message ||
+        appendJson?.error ||
+        `OpenCode TUI append failed: ${append.status}`;
+      return {
+        ...ready,
+        ok: false,
+        delivered: false,
+        errors: [...ready.errors, message],
+      };
+    }
+
+    const submit = await fetch(submitUrl, {
+      method: "POST",
+      signal: AbortSignal.timeout(5_000),
+    });
+    const submitJson: any = await submit.json().catch(() => ({}));
+    if (!submit.ok || submitJson !== true) {
+      const message =
+        submitJson?.data?.message ||
+        submitJson?.message ||
+        submitJson?.error ||
+        `OpenCode TUI submit failed: ${submit.status}`;
       return {
         ...ready,
         ok: false,
@@ -216,7 +228,7 @@ export async function sendOpenCodePrompt({
     return {
       ...ready,
       delivered: true,
-      delivery: "async",
+      delivery: "tui",
     };
   } catch (err) {
     return {
