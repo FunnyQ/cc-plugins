@@ -23,8 +23,9 @@ export type OpenCodeSendReport = {
   serverUrl?: string;
   sessionFound: boolean;
   delivered: boolean;
+  sessionDirectory?: string;
   inputId?: string;
-  delivery?: "steer" | "queue";
+  delivery?: "async";
   warnings: string[];
   errors: string[];
 };
@@ -62,12 +63,12 @@ function errorMessage(err: unknown): string {
 
 async function isOpenCodeServer(url: string): Promise<boolean> {
   try {
-    const r = await fetch(`${url}/api/session`, {
+    const r = await fetch(`${url}/global/health`, {
       signal: AbortSignal.timeout(1_000),
     });
     if (!r.ok) return false;
     const j: any = await r.json();
-    return Array.isArray(j?.data);
+    return j?.healthy === true;
   } catch {
     return false;
   }
@@ -134,7 +135,7 @@ async function checkOpenCodeSession(
 
   try {
     const r = await fetch(
-      `${serverUrl}/api/session/${encodeURIComponent(sessionId)}`,
+      `${serverUrl}/session/${encodeURIComponent(sessionId)}`,
       { signal: AbortSignal.timeout(2_000) },
     );
     if (r.status === 404) {
@@ -150,12 +151,14 @@ async function checkOpenCodeSession(
       };
     }
     if (!r.ok) throw new Error(`OpenCode session check failed: ${r.status}`);
+    const j: any = await r.json().catch(() => ({}));
     return {
       ok: true,
       ready: true,
       serverUrl,
       sessionFound: true,
       delivered: false,
+      sessionDirectory: typeof j?.directory === "string" ? j.directory : "",
       warnings,
       errors,
     };
@@ -181,19 +184,20 @@ export async function sendOpenCodePrompt({
   if (!ready.ok || !ready.serverUrl) return ready;
 
   try {
-    const r = await fetch(
-      `${ready.serverUrl}/api/session/${encodeURIComponent(sessionId)}/prompt`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          prompt: { text },
-          delivery: "steer",
-          resume: true,
-        }),
-        signal: AbortSignal.timeout(5_000),
-      },
+    const url = new URL(
+      `${ready.serverUrl}/session/${encodeURIComponent(sessionId)}/prompt_async`,
     );
+    if (ready.sessionDirectory) {
+      url.searchParams.set("directory", ready.sessionDirectory);
+    }
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        parts: [{ type: "text", text }],
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
     const j: any = await r.json().catch(() => ({}));
     if (!r.ok) {
       const message =
@@ -212,8 +216,7 @@ export async function sendOpenCodePrompt({
     return {
       ...ready,
       delivered: true,
-      inputId: typeof j?.data?.id === "string" ? j.data.id : undefined,
-      delivery: j?.data?.delivery === "queue" ? "queue" : "steer",
+      delivery: "async",
     };
   } catch (err) {
     return {

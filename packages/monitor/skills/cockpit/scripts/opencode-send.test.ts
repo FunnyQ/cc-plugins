@@ -30,7 +30,7 @@ function report(
     sessionFound: true,
     delivered: true,
     inputId: "msg_test",
-    delivery: "steer",
+    delivery: "async",
     warnings: [],
     errors: [],
     ...overrides,
@@ -65,7 +65,7 @@ describe("handleSendOpenCodeMessage", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({
       delivered: true,
-      delivery: "steer",
+      delivery: "async",
       inputId: "msg_test",
       serverUrl: "http://127.0.0.1:9123",
       warnings: [],
@@ -115,6 +115,59 @@ describe("handleSendOpenCodeMessage", () => {
       error: "OpenCode session not found",
       warnings: [],
     });
+  });
+});
+
+describe("sendOpenCodePrompt", () => {
+  test("uses the official async session prompt API", async () => {
+    const { sendOpenCodePrompt } = await import("./opencode-send");
+    const originalFetch = globalThis.fetch;
+    const calls: { url: string; init?: RequestInit }[] = [];
+    process.env.OPENCODE_SERVER_URL = "http://127.0.0.1:4888";
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const url = String(input);
+      calls.push({ url, init });
+      if (url === "http://127.0.0.1:4888/global/health") {
+        return Response.json({ healthy: true, version: "1.17.7" });
+      }
+      if (url === `http://127.0.0.1:4888/session/${SID}`) {
+        return Response.json({
+          id: SID,
+          directory: "/tmp/project",
+        });
+      }
+      if (
+        url ===
+        `http://127.0.0.1:4888/session/${SID}/prompt_async?directory=%2Ftmp%2Fproject`
+      ) {
+        return new Response(null, { status: 204 });
+      }
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      const result = await sendOpenCodePrompt({
+        sessionId: SID,
+        text: "hello",
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.delivered).toBe(true);
+      expect(result.delivery).toBe("async");
+      const sendCall = calls.at(-1);
+      expect(sendCall?.url).toBe(
+        `http://127.0.0.1:4888/session/${SID}/prompt_async?directory=%2Ftmp%2Fproject`,
+      );
+      expect(JSON.parse(String(sendCall?.init?.body))).toEqual({
+        parts: [{ type: "text", text: "hello" }],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.OPENCODE_SERVER_URL;
+    }
   });
 });
 
