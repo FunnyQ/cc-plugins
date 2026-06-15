@@ -3,6 +3,7 @@
 // into the sorted, stale-filtered, cockpit-tagged LiveSession list. The
 // filesystem/SQLite reads stay in live.ts; everything testable without I/O lives
 // here.
+import { openCodeTimestampMs } from "../../shared/scripts/opencode";
 
 export type LiveSession = {
   provider: "claude" | "codex" | "opencode";
@@ -79,11 +80,6 @@ export function codexUpdatedAtMs(row: CodexRowInput): number {
     row.created_at_ms ||
     row.created_at * 1000
   );
-}
-
-function openCodeTimestampMs(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return value < 1_000_000_000_000 ? value * 1000 : value;
 }
 
 // Parse cockpit's registry.json content into the membership key set
