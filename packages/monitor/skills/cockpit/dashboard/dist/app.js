@@ -178,6 +178,9 @@ export const store = reactive({
       if (!control.ready) return control.error || "Codex control unavailable";
       return "Send to Codex thread";
     }
+    if (s.provider === "opencode") {
+      return "OpenCode send bridge is not available";
+    }
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
   },
@@ -187,7 +190,9 @@ export const store = reactive({
     if (!this.canUseChannel) return this.channelDisabledTitle;
     return s?.provider === "codex"
       ? "Message this Codex thread"
-      : "Message this Claude session";
+      : s?.provider === "opencode"
+        ? "OpenCode send bridge is not available"
+        : "Message this Claude session";
   },
 
   get channelSendDisabled() {

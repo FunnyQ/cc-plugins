@@ -25,13 +25,24 @@ import {
 import { jsonResponse } from "./http";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
+const OPENCODE_ID_RE = /^[A-Za-z0-9_.:-]+$/;
 const BACKLOG_LINES = 50;
 const BACKLOG_READ_CHUNK_BYTES = 256 * 1024;
 const MAX_BACKLOG_READ_BYTES = 2 * 1024 * 1024;
-type Provider = "claude" | "codex";
+type Provider = "claude" | "codex" | "opencode";
 
 type CodexThreadRow = {
   rollout_path: string;
+};
+
+type OpenCodeMessageRow = {
+  message_id: string;
+  message_created: number;
+  message_updated: number;
+  message_data: string;
+  part_id: string | null;
+  part_created: number | null;
+  part_data: string | null;
 };
 
 // Only conversation entries are streamed; everything else is session-metadata
@@ -61,6 +72,17 @@ function claudeProjectsDir(): string {
 
 function codexSessionsDir(): string {
   return process.env.COCKPIT_CODEX_SESSIONS_DIR || join(codexDir(), "sessions");
+}
+
+function openCodeDb(): string {
+  return (
+    process.env.COCKPIT_OPENCODE_DB ||
+    join(
+      process.env.OPENCODE_DATA_DIR ||
+        join(homedir(), ".local", "share", "opencode"),
+      "opencode.db",
+    )
+  );
 }
 
 // Canonical projects root for the realpath-confinement check.
@@ -129,7 +151,14 @@ export function isInsideCodexSessions(filePath: string): boolean {
 function normalizeProvider(provider: string | null): Provider | null {
   if (!provider || provider === "claude") return "claude";
   if (provider === "codex") return "codex";
+  if (provider === "opencode") return "opencode";
   return null;
+}
+
+function validSessionId(provider: Provider, session: string): boolean {
+  return provider === "opencode"
+    ? OPENCODE_ID_RE.test(session) && session.length <= 160
+    : UUID_RE.test(session);
 }
 
 function resolveProviderTranscriptPath(
@@ -148,7 +177,212 @@ function isInsideProviderRoot(provider: Provider, filePath: string): boolean {
 }
 
 function providerRootName(provider: Provider): string {
+  if (provider === "opencode") return "OpenCode database";
   return provider === "codex" ? "Codex sessions" : "~/.claude/projects";
+}
+
+function safeParseJSON<T>(value: string | null): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+function openCodeTimestampIso(value: number): string | undefined {
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  const ms = value < 1_000_000_000_000 ? value * 1000 : value;
+  return new Date(ms).toISOString();
+}
+
+function openCodePartContent(part: unknown): unknown | null {
+  if (!part || typeof part !== "object") return null;
+  const p = part as {
+    type?: string;
+    text?: string;
+    content?: string;
+    name?: string;
+    input?: unknown;
+  };
+  if (p.type === "text" && typeof p.text === "string") {
+    return { type: "text", text: p.text };
+  }
+  if (p.type === "reasoning" && typeof p.text === "string") {
+    return { type: "thinking", thinking: p.text };
+  }
+  if (p.type === "tool") {
+    return {
+      type: "tool_use",
+      name: p.name ?? "tool",
+      input: p.input ?? part,
+    };
+  }
+  if (
+    p.type === "patch" ||
+    p.type === "step-start" ||
+    p.type === "step-finish"
+  ) {
+    return { type: "text", text: JSON.stringify(part, null, 2) };
+  }
+  const text = p.text ?? p.content;
+  if (typeof text === "string") return { type: "text", text };
+  return { type: "text", text: JSON.stringify(part, null, 2) };
+}
+
+function openCodeRowsToEntries(rows: OpenCodeMessageRow[]): unknown[] {
+  const grouped = new Map<
+    string,
+    {
+      row: OpenCodeMessageRow;
+      parts: unknown[];
+    }
+  >();
+  for (const row of rows) {
+    const group = grouped.get(row.message_id) ?? { row, parts: [] };
+    grouped.set(row.message_id, group);
+    const part = safeParseJSON<unknown>(row.part_data);
+    const content = openCodePartContent(part);
+    if (content) group.parts.push(content);
+  }
+
+  const entries: unknown[] = [];
+  for (const { row, parts } of grouped.values()) {
+    const data = safeParseJSON<{
+      role?: string;
+      content?: unknown;
+      text?: string;
+      summary?: unknown;
+    }>(row.message_data);
+    const role = data?.role === "user" ? "user" : "assistant";
+    const fallbackContent =
+      data?.content ??
+      data?.text ??
+      (data?.summary ? JSON.stringify(data.summary, null, 2) : "");
+    const content = parts.length ? parts : fallbackContent;
+    entries.push({
+      type: role,
+      uuid: row.message_id,
+      timestamp: openCodeTimestampIso(row.message_updated),
+      message: {
+        role,
+        content,
+      },
+      provider: "opencode",
+    });
+  }
+  return entries;
+}
+
+function readOpenCodeRows(
+  session: string,
+  afterUpdated = 0,
+  limit = BACKLOG_LINES,
+): OpenCodeMessageRow[] {
+  const dbPath = openCodeDb();
+  if (!existsSync(dbPath)) return [];
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      return db
+        .query(
+          `select
+             m.id as message_id,
+             m.time_created as message_created,
+             m.time_updated as message_updated,
+             m.data as message_data,
+             p.id as part_id,
+             p.time_created as part_created,
+             p.data as part_data
+           from (
+             select id, session_id, time_created, time_updated, data
+             from message
+             where session_id = ? and time_updated > ?
+             order by time_updated desc, id desc
+             limit ?
+           ) m
+           left join part p on p.message_id = m.id
+           order by m.time_created asc, m.id asc, p.time_created asc, p.id asc`,
+        )
+        .all(session, afterUpdated, limit) as OpenCodeMessageRow[];
+    } finally {
+      db.close();
+    }
+  } catch {
+    return [];
+  }
+}
+
+function maxOpenCodeUpdated(
+  rows: OpenCodeMessageRow[],
+  current: number,
+): number {
+  return rows.reduce(
+    (max, row) =>
+      Math.max(max, row.message_updated || row.message_created || 0),
+    current,
+  );
+}
+
+function createOpenCodeTranscriptStream(session: string): Response {
+  let closed = false;
+  let poll: ReturnType<typeof setInterval> | null = null;
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  const cleanup = () => {
+    closed = true;
+    if (poll) clearInterval(poll);
+    if (heartbeat) clearInterval(heartbeat);
+    poll = heartbeat = null;
+  };
+
+  const stream = new ReadableStream({
+    start(controller) {
+      let cursor = 0;
+      const seen = new Set<string>();
+      const enqueue = (chunk: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(chunk);
+        } catch {
+          cleanup();
+        }
+      };
+      const emitRows = (rows: OpenCodeMessageRow[]) => {
+        cursor = maxOpenCodeUpdated(rows, cursor);
+        for (const entry of openCodeRowsToEntries(rows) as Array<{
+          uuid?: string;
+        }>) {
+          if (entry.uuid && seen.has(entry.uuid)) continue;
+          if (entry.uuid) seen.add(entry.uuid);
+          enqueue(`data: ${JSON.stringify(entry)}\n\n`);
+        }
+      };
+
+      enqueue(": connected\n\n");
+      const backlog = readOpenCodeRows(session, 0, BACKLOG_LINES);
+      emitRows(backlog);
+      enqueue(`event: backlog-done\ndata: ${JSON.stringify({})}\n\n`);
+
+      poll = setInterval(
+        () => {
+          emitRows(readOpenCodeRows(session, cursor, BACKLOG_LINES));
+        },
+        Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000,
+      );
+      heartbeat = setInterval(() => enqueue(": ping\n\n"), 25_000);
+    },
+    cancel() {
+      cleanup();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 // True when an entry is a displayable conversation line (not metadata noise).
@@ -263,7 +497,9 @@ export function handleTranscriptStream(req: Request): Response {
   const session = url.searchParams.get("session") ?? "";
   const provider = normalizeProvider(url.searchParams.get("provider"));
   if (!provider) return jsonError("invalid provider");
-  if (!UUID_RE.test(session)) return jsonError("invalid session id");
+  if (!validSessionId(provider, session))
+    return jsonError("invalid session id");
+  if (provider === "opencode") return createOpenCodeTranscriptStream(session);
 
   // A Claude/Codex transcript can be created moments after the session is
   // selected, so "not found" is a transient `wait`, not a 404 — the tailer keeps
@@ -319,9 +555,11 @@ export function handleTranscriptHistory(req: Request): Response {
   const before = Number(url.searchParams.get("before"));
   const limit = Number(url.searchParams.get("limit"));
   if (!provider) return jsonError("invalid provider");
-  if (!UUID_RE.test(session)) return jsonError("invalid session id");
+  if (!validSessionId(provider, session))
+    return jsonError("invalid session id");
 
   const empty = { entries: [], historyStart: 0, hasMore: false };
+  if (provider === "opencode") return jsonResponse(empty);
   if (!Number.isFinite(before) || before <= 0) return jsonResponse(empty);
 
   const resolved = resolveProviderTranscriptPath(provider, session);

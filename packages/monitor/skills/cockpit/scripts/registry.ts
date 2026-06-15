@@ -23,7 +23,7 @@ export type RegistryEntry = {
   lastHeartbeat: string;
 };
 
-export type Provider = "claude" | "codex";
+export type Provider = "claude" | "codex" | "opencode";
 
 export type SessionStatus = "active" | "ended";
 
@@ -91,7 +91,10 @@ export function readRegistry(): RegistryEntry[] {
         .filter((s: any) => s && typeof s.sessionId === "string")
         .map((s: any) => ({
           ...s,
-          provider: s.provider === "codex" ? "codex" : "claude",
+          provider:
+            s.provider === "codex" || s.provider === "opencode"
+              ? s.provider
+              : "claude",
         })) as RegistryEntry[];
     }
   } catch {
@@ -164,6 +167,7 @@ function subagentsFor(
   now: number,
 ): number {
   if (!active) return 0;
+  if (provider === "opencode") return 0;
   return subagentCountFor(provider, sessionId, now);
 }
 
