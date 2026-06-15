@@ -1,6 +1,6 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships two plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships three plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back.
 
 ## Plugins
 
@@ -18,6 +18,12 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 | [preflight](./packages/dispatch/skills/preflight) | Lightweight interviewer that gathers requirements into a single in-conversation plan to approve and execute |
 | [flightplan](./packages/dispatch/skills/flightplan) | Heavyweight interviewer that writes a multi-file blueprint to disk — `PLAN.md` + a `tasks/` tree of self-contained task files for sub-agents |
 | [autopilot](./packages/dispatch/skills/autopilot) | Executes a flightplan tree in parallel waves — a dev→verify→judge→score loop gated on each task's Eval rubric, an atomic commit between waves, then the closing final-review gate, leaving an audit trail |
+
+**relay** is a single portable skill:
+
+| Skill | Description |
+|-------|-------------|
+| [relay](./packages/relay/skills/relay) | Delegate a task to another harness's CLI (codex / opencode / claude): `delegate` (do work), `review` (analysis only), or `image` (codex only) — capture the result, smart-apply when safe, and report back |
 
 ## Claude Code Installation
 
@@ -196,6 +202,35 @@ codex plugin add dispatch@q-lab-marketplace
 ```
 
 (Add the marketplace first if you haven't — see the monitor install steps above.)
+
+## relay
+
+One portable skill that delegates a task *out* to another harness's CLI, then captures the output and reports back — a multi-backend generalization of the codex-only `odin-codex` skill.
+
+```
+/relay <codex|opencode|claude> delegate <task>
+/relay <codex|opencode|claude> review [scope]
+/relay codex image <prompt> --out <path>
+```
+
+- **delegate** — ask a backend to *do* something (implement, refactor, debug); smart-applied when safe.
+- **review** — analysis only, no edits. codex/claude use native review; opencode emulates via a read-only prompt.
+- **image** — generate an image via codex (gpt-image-2). codex-only; `opencode`/`claude` fail fast at the capability gate.
+
+A capability gate rejects unsupported (backend, mode) pairs before any CLI runs. Every run captures full output to `/tmp/relay/<ts>/last.md` and prints it. Models resolve by precedence: `--model` flag > config file (`~/.config/q-lab/cc-plugins/relay/config.json`) > built-in defaults. Per-CLI invocation details, headless output handling, and the OpenCode symlink install live in the [backend reference](./packages/relay/skills/relay/references/backends.md).
+
+### Installation
+
+```bash
+# Claude Code
+claude plugins install relay@q-lab-marketplace
+
+# Codex
+codex plugin add relay@q-lab-marketplace
+
+# OpenCode (reads ~/.claude/skills/) — one-time symlink
+ln -s "$(pwd)/packages/relay/skills/relay" ~/.claude/skills/relay
+```
 
 ## Adding a New Plugin
 
