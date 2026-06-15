@@ -578,9 +578,19 @@ document.addEventListener("visibilitychange", () => {
 // stays on the empty state, since no log file exists for it).
 const deepLink = new URLSearchParams(location.search);
 const deepLinkSession = deepLink.get("session");
-if (deepLinkSession && /^[0-9a-f-]{36}$/i.test(deepLinkSession)) {
+const rawDeepLinkProvider = deepLink.get("provider") || "claude";
+const deepLinkProvider = ["claude", "codex", "opencode"].includes(
+  rawDeepLinkProvider,
+)
+  ? rawDeepLinkProvider
+  : "claude";
+const deepLinkSessionOk =
+  deepLinkProvider === "opencode"
+    ? /^[A-Za-z0-9_.:-]{1,160}$/.test(deepLinkSession || "")
+    : /^[0-9a-f-]{36}$/i.test(deepLinkSession || "");
+if (deepLinkSession && deepLinkSessionOk) {
   store.selectedSessionId = deepLinkSession;
-  store.selectedProvider = deepLink.get("provider") || "claude";
+  store.selectedProvider = deepLinkProvider;
   store.selectedProject = deepLink.get("project") || null;
 }
 
