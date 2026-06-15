@@ -82,6 +82,25 @@ export const claudeBackend: Backend = {
       return raw.trim();
     }
 
+    // `claude -p --output-format json` returns an ARRAY of stream events
+    // ([{type:"system"…}, {type:"assistant"…}, {type:"result", result:"…"}]).
+    // The final `result` event carries the answer — extract it rather than
+    // dumping the whole stream.
+    if (Array.isArray(parsed)) {
+      for (let i = parsed.length - 1; i >= 0; i--) {
+        const event = parsed[i];
+        if (
+          event &&
+          typeof event === "object" &&
+          (event as Record<string, unknown>).type === "result" &&
+          typeof (event as Record<string, unknown>).result === "string"
+        ) {
+          return (event as Record<string, unknown>).result as string;
+        }
+      }
+      return raw.trim();
+    }
+
     // Only plain objects carry an extractable envelope; anything else is raw.
     if (typeof parsed !== "object" || parsed === null) {
       return raw.trim();

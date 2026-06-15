@@ -11,6 +11,12 @@ import type { Backend, InvokeOpts, Mode } from "../types";
  * - Review is prompt-based only: "Analyze only — do not modify files" is in the prompt text.
  *   Hard read-only via --agent is deferred.
  * - Output parsing tolerates bug #26855 (--format json can exit before emitting step_finish).
+ *
+ * Output: `--format json` streams JSONL (one event per line) — `step_start`,
+ * `text`, `step_finish`. The actual answer lives in the `text` events; relay
+ * extracts it with parseJsonl rather than scraping `--format default`, whose
+ * stream interleaves the answer with TUI/progress noise. parseJsonl concatenates
+ * every `text` part and never blocks on a terminal event (#26855-safe).
  */
 export const opencodeBackend: Backend = {
   name: "opencode",
@@ -31,8 +37,9 @@ export const opencodeBackend: Backend = {
       argv.push("-m", model);
     }
 
-    // v1: use --format default (simplest; avoids JSON parsing complexity + #26855)
-    argv.push("--format", "default");
+    // JSON gives a clean, structured stream we can extract the final answer from
+    // (parseOutput → parseJsonl); --format default interleaves TUI/progress noise.
+    argv.push("--format", "json");
 
     // Append prompt text (opencode has no --prompt-file flag)
     if (opts.promptText !== undefined) {
@@ -43,8 +50,8 @@ export const opencodeBackend: Backend = {
   },
 
   parseOutput(raw: string): string {
-    // For --format default, just trim the output
-    return raw.trim();
+    // Extract the concatenated `text` parts from the JSONL stream.
+    return parseJsonl(raw);
   },
 };
 
