@@ -1690,6 +1690,7 @@ export function App() {
       // transcript; cockpit runs its own daemon (default port 5858). If that
       // daemon is down, opening would land on a dead tab — the panel already
       // shows a notice telling the user to start it, so bail quietly here.
+      if (session.provider === "opencode") return;
       if (!this.cockpitUp) return;
       const params = new URLSearchParams({
         session: session.id,
