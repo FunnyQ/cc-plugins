@@ -6,7 +6,7 @@
 >
 > **Depends on**: core/01
 > **Blocks**: backends/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -38,15 +38,15 @@ Tests construct small inline fake `Backend` objects (e.g. one with `supports = n
 
 ## Acceptance criteria
 
-- [ ] `gate.ts` exports `getBackend` and `capabilityGate`, both pure, neither importing a concrete backend file.
-- [ ] `getBackend(map, "nope")` returns `undefined`; `getBackend(map, "x")` returns `map.x`.
-- [ ] `capabilityGate` returns `null` when `backend.supports.has(mode)`, else a non-empty message naming the mode and backend.
-- [ ] Tests pass using inline fake backends only (no dependency on the real three).
+- [x] `gate.ts` exports `getBackend` and `capabilityGate`, both pure, neither importing a concrete backend file.
+- [x] `getBackend(map, "nope")` returns `undefined`; `getBackend(map, "x")` returns `map.x`.
+- [x] `capabilityGate` returns `null` when `backend.supports.has(mode)`, else a non-empty message naming the mode and backend.
+- [x] Tests pass using inline fake backends only (no dependency on the real three).
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/backends/gate.test.ts` passes.
-- [ ] Tests assert: supported pair → `null`; unsupported pair → message; unknown name → `undefined`.
+- [x] `bun test packages/relay/skills/relay/scripts/backends/gate.test.ts` passes.
+- [x] Tests assert: supported pair → `null`; unsupported pair → message; unknown name → `undefined`.
 
 ## Eval rubric
 

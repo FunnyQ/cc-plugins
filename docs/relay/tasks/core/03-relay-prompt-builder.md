@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/01, core/02
 > **Blocks**: backends/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -63,17 +63,17 @@ Optional CLI entry (`import.meta.main`): parse `relay-prompt <delegate|review> -
 
 ## Acceptance criteria
 
-- [ ] `formatPrompt` exported and pure (takes a `context` string, returns a string; never calls `collect()` or touches the filesystem); no backend names in output.
-- [ ] `buildPromptFile` exported (impure): collects context, formats, writes `<kind>-prompt.md` under a `/tmp/relay/...` dir, returns the path.
-- [ ] review prompt includes the "Analyze only — do not modify any files" instruction.
-- [ ] delegate prompt includes the execution-constraints block and the file-scope line.
-- [ ] delegate with no task exits/throws with a clear message.
-- [ ] Optional CLI prints the prompt-file path; the entry point uses `buildPromptFile` directly (no subprocess).
+- [x] `formatPrompt` exported and pure (takes a `context` string, returns a string; never calls `collect()` or touches the filesystem); no backend names in output.
+- [x] `buildPromptFile` exported (impure): collects context, formats, writes `<kind>-prompt.md` under a `/tmp/relay/...` dir, returns the path.
+- [x] review prompt includes the "Analyze only — do not modify any files" instruction.
+- [x] delegate prompt includes the execution-constraints block and the file-scope line.
+- [x] delegate with no task exits/throws with a clear message.
+- [x] Optional CLI prints the prompt-file path; the entry point uses `buildPromptFile` directly (no subprocess).
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/relay-prompt.test.ts` passes.
-- [ ] Tests cover (calling `formatPrompt` with a fixed `context` string — no filesystem): review prompt contains the read-only line; delegate prompt contains constraints + scope; focus/task fallbacks; output contains no literal `codex`/`opencode`/`claude`.
+- [x] `bun test packages/relay/skills/relay/scripts/relay-prompt.test.ts` passes.
+- [x] Tests cover (calling `formatPrompt` with a fixed `context` string — no filesystem): review prompt contains the read-only line; delegate prompt contains constraints + scope; focus/task fallbacks; output contains no literal `codex`/`opencode`/`claude`.
 
 ## Eval rubric
 

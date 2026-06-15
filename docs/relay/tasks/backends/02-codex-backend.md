@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: core/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -65,18 +65,18 @@ After an image run, resolve the source PNG (extract-from-output → fallback new
 
 ## Acceptance criteria
 
-- [ ] `codexBackend.supports` = `{delegate, review, image}`.
-- [ ] `strategy` returns `native` for default review, `prompt` for custom-file review, `prompt` for delegate, `native` for image.
-- [ ] delegate argv uses `-s workspace-write -a never`; `dangerous` switches to the bypass flag.
-- [ ] review native argv maps `uncommitted`/`base:<ref>`/`commit:<sha>` to the correct codex flags.
-- [ ] `buildImagePrompt` produces the gpt-image-2 line; `extractGeneratedPngPath`/`findNewestPng` resolve a PNG path.
-- [ ] `postRun` returns `parsed` unchanged for delegate/review, and for image copies the PNG to `opts.out` (timestamp-suffixed) and returns `Image saved: <path>`.
-- [ ] No `-m` flag is ever emitted for codex.
+- [x] `codexBackend.supports` = `{delegate, review, image}`.
+- [x] `strategy` returns `native` for default review, `prompt` for custom-file review, `prompt` for delegate, `native` for image.
+- [x] delegate argv uses `-s workspace-write -a never`; `dangerous` switches to the bypass flag.
+- [x] review native argv maps `uncommitted`/`base:<ref>`/`commit:<sha>` to the correct codex flags.
+- [x] `buildImagePrompt` produces the gpt-image-2 line; `extractGeneratedPngPath`/`findNewestPng` resolve a PNG path.
+- [x] `postRun` returns `parsed` unchanged for delegate/review, and for image copies the PNG to `opts.out` (timestamp-suffixed) and returns `Image saved: <path>`.
+- [x] No `-m` flag is ever emitted for codex.
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/backends/codex.test.ts` passes.
-- [ ] Tests cover: each mode's argv; scope→flag mapping; dangerous toggle; `buildImagePrompt` text; `extractGeneratedPngPath` hit/miss; `findNewestPng` against a temp fixture `baseDir` (newest-after-`after` selection). No real `codex` spawn.
+- [x] `bun test packages/relay/skills/relay/scripts/backends/codex.test.ts` passes.
+- [x] Tests cover: each mode's argv; scope→flag mapping; dangerous toggle; `buildImagePrompt` text; `extractGeneratedPngPath` hit/miss; `findNewestPng` against a temp fixture `baseDir` (newest-after-`after` selection). No real `codex` spawn.
 
 ## Eval rubric
 
