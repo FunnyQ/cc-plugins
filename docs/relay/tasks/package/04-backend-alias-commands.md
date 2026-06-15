@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: package/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -40,16 +40,16 @@ Do not duplicate orchestration logic in the alias files — they only fix the ba
 
 ## Acceptance criteria
 
-- [ ] `commands/{codex,opencode,claude}.md` exist, each with valid frontmatter (`description` + `argument-hint`).
-- [ ] Each routes to the relay skill with its backend fixed; none re-implements gate/strategy/report logic.
-- [ ] `opencode`/`claude` argument-hints omit `image`; `codex` includes it.
-- [ ] A comment or the body makes clear these are aliases for `/relay <backend>`.
+- [x] `commands/{codex,opencode,claude}.md` exist, each with valid frontmatter (`description` + `argument-hint`).
+- [x] Each routes to the relay skill with its backend fixed; none re-implements gate/strategy/report logic.
+- [x] `opencode`/`claude` argument-hints omit `image`; `codex` includes it.
+- [x] A comment or the body makes clear these are aliases for `/relay <backend>`.
 
 ## Verification
 
-- [ ] All three files parse as valid Markdown-with-frontmatter (e.g. each opens with a `---` frontmatter block containing `description`).
-- [ ] `grep -l 'alias for' packages/relay/commands/{codex,opencode,claude}.md` matches all three (they self-identify as aliases).
-- [ ] Read-through: each file fixes exactly its backend and contains no backend-specific gate/strategy logic (defers to the skill).
+- [x] All three files parse as valid Markdown-with-frontmatter (e.g. each opens with a `---` frontmatter block containing `description`).
+- [x] `grep -l 'alias for' packages/relay/commands/{codex,opencode,claude}.md` matches all three (they self-identify as aliases).
+- [x] Read-through: each file fixes exactly its backend and contains no backend-specific gate/strategy logic (defers to the skill).
 
 ## Eval rubric
 

@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: package/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -32,17 +32,17 @@ Surgical edits only: touch the relay-relevant spots, don't reformat unrelated se
 
 ## Acceptance criteria
 
-- [ ] `CHANGELOG.md` has a relay `0.1.0` entry in the file's existing format.
-- [ ] `CLAUDE.md` "What This Is" mentions relay (delegation + two-layer + matrix).
-- [ ] `CLAUDE.md` Architecture shows the `packages/relay/` subtree.
-- [ ] Distribution + version note for relay is present.
-- [ ] No unrelated sections reformatted.
+- [x] `CHANGELOG.md` has a relay `0.1.0` entry in the file's existing format.
+- [x] `CLAUDE.md` "What This Is" mentions relay (delegation + two-layer + matrix).
+- [x] `CLAUDE.md` Architecture shows the `packages/relay/` subtree.
+- [x] Distribution + version note for relay is present.
+- [x] No unrelated sections reformatted.
 
 ## Verification
 
-- [ ] `grep -i relay CHANGELOG.md` and `grep -i relay CLAUDE.md` both return matches.
-- [ ] This task touches only `CHANGELOG.md` and `CLAUDE.md` — verify with a path-scoped diff (`git diff --stat -- CHANGELOG.md CLAUDE.md` shows the edits; nothing else outside those two paths is attributable to this task). Do not assume a clean working tree — earlier tasks have already modified other files.
-- [ ] Read-through: the relay section is consistent with the manifests/registries (version `0.1.0`, both registries, distribution model).
+- [x] `grep -i relay CHANGELOG.md` and `grep -i relay CLAUDE.md` both return matches.
+- [x] This task touches only `CHANGELOG.md` and `CLAUDE.md` — verify with a path-scoped diff (`git diff --stat -- CHANGELOG.md CLAUDE.md` shows the edits; nothing else outside those two paths is attributable to this task). Do not assume a clean working tree — earlier tasks have already modified other files.
+- [x] Read-through: the relay section is consistent with the manifests/registries (version `0.1.0`, both registries, distribution model).
 
 ## Eval rubric
 
