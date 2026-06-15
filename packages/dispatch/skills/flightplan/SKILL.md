@@ -1,6 +1,6 @@
 ---
 name: flightplan
-version: 0.4.0
+version: 0.5.0
 description: Heavyweight interviewer that writes a multi-file specification artifact to disk — `docs/<topic>/PLAN.md` plus a `tasks/` tree with shared `_context/` files and self-contained task files that sub-agents can pick up in later sessions. AUTO-TRIGGER when the user asks to "fully spec out", "break this down into tasks", "decompose into task files", "prep this for sub-agents", "write PLAN.md and tasks", "draft a project blueprint", "interview me thoroughly", or asks for a multi-file spec artifact written to disk for later execution. Also trigger when the user explicitly says "/flightplan" or mentions they will execute the work in a different session. Do NOT trigger when the user wants a lightweight in-conversation spec (use preflight instead), or when they give a clear, actionable instruction that can be executed directly.
 ---
 
@@ -111,19 +111,38 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
    ```
    The script fails loudly on malformed or duplicate-ref tasks rather than silently dropping them. It preserves human-authored prologue/epilogue (e.g. "Known gaps") between the generated markers. Fill the Known gaps section manually if any surfaced during the interview.
 
-### Step 6 — Codex review of the written artifact (iterate to convergence)
+### Step 6 — Review the written artifact (engine-selectable; iterate to convergence)
 
-After all files pass lint, run a Codex review over the whole plan tree — then **loop**: review → act on findings → re-review. This is a **mandatory content-quality gate**, a different lens from the structural/schema checks `lint-task.ts` does. Codex is sharp: cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects, not minor notes.
+After all files pass lint, run an independent review over the whole plan tree — then **loop**: review → act on findings → re-review. This is a **mandatory content-quality gate**, a different lens from the structural/schema checks `lint-task.ts` does. A sharp reviewer treats cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift as real defects, not minor notes.
 
-**Why loop, not one pass.** A single review isn't enough. The first pass catches the loud problems; once you fix them, the *revised* plan exposes deeper issues the big ones were masking — and Codex, being non-deterministic, surfaces different things each run. Iterating is where most of the quality comes from. The loop only works because you **apply fixes between passes** — re-reviewing unchanged files just repeats the same findings.
+**Pick the review engine first** — default **Codex**. Use `AskUserQuestion` (codex / opus / opencode):
 
-Each pass (it adds a flightplan-specific prompt so Codex focuses on planning quality, not generic code style):
+- **Codex** (default) — OpenAI codex's native `review`; the cross-vendor signal an all-Claude author can't produce.
+- **OpenCode** — the opencode CLI reviews (cross-vendor, non-Claude). Pick to use opencode's models instead.
+- **Opus** — a strong Claude reviewer. **Because you (the main agent) just wrote this plan, you must NOT review it yourself** — author bias defeats the gate. Spawn a **fresh, independent reviewer subagent** instead (see below).
 
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug>
-```
+All three share one source of criteria — the 7-point checklist baked into `review-plan.ts` — so only *who critiques* changes.
 
-The script bundles all plan files to `codex review -` (stdin); scope is exactly the plan tree, regardless of other uncommitted changes. If `codex` is not installed it exits 0 with a warning — skip the gate entirely, note it as a Known gap in `tasks/README.md`, and go to Step 7.
+**Why loop, not one pass.** A single review isn't enough. The first pass catches the loud problems; once you fix them, the *revised* plan exposes deeper issues the big ones were masking — and the reviewer, being non-deterministic, surfaces different things each run. Iterating is where most of the quality comes from. The loop only works because you **apply fixes between passes** — re-reviewing unchanged files just repeats the same findings.
+
+Each pass, by engine:
+
+- **Codex** (default):
+  ```bash
+  bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug>
+  ```
+- **OpenCode**:
+  ```bash
+  bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug> --engine opencode   # optional: --model <provider/model>
+  ```
+  Both bundle all plan files for the external CLI; scope is exactly the plan tree, regardless of other uncommitted changes. If the chosen CLI isn't installed the script exits 0 with a warning — skip the gate, note it as a Known gap in `tasks/README.md`, and go to Step 7.
+- **Opus** — spawn a **fresh `Agent` subagent on Opus** for each pass (a clean context that did NOT write the plan, so it reviews without author bias):
+  1. Capture the exact review bundle the CLIs get:
+     ```bash
+     bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug> --print
+     ```
+  2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."*
+  3. Take its findings back to the loop. **You are the fixer, never the reviewer** — a new subagent each pass keeps every review independent (reviewer ≠ author, the same anti-bias split autopilot uses).
 
 **Act on findings between every pass** — rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on:` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Only skip a finding when it conflicts with an intentional design decision already recorded; if you skip one, add it as a Known gap in `tasks/README.md` with the reason — and don't "re-fix" it when a later pass raises it again.
 
@@ -175,7 +194,7 @@ Five hard rules. Details for each live in the referenced template.
 
 Reach for these instead of doing the mechanical work by hand. Each one has a tested pure function exported for unit testing.
 
-- `scripts/review-plan.ts` — focused Codex review of a written plan tree (`--uncommitted` + flightplan-specific prompt); exit code mirrors codex so callers can gate on it. Run it iteratively (Step 6): review → fix → re-review until a pass is materially clean.
+- `scripts/review-plan.ts` — focused review of a written plan tree, engine-selectable via `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to the sibling `opencode-run.ts`). `--model` overrides the opencode model; `--print` emits the instructions+bundle (the shared 7-point criteria) for the Opus reviewer subagent. Bundles the plan files so scope is exactly the tree; exit code mirrors the reviewer so callers can gate on it (a missing CLI exits 0 with a warning). Run it iteratively (Step 6): review → fix → re-review until a pass is materially clean.
 - `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
 - `scripts/lint-task.ts` — validates one or more task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers

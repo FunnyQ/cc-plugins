@@ -2,12 +2,16 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { join as joinPath } from "node:path";
 import {
   buildReviewPrompt,
   collapseDuplicateReviewOutput,
   collectPlanFiles,
   formatCodexReviewOutput,
+  parseArgs,
 } from "./review-plan";
+
+const SCRIPT = joinPath(import.meta.dir, "review-plan.ts");
 
 async function newRoot(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "flightplan-review-"));
@@ -166,6 +170,74 @@ describe("collapseDuplicateReviewOutput", () => {
     ].join("\n");
 
     expect(collapseDuplicateReviewOutput(output)).toBe(output);
+  });
+});
+
+describe("parseArgs", () => {
+  test("defaults: engine codex, no model, not print", () => {
+    expect(parseArgs(["docs/my-plan"])).toEqual({
+      planDir: "docs/my-plan",
+      engine: "codex",
+      print: false,
+    });
+  });
+
+  test("--engine opencode + --model are captured", () => {
+    expect(
+      parseArgs(["docs/my-plan", "--engine", "opencode", "--model", "x/y"]),
+    ).toEqual({
+      planDir: "docs/my-plan",
+      engine: "opencode",
+      model: "x/y",
+      print: false,
+    });
+  });
+
+  test("--print sets print and ignores engine wiring", () => {
+    const out = parseArgs(["docs/my-plan", "--print"]);
+    expect(out.print).toBe(true);
+    expect(out.planDir).toBe("docs/my-plan");
+  });
+
+  test("flag order is irrelevant; planDir can come after flags", () => {
+    expect(parseArgs(["--engine", "opencode", "docs/p"]).planDir).toBe(
+      "docs/p",
+    );
+  });
+
+  test("rejects an unknown engine", () => {
+    expect(() => parseArgs(["docs/p", "--engine", "gemini"])).toThrow(
+      /Unknown --engine/,
+    );
+  });
+
+  test("rejects an unexpected argument", () => {
+    expect(() => parseArgs(["docs/p", "--frob"])).toThrow(
+      /Unexpected argument/,
+    );
+  });
+});
+
+describe("--print (integration)", () => {
+  test("emits the instructions+bundle with no file-list header", async () => {
+    const root = await newRoot();
+    await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
+
+    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(res.success).toBe(true);
+    const out = res.stdout.toString();
+    // The exact review criteria bundle — same source all engines share.
+    expect(out.startsWith("You are reviewing a flightplan artifact")).toBe(
+      true,
+    );
+    expect(out).toContain("Goal: ship it.");
+    // --print must be clean: no "Flightplan review — N file(s)" header.
+    expect(out).not.toContain("Flightplan review");
+
+    await rm(root, { recursive: true });
   });
 });
 
