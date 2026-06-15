@@ -84,7 +84,7 @@ cc-plugins/
             │   ├── codex.ts              # native review + exec + image PNG handling (postRun)
             │   ├── opencode.ts           # opencode run + JSONL parse + model defaults
             │   └── claude.ts             # claude -p + /code-review native review
-            └── *.test.ts                 # unit tests; integration.test.ts gated by RELAY_INTEGRATION=1
+            └── *.test.ts                 # unit tests (bun test) — backends mock the CLI runner; live CLI behaviour is verified by manual smokes, not a committed integration test
 ```
 
 relay ships to both Claude Code and Codex marketplaces via `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` at version `0.1.0`. OpenCode integration is available via a `~/.claude/skills/` symlink (documented in SKILL.md and references/backends.md).
@@ -167,10 +167,18 @@ bun test packages/monitor/skills/install/scripts/
 
 ## Releasing
 
-⚠️ **Three version fields must be bumped together** — they drift easily, and the marketplace shows the wrong version if they disagree:
+⚠️ Versions live **only** in each plugin's two `plugin.json` files (Claude + Codex). The marketplace registries (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) carry **no `version` field** — don't add one. The published version is the git tag plus the `plugin.json` values.
 
-- `.claude-plugin/marketplace.json` → `plugins[].version` (the single `monitor` entry)
+**monitor and dispatch are versioned in lockstep** at the repo version (the `vX.Y.Z` git tag — currently `3.9.1`). When releasing repo-level work, bump all four together:
+
 - `packages/monitor/.claude-plugin/plugin.json` → `version`
 - `packages/monitor/.codex-plugin/plugin.json` → `version`
+- `packages/dispatch/.claude-plugin/plugin.json` → `version`
+- `packages/dispatch/.codex-plugin/plugin.json` → `version`
 
-`/odin-git:release` only auto-detects `marketplace.json`, so **manually bump both `plugin.json` files to match** before finishing any release, then add the matching `CHANGELOG.md` entry.
+**relay is versioned independently** (currently `0.1.0`), on its own cadence — bump its two files only when relay itself changed:
+
+- `packages/relay/.claude-plugin/plugin.json` → `version`
+- `packages/relay/.codex-plugin/plugin.json` → `version`
+
+`/odin-git:release` does not auto-detect these per-plugin fields, so **bump the relevant `plugin.json` files by hand** to match the tag before finishing a release, then add the matching `CHANGELOG.md` entry.

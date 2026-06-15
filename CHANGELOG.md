@@ -1,10 +1,20 @@
 # Changelog
 
-## [0.1.0] - 2026-06-15
+## [3.10.0] - 2026-06-15
 
 ### ✨ Added
 
-- relay plugin — cross-harness task delegation (`/relay <codex|opencode|claude> <delegate|review|image>`), a multi-backend superset of odin-codex.
+- **Relay plugin** — cross-harness task delegation via `/relay <codex|opencode|claude> <delegate|review|image>`. A backend-agnostic mode layer with per-harness backends (claude, codex, opencode), capability-gated dispatch, and a functional superset of odin-codex. Alias shorthand commands (`/relay claude`, `/relay codex`, `/relay opencode`) let you target a specific harness directly without specifying a mode. Relay is independently versioned at 0.1.0 and ships as part of this marketplace release.
+- **Custom-file review routing in relay**: reviews can now be directed at specific files rather than always defaulting to the current diff, enabling targeted code review across harnesses.
+
+### 🐛 Fixed
+
+- **Relay backend output parsing** (caught by end-to-end smoke tests): opencode backend switched to `--format json` + `parseJsonl` (was raw-trim on default format); codex backend dropped the `-a` flag removed in codex ≥ 0.139; claude delegate now extracts `.result` from the JSON events array instead of dumping the raw stream.
+- **Codex review deduplication**: deduplicate codex review output and improve format selection so repeated findings no longer stack up across review passes.
+
+### 📖 Documentation
+
+- **Autopilot CFG absolute-path requirement**: clarified that `CFG.scratch` and `CFG.log` paths must be absolute (relative paths split the flightlog across different agent `cwd` contexts, breaking the audit trail).
 
 ## [3.9.1] - 2026-06-11
 
