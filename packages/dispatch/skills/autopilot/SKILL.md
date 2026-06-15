@@ -40,7 +40,7 @@ Three hard constraints shape the design — internalize them:
 Before touching Workflow, gather the work-list in the main conversation:
 
 1. **Resolve the scripts path once.** autopilot reuses flightplan's scripts (siblings under the plugin). `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash — so don't `${CLAUDE_PLUGIN_ROOT}/...` your way to them. Take the skill's load-time *"Base directory for this skill"* banner and resolve `<base>/../flightplan/scripts` to an absolute path; call it `$SCRIPTS` and use it in every `bun` command below. (This is the same value you'll bake into `CFG.scriptsDir` in Step 3.)
-2. Resolve the plan dir. The user names a slug or path; the tree lives at `docs/<slug>/tasks/`.
+2. Resolve the plan dir **as an absolute path**. The user names a slug or path; the tree lives at `docs/<slug>/tasks/`. Capture the real repo root with `git rev-parse --show-toplevel` (it can be anywhere — `/Users/<name>/Projects/...`, `/opt/temp/project-repo`, `/workspace/...`) and build absolute paths for `tasksDir` / `planPath` / `logFile` from it (`<root>/docs/<slug>/...`) to bake into `CFG` in Step 3 — these MUST be absolute. Workflow agents don't share a cwd, so a *relative* `logFile` resolves against whichever agent's working directory; an agent that `cd`s into the tree writes the flightlog to a nested `docs/<slug>/tasks/docs/<slug>/.flightlog/` and splits the audit trail. `~/...` is an optional shorthand **only when the repo is under `$HOME`** (Bash + the file tools expand a leading `~`, avoids leaking the username) — for a repo outside `$HOME` use the full path; never invent a `~` form.
 3. Read `docs/<slug>/PLAN.md` for the overall goal and the bucketing — the Final review task scores against "did we meet the PLAN goal", so the orchestrator needs the goal in hand.
 4. Confirm there is ready work:
    ```bash
@@ -72,13 +72,13 @@ Adapt `references/orchestrator.md` — it is the canonical script. **Bake the sc
 ```javascript
 const CFG = {
   slug:                  '<slug>',
-  tasksDir:              'docs/<slug>/tasks',
-  planPath:              'docs/<slug>/PLAN.md',
-  logFile:               'docs/<slug>/.flightlog/run.jsonl',
+  tasksDir:              '<repo-root>/docs/<slug>/tasks',          // ABSOLUTE (git rev-parse --show-toplevel) — NOT relative; see Step 1.2
+  planPath:              '<repo-root>/docs/<slug>/PLAN.md',        // ABSOLUTE
+  logFile:               '<repo-root>/docs/<slug>/.flightlog/run.jsonl',  // ABSOLUTE — relative splits the flightlog across agent cwds
   planGoal:              '<one line from PLAN.md>',
   maxAttempts:           3,
   finalReviewMaxAttempts: 2,   // the closing cross-vendor review round loops at most this many times
-  scriptsDir:            '<abs path to skills/flightplan/scripts, from the skill load-time base dir>',
+  scriptsDir:            '<abs path to skills/flightplan/scripts>',  // ABSOLUTE, from the skill load-time base dir
   baseRef:               '<output of `git rev-parse HEAD` captured in Step 1>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
   devEngine:             'claude',  // 'claude' (default) or 'codex' — see "Dev engine" below

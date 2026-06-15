@@ -7,20 +7,23 @@ The main agent scouts inline, then calls `Workflow({ script: <this> })` — **wi
 ```javascript
 const CFG = {
   slug:                  'my-plan',
-  tasksDir:              'docs/my-plan/tasks',
-  planPath:              'docs/my-plan/PLAN.md',
-  logFile:               'docs/my-plan/.flightlog/run.jsonl',
+  // tasksDir/planPath/logFile: ABSOLUTE paths under the repo root, from
+  // `git rev-parse --show-toplevel` (NOT relative). e.g. a repo at
+  // /opt/temp/project-repo → '/opt/temp/project-repo/docs/my-plan/tasks'.
+  tasksDir:              '/abs/repo/docs/my-plan/tasks',          // ABSOLUTE — see "Why every path is absolute" below
+  planPath:              '/abs/repo/docs/my-plan/PLAN.md',        // ABSOLUTE
+  logFile:               '/abs/repo/docs/my-plan/.flightlog/run.jsonl',  // ABSOLUTE
   planGoal:              '<one-line goal copied from PLAN.md>',
   maxAttempts:           3,
   finalReviewMaxAttempts: 2,                              // bounded re-loop for the cross-vendor review round
-  scriptsDir:            '<abs path to skills/flightplan/scripts>',  // from the skill's load-time base dir
+  scriptsDir:            '/abs/.claude/plugins/cache/.../skills/flightplan/scripts',  // ABSOLUTE — from the skill's load-time base dir
   baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
   devEngine:             'claude',  // 'claude' (default) or 'codex' — who writes code in the dev step; 'codex' has each task written by the codex CLI via the codex-run.ts wrapper (last attempt before the cap still falls back to Claude-Opus)
 }
 ```
 
-> **Why `scriptsDir` is a literal:** `CLAUDE_PLUGIN_ROOT` does not reach agent Bash, and the orchestrator can't resolve paths itself. The main agent knows the skill's base directory at load time — resolve `skills/flightplan/scripts` from it (the load-time "Base directory for this skill" banner) and write the absolute path into `CFG.scriptsDir` so the workflow's agents can call `next-ready.ts` / `score-task.ts` / `flightlog.ts`. Baking it in (rather than passing via `args`) is what makes the run reliable.
+> **Why every path is absolute (`tasksDir` / `planPath` / `logFile` / `scriptsDir`):** Workflow agents do not share a stable working directory — an agent that `cd`s into the tasks tree (e.g. to read task files) resolves a *relative* `logFile` against *its own* cwd, so a `bun .../flightlog.ts log docs/<slug>/.flightlog/run.jsonl` from inside `docs/<slug>/tasks/` lands in a nested `docs/<slug>/tasks/docs/<slug>/.flightlog/` — splitting the audit trail across two dirs. (`CLAUDE_PLUGIN_ROOT` likewise never reaches agent Bash, so the orchestrator can't resolve paths itself.) **Bake every path as an absolute literal** so it resolves identically no matter which agent writes it. Get the real repo root from `git rev-parse --show-toplevel` (it may be anywhere — `/Users/<name>/Projects/...`, `/opt/temp/project-repo`, `/workspace/...`); build `<root>/docs/<slug>/...` from it. Resolve `scriptsDir` from the skill's load-time "Base directory for this skill" banner. The values are unambiguous absolute paths that every agent's Bash and file tools (Read/Write/Glob) resolve identically. `~/...` is an *optional* shorthand **only when the repo genuinely lives under `$HOME`** (Bash + the file tools expand a leading `~`, and it avoids leaking the username) — never invent a `~` form for a repo outside `$HOME`. Baking these in (rather than passing via `args`) is what makes the run reliable.
 
 ## The script
 
@@ -37,15 +40,22 @@ export const meta = {
 // The main agent fills these from its inline scout. `args` does not reliably
 // reach the orchestrator; an unset value surfaces as `undefined` and silently
 // fails the scout. Literals here = a reliable run.
+// EVERY path must be ABSOLUTE: Workflow agents don't share a cwd, so a relative
+// logFile/tasksDir resolves against whichever agent's cwd — an agent that cd's
+// into the tree splits the flightlog into a nested
+// docs/<slug>/tasks/docs/<slug>/.flightlog/. Absolute paths resolve identically
+// for every agent. Build them from `git rev-parse --show-toplevel` (the repo may
+// be anywhere — /Users/.../, /opt/..., /workspace/...). `~/...` only if the repo
+// is under $HOME. See "Why every path is absolute" above.
 const CFG = {
   slug:                  'my-plan',
-  tasksDir:              'docs/my-plan/tasks',
-  planPath:              'docs/my-plan/PLAN.md',
-  logFile:               'docs/my-plan/.flightlog/run.jsonl',
+  tasksDir:              '/abs/repo/docs/my-plan/tasks',          // ABSOLUTE (from git rev-parse --show-toplevel)
+  planPath:              '/abs/repo/docs/my-plan/PLAN.md',        // ABSOLUTE
+  logFile:               '/abs/repo/docs/my-plan/.flightlog/run.jsonl',  // ABSOLUTE
   planGoal:              '<one-line goal copied from PLAN.md>',
   maxAttempts:           3,
   finalReviewMaxAttempts: 2,   // bounded re-loop for the closing cross-vendor review round
-  scriptsDir:            '<abs path to skills/flightplan/scripts>',
+  scriptsDir:            '/abs/.claude/plugins/cache/.../skills/flightplan/scripts',  // ABSOLUTE
   baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
   devEngine:             'claude',  // 'claude' (default) or 'codex' — who writes code in the dev step; 'codex' has each task written by the codex CLI via the codex-run.ts wrapper (last attempt before the cap still falls back to Claude-Opus)
