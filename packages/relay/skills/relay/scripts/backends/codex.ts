@@ -82,6 +82,9 @@ export const codexBackend: Backend = {
   invoke(mode: Mode, opts: InvokeOpts) {
     if (mode === "delegate") {
       // delegate: codex exec with sandbox flags or dangerous bypass
+      // `codex exec` is non-interactive by default; `-s` controls the sandbox.
+      // (The old `-a never` approval flag was removed in codex >= 0.139 —
+      // passing it makes `codex exec` error with "unexpected argument '-a'".)
       const argv = opts.dangerous
         ? [
             CODEX_BIN,
@@ -96,8 +99,6 @@ export const codexBackend: Backend = {
             "exec",
             "-s",
             "workspace-write",
-            "-a",
-            "never",
             "-o",
             opts.lastFile!,
             "-",

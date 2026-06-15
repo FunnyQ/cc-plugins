@@ -39,7 +39,7 @@ describe("opencodeBackend", () => {
         "-m",
         "opencode-go/kimi-k2.7-code",
         "--format",
-        "default",
+        "json",
         "test prompt",
       ]);
     });
@@ -57,7 +57,7 @@ describe("opencodeBackend", () => {
         "-m",
         "opencode-go/qwen3.7-max",
         "--format",
-        "default",
+        "json",
         "review prompt",
       ]);
     });
@@ -70,7 +70,7 @@ describe("opencodeBackend", () => {
         "opencode",
         "run",
         "--format",
-        "default",
+        "json",
         "test prompt",
       ]);
     });
@@ -92,7 +92,7 @@ describe("opencodeBackend", () => {
 
       // Should still build argv, just with empty prompt
       expect(result.argv).toContain("--format");
-      expect(result.argv).toContain("default");
+      expect(result.argv).toContain("json");
       expect(result.argv).toContain("");
     });
 
@@ -107,22 +107,27 @@ describe("opencodeBackend", () => {
         "-m",
         "opencode-go/kimi-k2.7-code",
         "--format",
-        "default",
+        "json",
       ]);
     });
   });
 
   describe("parseOutput", () => {
-    it("trims whitespace from formatted output", () => {
-      const raw = "  formatted output text  \n\n";
+    // parseOutput delegates to parseJsonl — extract `text` parts from the JSONL
+    // stream. (parseJsonl itself is exhaustively tested in its own describe block.)
+    it("extracts the answer from a real opencode JSONL stream", () => {
+      const raw = [
+        '{"type":"step_start","part":{"type":"step-start"}}',
+        '{"type":"text","part":{"type":"text","text":"hello world"}}',
+        '{"type":"step_finish","part":{"type":"step-finish","reason":"stop"}}',
+      ].join("\n");
       const result = opencodeBackend.parseOutput(raw);
-      expect(result).toBe("formatted output text");
+      expect(result).toBe("hello world");
     });
 
-    it("preserves internal whitespace", () => {
-      const raw = "  line 1\n  line 2  ";
-      const result = opencodeBackend.parseOutput(raw);
-      expect(result).toBe("line 1\n  line 2");
+    it("returns empty string for non-JSONL output", () => {
+      const result = opencodeBackend.parseOutput("not json at all");
+      expect(result).toBe("");
     });
   });
 });

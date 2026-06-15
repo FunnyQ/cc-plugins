@@ -178,7 +178,13 @@ describe("executeRelay", () => {
         },
         run: (argv) => {
           promptArg = argv.at(-1) ?? "";
-          return { ok: true, stdout: "done", stderr: "", code: 0 };
+          // opencode --format json → JSONL; parseOutput extracts the text part.
+          return {
+            ok: true,
+            stdout: '{"type":"text","part":{"text":"done"}}',
+            stderr: "",
+            code: 0,
+          };
         },
       }),
     );
@@ -201,7 +207,13 @@ describe("executeRelay", () => {
         },
         run: (argv) => {
           promptArg = argv.at(-1) ?? "";
-          return { ok: true, stdout: "done", stderr: "", code: 0 };
+          // opencode --format json → JSONL; parseOutput extracts the text part.
+          return {
+            ok: true,
+            stdout: '{"type":"text","part":{"text":"done"}}',
+            stderr: "",
+            code: 0,
+          };
         },
       }),
     );

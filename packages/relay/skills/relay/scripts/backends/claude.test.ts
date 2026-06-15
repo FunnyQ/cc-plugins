@@ -148,6 +148,35 @@ describe("claudeBackend", () => {
       });
     });
 
+    describe("JSON array of stream events (real --output-format json)", () => {
+      it("extracts .result from the final result event", () => {
+        const json = JSON.stringify([
+          { type: "system", subtype: "init" },
+          {
+            type: "assistant",
+            message: { content: [{ type: "text", text: "relay works" }] },
+          },
+          {
+            type: "result",
+            subtype: "success",
+            is_error: false,
+            result: "relay works",
+          },
+        ]);
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe("relay works");
+      });
+
+      it("falls back to raw when the array has no result event", () => {
+        const json = JSON.stringify([
+          { type: "system" },
+          { type: "assistant" },
+        ]);
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe(json);
+      });
+    });
+
     describe("JSON with .text field (fallback)", () => {
       it("extracts .text when .result is absent", () => {
         const json = JSON.stringify({

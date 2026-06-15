@@ -9,8 +9,12 @@ Binary: `codex` (override via `CODEX_BIN`).
 ### Delegate (write-capable)
 
 ```bash
-codex exec -s workspace-write -a never -o <lastfile> -
+codex exec -s workspace-write -o <lastfile> -
 ```
+
+> `codex exec` is non-interactive by default; `-s` sets the sandbox. The old
+> `-a never` approval flag was removed in codex ≥ 0.139 — passing it errors with
+> `unexpected argument '-a' found`. Verified against codex-cli 0.139.0.
 
 Dangerous opt-in (only if user explicitly asks):
 ```bash
@@ -77,11 +81,12 @@ There is no native review; the prompt must instruct "analyze only, do not modify
 
 ### Output parsing
 
-**Preferred (v1):** `--format default` → formatted text straight to stdout (simplest).
+**Used:** `--format json` → JSONL (one event per line: `step_start`, `text`, `step_finish`). The answer lives in the `text` events; relay's `parseJsonl` concatenates every `part.text` from `type === "text"` lines.
+- Equivalent to: `jq -r 'select(.type=="text") | .part.text'`
+- Why not `--format default`: that stream interleaves the answer with TUI/progress noise, so a naive trim returns garbage. JSON gives a clean, structured extraction.
+- KNOWN BUG #26855: `run --format json` can exit before emitting the terminal `step_finish` event. `parseJsonl` never blocks on a terminal event — it just concatenates whatever `text` parts arrived, so this is a non-issue.
 
-**Alternative:** `--format json` → JSONL (one JSON object per line).
-- Extract final text via: `jq -r 'select(.type=="text") | .part.text'`
-- KNOWN BUG #26855: `run --format json` can exit before emitting the terminal `step_finish` event. Mitigation: do not rely on seeing a terminal event — concatenate all `text` parts captured.
+> **Invoke non-interactively with closed stdin.** `opencode run` inherits stdin; if stdin stays open (no TTY, never EOFs) it hangs waiting for input. relay calls it via `Bun.spawnSync` (stdin closed on spawn), so it returns normally. A bare shell `opencode run … > file` from a non-interactive context can hang — that is the harness, not opencode.
 
 ### Model
 

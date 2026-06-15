@@ -60,13 +60,12 @@ describe("codexBackend", () => {
           dangerous: false,
         };
         const result = codexBackend.invoke("delegate", opts);
+        // No `-a never`: removed in codex >= 0.139 (exec is non-interactive).
         expect(result.argv).toEqual([
           "codex",
           "exec",
           "-s",
           "workspace-write",
-          "-a",
-          "never",
           "-o",
           "/tmp/last.txt",
           "-",

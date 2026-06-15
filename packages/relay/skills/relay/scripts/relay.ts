@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
 import type { Backend, InvokeOpts, Mode, RunResult } from "./types";
 import { capabilityGate, getBackend } from "./backends/gate";
 import { BACKENDS } from "./backends";
@@ -146,7 +146,14 @@ export function executeRelay(
     createTmpRunDir,
     buildPromptFile,
     readFile: (path) => readFileSync(path, "utf-8"),
-    writeFile: (path, text) => writeFileSync(path, text, "utf-8"),
+    writeFile: (path, text) => {
+      // Defensive: ensure the parent scratch dir exists right before writing.
+      // The run dir is created up front, but an external CLI runs in between;
+      // re-creating the dir here keeps the output-contract write from crashing
+      // if anything disturbed it mid-run.
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, text, "utf-8");
+    },
     fileExists: existsSync,
     run,
     stderr: (text) => process.stderr.write(text),
