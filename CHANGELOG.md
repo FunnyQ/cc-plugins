@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.0] - 2026-06-15
+
+### ✨ Added
+
+- relay plugin — cross-harness task delegation (`/relay <codex|opencode|claude> <delegate|review|image>`), a multi-backend superset of odin-codex.
+
 ## [3.9.1] - 2026-06-11
 
 ### ✨ Added
