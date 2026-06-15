@@ -1,0 +1,17 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "description": "Delegate a task to another harness — relay work to the codex, opencode, or claude CLI (delegate / review / image), capture the result, and report back.",
+  "author": { "name": "Q" },
+  "license": "MIT",
+  "keywords": [
+    "relay",
+    "delegate",
+    "codex",
+    "opencode",
+    "claude",
+    "review",
+    "image",
+    "cross-harness"
+  ]
+}
