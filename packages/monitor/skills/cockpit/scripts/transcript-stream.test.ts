@@ -180,6 +180,17 @@ beforeEach(() => {
     `insert into message (id, session_id, time_created, time_updated, data)
      values (?, ?, ?, ?, ?)`,
     [
+      "msg_empty",
+      "ses_test",
+      1_700_000_000_001,
+      1_700_000_000_001,
+      JSON.stringify({ role: "assistant", content: "" }),
+    ],
+  );
+  odb.run(
+    `insert into message (id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?)`,
+    [
       "msg_assistant",
       "ses_test",
       1_700_000_000_002,
@@ -300,6 +311,7 @@ describe("transcript-stream backlog", () => {
     const buf = await collect(res, (b) => b.includes("backlog-done"));
     expect(buf).toContain("msg_user");
     expect(buf).toContain("hello opencode");
+    expect(buf).not.toContain("msg_empty");
     expect(buf).toContain("msg_assistant");
     expect(buf).toContain("hi from opencode");
     expect(buf).toContain("Changed files:");
