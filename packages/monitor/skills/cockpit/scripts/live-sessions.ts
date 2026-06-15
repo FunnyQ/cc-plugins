@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
+import { openCodeDb, openCodeTimestampMs } from "../../shared/scripts/opencode";
 
 export type Provider = "claude" | "codex" | "opencode";
 
@@ -139,22 +140,6 @@ function readCodexLive(now: number): LiveSession[] {
   } catch {
     return [];
   }
-}
-
-function openCodeDb(): string {
-  return (
-    process.env.COCKPIT_OPENCODE_DB ||
-    join(
-      process.env.OPENCODE_DATA_DIR ||
-        join(homedir(), ".local", "share", "opencode"),
-      "opencode.db",
-    )
-  );
-}
-
-function openCodeTimestampMs(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return value < 1_000_000_000_000 ? value * 1000 : value;
 }
 
 function readOpenCodeLive(now: number): LiveSession[] {

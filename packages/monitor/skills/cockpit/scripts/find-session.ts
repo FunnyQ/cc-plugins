@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
 import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
+import { openCodeDb } from "../../shared/scripts/opencode";
 
 type Provider = "claude" | "codex" | "opencode";
 
@@ -51,17 +52,6 @@ function parseArgs(argv: string[]): { provider: Provider; project: string } {
     }
   }
   return { provider, project: positionals[0] || process.cwd() };
-}
-
-function openCodeDb(): string {
-  return (
-    process.env.COCKPIT_OPENCODE_DB ||
-    join(
-      process.env.OPENCODE_DATA_DIR ||
-        join(homedir(), ".local", "share", "opencode"),
-      "opencode.db",
-    )
-  );
 }
 
 function findClaude(project: string): string | null {

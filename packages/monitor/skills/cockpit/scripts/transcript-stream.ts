@@ -16,6 +16,7 @@ import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 import { codexDir, codexStateDb, resolveCodexPath } from "./codex-db";
+import { openCodeDb, openCodeTimestampMs } from "../../shared/scripts/opencode";
 import {
   createTailStream,
   jsonError,
@@ -72,17 +73,6 @@ function claudeProjectsDir(): string {
 
 function codexSessionsDir(): string {
   return process.env.COCKPIT_CODEX_SESSIONS_DIR || join(codexDir(), "sessions");
-}
-
-function openCodeDb(): string {
-  return (
-    process.env.COCKPIT_OPENCODE_DB ||
-    join(
-      process.env.OPENCODE_DATA_DIR ||
-        join(homedir(), ".local", "share", "opencode"),
-      "opencode.db",
-    )
-  );
 }
 
 // Canonical projects root for the realpath-confinement check.
@@ -191,8 +181,8 @@ function safeParseJSON<T>(value: string | null): T | null {
 }
 
 function openCodeTimestampIso(value: number): string | undefined {
-  if (!Number.isFinite(value) || value <= 0) return undefined;
-  const ms = value < 1_000_000_000_000 ? value * 1000 : value;
+  const ms = openCodeTimestampMs(value);
+  if (!ms) return undefined;
   return new Date(ms).toISOString();
 }
 
