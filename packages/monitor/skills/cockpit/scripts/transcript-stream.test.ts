@@ -226,6 +226,33 @@ beforeEach(() => {
     `insert into part (id, message_id, session_id, time_created, time_updated, data)
      values (?, ?, ?, ?, ?, ?)`,
     [
+      "part_read",
+      "msg_assistant",
+      "ses_test",
+      1_700_000_000_002,
+      1_700_000_000_003,
+      JSON.stringify({
+        type: "tool",
+        tool: "read",
+        state: {
+          input: { filePath: "/tmp/project/inbox.ts" },
+          metadata: {
+            display: {
+              path: "/tmp/project/inbox.ts",
+              text: "export function inbox() {}",
+              lineStart: 1,
+              lineEnd: 1,
+              totalLines: 1,
+            },
+          },
+        },
+      }),
+    ],
+  );
+  odb.run(
+    `insert into part (id, message_id, session_id, time_created, time_updated, data)
+     values (?, ?, ?, ?, ?, ?)`,
+    [
       "part_patch",
       "msg_assistant",
       "ses_test",
@@ -314,6 +341,9 @@ describe("transcript-stream backlog", () => {
     expect(buf).not.toContain("msg_empty");
     expect(buf).toContain("msg_assistant");
     expect(buf).toContain("hi from opencode");
+    expect(buf).toContain("Read · tmp/project/inbox.ts");
+    expect(buf).toContain("export function inbox() {}");
+    expect(buf).not.toContain('"tool":"read"');
     expect(buf).toContain("Changed files:");
     expect(buf).toContain("app.ts");
     expect(buf).toContain("app.test.ts");

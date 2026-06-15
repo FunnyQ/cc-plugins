@@ -201,48 +201,108 @@ function compactOpenCodePath(path: string): string {
   return parts.slice(-3).join("/") || path;
 }
 
-function openCodePartContent(part: unknown): unknown | null {
-  if (!part || typeof part !== "object") return null;
+function openCodeReadToolContent(p: {
+  tool?: string;
+  state?: {
+    input?: { filePath?: string; path?: string };
+    output?: string;
+    metadata?: {
+      preview?: string;
+      display?: {
+        path?: string;
+        text?: string;
+        lineStart?: number;
+        lineEnd?: number;
+        totalLines?: number;
+      };
+    };
+  };
+}): unknown[] | null {
+  if (p.tool !== "read") return null;
+  const filePath =
+    p.state?.input?.filePath ??
+    p.state?.input?.path ??
+    p.state?.metadata?.display?.path ??
+    "";
+  const text =
+    p.state?.metadata?.display?.text ??
+    p.state?.metadata?.preview ??
+    p.state?.output ??
+    "";
+  if (!text.trim() && !filePath) return null;
+  return [
+    {
+      type: "tool_result",
+      label: filePath ? `Read · ${compactOpenCodePath(filePath)}` : "Read",
+      file_path: filePath,
+      content: text,
+    },
+  ];
+}
+
+function openCodePartContent(part: unknown): unknown[] {
+  if (!part || typeof part !== "object") return [];
   const p = part as {
     type?: string;
+    tool?: string;
     text?: string;
     content?: string;
     name?: string;
     input?: unknown;
     files?: unknown;
+    state?: {
+      input?: { filePath?: string; path?: string };
+      output?: string;
+      metadata?: {
+        preview?: string;
+        display?: {
+          path?: string;
+          text?: string;
+          lineStart?: number;
+          lineEnd?: number;
+          totalLines?: number;
+        };
+      };
+    };
   };
+  const readTool = p.type === "tool" ? openCodeReadToolContent(p) : null;
+  if (readTool) return readTool;
   if (p.type === "text" && typeof p.text === "string") {
-    return { type: "text", text: p.text };
+    return [{ type: "text", text: p.text }];
   }
   if (p.type === "reasoning" && typeof p.text === "string") {
-    return { type: "thinking", thinking: p.text };
+    return [{ type: "thinking", thinking: p.text }];
   }
   if (p.type === "tool") {
-    return {
-      type: "tool_use",
-      name: p.name ?? "tool",
-      input: p.input ?? part,
-    };
+    return [
+      {
+        type: "tool_use",
+        name: p.name ?? p.tool ?? "tool",
+        input: p.input ?? part,
+      },
+    ];
   }
   if (p.type === "step-start" || p.type === "step-finish") {
-    return null;
+    return [];
   }
   if (p.type === "patch") {
     const files = Array.isArray(p.files)
       ? p.files.filter((file): file is string => typeof file === "string")
       : [];
-    if (!files.length) return null;
-    return {
-      type: "text",
-      text: [
-        "Changed files:",
-        ...files.map((file) => `- \`${compactOpenCodePath(file)}\``),
-      ].join("\n"),
-    };
+    if (!files.length) return [];
+    return [
+      {
+        type: "text",
+        text: [
+          "Changed files:",
+          ...files.map((file) => `- \`${compactOpenCodePath(file)}\``),
+        ].join("\n"),
+      },
+    ];
   }
   const text = p.text ?? p.content;
-  if (typeof text === "string") return { type: "text", text };
-  return { type: "text", text: JSON.stringify(part, null, 2) };
+  if (typeof text === "string") return [{ type: "text", text }];
+  return [{ type: "text", text: JSON.stringify(part, null, 2) }];
 }
 
 function openCodeRowsToEntries(rows: OpenCodeMessageRow[]): unknown[] {
@@ -257,8 +317,7 @@ function openCodeRowsToEntries(rows: OpenCodeMessageRow[]): unknown[] {
     const group = grouped.get(row.message_id) ?? { row, parts: [] };
     grouped.set(row.message_id, group);
     const part = safeParseJSON<unknown>(row.part_data);
-    const content = openCodePartContent(part);
-    if (content) group.parts.push(content);
+    group.parts.push(...openCodePartContent(part));
   }
 
   const entries: unknown[] = [];
