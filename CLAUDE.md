@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing two local plugins:
+A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing three local plugins:
 
 - **monitor** — usage dashboard + per-project cockpit (documented in depth below).
 - **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
+- **relay** — cross-harness delegation via `/relay <codex|opencode|claude> <delegate|review|image>`, with a backend-agnostic mode layer plus per-harness strategy layer and a capability matrix where `image` is codex-only.
 
 **monitor** bundles three sibling skills:
 
@@ -21,8 +22,8 @@ This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`
 
 ```
 cc-plugins/
-├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch)
-├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch)
+├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch, relay)
+├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch, relay)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
 ├── packages/dispatch/                # plugin: interview-driven planning + execution (preflight + flightplan + autopilot)
 │   ├── .claude-plugin/plugin.json    # Claude manifest + PostToolUse hook → flightplan-lint.sh
@@ -33,34 +34,60 @@ cc-plugins/
 │       ├── flightplan/               # skill: multi-file PLAN.md + tasks/ blueprint (← odin probe-deep)
 │       │                             #   scripts/ also home autopilot's shared tools: next-ready / score-task (--log) / flightlog
 │       └── autopilot/                # skill: execute the tree via Workflow (wave loop + dev→verify→judge→score gate); see references/orchestrator.md
-└── packages/monitor/                 # plugin: usage dashboard + cockpit (monorepo layout: packages/<plugin>)
-    ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hook → setup.ts --session-check
-    ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)
-    └── skills/
-        ├── usage-dashboard/          # skill: usage dashboard (the rear-view)
-        │   ├── SKILL.md              # skill trigger config & docs
-        │   ├── PRODUCT.md            # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
-        │   ├── scripts/
-        │   │   ├── api.ts            # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
-        │   │   ├── live.ts           # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
-        │   │   ├── atlas-server.ts   # Bun HTTP server (static + /api/stats + /api/live), port 5938
-        │   │   └── statusline-collector.ts # captures live rate_limits, chains ccstatusline
-        │   ├── dashboard/dist/       # static SPA (petite-vue + Chart.js, no build step)
-        │   └── references/
-        │       └── pricing-defaults.json
-        ├── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
-        │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + Claude inbox/send + Codex remote-control send
-        │   ├── scripts/cockpit.ts        # CLI: start / log / wait / send
-        │   ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
-        │   ├── scripts/codex-control-probe.ts # Codex app-server control client: managed remote-control websocket first, direct app-server fallback
-        │   └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
-        └── install/                  # skill: one-stop setup/precheck for the whole plugin (command-triggered)
-            └── scripts/
-                ├── setup.ts          # monitor:install engine — checks both skills + wires the statusline config (--check/--dry-run/--apply); --migrate re-points statusline drift + removes the stale channel entry; --session-check is the marker-gated hook entry
-                ├── install.ts        # canonical dashboard precheck (exports dashboardChecks/printReport; CLI too)
-                ├── setup-statusline.ts   # statusline wiring (exports applyStatusline; CLI too)
-                └── statusline-decision.ts # pure wrap/stale/skip decision (unit-tested)
+├── packages/monitor/                 # plugin: usage dashboard + cockpit (monorepo layout: packages/<plugin>)
+│   ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hook → setup.ts --session-check
+│   ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)
+│   └── skills/
+│       ├── usage-dashboard/          # skill: usage dashboard (the rear-view)
+│       │   ├── SKILL.md              # skill trigger config & docs
+│       │   ├── PRODUCT.md            # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
+│       │   ├── scripts/
+│       │   │   ├── api.ts            # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
+│       │   │   ├── live.ts           # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
+│       │   │   ├── atlas-server.ts   # Bun HTTP server (static + /api/stats + /api/live), port 5938
+│       │   │   └── statusline-collector.ts # captures live rate_limits, chains ccstatusline
+│       │   ├── dashboard/dist/       # static SPA (petite-vue + Chart.js, no build step)
+│       │   └── references/
+│       │       └── pricing-defaults.json
+│       ├── cockpit/                  # skill: per-project session cockpit (own SKILL/PRODUCT/DESIGN/references)
+│       │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + Claude inbox/send + Codex remote-control send
+│       │   ├── scripts/cockpit.ts        # CLI: start / log / wait / send
+│       │   ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
+│       │   ├── scripts/codex-control-probe.ts # Codex app-server control client: managed remote-control websocket first, direct app-server fallback
+│       │   └── dashboard/dist/           # static SPA (petite-vue), Night Flight design system
+│       └── install/                  # skill: one-stop setup/precheck for the whole plugin (command-triggered)
+│           └── scripts/
+│               ├── setup.ts          # monitor:install engine — checks both skills + wires the statusline config (--check/--dry-run/--apply); --migrate re-points statusline drift + removes the stale channel entry; --session-check is the marker-gated hook entry
+│               ├── install.ts        # canonical dashboard precheck (exports dashboardChecks/printReport; CLI too)
+│               ├── setup-statusline.ts   # statusline wiring (exports applyStatusline; CLI too)
+│               └── statusline-decision.ts # pure wrap/stale/skip decision (unit-tested)
+└── packages/relay/                # plugin: cross-harness task delegation (relay)
+    ├── .claude-plugin/plugin.json        # Claude manifest, version 0.1.0
+    ├── .codex-plugin/plugin.json         # Codex manifest, skills: "./skills/", version 0.1.0
+    ├── commands/                        # slash commands (auto-discovered at plugin root)
+    │   ├── relay.md                     # the canonical /relay entry
+    │   ├── codex.md                     # alias: /codex → /relay codex
+    │   ├── opencode.md                  # alias: /opencode → /relay opencode
+    │   └── claude.md                    # alias: /claude → /relay claude
+    └── skills/relay/
+        ├── SKILL.md                      # orchestration, smart-apply, report formats, install docs
+        ├── references/backends.md        # per-CLI flags + headless output + opencode symlink install
+        └── scripts/
+            ├── relay.ts                  # entry: relay <backend> <mode> [flags]; gate + dispatch + capture; builds prompt internally
+            ├── relay-prompt.ts           # backend-agnostic prompt: formatPrompt (pure) + buildPromptFile (impure)
+            ├── context-collector.ts      # git/file/project context (ported from odin-codex)
+            ├── shared.ts                 # run(), createTmpRunDir, timestamp, model+config resolution
+            ├── types.ts                  # Mode, Strategy, Backend, InvokeOpts, RunResult
+            ├── backends/
+            │   ├── gate.ts               # capabilityGate + getBackend (pure; no concrete-backend imports)
+            │   ├── index.ts              # concrete BACKENDS registry (imports the three backends; built at the entry point)
+            │   ├── codex.ts              # native review + exec + image PNG handling (postRun)
+            │   ├── opencode.ts           # opencode run + JSONL parse + model defaults
+            │   └── claude.ts             # claude -p + /code-review native review
+            └── *.test.ts                 # unit tests; integration.test.ts gated by RELAY_INTEGRATION=1
 ```
+
+relay ships to both Claude Code and Codex marketplaces via `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` at version `0.1.0`. OpenCode integration is available via a `~/.claude/skills/` symlink (documented in SKILL.md and references/backends.md).
 
 ### Data Flow
 
