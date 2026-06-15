@@ -134,8 +134,12 @@ body {
 .provider-badge--codex {
   --badge: oklch(78% 0.1 165); /* aurora-green, in the positive family */
 }
+.provider-badge--opencode {
+  --badge: oklch(78% 0.12 78); /* warm amber, distinct from Claude/Codex */
+}
 .provider-badge--claude,
-.provider-badge--codex {
+.provider-badge--codex,
+.provider-badge--opencode {
   color: var(--badge);
   border-color: color-mix(in oklch, var(--badge) 40%, var(--edge));
   background: color-mix(in oklch, var(--badge) 10%, transparent);

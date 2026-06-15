@@ -7,6 +7,7 @@ import { Glob } from "bun";
 import {
   buildClaudeLiveSessions,
   buildCodexLiveSessions,
+  buildOpenCodeLiveSessions,
   parseCockpitKeys,
   sortLiveSessions,
   type LiveSession,
@@ -20,6 +21,10 @@ const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
 const CODEX_DIR = join(homedir(), ".codex");
 const CODEX_STATE_DB = join(CODEX_DIR, "state_5.sqlite");
 const CODEX_SESSIONS_DIR = join(CODEX_DIR, "sessions");
+const OPENCODE_DIR =
+  process.env.OPENCODE_DATA_DIR ||
+  join(homedir(), ".local", "share", "opencode");
+const OPENCODE_DB = join(OPENCODE_DIR, "opencode.db");
 // Resolve the projects root once: relative() needs the canonical base to
 // compare against the realpath'd transcript paths, and the dir is stable.
 const PROJECTS_REAL = (() => {
@@ -60,6 +65,13 @@ type CodexThreadRow = {
   cwd: string;
   title: string;
   model: string | null;
+};
+
+type OpenCodeSessionRow = {
+  id: string;
+  directory: string;
+  time_created: number;
+  time_updated: number;
 };
 
 function readSessionFiles(): ClaudeSessionFile[] {
@@ -146,6 +158,27 @@ function resolveCodexRolloutPath(id: string): string | undefined {
   return isAbsolute(row.rollout_path)
     ? row.rollout_path
     : resolve(CODEX_DIR, row.rollout_path);
+}
+
+function readOpenCodeSessionRows(limit = 24): OpenCodeSessionRow[] {
+  if (!existsSync(OPENCODE_DB)) return [];
+  try {
+    const db = new Database(OPENCODE_DB, { readonly: true });
+    try {
+      return db
+        .query(
+          `select id, directory, time_created, time_updated
+           from session
+           order by time_updated desc
+           limit ?`,
+        )
+        .all(limit) as OpenCodeSessionRow[];
+    } finally {
+      db.close();
+    }
+  } catch {
+    return [];
+  }
 }
 
 let transcriptIndex: Map<string, string> | null = null;
@@ -251,7 +284,16 @@ export function getLiveSessions(): LiveSession[] {
     now,
     existsSync,
   );
-  return sortLiveSessions([...claudeSessions, ...codexSessions]);
+  const openCodeSessions = buildOpenCodeLiveSessions(
+    readOpenCodeSessionRows(),
+    cockpitKeys,
+    now,
+  );
+  return sortLiveSessions([
+    ...claudeSessions,
+    ...codexSessions,
+    ...openCodeSessions,
+  ]);
 }
 
 export function jsonResponse(payload: object, status = 200): Response {

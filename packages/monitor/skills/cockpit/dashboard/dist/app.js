@@ -73,6 +73,7 @@ export const store = reactive({
   channelSending: false,
   channelError: "",
   codexControl: {},
+  opencodeControl: {},
   relaunchCopied: false,
 
   get selectedProjectName() {
@@ -150,6 +151,9 @@ export const store = reactive({
     if (s.provider === "codex") {
       return s.status === "active" && this.selectedCodexControlReady;
     }
+    if (s.provider === "opencode") {
+      return s.status === "active" && this.selectedOpenCodeControlReady;
+    }
     return s.provider === "claude" && s.channel === true;
   },
 
@@ -161,6 +165,16 @@ export const store = reactive({
 
   get selectedCodexControlReady() {
     return this.selectedCodexControl?.ready === true;
+  },
+
+  get selectedOpenCodeControl() {
+    const s = this.selectedSession;
+    if (!s || s.provider !== "opencode") return null;
+    return this.opencodeControl[this.controlKey(s)] || null;
+  },
+
+  get selectedOpenCodeControlReady() {
+    return this.selectedOpenCodeControl?.ready === true;
   },
 
   get channelDisabledTitle() {
@@ -178,6 +192,14 @@ export const store = reactive({
       if (!control.ready) return control.error || "Codex control unavailable";
       return "Send to Codex thread";
     }
+    if (s.provider === "opencode") {
+      if (s.status !== "active") return "OpenCode session is not active";
+      const control = this.selectedOpenCodeControl;
+      if (!control) return "Checking OpenCode bridge";
+      if (control.checking) return "Checking OpenCode bridge";
+      if (!control.ready) return control.error || "OpenCode bridge unavailable";
+      return "Send to OpenCode session";
+    }
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
   },
@@ -187,7 +209,9 @@ export const store = reactive({
     if (!this.canUseChannel) return this.channelDisabledTitle;
     return s?.provider === "codex"
       ? "Message this Codex thread"
-      : "Message this Claude session";
+      : s?.provider === "opencode"
+        ? "Message this OpenCode session"
+        : "Message this Claude session";
   },
 
   get channelSendDisabled() {
@@ -315,10 +339,15 @@ export const store = reactive({
     this.selectedProject = s.project;
     this._notify();
     this.ensureCodexControl(s);
+    this.ensureOpenCodeControl(s);
+  },
+
+  controlKey(s) {
+    return `${s.provider || "claude"}:${s.sessionId}`;
   },
 
   codexControlKey(s) {
-    return `${s.provider || "claude"}:${s.sessionId}`;
+    return this.controlKey(s);
   },
 
   async ensureCodexControl(s = this.selectedSession, force = false) {
@@ -362,6 +391,54 @@ export const store = reactive({
     }
   },
 
+  async ensureOpenCodeControl(s = this.selectedSession, force = false) {
+    if (!s || s.provider !== "opencode") return;
+    const key = this.controlKey(s);
+    const existing = this.opencodeControl[key];
+    if (!force && (existing?.ready || existing?.checking)) return;
+    this.opencodeControl = {
+      ...this.opencodeControl,
+      [key]: { ready: false, checking: true, error: "" },
+    };
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("token unavailable");
+      const params = new URLSearchParams({
+        session: s.sessionId,
+        token,
+      });
+      let r = await fetch(`/api/opencode-control/status?${params}`);
+      if (r.status === 401) {
+        const freshToken = await getToken(true);
+        if (!freshToken) throw new Error("token unavailable");
+        params.set("token", freshToken);
+        r = await fetch(`/api/opencode-control/status?${params}`);
+      }
+      if (!r.ok) throw new Error(`OpenCode bridge check failed: ${r.status}`);
+      const j = await r.json();
+      const error =
+        Array.isArray(j.errors) && j.errors.length ? j.errors.join("; ") : "";
+      this.opencodeControl = {
+        ...this.opencodeControl,
+        [key]: {
+          ready: j.ready === true,
+          checking: false,
+          error: j.ready === true ? "" : error || "OpenCode bridge unavailable",
+          serverUrl: j.serverUrl || "",
+        },
+      };
+    } catch (e) {
+      this.opencodeControl = {
+        ...this.opencodeControl,
+        [key]: {
+          ready: false,
+          checking: false,
+          error: (e && e.message) || "OpenCode bridge unavailable",
+        },
+      };
+    }
+  },
+
   async sendChannelMessage() {
     if (this.channelSendDisabled) return;
     const text = this.channelMessage.trim();
@@ -373,7 +450,9 @@ export const store = reactive({
       const endpoint =
         this.selectedSession?.provider === "codex"
           ? "/api/send-codex-message"
-          : "/api/send-message";
+          : this.selectedSession?.provider === "opencode"
+            ? "/api/send-opencode-message"
+            : "/api/send-message";
       let r = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -532,6 +611,9 @@ export const store = reactive({
       if (this.selectedSession?.provider === "codex") {
         this.ensureCodexControl(this.selectedSession);
       }
+      if (this.selectedSession?.provider === "opencode") {
+        this.ensureOpenCodeControl(this.selectedSession);
+      }
       // First load only: default-select the top (active-first) session.
       if (!this.selectedSessionId && this.sessions.length) {
         this.selectSession(this.sessions[0]);
@@ -573,9 +655,19 @@ document.addEventListener("visibilitychange", () => {
 // stays on the empty state, since no log file exists for it).
 const deepLink = new URLSearchParams(location.search);
 const deepLinkSession = deepLink.get("session");
-if (deepLinkSession && /^[0-9a-f-]{36}$/i.test(deepLinkSession)) {
+const rawDeepLinkProvider = deepLink.get("provider") || "claude";
+const deepLinkProvider = ["claude", "codex", "opencode"].includes(
+  rawDeepLinkProvider,
+)
+  ? rawDeepLinkProvider
+  : "claude";
+const deepLinkSessionOk =
+  deepLinkProvider === "opencode"
+    ? /^[A-Za-z0-9_.:-]{1,160}$/.test(deepLinkSession || "")
+    : /^[0-9a-f-]{36}$/i.test(deepLinkSession || "");
+if (deepLinkSession && deepLinkSessionOk) {
   store.selectedSessionId = deepLinkSession;
-  store.selectedProvider = deepLink.get("provider") || "claude";
+  store.selectedProvider = deepLinkProvider;
   store.selectedProject = deepLink.get("project") || null;
 }
 

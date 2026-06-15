@@ -491,7 +491,7 @@ function codexPayloadSegments(payload) {
 function resultSegment(part, lang) {
   return {
     kind: "code",
-    label: part.is_error ? "⚠ result (error)" : "↳ result",
+    label: part.label ?? (part.is_error ? "⚠ result (error)" : "↳ result"),
     error: !!part.is_error,
     text: segText(part.content),
     fileLang: part.is_error ? null : (lang ?? null),
@@ -554,7 +554,9 @@ function contentSegments(content) {
           part.name === "Read" ? langForPath(part.input?.file_path) : null,
       });
     } else if (part.type === "tool_result") {
-      out.push(resultSegment(part));
+      out.push(
+        resultSegment(part, part.fileLang ?? langForPath(part.file_path)),
+      );
     } else if (part.type === "image") {
       out.push({ kind: "code", text: "[image]" });
     } else {
