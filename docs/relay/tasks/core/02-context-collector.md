@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: core/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -85,15 +85,15 @@ Placeholders (no code fence): missing → `## path\n> File not found`; binary (n
 
 ## Acceptance criteria
 
-- [ ] `context-collector.ts` exports `collectGitInfo`, `collectRelatedGitInfo`, `collectFileContents`, `collectProjectInfo`, `collect` with the signatures above.
-- [ ] Binary and oversized files are skipped with a placeholder line, not inlined.
-- [ ] `collect()` with `gitScope: "none"` and `noProject: true` returns only the file-contents section (or empty if no files).
-- [ ] Output matches the Canonical output format above (section headings, placeholder lines, `\n---\n\n` separator, empty-section omission).
+- [x] `context-collector.ts` exports `collectGitInfo`, `collectRelatedGitInfo`, `collectFileContents`, `collectProjectInfo`, `collect` with the signatures above.
+- [x] Binary and oversized files are skipped with a placeholder line, not inlined.
+- [x] `collect()` with `gitScope: "none"` and `noProject: true` returns only the file-contents section (or empty if no files).
+- [x] Output matches the Canonical output format above (section headings, placeholder lines, `\n---\n\n` separator, empty-section omission).
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/context-collector.test.ts` passes.
-- [ ] Tests cover: `collectFileContents` with a present file, a missing file (placeholder), and a binary file (skipped); `collect()` section composition with various `gitScope`/`noProject` flags.
+- [x] `bun test packages/relay/skills/relay/scripts/context-collector.test.ts` passes.
+- [x] Tests cover: `collectFileContents` with a present file, a missing file (placeholder), and a binary file (skipped); `collect()` section composition with various `gitScope`/`noProject` flags.
 
 ## Eval rubric
 

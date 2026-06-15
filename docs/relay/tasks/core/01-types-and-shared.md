@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: core/03, backends/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -99,17 +99,17 @@ export function resolveModel(
 
 ## Acceptance criteria
 
-- [ ] `types.ts` exports `Mode`, `Strategy`, `RunResult`, `InvokeOpts`, `Backend` exactly as above (uses `type`, not `interface`).
-- [ ] `InvokeOpts` is the complete shared seam — it carries `promptFile`, `promptText`, `task`, `scope`, `focus`, `out`, `model`, `lastFile`, `dangerous`, so no downstream backend needs to extend it. (`lastFile` and the tmp dir are created by the relay entry point before `invoke()` is called.)
-- [ ] `shared.ts` exports `run`, `createTmpRunDir`, `timestampForPath`, `addTimestampSuffix`, `resolveModel`, `TMP_ROOT`, `DEFAULT_MODELS`, `CONFIG_PATH`.
-- [ ] `resolveModel` returns flag > config > constant, and `undefined` for codex/claude with no flag/config.
-- [ ] Malformed/missing config never throws; `resolveModel` falls back cleanly.
-- [ ] `addTimestampSuffix("./a.png")` returns `./a_<ts>.png`; `createTmpRunDir()` returns a path under `/tmp/relay`.
+- [x] `types.ts` exports `Mode`, `Strategy`, `RunResult`, `InvokeOpts`, `Backend` exactly as above (uses `type`, not `interface`).
+- [x] `InvokeOpts` is the complete shared seam — it carries `promptFile`, `promptText`, `task`, `scope`, `focus`, `out`, `model`, `lastFile`, `dangerous`, so no downstream backend needs to extend it. (`lastFile` and the tmp dir are created by the relay entry point before `invoke()` is called.)
+- [x] `shared.ts` exports `run`, `createTmpRunDir`, `timestampForPath`, `addTimestampSuffix`, `resolveModel`, `TMP_ROOT`, `DEFAULT_MODELS`, `CONFIG_PATH`.
+- [x] `resolveModel` returns flag > config > constant, and `undefined` for codex/claude with no flag/config.
+- [x] Malformed/missing config never throws; `resolveModel` falls back cleanly.
+- [x] `addTimestampSuffix("./a.png")` returns `./a_<ts>.png`; `createTmpRunDir()` returns a path under `/tmp/relay`.
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/shared.test.ts` passes.
-- [ ] Tests cover: each `resolveModel` precedence branch (flag, config hit, constant fallback, undefined), malformed config, and `addTimestampSuffix` shape.
+- [x] `bun test packages/relay/skills/relay/scripts/shared.test.ts` passes.
+- [x] Tests cover: each `resolveModel` precedence branch (flag, config hit, constant fallback, undefined), malformed config, and `addTimestampSuffix` shape.
 
 ## Eval rubric
 
