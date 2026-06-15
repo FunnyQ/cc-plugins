@@ -179,6 +179,53 @@ describe("sendOpenCodePrompt", () => {
       delete process.env.OPENCODE_TUI_SERVER_URL;
     }
   });
+
+  test("passes OpenCode server basic auth when configured", async () => {
+    const { sendOpenCodePrompt } = await import("./opencode-send");
+    const originalFetch = globalThis.fetch;
+    const authHeaders: string[] = [];
+    process.env.OPENCODE_TUI_SERVER_URL = "http://127.0.0.1:4889";
+    process.env.OPENCODE_SERVER_USERNAME = "q";
+    process.env.OPENCODE_SERVER_PASSWORD = "secret";
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      authHeaders.push(headers.get("authorization") || "");
+      if (url === "http://127.0.0.1:4889/global/health") {
+        return Response.json({ healthy: true, version: "1.17.7" });
+      }
+      if (url === `http://127.0.0.1:4889/session/${SID}`) {
+        return Response.json({ id: SID, directory: "/tmp/project" });
+      }
+      if (url.startsWith("http://127.0.0.1:4889/tui/")) {
+        return Response.json(true);
+      }
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      const result = await sendOpenCodePrompt({
+        sessionId: SID,
+        text: "hello",
+      });
+
+      expect(result.delivered).toBe(true);
+      expect(authHeaders).toEqual([
+        "Basic cTpzZWNyZXQ=",
+        "Basic cTpzZWNyZXQ=",
+        "Basic cTpzZWNyZXQ=",
+        "Basic cTpzZWNyZXQ=",
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.OPENCODE_TUI_SERVER_URL;
+      delete process.env.OPENCODE_SERVER_USERNAME;
+      delete process.env.OPENCODE_SERVER_PASSWORD;
+    }
+  });
 });
 
 describe("handleOpenCodeControlStatus", () => {
