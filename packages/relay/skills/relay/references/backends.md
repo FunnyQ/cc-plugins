@@ -149,3 +149,4 @@ The skill's frontmatter (`name`, `description`) is portable across all three har
 - **#26855 (opencode):** JSON format output may exit before the terminal `step_finish` event. If using `--format json`, concatenate all `text` parts captured; do not block waiting for a closing event.
 - **Image (codex-only):** `/relay opencode image` and `/relay claude image` fail fast before any CLI invocation.
 - **Claude review:** Uses `/code-review`, not `/review` (the latter is PR-scoped and unavailable headlessly).
+- **codex trusted directory:** `codex exec` refuses to run outside a git repo ("Not inside a trusted directory and `--skip-git-repo-check` was not specified"). relay does not pass that flag by design — run `/relay codex …` from inside the project's git repo (the normal case). Verified against codex-cli 0.139.0.
