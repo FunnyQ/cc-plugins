@@ -252,6 +252,70 @@ describe("executeRelay", () => {
     expect(printed.join("")).toBe("final review");
   });
 
+  it("rejects codex image with no prompt before spawning", () => {
+    let spawned = false;
+    const errors: string[] = [];
+
+    const result = executeRelay(
+      ["codex", "image"],
+      deps({
+        run: () => {
+          spawned = true;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(spawned).toBe(false);
+    expect(errors.join("")).toContain("image mode requires a prompt");
+  });
+
+  it("routes a review naming --files to the custom-files prompt strategy", () => {
+    let built = false;
+
+    const result = executeRelay(
+      ["codex", "review", "--files", "a.ts,b.ts"],
+      deps({
+        buildPromptFile: (args) => {
+          built = true;
+          // custom-files review must build a prompt (not native uncommitted)
+          expect(args).toMatchObject({
+            kind: "review",
+            files: ["a.ts", "b.ts"],
+          });
+          return "/tmp/prompt.md";
+        },
+        run: (argv) => {
+          // read-only exec prompt strategy, not `codex review --uncommitted`
+          expect(argv).toContain("read-only");
+          return { ok: true, stdout: "done", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(built).toBe(true);
+  });
+
+  it("exits non-zero when a post-run step fails", () => {
+    const errors: string[] = [];
+
+    const result = executeRelay(
+      ["codex", "image", "a quiet studio"],
+      deps({
+        // No PNG will be found (future cutoff via real run), so postRun fails.
+        run: () => ({ ok: true, stdout: "no png here", stderr: "", code: 0 }),
+        fileExists: () => false,
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(errors.join("")).toContain("No image found");
+  });
+
   it("exits with the CLI code on non-zero backend exit", () => {
     const errors: string[] = [];
     const result = executeRelay(

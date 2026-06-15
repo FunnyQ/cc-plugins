@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join } from "path";
 import { homedir } from "os";
-import type { Backend, Mode, InvokeOpts } from "../types";
+import type { Backend, Mode, InvokeOpts, PostRunResult } from "../types";
 import { addTimestampSuffix, run } from "../shared";
 
 // Codex binary from environment or default
@@ -122,14 +122,19 @@ export const codexBackend: Backend = {
 
       // Native review: parse scope and build codex review flags
       const argv = [CODEX_BIN, "review"];
-      if (opts.scope === "uncommitted") {
+      if (!opts.scope || opts.scope === "uncommitted") {
         argv.push("--uncommitted");
-      } else if (opts.scope?.startsWith("base:")) {
+      } else if (opts.scope.startsWith("base:")) {
         const ref = opts.scope.slice(5); // "base:<ref>" → "<ref>"
         argv.push("--base", ref);
-      } else if (opts.scope?.startsWith("commit:")) {
+      } else if (opts.scope.startsWith("commit:")) {
         const sha = opts.scope.slice(7); // "commit:<sha>" → "<sha>"
         argv.push("--commit", sha);
+      } else {
+        // Bare ref/SHA (e.g. "--scope main" or "--scope abc123"): treat as a
+        // base ref so it reviews against that point, instead of silently
+        // falling through to a plain `codex review` of the wrong diff.
+        argv.push("--base", opts.scope);
       }
       return { argv };
     }
@@ -150,23 +155,27 @@ export const codexBackend: Backend = {
     return raw;
   },
 
-  postRun(mode: Mode, parsed: string, opts: InvokeOpts): string {
-    if (mode !== "image") return parsed;
+  postRun(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult {
+    if (mode !== "image") return { ok: true, text: parsed };
 
     // Image mode: locate PNG and copy to opts.out with timestamp suffix
     // Try to extract PNG path from output first
     let sourcePng = extractGeneratedPngPath(parsed);
 
-    // Fallback: find newest PNG after a moment before the run
-    // (relay.ts captures output, so we know parsed exists; assume run just completed)
+    // Fallback: find the newest PNG created since the run started. relay.ts
+    // captures runStartedAt just before the spawn; using it (instead of a fixed
+    // 1s window measured after the run finished) avoids false "No image found"
+    // for generations that take longer than a second.
     if (!sourcePng) {
-      const before = new Date(Date.now() - 1000);
-      sourcePng = findNewestPng(before);
+      const after = opts.runStartedAt ?? new Date(Date.now() - 1000);
+      sourcePng = findNewestPng(after);
     }
 
     if (!sourcePng) {
-      // Return error message; relay.ts caller will handle non-success
-      return `Error: No image found in ~/.codex/generated_images after generation\n`;
+      return {
+        ok: false,
+        text: `Error: No image found in ~/.codex/generated_images after generation\n`,
+      };
     }
 
     // Copy PNG to output path with timestamp suffix
@@ -175,21 +184,24 @@ export const codexBackend: Backend = {
 
     // Ensure output directory exists
     if (!existsSync(outDir)) {
-      const proc = Bun.spawnSync(["mkdir", "-p", outDir], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      if (proc.exitCode !== 0) {
-        return `Error: Failed to create output directory ${outDir}\n`;
+      const mkdirResult = run(["mkdir", "-p", outDir]);
+      if (!mkdirResult.ok) {
+        return {
+          ok: false,
+          text: `Error: Failed to create output directory ${outDir}\n`,
+        };
       }
     }
 
     // Copy the PNG file
     const cpResult = run(["cp", sourcePng, finalPath]);
     if (!cpResult.ok) {
-      return `Error: Failed to copy image from ${sourcePng} to ${finalPath}: ${cpResult.stderr}\n`;
+      return {
+        ok: false,
+        text: `Error: Failed to copy image from ${sourcePng} to ${finalPath}: ${cpResult.stderr}\n`,
+      };
     }
 
-    return `Image saved: ${finalPath}\n`;
+    return { ok: true, text: `Image saved: ${finalPath}\n` };
   },
 };

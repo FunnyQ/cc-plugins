@@ -6,7 +6,7 @@ import type { Backend, InvokeOpts, Mode, RunResult } from "./types";
 import { capabilityGate, getBackend } from "./backends/gate";
 import { BACKENDS } from "./backends";
 import { buildPromptFile } from "./relay-prompt";
-import { createTmpRunDir, resolveModel, run } from "./shared";
+import { createTmpRunDir, parseCsv, resolveModel, run } from "./shared";
 
 const MODES = new Set<Mode>(["delegate", "review", "image"]);
 
@@ -86,10 +86,7 @@ export function parseFlags(argv: string[]): ParsedFlags {
       flags.task = requireValue(rest, i, arg);
       i++;
     } else if (arg === "--files") {
-      flags.files = requireValue(rest, i, arg)
-        .split(",")
-        .map((file) => file.trim())
-        .filter(Boolean);
+      flags.files = parseCsv(requireValue(rest, i, arg));
       i++;
     } else if (arg === "--focus") {
       flags.focus = requireValue(rest, i, arg);
@@ -202,11 +199,26 @@ export function executeRelay(
     parsed.flags,
     parsed.positional,
   );
+
+  if (parsed.mode === "image" && !task.trim()) {
+    deps.stderr(
+      "image mode requires a prompt (pass it as the positional text or --task)\n",
+    );
+    return { code: 1 };
+  }
+
   const dir = deps.createTmpRunDir();
+  // A review naming explicit files (without an explicit scope) is a custom-file
+  // review — route it to the prompt strategy instead of falling through to a
+  // native uncommitted-diff review that would ignore --files.
+  const defaultScope =
+    parsed.mode === "review" && parsed.flags.files.length > 0
+      ? "custom-files"
+      : "uncommitted";
   const opts: InvokeOpts = {
     task,
     focus,
-    scope: parsed.flags.scope ?? "uncommitted",
+    scope: parsed.flags.scope ?? defaultScope,
     out: parsed.flags.out ?? "relay-image.png",
     model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
     lastFile: join(dir, "raw.txt"),
@@ -234,6 +246,7 @@ export function executeRelay(
   }
 
   const invocation = backend.invoke(parsed.mode, opts);
+  opts.runStartedAt = new Date();
   const result = deps.run(invocation.argv, { stdin: invocation.stdin });
 
   if (!result.ok) {
@@ -251,10 +264,21 @@ export function executeRelay(
       ? deps.readFile(opts.lastFile)
       : result.stdout;
   const parsedOutput = backend.parseOutput(raw);
-  const finalOutput = backend.postRun
+  const postRun = backend.postRun
     ? backend.postRun(parsed.mode, parsedOutput, opts)
-    : parsedOutput;
+    : { ok: true, text: parsedOutput };
 
+  // A failed post-run step (e.g. codex image: no PNG found / copy failed) must
+  // exit non-zero — its error text is non-empty, so it would otherwise sail
+  // past the empty-output check below and report success.
+  if (!postRun.ok) {
+    deps.stderr(
+      postRun.text.endsWith("\n") ? postRun.text : `${postRun.text}\n`,
+    );
+    return { code: 1, dir, lastFile: opts.lastFile };
+  }
+
+  const finalOutput = postRun.text;
   if (!finalOutput.trim()) {
     deps.stderr("Backend command produced empty output\n");
     return { code: 1, dir, lastFile: opts.lastFile };

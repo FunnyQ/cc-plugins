@@ -1,5 +1,4 @@
 import type { Backend, InvokeOpts, Mode } from "../types";
-import { resolveModel } from "../shared";
 
 /**
  * opencode Backend: delegate + emulated (prompt-based) review.
@@ -21,8 +20,10 @@ export const opencodeBackend: Backend = {
     return "prompt";
   },
 
-  invoke(mode: Mode, opts: InvokeOpts) {
-    const model = resolveModel("opencode", mode, opts.model);
+  invoke(_mode: Mode, opts: InvokeOpts) {
+    // Model is already resolved in relay.ts (flag > config > per-mode default);
+    // opts.model is the final value — do not re-resolve here.
+    const model = opts.model;
     const argv: string[] = ["opencode", "run"];
 
     // Add resolved model (or default)

@@ -23,8 +23,14 @@ describe("opencodeBackend", () => {
   });
 
   describe("invoke", () => {
-    it("builds delegate argv with kimi model by default", () => {
-      const opts: InvokeOpts = { promptText: "test prompt" };
+    // relay.ts resolves the model (flag > config > per-mode default) and passes
+    // it as opts.model; invoke trusts that value. These pass the resolved model
+    // the way relay.ts would.
+    it("builds delegate argv with the resolved model", () => {
+      const opts: InvokeOpts = {
+        promptText: "test prompt",
+        model: "opencode-go/kimi-k2.7-code",
+      };
       const result = opencodeBackend.invoke("delegate", opts);
 
       expect(result.argv).toEqual([
@@ -38,8 +44,11 @@ describe("opencodeBackend", () => {
       ]);
     });
 
-    it("builds review argv with qwen model by default", () => {
-      const opts: InvokeOpts = { promptText: "review prompt" };
+    it("builds review argv with the resolved model", () => {
+      const opts: InvokeOpts = {
+        promptText: "review prompt",
+        model: "opencode-go/qwen3.7-max",
+      };
       const result = opencodeBackend.invoke("review", opts);
 
       expect(result.argv).toEqual([
@@ -50,6 +59,19 @@ describe("opencodeBackend", () => {
         "--format",
         "default",
         "review prompt",
+      ]);
+    });
+
+    it("omits -m when no model was resolved", () => {
+      const opts: InvokeOpts = { promptText: "test prompt" };
+      const result = opencodeBackend.invoke("delegate", opts);
+
+      expect(result.argv).toEqual([
+        "opencode",
+        "run",
+        "--format",
+        "default",
+        "test prompt",
       ]);
     });
 
@@ -75,7 +97,7 @@ describe("opencodeBackend", () => {
     });
 
     it("handles missing prompt text", () => {
-      const opts: InvokeOpts = {};
+      const opts: InvokeOpts = { model: "opencode-go/kimi-k2.7-code" };
       const result = opencodeBackend.invoke("delegate", opts);
 
       // Should build argv without appending undefined

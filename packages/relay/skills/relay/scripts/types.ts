@@ -20,7 +20,12 @@ export type InvokeOpts = {
   model?: string; // resolved model (may be undefined → CLI default)
   lastFile?: string; // pre-created output-capture path (codex `-o <lastFile>`); relay creates the tmp dir first
   dangerous?: boolean; // delegate sandbox opt-out
+  runStartedAt?: Date; // wall-clock just before the backend spawn (codex image: cutoff for newest-PNG search)
 };
+
+// Optional post-run side effect (e.g. codex image PNG copy). Returning {ok:false}
+// lets relay surface a non-zero exit instead of treating the error text as success.
+export type PostRunResult = { ok: boolean; text: string };
 
 export type Backend = {
   name: string; // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
@@ -33,6 +38,6 @@ export type Backend = {
   // Optional post-run step run by relay.ts AFTER the spawn + parseOutput. Receives the parsed
   // text + opts, returns the final text relay prints. This is the generic seam for backend-only
   // side effects (e.g. codex image: locate the PNG, copy it to opts.out, return "Image saved: <path>").
-  // relay.ts calls `b.postRun ? b.postRun(mode, parsed, opts) : parsed` — no backend-name branching.
-  postRun?(mode: Mode, parsed: string, opts: InvokeOpts): string;
+  // relay.ts calls `b.postRun ? b.postRun(mode, parsed, opts) : ...` — no backend-name branching.
+  postRun?(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult;
 };

@@ -119,6 +119,17 @@ describe("codexBackend", () => {
         ]);
         expect(result.stdin).toBeUndefined();
       });
+
+      it("should normalize a bare ref to --base instead of falling through", () => {
+        const opts: InvokeOpts = { scope: "main" };
+        const result = codexBackend.invoke("review", opts);
+        expect(result.argv).toEqual(["codex", "review", "--base", "main"]);
+      });
+
+      it("should default to --uncommitted when scope is absent", () => {
+        const result = codexBackend.invoke("review", {});
+        expect(result.argv).toEqual(["codex", "review", "--uncommitted"]);
+      });
     });
 
     describe("review custom-files (prompt fallback)", () => {
@@ -372,14 +383,14 @@ describe("codexBackend", () => {
       const parsed = "Some delegate output";
       const opts: InvokeOpts = {};
       const result = codexBackend.postRun!("delegate", parsed, opts);
-      expect(result).toBe(parsed);
+      expect(result).toEqual({ ok: true, text: parsed });
     });
 
     it("should return parsed unchanged for review mode", () => {
       const parsed = "Some review output";
       const opts: InvokeOpts = {};
       const result = codexBackend.postRun!("review", parsed, opts);
-      expect(result).toBe(parsed);
+      expect(result).toEqual({ ok: true, text: parsed });
     });
 
     it("should copy image PNG to output path for image mode", () => {
@@ -403,16 +414,22 @@ describe("codexBackend", () => {
       const result = codexBackend.postRun!("image", parsed, opts);
 
       // Result should indicate success
-      expect(result).toContain("Image saved:");
-      expect(result).toContain(".png");
+      expect(result.ok).toBe(true);
+      expect(result.text).toContain("Image saved:");
+      expect(result.text).toContain(".png");
     });
 
     it("should return error message if PNG not found", () => {
-      const opts: InvokeOpts = { out: "/tmp/nonexistent/result.png" };
+      const opts: InvokeOpts = {
+        out: "/tmp/nonexistent/result.png",
+        // Far-future cutoff so no real ~/.codex PNG matches the fallback search.
+        runStartedAt: new Date(Date.now() + 60_000),
+      };
       const parsed = "No PNG path in output";
       const result = codexBackend.postRun!("image", parsed, opts);
-      expect(result).toContain("Error");
-      expect(result).toContain("No image found");
+      expect(result.ok).toBe(false);
+      expect(result.text).toContain("Error");
+      expect(result.text).toContain("No image found");
     });
   });
 });

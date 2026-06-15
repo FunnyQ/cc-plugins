@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import type { Mode } from "./types";
+import type { Mode, RunResult } from "./types";
 
 // Temp directory root for relay runs
 export const TMP_ROOT = "/tmp/relay";
@@ -27,12 +27,13 @@ export const CONFIG_PATH = join(
   "config.json",
 );
 
-export type RunResult = {
-  ok: boolean;
-  stdout: string;
-  stderr: string;
-  code: number;
-};
+// Parse a comma-separated flag value into a trimmed, empty-free list.
+export function parseCsv(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 // Bun.spawnSync wrapper
 export function run(args: string[], opts?: { stdin?: string }): RunResult {
@@ -106,6 +107,8 @@ export function resolveModel(
     };
   }
 
+  // Note: the outer try/catch is required even though the *default* reader
+  // already swallows errors — an injected readConfig (tests, callers) may throw.
   let config: unknown;
   try {
     config = readConfig();

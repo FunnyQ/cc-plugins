@@ -3,7 +3,7 @@
 import { writeFileSync } from "fs";
 import { join } from "path";
 import { collect } from "./context-collector";
-import { createTmpRunDir } from "./shared";
+import { createTmpRunDir, parseCsv } from "./shared";
 import type { Mode } from "./types";
 
 export type PromptKind = "delegate" | "review";
@@ -150,10 +150,7 @@ if (import.meta.main) {
     for (let i = 1; i < args.length; i++) {
       const arg = args[i];
       if (arg === "--files" && i + 1 < args.length) {
-        opts.files = args[++i]
-          .split(",")
-          .map((f) => f.trim())
-          .filter(Boolean);
+        opts.files = parseCsv(args[++i]);
       } else if (arg === "--focus" && i + 1 < args.length) {
         opts.focus = args[++i];
       } else if (arg === "--task" && i + 1 < args.length) {

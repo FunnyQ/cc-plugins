@@ -20,10 +20,6 @@ function parseEffortAndFocus(focus: string | undefined): {
   }
 
   const tokens = focus.trim().split(/\s+/);
-  if (tokens.length === 0) {
-    return { effort: "high" };
-  }
-
   const firstToken = tokens[0];
   if (EFFORT_LEVELS.has(firstToken)) {
     const effort = firstToken;
@@ -86,36 +82,31 @@ export const claudeBackend: Backend = {
       return raw.trim();
     }
 
+    // Only plain objects carry an extractable envelope; anything else is raw.
+    if (typeof parsed !== "object" || parsed === null) {
+      return raw.trim();
+    }
+    const obj = parsed as Record<string, unknown>;
+
     // Extraction order: .result → .text → .content[0].text → raw
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      typeof (parsed as Record<string, unknown>).result === "string"
-    ) {
-      return (parsed as Record<string, unknown>).result as string;
+    if (typeof obj.result === "string") {
+      return obj.result;
     }
 
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      typeof (parsed as Record<string, unknown>).text === "string"
-    ) {
-      return (parsed as Record<string, unknown>).text as string;
+    if (typeof obj.text === "string") {
+      return obj.text;
     }
 
-    // Try .content[0].text, but only if parsed is a plain object with a content array.
-    if (typeof parsed === "object" && parsed !== null) {
-      const obj = parsed as Record<string, unknown>;
-      if (
-        Array.isArray(obj.content) &&
-        obj.content.length > 0 &&
-        typeof obj.content[0] === "object" &&
-        obj.content[0] !== null
-      ) {
-        const first = obj.content[0] as Record<string, unknown>;
-        if (typeof first.text === "string") {
-          return first.text;
-        }
+    // Try .content[0].text, but only if content is a non-empty array of objects.
+    if (
+      Array.isArray(obj.content) &&
+      obj.content.length > 0 &&
+      typeof obj.content[0] === "object" &&
+      obj.content[0] !== null
+    ) {
+      const first = obj.content[0] as Record<string, unknown>;
+      if (typeof first.text === "string") {
+        return first.text;
       }
     }
 
