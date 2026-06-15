@@ -1,0 +1,32 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "description": "Delegate a task to another harness — relay work to the codex, opencode, or claude CLI (delegate / review / image), capture the result, and report back.",
+  "author": { "name": "Q" },
+  "license": "MIT",
+  "keywords": [
+    "relay",
+    "delegate",
+    "codex",
+    "opencode",
+    "claude",
+    "review",
+    "image",
+    "cross-harness"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Relay",
+    "shortDescription": "Delegate tasks to another harness's CLI (codex / opencode / claude).",
+    "longDescription": "Relay work to codex, opencode, or claude CLI with delegate, review, and image modes. Supports native and prompt-based strategies across the harness ecosystem.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Delegate this task to codex.",
+      "Have opencode review my changes.",
+      "Ask claude to refactor this."
+    ],
+    "brandColor": "#8B6BB1"
+  }
+}
