@@ -1,0 +1,253 @@
+import { describe, it, expect } from "bun:test";
+import { claudeBackend } from "./claude";
+
+describe("claudeBackend", () => {
+  describe("properties", () => {
+    it("has name 'claude'", () => {
+      expect(claudeBackend.name).toBe("claude");
+    });
+
+    it("supports delegate and review only", () => {
+      expect(claudeBackend.supports.has("delegate")).toBe(true);
+      expect(claudeBackend.supports.has("review")).toBe(true);
+      expect(claudeBackend.supports.has("image")).toBe(false);
+    });
+  });
+
+  describe("strategy", () => {
+    it("returns 'prompt' for delegate", () => {
+      expect(claudeBackend.strategy("delegate")).toBe("prompt");
+    });
+
+    it("returns 'native' for review", () => {
+      expect(claudeBackend.strategy("review")).toBe("native");
+    });
+  });
+
+  describe("invoke", () => {
+    describe("delegate mode", () => {
+      it("builds argv with prompt text and json output format", () => {
+        const result = claudeBackend.invoke("delegate", {
+          promptText: "Test prompt",
+        });
+        expect(result.argv).toEqual([
+          "claude",
+          "-p",
+          "Test prompt",
+          "--output-format",
+          "json",
+        ]);
+      });
+
+      it("handles empty prompt text", () => {
+        const result = claudeBackend.invoke("delegate", {
+          promptText: "",
+        });
+        expect(result.argv).toEqual([
+          "claude",
+          "-p",
+          "",
+          "--output-format",
+          "json",
+        ]);
+      });
+
+      it("handles undefined prompt text", () => {
+        const result = claudeBackend.invoke("delegate", {});
+        expect(result.argv).toEqual([
+          "claude",
+          "-p",
+          "",
+          "--output-format",
+          "json",
+        ]);
+      });
+    });
+
+    describe("review mode — effort and focus parsing", () => {
+      it("uses default effort 'high' when focus is undefined", () => {
+        const result = claudeBackend.invoke("review", {});
+        expect(result.argv).toEqual(["claude", "-p", "/code-review high"]);
+      });
+
+      it("uses effort token as the effort level", () => {
+        const result = claudeBackend.invoke("review", { focus: "low" });
+        expect(result.argv).toEqual(["claude", "-p", "/code-review low"]);
+      });
+
+      it("handles 'medium' effort", () => {
+        const result = claudeBackend.invoke("review", { focus: "medium" });
+        expect(result.argv).toEqual(["claude", "-p", "/code-review medium"]);
+      });
+
+      it("handles 'high' effort (explicit)", () => {
+        const result = claudeBackend.invoke("review", { focus: "high" });
+        expect(result.argv).toEqual(["claude", "-p", "/code-review high"]);
+      });
+
+      it("handles 'ultra' effort", () => {
+        const result = claudeBackend.invoke("review", { focus: "ultra" });
+        expect(result.argv).toEqual(["claude", "-p", "/code-review ultra"]);
+      });
+
+      it("includes focus phrase after effort level", () => {
+        const result = claudeBackend.invoke("review", {
+          focus: "high consider performance",
+        });
+        expect(result.argv).toEqual([
+          "claude",
+          "-p",
+          "/code-review high consider performance",
+        ]);
+      });
+
+      it("treats non-effort token as focus phrase with default effort", () => {
+        const result = claudeBackend.invoke("review", {
+          focus: "security review",
+        });
+        expect(result.argv).toEqual([
+          "claude",
+          "-p",
+          "/code-review high security review",
+        ]);
+      });
+
+      it("handles focus phrase with multiple words after effort", () => {
+        const result = claudeBackend.invoke("review", {
+          focus: "ultra focus on edge cases and error handling",
+        });
+        expect(result.argv).toEqual([
+          "claude",
+          "-p",
+          "/code-review ultra focus on edge cases and error handling",
+        ]);
+      });
+
+      it("never includes --fix flag", () => {
+        const result = claudeBackend.invoke("review", {
+          focus: "high",
+        });
+        expect(result.argv.includes("--fix")).toBe(false);
+      });
+    });
+  });
+
+  describe("parseOutput", () => {
+    describe("valid JSON with .result field (delegate response)", () => {
+      it("extracts .result field", () => {
+        const json = JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "Implementation complete",
+          session_id: "abc123",
+          total_cost_usd: 0.01,
+        });
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe("Implementation complete");
+      });
+    });
+
+    describe("JSON with .text field (fallback)", () => {
+      it("extracts .text when .result is absent", () => {
+        const json = JSON.stringify({
+          type: "response",
+          text: "Response text",
+        });
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe("Response text");
+      });
+    });
+
+    describe("JSON with .content[0].text field (fallback)", () => {
+      it("extracts .content[0].text when result/text are absent", () => {
+        const json = JSON.stringify({
+          type: "response",
+          content: [{ text: "Nested response" }],
+        });
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe("Nested response");
+      });
+
+      it("falls back to raw when .content is empty", () => {
+        const json = JSON.stringify({
+          type: "response",
+          content: [],
+        });
+        const output = claudeBackend.parseOutput(json);
+        // When content array is empty, falls back to raw JSON string trimmed
+        expect(output).toBe('{"type":"response","content":[]}');
+      });
+    });
+
+    describe("non-JSON input (review output)", () => {
+      it("returns plain text when JSON.parse fails", () => {
+        const plainText = "## Issues\n- Bug at line 42";
+        const output = claudeBackend.parseOutput(plainText);
+        expect(output).toBe("## Issues\n- Bug at line 42");
+      });
+
+      it("returns trimmed plain text", () => {
+        const plainText = "   Some review feedback   ";
+        const output = claudeBackend.parseOutput(plainText);
+        expect(output).toBe("Some review feedback");
+      });
+
+      it("returns empty string for empty input", () => {
+        const output = claudeBackend.parseOutput("");
+        expect(output).toBe("");
+      });
+
+      it("returns trimmed whitespace-only input", () => {
+        const output = claudeBackend.parseOutput("   ");
+        expect(output).toBe("");
+      });
+
+      it("handles malformed JSON gracefully", () => {
+        const malformed = "not json { broken";
+        const output = claudeBackend.parseOutput(malformed);
+        expect(output).toBe("not json { broken");
+      });
+    });
+
+    describe("robustness", () => {
+      it("never throws on any input", () => {
+        const testCases = [
+          "",
+          "plain text",
+          "{ invalid json",
+          '{ "result": null }',
+          '{ "result": 123 }',
+        ];
+
+        for (const input of testCases) {
+          expect(() => claudeBackend.parseOutput(input)).not.toThrow();
+        }
+      });
+
+      it("handles JSON primitives by falling back to raw", () => {
+        expect(claudeBackend.parseOutput("null")).toBe("null");
+        expect(claudeBackend.parseOutput("false")).toBe("false");
+        expect(claudeBackend.parseOutput("true")).toBe("true");
+      });
+
+      it("prioritizes .result over .text", () => {
+        const json = JSON.stringify({
+          result: "primary",
+          text: "secondary",
+        });
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe("primary");
+      });
+
+      it("prioritizes .text over .content[0].text", () => {
+        const json = JSON.stringify({
+          text: "primary",
+          content: [{ text: "secondary" }],
+        });
+        const output = claudeBackend.parseOutput(json);
+        expect(output).toBe("primary");
+      });
+    });
+  });
+});
