@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.10.2] - 2026-06-16
+
+### ✨ Added
+
+- **Flightplan's plan review is now engine-selectable.** Step 6's review→fix→re-review loop defaults to **Codex** (unchanged) but can now run on **OpenCode** or **Opus**. `review-plan.ts` gained `--engine codex|opencode` (+ `--model` for OpenCode) and a `--print` mode that emits the exact instructions+bundle so all engines share one source of review criteria. The **Opus** engine spawns a **fresh, independent reviewer subagent** for each pass — never the main agent that wrote the plan — preserving the reviewer ≠ author anti-bias split. A missing CLI skips the gate gracefully (exit 0 + warning), same as before.
+
 ## [3.10.1] - 2026-06-15
 
 ### ✨ Added
