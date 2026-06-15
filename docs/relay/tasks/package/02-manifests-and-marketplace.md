@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: backends/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -83,17 +83,17 @@ Version surfaces: relay has **three** — the two `plugin.json` files (this task
 
 ## Acceptance criteria
 
-- [ ] `packages/relay/.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` both exist at `version: "0.1.0"` with matching name/description.
-- [ ] `.codex-plugin/plugin.json` has `"skills": "./skills/"` and an `interface` block.
-- [ ] `relay` appears in `.claude-plugin/marketplace.json` `plugins[]` and `.agents/plugins/marketplace.json` `plugins[]`.
-- [ ] All JSON files are valid (parse without error); the Claude `plugin.json`, Codex `plugin.json`, and Claude `marketplace.json` relay descriptions all equal the canonical string; Codex `interface` short/long descriptions contain the required phrases.
+- [x] `packages/relay/.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` both exist at `version: "0.1.0"` with matching name/description.
+- [x] `.codex-plugin/plugin.json` has `"skills": "./skills/"` and an `interface` block.
+- [x] `relay` appears in `.claude-plugin/marketplace.json` `plugins[]` and `.agents/plugins/marketplace.json` `plugins[]`.
+- [x] All JSON files are valid (parse without error); the Claude `plugin.json`, Codex `plugin.json`, and Claude `marketplace.json` relay descriptions all equal the canonical string; Codex `interface` short/long descriptions contain the required phrases.
 
 ## Verification
 
-- [ ] `bun -e "['packages/relay/.claude-plugin/plugin.json','packages/relay/.codex-plugin/plugin.json','.claude-plugin/marketplace.json','.agents/plugins/marketplace.json'].forEach(f=>JSON.parse(require('fs').readFileSync(f)))"` exits 0 (all valid JSON).
-- [ ] `grep -c '"name": "relay"'` across the two marketplace files returns 1 each.
-- [ ] Both `plugin.json` versions read `0.1.0`.
-- [ ] A small script asserts the three relay `description` fields all equal the canonical string and the Codex `interface` short/long contain the required phrases (e.g. `bun -e "…JSON.parse…assert…"`).
+- [x] `bun -e "['packages/relay/.claude-plugin/plugin.json','packages/relay/.codex-plugin/plugin.json','.claude-plugin/marketplace.json','.agents/plugins/marketplace.json'].forEach(f=>JSON.parse(require('fs').readFileSync(f)))"` exits 0 (all valid JSON).
+- [x] `grep -c '"name": "relay"'` across the two marketplace files returns 1 each.
+- [x] Both `plugin.json` versions read `0.1.0`.
+- [x] A small script asserts the three relay `description` fields all equal the canonical string and the Codex `interface` short/long contain the required phrases (e.g. `bun -e "…JSON.parse…assert…"`).
 
 ## Eval rubric
 
