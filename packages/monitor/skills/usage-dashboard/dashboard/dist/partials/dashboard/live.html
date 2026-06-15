@@ -29,7 +29,7 @@
       tabindex="0"
       @click="openInCockpit(s)"
       @keydown.enter="openInCockpit(s)"
-      :title="s.provider === 'opencode' ? 'OpenCode live transcript is not available in cockpit yet' : (cockpitUp ? 'Open in cockpit' : 'Start cockpit to open transcripts')"
+      :title="cockpitUp ? 'Open in cockpit' : 'Start cockpit to open transcripts'"
     >
       <span
         :class="liveStatusClass(s.status)"

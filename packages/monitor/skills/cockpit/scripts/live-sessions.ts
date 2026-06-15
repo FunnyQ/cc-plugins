@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
 
-export type Provider = "claude" | "codex";
+export type Provider = "claude" | "codex" | "opencode";
 
 export type LiveSession = {
   provider: Provider;
@@ -27,8 +27,8 @@ export type LiveSession = {
 // stale cutoff token-atlas uses for the same panel.
 const STALE_MS = 10 * 60 * 1000;
 
-// Codex emits no live status; a thread touched within this window is treated as
-// actively working, otherwise idle. Mirrors token-atlas's active-inferred cutoff.
+// Codex/OpenCode emit no live status; a session touched within this window is
+// treated as actively working, otherwise idle. Mirrors token-atlas's cutoff.
 const CODEX_BUSY_MS = 60 * 1000;
 
 // Dirs/DB are env-overridable so tests can point at fixtures (mirrors the
@@ -91,6 +91,13 @@ type CodexThreadRow = {
   updated_at_ms: number | null;
 };
 
+type OpenCodeSessionRow = {
+  id: string;
+  directory: string;
+  time_created: number;
+  time_updated: number;
+};
+
 // Codex has no per-session file; the `threads` table's most-recent rows stand in
 // for "recently active". Same cutoff keeps the two providers consistent. Spawned
 // child threads are excluded here so subagents only appear as the parent
@@ -134,8 +141,69 @@ function readCodexLive(now: number): LiveSession[] {
   }
 }
 
+function openCodeDb(): string {
+  return (
+    process.env.COCKPIT_OPENCODE_DB ||
+    join(
+      process.env.OPENCODE_DATA_DIR ||
+        join(homedir(), ".local", "share", "opencode"),
+      "opencode.db",
+    )
+  );
+}
+
+function openCodeTimestampMs(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return value < 1_000_000_000_000 ? value * 1000 : value;
+}
+
+function readOpenCodeLive(now: number): LiveSession[] {
+  const dbPath = openCodeDb();
+  if (!existsSync(dbPath)) return [];
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const rows = db
+        .query(
+          `select id, directory, time_created, time_updated
+           from session
+           where time_archived is null
+           order by time_updated desc
+           limit 24`,
+        )
+        .all() as OpenCodeSessionRow[];
+      const out: LiveSession[] = [];
+      for (const r of rows) {
+        if (typeof r.id !== "string" || typeof r.directory !== "string") {
+          continue;
+        }
+        const updatedAtMs =
+          openCodeTimestampMs(r.time_updated) ||
+          openCodeTimestampMs(r.time_created);
+        if (!updatedAtMs || now - updatedAtMs > STALE_MS) continue;
+        out.push({
+          provider: "opencode",
+          id: r.id,
+          cwd: r.directory,
+          updatedAtMs,
+          status: now - updatedAtMs <= CODEX_BUSY_MS ? "busy" : "idle",
+        });
+      }
+      return out;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return [];
+  }
+}
+
 export function getLiveSessions(now = Date.now()): LiveSession[] {
-  return [...readClaudeLive(now), ...readCodexLive(now)];
+  return [
+    ...readClaudeLive(now),
+    ...readCodexLive(now),
+    ...readOpenCodeLive(now),
+  ];
 }
 
 if (import.meta.main) {
