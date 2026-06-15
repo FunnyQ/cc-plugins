@@ -275,6 +275,13 @@ function openCodeRowsToEntries(rows: OpenCodeMessageRow[]): unknown[] {
       data?.text ??
       (data?.summary ? JSON.stringify(data.summary, null, 2) : "");
     const content = parts.length ? parts : fallbackContent;
+    if (
+      !parts.length &&
+      (content == null ||
+        (typeof content === "string" && content.trim() === ""))
+    ) {
+      continue;
+    }
     entries.push({
       type: role,
       uuid: row.message_id,
