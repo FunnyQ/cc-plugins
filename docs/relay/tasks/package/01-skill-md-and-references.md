@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: backends/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -60,19 +60,19 @@ ln -s <repo>/packages/relay/skills/relay ~/.claude/skills/relay
 
 ## Acceptance criteria
 
-- [ ] `SKILL.md` frontmatter has `name: relay`, a slash-command-only description, `version: 0.1.0`.
-- [ ] `commands/relay.md` exists with a `description` + `argument-hint` and routes `/relay` to the skill.
-- [ ] Orchestration covers all three modes and both strategies via single-step `relay.ts` calls (agent picks `--files`; no separate prompt-build step).
-- [ ] Smart-apply policy (delegate auto-apply in-scope + verify; review report-only) and both report formats are inlined.
-- [ ] `--model` save-to-config flow (AskUserQuestion → merge-write config) is documented.
-- [ ] `references/backends.md` documents per-CLI flags, the #26855 caveat, and the opencode symlink install line.
+- [x] `SKILL.md` frontmatter has `name: relay`, a slash-command-only description, `version: 0.1.0`.
+- [x] `commands/relay.md` exists with a `description` + `argument-hint` and routes `/relay` to the skill.
+- [x] Orchestration covers all three modes and both strategies via single-step `relay.ts` calls (agent picks `--files`; no separate prompt-build step).
+- [x] Smart-apply policy (delegate auto-apply in-scope + verify; review report-only) and both report formats are inlined.
+- [x] `--model` save-to-config flow (AskUserQuestion → merge-write config) is documented.
+- [x] `references/backends.md` documents per-CLI flags, the #26855 caveat, and the opencode symlink install line.
 
 ## Verification
 
-- [ ] `SKILL.md` parses as valid frontmatter + body (`name`/`description`/`version` present); `commands/relay.md` parses as valid frontmatter.
-- [ ] SKILL.md contains literal command examples for each cell, at minimum: `relay opencode delegate`, `relay codex image … --out …`, `relay codex review --scope`, `relay claude review`.
-- [ ] SKILL.md documents the unsupported-pair failure path (e.g. `/relay opencode image` → fails fast) and the smart-apply policy + both report templates.
-- [ ] Install line matches the actual skill path under `packages/relay/skills/relay`.
+- [x] `SKILL.md` parses as valid frontmatter + body (`name`/`description`/`version` present); `commands/relay.md` parses as valid frontmatter.
+- [x] SKILL.md contains literal command examples for each cell, at minimum: `relay opencode delegate`, `relay codex image … --out …`, `relay codex review --scope`, `relay claude review`.
+- [x] SKILL.md documents the unsupported-pair failure path (e.g. `/relay opencode image` → fails fast) and the smart-apply policy + both report templates.
+- [x] Install line matches the actual skill path under `packages/relay/skills/relay`.
 
 ## Eval rubric
 
