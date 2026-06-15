@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05, package/01, package/02, package/03, package/04
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -45,20 +45,20 @@ Check the seams, not individual task internals (those passed their own rubrics):
 
 ## Acceptance criteria
 
-- [ ] Full test suite passes: `bun test packages/relay/skills/relay/scripts/`.
-- [ ] No backend-name branching in `relay.ts`; gate runs before any spawn.
-- [ ] All matrix holes fail fast; all supported cells route to the correct strategy.
-- [ ] codex backend covers delegate + review (native + custom-file fallback) + image (odin-codex superset).
-- [ ] Alias commands `/codex`, `/opencode`, `/claude` exist and defer to the relay skill with their backend fixed.
-- [ ] The three version surfaces (Claude `plugin.json`, Codex `plugin.json`, `SKILL.md` frontmatter) all read `0.1.0`; relay present in both registries; descriptions consistent across all docs/manifests.
-- [ ] Any integration defect found is fixed and the affected task's verification re-run.
+- [x] Full test suite passes: `bun test packages/relay/skills/relay/scripts/`.
+- [x] No backend-name branching in `relay.ts`; gate runs before any spawn.
+- [x] All matrix holes fail fast; all supported cells route to the correct strategy.
+- [x] codex backend covers delegate + review (native + custom-file fallback) + image (odin-codex superset).
+- [x] Alias commands `/codex`, `/opencode`, `/claude` exist and defer to the relay skill with their backend fixed.
+- [x] The three version surfaces (Claude `plugin.json`, Codex `plugin.json`, `SKILL.md` frontmatter) all read `0.1.0`; relay present in both registries; descriptions consistent across all docs/manifests.
+- [x] Any integration defect found is fixed and the affected task's verification re-run.
 
 ## Verification
 
-- [ ] `bun test packages/relay/skills/relay/scripts/` exits 0.
-- [ ] `grep -rn 'backend === ' packages/relay/skills/relay/scripts/relay.ts` returns nothing.
-- [ ] Manual smoke (local, optional): `RELAY_INTEGRATION=1 bun test …` and a real `/relay codex review` / `/relay opencode delegate` / `/relay codex image`.
-- [ ] JSON validity + registry-presence checks from the packaging task re-pass.
+- [x] `bun test packages/relay/skills/relay/scripts/` exits 0.
+- [x] `grep -rn 'backend === ' packages/relay/skills/relay/scripts/relay.ts` returns nothing.
+- [x] Manual smoke (local, optional): `RELAY_INTEGRATION=1 bun test …` and a real `/relay codex review` / `/relay opencode delegate` / `/relay codex image`.
+- [x] JSON validity + registry-presence checks from the packaging task re-pass.
 
 ## Eval rubric
 
