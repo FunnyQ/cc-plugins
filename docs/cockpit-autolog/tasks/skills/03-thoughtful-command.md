@@ -6,7 +6,7 @@
 >
 > **Depends on**: skills/01, skills/02
 > **Blocks**: skills/04, docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -64,16 +64,16 @@ there. Make the command self-contained for both surfaces.
 
 ## Acceptance criteria
 
-- [ ] `packages/monitor/commands/thoughtful.md` exists with frontmatter + the standing instruction body.
-- [ ] The command instructs Claude to spawn the fork with `subagent_type` omitted, running `/cockpit scribe`.
-- [ ] The command covers the Codex path (`fork_context: true`, `--provider codex`).
-- [ ] The command states no `cockpit start` is needed (auto-register on first write).
-- [ ] `packages/monitor/skills/thoughtful/` is deleted.
+- [x] `packages/monitor/commands/thoughtful.md` exists with frontmatter + the standing instruction body.
+- [x] The command instructs Claude to spawn the fork with `subagent_type` omitted, running `/cockpit scribe`.
+- [x] The command covers the Codex path (`fork_context: true`, `--provider codex`).
+- [x] The command states no `cockpit start` is needed (auto-register on first write).
+- [x] `packages/monitor/skills/thoughtful/` is deleted.
 
 ## Verification
 
-- [ ] `test -f packages/monitor/commands/thoughtful.md && test ! -d packages/monitor/skills/thoughtful && echo ok` prints `ok`.
-- [ ] `grep -n "subagent_type\|/cockpit scribe\|provider codex" packages/monitor/commands/thoughtful.md` matches all three.
+- [x] `test -f packages/monitor/commands/thoughtful.md && test ! -d packages/monitor/skills/thoughtful && echo ok` prints `ok`.
+- [x] `grep -n "subagent_type\|/cockpit scribe\|provider codex" packages/monitor/commands/thoughtful.md` matches all three.
 
 ## Eval rubric
 
