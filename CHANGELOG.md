@@ -1,5 +1,18 @@
 # Changelog
 
+## [monitor 3.12.2] - 2026-06-17
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.12.2` tag._
+
+### ✨ Added
+
+- **Enlarge a cockpit diagram.** Click (or press Enter/Space on) a rendered decision-card diagram to blow it up in a lightbox at near-full-viewport, with a hover ⤢ hint — dense instrument panels are finally readable. Close with the backdrop, the ✕, or Esc. The lightbox reuses the already-sanitized SVG (no re-render) and sits below the permission modal so a needs-your-call prompt still wins.
+
+### 🐛 Fixed
+
+- **The "off the cockpit" invite no longer lingers once a session gets logged.** When a session started untracked and a later scribe entry arrived, the invite card stayed pinned below the real decision cards. Its `display:grid` was outranking the `[hidden]` attribute; the invite now hides correctly as soon as a decision lands.
+- **Thoughtful auto-logging and statusline repair now cover resumed, cleared, and compacted sessions.** Both `SessionStart` hooks were firing on a cold launch only; they now also run on `resume`, `clear`, and `compact`, so continuing or compacting a session no longer drops the auto-log nudge or the version-drift statusline fix.
+
 ## [chronicle 0.1.0] - 2026-06-17
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.1.0` tag._
