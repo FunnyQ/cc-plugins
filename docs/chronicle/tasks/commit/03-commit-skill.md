@@ -66,6 +66,8 @@ description: Craft git commit(s) for the current changes — auto-decides betwee
 
 Point at `scripts/analyze-changes.ts` and `references/commit-template.md` (real paths in this skill), never at sibling task ids.
 
+**Installed-path rule (freeze this):** when SKILL.md tells the agent to run the script, resolve it from the skill's load-time "Base directory for this skill" banner (`$SKILL_DIR/scripts/analyze-changes.ts`), with a file-exists guard. Do **not** hard-code a repo-relative path like `bun packages/chronicle/skills/commit/scripts/analyze-changes.ts` (only exists in the source repo — breaks for installed-plugin users) and do **not** rely on `${CLAUDE_PLUGIN_ROOT}` (not reliably set in agent Bash, empty under Codex). This is the convention relay 0.2.0 landed on — see `CHANGELOG.md` [relay 0.2.0].
+
 ## Acceptance criteria
 
 - [ ] `SKILL.md` has valid frontmatter with `name: commit` and a description carrying the trigger phrases + "human-invoked only".
