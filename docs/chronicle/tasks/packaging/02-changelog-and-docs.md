@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: packaging/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -38,17 +38,17 @@ chronicle is independently versioned (like relay). When updating the "Releasing"
 
 ## Acceptance criteria
 
-- [ ] `CHANGELOG.md` has a chronicle `0.1.0` entry in the repo's existing format.
-- [ ] `CLAUDE.md` "What This Is" lists chronicle and the plugin count is corrected.
-- [ ] `CLAUDE.md` Architecture tree includes a `packages/chronicle/` block with both skills.
-- [ ] The Releasing section mentions chronicle's independent versioning (or its two plugin.json paths).
-- [ ] All edits are additive/surgical — no unrelated prose touched.
+- [x] `CHANGELOG.md` has a chronicle `0.1.0` entry in the repo's existing format.
+- [x] `CLAUDE.md` "What This Is" lists chronicle and the plugin count is corrected.
+- [x] `CLAUDE.md` Architecture tree includes a `packages/chronicle/` block with both skills.
+- [x] The Releasing section mentions chronicle's independent versioning (or its two plugin.json paths).
+- [x] All edits are additive/surgical — no unrelated prose touched.
 
 ## Verification
 
-- [ ] `grep -n chronicle CHANGELOG.md` and `grep -n chronicle CLAUDE.md` both return the new lines.
-- [ ] `grep -n "three local plugins" CLAUDE.md` returns nothing (count was updated).
-- [ ] `git diff CLAUDE.md CHANGELOG.md` shows only chronicle-related changes: additions plus the one required edit to the plugin-count wording (e.g. "three" → "four"). No unrelated prose is touched.
+- [x] `grep -n chronicle CHANGELOG.md` and `grep -n chronicle CLAUDE.md` both return the new lines.
+- [x] `grep -n "three local plugins" CLAUDE.md` returns nothing (count was updated).
+- [x] `git diff CLAUDE.md CHANGELOG.md` shows only chronicle-related changes: additions plus the one required edit to the plugin-count wording (e.g. "three" → "four"). No unrelated prose is touched.
 
 ## Eval rubric
 
