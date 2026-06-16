@@ -17,7 +17,11 @@ export function readConfig(): CockpitConfig {
     if (!existsSync(path)) return {};
 
     const parsed = JSON.parse(readFileSync(path, "utf8"));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
       return {};
     }
 
@@ -28,15 +32,14 @@ export function readConfig(): CockpitConfig {
 }
 
 export function getLanguage(): string {
-  try {
-    const language = readConfig().log_language;
-    if (typeof language !== "string") return "English";
+  // readConfig() is total (returns {} on any failure) and the remaining work is
+  // a property read + trim on a guarded value, which cannot throw — no outer
+  // try/catch needed.
+  const language = readConfig().log_language;
+  if (typeof language !== "string") return "English";
 
-    const trimmed = language.trim();
-    return trimmed === "" ? "English" : trimmed;
-  } catch {
-    return "English";
-  }
+  const trimmed = language.trim();
+  return trimmed === "" ? "English" : trimmed;
 }
 
 export function setLanguage(language: string): void {
