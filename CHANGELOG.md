@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.1.2] - 2026-06-17
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.1.2` tag._
+
+### 🐛 Fixed
+
+- **Commit messages stay terse now that a fork writes them.** The context-inheriting write fork holds far more "why" than belongs in a commit, which bloated bodies into essays and turned the 繁中 summary into a line-by-line re-translation. The template now carries a length guardrail — body capped at ~3–4 one-line bullets, summary at 1–3 summarizing sentences — echoed in the Phase B spawn note.
+
 ## [monitor 3.12.3] - 2026-06-17
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.12.3` tag._
