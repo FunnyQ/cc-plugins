@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-// cockpit CLI — produces the kernel data: session goal + decision trail,
+// cockpit CLI — produces the kernel data: decision trail,
 // plus the control-loop client (wait/send) that talks to the daemon broker.
-//   cockpit start  --session <id> --session-goal X --project-goal Y [--owner user]
 //   cockpit log    --session <id> --decision D --reason R [--tradeoff T]
 //                  [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--needs-call]
 //   cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--session <id>]
@@ -22,8 +21,6 @@ import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
 
 // ---------- Types ----------
-
-type GoalRecord = { type: "goal"; session_goal: string; ts: string };
 
 // An open, self-labeled dimension of a decision's reasoning. Rather than a fixed
 // set of fields (problem/rejected/risk), the caller picks the label that fits the
@@ -94,9 +91,6 @@ type Args = {
 const SINGLE_FLAGS = new Set([
   "provider",
   "session",
-  "session-goal",
-  "project-goal",
-  "owner",
   "log-language",
   "decision",
   "reason",
@@ -219,67 +213,6 @@ function refreshHeartbeat(
   }
 }
 
-// ---------- project-meta.md ----------
-
-function readMetaField(metaPath: string, field: string): string | undefined {
-  if (!existsSync(metaPath)) return undefined;
-  const re = new RegExp(`^${field}:\\s*(.+?)\\s*$`, "m");
-  const m = readFileSync(metaPath, "utf8").match(re);
-  return m?.[1];
-}
-
-function writeProjectMeta(
-  project: string,
-  projectGoal: string,
-  owner: string,
-  logLanguage: string,
-): void {
-  const metaPath = join(projectCockpitDir(project), "project-meta.md");
-  const created =
-    readMetaField(metaPath, "created") || new Date().toISOString();
-  // log_language steers the language of decision-log entries. Persist it per
-  // project: keep the existing value when start is re-run without an explicit
-  // --log-language, and default to English when nothing has ever been set.
-  const logLang =
-    logLanguage || readMetaField(metaPath, "log_language") || "English";
-  const body = [
-    "---",
-    `project_goal: ${projectGoal}`,
-    `created: ${created}`,
-    `owner: ${owner}`,
-    `log_language: ${logLang}`,
-    "---",
-    "",
-    "Longer prose describing the project's purpose, constraints, north star.",
-    "Free-form — hand-edit or regenerate as the project evolves.",
-    "",
-  ].join("\n");
-  writeFileSync(metaPath, body);
-}
-
-// Write the goal as line 1 of the log, preserving any records already there.
-// `start` may be re-run on an existing session (e.g. to refresh the goal or set
-// log_language) — it must NOT truncate the decision trail, so we replace only a
-// leading goal record and keep everything appended after it.
-function writeGoalRecord(logPath: string, goal: GoalRecord): void {
-  let rest: string[] = [];
-  if (existsSync(logPath)) {
-    const existing = readFileSync(logPath, "utf8")
-      .split("\n")
-      .filter((l) => l.trim());
-    if (existing.length) {
-      let from = 0;
-      try {
-        if (JSON.parse(existing[0])?.type === "goal") from = 1;
-      } catch {
-        // line 1 isn't valid JSON — keep all existing lines below the new goal
-      }
-      rest = existing.slice(from);
-    }
-  }
-  writeFileSync(logPath, [JSON.stringify(goal), ...rest].join("\n") + "\n");
-}
-
 // Read a decision-log jsonl into parsed decision records. Side-effect-free:
 // drops blank and unparseable lines, returns only `type:"decision"` records, and
 // yields [] on any read error. The single parse path so the "skip bad lines"
@@ -305,41 +238,6 @@ function readDecisionRecords(logPath: string): DecisionRecord[] {
 }
 
 // ---------- Subcommands ----------
-
-function cmdStart(args: Args): void {
-  const project = process.cwd();
-  const provider = parseProvider(args.single["provider"]);
-  const sessionId = args.single["session"] || crypto.randomUUID();
-  const sessionGoal = args.single["session-goal"] || "";
-  const projectGoal = args.single["project-goal"] || "";
-  const owner = args.single["owner"] || "user";
-  const logLanguage = args.single["log-language"] || "";
-
-  mkdirSync(join(projectCockpitDir(project), "logs"), { recursive: true });
-  writeProjectMeta(project, projectGoal, owner, logLanguage);
-
-  const logPath = logPathFor(project, sessionId);
-  const goal: GoalRecord = {
-    type: "goal",
-    session_goal: sessionGoal,
-    ts: new Date().toISOString(),
-  };
-  writeGoalRecord(logPath, goal);
-
-  upsertSession({
-    provider,
-    project,
-    sessionId,
-    logPath,
-    lastHeartbeat: new Date().toISOString(),
-  });
-
-  console.log(`cockpit: started session ${sessionId}`);
-  console.log(
-    `  meta:  ${join(projectCockpitDir(project), "project-meta.md")}`,
-  );
-  console.log(`  log:   ${logPath}`);
-}
 
 function cmdLog(args: Args): void {
   const project = process.cwd();
@@ -481,7 +379,6 @@ function cmdScribe(args: Args): void {
   const logPath = logPathFor(project, sessionId);
 
   // Auto-register before write so the session becomes tracked:true in the dashboard.
-  // We do NOT write a goal record and do NOT touch project-meta.md.
   upsertSession({
     provider,
     project,
@@ -754,9 +651,6 @@ async function cmdSend(rest: string[]): Promise<void> {
 async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
   switch (sub) {
-    case "start":
-      cmdStart(parseArgs(rest));
-      break;
     case "log":
       cmdLog(parseArgs(rest));
       break;
@@ -774,9 +668,7 @@ async function main(): Promise<void> {
       break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
-      console.error(
-        "usage: cockpit <start|log|scribe|config|wait|send> [args]",
-      );
+      console.error("usage: cockpit <log|scribe|config|wait|send> [args]");
       process.exit(1);
   }
 }
