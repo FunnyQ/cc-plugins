@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Thoughtful mode is on for this session: when you finish something genuinely worth recording (a non-obvious decision, deliberate-but-odd code, a tricky learning, or a sharp caveat), spawn a background fork with `subagent_type` omitted running `/cockpit scribe`. One fork per logical chunk; skip trivial edits.' || true",
+            "command": "echo 'Thoughtful mode is on for this session: when you finish something genuinely worth recording (a non-obvious decision, deliberate-but-odd code, a tricky learning, or a sharp caveat), spawn a background fork (Agent tool, `subagent_type` set to `fork`, not omitted) running `/cockpit scribe`. One fork per logical chunk; skip trivial edits.' || true",
             "timeout": 5
           }
         ]

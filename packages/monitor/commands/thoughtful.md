@@ -8,13 +8,13 @@ Fire a fork when you have just made a non-obvious decision between real alternat
 
 Skip the fork for typos, one-line trivial edits, pure formatting, simple lookups, restating something already logged, and confirmations with no decision content. Prefer one fork per logical chunk of work, not one per file or step.
 
-On Claude Code, use the Agent tool in the background and omit `subagent_type` entirely so the fork inherits the current conversation context. Use this exact prompt:
+On Claude Code, use the Agent tool in the background with `subagent_type: "fork"` so the fork inherits the current conversation context (the "why"). Use this exact prompt:
 
 ```text
 Run /cockpit scribe to distill the work we just completed into cockpit decision-trail entries.
 ```
 
-Do not define a custom `subagent_type`; that would lose context inheritance. Fire-and-forget, then continue or finish normally.
+Use `"fork"` specifically — omitting `subagent_type` (or naming any other type) starts a fresh agent with no conversation context, which defeats the point. Fire-and-forget, then continue or finish normally.
 
 On Codex, spawn a background sub-agent with `fork_context: true` and no `agent_type`, so it inherits the current context. Use a prompt that states the surface is Codex and that every cockpit scribe call must pass `--provider codex`, for example:
 

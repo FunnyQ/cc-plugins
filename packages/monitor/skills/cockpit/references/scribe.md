@@ -173,4 +173,4 @@ or confirmation message is needed.
 
 ## Implementation notes
 
-This reference guide is meant to be invoked from inside a context-inheriting fork spawned by the cockpit skill (via the `thoughtful` command or auto-logging hook). The fork inherits the full conversation context (the "why") and augments it with the code diff (the "what"). Do not convert this into a standalone custom `subagent_type` agent — that would lose context.
+This reference guide is meant to be invoked from inside a context-inheriting fork spawned by the cockpit skill (via the `thoughtful` command or auto-logging hook). On Claude Code that fork is an Agent-tool call with `subagent_type: "fork"`; on Codex it is a background sub-agent with `fork_context: true`. Either way the fork inherits the full conversation context (the "why") and augments it with the code diff (the "what"). Do not spawn it with `subagent_type` omitted or set to any other (custom/named) type — that starts a fresh agent with no conversation context and defeats the purpose.
