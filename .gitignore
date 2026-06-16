@@ -7,3 +7,6 @@ node_modules/
 # impeccable live mode (local dev artifacts)
 .impeccable-live.json
 .impeccable-live/
+
+# impeccable per-directory hook cache (generated, not source)
+**/.impeccable/hook.cache.json
