@@ -104,6 +104,64 @@ function loadMermaid() {
   return _mermaidPromise;
 }
 
+// --- Enlarge: a lightbox that blows a rendered diagram up to near-full-viewport.
+// A Night Flight-themed instrument panel can get dense (see the Rollup DB flow);
+// clicking it opens this overlay so the boxes are readable. DOM-bound, built lazily
+// on first open so the module's static surface stays importable under plain Bun.
+let _lightbox = null;
+
+function onLightboxKey(e) {
+  if (e.key === "Escape") closeDiagramLightbox();
+}
+
+function ensureLightbox() {
+  if (_lightbox) return _lightbox;
+  const overlay = document.createElement("div");
+  overlay.className = "diagram-lightbox";
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <button type="button" class="diagram-lightbox__close" aria-label="Close">✕</button>
+    <div class="diagram-lightbox__stage" role="dialog" aria-modal="true" aria-label="Enlarged diagram">
+      <div class="diagram-lightbox__canvas"></div>
+    </div>`;
+  // Backdrop or the close button dismiss; a click on the stage itself does not.
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || e.target.closest(".diagram-lightbox__close"))
+      closeDiagramLightbox();
+  });
+  document.body.appendChild(overlay);
+  _lightbox = overlay;
+  return overlay;
+}
+
+// Open the lightbox on a sanitized SVG string (the same markup already in the
+// card — no re-render). The inline width/height/max-width mermaid bakes in would
+// cap the blow-up, so strip them and let CSS scale the SVG by its viewBox.
+export function openDiagramLightbox(svg) {
+  if (!svg) return;
+  const overlay = ensureLightbox();
+  const canvas = overlay.querySelector(".diagram-lightbox__canvas");
+  canvas.innerHTML = svg;
+  const svgEl = canvas.querySelector("svg");
+  if (svgEl) {
+    svgEl.removeAttribute("width");
+    svgEl.removeAttribute("height");
+    svgEl.style.maxWidth = "none";
+    svgEl.style.width = "100%";
+    svgEl.style.height = "auto";
+  }
+  overlay.hidden = false;
+  document.addEventListener("keydown", onLightboxKey);
+  overlay.querySelector(".diagram-lightbox__close")?.focus();
+}
+
+export function closeDiagramLightbox() {
+  if (!_lightbox || _lightbox.hidden) return;
+  _lightbox.hidden = true;
+  _lightbox.querySelector(".diagram-lightbox__canvas").innerHTML = "";
+  document.removeEventListener("keydown", onLightboxKey);
+}
+
 // SVG-profile sanitization. Mermaid (strict) emits SVG + an id-scoped <style>;
 // DOMPurify's svg profile keeps those and strips scripts/event handlers. Loaded
 // lazily so the static module surface needs no DOM.

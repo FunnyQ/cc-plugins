@@ -1310,6 +1310,11 @@ body {
   border-radius: var(--radius);
   background: var(--hull-2);
 }
+/* display:grid above outranks the UA [hidden] rule, so the invite would linger
+   once a (late) scribe entry sets emptyEl.hidden — restore hide-on-hidden. */
+.decision-log__invite[hidden] {
+  display: none;
+}
 .decision-log__invite-badge {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1696,6 +1701,91 @@ body {
   margin-top: 8px;
   font-size: 11px;
   color: var(--danger);
+}
+/* A rendered diagram is clickable to enlarge — signal it and surface an ⤢ hint
+   on hover/focus in the top-right corner. */
+.decision-card__diagram.is-zoomable {
+  position: relative;
+  cursor: zoom-in;
+}
+.decision-card__diagram.is-zoomable::after {
+  content: "⤢";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: color-mix(in oklab, var(--hull-2) 80%, transparent);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.decision-card__diagram.is-zoomable:hover::after,
+.decision-card__diagram.is-zoomable:focus-visible::after {
+  opacity: 1;
+}
+.decision-card__diagram.is-zoomable:focus-visible {
+  outline: 2px solid var(--aurora);
+  outline-offset: 2px;
+}
+
+/* Diagram lightbox — the explicit enlarge surface. Sits below the permission
+   modal (z-index 80) so a needs-your-call prompt always wins. */
+.diagram-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: color-mix(in oklab, var(--void) 78%, transparent);
+  backdrop-filter: blur(4px);
+}
+.diagram-lightbox[hidden] {
+  display: none;
+}
+.diagram-lightbox__stage {
+  width: min(96vw, 1400px);
+  max-height: 92vh;
+  overflow: auto;
+  padding: clamp(18px, 3vw, 36px);
+  background: var(--space);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+.diagram-lightbox__canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.diagram-lightbox__close {
+  position: absolute;
+  top: clamp(12px, 2.5vw, 28px);
+  right: clamp(12px, 2.5vw, 28px);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: var(--starlight);
+  background: var(--hull-2);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.diagram-lightbox__close:hover {
+  border-color: color-mix(in oklab, var(--aurora) 50%, var(--edge));
+  color: var(--aurora);
 }
 .decision-card__files {
   display: flex;
