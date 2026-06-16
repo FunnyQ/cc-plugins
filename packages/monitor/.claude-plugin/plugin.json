@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "3.12.2",
+  "version": "3.12.3",
   "description": "Monitor your Claude Code, Codex, and OpenCode sessions — a usage dashboard plus a per-project cockpit with a decision trail, live session view, needs-your-call bridge, and thoughtful auto-logging.",
   "author": {
     "name": "Q"
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Thoughtful mode is on for this session: when you finish something genuinely worth recording (a non-obvious decision, deliberate-but-odd code, a tricky learning, or a sharp caveat), spawn a background fork (Agent tool, `subagent_type` set to `fork`, not omitted) running `/cockpit scribe`. One fork per logical chunk; skip trivial edits.' || true",
+            "command": "echo 'DECISION LOG ACTIVE — /cockpit scribe is this session decision log. When you finish a chunk of work genuinely worth recording — a non-obvious decision between real alternatives, deliberate-but-odd code, a tricky learning, or a sharp caveat/ordering trap — spawn a background fork to distill it: Agent(subagent_type: \"fork\", prompt: \"Run /cockpit scribe to distill the work we just completed into cockpit decision-trail entries.\"). One fork per logical chunk. Skip trivial edits — the bar is high, and missing some is fine. Use \"fork\" exactly (omitting it starts a fresh, context-less agent).' || true",
             "timeout": 5
           }
         ]

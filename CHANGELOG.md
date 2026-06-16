@@ -1,5 +1,21 @@
 # Changelog
 
+## [monitor 3.12.3] - 2026-06-17
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.12.3` tag._
+
+### ✨ Improved
+
+- **Sharper thoughtful-mode auto-logging guidance.** The `SessionStart` thoughtful hook is reframed as a clearer "DECISION LOG ACTIVE" nudge: the four worth-recording triggers are listed inline, the bar is kept high (missing some is fine) so it doesn't fire forks on trivial turns, and the spawn prompt uses the full "distill the work we just completed" phrasing with an explicit `"fork"` reminder. The scribe reference now also asks whether an insight is structural enough to draw, so the fork reaches for a `--diagram` when the "what" is a shape rather than a sentence.
+
+## [chronicle 0.1.1] - 2026-06-17
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.1.1` tag._
+
+### 🐛 Fixed
+
+- **Chronicle's commit and PR skills now spawn context-inheriting forks.** Both skills described their analyze/write phases as a generic "sub-agent", which would start fresh, context-less agents — so commit bodies degraded to diff-plus-template and a PR's **Why** section lost the in-session rationale. The phases are now explicit `subagent_type: "fork"` (Codex `fork_context: true`) spawns that inherit the conversation "why" while keeping diff/git output out of the main context, with a warning against omitting the fork type.
+
 ## [monitor 3.12.2] - 2026-06-17
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.12.2` tag._

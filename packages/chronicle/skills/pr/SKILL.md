@@ -17,6 +17,8 @@ This skill runs in two phases:
 2. The main agent asks the user to confirm, edit, draft, or abort.
 3. A fork creates the PR/MR only after confirmation.
 
+Both forks are **context-inheriting**: on Claude Code, the Agent tool with `subagent_type: "fork"` (never omitted, never a fresh/named type); on Codex, a background sub-agent with `fork_context: true` (no `agent_type`). A fork inherits the conversation (so the **Why** section can draw on the intent discussed in-session, not only cockpit records and commit subjects) **and** keeps its own tool output (full branch diff, `gh`/`glab` spew) out of the main agent's context. Omitting `subagent_type` starts a fresh, context-less agent — the **Why** then collapses to whatever the scripts surface, which is exactly the thinning this skill's soft-cockpit fallback is meant to avoid.
+
 ## Script Resolution
 
 Run the bundled scripts from this skill's installed location. Resolve paths from the load-time **"Base directory for this skill"** banner and guard that the files exist. Do not use repo-relative source paths, and do not rely on `${CLAUDE_PLUGIN_ROOT}` being set in agent shell commands.

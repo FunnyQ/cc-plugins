@@ -10,6 +10,8 @@ description: Craft git commit(s) for the current changes — auto-decides betwee
 
 Run Chronicle as a two-phase fork flow: analyze first, gate in the main agent, then write commits.
 
+Both phases run as **context-inheriting forks** — on Claude Code, the Agent tool with `subagent_type: "fork"` (never omitted, never a fresh/named type). A fork inherits the current conversation (the "why" behind the changes, so commit bodies explain intent instead of just restating the diff) **and** keeps its own tool output (the full diff, git spew) out of the main agent's context. Omitting `subagent_type` — or naming any other type — starts a fresh, context-less agent: the commit message then degrades to diff-plus-template with no rationale, which defeats the purpose. On Codex, spawn a background sub-agent with `fork_context: true` (no `agent_type`) for the same effect.
+
 ## Staging Model
 
 Chronicle works from the full working changeset: staged, unstaged, and untracked files together. `analyze-changes.ts` reports that combined set.
@@ -22,11 +24,11 @@ v1 operates at whole-file granularity. If a file is partially staged, flatten it
 
 ## Phase A - Analyze
 
-Start an analyze sub-agent. It must not commit.
+Spawn an analyze fork (`subagent_type: "fork"`; on Codex, `fork_context: true`). It must not commit.
 
 Resolve the script from the skill's load-time "Base directory for this skill" banner as `$SKILL_DIR/scripts/analyze-changes.ts`, with a file-exists guard. Do not hard-code a repo-relative path such as `bun packages/chronicle/skills/commit/scripts/analyze-changes.ts`, and do not rely on `${CLAUDE_PLUGIN_ROOT}`.
 
-The analyze sub-agent must:
+The analyze fork must:
 
 1. Run `$SKILL_DIR/scripts/analyze-changes.ts`. If `totalFiles === 0`, report `nothing to commit` and stop.
 2. Read the full analysis JSON from `outputPath` and the message template from `promptPath`.
@@ -71,7 +73,7 @@ On `Adjust the grouping`, revise the `CommitPlan` and re-confirm. On `Just one c
 
 ## Phase B - Write
 
-Start a write sub-agent with the confirmed `CommitPlan` and the template format from `references/commit-template.md`.
+Spawn a write fork (`subagent_type: "fork"`; on Codex, `fork_context: true`) with the confirmed `CommitPlan` and the template format from `references/commit-template.md`. Because the fork inherits the conversation, lean on that "why" when writing each commit body — explain intent, not just the mechanical diff.
 
 For each commit in order:
 
