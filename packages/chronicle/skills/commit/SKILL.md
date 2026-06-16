@@ -73,7 +73,7 @@ On `Adjust the grouping`, revise the `CommitPlan` and re-confirm. On `Just one c
 
 ## Phase B - Write
 
-Spawn a write fork (`subagent_type: "fork"`; on Codex, `fork_context: true`) with the confirmed `CommitPlan` and the template format from `references/commit-template.md`. Because the fork inherits the conversation, lean on that "why" when writing each commit body — explain intent, not just the mechanical diff.
+Spawn a write fork (`subagent_type: "fork"`; on Codex, `fork_context: true`) with the confirmed `CommitPlan` and the template format from `references/commit-template.md`. Because the fork inherits the conversation, lean on that "why" when writing each commit body — explain intent, not just the mechanical diff. But mind the template's **length guardrail**: the inherited context is deep, so deliberately keep the body terse (~3–4 one-line bullets) and the 繁中 summary to 1–3 sentences that *summarize* rather than re-translate the body. When in doubt, shorter.
 
 For each commit in order:
 
