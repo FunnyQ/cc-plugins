@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/03
 > **Blocks**: docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -68,16 +68,16 @@ Line numbers are approximate — verify against the files. Remove, don't just hi
 
 ## Acceptance criteria
 
-- [ ] No goal header, session-goal text, or project-goal snippet renders anywhere in the dashboard.
-- [ ] `renderGoal`, `goalSnippet`, `shortGoal`, `selectedProjectGoal`, `selectedSessionGoal` are all gone.
-- [ ] A legacy log whose line 1 is `{type:"goal",...}` does not crash the stream — the record is skipped.
-- [ ] No `leg__goal` / `decision-log__goal` references remain in `index.html` or `style.css`.
-- [ ] No leftover imports/usages reference removed functions (no console ReferenceErrors).
+- [x] No goal header, session-goal text, or project-goal snippet renders anywhere in the dashboard.
+- [x] `renderGoal`, `goalSnippet`, `shortGoal`, `selectedProjectGoal`, `selectedSessionGoal` are all gone.
+- [x] A legacy log whose line 1 is `{type:"goal",...}` does not crash the stream — the record is skipped.
+- [x] No `leg__goal` / `decision-log__goal` references remain in `index.html` or `style.css`.
+- [x] No leftover imports/usages reference removed functions (no console ReferenceErrors).
 
 ## Verification
 
-- [ ] `grep -rn "goal\|Goal" packages/monitor/skills/cockpit/dashboard/dist/` returns only unrelated matches (none in app.js/index.html/project-rail.js/decision-log.js/style.css).
-- [ ] Manual (owner's dev server): open a session with decision entries — trail renders, no goal UI, no console errors. Open a session whose log still has a legacy goal line — no crash.
+- [x] `grep -rn "goal\|Goal" packages/monitor/skills/cockpit/dashboard/dist/` returns only unrelated matches (none in app.js/index.html/project-rail.js/decision-log.js/style.css).
+- [x] Manual (owner's dev server): open a session with decision entries — trail renders, no goal UI, no console errors. Open a session whose log still has a legacy goal line — no crash.
 
 ## Eval rubric
 

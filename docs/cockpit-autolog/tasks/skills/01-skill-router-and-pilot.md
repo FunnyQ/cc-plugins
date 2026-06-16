@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/02, backend/03, skills/02
 > **Blocks**: skills/03, docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -56,17 +56,17 @@ Net effect: `/cockpit` opens the cockpit and (optionally) sets language; it neve
 
 ## Acceptance criteria
 
-- [ ] `SKILL.md` is a thin router: Step 0 provider + dispatch to `pilot.md` vs `scribe.md`, no inlined procedures.
-- [ ] `SKILL.md` frontmatter `description` reflects both modes and stays opt-in (no auto-fire claim removed).
-- [ ] `references/pilot.md` contains the interactive front with **no** goal-setting and **no** `cockpit start`.
-- [ ] `pilot.md` reads language via `cockpit config get-language` and sets it via `cockpit config --log-language`.
-- [ ] `pilot.md` preserves the `needs_your_call` / `wait` / `send` bridge and the dashboard open step.
+- [x] `SKILL.md` is a thin router: Step 0 provider + dispatch to `pilot.md` vs `scribe.md`, no inlined procedures.
+- [x] `SKILL.md` frontmatter `description` reflects both modes and stays opt-in (no auto-fire claim removed).
+- [x] `references/pilot.md` contains the interactive front with **no** goal-setting and **no** `cockpit start`.
+- [x] `pilot.md` reads language via `cockpit config get-language` and sets it via `cockpit config --log-language`.
+- [x] `pilot.md` preserves the `needs_your_call` / `wait` / `send` bridge and the dashboard open step.
 
 ## Verification
 
-- [ ] `grep -n "goal\|start\|project-meta" packages/monitor/skills/cockpit/references/pilot.md` returns nothing goal/start related.
-- [ ] `grep -n "scribe\|pilot" packages/monitor/skills/cockpit/SKILL.md` shows both dispatch branches.
-- [ ] Manual: invoking `/cockpit` follows pilot.md (opens dashboard, no goal prompt); `/cockpit scribe` routes to scribe.md.
+- [x] `grep -n "goal\|start\|project-meta" packages/monitor/skills/cockpit/references/pilot.md` returns nothing goal/start related.
+- [x] `grep -n "scribe\|pilot" packages/monitor/skills/cockpit/SKILL.md` shows both dispatch branches.
+- [x] Manual: invoking `/cockpit` follows pilot.md (opens dashboard, no goal prompt); `/cockpit scribe` routes to scribe.md.
 
 ## Eval rubric
 
