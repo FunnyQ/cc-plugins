@@ -1,7 +1,7 @@
 {
   "name": "monitor",
   "version": "3.10.3",
-  "description": "Monitor your Claude Code, Codex, and OpenCode sessions: a usage dashboard plus a per-project cockpit (goal capture, decision log, live transcript, and needs-your-call bridge).",
+  "description": "Monitor your Claude Code, Codex, and OpenCode sessions: a usage dashboard plus a per-project cockpit with a decision trail, live transcript, needs-your-call bridge, and thoughtful auto-logging.",
   "author": {
     "name": "Q"
   },
@@ -11,8 +11,7 @@
     "stats",
     "usage",
     "cockpit",
-    "goal",
-    "decision-log",
+    "decision-trail",
     "live-session",
     "claude-code",
     "codex",
@@ -22,13 +21,13 @@
   "interface": {
     "displayName": "Monitor",
     "shortDescription": "Usage dashboard for Claude Code, Codex, and OpenCode + session cockpit.",
-    "longDescription": "Two skills in one plugin: a usage dashboard that visualizes Claude Code, Codex, and OpenCode sessions, tokens, cost, and model mix; and a per-project cockpit for setting a session goal, logging decisions that diffs cannot explain, streaming Claude/Codex live transcripts, and handing needs_your_call choices back to the user.",
+    "longDescription": "A usage dashboard that visualizes Claude Code, Codex, and OpenCode sessions, tokens, cost, and model mix; plus a per-project cockpit for auto-logging decisions that diffs cannot explain, streaming live transcripts, and handing needs_your_call choices back to the user.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "defaultPrompt": [
       "Show my Claude Code usage dashboard.",
-      "Start a cockpit session for this project.",
+      "Enable thoughtful cockpit auto-logging.",
       "Log this decision in cockpit.",
       "Wait for my cockpit answer."
     ],

@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -80,19 +80,19 @@ Do not change `version` in either manifest (release flow owns it).
 
 ## Acceptance criteria
 
-- [ ] `CLAUDE.md` cockpit section describes one skill (router + pilot/scribe/claude/codex references), no scribe/thoughtful skills.
-- [ ] `CLAUDE.md` documents the thoughtful command + the second SessionStart hook + global `log_language` config.
-- [ ] `CLAUDE.md` has no remaining references to goals, `project-meta.md`, or `cockpit start` as live features.
-- [ ] The directory tree + cockpit `scripts/` list are updated (`config.ts` added, `start` gone).
-- [ ] `CHANGELOG.md` has a new entry covering the consolidation, in the file's existing format.
-- [ ] Both monitor manifests' `description`/`keywords` no longer advertise goal capture / `start`; `version`, `hooks`, `mcpServers`, `channels` left untouched.
+- [x] `CLAUDE.md` cockpit section describes one skill (router + pilot/scribe/claude/codex references), no scribe/thoughtful skills.
+- [x] `CLAUDE.md` documents the thoughtful command + the second SessionStart hook + global `log_language` config.
+- [x] `CLAUDE.md` has no remaining references to goals, `project-meta.md`, or `cockpit start` as live features.
+- [x] The directory tree + cockpit `scripts/` list are updated (`config.ts` added, `start` gone).
+- [x] `CHANGELOG.md` has a new entry covering the consolidation, in the file's existing format.
+- [x] Both monitor manifests' `description`/`keywords` no longer advertise goal capture / `start`; `version`, `hooks`, `mcpServers`, `channels` left untouched.
 
 ## Verification
 
-- [ ] `grep -n "cockpit-scribe\|cockpit start\|project-meta\|session goal\|project goal" CLAUDE.md` returns nothing describing them as current.
-- [ ] `grep -n "config.json\|thoughtful\|pilot.md\|scribe.md" CLAUDE.md` reflects the new shape.
-- [ ] `grep -in "goal\|start a cockpit\|start a session" packages/monitor/.claude-plugin/plugin.json packages/monitor/.codex-plugin/plugin.json` returns nothing (covers `description`, `keywords`, and the Codex `interface.longDescription` / `defaultPrompt`); both still parse as valid JSON.
-- [ ] Manual read: the cockpit section matches the actual files produced by the other tasks.
+- [x] `grep -n "cockpit-scribe\|cockpit start\|project-meta\|session goal\|project goal" CLAUDE.md` returns nothing describing them as current.
+- [x] `grep -n "config.json\|thoughtful\|pilot.md\|scribe.md" CLAUDE.md` reflects the new shape.
+- [x] `grep -in "goal\|start a cockpit\|start a session" packages/monitor/.claude-plugin/plugin.json packages/monitor/.codex-plugin/plugin.json` returns nothing (covers `description`, `keywords`, and the Codex `interface.longDescription` / `defaultPrompt`); both still parse as valid JSON.
+- [x] Manual read: the cockpit section matches the actual files produced by the other tasks.
 
 ## Eval rubric
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### 🔄 Changed
+
+- **Cockpit is consolidated around one skill and a command-driven auto-logging path.** The cockpit skill now uses a thin router with provider references plus `pilot.md` and `scribe.md`; `thoughtful` is a slash command, with Claude sessions auto-enabled by a second `SessionStart` hook and Codex still using manual `/thoughtful`.
+- **Cockpit configuration is global language only.** Removed the old goals/project metadata/start flow in favor of `~/.config/q-lab/cockpit/config.json` with `cockpit config --log-language` and `cockpit config get-language`.
+
 ## [3.10.3] - 2026-06-16
 
 ### ✨ Added
