@@ -66,8 +66,8 @@ Neither registry carries a `version` field — versions live only in the two `pl
 Cockpit (in the `monitor` plugin) records a per-session decision trail that `analyze-branch.ts` harvests. **This is a SOFT dependency** — chronicle must work when cockpit is absent.
 
 - **Home**: `~/.cockpit/` (override env: `COCKPIT_HOME`).
-- **Registry**: `~/.cockpit/registry.json` — shape `{ sessions: RegistryEntry[] }` where `RegistryEntry = { provider, project, sessionId, logPath, lastHeartbeat }`. `project` is the project's cwd; `logPath` points at the jsonl.
-- **Logs**: `~/.cockpit/<project-dir>/logs/<sessionId>.jsonl` — one JSON record per line.
+- **Registry**: `~/.cockpit/registry.json` — shape `{ sessions: RegistryEntry[] }` where `RegistryEntry = { provider, project, sessionId, logPath, lastHeartbeat }`. `project` is the project's cwd; `logPath` is the **source of truth** for where the jsonl lives — read it, don't reconstruct the path.
+- **Logs**: project-local at `<project>/.cockpit/logs/<sessionId>.jsonl` (one JSON record per line) — but always resolve the actual file via the registry entry's `logPath`, never by rebuilding this path yourself.
 - **Decision record shape** (only `type:"decision"` lines matter; first line may be a goal record — skip non-decision lines):
 
 ```ts
@@ -79,10 +79,11 @@ type DecisionRecord = {
   decision: string;   // what was done
   reason: string;     // why
   tradeoff: string;   // what was given up
-  facets: { label: string; note: string }[];
+  facets: { label: string; text: string }[];
   needs_your_call: boolean;
   options: string[];
   files: string[];
+  diagram?: string;   // optional Mermaid source (decision cards may carry a diagram)
   timestamp: string;  // ISO 8601
 };
 ```

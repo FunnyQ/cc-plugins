@@ -60,6 +60,8 @@ description: Open a PR (GitHub) or MR (GitLab) for the current branch, with a bo
 
 Point at `scripts/analyze-branch.ts` and `scripts/request-creator.ts`; never at sibling task ids.
 
+**Installed-path rule (freeze this):** when SKILL.md tells the agent to run a script, resolve it from the skill's load-time "Base directory for this skill" banner (`$SKILL_DIR/scripts/analyze-branch.ts`), with a file-exists guard. Do **not** hard-code a repo-relative path like `bun packages/chronicle/skills/pr/scripts/analyze-branch.ts` (only exists in the source repo — breaks for installed-plugin users) and do **not** rely on `${CLAUDE_PLUGIN_ROOT}` (not reliably set in agent Bash, empty under Codex). This is the convention relay 0.2.0 landed on — see `CHANGELOG.md` [relay 0.2.0].
+
 ## Acceptance criteria
 
 - [ ] `SKILL.md` has valid frontmatter with `name: pr` and a description carrying the trigger phrases + "human-invoked only".
