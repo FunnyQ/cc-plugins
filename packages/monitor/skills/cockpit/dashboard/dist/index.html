@@ -46,7 +46,7 @@
           </div>
           <p
             class="viewport__destination"
-            v-text="selectedSessionGoal || selectedProjectGoal || 'Select a session to begin'"
+            v-text="'Select a session to begin'"
           ></p>
 
           <div class="hud__telemetry" aria-hidden="true">
@@ -165,7 +165,6 @@
                       title="Running, but not a cockpit session (no decision trail)"
                       >untracked</span
                     >
-                    <span class="leg__goal" v-text="shortGoal(s)"></span>
                   </li>
                 </template>
               </ul>

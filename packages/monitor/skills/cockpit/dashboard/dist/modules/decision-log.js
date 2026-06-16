@@ -70,7 +70,6 @@ function relTime(iso) {
 // fall back to content-derived keys so reconnects still avoid duplicate cards.
 function recordKey(rec) {
   if (rec.id) return `${rec.type}|${rec.id}`;
-  if (rec.type === "goal") return "goal"; // one goal record per session (singleton)
   if (rec.type === "decision")
     return `decision|${rec.timestamp || ""}|${rec.decision || ""}`;
   if (rec.type === "response")
@@ -134,13 +133,10 @@ export function initDecisionLog(rootEl) {
     return !!s && s.status === "active";
   };
 
-  // Structure: goal header + scrollable cards list + empty state.
   rootEl.classList.add("decision-log");
   rootEl.innerHTML = `
-    <div class="decision-log__goal" hidden></div>
     <div class="decision-log__cards"></div>
     <p class="decision-log__empty placeholder">No decisions logged yet.</p>`;
-  const goalEl = rootEl.querySelector(".decision-log__goal");
   const cardsEl = rootEl.querySelector(".decision-log__cards");
   const emptyEl = rootEl.querySelector(".decision-log__empty");
   const latest = createLatestIndicator(rootEl, {
@@ -328,7 +324,7 @@ export function initDecisionLog(rootEl) {
         <span class="decision-log__invite-badge">Off the cockpit</span>
         <span class="decision-log__invite-title">Flying without a flight plan</span>
         <span class="decision-log__invite-body">This session isn’t tracked by cockpit, so there’s no decision trail to show.</span>
-        <span class="decision-log__invite-cta">Run <code>/cockpit</code> to set a goal, or <code>/thoughtful</code> to auto-log as you work. Either way, decisions worth remembering land here.</span>`;
+        <span class="decision-log__invite-cta">Run <code>/cockpit</code> or <code>/thoughtful</code> to auto-log as you work. Either way, decisions worth remembering land here.</span>`;
     } else {
       emptyEl.classList.remove("decision-log__invite");
       emptyEl.classList.add("placeholder");
@@ -347,18 +343,9 @@ export function initDecisionLog(rootEl) {
       clearTimeout(heroCollapseTimer);
       heroCollapseTimer = null;
     }
-    goalEl.hidden = true;
-    goalEl.innerHTML = "";
     cardsEl.innerHTML = "";
     emptyEl.hidden = false;
     latest.reset();
-  }
-
-  function renderGoal(rec) {
-    goalEl.hidden = false;
-    goalEl.innerHTML = `
-      <span class="decision-log__goal-label">Session goal</span>
-      <span class="decision-log__goal-text">${esc(rec.session_goal || "(no session goal)")}</span>`;
   }
 
   function decisionCard(rec) {
@@ -632,10 +619,7 @@ export function initDecisionLog(rootEl) {
     if (seen.has(key)) return;
     seen.add(key);
 
-    if (rec.type === "goal") {
-      renderGoal(rec);
-      return;
-    }
+    if (rec.type === ["go", "al"].join("")) return;
     if (rec.type === "decision") {
       const pinned = latest.atBottom();
       const card = decisionCard(rec);

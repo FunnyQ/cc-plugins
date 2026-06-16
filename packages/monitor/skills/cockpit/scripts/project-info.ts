@@ -1,5 +1,5 @@
-// cockpit project-info — reads a project's locked settings (goal + project-meta
-// prose + assistant instruction files) and parses its DESIGN.md design tokens
+// cockpit project-info — reads a project's assistant instruction files and
+// parses its DESIGN.md design tokens
 // into a flat map the SPA applies as CSS custom properties.
 //
 // DESIGN.md format assumption: the Google DESIGN.md open standard — a Markdown
@@ -9,7 +9,7 @@
 // If DESIGN.md is absent or unparseable, tokens = null (SPA keeps its defaults).
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { readRegistry, readProjectGoal } from "./registry";
+import { readRegistry } from "./registry";
 import { jsonResponse as json } from "./http";
 
 export type ProjectTokens = {
@@ -26,26 +26,10 @@ export type ProjectTokens = {
 };
 
 export type ProjectInfo = {
-  projectGoal: string;
-  meta: string; // prose body of project-meta.md (after frontmatter)
   claudeMd: string | null;
   agentsMd: string | null;
   tokens: ProjectTokens | null;
 };
-
-// ---------- meta prose ----------
-
-function readMetaBody(project: string): string {
-  const p = join(project, ".cockpit", "project-meta.md");
-  if (!existsSync(p)) return "";
-  try {
-    const raw = readFileSync(p, "utf8");
-    const m = raw.match(/^---\n[\s\S]*?\n---\n?([\s\S]*)$/);
-    return (m ? m[1] : raw).trim();
-  } catch {
-    return "";
-  }
-}
 
 // ---------- instruction files (path-confined to the project root) ----------
 
@@ -236,8 +220,6 @@ export function parseDesignTokens(project: string): ProjectTokens | null {
 
 export function buildProjectInfo(project: string): ProjectInfo {
   return {
-    projectGoal: readProjectGoal(project),
-    meta: readMetaBody(project),
     claudeMd: readRootMarkdown(project, "CLAUDE.md"),
     agentsMd: readRootMarkdown(project, "AGENTS.md"),
     tokens: parseDesignTokens(project),
