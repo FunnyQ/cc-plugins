@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { buildSessions } from "./registry";
 
 const CLI = join(import.meta.dir, "cockpit.ts");
 const SID = "11111111-1111-1111-1111-111111111111";
@@ -39,6 +40,17 @@ function readLines(path: string): any[] {
     .split("\n")
     .filter((l) => l.trim())
     .map((l) => JSON.parse(l));
+}
+
+function sessionViewFor(sessionId: string) {
+  const prev = process.env.COCKPIT_HOME;
+  process.env.COCKPIT_HOME = cockpitHome;
+  try {
+    return buildSessions().find((s) => s.sessionId === sessionId);
+  } finally {
+    if (prev === undefined) delete process.env.COCKPIT_HOME;
+    else process.env.COCKPIT_HOME = prev;
+  }
 }
 
 beforeEach(() => {
@@ -82,273 +94,7 @@ describe("cockpit config", () => {
   });
 });
 
-describe("cockpit start", () => {
-  test("writes project-meta.md with project_goal frontmatter", () => {
-    const r = run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "test",
-      "--project-goal",
-      "scratch",
-    ]);
-    expect(r.code).toBe(0);
-    const meta = readFileSync(
-      join(projectDir, ".cockpit/project-meta.md"),
-      "utf8",
-    );
-    expect(meta).toMatch(/^---\n/);
-    expect(meta).toMatch(/project_goal: scratch/);
-    expect(meta).toMatch(/owner: user/);
-    expect(meta).toMatch(/created: \d{4}-/);
-  });
-
-  test("goal record is line 1 with session_goal but no project_goal", () => {
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "test",
-      "--project-goal",
-      "scratch",
-    ]);
-    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
-    const lines = readLines(logPath);
-    expect(lines.length).toBe(1);
-    expect(lines[0].type).toBe("goal");
-    expect(lines[0].session_goal).toBe("test");
-    expect(lines[0].ts).toBeTruthy();
-    expect(lines[0].project_goal).toBeUndefined();
-  });
-
-  test("registers the session with a fresh heartbeat", () => {
-    const before = Date.now();
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "test",
-      "--project-goal",
-      "scratch",
-    ]);
-    const reg = JSON.parse(
-      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
-    );
-    const entry = reg.sessions.find((s: any) => s.sessionId === SID);
-    expect(entry).toBeTruthy();
-    expect(entry.project).toBe(projectDir);
-    expect(entry.provider).toBe("claude");
-    expect(entry.logPath).toBe(
-      join(projectDir, ".cockpit/logs", `${SID}.jsonl`),
-    );
-    expect(new Date(entry.lastHeartbeat).getTime()).toBeGreaterThanOrEqual(
-      before - 1000,
-    );
-  });
-
-  test("preserves created timestamp when meta already exists", () => {
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-    ]);
-    const first = readFileSync(
-      join(projectDir, ".cockpit/project-meta.md"),
-      "utf8",
-    );
-    const created1 = first.match(/created: (\S+)/)![1];
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "b",
-      "--project-goal",
-      "p2",
-    ]);
-    const second = readFileSync(
-      join(projectDir, ".cockpit/project-meta.md"),
-      "utf8",
-    );
-    const created2 = second.match(/created: (\S+)/)![1];
-    expect(created2).toBe(created1);
-    expect(second).toMatch(/project_goal: p2/);
-  });
-
-  test("defaults log_language to English when not given", () => {
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-    ]);
-    const meta = readFileSync(
-      join(projectDir, ".cockpit/project-meta.md"),
-      "utf8",
-    );
-    expect(meta).toMatch(/log_language: English/);
-  });
-
-  test("writes the given log_language", () => {
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-      "--log-language",
-      "zh-TW",
-    ]);
-    const meta = readFileSync(
-      join(projectDir, ".cockpit/project-meta.md"),
-      "utf8",
-    );
-    expect(meta).toMatch(/log_language: zh-TW/);
-  });
-
-  test("re-running start preserves the decision trail (only refreshes the goal)", () => {
-    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "g1",
-      "--project-goal",
-      "p",
-    ]);
-    run(["log", "--session", SID, "--decision", "A", "--reason", "ra"]);
-    run(["log", "--session", SID, "--decision", "B", "--reason", "rb"]);
-    expect(readLines(logPath).length).toBe(3);
-
-    // Re-run start on the SAME session — must not truncate the decisions.
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "g2",
-      "--project-goal",
-      "p",
-    ]);
-    const lines = readLines(logPath);
-    expect(lines.length).toBe(3);
-    expect(lines[0].type).toBe("goal");
-    expect(lines[0].session_goal).toBe("g2"); // goal refreshed
-    expect(lines[1].decision).toBe("A"); // decisions intact
-    expect(lines[2].decision).toBe("B");
-  });
-
-  test("preserves log_language when start is re-run without the flag", () => {
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-      "--log-language",
-      "日本語",
-    ]);
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "b",
-      "--project-goal",
-      "p2",
-    ]);
-    const meta = readFileSync(
-      join(projectDir, ".cockpit/project-meta.md"),
-      "utf8",
-    );
-    expect(meta).toMatch(/log_language: 日本語/);
-  });
-
-  test("--provider codex registers a Codex-backed session", () => {
-    const r = run([
-      "start",
-      "--provider",
-      "codex",
-      "--session",
-      SID,
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-    ]);
-    expect(r.code).toBe(0);
-    const reg = JSON.parse(
-      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
-    );
-    const entry = reg.sessions.find((s: any) => s.sessionId === SID);
-    expect(entry.provider).toBe("codex");
-  });
-
-  test("--provider opencode registers an OpenCode-backed session", () => {
-    const r = run([
-      "start",
-      "--provider",
-      "opencode",
-      "--session",
-      "ses_test",
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-    ]);
-    expect(r.code).toBe(0);
-    const reg = JSON.parse(
-      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
-    );
-    const entry = reg.sessions.find((s: any) => s.sessionId === "ses_test");
-    expect(entry.provider).toBe("opencode");
-  });
-
-  test("rejects unknown providers", () => {
-    const r = run([
-      "start",
-      "--provider",
-      "other",
-      "--session",
-      SID,
-      "--session-goal",
-      "a",
-      "--project-goal",
-      "p",
-    ]);
-    expect(r.code).toBe(1);
-    expect(r.stderr).toContain("invalid provider");
-  });
-});
-
 describe("cockpit log", () => {
-  beforeEach(() => {
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "test",
-      "--project-goal",
-      "scratch",
-    ]);
-  });
-
   test("appends one valid decision record with defaults", () => {
     const r = run([
       "log",
@@ -361,8 +107,8 @@ describe("cockpit log", () => {
     ]);
     expect(r.code).toBe(0);
     const lines = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`));
-    expect(lines.length).toBe(2);
-    const rec = lines[1];
+    expect(lines.length).toBe(1);
+    const rec = lines[0];
     expect(Object.keys(rec).sort()).toEqual(
       [
         "decision",
@@ -456,9 +202,9 @@ describe("cockpit log", () => {
     run(["log", "--session", SID, "--decision", "one", "--reason", "r1"]);
     run(["log", "--session", SID, "--decision", "two", "--reason", "r2"]);
     const lines = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`));
-    expect(lines.length).toBe(3);
-    expect(lines[1].decision).toBe("one");
-    expect(lines[2].decision).toBe("two");
+    expect(lines.length).toBe(2);
+    expect(lines[0].decision).toBe("one");
+    expect(lines[1].decision).toBe("two");
   });
 
   test("a malformed line does not break parsing of the others", () => {
@@ -485,6 +231,7 @@ describe("cockpit log", () => {
   });
 
   test("log refreshes the session heartbeat", () => {
+    run(["log", "--session", SID, "--decision", "initial", "--reason", "r"]);
     const reg1 = JSON.parse(
       readFileSync(join(cockpitHome, "registry.json"), "utf8"),
     );
@@ -501,10 +248,74 @@ describe("cockpit log", () => {
     ).lastHeartbeat;
     expect(new Date(hb2).getTime()).toBeGreaterThan(new Date(hb1).getTime());
   });
+
+  test("auto-registers a fresh session so it becomes tracked", () => {
+    const before = Date.now();
+    const r = run([
+      "log",
+      "--session",
+      SID,
+      "--decision",
+      "first decision",
+      "--reason",
+      "no prior registration",
+    ]);
+    expect(r.code).toBe(0);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const entry = reg.sessions.find((s: any) => s.sessionId === SID);
+    expect(entry).toBeTruthy();
+    expect(entry.project).toBe(projectDir);
+    expect(entry.provider).toBe("claude");
+    expect(entry.logPath).toBe(
+      join(projectDir, ".cockpit/logs", `${SID}.jsonl`),
+    );
+    expect(new Date(entry.lastHeartbeat).getTime()).toBeGreaterThanOrEqual(
+      before - 1000,
+    );
+    expect(sessionViewFor(SID)?.tracked).toBe(true);
+  });
+
+  test("--provider codex routes log registration to a Codex-backed session", () => {
+    const r = run([
+      "log",
+      "--provider",
+      "codex",
+      "--session",
+      SID,
+      "--decision",
+      "d",
+      "--reason",
+      "r",
+    ]);
+    expect(r.code).toBe(0);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const entry = reg.sessions.find((s: any) => s.sessionId === SID);
+    expect(entry.provider).toBe("codex");
+  });
+
+  test("rejects unknown providers", () => {
+    const r = run([
+      "log",
+      "--provider",
+      "other",
+      "--session",
+      SID,
+      "--decision",
+      "d",
+      "--reason",
+      "r",
+    ]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("invalid provider");
+  });
 });
 
 describe("cockpit scribe", () => {
-  // Note: no cockpit start is called — scribe auto-registers on first write.
+  // Note: scribe auto-registers on first write.
 
   test("write mode: creates log file and record with correct shape", () => {
     const r = run([
@@ -561,9 +372,10 @@ describe("cockpit scribe", () => {
     expect(entry.logPath).toBe(
       join(projectDir, ".cockpit/logs", `${SID}.jsonl`),
     );
+    expect(sessionViewFor(SID)?.tracked).toBe(true);
   });
 
-  test("does not write a goal record on first scribe", () => {
+  test("writes only a decision record on first scribe", () => {
     run([
       "scribe",
       "--session",
@@ -577,7 +389,30 @@ describe("cockpit scribe", () => {
     ]);
     const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
     const lines = readLines(logPath);
-    expect(lines.every((r: any) => r.type !== "goal")).toBe(true);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].type).toBe("decision");
+  });
+
+  test("--provider opencode routes scribe registration to an OpenCode-backed session", () => {
+    const r = run([
+      "scribe",
+      "--provider",
+      "opencode",
+      "--session",
+      "ses_test",
+      "--type",
+      "rationale",
+      "--title",
+      "T",
+      "--text",
+      "X",
+    ]);
+    expect(r.code).toBe(0);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const entry = reg.sessions.find((s: any) => s.sessionId === "ses_test");
+    expect(entry.provider).toBe("opencode");
   });
 
   test("rejects invalid --type with non-zero exit and error message", () => {
@@ -617,17 +452,7 @@ describe("cockpit scribe", () => {
     expect(r.stdout.trim()).toBe("");
   });
 
-  test("--recent prints only scribe entries (not agent/goal records)", () => {
-    // Write a manual log entry (agent source) via cockpit start + log
-    run([
-      "start",
-      "--session",
-      SID,
-      "--session-goal",
-      "test",
-      "--project-goal",
-      "p",
-    ]);
+  test("--recent prints only scribe entries, not agent entries", () => {
     run([
       "log",
       "--session",
@@ -637,7 +462,6 @@ describe("cockpit scribe", () => {
       "--reason",
       "r",
     ]);
-    // Write a scribe entry
     run([
       "scribe",
       "--session",
