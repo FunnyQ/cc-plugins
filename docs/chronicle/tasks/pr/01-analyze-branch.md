@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: pr/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -94,21 +94,21 @@ Any read/parse failure inside the harvest degrades to "no decisions", never abor
 
 ## Acceptance criteria
 
-- [ ] Script exists; imports only Bun built-ins + `node:` stdlib.
-- [ ] The three pure functions are exported and behave per spec.
-- [ ] A `--base <branch>` flag overrides the auto-resolved base, and that override flows into `merge-base`, commits, diffStat, `branchStartISO`, and `changedFiles` (not just one of them).
-- [ ] Provider detection covers github + gitlab (incl. self-hosted) over ssh and https.
-- [ ] With no remote, `provider: "unknown"`, `remoteUrl: null`, and the script still emits commits + diffStat.
-- [ ] With cockpit absent or `registry.json` missing, `hasCockpit: false`, `decisions: []`, exit 0, no thrown error.
-- [ ] Decisions are scoped to the branch: time-bound to the branch's **first commit** time AND file-scoped to the branch's changed files (empty-`files` records pass on time alone), merged across sessions, de-duped by `id`.
-- [ ] CLI prints `{ outputPath, provider, hasCockpit, commitCount }`; the temp file parses as a `BranchMaterial`.
+- [x] Script exists; imports only Bun built-ins + `node:` stdlib.
+- [x] The three pure functions are exported and behave per spec.
+- [x] A `--base <branch>` flag overrides the auto-resolved base, and that override flows into `merge-base`, commits, diffStat, `branchStartISO`, and `changedFiles` (not just one of them).
+- [x] Provider detection covers github + gitlab (incl. self-hosted) over ssh and https.
+- [x] With no remote, `provider: "unknown"`, `remoteUrl: null`, and the script still emits commits + diffStat.
+- [x] With cockpit absent or `registry.json` missing, `hasCockpit: false`, `decisions: []`, exit 0, no thrown error.
+- [x] Decisions are scoped to the branch: time-bound to the branch's **first commit** time AND file-scoped to the branch's changed files (empty-`files` records pass on time alone), merged across sessions, de-duped by `id`.
+- [x] CLI prints `{ outputPath, provider, hasCockpit, commitCount }`; the temp file parses as a `BranchMaterial`.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/pr/scripts/analyze-branch.test.ts` is green.
-- [ ] On a real feature branch: `bun packages/chronicle/skills/pr/scripts/analyze-branch.ts` prints the four-key JSON; the temp file has non-empty `commits[]`.
-- [ ] `analyze-branch.ts --base <other-branch>` recomputes `base`, `mergeBase`, `commits`, `diffStat`, and `changedFiles` against that branch (verify `base` in the payload changed and the commit set differs from the default-base run).
-- [ ] Temporarily point `COCKPIT_HOME` at an empty dir → still exit 0 with `hasCockpit:false`.
+- [x] `bun test packages/chronicle/skills/pr/scripts/analyze-branch.test.ts` is green.
+- [x] On a real feature branch: `bun packages/chronicle/skills/pr/scripts/analyze-branch.ts` prints the four-key JSON; the temp file has non-empty `commits[]`.
+- [x] `analyze-branch.ts --base <other-branch>` recomputes `base`, `mergeBase`, `commits`, `diffStat`, and `changedFiles` against that branch (verify `base` in the payload changed and the commit set differs from the default-base run).
+- [x] Temporarily point `COCKPIT_HOME` at an empty dir → still exit 0 with `hasCockpit:false`.
 
 ## Eval rubric
 

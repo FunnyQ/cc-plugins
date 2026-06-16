@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: commit/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -60,16 +60,16 @@ This is a static markdown template (the analysis script resolves its *path*; the
 
 ## Acceptance criteria
 
-- [ ] `commit-template.md` exists at the path above.
-- [ ] It contains the format block, the full 11-row change-type table, and the rules list.
-- [ ] It mentions neither "odin" nor any odin path.
-- [ ] It lives at exactly `packages/chronicle/skills/commit/references/commit-template.md` (the path the analysis script resolves by default — verified independently when the script is wired).
+- [x] `commit-template.md` exists at the path above.
+- [x] It contains the format block, the full 11-row change-type table, and the rules list.
+- [x] It mentions neither "odin" nor any odin path.
+- [x] It lives at exactly `packages/chronicle/skills/commit/references/commit-template.md` (the path the analysis script resolves by default — verified independently when the script is wired).
 
 ## Verification
 
-- [ ] `test -f packages/chronicle/skills/commit/references/commit-template.md` succeeds.
-- [ ] The file renders the table with all 11 types (visual check).
-- [ ] `grep -i odin packages/chronicle/skills/commit/references/commit-template.md` returns nothing.
+- [x] `test -f packages/chronicle/skills/commit/references/commit-template.md` succeeds.
+- [x] The file renders the table with all 11 types (visual check).
+- [x] `grep -i odin packages/chronicle/skills/commit/references/commit-template.md` returns nothing.
 
 ## Eval rubric
 

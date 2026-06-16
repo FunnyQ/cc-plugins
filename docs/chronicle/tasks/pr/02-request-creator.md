@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: pr/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -65,17 +65,17 @@ The CLI default entry (`import.meta.main`) reads a JSON `CreateInput` from argv/
 
 ## Acceptance criteria
 
-- [ ] Script exists; imports only Bun built-ins + `node:` stdlib.
-- [ ] `buildArgs` is pure and produces correct argv for github + gitlab, with/without draft.
-- [ ] `createRequest` takes an injectable runner and never spawns in tests.
-- [ ] Missing CLI, no remote, and generic CLI error each map to the right `reason` without throwing.
-- [ ] On success it extracts and returns the PR/MR URL.
-- [ ] CLI mode reads a `CreateInput` JSON and prints a `CreateResult` JSON.
+- [x] Script exists; imports only Bun built-ins + `node:` stdlib.
+- [x] `buildArgs` is pure and produces correct argv for github + gitlab, with/without draft.
+- [x] `createRequest` takes an injectable runner and never spawns in tests.
+- [x] Missing CLI, no remote, and generic CLI error each map to the right `reason` without throwing.
+- [x] On success it extracts and returns the PR/MR URL.
+- [x] CLI mode reads a `CreateInput` JSON and prints a `CreateResult` JSON.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/pr/scripts/request-creator.test.ts` is green (no network, no real `gh`/`glab`).
-- [ ] `echo '{"provider":"github","title":"t","body":"b","base":"develop","head":"x","draft":true}' | bun packages/chronicle/skills/pr/scripts/request-creator.ts` returns a structured `CreateResult` (likely `missing-cli`/`cli-error` outside a real repo — that's a pass, it must not throw).
+- [x] `bun test packages/chronicle/skills/pr/scripts/request-creator.test.ts` is green (no network, no real `gh`/`glab`).
+- [x] `echo '{"provider":"github","title":"t","body":"b","base":"develop","head":"x","draft":true}' | bun packages/chronicle/skills/pr/scripts/request-creator.ts` returns a structured `CreateResult` (likely `missing-cli`/`cli-error` outside a real repo — that's a pass, it must not throw).
 
 ## Eval rubric
 
