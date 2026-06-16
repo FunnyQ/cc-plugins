@@ -16,11 +16,16 @@ const SID = "11111111-1111-1111-1111-111111111111";
 
 let projectDir: string;
 let cockpitHome: string;
+let configHome: string;
 
 function run(args: string[], cwd = projectDir) {
   const proc = Bun.spawnSync(["bun", CLI, ...args], {
     cwd,
-    env: { ...process.env, COCKPIT_HOME: cockpitHome },
+    env: {
+      ...process.env,
+      COCKPIT_HOME: cockpitHome,
+      XDG_CONFIG_HOME: configHome,
+    },
   });
   return {
     code: proc.exitCode,
@@ -40,11 +45,41 @@ beforeEach(() => {
   // realpathSync so it matches process.cwd() (macOS resolves /var → /private/var)
   projectDir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-proj-")));
   cockpitHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-home-")));
+  configHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-config-")));
 });
 
 afterEach(() => {
   rmSync(projectDir, { recursive: true, force: true });
   rmSync(cockpitHome, { recursive: true, force: true });
+  rmSync(configHome, { recursive: true, force: true });
+});
+
+describe("cockpit config", () => {
+  test("writes log_language and get-language prints only the value", () => {
+    const write = run(["config", "--log-language", "zh-TW"]);
+    expect(write.code).toBe(0);
+    expect(write.stdout).toBe("cockpit: log_language = zh-TW\n");
+    expect(write.stderr).toBe("");
+
+    const read = run(["config", "get-language"]);
+    expect(read.code).toBe(0);
+    expect(read.stdout).toBe("zh-TW\n");
+    expect(read.stderr).toBe("");
+  });
+
+  test("get-language defaults to English with no config", () => {
+    const r = run(["config", "get-language"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("English\n");
+    expect(r.stderr).toBe("");
+  });
+
+  test("rejects empty config invocation with usage", () => {
+    const r = run(["config"]);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("usage: cockpit config");
+  });
 });
 
 describe("cockpit start", () => {

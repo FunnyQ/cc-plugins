@@ -19,6 +19,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { findSession } from "./find-session";
 import { latestOpenCallId } from "./call-log";
+import { getLanguage, setLanguage } from "./config";
 
 // ---------- Types ----------
 
@@ -510,6 +511,27 @@ function cmdScribe(args: Args): void {
   console.log(`cockpit: scribed ${kind} for ${sessionId}`);
 }
 
+function cmdConfig(rest: string[]): void {
+  const args = parseArgs(rest);
+  const logLanguage = args.single["log-language"];
+
+  if (logLanguage) {
+    setLanguage(logLanguage);
+    console.log(`cockpit: log_language = ${logLanguage}`);
+    return;
+  }
+
+  if (positionals(rest)[0] === "get-language") {
+    console.log(getLanguage());
+    return;
+  }
+
+  console.error(
+    "usage: cockpit config --log-language <lang> | cockpit config get-language",
+  );
+  process.exit(1);
+}
+
 // ---------- Daemon broker client (wait / send) ----------
 
 type DaemonInfo = { pid: number; port: number; token: string };
@@ -741,6 +763,9 @@ async function main(): Promise<void> {
     case "scribe":
       cmdScribe(parseArgs(rest));
       break;
+    case "config":
+      cmdConfig(rest);
+      break;
     case "wait":
       await cmdWait(rest);
       break;
@@ -749,7 +774,9 @@ async function main(): Promise<void> {
       break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
-      console.error("usage: cockpit <start|log|scribe|wait|send> [args]");
+      console.error(
+        "usage: cockpit <start|log|scribe|config|wait|send> [args]",
+      );
       process.exit(1);
   }
 }
