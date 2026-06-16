@@ -4,7 +4,6 @@
 import { createApp, reactive } from "./vendor/petite-vue.es.js";
 import {
   defaultExpanded,
-  goalSnippet,
   groupSessionsByProject,
 } from "./modules/project-rail.js";
 import { initDecisionLog } from "./modules/decision-log.js";
@@ -55,8 +54,8 @@ export const store = reactive({
   // across the 3s poll because it lives on the store, not in the render.
   expandedOverrides: {},
   // Hero: clicking the viewport collapses it to a slim bar (a "barrier
-  // raised" over the warp) keeping only heading / goal / telemetry, and pauses
-  // the warp animation. Toggled by clicking the viewport.
+  // raised" over the warp) keeping only heading / telemetry, and pauses the
+  // warp animation. Toggled by clicking the viewport.
   heroCollapsed: false,
   // Starfield control (set after mount) so toggleHero can pause/resume it.
   _starfield: null,
@@ -64,8 +63,8 @@ export const store = reactive({
   // parked on an open needs_your_call — drives the warm HUD "your turn" alert.
   awaitingCall: false,
   // Manifest drawer: collapsed by default — the viewport already shows the
-  // current project + goal, so the project list stays out of the way until
-  // opened. Toggled by the manifest bar.
+  // current project, so the project list stays out of the way until opened.
+  // Toggled by the manifest bar.
   manifestOpen: false,
   designSystemOpen: false,
   _loadDesignSystem: null,
@@ -82,14 +81,6 @@ export const store = reactive({
       this.selectedProject.split("/").filter(Boolean).pop() ||
       this.selectedProject
     );
-  },
-
-  get selectedProjectGoal() {
-    if (!this.selectedProject) return "";
-    const p = this.projects.find((x) => x.project === this.selectedProject);
-    if (p && p.projectGoal) return p.projectGoal;
-    const s = this.sessions.find((x) => x.project === this.selectedProject);
-    return s ? s.projectGoal || "" : "";
   },
 
   // The selected session object + its derived fields drive the viewport hero
@@ -111,11 +102,6 @@ export const store = reactive({
       this.selectedProvider ||
       "claude"
     ).toUpperCase();
-  },
-
-  get selectedSessionGoal() {
-    const s = this.selectedSession;
-    return s ? (s.sessionGoal || "").trim() : "";
   },
 
   // "" when nothing is selected; otherwise the raw session status ("active" /
@@ -277,11 +263,7 @@ export const store = reactive({
 
   // Sessions grouped under their project, ordered active-first then by recency.
   get projectGroups() {
-    return groupSessionsByProject(this.sessions, this.projects);
-  },
-
-  goalSnippet(text) {
-    return goalSnippet(text);
+    return groupSessionsByProject(this.sessions);
   },
 
   isProjectExpanded(group) {
@@ -305,11 +287,6 @@ export const store = reactive({
 
   toggleProject(group) {
     this.expandedOverrides[group.project] = !this.isProjectExpanded(group);
-  },
-
-  shortGoal(s) {
-    const g = (s.sessionGoal || "").trim() || "(no session goal)";
-    return g.length > 64 ? g.slice(0, 61) + "…" : g;
   },
 
   // Human label for a leg's fine-grained status (see registry.ts LiveStatus).

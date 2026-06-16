@@ -1,6 +1,5 @@
-// Tests for project-info (ui/04): meta/instruction file reading, DESIGN.md
-// token parsing, path confinement, and the /api/project-info handler's
-// registry gate.
+// Tests for project-info (ui/04): instruction file reading, DESIGN.md token
+// parsing, path confinement, and the /api/project-info handler's registry gate.
 // Run: bun test packages/monitor/skills/cockpit/scripts/project-info.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -48,14 +47,6 @@ rounded:
 prose body.
 `;
 
-function seedMeta(dir: string, goal = "ship it") {
-  mkdirSync(join(dir, ".cockpit"), { recursive: true });
-  writeFileSync(
-    join(dir, ".cockpit", "project-meta.md"),
-    `---\nproject_goal: ${goal}\ncreated: 2026-05-23T09:00:00Z\nowner: user\n---\n\nThe north star prose.\n`,
-  );
-}
-
 beforeEach(() => {
   projectDir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-info-proj-")));
   cockpitHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-info-home-")));
@@ -67,8 +58,7 @@ afterEach(() => {
 });
 
 describe("buildProjectInfo", () => {
-  test("populates goal, meta prose, instruction files and tokens when all present", () => {
-    seedMeta(projectDir, "win");
+  test("populates instruction files and tokens when all present", () => {
     writeFileSync(
       join(projectDir, "CLAUDE.md"),
       "# Project rules\n\nbe surgical.",
@@ -80,9 +70,6 @@ describe("buildProjectInfo", () => {
     writeFileSync(join(projectDir, "DESIGN.md"), DESIGN_MD);
 
     const info = buildProjectInfo(projectDir);
-    expect(info.projectGoal).toBe("win");
-    expect(info.meta).toContain("north star");
-    expect(info.meta).not.toMatch(/^---/); // frontmatter stripped
     expect(info.claudeMd).toContain("be surgical");
     expect(info.agentsMd).toContain("read the room");
     expect(info.tokens).not.toBeNull();
@@ -96,25 +83,20 @@ describe("buildProjectInfo", () => {
   });
 
   test("tokens is null when no DESIGN.md", () => {
-    seedMeta(projectDir);
     const info = buildProjectInfo(projectDir);
     expect(info.tokens).toBeNull();
   });
 
   test("claudeMd is null when absent", () => {
-    seedMeta(projectDir);
     expect(buildProjectInfo(projectDir).claudeMd).toBeNull();
   });
 
   test("agentsMd is null when absent", () => {
-    seedMeta(projectDir);
     expect(buildProjectInfo(projectDir).agentsMd).toBeNull();
   });
 
-  test("missing meta is tolerated (empty goal + prose)", () => {
+  test("missing optional files are tolerated", () => {
     const info = buildProjectInfo(projectDir);
-    expect(info.projectGoal).toBe("");
-    expect(info.meta).toBe("");
     expect(info.claudeMd).toBeNull();
     expect(info.agentsMd).toBeNull();
     expect(info.tokens).toBeNull();
@@ -123,7 +105,6 @@ describe("buildProjectInfo", () => {
 
 describe("CLAUDE.md path confinement", () => {
   test("a CLAUDE.md symlinked outside the project is rejected (null)", () => {
-    seedMeta(projectDir);
     const outside = realpathSync(
       mkdtempSync(join(tmpdir(), "cockpit-outside-")),
     );
@@ -137,7 +118,6 @@ describe("CLAUDE.md path confinement", () => {
   });
 
   test("a CLAUDE.md symlinked to a different in-project path is rejected (null)", () => {
-    seedMeta(projectDir);
     mkdirSync(join(projectDir, "docs"), { recursive: true });
     writeFileSync(join(projectDir, "docs", "elsewhere.md"), "NOT THE ROOT");
     // Symlink resolves inside the project but is not <root>/CLAUDE.md → reject.
@@ -149,7 +129,6 @@ describe("CLAUDE.md path confinement", () => {
   });
 
   test("a real CLAUDE.md directly in the project root is returned", () => {
-    seedMeta(projectDir);
     writeFileSync(join(projectDir, "CLAUDE.md"), "# root rules");
     expect(buildProjectInfo(projectDir).claudeMd).toContain("root rules");
   });
@@ -157,7 +136,6 @@ describe("CLAUDE.md path confinement", () => {
 
 describe("AGENTS.md path confinement", () => {
   test("an AGENTS.md symlinked outside the project is rejected (null)", () => {
-    seedMeta(projectDir);
     const outside = realpathSync(
       mkdtempSync(join(tmpdir(), "cockpit-outside-")),
     );
@@ -171,7 +149,6 @@ describe("AGENTS.md path confinement", () => {
   });
 
   test("a real AGENTS.md directly in the project root is returned", () => {
-    seedMeta(projectDir);
     writeFileSync(join(projectDir, "AGENTS.md"), "# codex rules");
     expect(buildProjectInfo(projectDir).agentsMd).toContain("codex rules");
   });
@@ -216,7 +193,6 @@ describe("handleProjectInfo (registry gate)", () => {
   }
 
   test("known project → 200 with info", async () => {
-    seedMeta(projectDir, "registered goal");
     seedRegistry();
     const res = withHome(() =>
       handleProjectInfo(
@@ -227,7 +203,11 @@ describe("handleProjectInfo (registry gate)", () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.projectGoal).toBe("registered goal");
+    expect(body).not.toHaveProperty("projectGoal");
+    expect(body).not.toHaveProperty("meta");
+    expect(body.claudeMd).toBeNull();
+    expect(body.agentsMd).toBeNull();
+    expect(body.tokens).toBeNull();
   });
 
   test("unknown project → 400 (not served)", async () => {

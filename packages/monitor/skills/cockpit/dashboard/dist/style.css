@@ -306,7 +306,7 @@ body {
     stroke-dashoffset: -14;
   }
 }
-/* Beacon — the goal object at center: the waypoint you're flying toward. */
+/* Beacon — the waypoint at center. */
 .viewport__beacon {
   position: absolute;
   inset-block-start: var(--beacon-y, 50%);
@@ -364,7 +364,7 @@ body {
 }
 
 /* ── HUD — heads-up readouts laid over the warp view ───────
-   Heading + small goal subtitle pinned top-left; telemetry pinned bottom-left.
+   Heading pinned top-left; telemetry pinned bottom-left.
    The center belongs to the beacon. No corner brackets, no status badge. */
 .hud {
   position: relative;
@@ -429,8 +429,8 @@ body {
   color: var(--ink-faint);
 }
 
-/* Collapsed hero: tighten padding, single-line goal, telemetry to the right
-   so heading + goal (left) and telemetry (right) share the slim bar. */
+/* Collapsed hero: tighten padding, single-line destination, telemetry to the
+   right so heading and telemetry share the slim bar. */
 .viewport.is-collapsed .hud {
   padding-block: 12px;
 }
@@ -811,12 +811,6 @@ body {
 }
 .leg.is-ended {
   opacity: 0.5;
-}
-.leg__goal {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
 }
 /* A live session with no cockpit registry entry: dashed (not anchored) + muted,
    so it reads as "running, but no decision trail" without competing with the
@@ -1273,32 +1267,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-}
-.decision-log__goal {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
-  background: var(--hull-2);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius-sm);
-}
-/* author display:flex above defeats the UA [hidden] display:none, so without
-   this the empty goal bar still renders when there's no goal record (the
-   /thoughtful case). Same guard the respond/jump-latest boxes already carry. */
-.decision-log__goal[hidden] {
-  display: none;
-}
-.decision-log__goal-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--aurora);
-}
-.decision-log__goal-text {
-  font-weight: 600;
 }
 .decision-log__cards {
   display: flex;

@@ -1,13 +1,6 @@
 // cockpit registry — reads ~/.cockpit/registry.json, derives active/ended
 // status per session, and builds the /api/sessions + /api/projects payloads.
-import {
-  closeSync,
-  existsSync,
-  openSync,
-  readFileSync,
-  readSync,
-  statSync,
-} from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
@@ -53,8 +46,6 @@ export type SessionView = {
   // True when a live cockpit channel client is parked on /api/inbox.
   channel: boolean;
   lastHeartbeat: string;
-  sessionGoal: string;
-  projectGoal: string;
   // false for a session that's running but was never /cockpit-start'd: it shows
   // in the manifest (transcript streams by id) but has no goal/decision trail.
   tracked: boolean;
@@ -63,7 +54,6 @@ export type SessionView = {
 export type ProjectView = {
   project: string;
   name: string;
-  projectGoal: string;
   activeCount: number;
   sessionCount: number;
   lastHeartbeat: string;
@@ -171,53 +161,6 @@ function subagentsFor(
   return subagentCountFor(provider, sessionId, now);
 }
 
-// ---------- goal readers ----------
-
-// The goal record is line 1 of the log, so we only need the file's head — not
-// the whole (ever-growing) JSONL, which /api/sessions would otherwise re-read in
-// full every poll. Read a bounded prefix and scan it for the first non-empty
-// line; a goal record is far shorter than HEAD_BYTES, so it's always complete.
-const HEAD_BYTES = 64 * 1024;
-
-function readHead(path: string): string {
-  const fd = openSync(path, "r");
-  try {
-    const buf = Buffer.allocUnsafe(HEAD_BYTES);
-    const bytesRead = readSync(fd, buf, 0, HEAD_BYTES, 0);
-    return buf.toString("utf-8", 0, bytesRead);
-  } finally {
-    closeSync(fd);
-  }
-}
-
-export function readSessionGoal(logPath: string): string {
-  try {
-    const first = readHead(logPath)
-      .split("\n")
-      .find((l) => l.trim());
-    if (!first) return "";
-    const rec = JSON.parse(first);
-    return rec?.type === "goal" && typeof rec.session_goal === "string"
-      ? rec.session_goal
-      : "";
-  } catch {
-    return "";
-  }
-}
-
-export function readProjectGoal(project: string): string {
-  const metaPath = join(project, ".cockpit", "project-meta.md");
-  if (!existsSync(metaPath)) return "";
-  try {
-    const m = readFileSync(metaPath, "utf8").match(
-      /^project_goal:\s*(.*)\s*$/m,
-    );
-    return m ? m[1].trim() : "";
-  } catch {
-    return "";
-  }
-}
-
 // ---------- views ----------
 
 function activeFirst<
@@ -231,17 +174,6 @@ function activeFirst<
 }
 
 export function buildSessions(now = Date.now()): SessionView[] {
-  // Sessions sharing a project read the same project-meta.md; cache per build
-  // pass so it's read once per project, not once per session.
-  const goalCache = new Map<string, string>();
-  const projectGoal = (project: string): string => {
-    let g = goalCache.get(project);
-    if (g === undefined) {
-      g = readProjectGoal(project);
-      goalCache.set(project, g);
-    }
-    return g;
-  };
   // Sessions actually running right now (across all projects, tracked or not),
   // keyed provider:id. A registered session that's live is forced "active"; a
   // live session with no registry entry is appended so the manifest mirrors
@@ -272,8 +204,6 @@ export function buildSessions(now = Date.now()): SessionView[] {
       subagents: subagentsFor(active, e.provider, e.sessionId, now),
       channel: hasChannel(e.sessionId),
       lastHeartbeat: e.lastHeartbeat,
-      sessionGoal: readSessionGoal(e.logPath),
-      projectGoal: projectGoal(e.project),
       tracked: true,
     };
   });
@@ -299,8 +229,6 @@ export function buildSessions(now = Date.now()): SessionView[] {
       subagents: subagentsFor(true, l.provider, l.id, now),
       channel: hasChannel(l.id),
       lastHeartbeat: new Date(l.updatedAtMs).toISOString(),
-      sessionGoal: "",
-      projectGoal: projectGoal(l.cwd),
       tracked: false,
     });
   }
@@ -326,9 +254,6 @@ export function buildProjects(now = Date.now()): ProjectView[] {
     projects.push({
       project,
       name: basename(project),
-      // every session in the group carries the same project goal (already read
-      // in buildSessions) — reuse it rather than re-reading project-meta.md.
-      projectGoal: group[0]?.projectGoal ?? "",
       activeCount,
       sessionCount: group.length,
       lastHeartbeat,
