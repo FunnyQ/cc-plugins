@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.12.0] - 2026-06-17
+
+### ✨ Added
+
+- **Cockpit decision entries can now include diagrams.** Run `cockpit log --diagram` or `cockpit scribe --diagram` to attach a Mermaid diagram to any decision card. The diagram renders inline as a Night Flight-themed SVG (lazy-loaded; falls back to showing the source text if Mermaid can't render it) and is sanitized through DOMPurify's SVG profile.
+
+### 🐛 Fixed
+
+- **Cockpit auto-logging fork now inherits conversation context.** The thoughtful/scribe guidance was corrected to spawn the auto-log fork with `subagent_type: "fork"` (Codex: `fork_context: true`). Previously, omitting it spawned a context-less fresh agent that had no knowledge of the ongoing session.
+
 ## [3.11.0] - 2026-06-16
 
 ### ✨ Added
