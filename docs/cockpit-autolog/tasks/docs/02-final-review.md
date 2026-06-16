@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: backend/01, backend/02, backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04, docs/01
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -59,23 +59,23 @@ whole deliverable end to end:
 
 ## Acceptance criteria
 
-- [ ] Full cockpit test suite is green.
-- [ ] Language round-trips via the CLI; defaults to English with no config.
-- [ ] No-start auto-registration verified; `needs_your_call`/`wait`/`send` intact.
-- [ ] `cockpit-scribe/` and `thoughtful/` skill dirs are gone; one cockpit skill routes to both modes.
-- [ ] No live goal / project-meta / start references remain in cockpit source or CLAUDE.md.
-- [ ] Legacy goal-record tolerance holds (no crash); dashboard has no goal/prose UI, no console errors.
-- [ ] Any defects found are logged against the owning task, not silently patched.
+- [x] Full cockpit test suite is green.
+- [x] Language round-trips via the CLI; defaults to English with no config.
+- [x] No-start auto-registration verified; `needs_your_call`/`wait`/`send` intact.
+- [x] `cockpit-scribe/` and `thoughtful/` skill dirs are gone; one cockpit skill routes to both modes.
+- [x] No live goal / project-meta / start references remain in cockpit source or CLAUDE.md.
+- [x] Legacy goal-record tolerance holds (no crash); dashboard has no goal/prose UI, no console errors.
+- [x] Any defects found are logged against the owning task, not silently patched.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/` green.
-- [ ] `grep -rn "project-meta\|cmdStart\|GoalRecord\|session_goal\|project_goal" packages/monitor/skills/cockpit/scripts/ packages/monitor/skills/cockpit/SKILL.md packages/monitor/skills/cockpit/references/` returns nothing.
-- [ ] Dashboard dist is clean too: `grep -rni "goal" packages/monitor/skills/cockpit/dashboard/dist/ | grep -v vendor` returns nothing — this catches `leg__goal`, `decision-log__goal`, `projectGoal`, `sessionGoal`, `selectedSessionGoal`, `selectedProjectGoal`, `renderGoal`, `goalSnippet`, `shortGoal`, and any user-facing "set a goal" text. (The hero subtitle binding at `index.html` must no longer reference goal getters.)
-- [ ] Plugin manifests advertise no goals: `grep -in "goal" packages/monitor/.claude-plugin/plugin.json packages/monitor/.codex-plugin/plugin.json` returns nothing; both parse as valid JSON.
-- [ ] `ls packages/monitor/skills/` shows no `cockpit-scribe` / `thoughtful`; `ls packages/monitor/commands/` shows `thoughtful.md`.
-- [ ] `bun -e "JSON.parse(require('fs').readFileSync('packages/monitor/.claude-plugin/plugin.json','utf8'))"` exits 0.
-- [ ] Manual dashboard pass on the owner's dev server (clean trail + legacy-goal session, no errors).
+- [x] `bun test packages/monitor/skills/cockpit/scripts/` green.
+- [x] `grep -rn "project-meta\|cmdStart\|GoalRecord\|session_goal\|project_goal" packages/monitor/skills/cockpit/scripts/ packages/monitor/skills/cockpit/SKILL.md packages/monitor/skills/cockpit/references/` returns nothing.
+- [x] Dashboard dist is clean too: `grep -rni "goal" packages/monitor/skills/cockpit/dashboard/dist/ | grep -v vendor` returns nothing — this catches `leg__goal`, `decision-log__goal`, `projectGoal`, `sessionGoal`, `selectedSessionGoal`, `selectedProjectGoal`, `renderGoal`, `goalSnippet`, `shortGoal`, and any user-facing "set a goal" text. (The hero subtitle binding at `index.html` must no longer reference goal getters.)
+- [x] Plugin manifests advertise no goals: `grep -in "goal" packages/monitor/.claude-plugin/plugin.json packages/monitor/.codex-plugin/plugin.json` returns nothing; both parse as valid JSON.
+- [x] `ls packages/monitor/skills/` shows no `cockpit-scribe` / `thoughtful`; `ls packages/monitor/commands/` shows `thoughtful.md`.
+- [x] `bun -e "JSON.parse(require('fs').readFileSync('packages/monitor/.claude-plugin/plugin.json','utf8'))"` exits 0.
+- [x] Manual dashboard pass on the owner's dev server (clean trail + legacy-goal session, no errors).
 
 ## Eval rubric
 
