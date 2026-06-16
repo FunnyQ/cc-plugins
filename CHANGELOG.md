@@ -1,11 +1,22 @@
 # Changelog
 
-## [Unreleased]
+## [3.11.0] - 2026-06-16
+
+### ✨ Added
+
+- **Cockpit auto-logging is on by default on Claude Code.** A new `SessionStart` hook turns on thoughtful logging for every Claude session, so the cockpit decision trail fills in as you work — no setup, no per-session toggle. (Codex sessions stay manual: run `/thoughtful` when you want logging.)
+- **A new `/thoughtful` command** replaces the old skill, giving you a single, explicit way to opt a session into auto-logging.
+- **Global, XDG-aware cockpit config.** Your preferred log language now lives in one place — `~/.config/q-lab/cockpit/config.json` — and is shared across all projects. Set it with `cockpit config --log-language <lang>` and read it back with `cockpit config get-language`.
 
 ### 🔄 Changed
 
-- **Cockpit is consolidated around one skill and a command-driven auto-logging path.** The cockpit skill now uses a thin router with provider references plus `pilot.md` and `scribe.md`; `thoughtful` is a slash command, with Claude sessions auto-enabled by a second `SessionStart` hook and Codex still using manual `/thoughtful`.
-- **Cockpit configuration is global language only.** Removed the old goals/project metadata/start flow in favor of `~/.config/q-lab/cockpit/config.json` with `cockpit config --log-language` and `cockpit config get-language`.
+- **Cockpit is now one skill instead of three.** The old `cockpit`, `cockpit-scribe`, and `thoughtful` skills are collapsed into a single `cockpit` router skill (`SKILL.md` dispatching to `pilot.md` and `scribe.md`), making the cockpit simpler to reason about and maintain.
+- **The needs_your_call / wait / send bridge is preserved** — the UI-to-agent handoff you rely on works exactly as before.
+
+### 🔥 Removed
+
+- **Goal tracking is gone.** Both the per-session goal and the per-project goal have been retired — cockpit now focuses purely on the live decision trail. `project-meta.md` and the `cockpit start` command were removed along with them.
+- **Per-project cockpit config** is replaced by the single global `log_language` setting (see above); all other knobs were dropped.
 
 ## [3.10.3] - 2026-06-16
 
