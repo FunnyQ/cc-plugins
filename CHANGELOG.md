@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.12.1] - 2026-06-17
+
+### ✨ Added
+
+- **Restart the cockpit daemon without restarting your Claude session.** A new `cockpit restart [--port N] [--no-open]` command bounces the dashboard daemon onto the current plugin code — useful for picking up a plugin update or a working-tree edit mid-session. It kills the running daemon, rebinds on the same port, and confirms it won the race past the channel MCP's auto-respawn before returning.
+
 ## [3.12.0] - 2026-06-17
 
 ### ✨ Added
