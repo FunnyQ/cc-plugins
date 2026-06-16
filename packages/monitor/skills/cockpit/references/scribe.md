@@ -97,6 +97,14 @@ the result of honestly asking all four, not of never asking. Lenses are
 independent: a single piece of work can warrant a `decision` *and* a `caveat`
 *and* a `learning`.
 
+### Also ask: is this structural enough to draw?
+
+After the lens sweep, check each surviving entry once more: is the insight
+**structural** — a flow, a state machine, a sequence, a fan-out — where a
+picture carries it better than prose? If so, attach `--diagram` with Mermaid
+source (see the CLI reference below). Don't force it on flat insights; reach for
+it when the "what" is a shape, not a sentence.
+
 ### Then: write each surviving entry
 
 For each insight that is genuinely worth recording and not yet covered, pick a
