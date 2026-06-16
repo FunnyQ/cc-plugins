@@ -1,0 +1,28 @@
+{
+  "name": "chronicle",
+  "version": "0.1.0",
+  "description": "Write and guard your project's history — craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail.",
+  "author": { "name": "Q" },
+  "license": "MIT",
+  "keywords": [
+    "chronicle",
+    "git",
+    "commit",
+    "pull-request",
+    "merge-request",
+    "github",
+    "gitlab",
+    "history"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Chronicle",
+    "shortDescription": "Craft commits and author reviewer-legible PRs/MRs.",
+    "longDescription": "Chronicle writes and guards your project's history: a unified commit skill that auto-decides simple vs atomic, and a PR/MR author that turns commit history plus the cockpit decision trail into a reviewer-legible request on GitHub or GitLab.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Commit my changes.", "Open a PR for this branch."],
+    "brandColor": "#7A6FB0"
+  }
+}
