@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/02
 > **Blocks**: frontend/01, skills/01, docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -54,19 +54,19 @@ and lands `tracked: true` in the registry.
 
 ## Acceptance criteria
 
-- [ ] `GoalRecord`, `writeGoalRecord`, `writeProjectMeta`, `cmdStart`, and the `start` route are gone.
-- [ ] `readMetaField`/`project-meta.md` reads/writes are removed from `cockpit.ts`.
-- [ ] `log` / `scribe` / `wait` / `send` and the `needs_your_call` bridge still work.
-- [ ] A first `log` or `scribe` in a session with no prior `start` auto-registers (`tracked: true`).
-- [ ] No remaining reference to `session_goal` / `project_goal` / `project-meta` in `cockpit.ts`.
-- [ ] Removed/rewrote the obsolete goal/lang/start tests; added the no-start auto-register test.
+- [x] `GoalRecord`, `writeGoalRecord`, `writeProjectMeta`, `cmdStart`, and the `start` route are gone.
+- [x] `readMetaField`/`project-meta.md` reads/writes are removed from `cockpit.ts`.
+- [x] `log` / `scribe` / `wait` / `send` and the `needs_your_call` bridge still work.
+- [x] A first `log` or `scribe` in a session with no prior `start` auto-registers (`tracked: true`).
+- [x] No remaining reference to `session_goal` / `project_goal` / `project-meta` in `cockpit.ts`.
+- [x] Removed/rewrote the obsolete goal/lang/start tests; added the no-start auto-register test.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts` passes.
-- [ ] `grep -n "goal\|project-meta\|cmdStart\|GoalRecord" packages/monitor/skills/cockpit/scripts/cockpit.ts` returns nothing.
-- [ ] No-start auto-register: in a temp `COCKPIT_HOME`, run a `scribe`/`log` write with no `start`; confirm the registry entry exists (`tracked: true`).
-- [ ] `needs_your_call` bridge smoke (no `start`): in a temp `COCKPIT_HOME`, `cockpit log --decision "Q?" --needs-call --option A --option B`, capture the session/call id from the log, then `cockpit send <id> "A"`; confirm the log's latest call record is closed with a recorded `response` of `A` (the `wait` side parks for the UI/`send` answer — exercising `send` is the deterministic, non-blocking half). Prefer encoding this as a test in `cockpit.test.ts` if the existing bridge tests make it cheap.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts` passes.
+- [x] `grep -n "goal\|project-meta\|cmdStart\|GoalRecord" packages/monitor/skills/cockpit/scripts/cockpit.ts` returns nothing.
+- [x] No-start auto-register: in a temp `COCKPIT_HOME`, run a `scribe`/`log` write with no `start`; confirm the registry entry exists (`tracked: true`).
+- [x] `needs_your_call` bridge smoke (no `start`): in a temp `COCKPIT_HOME`, `cockpit log --decision "Q?" --needs-call --option A --option B`, capture the session/call id from the log, then `cockpit send <id> "A"`; confirm the log's latest call record is closed with a recorded `response` of `A` (the `wait` side parks for the UI/`send` answer — exercising `send` is the deterministic, non-blocking half). Prefer encoding this as a test in `cockpit.test.ts` if the existing bridge tests make it cheap.
 
 ## Eval rubric
 
