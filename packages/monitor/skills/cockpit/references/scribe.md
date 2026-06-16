@@ -125,7 +125,7 @@ be rejected by the CLI with a non-zero exit.
 ### CLI surface reference
 
 ```
-cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--session <id>] [--provider <p>]
+cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--diagram <mermaid>] [--session <id>] [--provider <p>]
 cockpit scribe --recent [N]
 ```
 
@@ -133,6 +133,10 @@ cockpit scribe --recent [N]
 - `--text` — required; the markdown body (maps to `reason` in the record).
 - `--title` — optional; the short headline (maps to `decision` in the record).
 - `--file` — optional, repeatable; source files touched by this entry.
+- `--diagram` — optional **Mermaid** source; the dashboard renders it inline as a
+  Night Flight-themed SVG. Use it only when the insight is structural and a picture
+  carries it better than the `--text` body (a flow, a state machine, a sequence) —
+  pass the source as one argument (a heredoc preserves newlines).
 - `--session` / `--provider` — optional; omit to auto-resolve the live session.
 
 ### Tone

@@ -179,7 +179,7 @@ bun test packages/monitor/skills/install/scripts/
 - Runtime: Bun (TypeScript, no transpile step needed)
 - Use `type` over `interface`
 - Frontend: petite-vue (not full Vue), Chart.js for charts
-- No external npm dependencies — vendor libs (petite-vue, Chart.js, marked, DOMPurify, highlight.js) are committed in `dashboard/dist/vendor/`
+- No external npm dependencies — vendor libs (petite-vue, Chart.js, marked, DOMPurify, highlight.js, mermaid) are committed in `dashboard/dist/vendor/`. **mermaid** is the UMD bundle (`mermaid.min.js`, ~3.3MB, sets `globalThis.mermaid`) because its ESM build is code-split into chunks that can't ship as one file; `modules/diagram.js` lazy-loads it via a `<script>` tag on first diagram render, themes it to Night Flight (concrete hex, since mermaid's khroma engine can't parse `oklch()`), and sanitizes the SVG through DOMPurify's SVG profile. A decision entry carries Mermaid source via `cockpit log/scribe --diagram`
 - Pricing is per-1M-tokens USD
 
 ## Releasing

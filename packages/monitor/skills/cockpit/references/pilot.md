@@ -91,6 +91,11 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
   [--facet "LABEL: a distinct dimension of the thinking" ...] \
   [--tradeoff "what it costs — what you gave up or are now assuming"] \
   [--file path/a.ts --file path/b.ts] \
+  [--diagram "$(cat <<'MMD'
+flowchart TD
+  A[...] --> B[...]
+MMD
+)"] \
   [--needs-call --option "A" --option "B"]
 ```
 
@@ -117,6 +122,15 @@ bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
   often reads better as an `ASSUMPTION` or `RISK` facet — use whichever frames it best.)
 
 `--reason` and each `--facet` body render as Markdown in the dashboard.
+
+- `--diagram` — optional **Mermaid** source. When structure beats prose — a flow,
+  a state machine, a sequence, a dependency graph — attach it and the dashboard
+  renders it inline as an SVG, themed to the Night Flight palette. You author the
+  Mermaid text yourself (you have the in-session context an external CLI lacks);
+  pass it as one argument (a heredoc keeps newlines intact). Reach for it only
+  when a picture genuinely carries what a sentence can't — most decisions don't
+  need one. Rendering is sandboxed (SVG-profile sanitized, no scripts/HTML labels);
+  if the source can't parse, the card shows it as text rather than breaking.
 
 **Example 1 — shallow vs. with the thinking, facets pulling their weight:**
 

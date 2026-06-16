@@ -2,8 +2,8 @@
 // cockpit CLI — produces the kernel data: decision trail,
 // plus the control-loop client (wait/send) that talks to the daemon broker.
 //   cockpit log    --session <id> --decision D --reason R [--tradeoff T]
-//                  [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--needs-call]
-//   cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--session <id>]
+//                  [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--diagram MERMAID] [--needs-call]
+//   cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--diagram MERMAID] [--session <id>]
 //   cockpit scribe --recent [N]
 //   cockpit wait   <sessionId>            # park (long-poll) until the user answers; prints the answer
 //   cockpit send   <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
@@ -52,6 +52,7 @@ type DecisionRecord = {
   needs_your_call: boolean;
   options: string[];
   files: string[];
+  diagram?: string; // NEW — optional Mermaid source; rendered as a themed SVG in the card
   timestamp: string;
 };
 
@@ -99,6 +100,7 @@ const SINGLE_FLAGS = new Set([
   "type",
   "text",
   "title",
+  "diagram",
 ]);
 const REPEATED_FLAGS = new Set(["file", "option", "facet"]);
 const BOOL_FLAGS = new Set(["needs-call"]);
@@ -263,6 +265,9 @@ function cmdLog(args: Args): void {
     needs_your_call: args.flags.has("needs-call"),
     options: args.repeated["option"] || [],
     files: args.repeated["file"] || [],
+    // Optional — omitted entirely when absent so the vast majority of entries
+    // (no diagram) keep their lean shape.
+    ...(args.single["diagram"] ? { diagram: args.single["diagram"] } : {}),
     timestamp: new Date().toISOString(),
   };
 
@@ -373,6 +378,7 @@ function cmdScribe(args: Args): void {
     needs_your_call: false,
     options: [],
     files: args.repeated["file"] || [],
+    ...(args.single["diagram"] ? { diagram: args.single["diagram"] } : {}),
     timestamp: new Date().toISOString(),
   };
 

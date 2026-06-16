@@ -6,6 +6,7 @@ import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
 import { createLatestIndicator } from "./latest-indicator.js";
+import { renderDiagram } from "./diagram.js";
 
 // new-tab-safe links (matches token-atlas)
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -387,6 +388,14 @@ export function initDecisionLog(rootEl) {
     const options = (rec.options || [])
       .map((o) => `<li>${esc(o)}</li>`)
       .join("");
+    // A diagram rides as Mermaid source; the SVG is rendered after mount (async,
+    // lazy bundle) into this figure. The <pre> holds the source as a graceful
+    // fallback shown only if rendering fails.
+    const diagram = rec.diagram
+      ? `<figure class="decision-card__diagram" data-pending>
+           <pre class="decision-card__diagram-src">${esc(rec.diagram)}</pre>
+         </figure>`
+      : "";
 
     card.innerHTML = `
       ${rec.needs_your_call ? '<div class="decision-card__badge">🕹 needs your call</div>' : ""}
@@ -396,12 +405,32 @@ export function initDecisionLog(rootEl) {
       </header>
       <div class="decision-card__reason">${md(rec.reason)}</div>
       ${facets}
+      ${diagram}
       ${rec.tradeoff ? `<p class="decision-card__tradeoff">${esc(rec.tradeoff)}</p>` : ""}
       ${files ? `<div class="decision-card__files">${files}</div>` : ""}
       ${options ? `<ul class="decision-card__options">${options}</ul>` : ""}
       ${rec.needs_your_call ? respondForm(rec) : ""}
       <div class="decision-card__answer" hidden></div>`;
+    if (rec.diagram) mountDiagram(card, rec.diagram);
     return card;
+  }
+
+  // Render the card's Mermaid source into its figure once (the card HTML is built
+  // once and never re-run, same discipline as the rest of this module). On
+  // success the SVG replaces the source <pre>; on failure the <pre> stays and the
+  // figure is flagged so CSS can mark it as an unrendered fallback.
+  async function mountDiagram(card, source) {
+    const figure = card.querySelector(".decision-card__diagram");
+    if (!figure) return;
+    const result = await renderDiagram(source);
+    if (result.ok) {
+      figure.innerHTML = result.svg;
+      figure.removeAttribute("data-pending");
+      requestAnimationFrame(updateCompactDecisionSize);
+    } else {
+      figure.removeAttribute("data-pending");
+      figure.setAttribute("data-failed", "");
+    }
   }
 
   // Interactive answer surface for an open needs_your_call (active sessions

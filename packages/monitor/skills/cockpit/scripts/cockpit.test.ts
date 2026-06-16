@@ -198,6 +198,33 @@ describe("cockpit log", () => {
     expect(rec.tradeoff).toBe("slower");
   });
 
+  test("--diagram stores the Mermaid source verbatim on the record", () => {
+    const mmd = "flowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]";
+    run([
+      "log",
+      "--session",
+      SID,
+      "--decision",
+      "shape the flow",
+      "--reason",
+      "structure beats prose",
+      "--diagram",
+      mmd,
+    ]);
+    const rec = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`)).at(
+      -1,
+    );
+    expect(rec.diagram).toBe(mmd);
+  });
+
+  test("a log without --diagram omits the field entirely", () => {
+    run(["log", "--session", SID, "--decision", "plain", "--reason", "r"]);
+    const rec = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`)).at(
+      -1,
+    );
+    expect("diagram" in rec).toBe(false);
+  });
+
   test("two logs append two lines without rewriting earlier ones", () => {
     run(["log", "--session", SID, "--decision", "one", "--reason", "r1"]);
     run(["log", "--session", SID, "--decision", "two", "--reason", "r2"]);
@@ -348,6 +375,29 @@ describe("cockpit scribe", () => {
     expect(rec.files).toEqual([]);
     expect(rec.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(rec.timestamp).toBeTruthy();
+  });
+
+  test("--diagram rides on a scribed entry", () => {
+    const mmd =
+      "sequenceDiagram\n  UI->>Agent: needs_your_call\n  Agent-->>UI: answer";
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "rationale",
+      "--title",
+      "the wait/send bridge",
+      "--text",
+      "UI→agent only; answers ride the transcript",
+      "--diagram",
+      mmd,
+    ]);
+    const rec = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`)).at(
+      -1,
+    );
+    expect(rec.diagram).toBe(mmd);
+    expect(rec.source).toBe("scribe");
   });
 
   test("auto-registers the session so it becomes tracked", () => {

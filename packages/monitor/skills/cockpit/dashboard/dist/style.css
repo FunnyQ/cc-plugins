@@ -1645,6 +1645,58 @@ body {
   line-height: 1;
   color: color-mix(in oklch, var(--aurora) 65%, var(--ink-muted));
 }
+/* A diagram is an instrument screen embedded in the card: it carries its own
+   recessed deep-space backdrop so the Night Flight-themed SVG reads the same on
+   a warm call card and on the lit (light) readout — never inheriting a surface
+   the diagram theme wasn't built against. */
+.decision-card__diagram {
+  margin: 0;
+  padding: 12px;
+  background: var(--space);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+.decision-card__diagram svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.decision-card__diagram::before {
+  content: "DIAGRAM";
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+/* The Mermaid source as a graceful fallback — hidden once the SVG mounts, shown
+   faintly while it's pending and plainly if rendering failed. */
+.decision-card__diagram-src {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.decision-card__diagram[data-pending] .decision-card__diagram-src {
+  opacity: 0.55;
+}
+.decision-card__diagram[data-failed] {
+  border-color: color-mix(in oklch, var(--danger) 50%, var(--edge));
+}
+.decision-card__diagram[data-failed]::after {
+  content: "Couldn’t render — showing source";
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--danger);
+}
 .decision-card__files {
   display: flex;
   flex-wrap: wrap;
