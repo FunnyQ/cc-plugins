@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/03
 > **Blocks**: docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -59,16 +59,16 @@ so the dashboard API no longer carries `sessionGoal` / `projectGoal` / project-p
 
 ## Acceptance criteria
 
-- [ ] `SessionView.sessionGoal`, `ProjectView.projectGoal`, `ProjectInfo.projectGoal` are removed.
-- [ ] `readSessionGoal`, `readProjectGoal`, `readMetaBody`, and `goalCache` are deleted.
-- [ ] `/api/sessions`, `/api/projects`, `/api/project-info` payloads no longer include goal or prose fields.
-- [ ] `call-log` still tolerates a legacy `type:"goal"` line-1 record (regression test kept).
-- [ ] All three touched test files pass after fixture/assertion updates.
+- [x] `SessionView.sessionGoal`, `ProjectView.projectGoal`, `ProjectInfo.projectGoal` are removed.
+- [x] `readSessionGoal`, `readProjectGoal`, `readMetaBody`, and `goalCache` are deleted.
+- [x] `/api/sessions`, `/api/projects`, `/api/project-info` payloads no longer include goal or prose fields.
+- [x] `call-log` still tolerates a legacy `type:"goal"` line-1 record (regression test kept).
+- [x] All three touched test files pass after fixture/assertion updates.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/scripts/registry.test.ts packages/monitor/skills/cockpit/scripts/project-info.test.ts packages/monitor/skills/cockpit/scripts/call-log.test.ts` passes.
-- [ ] `grep -n "Goal\|readMetaBody\|project-meta" packages/monitor/skills/cockpit/scripts/registry.ts packages/monitor/skills/cockpit/scripts/project-info.ts` returns nothing.
+- [x] `bun test packages/monitor/skills/cockpit/scripts/registry.test.ts packages/monitor/skills/cockpit/scripts/project-info.test.ts packages/monitor/skills/cockpit/scripts/call-log.test.ts` passes.
+- [x] `grep -n "Goal\|readMetaBody\|project-meta" packages/monitor/skills/cockpit/scripts/registry.ts packages/monitor/skills/cockpit/scripts/project-info.ts` returns nothing.
 
 ## Eval rubric
 
