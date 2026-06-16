@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: commit/03, pr/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -79,18 +79,18 @@ Do NOT add a `version` field to either registry entry — versions live only in 
 
 ## Acceptance criteria
 
-- [ ] Both `plugin.json` files exist, are valid JSON, and carry `version: "0.1.0"` with identical name/description/author/license/keywords.
-- [ ] The Codex manifest has `"skills": "./skills/"` and a complete `interface` block.
-- [ ] `chronicle` appears once in each marketplace registry with the correct source shape for that registry.
-- [ ] Neither registry entry has a `version` field.
-- [ ] Existing `monitor`/`dispatch`/`relay` entries are untouched.
+- [x] Both `plugin.json` files exist, are valid JSON, and carry `version: "0.1.0"` with identical name/description/author/license/keywords.
+- [x] The Codex manifest has `"skills": "./skills/"` and a complete `interface` block.
+- [x] `chronicle` appears once in each marketplace registry with the correct source shape for that registry.
+- [x] Neither registry entry has a `version` field.
+- [x] Existing `monitor`/`dispatch`/`relay` entries are untouched.
 
 ## Verification
 
-- [ ] `bun -e 'JSON.parse(await Bun.file("packages/chronicle/.claude-plugin/plugin.json").text())'` and the Codex one both parse.
-- [ ] `bun -e 'JSON.parse(await Bun.file(".claude-plugin/marketplace.json").text())'` and the agents one both parse.
-- [ ] `grep -c '"name": "chronicle"'` across both registries returns 1 each.
-- [ ] `git diff` shows only additive changes to the two registries.
+- [x] `bun -e 'JSON.parse(await Bun.file("packages/chronicle/.claude-plugin/plugin.json").text())'` and the Codex one both parse.
+- [x] `bun -e 'JSON.parse(await Bun.file(".claude-plugin/marketplace.json").text())'` and the agents one both parse.
+- [x] `grep -c '"name": "chronicle"'` across both registries returns 1 each.
+- [x] `git diff` shows only additive changes to the two registries.
 
 ## Eval rubric
 
