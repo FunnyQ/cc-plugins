@@ -6,7 +6,7 @@
 >
 > **Depends on**: backend/02
 > **Blocks**: skills/01, skills/03, docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -75,17 +75,17 @@ a fork (the `thoughtful` command spawns it), not as a custom subagent_type.
 
 ## Acceptance criteria
 
-- [ ] `references/scribe.md` exists with the full scribe procedure (four lenses, `--recent` dedup, tone, provider handling).
-- [ ] CLI path resolution uses the same-skill form `<base>/scripts/cockpit.ts` (no `../`).
-- [ ] Language is resolved via `cockpit config get-language`; no `project-meta.md` grep remains.
-- [ ] `packages/monitor/skills/cockpit-scribe/` is deleted.
-- [ ] scribe.md notes it runs inside a context-inheriting fork (subagent_type omitted), not a custom agent.
+- [x] `references/scribe.md` exists with the full scribe procedure (four lenses, `--recent` dedup, tone, provider handling).
+- [x] CLI path resolution uses the same-skill form `<base>/scripts/cockpit.ts` (no `../`).
+- [x] Language is resolved via `cockpit config get-language`; no `project-meta.md` grep remains.
+- [x] `packages/monitor/skills/cockpit-scribe/` is deleted.
+- [x] scribe.md notes it runs inside a context-inheriting fork (subagent_type omitted), not a custom agent.
 
 ## Verification
 
-- [ ] `test ! -d packages/monitor/skills/cockpit-scribe && echo gone` prints `gone`.
-- [ ] `grep -n "project-meta\|\.\./cockpit/scripts" packages/monitor/skills/cockpit/references/scribe.md` returns nothing.
-- [ ] `grep -n "config get-language" packages/monitor/skills/cockpit/references/scribe.md` matches.
+- [x] `test ! -d packages/monitor/skills/cockpit-scribe && echo gone` prints `gone`.
+- [x] `grep -n "project-meta\|\.\./cockpit/scripts" packages/monitor/skills/cockpit/references/scribe.md` returns nothing.
+- [x] `grep -n "config get-language" packages/monitor/skills/cockpit/references/scribe.md` matches.
 
 ## Eval rubric
 
