@@ -154,6 +154,12 @@ curl -s localhost:5938/api/live | jq
 # Run the cockpit daemon (port 5858)
 bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
 
+# Restart the daemon onto THIS install's code (after a plugin update or a working-
+# tree edit). Kills the current daemon and rebinds, then verifies our root won the
+# port — superseding+retrying past any concurrent MCP respawn from another install.
+# Serves whichever cockpit.ts you invoke, so run it from the updated cache (or repo).
+bun packages/monitor/skills/cockpit/scripts/cockpit.ts restart            # [--port N] [--no-open]
+
 # Read or update the global cockpit decision-log language
 bun packages/monitor/skills/cockpit/scripts/cockpit.ts config get-language
 bun packages/monitor/skills/cockpit/scripts/cockpit.ts config --log-language zh-TW
@@ -163,8 +169,9 @@ bun packages/monitor/skills/cockpit/scripts/cockpit.ts config --log-language zh-
 
 # Dev: a live channel-flagged Claude session keeps respawning the cached daemon
 # (the channel MCP's reconnect loop calls ensureCockpitDaemon when the daemon
-# dies), so a repo-root daemon loses the supersede war for port 5858. To test
-# working-tree changes against an isolated daemon, run it on its own port + home:
+# dies). `cockpit.ts restart` now wins that race for port 5858 (supersede + retry),
+# so prefer it. To instead test working-tree changes against a fully isolated
+# daemon (no contention at all), run it on its own port + home:
 COCKPIT_HOME=/tmp/cockpit-dev bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts --port 5999
 
 # Run the cockpit test suite

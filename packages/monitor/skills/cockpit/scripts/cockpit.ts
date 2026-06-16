@@ -7,6 +7,7 @@
 //   cockpit scribe --recent [N]
 //   cockpit wait   <sessionId>            # park (long-poll) until the user answers; prints the answer
 //   cockpit send   <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
+//   cockpit restart [--port N] [--no-open] # bounce the daemon onto this install's code (wins the MCP respawn race)
 import {
   appendFileSync,
   existsSync,
@@ -14,11 +15,13 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { findSession } from "./find-session";
 import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
+import { classifyDaemon } from "./restart-lifecycle";
 
 // ---------- Types ----------
 
@@ -652,6 +655,116 @@ async function cmdSend(rest: string[]): Promise<void> {
   }
 }
 
+// ---------- Restart ----------
+
+// The cockpit daemon this install launches. Sibling of this CLI, so a restart
+// always serves the same version as the `cockpit.ts` you invoked — run it from
+// the freshly-updated plugin cache (or a dev checkout) and that's what binds.
+const COCKPIT_SERVER = join(import.meta.dir, "cockpit-server.ts");
+const MY_ROOT = import.meta.dir;
+
+// daemon.json carries the launcher's root (see daemon-lifecycle.ts); readDaemon()
+// only surfaces port/token, so read the root separately for the ownership check.
+function readDaemonRoot(): string | undefined {
+  try {
+    const raw = JSON.parse(readFileSync(DAEMON_PATH, "utf8"));
+    return typeof raw?.root === "string" ? raw.root : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function daemonPid(): number | undefined {
+  try {
+    const raw = JSON.parse(readFileSync(DAEMON_PATH, "utf8"));
+    return typeof raw?.pid === "number" ? raw.pid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Confirm the bound daemon actually answers HTTP (daemon.json can be written a
+// beat before the socket is listening).
+async function portAnswers(port: number): Promise<boolean> {
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/token`, {
+      signal: AbortSignal.timeout(800),
+    });
+    return r.ok || r.status === 503;
+  } catch {
+    return false;
+  }
+}
+
+function stopPid(pid: number): void {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    return; // already gone
+  }
+  for (let i = 0; i < 30 && isAlive(pid); i++) Bun.sleepSync(50); // ≤1.5s graceful
+  if (isAlive(pid)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+    for (let i = 0; i < 20 && isAlive(pid); i++) Bun.sleepSync(50); // ≤1s
+  }
+}
+
+// `cockpit restart [--port N] [--no-open]` — bounce the daemon onto this install's
+// code. Kills the running daemon (a same-root relaunch would otherwise "reuse" and
+// never pick up new code), then spawns a fresh one and confirms OUR root won the
+// port — retrying past any concurrent MCP respawn from another install.
+async function cmdRestart(rest: string[]): Promise<void> {
+  const portFlag = flagValue(rest, "port");
+  const noOpen = rest.includes("--no-open");
+
+  const oldPid = daemonPid();
+  if (oldPid && isAlive(oldPid)) stopPid(oldPid);
+
+  const ATTEMPTS = 4;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const args = [COCKPIT_SERVER];
+    if (portFlag) args.push("--port", portFlag);
+    // Only the first attempt opens a tab; retries stay headless so a contended
+    // restart can't fan out into a pile of browser windows.
+    if (noOpen || attempt > 1) args.push("--no-open");
+    spawn("bun", args, { detached: true, stdio: "ignore" }).unref();
+
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      const kind = classifyDaemon(
+        { pid: daemonPid(), root: readDaemonRoot() },
+        MY_ROOT,
+        isAlive,
+      );
+      if (kind === "ours") {
+        const d = readDaemon();
+        if (d && (await portAnswers(d.port))) {
+          console.log(
+            `cockpit: daemon restarted → http://localhost:${d.port} (pid ${daemonPid()})`,
+          );
+          console.log(`  serving: ${MY_ROOT}`);
+          return;
+        }
+      } else if (kind === "foreign") {
+        // Another install (e.g. an MCP respawn from the old plugin cache) grabbed
+        // the port — supersede it and spawn ours again.
+        const p = daemonPid();
+        if (p) stopPid(p);
+        break;
+      }
+      await Bun.sleep(100);
+    }
+  }
+  console.error(
+    "cockpit restart: could not confirm a fresh daemon from this install — a respawn from another install may be contending for the port. Retry, or restart the Claude session so its channel uses the updated plugin.",
+  );
+  process.exit(1);
+}
+
 // ---------- Main ----------
 
 async function main(): Promise<void> {
@@ -672,9 +785,14 @@ async function main(): Promise<void> {
     case "send":
       await cmdSend(rest);
       break;
+    case "restart":
+      await cmdRestart(rest);
+      break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
-      console.error("usage: cockpit <log|scribe|config|wait|send> [args]");
+      console.error(
+        "usage: cockpit <log|scribe|config|wait|send|restart> [args]",
+      );
       process.exit(1);
   }
 }
