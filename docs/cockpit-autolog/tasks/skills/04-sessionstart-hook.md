@@ -6,7 +6,7 @@
 >
 > **Depends on**: skills/03
 > **Blocks**: docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -51,19 +51,19 @@ the existing hook — don't disturb them).
 
 ## Acceptance criteria
 
-- [ ] A second `SessionStart` entry is added; the existing `--session-check` entry is unchanged.
-- [ ] The new entry injects the thoughtful standing instruction via stdout on session start.
-- [ ] The instruction tells the agent to spawn a fork with `subagent_type` omitted running `/cockpit scribe`.
-- [ ] `plugin.json` remains valid JSON with `mcpServers`, `channels`, and both hooks intact.
-- [ ] No change affects Codex (`.codex-plugin/plugin.json` is not touched; Codex has no hooks).
+- [x] A second `SessionStart` entry is added; the existing `--session-check` entry is unchanged.
+- [x] The new entry injects the thoughtful standing instruction via stdout on session start.
+- [x] The instruction tells the agent to spawn a fork with `subagent_type` omitted running `/cockpit scribe`.
+- [x] `plugin.json` remains valid JSON with `mcpServers`, `channels`, and both hooks intact.
+- [x] No change affects Codex (`.codex-plugin/plugin.json` is not touched; Codex has no hooks).
 
 ## Verification
 
-- [ ] Structured check (valid JSON + exactly two SessionStart entries, one per purpose):
+- [x] Structured check (valid JSON + exactly two SessionStart entries, one per purpose):
   ```bash
   bun -e 'const h=JSON.parse(require("fs").readFileSync("packages/monitor/.claude-plugin/plugin.json","utf8")).hooks.SessionStart; if(h.length!==2)throw new Error("expected 2 SessionStart entries, got "+h.length); const cmds=h.flatMap(e=>e.hooks.map(x=>x.command)).join("\n"); if(!/session-check/.test(cmds))throw new Error("setup --session-check entry missing"); if(!/scribe|thoughtful/i.test(cmds))throw new Error("thoughtful-injection entry missing"); console.log("ok: 2 entries, both purposes present")'
   ```
-- [ ] Manual: a fresh Claude session shows the injected instruction in context; the agent then auto-forks scribe on worthy work.
+- [x] Manual: a fresh Claude session shows the injected instruction in context; the agent then auto-forks scribe on worthy work.
 
 ## Eval rubric
 
