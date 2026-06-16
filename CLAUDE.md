@@ -211,18 +211,13 @@ bun test packages/monitor/skills/install/scripts/
 
 ⚠️ Versions live **only** in each plugin's two `plugin.json` files (Claude + Codex). The marketplace registries (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) carry **no `version` field** — don't add one. The published version is the git tag plus the `plugin.json` values.
 
-**monitor and dispatch are versioned in lockstep** at the repo version (the `vX.Y.Z` git tag — currently `3.9.1`). When releasing repo-level work, bump all four together:
+**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.12.1`, dispatch `3.12.1`, relay `0.1.0`, chronicle `0.1.0`.
 
-- `packages/monitor/.claude-plugin/plugin.json` → `version`
-- `packages/monitor/.codex-plugin/plugin.json` → `version`
-- `packages/dispatch/.claude-plugin/plugin.json` → `version`
-- `packages/dispatch/.codex-plugin/plugin.json` → `version`
+**Bump only the plugin(s) you actually touched** — leave every other plugin's version alone. Each plugin's two files move together:
 
-**relay and chronicle are versioned independently** (relay currently `0.1.0`; chronicle currently `0.1.0`), on their own cadence — bump their two files only when that plugin itself changed:
+- `packages/<plugin>/.claude-plugin/plugin.json` → `version`
+- `packages/<plugin>/.codex-plugin/plugin.json` → `version`
 
-- `packages/relay/.claude-plugin/plugin.json` → `version`
-- `packages/relay/.codex-plugin/plugin.json` → `version`
-- `packages/chronicle/.claude-plugin/plugin.json` → `version`
-- `packages/chronicle/.codex-plugin/plugin.json` → `version`
+> History note: tags up to `v3.12.1` were repo-wide `vX.Y.Z` and covered monitor + dispatch in lockstep. That lockstep is retired — monitor and dispatch now version independently like everything else, so a release touching only one of them bumps only that one. The legacy `vX.Y.Z` tags stay as-is; new releases use the scoped `<plugin>-vX.Y.Z` form.
 
-`/odin-git:release` does not auto-detect these per-plugin fields, so **bump the relevant `plugin.json` files by hand** to match the tag before finishing a release, then add the matching `CHANGELOG.md` entry.
+`/odin-git:release` does not auto-detect these per-plugin fields, so **bump the touched plugin's two `plugin.json` files by hand** to match its scoped tag before finishing a release, then add the matching `CHANGELOG.md` entry (head it per-plugin, e.g. `## [chronicle 0.1.0]`, noting the scoped tag it tracks). Because the scoped tag isn't `v`-prefixed, `git flow release finish` won't produce it cleanly — replicate the finish with plain git (merge develop → main, annotated `<plugin>-vX.Y.Z` tag on main, merge main back to develop, push both branches + the tag).

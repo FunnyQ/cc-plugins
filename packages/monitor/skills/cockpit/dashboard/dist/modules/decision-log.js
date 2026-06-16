@@ -6,7 +6,7 @@ import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
 import { createLatestIndicator } from "./latest-indicator.js";
-import { renderDiagram } from "./diagram.js";
+import { renderDiagram, openDiagramLightbox } from "./diagram.js";
 
 // new-tab-safe links (matches token-atlas)
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -426,6 +426,19 @@ export function initDecisionLog(rootEl) {
     if (result.ok) {
       figure.innerHTML = result.svg;
       figure.removeAttribute("data-pending");
+      // Click (or Enter/Space) the rendered figure to blow it up in a lightbox —
+      // dense instrument panels are hard to read at card width.
+      figure.classList.add("is-zoomable");
+      figure.setAttribute("role", "button");
+      figure.setAttribute("tabindex", "0");
+      figure.setAttribute("aria-label", "Enlarge diagram");
+      figure.addEventListener("click", () => openDiagramLightbox(result.svg));
+      figure.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openDiagramLightbox(result.svg);
+        }
+      });
       requestAnimationFrame(updateCompactDecisionSize);
     } else {
       figure.removeAttribute("data-pending");
