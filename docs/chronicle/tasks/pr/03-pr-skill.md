@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: pr/01, pr/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -64,18 +64,18 @@ Point at `scripts/analyze-branch.ts` and `scripts/request-creator.ts`; never at 
 
 ## Acceptance criteria
 
-- [ ] `SKILL.md` has valid frontmatter with `name: pr` and a description carrying the trigger phrases + "human-invoked only".
-- [ ] The two-phase fork flow (analyze → gate → create) is documented with the `{title, body, base, head, provider}` and `CreateInput` hand-offs.
-- [ ] The 4-section body (Why / What changed / What to focus on / How to judge) is defined with the cockpit-field → section mapping.
-- [ ] The soft cockpit dependency and the `provider:"unknown"` stop condition are both documented.
-- [ ] The gate offers create / draft / edit / abort via the host's interactive prompt (`AskUserQuestion` on Claude, equivalent elsewhere); failures are reported honestly.
-- [ ] No odin-git reference and no sibling-task-id references in the body.
+- [x] `SKILL.md` has valid frontmatter with `name: pr` and a description carrying the trigger phrases + "human-invoked only".
+- [x] The two-phase fork flow (analyze → gate → create) is documented with the `{title, body, base, head, provider}` and `CreateInput` hand-offs.
+- [x] The 4-section body (Why / What changed / What to focus on / How to judge) is defined with the cockpit-field → section mapping.
+- [x] The soft cockpit dependency and the `provider:"unknown"` stop condition are both documented.
+- [x] The gate offers create / draft / edit / abort via the host's interactive prompt (`AskUserQuestion` on Claude, equivalent elsewhere); failures are reported honestly.
+- [x] No odin-git reference and no sibling-task-id references in the body.
 
 ## Verification
 
-- [ ] `grep -n "name: pr" packages/chronicle/skills/pr/SKILL.md` matches inside frontmatter.
-- [ ] Manual read-through: an agent could run the full flow using only this file + the two referenced scripts.
-- [ ] Smoke (manual, after packaging): a branch with a cockpit log → body's "Why"/"What to focus on" cite decisions; same branch with `COCKPIT_HOME` empty → all four sections still render, no error.
+- [x] `grep -n "name: pr" packages/chronicle/skills/pr/SKILL.md` matches inside frontmatter.
+- [x] Manual read-through: an agent could run the full flow using only this file + the two referenced scripts.
+- [x] Smoke (manual, after packaging): a branch with a cockpit log → body's "Why"/"What to focus on" cite decisions; same branch with `COCKPIT_HOME` empty → all four sections still render, no error.
 
 ## Eval rubric
 

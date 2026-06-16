@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: commit/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -88,18 +88,18 @@ Port/author `bun:test` cases for the four pure functions. Cover at minimum:
 
 ## Acceptance criteria
 
-- [ ] `analyze-changes.ts` exists under the commit skill and imports only Bun built-ins + `node:` stdlib (no npm, no odin path).
-- [ ] The four functions above are exported and pass the concrete cases in the Tests section (status combos `??`/`A `/`MM`/`R old -> new`/deletion/`<4`-char; quoted-path unquoting + fallback; lock/node_modules skip; binary-extension detection, case-insensitive).
-- [ ] Template resolution returns `../references/commit-template.md` by default and honors `settings.skills.chronicle.commit.templatePath` (with `~` expansion) when set.
-- [ ] Temp output goes to `/tmp/chronicle/commit/`.
-- [ ] No string "odin" or "atomic-commit"-as-settings-key appears in the file.
-- [ ] CLI run prints a JSON object with keys `outputPath`, `promptPath`, `totalFiles`.
+- [x] `analyze-changes.ts` exists under the commit skill and imports only Bun built-ins + `node:` stdlib (no npm, no odin path).
+- [x] The four functions above are exported and pass the concrete cases in the Tests section (status combos `??`/`A `/`MM`/`R old -> new`/deletion/`<4`-char; quoted-path unquoting + fallback; lock/node_modules skip; binary-extension detection, case-insensitive).
+- [x] Template resolution returns `../references/commit-template.md` by default and honors `settings.skills.chronicle.commit.templatePath` (with `~` expansion) when set.
+- [x] Temp output goes to `/tmp/chronicle/commit/`.
+- [x] No string "odin" or "atomic-commit"-as-settings-key appears in the file.
+- [x] CLI run prints a JSON object with keys `outputPath`, `promptPath`, `totalFiles`.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/commit/scripts/analyze-changes.test.ts` is green.
-- [ ] In a dirty git tree: `bun packages/chronicle/skills/commit/scripts/analyze-changes.ts` prints the three-key JSON, and the referenced `outputPath` file parses as JSON with a `files[]` array.
-- [ ] `grep -ri "odin" packages/chronicle/skills/commit/scripts/analyze-changes.ts` returns nothing.
+- [x] `bun test packages/chronicle/skills/commit/scripts/analyze-changes.test.ts` is green.
+- [x] In a dirty git tree: `bun packages/chronicle/skills/commit/scripts/analyze-changes.ts` prints the three-key JSON, and the referenced `outputPath` file parses as JSON with a `files[]` array.
+- [x] `grep -ri "odin" packages/chronicle/skills/commit/scripts/analyze-changes.ts` returns nothing.
 
 ## Eval rubric
 

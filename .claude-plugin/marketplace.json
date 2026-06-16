@@ -18,6 +18,11 @@
       "name": "relay",
       "source": "./packages/relay",
       "description": "Delegate a task to another harness — relay work to the codex, opencode, or claude CLI (delegate / review / image), capture the result, and report back."
+    },
+    {
+      "name": "chronicle",
+      "source": "./packages/chronicle",
+      "description": "Write and guard your project's history — craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail."
     }
   ]
 }

@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: commit/01, commit/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -70,19 +70,19 @@ Point at `scripts/analyze-changes.ts` and `references/commit-template.md` (real 
 
 ## Acceptance criteria
 
-- [ ] `SKILL.md` has valid frontmatter with `name: commit` and a description carrying the trigger phrases + "human-invoked only".
-- [ ] The two-phase fork flow (analyze → gate → write) is documented with the structured `CommitPlan` hand-off.
-- [ ] The decision tree spells out all three atomic triggers and the default file-count threshold (against `totalFiles` incl. untracked), marked tunable.
-- [ ] The deterministic staging model is documented (full changeset in, whole-file re-stage per plan, no pre-staging consent prompt); the atomic-split gate is the ONLY confirmation in the flow.
-- [ ] The simple branch explicitly commits without any confirmation; the atomic branch confirms via the host's interactive prompt (`AskUserQuestion` on Claude, equivalent elsewhere).
-- [ ] The write phase stages by explicit filename and uses the emoji + body + 繁中 template; no `git add -A`.
-- [ ] No reference to odin-git, and no sibling-task-id references in the body.
+- [x] `SKILL.md` has valid frontmatter with `name: commit` and a description carrying the trigger phrases + "human-invoked only".
+- [x] The two-phase fork flow (analyze → gate → write) is documented with the structured `CommitPlan` hand-off.
+- [x] The decision tree spells out all three atomic triggers and the default file-count threshold (against `totalFiles` incl. untracked), marked tunable.
+- [x] The deterministic staging model is documented (full changeset in, whole-file re-stage per plan, no pre-staging consent prompt); the atomic-split gate is the ONLY confirmation in the flow.
+- [x] The simple branch explicitly commits without any confirmation; the atomic branch confirms via the host's interactive prompt (`AskUserQuestion` on Claude, equivalent elsewhere).
+- [x] The write phase stages by explicit filename and uses the emoji + body + 繁中 template; no `git add -A`.
+- [x] No reference to odin-git, and no sibling-task-id references in the body.
 
 ## Verification
 
-- [ ] `grep -n "name: commit" packages/chronicle/skills/commit/SKILL.md` matches inside frontmatter.
-- [ ] Manual read-through: an agent could execute the full flow using only this file + the two referenced files.
-- [ ] Smoke (manual, after packaging): dirty tree with a feat+fix mix → skill proposes a 2-commit split; a single-file doc tweak → commits straight through.
+- [x] `grep -n "name: commit" packages/chronicle/skills/commit/SKILL.md` matches inside frontmatter.
+- [x] Manual read-through: an agent could execute the full flow using only this file + the two referenced files.
+- [x] Smoke (manual, after packaging): dirty tree with a feat+fix mix → skill proposes a 2-commit split; a single-file doc tweak → commits straight through.
 
 ## Eval rubric
 

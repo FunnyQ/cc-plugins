@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing three local plugins:
+A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing four local plugins:
 
 - **monitor** — usage dashboard + per-project cockpit (documented in depth below).
 - **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
 - **relay** — cross-harness delegation via `/relay <codex|opencode|claude> <delegate|review|image>`, with a backend-agnostic mode layer plus per-harness strategy layer and a capability matrix where `image` is codex-only.
+- **chronicle** — commit + PR/MR authoring: reshapes odin-git's simple/atomic commit ideas into one decision tree with no odin-git dependency, and treats cockpit's decision trail as a soft enrichment for PR context.
 
 **monitor** bundles three sibling skills:
 
@@ -24,8 +25,8 @@ This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`
 
 ```
 cc-plugins/
-├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch, relay)
-├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch, relay)
+├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch, relay, chronicle)
+├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch, relay, chronicle)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
 ├── packages/dispatch/                # plugin: interview-driven planning + execution (preflight + flightplan + autopilot)
 │   ├── .claude-plugin/plugin.json    # Claude manifest + PostToolUse hook → flightplan-lint.sh
@@ -72,7 +73,24 @@ cc-plugins/
 │               ├── install.ts        # canonical dashboard precheck (exports dashboardChecks/printReport; CLI too)
 │               ├── setup-statusline.ts   # statusline wiring (exports applyStatusline; CLI too)
 │               └── statusline-decision.ts # pure wrap/stale/skip decision (unit-tested)
-└── packages/relay/                # plugin: cross-harness task delegation (relay)
+├── packages/chronicle/               # plugin: commit + PR/MR authoring; ships to both marketplaces at independent version 0.1.0
+│   ├── .claude-plugin/plugin.json    # Claude manifest, version 0.1.0
+│   ├── .codex-plugin/plugin.json     # Codex manifest, skills: "./skills/", version 0.1.0
+│   └── skills/
+│       ├── commit/                   # skill: unified simple/atomic commit decision tree
+│       │   ├── SKILL.md
+│       │   ├── references/commit-template.md
+│       │   └── scripts/
+│       │       ├── analyze-changes.ts
+│       │       └── analyze-changes.test.ts
+│       └── pr/                       # skill: PR/MR author enriched by cockpit decision trail when available
+│           ├── SKILL.md
+│           └── scripts/
+│               ├── analyze-branch.ts
+│               ├── analyze-branch.test.ts
+│               ├── request-creator.ts
+│               └── request-creator.test.ts
+└── packages/relay/                   # plugin: cross-harness task delegation (relay)
     ├── .claude-plugin/plugin.json        # Claude manifest, version 0.1.0
     ├── .codex-plugin/plugin.json         # Codex manifest, skills: "./skills/", version 0.1.0
     ├── commands/                        # backend-fixed alias commands (auto-discovered; generic entry is the relay:relay skill)
@@ -200,9 +218,11 @@ bun test packages/monitor/skills/install/scripts/
 - `packages/dispatch/.claude-plugin/plugin.json` → `version`
 - `packages/dispatch/.codex-plugin/plugin.json` → `version`
 
-**relay is versioned independently** (currently `0.1.0`), on its own cadence — bump its two files only when relay itself changed:
+**relay and chronicle are versioned independently** (relay currently `0.1.0`; chronicle currently `0.1.0`), on their own cadence — bump their two files only when that plugin itself changed:
 
 - `packages/relay/.claude-plugin/plugin.json` → `version`
 - `packages/relay/.codex-plugin/plugin.json` → `version`
+- `packages/chronicle/.claude-plugin/plugin.json` → `version`
+- `packages/chronicle/.codex-plugin/plugin.json` → `version`
 
 `/odin-git:release` does not auto-detect these per-plugin fields, so **bump the relevant `plugin.json` files by hand** to match the tag before finishing a release, then add the matching `CHANGELOG.md` entry.
