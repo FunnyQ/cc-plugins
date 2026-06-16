@@ -161,24 +161,30 @@ async function gatherGit(baseOverride: string | null) {
   const repoRoot = (await gitText(["rev-parse", "--show-toplevel"])).trim();
   const base = await resolveBase(baseOverride);
   const mergeBase = (await gitText(["merge-base", base, "HEAD"])).trim();
-  const head = (await gitText(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
-  const remoteText = await tryGitText(["remote", "get-url", "origin"]);
+  const [
+    head,
+    remoteText,
+    commitsText,
+    diffStat,
+    changedFilesText,
+    commitTimesText,
+  ] = await Promise.all([
+    gitText(["rev-parse", "--abbrev-ref", "HEAD"]),
+    tryGitText(["remote", "get-url", "origin"]),
+    gitText(["log", "--format=%H%x1f%s%x1f%b%x1e", `${mergeBase}..HEAD`]),
+    gitText(["diff", "--stat", `${mergeBase}..HEAD`]),
+    gitText(["diff", "--name-only", `${mergeBase}..HEAD`]),
+    gitText(["log", "--reverse", "--format=%cI", `${mergeBase}..HEAD`]),
+  ]);
   const remoteUrl = remoteText?.trim() || null;
-  const commits = parseCommits(
-    await gitText(["log", "--format=%H%x1f%s%x1f%b%x1e", `${mergeBase}..HEAD`]),
-  );
-  const diffStat = await gitText(["diff", "--stat", `${mergeBase}..HEAD`]);
-  const changedFiles = lines(
-    await gitText(["diff", "--name-only", `${mergeBase}..HEAD`]),
-  );
-  const commitTimes = lines(
-    await gitText(["log", "--reverse", "--format=%cI", `${mergeBase}..HEAD`]),
-  );
+  const commits = parseCommits(commitsText);
+  const changedFiles = lines(changedFilesText);
+  const commitTimes = lines(commitTimesText);
 
   return {
     repoRoot,
     base,
-    head,
+    head: head.trim(),
     mergeBase,
     remoteUrl,
     commits,

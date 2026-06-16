@@ -96,57 +96,61 @@ export function unquoteGitPath(rawPath: string): string {
   }
 }
 
+const SKIP_DIFF_PATTERNS: RegExp[] = [
+  /\.lock$/,
+  /lock\.json$/,
+  /lock\.yaml$/,
+  /\.lockb$/,
+  /yarn\.lock$/,
+  /node_modules/,
+];
+
 export function shouldSkipDiff(path: string): boolean {
-  return [
-    /\.lock$/,
-    /lock\.json$/,
-    /lock\.yaml$/,
-    /\.lockb$/,
-    /yarn\.lock$/,
-    /node_modules/,
-  ].some((pattern) => pattern.test(path));
+  return SKIP_DIFF_PATTERNS.some((pattern) => pattern.test(path));
 }
 
+const BINARY_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".bmp",
+  ".ico",
+  ".webp",
+  ".avif",
+  ".svg",
+  ".mp3",
+  ".mp4",
+  ".wav",
+  ".ogg",
+  ".webm",
+  ".avi",
+  ".mov",
+  ".flac",
+  ".pdf",
+  ".zip",
+  ".tar",
+  ".gz",
+  ".bz2",
+  ".7z",
+  ".rar",
+  ".xz",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".eot",
+  ".exe",
+  ".dll",
+  ".so",
+  ".dylib",
+  ".sqlite",
+  ".db",
+  ".lockb",
+]);
+
 export function isBinaryFile(path: string): boolean {
-  return new Set([
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".bmp",
-    ".ico",
-    ".webp",
-    ".avif",
-    ".svg",
-    ".mp3",
-    ".mp4",
-    ".wav",
-    ".ogg",
-    ".webm",
-    ".avi",
-    ".mov",
-    ".flac",
-    ".pdf",
-    ".zip",
-    ".tar",
-    ".gz",
-    ".bz2",
-    ".7z",
-    ".rar",
-    ".xz",
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".otf",
-    ".eot",
-    ".exe",
-    ".dll",
-    ".so",
-    ".dylib",
-    ".sqlite",
-    ".db",
-    ".lockb",
-  ]).has(extname(path).toLowerCase());
+  return BINARY_EXTENSIONS.has(extname(path).toLowerCase());
 }
 
 function expandHome(path: string): string {
@@ -228,6 +232,15 @@ async function readUntrackedFile(path: string): Promise<AnalyzedFile> {
   };
 }
 
+function binaryResult(entry: ParsedStatus): AnalyzedFile {
+  return {
+    ...entry,
+    diff: "[binary file - diff skipped]",
+    insertions: 0,
+    deletions: 0,
+  };
+}
+
 async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
   if (
     entry.status === "added" &&
@@ -235,12 +248,7 @@ async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
     !shouldSkipDiff(entry.path)
   ) {
     if (isBinaryFile(entry.path)) {
-      return {
-        ...entry,
-        diff: "[binary file - diff skipped]",
-        insertions: 0,
-        deletions: 0,
-      };
+      return binaryResult(entry);
     }
 
     return { ...entry, ...(await readUntrackedFile(entry.path)) };
@@ -259,12 +267,7 @@ async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
   }
 
   if (isBinaryFile(entry.path)) {
-    return {
-      ...entry,
-      diff: "[binary file - diff skipped]",
-      insertions: 0,
-      deletions: 0,
-    };
+    return binaryResult(entry);
   }
 
   const cached = entry.staged ? "--cached" : "";
