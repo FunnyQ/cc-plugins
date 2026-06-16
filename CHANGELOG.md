@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.1.0] - 2026-06-17
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.1.0` tag._
+
+### ✨ Added
+
+- **Chronicle joins the marketplace as an independently-versioned plugin.** The new `commit` skill unifies simple and atomic commit flows into one decision tree, while the `pr` skill authors PR/MR descriptions enriched by the cockpit decision trail when available. Chronicle ships to both Claude Code and Codex marketplaces at version `0.1.0`.
+
 ## [3.12.1] - 2026-06-17
 
 ### ✨ Added
