@@ -619,7 +619,8 @@ export function initDecisionLog(rootEl) {
     if (seen.has(key)) return;
     seen.add(key);
 
-    if (rec.type === ["go", "al"].join("")) return;
+    // Legacy tolerance: silently skip retired goal records from old logs.
+    if (rec.type === "goal") return;
     if (rec.type === "decision") {
       const pinned = latest.atBottom();
       const card = decisionCard(rec);

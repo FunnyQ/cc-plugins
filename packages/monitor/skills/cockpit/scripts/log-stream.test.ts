@@ -89,15 +89,7 @@ beforeEach(() => {
   process.env.COCKPIT_RESOLVE_POLL_MS = "100";
   process.env.COCKPIT_TAIL_POLL_MS = "100";
   logPath = join(projectDir, ".cockpit", "logs", `${SID}.jsonl`);
-  cli([
-    "start",
-    "--session",
-    SID,
-    "--session-goal",
-    "g",
-    "--project-goal",
-    "p",
-  ]);
+  cli(["log", "--session", SID, "--decision", "seed", "--reason", "seed"]);
 });
 
 afterEach(() => {
@@ -116,7 +108,7 @@ describe("handleLogStream", () => {
       f.some((x) => x.startsWith("event: backlog-done")),
     );
     const recs = dataFrames(frames);
-    expect(recs[0].type).toBe("goal");
+    expect(recs[0].type).toBe("decision");
     expect(recs.some((r) => r.type === "decision" && r.decision === "d1")).toBe(
       true,
     );
@@ -148,7 +140,8 @@ describe("handleLogStream", () => {
     );
     const decisions = dataFrames(frames)
       .filter((r) => r.type === "decision")
-      .map((r) => r.decision);
+      .map((r) => r.decision)
+      .filter((d) => d !== "seed");
     expect(decisions).toEqual(["good1", "good2"]);
   });
 
@@ -163,22 +156,14 @@ describe("handleLogStream", () => {
     expect(res.headers.get("Content-Type")).toContain("text/event-stream");
     const framesP = collect(
       res,
-      (f) => dataFrames(f).some((r) => r.type === "goal"),
+      (f) => dataFrames(f).some((r) => r.decision === "late"),
       4000,
     );
     setTimeout(() => {
-      cli([
-        "start",
-        "--session",
-        lateSid,
-        "--session-goal",
-        "late",
-        "--project-goal",
-        "p",
-      ]);
+      cli(["log", "--session", lateSid, "--decision", "late", "--reason", "p"]);
     }, 200);
     const frames = await framesP;
-    expect(dataFrames(frames).some((r) => r.type === "goal")).toBe(true);
+    expect(dataFrames(frames).some((r) => r.decision === "late")).toBe(true);
   });
 
   test("invalid/non-uuid session returns an error, no crash", async () => {

@@ -84,15 +84,16 @@ beforeAll(async () => {
   projectDir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-bproj-")));
   cockpitHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-bhome-")));
   // Seed a session so the registry has a logPath for SID.
-  runCli([
-    "start",
+  const seed = runCli([
+    "log",
     "--session",
     SID,
-    "--session-goal",
+    "--decision",
     "bridge",
-    "--project-goal",
+    "--reason",
     "p",
   ]);
+  if (seed.code !== 0) throw new Error("bridge seed failed: " + seed.stderr);
   port = freePort();
   daemon = Bun.spawn(["bun", DAEMON, "--no-open", "--port", String(port)], {
     env: {

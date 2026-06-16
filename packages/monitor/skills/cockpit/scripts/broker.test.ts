@@ -27,13 +27,13 @@ function seed(projectDir: string, sid: string) {
     [
       "bun",
       CLI,
-      "start",
+      "log",
       "--session",
       sid,
-      "--session-goal",
-      "g",
-      "--project-goal",
-      "p",
+      "--decision",
+      "seed",
+      "--reason",
+      "seed",
     ],
     { cwd: projectDir, env: { ...process.env, COCKPIT_HOME: cockpitHome } },
   );
