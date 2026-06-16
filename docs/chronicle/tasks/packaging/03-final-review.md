@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: commit/01, commit/02, commit/03, pr/01, pr/02, pr/03, packaging/01, packaging/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -44,22 +44,22 @@ This task transitively depends on every other task in the plan (the dependency c
 
 ## Acceptance criteria
 
-- [ ] Every script path referenced by either SKILL.md exists on disk.
-- [ ] `bun test packages/chronicle/skills/**/scripts/` is fully green.
-- [ ] Both manifests parse and share `version: "0.1.0"`; `chronicle` registered once in each registry, no `version` field there.
-- [ ] `analyze-branch.ts` with an empty `COCKPIT_HOME` exits 0 and reports `hasCockpit:false`.
-- [ ] `grep -ri odin packages/chronicle/` returns nothing.
-- [ ] `CHANGELOG.md` has a chronicle `0.1.0` entry; `CLAUDE.md` lists chronicle (count corrected, tree block present); Releasing section notes independent versioning.
-- [ ] The v1 definition of done above (commit + pr, both providers, independent version) is fully satisfied; any shortfall is filed against its bucket, not patched here.
+- [x] Every script path referenced by either SKILL.md exists on disk.
+- [x] `bun test packages/chronicle/skills/**/scripts/` is fully green.
+- [x] Both manifests parse and share `version: "0.1.0"`; `chronicle` registered once in each registry, no `version` field there.
+- [x] `analyze-branch.ts` with an empty `COCKPIT_HOME` exits 0 and reports `hasCockpit:false`.
+- [x] `grep -ri odin packages/chronicle/` returns nothing.
+- [x] `CHANGELOG.md` has a chronicle `0.1.0` entry; `CLAUDE.md` lists chronicle (count corrected, tree block present); Releasing section notes independent versioning.
+- [x] The v1 definition of done above (commit + pr, both providers, independent version) is fully satisfied; any shortfall is filed against its bucket, not patched here.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/**/scripts/` → green.
-- [ ] `for f in analyze-changes analyze-branch request-creator; do ...` (or manual) confirm each referenced script + the template + both manifests exist.
-- [ ] `COCKPIT_HOME=$(mktemp -d) bun packages/chronicle/skills/pr/scripts/analyze-branch.ts` exits 0 with `hasCockpit:false`.
-- [ ] `grep -ri odin packages/chronicle/` is empty.
-- [ ] Both registries parse and contain exactly one `chronicle` entry each.
-- [ ] `grep -n chronicle CHANGELOG.md CLAUDE.md` returns the new entries; `grep -n "three local plugins" CLAUDE.md` is empty.
+- [x] `bun test packages/chronicle/skills/**/scripts/` → green.
+- [x] `for f in analyze-changes analyze-branch request-creator; do ...` (or manual) confirm each referenced script + the template + both manifests exist.
+- [x] `COCKPIT_HOME=$(mktemp -d) bun packages/chronicle/skills/pr/scripts/analyze-branch.ts` exits 0 with `hasCockpit:false`.
+- [x] `grep -ri odin packages/chronicle/` is empty.
+- [x] Both registries parse and contain exactly one `chronicle` entry each.
+- [x] `grep -n chronicle CHANGELOG.md CLAUDE.md` returns the new entries; `grep -n "three local plugins" CLAUDE.md` is empty.
 
 ## Eval rubric
 
