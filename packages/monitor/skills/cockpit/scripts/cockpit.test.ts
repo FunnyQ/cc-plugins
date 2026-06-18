@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -302,6 +303,44 @@ describe("cockpit log", () => {
       before - 1000,
     );
     expect(sessionViewFor(SID)?.tracked).toBe(true);
+  });
+
+  test("reaps registry entries whose last signal is older than the TTL", () => {
+    const STALE = "99999999-9999-9999-9999-999999999999";
+    const daysAgo = (n: number) =>
+      new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+    // Seed: one long-ended entry (20d, no log file → mtime 0) + one recent (2d).
+    const RECENT = "22222222-2222-2222-2222-222222222222";
+    writeFileSync(
+      join(cockpitHome, "registry.json"),
+      JSON.stringify({
+        sessions: [
+          {
+            provider: "claude",
+            project: projectDir,
+            sessionId: STALE,
+            logPath: join(projectDir, ".cockpit/logs", `${STALE}.jsonl`),
+            lastHeartbeat: daysAgo(20),
+          },
+          {
+            provider: "claude",
+            project: projectDir,
+            sessionId: RECENT,
+            logPath: join(projectDir, ".cockpit/logs", `${RECENT}.jsonl`),
+            lastHeartbeat: daysAgo(2),
+          },
+        ],
+      }),
+    );
+    // Any write triggers the reap.
+    run(["log", "--session", SID, "--decision", "d", "--reason", "r"]);
+    const reg = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    );
+    const ids = reg.sessions.map((s: any) => s.sessionId);
+    expect(ids).toContain(SID); // just-touched
+    expect(ids).toContain(RECENT); // within window
+    expect(ids).not.toContain(STALE); // reaped
   });
 
   test("--provider codex routes log registration to a Codex-backed session", () => {

@@ -13,6 +13,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { spawn } from "node:child_process";
@@ -186,13 +187,43 @@ function readRegistry(): Registry {
   return { sessions: [] };
 }
 
-function upsertSession(entry: RegistryEntry): void {
+// Long-ended sessions are never removed by upsert (keyed by sessionId, so they
+// just accumulate), which both grows registry.json without bound and keeps their
+// projects in the dashboard's project list forever — plus every /api/sessions
+// poll stat()s each entry's log. Reap entries whose last signal is older than
+// this on write. 14 days = the dashboard's "recent projects" look-back window.
+const REGISTRY_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+// Most-recent activity for an entry — mirrors registry.ts statusOf: max of the
+// heartbeat and the log file's mtime (a session can be live well past its last
+// heartbeat write). Missing/unparseable signals count as 0 (ancient).
+function lastSignalMs(e: RegistryEntry): number {
+  const hb = Date.parse(e.lastHeartbeat);
+  let mtime = 0;
+  try {
+    mtime = statSync(e.logPath).mtimeMs;
+  } catch {
+    // log gone — heartbeat is the only signal
+  }
+  return Math.max(Number.isNaN(hb) ? 0 : hb, mtime);
+}
+
+// Single write path: reap stale entries, then persist. The just-touched entry
+// always survives (fresh heartbeat → 0ms old), so no special-casing needed.
+function writeRegistry(reg: Registry, now = Date.now()): void {
+  reg.sessions = reg.sessions.filter(
+    (s) => now - lastSignalMs(s) < REGISTRY_TTL_MS,
+  );
   mkdirSync(COCKPIT_HOME, { recursive: true });
+  writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
+}
+
+function upsertSession(entry: RegistryEntry): void {
   const reg = readRegistry();
   const idx = reg.sessions.findIndex((s) => s.sessionId === entry.sessionId);
   if (idx >= 0) reg.sessions[idx] = entry;
   else reg.sessions.push(entry);
-  writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
+  writeRegistry(reg);
 }
 
 function refreshHeartbeat(
@@ -205,8 +236,7 @@ function refreshHeartbeat(
   const now = new Date().toISOString();
   if (entry) {
     entry.lastHeartbeat = now;
-    mkdirSync(COCKPIT_HOME, { recursive: true });
-    writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
+    writeRegistry(reg);
   } else {
     upsertSession({
       provider,
