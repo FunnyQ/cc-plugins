@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.13.0] - 2026-06-18
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.13.0` tag._
+
+### ✨ Added
+
+- **Usage history now outlives Claude Code's cleanup.** A new persistent SQLite rollup DB (`rollup-db.ts` + `rollup-update.ts`, stored under `~/.local/share`) tail-ingests `~/.claude` transcripts into billing-deduped hourly buckets, so the dashboard's token/cost history survives `cleanupPeriodDays` deleting the underlying transcripts. `api.ts` now sources its aggregate maps from the rollup (with a live-walk fallback), and the statusline collector fires a throttled, fail-silent background nudge to keep it fresh. The `/api/stats` output shape and live-pricing cost are unchanged.
+
 ## [chronicle 0.2.0] - 2026-06-18
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.2.0` tag._
