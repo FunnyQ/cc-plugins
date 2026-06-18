@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.14.3] - 2026-06-18
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.14.3` tag._
+
+### 🐛 Fixed
+
+- **Scribe entries now actually follow the configured decision-log language.** The language requirement lived only in scribe.md's "Step 5 — Language", which sat _after_ the write step (Step 4) — so a fork wrote every entry in its inherited (often English) context first and met the rule too late. Language resolution now happens up front in Step 1 and is enforced at the point of writing in Step 4, with explicit wording that it overrides the conversation/prompt language; Step 5 becomes a final sanity-check. The `SessionStart` auto-logging guidance also now reminds that the fork writes in the configured language, which may differ from the chat.
+
 ## [monitor 3.14.2] - 2026-06-18
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.14.2` tag._
