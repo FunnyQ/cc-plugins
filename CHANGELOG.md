@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.14.1] - 2026-06-18
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.14.1` tag._
+
+### 🔧 Changed
+
+- **The thoughtful-logging nudge is now terse and diagram-first.** The `Stop`-hook reminder no longer repeats the full fork how-to every turn (that boilerplate is taught once at `SessionStart`); it is now a one-line poke in two tiers by change size — light vs structural — each carrying only the essential `subagent_type:"fork"` token so it stays actionable even after the session is compacted. Both tiers, and the `scribe` reference itself, now lead **diagram-first**: prefer attaching a Mermaid `--diagram` whenever the insight has a shape (flow / sequence / state / fan-out), falling back to prose only for genuinely flat facts.
+
 ## [monitor 3.14.0] - 2026-06-18
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.14.0` tag._
