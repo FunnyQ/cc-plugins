@@ -1,6 +1,6 @@
 ---
 name: writer
-description: "Chronicle's commit writer. Stages files and writes commits from the Commit Manager's confirmed plan + rationale brief, following the chronicle template. Spawned by the chronicle:commit skill."
+description: "Chronicle's commit writer. Stages files and writes commits from the Commit Manager's confirmed plan + rationale brief, following the chronicle template. Spawned by chronicle:manager."
 model: haiku
 tools: ["Bash", "Read"]
 allowed-tools: Bash(git *), Bash(bun *)
@@ -42,7 +42,9 @@ For each commit, **in the given order**:
    git add <file1> <file2> ...
    ```
 
-   Never `git add -A` / `git add .`.
+   The plan is whole-file: each file is already assigned to exactly one commit, so
+   you only ever stage by explicit filename. Never `git add -A` / `git add .`, and
+   never `git add -p` / partial-hunk staging — there are no hunk decisions to make.
 
 2. Commit with a heredoc following the template:
 
