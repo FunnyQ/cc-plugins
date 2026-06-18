@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.2.0] - 2026-06-18
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.2.0` tag._
+
+### ✨ Improved
+
+- **The commit skill is now driven by one Commit Manager.** The old two-phase flow (an analyze fork, then a write fork, both on your model) is replaced by a single context-inheriting Commit Manager fork that owns the whole run: it spawns a fresh Haiku `chronicle:analyst` to gather changeset facts, decides simple vs atomic itself, then spawns a fresh Haiku `chronicle:writer` to stage and commit. The grunt work drops to Haiku while the Manager keeps the conversation's "why" — which it distills into each commit's `whyBrief` and passes down, since the fresh children don't inherit the conversation. This threads three Claude Code constraints (a fork can't spawn another fork; fresh agents honor a per-call model override; children don't inherit context), and keeps all diff/git output inside the Manager subtree so the main conversation only sees the final `git log`.
+
 ## [chronicle 0.1.2] - 2026-06-17
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.1.2` tag._
