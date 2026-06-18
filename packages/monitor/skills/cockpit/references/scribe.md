@@ -42,6 +42,21 @@ PROVIDER_FLAG="--provider codex"
 Decide which surface you are on from the inherited context (the spawn prompt
 notes the surface) and use `$PROVIDER_FLAG` consistently in every call below.
 
+### Resolve the log language — BEFORE you write anything
+
+Entries must be written in the configured decision-log language, **not** the
+language of the inherited conversation or your spawn prompt. Resolve it now, as
+part of setup, so it is fixed before Step 4 writes a single entry:
+
+```bash
+LANG_NAME="$(bun "$CLI" config get-language)"   # e.g. zh-TW, or English by default
+```
+
+This is non-negotiable and overrides everything else: even if the conversation
+you inherited and this prompt are entirely in English, every `--title` / `--text`
+you write **must** be in `$LANG_NAME`. Mentally compose each entry in `$LANG_NAME`
+from the start — do not draft in another language and rely on translating later.
+
 ---
 
 ## Step 2 — Add the code-change lens
@@ -115,10 +130,11 @@ shape, draw it; if it's a sentence, write the sentence.
 ### Then: write each surviving entry
 
 For each insight that is genuinely worth recording and not yet covered, pick a
-`kind` and call:
+`kind` and call — writing `--title` and `--text` in `$LANG_NAME` (resolved in
+Step 1), regardless of the language of the conversation or this prompt:
 
 ```bash
-bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" $PROVIDER_FLAG
+bun "$CLI" scribe --type <kind> --title "<short headline in $LANG_NAME>" --text "<body in $LANG_NAME, markdown>" $PROVIDER_FLAG
 ```
 
 ### Kind values and when to use them
@@ -163,15 +179,13 @@ obvious path". Avoid vague summaries ("the code was improved") — be specific
 
 ---
 
-## Step 5 — Language
+## Step 5 — Language (already handled — final check)
 
-Before writing, resolve the log language from the cockpit config:
-
-```bash
-LANG_NAME="$(bun "$CLI" config get-language)"   # prints e.g. zh-TW, or English by default
-```
-
-Write `--title` / `--text` in `$LANG_NAME`. There is no project metadata fallback anymore.
+Language was resolved in Step 1 and applied as you wrote each entry in Step 4.
+Before ending, sanity-check: every `--title` / `--text` you wrote is in
+`$LANG_NAME`. If any slipped into another language (e.g. because the inherited
+conversation was English), it does not match the config — rewrite it. There is no
+project metadata fallback anymore.
 
 ---
 
