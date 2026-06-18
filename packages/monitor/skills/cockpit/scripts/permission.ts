@@ -16,10 +16,10 @@
 // A restarted daemon simply has no pending requests; clients re-poll. Same
 // cockpitHome()/daemonToken()/UUID_RE/env-override helpers as broker.ts/inbox.ts.
 import { readFileSync, statSync, watch, type FSWatcher } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { jsonResponse as json } from "./http";
 import { resolveClaudeTranscriptPath } from "./transcript-stream";
+import { cockpitHome } from "./cockpit-home";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -85,10 +85,6 @@ function abandonParkedPull(session: string): void {
 }
 
 // ---------- central dir + token (overridable for tests) ----------
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 // The shared secret the daemon wrote on bind. Read fresh per request so a daemon
 // restart (new token) is picked up without caching staleness.

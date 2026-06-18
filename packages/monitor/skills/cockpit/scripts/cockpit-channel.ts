@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   execFileSync,
@@ -16,6 +15,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { findSession } from "./find-session";
+import { cockpitHome } from "./cockpit-home";
 
 export type DaemonCoords = { port: number; token: string };
 export type ProcessInfo = { pid: number; port: number };
@@ -34,10 +34,6 @@ type ChannelServer = Server & {
 
 export const CHANNEL_INSTRUCTIONS =
   'Messages from the cockpit dashboard arrive as <channel source="cockpit">...</channel>.';
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 function daemonInfoPath(): string {
   return join(cockpitHome(), "daemon.json");

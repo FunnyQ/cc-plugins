@@ -143,7 +143,7 @@ Opens `http://localhost:5858` in your default browser.
 
 - Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
 - Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and rollout files under `~/.codex/sessions`.
-- Decision logs, registry, and wait/send bridge are shared through `.cockpit/` and `~/.cockpit/`.
+- Decision logs live per-project under `.cockpit/`; the registry and wait/send bridge are shared through `~/.local/share/q-lab/cockpit/`.
 
 ### Channel (send box)
 

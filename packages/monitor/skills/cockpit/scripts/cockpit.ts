@@ -16,12 +16,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawn } from "node:child_process";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { findSession } from "./find-session";
 import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
+import { cockpitHome } from "./cockpit-home";
 
 // ---------- Types ----------
 
@@ -72,7 +72,7 @@ type Provider = "claude" | "codex" | "opencode";
 
 // ---------- Paths ----------
 
-const COCKPIT_HOME = process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
+const COCKPIT_HOME = cockpitHome();
 const REGISTRY_PATH = join(COCKPIT_HOME, "registry.json");
 const DAEMON_PATH = join(COCKPIT_HOME, "daemon.json");
 

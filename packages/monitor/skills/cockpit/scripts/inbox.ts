@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { jsonResponse as json } from "./http";
+import { cockpitHome } from "./cockpit-home";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -13,10 +13,6 @@ const stashed = new Map<string, { text: string; expires: number }>();
 // (timeout/message) and the next re-parking, the channel is still attached, so
 // `hasChannel` must not flicker false in that gap.
 const channelSeen = new Map<string, number>();
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 function daemonToken(): string | null {
   try {

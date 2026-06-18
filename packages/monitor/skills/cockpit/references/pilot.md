@@ -52,7 +52,7 @@ See **The dashboard daemon** below.
 
 One daemon serves every project's cockpit; you don't run a server per session.
 
-- **Singleton, idempotent.** A PID file at `~/.cockpit/daemon.json` tracks the
+- **Singleton, idempotent.** A PID file at `~/.local/share/q-lab/cockpit/daemon.json` tracks the
   live instance. Running it again detects the running daemon, opens the browser,
   prints its URL, and exits `0` — so re-running always lands the user on the
   cockpit, even when the daemon was launched headless by the channel MCP.
@@ -165,7 +165,7 @@ The ✅ version lets a reader reconstruct *why the pair*, *what bug it fixes*, a
 
 ```bash
 --decision "One dashboard daemon serves every project, not a server per session"
---reason   "A singleton keyed by a PID file (~/.cockpit/daemon.json) runs once;
+--reason   "A singleton keyed by a PID file (~/.local/share/q-lab/cockpit/daemon.json) runs once;
             every session's SSE just subscribes to it."
 --facet    "REJECTED: spawning a server for each session — sessions open and
             close constantly, so per-session servers mean port churn and orphaned

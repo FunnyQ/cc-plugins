@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "3.13.0",
+  "version": "3.14.0",
   "description": "Monitor your Claude Code, Codex, and OpenCode sessions — a usage dashboard plus a per-project cockpit with a decision trail, live session view, needs-your-call bridge, and thoughtful auto-logging.",
   "author": {
     "name": "Q"
@@ -50,6 +50,17 @@
             "type": "command",
             "command": "echo 'DECISION LOG ACTIVE — /cockpit scribe is this session decision log. When you finish a chunk of work genuinely worth recording — a non-obvious decision between real alternatives, deliberate-but-odd code, a tricky learning, or a sharp caveat/ordering trap — spawn a background fork to distill it: Agent(subagent_type: \"fork\", prompt: \"Run /cockpit scribe to distill the work we just completed into cockpit decision-trail entries.\"). One fork per logical chunk. Skip trivial edits — the bar is high, and missing some is fine. Use \"fork\" exactly (omitting it starts a fresh, context-less agent).' || true",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/scribe-nudge.ts\"",
+            "timeout": 10
           }
         ]
       }

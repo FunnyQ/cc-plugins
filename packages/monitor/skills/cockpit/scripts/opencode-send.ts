@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { jsonResponse as json } from "./http";
+import { cockpitHome } from "./cockpit-home";
 
 const OPENCODE_SESSION_RE = /^ses_[A-Za-z0-9_-]{8,160}$/;
 
@@ -29,10 +29,6 @@ type SendOpenCodePrompt = (
 ) => Promise<OpenCodeSendReport>;
 
 type CheckOpenCodeSession = (sessionId: string) => Promise<OpenCodeSendReport>;
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 function daemonToken(): string | null {
   try {

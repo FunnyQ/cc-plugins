@@ -4,11 +4,11 @@
 // Routing is keyed by sessionId (a Map, not a flat queue) so concurrent
 // sessions never steal each other's events.
 import { appendFileSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { readRegistry } from "./registry";
 import { jsonResponse as json } from "./http";
 import { callMatches, latestOpenCallId } from "./call-log";
+import { cockpitHome } from "./cockpit-home";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -68,10 +68,6 @@ function takeStashedAnswer(
 }
 
 // ---------- central dir (overridable for tests) ----------
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 // The shared secret the daemon wrote on bind. Read fresh per request so a
 // daemon restart (new token) is picked up without caching staleness.

@@ -1,12 +1,12 @@
 // cockpit registry — reads ~/.cockpit/registry.json, derives active/ended
 // status per session, and builds the /api/sessions + /api/projects payloads.
 import { readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
 import { subagentCountFor } from "./subagents";
 import { hasChannel } from "./inbox";
+import { cockpitHome } from "./cockpit-home";
 
 export type RegistryEntry = {
   provider: Provider;
@@ -62,10 +62,6 @@ export type ProjectView = {
 export const STALE_MS = 10 * 60 * 1000; // 10 min — matches token-atlas live filtering
 
 // ---------- central dir (overridable for tests) ----------
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 function registryPath(): string {
   return join(cockpitHome(), "registry.json");

@@ -63,7 +63,7 @@ cc-plugins/
 │       │   │   ├── scribe.md         # background auto-distill via cockpit scribe
 │       │   │   ├── claude.md         # Claude provider/session/wait policy
 │       │   │   └── codex.md          # Codex provider/session/wait policy
-│       │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + Claude inbox/send + Codex remote-control send
+│       │   ├── scripts/cockpit-server.ts # Bun daemon (singleton via ~/.local/share/q-lab/cockpit/daemon.json), port 5858: decision-log SSE + transcript stream + wait/send broker + Claude inbox/send + Codex remote-control send
 │       │   ├── scripts/cockpit.ts        # CLI: log / scribe / wait / send / config
 │       │   ├── scripts/cockpit-channel.ts # channel MCP server (stdio): long-polls /api/inbox, injects UI text into the live session (no tools — agent→UI is the transcript)
 │       │   ├── scripts/codex-control-probe.ts # Codex app-server control client: managed remote-control websocket first, direct app-server fallback
@@ -141,7 +141,7 @@ Purely additive — the `/api/stats` snapshot is untouched. `live.ts` powers one
 
 1. `GET /api/live` — active sessions from both providers: Claude from `~/.claude/sessions/*.json` (status `busy`/`idle`/`waiting`, stale-filtered at 10 min) and Codex from the `threads` table in `~/.codex/state_5.sqlite` (status `active-inferred`/`recent`). Drives the "Live now" panel, polled every 3s (paused while the tab is hidden).
 
-usage-dashboard does **not** render transcripts — it's the rear-view (usage analytics). Clicking a Live-now row calls `openInCockpit(session)`, which opens `http://localhost:<cockpitPort>/?session=<id>&provider=<p>&project=<cwd>` in a new tab: cockpit (the live windshield) owns the transcript view. The port comes from `/api/live`'s `cockpitPort` (read from cockpit's `~/.cockpit/daemon.json`, so a custom-`--port` cockpit still resolves), falling back to `5858`; rows are inert when `cockpitUp` is false so a dead daemon never opens a broken tab. The transcript renderer + `marked`/`DOMPurify`/`highlight.js` vendors were removed here to avoid maintaining two copies — cockpit's `transcript-stream.ts` + `modules/transcript.js` are the single source.
+usage-dashboard does **not** render transcripts — it's the rear-view (usage analytics). Clicking a Live-now row calls `openInCockpit(session)`, which opens `http://localhost:<cockpitPort>/?session=<id>&provider=<p>&project=<cwd>` in a new tab: cockpit (the live windshield) owns the transcript view. The port comes from `/api/live`'s `cockpitPort` (read from cockpit's `~/.local/share/q-lab/cockpit/daemon.json`, so a custom-`--port` cockpit still resolves), falling back to `5858`; rows are inert when `cockpitUp` is false so a dead daemon never opens a broken tab. The transcript renderer + `marked`/`DOMPurify`/`highlight.js` vendors were removed here to avoid maintaining two copies — cockpit's `transcript-stream.ts` + `modules/transcript.js` are the single source.
 
 ### Key Design Decisions
 
