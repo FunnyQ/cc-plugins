@@ -66,9 +66,17 @@ export function branchDecisions(
   sinceISO: string,
 ): DecisionRecord[] {
   const changed = new Set(changedFiles);
+  // Compare instants, not strings. Cockpit logs timestamps in UTC ("…Z") while
+  // git's %cI emits a local offset ("…+08:00"); a lexical `<` across those two
+  // formats is meaningless (e.g. "12:59Z" < "16:48+08:00" though the first is
+  // chronologically later), which silently dropped every in-branch decision for
+  // any non-UTC user. Date.parse normalizes both to epoch ms; NaN comparisons are
+  // false, so an unparseable timestamp falls through to the file filter rather
+  // than being dropped.
+  const since = Date.parse(sinceISO);
 
   return records.filter((record) => {
-    if (record.timestamp < sinceISO) return false;
+    if (Date.parse(record.timestamp) < since) return false;
     if (record.files.length === 0) return true;
     return record.files.some((file) => changed.has(file));
   });
