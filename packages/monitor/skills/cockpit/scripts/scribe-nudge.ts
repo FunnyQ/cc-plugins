@@ -93,26 +93,26 @@ export function decideNudge(opts: {
   return true;
 }
 
-/** Build the `additionalContext` reminder string injected back into the model. */
+/**
+ * Build the `additionalContext` reminder injected back into the model. Kept
+ * deliberately terse — the full how-to (the fork mechanics + policy) is taught
+ * once by the SessionStart hook, so this is a light poke, not a repeated manual.
+ * Two tiers by change size control only the tone; both are diagram-first.
+ */
 export function buildReminder(c: Complexity): string {
-  const base =
-    "DECISION LOG — code changed since the last decision-trail entry. If this " +
-    "chunk is genuinely worth recording (a non-obvious decision between real " +
-    "alternatives, deliberate-but-odd code, a tricky learning, or a sharp " +
-    "caveat/ordering trap), spawn ONE background fork to distill it: " +
-    'Agent(subagent_type: "fork", prompt: "Run /cockpit scribe to distill the ' +
-    'work we just completed into cockpit decision-trail entries."). One fork per ' +
-    "logical chunk. Skip trivial edits — the bar is high, and missing some is " +
-    'fine. Use "fork" exactly (omitting it starts a fresh, context-less agent).';
-
-  if (!c.structural) return base;
-
-  const lead =
-    `⬡ This looks like a sizable/structural change (${c.files} files, ~${c.lines} ` +
-    "lines). When you log it, strongly consider attaching a Mermaid `--diagram` " +
-    "(a flow, state machine, or sequence) — for a change this shape, a picture " +
-    "conveys the intent far faster than prose.\n\n";
-  return lead + base;
+  if (c.structural) {
+    return (
+      `📐 Sizable change (${c.files} files, ~${c.lines} lines). If it hid a real ` +
+      'decision/learning/caveat, spawn a fork (subagent_type:"fork") to run ' +
+      "/cockpit scribe — draw it with a Mermaid `--diagram` first (flow / sequence " +
+      "/ state / fan-out), prose only for what a picture can't carry."
+    );
+  }
+  return (
+    "💭 If that change hid a real decision/learning/caveat, spawn a fork " +
+    '(subagent_type:"fork") to run /cockpit scribe — prefer a Mermaid `--diagram` ' +
+    "if it has any shape, else a terse note. Otherwise skip."
+  );
 }
 
 // ── Marker store ─────────────────────────────────────────────────────────────
