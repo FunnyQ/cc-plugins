@@ -33,6 +33,7 @@ What `--apply` does:
 
 1. **statusline collector** → `~/.claude/settings.json` (usage-dashboard live usage limits; wraps any existing statusline)
 2. **stale-channel cleanup** → removes a leftover hand-wired `cockpit-channel` from `~/.claude.json` if present
+3. **plugin script permissions** → adds `Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts[ *])` to `permissions.allow` in `~/.claude/settings.json`, so the marketplace's own scripts run without a permission prompt. This matters for nested sub-agents (e.g. `chronicle:drafter` under `chronicle:editor`): a deeply-nested agent can't surface a permission prompt to be answered, so an un-allowlisted `bun` call is silently denied and the flow stalls.
 
 The dashboard precheck (`install.ts`) and statusline wiring
 (`setup-statusline.ts`) live in this skill and are imported by usage-dashboard,
