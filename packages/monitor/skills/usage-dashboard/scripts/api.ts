@@ -15,6 +15,8 @@ import { join } from "node:path";
 import { dedupKey } from "./dedup";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
+import { allHourlyRows, openRollupDb } from "./rollup-db";
+import { updateRollup } from "./rollup-update";
 
 const HOME = homedir();
 const CLAUDE_DIR = join(HOME, ".claude");
@@ -1332,6 +1334,88 @@ function countClaudeToolCalls(content: unknown): number {
   ).length;
 }
 
+type ClaudeAggregates = {
+  modelUsage: Record<string, ModelUsage>;
+  dailyModelUsage: Map<string, Map<string, ModelUsage>>;
+  hourlyUsage: Map<number, HourlyUsageBucket>;
+  projectTokens: Map<string, number>;
+  projectModelUsage: Map<string, Map<string, ModelUsage>>;
+};
+
+// Reconstruct the four Claude aggregate maps + projectTokens from the persistent
+// rollup, so they reflect the *full* token history even after Claude Code deletes
+// the underlying transcripts. usage_hourly is finer-grained than any single map
+// (it carries hour + project + model), so each map is a different GROUP BY of the
+// same rows. hour_ms=0 rows are timeless entries: counted in the model/project
+// totals but excluded from the hourly/daily maps — exactly the live parser's
+// behaviour (addHourlyUsage skips ts=0; daily skips empty dates).
+function readRollupAggregates(db: Database): ClaudeAggregates {
+  const modelUsage: Record<string, ModelUsage> = {};
+  const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
+  const hourlyUsage = new Map<number, HourlyUsageBucket>();
+  const projectTokens = new Map<string, number>();
+  const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
+
+  for (const r of allHourlyRows(db)) {
+    const usage: ModelUsage = {
+      inputTokens: r.input_tokens,
+      outputTokens: r.output_tokens,
+      cacheReadInputTokens: r.cache_read,
+      cacheCreationInputTokens: r.cache_creation,
+      reasoningOutputTokens: r.reasoning,
+    };
+
+    // modelUsage — every row, keyed by raw model (buildStats applies modelKey).
+    modelUsage[r.model] ??= emptyModelUsage();
+    addModelUsage(modelUsage[r.model], usage);
+
+    // projectModelUsage + projectTokens — only rows with a cwd, matching the live
+    // parser which writes these solely when entry.cwd is truthy.
+    if (r.project) {
+      let byModel = projectModelUsage.get(r.project);
+      if (!byModel) {
+        byModel = new Map();
+        projectModelUsage.set(r.project, byModel);
+      }
+      const pu = byModel.get(r.model) ?? emptyModelUsage();
+      addModelUsage(pu, usage);
+      byModel.set(r.model, pu);
+      projectTokens.set(
+        r.project,
+        (projectTokens.get(r.project) ?? 0) + modelUsageTotal(usage),
+      );
+    }
+
+    // hourly + daily — only timestamped rows.
+    if (r.hour_ms) {
+      // hourlyUsage is keyed by the namespaced modelKey (see live parser).
+      addHourlyUsage(
+        hourlyUsage,
+        r.hour_ms,
+        modelKey("claude", r.model),
+        usage,
+      );
+      const date = fmtDate(r.hour_ms);
+      let byModel = dailyModelUsage.get(date);
+      if (!byModel) {
+        byModel = new Map();
+        dailyModelUsage.set(date, byModel);
+      }
+      const du = byModel.get(r.model) ?? emptyModelUsage();
+      addModelUsage(du, usage);
+      byModel.set(r.model, du);
+    }
+  }
+
+  return {
+    modelUsage,
+    dailyModelUsage,
+    hourlyUsage,
+    projectTokens,
+    projectModelUsage,
+  };
+}
+
 function parseTranscriptUsage(): {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
@@ -1473,19 +1557,41 @@ function parseTranscriptUsage(): {
     }
   }
 
-  return {
+  const ledger = Array.from(ledgerBySession.values())
+    .map(({ toolCallIds: _toolCallIds, ...row }) => row)
+    .filter(
+      (row) =>
+        row.timestampMs > 0 &&
+        (row.interactions > 0 || row.tokens > 0 || row.toolCalls > 0),
+    );
+
+  // The aggregate maps come from the persistent rollup (full history, survives
+  // transcript deletion); the per-session ledger + file count stay sourced from
+  // the live walk above (inherently recent — they shrink as files are cleaned up,
+  // which is acceptable). If the rollup is unavailable for any reason, fall back
+  // to the live-walk maps so the dashboard still renders.
+  let aggregates: ClaudeAggregates = {
     modelUsage,
     dailyModelUsage,
     hourlyUsage,
     projectTokens,
     projectModelUsage,
-    ledger: Array.from(ledgerBySession.values())
-      .map(({ toolCallIds: _toolCallIds, ...row }) => row)
-      .filter(
-        (row) =>
-          row.timestampMs > 0 &&
-          (row.interactions > 0 || row.tokens > 0 || row.toolCalls > 0),
-      ),
+  };
+  try {
+    const db = openRollupDb();
+    try {
+      updateRollup(db);
+      aggregates = readRollupAggregates(db);
+    } finally {
+      db.close();
+    }
+  } catch {
+    // keep live-walk aggregates
+  }
+
+  return {
+    ...aggregates,
+    ledger,
     transcriptFileCount: transcriptFiles.length,
   };
 }

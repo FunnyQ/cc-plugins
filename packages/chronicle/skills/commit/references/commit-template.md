@@ -39,9 +39,9 @@
 
 ## Length guardrail
 
-A context-inheriting fork writes these messages, so it holds far more "why"
-than belongs in a commit. Be terse on purpose — the commit records the change,
-not the whole investigation:
+The Commit Manager hands the writer a distilled `whyBrief` that holds far more
+"why" than belongs in a commit. Be terse on purpose — the commit records the
+change, not the whole investigation:
 
 - **Body**: one line per bullet where possible; ~3–4 bullets for a normal
   change. Say *why*; don't restate the diff or narrate the session.

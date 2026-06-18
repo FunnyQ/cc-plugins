@@ -47,10 +47,12 @@ cc-plugins/
 │       │   ├── SKILL.md              # skill trigger config & docs
 │       │   ├── PRODUCT.md            # design direction — Sunrise Atlas (Big Sur dawn palette, calm working surface, anti-Nordic)
 │       │   ├── scripts/
-│       │   │   ├── api.ts            # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats()
+│       │   │   ├── api.ts            # data engine — reads ~/.claude/ & ~/.codex/, merges pricing, exports buildStats(); Claude aggregates now come from the rollup DB
+│       │   │   ├── rollup-db.ts      # persistent rollup DB (bun:sqlite at ~/.local/share/q-lab/token-atlas/rollup.db): schema + accessors; usage_hourly / ingested_files / seen_requests / meta
+│       │   │   ├── rollup-update.ts  # incremental tail-ingest of ~/.claude transcripts → usage_hourly (resume from bytes_parsed, billing dedup, truncation→rebuild, prune deleted files)
 │       │   │   ├── live.ts           # live-sessions engine (Claude + Codex) — active sessions for the "Live now" panel
 │       │   │   ├── atlas-server.ts   # Bun HTTP server (static + /api/stats + /api/live), port 5938
-│       │   │   └── statusline-collector.ts # captures live rate_limits, chains ccstatusline
+│       │   │   └── statusline-collector.ts # captures live rate_limits, chains ccstatusline, fires a throttled detached rollup nudge
 │       │   ├── dashboard/dist/       # static SPA (petite-vue + Chart.js, no build step)
 │       │   └── references/
 │       │       └── pricing-defaults.json
@@ -124,6 +126,15 @@ relay ships to both Claude Code and Codex marketplaces via `.claude-plugin/plugi
 3. `atlas-server.ts` exposes `GET /api/stats` (calls `buildStats()`) and serves `dashboard/dist/` statically
 4. Frontend fetches `/api/stats` on load, renders with petite-vue + Chart.js
 
+### Usage rollup DB
+
+Claude Code deletes transcripts via `cleanupPeriodDays` (default 30), so re-parsing `~/.claude/projects/**` on every load loses token/cost/model history as files age out. The rollup DB makes that history **survive deletion**:
+
+1. `parseTranscriptUsage()` (in `api.ts`) calls `updateRollup()` then `readRollupAggregates()` — its four aggregate maps + `projectTokens` are sourced from the rollup (full history), not the live walk; `ledger` + file count stay on the live walk (inherently recent, shrink as files are cleaned up). If the DB is unavailable it falls back to the live-walk maps.
+2. `rollup-update.ts` is incremental: each transcript is tail-parsed from `ingested_files.bytes_parsed` (at UTF-8-safe newline boundaries), billing-deduped across runs via `seen_requests`, and additively upserted into `usage_hourly(hour_ms, project, model)` — **tokens only** (cost stays a downstream live-pricing computation, so price corrections apply retroactively). `hour_ms` is the local hour-start (matches `hourStartMs`), so daily/heatmap reconstruction is byte-identical and `/api/stats` is unchanged.
+3. Triggers: primary = dashboard load (update-then-read in `parseTranscriptUsage`); secondary = a detached, 5-min-throttled `nudgeRollup()` from `statusline-collector.ts`. No daemon.
+4. Bounded growth: a file shrinking below `bytes_parsed` (truncation) forces a full rebuild; deleted files are pruned from `ingested_files` **and** `seen_requests` (`usage_hourly` keeps its tokens). Schema changes bump `meta.schema_version`, which drives a destructive rebuild (the rollup is fully derived, so rebuilding is always safe). DB lives at `~/.local/share/q-lab/token-atlas/rollup.db` (XDG, out of dotfiles sync).
+
 ### Live sessions ("Live now" panel)
 
 Purely additive — the `/api/stats` snapshot is untouched. `live.ts` powers one endpoint (server binds `127.0.0.1`):
@@ -137,7 +148,8 @@ usage-dashboard does **not** render transcripts — it's the rear-view (usage an
 - **No build step** for frontend — `dashboard/dist/` is committed as-is, vendor libs included
 - **Bun-only** runtime — uses `bun:sqlite`, `Bun.serve`, `Bun.file`
 - Model usage keys are namespaced as `provider:model` (e.g. `claude:claude-opus-4-7`, `codex:o3`)
-- **Billing dedup** — `api.ts` dedups transcript entries by `requestId:messageId` to avoid double-counting usage.
+- **Billing dedup** — `api.ts` dedups transcript entries by `requestId:messageId` to avoid double-counting usage (the shared key lives in `dedup.ts`; the rollup ingest reuses it).
+- **Usage rollup DB** — Claude aggregates are reconstructed from a persistent `bun:sqlite` rollup (see "Usage rollup DB" above) so usage history outlives `cleanupPeriodDays` transcript deletion. The DB stores tokens only; cost is computed downstream from live pricing.
 - **Theme** — light + dark via `[data-theme]` on `<html>`; tokens defined twice in `style.css`; toggle uses the View Transitions API for a cross-fade
 - **Sunrise Bloom delight** — `.panel` / `.card` / `.budget-panel` / `.data-health-panel` use an `::before` (or `::after`) radial-gradient bloom. JS `installBloomTracker()` in `app.js` lerps `--bloom-x/--bloom-y` toward cursor each frame for the trailing effect. Add new panel-shaped classes to **both** the CSS selector list and the JS `SELECTOR` constant
 - **Hero wave** — `.hero-band` uses a 200%-wide SVG `mask-image` containing two identical wave cycles; `hero-wave-drift` animation slides `mask-position-x` one wavelength for a seamless loop
@@ -168,6 +180,13 @@ bun packages/monitor/skills/usage-dashboard/scripts/live.ts
 
 # Inspect the live-sessions endpoint against a running server
 curl -s localhost:5938/api/live | jq
+
+# Update the usage rollup DB (incremental; --rebuild re-ingests from scratch)
+bun packages/monitor/skills/usage-dashboard/scripts/rollup-update.ts
+bun packages/monitor/skills/usage-dashboard/scripts/rollup-update.ts --rebuild
+
+# Run the rollup test suite
+bun test packages/monitor/skills/usage-dashboard/scripts/rollup-update.test.ts
 
 # Run the cockpit daemon (port 5858)
 bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
