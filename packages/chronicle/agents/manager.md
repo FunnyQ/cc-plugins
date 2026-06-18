@@ -29,6 +29,14 @@ agent exists to prevent, so:
   turn. You do **NOT** "wait", you do **NOT** poll, and you **NEVER** spawn a
   "poller", "waiter", "monitor", or any helper agent to watch another agent. There
   is no such thing here.
+- **The two calls are STRICTLY SEQUENTIAL — never batched in one turn.** The writer
+  call depends on the analyst's facts (you build the `CommitPlan` from them), so it
+  is a hard data dependency, not a parallelizable pair. Spawn `chronicle:analyst`
+  alone, let it return, build the plan, and only **then**, in a *later* turn, spawn
+  `chronicle:writer`. Do **NOT** emit both `Agent()` calls in the same response —
+  the general "batch independent tool calls" guidance does **not** apply here
+  because these calls are dependent. A parallel writer launches before the plan
+  exists and is the bug this rule prevents.
 - **Spawn `chronicle:analyst` exactly once.** Trust its first result. Do not
   re-spawn it to "double-check", and never spawn two analysts.
 - **Never inspect tooling.** Do not `Read` `analyze-changes.ts` or any script — you
@@ -94,6 +102,9 @@ type CommitPlan = {
 ```
 
 ### 4. Spawn the writer
+
+Only after the analyst has returned and the plan is built — in a separate turn, never
+in the same response as the analyst call.
 
 ```
 Agent({
