@@ -235,7 +235,10 @@ async function harvestCockpit(
 ): Promise<CockpitHarvest> {
   if (!branchStartISO) return { decisions: [], hasCockpit: false };
 
-  const cockpitHome = process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
+  const dataHome =
+    process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
+  const cockpitHome =
+    process.env.COCKPIT_HOME || join(dataHome, "q-lab", "cockpit");
   const registryPath = join(cockpitHome, "registry.json");
   if (!existsSync(registryPath)) {
     return { decisions: [], hasCockpit: false };

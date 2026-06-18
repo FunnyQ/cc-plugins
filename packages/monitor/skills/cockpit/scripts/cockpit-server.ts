@@ -12,7 +12,6 @@ import {
   readFileSync,
 } from "node:fs";
 import { extname, resolve, relative, isAbsolute, join } from "node:path";
-import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { projectsPayload, sessionsPayload } from "./registry";
@@ -39,6 +38,7 @@ import { handleProjectInfo } from "./project-info";
 import { handleDesignSystem } from "./design-system";
 import { jsonResponse, jsonError } from "./http";
 import { decideStartup, type DaemonInfo } from "./daemon-lifecycle";
+import { cockpitHome } from "./cockpit-home";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
@@ -47,10 +47,6 @@ const DEFAULT_PORT = 5858;
 const ROOT = import.meta.dir;
 
 // ---------- central dir (overridable for tests) ----------
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 function daemonInfoPath(): string {
   return join(cockpitHome(), "daemon.json");

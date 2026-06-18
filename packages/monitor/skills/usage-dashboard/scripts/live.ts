@@ -12,6 +12,7 @@ import {
   sortLiveSessions,
   type LiveSession,
 } from "./live-sessions";
+import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
 
 export type { LiveSession } from "./live-sessions";
 
@@ -221,10 +222,7 @@ export function isInsideCodexSessions(filePath: string): boolean {
 // Companion read of cockpit's registry (same machine, same author) so we can
 // tag which live sessions have a cockpit decision trail. Membership only — we
 // don't touch cockpit's transcript/rendering internals. Missing/corrupt → none.
-const COCKPIT_REGISTRY = join(
-  process.env.COCKPIT_HOME || join(homedir(), ".cockpit"),
-  "registry.json",
-);
+const COCKPIT_REGISTRY = join(cockpitHome(), "registry.json");
 
 function cockpitSessionKeys(): Set<string> {
   try {
@@ -239,10 +237,7 @@ function cockpitSessionKeys(): Set<string> {
 // Live panel's rows open a session's transcript in cockpit (port 5858), so a
 // dead daemon means a dead tab — surface it as a notice instead. Mirrors
 // cockpit-server.ts's own liveness check (PID file + signal-0 probe).
-const COCKPIT_DAEMON = join(
-  process.env.COCKPIT_HOME || join(homedir(), ".cockpit"),
-  "daemon.json",
-);
+const COCKPIT_DAEMON = join(cockpitHome(), "daemon.json");
 
 // The live cockpit daemon's port, or null when it isn't running. Cockpit can
 // bind a custom --port, and daemon.json records the real one — the Live panel

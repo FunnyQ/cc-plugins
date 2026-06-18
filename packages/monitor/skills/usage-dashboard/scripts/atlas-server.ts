@@ -7,7 +7,6 @@ import {
   readFileSync,
 } from "node:fs";
 import { extname, resolve, relative, isAbsolute, join } from "node:path";
-import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import { buildStats } from "./api.ts";
 import {
@@ -17,16 +16,13 @@ import {
   jsonError,
 } from "./live.ts";
 import { decideStartup, type AtlasInfo } from "./atlas-lifecycle";
+import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5938;
 const ROOT = import.meta.dir;
 
 // ---------- central dir ----------
-
-function cockpitHome(): string {
-  return process.env.COCKPIT_HOME || join(homedir(), ".cockpit");
-}
 
 function atlasInfoPath(): string {
   return join(cockpitHome(), "atlas.json");
