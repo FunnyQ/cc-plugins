@@ -59,8 +59,16 @@ separate, scoped agents.
      picture carries (flow / before-after / sequence / architecture), open this
      section with ONE cohesive Mermaid diagram in a ```mermaid fenced block,
      distilled from `decisions[].diagram` + the commit/diff structure (do not paste
-     the per-decision diagrams in). Plain Mermaid, no theming — the host renders it.
-     Diagram-first, not diagram-always: skip it for a flat change.
+     the per-decision diagrams in). Diagram-first, not diagram-always: skip it for a
+     flat change.
+     - **Self-contained colour only.** GitHub/GitLab render with their OWN default
+       Mermaid — they do **NOT** have the cockpit dashboard's `themeCSS` palette. So
+       do **not** use the cockpit `:::ok` / `:::bad` / `:::fix` / `:::info` class
+       tags expecting colour — on the host they are undefined and render flat. If you
+       want colour, define it **inline in the diagram** with `classDef` (e.g.
+       `classDef bad fill:#5b1a1a,stroke:#e5605f,color:#fff;` then `node:::bad`).
+       Otherwise keep the diagram uncolored. Everything the diagram needs must live
+       inside the fenced block — it is plain, portable Mermaid.
    - **What to focus on**: turn `tradeoff` fields, `kind:"caveat"` records, and
      `needs_your_call:true` records into review guidance; call out risky files from
      `decisions[].files`.
