@@ -1,5 +1,33 @@
 # Changelog
 
+## [chronicle 0.3.0] - 2026-06-18
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.3.0` tag._
+
+### 🔧 Changed
+
+- **Both the commit and PR flows were rebuilt onto a nested-manager topology.** They previously ran as context-inheriting `fork`s, but a fork is a leaf the harness forbids from spawning subagents — so `chronicle:commit` silently never delegated to its Haiku analyst/writer (it ran git inline), and `chronicle:pr`'s fork could open a PR on its own. Both are now driven by nested custom orchestrators that hold `Agent` + `Read` but **no `Bash`/`gh`**, so they *must* delegate: `chronicle:commit` → `chronicle:manager` → `chronicle:analyst` + `chronicle:writer`; `chronicle:pr` → `chronicle:editor` → `chronicle:drafter` (bun-only, no `gh` — structurally can't create) + `chronicle:publisher` (the only agent that opens the request, auto-creating as a draft by default). Orchestrators run on Sonnet (Haiku mishandles the synchronous spawn loop); the leaf workers stay on Haiku.
+
+### ✨ Added
+
+- **PR/MR bodies can lead with a synthesized overview diagram.** When the change has a shape, the drafter opens "What changed" with one cohesive Mermaid diagram of the whole PR, distilled from the cockpit decisions + diff. It uses inline `classDef` for colour, since GitHub/GitLab render with their own default Mermaid (no cockpit theme).
+
+### 🐛 Fixed
+
+- **`chronicle:pr` now actually reads the cockpit decision trail.** Branch-scoping compared decision timestamps as raw strings, but cockpit logs UTC (`…Z`) while git `%cI` emits a local offset (`…+08:00`) — so for any non-UTC user every in-branch decision was silently dropped (`hasCockpit:true` but `decisions:0`, with a context-inheriting fork masking the dead path). Timestamps are now compared as parsed instants; a mixed-timezone regression test guards it.
+
+## [monitor 3.15.0] - 2026-06-18
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.15.0` tag._
+
+### ✨ Added
+
+- **Cockpit diagrams now colour nodes by meaning.** A Night Flight `themeCSS` palette gives Mermaid six semantic node classes — `:::ok` / `:::bad` / `:::fix` / `:::info` / `:::warn` / `:::start` — so a decision diagram's success path, failure path, and the fix read at a glance instead of rendering in one flat accent. Scribe/pilot guidance now tags nodes with these classes; the palette is additive, so untagged diagrams still render.
+
+### 🔧 Changed
+
+- **`/monitor:install --apply` now pre-approves the marketplace's own scripts.** It adds `Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)` to `permissions.allow` so plugin scripts run without a permission prompt. This is required for deeply-nested sub-agents (e.g. chronicle's drafter under its editor): a nested agent can't surface a permission prompt to be answered, so an un-allowlisted `bun` call is otherwise silently denied. (Wired into `--apply` only, not the SessionStart migrate path, which never fresh-wires.)
+
 ## [monitor 3.14.3] - 2026-06-18
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.14.3` tag._
