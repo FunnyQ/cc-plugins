@@ -1,5 +1,25 @@
 # Changelog
 
+## [monitor 3.14.0] - 2026-06-18
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.14.0` tag._
+
+### ✨ Added
+
+- **Thoughtful auto-logging now gets nudged at the right moment.** A new `Stop` hook (`scribe-nudge.ts`) re-surfaces the decision-log reminder at the end of each turn — the natural "a chunk of work just finished" boundary — via the hook's `additionalContext`, which fixes the old `SessionStart`-only guidance that got buried as the session grew. It stays high-signal rather than naggy: it nudges only when code actually changed since the last nudge (a git signature over HEAD + numstat + porcelain), throttles repeats, and fires once per distinct code-state. When the change looks structural (many files / many lines, untracked files included), the reminder also encourages attaching a Mermaid `--diagram`.
+
+### 🔧 Changed
+
+- **The global cockpit home moved to a standard XDG path.** `~/.cockpit` (holding `daemon.json` / `registry.json` / `atlas.json`) is now resolved under `~/.local/share/q-lab/cockpit` via `XDG_DATA_HOME`, matching the rollup DB's location. A single shared `cockpitHome()` helper replaces the dozen inlined definitions and performs a one-time, race-safe migration of any legacy `~/.cockpit` on first resolve. `COCKPIT_HOME` still works as an explicit override, and project-local `.cockpit/` decision logs are unchanged.
+
+## [chronicle 0.2.1] - 2026-06-18
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.2.1` tag._
+
+### 🔧 Changed
+
+- **Follows the cockpit home move to XDG.** The PR skill's decision-trail reader now resolves the cockpit registry under `~/.local/share/q-lab/cockpit` (via `XDG_DATA_HOME`) instead of `~/.cockpit`, mirroring monitor 3.14.0 so PR enrichment keeps finding the trail. `COCKPIT_HOME` still overrides.
+
 ## [monitor 3.13.0] - 2026-06-18
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.13.0` tag._
