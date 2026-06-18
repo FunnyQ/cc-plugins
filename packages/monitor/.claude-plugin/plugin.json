@@ -53,6 +53,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/scribe-nudge.ts\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }
