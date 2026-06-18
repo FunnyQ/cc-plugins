@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.3.1] - 2026-06-19
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.3.1` tag._
+
+### 🐛 Fixed
+
+- **`chronicle:commit` no longer launches its writer before the analyst returns.** The Commit Manager was emitting the `chronicle:analyst` and `chronicle:writer` spawns in the *same* turn, so the writer ran in parallel and received an empty plan — the manager builds the `CommitPlan` from the analyst's facts, a hard data dependency. `manager.md` described a sequential flow but never forbade same-turn batching, so the model followed the harness's default "batch independent tool calls" guidance. It now states the two `Agent()` calls are strictly sequential and must never be batched in one turn (the batch-parallel guidance doesn't apply to dependent calls), with a reminder at the writer step to spawn only after the analyst returns.
+
 ## [chronicle 0.3.0] - 2026-06-18
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.3.0` tag._
