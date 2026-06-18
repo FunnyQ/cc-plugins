@@ -168,6 +168,15 @@ cockpit scribe --recent [N]
   Night Flight-themed SVG. Use it only when the insight is structural and a picture
   carries it better than the `--text` body (a flow, a state machine, a sequence) —
   pass the source as one argument (a heredoc preserves newlines).
+  - **Colour the nodes by meaning.** The renderer predefines a Night Flight palette
+    you tag with `:::class` markers — colour then carries the shape (success vs.
+    failure vs. the fix) instead of every node reading as the same accent. Tag a
+    flowchart node by appending the class: `B[Rails has env]:::ok`. Available:
+    `:::ok` (green — success/healthy path), `:::bad` (red — failure/error path),
+    `:::fix` (amber — the fix or action to take), `:::info` (cyan — a neutral note),
+    `:::warn` (dim amber — a softer caution), `:::start` (grey — a neutral entry).
+    Tag only the nodes that carry meaning; leave plumbing nodes untagged. Don't
+    write your own `classDef` — the palette is already injected.
 - `--session` / `--provider` — optional; omit to auto-resolve the live session.
 
 ### Tone
