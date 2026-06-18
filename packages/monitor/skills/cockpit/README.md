@@ -12,7 +12,7 @@ Provider support:
 
 - Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
 - Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and their rollout paths under `~/.codex/sessions`.
-- The decision log, registry, and wait/send bridge are shared through `.cockpit/` and `~/.cockpit/`.
+- The decision log lives per-project under `.cockpit/`; the registry and wait/send bridge are shared through `~/.local/share/q-lab/cockpit/`.
 
 ## Cockpit channel
 
