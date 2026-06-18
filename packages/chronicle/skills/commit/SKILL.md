@@ -1,143 +1,128 @@
 ---
 name: commit
 description: Craft git commit(s) for the current changes — auto-decides between one
-  simple commit and an atomic split, asking you to confirm only when a split is
-  warranted. Triggers on "/chronicle:commit", "commit my changes", "commit this",
-  "幫我 commit", "提交變更". Do NOT auto-fire; human-invoked only.
+  simple commit and an atomic split. Triggers on "/chronicle:commit", "commit my
+  changes", "commit this", "幫我 commit", "提交變更". Do NOT auto-fire; human-invoked only.
 ---
 
 # Chronicle Commit
 
-Run Chronicle as a single **Commit Manager** that owns the whole flow: it spawns a
-cheap Haiku analyst, decides simple vs atomic, then spawns a cheap Haiku writer —
-keeping all git spew out of the main conversation while preserving the "why"
-behind the changes.
+Spawn ONE **Commit Manager** that owns the whole flow: it spawns a cheap Haiku
+analyst, auto-decides simple vs atomic, then spawns a cheap Haiku writer — keeping
+all git output out of the main conversation while preserving the "why" behind the
+changes.
 
 ## Topology
 
 ```
-main agent
-  └─ Commit Manager   (subagent_type: "fork" — inherits THIS conversation, runs on your model)
-       ├─ chronicle:analyst  (fresh Haiku) — runs analyze-changes.ts, returns changeset facts + two proposals
-       ├─ Manager decides simple | atomic  (+ atomic gate)
-       └─ chronicle:writer   (fresh Haiku) — stages files + writes commits from the Manager's brief
+main agent  (holds the conversation = the "why")
+  └─ chronicle:manager   (subagent_type — a nested custom agent, NOT a fork)
+       ├─ chronicle:analyst  (Haiku) — runs analyze-changes.ts, returns changeset facts + two proposals
+       ├─ Manager auto-decides simple | atomic
+       └─ chronicle:writer   (Haiku) — stages whole files + writes commits from the Manager's brief
 ```
 
-Why this exact shape — it threads three Claude Code constraints:
+Why this exact shape — it threads the harness's spawn rules (see below for the
+verified model):
 
-- **The Manager is a fork** so it inherits the conversation: the "why" behind the
-  changes, so commit bodies explain intent instead of restating the diff. Omitting
-  `subagent_type` (or naming any other type) would start a fresh, context-less
-  Manager and defeat the purpose. On Codex, spawn the Manager as a background
-  sub-agent with `fork_context: true`.
-- **Its children are fresh named agents, not forks.** A fork may spawn other
-  subagent types but **never another fork**, and a fresh agent honors a per-call
-  `model` override — so `chronicle:analyst` and `chronicle:writer` run on Haiku
-  (set in their own frontmatter), which is cheap and correct for mechanical work.
-- **The children do NOT inherit the conversation.** This is the load-bearing rule:
-  the Manager must **distill the rationale and pass it down in each child's
-  prompt** — above all the writer's per-commit `whyBrief`. Skip it and the commit
-  body degrades to a restated diff, which is the whole thing this design avoids.
+- **The Manager is spawned via `subagent_type`, never as a fork.** A fork is a leaf
+  — it is forbidden from spawning subagents — so a fork Manager could never reach
+  the children. A nested custom agent can. The cost: a nested agent does **not**
+  inherit the conversation, so the main agent must hand the Manager the distilled
+  **`contextBrief`** in its spawn prompt (the Manager has no other source for the
+  "why").
+- **The Manager can spawn because it is a custom agent whose `tools:` include
+  `Agent`.** Spawn capability is purely tools-gated. The Manager is given
+  `Agent` + `Read` and **deliberately no `Bash`** — so it physically cannot run git
+  itself and *must* delegate. "Orchestrate, never execute" is structural here, not a
+  rule it has to remember.
+- **The children are Haiku, spawned by name.** A nested custom agent can address
+  plugin-defined types (`chronicle:analyst` / `chronicle:writer`) via
+  `subagent_type` — verified. They run on Haiku (set in their own frontmatter),
+  cheap and correct for mechanical work, and never see the conversation — so the
+  Manager's per-commit `whyBrief` is the only "why" the writer gets.
 
 All diff/git output stays inside the Manager subtree; the main agent only sees the
-final `git log`.
+final `git log`. The three agents live at
+`packages/chronicle/agents/{manager,analyst,writer}.md` and auto-register as
+`chronicle:manager` / `chronicle:analyst` / `chronicle:writer`.
 
-The two Haiku agents live at `packages/chronicle/agents/{analyst,writer}.md` and
-auto-register as `chronicle:analyst` / `chronicle:writer`.
+### Verified spawn model (why the above is safe)
+
+Live-tested in this harness:
+
+| Caller | Can spawn? |
+|---|---|
+| Fork (`subagent_type:"fork"`) | ❌ — a fork is a leaf, never delegates |
+| Custom agent **with `Agent` in `tools:`** | ✅ — and it can address plugin types like `chronicle:analyst` |
+| Custom agent without `Agent` | ❌ |
+
+So: Manager = custom agent + `Agent` tool (can spawn) − `Bash` (can't run git).
+Children = custom agents without `Agent` (leaves that do the git work).
+
+## The main agent's job (thin)
+
+The main agent does exactly two things, then waits for the Manager's report:
+
+1. **Distill the `contextBrief`** — a tight summary of *why* these changes were
+   made, drawn from this conversation. This cannot move into the Manager (the
+   Manager can't see the chat). Keep it to the rationale a commit body would want:
+   intent, the problem being solved, anything non-obvious from the diff.
+2. **Spawn the Manager** (`subagent_type: "chronicle:manager"`), passing:
+   - `$SKILL_DIR` — the skill's load-time "Base directory for this skill" banner
+     value (so it can resolve `$SKILL_DIR/scripts/analyze-changes.ts` and
+     `$SKILL_DIR/references/commit-template.md`). Do not hard-code a repo-relative
+     path or rely on `${CLAUDE_PLUGIN_ROOT}`.
+   - `contextBrief` (from step 1).
+   - `branch` — the current branch. If it is a protected branch, defer to the
+     user's existing git-flow guard before spawning; do not re-implement branch
+     protection.
+
+The Manager returns the final `git log --oneline`; the main agent relays it to the
+user (commit hash + subject line per commit) and nothing else.
+
+## What the Manager does (reference)
+
+Full procedure lives in `agents/manager.md`. In brief: spawn `chronicle:analyst` →
+auto-apply the decision tree → build a whole-file `CommitPlan` with a per-commit
+`whyBrief` → spawn `chronicle:writer` → relay its `git log` up.
+
+### Decision tree (Manager, automatic)
+
+Classify as **atomic** if ANY is true, else **simple**:
+
+- `>= 2` distinct change-types among the files (e.g. `feat` + `fix` + `refactor`).
+- Changes span unrelated modules or directories.
+- File count `> 5` total changed files (analyst's `totalFiles`, counting staged +
+  unstaged + untracked).
+
+There is **no confirmation gate** — the human's invocation of the skill is the
+consent, and a nested Manager can't prompt anyway. It decides and proceeds.
 
 ## Staging Model
 
 Chronicle works from the full working changeset: staged, unstaged, and untracked
-files together. `analyze-changes.ts` reports that combined set.
+files together (`analyze-changes.ts` reports that combined set). The writer
+re-stages per the plan with explicit `git add <file>` — prior staging state does
+not change the outcome.
 
-In Phase B, re-stage files per the confirmed plan with explicit `git add <file>`
-commands. Prior staging state does not change the outcome and needs no separate
-consent prompt.
+**Whole-file granularity, always.** Every changed file belongs to exactly one
+commit. A file with mixed concerns goes *entirely* into one commit. Hunk-level
+staging is out of scope: the plan never splits a file, and the writer stages only
+by explicit filename — never `git add -p`, `git add -A`, or `git add .` (Claude
+Code's Bash tool can't drive interactive `-p` anyway). The no-hunk guarantee lives
+in the plan, not in special writer handling.
 
-Pull the human in only for the atomic-split decision. The only confirmation in the
-whole flow is the atomic-split gate.
+## Codex
 
-v1 operates at whole-file granularity. If a file is partially staged, flatten it to
-a whole-file change when assigning it to a commit group.
-
-## Spawning the Commit Manager
-
-The main agent spawns ONE Commit Manager fork (`subagent_type: "fork"`; on Codex,
-`fork_context: true`) and hands it the skill's load-time "Base directory for this
-skill" banner value as `$SKILL_DIR` (so it can resolve
-`$SKILL_DIR/scripts/analyze-changes.ts` and `references/commit-template.md`). Do
-not hard-code a repo-relative path, and do not rely on `${CLAUDE_PLUGIN_ROOT}`.
-
-The Manager runs the phases below and returns the final `git log --oneline` to the
-main agent.
-
-## Phase A — Analyze
-
-The Manager spawns `chronicle:analyst` (a fresh Haiku agent) with the absolute
-`analyze-changes.ts` path. The analyst:
-
-1. Runs the script. If `totalFiles === 0`, it reports `nothingToCommit`; the
-   Manager then reports `nothing to commit` to the main agent and stops.
-2. Returns changeset facts plus two proposals (`simpleCommit` and `atomicPlan`),
-   along with `promptPath`. The analyst classifies change-types but does **not**
-   decide simple-vs-atomic and never commits.
-
-## Decision (Manager)
-
-The Manager — not the analyst — applies the decision tree. Classify as
-**atomic-worthy** if any condition is true:
-
-- There are >= 2 distinct change-types among the files (e.g. `feat` + `fix` + `refactor`).
-- Changes span unrelated modules or directories.
-- File count exceeds the tunable threshold: default **> 5** total changed files
-  (use the analyst's `totalFiles`, which counts staged + unstaged + untracked).
-
-Otherwise classify as **simple**.
-
-## Gate (Manager, atomic only)
-
-If **simple**, proceed straight to Phase B — the human invoked this skill; that
-invocation is the consent. Do not ask for extra confirmation.
-
-If **atomic**, the Manager (a foreground fork, so it can prompt directly) presents
-the proposed split — each commit's emoji, type, subject, and file list — and
-confirms through the host's interactive prompt:
-
-- Claude Code: `AskUserQuestion`.
-- Codex or other harnesses: the equivalent confirmation prompt.
-
-Options:
-
-- `Execute this split (Recommended)`
-- `Adjust the grouping`
-- `Just one commit instead`
-- `Abort`
-
-On `Adjust the grouping`, revise the plan and re-confirm. On `Just one commit
-instead`, collapse to the `simpleCommit` plan and proceed. On `Abort`, stop
-without committing.
-
-## Phase B — Write
-
-The Manager builds the confirmed `CommitPlan` and — drawing on the conversation it
-inherited — fills a per-commit **`whyBrief`** (the distilled intent for that
-commit). It then spawns `chronicle:writer` (a fresh Haiku agent) with the
-`CommitPlan` and the template format from `references/commit-template.md`.
-
-The writer does not see the conversation, so the `whyBrief` is the only "why" it
-gets — make it carry the intent, but keep it tight: the template's **length
-guardrail** still applies (body ~3–4 one-line bullets; 繁中 summary 1–3 sentences
-that summarize, not re-translate). When in doubt, shorter.
-
-For each commit in order the writer runs `git add <explicit files>` (never `git
-add -A`) then `git commit` with the heredoc template. After all commits, it returns
-`git log --oneline -n <count>`, which the Manager relays to the main agent.
+Codex has no named-agent registry. There the main agent runs the same flow inline
+(or via its own sub-agent mechanism with `fork_context` for the why): analyze →
+auto-decide → commit, honoring the same whole-file / no-hunk rule.
 
 ## Edge Cases
 
-- **Pre-staged files**: handle deterministically with the staging model above. Do
-  not ask for an extra prompt.
-- **Single file with mixed concerns**: hunk-level staging is out of scope for v1.
-  Put the whole file's change into one group.
-- **Commit to a protected branch**: defer to the user's existing git-flow guard.
-  Do not re-implement branch protection.
+- **Nothing to commit**: analyst returns `nothingToCommit`; the Manager reports
+  `nothing to commit` and stops.
+- **Pre-staged files**: handled by the staging model above — no extra prompt.
+- **Single file with mixed concerns**: the whole file goes into one commit (no
+  hunk splitting in v1).

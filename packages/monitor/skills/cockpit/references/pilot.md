@@ -140,6 +140,11 @@ MMD
   when a picture genuinely carries what a sentence can't — most decisions don't
   need one. Rendering is sandboxed (SVG-profile sanitized, no scripts/HTML labels);
   if the source can't parse, the card shows it as text rather than breaking.
+  Colour nodes by meaning with `:::class` markers (the palette is predefined — don't
+  write your own `classDef`): append the class to a node, e.g. `B[has env]:::ok`.
+  `:::ok` green (success path), `:::bad` red (failure path), `:::fix` amber (the fix),
+  `:::info` cyan (a note), `:::warn` dim amber, `:::start` grey (neutral entry). Tag
+  only the nodes that carry meaning; leave plumbing nodes untagged.
 
 **Example 1 — shallow vs. with the thinking, facets pulling their weight:**
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 //
 // monitor:install engine — the single entry that checks every prerequisite for
-// both skills and wires the one config a non-dev user otherwise edits by hand:
-//   the usage-dashboard statusline collector in ~/.claude/settings.json.
+// both skills and wires the configs a non-dev user otherwise edits by hand:
+//   - the usage-dashboard statusline collector in ~/.claude/settings.json
+//   - permissions.allow entries that pre-approve `bun <q-lab plugin script>.ts`
+//     (so deeply-nested sub-agents — e.g. chronicle:drafter — can run them without
+//     hitting an unanswerable permission prompt that silently denies them).
 //
 // The cockpit channel is now packaged in the plugin manifest (mcpServers +
 // channels), so it no longer needs a hand-written ~/.claude.json entry. This
@@ -52,6 +55,17 @@ const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
 const CLAUDE_JSON = join(HOME, ".claude.json");
 const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 const MIN_CLAUDE_VERSION = "2.1.80"; // channels research-preview floor
+
+// Pre-approve `bun <q-lab-marketplace plugin script>.ts` in permissions.allow.
+// Without this, an un-allowlisted bun call hits a permission prompt — and a
+// deeply-nested sub-agent (e.g. chronicle:editor → chronicle:drafter, or
+// chronicle:manager → chronicle:analyst) can't surface that prompt to be answered,
+// so it is silently DENIED and the whole flow stalls. Static allow entries make the
+// scripts runnable at any nesting depth, no prompt. Mirrors the odin entry.
+const SCRIPT_PERMISSIONS = [
+  "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
+  "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+];
 
 // --- helpers ----------------------------------------------------------------
 function readJson(path: string): { data: any; readable: boolean } {
@@ -220,6 +234,56 @@ function applyStatuslinePiece(dryRun: boolean): boolean {
   return true;
 }
 
+// --- apply: pre-approve q-lab plugin scripts in permissions.allow -----------
+function missingScriptPermissions(): string[] {
+  const { data } = readJson(SETTINGS_JSON);
+  const allow: unknown = data?.permissions?.allow;
+  const have = Array.isArray(allow) ? (allow as string[]) : [];
+  return SCRIPT_PERMISSIONS.filter((p) => !have.includes(p));
+}
+
+function applyScriptPermissions(dryRun: boolean): boolean {
+  const { data, readable } = readJson(SETTINGS_JSON);
+  if (!readable) {
+    console.log(`✗ Couldn't parse ${SETTINGS_JSON} — fix it first.`);
+    return false;
+  }
+  const missing = missingScriptPermissions();
+  if (missing.length === 0) {
+    console.log("○ q-lab plugin scripts already pre-approved — nothing to do.");
+    return true;
+  }
+  if (dryRun) {
+    console.log(`Would add to permissions.allow in ${SETTINGS_JSON}:`);
+    for (const p of missing) console.log(`   ${p}`);
+    return true;
+  }
+  const allow = Array.isArray(data.permissions?.allow)
+    ? (data.permissions.allow as string[])
+    : [];
+  const next = {
+    ...data,
+    permissions: { ...(data.permissions ?? {}), allow: [...allow, ...missing] },
+  };
+  const bak = backup(SETTINGS_JSON);
+  writeFileSync(SETTINGS_JSON, `${JSON.stringify(next, null, 2)}\n`);
+  console.log(`✓ Pre-approved q-lab plugin scripts in ${SETTINGS_JSON}`);
+  if (bak) console.log(`   (backup: ${bak})`);
+  return true;
+}
+
+function scriptPermissionChecks(): Check[] {
+  const missing = missingScriptPermissions();
+  return [
+    {
+      label: "q-lab plugin scripts pre-approved (bun)",
+      ok: missing.length === 0,
+      level: "optional",
+      hint: "Without these allow entries, `bun <plugin script>` prompts for permission — and a nested sub-agent (e.g. chronicle:drafter) can't answer it, so it's silently denied.\n   Run --apply to add them.",
+    },
+  ];
+}
+
 // --- migrate: re-point drifted pieces + clean up the stale channel entry ----
 // Never fresh-wires the statusline — that's the initial opt-in, which stays
 // manual. It only re-points an already-wired statusline that drifted to an older
@@ -303,9 +367,11 @@ function main() {
     const wantStatusline =
       flags.has("--apply") || flags.has("--apply-statusline") || dryRun;
     let ok = true;
-    // --apply / --dry-run also clean up a stale hand-wired channel entry.
+    // --apply / --dry-run also clean up a stale hand-wired channel entry and
+    // pre-approve the q-lab plugin scripts.
     if (flags.has("--apply") || dryRun) {
       ok = unwireChannel(dryRun) !== "error" && ok;
+      ok = applyScriptPermissions(dryRun) && ok;
     }
     if (wantStatusline) ok = applyStatuslinePiece(dryRun) && ok;
     console.log();
@@ -322,6 +388,7 @@ function main() {
   const { requiredFailed } = printReport([
     ...dashboardChecks(),
     ...channelChecks(),
+    ...scriptPermissionChecks(),
   ]);
   console.log();
   if (requiredFailed) {

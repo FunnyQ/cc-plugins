@@ -57,6 +57,40 @@ export const NIGHT_FLIGHT_THEME = {
   signalTextColor: "#edeef4",
 };
 
+// Semantic node palette. Mermaid flowcharts don't auto-vary node colour — without
+// a classDef every node reads as the same accent (hence the old all-cyan look).
+// The author tags nodes with short markers (`Foo:::ok`, `Bar:::bad`), and these
+// classes carry the colour, so hue means something (success / failure / fix path)
+// instead of being decoration. Each entry: stroke is the solid border + text-stays
+// starlight; fill is the same hue at low alpha so the tint reads over the dark card.
+// Keep the hues inside the Night Flight family — these mirror the same OKLCH tokens
+// as the theme above (aurora / signal / a green badge / danger). Drift = off-theme,
+// never broken.
+const SEMANTIC_NODES = {
+  start: { stroke: "#777988", fill: "#22253766" }, // neutral entry — --ink-faint
+  info: { stroke: "#2ad7d7", fill: "#2ad7d71f" }, // cool note — --aurora
+  ok: { stroke: "#4fd6a3", fill: "#4fd6a31f" }, // success path — aurora-green badge
+  bad: { stroke: "#e5605f", fill: "#e5605f1f" }, // failure path — --danger
+  fix: { stroke: "#feb354", fill: "#feb3541f" }, // the fix / action — --signal
+  warn: { stroke: "#feb354", fill: "#feb35414" }, // softer caution — --signal, dimmer
+};
+
+// Build the scoped CSS mermaid injects into each diagram's <style> block. `:::name`
+// in the source adds the class to the node <g>; we colour its shape + keep the label
+// readable. !important wins over mermaid's base `.node rect` rule. htmlLabels:false
+// means labels are SVG <text>, so we target text/.nodeLabel for colour.
+const SEMANTIC_NODE_CSS = Object.entries(SEMANTIC_NODES)
+  .map(
+    ([name, { stroke, fill }]) => `
+g.node.${name} > rect,
+g.node.${name} > polygon,
+g.node.${name} > circle,
+g.node.${name} > path { fill: ${fill} !important; stroke: ${stroke} !important; }
+g.node.${name} text,
+g.node.${name} .nodeLabel { fill: #edeef4 !important; color: #edeef4 !important; }`,
+  )
+  .join("\n");
+
 // Deterministic per-render id (no Math.random) so Mermaid's id-scoped <style>
 // block can't collide across cards.
 let _idSeq = 0;
@@ -93,6 +127,7 @@ function loadMermaid() {
       htmlLabels: false,
       theme: "base",
       themeVariables: NIGHT_FLIGHT_THEME,
+      themeCSS: SEMANTIC_NODE_CSS,
       flowchart: { htmlLabels: false, curve: "basis" },
       fontFamily: NIGHT_FLIGHT_THEME.fontFamily,
     });

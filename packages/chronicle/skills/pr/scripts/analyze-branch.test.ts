@@ -87,6 +87,23 @@ describe("branchDecisions", () => {
     ).toEqual(["equal", "after"]);
   });
 
+  test("compares timestamps chronologically across timezone formats", () => {
+    // Cutoff in local +08:00, records in UTC Z. 16:48:34+08:00 == 08:48:34Z, so
+    // the 12:59Z record (later) must be kept and the 07:00Z record (earlier)
+    // dropped. A lexical string compare would invert this (12 < 16 < 07 is false
+    // etc.), which is the real-world bug this guards against.
+    const records = [
+      decision("after-utc", "2026-06-18T12:59:51.331Z", []),
+      decision("before-utc", "2026-06-18T07:00:00.000Z", []),
+    ];
+
+    expect(
+      branchDecisions(records, [], "2026-06-18T16:48:34+08:00").map(
+        (record) => record.id,
+      ),
+    ).toEqual(["after-utc"]);
+  });
+
   test("keeps overlapping files and drops non-overlapping files", () => {
     const records = [
       decision("overlap", "2026-01-01T00:00:00.000Z", ["src/a.ts"]),

@@ -1,6 +1,6 @@
 ---
 name: analyst
-description: "Chronicle's changeset analyst. Runs analyze-changes.ts and returns the facts the Commit Manager needs to decide simple vs atomic. Spawned by the chronicle:commit skill — never commits."
+description: "Chronicle's changeset analyst. Runs analyze-changes.ts and returns the facts the Commit Manager needs to decide simple vs atomic. Spawned by chronicle:manager — never commits."
 model: haiku
 tools: ["Bash", "Read"]
 allowed-tools: Bash(bun *)
@@ -43,6 +43,9 @@ can choose:
   their implementation), keep change-types separate, each commit independently
   deployable, infrastructure before feature code. For `.vue` files consider which
   sections changed.
+
+Both proposals are **whole-file**: every file lands in exactly one group, never
+split across commits. A file with mixed concerns goes entirely into one group.
 
 Subjects only — imperative mood, ≤ ~50 chars. Do **not** write commit bodies or
 the 繁中 summary; the writer does that with the Manager's rationale brief.
