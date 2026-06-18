@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.14.2] - 2026-06-18
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.14.2` tag._
+
+### 🐛 Fixed
+
+- **The cockpit registry no longer grows without bound.** `registry.json` only ever upserted sessions by id and never dropped ended ones, so it accumulated an entry per session forever — bloating the file, keeping long-dead projects in the dashboard's project list, and making every `/api/sessions` poll `stat()` every historical session's log. Writes now route through a single path that reaps any entry whose last activity signal (heartbeat or log mtime) is older than 14 days — which doubles as the dashboard's "recent projects" look-back window. (`scribe-nudge.json` already self-pruned at 24h and is unchanged.)
+
 ## [monitor 3.14.1] - 2026-06-18
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.14.1` tag._
