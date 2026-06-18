@@ -89,19 +89,23 @@ describe("decideNudge", () => {
 });
 
 describe("buildReminder", () => {
-  it("returns the base reminder for non-structural changes", () => {
+  it("light tier is terse, fork-actionable, and diagram-first", () => {
     const msg = buildReminder({ files: 1, lines: 4, structural: false });
-    expect(msg).toContain("DECISION LOG");
-    expect(msg).toContain('subagent_type: "fork"');
-    expect(msg).not.toContain("--diagram");
+    expect(msg).toContain('subagent_type:"fork"');
+    expect(msg).toContain("/cockpit scribe");
+    // Diagram-first: even the light tier prefers a diagram when there's a shape.
+    expect(msg).toContain("--diagram");
+    // No multi-line how-to boilerplate (that lives in the SessionStart hook).
+    expect(msg).not.toContain("Agent(");
+    // Light tier does not announce a change size.
+    expect(msg).not.toContain("files,");
   });
 
-  it("prepends a diagram emphasis with the change size for structural changes", () => {
+  it("structural tier leads with the change size and a diagram-first push", () => {
     const msg = buildReminder({ files: 5, lines: 200, structural: true });
     expect(msg).toContain("--diagram");
     expect(msg).toContain("5 files");
     expect(msg).toContain("200");
-    // The base reminder is still present after the lead-in.
-    expect(msg).toContain("DECISION LOG");
+    expect(msg).toContain('subagent_type:"fork"');
   });
 });

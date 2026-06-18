@@ -97,13 +97,20 @@ the result of honestly asking all four, not of never asking. Lenses are
 independent: a single piece of work can warrant a `decision` *and* a `caveat`
 *and* a `learning`.
 
-### Also ask: is this structural enough to draw?
+### Default to a diagram — prose is the fallback
 
-After the lens sweep, check each surviving entry once more: is the insight
-**structural** — a flow, a state machine, a sequence, a fan-out — where a
-picture carries it better than prose? If so, attach `--diagram` with Mermaid
-source (see the CLI reference below). Don't force it on flat insights; reach for
-it when the "what" is a shape, not a sentence.
+The pilot reads diagrams faster than prose, so **diagram-first**: for each
+surviving entry, first try to express the insight as a Mermaid `--diagram` — a
+flow, state machine, sequence, fan-out, before/after, or decision tree. The
+`--diagram` rides *alongside* `--text` (the picture carries the shape; the text
+carries what a picture can't), so reaching for it costs you nothing and is pure
+upside.
+
+**Guardrail — diagram-first is not diagram-always.** Fall back to prose-only when
+the insight is genuinely *flat*: a single `caveat` sentence ("X must run before
+Y"), a one-line `decision` ("chose append-only JSONL over SQLite"). Forcing a
+diagram onto a flat fact adds noise, not clarity. The test: if the "what" has a
+shape, draw it; if it's a sentence, write the sentence.
 
 ### Then: write each surviving entry
 
