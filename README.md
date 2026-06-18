@@ -76,6 +76,7 @@ A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and v
 
 - **Live now (Claude + Codex)** — a panel of your currently-active Claude and Codex sessions with live status; click one to open it in cockpit's live transcript view (token-atlas links out rather than rendering transcripts itself). When cockpit's daemon isn't running the panel says so and the rows stay inert, so a click never opens a dead tab
 - **Cost + usage overview** — sessions, interactions, tokens, estimated spend, daily burn, and monthly budget projection
+- **Persistent history** — Claude usage is rolled into a local SQLite store (`~/.local/share/q-lab/token-atlas/`), so your token/cost/model history survives Claude Code's automatic transcript cleanup (`cleanupPeriodDays`) instead of disappearing as old sessions age out
 - **Model analysis** — daily trend, model distribution, and per-model token/cost breakdown
 - **Project insights** — project rankings with drilldown details for model mix and cost
 - **Session ledger** — recent Claude and Codex sessions side by side
