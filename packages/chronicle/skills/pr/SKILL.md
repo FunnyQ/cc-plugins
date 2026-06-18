@@ -63,6 +63,7 @@ Section guidance:
 
 - **Why**: explain the motivation. Prefer cockpit `decision` and `reason` records, then commit bodies. If `hasCockpit` is false, derive intent from commit subjects and bodies alone.
 - **What changed**: summarize commits and `diffStat` by area. Do not dump the raw commit log; group related changes into reviewer-readable bullets or short paragraphs.
+  - **Optional overview diagram.** When the PR has a *shape* a picture carries better than prose — a flow, a before/after, a sequence, a dependency or architecture change — open **What changed** with a single Mermaid diagram in a ```mermaid fenced block (GitHub and GitLab render it natively). Synthesize **one** cohesive diagram for the whole PR: draw on the harvested `decisions[].diagram` and the commit/diff structure as raw material, but do **not** paste the per-decision diagrams in — distill them into one. This is diagram-first, not diagram-always: skip it for a flat change (a one-line fix, a config bump) where a diagram adds noise, not clarity. Keep it plain Mermaid (no theming — the host renders it, not the cockpit dashboard).
 - **What to focus on**: turn cockpit `tradeoff` fields, `kind:"caveat"` records, and `needs_your_call:true` records into review guidance. Call out risky or important files from `decisions[].files`.
 - **How to judge**: state acceptance and test notes: commands to run, behavior to verify, and any manual checks implied by the commits or decisions.
 
