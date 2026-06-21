@@ -14,6 +14,7 @@ import {
   isExternal,
   modelKey,
   modelUsageTotal,
+  normalizeModelId,
   openCodeUsageFromTokens,
   priceFor,
   pricingModelAliases,
@@ -138,6 +139,80 @@ describe("pricing lookup", () => {
   test("priceFor resolves via alias, falls back when unknown", () => {
     expect(priceFor("codex:o3", table)).toBe(table.models["openai/o3"]);
     expect(priceFor("nope", table)).toBe(table.fallback);
+  });
+});
+
+describe("normalizeModelId", () => {
+  test("strips provider prefix, version dots, and case", () => {
+    expect(normalizeModelId("anthropic/claude-opus-4.8")).toBe("claudeopus48");
+    expect(normalizeModelId("claude-opus-4-8")).toBe("claudeopus48");
+    expect(normalizeModelId("MiniMax-M3")).toBe("minimaxm3");
+    expect(normalizeModelId("minimax/minimax-m3")).toBe("minimaxm3");
+  });
+  test("drops a trailing -YYYYMMDD snapshot date", () => {
+    expect(normalizeModelId("claude-opus-4-5-20251101")).toBe("claudeopus45");
+    expect(normalizeModelId("moonshotai/kimi-k2.6-20260420")).toBe("kimik26");
+  });
+  test("drops :tag routing suffixes", () => {
+    expect(normalizeModelId("openai/gpt-oss-120b:free")).toBe("gptoss120b");
+    expect(normalizeModelId("openai/gpt-oss-120b")).toBe("gptoss120b");
+  });
+});
+
+describe("priceFor normalized fallback", () => {
+  const normTable: PricingTable = {
+    models: {
+      // Curated entry under the raw name — exact alias must win.
+      "claude-opus-4-8": {
+        input: 5,
+        output: 25,
+        cacheRead: 0.5,
+        cacheWrite: 6,
+      },
+      // Live-style OpenRouter ids that only a normalized match can reach.
+      "anthropic/claude-sonnet-4.5": {
+        input: 3,
+        output: 15,
+        cacheRead: 0.3,
+        cacheWrite: 3.75,
+      },
+      "minimax/minimax-m3:free": {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+      },
+      "minimax/minimax-m3": {
+        input: 0.25,
+        output: 1,
+        cacheRead: 0.025,
+        cacheWrite: 0.3,
+      },
+    },
+    fallback: { input: 1, output: 1, cacheRead: NaN, cacheWrite: NaN },
+    externalModelPrefixes: ["openai/", "minimax/"],
+  };
+
+  test("exact alias wins over a normalized live id", () => {
+    // Has a curated default — normalization must not reprice it.
+    expect(priceFor("claude:claude-opus-4-8", normTable)).toBe(
+      normTable.models["claude-opus-4-8"],
+    );
+  });
+  test("normalized fallback bridges dash↔dot + provider prefix + date", () => {
+    expect(priceFor("claude:claude-sonnet-4-5-20250929", normTable)).toBe(
+      normTable.models["anthropic/claude-sonnet-4.5"],
+    );
+  });
+  test("prefers the canonical id over a $0 :free routing variant", () => {
+    expect(priceFor("opencode:MiniMax-M3", normTable)).toBe(
+      normTable.models["minimax/minimax-m3"],
+    );
+  });
+  test("still falls back when nothing matches", () => {
+    expect(priceFor("claude:utterly-unknown-xyz", normTable)).toBe(
+      normTable.fallback,
+    );
   });
 });
 

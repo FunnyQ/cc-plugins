@@ -14,12 +14,6 @@
       "cacheRead": 0.5,
       "cacheWrite": 6.25
     },
-    "claude-opus-4-5-20251101": {
-      "input": 15.0,
-      "output": 75.0,
-      "cacheRead": 1.5,
-      "cacheWrite": 18.75
-    },
     "claude-sonnet-4-6": {
       "input": 3.0,
       "output": 15.0,

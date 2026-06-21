@@ -383,6 +383,77 @@
   color: color-mix(in oklch, var(--warn) 58%, var(--text));
 }
 
+.pricing-confidence-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pricing-confidence-refresh {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 34px;
+  block-size: 34px;
+  padding: 0;
+  border: 1px solid color-mix(in oklch, var(--accent) 28%, var(--edge));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--accent) 12%, var(--status-surface));
+  color: color-mix(in oklch, var(--accent) 60%, var(--text));
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.pricing-confidence-refresh:hover:not(:disabled) {
+  border-color: color-mix(in oklch, var(--accent) 44%, var(--edge));
+  background: color-mix(in oklch, var(--accent) 20%, var(--status-surface));
+}
+
+.pricing-confidence-refresh:disabled {
+  cursor: progress;
+  opacity: 0.62;
+}
+
+.pricing-confidence-refresh-icon {
+  inline-size: 17px;
+  block-size: 17px;
+}
+
+.pricing-confidence-refresh[aria-busy="true"] .pricing-confidence-refresh-icon {
+  animation: pricing-confidence-spin 0.8s linear infinite;
+}
+
+@keyframes pricing-confidence-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-confidence-refresh[aria-busy="true"]
+    .pricing-confidence-refresh-icon {
+    animation: none;
+  }
+}
+
+.pricing-confidence-note {
+  border: 1px solid color-mix(in oklch, var(--accent) 18%, var(--edge-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--accent) 7%, var(--status-surface));
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.4;
+  padding: var(--s-8) var(--s-10);
+  word-break: break-word;
+}
+
+.pricing-confidence-note--error {
+  border-color: color-mix(in oklch, var(--warn) 22%, var(--edge-soft));
+  background: color-mix(in oklch, var(--warn) 8%, var(--status-surface));
+  color: color-mix(in oklch, var(--warn) 52%, var(--text));
+}
+
 .pricing-confidence-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
