@@ -167,6 +167,11 @@ function codeSignature(
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Headless / SDK runs (`claude -p`, relay delegate/review, SDK apps) have no
+  // interactive cockpit and no human to act on a scribe nudge — bail. Interactive
+  // TUI sets CLAUDE_CODE_ENTRYPOINT=cli; headless sets sdk-cli (SDK apps: sdk-*).
+  if ((process.env.CLAUDE_CODE_ENTRYPOINT ?? "").startsWith("sdk")) return;
+
   let input: { session_id?: string; cwd?: string } = {};
   try {
     input = JSON.parse(await Bun.stdin.text());
