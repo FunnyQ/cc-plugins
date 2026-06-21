@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.15.1] - 2026-06-21
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.15.1` tag._
+
+### 🐛 Fixed
+
+- **The cockpit "thoughtful" scribe nudge no longer fires in headless `claude -p` runs.** The `Stop` hook that re-surfaces the auto-logging reminder fires in print/SDK mode too — so relay's `delegate`/`review` backends (and any SDK app) had a `/cockpit scribe` nudge injected into every turn, where there is no interactive cockpit and no human to ever act on it. `scribe-nudge.ts` now bails at the top of `main()` when `CLAUDE_CODE_ENTRYPOINT` starts with `sdk` (headless runs report `sdk-cli`; SDK apps `sdk-*`; the interactive TUI reports `cli`), verified against a live Stop hook probe. Interactive cockpit sessions are unaffected.
+
 ## [chronicle 0.3.1] - 2026-06-19
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.3.1` tag._
