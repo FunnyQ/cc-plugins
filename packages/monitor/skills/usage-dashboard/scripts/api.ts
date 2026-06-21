@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { dedupKey } from "./dedup";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
@@ -837,6 +837,63 @@ function clonePricingTable(table: PricingTable): PricingTable {
   };
 }
 
+type OpenRouterPricing = {
+  models: Record<string, ModelPrice>;
+  error: string | null;
+};
+
+// Fetch live per-model pricing from OpenRouter. Keys are OpenRouter model ids
+// (e.g. "anthropic/claude-opus-4", "minimax/minimax-m3") — harness-agnostic.
+// Failures are reported via `error`, never thrown.
+async function fetchOpenRouterPricing(
+  timeoutMs = 3000,
+): Promise<OpenRouterPricing> {
+  const models: Record<string, ModelPrice> = {};
+  let error: string | null = null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(OPENROUTER_URL, { signal: ctrl.signal });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id: string;
+          pricing?: {
+            prompt?: string;
+            completion?: string;
+            input_cache_read?: string;
+            input_cache_write?: string;
+          };
+        }>;
+      };
+      for (const m of json.data ?? []) {
+        const p = m.pricing;
+        if (!p?.prompt || !p?.completion) continue;
+        // OpenRouter pricing is per token, multiply by 1M
+        const input = parseFloat(p.prompt) * 1_000_000;
+        const output = parseFloat(p.completion) * 1_000_000;
+        const cacheRead = p.input_cache_read
+          ? parseFloat(p.input_cache_read) * 1_000_000
+          : input * 0.1;
+        const cacheWrite = p.input_cache_write
+          ? parseFloat(p.input_cache_write) * 1_000_000
+          : input * 1.25;
+        if (Number.isFinite(input) && Number.isFinite(output)) {
+          models[m.id] = { input, output, cacheRead, cacheWrite };
+        }
+      }
+    } else {
+      error = `HTTP ${res.status}`;
+    }
+  } catch (err) {
+    error =
+      err instanceof Error ? err.name || err.message : "OpenRouter failed";
+  } finally {
+    clearTimeout(timer);
+  }
+  return { models, error };
+}
+
 async function loadPricingWithMeta(): Promise<PricingLoad> {
   if (pricingCache) return pricingCache;
   pricingCache = (async () => {
@@ -868,48 +925,12 @@ async function loadPricingWithMeta(): Promise<PricingLoad> {
     };
 
     // Try OpenRouter. Failures are non-fatal; defaults remain the basis.
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 3000);
-    try {
-      const res = await fetch(OPENROUTER_URL, { signal: ctrl.signal });
-      if (res.ok) {
-        const json = (await res.json()) as {
-          data?: Array<{
-            id: string;
-            pricing?: {
-              prompt?: string;
-              completion?: string;
-              input_cache_read?: string;
-              input_cache_write?: string;
-            };
-          }>;
-        };
-        for (const m of json.data ?? []) {
-          const p = m.pricing;
-          if (!p?.prompt || !p?.completion) continue;
-          // OpenRouter pricing is per token, multiply by 1M
-          const input = parseFloat(p.prompt) * 1_000_000;
-          const output = parseFloat(p.completion) * 1_000_000;
-          const cacheRead = p.input_cache_read
-            ? parseFloat(p.input_cache_read) * 1_000_000
-            : input * 0.1;
-          const cacheWrite = p.input_cache_write
-            ? parseFloat(p.input_cache_write) * 1_000_000
-            : input * 1.25;
-          if (Number.isFinite(input) && Number.isFinite(output)) {
-            table.models[m.id] = { input, output, cacheRead, cacheWrite };
-            sourceByModel[m.id] = "live";
-            meta.openRouter.used = true;
-          }
-        }
-      } else {
-        meta.openRouter.error = `HTTP ${res.status}`;
-      }
-    } catch (err) {
-      meta.openRouter.error =
-        err instanceof Error ? err.name || err.message : "OpenRouter failed";
-    } finally {
-      clearTimeout(timer);
+    const live = await fetchOpenRouterPricing(3000);
+    meta.openRouter.error = live.error;
+    for (const [id, price] of Object.entries(live.models)) {
+      table.models[id] = price;
+      sourceByModel[id] = "live";
+      meta.openRouter.used = true;
     }
 
     // User override last (highest priority)
@@ -946,20 +967,65 @@ export function pricingModelAliases(
   return [...aliases];
 }
 
-export function priceFor(model: string, table: PricingTable): ModelPrice {
-  for (const key of pricingModelAliases(model, table)) {
-    if (table.models[key]) return table.models[key];
+// Reduce a model id — ours or OpenRouter's — to a provider/harness-agnostic
+// comparison key: drop the provider prefix (`anthropic/`, `minimax/`, …), any
+// `:tag` routing suffix (`:free`, `:thinking`, …), a trailing `-YYYYMMDD`
+// snapshot date, then lowercase and strip `. - _` separators. Lets our
+// `claude-opus-4-5-20251101` match OpenRouter's `anthropic/claude-opus-4.5`.
+export function normalizeModelId(id: string): string {
+  let s = String(id).toLowerCase();
+  const slash = s.lastIndexOf("/");
+  if (slash >= 0) s = s.slice(slash + 1);
+  const colon = s.indexOf(":");
+  if (colon >= 0) s = s.slice(0, colon);
+  s = s.replace(/-\d{8}$/, "");
+  return s.replace(/[._-]/g, "");
+}
+
+// Memoized normalized id → table key index, keyed by the table object so it is
+// rebuilt only when the pricing table is replaced (cache invalidation / refresh).
+const normalizedIndexCache = new WeakMap<PricingTable, Map<string, string>>();
+function normalizedModelIndex(table: PricingTable): Map<string, string> {
+  const cached = normalizedIndexCache.get(table);
+  if (cached) return cached;
+  const idx = new Map<string, string>();
+  for (const key of Object.keys(table.models)) {
+    const n = normalizeModelId(key);
+    if (!n) continue;
+    const prev = idx.get(n);
+    // Prefer a canonical (untagged) id over routing variants like `:free`, whose
+    // $0 pricing would otherwise shadow the real price under the same norm key.
+    if (prev === undefined || (prev.includes(":") && !key.includes(":"))) {
+      idx.set(n, key);
+    }
   }
-  return table.fallback;
+  normalizedIndexCache.set(table, idx);
+  return idx;
+}
+
+// Resolve a model to its table key: exact aliases first (so curated defaults and
+// overrides always win), then a normalized fallback that only catches models
+// which would otherwise have no price at all.
+function resolveModelKey(model: string, table: PricingTable): string | null {
+  for (const key of pricingModelAliases(model, table)) {
+    if (table.models[key]) return key;
+  }
+  const n = normalizeModelId(rawModelFromKey(model));
+  const hit = n ? normalizedModelIndex(table).get(n) : undefined;
+  return hit ?? null;
+}
+
+export function priceFor(model: string, table: PricingTable): ModelPrice {
+  const key = resolveModelKey(model, table);
+  return key ? table.models[key] : table.fallback;
 }
 
 function pricingSourceForModel(
   model: string,
   pricing: PricingLoad,
 ): PricingSource | "fallback" {
-  for (const key of pricingModelAliases(model, pricing.table)) {
-    if (pricing.sourceByModel[key]) return pricing.sourceByModel[key];
-  }
+  const key = resolveModelKey(model, pricing.table);
+  if (key && pricing.sourceByModel[key]) return pricing.sourceByModel[key];
   return "fallback";
 }
 
@@ -989,6 +1055,89 @@ function pricingMetaForModels(
       fallback: fallbackModels.length,
       fallbackModels,
     },
+  };
+}
+
+export type PricingRefreshResult = {
+  ok: boolean;
+  overridePath: string;
+  openRouterError: string | null;
+  resolved: { model: string; key: string }[];
+  unresolved: string[];
+  writtenCount: number;
+};
+
+// Fetch live OpenRouter pricing and persist it into the user override file
+// (~/.config/cc-dashboard/pricing.json) for every used model OpenRouter knows.
+// Override entries are keyed by the raw model name (no provider/harness prefix),
+// so pricing is purely model-scoped — a model used across harnesses gets one
+// entry. Existing override entries not in the used set are preserved.
+export async function refreshPricingOverride(
+  usedModelKeys?: string[],
+): Promise<PricingRefreshResult> {
+  const defaults = safeReadJSON<PricingTable>(PRICING_DEFAULTS);
+  if (!defaults)
+    throw new Error(`Missing pricing defaults: ${PRICING_DEFAULTS}`);
+
+  // Resolve the used-model list. Trust the caller's list when provided
+  // (the dashboard already has it); otherwise derive it from a fresh build.
+  let keys = (usedModelKeys ?? []).filter((k) => typeof k === "string" && k);
+  if (keys.length === 0) {
+    const stats = await buildStats();
+    keys = stats.byModel.map((m: { model: string }) => m.model);
+  }
+
+  // User asked for this explicitly — allow a longer timeout than the 3s
+  // background fetch so a slow network still resolves.
+  const live = await fetchOpenRouterPricing(10_000);
+  // A throwaway table so resolveModelKey can match used models against the live
+  // ids the same way priceFor does — exact aliases first, then normalized.
+  const liveTable: PricingTable = {
+    models: live.models,
+    fallback: defaults.fallback,
+    externalModelPrefixes: defaults.externalModelPrefixes,
+  };
+
+  // Preserve hand-set override entries; merge fresh live prices on top.
+  const existing = readJSONWithError<{ models?: Record<string, ModelPrice> }>(
+    USER_PRICING_OVERRIDE,
+  );
+  if (existing.error) throw new Error(`Override unreadable: ${existing.error}`);
+  const models: Record<string, ModelPrice> = {
+    ...(existing.data?.models ?? {}),
+  };
+
+  const resolved: { model: string; key: string }[] = [];
+  const unresolved: string[] = [];
+  const seen = new Set<string>();
+  for (const modelKeyStr of keys) {
+    const raw = rawModelFromKey(modelKeyStr);
+    if (seen.has(raw)) continue; // collapse the same model across harnesses
+    seen.add(raw);
+    const liveKey = resolveModelKey(modelKeyStr, liveTable);
+    if (liveKey) {
+      models[raw] = live.models[liveKey];
+      resolved.push({ model: modelKeyStr, key: raw });
+    } else {
+      unresolved.push(modelKeyStr);
+    }
+  }
+
+  mkdirSync(dirname(USER_PRICING_OVERRIDE), { recursive: true });
+  writeFileSync(
+    USER_PRICING_OVERRIDE,
+    `${JSON.stringify({ models }, null, 2)}\n`,
+  );
+  // Drop the cached pricing so the next buildStats reflects the new override.
+  pricingCache = null;
+
+  return {
+    ok: true,
+    overridePath: USER_PRICING_OVERRIDE.replace(HOME, "~"),
+    openRouterError: live.error,
+    resolved,
+    unresolved,
+    writtenCount: resolved.length,
   };
 }
 

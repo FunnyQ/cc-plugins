@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { extname, resolve, relative, isAbsolute, join } from "node:path";
 import { spawn } from "node:child_process";
-import { buildStats } from "./api.ts";
+import { buildStats, refreshPricingOverride } from "./api.ts";
 import {
   getLiveSessions,
   cockpitDaemonPort,
@@ -194,6 +194,23 @@ async function handleStats(): Promise<Response> {
   }
 }
 
+async function handlePricingRefresh(req: Request): Promise<Response> {
+  try {
+    let models: string[] | undefined;
+    try {
+      const body = (await req.json()) as { models?: unknown };
+      if (Array.isArray(body?.models)) {
+        models = body.models.filter((m): m is string => typeof m === "string");
+      }
+    } catch {
+      // No/invalid body — fall back to deriving the model list server-side.
+    }
+    return jsonResponse(await refreshPricingOverride(models));
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
 function handleLive(): Response {
   try {
     const cockpitPort = cockpitDaemonPort();
@@ -221,6 +238,8 @@ try {
       const url = new URL(req.url);
       if (url.pathname === "/api/stats") return handleStats();
       if (url.pathname === "/api/live") return handleLive();
+      if (url.pathname === "/api/pricing/refresh" && req.method === "POST")
+        return handlePricingRefresh(req);
       return serveStatic(url.pathname);
     },
   });
