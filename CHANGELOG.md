@@ -1,5 +1,21 @@
 # Changelog
 
+## [monitor 3.15.2] - 2026-06-21
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.15.2` tag._
+
+### ✨ Added
+
+- **"Fetch latest pricing" button in the dashboard's Pricing confidence panel.** A square refresh button (bottom-right of the panel) pulls live per-model pricing from OpenRouter and writes it into your override file (`~/.config/cc-dashboard/pricing.json`), then reloads the stats so the panel updates in place. Entries are keyed by the raw model name — no harness prefix — so a model used across Claude/Codex/OpenCode collapses to one price, and your hand-set override entries are preserved. A status note ("Saved to … — N models priced") auto-dismisses after 5 seconds.
+
+### 🔧 Changed
+
+- **Model→price matching is now harness-agnostic and tolerant of id formatting.** A new normalization step lets used models resolve to live OpenRouter prices that previously fell through to the conservative fallback: it bridges provider prefixes (`anthropic/`, `minimax/`…), version dot-vs-dash (`claude-opus-4-5` ↔ `claude-opus-4.5`), trailing `-YYYYMMDD` snapshot dates, and `:free`/`:thinking` routing tags. Exact matches still win first, so curated defaults and overrides are never repriced; normalization only rescues models that would otherwise have no price. On a real account this took the "fallback in use" count to zero with no mismatches.
+
+### 🐛 Fixed
+
+- **Removed a stale `claude-opus-4-5` default price (15/75 per 1M).** It now resolves to the correct live OpenRouter price (5/25) via the normalization above, instead of a wrong hard-coded value.
+
 ## [monitor 3.15.1] - 2026-06-21
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.15.1` tag._
