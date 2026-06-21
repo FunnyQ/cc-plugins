@@ -62,6 +62,10 @@ export function App() {
     dailyUsageIndexesByProvider: {},
     loading: false,
     refreshInFlight: false,
+    pricingRefreshing: false,
+    pricingRefreshNote: null,
+    pricingRefreshError: false,
+    pricingNoteTimer: null,
     refreshTimer: null,
     error: null,
     rangeKey: initialPrefs.rangeKey ?? "24h",
@@ -122,6 +126,7 @@ export function App() {
       if (this.livePollTimer) window.clearInterval(this.livePollTimer);
       if (this.liveTickTimer) window.clearInterval(this.liveTickTimer);
       if (this.rangeKeyPulseTimer) window.clearTimeout(this.rangeKeyPulseTimer);
+      if (this.pricingNoteTimer) window.clearTimeout(this.pricingNoteTimer);
       if (this.liveVisibilityHandler) {
         document.removeEventListener(
           "visibilitychange",
@@ -135,6 +140,7 @@ export function App() {
       this.livePollTimer = null;
       this.liveTickTimer = null;
       this.rangeKeyPulseTimer = null;
+      this.pricingNoteTimer = null;
       this.liveVisibilityHandler = null;
       this.rangeKeydownHandler = null;
     },
@@ -252,6 +258,72 @@ export function App() {
       } finally {
         this.refreshInFlight = false;
         if (!quiet) this.loading = false;
+      }
+    },
+
+    // Fetch latest pricing from OpenRouter, persist it to the user override
+    // file (model-keyed, harness-agnostic), then reload stats so the panel
+    // reflects the freshly written prices.
+    // Show a transient status note that auto-dismisses after 5s.
+    flashPricingNote(note, isError) {
+      this.pricingRefreshNote = note;
+      this.pricingRefreshError = isError;
+      if (this.pricingNoteTimer) window.clearTimeout(this.pricingNoteTimer);
+      this.pricingNoteTimer = window.setTimeout(() => {
+        this.pricingRefreshNote = null;
+        this.pricingRefreshError = false;
+        this.pricingNoteTimer = null;
+      }, 5_000);
+    },
+
+    async refreshPricing() {
+      if (this.pricingRefreshing) return;
+      this.pricingRefreshing = true;
+      this.pricingRefreshError = false;
+      this.pricingRefreshNote = null;
+      if (this.pricingNoteTimer) {
+        window.clearTimeout(this.pricingNoteTimer);
+        this.pricingNoteTimer = null;
+      }
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(() => ctrl.abort(), 20_000);
+      try {
+        const models = (this.stats?.byModel ?? []).map((m) => m.model);
+        const res = await fetch("/api/pricing/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ models }),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        // Reload stats so Live/Override/Fallback counts reflect the new file.
+        await this.refresh({ quiet: true });
+        const priced =
+          data.writtenCount === 1
+            ? "1 model priced"
+            : `${data.writtenCount} models priced`;
+        const missing = Array.isArray(data.unresolved)
+          ? data.unresolved.length
+          : 0;
+        const missTail = missing ? ` · ${missing} not on OpenRouter` : "";
+        const orTail = data.openRouterError
+          ? ` · OpenRouter: ${data.openRouterError}`
+          : "";
+        // Surface a hard failure only when nothing landed and OpenRouter erred.
+        this.flashPricingNote(
+          `Saved to ${data.overridePath} — ${priced}${missTail}${orTail}`,
+          Boolean(data.openRouterError) && data.writtenCount === 0,
+        );
+      } catch (err) {
+        this.flashPricingNote(
+          `Pricing refresh failed: ${err?.message ?? err}`,
+          true,
+        );
+      } finally {
+        window.clearTimeout(timer);
+        this.pricingRefreshing = false;
       }
     },
 
