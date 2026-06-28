@@ -17,7 +17,7 @@ A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing fo
 - **cockpit** — the windshield: one skill with a thin `SKILL.md` router. Plain `/cockpit` routes through the provider reference (`references/claude.md` or `references/codex.md`) into `references/pilot.md`; `/cockpit scribe` routes into `references/scribe.md` for auto-distilling work into typed decision-trail entries. The cockpit provides a distilled decision trail, live transcript, a `needs_your_call` wait/send bridge, and a send box for running sessions. Its dashboard daemon owns the live transcript view that usage-dashboard's "Live now" rows link into. Claude Code sends use the cockpit channel MCP server; Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. The channel is UI→agent only: the agent's answers ride the transcript (the single source of truth — no separate reply tool).
 - **install** — one-stop setup (command-triggered): the canonical home for all prerequisite checks and config wiring for the whole plugin. `setup.ts` checks both skills and wires the one config a non-dev user can't easily edit by hand — the statusline collector in `~/.claude/settings.json`. (The **cockpit channel** is now packaged in the plugin manifest — `mcpServers` + `channels` in `.claude-plugin/plugin.json` — so it no longer needs a hand-written `~/.claude.json` entry; setup.ts only *cleans up* a stale entry left by older versions, which would otherwise double-register the channel.) The dashboard precheck (`install.ts`) and statusline wiring (`setup-statusline.ts` + pure `statusline-decision.ts`) live here; usage-dashboard imports them rather than owning copies. The Claude manifest has two **`SessionStart` hooks**: one runs `setup.ts --session-check` — marker-gated via `$CLAUDE_PLUGIN_DATA/.wired-version`, so once per version it silently re-points a version-drifted statusline path (the cache encodes the version, e.g. `.../monitor/3.1.0/...`, and old dirs linger so "wired" means *exact current path*, not mere existence) and removes any stale channel entry, or, on a fresh install, prints one write-free nudge to run `/monitor:install`; the other injects thoughtful auto-logging guidance for Claude sessions. It never fresh-wires the statusline — initial opt-in stays manual. Codex has no SessionStart hooks, so auto-logging is enabled manually with `/thoughtful`.
 
-Cockpit has no per-project metadata file or local planning state. The only cockpit config is the global decision-log language at `~/.config/q-lab/cockpit/config.json`, managed by `cockpit config --log-language` and `cockpit config get-language`.
+Cockpit has no per-project metadata file or local planning state. Cockpit config is global, at `~/.config/q-lab/cockpit/config.json`: the decision-log language (`cockpit config --log-language` / `get-language`) and the project/user-scope scribe-nudge preferences (`cockpit nudge ... --scope project|user`, see below). Per-project nudge opinions live keyed by project root inside this one global file — never a repo dotfile.
 
 This file documents usage-dashboard in depth; cockpit carries its own `SKILL.md`, `PRODUCT.md`, and `DESIGN.md` under `packages/monitor/skills/cockpit/`. The dashboard and cockpit run **independent** web servers (separate ports, separate `dist/` SPAs) — only the plugin packaging is merged.
 
@@ -203,6 +203,12 @@ bun packages/monitor/skills/cockpit/scripts/cockpit.ts config --log-language zh-
 
 # Enable best-effort thoughtful auto-logging in Codex or re-affirm it manually
 /thoughtful
+
+# Toggle the scribe Stop-hook nudges (/monitor:nudge command). Three scopes —
+# session (TTL file ~/.local/share/q-lab/cockpit/scribe-nudge-toggle.json),
+# project + user (global config). Most-specific defined scope wins.
+bun packages/monitor/skills/cockpit/scripts/cockpit.ts nudge status            # on|off|toggle|clear|status
+bun packages/monitor/skills/cockpit/scripts/cockpit.ts nudge off --scope user  # --scope session|project|user
 
 # Dev: a live channel-flagged Claude session keeps respawning the cached daemon
 # (the channel MCP's reconnect loop calls ensureCockpitDaemon when the daemon

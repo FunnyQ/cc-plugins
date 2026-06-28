@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.16.0] - 2026-06-28
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.16.0` tag._
+
+### ✨ Added
+
+- **`/monitor:nudge` — a multi-scope kill switch for the scribe auto-log reminders.** The 💭 "spawn a fork to run /cockpit scribe" nudge that the `Stop` hook re-surfaces at the end of each turn can now be silenced (or re-enabled) at three scopes — `session` (TTL-pruned file, one week idle), `project` (keyed by git root), and `user` (global default) — via `cockpit nudge [on|off|toggle|clear|status] [--scope session|project|user]`. The most-specific *defined* scope wins (`session → project → user → default: on`), so a broad `off` can be re-enabled at a narrower scope — e.g. mute everywhere with `nudge off --scope user`, then hear them in just one session with `nudge on`. Project and user opinions persist in the one global cockpit config (the project opinion is keyed by its git root, never a repo dotfile); `status` prints the effective result plus the per-scope breakdown. The `Stop` hook consults this toggle before nudging, so an all-unset setup stays enabled (unchanged behaviour).
+
 ## [monitor 3.15.2] - 2026-06-21
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.15.2` tag._

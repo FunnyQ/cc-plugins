@@ -23,6 +23,13 @@ import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
 import { cockpitHome } from "./cockpit-home";
+import {
+  readScopes,
+  resolveNudgeEnabled,
+  setScope,
+  type NudgeScope,
+  type ToggleAction,
+} from "./nudge-toggle";
 
 // ---------- Types ----------
 
@@ -795,6 +802,79 @@ async function cmdRestart(rest: string[]): Promise<void> {
   process.exit(1);
 }
 
+// ---------- Nudge toggle ----------
+
+const NUDGE_USAGE =
+  "usage: cockpit nudge <on|off|toggle|clear|status> [--scope session|project|user]";
+
+function fmtScope(state: "on" | "off" | undefined): string {
+  return state === undefined ? "default" : state.toUpperCase();
+}
+
+/**
+ * `cockpit nudge <on|off|toggle|clear|status> [--scope ...]` — flip the scribe
+ * Stop-hook reminders at one of three scopes (session / project / user). The
+ * most-specific defined scope wins; status prints the effective result plus the
+ * per-scope breakdown. Session lives in a TTL-pruned file; project + user live
+ * in the global config (nudge-toggle.ts / config.ts).
+ */
+function cmdNudge(rest: string[]): void {
+  let action = "status";
+  let scope: NudgeScope = "session";
+  for (let i = 0; i < rest.length; i++) {
+    const tok = rest[i];
+    if (tok === "--scope") {
+      const v = rest[++i];
+      if (v !== "session" && v !== "project" && v !== "user") {
+        console.error(`cockpit nudge: invalid scope "${v ?? ""}"`);
+        console.error(NUDGE_USAGE);
+        process.exit(1);
+      }
+      scope = v;
+    } else {
+      action = tok.toLowerCase();
+    }
+  }
+  if (!["on", "off", "toggle", "clear", "status"].includes(action)) {
+    console.error(`cockpit nudge: unknown action "${action}"`);
+    console.error(NUDGE_USAGE);
+    process.exit(1);
+  }
+
+  const cwd = process.cwd();
+  const now = Date.now();
+  // Session id is required only to mutate the session scope; status and the
+  // project/user scopes tolerate its absence (the session column shows default).
+  const sessionId = findSession("claude", cwd);
+  if (action !== "status" && scope === "session" && !sessionId) {
+    console.error(
+      "cockpit nudge: could not resolve the current session id (no CLAUDE_CODE_SESSION_ID and no transcript). Run inside a Claude session, or target --scope project|user.",
+    );
+    process.exit(1);
+  }
+
+  if (action !== "status") {
+    setScope(scope, action as ToggleAction, {
+      sessionId: sessionId ?? "",
+      cwd,
+      now,
+    });
+  }
+
+  const scopes = readScopes(sessionId, cwd, now);
+  const enabled = resolveNudgeEnabled(
+    scopes.session,
+    scopes.project,
+    scopes.user,
+  );
+  const verb =
+    action === "status" ? "" : ` — ${scope} set to ${fmtScope(scopes[scope])}`;
+  console.log(`scribe nudges: ${enabled ? "ON" : "OFF"} (effective)${verb}`);
+  console.log(
+    `  session: ${fmtScope(scopes.session)} · project: ${fmtScope(scopes.project)} · user: ${fmtScope(scopes.user)}`,
+  );
+}
+
 // ---------- Main ----------
 
 async function main(): Promise<void> {
@@ -818,10 +898,13 @@ async function main(): Promise<void> {
     case "restart":
       await cmdRestart(rest);
       break;
+    case "nudge":
+      cmdNudge(rest);
+      break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
       console.error(
-        "usage: cockpit <log|scribe|config|wait|send|restart> [args]",
+        "usage: cockpit <log|scribe|config|wait|send|restart|nudge> [args]",
       );
       process.exit(1);
   }
