@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { cockpitHome } from "./cockpit-home";
+import { nudgeEnabledFor } from "./nudge-toggle";
 
 // ── Tunables ────────────────────────────────────────────────────────────────
 const THROTTLE_MS = Number(process.env.COCKPIT_NUDGE_THROTTLE_MS) || 8 * 60_000;
@@ -180,6 +181,11 @@ async function main() {
   }
 
   const cwd = input.cwd || process.cwd();
+
+  // Multi-scope opt-out, flipped via `cockpit nudge` (session / project / user).
+  // Most-specific defined scope wins; all-unset stays enabled.
+  if (!nudgeEnabledFor(input.session_id, cwd, Date.now())) return;
+
   const probe = codeSignature(cwd);
   if (!probe) return; // not a git repo, or no detectable change basis
 
