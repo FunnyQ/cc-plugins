@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { mkdirSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -52,8 +52,6 @@ function nudgeRollup(): void {
 
     mkdirSync(CACHE_DIR, { recursive: true });
     writeFileSync(ROLLUP_NUDGE_MARKER, "");
-    const now = new Date();
-    utimesSync(ROLLUP_NUDGE_MARKER, now, now);
 
     const child = spawn(
       process.execPath,

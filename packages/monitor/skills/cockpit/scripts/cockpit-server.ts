@@ -4,14 +4,8 @@
 // instance's pid/port/token/root: starting twice from the same install reuses it
 // (never double-binds), but a launcher from a moved or updated install supersedes
 // the stale daemon (whose served paths would 404). See daemon-lifecycle.ts.
-import {
-  statSync,
-  existsSync,
-  mkdirSync,
-  writeFileSync,
-  readFileSync,
-} from "node:fs";
-import { extname, resolve, relative, isAbsolute, join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { resolve, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { projectsPayload, sessionsPayload } from "./registry";
@@ -39,6 +33,7 @@ import { handleDesignSystem } from "./design-system";
 import { jsonResponse, jsonError } from "./http";
 import { decideStartup, type DaemonInfo } from "./daemon-lifecycle";
 import { cockpitHome } from "./cockpit-home";
+import { serveStaticFile } from "../../shared/scripts/static-server";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
@@ -163,25 +158,6 @@ function startupGuard(): void {
   }
 }
 
-// ---------- mime ----------
-
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".mjs": "application/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".woff2": "font/woff2",
-  ".ico": "image/x-icon",
-};
-
-function mimeFor(path: string): string {
-  return MIME[extname(path).toLowerCase()] ?? "application/octet-stream";
-}
-
 // ---------- api handlers ----------
 
 function handleSessions(): Response {
@@ -207,34 +183,6 @@ function handleToken(): Response {
   const info = readDaemonInfo();
   if (!info?.token) return jsonError("daemon token unavailable", 503);
   return jsonResponse({ token: info.token });
-}
-
-// ---------- static serving ----------
-
-function isInsideDist(filePath: string): boolean {
-  const rel = relative(DIST, filePath);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-}
-
-function serveStatic(pathname: string): Response {
-  const rel = pathname === "/" ? "/index.html" : pathname;
-  const filePath = resolve(DIST, "." + rel);
-  if (!isInsideDist(filePath) || !existsSync(filePath)) {
-    return new Response("Not found", { status: 404 });
-  }
-  try {
-    if (!statSync(filePath).isFile()) {
-      return new Response("Not found", { status: 404 });
-    }
-  } catch {
-    return new Response("Not found", { status: 404 });
-  }
-  return new Response(Bun.file(filePath), {
-    headers: {
-      "Content-Type": mimeFor(filePath),
-      "Cache-Control": "no-cache",
-    },
-  });
 }
 
 // ---------- server ----------
@@ -286,7 +234,7 @@ function buildServer() {
         return handlePermissionPull(req);
       if (url.pathname === "/api/permission-resolved")
         return handlePermissionResolved(req);
-      return serveStatic(url.pathname);
+      return serveStaticFile(DIST, url.pathname);
     },
   });
 }
