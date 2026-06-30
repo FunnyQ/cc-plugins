@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { isAbsolute, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 import {
@@ -12,20 +11,20 @@ import {
   sortLiveSessions,
   type LiveSession,
 } from "./live-sessions";
+import { readSessionFiles } from "./session-files";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
+import { isAlive } from "../../cockpit/scripts/cockpit-channel";
+import { isPathInside } from "../../shared/scripts/path-inside";
+import {
+  CODEX_DIR,
+  CODEX_SESSIONS_DIR,
+  CODEX_STATE_DB,
+  OPENCODE_DB,
+  PROJECTS_DIR,
+} from "./paths";
 
 export type { LiveSession } from "./live-sessions";
 
-const CLAUDE_DIR = join(homedir(), ".claude");
-const SESSIONS_DIR = join(CLAUDE_DIR, "sessions");
-const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
-const CODEX_DIR = join(homedir(), ".codex");
-const CODEX_STATE_DB = join(CODEX_DIR, "state_5.sqlite");
-const CODEX_SESSIONS_DIR = join(CODEX_DIR, "sessions");
-const OPENCODE_DIR =
-  process.env.OPENCODE_DATA_DIR ||
-  join(homedir(), ".local", "share", "opencode");
-const OPENCODE_DB = join(OPENCODE_DIR, "opencode.db");
 // Resolve the projects root once: relative() needs the canonical base to
 // compare against the realpath'd transcript paths, and the dir is stable.
 const PROJECTS_REAL = (() => {
@@ -43,18 +42,7 @@ const CODEX_SESSIONS_REAL = (() => {
   }
 })();
 const TRANSCRIPT_INDEX_TTL_MS = 5_000;
-
-type ClaudeSessionFile = {
-  pid: number;
-  sessionId: string;
-  cwd: string;
-  status: "busy" | "idle" | "waiting" | string;
-  startedAt: number;
-  updatedAt?: number;
-  version?: string;
-  kind?: string;
-  entrypoint?: string;
-};
+const COCKPIT_FILE_TTL_MS = 5_000;
 
 type CodexThreadRow = {
   id: string;
@@ -74,28 +62,6 @@ type OpenCodeSessionRow = {
   time_created: number;
   time_updated: number;
 };
-
-function readSessionFiles(): ClaudeSessionFile[] {
-  if (!existsSync(SESSIONS_DIR)) return [];
-  const out: ClaudeSessionFile[] = [];
-  for (const f of readdirSync(SESSIONS_DIR)) {
-    if (!f.endsWith(".json")) continue;
-    try {
-      const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
-      if (
-        data &&
-        typeof data.sessionId === "string" &&
-        typeof data.cwd === "string" &&
-        typeof data.startedAt === "number"
-      ) {
-        out.push(data);
-      }
-    } catch {
-      // skip malformed / partially-written file
-    }
-  }
-  return out;
-}
 
 export function resolveClaudeTranscriptPath(id: string): string | undefined {
   if (!existsSync(PROJECTS_DIR)) return undefined;
@@ -210,27 +176,38 @@ function getTranscriptIndex(): Map<string, string> {
 }
 
 export function isInsideProjects(filePath: string): boolean {
-  const rel = relative(PROJECTS_REAL, filePath);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  return isPathInside(PROJECTS_REAL, filePath);
 }
 
 export function isInsideCodexSessions(filePath: string): boolean {
-  const rel = relative(CODEX_SESSIONS_REAL, filePath);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  return isPathInside(CODEX_SESSIONS_REAL, filePath);
 }
 
 // Companion read of cockpit's registry (same machine, same author) so we can
 // tag which live sessions have a cockpit decision trail. Membership only — we
 // don't touch cockpit's transcript/rendering internals. Missing/corrupt → none.
 const COCKPIT_REGISTRY = join(cockpitHome(), "registry.json");
+let cockpitSessionKeysCache: Set<string> | null = null;
+let cockpitSessionKeysAt = 0;
 
 function cockpitSessionKeys(): Set<string> {
+  const now = Date.now();
+  if (
+    cockpitSessionKeysCache &&
+    now - cockpitSessionKeysAt < COCKPIT_FILE_TTL_MS
+  ) {
+    return cockpitSessionKeysCache;
+  }
   try {
-    return parseCockpitKeys(readFileSync(COCKPIT_REGISTRY, "utf8"));
+    cockpitSessionKeysCache = parseCockpitKeys(
+      readFileSync(COCKPIT_REGISTRY, "utf8"),
+    );
   } catch {
     // registry missing — no cockpit tags
-    return new Set<string>();
+    cockpitSessionKeysCache = new Set<string>();
   }
+  cockpitSessionKeysAt = now;
+  return cockpitSessionKeysCache;
 }
 
 // Companion read of cockpit's daemon PID file (same machine, same author). The
@@ -238,29 +215,32 @@ function cockpitSessionKeys(): Set<string> {
 // dead daemon means a dead tab — surface it as a notice instead. Mirrors
 // cockpit-server.ts's own liveness check (PID file + signal-0 probe).
 const COCKPIT_DAEMON = join(cockpitHome(), "daemon.json");
+let cockpitDaemonPortCache: number | null = null;
+let cockpitDaemonPortAt = 0;
 
 // The live cockpit daemon's port, or null when it isn't running. Cockpit can
 // bind a custom --port, and daemon.json records the real one — the Live panel
 // must open that port, not a hardcoded 5858, or a custom-port cockpit opens a
 // dead tab despite reading as up.
 export function cockpitDaemonPort(): number | null {
+  const now = Date.now();
+  if (now - cockpitDaemonPortAt < COCKPIT_FILE_TTL_MS) {
+    return cockpitDaemonPortCache;
+  }
   try {
     const info = JSON.parse(readFileSync(COCKPIT_DAEMON, "utf8"));
-    if (typeof info?.pid !== "number") return null;
-    let alive = false;
-    try {
-      process.kill(info.pid, 0);
-      alive = true;
-    } catch (err) {
-      // ESRCH → no such process (dead); EPERM → exists but not ours (alive).
-      alive = (err as NodeJS.ErrnoException)?.code === "EPERM";
-    }
-    if (!alive) return null;
-    return typeof info.port === "number" ? info.port : 5858;
+    cockpitDaemonPortCache =
+      typeof info?.pid === "number" && isAlive(info.pid)
+        ? typeof info.port === "number"
+          ? info.port
+          : 5858
+        : null;
   } catch {
     // daemon.json missing or corrupt — treat as not running
-    return null;
+    cockpitDaemonPortCache = null;
   }
+  cockpitDaemonPortAt = now;
+  return cockpitDaemonPortCache;
 }
 
 export function getLiveSessions(): LiveSession[] {
@@ -289,21 +269,6 @@ export function getLiveSessions(): LiveSession[] {
     ...codexSessions,
     ...openCodeSessions,
   ]);
-}
-
-export function jsonResponse(payload: object, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
-export function jsonError(err: unknown, status = 500): Response {
-  const msg = err instanceof Error ? err.message : String(err);
-  return jsonResponse({ error: msg }, status);
 }
 
 if (import.meta.main) {

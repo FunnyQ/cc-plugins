@@ -11,9 +11,9 @@
 
 import { Database } from "bun:sqlite";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { dedupKey } from "./dedup";
+import { PROJECTS_DIR } from "./paths";
 import {
   addHourlyRow,
   clearIngestedFile,
@@ -26,10 +26,6 @@ import {
   upsertIngestedFile,
   type HourlyRow,
 } from "./rollup-db";
-
-const HOME = homedir();
-const PROJECTS_DIR =
-  process.env.TOKEN_ATLAS_PROJECTS_DIR || join(HOME, ".claude", "projects");
 
 type TranscriptUsage = {
   input_tokens?: number;

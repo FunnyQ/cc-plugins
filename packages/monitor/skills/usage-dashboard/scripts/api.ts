@@ -10,28 +10,28 @@ import {
   writeFileSync,
 } from "node:fs";
 import { Database } from "bun:sqlite";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { dedupKey } from "./dedup";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
 import { allHourlyRows, openRollupDb } from "./rollup-db";
 import { updateRollup } from "./rollup-update";
-
-const HOME = homedir();
-const CLAUDE_DIR = join(HOME, ".claude");
-const CODEX_DIR = join(HOME, ".codex");
-const OPENCODE_DIR =
-  process.env.OPENCODE_DATA_DIR || join(HOME, ".local", "share", "opencode");
-const OPENCODE_STORAGE_DIR = join(OPENCODE_DIR, "storage");
-const OPENCODE_PROJECT_DIR = join(OPENCODE_DIR, "project");
-const OPENCODE_DB = join(OPENCODE_DIR, "opencode.db");
-const CODEX_STATE_DB = join(CODEX_DIR, "state_5.sqlite");
-const CODEX_SESSIONS_DIR = join(CODEX_DIR, "sessions");
-const STATS_CACHE = join(CLAUDE_DIR, "stats-cache.json");
-const HISTORY = join(CLAUDE_DIR, "history.jsonl");
-const SESSIONS_DIR = join(CLAUDE_DIR, "sessions");
-const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
+import { openCodeTimestampMs } from "../../shared/scripts/opencode";
+import { readSessionFiles } from "./session-files";
+import { projectNameFor } from "./live-sessions";
+import {
+  CODEX_AUTH,
+  CODEX_SESSIONS_DIR,
+  CODEX_STATE_DB,
+  HISTORY,
+  HOME,
+  OPENCODE_DB,
+  OPENCODE_PROJECT_DIR,
+  OPENCODE_STORAGE_DIR,
+  PROJECTS_DIR,
+  SESSIONS_DIR,
+  STATS_CACHE,
+} from "./paths";
 const PRICING_DEFAULTS = join(
   import.meta.dir,
   "..",
@@ -47,7 +47,6 @@ const USER_PRICING_OVERRIDE = join(
 const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
 const TOKEN_ATLAS_CACHE_DIR = join(HOME, ".cache", "token-atlas");
 const RATE_LIMITS_CACHE = join(TOKEN_ATLAS_CACHE_DIR, "rate-limits.json");
-const CODEX_AUTH = join(CODEX_DIR, "auth.json");
 const CODEX_USAGE_CACHE = join(
   TOKEN_ATLAS_CACHE_DIR,
   "codex-usage-limits.json",
@@ -1261,30 +1260,7 @@ function parseSessions(): Array<{
   updatedAt?: number;
   version?: string;
 }> {
-  if (!existsSync(SESSIONS_DIR)) return [];
-  const out: Array<{
-    pid: number;
-    sessionId: string;
-    cwd: string;
-    startedAt: number;
-    status: string;
-    updatedAt?: number;
-    version?: string;
-  }> = [];
-  for (const f of readdirSync(SESSIONS_DIR)) {
-    if (!f.endsWith(".json")) continue;
-    const data = safeReadJSON<{
-      pid: number;
-      sessionId: string;
-      cwd: string;
-      startedAt: number;
-      status: string;
-      updatedAt?: number;
-      version?: string;
-    }>(join(SESSIONS_DIR, f));
-    if (data) out.push(data);
-  }
-  return out;
+  return readSessionFiles();
 }
 
 export function emptyModelUsage(): ModelUsage {
@@ -1422,7 +1398,7 @@ function usageCost(
     : calcCost(usage, model, pricing);
 }
 
-function walkJsonlFiles(dir: string, out: string[] = []): string[] {
+function walkFiles(dir: string, ext: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -1433,27 +1409,8 @@ function walkJsonlFiles(dir: string, out: string[] = []): string[] {
       continue;
     }
     if (stat.isDirectory()) {
-      walkJsonlFiles(path, out);
-    } else if (stat.isFile() && path.endsWith(".jsonl")) {
-      out.push(path);
-    }
-  }
-  return out;
-}
-
-function walkJsonFiles(dir: string, out: string[] = []): string[] {
-  if (!existsSync(dir)) return out;
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    let stat;
-    try {
-      stat = statSync(path);
-    } catch {
-      continue;
-    }
-    if (stat.isDirectory()) {
-      walkJsonFiles(path, out);
-    } else if (stat.isFile() && path.endsWith(".json")) {
+      walkFiles(path, ext, out);
+    } else if (stat.isFile() && path.endsWith(ext)) {
       out.push(path);
     }
   }
@@ -1584,7 +1541,7 @@ function parseTranscriptUsage(): {
     InternalLedgerRow & { toolCallIds: Set<string> }
   >();
   const seen = new Set<string>();
-  const transcriptFiles = walkJsonlFiles(PROJECTS_DIR);
+  const transcriptFiles = walkFiles(PROJECTS_DIR, ".jsonl");
 
   for (const file of transcriptFiles) {
     let raw = "";
@@ -1976,7 +1933,7 @@ function parseCodexUsage(): {
   }
 
   const rowByRollout = new Map(rows.map((row) => [row.rollout_path, row]));
-  const codexSessionFiles = walkJsonlFiles(CODEX_SESSIONS_DIR);
+  const codexSessionFiles = walkFiles(CODEX_SESSIONS_DIR, ".jsonl");
   const sessionFiles = new Set([
     ...rows.map((row) => row.rollout_path).filter(Boolean),
     ...codexSessionFiles,
@@ -2108,6 +2065,36 @@ function parseCodexUsage(): {
     const timestampMs = (row.updated_at || row.created_at) * 1000;
     if (!timestampMs) continue;
     addHourlyUsage(hourlyUsage, timestampMs, key, usage);
+
+    modelUsage[key] ??= emptyModelUsage();
+    addModelUsage(modelUsage[key], usage);
+
+    const date = fmtDate(timestampMs);
+    let byModel = dailyModelUsage.get(date);
+    if (!byModel) {
+      byModel = new Map();
+      dailyModelUsage.set(date, byModel);
+    }
+    const dayUsage = byModel.get(key) ?? emptyModelUsage();
+    addModelUsage(dayUsage, usage);
+    byModel.set(key, dayUsage);
+
+    if (row.cwd) {
+      const tokenTotal = row.tokens_used || modelUsageTotal(usage);
+      projectTokens.set(
+        row.cwd,
+        (projectTokens.get(row.cwd) ?? 0) + tokenTotal,
+      );
+      let projectByModel = projectModelUsage.get(row.cwd);
+      if (!projectByModel) {
+        projectByModel = new Map();
+        projectModelUsage.set(row.cwd, projectByModel);
+      }
+      const projectUsage = projectByModel.get(key) ?? emptyModelUsage();
+      addModelUsage(projectUsage, usage);
+      projectByModel.set(key, projectUsage);
+    }
+
     ledger.push({
       id: `codex:${row.id}`,
       provider: "codex",
@@ -2142,13 +2129,6 @@ function parseCodexUsage(): {
     codexSessionFileCount: codexSessionFiles.length,
     codexThreadRowCount: rows.length,
   };
-}
-
-function normalizeOpenCodeTimestampMs(value: number | undefined): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    return 0;
-  }
-  return value < 1_000_000_000_000 ? value * 1000 : value;
 }
 
 function openCodeMessageInfo(stored: OpenCodeStoredMessage): OpenCodeMessage {
@@ -2238,18 +2218,13 @@ function parseOpenCodeUsage(): {
 
   const storageRoots = openCodeStorageRoots();
   const sessionFiles = storageRoots.flatMap((root) =>
-    walkJsonFiles(join(root, "session")),
+    walkFiles(join(root, "session"), ".json"),
   );
   const messageFiles = storageRoots.flatMap((root) =>
-    walkJsonFiles(join(root, "message")),
+    walkFiles(join(root, "message"), ".json"),
   );
   const sessionsById = new Map<string, OpenCodeSession>();
   const toolCallsByMessageId = new Map<string, number>();
-
-  for (const file of sessionFiles) {
-    const session = safeReadJSON<OpenCodeSession>(file);
-    if (session?.id) sessionsById.set(session.id, session);
-  }
 
   let openCodeSessionRowCount = 0;
   let openCodeMessageRowCount = 0;
@@ -2258,10 +2233,9 @@ function parseOpenCodeUsage(): {
     try {
       db = new Database(OPENCODE_DB, { readonly: true });
       const sessionRows = db
-        .query<
-          OpenCodeSessionRow,
-          []
-        >("select id, directory, time_created, time_updated from session")
+        .query<OpenCodeSessionRow, []>(
+          "select id, directory, time_created, time_updated from session",
+        )
         .all();
       openCodeSessionRowCount = sessionRows.length;
       for (const row of sessionRows) {
@@ -2276,20 +2250,18 @@ function parseOpenCodeUsage(): {
       }
 
       const toolRows = db
-        .query<
-          { message_id: string; tool_calls: number },
-          []
-        >("select message_id, count(*) as tool_calls from part where json_extract(data, '$.type') = 'tool' group by message_id")
+        .query<{ message_id: string; tool_calls: number }, []>(
+          "select message_id, count(*) as tool_calls from part where json_extract(data, '$.type') = 'tool' group by message_id",
+        )
         .all();
       for (const row of toolRows) {
         toolCallsByMessageId.set(row.message_id, row.tool_calls);
       }
 
       const messageRows = db
-        .query<
-          OpenCodeMessageRow,
-          []
-        >("select id, session_id, time_created, time_updated, data from message")
+        .query<OpenCodeMessageRow, []>(
+          "select id, session_id, time_created, time_updated, data from message",
+        )
         .all();
       openCodeMessageRowCount = messageRows.length;
       for (const row of messageRows) {
@@ -2318,6 +2290,13 @@ function parseOpenCodeUsage(): {
     }
   }
 
+  if (openCodeSessionRowCount === 0) {
+    for (const file of sessionFiles) {
+      const session = safeReadJSON<OpenCodeSession>(file);
+      if (session?.id) sessionsById.set(session.id, session);
+    }
+  }
+
   function ingestOpenCodeMessage({
     info,
     sessionId,
@@ -2333,12 +2312,12 @@ function parseOpenCodeUsage(): {
     fallbackMessageId?: string;
   }) {
     const createdMs =
-      normalizeOpenCodeTimestampMs(info.time?.created) ||
-      normalizeOpenCodeTimestampMs(session?.time?.created) ||
-      normalizeOpenCodeTimestampMs(fallbackTimestampMs);
+      openCodeTimestampMs(info.time?.created ?? 0) ||
+      openCodeTimestampMs(session?.time?.created ?? 0) ||
+      openCodeTimestampMs(fallbackTimestampMs);
     const completedMs =
-      normalizeOpenCodeTimestampMs(info.time?.completed) ||
-      normalizeOpenCodeTimestampMs(session?.time?.updated) ||
+      openCodeTimestampMs(info.time?.completed ?? 0) ||
+      openCodeTimestampMs(session?.time?.updated ?? 0) ||
       createdMs;
     const timestampMs = completedMs || createdMs;
     if (!timestampMs) return;
@@ -2540,11 +2519,7 @@ export function fmtDate(ms: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export function projectName(path: string): string {
-  // Last non-empty path segment
-  const parts = path.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? path;
-}
+export const projectName = projectNameFor;
 
 function serializeLedgerRows(
   rows: InternalLedgerRow[],
@@ -2755,30 +2730,23 @@ export async function buildStats() {
     }
     tokensByDate.set(date, dayTokens);
   }
-  for (const [date, activity] of codexUsage.dailyActivity.entries()) {
-    const current = activityByDate.get(date);
-    if (current) {
-      current.sessionCount += activity.threadCount;
-    } else {
-      activityByDate.set(date, {
-        date,
-        messageCount: 0,
-        sessionCount: activity.threadCount,
-        toolCallCount: 0,
-      });
-    }
-  }
-  for (const [date, activity] of openCodeUsage.dailyActivity.entries()) {
-    const current = activityByDate.get(date);
-    if (current) {
-      current.sessionCount += activity.sessionCount;
-    } else {
-      activityByDate.set(date, {
-        date,
-        messageCount: 0,
-        sessionCount: activity.sessionCount,
-        toolCallCount: 0,
-      });
+  for (const [source, sessionField] of [
+    [codexUsage.dailyActivity, "threadCount"],
+    [openCodeUsage.dailyActivity, "sessionCount"],
+  ] as const) {
+    for (const [date, activity] of source.entries()) {
+      const current = activityByDate.get(date);
+      const sessionCount = activity[sessionField];
+      if (current) {
+        current.sessionCount += sessionCount;
+      } else {
+        activityByDate.set(date, {
+          date,
+          messageCount: 0,
+          sessionCount,
+          toolCallCount: 0,
+        });
+      }
     }
   }
   const dailyDates = new Set([
@@ -2803,24 +2771,7 @@ export async function buildStats() {
         }
       }
       const usageByModelRows = usageByModel
-        ? Object.fromEntries(
-            Array.from(usageByModel.entries()).map(([model, usage]) => [
-              model,
-              {
-                inputTokens: usage.inputTokens,
-                outputTokens: usage.outputTokens,
-                cacheReadTokens: usage.cacheReadInputTokens,
-                cacheCreationTokens: usage.cacheCreationInputTokens,
-                reasoningTokens: usage.reasoningOutputTokens ?? 0,
-                costUSD: usageCost(usage, rawModelFromKey(model), pricing),
-                provider: providerFromModelKey(model),
-                isExternal: isExternal(
-                  rawModelFromKey(model),
-                  pricing.externalModelPrefixes,
-                ),
-              },
-            ]),
-          )
+        ? serializeUsageByModel(usageByModel, pricing)
         : {};
       const codexThreads = codexUsage.dailyActivity.get(date)?.threadCount ?? 0;
       const openCodeSessions =
@@ -3063,20 +3014,17 @@ export async function buildStats() {
   for (const [date, counts] of historyDailyHourCounts) {
     combinedDailyHourCounts[date] = [...counts];
   }
-  for (const [date, counts] of codexUsage.dailyHourCounts) {
-    const existing = combinedDailyHourCounts[date];
-    if (existing) {
-      for (let h = 0; h < 24; h++) existing[h] += counts[h] ?? 0;
-    } else {
-      combinedDailyHourCounts[date] = [...counts];
-    }
-  }
-  for (const [date, counts] of openCodeUsage.dailyHourCounts) {
-    const existing = combinedDailyHourCounts[date];
-    if (existing) {
-      for (let h = 0; h < 24; h++) existing[h] += counts[h] ?? 0;
-    } else {
-      combinedDailyHourCounts[date] = [...counts];
+  for (const source of [
+    codexUsage.dailyHourCounts,
+    openCodeUsage.dailyHourCounts,
+  ]) {
+    for (const [date, counts] of source) {
+      const existing = combinedDailyHourCounts[date];
+      if (existing) {
+        for (let h = 0; h < 24; h++) existing[h] += counts[h] ?? 0;
+      } else {
+        combinedDailyHourCounts[date] = [...counts];
+      }
     }
   }
   const totalSessions =

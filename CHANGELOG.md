@@ -1,5 +1,17 @@
 # Changelog
 
+## [monitor 3.16.1] - 2026-07-01
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.16.1` tag._
+
+### 🐛 Fixed
+
+- **`parseCodexUsage()` now includes Codex threads with no rollout_path in cost summaries.** Threads with token usage but no on-disk rollout_path were silently omitted from the per-model cost summary and per-project totals (though they still appeared in the hourly chart and recent-activity ledger). The four aggregate maps now include these threads, matching the existing accumulation pattern.
+
+### 🔧 Changed
+
+- **Extracted shared utility modules to eliminate duplicated logic.** `paths.ts`, `session-files.ts`, `shared/scripts/path-inside.ts`, and `shared/scripts/static-server.ts` consolidate path constants, session-file reading (with validation), path-containment checks, the static file server + MIME table, JSON response helpers, OpenCode timestamp normalization, and the daily-activity/daily-hour-count merge loops that were spread across `api.ts`/`live.ts`/`atlas-server.ts`/`cockpit/scripts/cockpit-server.ts`. `OPENCODE_DIR`/`OPENCODE_DB` resolution now respects the `COCKPIT_OPENCODE_DB` env override (previously ignored). Added a 5s TTL cache to two file reads on the 3-second `/api/live` poll path (`cockpitSessionKeys`/`cockpitDaemonPort`).
+
 ## [monitor 3.16.0] - 2026-06-28
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.16.0` tag._
