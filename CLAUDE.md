@@ -132,7 +132,7 @@ packages/herdr/                       # plugin: Herdr reference + in-session age
         ├── herd.ts                   # typed Bun wrapper over the herdr CLI: spawn/send/keys/wait/read/list/close
         │                             #   (createHerd(run) factory — importable so relay consumes it on the live path);
         │                             #   names not pane ids, send writes literal+Enter, keys sends bare chords,
-        │                             #   spawn({newTab}) opens an agent in its own tab (create→start→close shell→restore focus),
+        │                             #   spawn({newTab}) opens an agent in its own labelled tab (create→start→close shell→restore focus; --tab-label overrides the agent-name default),
         │                             #   read defaults to visible, honors HERDR_BIN_PATH; gated on HERDR_ENV=1
         └── herd.test.ts              # unit tests (bun test) — mocks the herdr runner; live-verified inside herdr 0.7.1
 ```

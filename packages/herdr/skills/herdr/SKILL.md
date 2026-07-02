@@ -26,8 +26,10 @@ HERD="$SKILL_DIR/scripts/herd.ts"
 # Spawn codex in a new pane (no focus), get back a unique name like "reviewer-a3f9"
 bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 
-# Spawn in its OWN new tab instead of splitting the current pane (keeps your pane full-size)
+# Spawn in its OWN new tab instead of splitting the current pane (keeps your pane full-size).
+# The tab is labelled with the agent name by default; --tab-label sets a custom label.
 bun "$HERD" spawn reviewer --agent codex --new-tab --cwd "$PWD"
+bun "$HERD" spawn reviewer --agent codex --new-tab --tab-label "PR #42 review" --cwd "$PWD"
 
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"

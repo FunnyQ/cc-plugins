@@ -1,5 +1,13 @@
 # Changelog
 
+## [herdr 0.1.2] - 2026-07-02
+
+_herdr is independently versioned; this entry tracks the `herdr-v0.1.2` tag._
+
+### ✨ Added
+
+- **New-tab spawns are now labelled.** `spawn({ newTab: true })` labels the tab it creates (via `tab create --label`) so you can tell at a glance what each tab is for. Defaults to the generated agent name (e.g. `relay-codex-delegate-8b6f` — encodes role + a unique suffix); override with `tabLabel` / `herd spawn --tab-label "PR #42 review"`. relay live runs get labelled tabs for free (no relay change needed).
+
 ## [herdr 0.1.1] - 2026-07-02
 
 _herdr is independently versioned; this entry tracks the `herdr-v0.1.1` tag._
