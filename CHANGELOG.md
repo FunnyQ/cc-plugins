@@ -1,5 +1,35 @@
 # Changelog
 
+## [herdr 0.1.1] - 2026-07-02
+
+_herdr is independently versioned; this entry tracks the `herdr-v0.1.1` tag._
+
+### ✨ Added
+
+- **`spawn({ newTab: true })` / `herd spawn --new-tab` — start an agent in its own tab, not a split.** herdr has no "start an agent in a fresh empty tab" primitive, so the wrapper does the dance: capture the focused tab → `tab create --no-focus` → `agent start --tab <new>` → close the leftover shell root pane → restore focus (`agent start --tab` steals focus despite `--no-focus`). The caller's pane keeps its full size.
+- **`keys` verb — send bare key chords with no text.** `herd.keys(target, "enter")` submits whatever already sits in the input box; `herd.keys(target, "ctrl+a", "ctrl+k")` clears a line. Wraps `pane send-keys` (re-resolving name → pane id first), filling the gap left by `send`, which always types text before the Enter.
+
+### 🐛 Fixed
+
+- **`herd.send` no longer races the TUI: a settle pause before pressing Enter.** Submitting immediately after writing the prompt text could get the Enter swallowed by a TUI still processing the pasted input (seen live with codex: the bootstrap sat in the input box, never submitted, and the agent idled forever). `send` now waits 400 ms between the text write and the `pane send-keys … enter` — tune or disable via `HERD_SUBMIT_SETTLE_MS`. Applies to `spawn --task` too (it submits through the same path).
+
+## [relay 0.3.0] - 2026-07-02
+
+_relay is independently versioned; this entry tracks the `relay-v0.3.0` tag._
+
+### ✨ Added
+
+- **Live-pane execution inside herdr — delegates and reviews you can watch and take over.** When relay runs inside herdr (`HERDR_ENV=1`), `delegate` and `review` now spawn the backend's **interactive TUI** (`codex` / `claude` / `opencode`) in a visible sibling pane instead of a blocking headless spawn, driven through the herdr plugin's `herd.ts` wrapper. The full prompt rides a `live-prompt.md` file (a one-line bootstrap is all the pane receives — multi-line TUI sends submit prematurely), and the answer comes back via a result-file contract: the delegate writes its complete final markdown to `result.md` ending with an exact end-marker line, and relay polls for agent-**settled** (`idle` *or* `done` — codex parks at `done` after answering) + marker, and self-heals a lost bootstrap delivery (pane never leaves idle, no result file → re-send the whole bootstrap line, at most twice; covers both a swallowed Enter and text the TUI dropped while starting up). stdout stays the clean answer; live metadata (agent name, keep/close hint) rides stderr. In live mode, review always uses the prompt strategy — a git-ref scope becomes a produce-the-diff-yourself instruction (`git diff <ref>...` / `git show <sha>`). `image` stays headless/native.
+- **`--headless` and `--wait-timeout <ms>` flags.** `--headless` forces the classic flow even inside herdr (essential for nested delegation — a live-delegated agent inherits `HERDR_ENV=1`); `--wait-timeout` bounds the live poll (default 10 min). A run that outlives the timeout is **not a failure**: relay exits 0 with a `pending` report of copy-pasteable follow-ups (`herd wait/read/close` + `cat result.md`) and never kills or closes the pane. Pane lifecycle after success is the calling agent's call (AskUserQuestion close-or-keep, per SKILL.md).
+- **No hard herdr dependency.** `herd.ts` is resolved at runtime (`HERD_SCRIPT_PATH` override → repo-sibling checkout → both harnesses' plugin caches, newest version first) and dynamically imported only when the live path is taken; anything unresolvable degrades to one stderr note + the unchanged headless flow, so relay stays portable to machines without the herdr plugin. Headless fallback is double-run-safe: a spawn that throws after partially creating its pane is detected via an agent-list diff (new `relay-<backend>-<mode>-*` name), and relay then reports the error instead of re-running the task headless (found by a codex live review of this very change).
+- **Live runs open their own tab, not a split.** The live pane now spawns via `herd.spawn({ newTab: true })`, so your working pane keeps its full size instead of being halved by a `--split down`. (`split: "down"` is still passed as a graceful fallback for an older `herd.ts` that predates `newTab`.)
+- **`--dangerous` is now a uniform YOLO switch across all three live backends.** codex → `--dangerously-bypass-approvals-and-sandbox`, claude → `--dangerously-skip-permissions`, and **opencode → `--auto`** (its "auto-approve permissions not explicitly denied" flag, accepted by the interactive TUI) — previously opencode had no unattended-live story and stalled on permission prompts. Without `--dangerous`, no bypass flag is passed and approval prompts surface in the pane for a human to answer; with it, an unwatched pane runs to completion.
+
+### 🔧 Changed
+
+- `executeRelay` is now async (the headless runner stays sync internally); backends gained a pure optional `invokeLive` seam describing their TUI launch (model/dangerous flag mapping).
+- **Input-state-aware bootstrap nudge.** When the pane never leaves idle and no result file appears, relay no longer blindly re-sends the whole bootstrap (which could submit the read-this-file instruction *twice*). It now reads the pane's visible input box first: full line present but unsubmitted → press **Enter only**; line lost entirely → **re-send**; partial paste → **clear the line (`ctrl+a ctrl+k`) then re-send**. Uses herdr 0.1.1's new `keys` verb.
+
 ## [herdr 0.1.0] - 2026-07-02
 
 _herdr is independently versioned; this entry tracks the `herdr-v0.1.0` tag._
