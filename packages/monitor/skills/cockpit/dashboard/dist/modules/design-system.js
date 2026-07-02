@@ -126,23 +126,46 @@ function renderDesignSystem(rootEl, data) {
 
 export function initDesignSystem(rootEl) {
   if (!rootEl) return null;
-  let loaded = false;
+  // Cache only positive hits (a project's parsed design doc); a missing doc is
+  // re-probed on each selection so a DESIGN.md added mid-session still surfaces.
+  const cache = new Map();
+  let renderedProject = null;
 
-  async function load() {
-    if (loaded) return;
-    rootEl.classList.add("design-system");
-    rootEl.innerHTML = `<p class="placeholder">Loading design system.</p>`;
+  async function fetchFor(project) {
+    if (cache.has(project)) return cache.get(project);
+    let data = null;
     try {
-      const res = await fetch("/api/design-system");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      renderDesignSystem(rootEl, data);
-      loaded = true;
+      const res = await fetch(
+        `/api/design-system?project=${encodeURIComponent(project)}`,
+      );
+      if (res.ok) data = await res.json();
     } catch (e) {
       console.error("cockpit: design-system fetch failed", e);
-      rootEl.innerHTML = `<p class="placeholder">Design system route unavailable. Restart Cockpit daemon.</p>`;
+    }
+    if (data) cache.set(project, data);
+    return data;
+  }
+
+  // Availability probe for the DESIGN toggle — true iff the project has a doc.
+  async function probe(project) {
+    if (!project) return false;
+    return (await fetchFor(project)) !== null;
+  }
+
+  async function load(project) {
+    if (!project) return;
+    if (renderedProject === project && cache.get(project)) return;
+    rootEl.classList.add("design-system");
+    rootEl.innerHTML = `<p class="placeholder">Loading design system.</p>`;
+    const data = await fetchFor(project);
+    if (data) {
+      renderDesignSystem(rootEl, data);
+      renderedProject = project;
+    } else {
+      renderedProject = null;
+      rootEl.innerHTML = `<p class="placeholder">No design doc for this project.</p>`;
     }
   }
 
-  return { load };
+  return { load, probe };
 }

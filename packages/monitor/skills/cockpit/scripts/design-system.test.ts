@@ -1,7 +1,15 @@
 // Tests for cockpit design-system: DESIGN.md frontmatter parsing and API shape.
 // Run: bun test packages/monitor/skills/cockpit/scripts/design-system.test.ts
 import { describe, expect, test } from "bun:test";
-import { handleDesignSystem, parseCockpitDesignSystem } from "./design-system";
+import { join } from "node:path";
+import {
+  handleDesignSystem,
+  parseCockpitDesignSystem,
+  readProjectDesignSystem,
+} from "./design-system";
+
+// The cockpit skill root ships its own DESIGN.md — use it as the project fixture.
+const COCKPIT_DIR = join(import.meta.dir, "..");
 
 const DESIGN_MD = `---
 name: Night Flight
@@ -55,13 +63,29 @@ describe("parseCockpitDesignSystem", () => {
   });
 });
 
+describe("readProjectDesignSystem", () => {
+  test("reads a project's own DESIGN.md", () => {
+    const parsed = readProjectDesignSystem(COCKPIT_DIR);
+    expect(parsed.name).toBe("Night Flight");
+    expect(parsed.colors.length).toBeGreaterThan(5);
+    expect(parsed.components.length).toBeGreaterThan(5);
+  });
+
+  test("throws when the project has no design doc", () => {
+    expect(() => readProjectDesignSystem(import.meta.dir)).toThrow("not found");
+  });
+});
+
 describe("handleDesignSystem", () => {
-  test("serves cockpit's checked-in DESIGN.md", async () => {
-    const res = handleDesignSystem();
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.name).toBe("Night Flight");
-    expect(body.colors.length).toBeGreaterThan(5);
-    expect(body.components.length).toBeGreaterThan(5);
+  test("404s when no project is given", () => {
+    expect(handleDesignSystem().status).toBe(404);
+    expect(handleDesignSystem(null).status).toBe(404);
+  });
+
+  test("404s for a project outside the registry", () => {
+    // A path the daemon never registered must never be read from the API.
+    expect(handleDesignSystem("/nonexistent-unregistered-xyz").status).toBe(
+      404,
+    );
   });
 });

@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.16.2] - 2026-07-02
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.16.2` tag._
+
+### 🔧 Changed
+
+- **Cockpit's DESIGN button now shows the selected project's design doc, not cockpit's own.** The dashboard's `/api/design-system` endpoint reads the selected project's `DESIGN.md` (or `design.md`) instead of a fixed path to cockpit's checked-in file, and the DESIGN toggle hides entirely when the selected project has no design doc (no fallback to cockpit's own). The endpoint is confined to registry-known projects and realpath-confined to the project root — mirroring the existing `project-info.ts` hardening — so a crafted deep link can't make the daemon read arbitrary `DESIGN.md` files. The frontend availability probe also captures-and-compares the selected project after its await, so a slow probe for a since-changed selection can't clobber current UI state.
+
 ## [monitor 3.16.1] - 2026-07-01
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.16.1` tag._

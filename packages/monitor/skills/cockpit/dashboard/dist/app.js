@@ -67,7 +67,11 @@ export const store = reactive({
   // Toggled by the manifest bar.
   manifestOpen: false,
   designSystemOpen: false,
+  // Reflects whether the selected project has a DESIGN.md/design.md — the
+  // DESIGN toggle is hidden entirely when false (no project-agnostic fallback).
+  designDocAvailable: false,
   _loadDesignSystem: null,
+  _probeDesignSystem: null,
   channelMessage: "",
   channelSending: false,
   channelError: "",
@@ -273,7 +277,7 @@ export const store = reactive({
 
   openDesignSystem() {
     this.designSystemOpen = true;
-    if (this._loadDesignSystem) this._loadDesignSystem();
+    if (this._loadDesignSystem) this._loadDesignSystem(this.selectedProject);
   },
 
   toggleDesignSystem() {
@@ -283,6 +287,24 @@ export const store = reactive({
 
   closeDesignSystem() {
     this.designSystemOpen = false;
+  },
+
+  // Re-check the selected project's design doc; hide (and close) the panel when
+  // the project has none, reload it when it does and the panel is open.
+  async refreshDesignAvailability() {
+    const project = this.selectedProject;
+    const available = this._probeDesignSystem
+      ? await this._probeDesignSystem(project)
+      : false;
+    // The probe is async — bail if the selection moved on while it was in
+    // flight, so a slow probe for a stale project can't clobber current state.
+    if (project !== this.selectedProject) return;
+    this.designDocAvailable = available;
+    if (!available) {
+      if (this.designSystemOpen) this.closeDesignSystem();
+    } else if (this.designSystemOpen && this._loadDesignSystem) {
+      this._loadDesignSystem(project);
+    }
   },
 
   toggleProject(group) {
@@ -678,6 +700,12 @@ const designSystem = initDesignSystem(
   document.querySelector('[data-column="design-system"]'),
 );
 store._loadDesignSystem = designSystem && designSystem.load;
+store._probeDesignSystem = designSystem && designSystem.probe;
+// The DESIGN toggle tracks the selected project's design doc. Subscribe fires on
+// later selection changes; the explicit call covers the initial selection
+// (deep-link or default-select), which is set before this subscriber registers.
+store.subscribe(() => store.refreshDesignAvailability());
+store.refreshDesignAvailability();
 
 // Permission relay overlay — subscribes to /api/permission-stream for the
 // selected session and drives the reusable modal (own DOM, outside the columns).

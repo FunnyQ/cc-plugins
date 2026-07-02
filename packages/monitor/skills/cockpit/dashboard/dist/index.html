@@ -66,6 +66,7 @@
       <button
         class="design-toggle"
         type="button"
+        v-show="designDocAvailable"
         :aria-expanded="designSystemOpen ? 'true' : 'false'"
         aria-controls="design-system-panel"
         @click="toggleDesignSystem()"
