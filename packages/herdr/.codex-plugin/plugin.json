@@ -1,0 +1,31 @@
+{
+  "name": "herdr",
+  "version": "0.1.0",
+  "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, and controlling sibling panes/agents when running inside a herdr pane.",
+  "author": { "name": "Q" },
+  "license": "MIT",
+  "keywords": [
+    "herdr",
+    "terminal",
+    "workspace",
+    "panes",
+    "agent-orchestration",
+    "tmux",
+    "multiplexer"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Herdr",
+    "shortDescription": "Herdr terminal workspace manager reference + agent orchestration.",
+    "longDescription": "Reference and in-session orchestration for the Herdr terminal workspace manager — config.toml, CLI, plugin development, and controlling sibling panes/agents when running inside a herdr pane.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": [
+      "How do I configure herdr keybindings?",
+      "Spawn a reviewer agent in a new pane.",
+      "Write a herdr plugin."
+    ],
+    "brandColor": "#8B6BB1"
+  }
+}
