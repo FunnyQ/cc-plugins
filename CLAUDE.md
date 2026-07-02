@@ -10,7 +10,7 @@ A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing fi
 - **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
 - **relay** — cross-harness delegation via `/relay <codex|opencode|claude> <delegate|review|image>`, with a backend-agnostic mode layer plus per-harness strategy layer and a capability matrix where `image` is codex-only.
 - **chronicle** — commit + PR/MR authoring: reshapes odin-git's simple/atomic commit ideas into one decision tree with no odin-git dependency, and treats cockpit's decision trail as a soft enrichment for PR context.
-- **herdr** — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager. A knowledge skill (config, CLI, plugin development, live pane/agent recipes) plus a typed Bun wrapper `scripts/herd.ts` that collapses herdr's raw CLI into five verbs (spawn/send/wait/read/list/close) for driving agents in sibling panes when running inside herdr (`HERDR_ENV=1`). See `packages/herdr/skills/herdr/SKILL.md`.
+- **herdr** — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager. A knowledge skill (config, CLI, plugin development, live pane/agent recipes) plus a typed Bun wrapper `scripts/herd.ts` that collapses herdr's raw CLI into seven verbs (spawn/send/keys/wait/read/list/close) for driving agents in sibling panes or their own tabs (`spawn --new-tab`) when running inside herdr (`HERDR_ENV=1`). See `packages/herdr/skills/herdr/SKILL.md`.
 
 **monitor** bundles three sibling skills:
 
@@ -105,7 +105,8 @@ cc-plugins/
         ├── references/backends.md        # per-CLI flags + headless output + opencode symlink install
         └── scripts/
             ├── relay.ts                  # entry: relay <backend> <mode> [flags]; gate + dispatch + capture; builds prompt internally
-            ├── relay-prompt.ts           # backend-agnostic prompt: formatPrompt (pure) + buildPromptFile (impure)
+            ├── relay-prompt.ts           # backend-agnostic prompt: formatPrompt (pure) + buildPromptFile (impure) + live file-contract/scope helpers
+            ├── live.ts                   # live-pane layer (inside herdr, HERDR_ENV=1): herd.ts locator + liveGate + runLive poller; herd.ts is dynamically imported — no hard herdr dependency
             ├── context-collector.ts      # git/file/project context (ported from odin-codex)
             ├── shared.ts                 # run(), createTmpRunDir, timestamp, model+config resolution
             ├── types.ts                  # Mode, Strategy, Backend, InvokeOpts, RunResult
@@ -118,7 +119,7 @@ cc-plugins/
             └── *.test.ts                 # unit tests (bun test) — backends mock the CLI runner; live CLI behaviour is verified by manual smokes, not a committed integration test
 ```
 
-relay ships to both Claude Code and Codex marketplaces via `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` at version `0.1.0`. OpenCode integration is available via a `~/.claude/skills/` symlink (documented in SKILL.md and references/backends.md).
+relay ships to both Claude Code and Codex marketplaces via `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` (see "Releasing" for current versions). OpenCode integration is available via a `~/.claude/skills/` symlink (documented in SKILL.md and references/backends.md).
 
 ```
 packages/herdr/                       # plugin: Herdr reference + in-session agent orchestration
@@ -128,10 +129,11 @@ packages/herdr/                       # plugin: Herdr reference + in-session age
     ├── SKILL.md                      # router: fronts the herd wrapper for orchestration; references for the long tail
     ├── references/                   # migrated third-party docs (config / cli / plugin-development / agent-orchestration)
     └── scripts/
-        ├── herd.ts                   # typed Bun wrapper over the herdr CLI: spawn/send/wait/read/list/close
-        │                             #   (createHerd(run) factory — importable so relay can consume it later);
-        │                             #   names not pane ids, send writes literal+Enter, read defaults to visible,
-        │                             #   honors HERDR_BIN_PATH; gated on HERDR_ENV=1
+        ├── herd.ts                   # typed Bun wrapper over the herdr CLI: spawn/send/keys/wait/read/list/close
+        │                             #   (createHerd(run) factory — importable so relay consumes it on the live path);
+        │                             #   names not pane ids, send writes literal+Enter, keys sends bare chords,
+        │                             #   spawn({newTab}) opens an agent in its own tab (create→start→close shell→restore focus),
+        │                             #   read defaults to visible, honors HERDR_BIN_PATH; gated on HERDR_ENV=1
         └── herd.test.ts              # unit tests (bun test) — mocks the herdr runner; live-verified inside herdr 0.7.1
 ```
 
@@ -252,7 +254,7 @@ bun test packages/monitor/skills/install/scripts/
 
 ⚠️ Versions live **only** in each plugin's two `plugin.json` files (Claude + Codex). The marketplace registries (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) carry **no `version` field** — don't add one. The published version is the git tag plus the `plugin.json` values.
 
-**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.16.2`, dispatch `3.12.1`, relay `0.2.0`, chronicle `0.3.1`, herdr `0.1.0`.
+**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.16.2`, dispatch `3.12.1`, relay `0.3.0`, chronicle `0.3.1`, herdr `0.1.1`.
 
 **Bump only the plugin(s) you actually touched** — leave every other plugin's version alone. Each plugin's two files move together:
 

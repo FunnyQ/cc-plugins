@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { formatPrompt, buildPromptFile } from "./relay-prompt";
+import {
+  formatPrompt,
+  buildPromptFile,
+  appendFileContract,
+  scopeInstruction,
+  RESULT_END_MARKER,
+} from "./relay-prompt";
 import { rmSync, existsSync, readFileSync } from "fs";
 import { TMP_ROOT } from "./shared";
 import type { FormatOptions, PromptKind } from "./relay-prompt";
@@ -197,6 +203,48 @@ describe("formatPrompt", () => {
       expect(parts[0]).toBe(baseContext);
       expect(parts[1]).toContain("Review the above");
     });
+  });
+});
+
+describe("appendFileContract", () => {
+  it("embeds the result path and ends with the marker instruction", () => {
+    const result = appendFileContract(
+      "base prompt",
+      "/tmp/relay/run/result.md",
+    );
+
+    expect(result).toContain("base prompt");
+    expect(result).toContain("/tmp/relay/run/result.md");
+    expect(result).toContain(RESULT_END_MARKER);
+    // The marker instruction is the load-bearing line — the poll loop keys on it.
+    expect(result).toContain(
+      `The file's last line must be exactly: ${RESULT_END_MARKER}`,
+    );
+    // The file is mandatory (relay does not read the pane), with a human-visible
+    // escape hatch for sandboxes that genuinely cannot write it.
+    expect(result).toContain("relay does not read the pane");
+    expect(result).toContain("print the FULL answer in the pane");
+  });
+});
+
+describe("scopeInstruction", () => {
+  it("maps uncommitted (and undefined) to a git diff/status instruction", () => {
+    expect(scopeInstruction("uncommitted")).toContain("git diff");
+    expect(scopeInstruction("uncommitted")).toContain("git status --short");
+    expect(scopeInstruction(undefined)).toBe(scopeInstruction("uncommitted"));
+  });
+
+  it("returns empty for custom-files (files already inlined)", () => {
+    expect(scopeInstruction("custom-files")).toBe("");
+  });
+
+  it("maps base:<ref> and bare refs to git diff <ref>...", () => {
+    expect(scopeInstruction("base:main")).toContain("git diff main...");
+    expect(scopeInstruction("develop")).toContain("git diff develop...");
+  });
+
+  it("maps commit:<sha> to git show", () => {
+    expect(scopeInstruction("commit:abc123")).toContain("git show abc123");
   });
 });
 

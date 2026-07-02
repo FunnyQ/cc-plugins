@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join } from "path";
 import { homedir } from "os";
-import type { Backend, Mode, InvokeOpts, PostRunResult } from "../types";
+import type {
+  Backend,
+  Mode,
+  InvokeOpts,
+  LiveSpec,
+  PostRunResult,
+} from "../types";
 import { addTimestampSuffix, run } from "../shared";
 
 // Codex binary from environment or default
@@ -154,6 +160,17 @@ export const codexBackend: Backend = {
   parseOutput(raw: string): string {
     // Codex output is already clean; return as-is
     return raw;
+  },
+
+  invokeLive(mode: Mode, opts: InvokeOpts): LiveSpec | null {
+    // image stays headless/native — gpt-image-2 generation has no TUI story.
+    if (mode === "image") return null;
+    const argv: string[] = [];
+    if (opts.model) argv.push("-m", opts.model);
+    // Non-dangerous passes NO sandbox flag on purpose: the TUI's own approval
+    // prompts are visible in the pane, which is the point of live mode.
+    if (opts.dangerous) argv.push("--dangerously-bypass-approvals-and-sandbox");
+    return { agentBin: CODEX_BIN, argv };
   },
 
   postRun(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult {

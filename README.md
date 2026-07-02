@@ -233,6 +233,8 @@ One portable skill that delegates a task *out* to another harness's CLI, then ca
 
 A capability gate rejects unsupported (backend, mode) pairs before any CLI runs. Every run captures full output to `/tmp/relay/<ts>/last.md` and prints it. Models resolve by precedence: `--model` flag > config file (`~/.config/q-lab/cc-plugins/relay/config.json`) > built-in defaults. Per-CLI invocation details, headless output handling, and the OpenCode symlink install live in the [backend reference](./packages/relay/skills/relay/references/backends.md).
 
+**Live-pane mode** — inside [herdr](https://herdr.dev) (`HERDR_ENV=1`), delegate/review automatically run the backend's interactive TUI in a visible, take-over-able pane opened in **its own new tab** (so your working pane keeps its full size), via the herdr plugin's `herd.ts`, dynamically imported — no hard dependency. The answer is captured through a result-file contract; stdout stays the clean answer, live metadata rides stderr. `--dangerous` makes it a **YOLO / unattended** run (auto-approves permissions: codex/claude bypass flags, opencode `--auto`); without it, approval prompts surface in the pane for a human to answer. A run that outlives `--wait-timeout` (default 10 min) exits 0 with a "still running" report and leaves the pane alive. `--headless` opts out; outside herdr the classic headless flow is unchanged.
+
 ### Installation
 
 ```bash
@@ -251,7 +253,7 @@ ln -s "$(pwd)/packages/relay/skills/relay" ~/.claude/skills/relay
 Reference and in-session agent orchestration for [Herdr](https://herdr.dev), a terminal workspace manager with workspaces, tabs, split panes, and agent detection. Two halves:
 
 - **Reference** — a knowledge skill that answers questions about Herdr's `config.toml`, CLI, keybindings, and plugin development. Detail lives in `references/`; the skill reads only the relevant file.
-- **`herd` wrapper** — a typed Bun wrapper (`scripts/herd.ts`) over the raw `herdr` CLI, for when you (an agent) are running *inside* a herdr pane (`HERDR_ENV=1`) and want to spawn and drive other agents in sibling panes. It collapses herdr's multi-step recipes into five verbs and handles the sharp edges: it addresses agents by a **collision-resistant generated name** (pane ids renumber), its `send` writes the prompt **and presses Enter** (raw `agent send` only writes literal text), and its `read` defaults to the visible screen (agent TUIs leave scrollback empty).
+- **`herd` wrapper** — a typed Bun wrapper (`scripts/herd.ts`) over the raw `herdr` CLI, for when you (an agent) are running *inside* a herdr pane (`HERDR_ENV=1`) and want to spawn and drive other agents in sibling panes or their own tabs (`spawn --new-tab`). It collapses herdr's multi-step recipes into seven verbs and handles the sharp edges: it addresses agents by a **collision-resistant generated name** (pane ids renumber), its `send` writes the prompt **and presses Enter** (raw `agent send` only writes literal text), its `keys` verb sends bare key chords (submit / clear the input box), and its `read` defaults to the visible screen (agent TUIs leave scrollback empty).
 
 ```bash
 HERD="$CLAUDE_PLUGIN_ROOT/skills/herdr/scripts/herd.ts"   # or the skill's load-time base dir

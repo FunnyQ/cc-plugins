@@ -69,6 +69,7 @@ export type SpawnOpts = {
   agent: string; // binary to launch in the pane, e.g. "codex" | "claude" | "opencode"
   cwd?: string;
   split?: "right" | "down"; // default "down"
+  newTab?: boolean; // open the agent in its OWN new tab instead of splitting the caller's pane (takes precedence over split)
   workspace?: string;
   tab?: string;
   env?: string[]; // KEY=VALUE entries
@@ -86,6 +87,7 @@ export type SendResult = {
   paneId: string | null;
   submitted: boolean;
 };
+export type KeysResult = { target: string; paneId: string; keys: string[] };
 export type CloseResult = { target: string; paneId: string; closed: true };
 
 function randHex(n: number): string {
@@ -237,22 +239,103 @@ export function createHerd(run: Runner = herdrRunner) {
     let paneId: string | null = null;
     if (submit) {
       paneId = await resolvePane(target); // re-resolve right before use
+      // Let the TUI finish processing the pasted text before pressing Enter —
+      // an Enter that lands too fast can be swallowed (seen live with codex:
+      // the text sits in the input box, never submitted). Tune/disable via
+      // HERD_SUBMIT_SETTLE_MS.
+      const settleMs = Number(process.env.HERD_SUBMIT_SETTLE_MS ?? 400);
+      if (settleMs > 0) await Bun.sleep(settleMs);
       await callVoid(["pane", "send-keys", paneId, "enter"]);
     }
     return { target, paneId, submitted: submit };
   }
 
-  async function spawn(opts: SpawnOpts): Promise<SpawnResult> {
-    const name = await genName(opts.role);
+  /** Send bare key chords to a target's pane (no text) — e.g. keys(name, "enter")
+   *  to submit whatever sits in the input box, or keys(name, "ctrl+a", "ctrl+k")
+   *  to clear a line. Wraps `pane send-keys`; re-resolves name → pane id first. */
+  async function keys(
+    target: string,
+    ...keyNames: string[]
+  ): Promise<KeysResult> {
+    if (keyNames.length === 0) {
+      throw new HerdrError("keys requires at least one key");
+    }
+    const paneId = await resolvePane(target);
+    await callVoid(["pane", "send-keys", paneId, ...keyNames]);
+    return { target, paneId, keys: keyNames };
+  }
+
+  /** The currently-focused tab id, or null. Used to restore focus after a
+   *  new-tab spawn (agent start --tab steals focus despite --no-focus). */
+  async function focusedTabId(): Promise<string | null> {
+    try {
+      const r = await callJson(["tab", "list"]);
+      const tabs: any[] = r.tabs ?? [];
+      return tabs.find((t) => t.focused)?.tab_id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Start the agent in a FRESH tab instead of splitting the caller's pane.
+   *  herdr has no "agent start in a new empty tab" primitive: `tab create`
+   *  leaves a shell root pane and `agent start --tab` splits within the tab. So
+   *  we create the tab, start the agent in it, close the leftover shell root, and
+   *  restore focus to the tab the caller was on. All post-start steps are
+   *  best-effort — a real spawn already succeeded. */
+  async function startInNewTab(name: string, opts: SpawnOpts): Promise<any> {
+    const prevTab = await focusedTabId();
+
+    const createArgs = ["tab", "create", "--no-focus"];
+    if (opts.workspace) createArgs.push("--workspace", opts.workspace);
+    if (opts.cwd) createArgs.push("--cwd", opts.cwd);
+    const created = await callJson(createArgs);
+    const tabId: string | undefined = created.tab?.tab_id;
+    const shellPaneId: string | undefined = created.root_pane?.pane_id;
+
     const args = ["agent", "start", name];
     if (opts.cwd) args.push("--cwd", opts.cwd);
-    if (opts.workspace) args.push("--workspace", opts.workspace);
-    if (opts.tab) args.push("--tab", opts.tab);
-    args.push("--split", opts.split ?? "down", "--no-focus");
+    if (tabId) args.push("--tab", tabId);
+    args.push("--no-focus");
     for (const e of opts.env ?? []) args.push("--env", e);
     args.push("--", opts.agent, ...(opts.argv ?? []));
-
     const started = await callJson(args);
+
+    // Drop the shell root pane so the tab holds only the agent.
+    if (shellPaneId) {
+      try {
+        await callJson(["pane", "close", shellPaneId]);
+      } catch {
+        /* best-effort — leave the shell pane rather than fail the spawn */
+      }
+    }
+    // Give focus back to where the caller was.
+    if (prevTab) {
+      try {
+        await callVoid(["tab", "focus", prevTab]);
+      } catch {
+        /* best-effort */
+      }
+    }
+    return started;
+  }
+
+  async function spawn(opts: SpawnOpts): Promise<SpawnResult> {
+    const name = await genName(opts.role);
+
+    let started: any;
+    if (opts.newTab) {
+      started = await startInNewTab(name, opts);
+    } else {
+      const args = ["agent", "start", name];
+      if (opts.cwd) args.push("--cwd", opts.cwd);
+      if (opts.workspace) args.push("--workspace", opts.workspace);
+      if (opts.tab) args.push("--tab", opts.tab);
+      args.push("--split", opts.split ?? "down", "--no-focus");
+      for (const e of opts.env ?? []) args.push("--env", e);
+      args.push("--", opts.agent, ...(opts.argv ?? []));
+      started = await callJson(args);
+    }
     const info = normAgent(started.agent ?? started);
 
     let task: { sent: boolean } | undefined;
@@ -281,7 +364,18 @@ export function createHerd(run: Runner = herdrRunner) {
     return { target, paneId, closed: true };
   }
 
-  return { list, get, resolvePane, genName, spawn, send, wait, read, close };
+  return {
+    list,
+    get,
+    resolvePane,
+    genName,
+    spawn,
+    send,
+    keys,
+    wait,
+    read,
+    close,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +392,7 @@ function assertHerdrEnv(): void {
 }
 
 /** Flags that never take a value (so a following token — even one starting with `--` — is not consumed). */
-const BOOLEAN_FLAGS = new Set(["no-submit"]);
+const BOOLEAN_FLAGS = new Set(["no-submit", "new-tab"]);
 
 /** Minimal flag parser: returns { positionals, flags, rest } where rest is everything after a bare `--`.
  *  Value-flags always consume the next token as their value — including values that start with `--`
@@ -343,9 +437,10 @@ const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent or
 
 Usage:
   herd list
-  herd spawn <role> --agent <bin> [--cwd P] [--split down|right] [--workspace ID]
+  herd spawn <role> --agent <bin> [--cwd P] [--split down|right] [--new-tab] [--workspace ID]
               [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
   herd send <target> <text> [--no-submit]
+  herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k
   herd wait <target> [--status idle|working|blocked|unknown] [--timeout MS]
   herd read <target> [--lines N] [--source recent-unwrapped|recent|visible]
   herd close <target>
@@ -379,6 +474,7 @@ async function main() {
           agent,
           cwd: (flags.cwd as string) ?? process.cwd(),
           split: (flags.split as "right" | "down") ?? "down",
+          newTab: flags["new-tab"] === true,
           workspace: flags.workspace as string | undefined,
           tab: flags.tab as string | undefined,
           env,
@@ -404,6 +500,16 @@ async function main() {
           throw new HerdrError("send requires <target> and <text>");
         const res = await herd.send(target, text, { submit });
         console.log(JSON.stringify(res, null, 2));
+        break;
+      }
+      case "keys": {
+        const target = positionals[0];
+        const keyNames = positionals.slice(1);
+        if (!target || keyNames.length === 0)
+          throw new HerdrError("keys requires <target> and at least one <key>");
+        console.log(
+          JSON.stringify(await herd.keys(target, ...keyNames), null, 2),
+        );
         break;
       }
       case "wait": {

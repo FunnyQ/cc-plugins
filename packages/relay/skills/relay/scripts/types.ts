@@ -38,6 +38,14 @@ export type InvokeOpts = {
 // lets relay surface a non-zero exit instead of treating the error text as success.
 export type PostRunResult = { ok: boolean; text: string };
 
+// How to launch this backend's INTERACTIVE TUI in a live herdr pane.
+// argv carries only TUI-safe extras (model/permission flags) — never the
+// headless exec/-p/-o forms; the prompt arrives later via a herd send.
+export type LiveSpec = {
+  agentBin: string; // interactive TUI binary
+  argv: string[]; // extra TUI args — NO exec/-p/-o
+};
+
 export type Backend = {
   name: string; // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
   supports: Set<Mode>;
@@ -51,4 +59,8 @@ export type Backend = {
   // side effects (e.g. codex image: locate the PNG, copy it to opts.out, return "Image saved: <path>").
   // relay.ts calls `b.postRun ? b.postRun(mode, parsed, opts) : ...` — no backend-name branching.
   postRun?(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult;
+  // Optional live seam: describe the interactive TUI launch for a herdr pane.
+  // Pure — no spawning. Returning null means this mode has no live path
+  // (e.g. codex image), so relay stays headless for it.
+  invokeLive?(mode: Mode, opts: InvokeOpts): LiveSpec | null;
 };

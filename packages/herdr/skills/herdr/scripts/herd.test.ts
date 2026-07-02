@@ -7,6 +7,9 @@ import {
   type Runner,
 } from "./herd.ts";
 
+// Skip the real submit-settle pause (herd.send sleeps before pressing Enter).
+process.env.HERD_SUBMIT_SETTLE_MS = "0";
+
 /** A mock runner that records argv and replies from a scripted table. */
 function mockRunner(
   handler: (args: string[]) => Partial<RunResult> | undefined,
@@ -210,6 +213,75 @@ describe("spawn", () => {
     ).toBe(true);
   });
 
+  test("newTab: creates a tab, starts in it, closes the shell root, restores focus", async () => {
+    const seen: string[][] = [];
+    const { run } = mockRunner((a) => {
+      seen.push(a);
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([]) };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              tabs: [
+                { tab_id: "w3:t2", focused: true },
+                { tab_id: "w3:t1", focused: false },
+              ],
+            },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "create")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              tab: { tab_id: "w3:t9" },
+              root_pane: { pane_id: "w3:pShell" },
+            },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w3:pAgent",
+            tab_id: "w3:t9",
+            workspace_id: "w3",
+            terminal_id: "t",
+            cwd: "/repo",
+            agent_status: "unknown",
+          }),
+        };
+      if (a[0] === "pane" && a[1] === "close")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      if (a[0] === "tab" && a[1] === "focus") return { stdout: "" };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    const res = await herd.spawn({
+      role: "reviewer",
+      agent: "codex",
+      cwd: "/repo",
+      newTab: true,
+    });
+
+    expect(res.name).toMatch(/^reviewer-[0-9a-f]{4}$/);
+    expect(res.paneId).toBe("w3:pAgent");
+
+    const startCall = seen.find((c) => c[0] === "agent" && c[1] === "start")!;
+    // Started INTO the new tab, never as a split of the caller's pane.
+    expect(startCall[startCall.indexOf("--tab") + 1]).toBe("w3:t9");
+    expect(startCall).not.toContain("--split");
+    // Leftover shell root pane dropped; focus restored to the caller's tab.
+    expect(
+      seen.some(
+        (c) => c[0] === "pane" && c[1] === "close" && c[2] === "w3:pShell",
+      ),
+    ).toBe(true);
+    expect(
+      seen.some((c) => c[0] === "tab" && c[1] === "focus" && c[2] === "w3:t2"),
+    ).toBe(true);
+  });
+
   test("with --task: sends even if the idle wait errors (non-agent binary)", async () => {
     const { run } = mockRunner((a) => {
       if (a[1] === "list") return { stdout: listEnvelope([]) };
@@ -291,6 +363,37 @@ describe("read", () => {
   });
 });
 
+describe("keys", () => {
+  test("resolves the pane then sends bare key chords (no text)", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[1] === "get")
+        return { stdout: agentEnvelope({ name: "rev-1", pane_id: "w9:pB" }) };
+      if (a[0] === "pane" && a[1] === "send-keys") return { stdout: "" };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    const res = await herd.keys("rev-1", "ctrl+a", "ctrl+k");
+    expect(res).toEqual({
+      target: "rev-1",
+      paneId: "w9:pB",
+      keys: ["ctrl+a", "ctrl+k"],
+    });
+    expect(calls.find((c) => c[0] === "pane" && c[1] === "send-keys")).toEqual([
+      "pane",
+      "send-keys",
+      "w9:pB",
+      "ctrl+a",
+      "ctrl+k",
+    ]);
+  });
+
+  test("rejects an empty key list", async () => {
+    const { run } = mockRunner(() => undefined);
+    const herd = createHerd(run);
+    await expect(herd.keys("rev-1")).rejects.toThrow(HerdrError);
+  });
+});
+
 describe("close", () => {
   test("resolves the pane then closes it", async () => {
     const { run, calls } = mockRunner((a) => {
@@ -316,6 +419,18 @@ describe("parseArgs", () => {
     const { flags } = parseArgs(["--agent", "codex", "--task", "--check src"]);
     expect(flags.agent).toBe("codex");
     expect(flags.task).toBe("--check src");
+  });
+
+  test("new-tab is boolean and does not swallow the next token", () => {
+    const { flags, positionals } = parseArgs([
+      "reviewer",
+      "--new-tab",
+      "--agent",
+      "codex",
+    ]);
+    expect(flags["new-tab"]).toBe(true);
+    expect(flags.agent).toBe("codex");
+    expect(positionals).toEqual(["reviewer"]);
   });
 
   test("no-submit is boolean and does not swallow the next token", () => {

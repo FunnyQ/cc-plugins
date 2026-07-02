@@ -11,6 +11,34 @@ import {
 import type { InvokeOpts } from "../types";
 
 describe("codexBackend", () => {
+  describe("invokeLive", () => {
+    it("returns null for image mode (stays headless/native)", () => {
+      expect(codexBackend.invokeLive!("image", {})).toBeNull();
+    });
+
+    it("launches the bare TUI (no exec/-o) and maps model + dangerous", () => {
+      const spec = codexBackend.invokeLive!("delegate", {
+        model: "gpt-6-codex",
+        dangerous: true,
+      })!;
+
+      expect(spec.agentBin).toBe("codex");
+      expect(spec.argv).toEqual([
+        "-m",
+        "gpt-6-codex",
+        "--dangerously-bypass-approvals-and-sandbox",
+      ]);
+      expect(spec.argv).not.toContain("exec");
+      expect(spec.argv).not.toContain("-o");
+    });
+
+    it("passes no sandbox flag when not dangerous (pane shows approvals)", () => {
+      const spec = codexBackend.invokeLive!("review", {})!;
+
+      expect(spec.argv).toEqual([]);
+    });
+  });
+
   describe("supports", () => {
     it("should support delegate, review, and image modes", () => {
       expect(codexBackend.supports.has("delegate")).toBe(true);

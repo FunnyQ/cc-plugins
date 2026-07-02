@@ -5,7 +5,19 @@ import { dirname, join } from "path";
 import type { Backend, InvokeOpts, Mode, RunResult } from "./types";
 import { capabilityGate, getBackend } from "./backends/gate";
 import { BACKENDS } from "./backends";
-import { buildPromptFile } from "./relay-prompt";
+import {
+  appendFileContract,
+  buildPromptFile,
+  scopeInstruction,
+} from "./relay-prompt";
+import {
+  DEFAULT_WAIT_TIMEOUT_MS,
+  liveGate,
+  resolveHerdScript,
+  runLive,
+  type LiveRunResult,
+  type RunLiveOpts,
+} from "./live";
 import { createTmpRunDir, parseCsv, resolveModel, run } from "./shared";
 
 const MODES = new Set<Mode>(["delegate", "review", "image"]);
@@ -21,6 +33,8 @@ export type RelayFlags = {
   noProject: boolean;
   promptFile?: string;
   dangerous: boolean;
+  headless: boolean; // opt out of the live-pane path even inside herdr
+  waitTimeoutMs?: number; // live poll budget (--wait-timeout, default 10 min)
 };
 
 export type ParsedFlags = {
@@ -40,6 +54,9 @@ export type RelayDeps = {
   run: (argv: string[], opts?: { stdin?: string }) => RunResult;
   stderr: (text: string) => void;
   stdout: (text: string) => void;
+  env: Record<string, string | undefined>;
+  resolveHerdScript: () => string | null;
+  runLive: (opts: RunLiveOpts) => Promise<LiveRunResult>;
 };
 
 export type RelayExecution = {
@@ -47,6 +64,8 @@ export type RelayExecution = {
   dir?: string;
   lastFile?: string;
   lastMd?: string;
+  agentName?: string; // live runs: the herd agent name (pane target)
+  pending?: boolean; // live timeout: still running, exit 0, collect via herd
 };
 
 class UsageError extends Error {}
@@ -58,6 +77,7 @@ function usage(backends: string): string {
     "       --scope <uncommitted|base:<ref>|commit:<sha>|custom-files>",
     "       --model <provider/model> | --out <path> | --git-scope <s> | --no-project",
     "       --prompt-file <p> | --dangerous",
+    "       --headless | --wait-timeout <ms>   (live-pane runs inside herdr)",
   ].join("\n");
 }
 
@@ -76,6 +96,7 @@ export function parseFlags(argv: string[]): ParsedFlags {
     gitScope: "related",
     noProject: false,
     dangerous: false,
+    headless: false,
   };
   const positional: string[] = [];
 
@@ -110,10 +131,21 @@ export function parseFlags(argv: string[]): ParsedFlags {
     } else if (arg === "--prompt-file") {
       flags.promptFile = requireValue(rest, i, arg);
       i++;
+    } else if (arg === "--wait-timeout") {
+      const value = Number(requireValue(rest, i, arg));
+      if (!Number.isFinite(value) || value <= 0) {
+        throw new UsageError(
+          "--wait-timeout must be a positive number of milliseconds",
+        );
+      }
+      flags.waitTimeoutMs = value;
+      i++;
     } else if (arg === "--no-project") {
       flags.noProject = true;
     } else if (arg === "--dangerous") {
       flags.dangerous = true;
+    } else if (arg === "--headless") {
+      flags.headless = true;
     } else if (arg.startsWith("--")) {
       throw new UsageError(`Unknown flag: ${arg}`);
     } else {
@@ -139,7 +171,7 @@ function promptTextForMode(
   return { task, focus };
 }
 
-export function executeRelay(
+export async function executeRelay(
   argv: string[],
   deps: RelayDeps = {
     registry: BACKENDS,
@@ -158,8 +190,11 @@ export function executeRelay(
     run,
     stderr: (text) => process.stderr.write(text),
     stdout: (text) => process.stdout.write(text),
+    env: process.env,
+    resolveHerdScript: () => resolveHerdScript(),
+    runLive: (opts) => runLive(opts),
   },
-): RelayExecution {
+): Promise<RelayExecution> {
   let parsed: ParsedFlags;
   const availableBackends = Object.keys(deps.registry).join("|");
 
@@ -232,6 +267,113 @@ export function executeRelay(
     dangerous: parsed.flags.dangerous,
   };
 
+  // Live-pane routing: inside herdr (HERDR_ENV=1), delegate/review runs in a
+  // visible sibling pane instead of a blocking headless spawn. Everything here
+  // is optional — any denial (or a pre-spawn runner error) falls through to
+  // the unchanged headless flow below.
+  const insideHerdr = deps.env.HERDR_ENV === "1";
+  const herdScriptPath = insideHerdr ? deps.resolveHerdScript() : null;
+  const gate = liveGate({
+    env: deps.env,
+    headless: parsed.flags.headless,
+    mode: parsed.mode,
+    backend,
+    herdScriptPath,
+  });
+  if (!gate.live && gate.reason) {
+    deps.stderr(
+      `[relay] live mode unavailable (${gate.reason}); running headless\n`,
+    );
+  }
+
+  // The gate only checks that a live seam EXISTS; invokeLive may still decline a
+  // specific mode by returning null (the type is `LiveSpec | null` — codex image
+  // already does this). Resolve it here so a null cleanly degrades to headless
+  // instead of force-unwrapping to a crash below.
+  const liveSpec = gate.live ? backend.invokeLive!(parsed.mode, opts) : null;
+  if (gate.live && !liveSpec) {
+    deps.stderr(
+      `[relay] ${backend.name} has no live path for ${parsed.mode}; running headless\n`,
+    );
+  }
+
+  if (gate.live && liveSpec) {
+    // Live always uses the prompt strategy — there is no native `codex review`
+    // inside a TUI; a git-ref scope becomes a produce-the-diff-yourself
+    // instruction appended below.
+    const promptFile =
+      parsed.flags.promptFile ??
+      deps.buildPromptFile({
+        kind: parsed.mode as "delegate" | "review",
+        files: parsed.flags.files,
+        focus,
+        task,
+        gitScope: parsed.flags.gitScope,
+        noProject: parsed.flags.noProject,
+      });
+    const promptText = deps.readFile(promptFile);
+    const resultPath = join(dir, "result.md");
+    const scopeNote =
+      parsed.mode === "review" ? scopeInstruction(opts.scope) : "";
+    const livePrompt = appendFileContract(
+      scopeNote ? `${promptText}\n\n${scopeNote}` : promptText,
+      resultPath,
+    );
+    // The full prompt rides a file — a multi-line herd.send submits prematurely
+    // in TUI inputs (and risks ARG_MAX); the pane only gets a one-line bootstrap.
+    const livePromptPath = join(dir, "live-prompt.md");
+    deps.writeFile(livePromptPath, livePrompt);
+    const bootstrapText = `Read the file ${livePromptPath} and follow its instructions exactly, including the result-file instructions at the end.`;
+
+    const liveResult = await deps.runLive({
+      backend: parsed.backend,
+      mode: parsed.mode,
+      spec: liveSpec,
+      herdScriptPath: herdScriptPath!,
+      bootstrapText,
+      resultPath,
+      cwd: process.cwd(),
+      waitTimeoutMs: parsed.flags.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
+    });
+
+    if (liveResult.ok) {
+      // result.md is already the delegate's clean final markdown — no
+      // parseOutput/postRun (those exist for headless stream/image handling).
+      if (!liveResult.text.trim()) {
+        deps.stderr("Live run produced empty output\n");
+        return { code: 1, dir, agentName: liveResult.agentName };
+      }
+      const lastMd = join(dir, "last.md");
+      deps.writeFile(lastMd, liveResult.text);
+      // stdout carries ONLY the answer; live metadata rides stderr so piping
+      // the result stays clean.
+      deps.stdout(liveResult.text);
+      deps.stderr(
+        `\n[relay live] agent ${liveResult.agentName} — pane left open (confirm close-or-keep; \`herd close ${liveResult.agentName}\` to close)\n`,
+      );
+      return { code: 0, dir, lastMd, agentName: liveResult.agentName };
+    }
+
+    if (liveResult.pending) {
+      // Still running is NOT a failure: exit 0 with a follow-up report.
+      deps.stdout(liveResult.report);
+      return { code: 0, dir, agentName: liveResult.agentName, pending: true };
+    }
+
+    if (liveResult.agentName) {
+      // Post-spawn failure: a pane may be mid-flight — do NOT double-run the
+      // task headless; surface the error instead.
+      deps.stderr(`Live run failed: ${liveResult.error}\n`);
+      return { code: 1, dir, agentName: liveResult.agentName };
+    }
+
+    // Pre-spawn failure (herd.ts failed to load/spawn): nothing is running —
+    // fall through to the headless flow in this same invocation.
+    deps.stderr(
+      `[relay] live spawn unavailable (${liveResult.error}); falling back to headless\n`,
+    );
+  }
+
   const strategy = backend.strategy(parsed.mode, opts);
   if (strategy === "prompt") {
     if (parsed.mode === "image") {
@@ -298,6 +440,6 @@ export function executeRelay(
 }
 
 if (import.meta.main) {
-  const result = executeRelay(process.argv.slice(2));
+  const result = await executeRelay(process.argv.slice(2));
   process.exit(result.code);
 }

@@ -2,6 +2,24 @@
 
 > Verified on Q's machine (2026-06-15). Each backend section translates a `relay` mode into the canonical CLI invocation.
 
+## Live-pane mode (herdr)
+
+Inside herdr (`HERDR_ENV=1`), delegate/review launch the backend's **interactive TUI** in **its own new tab** (not a split of the caller's pane, so your working pane keeps its full size) instead of the headless invocations below (`--headless` opts out). The prompt rides a file (`live-prompt.md`); the pane only receives a one-line bootstrap; the answer is captured from `result.md` via an end-marker contract. Motivation: the work becomes visible and take-over-able, and it sidesteps headless flakiness — opencode's `run` in particular can hang around the #26855 family.
+
+Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
+
+| Backend | TUI binary | `--model` mapping | `--dangerous` (YOLO) mapping |
+|---|---|---|---|
+| codex | `codex` (`CODEX_BIN`) | `-m <model>` | `--dangerously-bypass-approvals-and-sandbox` |
+| claude | `claude` | `--model <model>` | `--dangerously-skip-permissions` |
+| opencode | `opencode` | `-m <model>` | `--auto` (auto-approve permissions not explicitly denied) |
+
+`--dangerous` is a **uniform YOLO switch** across all three live backends: it lets an **unattended** run proceed without stopping on approval prompts. Without `--dangerous`, no sandbox/approval-bypass flag is passed and the TUI's own approval prompts surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So: `--dangerous` = fire-and-forget; no flag = supervised. `image` has no live path (codex `invokeLive("image")` → null).
+
+**New-tab placement** — `herd.ts` has no "start an agent in a fresh empty tab" primitive, so `spawn({ newTab: true })` does the dance: capture the focused tab → `tab create --no-focus` → `agent start --tab <new>` → close the leftover shell root pane → restore focus to the caller's tab (`agent start --tab` steals focus despite `--no-focus`). An older `herd.ts` without `newTab` support silently ignores it and falls back to the `--split down` that relay also passes.
+
+relay locates the herdr wrapper (`herd.ts`) via: `HERD_SCRIPT_PATH` env override → repo-sibling checkout (`packages/herdr/…`) → plugin caches of both harnesses (`~/.claude/plugins/cache`, `~/.codex/plugins/cache`), newest version first. Unresolvable → one stderr note + headless fallback; there is no hard herdr dependency (herd.ts is dynamically imported only on the live path).
+
 ## codex
 
 Binary: `codex` (override via `CODEX_BIN`).
