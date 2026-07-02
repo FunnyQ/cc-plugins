@@ -16,7 +16,7 @@ When the user asks about Herdr config, CLI commands, keybindings, plugins, or pl
 
 ## Orchestrating agents — use the `herd` wrapper first
 
-When you are inside a herdr pane (`HERDR_ENV=1`) and need to spawn or drive other agents, prefer the bundled `scripts/herd.ts` wrapper over hand-rolling raw `herdr` CLI chains. It collapses herdr's multi-step recipes (split → parse pane id → send text → press Enter → wait → read) into five typed verbs and handles the sharp edges for you: it addresses agents by a **collision-proof generated name** (never by non-durable pane ids), and its `send` writes the prompt **and presses Enter** (raw `agent send` only writes literal text).
+When you are inside a herdr pane (`HERDR_ENV=1`) and need to spawn or drive other agents, prefer the bundled `scripts/herd.ts` wrapper over hand-rolling raw `herdr` CLI chains. It collapses herdr's multi-step recipes (split → parse pane id → send text → press Enter → wait → read) into seven typed verbs and handles the sharp edges for you: it addresses agents by a **collision-proof generated name** (never by non-durable pane ids), and its `send` writes the prompt **and presses Enter** (raw `agent send` only writes literal text).
 
 Resolve the script from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`); `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call.
 
@@ -26,11 +26,18 @@ HERD="$SKILL_DIR/scripts/herd.ts"
 # Spawn codex in a new pane (no focus), get back a unique name like "reviewer-a3f9"
 bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 
+# Spawn in its OWN new tab instead of splitting the current pane (keeps your pane full-size)
+bun "$HERD" spawn reviewer --agent codex --new-tab --cwd "$PWD"
+
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
 
 # Send a prompt to a running agent and submit it (Enter). --no-submit to stage only
 bun "$HERD" send reviewer-a3f9 "now check error handling"
+
+# Send bare key chords (no text) — submit what's in the box, or clear a line
+bun "$HERD" keys reviewer-a3f9 enter
+bun "$HERD" keys reviewer-a3f9 ctrl+a ctrl+k
 
 # Block until it settles, then read its screen
 bun "$HERD" wait reviewer-a3f9 --status idle --timeout 120000
