@@ -1,5 +1,14 @@
 # Changelog
 
+## [herdr 0.1.0] - 2026-07-02
+
+_herdr is independently versioned; this entry tracks the `herdr-v0.1.0` tag._
+
+### ✨ Added
+
+- **New `herdr` plugin — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager.** Migrated the standalone `/herdr` reference skill (config, CLI, plugin development, live pane/agent recipes) into its own marketplace package rather than folding it into `relay` — the reference is *knowledge*, distinct from relay's *executor* role. Ships to both the Claude and Codex marketplaces at `0.1.0`.
+- **`herd` wrapper (`scripts/herd.ts`) — a typed Bun layer over the raw `herdr` CLI.** Collapses herdr's multi-step recipes into five verbs — `spawn` / `send` / `wait` / `read` / `list` / `close` — for driving agents in sibling panes when running inside herdr (`HERDR_ENV=1`). Handles the CLI's sharp edges, all verified live against herdr 0.7.1: addresses agents by a collision-resistant generated **name** (pane ids renumber and aren't durable), `send` writes literal text **and presses Enter** to submit (raw `agent send` doesn't), `read` defaults to `--source visible` because agent TUIs render into the alternate screen and leave scrollback empty, and the runner honors `HERDR_BIN_PATH`. Exposed as a `createHerd(run)` factory so `relay` can consume the same layer for a future live-pane strategy. Backed by 15 unit tests (mocked runner) plus a codex-reviewed argument parser.
+
 ## [monitor 3.16.2] - 2026-07-02
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.16.2` tag._
