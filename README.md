@@ -1,6 +1,6 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships three plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic) and reviewer-legible PRs/MRs; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
 ## Plugins
 
@@ -24,6 +24,19 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 | Skill | Description |
 |-------|-------------|
 | [relay](./packages/relay/skills/relay) | Delegate a task to another harness's CLI (codex / opencode / claude): `delegate` (do work), `review` (analysis only), or `image` (codex only) — capture the result, smart-apply when safe, and report back |
+
+**chronicle** bundles two skills:
+
+| Skill | Description |
+|-------|-------------|
+| [commit](./packages/chronicle/skills/commit) | Craft git commit(s) for the current changes — auto-decides between one simple commit and an atomic split |
+| [pr](./packages/chronicle/skills/pr) | Open a reviewer-legible PR/MR for the current branch, enriched by the cockpit decision trail when present |
+
+**herdr** is a single skill:
+
+| Skill | Description |
+|-------|-------------|
+| [herdr](./packages/herdr/skills/herdr) | Reference for the [Herdr](https://herdr.dev) terminal workspace manager (config, CLI, plugin dev) plus a typed `herd` wrapper to spawn and drive agents in sibling panes when running inside herdr |
 
 ## Claude Code Installation
 
@@ -231,6 +244,36 @@ codex plugin add relay@q-lab-marketplace
 
 # OpenCode (reads ~/.claude/skills/) — one-time symlink
 ln -s "$(pwd)/packages/relay/skills/relay" ~/.claude/skills/relay
+```
+
+## herdr
+
+Reference and in-session agent orchestration for [Herdr](https://herdr.dev), a terminal workspace manager with workspaces, tabs, split panes, and agent detection. Two halves:
+
+- **Reference** — a knowledge skill that answers questions about Herdr's `config.toml`, CLI, keybindings, and plugin development. Detail lives in `references/`; the skill reads only the relevant file.
+- **`herd` wrapper** — a typed Bun wrapper (`scripts/herd.ts`) over the raw `herdr` CLI, for when you (an agent) are running *inside* a herdr pane (`HERDR_ENV=1`) and want to spawn and drive other agents in sibling panes. It collapses herdr's multi-step recipes into five verbs and handles the sharp edges: it addresses agents by a **collision-resistant generated name** (pane ids renumber), its `send` writes the prompt **and presses Enter** (raw `agent send` only writes literal text), and its `read` defaults to the visible screen (agent TUIs leave scrollback empty).
+
+```bash
+HERD="$CLAUDE_PLUGIN_ROOT/skills/herdr/scripts/herd.ts"   # or the skill's load-time base dir
+
+bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
+bun "$HERD" send reviewer-a3f9 "now check error handling"
+bun "$HERD" wait reviewer-a3f9 --status idle --timeout 120000
+bun "$HERD" read reviewer-a3f9 --lines 60
+bun "$HERD" list
+bun "$HERD" close reviewer-a3f9
+```
+
+All verbs print JSON except `read` (prints the pane's text). The wrapper honors `HERDR_BIN_PATH` and fails fast when not inside herdr.
+
+### Installation
+
+```bash
+# Claude Code
+claude plugins install herdr@q-lab-marketplace
+
+# Codex
+codex plugin add herdr@q-lab-marketplace
 ```
 
 ## Adding a New Plugin
