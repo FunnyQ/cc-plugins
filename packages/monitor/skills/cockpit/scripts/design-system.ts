@@ -1,7 +1,8 @@
 // cockpit design-system API: reads this plugin's own DESIGN.md and returns a
 // compact, structured visual model for the dashboard instrument panel.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
+import { readRegistry } from "./registry";
 
 export type DesignToken = {
   key: string;
@@ -43,7 +44,9 @@ export type CockpitDesignSystem = {
   rules: DesignRule[];
 };
 
-const DESIGN_PATH = join(import.meta.dir, "..", "DESIGN.md");
+// The dashboard's DESIGN button reflects the *selected project's* design doc,
+// not cockpit's own — we look for either casing directly under the project root.
+const DESIGN_FILENAMES = ["DESIGN.md", "design.md"];
 
 function titleize(key: string): string {
   return key.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -136,9 +139,35 @@ export function parseCockpitDesignSystem(
   };
 }
 
-export function readCockpitDesignSystem(): CockpitDesignSystem {
-  if (!existsSync(DESIGN_PATH)) throw new Error("DESIGN.md not found");
-  return parseCockpitDesignSystem(readFileSync(DESIGN_PATH, "utf8"));
+// Resolve the project's design doc, path-confined to the project root (mirrors
+// project-info.ts). A candidate that is a symlink resolving outside the root is
+// rejected — its realpath won't equal <realRoot>/<filename>.
+function resolveDesignPath(projectDir: string): string | null {
+  let realRoot: string;
+  try {
+    realRoot = realpathSync(projectDir);
+  } catch {
+    return null;
+  }
+  for (const name of DESIGN_FILENAMES) {
+    const candidate = join(projectDir, name);
+    if (!existsSync(candidate)) continue;
+    try {
+      const realFile = realpathSync(candidate);
+      if (realFile === join(realRoot, name)) return realFile;
+    } catch {
+      /* unreadable / dangling symlink — try the next name */
+    }
+  }
+  return null;
+}
+
+export function readProjectDesignSystem(
+  projectDir: string,
+): CockpitDesignSystem {
+  const path = resolveDesignPath(projectDir);
+  if (!path) throw new Error("DESIGN.md not found");
+  return parseCockpitDesignSystem(readFileSync(path, "utf8"));
 }
 
 function json(payload: object, status = 200): Response {
@@ -151,13 +180,15 @@ function json(payload: object, status = 200): Response {
   });
 }
 
-export function handleDesignSystem(): Response {
+export function handleDesignSystem(projectDir?: string | null): Response {
+  if (!projectDir) return json({ error: "project required" }, 404);
+  // Confine: only serve projects the daemon already knows from the registry.
+  const known = new Set(readRegistry().map((e) => e.project));
+  if (!known.has(projectDir)) return json({ error: "unknown project" }, 404);
   try {
-    return json(readCockpitDesignSystem());
+    return json(readProjectDesignSystem(projectDir));
   } catch (err) {
-    return json(
-      { error: err instanceof Error ? err.message : String(err) },
-      500,
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    return json({ error: msg }, /not found/.test(msg) ? 404 : 500);
   }
 }

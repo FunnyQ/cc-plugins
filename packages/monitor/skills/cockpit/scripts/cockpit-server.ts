@@ -204,7 +204,8 @@ function buildServer() {
       const url = new URL(req.url);
       if (url.pathname === "/api/projects") return handleProjects();
       if (url.pathname === "/api/token") return handleToken();
-      if (url.pathname === "/api/design-system") return handleDesignSystem();
+      if (url.pathname === "/api/design-system")
+        return handleDesignSystem(url.searchParams.get("project"));
       if (url.pathname === "/api/project-info") return handleProjectInfo(req);
       if (url.pathname === "/api/sessions") return handleSessions();
       if (url.pathname === "/api/log/stream") return handleLogStream(req);
