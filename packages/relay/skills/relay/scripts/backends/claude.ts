@@ -1,4 +1,4 @@
-import type { Backend, InvokeOpts, Mode } from "../types";
+import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 
 // Effort levels supported by /code-review
 const EFFORT_LEVELS = new Set(["low", "medium", "high", "ultra"]);
@@ -69,6 +69,13 @@ export const claudeBackend: Backend = {
 
     // Should not reach here (gate prevents unsupported modes), but be defensive
     return { argv: [] };
+  },
+
+  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
+    const argv: string[] = [];
+    if (opts.model) argv.push("--model", opts.model);
+    if (opts.dangerous) argv.push("--dangerously-skip-permissions");
+    return { agentBin: "claude", argv };
   },
 
   parseOutput(raw: string): string {

@@ -1,4 +1,4 @@
-import type { Backend, InvokeOpts, Mode } from "../types";
+import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 
 /**
  * opencode Backend: delegate + emulated (prompt-based) review.
@@ -47,6 +47,17 @@ export const opencodeBackend: Backend = {
     }
 
     return { argv };
+  },
+
+  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
+    const argv: string[] = [];
+    if (opts.model) argv.push("-m", opts.model);
+    // opencode has no --dangerously-* flag; its YOLO equivalent is `--auto`
+    // ("auto-approve permissions that are not explicitly denied"), accepted by
+    // the interactive TUI too. Gate it on --dangerous so it matches codex/claude:
+    // --dangerous = unattended, no --dangerous = prompts surface in the pane.
+    if (opts.dangerous) argv.push("--auto");
+    return { agentBin: "opencode", argv };
   },
 
   parseOutput(raw: string): string {

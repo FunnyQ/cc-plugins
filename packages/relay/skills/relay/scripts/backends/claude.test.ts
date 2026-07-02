@@ -2,6 +2,27 @@ import { describe, it, expect } from "bun:test";
 import { claudeBackend } from "./claude";
 
 describe("claudeBackend", () => {
+  describe("invokeLive", () => {
+    it("launches the bare TUI (no -p) and maps model + dangerous", () => {
+      const spec = claudeBackend.invokeLive!("delegate", {
+        model: "opus",
+        dangerous: true,
+      });
+
+      expect(spec).toEqual({
+        agentBin: "claude",
+        argv: ["--model", "opus", "--dangerously-skip-permissions"],
+      });
+    });
+
+    it("passes no extra args by default", () => {
+      expect(claudeBackend.invokeLive!("review", {})).toEqual({
+        agentBin: "claude",
+        argv: [],
+      });
+    });
+  });
+
   describe("properties", () => {
     it("has name 'claude'", () => {
       expect(claudeBackend.name).toBe("claude");

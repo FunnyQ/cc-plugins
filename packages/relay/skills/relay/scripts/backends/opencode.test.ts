@@ -3,6 +3,35 @@ import { opencodeBackend, parseJsonl } from "./opencode";
 import type { InvokeOpts } from "../types";
 
 describe("opencodeBackend", () => {
+  describe("invokeLive", () => {
+    it("launches the bare TUI with the resolved model", () => {
+      const spec = opencodeBackend.invokeLive!("delegate", {
+        model: "opencode-go/kimi-k2.7-code",
+      });
+
+      expect(spec).toEqual({
+        agentBin: "opencode",
+        argv: ["-m", "opencode-go/kimi-k2.7-code"],
+      });
+    });
+
+    it("maps --dangerous to --auto (opencode's YOLO), never headless flags", () => {
+      const spec = opencodeBackend.invokeLive!("delegate", {
+        dangerous: true,
+      })!;
+
+      expect(spec.argv).toEqual(["--auto"]);
+      expect(spec.argv).not.toContain("run");
+      expect(spec.argv).not.toContain("--format");
+    });
+
+    it("omits --auto without --dangerous (prompts surface in the pane)", () => {
+      const spec = opencodeBackend.invokeLive!("delegate", {})!;
+
+      expect(spec.argv).toEqual([]);
+    });
+  });
+
   describe("supports", () => {
     it("supports delegate and review", () => {
       expect(opencodeBackend.supports.has("delegate")).toBe(true);

@@ -4,7 +4,7 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { collect } from "./context-collector";
 import { createTmpRunDir, parseCsv } from "./shared";
-import type { Mode } from "./types";
+import type { Mode, Scope } from "./types";
 
 export type PromptKind = "delegate" | "review";
 
@@ -60,6 +60,52 @@ export function formatPrompt(options: FormatOptions): string {
   }
 
   throw new Error(`Unknown prompt kind: ${kind}`);
+}
+
+// Sentinel the live delegate writes as the LAST line of result.md — relay's
+// poll loop treats the file as final only once this line has landed.
+export const RESULT_END_MARKER = "==== RELAY RESULT END ====";
+
+/**
+ * Append the live-run result-file contract to a prompt. The delegate runs in
+ * an interactive TUI pane, so its final answer is captured via this file —
+ * pane reads are lossy (alt-screen TUIs leave scrollback empty).
+ * Pure function.
+ */
+export function appendFileContract(prompt: string, resultPath: string): string {
+  return (
+    prompt +
+    "\n\n---\n\n" +
+    "Result-file contract (IMPORTANT):\n" +
+    `- When your answer is FINAL, write it — the COMPLETE final answer, as markdown — to: ${resultPath}\n` +
+    `- The file's last line must be exactly: ${RESULT_END_MARKER}\n` +
+    "- Do not write the file until the answer is final; write it once, in full.\n" +
+    "- The file is how your answer is collected — relay does not read the pane. Writing it is mandatory.\n" +
+    "- If writing it is genuinely impossible (e.g. a sandbox blocks the path), print the FULL answer in the pane and state you could not write the file — a human reads it from the pane (relay reports the pane's name when it gives up waiting)."
+  );
+}
+
+/**
+ * Live review runs in a TUI (no native `codex review`), so a git-ref scope
+ * becomes an instruction telling the agent to produce the diff itself.
+ * `custom-files` returns "" — the files are already inlined in the prompt.
+ * Pure function.
+ */
+export function scopeInstruction(scope: Scope | undefined): string {
+  if (!scope || scope === "uncommitted") {
+    return "Review scope: the uncommitted working-tree changes. Run `git diff` and `git status --short` to see them.";
+  }
+  if (scope === "custom-files") return "";
+  if (scope.startsWith("base:")) {
+    const ref = scope.slice(5);
+    return `Review scope: changes since ${ref}. Run \`git diff ${ref}...\` to see them.`;
+  }
+  if (scope.startsWith("commit:")) {
+    const sha = scope.slice(7);
+    return `Review scope: the single commit ${sha}. Run \`git show ${sha}\` to see it.`;
+  }
+  // Bare ref/SHA — same treatment as base:<ref> (mirrors the headless mapping).
+  return `Review scope: changes since ${scope}. Run \`git diff ${scope}...\` to see them.`;
 }
 
 /**
