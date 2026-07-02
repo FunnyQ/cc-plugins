@@ -70,6 +70,7 @@ export type SpawnOpts = {
   cwd?: string;
   split?: "right" | "down"; // default "down"
   newTab?: boolean; // open the agent in its OWN new tab instead of splitting the caller's pane (takes precedence over split)
+  tabLabel?: string; // label for the new tab (newTab only); defaults to the generated agent name
   workspace?: string;
   tab?: string;
   env?: string[]; // KEY=VALUE entries
@@ -289,6 +290,9 @@ export function createHerd(run: Runner = herdrRunner) {
     const createArgs = ["tab", "create", "--no-focus"];
     if (opts.workspace) createArgs.push("--workspace", opts.workspace);
     if (opts.cwd) createArgs.push("--cwd", opts.cwd);
+    // Label the tab so the caller can tell at a glance what it's for. Defaults
+    // to the generated agent name (which encodes role + a unique suffix).
+    createArgs.push("--label", opts.tabLabel ?? name);
     const created = await callJson(createArgs);
     const tabId: string | undefined = created.tab?.tab_id;
     const shellPaneId: string | undefined = created.root_pane?.pane_id;
@@ -437,8 +441,8 @@ const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent or
 
 Usage:
   herd list
-  herd spawn <role> --agent <bin> [--cwd P] [--split down|right] [--new-tab] [--workspace ID]
-              [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
+  herd spawn <role> --agent <bin> [--cwd P] [--split down|right] [--new-tab] [--tab-label TEXT]
+              [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
   herd send <target> <text> [--no-submit]
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k
   herd wait <target> [--status idle|working|blocked|unknown] [--timeout MS]
@@ -475,6 +479,7 @@ async function main() {
           cwd: (flags.cwd as string) ?? process.cwd(),
           split: (flags.split as "right" | "down") ?? "down",
           newTab: flags["new-tab"] === true,
+          tabLabel: flags["tab-label"] as string | undefined,
           workspace: flags.workspace as string | undefined,
           tab: flags.tab as string | undefined,
           env,
