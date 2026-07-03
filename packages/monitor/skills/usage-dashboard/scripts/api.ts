@@ -579,7 +579,7 @@ export function buildUsageLimitWindow(
   };
 }
 
-function readUsageLimits(): UsageLimits {
+export function readUsageLimits(): UsageLimits {
   const cache = readJSONWithError<RateLimitsCache>(RATE_LIMITS_CACHE);
   const base = {
     source: "statusline-cache",
@@ -792,7 +792,7 @@ function readCodexUsageCache(): UsageLimits {
   );
 }
 
-async function readCodexUsageLimits(): Promise<UsageLimits> {
+export async function readCodexUsageLimits(): Promise<UsageLimits> {
   const cached = readCodexUsageCache();
   if (!cached.stale && !cached.error) return cached;
 

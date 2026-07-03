@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.17.0] - 2026-07-04
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.17.0` tag._
+
+### ✨ Added
+
+- **Optional remote usage export — push your Claude + Codex quota snapshot to an external dashboard.** The statusline collector gained a tertiary trigger, `nudgePush()`, that spawns a detached, 2-min-throttled `push-usage.ts` worker to POST the latest usage-window snapshot (`{ capturedAt, claude, codex }`) to a remote relay such as an n8n webhook — so an external display (e.g. a TRMNL e-ink dashboard) can show current quota/usage without running the dashboard. It exports **only** usage-window data — never transcripts, message content, or project/session lists. Fully opt-in: nothing runs unless `LLM_QUOTA_INGEST_URL` is set, so existing users see zero behavior change. `LLM_QUOTA_INGEST_SECRET`, if set, is sent as the `X-Auth-Token` header. Like the rollup nudge, the push is detached + throttled so statusline rendering never waits on (or fails because of) the network call or the Codex usage API. `readUsageLimits()` / `readCodexUsageLimits()` are now exported from `api.ts` so the worker reuses the existing cache logic instead of duplicating it.
+
 ## [herdr 0.1.2] - 2026-07-02
 
 _herdr is independently versioned; this entry tracks the `herdr-v0.1.2` tag._
