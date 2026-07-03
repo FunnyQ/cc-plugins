@@ -16,7 +16,7 @@ description: >-
 
 # AI Code Stats Dashboard
 
-A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP server. Reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, `~/.codex/sessions/`, and OpenCode data under `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` with legacy JSON fallback from `storage/` plus `project/*/storage/` — no telemetry, no network access required (OpenRouter is consulted opportunistically for live pricing but failures are silent).
+A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP server. Reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, `~/.codex/sessions/`, and OpenCode data under `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` with legacy JSON fallback from `storage/` plus `project/*/storage/`. By default it is local-only: no usage export is performed unless `LLM_QUOTA_INGEST_URL` is explicitly configured. OpenRouter is consulted opportunistically for live pricing, but failures are silent.
 
 ## Run
 
@@ -61,6 +61,22 @@ expanded in the status-line context, and installed plugins live at
 version-pinned cache paths, so the absolute path must be resolved at runtime.
 After `claude plugin update` the cache path changes; the precheck detects the
 now-stale path, so re-running the dashboard re-surfaces the offer below.
+
+## Optional Remote Usage Export
+
+The statusline collector can also push the latest Claude + Codex usage-window
+snapshot to a server such as an n8n webhook, so an external dashboard such as
+TRMNL can display current quota/usage information. This is opt-in and only runs
+when `LLM_QUOTA_INGEST_URL` is set in the statusline collector's environment.
+
+When enabled, the detached background worker POSTs JSON containing:
+
+- `capturedAt` — the export timestamp
+- `claude` — the cached Claude statusline usage limits
+- `codex` — the Codex usage limits from the local cache or Codex usage API
+
+It does not send transcripts, message content, or project/session lists. If
+`LLM_QUOTA_INGEST_SECRET` is set, it is sent as the `X-Auth-Token` header.
 
 ### Offer to wire it up
 
