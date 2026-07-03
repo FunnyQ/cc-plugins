@@ -9,6 +9,8 @@ const CACHE_DIR = join(homedir(), ".cache", "token-atlas");
 const RATE_LIMITS_CACHE = join(CACHE_DIR, "rate-limits.json");
 const ROLLUP_NUDGE_MARKER = join(CACHE_DIR, ".rollup-nudge");
 const ROLLUP_NUDGE_THROTTLE_MS = 5 * 60 * 1000;
+const PUSH_NUDGE_MARKER = join(CACHE_DIR, ".push-nudge");
+const PUSH_NUDGE_THROTTLE_MS = 2 * 60 * 1000;
 const STATUSLINE_COMMAND =
   process.env.TOKEN_ATLAS_STATUSLINE_COMMAND?.trim() ||
   "bunx -y ccstatusline@latest";
@@ -64,6 +66,37 @@ function nudgeRollup(): void {
   }
 }
 
+// Tertiary trigger: push the latest Claude + Codex usage snapshot to a remote
+// relay (n8n) so an external dashboard (e.g. TRMNL) can read it. Opt-in via
+// LLM_QUOTA_INGEST_URL. Throttled + fully detached for the same reason as the
+// rollup nudge: statusline rendering must never wait on (or fail because of) the
+// network push or the Codex usage API call that push-usage.ts makes.
+function nudgePush(): void {
+  if (!process.env.LLM_QUOTA_INGEST_URL?.trim()) return;
+  try {
+    const last = (() => {
+      try {
+        return statSync(PUSH_NUDGE_MARKER).mtimeMs;
+      } catch {
+        return 0;
+      }
+    })();
+    if (Date.now() - last < PUSH_NUDGE_THROTTLE_MS) return;
+
+    mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(PUSH_NUDGE_MARKER, "");
+
+    const child = spawn(
+      process.execPath,
+      [join(import.meta.dir, "push-usage.ts")],
+      { detached: true, stdio: "ignore" },
+    );
+    child.unref();
+  } catch {
+    // Best-effort only — never let a usage push disrupt the statusline.
+  }
+}
+
 function runStatusline(payload: string): number {
   const result = spawnSync(STATUSLINE_COMMAND, {
     input: payload,
@@ -86,4 +119,5 @@ function runStatusline(payload: string): number {
 const payload = await readStdin();
 cacheRateLimits(payload);
 nudgeRollup();
+nudgePush();
 process.exit(runStatusline(payload));
