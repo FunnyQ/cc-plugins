@@ -1,5 +1,13 @@
 # Changelog
 
+## [dispatch 3.12.2] - 2026-07-04
+
+_dispatch is independently versioned; this entry tracks the `dispatch-v3.12.2` tag._
+
+### ✨ Added
+
+- **autopilot — choose the model for the final-review `/simplify` lenses.** New `CFG.reviewLensModel` option (`'opus'` default, or `'fable'` for Claude Fable 5), surfaced as a Step-2 pick alongside the dev engine and cross-vendor reviewer. It routes through the orchestrator's `MODEL.reviewLens`, so it affects **only** the four final-review quality lenses (reuse / simplification / efficiency / altitude); the fixer and rubric judge stay Opus, keeping the dev≠judge gate stable. Named for its true blast radius (`reviewLensModel`, not `finalReviewModel`).
+
 ## [chronicle 0.3.2] - 2026-07-04
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.3.2` tag._

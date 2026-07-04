@@ -62,14 +62,15 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 ## Step 2 — Confirm the flight with the user
 
-**Ask which dev engine and which cross-vendor reviewer to fly with — don't silently default.** These are two **independent** choices; use `AskUserQuestion`:
+**Ask which dev engine, which cross-vendor reviewer, and which final-review lens model to fly with — don't silently default.** These are **independent** choices; use `AskUserQuestion`:
 
 - **Dev engine** (`CFG.devEngine`) — **Claude** (default; Sonnet writes, Opus on the last attempt), **Codex** (`'codex'` — the OpenAI codex CLI writes each task via `codex-run.ts`), or **OpenCode** (`'opencode'` — the opencode CLI writes each task via `opencode-run.ts`). With Codex/OpenCode the dev step is a cheap Haiku driver and Claude still judges, giving a cross-vendor dev≠judge split.
 - **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
+- **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the four Claude `/simplify` lenses (reuse / simplification / efficiency / altitude) in the closing Final review. Affects **only** those four lenses; the fixer and rubric judge stay Opus regardless.
 
-The picks set `CFG.devEngine` + `CFG.reviewEngine` in Step 3. Whichever external engines get chosen make their `--version` check from Step 1 load-bearing — if a picked engine is unreachable, say so and offer to fall back before flying (Claude for the dev engine; the other CLI for the reviewer).
+The picks set `CFG.devEngine` + `CFG.reviewEngine` + `CFG.reviewLensModel` in Step 3. Whichever external engines get chosen make their `--version` check from Step 1 load-bearing — if a picked engine is unreachable, say so and offer to fall back before flying (Claude for the dev engine; the other CLI for the reviewer).
 
-Then show a one-screen brief and get a go: the slug, how many tasks, the chosen dev engine + cross-vendor reviewer, the two caps (`maxAttempts` / `finalReviewMaxAttempts`), the model policy, that capped tasks will be parked + escalated (not silently skipped), and that the closing Final review round runs the chosen external CLI review — which **sends the branch diff to an external service** (OpenAI for codex; the configured opencode provider for opencode). This is real compute, real edits, and an external code review — get an explicit go before calling Workflow.
+Then show a one-screen brief and get a go: the slug, how many tasks, the chosen dev engine + cross-vendor reviewer + final-review lens model, the two caps (`maxAttempts` / `finalReviewMaxAttempts`), the model policy, that capped tasks will be parked + escalated (not silently skipped), and that the closing Final review round runs the chosen external CLI review — which **sends the branch diff to an external service** (OpenAI for codex; the configured opencode provider for opencode). This is real compute, real edits, and an external code review — get an explicit go before calling Workflow.
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
@@ -91,6 +92,7 @@ const CFG = {
   reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — cross-vendor reviewer in the Final review
   opencodeDevModel:      '',        // optional opencode model for the dev engine (empty → default opencode-go/kimi-k2.7-code); opencode-only
   opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → default opencode-go/qwen3.7-max); opencode-only
+  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 4 final-review /simplify lenses ONLY; fixer + judge stay Opus
 }
 ```
 
@@ -177,7 +179,7 @@ Encoded as a constant table at the top of the orchestrator so it's tunable in on
 | **Rubric judge** | Opus | The graded gate that decides loop-or-pass; judgement quality is paramount (a weak judge ships bad code or loops forever). |
 | **Commit (inter-wave + post-loop)** | Haiku | Commits the wave's changes with **inline git** (the `COMMIT_INSTRUCTIONS` block — atomic principles + commit template baked into the prompt), NOT the `odin-git:atomic-commit` skill: a Workflow agent has no `Agent` tool, so that skill's vör/bragi sub-agents can't spawn. A wave's changes are usually one coherent set, so grouping + message-writing is within Haiku's reach. |
 | **Final review — cross-vendor lens** (`CFG.reviewEngine`) | Haiku | Only *drives* the chosen external CLI (codex or opencode, via `<engine>-run.ts review`) and records its output — the review intelligence lives in that CLI, so a cheap model to invoke + capture is all that's needed. |
-| **Final review — /simplify lenses** | Opus × 4 (parallel) | reuse / simplification / efficiency / altitude. These must genuinely *understand* the code to judge quality, so they get the strongest model. They only *record* findings; they don't edit. |
+| **Final review — /simplify lenses** (`CFG.reviewLensModel`) | Opus × 4 (parallel), default — or **Fable 5** (`'fable'`) | reuse / simplification / efficiency / altitude. These must genuinely *understand* the code to judge quality, so they get a strong model. Tunable via `CFG.reviewLensModel` (`'opus'` default, or `'fable'`) — this affects **only** these four lenses; the fixer and judge stay Opus. They only *record* findings; they don't edit. |
 | **Final review — fixer** | Opus | Reads every lens's findings and applies them; highest-stakes holistic gate (integration, consistency, regressions, met the PLAN goal). Capped at `finalReviewMaxAttempts` (default 2). |
 
 ## Grounding the score (do not skip)
