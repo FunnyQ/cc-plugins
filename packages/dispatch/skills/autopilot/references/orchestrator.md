@@ -23,6 +23,7 @@ const CFG = {
   reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — the cross-vendor reviewer in the closing Final review (driven via <engine>-run.ts review)
   opencodeDevModel:      '',        // optional opencode model for the dev engine (empty → wrapper default opencode-go/kimi-k2.7-code); only applies when devEngine is 'opencode' (codex ignores -m)
   opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
+  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 4 final-review /simplify lenses (reuse/simplification/efficiency/altitude) ONLY; the fixer + rubric judge stay Opus
 }
 ```
 
@@ -65,6 +66,7 @@ const CFG = {
   reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — the cross-vendor reviewer in the closing Final review (driven via <engine>-run.ts review)
   opencodeDevModel:      '',        // optional opencode model for the dev engine (empty → wrapper default opencode-go/kimi-k2.7-code); only applies when devEngine is 'opencode' (codex ignores -m)
   opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
+  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 4 final-review /simplify lenses (reuse/simplification/efficiency/altitude) ONLY; the fixer + rubric judge stay Opus
 }
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
@@ -72,8 +74,11 @@ const CFG = {
 //   reviewExternal (Haiku) — only DRIVES an external CLI (codex/opencode); the
 //     review intelligence lives in that CLI, so the wrapping agent just invokes
 //     + records.
-//   reviewLens  (Opus)  — the four /simplify lenses must truly *understand* the
-//     code to judge reuse/complexity/efficiency/altitude, so they get Opus.
+//   reviewLens  (Opus default; CFG.reviewLensModel can set 'fable') — the four
+//     /simplify lenses must truly *understand* the code to judge
+//     reuse/complexity/efficiency/altitude, so they get a strong model. Tunable in
+//     one place via CFG.reviewLensModel ('opus' | 'fable'); this affects ONLY the
+//     four lenses — the fixer and rubric judge stay Opus regardless.
 //   fix (Opus) — reads every finding and applies the changes.
 //   devExternal (Haiku) — only used when CFG.devEngine is an external engine
 //     (codex/opencode): a cheap driver that has that CLI write the implementation
@@ -81,7 +86,7 @@ const CFG = {
 //     in the external CLI, so the driver just invokes + checks. The last attempt
 //     before the cap still escalates to Claude-Opus (devEscalated) — a
 //     cross-vendor last shot before parking.
-const MODEL = { dev: 'sonnet', devEscalated: 'opus', devExternal: 'haiku', verify: 'haiku', judge: 'opus', reviewExternal: 'haiku', reviewLens: 'opus', fix: 'opus', commit: 'haiku' }
+const MODEL = { dev: 'sonnet', devEscalated: 'opus', devExternal: 'haiku', verify: 'haiku', judge: 'opus', reviewExternal: 'haiku', reviewLens: CFG.reviewLensModel ?? 'opus', fix: 'opus', commit: 'haiku' }
 const MAX = CFG.maxAttempts ?? 3
 const FINAL_MAX = CFG.finalReviewMaxAttempts ?? 2   // the Final review round loops at most this many times before parking
 const S = CFG.scriptsDir   // abs path to flightplan/scripts
