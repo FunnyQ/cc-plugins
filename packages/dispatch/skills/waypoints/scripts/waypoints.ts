@@ -5,6 +5,7 @@
  * Usage:
  *   bun waypoints.ts active <proj>
  *   bun waypoints.ts leg-scaffold <proj> <NN-slug> <bucket>[,<bucket>...]
+ *   bun waypoints.ts advance <proj> [--dry-run] [--outcome "<text>"] [--date YYYY-MM-DD]
  */
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -217,6 +218,51 @@ export function overviewFirstLine(md: string): string | null {
   return null;
 }
 
+export function draftOutcome(runlog: string, planOverview: string): string {
+  const finalReviewLine = firstFinalReviewLine(runlog);
+  if (finalReviewLine) return cleanOutcome(finalReviewLine);
+
+  const lastNarrativeLine = lastRunlogLine(runlog);
+  if (lastNarrativeLine) return cleanOutcome(lastNarrativeLine);
+
+  const firstPlanSentence = firstSentence(planOverview);
+  if (firstPlanSentence) return cleanOutcome(`planned: ${firstPlanSentence}`);
+
+  return "landed (no RUNLOG summary available)";
+}
+
+export function advanceRoadmap(
+  roadmap: Roadmap,
+  outcome: string,
+  date: string,
+): Roadmap {
+  const activeIndex = roadmap.legs.findIndex((leg) => leg.status === "active");
+  const pendingIndex = roadmap.legs.findIndex(
+    (leg) => leg.status === "pending",
+  );
+
+  return {
+    ...roadmap,
+    legs: roadmap.legs.map((leg, index) => {
+      if (index === activeIndex) {
+        return {
+          ...leg,
+          status: "done",
+          landedDate: date,
+          outcome,
+        };
+      }
+      if (index === pendingIndex) {
+        return {
+          ...leg,
+          status: "active",
+        };
+      }
+      return { ...leg };
+    }),
+  };
+}
+
 export function planLegScaffold(input: LegScaffoldPlanInput): LegScaffoldPlan {
   validateLegSlug(input.nnSlug);
   if (input.buckets.length === 0) {
@@ -257,6 +303,49 @@ function collectContinuation(lines: string[], start: number): string {
 function normalizePointerSlug(pointerSlug: string, nn: string): string {
   const suffix = /^\d{2}-(.+)$/.exec(pointerSlug)?.[1] ?? pointerSlug;
   return `${nn}-${suffix}`;
+}
+
+function firstFinalReviewLine(runlog: string): string | null {
+  const lines = runlog.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^##\s+Final review\s*$/i.test(line));
+  if (start === -1) return null;
+
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (/^##\s+/.test(line)) return null;
+    if (line && !isHeading(line)) return line;
+  }
+  return null;
+}
+
+function lastRunlogLine(runlog: string): string | null {
+  const lines = runlog.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line && !isHeading(line)) return line;
+  }
+  return null;
+}
+
+function firstSentence(text: string): string | null {
+  const collapsed = text.trim().replace(/\s+/g, " ");
+  if (!collapsed) return null;
+  return /^[^.!?]+[.!?]/.exec(collapsed)?.[0] ?? collapsed;
+}
+
+function cleanOutcome(text: string): string {
+  const cleaned = text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[*_~]/g, "")
+    .replace(/^\s*[-*+]\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.slice(0, 120);
+}
+
+function isHeading(line: string): boolean {
+  return /^#{1,6}\s+/.test(line);
 }
 
 async function main() {
@@ -307,8 +396,94 @@ async function main() {
         }
         return;
       }
+      case "advance": {
+        const [proj, ...flags] = args;
+        if (!proj) {
+          throw new Error(
+            'Usage: bun waypoints.ts advance <proj> [--dry-run] [--outcome "<text>"] [--date YYYY-MM-DD]',
+          );
+        }
+
+        let dryRun = false;
+        let outcome: string | null = null;
+        let dateStr: string | null = null;
+
+        for (let i = 0; i < flags.length; i++) {
+          if (flags[i] === "--dry-run") {
+            dryRun = true;
+          } else if (flags[i] === "--outcome") {
+            outcome = flags[++i] ?? null;
+          } else if (flags[i] === "--date") {
+            dateStr = flags[++i] ?? null;
+          }
+        }
+
+        const waypointsPath = join("docs", proj, "WAYPOINTS.md");
+        const roadmap = parseRoadmap(await readFile(waypointsPath, "utf-8"));
+        const activeLeg = roadmap.legs.find((leg) => leg.status === "active");
+        if (!activeLeg) {
+          const complete =
+            roadmap.legs.length > 0 &&
+            roadmap.legs.every((leg) => leg.status === "done");
+          if (complete) {
+            console.error("No active leg — roadmap complete.");
+          } else {
+            console.error("No active leg — mark one pending leg [~] to start.");
+          }
+          process.exit(1);
+        }
+
+        const runlogPath = join(
+          "docs",
+          proj,
+          "legs",
+          activeLeg.slug,
+          ".flightlog",
+          "RUNLOG.md",
+        );
+        const planPath = join("docs", proj, "legs", activeLeg.slug, "PLAN.md");
+        let runlog = "";
+        let planOverview = "";
+
+        try {
+          runlog = await readFile(runlogPath, "utf-8");
+        } catch {
+          // Best-effort: RUNLOG may not exist yet.
+        }
+
+        try {
+          const plan = await readFile(planPath, "utf-8");
+          planOverview = overviewFirstLine(plan) || "";
+        } catch {
+          // Best-effort: PLAN.md may not exist yet.
+        }
+
+        const draftedOutcome = draftOutcome(runlog, planOverview);
+        if (dryRun || !outcome) {
+          console.log(`DRAFT OUTCOME: ${draftedOutcome}`);
+          return;
+        }
+
+        const today = dateStr || new Date().toISOString().split("T")[0];
+        const newRoadmap = advanceRoadmap(roadmap, outcome, today);
+        await Bun.write(waypointsPath, serializeRoadmap(newRoadmap));
+
+        const newActive = newRoadmap.legs.find(
+          (leg) => leg.status === "active",
+        );
+        if (newActive) {
+          console.log(
+            `Landed ${activeLeg.slug}, promoting ${newActive.slug} to active.`,
+          );
+        } else {
+          console.log(`Landed ${activeLeg.slug}. Roadmap complete.`);
+        }
+        return;
+      }
       default:
-        console.error("Usage: bun waypoints.ts <active|leg-scaffold> ...");
+        console.error(
+          "Usage: bun waypoints.ts <active|leg-scaffold|advance> ...",
+        );
         process.exit(2);
     }
   } catch (err) {

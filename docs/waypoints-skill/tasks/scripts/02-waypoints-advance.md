@@ -6,7 +6,7 @@
 >
 > **Depends on**: scripts/01
 > **Blocks**: skill/01, integration/01, integration/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -94,17 +94,17 @@ with a guaranteed active leg, it does not itself handle the zero-active case.
 
 ## Acceptance criteria
 
-- [ ] `waypoints.ts` now also exposes the `advance` verb via the same `main()` dispatch.
-- [ ] `draftOutcome` implements the four-branch cascade above with the shown outputs (final-verdict, last-narrative, plan fallback, empty fallback).
-- [ ] `advanceRoadmap` flips `[~]`→`[x]` (with `· landed <date> · outcome: <outcome>`) and promotes the next `[ ]`→`[~]`; when no pending leg remains it lands the active one and leaves no `[~]`.
-- [ ] `advance` writes only when `--outcome` is passed; bare `advance` and `--dry-run` preview the drafted outcome without writing; `--date` defaults to today in `main()`.
-- [ ] With no active `[~]` leg, `advance` (any mode) exits non-zero without writing, distinguishing "roadmap complete" from "nothing active yet".
-- [ ] `draftOutcome`/`advanceRoadmap` are pure — no filesystem, `Date.now()`, or `Math.random()` inside them; the date is injected.
+- [x] `waypoints.ts` now also exposes the `advance` verb via the same `main()` dispatch.
+- [x] `draftOutcome` implements the four-branch cascade above with the shown outputs (final-verdict, last-narrative, plan fallback, empty fallback).
+- [x] `advanceRoadmap` flips `[~]`→`[x]` (with `· landed <date> · outcome: <outcome>`) and promotes the next `[ ]`→`[~]`; when no pending leg remains it lands the active one and leaves no `[~]`.
+- [x] `advance` writes only when `--outcome` is passed; bare `advance` and `--dry-run` preview the drafted outcome without writing; `--date` defaults to today in `main()`.
+- [x] With no active `[~]` leg, `advance` (any mode) exits non-zero without writing, distinguishing "roadmap complete" from "nothing active yet".
+- [x] `draftOutcome`/`advanceRoadmap` are pure — no filesystem, `Date.now()`, or `Math.random()` inside them; the date is injected.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/waypoints/scripts/` is green, adding coverage for: `draftOutcome`'s four cascade branches, `advanceRoadmap` transition (with-pending and no-pending), a `serializeRoadmap(advanceRoadmap(...))` round-trip that confirms **milestone titles and untouched legs survive** the write, and the no-active-leg guard (a completed and a not-yet-started roadmap both exit non-zero without writing).
-- [ ] Smoke: on a temp `docs/demo/WAYPOINTS.md` (leg 1 `[~]` with a fabricated `.flightlog/RUNLOG.md`), run `advance demo --dry-run` (prints a draft, writes nothing), then `advance demo --outcome "landed X" --date 2026-07-04` and confirm leg 1 is `[x]` with the outcome and leg 2 is `[~]`.
+- [x] `bun test packages/dispatch/skills/waypoints/scripts/` is green, adding coverage for: `draftOutcome`'s four cascade branches, `advanceRoadmap` transition (with-pending and no-pending), a `serializeRoadmap(advanceRoadmap(...))` round-trip that confirms **milestone titles and untouched legs survive** the write, and the no-active-leg guard (a completed and a not-yet-started roadmap both exit non-zero without writing).
+- [x] Smoke: on a temp `docs/demo/WAYPOINTS.md` (leg 1 `[~]` with a fabricated `.flightlog/RUNLOG.md`), run `advance demo --dry-run` (prints a draft, writes nothing), then `advance demo --outcome "landed X" --date 2026-07-04` and confirm leg 1 is `[x]` with the outcome and leg 2 is `[~]`.
 
 ## Eval rubric
 

@@ -1,7 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  advanceRoadmap,
   assertSingleActive,
+  draftOutcome,
   formatActive,
   parseRoadmap,
   planLegScaffold,
@@ -9,6 +13,8 @@ import {
   validateBucket,
   validateLegSlug,
 } from "./waypoints";
+
+const SCRIPT_PATH = new URL("./waypoints.ts", import.meta.url).pathname;
 
 const SAMPLE = `# MyApp — Waypoints
 
@@ -24,6 +30,14 @@ const SAMPLE = `# MyApp — Waypoints
 - [ ] 3. Billing — paid plans via Stripe
       → legs/03-billing/
 `;
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  for (const dir of tempDirs.splice(0)) {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 describe("parseRoadmap", () => {
   test("parses all status glyphs and leg fields", () => {
@@ -155,6 +169,252 @@ PRIOR LANDED LEGS:
   });
 });
 
+describe("draftOutcome", () => {
+  test("uses first narrative line under final review", () => {
+    expect(
+      draftOutcome(
+        `## Work
+Earlier entry.
+
+## Final review
+
+### Verdict
+**All tasks passed;** added \`rate-limiting\`.
+`,
+        "Ignored fallback.",
+      ),
+    ).toBe("All tasks passed; added rate-limiting.");
+  });
+
+  test("falls back to last non-heading runlog line", () => {
+    expect(
+      draftOutcome(
+        `# Runlog
+
+Started implementation.
+
+## Notes
+- Finished profile polish with   extra   spaces.
+`,
+        "Ignored fallback.",
+      ),
+    ).toBe("Finished profile polish with extra spaces.");
+  });
+
+  test("falls back to first plan sentence", () => {
+    expect(
+      draftOutcome("", "Auth foundation: email sign-up/sign-in. Later."),
+    ).toBe("planned: Auth foundation: email sign-up/sign-in.");
+  });
+
+  test("falls back to no-summary literal", () => {
+    expect(draftOutcome("", "")).toBe("landed (no RUNLOG summary available)");
+  });
+
+  test("collapses whitespace, strips markdown, and truncates to 120 chars", () => {
+    expect(
+      draftOutcome(
+        [
+          "## Final review",
+          "[Result](https://example.com): **" +
+            "a".repeat(140) +
+            "** completed",
+        ].join("\n"),
+        "",
+      ),
+    ).toBe(`Result: ${"a".repeat(112)}`);
+  });
+});
+
+describe("advanceRoadmap", () => {
+  test("lands active leg and promotes next pending leg", () => {
+    const roadmap = parseRoadmap(SAMPLE);
+    const advanced = advanceRoadmap(
+      roadmap,
+      "Profile shipped with audit trail.",
+      "2026-07-04",
+    );
+
+    expect(advanced.legs.map((leg) => leg.status)).toEqual([
+      "done",
+      "done",
+      "active",
+    ]);
+    expect(advanced.legs[1]).toMatchObject({
+      status: "done",
+      landedDate: "2026-07-04",
+      outcome: "Profile shipped with audit trail.",
+    });
+    expect(advanced.legs[2].status).toBe("active");
+  });
+
+  test("lands active leg without promoting when no pending leg remains", () => {
+    const roadmap = parseRoadmap(SAMPLE);
+    roadmap.legs[2].status = "done";
+
+    const advanced = advanceRoadmap(roadmap, "Final leg landed.", "2026-07-04");
+
+    expect(advanced.legs.map((leg) => leg.status)).toEqual([
+      "done",
+      "done",
+      "done",
+    ]);
+    expect(advanced.legs[1]).toMatchObject({
+      landedDate: "2026-07-04",
+      outcome: "Final leg landed.",
+    });
+  });
+
+  test("round-trips through serialization without losing titles or metadata", () => {
+    const roadmap = parseRoadmap(SAMPLE);
+    const advanced = advanceRoadmap(roadmap, "Profile shipped.", "2026-07-04");
+    const reparsed = parseRoadmap(serializeRoadmap(advanced));
+
+    expect(reparsed).toEqual(advanced);
+    expect(reparsed.legs[0]).toMatchObject({
+      title: "Multi-factor auth",
+      outcome: "also added rate-limiting",
+    });
+    expect(reparsed.legs[1]).toMatchObject({
+      title: "Session & profile",
+      landedDate: "2026-07-04",
+      outcome: "Profile shipped.",
+    });
+  });
+
+  test("does not mutate the input roadmap", () => {
+    const roadmap = parseRoadmap(SAMPLE);
+    const before = structuredClone(roadmap);
+
+    advanceRoadmap(roadmap, "Profile shipped.", "2026-07-04");
+
+    expect(roadmap).toEqual(before);
+  });
+});
+
+describe("advance CLI", () => {
+  test("complete roadmap exits non-zero without writing", async () => {
+    const dir = await writeProject("complete", completeRoadmap());
+    const before = await readFile(
+      join(dir, "docs", "complete", "WAYPOINTS.md"),
+      "utf-8",
+    );
+
+    const result = await runWaypoints(dir, [
+      "advance",
+      "complete",
+      "--outcome",
+      "Done.",
+      "--date",
+      "2026-07-04",
+    ]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("roadmap complete");
+    expect(
+      await readFile(join(dir, "docs", "complete", "WAYPOINTS.md"), "utf-8"),
+    ).toBe(before);
+  });
+
+  test("unstarted roadmap exits non-zero without writing", async () => {
+    const dir = await writeProject("unstarted", unstartedRoadmap());
+    const before = await readFile(
+      join(dir, "docs", "unstarted", "WAYPOINTS.md"),
+      "utf-8",
+    );
+
+    const result = await runWaypoints(dir, [
+      "advance",
+      "unstarted",
+      "--outcome",
+      "Done.",
+      "--date",
+      "2026-07-04",
+    ]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("mark one pending");
+    expect(
+      await readFile(join(dir, "docs", "unstarted", "WAYPOINTS.md"), "utf-8"),
+    ).toBe(before);
+  });
+
+  test("bare advance previews the drafted outcome without writing", async () => {
+    const dir = await writeProject("demo", SAMPLE, {
+      runlog: "## Final review\nAll tasks passed.\n",
+      plan: "## Overview\nProfile work.\n",
+    });
+    const before = await readFile(
+      join(dir, "docs", "demo", "WAYPOINTS.md"),
+      "utf-8",
+    );
+
+    const result = await runWaypoints(dir, ["advance", "demo"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("DRAFT OUTCOME: All tasks passed.");
+    expect(
+      await readFile(join(dir, "docs", "demo", "WAYPOINTS.md"), "utf-8"),
+    ).toBe(before);
+  });
+
+  test("dry-run previews without writing even when outcome is supplied", async () => {
+    const dir = await writeProject("demo", SAMPLE, {
+      runlog: "## Final review\nAll tasks passed.\n",
+    });
+    const before = await readFile(
+      join(dir, "docs", "demo", "WAYPOINTS.md"),
+      "utf-8",
+    );
+
+    const result = await runWaypoints(dir, [
+      "advance",
+      "demo",
+      "--dry-run",
+      "--outcome",
+      "Confirmed.",
+      "--date",
+      "2026-07-04",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("DRAFT OUTCOME: All tasks passed.");
+    expect(
+      await readFile(join(dir, "docs", "demo", "WAYPOINTS.md"), "utf-8"),
+    ).toBe(before);
+  });
+
+  test("outcome writes transition with supplied date", async () => {
+    const dir = await writeProject("demo", SAMPLE);
+
+    const result = await runWaypoints(dir, [
+      "advance",
+      "demo",
+      "--outcome",
+      "Profile shipped.",
+      "--date",
+      "2026-07-04",
+    ]);
+    const roadmap = parseRoadmap(
+      await readFile(join(dir, "docs", "demo", "WAYPOINTS.md"), "utf-8"),
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
+      "Landed 02-profile, promoting 03-billing to active.",
+    );
+    expect(roadmap.legs.map((leg) => leg.status)).toEqual([
+      "done",
+      "done",
+      "active",
+    ]);
+    expect(roadmap.legs[1]).toMatchObject({
+      landedDate: "2026-07-04",
+      outcome: "Profile shipped.",
+    });
+  });
+});
+
 describe("validation", () => {
   test("accepts valid leg slugs and buckets", () => {
     expect(() => validateLegSlug("01-auth")).not.toThrow();
@@ -202,3 +462,51 @@ describe("planLegScaffold", () => {
     ).toThrow(/bucket/);
   });
 });
+
+function completeRoadmap(): string {
+  return SAMPLE.replace("- [~] 2.", "- [x] 2.").replace("- [ ] 3.", "- [x] 3.");
+}
+
+function unstartedRoadmap(): string {
+  return SAMPLE.replace("- [~] 2.", "- [ ] 2.");
+}
+
+async function writeProject(
+  proj: string,
+  waypoints: string,
+  activeFiles: { runlog?: string; plan?: string } = {},
+): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "waypoints-test-"));
+  tempDirs.push(dir);
+  const projectDir = join(dir, "docs", proj);
+  const activeDir = join(projectDir, "legs", "02-profile");
+  await mkdir(join(activeDir, ".flightlog"), { recursive: true });
+  await writeFile(join(projectDir, "WAYPOINTS.md"), waypoints);
+  if (activeFiles.runlog) {
+    await writeFile(
+      join(activeDir, ".flightlog", "RUNLOG.md"),
+      activeFiles.runlog,
+    );
+  }
+  if (activeFiles.plan) {
+    await writeFile(join(activeDir, "PLAN.md"), activeFiles.plan);
+  }
+  return dir;
+}
+
+async function runWaypoints(
+  cwd: string,
+  args: string[],
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const proc = Bun.spawn(["bun", SCRIPT_PATH, ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { exitCode, stdout, stderr };
+}
