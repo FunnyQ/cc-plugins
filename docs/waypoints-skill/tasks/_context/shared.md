@@ -88,8 +88,7 @@ Rules the CLI relies on:
 
 ## `waypoints.ts` CLI — the three verbs
 
-One Bun CLI, invoked as `bun packages/dispatch/skills/waypoints/scripts/waypoints.ts <verb> ...`.
-All verbs take `<proj>` = the roadmap dir name under `docs/` (so `docs/<proj>/WAYPOINTS.md`).
+One Bun CLI. In SKILL.md and any user-facing docs, invoke it plugin-rooted so it resolves for a marketplace-installed user: `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts <verb> ...` (the repo-relative `packages/dispatch/...` path exists only in this dev repo). All verbs take `<proj>` = the roadmap dir name under `docs/` (so `docs/<proj>/WAYPOINTS.md`).
 
 ### `active <proj>`
 

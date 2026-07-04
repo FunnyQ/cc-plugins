@@ -225,9 +225,9 @@ If the request is ordinary "spec this out" with no roadmap intent, stay in NORMA
 
 Once the project `<proj>` is resolved:
 
-1. Run `bun packages/dispatch/skills/waypoints/scripts/waypoints.ts active <proj>` to get the active leg's `NN-slug`, `DONE-STATE`, and prior-legs digest.
+1. Run `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts active <proj>` to get the active leg's `NN-slug`, `DONE-STATE`, and prior-legs digest.
 2. Interview only for that leg's done-state, using the prior-legs digest as rolling-wave context (do NOT re-plan the whole project).
-3. Scaffold with `bun packages/dispatch/skills/waypoints/scripts/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>` (NOT `scaffold.ts`).
+3. Scaffold with `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>` (NOT `scaffold.ts`).
 4. Write the leg's flightplan spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`.
 5. Run the existing lint-task.ts, build-readme.ts, and review-plan.ts pointed at that leg path (they already accept arbitrary paths).
 6. Note that execution is unchanged: `/autopilot docs/<proj>/legs/<NN-slug>`.
