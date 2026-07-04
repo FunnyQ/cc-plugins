@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.3.2] - 2026-07-04
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.3.2` tag._
+
+### 🐛 Fixed
+
+- **`chronicle:commit` no longer crashes on commit-less repositories.** `analyze-changes.ts` ran `git log --oneline -10` inside a `Promise.all`; in a freshly `git init`'d repo with no commits, git exits non-zero ("your current branch does not have any commits yet") and Bun's `$` shell rejects, so the whole analysis aborted with exit 128 — blocking the first commit on any new project. The `git log` call now `.catch(() => "")`s, so a missing history resolves to an empty `recentCommits` array and the changeset analysis proceeds normally.
+
 ## [monitor 3.17.0] - 2026-07-04
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.17.0` tag._
