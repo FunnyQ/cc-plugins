@@ -6,7 +6,7 @@
 >
 > **Depends on**: scripts/01, scripts/02
 > **Blocks**: integration/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -76,16 +76,16 @@ and when NOT to (single feature → flightplan; small goal → preflight; a task
 
 ## Acceptance criteria
 
-- [ ] `SKILL.md` exists with valid frontmatter (`name: waypoints`, `version: 0.1.0`, an AUTO-TRIGGER `description`).
-- [ ] The body covers why/when-vs-siblings/process/the three verbs/non-goals, and documents verb signatures matching the CLI exactly.
-- [ ] `references/waypoints-template.md` and `references/interview-guide.md` exist and are self-consistent with the `WAYPOINTS.md` format in `../_context/shared.md`.
-- [ ] Nothing in the skill contradicts the CLI (verb names, args, output blocks all match).
+- [x] `SKILL.md` exists with valid frontmatter (`name: waypoints`, `version: 0.1.0`, an AUTO-TRIGGER `description`).
+- [x] The body covers why/when-vs-siblings/process/the three verbs/non-goals, and documents verb signatures matching the CLI exactly.
+- [x] `references/waypoints-template.md` and `references/interview-guide.md` exist and are self-consistent with the `WAYPOINTS.md` format in `../_context/shared.md`.
+- [x] Nothing in the skill contradicts the CLI (verb names, args, output blocks all match).
 
 ## Verification
 
-- [ ] `grep -n "^name: waypoints" packages/dispatch/skills/waypoints/SKILL.md` matches; the frontmatter has exactly the three fields.
-- [ ] Manual read-through: the documented `active`/`leg-scaffold`/`advance` invocations match `../_context/shared.md` verbatim in shape.
-- [ ] The `WAYPOINTS.md` example in the template parses under the CLI's `parseRoadmap` (paste it into a temp file and run `active`).
+- [x] `grep -n "^name: waypoints" packages/dispatch/skills/waypoints/SKILL.md` matches; the frontmatter has exactly the three fields.
+- [x] Manual read-through: the documented `active`/`leg-scaffold`/`advance` invocations match `../_context/shared.md` verbatim in shape.
+- [x] The `WAYPOINTS.md` example in the template parses under the CLI's `parseRoadmap` (paste it into a temp file and run `active`).
 
 ## Eval rubric
 

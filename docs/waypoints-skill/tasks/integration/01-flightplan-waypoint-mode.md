@@ -6,7 +6,7 @@
 >
 > **Depends on**: scripts/01, scripts/02
 > **Blocks**: integration/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -72,19 +72,19 @@ that keeps the looser path regex from linting unrelated markdown.
 
 ## Acceptance criteria
 
-- [ ] `flightplan/SKILL.md` has a "Waypoint mode" section describing detect → `active` → scoped interview → `leg-scaffold` → write into `legs/NN-slug/`, and its `version` is `0.6.0`.
-- [ ] The waypoint-mode instructions invoke the CLI verbs with the exact signatures from `../_context/shared.md`.
-- [ ] Waypoint-mode **entry is narrow**: it triggers only for a request targeting a specific waypointed project (named / pointed-at / single-roadmap-clear-intent), asks which when several roadmaps exist, and does not hijack an ordinary "spec this out" request just because some `WAYPOINTS.md` exists elsewhere.
-- [ ] The change to `flightplan/SKILL.md` is minimal: the only diff is the new "Waypoint mode" section (pure addition) plus the single `version: 0.5.0` → `0.6.0` line replacement — no existing non-waypoint flow prose is edited, reworded, or removed.
-- [ ] `flightplan-lint.sh` matches both flat and nested leg task-file paths, and still requires the `> **Required reading**:` content marker.
+- [x] `flightplan/SKILL.md` has a "Waypoint mode" section describing detect → `active` → scoped interview → `leg-scaffold` → write into `legs/NN-slug/`, and its `version` is `0.6.0`.
+- [x] The waypoint-mode instructions invoke the CLI verbs with the exact signatures from `../_context/shared.md`.
+- [x] Waypoint-mode **entry is narrow**: it triggers only for a request targeting a specific waypointed project (named / pointed-at / single-roadmap-clear-intent), asks which when several roadmaps exist, and does not hijack an ordinary "spec this out" request just because some `WAYPOINTS.md` exists elsewhere.
+- [x] The change to `flightplan/SKILL.md` is minimal: the only diff is the new "Waypoint mode" section (pure addition) plus the single `version: 0.5.0` → `0.6.0` line replacement — no existing non-waypoint flow prose is edited, reworded, or removed.
+- [x] `flightplan-lint.sh` matches both flat and nested leg task-file paths, and still requires the `> **Required reading**:` content marker.
 
 ## Verification
 
-- [ ] A file at `docs/demo/legs/01-x/tasks/work/02-y.md` containing `> **Required reading**:` and a lint violation makes the hook exit 2 (previously exit 0). Test by sourcing the regex or invoking the hook with a crafted `file_path`.
-- [ ] An unrelated markdown file (no Required-reading marker) still exits 0 under the widened regex.
-- [ ] `grep -n "version: 0.6.0" packages/dispatch/skills/flightplan/SKILL.md` matches.
-- [ ] `git diff packages/dispatch/skills/flightplan/SKILL.md` shows only the added waypoint-mode section plus the one version-line change — no other deletions or edits to existing flow prose.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` stays green (the flightplan scripts are untouched — this is a regression guard).
+- [x] A file at `docs/demo/legs/01-x/tasks/work/02-y.md` containing `> **Required reading**:` and a lint violation makes the hook exit 2 (previously exit 0). Test by sourcing the regex or invoking the hook with a crafted `file_path`.
+- [x] An unrelated markdown file (no Required-reading marker) still exits 0 under the widened regex.
+- [x] `grep -n "version: 0.6.0" packages/dispatch/skills/flightplan/SKILL.md` matches.
+- [x] `git diff packages/dispatch/skills/flightplan/SKILL.md` shows only the added waypoint-mode section plus the one version-line change — no other deletions or edits to existing flow prose.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` stays green (the flightplan scripts are untouched — this is a regression guard).
 
 ## Eval rubric
 
