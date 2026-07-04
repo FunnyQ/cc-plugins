@@ -1,7 +1,7 @@
 {
   "name": "dispatch",
-  "version": "3.12.2",
-  "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk; autopilot flies the tree with a dev→verify→judge→score quality loop and a closing final-review gate.",
+  "version": "3.13.0",
+  "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk; autopilot flies the tree with a dev→verify→judge→score quality loop and a closing final-review gate; waypoints orchestrates the rolling-wave roadmap tier above flightplan.",
   "author": {
     "name": "Q"
   },
@@ -10,6 +10,7 @@
     "preflight",
     "flightplan",
     "autopilot",
+    "waypoints",
     "interview",
     "spec",
     "blueprint",

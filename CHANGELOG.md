@@ -1,5 +1,20 @@
 # Changelog
 
+## [dispatch 3.13.0] - 2026-07-04
+
+_dispatch is independently versioned; this entry tracks the `dispatch-v3.13.0` tag._
+
+### ✨ Added
+
+- **waypoints** — a fourth dispatch skill: a rolling-wave milestone-roadmap tier above flightplan. Writes
+  `docs/<proj>/WAYPOINTS.md` (milestones + `[x]`/`[~]`/`[ ]` status), a `waypoints.ts` CLI
+  (`active` / `leg-scaffold` / `advance`), and a flightplan "waypoint mode" that plans one leg at a time
+  into `docs/<proj>/legs/NN-slug/`. Tracks the scoped tag `dispatch-v3.13.0`.
+
+### 🔧 Changed
+
+- **flightplan** (0.6.0) — gains waypoint mode; `flightplan-lint.sh` now lints nested leg task files.
+
 ## [dispatch 3.12.2] - 2026-07-04
 
 _dispatch is independently versioned; this entry tracks the `dispatch-v3.12.2` tag._
