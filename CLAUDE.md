@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing five local plugins:
 
 - **monitor** — usage dashboard + per-project cockpit (documented in depth below).
-- **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
+- **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail) + `waypoints` (a rolling-wave milestone-roadmap tier *above* flightplan: writes only `docs/<proj>/WAYPOINTS.md` and a `waypoints.ts` CLI — `active` / `leg-scaffold` / `advance` — so each leg's flightplan is generated just-in-time after the previous leg lands; flightplan gains a narrow "waypoint mode" to plan one leg into `docs/<proj>/legs/NN-slug/`). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
 - **relay** — cross-harness delegation via `/relay <codex|opencode|claude> <delegate|review|image>`, with a backend-agnostic mode layer plus per-harness strategy layer and a capability matrix where `image` is codex-only.
 - **chronicle** — commit + PR/MR authoring: reshapes odin-git's simple/atomic commit ideas into one decision tree with no odin-git dependency, and treats cockpit's decision trail as a soft enrichment for PR context.
 - **herdr** — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager. A knowledge skill (config, CLI, plugin development, live pane/agent recipes) plus a typed Bun wrapper `scripts/herd.ts` that collapses herdr's raw CLI into seven verbs (spawn/send/keys/wait/read/list/close) for driving agents in sibling panes or their own tabs (`spawn --new-tab`) when running inside herdr (`HERDR_ENV=1`). See `packages/herdr/skills/herdr/SKILL.md`.
@@ -29,15 +29,16 @@ cc-plugins/
 ├── .claude-plugin/marketplace.json   # Claude marketplace registry (plugins: monitor, dispatch, relay, chronicle)
 ├── .agents/plugins/marketplace.json  # Codex marketplace registry (plugins: monitor, dispatch, relay, chronicle)
 ├── CHANGELOG.md                      # release notes (Keep a Changelog format)
-├── packages/dispatch/                # plugin: interview-driven planning + execution (preflight + flightplan + autopilot)
+├── packages/dispatch/                # plugin: interview-driven planning + execution (preflight + flightplan + autopilot + waypoints)
 │   ├── .claude-plugin/plugin.json    # Claude manifest + PostToolUse hook → flightplan-lint.sh
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills only; no hooks)
 │   ├── hooks/flightplan-lint.sh      # lints flightplan task files on Edit/Write (path + content gated)
 │   └── skills/
 │       ├── preflight/                # skill: lightweight in-conversation spec (← odin probe)
-│       ├── flightplan/               # skill: multi-file PLAN.md + tasks/ blueprint (← odin probe-deep)
+│       ├── flightplan/               # skill: multi-file PLAN.md + tasks/ blueprint (← odin probe-deep); also hosts a narrow "waypoint mode" that plans one leg into docs/<proj>/legs/NN-slug/
 │       │                             #   scripts/ also home autopilot's shared tools: next-ready / score-task (--log) / flightlog
-│       └── autopilot/                # skill: execute the tree via Workflow (wave loop + dev→verify→judge→score gate); see references/orchestrator.md
+│       ├── autopilot/                # skill: execute the tree via Workflow (wave loop + dev→verify→judge→score gate); see references/orchestrator.md
+│       └── waypoints/                # skill: rolling-wave milestone roadmap ABOVE flightplan — writes only docs/<proj>/WAYPOINTS.md + waypoints.ts CLI (active / leg-scaffold / advance)
 ├── packages/monitor/                 # plugin: usage dashboard + cockpit (monorepo layout: packages/<plugin>)
 │   ├── .claude-plugin/plugin.json    # Claude manifest (version must match marketplace.json) + SessionStart hooks → setup.ts --session-check + thoughtful injection
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: "./skills/" — both auto-discovered; no hooks support)
@@ -254,7 +255,7 @@ bun test packages/monitor/skills/install/scripts/
 
 ⚠️ Versions live **only** in each plugin's two `plugin.json` files (Claude + Codex). The marketplace registries (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) carry **no `version` field** — don't add one. The published version is the git tag plus the `plugin.json` values.
 
-**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.16.2`, dispatch `3.12.1`, relay `0.3.0`, chronicle `0.3.1`, herdr `0.1.1`.
+**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.16.2`, dispatch `3.13.0`, relay `0.3.0`, chronicle `0.3.1`, herdr `0.1.1`.
 
 **Bump only the plugin(s) you actually touched** — leave every other plugin's version alone. Each plugin's two files move together:
 
