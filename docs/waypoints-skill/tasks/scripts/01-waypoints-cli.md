@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: scripts/02, skill/01, integration/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -109,17 +109,17 @@ export function validateBucket(bucket: string): void    // throws on internal da
 
 ## Acceptance criteria
 
-- [ ] `waypoints.ts` exposes verbs `active` and `leg-scaffold`; an unknown verb exits non-zero with usage.
-- [ ] `parseRoadmap` correctly extracts status, num/nn, slug, **title**, doneState, landedDate, outcome from the format in `../_context/shared.md`, and throws on a leg missing its `→ legs/NN-slug/` pointer.
-- [ ] `serializeRoadmap(parseRoadmap(md))` round-trips a well-formed roadmap without semantic loss — **milestone titles are preserved**, not erased or invented; `assertSingleActive` throws only when `[~]` count > 1 (zero active is accepted as a valid terminal/complete state).
-- [ ] `active` prints the parseable ACTIVE/DONE-STATE/PRIOR-LANDED block; with no `[~]` leg it exits non-zero, distinguishing a completed roadmap (all `[x]`) from nothing-active-yet.
-- [ ] `leg-scaffold` creates `docs/<proj>/legs/<NN-slug>/tasks/_context/` + one dir per bucket, rejects a digit-led-only or slash-bearing slug and dashed bucket names, and throws `EEXIST` on an existing leg dir.
-- [ ] Parse/serialize/format/validate helpers are pure — no filesystem, `Date.now()`, or `Math.random()` inside them.
+- [x] `waypoints.ts` exposes verbs `active` and `leg-scaffold`; an unknown verb exits non-zero with usage.
+- [x] `parseRoadmap` correctly extracts status, num/nn, slug, **title**, doneState, landedDate, outcome from the format in `../_context/shared.md`, and throws on a leg missing its `→ legs/NN-slug/` pointer.
+- [x] `serializeRoadmap(parseRoadmap(md))` round-trips a well-formed roadmap without semantic loss — **milestone titles are preserved**, not erased or invented; `assertSingleActive` throws only when `[~]` count > 1 (zero active is accepted as a valid terminal/complete state).
+- [x] `active` prints the parseable ACTIVE/DONE-STATE/PRIOR-LANDED block; with no `[~]` leg it exits non-zero, distinguishing a completed roadmap (all `[x]`) from nothing-active-yet.
+- [x] `leg-scaffold` creates `docs/<proj>/legs/<NN-slug>/tasks/_context/` + one dir per bucket, rejects a digit-led-only or slash-bearing slug and dashed bucket names, and throws `EEXIST` on an existing leg dir.
+- [x] Parse/serialize/format/validate helpers are pure — no filesystem, `Date.now()`, or `Math.random()` inside them.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/waypoints/scripts/` is green, covering: parse of all three glyphs, missing-pointer throw, em-dash title/done-state split preserving an ASCII hyphen in the title, a round-trip that proves titles survive parse → serialize, `assertSingleActive` (zero active accepted, two throws), `formatActive` shape, and leg-scaffold validation (good + bad slugs/buckets).
-- [ ] Smoke: in a temp dir with a hand-written `docs/demo/WAYPOINTS.md`, run `active demo` and `leg-scaffold demo 01-auth work` and eyeball each output (active block + created dirs).
+- [x] `bun test packages/dispatch/skills/waypoints/scripts/` is green, covering: parse of all three glyphs, missing-pointer throw, em-dash title/done-state split preserving an ASCII hyphen in the title, a round-trip that proves titles survive parse → serialize, `assertSingleActive` (zero active accepted, two throws), `formatActive` shape, and leg-scaffold validation (good + bad slugs/buckets).
+- [x] Smoke: in a temp dir with a hand-written `docs/demo/WAYPOINTS.md`, run `active demo` and `leg-scaffold demo 01-auth work` and eyeball each output (active block + created dirs).
 
 ## Eval rubric
 
