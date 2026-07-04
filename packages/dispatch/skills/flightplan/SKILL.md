@@ -1,6 +1,6 @@
 ---
 name: flightplan
-version: 0.5.0
+version: 0.6.0
 description: Heavyweight interviewer that writes a multi-file specification artifact to disk — `docs/<topic>/PLAN.md` plus a `tasks/` tree with shared `_context/` files and self-contained task files that sub-agents can pick up in later sessions. AUTO-TRIGGER when the user asks to "fully spec out", "break this down into tasks", "decompose into task files", "prep this for sub-agents", "write PLAN.md and tasks", "draft a project blueprint", "interview me thoroughly", or asks for a multi-file spec artifact written to disk for later execution. Also trigger when the user explicitly says "/flightplan" or mentions they will execute the work in a different session. Do NOT trigger when the user wants a lightweight in-conversation spec (use preflight instead), or when they give a clear, actionable instruction that can be executed directly.
 ---
 
@@ -208,3 +208,26 @@ Reach for these instead of doing the mechanical work by hand. Each one has a tes
 The dispatch plugin registers `hooks/flightplan-lint.sh` as a PostToolUse hook on `Edit|Write`. It auto-lints any file that (a) lives at `docs/<slug>/tasks/<bucket>/NN-*.md` and (b) contains the `> **Required reading**:` marker. Anything else is a silent no-op.
 
 When a task file violates the self-containment contract or is missing its Eval rubric, the hook exits 2 with stderr feedback, so the violation surfaces to the LLM immediately rather than waiting for the Step 5 whole-tree lint. Write `_context/` files before task files (see Step 5, point 2) to keep the hook quiet during normal flow.
+
+## Waypoint mode
+
+Enter waypoint mode ONLY when the request targets a specific waypointed project:
+
+- User names it, OR
+- User points at a `docs/<proj>/` with `WAYPOINTS.md`, OR
+- User references a leg/roadmap
+
+OR when exactly one roadmap exists AND the request is clearly to plan its next leg.
+
+If multiple roadmaps exist and none is named, ask which; don't guess.
+
+If the request is ordinary "spec this out" with no roadmap intent, stay in NORMAL flightplan mode even if `WAYPOINTS.md` exists elsewhere.
+
+Once the project `<proj>` is resolved:
+
+1. Run `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts active <proj>` to get the active leg's `NN-slug`, `DONE-STATE`, and prior-legs digest.
+2. Interview only for that leg's done-state, using the prior-legs digest as rolling-wave context (do NOT re-plan the whole project).
+3. Scaffold with `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>` (NOT `scaffold.ts`).
+4. Write the leg's flightplan spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`.
+5. Run the existing lint-task.ts, build-readme.ts, and review-plan.ts pointed at that leg path (they already accept arbitrary paths).
+6. Note that execution is unchanged: `/autopilot docs/<proj>/legs/<NN-slug>`.

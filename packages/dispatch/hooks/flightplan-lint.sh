@@ -23,7 +23,7 @@ if [ -z "$file_path" ] || [ ! -f "$file_path" ]; then
 fi
 
 # 1. Path filter — looks like a flightplan task file path
-if ! [[ "$file_path" =~ /docs/[^/]+/tasks/[a-z][a-z0-9]*/[0-9]{2}-.+\.md$ ]]; then
+if ! [[ "$file_path" =~ (^|/)docs/.+/tasks/[a-z][a-z0-9]*/[0-9]{2}-.+\.md$ ]]; then
   exit 0
 fi
 

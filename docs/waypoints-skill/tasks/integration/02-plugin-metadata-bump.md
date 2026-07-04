@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: skill/01, integration/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -67,19 +67,19 @@ Match the exact heading style and section ordering used by the nearest existing 
 
 ## Acceptance criteria
 
-- [ ] Both `packages/dispatch/.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` read `"version": "3.13.0"`.
-- [ ] The Claude manifest's `description` mentions `waypoints` and its `keywords` array includes `"waypoints"`.
-- [ ] The Codex manifest's top-level `description`, `keywords`, and `interface.longDescription` all include `waypoints` (naming four skills), with no other structural change.
-- [ ] `CHANGELOG.md` has a `## [dispatch 3.13.0]` entry noting the new skill, the flightplan change, and the `dispatch-v3.13.0` tag, in the repo's changelog format.
-- [ ] The marketplace registry files are untouched.
+- [x] Both `packages/dispatch/.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` read `"version": "3.13.0"`.
+- [x] The Claude manifest's `description` mentions `waypoints` and its `keywords` array includes `"waypoints"`.
+- [x] The Codex manifest's top-level `description`, `keywords`, and `interface.longDescription` all include `waypoints` (naming four skills), with no other structural change.
+- [x] `CHANGELOG.md` has a `## [dispatch 3.13.0]` entry noting the new skill, the flightplan change, and the `dispatch-v3.13.0` tag, in the repo's changelog format.
+- [x] The marketplace registry files are untouched.
 
 ## Verification
 
-- [ ] `grep -c '"version": "3.13.0"' packages/dispatch/.claude-plugin/plugin.json packages/dispatch/.codex-plugin/plugin.json` reports 1 each.
-- [ ] `bun -e "JSON.parse(await Bun.file('packages/dispatch/.codex-plugin/plugin.json').text())"` parses (valid JSON after the prose edit); same for the claude manifest.
-- [ ] `grep -c waypoints packages/dispatch/.claude-plugin/plugin.json` is ≥ 2 (description + keyword).
-- [ ] `grep -c waypoints packages/dispatch/.codex-plugin/plugin.json` is ≥ 3 (description + keyword + longDescription).
-- [ ] `grep -n "dispatch 3.13.0" CHANGELOG.md` matches.
+- [x] `grep -c '"version": "3.13.0"' packages/dispatch/.claude-plugin/plugin.json packages/dispatch/.codex-plugin/plugin.json` reports 1 each.
+- [x] `bun -e "JSON.parse(await Bun.file('packages/dispatch/.codex-plugin/plugin.json').text())"` parses (valid JSON after the prose edit); same for the claude manifest.
+- [x] `grep -c waypoints packages/dispatch/.claude-plugin/plugin.json` is ≥ 2 (description + keyword).
+- [x] `grep -c waypoints packages/dispatch/.codex-plugin/plugin.json` is ≥ 3 (description + keyword + longDescription).
+- [x] `grep -n "dispatch 3.13.0" CHANGELOG.md` matches.
 
 ## Eval rubric
 
