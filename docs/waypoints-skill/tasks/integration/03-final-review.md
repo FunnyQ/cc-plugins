@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: scripts/01, scripts/02, skill/01, integration/01, integration/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -61,22 +61,22 @@ Exercise the full loop against a throwaway `docs/demo/` roadmap — do not rely 
 
 ## Acceptance criteria
 
-- [ ] The end-to-end walk (active → leg-scaffold → nested-lint → advance → round-trip) works on a scratch `docs/demo/` roadmap.
-- [ ] A `WAYPOINTS.md` produced by following the `waypoints` SKILL/template parses under the CLI, and the template's own example roadmap parses (skill output and CLI parser agree).
-- [ ] Following `flightplan`'s waypoint-mode instructions actually writes the leg's flightplan spec + `tasks/` into `docs/demo/legs/01-auth/` (the nested path), and `lint-task.ts` / `build-readme.ts` / `review-plan.ts` all run against that leg dir.
-- [ ] Docs (both SKILL.mds + references) and the CLI agree on every verb signature, arg, and output block.
-- [ ] `bun test packages/dispatch/skills/waypoints/scripts/` and `bun test packages/dispatch/skills/flightplan/scripts/` are both green.
-- [ ] Both dispatch manifests parse and read 3.13.0; the marketplace registries are unchanged.
-- [ ] Marketplace-visible metadata names `waypoints`: Claude `description`+`keywords`, Codex `description`+`keywords`+`interface.longDescription`, and a `## [dispatch 3.13.0]` `CHANGELOG.md` entry.
-- [ ] The PLAN goal is met: a user can plan a milestone roadmap, plan one leg via flightplan waypoint mode, run it with autopilot, and land it with `advance` — with no auto-walk-roadmap and status only in `WAYPOINTS.md`.
+- [x] The end-to-end walk (active → leg-scaffold → nested-lint → advance → round-trip) works on a scratch `docs/demo/` roadmap.
+- [x] A `WAYPOINTS.md` produced by following the `waypoints` SKILL/template parses under the CLI, and the template's own example roadmap parses (skill output and CLI parser agree).
+- [x] Following `flightplan`'s waypoint-mode instructions actually writes the leg's flightplan spec + `tasks/` into `docs/demo/legs/01-auth/` (the nested path), and `lint-task.ts` / `build-readme.ts` / `review-plan.ts` all run against that leg dir.
+- [x] Docs (both SKILL.mds + references) and the CLI agree on every verb signature, arg, and output block.
+- [x] `bun test packages/dispatch/skills/waypoints/scripts/` and `bun test packages/dispatch/skills/flightplan/scripts/` are both green.
+- [x] Both dispatch manifests parse and read 3.13.0; the marketplace registries are unchanged.
+- [x] Marketplace-visible metadata names `waypoints`: Claude `description`+`keywords`, Codex `description`+`keywords`+`interface.longDescription`, and a `## [dispatch 3.13.0]` `CHANGELOG.md` entry.
+- [x] The PLAN goal is met: a user can plan a milestone roadmap, plan one leg via flightplan waypoint mode, run it with autopilot, and land it with `advance` — with no auto-walk-roadmap and status only in `WAYPOINTS.md`.
 
 ## Verification
 
-- [ ] Run the full end-to-end walk above and confirm each step's observed output.
-- [ ] `bun test packages/dispatch/skills/waypoints/scripts/ packages/dispatch/skills/flightplan/scripts/` green.
-- [ ] `bun -e "JSON.parse(await Bun.file('packages/dispatch/.claude-plugin/plugin.json').text()); JSON.parse(await Bun.file('packages/dispatch/.codex-plugin/plugin.json').text())"` exits 0.
-- [ ] `grep -c waypoints` is ≥ 2 for the Claude manifest and ≥ 3 for the Codex manifest; `grep -n "dispatch 3.13.0" CHANGELOG.md` matches.
-- [ ] `git status` shows the marketplace registry files unmodified.
+- [x] Run the full end-to-end walk above and confirm each step's observed output.
+- [x] `bun test packages/dispatch/skills/waypoints/scripts/ packages/dispatch/skills/flightplan/scripts/` green.
+- [x] `bun -e "JSON.parse(await Bun.file('packages/dispatch/.claude-plugin/plugin.json').text()); JSON.parse(await Bun.file('packages/dispatch/.codex-plugin/plugin.json').text())"` exits 0.
+- [x] `grep -c waypoints` is ≥ 2 for the Claude manifest and ≥ 3 for the Codex manifest; `grep -n "dispatch 3.13.0" CHANGELOG.md` matches.
+- [x] `git status` shows the marketplace registry files unmodified.
 
 ## Eval rubric
 

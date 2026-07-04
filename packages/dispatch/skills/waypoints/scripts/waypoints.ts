@@ -52,6 +52,10 @@ const GLYPH_BY_STATUS: Record<LegStatus, string> = {
 
 const LEG_SLUG_REGEX = /^\d{2}-[a-z][a-z0-9-]*$/;
 const BUCKET_REGEX = /^[a-z][a-z0-9]*$/;
+// <proj> is joined straight into docs/<proj>/... — constrain it to a kebab
+// slug so values like "../outside" can't escape the docs/ root.
+const PROJ_SLUG_REGEX = /^[a-z][a-z0-9-]*$/;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseRoadmap(md: string): Roadmap {
   const lines = md.split(/\r?\n/);
@@ -93,9 +97,7 @@ export function parseRoadmap(md: string): Roadmap {
       );
     }
     const slug = normalizePointerSlug(pointer[1], nn);
-    const afterPointer = continuation.slice(
-      continuation.indexOf(pointer[0]) + pointer[0].length,
-    );
+    const afterPointer = continuation.slice(pointer.index + pointer[0].length);
     const landedDate = /(?:^|\s)· landed ([^·]+?)(?=\s+·|$)/
       .exec(afterPointer)?.[1]
       ?.trim();
@@ -151,21 +153,25 @@ export function assertSingleActive(roadmap: Roadmap): void {
   }
 }
 
+export function requireActiveLeg(roadmap: Roadmap): Leg {
+  assertSingleActive(roadmap);
+  const active = roadmap.legs.find((leg) => leg.status === "active");
+  if (active) return active;
+  const complete =
+    roadmap.legs.length > 0 &&
+    roadmap.legs.every((leg) => leg.status === "done");
+  throw new Error(
+    complete
+      ? "No active leg — roadmap complete."
+      : "No active leg — mark one pending leg [~] to start.",
+  );
+}
+
 export function formatActive(
   roadmap: Roadmap,
   priorGoals: Record<string, string>,
 ): string {
-  assertSingleActive(roadmap);
-  const active = roadmap.legs.find((leg) => leg.status === "active");
-  if (!active) {
-    const complete =
-      roadmap.legs.length > 0 &&
-      roadmap.legs.every((leg) => leg.status === "done");
-    if (complete) {
-      throw new Error("No active leg — roadmap complete.");
-    }
-    throw new Error("No active leg — mark one pending leg [~] to start.");
-  }
+  const active = requireActiveLeg(roadmap);
 
   const lines = [
     `ACTIVE: ${active.slug}`,
@@ -181,6 +187,14 @@ export function formatActive(
     if (goal) lines.push(`  goal: ${goal}`);
   }
   return lines.join("\n");
+}
+
+export function validateProjectSlug(proj: string): void {
+  if (!PROJ_SLUG_REGEX.test(proj)) {
+    throw new Error(
+      `<proj> must be a kebab-case slug under docs/ (got: ${JSON.stringify(proj)})`,
+    );
+  }
 }
 
 export function validateLegSlug(nnSlug: string): void {
@@ -206,16 +220,20 @@ export function parseBuckets(raw: string): string[] {
     .filter(Boolean);
 }
 
-export function overviewFirstLine(md: string): string | null {
+function firstLineUnderSection(md: string, headingRe: RegExp): string | null {
   const lines = md.split(/\r?\n/);
-  const start = lines.findIndex((line) => /^##\s+Overview\s*$/.test(line));
+  const start = lines.findIndex((line) => headingRe.test(line));
   if (start === -1) return null;
   for (let i = start + 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (/^##\s+/.test(line)) return null;
-    if (line) return line;
+    if (line && !isHeading(line)) return line;
   }
   return null;
+}
+
+export function overviewFirstLine(md: string): string | null {
+  return firstLineUnderSection(md, /^##\s+Overview\s*$/);
 }
 
 export function draftOutcome(runlog: string, planOverview: string): string {
@@ -236,9 +254,15 @@ export function advanceRoadmap(
   outcome: string,
   date: string,
 ): Roadmap {
+  assertSingleActive(roadmap);
   const activeIndex = roadmap.legs.findIndex((leg) => leg.status === "active");
+  if (activeIndex === -1) {
+    throw new Error("No active leg to advance.");
+  }
+  // Promote the first pending leg *after* the active one so a malformed
+  // roadmap with a stray earlier pending leg can't regress the order.
   const pendingIndex = roadmap.legs.findIndex(
-    (leg) => leg.status === "pending",
+    (leg, index) => index > activeIndex && leg.status === "pending",
   );
 
   return {
@@ -258,7 +282,7 @@ export function advanceRoadmap(
           status: "active",
         };
       }
-      return { ...leg };
+      return leg;
     }),
   };
 }
@@ -306,16 +330,7 @@ function normalizePointerSlug(pointerSlug: string, nn: string): string {
 }
 
 function firstFinalReviewLine(runlog: string): string | null {
-  const lines = runlog.split(/\r?\n/);
-  const start = lines.findIndex((line) => /^##\s+Final review\s*$/i.test(line));
-  if (start === -1) return null;
-
-  for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (/^##\s+/.test(line)) return null;
-    if (line && !isHeading(line)) return line;
-  }
-  return null;
+  return firstLineUnderSection(runlog, /^##\s+Final review\s*$/i);
 }
 
 function lastRunlogLine(runlog: string): string | null {
@@ -348,6 +363,14 @@ function isHeading(line: string): boolean {
   return /^#{1,6}\s+/.test(line);
 }
 
+function localToday(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 async function main() {
   const [verb, ...args] = process.argv.slice(2);
   try {
@@ -355,6 +378,7 @@ async function main() {
       case "active": {
         const [proj] = args;
         if (!proj) throw new Error("Usage: bun waypoints.ts active <proj>");
+        validateProjectSlug(proj);
         const roadmap = parseRoadmap(
           await readFile(join("docs", proj, "WAYPOINTS.md"), "utf-8"),
         );
@@ -383,6 +407,7 @@ async function main() {
             "Usage: bun waypoints.ts leg-scaffold <proj> <NN-slug> <bucket>[,<bucket>...]",
           );
         }
+        validateProjectSlug(proj);
         const plan = planLegScaffold({
           proj,
           nnSlug,
@@ -403,35 +428,39 @@ async function main() {
             'Usage: bun waypoints.ts advance <proj> [--dry-run] [--outcome "<text>"] [--date YYYY-MM-DD]',
           );
         }
+        validateProjectSlug(proj);
 
         let dryRun = false;
         let outcome: string | null = null;
         let dateStr: string | null = null;
 
         for (let i = 0; i < flags.length; i++) {
-          if (flags[i] === "--dry-run") {
+          const flag = flags[i];
+          if (flag === "--dry-run") {
             dryRun = true;
-          } else if (flags[i] === "--outcome") {
-            outcome = flags[++i] ?? null;
-          } else if (flags[i] === "--date") {
-            dateStr = flags[++i] ?? null;
+          } else if (flag === "--outcome") {
+            const value = flags[++i];
+            if (value === undefined || value.startsWith("--")) {
+              throw new Error("--outcome requires a value");
+            }
+            if (!value.trim()) {
+              throw new Error("--outcome must not be empty");
+            }
+            outcome = value;
+          } else if (flag === "--date") {
+            const value = flags[++i];
+            if (value === undefined || !ISO_DATE_REGEX.test(value)) {
+              throw new Error("--date requires a YYYY-MM-DD value");
+            }
+            dateStr = value;
+          } else {
+            throw new Error(`Unknown flag: ${flag}`);
           }
         }
 
         const waypointsPath = join("docs", proj, "WAYPOINTS.md");
         const roadmap = parseRoadmap(await readFile(waypointsPath, "utf-8"));
-        const activeLeg = roadmap.legs.find((leg) => leg.status === "active");
-        if (!activeLeg) {
-          const complete =
-            roadmap.legs.length > 0 &&
-            roadmap.legs.every((leg) => leg.status === "done");
-          if (complete) {
-            console.error("No active leg — roadmap complete.");
-          } else {
-            console.error("No active leg — mark one pending leg [~] to start.");
-          }
-          process.exit(1);
-        }
+        const activeLeg = requireActiveLeg(roadmap);
 
         const runlogPath = join(
           "docs",
@@ -464,7 +493,7 @@ async function main() {
           return;
         }
 
-        const today = dateStr || new Date().toISOString().split("T")[0];
+        const today = dateStr || localToday();
         const newRoadmap = advanceRoadmap(roadmap, outcome, today);
         await Bun.write(waypointsPath, serializeRoadmap(newRoadmap));
 
