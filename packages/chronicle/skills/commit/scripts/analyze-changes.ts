@@ -290,7 +290,7 @@ async function analyzeChanges(): Promise<AnalysisResult> {
   const entries = statusLines.flatMap(parseStatusLine);
   const [files, logOutput] = await Promise.all([
     Promise.all(entries.map(analyzeFile)),
-    gitText`git log --oneline -10`,
+    gitText`git log --oneline -10`.catch(() => ""),
   ]);
 
   return {
