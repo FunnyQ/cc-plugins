@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { Database } from "bun:sqlite";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { dedupKey } from "./dedup";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
