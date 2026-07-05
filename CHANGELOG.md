@@ -1,5 +1,15 @@
 # Changelog
 
+## [monitor 3.18.0] - 2026-07-05
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.0` tag._
+
+### ✨ Added
+
+- **Write-time lint for `--diagram` Mermaid source.** `cockpit log` / `cockpit scribe` now lint the diagram before anything is written (new `scripts/diagram-lint.ts`): unknown diagram-type first line, unbalanced brackets, unknown `:::` classes, and unquoted `()` inside `[...]` labels each exit non-zero with a fix hint. This closes a real feedback gap — Mermaid's parser is DOM-bound, so a broken diagram used to fail silently at render time where the authoring agent could never see it; now the author fixes it on the spot. Deliberately conservative: sequence async arrows (`-)`), cylinder shapes (`[(db)]`), quoted labels, frontmatter, and mindmap cloud/bang shapes all pass. The type whitelist is the vendored mermaid v11 bundle's complete keyword set, drift-guarded by a test that checks every entry against the bundle.
+- **Download a decision-card diagram as SVG.** The diagram lightbox gained an "SVG ⤓" button: it exports the exact sanitized SVG on display (no re-render), bakes the Night Flight card surface colour onto the root so the dark ink stays readable outside the dashboard (GitHub READMEs, PR bodies), and names the file from the card headline (`cockpit-<title>.svg`).
+- **Diagram authoring guidance in the cockpit references** (inspired by reviewing the archify skill): a shape→Mermaid-type selection table (state machine → `stateDiagram-v2`, call chain → `sequenceDiagram`, decision tree → `flowchart TD`, before/after → two `subgraph`s) and layout discipline for glance-sized decision-card diagrams — one main path, sparse event-like edge labels, detail in `--facet`/`--text` rather than extra arrows, ~12-edge budget.
+
 ## [dispatch 3.13.0] - 2026-07-04
 
 _dispatch is independently versioned; this entry tracks the `dispatch-v3.13.0` tag._
