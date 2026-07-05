@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.18.1] - 2026-07-06
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.1` tag._
+
+### 🐛 Fixed
+
+- **Pricing refresh no longer 500s.** `POST /api/pricing/refresh` (the dashboard's "refresh pricing" button) threw `ReferenceError: dirname is not defined` on every call — `refreshPricingOverride` in `usage-dashboard/scripts/api.ts` used `dirname()` to create the override directory, but only `join` was imported from `node:path`. Added `dirname` to the import. The bug only surfaced on the code path that creates `~/.config/cc-dashboard/` when it doesn't yet exist, which is why it looked intermittent. Note: Fable 5 and Opus 4.8 aren't in the static `pricing-defaults.json` — they resolve via the OpenRouter live fetch and land in the user override once a refresh succeeds.
+
 ## [monitor 3.18.0] - 2026-07-05
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.0` tag._
