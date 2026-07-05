@@ -127,6 +127,23 @@ Y"), a one-line `decision` ("chose append-only JSONL over SQLite"). Forcing a
 diagram onto a flat fact adds noise, not clarity. The test: if the "what" has a
 shape, draw it; if it's a sentence, write the sentence.
 
+**Pick the Mermaid type from the shape of the insight:**
+
+| The insight is… | Use |
+|---|---|
+| states/statuses and what moves between them | `stateDiagram-v2` |
+| a call chain / who-talks-to-whom over time | `sequenceDiagram` |
+| a decision tree, branch, or fallback cascade | `flowchart TD` |
+| a pipeline or dependency chain | `flowchart LR` |
+| a before/after or two compared designs | `flowchart` with two `subgraph`s |
+
+**Layout discipline — draw the narrative, not the wiring.** One main path that
+reads in one direction, side concerns as short stubs off it. Label only the
+non-obvious edges, with short event-like words ("retry", "timeout"). Detail
+belongs in `--text`, not in extra arrows — if you're adding a node to explain a
+node, move the explanation to text. Edge budget: ~12; past that, delete edges
+until the main narrative is what remains, or split the insight into two entries.
+
 ### Then: write each surviving entry
 
 For each insight that is genuinely worth recording and not yet covered, pick a
@@ -167,7 +184,10 @@ cockpit scribe --recent [N]
 - `--diagram` — optional **Mermaid** source; the dashboard renders it inline as a
   Night Flight-themed SVG. Use it only when the insight is structural and a picture
   carries it better than the `--text` body (a flow, a state machine, a sequence) —
-  pass the source as one argument (a heredoc preserves newlines).
+  pass the source as one argument (a heredoc preserves newlines). The CLI lints
+  the source before writing (unknown diagram type, unbalanced brackets, unknown
+  `:::` classes, unquoted `()` inside `[...]` labels) and exits non-zero with a
+  fix hint — correct the source and re-run rather than dropping the diagram.
   - **Colour the nodes by meaning.** The renderer predefines a Night Flight palette
     you tag with `:::class` markers — colour then carries the shape (success vs.
     failure vs. the fix) instead of every node reading as the same accent. Tag a
