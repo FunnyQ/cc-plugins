@@ -66,7 +66,9 @@ export const NIGHT_FLIGHT_THEME = {
 // Keep the hues inside the Night Flight family — these mirror the same OKLCH tokens
 // as the theme above (aurora / signal / a green badge / danger). Drift = off-theme,
 // never broken.
-const SEMANTIC_NODES = {
+// Exported: the CLI's diagram lint (scripts/diagram-lint.ts) validates `:::class`
+// markers against these keys, so the palette and the lint can't drift.
+export const SEMANTIC_NODES = {
   start: { stroke: "#777988", fill: "#22253766" }, // neutral entry — --ink-faint
   info: { stroke: "#2ad7d7", fill: "#2ad7d71f" }, // cool note — --aurora
   ok: { stroke: "#4fd6a3", fill: "#4fd6a31f" }, // success path — aurora-green badge
@@ -144,6 +146,11 @@ function loadMermaid() {
 // clicking it opens this overlay so the boxes are readable. DOM-bound, built lazily
 // on first open so the module's static surface stays importable under plain Bun.
 let _lightbox = null;
+// The sanitized SVG currently on display + a title for the download filename.
+// Kept module-level so the download button reuses the exact markup in the
+// card — no re-render, no drift between what you see and what you save.
+let _lightboxSvg = null;
+let _lightboxTitle = "";
 
 function onLightboxKey(e) {
   if (e.key === "Escape") closeDiagramLightbox();
@@ -155,6 +162,7 @@ function ensureLightbox() {
   overlay.className = "diagram-lightbox";
   overlay.hidden = true;
   overlay.innerHTML = `
+    <button type="button" class="diagram-lightbox__download">SVG ⤓</button>
     <button type="button" class="diagram-lightbox__close" aria-label="Close">✕</button>
     <div class="diagram-lightbox__stage" role="dialog" aria-modal="true" aria-label="Enlarged diagram">
       <div class="diagram-lightbox__canvas"></div>
@@ -163,18 +171,56 @@ function ensureLightbox() {
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay || e.target.closest(".diagram-lightbox__close"))
       closeDiagramLightbox();
+    else if (e.target.closest(".diagram-lightbox__download"))
+      downloadDiagramSvg();
   });
   document.body.appendChild(overlay);
   _lightbox = overlay;
   return overlay;
 }
 
+// Turn the displayed (transparent-background, dark-ink) SVG into a standalone
+// file: outside the cockpit it would land on a white page and the Night Flight
+// ink would be unreadable, so bake the card surface colour (--space) onto the
+// root. Everything else — the id-scoped <style>, fonts fallback — is already
+// self-contained in mermaid's output.
+function standaloneSvg(svg) {
+  const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+  const root = doc.documentElement;
+  if (root.nodeName !== "svg") return svg;
+  root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  root.style.backgroundColor = "#0e101f"; // --space
+  return new XMLSerializer().serializeToString(root);
+}
+
+function downloadDiagramSvg() {
+  if (!_lightboxSvg) return;
+  const slug =
+    (_lightboxTitle || "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "diagram";
+  const blob = new Blob([standaloneSvg(_lightboxSvg)], {
+    type: "image/svg+xml",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cockpit-${slug}.svg`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Open the lightbox on a sanitized SVG string (the same markup already in the
 // card — no re-render). The inline width/height/max-width mermaid bakes in would
 // cap the blow-up, so strip them and let CSS scale the SVG by its viewBox.
-export function openDiagramLightbox(svg) {
+// `title` (optional) seeds the download filename.
+export function openDiagramLightbox(svg, title = "") {
   if (!svg) return;
   const overlay = ensureLightbox();
+  _lightboxSvg = svg;
+  _lightboxTitle = title;
   const canvas = overlay.querySelector(".diagram-lightbox__canvas");
   canvas.innerHTML = svg;
   const svgEl = canvas.querySelector("svg");
@@ -194,6 +240,8 @@ export function closeDiagramLightbox() {
   if (!_lightbox || _lightbox.hidden) return;
   _lightbox.hidden = true;
   _lightbox.querySelector(".diagram-lightbox__canvas").innerHTML = "";
+  _lightboxSvg = null;
+  _lightboxTitle = "";
   document.removeEventListener("keydown", onLightboxKey);
 }
 

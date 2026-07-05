@@ -1,6 +1,6 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic) and reviewer-legible PRs/MRs; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic) and reviewer-legible PRs/MRs; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
 ## Plugins
 
@@ -11,13 +11,14 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 | [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
 | [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
 
-**dispatch** bundles three skills:
+**dispatch** bundles four skills:
 
 | Skill | Description |
 |-------|-------------|
 | [preflight](./packages/dispatch/skills/preflight) | Lightweight interviewer that gathers requirements into a single in-conversation plan to approve and execute |
 | [flightplan](./packages/dispatch/skills/flightplan) | Heavyweight interviewer that writes a multi-file blueprint to disk — `PLAN.md` + a `tasks/` tree of self-contained task files for sub-agents |
 | [autopilot](./packages/dispatch/skills/autopilot) | Executes a flightplan tree in parallel waves — a dev→verify→judge→score loop gated on each task's Eval rubric, an atomic commit between waves, then the closing final-review gate, leaving an audit trail |
+| [waypoints](./packages/dispatch/skills/waypoints) | Rolling-wave milestone-roadmap tier *above* flightplan — writes only `docs/<proj>/WAYPOINTS.md` plus a `waypoints.ts` CLI (`active` / `leg-scaffold` / `advance`) so each leg's flightplan is planned just-in-time after the previous leg lands |
 
 **relay** is a single portable skill:
 
@@ -197,13 +198,14 @@ Cockpit checks `/api/codex-control/status` before enabling the Codex send box, s
 
 ## dispatch
 
-Interview-driven planning you can execute. Three skills form one arc — gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop.
+Interview-driven planning you can execute. Three skills form one arc — gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop — and a fourth, `waypoints`, sits *above* it for whole-project rolling-wave planning.
 
 ![Dispatch flow: preflight → flightplan → autopilot → final review → ship](./assets/dispatch-flow.svg)
 
 - **preflight** — a lightweight interview that produces a single in-conversation plan. Best when you'll execute now, in one session.
 - **flightplan** — a thorough interview that writes `docs/<slug>/PLAN.md` plus a `tasks/` tree of self-contained task files (each with its own `## Eval rubric`). Best when the work spans sessions or hands off to sub-agents.
 - **autopilot** — executes that tree in **waves**. Each wave re-scouts the ready set (`next-ready`) and runs those tasks in parallel; for each task it runs Dev → an independent binary gate (re-runs the task's Verification) → a rubric judge → a deterministic score gate, retrying until the task passes its rubric. Between waves it makes an **atomic commit** of the completed work, so the run leaves a clean per-wave history rather than one giant diff. The `Final review` task depends transitively on every other task, so the wave loop naturally schedules it last as the whole-tree gate — a closing multi-lens review round (cross-vendor `codex` + four `/simplify` lenses → an Opus fixer), followed by a final commit of its fixes. Every verdict lands in a self-gitignored `docs/<slug>/.flightlog/` audit trail (`RUNLOG.md`).
+- **waypoints** — the tier *above* flightplan for large builds. It writes only a milestone **roadmap** (`docs/<proj>/WAYPOINTS.md`, legs tracked with `[x]`/`[~]`/`[ ]`); each leg's detailed flightplan is generated **just-in-time** after the previous leg lands, so every plan starts from what actually shipped rather than one oversized up-front guess. A `waypoints.ts` CLI collapses the lifecycle into three verbs — `active` (rolling-wave digest), `leg-scaffold` (nest a leg's tree under `docs/<proj>/legs/NN-slug/`), and `advance` (land the active leg; writing requires `--outcome` as the confirmation gate). `flightplan` gains a narrow **waypoint mode** that plans one leg at a time. Human-in-loop by design — one leg lands before the next is planned.
 
 ### Installation
 

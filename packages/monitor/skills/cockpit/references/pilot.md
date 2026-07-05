@@ -140,6 +140,33 @@ MMD
   when a picture genuinely carries what a sentence can't — most decisions don't
   need one. Rendering is sandboxed (SVG-profile sanitized, no scripts/HTML labels);
   if the source can't parse, the card shows it as text rather than breaking.
+  The CLI lints the source before writing (unknown diagram type, unbalanced
+  brackets, unknown `:::` classes, unquoted `()` inside `[...]` labels) and exits
+  non-zero with a fix hint — correct the source and re-run rather than dropping
+  the diagram.
+
+  **Pick the Mermaid type from the shape of the insight** — the right type does
+  more for readability than any styling:
+
+  | The insight is… | Use |
+  |---|---|
+  | states/statuses and what moves between them | `stateDiagram-v2` |
+  | a call chain / who-talks-to-whom over time | `sequenceDiagram` |
+  | a decision tree, branch, or fallback cascade | `flowchart TD` |
+  | a pipeline or dependency chain | `flowchart LR` |
+  | a before/after or two compared designs | `flowchart` with two `subgraph`s |
+
+  **Layout discipline — draw the narrative, not the wiring.** A decision-card
+  diagram is a glance-sized instrument, not a wiring schematic:
+  - **One main path.** The happy path reads in one direction (top-down or
+    left-right); side concerns hang off it as short stubs, never cut across it.
+  - **Label only the non-obvious edges,** with short event-like words ("retry",
+    "timeout", "cache miss"). An arrow between adjacent steps needs no label.
+  - **Detail belongs in `--reason`/`--facet`, not in extra arrows.** If you're
+    adding a node to explain a node, move the explanation to text.
+  - **Edge budget: ~12.** Past that, delete edges until the main narrative is
+    what remains — or split the insight into two entries.
+
   Colour nodes by meaning with `:::class` markers (the palette is predefined — don't
   write your own `classDef`): append the class to a node, e.g. `B[has env]:::ok`.
   `:::ok` green (success path), `:::bad` red (failure path), `:::fix` amber (the fix),
