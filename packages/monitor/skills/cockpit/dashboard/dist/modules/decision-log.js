@@ -432,11 +432,16 @@ export function initDecisionLog(rootEl) {
       figure.setAttribute("role", "button");
       figure.setAttribute("tabindex", "0");
       figure.setAttribute("aria-label", "Enlarge diagram");
-      figure.addEventListener("click", () => openDiagramLightbox(result.svg));
+      // The card headline seeds the lightbox's download filename.
+      const title =
+        card.querySelector(".decision-card__decision")?.textContent || "";
+      figure.addEventListener("click", () =>
+        openDiagramLightbox(result.svg, title),
+      );
       figure.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          openDiagramLightbox(result.svg);
+          openDiagramLightbox(result.svg, title);
         }
       });
       requestAnimationFrame(updateCompactDecisionSize);

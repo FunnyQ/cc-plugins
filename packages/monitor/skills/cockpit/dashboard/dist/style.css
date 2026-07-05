@@ -1787,6 +1787,31 @@ body {
   border-color: color-mix(in oklab, var(--aurora) 50%, var(--edge));
   color: var(--aurora);
 }
+/* Download-as-SVG — sits left of the close button; same pill language. */
+.diagram-lightbox__download {
+  position: absolute;
+  top: clamp(12px, 2.5vw, 28px);
+  right: calc(clamp(12px, 2.5vw, 28px) + 36px + 10px);
+  height: 36px;
+  padding-inline: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--starlight);
+  background: var(--hull-2);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.diagram-lightbox__download:hover {
+  border-color: color-mix(in oklab, var(--aurora) 50%, var(--edge));
+  color: var(--aurora);
+}
 .decision-card__files {
   display: flex;
   flex-wrap: wrap;
