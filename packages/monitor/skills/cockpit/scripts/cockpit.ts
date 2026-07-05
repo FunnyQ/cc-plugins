@@ -19,6 +19,7 @@ import {
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { findSession } from "./find-session";
+import { lintDiagram } from "./diagram-lint";
 import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
@@ -279,6 +280,20 @@ function readDecisionRecords(logPath: string): DecisionRecord[] {
     .filter((r): r is DecisionRecord => r !== null && r.type === "decision");
 }
 
+// Gate a --diagram argument through the lint before anything is written. The
+// dashboard degrades a broken diagram to raw source where the author can't see
+// it — failing loudly here is the only point in the loop where they can fix it.
+function gateDiagram(cmd: string, src: string | undefined): void {
+  if (!src) return;
+  const problems = lintDiagram(src);
+  if (problems.length === 0) return;
+  console.error(
+    `cockpit ${cmd}: --diagram failed lint — fix the Mermaid source and re-run:`,
+  );
+  for (const p of problems) console.error(`  - ${p}`);
+  process.exit(1);
+}
+
 // ---------- Subcommands ----------
 
 function cmdLog(args: Args): void {
@@ -293,6 +308,7 @@ function cmdLog(args: Args): void {
     );
     process.exit(1);
   }
+  gateDiagram("log", args.single["diagram"]);
   const rec: DecisionRecord = {
     id: crypto.randomUUID(),
     type: "decision",
@@ -405,6 +421,8 @@ function cmdScribe(args: Args): void {
     );
     process.exit(1);
   }
+
+  gateDiagram("scribe", args.single["diagram"]);
 
   const rec: DecisionRecord = {
     id: crypto.randomUUID(),

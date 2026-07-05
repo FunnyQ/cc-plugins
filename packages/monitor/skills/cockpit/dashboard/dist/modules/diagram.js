@@ -66,7 +66,9 @@ export const NIGHT_FLIGHT_THEME = {
 // Keep the hues inside the Night Flight family — these mirror the same OKLCH tokens
 // as the theme above (aurora / signal / a green badge / danger). Drift = off-theme,
 // never broken.
-const SEMANTIC_NODES = {
+// Exported: the CLI's diagram lint (scripts/diagram-lint.ts) validates `:::class`
+// markers against these keys, so the palette and the lint can't drift.
+export const SEMANTIC_NODES = {
   start: { stroke: "#777988", fill: "#22253766" }, // neutral entry — --ink-faint
   info: { stroke: "#2ad7d7", fill: "#2ad7d71f" }, // cool note — --aurora
   ok: { stroke: "#4fd6a3", fill: "#4fd6a31f" }, // success path — aurora-green badge

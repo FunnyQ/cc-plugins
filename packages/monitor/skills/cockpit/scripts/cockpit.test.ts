@@ -218,6 +218,44 @@ describe("cockpit log", () => {
     expect(rec.diagram).toBe(mmd);
   });
 
+  test("a --diagram that fails lint blocks the write with a fix hint", () => {
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    const res = run([
+      "log",
+      "--session",
+      SID,
+      "--decision",
+      "d",
+      "--reason",
+      "r",
+      "--diagram",
+      "flowchart TD\n  A[cache miss (L2)] --> B",
+    ]);
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain("failed lint");
+    expect(res.stderr).toContain('["cache miss (L2)"]');
+    // Nothing persisted — the lint gates before any write.
+    expect(() => readLines(logPath)).toThrow();
+  });
+
+  test("scribe --diagram is gated by the same lint", () => {
+    const res = run([
+      "scribe",
+      "--session",
+      SID,
+      "--provider",
+      "claude",
+      "--type",
+      "learning",
+      "--text",
+      "t",
+      "--diagram",
+      "not-a-diagram\n  A --> B",
+    ]);
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain("failed lint");
+  });
+
   test("a log without --diagram omits the field entirely", () => {
     run(["log", "--session", SID, "--decision", "plain", "--reason", "r"]);
     const rec = readLines(join(projectDir, ".cockpit/logs", `${SID}.jsonl`)).at(
