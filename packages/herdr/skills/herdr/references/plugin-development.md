@@ -1,5 +1,7 @@
 # Herdr Plugin Development
 
+Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+
 Plugins are shareable executable workflow packages. Any language — Bash, JS, Rust, Go, Lua, Python. Herdr owns the host surface; the plugin owns its implementation.
 
 The entire Herdr CLI is the plugin API (see `cli.md`). Call back via `HERDR_BIN_PATH` (portable across Unix sockets and Windows named pipes).
