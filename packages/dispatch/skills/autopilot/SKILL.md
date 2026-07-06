@@ -32,7 +32,7 @@ Use the **hybrid shape**: scout inline first to discover the work-list, *then* h
 Three hard constraints shape the design — internalize them:
 
 1. **The Workflow orchestrator script has no filesystem access** and **cannot `import`** our scripts. So anything that reads/writes disk (running `next-ready.ts`, editing a task's `Status`, appending to the flightlog) must be done by a tool-capable **agent** inside the workflow, never by the orchestrator JS.
-2. **The pass/fail gate is pure arithmetic** (weighted average + hard-fail veto). Because the orchestrator can't import `scoreTask`, **inline that arithmetic in the orchestrator JS** from the judge's structured per-dimension scores. The `score-task.ts` CLI stays for the *logging* path (an agent runs it to persist the verdict). The inline formula must mirror `scoreTask()` exactly — see `references/orchestrator.md`.
+2. **There is exactly one scoring implementation.** The rubric judge runs `score-task.ts --json --log`, and the orchestrator gates on that printed verdict object. Do not duplicate the weighted-average / hard-fail arithmetic in the Workflow script.
 3. **The orchestrator can't pause for input.** On a task that can't pass, it parks the task and keeps going; escalation to the user happens *after* the workflow returns (see Escalation below).
 
 ## Step 1 — Scout inline
@@ -53,7 +53,7 @@ Before touching Workflow, gather the work-list in the main conversation:
    ```
    Bake this as `CFG.baseRef` — the Final review lenses use `git diff <baseRef>..HEAD` to see all committed task changes, rather than the working-tree diff (which would be empty after inter-wave commits).
 6. Decide `maxAttempts` (default **3**, the per-task cap) and `finalReviewMaxAttempts` (default **2**, the Final review round's cap). The dev engine (Claude / codex / opencode) is chosen with the user in Step 2; confirm the rest of the model policy only if they want to change it.
-6. Confirm the selected external CLI(s) are available — the dev step (when its engine is external) and the closing cross-vendor review round shell out to them. Version-check whichever engines Step 2 will offer or the user picks:
+7. Confirm the selected external CLI(s) are available — the dev step (when its engine is external) and the closing cross-vendor review round shell out to them. Version-check whichever engines Step 2 will offer or the user picks:
    ```bash
    codex --version      # needed if devEngine or reviewEngine is 'codex'
    opencode --version   # needed if devEngine or reviewEngine is 'opencode'
@@ -74,33 +74,24 @@ Then show a one-screen brief and get a go: the slug, how many tasks, the chosen 
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
-Adapt `references/orchestrator.md` — it is the canonical script. **Bake the scouted values into the `CFG` block at the top of the script as literals; do NOT rely on the Workflow `args` global** (it does not reliably reach the orchestrator — an unset value surfaces as `undefined`, e.g. `bun undefined/next-ready.ts`, which fails the scout and silently looks like "no work to do"). You already know every value from Step 1's scout, so write them in directly:
+Adapt `references/orchestrator.md` — it is the canonical script. Copy its `CFG` block and fill these scouted values as literals; do not rely on the Workflow `args` global:
 
-```javascript
-const CFG = {
-  slug:                  '<slug>',
-  tasksDir:              '<repo-root>/docs/<slug>/tasks',          // ABSOLUTE (git rev-parse --show-toplevel) — NOT relative; see Step 1.2
-  planPath:              '<repo-root>/docs/<slug>/PLAN.md',        // ABSOLUTE
-  logFile:               '<repo-root>/docs/<slug>/.flightlog/run.jsonl',  // ABSOLUTE — relative splits the flightlog across agent cwds
-  planGoal:              '<one line from PLAN.md>',
-  maxAttempts:           3,
-  finalReviewMaxAttempts: 2,   // the closing cross-vendor review round loops at most this many times
-  scriptsDir:            '<abs path to skills/flightplan/scripts>',  // ABSOLUTE, from the skill load-time base dir
-  baseRef:               '<output of `git rev-parse HEAD` captured in Step 1>',
-  commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
-  devEngine:             'claude',  // 'claude' (default), 'codex', or 'opencode' — see "Dev engine" below
-  reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — cross-vendor reviewer in the Final review
-  opencodeDevModel:      '',        // optional opencode model for the dev engine (empty → default opencode-go/kimi-k2.7-code); opencode-only
-  opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → default opencode-go/qwen3.7-max); opencode-only
-  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 4 final-review /simplify lenses ONLY; fixer + judge stay Opus
-}
-```
+- `slug`
+- absolute `tasksDir`, `planPath`, and `logFile`
+- `planGoal`
+- `maxAttempts` and `finalReviewMaxAttempts`
+- absolute `scriptsDir`
+- `baseRef`
+- `commitBetweenWaves`
+- `devEngine` and `reviewEngine`
+- `opencodeDevModel` and `opencodeReviewModel`
+- `reviewLensModel`
 
 Then call `Workflow({ script: <the adapted script> })` — no `args` needed.
 
-**Dev engine (`CFG.devEngine`) + cross-vendor reviewer (`CFG.reviewEngine`) — two independent axes.** Default dev engine `'claude'` writes code with Sonnet (→ Opus on the last attempt). Set it to `'codex'` or `'opencode'` to hand each task's implementation to that external CLI: the dev step becomes a cheap Haiku *driver* that runs the `<engine>-run.ts delegate` wrapper (reachable from a Workflow agent's Bash — the same wrapper the closing cross-vendor review lens uses), so the external CLI does the coding. The wrapper prints the CLI's summary + a `git status --short` and cleans up its own scratch, so the driver never mines a transcript. The independent verify → judge → score pipeline stays Claude, turning the dev≠judge split into a **cross-vendor** one (the external CLI writes, Claude-Opus judges). The last attempt before the cap still falls back to Claude-Opus — a final try before the task is parked — and if the CLI is unreachable the wrapper exits non-zero (the driver never fabricates), so the gate fails the attempt cleanly. `CFG.reviewEngine` (`'codex'` default, or `'opencode'`) **independently** picks the external bug/correctness lens in the closing Final review — so you can have opencode write and codex review, or any mix. Only the dev step changes with `devEngine`; the finalReview round's other lenses and everything else are identical. (codex review is sandbox-enforced read-only; opencode review is prompt-enforced read-only — its wrapper prepends a hard "analyze only" guard, since opencode has no `-s read-only` equivalent yet.)
+**Dev engine (`CFG.devEngine`) + cross-vendor reviewer (`CFG.reviewEngine`) are independent axes.** `devEngine` controls who writes non-final tasks; `reviewEngine` controls the external bug/correctness lens in the closing Final review. The full external-engine behavior and failure handling live in `references/orchestrator.md`.
 
-**Picking the opencode model.** opencode requires a `-m provider/model`. Leave `CFG.opencodeDevModel` / `CFG.opencodeReviewModel` empty to use the wrapper defaults (`opencode-go/kimi-k2.7-code` for dev, `opencode-go/qwen3.7-max` for review); set either to override just that role (the orchestrator threads it through as `opencode-run.ts … --model <value>`). These are **opencode-only** — codex uses its own configured model and ignores `-m`, so they have no effect when an engine is codex. When the user names a specific opencode model in Step 2, bake it into the matching field; otherwise leave them empty.
+**Picking the opencode model.** Leave `CFG.opencodeDevModel` / `CFG.opencodeReviewModel` empty for wrapper defaults, or set either to a `provider/model` override for that role. These fields are opencode-only; codex ignores them.
 
 The orchestrator runs a **wave loop**: each wave asks an agent to run `next-ready.ts` (status changes only happen *inside* the run, so the ready set must be re-scouted every wave — a static list misses tasks unblocked mid-flight), then executes the wave's ready tasks **in parallel**. Each task is a retry pipeline:
 
@@ -112,10 +103,10 @@ Binary gate (Haiku) ─ INDEPENDENTLY re-runs the task's ## Verification command
    │                   + checks ## Acceptance criteria. Cheap filter, runs first.
    ├─ fail → loop back to Dev with the failure output
    ▼ pass
-Rubric judge (Opus) ─ scores each ## Eval rubric dimension, runs score-task --log
+Rubric judge (Opus) ─ scores each ## Eval rubric dimension, runs score-task --json --log
    │
    ▼
-Score gate (inline arithmetic in the orchestrator) ─ weighted avg + veto
+Score gate ─ consumes score-task.ts --json verdict
    ├─ fail → loop back to Dev with the judge's rationale
    ▼ pass
 done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes   (next wave's next-ready will see it)
@@ -132,27 +123,15 @@ The `Final review` task (`> **Final review**: true`) depends transitively on eve
 
 ### The closing multi-lens review round
 
-The dev and rubric judge are both Claude, so they share blind spots. The Final review's "dev" step instead fans out **independent review lenses**, then a single Opus **fixer** reads all their findings and applies them. On the `finalReview` marker the orchestrator runs (capped at `finalReviewMaxAttempts`, default **2**):
+The Final review's "dev" step fans out independent record-only reviewers, then a single Opus fixer applies the real fixes and re-runs verification:
 
-```
-parallel reviewers — each writes findings to .flightlog/review/attempt-N/<lens>.md, edits nothing
-   ├─ <reviewEngine> → <engine>-run.ts review (codex/opencode CLI over Bash): cross-vendor bug/correctness
-   ├─ reuse          → duplicated logic, missed reuse of existing helpers     ┐
-   ├─ simplification → dead code, needless complexity, clearer equivalents     │ the four
-   ├─ efficiency     → redundant passes, N+1s, recomputation, allocations      │ /simplify
-   └─ altitude       → over-/under-engineering (wrong abstraction level)       ┘ lenses
-   │
-   ▼
-Opus fixer — reads every findings file, applies the real fixes (Edit/Write), re-runs ## Verification
-   │
-   ▼
-the normal binary gate + rubric judge + score gate
-   ├─ rubric fail → re-loop (fresh review fan-out + fixes), up to finalReviewMaxAttempts
-   ▼ pass
-done
-```
+- `<reviewEngine>`: codex/opencode CLI bug and correctness review.
+- `reuse`: duplicated logic and missed existing helpers.
+- `simplification`: dead code, needless complexity, clearer equivalents.
+- `efficiency`: redundant work, N+1s, recomputation, avoidable allocation/IO.
+- `altitude`: over- or under-engineered abstraction level.
 
-**Why this exact shape** — it's dictated by what a **Workflow agent** can do (verified empirically): it has `Skill` + `Bash` (the external CLI is reachable) but **no `Agent` tool**, so a single agent can't fan out reviewers itself, and fan-out skills like `/simplify` and Claude's own `/code-review` can't run inside it. The orchestrator sidesteps both: it issues one `agent()` **per lens** via `parallel()`, recovering the cross-vendor external review + `/simplify` multi-agent power at the orchestrator level. **The external engine (codex/opencode) owns bugs** (where a non-Claude vendor catches what an all-Claude pipeline can't); **the four Claude lenses own quality** (they are exactly `/simplify`'s reuse / simplification / efficiency / altitude axes, one agent each). Splitting reviewers (record-only) from the fixer (edits) keeps the fixer **≠** the judge, so the dev≠judge anti-bias split still holds. If the external CLI is unreachable its reviewer writes its `<ENGINE> UNREACHABLE` token instead of findings, so the fixer flags it and the gate fails the task rather than rubber-stamping an un-reviewed deliverable.
+The fan-out happens at orchestrator level because Workflow agents cannot spawn other agents. See `references/orchestrator.md` for the full rationale, failure handling, and exact prompts.
 
 ## Step 4 — Report
 
@@ -195,6 +174,8 @@ When a task exhausts its cap (`maxAttempts`, or `finalReviewMaxAttempts` for the
 3. **You** (the main agent) surface the escalations to the user. In an active cockpit session, hand the stick back via `needs_your_call` + `cockpit wait`; otherwise use `AskUserQuestion`. Show the task and its `reason`.
 4. After the user unblocks it (a decision, a spec fix, a manual nudge), **resume**: reset the parked task's `Status` to `todo` and re-run autopilot. The wave loop picks up where it left off — completed tasks stay `done`, so `next-ready` only re-offers the unblocked work.
 
+Crash recovery note: an interrupted run can leave task files at `Status: in-progress`; `next-ready` only offers `todo`, so reset stale `in-progress` tasks to `todo` before re-running autopilot.
+
 The orchestrator never asks the user anything mid-run — Workflow can't pause for input. Escalation is always post-return.
 
 ## The flightlog (audit trail)
@@ -212,8 +193,8 @@ Each entry records an `agentLabel` so a suspicious verdict can be traced back to
 
 autopilot ships no scripts of its own — it reuses flightplan's, which are siblings under `skills/flightplan/scripts/`:
 
-- `next-ready.ts <tasks-dir> [--json]` — the per-wave ready-set scout. `--json` emits `[{ref,finalReview}]` (or `[]` when none ready); the scout echoes it verbatim so an empty set can't be misread as "everything is ready".
-- `score-task.ts <task> <scores.json> [--log <file>] [--attempt N] [--agent <label>]` — `scoreTask(rubric, scores)` exported; the inline orchestrator gate mirrors it. `--log` persists the verdict to the flightlog.
+- `next-ready.ts <tasks-dir> [--json]` — the per-wave ready-set scout. `--json` emits `[{ref,finalReview,path}]` (or `[]` when none ready); the scout echoes it verbatim so an empty set can't be misread as "everything is ready".
+- `score-task.ts <task> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]` — `scoreTask(rubric, scores)` exported. `--json` prints the machine verdict the orchestrator gates on; `--log` persists the same verdict to the flightlog.
 - `mark-done.ts <task>` — the done-transition: sets `Status: done` and ticks every `## Acceptance criteria` / `## Verification` checkbox. Run when a task passes the gate.
 - `flightlog.ts log|report` — narrative entries + `RUNLOG.md`.
 - `lint-task.ts <tasks-dir>` — run during scout if `next-ready` reports a malformed tree.

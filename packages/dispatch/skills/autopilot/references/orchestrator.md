@@ -2,34 +2,13 @@
 
 This is the script the `autopilot` skill adapts and passes to the **Workflow** tool. Read the three hard constraints in `SKILL.md` first; they explain every awkward-looking choice here.
 
-The main agent scouts inline, then calls `Workflow({ script: <this> })` — **with the scouted values baked into the `CFG` block at the top of the script as literals.** Do NOT rely on the Workflow `args` global: in practice it does not reliably reach the orchestrator (an unset `args` surfaces as `undefined`, e.g. `bun undefined/next-ready.ts`, which fails the scout and silently looks like "no work to do"). Since the main agent already knows every value from the inline scout, write them in directly:
-
-```javascript
-const CFG = {
-  slug:                  'my-plan',
-  // tasksDir/planPath/logFile: ABSOLUTE paths under the repo root, from
-  // `git rev-parse --show-toplevel` (NOT relative). e.g. a repo at
-  // /opt/temp/project-repo → '/opt/temp/project-repo/docs/my-plan/tasks'.
-  tasksDir:              '/abs/repo/docs/my-plan/tasks',          // ABSOLUTE — see "Why every path is absolute" below
-  planPath:              '/abs/repo/docs/my-plan/PLAN.md',        // ABSOLUTE
-  logFile:               '/abs/repo/docs/my-plan/.flightlog/run.jsonl',  // ABSOLUTE
-  planGoal:              '<one-line goal copied from PLAN.md>',
-  maxAttempts:           3,
-  finalReviewMaxAttempts: 2,                              // bounded re-loop for the cross-vendor review round
-  scriptsDir:            '/abs/.claude/plugins/cache/.../skills/flightplan/scripts',  // ABSOLUTE — from the skill's load-time base dir
-  baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
-  commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
-  devEngine:             'claude',  // 'claude' (default), 'codex', or 'opencode' — who writes code in the dev step; an external engine has each task written by that CLI via its <engine>-run.ts wrapper (last attempt before the cap still falls back to Claude-Opus)
-  reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — the cross-vendor reviewer in the closing Final review (driven via <engine>-run.ts review)
-  opencodeDevModel:      '',        // optional opencode model for the dev engine (empty → wrapper default opencode-go/kimi-k2.7-code); only applies when devEngine is 'opencode' (codex ignores -m)
-  opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
-  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 4 final-review /simplify lenses (reuse/simplification/efficiency/altitude) ONLY; the fixer + rubric judge stay Opus
-}
-```
+The main agent scouts inline, then calls `Workflow({ script: <this> })` — **with the scouted values baked into the `CFG` block at the top of the script as literals.** Do NOT rely on the Workflow `args` global: in practice it does not reliably reach the orchestrator (an unset `args` surfaces as `undefined`, e.g. `bun undefined/next-ready.ts`, which fails the scout and silently looks like "no work to do"). Since the main agent already knows every value from the inline scout, write them in directly.
 
 > **Why every path is absolute (`tasksDir` / `planPath` / `logFile` / `scriptsDir`):** Workflow agents do not share a stable working directory — an agent that `cd`s into the tasks tree (e.g. to read task files) resolves a *relative* `logFile` against *its own* cwd, so a `bun .../flightlog.ts log docs/<slug>/.flightlog/run.jsonl` from inside `docs/<slug>/tasks/` lands in a nested `docs/<slug>/tasks/docs/<slug>/.flightlog/` — splitting the audit trail across two dirs. (`CLAUDE_PLUGIN_ROOT` likewise never reaches agent Bash, so the orchestrator can't resolve paths itself.) **Bake every path as an absolute literal** so it resolves identically no matter which agent writes it. Get the real repo root from `git rev-parse --show-toplevel` (it may be anywhere — `/Users/<name>/Projects/...`, `/opt/temp/project-repo`, `/workspace/...`); build `<root>/docs/<slug>/...` from it. Resolve `scriptsDir` from the skill's load-time "Base directory for this skill" banner. The values are unambiguous absolute paths that every agent's Bash and file tools (Read/Write/Glob) resolve identically. `~/...` is an *optional* shorthand **only when the repo genuinely lives under `$HOME`** (Bash + the file tools expand a leading `~`, and it avoids leaking the username) — never invent a `~` form for a repo outside `$HOME`. Baking these in (rather than passing via `args`) is what makes the run reliable.
 
 ## The script
+
+When adapting this script for the Workflow call, strip the explanatory comments; they are for the adapter, not the runtime. Keep only the one-line CFG field comments.
 
 ```javascript
 export const meta = {
@@ -41,16 +20,8 @@ export const meta = {
 }
 
 // ── Config — BAKE THESE IN (do not rely on the Workflow `args` global) ──────
-// The main agent fills these from its inline scout. `args` does not reliably
-// reach the orchestrator; an unset value surfaces as `undefined` and silently
-// fails the scout. Literals here = a reliable run.
-// EVERY path must be ABSOLUTE: Workflow agents don't share a cwd, so a relative
-// logFile/tasksDir resolves against whichever agent's cwd — an agent that cd's
-// into the tree splits the flightlog into a nested
-// docs/<slug>/tasks/docs/<slug>/.flightlog/. Absolute paths resolve identically
-// for every agent. Build them from `git rev-parse --show-toplevel` (the repo may
-// be anywhere — /Users/.../, /opt/..., /workspace/...). `~/...` only if the repo
-// is under $HOME. See "Why every path is absolute" above.
+// Fill from the inline scout; do not rely on `args`.
+// Every path must be absolute; see "Why every path is absolute" above.
 const CFG = {
   slug:                  'my-plan',
   tasksDir:              '/abs/repo/docs/my-plan/tasks',          // ABSOLUTE (from git rev-parse --show-toplevel)
@@ -115,36 +86,6 @@ const withModel = (key, override) => ({
 const devEngine    = CFG.devEngine && CFG.devEngine !== 'claude' ? withModel(CFG.devEngine, CFG.opencodeDevModel) : null
 const reviewEngine = withModel(CFG.reviewEngine ?? 'codex', CFG.opencodeReviewModel)
 
-// ── Inline score gate ───────────────────────────────────────────────────────
-// MUST mirror scoreTask() in score-task.ts exactly. We can't import it (the
-// orchestrator has no module access), so the arithmetic is duplicated here for
-// the control-flow decision. The judge agent separately runs `score-task --log`
-// for the persisted verdict, using the same formula — the two must agree.
-function scoreInline(rubric, scores) {
-  let weightSum = 0, acc = 0
-  const missing = []
-  for (const d of rubric.dimensions) {
-    const has = Object.prototype.hasOwnProperty.call(scores, d.name)
-    if (!has) missing.push(d.name)
-    weightSum += d.weight
-    acc += (has ? scores[d.name] : 0) * d.weight
-  }
-  const weighted = weightSum > 0 ? acc / weightSum : 0
-  let hardFailed = false
-  if (rubric.hardFail) {
-    const hv = scores[rubric.hardFail.dimension]
-    if (typeof hv === 'number') {
-      hardFailed = rubric.hardFail.op === '<'
-        ? hv < rubric.hardFail.value
-        : hv <= rubric.hardFail.value
-    }
-  }
-  const meets = rubric.passOp === '>'
-    ? weighted > rubric.passThreshold
-    : weighted >= rubric.passThreshold
-  return { weighted, passed: meets && !hardFailed && missing.length === 0, hardFailed, missing }
-}
-
 // ── Schemas ─────────────────────────────────────────────────────────────────
 const READY_SCHEMA = {
   type: 'object',
@@ -156,8 +97,9 @@ const READY_SCHEMA = {
         properties: {
           ref: { type: 'string' },              // "ui/03"
           finalReview: { type: 'boolean' },      // header carries `> **Final review**: true`
+          path: { type: 'string' },              // exact task file path from next-ready.ts
         },
-        required: ['ref', 'finalReview'],
+        required: ['ref', 'finalReview', 'path'],
       },
     },
     error: { type: 'string' },
@@ -177,40 +119,26 @@ const GATE_SCHEMA = {
 const JUDGE_SCHEMA = {
   type: 'object',
   properties: {
-    rubric: {
+    scores: { type: 'object', additionalProperties: { type: 'number' } },  // { Correctness: 5, ... }
+    verdict: {
       type: 'object',
       properties: {
-        passThreshold: { type: 'number' },
-        passOp: { type: 'string', enum: ['>', '>='] },
-        hardFail: {
-          type: ['object', 'null'],
-          properties: {
-            dimension: { type: 'string' },
-            op: { type: 'string', enum: ['<', '<='] },
-            value: { type: 'number' },
-          },
-        },
-        dimensions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: { name: { type: 'string' }, weight: { type: 'number' } },
-            required: ['name', 'weight'],
-          },
-        },
+        weighted: { type: 'number' },
+        passed: { type: 'boolean' },
+        hardFailed: { type: 'boolean' },
+        missing: { type: 'array', items: { type: 'string' } },
       },
-      required: ['passThreshold', 'passOp', 'dimensions'],
+      required: ['weighted', 'passed', 'hardFailed', 'missing'],
     },
-    scores: { type: 'object', additionalProperties: { type: 'number' } },  // { Correctness: 5, ... }
     rationale: { type: 'string' },
   },
-  required: ['rubric', 'scores', 'rationale'],
+  required: ['scores', 'verdict', 'rationale'],
 }
 
 // ── Prompts ───────────────────────────────────────────────────────────────
-const devPrompt = (ref, attempt, feedback) => `
+const devPrompt = (ref, path, attempt, feedback) => `
 You are implementing flightplan task ${ref} in the tree at ${CFG.tasksDir}.
-Read the task file (find it under ${CFG.tasksDir}/<bucket>/NN-*.md matching ${ref}) and every file in its "Required reading".
+Read the task file at ${path} and every file in its "Required reading".
 Implement the task fully: create/modify the listed files, follow Implementation notes.
 ${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nAddress that specifically.' : ''}
 When done: set the task header "> **Status**:" to in-progress while working. Run the task's ## Verification yourself first.
@@ -228,9 +156,9 @@ Return a one-paragraph summary of what you did.`
 // If the CLI is unreachable the driver must NOT fabricate code — it reports failure
 // so the binary gate fails the attempt and the loop proceeds (the last attempt
 // falls back to Claude-Opus).
-const devExternalPrompt = (engine, ref, attempt, feedback) => `
+const devExternalPrompt = (engine, ref, path, attempt, feedback) => `
 You are the ${engine.label.toUpperCase()} DEV DRIVER for flightplan task ${ref} (tree: ${CFG.tasksDir}). You do NOT write the implementation yourself — you have the ${engine.label} CLI write it, then you verify.
-1. Locate and read the task file (${CFG.tasksDir}/<bucket>/NN-*.md matching ${ref}) and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
+1. Read the task file at ${path} and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
 2. Set the task header "> **Status**:" to in-progress.
 3. Build the ${engine.label} instruction from the task file — the exact files to create/modify plus the full Goal, Implementation notes, and Acceptance criteria, telling ${engine.label} to implement the task fully and stay strictly within the listed files. It runs non-interactively, so give it EVERYTHING up front; it can never ask you anything.${attempt > 1 ? ' This is retry attempt ' + attempt + '. The previous attempt was rejected:\\n' + feedback + '\\nFold this feedback into the instruction so ' + engine.label + ' fixes exactly that.' : ''}
 4. Write that instruction to a temp file, then run:
@@ -294,11 +222,11 @@ Get the full diff with BOTH commands:
 Combine both outputs — the working-tree diff covers any retry attempt's edits that are not yet committed.
 Write your findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first) as a short markdown bullet list — each finding carries file:line and the concrete fix. If nothing is material, write exactly "No findings.". You are a REVIEWER: do NOT edit any source file — only record. Return a one-line count of your findings.`
 
-const fixPrompt = (ref, attempt, feedback) => `
+const fixPrompt = (ref, path, attempt, feedback) => `
 You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}), on Opus. Independent reviewers have each written findings to ${reviewDir(attempt)}/ (one file per lens: ${reviewEngine.label}, reuse, simplification, efficiency, altitude).
 1. Read EVERY file in ${reviewDir(attempt)}/. If ${reviewEngine.label}.md begins with "${reviewEngine.token}", call that out prominently — the cross-vendor pass did not run.
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the four Claude lenses (behaviour-preserving). For any finding you reject, say why.
-3. VERIFY. Open the task file (under ${CFG.tasksDir}/<bucket>/NN-*.md matching ${ref}) and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.
+3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.
 ${attempt > 1 ? 'This is re-loop attempt ' + attempt + ' (capped at ' + FINAL_MAX + '). The previous round was rejected:\n' + feedback + '\nEnsure the new findings + your fixes address that.' : ''}
 Set the task header "> **Status**:" to in-progress while working.
 Log a narrative note (which lenses fired, total findings, what you fixed, whether the cross-vendor lens ran):
@@ -308,43 +236,43 @@ Return a one-paragraph summary: lenses run, cross-vendor status, key fixes, veri
 // Run the Final review "dev" step: fan out the lenses in parallel, then one
 // Opus fixer applies every finding. Replaces the single dev agent for the
 // finalReview task; the binary gate + judge + score gate downstream are unchanged.
-async function runFinalReview(ref, attempt, feedback) {
+async function runFinalReview(ref, path, attempt, feedback) {
   await parallel(REVIEW_LENSES.map(lens => () =>
     agent(reviewPrompt(ref, lens, attempt),
       { label: `review:${lens.key}#${attempt}`, phase: 'Execute', model: lens.model })))
-  await agent(fixPrompt(ref, attempt, feedback),
+  await agent(fixPrompt(ref, path, attempt, feedback),
     { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
 }
 
-const verifyPrompt = (ref) => `
+const verifyPrompt = (ref, path) => `
 You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
-Do NOT trust the dev's claims. Open the task file, then:
+Do NOT trust the dev's claims. Open the task file at ${path}, then:
   1. Run every concrete command in its ## Verification section yourself.
   2. Check every box in ## Acceptance criteria against the actual code/output.
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.`
 
-const judgePrompt = (ref, gateSummary) => `
+const judgePrompt = (ref, path, gateSummary, attempt) => `
 You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
 The independent binary gate already PASSED with this evidence:
 ${gateSummary}
-Open the task file and its ## Eval rubric. Score EACH dimension 0–scaleMax based on the real code and the verification evidence above — ground the correctness dimension in that evidence, not opinion.
-Return the parsed rubric (passThreshold, passOp, hardFail, dimensions[{name,weight}]), your per-dimension scores keyed by dimension name, and a rationale.
-Then persist the verdict to the flightlog (use the SAME scores):
+Open the task file at ${path} and its ## Eval rubric. Score EACH dimension 0–scaleMax based on the real code and the verification evidence above — ground the correctness dimension in that evidence, not opinion.
+Write the scores JSON to a temp file, then run score-task.ts to compute and persist the verdict:
   echo '<scores-json>' > /tmp/scores-${ref.replace('/','-')}.json
-  bun ${S}/score-task.ts <task-file> /tmp/scores-${ref.replace('/','-')}.json --log ${CFG.logFile} --attempt <attempt> --agent "<your label>"`
+  bun ${S}/score-task.ts ${path} /tmp/scores-${ref.replace('/','-')}.json --json --log ${CFG.logFile} --attempt ${attempt} --agent "<your label>"
+If the command exits 1, that is a valid rubric failure; still return the printed JSON verdict. Return the CLI's printed verdict object VERBATIM as "verdict", plus your scores and rationale.`
 
-const markDonePrompt = (ref) => `
-Finalize flightplan task ${ref} (under ${CFG.tasksDir}): locate its file (<bucket>/NN-*.md matching ${ref}) and run:
-  bun ${S}/mark-done.ts <task-file>
+const markDonePrompt = (ref, path) => `
+Finalize flightplan task ${ref} at ${path} by running:
+  bun ${S}/mark-done.ts ${path}
 That deterministically sets "> **Status**: done" AND ticks every checkbox in the task's ## Acceptance criteria and ## Verification sections (the task passed the gate, so all hold). Change nothing else by hand.`
 
-const markBlockedPrompt = (ref, reason) => `
-Set the "> **Status**:" line in flightplan task ${ref}'s file (under ${CFG.tasksDir}) to: blocked. Change nothing else. (Parked by autopilot: ${reason})`
+const markBlockedPrompt = (ref, path, reason) => `
+Set the "> **Status**:" line in flightplan task ${ref}'s file (${path}) to: blocked. Change nothing else. (Parked by autopilot: ${reason})`
 
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
-async function executeTask(item, wave) {
-  const { ref, finalReview } = item
+async function executeTask(item) {
+  const { ref, finalReview, path } = item
   // The cross-vendor Final review round gets its own (smaller) cap; everything
   // else uses MAX. Past the cap the task is parked + escalated, never skipped.
   const cap = finalReview ? FINAL_MAX : MAX
@@ -352,7 +280,7 @@ async function executeTask(item, wave) {
   for (let attempt = 1; attempt <= cap; attempt++) {
     if (finalReview) {
       // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
-      await runFinalReview(ref, attempt, feedback)
+      await runFinalReview(ref, path, attempt, feedback)
     } else {
       // Dev step. The last attempt before the cap is the "last shot": Claude
       // escalates Sonnet → Opus, and an external engine ALSO falls back to
@@ -361,29 +289,29 @@ async function executeTask(item, wave) {
       // skipping it.
       const lastShot = attempt >= cap && cap > 1
       if (devEngine && !lastShot) {
-        await agent(devExternalPrompt(devEngine, ref, attempt, feedback),
+        await agent(devExternalPrompt(devEngine, ref, path, attempt, feedback),
           { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
       } else {
         const devModel = attempt >= cap ? MODEL.devEscalated : MODEL.dev
-        await agent(devPrompt(ref, attempt, feedback),
+        await agent(devPrompt(ref, path, attempt, feedback),
           { label: `dev:${ref}#${attempt}`, phase: 'Execute', model: devModel })
       }
     }
 
-    const gate = await agent(verifyPrompt(ref),
+    const gate = await agent(verifyPrompt(ref, path),
       { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
     if (!gate || !gate.passed) {
       feedback = `Binary gate failed (verification/acceptance):\n${gate?.summary ?? 'no output'}`
       continue
     }
 
-    const judged = await agent(judgePrompt(ref, gate.summary),
+    const judged = await agent(judgePrompt(ref, path, gate.summary, attempt),
       { label: `judge:${ref}#${attempt}`, phase: 'Execute', model: MODEL.judge, schema: JUDGE_SCHEMA })
     if (!judged) { feedback = 'Judge produced no verdict.'; continue }
 
-    const verdict = scoreInline(judged.rubric, judged.scores)
+    const verdict = judged.verdict
     if (verdict.passed) {
-      await agent(markDonePrompt(ref), { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify })
+      await agent(markDonePrompt(ref, path), { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify })
       return { task: ref, passed: true, attempt, weighted: verdict.weighted }
     }
     feedback = `Rubric score ${verdict.weighted.toFixed(2)} did not pass`
@@ -391,7 +319,7 @@ async function executeTask(item, wave) {
       + (verdict.missing.length ? ` (missing dims: ${verdict.missing.join(', ')})` : '')
       + `:\n${judged.rationale}`
   }
-  await agent(markBlockedPrompt(ref, feedback), { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify })
+  await agent(markBlockedPrompt(ref, path, feedback), { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify })
   return { task: ref, passed: false, attempt: cap, reason: feedback }
 }
 
@@ -433,24 +361,22 @@ const completed = []
 const escalations = []
 const parked = new Set()
 let wave = 0
-let prevWaveHadEscalations = false   // guard: don't commit if previous wave left blocked tasks with dirty edits
 
 while (true) {
   wave++
-  // Commit previous wave's changes before scouting the next ready set — but ONLY
-  // if the previous wave had no escalations. A wave with a mix of passed and failed
-  // tasks leaves the failed tasks' edits (plus Status: blocked) in the working tree.
-  // Committing those would bake incomplete/rejected code into history before the user
-  // can unblock them. Skip the commit for any wave that produced escalations.
-  const commitPreamble = (wave > 1 && CFG.commitBetweenWaves && !prevWaveHadEscalations)
+  // Commit previous wave's changes before scouting the next ready set, but only
+  // while the entire run is escalation-free. A blocked task's dirty edits can
+  // persist across later waves, so a per-wave guard would still risk committing
+  // incomplete/rejected work after a later clean wave.
+  const commitPreamble = (wave > 1 && CFG.commitBetweenWaves && escalations.length === 0)
     ? `First, commit all changes from the previous wave.\n${COMMIT_INSTRUCTIONS}\n\nThen: `
     : ``
 
   const scout = await agent(
     commitPreamble
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --json\n`
-    + `It prints a JSON array of the ready tasks (each with its finalReview flag), e.g.\n`
-    + `  [{"ref":"ui/03","finalReview":false},{"ref":"api/02","finalReview":false}]\n`
+    + `It prints a JSON array of the ready tasks (each with its finalReview flag and exact file path), e.g.\n`
+    + `  [{"ref":"ui/03","finalReview":false,"path":"${CFG.tasksDir}/ui/03-build.md"},{"ref":"api/02","finalReview":false,"path":"${CFG.tasksDir}/api/02-endpoint.md"}]\n`
     + `or exactly [] when NOTHING is ready (all tasks done/blocked). An empty array means there is no work — that is the normal end state.\n`
     + `Return { refs: <the printed array, VERBATIM> }. If it printed [], return refs: []. Do NOT open task files, infer, or enumerate any task the command did not print — echo only what it printed.\n`
     + `If the command exits non-zero, return refs: [] and put the stderr in error.`,
@@ -473,13 +399,12 @@ while (true) {
   if (fresh.length === 0) break
 
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
-  const results = (await parallel(fresh.map(item => () => executeTask(item, wave)))).filter(Boolean)
+  const results = (await parallel(fresh.map(item => () => executeTask(item)))).filter(Boolean)
 
   for (const r of results) {
     if (r.passed) completed.push(r.task)
     else { escalations.push(r); parked.add(r.task) }
   }
-  prevWaveHadEscalations = results.some(r => !r.passed)
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
   if (!results.some(r => r.passed)) break
 }
@@ -509,8 +434,8 @@ return { slug: CFG.slug, completed, escalations }
 ## Notes / gotchas
 
 - **Wave re-scout is non-negotiable.** Statuses change only inside the run, so the ready set must be recomputed each wave. A task unblocked by a wave-N completion is picked up in wave N+1.
-- **The scout echoes `next-ready.ts --json` verbatim — it does not interpret.** Use the `--json` mode (emits `[{ref,finalReview}]`, or `[]` when none ready) and have the agent return that array as-is. An earlier line-oriented scout had a fatal blind spot: when `next-ready` printed nothing (all tasks done), the agent didn't map "empty" → `[]` and instead re-listed every task as ready, causing the whole tree to re-run. `[]` from `--json` is unambiguous; the `!completed.includes` filter is the backstop.
-- **The inline gate and `score-task --log` must use the same scores.** The orchestrator decides loop/pass from `scoreInline`; the judge agent persists via the CLI. If you change the formula, change it in both `score-task.ts` and `scoreInline` here.
+- **The scout echoes `next-ready.ts --json` verbatim — it does not interpret.** Use the `--json` mode (emits `[{ref,finalReview,path}]`, or `[]` when none ready) and have the agent return that array as-is. An earlier line-oriented scout had a fatal blind spot: when `next-ready` printed nothing (all tasks done), the agent didn't map "empty" → `[]` and instead re-listed every task as ready, causing the whole tree to re-run. `[]` from `--json` is unambiguous; the `!completed.includes` filter is the backstop.
+- **There is exactly one scoring implementation.** The judge agent runs `score-task.ts --json --log` with its scores, and the orchestrator gates on that printed verdict object. If the formula changes, change `score-task.ts`; the orchestrator must not duplicate the arithmetic.
 - **Final review needs no special phase.** Its transitive `Depends on` reaches every task, so `next-ready` only offers it once all else is `done`. When the `finalReview` flag is set the orchestrator runs `runFinalReview` instead of a single dev agent (the multi-lens fan-out below) and uses the smaller `FINAL_MAX` cap; the binary gate + rubric judge + score gate are unchanged — they evaluate the round's output against the Final review task's own `## Eval rubric` (integration / consistency / no regressions / meets PLAN goal).
 - **The review fan-out is done by the *orchestrator*, not by one agent.** A Workflow agent has `Skill` + `Bash` (the external CLI is reachable) but **no `Agent` tool**, so it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that: `runFinalReview` issues one `agent()` per lens via `parallel()` — the cross-vendor lens (`CFG.reviewEngine`: codex or opencode, driven through the `<engine>-run.ts review` wrapper over Bash) plus the four `/simplify` lenses (reuse / simplification / efficiency / altitude), each Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing; a single Opus **fixer** then reads all the files and applies the changes. The external engine is the deliberate cross-*vendor* signal the all-Claude dev+judge can't produce; if it's unreachable that reviewer writes its `<ENGINE> UNREACHABLE` token so the fixer flags it and the gate fails the task rather than passing an un-reviewed deliverable. (codex review is sandbox-enforced read-only; opencode review is prompt-enforced read-only — its wrapper prepends a hard "analyze only" guard.)
 - **The fixer is not the judge.** Reviewers + fixer are the "dev" side of the Final review; the binary gate + rubric judge stay independent, so the dev≠judge anti-self-grading split still holds even though the round is more elaborate.
