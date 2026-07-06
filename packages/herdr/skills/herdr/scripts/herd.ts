@@ -2,11 +2,12 @@
 /**
  * herd.ts — a small, typed wrapper over the raw `herdr` CLI for in-session
  * agent orchestration. Collapses herdr's multi-step recipes (split → parse id →
- * run → wait → read) into five verbs an agent can call without re-deriving the
+ * run → wait → read) into seven verbs an agent can call without re-deriving the
  * CLI's sharp edges:
  *
  *   spawn  — start an agent in a fresh pane under a collision-proof name
  *   send   — write a prompt to a running agent AND submit it (Enter)
+ *   keys   — send bare key chords to the agent's pane
  *   wait   — block until the agent reaches a status
  *   read   — read a pane's recent output as clean text
  *   list   — the current agents as a typed array
