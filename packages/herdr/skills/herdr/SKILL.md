@@ -1,6 +1,6 @@
 ---
 name: herdr
-description: "Herdr terminal workspace manager: configuration (config.toml), CLI reference, plugin development, and in-session agent orchestration (spawning/coordinating agents across panes when running inside herdr)."
+description: "Herdr terminal workspace manager: use for herdr config / config.toml, keybindings, themes, CLI commands, plugin development, and — when running inside a herdr pane (HERDR_ENV=1) — spawning, driving, or coordinating agents in other panes or tabs."
 version: 1
 ---
 
@@ -9,10 +9,6 @@ version: 1
 Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file; add `~/.config/herdr/config.toml` when you need customization.
 
 Docs: <https://herdr.dev/docs/>
-
-## Trigger
-
-When the user asks about Herdr config, CLI commands, keybindings, plugins, or plugin development — or, when running *inside* a herdr pane (`HERDR_ENV=1`), asks to spawn / drive / coordinate agents in other panes.
 
 ## Orchestrating agents — use the `herd` wrapper first
 
@@ -26,10 +22,7 @@ HERD="$SKILL_DIR/scripts/herd.ts"
 # Spawn codex in a new pane (no focus), get back a unique name like "reviewer-a3f9"
 bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 
-# Spawn in its OWN new tab instead of splitting the current pane (keeps your pane full-size).
-# The tab is labelled with the agent name by default; --tab-label sets a custom label.
-bun "$HERD" spawn reviewer --agent codex --new-tab --cwd "$PWD"
-bun "$HERD" spawn reviewer --agent codex --new-tab --tab-label "PR #42 review" --cwd "$PWD"
+# Add --new-tab to open the agent in its own labelled tab; --tab-label overrides the default label.
 
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
@@ -49,7 +42,7 @@ bun "$HERD" list                 # all current agents as typed JSON
 bun "$HERD" close reviewer-a3f9  # close the agent's pane
 ```
 
-All verbs print JSON except `read` (prints the pane's text). `read` defaults to `--source visible` (the current screen) because agent TUIs render into the alternate-screen buffer, leaving `recent`/`recent-unwrapped` empty; pass `--source recent-unwrapped` for a scrolled log tail. Run tests with `bun test scripts/herd.test.ts`.
+All verbs print JSON except `read` (prints the pane's text). `read` defaults to `--source visible` (the current screen) because agent TUIs render into the alternate-screen buffer, leaving `recent`/`recent-unwrapped` empty; pass `--source recent-unwrapped` for a scrolled log tail. The wrapper's `wait` cannot wait for status `done`; only raw `herdr wait agent-status <pane> --status done` supports the common "block until the other agent finishes" case. Run tests with `bun test scripts/herd.test.ts`.
 
 For anything the wrapper doesn't cover (worktrees, layout, notifications, waiting on arbitrary pane output, plugin panes), drop to the raw CLI — see `references/agent-orchestration.md` for live recipes and `references/cli.md` for the full command surface.
 
