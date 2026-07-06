@@ -30,6 +30,8 @@ If unsure, ask: *"executing now, or saving for later?"* Saving for later = `flig
 
 ## Process
 
+Resolve the scripts path once. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash, so take the skill's load-time *"Base directory for this skill"* banner, set `SCRIPTS="<base-dir>/scripts"`, and use `bun "$SCRIPTS"/...` in every command below.
+
 ### Step 1 — Enter plan mode
 
 Call `EnterPlanMode` immediately, before any text output, before any question. If already in plan mode, skip.
@@ -52,7 +54,7 @@ See `references/interview-guide.md` for the canonical walking-the-tree examples,
 
 **Required dimensions** (do not stop until each is resolved or explicitly deferred to Open Questions):
 
-- **Topic slug** — a kebab-case identifier for `docs/<topic>/`. The moment a slug is agreed, check for collision with `bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/scaffold.ts --check <slug>`. The script prints `OK` or `EXISTS: <suggested -vN slug>`. If it collides, pause the interview and ask: merge, version-bump, or abort. Resolve before continuing.
+- **Topic slug** — a kebab-case identifier for `docs/<topic>/`. The moment a slug is agreed, check for collision with `bun "$SCRIPTS"/scaffold.ts --check <slug>`. The script prints `OK` or `EXISTS: <suggested -vN slug>`. If it collides, pause the interview and ask: merge, version-bump, or abort. Resolve before continuing.
 - **Problem & users** — who this is for, what changes after it ships.
 - **Scope boundaries** — what is explicitly out of scope (the Non-goals list).
 - **Tech constraints** — stack, conventions, deployment target, integrations, version pins.
@@ -87,7 +89,7 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
 
 1. **Scaffold the tree** (deterministic mkdir only — no stub files):
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/scaffold.ts <slug> <bucket1>,<bucket2>,...
+   bun "$SCRIPTS"/scaffold.ts <slug> <bucket1>,<bucket2>,...
    ```
    Creates `docs/<slug>/tasks/_context/` and one dir per bucket. The root `docs/<slug>/` is created non-recursively, so a TOCTOU race (slug created between Step 2's `--check` and now) throws EEXIST instead of silently overwriting.
 
@@ -101,13 +103,13 @@ Call `ExitPlanMode` once PLAN.md content is drafted. Always exit — even if ope
 
 3. **Lint the whole tree** to catch cross-file issues the per-file hook misses (duplicate `bucket/NN`, broken cross-bucket deps):
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/lint-task.ts docs/<slug>/tasks
+   bun "$SCRIPTS"/lint-task.ts docs/<slug>/tasks
    ```
    Pass the **tasks directory** (not a glob) — the script walks bucket dirs and auto-skips `_context/` and any `README.md`. If any violation is reported (PLAN.md refs in any casing, sibling-task refs, missing sections, missing/unparseable `## Eval rubric` or a pass threshold outside the scale, no final-review task or one that doesn't reach every task, broken Required reading paths, H1-vs-path mismatch, bad Status), fix and re-run. Do not finish with violations outstanding.
 
 4. **Generate `tasks/README.md`** from the task headers — index, dep graphs, cross-bucket table:
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/build-readme.ts docs/<slug>/tasks
+   bun "$SCRIPTS"/build-readme.ts docs/<slug>/tasks
    ```
    The script fails loudly on malformed or duplicate-ref tasks rather than silently dropping them. It preserves human-authored prologue/epilogue (e.g. "Known gaps") between the generated markers. Fill the Known gaps section manually if any surfaced during the interview.
 
@@ -129,17 +131,17 @@ Each pass, by engine:
 
 - **Codex** (default):
   ```bash
-  bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug>
+  bun "$SCRIPTS"/review-plan.ts docs/<slug>
   ```
 - **OpenCode**:
   ```bash
-  bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug> --engine opencode   # optional: --model <provider/model>
+  bun "$SCRIPTS"/review-plan.ts docs/<slug> --engine opencode   # optional: --model <provider/model>
   ```
   Both bundle all plan files for the external CLI; scope is exactly the plan tree, regardless of other uncommitted changes. If the chosen CLI isn't installed the script exits 0 with a warning — skip the gate, note it as a Known gap in `tasks/README.md`, and go to Step 7.
 - **Opus** — spawn a **fresh `Agent` subagent on Opus** for each pass (a clean context that did NOT write the plan, so it reviews without author bias):
   1. Capture the exact review bundle the CLIs get:
      ```bash
-     bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/review-plan.ts docs/<slug> --print
+     bun "$SCRIPTS"/review-plan.ts docs/<slug> --print
      ```
   2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."*
   3. Take its findings back to the loop. **You are the fixer, never the reviewer** — a new subagent each pass keeps every review independent (reviewer ≠ author, the same anti-bias split autopilot uses).
@@ -162,7 +164,7 @@ Tell the user where the files live and which task to start from. Do not start im
 For the next executor: there is a helper they can run to ask "what should I work on?" — it lists tasks whose dependencies are all `done`:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/flightplan/scripts/next-ready.ts docs/<slug>/tasks
+bun "$SCRIPTS"/next-ready.ts docs/<slug>/tasks
 ```
 
 ## Core principles for the artifacts
@@ -225,9 +227,11 @@ If the request is ordinary "spec this out" with no roadmap intent, stay in NORMA
 
 Once the project `<proj>` is resolved:
 
-1. Run `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts active <proj>` to get the active leg's `NN-slug`, `DONE-STATE`, and prior-legs digest.
+Resolve the sibling waypoint script as `WAYPOINTS_SCRIPT="<base-dir>/../waypoints/scripts/waypoints.ts"` from this skill's load-time base directory.
+
+1. Run `bun "$WAYPOINTS_SCRIPT" active <proj>` to get the active leg's `NN-slug`, `DONE-STATE`, and prior-legs digest.
 2. Interview only for that leg's done-state, using the prior-legs digest as rolling-wave context (do NOT re-plan the whole project).
-3. Scaffold with `bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>` (NOT `scaffold.ts`).
+3. Scaffold with `bun "$WAYPOINTS_SCRIPT" leg-scaffold <proj> <NN-slug> <buckets>` (NOT `scaffold.ts`).
 4. Write the leg's flightplan spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`.
 5. Run the existing lint-task.ts, build-readme.ts, and review-plan.ts pointed at that leg path (they already accept arbitrary paths).
 6. Note that execution is unchanged: `/autopilot docs/<proj>/legs/<NN-slug>`.

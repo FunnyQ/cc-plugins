@@ -12,8 +12,10 @@
  * was scored.
  *
  * Usage:
- *   bun score-task.ts <task-file> <scores.json> [--log <file>] [--attempt N] [--agent <label>]
+ *   bun score-task.ts <task-file> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]
  *     scores.json: { "Correctness": 5, "Test coverage": 4, ... } keyed by dimension name
+ *     --json: print the machine gate verdict only:
+ *             {"weighted":number,"passed":boolean,"hardFailed":boolean,"missing":string[]}
  *     --log <file>: append the verdict to a flightlog JSONL trail (auto-creates
  *                   the dir + a self-ignore when logging into `.flightlog/`).
  *     --attempt / --agent: metadata stamped onto the logged entry.
@@ -45,6 +47,20 @@ export type ScoreResult = {
   /** Dimensions declared by the rubric but absent from the scores input. */
   missing: string[];
 };
+
+export type ScoreJsonResult = Pick<
+  ScoreResult,
+  "weighted" | "passed" | "hardFailed" | "missing"
+>;
+
+export function toJsonResult(result: ScoreResult): ScoreJsonResult {
+  return {
+    weighted: result.weighted,
+    passed: result.passed,
+    hardFailed: result.hardFailed,
+    missing: result.missing,
+  };
+}
 
 /** Apply a rubric's weighting + hard-fail veto to a set of per-dimension scores. */
 export function scoreTask(
@@ -133,6 +149,7 @@ function flagValue(argv: string[], name: string): string | undefined {
 
 async function main() {
   const argv = process.argv.slice(2);
+  const jsonMode = argv.includes("--json");
   const positional = argv.filter(
     (a, i) => !a.startsWith("--") && !argv[i - 1]?.startsWith("--"),
   );
@@ -142,7 +159,7 @@ async function main() {
   const agentLabel = flagValue(argv, "--agent");
   if (!taskFile || !scoresFile) {
     console.error(
-      "Usage: bun score-task.ts <task-file> <scores.json> [--log <file>] [--attempt N] [--agent <label>]",
+      "Usage: bun score-task.ts <task-file> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]",
     );
     process.exit(2);
   }
@@ -180,7 +197,9 @@ async function main() {
     await appendEntry(logFile, entry);
   }
 
-  console.log(JSON.stringify(result, null, 2));
+  console.log(
+    JSON.stringify(jsonMode ? toJsonResult(result) : result, null, 2),
+  );
   process.exit(result.passed ? 0 : 1);
 }
 

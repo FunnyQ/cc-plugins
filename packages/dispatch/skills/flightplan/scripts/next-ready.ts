@@ -28,11 +28,13 @@ export type LoadError = { file: string; reason: string };
 
 export type LoadResult = {
   byRef: Record<string, ParsedTask>;
+  pathByRef: Record<string, string>;
   errors: LoadError[];
 };
 
 export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
   const byRef: Record<string, ParsedTask> = {};
+  const pathByRef: Record<string, string> = {};
   const refToFile = new Map<string, string>();
   const errors: LoadError[] = [];
   const buckets = await readdir(tasksDir, { withFileTypes: true });
@@ -62,13 +64,14 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
       }
       refToFile.set(ref, path);
       byRef[ref] = parsed.task;
+      pathByRef[ref] = path;
     }
   }
-  return { byRef, errors };
+  return { byRef, pathByRef, errors };
 }
 
 /** A ready task ref plus whether it is the closing final-review task. */
-export type ReadyRef = { ref: string; finalReview: boolean };
+export type ReadyRef = { ref: string; finalReview: boolean; path: string };
 
 /**
  * Same ready set as `findReady`, but each entry carries its `finalReview`
@@ -80,10 +83,15 @@ export type ReadyRef = { ref: string; finalReview: boolean };
  */
 export function findReadyDetailed(
   byRef: Record<string, ParsedTask>,
+  pathByRef: Record<string, string>,
 ): ReadyRef[] {
   return findReady(byRef).map((r) => {
     const ref = refToString(r);
-    return { ref, finalReview: byRef[ref]?.finalReview ?? false };
+    return {
+      ref,
+      finalReview: byRef[ref]?.finalReview ?? false,
+      path: pathByRef[ref] ?? "",
+    };
   });
 }
 
@@ -113,7 +121,7 @@ async function main() {
     console.error("Usage: bun next-ready.ts <tasks-dir> [--json]");
     process.exit(2);
   }
-  const { byRef, errors } = await loadAllTasks(tasksDir);
+  const { byRef, pathByRef, errors } = await loadAllTasks(tasksDir);
 
   if (errors.length > 0) {
     console.error(
@@ -128,7 +136,7 @@ async function main() {
   if (jsonMode) {
     // Always valid JSON — an empty ready set prints `[]`, never blank, so a
     // consumer can't mistake "done" for "everything is ready".
-    console.log(JSON.stringify(findReadyDetailed(byRef)));
+    console.log(JSON.stringify(findReadyDetailed(byRef, pathByRef)));
   } else {
     for (const ref of findReady(byRef)) {
       console.log(refToString(ref));

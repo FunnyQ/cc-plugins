@@ -1,5 +1,32 @@
 # Changelog
 
+## [dispatch 3.14.0] - 2026-07-07
+
+_dispatch is independently versioned; this entry tracks the `dispatch-v3.14.0` tag._
+
+### ✨ Added
+
+- **`score-task --json`** — the flightplan scoring gate now supports a `--json` flag (`toJsonResult()` helper) that emits a machine-readable verdict, so callers no longer need to parse human-facing text.
+- **`next-ready` returns task file paths.** `ReadyRef` gains a `path` field (sourced from a new `pathByRef` map), so callers get a ready task's file location directly instead of re-deriving it.
+
+### 🔧 Changed
+
+- **autopilot orchestrator drops inline scoring.** The orchestrator's `scoreInline()` helper is gone; gate decisions now call `score-task.ts --json` directly. `JUDGE_SCHEMA` was reshaped to carry scores plus a nested `verdict` object instead of the full rubric, and `READY_SCHEMA` now requires the `path` field sourced from `next-ready`.
+- **flightplan and waypoints docs** updated to document the new `--json` flag and `path` field, with outdated inline-scoring prose removed.
+
+## [chronicle 0.4.0] - 2026-07-07
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.4.0` tag._
+
+### ✨ Added
+
+- **Bounded diffs in the commit analyzer.** `analyze-changes.ts` now caps unified diffs at 400 lines (`capDiff()`, with a truncation footer noting total +/- counts) and skips inlining untracked files over 256 KiB, so a single huge file or diff can no longer blow up the commit-analysis payload. Also adds a `summary` field to the analysis result.
+- **Branch analyzer error handling.** `analyze-branch.ts`'s `main()` now captures the actual error (`fallbackPayloadForError()`) instead of swallowing it silently, so a failed analysis reports why in its fallback payload and JSON output instead of just going blank.
+
+### 📖 Docs
+
+- **`DESIGN.md`** documents the current agent-spawn topology (Manager as a custom agent with the `Agent` tool; analyst/writer as Haiku leaves) and the rationale behind it. Agent prompts and the commit `SKILL.md` were trimmed to match.
+
 ## [monitor 3.18.1] - 2026-07-06
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.1` tag._

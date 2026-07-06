@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scoreTask, buildScoreEntry, type ScoreResult } from "./score-task";
+import {
+  scoreTask,
+  buildScoreEntry,
+  toJsonResult,
+  type ScoreResult,
+} from "./score-task";
 import { parseLog } from "./lib/flightlog";
 import type { Rubric } from "./lib/parse-task";
 
@@ -149,6 +154,21 @@ describe("buildScoreEntry", () => {
   });
 });
 
+describe("toJsonResult", () => {
+  test("keeps only the machine gate fields", () => {
+    const result = scoreTask(RUBRIC, {
+      Correctness: 3,
+      "Test coverage": 5,
+    });
+    expect(toJsonResult(result)).toEqual({
+      weighted: result.weighted,
+      passed: false,
+      hardFailed: true,
+      missing: ["Interface & readability", "Assumptions & docs"],
+    });
+  });
+});
+
 const SAMPLE_TASK = `# UI-03: Sample task
 
 > **Required reading**:
@@ -173,8 +193,8 @@ Do the thing.
 | Assumptions & docs | ×1 | a | b | c |
 `;
 
-describe("score-task CLI --log", () => {
-  test("appends a verdict to the flightlog trail and exits with the gate code", async () => {
+describe("score-task CLI", () => {
+  test("--log appends a verdict to the flightlog trail and exits with the gate code", async () => {
     const root = await mkdtemp(join(tmpdir(), "score-task-cli-"));
     const taskFile = join(root, "03-sample.md");
     const scoresFile = join(root, "scores.json");
@@ -218,6 +238,55 @@ describe("score-task CLI --log", () => {
       expect(entry.agentLabel).toBe("judge-ui-03-a2");
       expect(entry.passed).toBe(true);
     }
+
+    await rm(root, { recursive: true });
+  });
+
+  test("--json prints the compact verdict and still composes with --log", async () => {
+    const root = await mkdtemp(join(tmpdir(), "score-task-json-"));
+    const taskFile = join(root, "03-sample.md");
+    const scoresFile = join(root, "scores.json");
+    const logFile = join(root, ".flightlog", "run.jsonl");
+    await writeFile(taskFile, SAMPLE_TASK);
+    await writeFile(
+      scoresFile,
+      JSON.stringify({
+        Correctness: 5,
+        "Test coverage": 4,
+        "Interface & readability": 4,
+        "Assumptions & docs": 4,
+      }),
+    );
+
+    const proc = Bun.spawn(
+      [
+        "bun",
+        join(import.meta.dir, "score-task.ts"),
+        taskFile,
+        scoresFile,
+        "--json",
+        "--log",
+        logFile,
+        "--attempt",
+        "2",
+        "--agent",
+        "judge-ui-03-a2",
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const out = await new Response(proc.stdout).text();
+    const code = await proc.exited;
+    expect(code).toBe(0);
+    expect(JSON.parse(out)).toEqual({
+      weighted: 31 / 7,
+      passed: true,
+      hardFailed: false,
+      missing: [],
+    });
+
+    const entries = parseLog(await readFile(logFile, "utf-8"));
+    expect(entries).toHaveLength(1);
+    expect(entries[0].kind).toBe("score");
 
     await rm(root, { recursive: true });
   });

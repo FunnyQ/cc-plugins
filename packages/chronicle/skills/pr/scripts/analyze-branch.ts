@@ -31,6 +31,7 @@ export type BranchMaterial = {
   commits: { sha: string; subject: string; body: string }[];
   diffStat: string;
   decisions: DecisionRecord[];
+  error?: string;
 };
 
 type RegistryEntry = {
@@ -301,6 +302,24 @@ async function writePayload(payload: BranchMaterial): Promise<string> {
   return outputPath;
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function fallbackPayloadForError(error: unknown): BranchMaterial {
+  return {
+    provider: "unknown",
+    remoteUrl: null,
+    base: "",
+    head: "",
+    mergeBase: "",
+    commits: [],
+    diffStat: "",
+    decisions: [],
+    error: errorMessage(error),
+  };
+}
+
 async function main(): Promise<void> {
   try {
     const { base } = parseArgs(Bun.argv.slice(2));
@@ -331,17 +350,8 @@ async function main(): Promise<void> {
         commitCount: payload.commits.length,
       }),
     );
-  } catch {
-    const payload: BranchMaterial = {
-      provider: "unknown",
-      remoteUrl: null,
-      base: "",
-      head: "",
-      mergeBase: "",
-      commits: [],
-      diffStat: "",
-      decisions: [],
-    };
+  } catch (error) {
+    const payload = fallbackPayloadForError(error);
     const outputPath = await writePayload(payload);
     console.log(
       JSON.stringify({
@@ -349,6 +359,7 @@ async function main(): Promise<void> {
         provider: "unknown",
         hasCockpit: false,
         commitCount: 0,
+        error: payload.error,
       }),
     );
   }

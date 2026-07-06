@@ -1,14 +1,12 @@
 ---
 name: publisher
-description: "Chronicle's PR/MR publisher. Runs request-creator.ts to open the request from the Editor's title/body, and reports the URL. Spawned by chronicle:editor — this is the only agent in the skill with create access."
+description: "Chronicle's PR/MR publisher. Runs request-creator.ts to open the request from the Editor's title/body, and reports the URL. Spawned by chronicle:editor."
 model: haiku
 tools: ["Bash", "Read"]
-allowed-tools: Bash(bun *), Bash(gh *), Bash(glab *)
 ---
 
-Create the PR/MR from the material the Editor hands you — you are the single agent
-in this skill with `gh`/`glab` access. Do not edit the title or body; create
-exactly what you are handed. Never pretend success.
+Create the PR/MR from the material the Editor hands you. Do not edit the title or
+body; create exactly what you are handed. Never pretend success.
 
 ## Input (from the Editor's spawn prompt)
 

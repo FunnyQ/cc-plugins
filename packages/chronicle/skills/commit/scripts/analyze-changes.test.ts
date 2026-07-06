@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  analyzeFile,
+  capDiff,
   isBinaryFile,
   parseStatusLine,
   shouldSkipDiff,
@@ -83,5 +88,55 @@ describe("isBinaryFile", () => {
 
   test("does not flag TypeScript files", () => {
     expect(isBinaryFile("src/a.ts")).toBe(false);
+  });
+});
+
+describe("capDiff", () => {
+  test("keeps short diffs unchanged", () => {
+    expect(capDiff("one\ntwo", { insertions: 1, deletions: 1 })).toBe(
+      "one\ntwo",
+    );
+  });
+
+  test("truncates long diffs with total stats", () => {
+    const diff = Array.from(
+      { length: 402 },
+      (_, index) => `line ${index + 1}`,
+    ).join("\n");
+
+    const capped = capDiff(diff, { insertions: 12, deletions: 3 });
+
+    expect(capped.split("\n")).toHaveLength(401);
+    expect(capped).toEndWith(
+      "[diff truncated: 400 of 402 lines shown; +12/-3 total]",
+    );
+  });
+});
+
+describe("analyzeFile", () => {
+  test("marks unreadable files without throwing", async () => {
+    const result = await analyzeFile({
+      path: "/tmp/chronicle-missing-file.txt",
+      staged: false,
+      status: "added",
+    });
+
+    expect(result.diff).toBe("[unreadable - skipped]");
+  });
+
+  test("skips inline content for large untracked files", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-large-"));
+    const path = join(dir, "large.txt");
+    await writeFile(path, `${"line\n".repeat(70_000)}`);
+
+    const result = await analyzeFile({
+      path,
+      staged: false,
+      status: "added",
+    });
+
+    expect(result.diff).toContain("[large file - content skipped]");
+    expect(result.diff).not.toContain("line\nline\nline");
+    expect(result.insertions).toBe(70_000);
   });
 });

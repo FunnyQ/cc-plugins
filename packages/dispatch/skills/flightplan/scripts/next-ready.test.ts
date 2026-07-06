@@ -140,9 +140,13 @@ describe("findReadyDetailed", () => {
       "ui/01.md": TASK("ui", "01", "none", "done"),
       "ui/02-final.md": FINAL_TASK("ui", "02", "ui/01", "todo"),
     });
-    const { byRef } = await loadAllTasks(join(root, "tasks"));
-    expect(findReadyDetailed(byRef)).toEqual([
-      { ref: "ui/02", finalReview: true },
+    const { byRef, pathByRef } = await loadAllTasks(join(root, "tasks"));
+    expect(findReadyDetailed(byRef, pathByRef)).toEqual([
+      {
+        ref: "ui/02",
+        finalReview: true,
+        path: join(root, "tasks", "ui", "02-final.md"),
+      },
     ]);
     await rm(root, { recursive: true });
   });
@@ -152,8 +156,8 @@ describe("findReadyDetailed", () => {
       "ui/01.md": TASK("ui", "01", "none", "done"),
       "ui/02.md": TASK("ui", "02", "ui/01", "done"),
     });
-    const { byRef } = await loadAllTasks(join(root, "tasks"));
-    expect(findReadyDetailed(byRef)).toEqual([]);
+    const { byRef, pathByRef } = await loadAllTasks(join(root, "tasks"));
+    expect(findReadyDetailed(byRef, pathByRef)).toEqual([]);
     await rm(root, { recursive: true });
   });
 });
@@ -188,7 +192,13 @@ describe("--json CLI", () => {
     });
     const { out, code } = await run(join(root, "tasks"));
     expect(code).toBe(0);
-    expect(JSON.parse(out)).toEqual([{ ref: "ui/01", finalReview: false }]);
+    expect(JSON.parse(out)).toEqual([
+      {
+        ref: "ui/01",
+        finalReview: false,
+        path: join(root, "tasks", "ui", "01.md"),
+      },
+    ]);
     await rm(root, { recursive: true });
   });
 });

@@ -10,6 +10,8 @@ const DEFAULT_PROMPT_PATH = resolve(
   "../references/commit-template.md",
 );
 const TEMP_OUTPUT_DIR = "/tmp/chronicle/commit";
+const MAX_DIFF_LINES = 400;
+const MAX_UNTRACKED_INLINE_BYTES = 256 * 1024;
 
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 export type ParsedStatus = {
@@ -26,6 +28,7 @@ type AnalyzedFile = ParsedStatus & {
 };
 
 type AnalysisResult = {
+  summary: FileSummary[];
   files: AnalyzedFile[];
   recentCommits: string[];
 };
@@ -34,6 +37,8 @@ type Numstat = {
   insertions: number;
   deletions: number;
 };
+
+type FileSummary = ParsedStatus & Numstat;
 
 function statusFromCode(code: string): FileStatus | undefined {
   switch (code) {
@@ -220,15 +225,43 @@ function parseNumstat(output: string): Numstat {
   };
 }
 
+export function capDiff(
+  diff: string,
+  stats: Numstat,
+  maxLines = MAX_DIFF_LINES,
+): string {
+  const diffLines = diff.split("\n");
+  if (diffLines.length <= maxLines) return diff;
+
+  return [
+    ...diffLines.slice(0, maxLines),
+    `[diff truncated: ${maxLines} of ${diffLines.length} lines shown; +${stats.insertions}/-${stats.deletions} total]`,
+  ].join("\n");
+}
+
 async function readUntrackedFile(path: string): Promise<AnalyzedFile> {
-  const content = await Bun.file(path).text();
+  const file = Bun.file(path);
+  const content = await file.text();
+  const insertions = lineCount(content);
+
+  if (file.size > MAX_UNTRACKED_INLINE_BYTES) {
+    return {
+      path,
+      staged: false,
+      status: "added",
+      diff: `+++ new file: ${path}\n[large file - content skipped]`,
+      insertions,
+      deletions: 0,
+    };
+  }
+
+  const stats = { insertions, deletions: 0 };
   return {
     path,
     staged: false,
     status: "added",
-    diff: `+++ new file: ${path}\n${content}`,
-    insertions: lineCount(content),
-    deletions: 0,
+    ...stats,
+    diff: capDiff(`+++ new file: ${path}\n${content}`, stats),
   };
 }
 
@@ -241,47 +274,67 @@ function binaryResult(entry: ParsedStatus): AnalyzedFile {
   };
 }
 
-async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
-  if (
-    entry.status === "added" &&
-    !entry.staged &&
-    !shouldSkipDiff(entry.path)
-  ) {
+export async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
+  try {
+    if (
+      entry.status === "added" &&
+      !entry.staged &&
+      !shouldSkipDiff(entry.path)
+    ) {
+      if (isBinaryFile(entry.path)) {
+        return binaryResult(entry);
+      }
+
+      return { ...entry, ...(await readUntrackedFile(entry.path)) };
+    }
+
+    if (shouldSkipDiff(entry.path)) {
+      const content = await Bun.file(entry.path)
+        .text()
+        .catch(() => "");
+      return {
+        ...entry,
+        diff: "[lock file - diff skipped]",
+        insertions: lineCount(content),
+        deletions: 0,
+      };
+    }
+
     if (isBinaryFile(entry.path)) {
       return binaryResult(entry);
     }
 
-    return { ...entry, ...(await readUntrackedFile(entry.path)) };
-  }
+    const cached = entry.staged ? "--cached" : "";
+    const [numstatText, diff] = await Promise.all([
+      cached
+        ? gitText`git diff --cached --numstat -- ${entry.path}`
+        : gitText`git diff --numstat -- ${entry.path}`,
+      cached
+        ? gitText`git diff --cached -- ${entry.path}`
+        : gitText`git diff -- ${entry.path}`,
+    ]);
+    const stats = parseNumstat(numstatText);
 
-  if (shouldSkipDiff(entry.path)) {
-    const content = await Bun.file(entry.path)
-      .text()
-      .catch(() => "");
+    return { ...entry, ...stats, diff: capDiff(diff, stats) };
+  } catch {
     return {
       ...entry,
-      diff: "[lock file - diff skipped]",
-      insertions: lineCount(content),
+      diff: "[unreadable - skipped]",
+      insertions: 0,
       deletions: 0,
     };
   }
+}
 
-  if (isBinaryFile(entry.path)) {
-    return binaryResult(entry);
-  }
-
-  const cached = entry.staged ? "--cached" : "";
-  const [numstatText, diff] = await Promise.all([
-    cached
-      ? gitText`git diff --cached --numstat -- ${entry.path}`
-      : gitText`git diff --numstat -- ${entry.path}`,
-    cached
-      ? gitText`git diff --cached -- ${entry.path}`
-      : gitText`git diff -- ${entry.path}`,
-  ]);
-  const stats = parseNumstat(numstatText);
-
-  return { ...entry, ...stats, diff };
+function summarizeFile(file: AnalyzedFile): FileSummary {
+  return {
+    path: file.path,
+    oldPath: file.oldPath,
+    staged: file.staged,
+    status: file.status,
+    insertions: file.insertions,
+    deletions: file.deletions,
+  };
 }
 
 async function analyzeChanges(): Promise<AnalysisResult> {
@@ -294,6 +347,7 @@ async function analyzeChanges(): Promise<AnalysisResult> {
   ]);
 
   return {
+    summary: files.map(summarizeFile),
     files,
     recentCommits: logOutput.trimEnd() ? logOutput.trimEnd().split("\n") : [],
   };

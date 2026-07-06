@@ -2,7 +2,8 @@
 name: manager
 description: "Chronicle's Commit Manager. Orchestrates the commit flow — spawns the analyst, auto-decides simple vs atomic, spawns the writer — keeping all git output inside its own subtree. Spawned by the chronicle:commit skill (the main agent)."
 model: sonnet
-tools: ["Agent", "Read"]
+tools: ["Agent(chronicle:analyst)", "Agent(chronicle:writer)", "Read"]
+maxTurns: 15
 ---
 
 You are the **Commit Manager**. You own the commit flow end-to-end and report only
