@@ -1,5 +1,28 @@
 # Changelog
 
+## [herdr 0.1.3] - 2026-07-07
+
+_herdr is independently versioned; this entry tracks the `herdr-v0.1.3` tag._
+
+### 📖 Docs
+
+- **`herd.ts` docblock verb count fixed** — corrected to say seven verbs, not five.
+- **herdr 0.7.1 verification headers** added to `cli.md`, `config.md`, and `plugin-development.md` references.
+- **Agent-orchestration spawn recipe fixed** and `SKILL.md` trigger docs trimmed.
+
+## [relay 0.4.0] - 2026-07-07
+
+_relay is independently versioned; this entry tracks the `relay-v0.4.0` tag._
+
+### ✨ Added
+
+- **`relay config set-model <backend> <mode> <model>`** — a new subcommand that validates the backend against the registry and the mode against `delegate|review|image`, then merge-writes the default model into `~/.config/q-lab/cc-plugins/relay/config.json` (preserving existing keys). Replaces error-prone agent hand-edits of the config JSON with deterministic script work.
+
+### 📖 Docs
+
+- **Live-pane mode docs extracted** from `SKILL.md` into a dedicated `references/live.md`.
+- **Renamed `/relay:claude` command to `/relay:claude-cli`** to avoid an APFS case-insensitive filename collision with `CLAUDE.md`.
+
 ## [dispatch 3.14.0] - 2026-07-07
 
 _dispatch is independently versioned; this entry tracks the `dispatch-v3.14.0` tag._

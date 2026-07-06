@@ -18,7 +18,13 @@ import {
   type LiveRunResult,
   type RunLiveOpts,
 } from "./live";
-import { createTmpRunDir, parseCsv, resolveModel, run } from "./shared";
+import {
+  CONFIG_PATH,
+  createTmpRunDir,
+  parseCsv,
+  resolveModel,
+  run,
+} from "./shared";
 
 const MODES = new Set<Mode>(["delegate", "review", "image"]);
 
@@ -50,6 +56,7 @@ export type RelayDeps = {
   buildPromptFile: typeof buildPromptFile;
   readFile: (path: string) => string;
   writeFile: (path: string, text: string) => void;
+  ensureDir: (path: string) => void;
   fileExists: (path: string) => boolean;
   run: (argv: string[], opts?: { stdin?: string }) => RunResult;
   stderr: (text: string) => void;
@@ -73,6 +80,7 @@ class UsageError extends Error {}
 function usage(backends: string): string {
   return [
     `Usage: relay <${backends}> <delegate|review|image> [flags]`,
+    `       relay config set-model <${backends}> <delegate|review|image> <model>`,
     "flags: --task <text> | --files <csv> | --focus <text>",
     "       --scope <uncommitted|base:<ref>|commit:<sha>|custom-files>",
     "       --model <provider/model> | --out <path> | --git-scope <s> | --no-project",
@@ -160,6 +168,90 @@ function isMode(mode: string | undefined): mode is Mode {
   return mode !== undefined && MODES.has(mode as Mode);
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function readJsonObject(
+  path: string,
+  deps: RelayDeps,
+): Record<string, unknown> {
+  if (!deps.fileExists(path)) return {};
+
+  const parsed = JSON.parse(deps.readFile(path));
+  return isObject(parsed) ? parsed : {};
+}
+
+function mergeModelConfig(
+  config: Record<string, unknown>,
+  backend: string,
+  mode: Mode,
+  model: string,
+): Record<string, unknown> {
+  const models = isObject(config.models) ? config.models : {};
+  const backendModels = isObject(models[backend]) ? models[backend] : {};
+
+  return {
+    ...config,
+    models: {
+      ...models,
+      [backend]: {
+        ...backendModels,
+        [mode]: model,
+      },
+    },
+  };
+}
+
+async function executeConfigCommand(
+  argv: string[],
+  deps: RelayDeps,
+  availableBackends: string,
+): Promise<RelayExecution> {
+  const [, subcommand, backendName, modeName, model, ...extra] = argv;
+
+  if (
+    subcommand !== "set-model" ||
+    !backendName ||
+    !modeName ||
+    !model ||
+    extra.length > 0
+  ) {
+    deps.stderr(
+      `Usage: relay config set-model <${availableBackends}> <delegate|review|image> <model>\n`,
+    );
+    return { code: 1 };
+  }
+
+  if (!getBackend(deps.registry, backendName)) {
+    deps.stderr(`Unknown backend: ${backendName}\n`);
+    return { code: 1 };
+  }
+
+  if (!isMode(modeName)) {
+    deps.stderr(`Unknown mode: ${modeName}\n`);
+    return { code: 1 };
+  }
+
+  let config: Record<string, unknown>;
+  try {
+    config = readJsonObject(CONFIG_PATH, deps);
+  } catch (error) {
+    deps.stderr(
+      `Could not read relay config: ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    return { code: 1 };
+  }
+
+  const nextConfig = mergeModelConfig(config, backendName, modeName, model);
+  deps.ensureDir(dirname(CONFIG_PATH));
+  deps.writeFile(CONFIG_PATH, `${JSON.stringify(nextConfig, null, 2)}\n`);
+  deps.stdout(`Saved default model for ${backendName} ${modeName}: ${model}\n`);
+  return { code: 0 };
+}
+
 function promptTextForMode(
   mode: Mode,
   flags: RelayFlags,
@@ -186,6 +278,7 @@ export async function executeRelay(
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, text, "utf-8");
     },
+    ensureDir: (path) => mkdirSync(path, { recursive: true }),
     fileExists: existsSync,
     run,
     stderr: (text) => process.stderr.write(text),
@@ -197,6 +290,10 @@ export async function executeRelay(
 ): Promise<RelayExecution> {
   let parsed: ParsedFlags;
   const availableBackends = Object.keys(deps.registry).join("|");
+
+  if (argv[0] === "config") {
+    return executeConfigCommand(argv, deps, availableBackends);
+  }
 
   try {
     parsed = parseFlags(argv);

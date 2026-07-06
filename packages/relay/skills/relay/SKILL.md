@@ -45,30 +45,10 @@ For brevity the examples below write `relay.ts <backend> <mode> …` as shorthan
 
 ## Live-pane mode (inside herdr)
 
-When the session runs inside herdr (`HERDR_ENV=1`), `delegate` and `review` automatically execute in a **visible, take-over-able TUI opened in its own new herdr tab** (your current pane keeps its full size — no split) instead of a blocking headless spawn. `image` always stays headless/native. Nothing changes in how you invoke `relay.ts` — the routing is automatic.
-
-Flags:
-
-- `--headless` — force today's headless flow even inside herdr. **Use this for nested delegation**: an agent that was itself live-delegated inherits `HERDR_ENV=1`, and a second layer of panes is rarely what anyone wants.
-- `--wait-timeout <ms>` — how long relay polls for the result (default 600000 = 10 min).
-- `--dangerous` — **YOLO / unattended** live run: the delegate proceeds without stopping on approval prompts (codex `--dangerously-bypass-approvals-and-sandbox`, claude `--dangerously-skip-permissions`, opencode `--auto`). Without it, approval prompts surface **in the pane** for a human to answer. Pass `--dangerous` when nobody is watching the pane to press "allow"; leave it off for supervised runs.
-
-Output contract:
-
-- **stdout = the answer only** (clean markdown from the delegate's result file). Live metadata — agent name, keep/close hint — rides **stderr**.
-- The tail of stderr names the herd agent (e.g. `relay-codex-delegate-a3f9`). Keep it: it's the handle for every follow-up.
-
-**After a successful live run** the pane is left open on purpose. Confirm with the user via AskUserQuestion — close it, or keep it for follow-up conversation:
-
-```
-AskUserQuestion("live pane（<agent-name>）要關閉還是留著追問？")
-```
-
-On close: `bun <herd.ts> close <agent-name>` (herd.ts lives in the herdr plugin; the exact path is printed in relay's stderr report). On keep: continue the conversation directly with `herd send/wait/read` — follow-ups are out of relay's scope; relay is one-shot spawn→capture.
-
-**Pending report (exit 0 + "still running")** — if the delegate outlives `--wait-timeout`, relay does NOT kill or close anything. It exits **0** with a report of copy-pasteable follow-ups (`herd wait/read/close <name>` + `cat <result.md>`). Treat this as "work in progress", not failure: relay's non-zero = stop rule does not apply. Collect the answer later with `herd wait <name>` then `cat` the result file.
-
-If live mode is denied for a non-user reason (herd.ts unresolvable, backend without a live seam), relay prints one stderr note and runs headless in the same invocation — no action needed.
+Inside herdr (`HERDR_ENV=1`), `delegate` and `review` auto-route to a live TUI pane in a new tab.
+Before running in that environment, read `references/live.md`.
+It covers flags (`--headless` / `--wait-timeout` / `--dangerous`), stdout/stderr output contract, pane close-or-keep protocol, and pending-report semantics.
+`image` stays headless/native.
 
 ---
 
@@ -147,6 +127,8 @@ AskUserQuestion("要生什麼圖？")
 
 If **--out** is missing, ask the user (offer default: `./generated/image.png`).
 
+In non-interactive contexts (invoked by a sub-agent or headless), do not block on AskUserQuestion; fail fast with a clear message naming the missing argument.
+
 Once both are known, run:
 
 ```bash
@@ -164,9 +146,11 @@ Report the final saved path. If the user wants a different name, use a non-destr
 Evaluate each backend suggestion and act:
 
 **Auto-apply** (for delegate only):
-- Codex provided a concrete diff or exact file/line edit
+- The backend provided a concrete diff or exact file/line edit
 - The change is inside the selected scope
 - The current agent can run verification afterward
+
+In delegate mode, backends are write-capable and may have already edited the working tree; this apply policy governs suggestions in the report, while already-applied changes are verified and reported under 已套用變更.
 
 After applying, run any available verification (lint / type check / tests) via Bash. If verification fails, undo only your own attempted edit and move the suggestion to "report only."
 
@@ -194,27 +178,18 @@ When the user passes an explicit `--model` flag:
    AskUserQuestion("儲存 <model> 作為 <backend> <mode> 的預設值嗎？")
    ```
 
-3. If the user approves, merge-write the config file:
-   - Location: `~/.config/q-lab/cc-plugins/relay/config.json`
-   - Shape: `{ "models": { "<backend>": { "<mode>": "<provider/model>" } } }`
-   - Preserve existing keys; only update the target `<backend>.<mode>` entry
+3. If the user approves, save it through the relay config command:
+   ```bash
+   relay.ts config set-model <backend> <mode> "<provider/model>"
+   ```
 
-Example config after saving opencode delegate model:
-```json
-{
-  "models": {
-    "opencode": {
-      "delegate": "opencode-go/kimi-k2.7-code"
-    }
-  }
-}
-```
+Config file location: `~/.config/q-lab/cc-plugins/relay/config.json`.
 
 ---
 
 ## Failure Handling
 
-If the script exits non-zero or returns empty output, report the failure in zh-TW and stop — do not guess or fabricate suggestions. (Exception: a live-mode **pending report** exits 0 by design — see "Live-pane mode" above.) Include:
+If the script exits non-zero, report the failure in zh-TW and stop — do not guess or fabricate suggestions. (Exception: a live-mode **pending report** exits 0 by design — see `references/live.md`.) Include:
 
 - Command intent
 - Exit code if available
@@ -268,4 +243,5 @@ Capability gates (e.g., `/relay:relay opencode image` → unsupported) fail fast
 
 ## Additional Resources
 
-- **`references/backends.md`** — per-CLI flags, headless output handling, #26855 caveat, and install instructions
+- **`references/backends.md`** — read only when installing the OpenCode symlink integration or debugging a backend CLI failure; `relay.ts` already encodes all CLI invocations, so normal runs never need it.
+- **`references/live.md`** — read only when `HERDR_ENV=1`; covers live-pane flags, output contract, pane lifecycle, and pending-report semantics.

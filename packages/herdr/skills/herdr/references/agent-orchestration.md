@@ -1,5 +1,7 @@
 # Herdr Agent Orchestration
 
+Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+
 Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself — inspect sibling panes, split panes, spawn other agents, and coordinate with them over the CLI. This is a live-session operational guide; see `cli.md` for full command/flag syntax.
 
 ## Precondition
@@ -25,7 +27,7 @@ herdr workspace list
 
 **Run a server and wait until it's ready:**
 ```bash
-NEW_PANE=$(herdr pane split 1-2 --direction right --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
+NEW_PANE=$(herdr pane split --current --direction right --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr pane run "$NEW_PANE" "npm run dev"
 herdr wait output "$NEW_PANE" --match "ready" --timeout 30000
 herdr pane read "$NEW_PANE" --source recent --lines 20
@@ -33,7 +35,7 @@ herdr pane read "$NEW_PANE" --source recent --lines 20
 
 **Run tests in a separate pane, then inspect the result:**
 ```bash
-NEW_PANE=$(herdr pane split 1-2 --direction down --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
+NEW_PANE=$(herdr pane split --current --direction down --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr pane run "$NEW_PANE" "cargo test"
 herdr wait output "$NEW_PANE" --match "test result" --timeout 60000
 herdr pane read "$NEW_PANE" --source recent --lines 30
@@ -44,25 +46,33 @@ herdr pane read "$NEW_PANE" --source recent --lines 30
 herdr agent start reviewer --cwd "$PWD" --split right --no-focus -- claude
 herdr agent wait reviewer --status idle --timeout 15000
 herdr agent send reviewer "review the test coverage in src/api/"
+REVIEWER_PANE=$(herdr agent get reviewer | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["agent"]["pane_id"])')
+sleep 0.4
+herdr pane send-keys "$REVIEWER_PANE" enter
 ```
 
 **Coordinate with another agent (block until it's done, then read its output):**
 ```bash
-herdr wait agent-status 1-1 --status done --timeout 120000
-herdr pane read 1-1 --source recent --lines 100
+herdr pane list
+OTHER_PANE="<pane_id_from_fresh_list>"
+herdr wait agent-status "$OTHER_PANE" --status done --timeout 120000
+herdr pane read "$OTHER_PANE" --source recent --lines 100
 ```
 
 **Watch a sibling pane robustly** — read what's already there before waiting, so you don't miss output that arrived before the wait started:
 ```bash
-herdr pane read 1-3 --source recent --lines 40
-herdr wait output 1-3 --match "ready" --timeout 30000
-herdr pane read 1-3 --source recent-unwrapped --lines 40   # inspect the same transcript the waiter matched
+herdr pane list
+SIBLING_PANE="<pane_id_from_fresh_list>"
+herdr pane read "$SIBLING_PANE" --source recent --lines 40
+herdr wait output "$SIBLING_PANE" --match "ready" --timeout 30000
+herdr pane read "$SIBLING_PANE" --source recent-unwrapped --lines 40   # inspect the same transcript the waiter matched
 ```
 
 ## Gotchas
 
 - `wait output --source recent` matches against **unwrapped** recent text — pane width and soft-wrapping don't affect the match — even though `pane read --source recent` displays the wrapped version.
 - Use `pane read` for output that already exists; use `wait output` for output you expect to appear next.
+- Raw `agent send` writes literal text but does not submit it. Re-resolve the agent's pane id, pause briefly (about 0.4s), then send `enter`; an Enter sent too fast can be swallowed by the agent TUI.
 - `pane send-text` / `pane send-keys` / `pane run` print nothing on success — don't expect JSON back.
 
 See `cli.md` for the full command/flag reference.

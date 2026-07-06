@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { BACKENDS } from "./backends";
 import { executeRelay, parseFlags, type RelayDeps } from "./relay";
+import { CONFIG_PATH } from "./shared";
 import type { RunResult } from "./types";
 import type { LiveRunResult } from "./live";
 
@@ -18,6 +19,7 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
     writeFile: (path, text) => {
       files.set(path, text);
     },
+    ensureDir: () => {},
     fileExists: (path) => files.has(path),
     run: () => ({
       ok: true,
@@ -157,6 +159,71 @@ describe("parseFlags", () => {
 });
 
 describe("executeRelay", () => {
+  it("merge-writes config set-model without running a backend", async () => {
+    let spawned = false;
+    const files = new Map<string, string>([
+      [
+        CONFIG_PATH,
+        JSON.stringify({
+          keep: true,
+          models: {
+            opencode: { review: "old-review" },
+            claude: { delegate: "old-claude" },
+          },
+        }),
+      ],
+    ]);
+    const ensuredDirs: string[] = [];
+    const printed: string[] = [];
+
+    const result = await executeRelay(
+      ["config", "set-model", "opencode", "delegate", "provider/model"],
+      deps({
+        readFile: (path) => files.get(path) ?? "",
+        writeFile: (path, text) => files.set(path, text),
+        ensureDir: (path) => ensuredDirs.push(path),
+        fileExists: (path) => files.has(path),
+        run: () => {
+          spawned = true;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        stdout: (text) => printed.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(spawned).toBe(false);
+    expect(ensuredDirs).toContain(CONFIG_PATH.replace(/\/config\.json$/, ""));
+    expect(JSON.parse(files.get(CONFIG_PATH)!)).toEqual({
+      keep: true,
+      models: {
+        opencode: {
+          review: "old-review",
+          delegate: "provider/model",
+        },
+        claude: { delegate: "old-claude" },
+      },
+    });
+    expect(printed.join("")).toContain("Saved default model");
+  });
+
+  it("rejects config set-model for unknown backend or mode", async () => {
+    const errors: string[] = [];
+    const unknownBackend = await executeRelay(
+      ["config", "set-model", "future", "delegate", "provider/model"],
+      deps({ stderr: (text) => errors.push(text) }),
+    );
+    const unknownMode = await executeRelay(
+      ["config", "set-model", "codex", "inspect", "provider/model"],
+      deps({ stderr: (text) => errors.push(text) }),
+    );
+
+    expect(unknownBackend.code).toBe(1);
+    expect(unknownMode.code).toBe(1);
+    expect(errors.join("")).toContain("Unknown backend: future");
+    expect(errors.join("")).toContain("Unknown mode: inspect");
+  });
+
   it("rejects unknown backend at dispatch and lists registry keys", async () => {
     const errors: string[] = [];
     const result = await executeRelay(

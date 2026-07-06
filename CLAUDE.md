@@ -100,7 +100,7 @@ cc-plugins/
     ├── commands/                        # backend-fixed alias commands (auto-discovered; generic entry is the relay:relay skill)
     │   ├── codex.md                     # alias: /relay:codex → /relay:relay codex $ARGUMENTS
     │   ├── opencode.md                  # alias: /relay:opencode → /relay:relay opencode $ARGUMENTS
-    │   └── claude.md                    # alias: /relay:claude → /relay:relay claude $ARGUMENTS
+    │   └── claude-cli.md                # alias: /relay:claude-cli → /relay:relay claude $ARGUMENTS
     └── skills/relay/
         ├── SKILL.md                      # orchestration, smart-apply, report formats, install docs
         ├── references/backends.md        # per-CLI flags + headless output + opencode symlink install

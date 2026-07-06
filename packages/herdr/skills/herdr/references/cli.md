@@ -1,5 +1,7 @@
 # Herdr CLI Reference
 
+Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+
 Most commands output JSON for scripting.
 
 ## IDs are not durable
