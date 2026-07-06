@@ -27,6 +27,8 @@ If a `docs/<slug>/tasks/` tree already exists and the user wants execution, use 
 
 ## Process
 
+Resolve the scripts path once. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash, so take the skill's load-time *"Base directory for this skill"* banner, set `SCRIPTS="<base-dir>/scripts"`, and use `bun "$SCRIPTS"/...` in every command below.
+
 1. Interview for the roadmap using `references/interview-guide.md`. Elicit milestone legs and each leg's done-state. Do **not** break legs into tasks.
 2. After the user approves, write `docs/<proj>/WAYPOINTS.md` using `references/waypoints-template.md`. This skill authors the roadmap; there is no CLI verb for creating it. Mark leg 1 `[~]` and every later leg `[ ]`.
 3. To plan a leg, hand off to `flightplan`. It detects the project's `WAYPOINTS.md`, reads the active leg, and runs in waypoint mode.
@@ -37,7 +39,7 @@ If a `docs/<slug>/tasks/` tree already exists and the user wants execution, use 
 All verbs run through:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts <verb> ...
+bun "$SCRIPTS"/waypoints.ts <verb> ...
 ```
 
 `<proj>` is the directory under `docs/`, so the roadmap lives at `docs/<proj>/WAYPOINTS.md`. Run every verb from the project root — `docs/<proj>` resolves against the current working directory.
@@ -47,7 +49,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts <verb> ...
 Invocation:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts active <proj>
+bun "$SCRIPTS"/waypoints.ts active <proj>
 ```
 
 Reads `docs/<proj>/WAYPOINTS.md` and prints the active leg plus a rolling-wave digest of prior landed legs:
@@ -68,7 +70,7 @@ If there is no `[~]` leg, it exits non-zero with a clear message. It distinguish
 Invocation:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>
+bun "$SCRIPTS"/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>
 ```
 
 `<buckets>` is comma-separated. The command builds a nested leg flightplan tree:
@@ -98,8 +100,8 @@ Rules:
 Preview invocations:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts advance <proj>
-bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts advance <proj> --dry-run
+bun "$SCRIPTS"/waypoints.ts advance <proj>
+bun "$SCRIPTS"/waypoints.ts advance <proj> --dry-run
 ```
 
 Preview only, never writes. It drafts one outcome line from `docs/<proj>/legs/NN-slug/.flightlog/RUNLOG.md` plus the leg flightplan's goal, then prints:
@@ -111,7 +113,7 @@ DRAFT OUTCOME: <drafted one-line outcome>
 Write invocation:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/waypoints/scripts/waypoints.ts advance <proj> --outcome "<confirmed line>" [--date YYYY-MM-DD]
+bun "$SCRIPTS"/waypoints.ts advance <proj> --outcome "<confirmed line>" [--date YYYY-MM-DD]
 ```
 
 The presence of `--outcome` is the confirmation gate. `--date` defaults to today.
