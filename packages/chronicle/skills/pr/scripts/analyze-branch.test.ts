@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   branchDecisions,
+  fallbackPayloadForError,
   detectProvider,
   projectMatches,
   type DecisionRecord,
@@ -128,5 +129,17 @@ describe("branchDecisions", () => {
         (record) => record.id,
       ),
     ).toEqual(["unscoped"]);
+  });
+});
+
+describe("fallbackPayloadForError", () => {
+  test("preserves the failure message", () => {
+    expect(fallbackPayloadForError(new Error("merge-base failed")).error).toBe(
+      "merge-base failed",
+    );
+  });
+
+  test("stringifies non-error failures", () => {
+    expect(fallbackPayloadForError("boom").error).toBe("boom");
   });
 });
