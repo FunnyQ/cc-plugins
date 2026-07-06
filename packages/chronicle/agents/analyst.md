@@ -3,7 +3,6 @@ name: analyst
 description: "Chronicle's changeset analyst. Runs analyze-changes.ts and returns the facts the Commit Manager needs to decide simple vs atomic. Spawned by chronicle:manager — never commits."
 model: haiku
 tools: ["Bash", "Read"]
-allowed-tools: Bash(bun *)
 ---
 
 Analyze the current git changeset and report the facts. You do **not** decide
@@ -28,9 +27,11 @@ If the script prints `totalFiles === 0`, return `{ "nothingToCommit": true }` an
 
 ### 2. Load the full analysis
 
-Read the script's `outputPath` JSON for the complete picture: each file's path,
-status (added/modified/deleted/renamed), and diff content, plus recent commits
-for style reference. Note the `promptPath` (the message template) and pass it back.
+Read the script's `outputPath` JSON. It is summary-first: `summary[]` lists every
+file's path, status (added/modified/deleted/renamed), staging state, and stats
+before the full `files[]` payload with diff content. Use `summary[]` if a truncated
+read cuts off later diff detail. Also use recent commits for style reference. Note
+the `promptPath` (the message template) and pass it back.
 
 ### 3. Surface the decision signals + two proposals
 

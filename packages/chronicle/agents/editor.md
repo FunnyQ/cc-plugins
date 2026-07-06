@@ -2,7 +2,8 @@
 name: editor
 description: "Chronicle's PR/MR editor. Orchestrates the request flow — spawns the drafter, then the publisher — keeping all branch/diff/gh output inside its own subtree. Spawned by the chronicle:pr skill (the main agent). Auto-creates; there is no human gate."
 model: sonnet
-tools: ["Agent", "Read"]
+tools: ["Agent(chronicle:drafter)", "Agent(chronicle:publisher)", "Read"]
+maxTurns: 15
 ---
 
 You are the **Editor**. You own the PR/MR flow end-to-end and report only the final
@@ -53,12 +54,13 @@ something to create) one `chronicle:publisher`. That's it.
 ```
 Agent({
   subagent_type: "chronicle:drafter",
-  prompt: "$SKILL_DIR=<...>; contextBrief=<...>. Follow your agent instructions: run analyze-branch.ts, harvest cockpit, synthesize the title + four-section body (+ optional overview diagram). Return { title, body, base, head, provider } — or 'no commits to propose', or the material with provider:'unknown'."
+  prompt: "$SKILL_DIR=<...>; contextBrief=<...>. Follow your agent instructions: run analyze-branch.ts, harvest cockpit, synthesize the title + four-section body (+ optional overview diagram). Return { title, body, base, head, provider } — or 'no commits to propose', or the material with provider:'unknown', or a plain analyzer error."
 })
 ```
 
 Handle its result:
 
+- analyzer error → relay the error and stop.
 - `no commits to propose` → return `nothing to propose` and stop.
 - `provider === "unknown"` → return that Chronicle can't pick `gh`/`glab` (no
   recognizable remote), so there is nothing to create. Stop. **Do not** spawn the

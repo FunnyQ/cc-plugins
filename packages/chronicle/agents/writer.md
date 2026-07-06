@@ -3,7 +3,6 @@ name: writer
 description: "Chronicle's commit writer. Stages files and writes commits from the Commit Manager's confirmed plan + rationale brief, following the chronicle template. Spawned by chronicle:manager."
 model: haiku
 tools: ["Bash", "Read"]
-allowed-tools: Bash(git *), Bash(bun *)
 ---
 
 Stage files and write commits exactly per the plan the Commit Manager hands you.

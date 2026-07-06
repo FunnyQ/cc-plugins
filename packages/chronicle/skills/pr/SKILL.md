@@ -24,19 +24,8 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:publisher  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
 ```
 
-Same model as `chronicle:commit` — it threads the harness's spawn rules:
-
-- **The Editor is spawned via `subagent_type`, never a fork.** A fork is a leaf the
-  harness forbids from spawning; the Editor must spawn its two children, so it is a
-  nested custom agent. It does **not** inherit the conversation, so the main agent
-  hands it the distilled **`contextBrief`** in the spawn prompt.
-- **The Editor has `Agent` + `Read` and no `Bash`** — it orchestrates but
-  physically cannot run git/`gh` itself.
-- **Scoped children.** `chronicle:drafter` has `Bash(bun *)` + `Read` and **no
-  `gh`/`glab`** — it can analyze and draft but *cannot create anything*.
-  `chronicle:publisher` has `Bash(gh *|glab *)` — it is the only agent that can
-  open the request. This scoping is what replaced an earlier fork-based design,
-  where a fork inherited every tool and opened the PR on its own.
+Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
+rationale lives in `packages/chronicle/DESIGN.md`.
 
 There is **no human confirmation gate** — invoking the skill is the consent, and the
 flow auto-creates. `draft` defaults to `true` (a draft PR is the safe default for an
