@@ -200,7 +200,7 @@ Cockpit checks `/api/codex-control/status` before enabling the Codex send box, s
 
 Interview-driven planning you can execute. Three skills form one arc — gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop — and a fourth, `waypoints`, sits *above* it for whole-project rolling-wave planning.
 
-![Dispatch flow: preflight → flightplan → autopilot → final review → ship](./assets/dispatch-flow.svg)
+![Dispatch flow: preflight, waypoints, flightplan, autopilot, final review, ship](./assets/dispatch-flow.svg)
 
 - **preflight** — a lightweight interview that produces a single in-conversation plan. Best when you'll execute now, in one session.
 - **flightplan** — a thorough interview that writes `docs/<slug>/PLAN.md` plus a `tasks/` tree of self-contained task files (each with its own `## Eval rubric`). Best when the work spans sessions or hands off to sub-agents.
