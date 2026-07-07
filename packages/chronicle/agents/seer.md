@@ -27,22 +27,24 @@ It prints a JSON blob to stdout **and** writes the same object to an `outputPath
 
 ### 2. Load the full facts
 
-Read the `outputPath` JSON (it is the complete, untruncated object). Return it whole
-— do not summarize away fields. The main agent needs:
+Read the `outputPath` JSON (it is the complete, untruncated object). Return only the
+fields the main agent needs; omit the raw `tags[]` list:
 
 - `hasConfig`, `config` — whether `.chronicle/release.json` already exists, and it.
 - `suggested` — the detected `ReleaseConfig` defaults (used only when `hasConfig` is
   false, to seed the interview).
-- `branch`, `root`, `tags`.
+- `branch`, `root`, `outputPath`.
 - whole-repo: `current`, `bumps` (`{ patch, minor, major }`), `lastTag`.
 - per-component: `components[]`, each `{ name, path, lastTag, current, bumps,
-  commitCount }`. `commitCount` is commits since that component's last scoped tag —
-  the signal for "which component actually changed".
+  commitCount }`. `commitCount` is commits since that component's last scoped tag;
+  null means the analyzer could not determine the count, so the main agent must not
+  treat it as "unchanged".
 
 ### 3. Return JSON
 
-Return the facts object verbatim (the `outputPath` payload). Add nothing; invent
-nothing. If the analyzer errors, return the error text plainly so the main agent can
+Return a JSON object with exactly those fields from the `outputPath` payload, plus
+`outputPath` itself for debugging. Add nothing; invent nothing; do not include raw
+`tags`. If the analyzer errors, return the error text plainly so the main agent can
 relay it.
 
 ## Guidelines

@@ -3,6 +3,7 @@ import {
   applyVersionToContent,
   computeBumps,
   detectShape,
+  lastTagFor,
   normalizeVersion,
   parseConfig,
   readVersionFromContent,
@@ -114,6 +115,16 @@ describe("applyVersionToContent", () => {
     expect(out).toContain(`"version": "18.0.0"`); // nested untouched
     expect(out).toContain(`"version": "0.5.0"`); // top-level bumped
     expect(out).not.toContain(`"version": "0.4.0"`);
+  });
+
+  test("targets top-level in minified json when a nested version appears first", () => {
+    const content = `{"engine":{"version":"18"},"version":"0.4.0"}`;
+    const out = applyVersionToContent(
+      content,
+      { path: "p", kind: "json" },
+      "0.5.0",
+    );
+    expect(out).toBe(`{"engine":{"version":"18"},"version":"0.5.0"}`);
   });
 
   test("rewrites a toml version", () => {
@@ -254,6 +265,22 @@ describe("tagPrefix", () => {
 
   test("honors a custom template (source of truth, not hard-coded 'v')", () => {
     expect(tagPrefix({ ...whole, tag: "release-{version}" })).toBe("release-");
+  });
+});
+
+describe("lastTagFor", () => {
+  test("matches a version-first template without accepting unrelated tags", () => {
+    const config: ReleaseConfig = {
+      mode: "whole-repo",
+      tag: "{version}-final",
+      changelog: "CHANGELOG.md",
+      branches: { develop: "develop", main: "main" },
+      versionFiles: [],
+    };
+
+    expect(
+      lastTagFor(["v9.9.9", "1.2.3-final", "2.0.0", "1.3.0-final"], config),
+    ).toEqual({ tag: "1.3.0-final", version: "1.3.0" });
   });
 });
 

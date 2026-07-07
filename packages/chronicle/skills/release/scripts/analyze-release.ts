@@ -106,17 +106,40 @@ function spliceGroup(
   return content.slice(0, gStart) + value + content.slice(gStart + m[1].length);
 }
 
-/**
- * Find the top-level JSON `"version"`. `readVersionFromContent` reads it via
- * JSON.parse (structurally top-level), so the runesmith must target the same field —
- * a naive first-match would rewrite a nested `"version"` that happens to appear
- * earlier. Pick the match with the shallowest line indentation (top-level members
- * of a pretty-printed manifest sit at the outermost indent); fall back to the first
- * match for minified single-line JSON.
- */
+/** Find the top-level JSON `"version"` key without reformatting the file. */
 function topLevelJsonVersion(content: string): RegExpMatchArray | null {
+  const depthAt = new Array<number>(content.length);
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    depthAt[i] = depth;
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === "{") {
+      depth++;
+    } else if (ch === "}") {
+      depth = Math.max(0, depth - 1);
+    }
+  }
+
   let best: { m: RegExpMatchArray; indent: number } | null = null;
   for (const m of content.matchAll(/"version"\s*:\s*"([^"]+)"/g)) {
+    if (depthAt[m.index!] !== 1) continue;
     const indent = m.index! - (content.lastIndexOf("\n", m.index!) + 1);
     if (!best || indent < best.indent) best = { m, indent };
   }
@@ -400,19 +423,41 @@ export function tagPrefix(config: ReleaseConfig, component?: string): string {
   return i >= 0 ? filled.slice(0, i) : filled;
 }
 
-function lastTagFor(
+function escapeRegex(s: string): string {
+  return s.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+}
+
+function tagRegex(config: ReleaseConfig, component?: string): RegExp {
+  const semver = "(?<version>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?)";
+  let pattern = "";
+  let last = 0;
+  for (const m of config.tag.matchAll(/\{version\}|\{component\}/g)) {
+    pattern += escapeRegex(config.tag.slice(last, m.index!));
+    pattern +=
+      m[0] === "{version}"
+        ? semver
+        : escapeRegex(component ?? "[unknown-component]");
+    last = m.index! + m[0].length;
+  }
+  pattern += escapeRegex(config.tag.slice(last));
+  return new RegExp(`^${pattern}$`);
+}
+
+export function lastTagFor(
   tags: string[],
   config: ReleaseConfig,
   component?: string,
 ): { tag: string; version: string } | null {
-  const prefix = tagPrefix(config, component);
+  const re = tagRegex(config, component);
   const matching = tags
-    .filter((t) => t.startsWith(prefix))
-    .map((t) => t.slice(prefix.length))
-    .filter((v) => parseSemver(v))
-    .sort((a, b) => cmpSemver(a, b));
+    .flatMap((tag) => {
+      const m = re.exec(tag);
+      const version = m?.groups?.version;
+      return version && parseSemver(version) ? [{ tag, version }] : [];
+    })
+    .sort((a, b) => cmpSemver(a.version, b.version));
   const top = matching.at(-1);
-  return top ? { tag: `${prefix}${top}`, version: top } : null;
+  return top ?? null;
 }
 
 function cmpSemver(a: string, b: string): number {
@@ -492,22 +537,20 @@ async function apply(
   return changed;
 }
 
-async function sh(cmd: string): Promise<string> {
-  try {
-    return (await $({ raw: [cmd] }).quiet()).stdout.toString().trim();
-  } catch {
-    return "";
-  }
-}
-
 async function commitCountSince(
   ref: string | null,
   pathScope?: string,
-): Promise<number> {
+): Promise<number | null> {
   const range = ref ? `${ref}..HEAD` : "HEAD";
-  const scope = pathScope ? ` -- ${pathScope}` : "";
-  const out = await sh(`git rev-list --count ${range}${scope}`);
-  return Number(out) || 0;
+  try {
+    const out = pathScope
+      ? await $`git rev-list --count ${range} -- ${pathScope}`.quiet()
+      : await $`git rev-list --count ${range}`.quiet();
+    const count = Number(out.stdout.toString().trim());
+    return Number.isFinite(count) ? count : null;
+  } catch {
+    return null;
+  }
 }
 
 export type ComponentFact = {
@@ -516,7 +559,7 @@ export type ComponentFact = {
   lastTag: string | null;
   current: string | null;
   bumps: { patch: string; minor: string; major: string } | null;
-  commitCount: number;
+  commitCount: number | null;
 };
 
 async function perComponentFacts(

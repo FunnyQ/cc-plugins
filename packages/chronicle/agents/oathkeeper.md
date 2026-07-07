@@ -47,10 +47,12 @@ malfunction — stop and use what you already have.
   `references/release-config.md`).
 - `persistConfig` — `true` on a first run: the smith must write
   `.chronicle/release.json` before bumping.
-- `releases[]` — one or more units to cut, each `{ component, targetVersion }`.
-  Per-component repos carry the component name; whole-repo carries a single entry
-  with `component: null`. **Two or more entries is a coordinated release**: one
-  commit, one develop→main merge, N scoped tags.
+- `releases[]` — one or more units to cut, each
+  `{ component, targetVersion, lastTag }`. Per-component repos carry the component
+  name and their scoped `lastTag`; whole-repo carries a single entry with
+  `component: null` and the top-level `lastTag`. `lastTag` may be null on a first
+  release. **Two or more entries is a coordinated release**: one commit, one
+  develop→main merge, N scoped tags.
 - `contextBrief` — the distilled "why" of this release.
 - `branch` — the current branch.
 
@@ -79,7 +81,7 @@ Then across the whole batch:
 ```
 Agent({
   subagent_type: "chronicle:smith",
-  prompt: "$SKILL_DIR=<...>. persistConfig=<bool>; if true, save this config first: <config JSON>. Then for EACH release, --apply <targetVersion>[ --component <component>] and --verify the same. releases=<[{component,targetVersion}, ...] JSON>. Return { savedConfig?, changed[], verify:{ allMatch, byRelease[] } }."
+  prompt: "$SKILL_DIR=<...>. persistConfig=<bool>; if true, save this config first: <config JSON>. Then for EACH release, --apply <targetVersion>[ --component <component>] and --verify the same. releases=<[{component,targetVersion,lastTag}, ...] JSON>. Return { savedConfig?, changed[], verify:{ allMatch, byRelease[] } }."
 })
 ```
 
@@ -91,7 +93,7 @@ further. Never let a half-bumped tree reach a tag.
 ```
 Agent({
   subagent_type: "chronicle:annalist",
-  prompt: "$SKILL_DIR=<...>. Write a CHANGELOG entry per release. changelogPath=<config.changelog>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON> (lastTag per component from survey, may be null; pathScope none for whole-repo). Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
+  prompt: "$SKILL_DIR=<...>. Write a CHANGELOG entry per release. changelogPath=<config.changelog>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON> (lastTag comes from the matching releases[] entry and may be null; pathScope none for whole-repo). Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
 })
 ```
 

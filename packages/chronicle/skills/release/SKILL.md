@@ -75,9 +75,11 @@ If `hasConfig` is true, use `config` as-is and skip this step.
 ### 3. Version gate (always)
 
 The gate resolves a **`releases[]`** list — one entry per unit being cut, each
-`{ component, targetVersion }` (whole-repo uses a single entry with `component:
-null`). One component is just a length-1 list; two or more is a **coordinated
-release**.
+`{ component, targetVersion, lastTag }` (whole-repo uses a single entry with
+`component: null`). `lastTag` comes from the seer facts the main agent already
+holds: per-component from `components[].lastTag`, whole-repo from top-level
+`lastTag`, and it may be null on a first release. One component is just a length-1
+list; two or more is a **coordinated release**.
 
 - **per-component**: pick the component set, then a bump per component.
   - If component token(s) were given, use exactly those.
@@ -85,13 +87,14 @@ release**.
     to it; if several, offer them all (pre-select the changed ones) and let the user
     release one, some, or all together — this is the coordinated path; if none
     changed, tell the user there's nothing to release and stop (unless they force an
-    explicit component + version).
+    explicit component + version). If `commitCount` is null, treat the change count
+    as unknown and do not infer that the component is unchanged.
   - For **each** selected component, ask its bump (`patch` / `minor` / `major` /
     explicit) using that component's own `bumps`. Resolve one
-    `{ component, targetVersion }` per selection.
+    `{ component, targetVersion, lastTag }` per selection.
 - **whole-repo**: ask the bump using the top-level `bumps` → a single
-  `{ component: null, targetVersion }`. If `current` is null (first release, no prior
-  tag), ask for an explicit starting version (offer `0.1.0`).
+  `{ component: null, targetVersion, lastTag }`. If `current` is null (first
+  release, no prior tag), ask for an explicit starting version (offer `0.1.0`).
 
 Resolve `releases[]`. Coordinated releases are per-component only — you never mix
 whole-repo with per-component units.
@@ -104,11 +107,12 @@ whole-repo with per-component units.
 
 Distill a tight `contextBrief` (the "why" of this release, from the conversation —
 the Oathkeeper can't see the chat), then spawn it with: `$SKILL_DIR`, `mode`,
-`config`, `persistConfig`, `releases[]` (each `{ component, targetVersion }`),
-`contextBrief`, and `branch`. The Oathkeeper derives each unit's tag name, changelog
-header, and path scope from `config` itself. It returns the final report; relay it to
-the user — the touched files + next steps (prepare), or the tag(s) + push status
-(auto). Nothing else.
+`config`, `persistConfig`, `releases[]` (each
+`{ component, targetVersion, lastTag }`), `contextBrief`, and `branch`. The
+Oathkeeper derives each unit's tag name, changelog header, and path scope from
+`config` itself, and forwards each release's `lastTag` to the annalist. It returns
+the final report; relay it to the user — the touched files + next steps (prepare),
+or the tag(s) + push status (auto). Nothing else.
 
 ## Protected branches
 
