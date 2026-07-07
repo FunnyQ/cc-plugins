@@ -25,9 +25,10 @@ point them at a config file. Do not write a config anywhere except the first-run
 - `persistConfig` — `true` only on a first run (no `.chronicle/release.json` yet).
   When `false`, the config already exists on disk: do **nothing** config-related —
   skip step 1 entirely and go straight to apply.
-- `targetVersion` — the bare version, e.g. `0.5.0`.
-- `component` — optional; pass through as `--component <name>` for a per-component
-  repo.
+- `releases[]` — one or more units to bump, each `{ component, targetVersion }`.
+  `targetVersion` is the bare version (e.g. `0.5.0`); `component` (per-component
+  repos) passes through as `--component <name>`, and is null/absent for whole-repo.
+  A coordinated release hands you several entries — bump **each**.
 
 ## Process
 
@@ -46,32 +47,38 @@ bun $SKILL_DIR/scripts/analyze-release.ts --save-config /tmp/chronicle/release-c
 When `persistConfig` is `false`, **skip this step** — do not write a config file and
 do not pass one to anything.
 
-### 2. Apply the version
+### 2. Apply + verify each release
+
+Loop over `releases[]`. For **each** `{ component, targetVersion }`, run apply then
+verify — one component at a time (`--apply`/`--verify` scope to that component's
+version files):
 
 ```bash
 bun $SKILL_DIR/scripts/analyze-release.ts --apply <targetVersion> [--component <name>]
-```
-
-The script rewrites each configured version file — standard `kind` files by field,
-`pattern` files by the captured group (so a Rails `application.rb` constant is
-handled without any framework knowledge here). It prints `{ applied, changed[] }`.
-
-### 3. Verify
-
-```bash
 bun $SKILL_DIR/scripts/analyze-release.ts --verify <targetVersion> [--component <name>]
 ```
 
-Exit 0 = every configured file sits at the target; exit 1 = a mismatch. Capture the
-JSON either way.
+Apply rewrites each configured version file — standard `kind` files by field,
+`pattern` files by the captured group (so a Rails `application.rb` constant is handled
+without any framework knowledge here); it prints `{ applied, changed[] }`. Verify
+exits 0 when every configured file sits at the target, 1 on a mismatch; capture the
+JSON either way. A whole-repo run is just a single release with no `--component`.
 
-### 4. Return JSON
+### 3. Return JSON
+
+Union every release's `changed[]`; `allMatch` is true only if **every** release
+verified:
 
 ```json
 {
   "savedConfig": "<path or null>",
-  "changed": ["packages/chronicle/.claude-plugin/plugin.json", "..."],
-  "verify": { "allMatch": true, "files": [ { "path": "...", "current": "0.5.0", "matches": true } ] }
+  "changed": ["packages/chronicle/.claude-plugin/plugin.json", "packages/monitor/.claude-plugin/plugin.json", "..."],
+  "verify": {
+    "allMatch": true,
+    "byRelease": [
+      { "component": "chronicle", "targetVersion": "0.5.0", "allMatch": true, "files": [ { "path": "...", "current": "0.5.0", "matches": true } ] }
+    ]
+  }
 }
 ```
 
