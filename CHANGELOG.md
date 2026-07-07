@@ -1,5 +1,14 @@
 # Changelog
 
+## [monitor 3.18.4] - 2026-07-08
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.4` tag._
+
+### ✨ Added
+
+- **New `cockpit prune [--days N] [--dry-run]` CLI command** cleans up decision-log clutter: cockpit's registry already reaps stale entries every 14 days, but the on-disk `.cockpit/logs/*.jsonl` files were never removed, so orphaned logs piled up without bound. Prune now trashes log files whose last signal (registry heartbeat or file mtime, whichever is newer) is older than the cutoff, and drops matching or dangling registry entries — always via `trash`, never a hard delete.
+- **New `/monitor:prune-logs` slash command** fronts the CLI with a safe confirmation flow: it always previews the plan with `--dry-run` first and only deletes after you confirm.
+
 ## [chronicle 0.5.3] - 2026-07-08
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.5.3` tag._
