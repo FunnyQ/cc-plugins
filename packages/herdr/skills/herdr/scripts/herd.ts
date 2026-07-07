@@ -289,7 +289,12 @@ export function createHerd(run: Runner = herdrRunner) {
     const prevTab = await focusedTabId();
 
     const createArgs = ["tab", "create", "--no-focus"];
-    if (opts.workspace) createArgs.push("--workspace", opts.workspace);
+    // Pin the new tab to the CALLER's workspace, not whatever workspace happens
+    // to have focus — otherwise a tab spawned while the user is looking at a
+    // different workspace lands there. HERDR_WORKSPACE_ID is injected into every
+    // herdr pane; an explicit opts.workspace still wins.
+    const workspace = opts.workspace ?? process.env.HERDR_WORKSPACE_ID;
+    if (workspace) createArgs.push("--workspace", workspace);
     if (opts.cwd) createArgs.push("--cwd", opts.cwd);
     // Label the tab so the caller can tell at a glance what it's for. Defaults
     // to the generated agent name (which encodes role + a unique suffix).

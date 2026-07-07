@@ -286,6 +286,90 @@ describe("spawn", () => {
     ).toBe(true);
   });
 
+  // Shared mock for the workspace-pinning tests below: a caller spawns a new
+  // tab; we only care about which --workspace lands on `tab create`.
+  function newTabRunner(seen: string[][]) {
+    return mockRunner((a) => {
+      seen.push(a);
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([]) };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: { tabs: [{ tab_id: "wFocus:t2", focused: true }] },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "create")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              tab: { tab_id: "wX:t9" },
+              root_pane: { pane_id: "wX:pShell" },
+            },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "wX:pAgent",
+            tab_id: "wX:t9",
+            workspace_id: "wX",
+            terminal_id: "t",
+            cwd: "/repo",
+            agent_status: "unknown",
+          }),
+        };
+      if (a[0] === "pane" && a[1] === "close")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      if (a[0] === "tab" && a[1] === "focus") return { stdout: "" };
+      return undefined;
+    });
+  }
+
+  test("newTab: pins --workspace to the caller's HERDR_WORKSPACE_ID by default", async () => {
+    const prev = process.env.HERDR_WORKSPACE_ID;
+    process.env.HERDR_WORKSPACE_ID = "wCaller";
+    try {
+      const seen: string[][] = [];
+      const { run } = newTabRunner(seen);
+      await createHerd(run).spawn({
+        role: "reviewer",
+        agent: "codex",
+        cwd: "/repo",
+        newTab: true,
+      });
+      const createCall = seen.find((c) => c[0] === "tab" && c[1] === "create")!;
+      expect(createCall[createCall.indexOf("--workspace") + 1]).toBe("wCaller");
+    } finally {
+      if (prev === undefined) delete process.env.HERDR_WORKSPACE_ID;
+      else process.env.HERDR_WORKSPACE_ID = prev;
+    }
+  });
+
+  test("newTab: an explicit workspace overrides HERDR_WORKSPACE_ID", async () => {
+    const prev = process.env.HERDR_WORKSPACE_ID;
+    process.env.HERDR_WORKSPACE_ID = "wEnv";
+    try {
+      const seen: string[][] = [];
+      const { run } = newTabRunner(seen);
+      await createHerd(run).spawn({
+        role: "reviewer",
+        agent: "codex",
+        cwd: "/repo",
+        newTab: true,
+        workspace: "wExplicit",
+      });
+      const createCall = seen.find((c) => c[0] === "tab" && c[1] === "create")!;
+      expect(createCall[createCall.indexOf("--workspace") + 1]).toBe(
+        "wExplicit",
+      );
+    } finally {
+      if (prev === undefined) delete process.env.HERDR_WORKSPACE_ID;
+      else process.env.HERDR_WORKSPACE_ID = prev;
+    }
+  });
+
   test("newTab: an explicit tabLabel overrides the default agent-name label", async () => {
     const seen: string[][] = [];
     const { run } = mockRunner((a) => {
