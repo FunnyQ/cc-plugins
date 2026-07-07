@@ -1,5 +1,17 @@
 # Changelog
 
+## [chronicle 0.5.3] - 2026-07-08
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.5.3` tag._
+
+### 🐛 Fixed
+
+- **`/chronicle:release`'s changelog step now correctly diffs from the previous release** instead of silently falling back to the entire repo history — `lastTag` is now threaded all the way through the release skill's internal handoff.
+- **Release-fact gathering no longer breaks on paths containing spaces or shell metacharacters**, and a git failure while counting commits is now surfaced as a real error instead of being reported as "no changes."
+- **Version bumps in minified JSON files no longer touch the wrong `"version"` field** when a nested `"version"` key appears before the top-level one.
+- **Tag-template matching now respects the configured pattern precisely**, so version-first or non-terminal `{version}` tag templates (not just simple trailing-version ones) resolve to the correct previous tag.
+- Internal cleanup: an unused raw shell helper was removed, and the release fact-gathering step now returns only its computed results instead of an extra raw tag list.
+
 ## [chronicle 0.5.2] - 2026-07-07
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.5.2` tag._
