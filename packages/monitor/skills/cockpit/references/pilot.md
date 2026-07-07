@@ -4,23 +4,24 @@ Open the cockpit dashboard and establish the live decision trail surface for
 this project. This mode never writes planning records or asks for planning
 confirmation.
 
-## Step 1 — Determine the session id
+## Step 1 — Resolve session id and language
 
 The dashboard uses the harness session id to join the decision log to the live
-transcript. Run the **session-id command from your provider reference**. If it
-exits non-zero, generate one (`crypto.randomUUID()`) and note which id you used
-(your reference notes any provider-specific retry first).
+transcript. Resolve that id and the configured decision-log language in one
+call:
+
+```bash
+bun <plugin-root>/skills/cockpit/scripts/cockpit.ts prep --provider <provider>
+```
+
+If it exits non-zero because the session id cannot be resolved, generate one
+(`crypto.randomUUID()`) and note which id you used (your provider reference
+notes any provider-specific retry first).
 
 This only resolves the id for use. It does not register the session. The session
 auto-registers on the first `log` or `scribe` write.
 
-## Step 2 — Resolve language
-
-Read the current decision-log language from the cockpit config:
-
-```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts config get-language
-```
+## Step 2 — Optionally update language
 
 If the user explicitly asks to change it, run:
 
@@ -133,45 +134,9 @@ MMD
 `--reason` and each `--facet` body render as Markdown in the dashboard.
 
 - `--diagram` — optional **Mermaid** source. When structure beats prose — a flow,
-  a state machine, a sequence, a dependency graph — attach it and the dashboard
-  renders it inline as an SVG, themed to the Night Flight palette. You author the
-  Mermaid text yourself (you have the in-session context an external CLI lacks);
-  pass it as one argument (a heredoc keeps newlines intact). Reach for it only
-  when a picture genuinely carries what a sentence can't — most decisions don't
-  need one. Rendering is sandboxed (SVG-profile sanitized, no scripts/HTML labels);
-  if the source can't parse, the card shows it as text rather than breaking.
-  The CLI lints the source before writing (unknown diagram type, unbalanced
-  brackets, unknown `:::` classes, unquoted `()` inside `[...]` labels) and exits
-  non-zero with a fix hint — correct the source and re-run rather than dropping
-  the diagram.
-
-  **Pick the Mermaid type from the shape of the insight** — the right type does
-  more for readability than any styling:
-
-  | The insight is… | Use |
-  |---|---|
-  | states/statuses and what moves between them | `stateDiagram-v2` |
-  | a call chain / who-talks-to-whom over time | `sequenceDiagram` |
-  | a decision tree, branch, or fallback cascade | `flowchart TD` |
-  | a pipeline or dependency chain | `flowchart LR` |
-  | a before/after or two compared designs | `flowchart` with two `subgraph`s |
-
-  **Layout discipline — draw the narrative, not the wiring.** A decision-card
-  diagram is a glance-sized instrument, not a wiring schematic:
-  - **One main path.** The happy path reads in one direction (top-down or
-    left-right); side concerns hang off it as short stubs, never cut across it.
-  - **Label only the non-obvious edges,** with short event-like words ("retry",
-    "timeout", "cache miss"). An arrow between adjacent steps needs no label.
-  - **Detail belongs in `--reason`/`--facet`, not in extra arrows.** If you're
-    adding a node to explain a node, move the explanation to text.
-  - **Edge budget: ~12.** Past that, delete edges until the main narrative is
-    what remains — or split the insight into two entries.
-
-  Colour nodes by meaning with `:::class` markers (the palette is predefined — don't
-  write your own `classDef`): append the class to a node, e.g. `B[has env]:::ok`.
-  `:::ok` green (success path), `:::bad` red (failure path), `:::fix` amber (the fix),
-  `:::info` cyan (a note), `:::warn` dim amber, `:::start` grey (neutral entry). Tag
-  only the nodes that carry meaning; leave plumbing nodes untagged.
+  a state machine, a sequence, a dependency graph — attach it when a picture
+  genuinely carries what a sentence can't. When you decide to attach a
+  `--diagram`, read [references/diagram.md](diagram.md) first.
 
 **Example 1 — shallow vs. with the thinking, facets pulling their weight:**
 

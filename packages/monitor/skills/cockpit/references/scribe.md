@@ -11,8 +11,7 @@ diff (the "what"). It is **not** meant to be invoked directly by the user.
 
 `CLAUDE_PLUGIN_ROOT` is NOT reliable inside an agent Bash call. Resolve the
 CLI from the load-time "Base directory for this skill" banner that Claude Code
-prints when the skill loads. `cockpit-scribe` and `cockpit` are sibling
-directories under `packages/monitor/skills/`, so:
+prints when the skill loads.
 
 ```bash
 # Substitute the real banner path in place of <BANNER_PATH>
@@ -28,7 +27,7 @@ env var. If the file guard fails, stop and surface the error; do not continue.
 
 `cockpit scribe` auto-resolves the session against **Claude** transcripts by
 default. If this fork is running under **Codex** (not Claude Code), every
-`cockpit scribe` call below — both `--recent` and the write calls — **must**
+`cockpit scribe` call below — both `--prep` and the write calls — **must**
 pass `--provider codex`, or scribe will resolve against the wrong vendor's
 sessions (writing to a stale Claude session, or failing to find one):
 
@@ -42,55 +41,33 @@ PROVIDER_FLAG="--provider codex"
 Decide which surface you are on from the inherited context (the spawn prompt
 notes the surface) and use `$PROVIDER_FLAG` consistently in every call below.
 
-### Resolve the log language — BEFORE you write anything
+### Run the prep bundle — BEFORE you write anything
 
 Entries must be written in the configured decision-log language, **not** the
 language of the inherited conversation or your spawn prompt. Resolve it now, as
-part of setup, so it is fixed before Step 4 writes a single entry:
+part of setup, so it is fixed before Step 2 writes a single entry:
 
 ```bash
-LANG_NAME="$(bun "$CLI" config get-language)"   # e.g. zh-TW, or English by default
+bun "$CLI" scribe --prep $PROVIDER_FLAG
 ```
+
+This one call prints the configured language, the last 8 scribe-authored entries
+for dedup, and git change context (`git diff`, `git diff --staged`,
+`git log --oneline -5`). Read the output carefully. The diff is your primary
+source for `rationale` and `caveat` entries; the conversation context is your
+primary source for `decision` and `learning` entries. Do **not** re-log material
+already covered by the recent scribe entries; if the diff is fully described by
+existing entries, skip to Step 3. If git context is unavailable, the command
+prints labeled notices and still exits 0.
 
 This is non-negotiable and overrides everything else: even if the conversation
 you inherited and this prompt are entirely in English, every `--title` / `--text`
-you write **must** be in `$LANG_NAME`. Mentally compose each entry in `$LANG_NAME`
+you write **must** be in the printed language. Mentally compose each entry in that language
 from the start — do not draft in another language and rely on translating later.
 
 ---
 
-## Step 2 — Add the code-change lens
-
-Run these commands to ground entries in what actually changed. The inherited
-conversation provides the "why"; the diff provides the "what":
-
-```bash
-git diff
-git diff --staged
-git log --oneline -5
-```
-
-Read the output carefully. The diff is your primary source for `rationale` and
-`caveat` entries; the conversation context is your primary source for
-`decision` and `learning` entries.
-
----
-
-## Step 3 — Dedup against already-logged scribe entries
-
-Before writing anything, check what's already been recorded:
-
-```bash
-bun "$CLI" scribe --recent $PROVIDER_FLAG
-```
-
-This prints the last 8 scribe-authored entries (compact: `kind · title ·
-time`). Read the list and do **not** re-log material already covered. If the
-diff is fully described by existing entries, skip to Step 6.
-
----
-
-## Step 4 — Choose lenses and write entries
+## Step 2 — Choose lenses and write entries
 
 ### First: sweep all four lenses
 
@@ -127,31 +104,16 @@ Y"), a one-line `decision` ("chose append-only JSONL over SQLite"). Forcing a
 diagram onto a flat fact adds noise, not clarity. The test: if the "what" has a
 shape, draw it; if it's a sentence, write the sentence.
 
-**Pick the Mermaid type from the shape of the insight:**
-
-| The insight is… | Use |
-|---|---|
-| states/statuses and what moves between them | `stateDiagram-v2` |
-| a call chain / who-talks-to-whom over time | `sequenceDiagram` |
-| a decision tree, branch, or fallback cascade | `flowchart TD` |
-| a pipeline or dependency chain | `flowchart LR` |
-| a before/after or two compared designs | `flowchart` with two `subgraph`s |
-
-**Layout discipline — draw the narrative, not the wiring.** One main path that
-reads in one direction, side concerns as short stubs off it. Label only the
-non-obvious edges, with short event-like words ("retry", "timeout"). Detail
-belongs in `--text`, not in extra arrows — if you're adding a node to explain a
-node, move the explanation to text. Edge budget: ~12; past that, delete edges
-until the main narrative is what remains, or split the insight into two entries.
+When you decide to attach a `--diagram`, read [references/diagram.md](diagram.md)
+first.
 
 ### Then: write each surviving entry
 
 For each insight that is genuinely worth recording and not yet covered, pick a
-`kind` and call — writing `--title` and `--text` in `$LANG_NAME` (resolved in
-Step 1), regardless of the language of the conversation or this prompt:
+`kind` and call. Write `--title` and `--text` in the language printed by Step 1.
 
 ```bash
-bun "$CLI" scribe --type <kind> --title "<short headline in $LANG_NAME>" --text "<body in $LANG_NAME, markdown>" $PROVIDER_FLAG
+bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" $PROVIDER_FLAG
 ```
 
 ### Kind values and when to use them
@@ -175,6 +137,7 @@ be rejected by the CLI with a non-zero exit.
 ```
 cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--diagram <mermaid>] [--session <id>] [--provider <p>]
 cockpit scribe --recent [N]
+cockpit scribe --prep [--provider <p>]
 ```
 
 - `--type` — required in write mode; must be `decision|rationale|learning|caveat`.
@@ -182,21 +145,9 @@ cockpit scribe --recent [N]
 - `--title` — optional; the short headline (maps to `decision` in the record).
 - `--file` — optional, repeatable; source files touched by this entry.
 - `--diagram` — optional **Mermaid** source; the dashboard renders it inline as a
-  Night Flight-themed SVG. Use it only when the insight is structural and a picture
-  carries it better than the `--text` body (a flow, a state machine, a sequence) —
-  pass the source as one argument (a heredoc preserves newlines). The CLI lints
-  the source before writing (unknown diagram type, unbalanced brackets, unknown
-  `:::` classes, unquoted `()` inside `[...]` labels) and exits non-zero with a
-  fix hint — correct the source and re-run rather than dropping the diagram.
-  - **Colour the nodes by meaning.** The renderer predefines a Night Flight palette
-    you tag with `:::class` markers — colour then carries the shape (success vs.
-    failure vs. the fix) instead of every node reading as the same accent. Tag a
-    flowchart node by appending the class: `B[Rails has env]:::ok`. Available:
-    `:::ok` (green — success/healthy path), `:::bad` (red — failure/error path),
-    `:::fix` (amber — the fix or action to take), `:::info` (cyan — a neutral note),
-    `:::warn` (dim amber — a softer caution), `:::start` (grey — a neutral entry).
-    Tag only the nodes that carry meaning; leave plumbing nodes untagged. Don't
-    write your own `classDef` — the palette is already injected.
+  Night Flight-themed SVG. Read [references/diagram.md](diagram.md) first.
+- `--prep` — prints the configured language, recent scribe entries, and git
+  change context in one call.
 - `--session` / `--provider` — optional; omit to auto-resolve the live session.
 
 ### Tone
@@ -208,17 +159,7 @@ obvious path". Avoid vague summaries ("the code was improved") — be specific
 
 ---
 
-## Step 5 — Language (already handled — final check)
-
-Language was resolved in Step 1 and applied as you wrote each entry in Step 4.
-Before ending, sanity-check: every `--title` / `--text` you wrote is in
-`$LANG_NAME`. If any slipped into another language (e.g. because the inherited
-conversation was English), it does not match the config — rewrite it. There is no
-project metadata fallback anymore.
-
----
-
-## Step 6 — Consolidate; end quietly
+## Step 3 — Consolidate; end quietly
 
 **Dedup across lenses — don't collapse to one.** The bar is per-*insight*, not
 per-entry-count. Cut entries that repeat each other or restate the diff
