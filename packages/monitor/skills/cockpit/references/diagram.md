@@ -10,9 +10,16 @@ sandboxed (SVG-profile sanitized, no scripts/HTML labels). If the source can't
 parse in the dashboard, the card shows it as text rather than breaking.
 
 The CLI lints the source before writing: unknown diagram type, unbalanced
-brackets, unknown `:::` classes, and unquoted `()` inside `[...]` labels all
-exit non-zero with a fix hint. Correct the source and re-run rather than
-dropping the diagram.
+brackets, unknown `:::` classes, unquoted `()` inside `[...]` labels, and a
+`[/…]` label that opens a shape it never closes all exit non-zero with a fix
+hint. Correct the source and re-run rather than dropping the diagram.
+
+**Quote any label with punctuation.** A bare `[...]` label is parsed for shape
+syntax, so leading/embedded `/ \ ( )` bite: `[/release]` reads as an
+unterminated parallelogram (`[/…/]`), not the literal text "/release", and
+fails the whole parse. Wrap it — `["/release"]` — whenever the label carries a
+slash-command, path, parenthetical, or other punctuation. Plain-word labels
+(`[read config]`) need no quotes.
 
 ## Pick the Mermaid type from the shape
 

@@ -1,0 +1,82 @@
+{
+  "mode": "per-component",
+  "tag": "{component}-v{version}",
+  "changelog": "CHANGELOG.md",
+  "branches": {
+    "develop": "develop",
+    "main": "main"
+  },
+  "versionFiles": [],
+  "components": [
+    {
+      "name": "chronicle",
+      "path": "packages/chronicle",
+      "versionFiles": [
+        {
+          "path": "packages/chronicle/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/chronicle/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    },
+    {
+      "name": "dispatch",
+      "path": "packages/dispatch",
+      "versionFiles": [
+        {
+          "path": "packages/dispatch/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/dispatch/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    },
+    {
+      "name": "herdr",
+      "path": "packages/herdr",
+      "versionFiles": [
+        {
+          "path": "packages/herdr/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/herdr/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    },
+    {
+      "name": "monitor",
+      "path": "packages/monitor",
+      "versionFiles": [
+        {
+          "path": "packages/monitor/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/monitor/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    },
+    {
+      "name": "relay",
+      "path": "packages/relay",
+      "versionFiles": [
+        {
+          "path": "packages/relay/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/relay/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    }
+  ]
+}
