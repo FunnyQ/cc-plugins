@@ -10,12 +10,15 @@
 //   cockpit wait   <sessionId>            # park (long-poll) until the user answers; prints the answer
 //   cockpit send   <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
 //   cockpit restart [--port N] [--no-open] # bounce the daemon onto this install's code (wins the MCP respawn race)
+//   cockpit prune  [--days N] [--dry-run]   # trash decision-log jsonl older than N days (default 14) + drop dead registry entries
 import {
   appendFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
@@ -26,6 +29,7 @@ import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
 import { cockpitHome } from "./cockpit-home";
+import { DEFAULT_PRUNE_DAYS, planPrune, type LogFile } from "./prune-plan";
 import {
   readScopes,
   resolveNudgeEnabled,
@@ -952,6 +956,121 @@ function cmdNudge(rest: string[]): void {
   );
 }
 
+// ---------- Prune ----------
+
+const PRUNE_USAGE = "usage: cockpit prune [--days N] [--dry-run]";
+
+// Move files to the OS trash (Q's rule: never hard-`rm` user data). Falls back to
+// unlink if the `trash` CLI is absent so a non-macOS box still prunes.
+function trashFiles(paths: string[]): void {
+  if (paths.length === 0) return;
+  const res = spawnSync("trash", paths, { stdio: "ignore" });
+  if (res.status === 0) return;
+  for (const p of paths) {
+    try {
+      unlinkSync(p);
+    } catch {
+      // already gone — nothing to do
+    }
+  }
+}
+
+// Scan every known project root's `.cockpit/logs/` for jsonl files. Dedups by
+// path so overlapping roots (a repo + a subdir cockpit ran from) count once.
+function scanLogFiles(roots: string[]): LogFile[] {
+  const out: LogFile[] = [];
+  const seen = new Set<string>();
+  for (const root of roots) {
+    const dir = join(projectCockpitDir(root), "logs");
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      continue; // no logs dir for this root
+    }
+    for (const name of names) {
+      if (!name.endsWith(".jsonl")) continue;
+      const path = join(dir, name);
+      if (seen.has(path)) continue;
+      seen.add(path);
+      let mtimeMs = 0;
+      try {
+        mtimeMs = statSync(path).mtimeMs;
+      } catch {
+        // unreadable → treat as ancient (mtime 0)
+      }
+      out.push({ path, mtimeMs });
+    }
+  }
+  return out;
+}
+
+/**
+ * `cockpit prune [--days N] [--dry-run]` — reclaim accumulated decision logs.
+ * The registry self-reaps stale ENTRIES on write, but the on-disk jsonl FILES
+ * (and orphans whose entry was already reaped) live forever. This trashes log
+ * files whose last activity is older than N days (default 14, matching the
+ * registry TTL) and drops the matching / dangling registry entries.
+ */
+function cmdPrune(rest: string[]): void {
+  let days = DEFAULT_PRUNE_DAYS;
+  let dryRun = false;
+  for (let i = 0; i < rest.length; i++) {
+    const tok = rest[i];
+    if (tok === "--dry-run") {
+      dryRun = true;
+    } else if (tok === "--days") {
+      const v = rest[++i];
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) {
+        console.error(`cockpit prune: invalid --days "${v ?? ""}"`);
+        console.error(PRUNE_USAGE);
+        process.exit(1);
+      }
+      days = n;
+    } else {
+      console.error(`cockpit prune: unknown argument "${tok}"`);
+      console.error(PRUNE_USAGE);
+      process.exit(1);
+    }
+  }
+
+  const reg = readRegistry();
+  const roots = [...new Set(reg.sessions.map((s) => s.project))];
+  const logFiles = scanLogFiles(roots);
+  const now = Date.now();
+  const plan = planPrune(
+    reg.sessions,
+    logFiles,
+    now,
+    days * 24 * 60 * 60 * 1000,
+  );
+
+  console.log(
+    `cockpit prune (older than ${days}d)${dryRun ? " — DRY RUN" : ""}:`,
+  );
+  console.log(`  logs: ${plan.trash.length} to remove, ${plan.keptFiles} kept`);
+  console.log(
+    `  registry: ${plan.dropSessionIds.length} entries to drop, ${plan.keptEntries} kept`,
+  );
+
+  if (dryRun) {
+    for (const p of plan.trash) console.log(`  - ${p}`);
+    return;
+  }
+  if (plan.trash.length === 0 && plan.dropSessionIds.length === 0) {
+    console.log("  nothing to prune.");
+    return;
+  }
+
+  trashFiles(plan.trash);
+  const drop = new Set(plan.dropSessionIds);
+  reg.sessions = reg.sessions.filter((s) => !drop.has(s.sessionId));
+  mkdirSync(COCKPIT_HOME, { recursive: true });
+  writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2));
+  console.log("  done.");
+}
+
 // ---------- Main ----------
 
 async function main(): Promise<void> {
@@ -981,10 +1100,13 @@ async function main(): Promise<void> {
     case "nudge":
       cmdNudge(rest);
       break;
+    case "prune":
+      cmdPrune(rest);
+      break;
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
       console.error(
-        "usage: cockpit <log|scribe|prep|config|wait|send|restart|nudge> [args]",
+        "usage: cockpit <log|scribe|prep|config|wait|send|restart|nudge|prune> [args]",
       );
       process.exit(1);
   }
