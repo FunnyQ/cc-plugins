@@ -1,5 +1,34 @@
 # Changelog
 
+## [relay 0.5.0] - 2026-07-07
+
+_relay is independently versioned; this entry tracks the `relay-v0.5.0` tag._
+
+### ✨ Added
+
+- **`--keep-pane` flag** — keep a successful live pane open for follow-up conversation. Without it, relay now closes the pane after collecting a verified result.
+
+### 🔧 Changed
+
+- **Live pane closes by default after a verified result.** Previously a successful live run always left the pane open; now relay closes it once the agent has settled and the result-file marker verifies the answer (best-effort — a close failure never downgrades a verified success). Failures and pending timeouts still leave the pane open for postmortem.
+- **Status-aware timeout.** At the poll timeout, relay now checks the agent's herdr status: a still-`working`/`blocked`/unknown pane returns `pending` as before, but a pane that has already settled (`idle`/`done`) without a verified result returns a failure instead of misreporting "still running".
+
+### 📖 Docs
+
+- **Live-vs-headless guidance** added to `references/live.md` + `SKILL.md`: editing capability is identical, so `--headless` needs a genuine reason (nested delegation / no live seam / no pane surface); and relay is a single blocking call, so don't poll its output while it runs.
+
+## [dispatch 3.15.0] - 2026-07-07
+
+_dispatch is independently versioned; this entry tracks the `dispatch-v3.15.0` tag._
+
+### ✨ Added
+
+- **autopilot live dev engine (opt-in).** When the external dev engine (codex/opencode) is selected and the session runs inside herdr (`HERDR_ENV=1` + a resolvable `relay.ts`), autopilot can run the dev step in a visible herdr live pane via relay instead of the headless `<engine>-run.ts` wrapper. Gated by `CFG.liveDevEngine` + absolute `CFG.relayPath`, surfaced as a scout-time question; **headless stays the default** and the fallback path is byte-identical. The review lens always stays headless.
+
+### 🔧 Changed
+
+- **Pending semantics for the live dev driver.** A relay pending report is treated as a failed gate attempt (logged with the agent name and a pane-left-open-for-postmortem note); the task's `## Verification` remains the real correctness gate. Relay's default 10-minute poll budget is kept as-is — decomposed flightplan tasks are small by design, so needing longer signals decompose-further or escalate-to-Opus.
+
 ## [herdr 0.1.3] - 2026-07-07
 
 _herdr is independently versioned; this entry tracks the `herdr-v0.1.3` tag._

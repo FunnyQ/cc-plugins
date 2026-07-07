@@ -40,6 +40,7 @@ export type RelayFlags = {
   promptFile?: string;
   dangerous: boolean;
   headless: boolean; // opt out of the live-pane path even inside herdr
+  keepPane: boolean; // keep a successful live pane open for follow-up
   waitTimeoutMs?: number; // live poll budget (--wait-timeout, default 10 min)
 };
 
@@ -85,7 +86,7 @@ function usage(backends: string): string {
     "       --scope <uncommitted|base:<ref>|commit:<sha>|custom-files>",
     "       --model <provider/model> | --out <path> | --git-scope <s> | --no-project",
     "       --prompt-file <p> | --dangerous",
-    "       --headless | --wait-timeout <ms>   (live-pane runs inside herdr)",
+    "       --headless | --keep-pane | --wait-timeout <ms>   (live-pane runs inside herdr)",
   ].join("\n");
 }
 
@@ -105,6 +106,7 @@ export function parseFlags(argv: string[]): ParsedFlags {
     noProject: false,
     dangerous: false,
     headless: false,
+    keepPane: false,
   };
   const positional: string[] = [];
 
@@ -154,6 +156,8 @@ export function parseFlags(argv: string[]): ParsedFlags {
       flags.dangerous = true;
     } else if (arg === "--headless") {
       flags.headless = true;
+    } else if (arg === "--keep-pane") {
+      flags.keepPane = true;
     } else if (arg.startsWith("--")) {
       throw new UsageError(`Unknown flag: ${arg}`);
     } else {
@@ -431,6 +435,7 @@ export async function executeRelay(
       resultPath,
       cwd: process.cwd(),
       waitTimeoutMs: parsed.flags.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
+      keepPane: parsed.flags.keepPane ?? false,
     });
 
     if (liveResult.ok) {
@@ -445,9 +450,15 @@ export async function executeRelay(
       // stdout carries ONLY the answer; live metadata rides stderr so piping
       // the result stays clean.
       deps.stdout(liveResult.text);
-      deps.stderr(
-        `\n[relay live] agent ${liveResult.agentName} — pane left open (confirm close-or-keep; \`herd close ${liveResult.agentName}\` to close)\n`,
-      );
+      if (parsed.flags.keepPane) {
+        deps.stderr(
+          `\n[relay live] agent ${liveResult.agentName} — pane left open (\`herd close ${liveResult.agentName}\` to close)\n`,
+        );
+      } else {
+        deps.stderr(
+          `\n[relay live] agent ${liveResult.agentName} — pane closed after verified result\n`,
+        );
+      }
       return { code: 0, dir, lastMd, agentName: liveResult.agentName };
     }
 

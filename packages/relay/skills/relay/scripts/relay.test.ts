@@ -116,6 +116,7 @@ describe("parseFlags", () => {
       "/tmp/manual.md",
       "--dangerous",
       "--headless",
+      "--keep-pane",
       "--wait-timeout",
       "30000",
     ]);
@@ -132,6 +133,7 @@ describe("parseFlags", () => {
       promptFile: "/tmp/manual.md",
       dangerous: true,
       headless: true,
+      keepPane: true,
       waitTimeoutMs: 30000,
     });
   });
@@ -637,6 +639,7 @@ describe("executeRelay live routing", () => {
     expect(writes.get("/tmp/relay/test-run/last.md")).toBe(markdown);
     // Live metadata (agent name, keep/close hint) rides stderr, not stdout.
     expect(metadata.join("")).toContain("relay-opencode-delegate-9f1c");
+    expect(metadata.join("")).toContain("pane closed");
     expect(printed.join("")).not.toContain("pane left open");
   });
 
@@ -677,6 +680,22 @@ describe("executeRelay live routing", () => {
     );
 
     expect(waitTimeoutMs).toBe(5000);
+  });
+
+  it("passes --keep-pane through to the live runner", async () => {
+    let keepPane = false;
+
+    await executeRelay(
+      ["claude", "delegate", "--task", "x", "--keep-pane"],
+      liveDeps({
+        runLive: (opts) => {
+          keepPane = opts.keepPane;
+          return Promise.resolve(liveOk);
+        },
+      }),
+    );
+
+    expect(keepPane).toBe(true);
   });
 
   it("falls back to headless in the same invocation on a pre-spawn live error", async () => {

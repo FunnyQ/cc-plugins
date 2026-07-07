@@ -176,6 +176,8 @@ function fakeHerd(options: {
   statuses: string[]; // status returned per get() call (last repeats)
   spawnError?: Error;
   sendError?: Error;
+  closeError?: Error;
+  getErrorAtGet?: number;
   preSpawnAgents?: string[]; // list() result before spawn (snapshot)
   postSpawnAgents?: string[]; // list() result after spawn (leak probe)
   visible?: string; // what read({source:"visible"}) returns (input-box probe)
@@ -212,6 +214,7 @@ function fakeHerd(options: {
     },
     async get(target) {
       calls.push({ verb: "get", args: [target] });
+      if (options.getErrorAtGet === gets + 1) throw new Error("get failed");
       const status =
         options.statuses[Math.min(gets++, options.statuses.length - 1)];
       return { status };
@@ -219,6 +222,11 @@ function fakeHerd(options: {
     async read(target, opts) {
       calls.push({ verb: "read", args: [target, opts] });
       return options.visible ?? "";
+    },
+    async close(target) {
+      calls.push({ verb: "close", args: [target] });
+      if (options.closeError) throw options.closeError;
+      return {};
     },
   };
   return { herd, calls };
@@ -231,10 +239,13 @@ function runLiveHarness(options: {
   waitTimeoutMs?: number;
   spawnError?: Error;
   sendError?: Error;
+  closeError?: Error;
+  getErrorAtGet?: number;
   loadError?: Error;
   preSpawnAgents?: string[];
   postSpawnAgents?: string[];
   visible?: string;
+  keepPane?: boolean;
 }) {
   const { herd, calls } = fakeHerd(options);
   const errors: string[] = [];
@@ -250,6 +261,7 @@ function runLiveHarness(options: {
     resultPath: "/tmp/relay/run/result.md",
     cwd: "/repo",
     waitTimeoutMs: options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
+    keepPane: options.keepPane ?? false,
   };
 
   const deps: RunLiveDeps = {
@@ -321,9 +333,60 @@ describe("runLive", () => {
     expect(errors.some((e) => e.includes("working"))).toBe(true);
   });
 
+  it("closes the pane by default after a verified success", async () => {
+    const content = `# Result\n${RESULT_END_MARKER}\n`;
+    const { run, calls } = runLiveHarness({
+      statuses: ["working", "idle"],
+      resultAppearsAtGet: 2,
+      resultContent: content,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(true);
+    expect(calls.filter((c) => c.verb === "close")).toEqual([
+      { verb: "close", args: ["relay-codex-delegate-ab12"] },
+    ]);
+  });
+
+  it("keeps the pane open on verified success when keepPane is true", async () => {
+    const content = `# Result\n${RESULT_END_MARKER}\n`;
+    const { run, calls } = runLiveHarness({
+      statuses: ["working", "idle"],
+      resultAppearsAtGet: 2,
+      resultContent: content,
+      keepPane: true,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(true);
+    expect(calls.some((c) => c.verb === "close")).toBe(false);
+  });
+
+  it("still returns ok when closing the pane fails after verified success", async () => {
+    const content = `# Result\n${RESULT_END_MARKER}\n`;
+    const { run, calls, errors } = runLiveHarness({
+      statuses: ["working", "idle"],
+      resultAppearsAtGet: 2,
+      resultContent: content,
+      closeError: new Error("close failed"),
+    });
+
+    const result = await run();
+
+    expect(result).toEqual({
+      ok: true,
+      agentName: "relay-codex-delegate-ab12",
+      text: "# Result",
+    });
+    expect(calls.some((c) => c.verb === "close")).toBe(true);
+    expect(errors.some((e) => e.includes("failed to close pane"))).toBe(true);
+  });
+
   it("keeps polling while the marker is missing, then times out pending — without closing", async () => {
     const { run, calls } = runLiveHarness({
-      statuses: ["idle"],
+      statuses: ["working"],
       resultAppearsAtGet: 1,
       resultContent: "partial answer, no marker yet\n",
       waitTimeoutMs: 12_000,
@@ -340,6 +403,38 @@ describe("runLive", () => {
     expect(result.report).toContain("close");
     expect(result.report).toContain("NOT a failure");
     // relay never kills or closes the pane.
+    expect(calls.some((c) => c.verb === "close")).toBe(false);
+  });
+
+  it("fails without closing when the agent settled at timeout without a verified result", async () => {
+    const { run, calls } = runLiveHarness({
+      statuses: ["done"],
+      waitTimeoutMs: 4_000,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || result.pending) throw new Error("expected failure");
+    expect(result.agentName).toBe("relay-codex-delegate-ab12");
+    expect(result.error).toContain("settled");
+    expect(result.error).toContain("done");
+    expect(calls.some((c) => c.verb === "close")).toBe(false);
+  });
+
+  it("times out pending when the final status check is unreadable", async () => {
+    const { run, calls } = runLiveHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 4_000,
+      getErrorAtGet: 2,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || !result.pending) throw new Error("expected pending");
+    expect(result.agentName).toBe("relay-codex-delegate-ab12");
+    expect(result.report).toContain("NOT a failure");
     expect(calls.some((c) => c.verb === "close")).toBe(false);
   });
 
