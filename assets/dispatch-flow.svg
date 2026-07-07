@@ -15,6 +15,7 @@
     <marker id="ah-ink" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#33485A"/></marker>
     <marker id="ah-teal" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#1FA7B0"/></marker>
     <marker id="ah-green" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#2F9C70"/></marker>
+    <marker id="ah-indigo" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#6473D7"/></marker>
     <marker id="ah-amber" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#D9852E"/></marker>
     <marker id="ah-red" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#C9603F"/></marker>
     <style>
@@ -35,95 +36,112 @@
   <rect width="1320" height="820" fill="url(#bg)"/>
 
   <!-- Title -->
-  <text class="h1 ink" x="60" y="48">Dispatch — the full arc from idea to ship</text>
-  <text class="sub mut" x="61" y="74">preflight clarifies → flightplan writes the blueprint → autopilot executes (every task clears its rubric gate) → final review → ship</text>
+  <text class="h1 ink" x="60" y="48">Dispatch — plan at the right altitude, then fly</text>
+  <text class="sub mut" x="61" y="74">preflight for now · waypoints for milestone roadmaps · flightplan writes the executable tree · autopilot runs waves, gates, commits, final review</text>
 
   <!-- through-line behind top tier -->
-  <rect x="60" y="166" width="1185" height="8" rx="4" fill="url(#runway)"/>
+  <rect x="60" y="166" width="1135" height="8" rx="4" fill="url(#runway)"/>
 
-  <!-- ===== TOP TIER: the 3-skill arc ===== -->
+  <!-- ===== TOP TIER: planning tiers + execution ===== -->
   <!-- arrows between cards -->
-  <line class="ln" x1="362" y1="170" x2="466" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <line class="ln" x1="772" y1="170" x2="876" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <line class="ln" x1="1182" y1="170" x2="1196" y2="170" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <line class="ln" x1="306" y1="170" x2="326" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <line class="ln" x1="576" y1="170" x2="596" y2="170" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
+  <line class="ln" x1="846" y1="170" x2="866" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <line class="ln" x1="1116" y1="170" x2="1158" y2="170" stroke="#2F9C70" marker-end="url(#ah-green)"/>
 
   <!-- Card P: preflight -->
-  <g filter="url(#soft)"><rect x="60" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <g filter="url(#soft)"><rect x="60" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
   <rect x="60" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
   <circle cx="92" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="92" y="143" text-anchor="middle">1</text>
   <text class="ntitle ink" x="118" y="144">preflight</text>
   <rect x="118" y="156" width="86" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="161" y="170" text-anchor="middle">light</text>
-  <text class="role ink" x="80" y="202">Interview to clarify needs</text>
-  <text class="role2 mut" x="80" y="223">→ one in-conversation plan, approve &amp; run</text>
+  <text class="role ink" x="80" y="202">Clarify work to do now</text>
+  <text class="role2 mut" x="80" y="223">→ one chat plan, approve &amp; run</text>
+
+  <!-- Card W: waypoints -->
+  <g filter="url(#soft)"><rect x="330" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="330" y="104" width="6" height="132" rx="3" fill="#6473D7"/>
+  <circle cx="362" cy="138" r="15" fill="#6473D7"/><text class="wt" font-size="14" font-weight="700" x="362" y="143" text-anchor="middle">2</text>
+  <text class="ntitle ink" x="388" y="144">waypoints</text>
+  <rect x="388" y="156" width="98" height="20" rx="10" fill="#EEF0FF"/><text class="tag" fill="#6473D7" x="437" y="170" text-anchor="middle">roadmap</text>
+  <text class="role ink" x="350" y="202">Plan milestone legs</text>
+  <text class="role2 mut" x="350" y="223">→ WAYPOINTS.md + active leg</text>
 
   <!-- Card F: flightplan -->
-  <g filter="url(#soft)"><rect x="470" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="470" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
-  <circle cx="502" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="502" y="143" text-anchor="middle">2</text>
-  <text class="ntitle ink" x="528" y="144">flightplan</text>
-  <rect x="528" y="156" width="92" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="574" y="170" text-anchor="middle">heavy</text>
-  <text class="role ink" x="490" y="202">Interview → blueprint to disk</text>
-  <text class="role2 mut" x="490" y="223">→ PLAN.md + _context + tasks tree</text>
+  <g filter="url(#soft)"><rect x="600" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="600" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
+  <circle cx="632" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="632" y="143" text-anchor="middle">3</text>
+  <text class="ntitle ink" x="658" y="144">flightplan</text>
+  <rect x="658" y="156" width="92" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="704" y="170" text-anchor="middle">blueprint</text>
+  <text class="role ink" x="620" y="202">Write executable specs</text>
+  <text class="role2 mut" x="620" y="223">→ PLAN.md + _context + tasks</text>
 
   <!-- Card A: autopilot -->
-  <g filter="url(#soft)"><rect x="880" y="104" width="300" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="880" y="104" width="6" height="132" rx="3" fill="#34A879"/>
-  <circle cx="912" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="912" y="143" text-anchor="middle">3</text>
-  <text class="ntitle ink" x="938" y="144">autopilot</text>
-  <rect x="938" y="156" width="86" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="981" y="170" text-anchor="middle">auto</text>
-  <text class="role ink" x="900" y="202">Auto-fly every task</text>
-  <text class="role2 mut" x="900" y="223">→ each clears rubric → final review → ship</text>
+  <g filter="url(#soft)"><rect x="870" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="870" y="104" width="6" height="132" rx="3" fill="#34A879"/>
+  <circle cx="902" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="902" y="143" text-anchor="middle">4</text>
+  <text class="ntitle ink" x="928" y="144">autopilot</text>
+  <rect x="928" y="156" width="86" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="971" y="170" text-anchor="middle">auto</text>
+  <text class="role ink" x="890" y="202">Fly tasks in waves</text>
+  <text class="role2 mut" x="890" y="223">→ gates, commits, final review</text>
 
   <!-- Ship -->
-  <g filter="url(#soft)"><circle cx="1248" cy="170" r="46" fill="#fff" stroke="#34A879"/></g>
-  <text font-size="26" x="1248" y="170" text-anchor="middle">🚀</text>
-  <text class="nlbl" fill="#2F9C70" x="1248" y="200" text-anchor="middle">shipped</text>
+  <g filter="url(#soft)"><circle cx="1218" cy="170" r="46" fill="#fff" stroke="#34A879"/></g>
+  <text font-size="26" x="1218" y="170" text-anchor="middle">🚀</text>
+  <text class="nlbl" fill="#2F9C70" x="1218" y="200" text-anchor="middle">shipped</text>
 
   <!-- connectors from F and A down into the detail boxes -->
-  <path class="ln" d="M620,236 L620,268 L310,268 L310,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <text class="note mut" x="330" y="262">writes</text>
-  <path class="ln" d="M1030,236 L1030,268 L930,268 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <path class="ln" d="M452,236 L452,268 L205,268 L205,298" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
+  <text class="note mut" x="230" y="262">roadmaps</text>
+  <path class="ln" d="M722,236 L722,268 L330,268 L330,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <text class="note mut" x="350" y="262">writes</text>
+  <path class="ln" d="M992,236 L992,268 L930,268 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
   <text class="note mut" x="948" y="262">reads &amp; runs</text>
 
   <!-- ===== LEFT: flightplan artifact tree ===== -->
   <g filter="url(#soft)"><rect x="60" y="300" width="500" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <text class="ctitle ink" x="84" y="334">flightplan's blueprint (self-contained task tree)</text>
+  <text class="ctitle ink" x="84" y="334">waypoints + flightplan artifacts</text>
 
-  <rect x="84" y="350" width="240" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
-  <text class="chip ink" x="98" y="372">📄 PLAN.md — source of truth</text>
-  <rect x="84" y="396" width="452" height="34" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
-  <text class="chip ink" x="98" y="418">📁 _context/ — shared.md · rubric.md (shared scale/dims)</text>
+  <rect x="84" y="350" width="452" height="30" rx="8" fill="#EEF0FF" stroke="#C8CEF7"/>
+  <text class="chip ink" x="98" y="370">WAYPOINTS.md — roadmap legs: [x] landed · [~] active · [ ] later</text>
+  <rect x="84" y="390" width="452" height="30" rx="8" fill="#EEF0FF" stroke="#C8CEF7"/>
+  <text class="chip ink" x="98" y="410">legs/NN-slug/ — each active leg gets its own flightplan tree</text>
+
+  <rect x="84" y="436" width="240" height="30" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
+  <text class="chip ink" x="98" y="456">PLAN.md — source of truth</text>
+  <rect x="84" y="476" width="452" height="30" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
+  <text class="chip ink" x="98" y="496">_context/ — shared.md · rubric.md (shared scale/dims)</text>
 
   <!-- bucket A -->
-  <text class="note mut" x="86" y="456">tasks/&lt;bucket-a&gt;/</text>
+  <text class="note mut" x="86" y="532">tasks/&lt;bucket-a&gt;/</text>
   <g>
-    <rect x="84" y="464" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="484">01 ⓡ</text>
-    <rect x="178" y="464" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="484">02 ⓡ</text>
-    <rect x="272" y="464" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="288" y="484">03 ⓡ</text>
+    <rect x="84" y="540" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="559">01 ⓡ</text>
+    <rect x="178" y="540" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="559">02 ⓡ</text>
+    <rect x="272" y="540" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="288" y="559">03 ⓡ</text>
   </g>
   <!-- bucket B -->
-  <text class="note mut" x="86" y="520">tasks/&lt;bucket-b&gt;/</text>
+  <text class="note mut" x="86" y="588">tasks/&lt;bucket-b&gt;/</text>
   <g>
-    <rect x="84" y="528" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="548">01 ⓡ</text>
-    <rect x="178" y="528" width="86" height="30" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="548">02 ⓡ</text>
+    <rect x="84" y="596" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="615">01 ⓡ</text>
+    <rect x="178" y="596" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="615">02 ⓡ</text>
   </g>
 
   <!-- final review task -->
-  <rect x="84" y="582" width="452" height="42" rx="9" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="chip" fill="#B5701E" x="100" y="608">🏁 final-review · Final review: true · depends on all tasks</text>
+  <rect x="84" y="646" width="452" height="36" rx="9" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="chip" fill="#B5701E" x="100" y="669">final-review · Final review: true · depends on all tasks</text>
 
-  <text class="note mut" x="84" y="652">ⓡ = task carries its ## Eval rubric (dims×weight + pass line + hard-fail)</text>
-  <text class="note mut" x="84" y="672">lint enforces: every task has a rubric; final review covers all tasks</text>
-  <text class="note mut" x="84" y="700">dependency graph sets order → next-ready finds tasks with all deps done</text>
+  <text class="note mut" x="84" y="700">ⓡ = task carries its ## Eval rubric; lint requires one final-review task</text>
+  <text class="note mut" x="84" y="720">dependency graph sets order → next-ready finds tasks with all deps done</text>
 
   <!-- feed arrow tree -> loop -->
-  <path class="ln" d="M540,470 L598,470" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <text class="note mut" x="544" y="461">ready</text>
+  <path class="ln" d="M540,554 L598,554" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <text class="note mut" x="544" y="545">ready</text>
 
   <!-- ===== RIGHT: autopilot per-task loop ===== -->
   <g filter="url(#soft)"><rect x="600" y="300" width="660" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
   <text class="ctitle ink" x="624" y="334">autopilot — wave loop (ready tasks run in parallel)</text>
-  <text class="note mut" x="624" y="354">next-ready re-scouts each wave → run in parallel → atomic-commit between waves ↻</text>
+  <text class="note mut" x="624" y="354">choose dev engine: claude / codex / opencode · reviewer: codex / opencode · lenses: opus / fable</text>
+  <text class="note mut" x="624" y="370">next-ready re-scouts each wave → run in parallel → atomic-commit between waves ↻</text>
 
   <!-- pipeline nodes: Dev → Binary gate → Rubric judge → score gate -->
   <rect x="628" y="378" width="116" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
@@ -164,22 +182,23 @@
   <!-- inter-wave atomic commit on the done → next-wave cycle -->
   <path class="ln" d="M1063,582 L902,532" stroke="#2F9C70" stroke-dasharray="4 3" marker-end="url(#ah-green)"/>
   <rect x="676" y="516" width="224" height="26" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="chip" fill="#2F9C70" x="788" y="534" text-anchor="middle">🔖 atomic-commit between waves</text>
+  <text class="chip" fill="#2F9C70" x="788" y="534" text-anchor="middle">atomic-commit between waves</text>
 
-  <text class="note mut" x="624" y="566">loop has MAX_ATTEMPTS; on cap → needs_your_call hands back to you</text>
+  <text class="note mut" x="624" y="566">loop has MAX_ATTEMPTS; external dev can run headless or in a live herdr pane</text>
+  <text class="note mut" x="624" y="584">on cap → park task, keep flying independent work, then hand back to you</text>
 
   <!-- all done -> final review -> ship -->
   <path class="ln" d="M1063,595 L900,595 L900,626" stroke="#33485A" marker-end="url(#ah-ink)"/>
   <text class="note mut" x="912" y="620">all tasks done</text>
 
   <rect x="624" y="630" width="300" height="62" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="774" y="650" text-anchor="middle">🏁 Final review</text>
-  <text class="nsub" fill="#B5701E" x="774" y="667" text-anchor="middle">🤖 codex + 4 /simplify lenses → Opus fixer · cross-vendor</text>
+  <text class="nlbl" fill="#B5701E" x="774" y="650" text-anchor="middle">Final review</text>
+  <text class="nsub" fill="#B5701E" x="774" y="667" text-anchor="middle">reviewer + 4 lenses → Opus fixer · capped loop</text>
   <text class="nsub" fill="#B5701E" x="774" y="683" text-anchor="middle">integration · goal · consistency · no regressions</text>
 
   <line class="ln" x1="924" y1="661" x2="1006" y2="661" stroke="#2F9C70" marker-end="url(#ah-green)"/>
   <rect x="1008" y="638" width="140" height="46" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="nlbl" fill="#2F9C70" x="1078" y="666" text-anchor="middle">🚀 Ship</text>
+  <text class="nlbl" fill="#2F9C70" x="1078" y="666" text-anchor="middle">Ship</text>
 
   <!-- legend -->
   <text class="note mut" x="624" y="710">green = gate passed / ship · amber = rubric scoring / final review · red = failed, sent back</text>
