@@ -13,7 +13,7 @@ Cut a release for the current repo. Chronicle stores the repo's release shape on
 in a committed `.chronicle/release.json`, then every later run reads it — no
 re-guessing. The **main agent** owns the two things only it can do (asking you which
 version to cut, and — on first run — interviewing the release shape); a nested
-**Releaser** orchestrator owns the mechanical bump → changelog → finish, keeping all
+**Oathkeeper** orchestrator owns the mechanical bump → changelog → finish, keeping all
 git/script output out of this conversation.
 
 ## Modes (from the invocation)
@@ -37,25 +37,25 @@ git/script output out of this conversation.
 
 ```
 main agent  (holds the "why"; the ONLY one that can prompt you)
-  ├─ chronicle:surveyor   (Haiku) — runs analyze-release.ts → release facts (read-only)
+  ├─ chronicle:seer   (Haiku) — runs analyze-release.ts → release facts (read-only)
   ├─ [first run only] interview the shape → assemble ReleaseConfig
   ├─ [version gate] which component(s)? which bump each? → releases[]
-  └─ chronicle:releaser   (subagent_type — nested custom agent, NOT a fork; no Bash)
-       ├─ chronicle:bumper      (Haiku)  — save config (first run) + --apply + --verify
-       ├─ chronicle:chronicler  (Sonnet) — git log → Keep-a-Changelog entry
-       └─ chronicle:finisher    (Haiku)  — auto only: commit + merge + tag + (push)
+  └─ chronicle:oathkeeper   (subagent_type — nested custom agent, NOT a fork; no Bash)
+       ├─ chronicle:smith      (Haiku)  — save config (first run) + --apply + --verify
+       ├─ chronicle:annalist  (Sonnet) — git log → Keep-a-Changelog entry
+       └─ chronicle:hammerbearer    (Haiku)  — auto only: commit + merge + tag + (push)
 ```
 
 Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
 rationale lives in `packages/chronicle/DESIGN.md`. The five agents live at
-`packages/chronicle/agents/{surveyor,releaser,bumper,chronicler,finisher}.md`.
+`packages/chronicle/agents/{seer,oathkeeper,smith,annalist,hammerbearer}.md`.
 
 ## The main agent's job
 
-### 1. Survey (spawn `chronicle:surveyor`)
+### 1. Survey (spawn `chronicle:seer`)
 
 Pass `$SKILL_DIR` (the skill's load-time "Base directory for this skill" banner —
-do not hard-code a path or rely on `${CLAUDE_PLUGIN_ROOT}`). The surveyor returns
+do not hard-code a path or rely on `${CLAUDE_PLUGIN_ROOT}`). The seer returns
 the facts you need: `hasConfig`, `config`, `suggested`, `branch`, and — for a
 per-component repo — a `components[]` list each with `current`, `commitCount`, and
 `bumps`; for whole-repo a single `current` + `bumps`.
@@ -67,7 +67,7 @@ If `hasConfig` is false, confirm/adjust `suggested` into a final `ReleaseConfig`
 confirm **mode** (whole-repo vs per-component), the **tag** template, which
 **version files** to bump (add a capture-group `pattern` for odd locations like a
 Rails `config/application.rb` — `suggested` won't include those), and the
-`develop`/`main` **branch** names. Mark this config to be persisted (the bumper
+`develop`/`main` **branch** names. Mark this config to be persisted (the smith
 writes it, and it rides into the release commit / your `/chronicle:commit`).
 
 If `hasConfig` is true, use `config` as-is and skip this step.
@@ -100,12 +100,12 @@ whole-repo with per-component units.
 > `cockpit wait` for these gates instead of `AskUserQuestion` (see
 > [[cockpit-needs-your-call-for-decision-gates]]).
 
-### 4. Spawn `chronicle:releaser`
+### 4. Spawn `chronicle:oathkeeper`
 
 Distill a tight `contextBrief` (the "why" of this release, from the conversation —
-the Releaser can't see the chat), then spawn it with: `$SKILL_DIR`, `mode`,
+the Oathkeeper can't see the chat), then spawn it with: `$SKILL_DIR`, `mode`,
 `config`, `persistConfig`, `releases[]` (each `{ component, targetVersion }`),
-`contextBrief`, and `branch`. The Releaser derives each unit's tag name, changelog
+`contextBrief`, and `branch`. The Oathkeeper derives each unit's tag name, changelog
 header, and path scope from `config` itself. It returns the final report; relay it to
 the user — the touched files + next steps (prepare), or the tag(s) + push status
 (auto). Nothing else.
@@ -113,7 +113,7 @@ the user — the touched files + next steps (prepare), or the tag(s) + push stat
 ## Protected branches
 
 Release operates on `develop`/`main`. Defer to the user's existing git-flow guard;
-don't re-implement branch protection. In `auto` the finisher verifies it ends on
+don't re-implement branch protection. In `auto` the hammerbearer verifies it ends on
 `develop`.
 
 ## Codex
@@ -128,5 +128,5 @@ honoring the same `.chronicle/release.json` contract and prepare-by-default.
   []` — changelog + tag only. Confirm the starting version in the gate.
 - **Nothing changed** since the last tag (`commitCount: 0` everywhere): tell the
   user there's nothing to release and stop, unless they force an explicit version.
-- **Verify fails** after the bump (a file didn't move): the bumper reports it; the
-  Releaser stops before any finish. Never tag a half-bumped tree.
+- **Verify fails** after the bump (a file didn't move): the smith reports it; the
+  Oathkeeper stops before any finish. Never tag a half-bumped tree.
