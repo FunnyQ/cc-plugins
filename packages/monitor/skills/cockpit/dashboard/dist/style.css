@@ -95,7 +95,7 @@ body {
   font-family: var(--font-sans);
   background: var(--void);
   color: var(--starlight);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
