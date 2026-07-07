@@ -1,5 +1,21 @@
 # Changelog
 
+## [monitor 3.18.2] - 2026-07-07
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.2` tag._
+
+### ✨ Added
+
+- **Cockpit prep mode** for orchestration setup.
+
+### 🔧 Changed
+
+- **Cockpit dashboard body font-size bumped from 14px to 16px** for better readability.
+
+### 📖 Docs
+
+- **Cockpit reference restructure** — usage-dashboard docs consolidated into a README, Mermaid diagram guidance extracted into its own cockpit reference, the `claude.md` reference renamed to `claude-cli.md` (avoids a macOS case-collision with `CLAUDE.md`), and the codex reference now points at the selected mode reference (`pilot.md` / `scribe.md`) instead of the shared `SKILL.md`.
+
 ## [herdr 0.1.4] - 2026-07-07
 
 _herdr is independently versioned; this entry tracks the `herdr-v0.1.4` tag._
