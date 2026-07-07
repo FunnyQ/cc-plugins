@@ -1,5 +1,21 @@
 # Changelog
 
+## [herdr 0.1.4] - 2026-07-07
+
+_herdr is independently versioned; this entry tracks the `herdr-v0.1.4` tag._
+
+### 🔧 Changed
+
+- **New agent tabs now open in the caller's workspace, not the focused one.** `herd.ts`'s new-tab spawn (`startInNewTab`) defaults `tab create --workspace` to the caller's `HERDR_WORKSPACE_ID` when no explicit `workspace` is given. Previously a tab spawned while you were viewing a *different* herdr workspace landed in that workspace; now it stays pinned to where the delegating agent lives (fixes relay live-pane delegations opening in the wrong workspace). An explicit `opts.workspace` still wins.
+
+## [dispatch 3.15.1] - 2026-07-07
+
+_dispatch is independently versioned; this entry tracks the `dispatch-v3.15.1` tag._
+
+### 🔧 Changed
+
+- **autopilot live dev driver waits longer before giving up.** The live delegate now passes `--wait-timeout 900000` (15 min, up from relay's 10-min default). Since relay's poll loop returns the instant the result lands, the bigger budget costs nothing for normal-speed tasks and only extends patience for genuinely-long ones — so a `pending` outcome now reliably means a pathological/runaway task (correctly retried/escalated) rather than a slow-but-fine one being killed prematurely.
+
 ## [relay 0.5.0] - 2026-07-07
 
 _relay is independently versioned; this entry tracks the `relay-v0.5.0` tag._
