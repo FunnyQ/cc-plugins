@@ -47,14 +47,16 @@ malfunction — stop and use what you already have.
   `references/release-config.md`).
 - `persistConfig` — `true` on a first run: the bumper must write
   `.chronicle/release.json` before bumping.
-- `component` — the target component name (per-component repos), else absent.
-- `targetVersion` — the bare version to cut, e.g. `"0.5.0"`.
+- `releases[]` — one or more units to cut, each `{ component, targetVersion }`.
+  Per-component repos carry the component name; whole-repo carries a single entry
+  with `component: null`. **Two or more entries is a coordinated release**: one
+  commit, one develop→main merge, N scoped tags.
 - `contextBrief` — the distilled "why" of this release.
 - `branch` — the current branch.
 
 ## Derive (no Bash needed — pure string work)
 
-From `config` + `component` + `targetVersion`:
+For **each** entry in `releases[]`, from `config` + `component` + `targetVersion`:
 
 - **tagName** — fill `config.tag`: `{version}` → `targetVersion`, `{component}` →
   `component`. e.g. `chronicle-v0.5.0` or `v0.5.0`.
@@ -62,54 +64,60 @@ From `config` + `component` + `targetVersion`:
   `chronicle 0.5.0`); whole-repo: `"<targetVersion>"`.
 - **pathScope** — per-component: the component's `path` (e.g. `packages/chronicle`);
   whole-repo: none.
-- **commitSubject** — `🔧 release: <headerLabel>` (matches the repo's existing
-  release commits).
+
+Then across the whole batch:
+
+- **tags[]** — every derived `tagName`, in `releases[]` order.
+- **commitSubject** — one entry: `🔧 release: <headerLabel>`. Coordinated (N>1):
+  `🔧 release: <label1> + <label2> + …` (e.g. `🔧 release: chronicle 0.5.0 + monitor
+  3.18.3`) — matches the repo's existing coordinated release commits.
 
 ## Flow
 
-### 1. Spawn the bumper
+### 1. Spawn the bumper (once — it bumps every release)
 
 ```
 Agent({
   subagent_type: "chronicle:bumper",
-  prompt: "$SKILL_DIR=<...>. persistConfig=<bool>; if true, save this config first: <config JSON>. Then --apply <targetVersion>[ --component <component>] and --verify the same. Return { savedConfig?, changed[], verify:{ allMatch, files } }."
+  prompt: "$SKILL_DIR=<...>. persistConfig=<bool>; if true, save this config first: <config JSON>. Then for EACH release, --apply <targetVersion>[ --component <component>] and --verify the same. releases=<[{component,targetVersion}, ...] JSON>. Return { savedConfig?, changed[], verify:{ allMatch, byRelease[] } }."
 })
 ```
 
 If `verify.allMatch` is false, **stop**: report the mismatched files and cut nothing
 further. Never let a half-bumped tree reach a tag.
 
-### 2. Spawn the chronicler
+### 2. Spawn the chronicler (once — it writes every entry)
 
 ```
 Agent({
   subagent_type: "chronicle:chronicler",
-  prompt: "$SKILL_DIR=<...>. Write the CHANGELOG entry. changelogPath=<config.changelog>; headerLabel=<...>; tagName=<...>; lastTag=<from survey, may be null>; pathScope=<... or none>. Read references/changelog-template.md. Return the entry text + the changelog path."
+  prompt: "$SKILL_DIR=<...>. Write a CHANGELOG entry per release. changelogPath=<config.changelog>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON> (lastTag per component from survey, may be null; pathScope none for whole-repo). Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
 })
 ```
 
 ### 3. Assemble the touched-file set
 
-`changed[]` from the bumper + the changelog file + (`persistConfig`)
-`.chronicle/release.json`. This is what a commit must stage by explicit name.
+`changed[]` from the bumper (union across all releases) + the changelog file +
+(`persistConfig`) `.chronicle/release.json`. This is what a commit must stage by
+explicit name.
 
 ### 4a. mode = prepare → STOP and report
 
-Report: the touched files, the new version + tag name that WILL be cut, and the next
-steps — review, then `/chronicle:commit`, then tag `tagName`. Do **not** spawn the
-finisher.
+Report: the touched files, the new version(s) + tag name(s) that WILL be cut, and the
+next steps — review, then `/chronicle:commit`, then tag each of `tags[]`. Do **not**
+spawn the finisher.
 
 ### 4b. mode = auto | auto-push → spawn the finisher
 
 ```
 Agent({
   subagent_type: "chronicle:finisher",
-  prompt: "$SKILL_DIR=<...>. Finish the release. files=<touched[]>; commitSubject=<...>; tagName=<...>; branches=<config.branches>; push=<true iff mode==auto-push>. Commit the bump, merge develop→main, annotated tag on main, merge main→develop, end on develop; push only if push=true. Return { committed, tag, merged, pushed, log }."
+  prompt: "$SKILL_DIR=<...>. Finish the release. files=<touched[]>; commitSubject=<...>; tags=<[tagName, ...] JSON>; branches=<config.branches>; push=<true iff mode==auto-push>. Commit the bump once, merge develop→main once, cut EVERY tag on main, merge main→develop, end on develop; push only if push=true. Return { committed, tags, merged, pushed, log }."
 })
 ```
 
 ### 5. Report
 
-Relay the finisher's result verbatim: the tag cut, whether it was pushed, and the
-final `git log --oneline`. On any failure (verify mismatch, merge conflict, push
+Relay the finisher's result verbatim: the tag(s) cut, whether they were pushed, and
+the final `git log --oneline`. On any failure (verify mismatch, merge conflict, push
 error) relay the reason plainly — never claim a release that didn't happen.

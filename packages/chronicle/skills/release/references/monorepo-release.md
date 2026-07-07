@@ -45,6 +45,36 @@ git push origin <component>-vX.Y.Z
 End on `develop`. Stop at the first conflict and hand the tree back — never force,
 never auto-resolve, never move an existing tag.
 
+## Coordinated release — N components, one merge, N tags
+
+When several components changed and you want to ship them together (the reference
+case: `chronicle` + `monitor` in one go), the release gate accepts a **set** of
+components — each with its own bump — and the finish carries **one** bump commit and
+**one** develop→main merge that all the scoped tags sit on. Each component still bumps
+only its own version files and gets its own per-component CHANGELOG entry; only the
+commit, the two merges, and the push are shared.
+
+```bash
+# on develop — every component's version files + all CHANGELOG entries already written & verified
+git add <all version files> CHANGELOG.md [.chronicle/release.json]
+git commit -m "🔧 release: chronicle 0.5.0 + monitor 3.18.3"
+
+git checkout main
+git merge --no-ff develop -m "Merge branch 'develop' for chronicle-v0.5.0 + monitor-v3.18.3"
+git tag -a chronicle-v0.5.0 -m "chronicle-v0.5.0"     # every tag on this one merge commit
+git tag -a monitor-v3.18.3  -m "monitor-v3.18.3"
+
+git checkout develop
+git merge --no-ff main -m "Merge branch 'main' back into develop"
+
+# push only in `auto push`
+git push origin develop main
+git push origin chronicle-v0.5.0 monitor-v3.18.3
+```
+
+This replaces the previously hand-driven coordinated release. The single-component
+finish above is just the N=1 case.
+
 ## Whole-repo contrast
 
 A `whole-repo` config is the common case (a single product like a Rails + Nuxt app):

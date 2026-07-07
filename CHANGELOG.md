@@ -1,5 +1,14 @@
 # Changelog
 
+## [chronicle 0.5.1] - 2026-07-07
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.5.1` tag._
+
+### ✨ Added
+
+- **`/chronicle:release` can now cut coordinated multi-component releases natively.** A single invocation drives several components through one shared version gate and produces one bump commit plus one `develop → main` merge carrying all of the scoped tags together — replacing the previously hand-driven, one-component-at-a-time coordination. The pure version-analysis core is untouched, so its existing test coverage still holds.
+- **New branch-guard hook (`check-branch.sh`)** asks for confirmation before a `git commit` lands directly on the git-flow production branch, helping catch an accidental commit to `main`/`master`. It fails open when `jq` isn't installed and respects a configured `gitflow.branch.master`, falling back to `main`/`master` otherwise.
+
 ## [monitor 3.18.3] - 2026-07-07
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.3` tag._

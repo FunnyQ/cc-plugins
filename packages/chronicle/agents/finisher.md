@@ -14,10 +14,14 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
 
 - `files` — the exact files to stage, by name (version files + changelog +
   possibly `.chronicle/release.json`). **Stage only these** — never `git add -A`.
-- `commitSubject` — e.g. `🔧 release: chronicle 0.5.0`.
-- `tagName` — e.g. `chronicle-v0.5.0` (or `v0.5.0` whole-repo).
+- `commitSubject` — e.g. `🔧 release: chronicle 0.5.0`, or coordinated
+  `🔧 release: chronicle 0.5.0 + monitor 3.18.3`.
+- `tags` — the annotated tags to cut on the merge commit, e.g. `["chronicle-v0.5.0"]`
+  or coordinated `["chronicle-v0.5.0", "monitor-v3.18.3"]` (whole-repo: `["v0.5.0"]`).
+  **All tags land on the single develop→main merge commit** — one commit, one merge,
+  N tags.
 - `branches` — `{ develop, main }`.
-- `push` — commit + merge + tag locally always; push both branches and the tag
+- `push` — commit + merge + tag locally always; push both branches and **every** tag
   **only if** `push` is true.
 
 ## Process — stop at the first failure, never force
@@ -36,17 +40,18 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
    that there was nothing to release and hand back. Only proceed past here with a
    real new commit hash.
 
-2. **Merge develop → main:**
+2. **Merge develop → main** (one merge, whatever the tag count):
 
    ```bash
    git checkout <main>
-   git merge --no-ff <develop> -m "Merge branch '<develop>' for <tagName>"
+   git merge --no-ff <develop> -m "Merge branch '<develop>' for <tags joined by ' + '>"
    ```
 
-3. **Annotated tag on main:**
+3. **Annotated tag(s) on main** — cut **every** tag in `tags` on this one merge
+   commit:
 
    ```bash
-   git tag -a <tagName> -m "<tagName>"
+   git tag -a <tagName> -m "<tagName>"        # repeat for each tag in `tags`
    ```
 
 4. **Merge main → develop** (keep branches in sync), and **end on develop:**
@@ -56,11 +61,11 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
    git merge --no-ff <main> -m "Merge branch '<main>' back into <develop>"
    ```
 
-5. **Push — only if `push` is true:**
+5. **Push — only if `push` is true** (push every tag):
 
    ```bash
    git push origin <develop> <main>
-   git push origin <tagName>
+   git push origin <tag1> [<tag2> ...]        # all tags in `tags`
    ```
 
 6. Confirm `git branch --show-current` is `<develop>`.
@@ -79,13 +84,13 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
 ```json
 {
   "committed": true,
-  "tag": "chronicle-v0.5.0",
+  "tags": ["chronicle-v0.5.0", "monitor-v3.18.3"],
   "merged": ["develop→main", "main→develop"],
-  "pushed": ["develop", "main", "chronicle-v0.5.0"],
+  "pushed": ["develop", "main", "chronicle-v0.5.0", "monitor-v3.18.3"],
   "branch": "develop",
   "log": "<git log --oneline -4>"
 }
 ```
 
-Set `pushed: []` when `push` was false. Report honestly — never claim a push or tag
-that didn't happen.
+`tags` lists every tag cut (one for a single release). Set `pushed: []` when `push`
+was false. Report honestly — never claim a push or tag that didn't happen.
