@@ -173,6 +173,7 @@ export type HerdClient = {
     opts?: { lines?: number; source?: string },
   ): Promise<string>;
   list(): Promise<Array<{ name: string | null }>>;
+  close(target: string): Promise<unknown>;
 };
 
 export type LiveRunResult =
@@ -189,6 +190,7 @@ export type RunLiveOpts = {
   resultPath: string;
   cwd: string;
   waitTimeoutMs: number;
+  keepPane: boolean;
 };
 
 export type RunLiveDeps = {
@@ -247,9 +249,10 @@ function pendingReport(
 
 /**
  * Spawn the backend TUI in a sibling pane, send the bootstrap line, and poll
- * for agent-idle + result-file marker. Never kills or closes the pane: a
- * timeout exits as `pending`, and pane lifecycle after success belongs to the
- * calling agent (close-or-keep is a human decision, per SKILL.md).
+ * for agent-idle + result-file marker. A verified success closes the pane
+ * unless keepPane is set. Timeout exits are status-aware: still-working panes
+ * return pending, already-settled panes without a verified result return
+ * failure, and every non-success outcome leaves the pane open for postmortem.
  */
 export async function runLive(
   opts: RunLiveOpts,
@@ -383,7 +386,20 @@ export async function runLive(
     if (!settled) continue;
     if (deps.fileExists(opts.resultPath)) {
       const text = extractFinalText(deps.readFile(opts.resultPath));
-      if (text !== null) return { ok: true, agentName, text };
+      if (text !== null) {
+        if (!opts.keepPane) {
+          try {
+            await herd.close(agentName);
+          } catch (error) {
+            deps.stderr(
+              `[relay live] ${agentName}: failed to close pane after verified success: ${
+                error instanceof Error ? error.message : String(error)
+              }\n`,
+            );
+          }
+        }
+        return { ok: true, agentName, text };
+      }
       continue;
     }
     if (!sawActivity && nudgesLeft > 0) {
@@ -434,6 +450,21 @@ export async function runLive(
         }
       }
     }
+  }
+
+  let finalStatus = "unknown";
+  try {
+    finalStatus = (await herd.get(agentName)).status;
+  } catch {
+    /* unknowable means we must not assume the agent finished */
+  }
+  if (finalStatus === "idle" || finalStatus === "done") {
+    return {
+      ok: false,
+      pending: false,
+      agentName,
+      error: `agent settled (${finalStatus}) at timeout without a verified result file`,
+    };
   }
 
   return {

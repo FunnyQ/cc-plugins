@@ -47,8 +47,10 @@ For brevity the examples below write `relay.ts <backend> <mode> …` as shorthan
 
 Inside herdr (`HERDR_ENV=1`), `delegate` and `review` auto-route to a live TUI pane in a new tab.
 Before running in that environment, read `references/live.md`.
-It covers flags (`--headless` / `--wait-timeout` / `--dangerous`), stdout/stderr output contract, pane close-or-keep protocol, and pending-report semantics.
+It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
 `image` stays headless/native.
+
+**Keep the default live — `--headless` needs a real reason.** Editing capability is identical (same CLI/model/write access), so "more precise/deterministic" is never it; override only for nested delegation, no live seam, or no pane surface. And `relay.ts` is one blocking call — don't poll it while it runs. See `references/live.md`.
 
 ---
 
