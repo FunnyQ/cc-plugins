@@ -1,5 +1,24 @@
 # Changelog
 
+## [monitor 3.18.3] - 2026-07-07
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.3` tag._
+
+### 🔧 Fixed
+
+- **Cockpit's Mermaid diagram linter now catches unterminated parallelogram/trapezoid shapes** — labels like an unquoted slash command (`[/release]`) no longer slip past the diagram-lint check silently; the case is now flagged with test coverage and a note in the diagram reference guide.
+
+## [chronicle 0.5.0] - 2026-07-07
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.5.0` tag._
+
+### ✨ Added
+
+- **New `/chronicle:release` skill** — cuts a release end-to-end: bumps version files, writes the CHANGELOG entry, and (in auto mode) commits, merges, tags, and pushes. Auto-detects whether the repo is versioned whole-repo or per-component and remembers the shape in a committed `.chronicle/release.json` after a one-time interview, so every later run just reads it instead of re-guessing.
+- **Three modes from the invocation**: `/chronicle:release` (prepare — bump + changelog + verify, then stop for review); `auto` (also commits, merges `develop → main`, tags, and merges back — local only); `auto push` (the above plus pushing branches and the tag). A version or component token can follow any mode to skip that part of the gate.
+- **Capture-group version-file patterns** (Rails-friendly) let a release unit's version live in files beyond `plugin.json`, e.g. a Ruby `VERSION = "x.y.z"` constant, via a configurable regex with a capture group.
+- **Nested no-Bash orchestrator** mirroring the existing commit/pr skills: a `releaser` custom agent spawns `surveyor` (read-only release-fact gathering), `bumper` (persists config + applies + verifies version bumps), `chronicler` (writes the Keep-a-Changelog entry from `git log`), and `finisher` (commit/merge/tag/push in auto mode) — keeping git and script output out of the main conversation.
+
 ## [monitor 3.18.2] - 2026-07-07
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.2` tag._

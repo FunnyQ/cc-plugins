@@ -39,10 +39,17 @@ Group into `Added` / `Changed` / `Fixed` / `Removed` / `Deprecated` / `Security`
 they apply — omit empty sections. Rewrite each line as a user-facing sentence; drop
 pure-chore noise (lockfile bumps, formatting) unless it's the only change.
 
-### 3. Prepend the entry
+### 3. Prepend the entry — ALWAYS at the top, never anchored on an old heading
 
 Read `changelogPath` (create it with a standard Keep-a-Changelog preamble if
-missing). Insert the new entry **above** the most recent one, below the preamble:
+missing). The new entry always goes **at the very top of the entry list** —
+immediately below the `# Changelog` preamble and **above the first existing `## [`
+heading**, whatever component/version that heading is for. The changelog is a single
+newest-first log; do **not** try to slot the entry next to the same component's
+previous entry, and do **not** anchor on `## [<lastTag>]` (that heading may be
+mid-file, or may not exist at all).
+
+The entry shape:
 
 ```markdown
 ## [<headerLabel>] - <YYYY-MM-DD>
@@ -56,9 +63,20 @@ _tracks tag `<tagName>`_
 - ...
 ```
 
-Match the existing file's heading style if it already uses one (e.g. this repo heads
-entries per-plugin like `## [chronicle 0.4.0]`). Use `Edit` to splice; never rewrite
-unrelated existing entries.
+**How to splice it in without mutating any existing entry (critical):** make the
+`Edit`'s `old_string` be the **first** existing `## [` heading line verbatim, and its
+`new_string` be your new entry, a blank line, then that **same** heading line
+unchanged. The anchor heading appears identically on both sides, so it is inserted
+*above* — never renamed. Example against a file whose first entry is
+`## [monitor 3.18.2] - 2026-07-07`:
+
+- `old_string`: `## [monitor 3.18.2] - 2026-07-07`
+- `new_string`: `<your full new entry>\n\n## [monitor 3.18.2] - 2026-07-07`
+
+The single most damaging failure mode is turning an existing heading into yours
+(e.g. editing `## [chronicle 0.4.0]` into `## [chronicle 0.5.0]`), which destroys
+that release's entry. Never edit an existing `## [` heading's text. If the file has
+no `## [` heading yet, insert directly after the preamble.
 
 ### 4. Return
 
