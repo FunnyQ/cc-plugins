@@ -2,8 +2,9 @@
 
 Provider value: **`codex`**.
 
-Read this once at Step 0, then follow the shared `SKILL.md` procedure using the
-three Codex-specific bits below. Everything else is shared.
+Read this once at Step 0, then follow the selected mode reference (`pilot.md` or
+`scribe.md`) using the three Codex-specific bits below. Everything else is
+shared by that mode.
 
 ## Plugin root
 
