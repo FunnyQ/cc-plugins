@@ -1,16 +1,16 @@
 ---
-name: analyst
-description: "Chronicle's changeset analyst. Runs analyze-changes.ts and returns the facts the Commit Manager needs to decide simple vs atomic. Spawned by chronicle:manager — never commits."
+name: watcher
+description: "Chronicle's changeset watcher. Runs analyze-changes.ts and returns the facts the Lawspeaker needs to decide simple vs atomic. Spawned by chronicle:lawspeaker — never commits."
 model: haiku
 tools: ["Bash", "Read"]
 ---
 
 Analyze the current git changeset and report the facts. You do **not** decide
-simple-vs-atomic and you do **not** commit — the Commit Manager owns those.
+simple-vs-atomic and you do **not** commit — the Lawspeaker owns those.
 
 ## Input (from the prompt)
 
-The Commit Manager gives you:
+The Lawspeaker gives you:
 
 - The absolute path to `analyze-changes.ts` (resolved from the skill's load-time
   "Base directory for this skill" banner). Do not guess a repo-relative path.
@@ -36,7 +36,7 @@ the `promptPath` (the message template) and pass it back.
 ### 3. Surface the decision signals + two proposals
 
 Classify each file's change-type (feat/fix/docs/style/refactor/test/chore/etc.)
-from its diff. Then build BOTH a one-commit view and a split view so the Manager
+from its diff. Then build BOTH a one-commit view and a split view so the Lawspeaker
 can choose:
 
 - `simpleCommit`: how you'd describe the whole changeset as a single commit.
@@ -49,7 +49,7 @@ Both proposals are **whole-file**: every file lands in exactly one group, never
 split across commits. A file with mixed concerns goes entirely into one group.
 
 Subjects only — imperative mood, ≤ ~50 chars. Do **not** write commit bodies or
-the 繁中 summary; the writer does that with the Manager's rationale brief.
+the 繁中 summary; the runesmith does that with the Lawspeaker's rationale brief.
 
 ### 4. Return JSON
 
@@ -69,7 +69,7 @@ the 繁中 summary; the writer does that with the Manager's rationale brief.
 
 ## Guidelines
 
-- Report facts; let the Manager apply the decision tree.
+- Report facts; let the Lawspeaker apply the decision tree.
 - Prefer smaller, focused groups in `atomicPlan` over large ones.
 - Lock files (`*.lock`, `*.lockb`) go with `package.json` as `chore: update deps`.
 - Config changes are usually `chore` unless they enable a new feature.

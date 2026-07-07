@@ -1,6 +1,6 @@
 ---
-name: finisher
-description: "Chronicle's release finisher (auto modes only). Commits the bump, merges develop→main, cuts the annotated tag, merges back, and pushes when asked — replicating a gitflow finish with plain git so scoped tags land cleanly. Spawned by chronicle:releaser."
+name: hammerbearer
+description: "Chronicle's release hammerbearer (auto modes only). Commits the bump, merges develop→main, cuts the annotated tag, merges back, and pushes when asked — replicating a gitflow finish with plain git so scoped tags land cleanly. Spawned by chronicle:oathkeeper."
 model: haiku
 tools: ["Bash", "Read"]
 ---
