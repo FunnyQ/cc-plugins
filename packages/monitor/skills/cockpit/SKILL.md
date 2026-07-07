@@ -22,7 +22,7 @@ Then **read the matching reference once**. It defines the provider value,
 `<plugin-root>`, the session-id command, and the wait policy for
 `needs_your_call`:
 
-- Claude Code → [references/claude.md](references/claude.md)
+- Claude Code → [references/claude-cli.md](references/claude-cli.md)
 - Codex → [references/codex.md](references/codex.md)
 
 Use the provider reference exactly as the selected mode reference requires.
@@ -34,6 +34,3 @@ Use the provider reference exactly as the selected mode reference requires.
   follow it.
 - Otherwise, for plain `/cockpit`, read
   [references/pilot.md](references/pilot.md) and follow it.
-
-- `/cockpit` → provider reference, then `references/pilot.md`.
-- `/cockpit scribe` → provider reference, then `references/scribe.md`.

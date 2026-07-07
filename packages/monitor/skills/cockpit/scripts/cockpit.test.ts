@@ -20,13 +20,18 @@ let projectDir: string;
 let cockpitHome: string;
 let configHome: string;
 
-function run(args: string[], cwd = projectDir) {
+function run(
+  args: string[],
+  cwd = projectDir,
+  extraEnv: Record<string, string> = {},
+) {
   const proc = Bun.spawnSync(["bun", CLI, ...args], {
     cwd,
     env: {
       ...process.env,
       COCKPIT_HOME: cockpitHome,
       XDG_CONFIG_HOME: configHome,
+      ...extraEnv,
     },
   });
   return {
@@ -92,6 +97,19 @@ describe("cockpit config", () => {
     expect(r.code).toBe(1);
     expect(r.stdout).toBe("");
     expect(r.stderr).toContain("usage: cockpit config");
+  });
+});
+
+describe("cockpit prep", () => {
+  test("prints the resolved session id and configured language", () => {
+    run(["config", "--log-language", "zh-TW"]);
+    const r = run(["prep"], projectDir, { CLAUDE_CODE_SESSION_ID: SID });
+
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("Session id:");
+    expect(r.stdout).toContain(SID);
+    expect(r.stdout).toContain("Decision-log language:");
+    expect(r.stdout).toContain("zh-TW");
   });
 });
 
@@ -701,6 +719,33 @@ describe("cockpit scribe", () => {
     // Only scribe-sourced entries appear; old agent entry is filtered out
     expect(r.stdout).toContain("new-entry");
     expect(r.stdout).not.toContain("old-decision");
+  });
+
+  test("--prep bundles language, recent entries, and git context", () => {
+    run(["config", "--log-language", "zh-TW"]);
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "learning",
+      "--title",
+      "new-entry",
+      "--text",
+      "body",
+    ]);
+
+    const r = run(["scribe", "--session", SID, "--prep"]);
+
+    expect(r.code).toBe(0);
+    expect(r.stderr).toBe("");
+    expect(r.stdout).toContain("Decision-log language:");
+    expect(r.stdout).toContain("zh-TW");
+    expect(r.stdout).toContain("Recent scribe entries:");
+    expect(r.stdout).toContain("learning · new-entry");
+    expect(r.stdout).toContain("Git change context:");
+    expect(r.stdout).toContain("$ git diff");
+    expect(r.stdout).toContain("not available");
   });
 
   test("concurrency guard: two near-simultaneous writes both succeed and both ids persist", () => {

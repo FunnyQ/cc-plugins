@@ -95,17 +95,6 @@ user with the `AskUserQuestion` tool** whether they want it set up automatically
   hint verbatim and stop.
 - **Skip** — launch the dashboard without usage limits; the panel stays empty.
 
-## Sections
-
-- **Provider switch** — All / Claude / Codex / OpenCode, with All as the combined default
-- **Overview cards** — sessions, interactions, tokens, estimated cost from local usage (filtered by date range)
-- **Daily trend** — line chart per provider model with Tokens/Cost switch and multi-select toggle
-- **Model distribution** — donut chart filtered by date range and provider
-- **Per-model cost & tokens table** — provider, input/output/cache/reasoning breakdown with USD estimate, filtered by date range
-- **Activity heatmap** — 7d × 24h grid plus GitHub-style daily activity wall built from local activity data
-- **Top projects** — ranked by message count with % bar
-- **Recent activity** — projects sorted by last seen
-
 ## Pricing
 
 Defaults shipped in `references/pricing-defaults.json`. On startup the server tries OpenRouter `/api/v1/models` (3s timeout) and merges live prices. User overrides win — drop a JSON file at `~/.config/cc-dashboard/pricing.json`:
@@ -126,24 +115,3 @@ External (non-Anthropic) models without dedicated cache pricing have cache token
 - **Port in use** — script auto-kills whatever holds the port; if you'd rather use another, pass `--port 9000` (or any free port).
 - **No projects shown** — `history.jsonl` may be missing or you've used Claude Code for less than a few sessions.
 - **All costs look identical / wrong** — drop a custom pricing override at `~/.config/cc-dashboard/pricing.json`.
-
-## File layout
-
-```
-usage-dashboard/
-├── SKILL.md
-├── scripts/
-│   ├── api.ts                # data engine (also CLI: prints JSON)
-│   ├── atlas-server.ts       # HTTP server + auto-open
-│   └── statusline-collector.ts # captures live rate_limits and chains ccstatusline
-│                             # (precheck install.ts + setup-statusline.ts now live in the install skill)
-├── dashboard/dist/           # static frontend (no build step)
-│   ├── index.html
-│   ├── app.js
-│   ├── style.css
-│   └── vendor/
-│       ├── petite-vue.es.js
-│       └── chart.umd.js
-└── references/
-    └── pricing-defaults.json
-```
