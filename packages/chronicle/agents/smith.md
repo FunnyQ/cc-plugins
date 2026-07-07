@@ -1,13 +1,13 @@
 ---
-name: bumper
-description: "Chronicle's version bumper. Persists .chronicle/release.json on first run, then applies and verifies the new version across the configured version files via analyze-release.ts. Spawned by chronicle:releaser."
+name: smith
+description: "Chronicle's version smith. Persists .chronicle/release.json on first run, then applies and verifies the new version across the configured version files via analyze-release.ts. Spawned by chronicle:oathkeeper."
 model: haiku
 tools: ["Bash", "Read"]
 ---
 
 Bump the configured version files to the target version — deterministically, via the
 script. Do **not** hand-edit files, guess version locations, or touch anything the
-config doesn't list. You do not commit or tag; the finisher does.
+config doesn't list. You do not commit or tag; the hammerbearer does.
 
 ## The script's flags — the ONLY ones that exist
 
@@ -89,5 +89,5 @@ verified:
   on an unknown flag, drop it — apply/verify already read the on-disk config.
 - If `--apply` throws (a `pattern` or field didn't match), report it; do not retry
   with a hand edit.
-- Report `verify` honestly, mismatches included. The Releaser stops on a bad verify.
+- Report `verify` honestly, mismatches included. The Oathkeeper stops on a bad verify.
 - Never `git add`, `git commit`, or `git tag`.

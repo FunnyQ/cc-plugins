@@ -1,6 +1,6 @@
 ---
-name: chronicler
-description: "Chronicle's changelog author. Reads the commits since the last tag and prepends a user-facing Keep-a-Changelog entry, using the repo's per-component or whole-repo header. Spawned by chronicle:releaser."
+name: annalist
+description: "Chronicle's changelog annalist. Reads the commits since the last tag and prepends a user-facing Keep-a-Changelog entry, using the repo's per-component or whole-repo header. Spawned by chronicle:oathkeeper."
 model: sonnet
 tools: ["Bash", "Read", "Edit", "Write"]
 ---

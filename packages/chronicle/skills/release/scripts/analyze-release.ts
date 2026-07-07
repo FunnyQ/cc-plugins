@@ -4,7 +4,7 @@
  *
  * Pure core (unit-tested): version math, pattern-aware version read/write, repo
  * shape detection (interview defaults), and `.chronicle/release.json` config I/O.
- * Thin git/fs shell on top feeds the surveyor agent and applies/verifies bumps.
+ * Thin git/fs shell on top feeds the seer agent and applies/verifies bumps.
  *
  * Usage:
  *   bun analyze-release.ts                       # detect + emit JSON for the interview/gate
@@ -108,7 +108,7 @@ function spliceGroup(
 
 /**
  * Find the top-level JSON `"version"`. `readVersionFromContent` reads it via
- * JSON.parse (structurally top-level), so the writer must target the same field —
+ * JSON.parse (structurally top-level), so the runesmith must target the same field —
  * a naive first-match would rewrite a nested `"version"` that happens to appear
  * earlier. Pick the match with the shallowest line indentation (top-level members
  * of a pretty-printed manifest sit at the outermost indent); fall back to the first
@@ -389,7 +389,7 @@ async function allTags(): Promise<string[]> {
  * The literal prefix a tag has before its version, derived from `config.tag` (the
  * source of truth) — not hard-coded. `v{version}` → `v`; `{component}-v{version}`
  * with component `chronicle` → `chronicle-v`; a custom `release-{version}` →
- * `release-`. This keeps last-tag lookup consistent with how the finisher cuts the
+ * `release-`. This keeps last-tag lookup consistent with how the hammerbearer cuts the
  * tag, even when the interview set a non-default template.
  */
 export function tagPrefix(config: ReleaseConfig, component?: string): string {

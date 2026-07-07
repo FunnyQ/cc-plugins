@@ -9,8 +9,8 @@ description: Open a PR (GitHub) or MR (GitLab) for the current branch, with a bo
 
 # Chronicle PR Skill
 
-Spawn ONE **Editor** that owns the whole flow: it spawns a drafter to analyze the
-branch + synthesize a reviewer-legible body, then a publisher to open the request —
+Spawn ONE **Storykeeper** that owns the whole flow: it spawns a skald to analyze the
+branch + synthesize a reviewer-legible body, then a messenger to open the request —
 keeping all branch/diff/`gh` output out of the main conversation while preserving
 the "why" behind the change. Human-invoked only; do not auto-trigger from incidental
 PR/MR mentions.
@@ -19,9 +19,9 @@ PR/MR mentions.
 
 ```
 main agent  (holds the conversation = the "why")
-  └─ chronicle:editor   (subagent_type — a nested custom agent, NOT a fork)
-       ├─ chronicle:drafter    (sonnet) — analyze-branch.ts → harvest cockpit → title + 4-section body (+ overview diagram)
-       └─ chronicle:publisher  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
+  └─ chronicle:storykeeper   (subagent_type — a nested custom agent, NOT a fork)
+       ├─ chronicle:skald    (sonnet) — analyze-branch.ts → harvest cockpit → title + 4-section body (+ overview diagram)
+       └─ chronicle:messenger  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
 ```
 
 Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
@@ -31,18 +31,18 @@ There is **no human confirmation gate** — invoking the skill is the consent, a
 flow auto-creates. `draft` defaults to `true` (a draft PR is the safe default for an
 auto-open; the main agent may pass `draft:false` to open it ready).
 
-The three agents live at `packages/chronicle/agents/{editor,drafter,publisher}.md`
-and auto-register as `chronicle:editor` / `chronicle:drafter` /
-`chronicle:publisher`. Their full procedures (the four-section body spec, the
+The three agents live at `packages/chronicle/agents/{storykeeper,skald,messenger}.md`
+and auto-register as `chronicle:storykeeper` / `chronicle:skald` /
+`chronicle:messenger`. Their full procedures (the four-section body spec, the
 optional Mermaid overview diagram, the `CreateInput`/`CreateResult` contract) live
 in those files.
 
 ## The main agent's job (thin)
 
 1. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
-   drawn from this conversation (the Editor and its children can't see the chat).
+   drawn from this conversation (the Storykeeper and its children can't see the chat).
    This is the only "why" they get beyond the cockpit trail and commits.
-2. **Spawn the Editor** (`subagent_type: "chronicle:editor"`), passing:
+2. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
    - `$SKILL_DIR` — the skill's load-time "Base directory for this skill" banner
      value (so the children resolve `$SKILL_DIR/scripts/analyze-branch.ts` and
      `$SKILL_DIR/scripts/request-creator.ts`). Do not hard-code a repo-relative path
@@ -53,13 +53,13 @@ in those files.
    - `draft` — optional; default `true`. Pass `false` only if the user asked to open
      the PR ready rather than as a draft.
 
-The Editor returns the final result; the main agent relays it to the user (the PR/MR
+The Storykeeper returns the final result; the main agent relays it to the user (the PR/MR
 URL, noting draft vs ready, or the failure reason) and nothing else.
 
-## What the Editor does (reference)
+## What the Storykeeper does (reference)
 
-Full procedure in `agents/editor.md`. In brief: spawn `chronicle:drafter` → if there
-are commits and a known provider, spawn `chronicle:publisher` with the confirmed
+Full procedure in `agents/storykeeper.md`. In brief: spawn `chronicle:skald` → if there
+are commits and a known provider, spawn `chronicle:messenger` with the confirmed
 `CreateInput` → relay the `CreateResult` up. Stops without creating when there are
 no commits or the provider is `unknown`.
 
@@ -71,10 +71,10 @@ distill the why → analyze + draft → create, honoring the same auto-create +
 
 ## Edge Cases
 
-- **No commits**: drafter reports it; the Editor returns `nothing to propose` and
+- **No commits**: skald reports it; the Storykeeper returns `nothing to propose` and
   stops.
-- **Unknown provider** (no recognizable `github`/`gitlab` remote): the Editor stops
+- **Unknown provider** (no recognizable `github`/`gitlab` remote): the Storykeeper stops
   before creation — there is nothing it can open.
-- **Creation failure** (missing CLI / no remote / CLI error): the publisher returns
-  `{ ok:false, reason, message }`; the Editor relays it plainly. Never pretend
+- **Creation failure** (missing CLI / no remote / CLI error): the messenger returns
+  `{ ok:false, reason, message }`; the Storykeeper relays it plainly. Never pretend
   success.

@@ -1,16 +1,16 @@
 ---
-name: drafter
-description: "Chronicle's PR/MR drafter. Runs analyze-branch.ts, harvests the cockpit decision trail, and synthesizes a reviewer-legible title + four-section body (optionally a Mermaid overview diagram). Spawned by chronicle:editor — drafts only, never creates the request."
+name: skald
+description: "Chronicle's PR/MR skald. Runs analyze-branch.ts, harvests the cockpit decision trail, and synthesizes a reviewer-legible title + four-section body (optionally a Mermaid overview diagram). Spawned by chronicle:storykeeper — drafts only, never creates the request."
 model: sonnet
 tools: ["Bash", "Read"]
 ---
 
 Analyze the current branch and draft the PR/MR material. You **draft only** — you
-must not run `gh`/`glab` or open the request. You hand the draft back to the Editor
-(`chronicle:editor`), which then spawns `chronicle:publisher` to create it. This
+must not run `gh`/`glab` or open the request. You hand the draft back to the Storykeeper
+(`chronicle:storykeeper`), which then spawns `chronicle:messenger` to create it. This
 split keeps drafting and creating in separate instructed roles.
 
-## Input (from the Editor's spawn prompt)
+## Input (from the Storykeeper's spawn prompt)
 
 - `$SKILL_DIR` — absolute path to the skill dir (`.../skills/pr`). Resolve
   `$SKILL_DIR/scripts/analyze-branch.ts`.
@@ -35,7 +35,7 @@ split keeps drafting and creating in separate instructed roles.
 3. `Read` the `BranchMaterial` JSON from `outputPath` — `commits`, `diffStat`,
    `decisions[]` (each with `reason`, `tradeoff`, `kind`, `needs_your_call`,
    `files`, `diagram`), `base`, `head`, `provider`.
-4. If `provider === "unknown"`, return the material and tell the Editor to stop
+4. If `provider === "unknown"`, return the material and tell the Storykeeper to stop
    before creation — Chronicle can't choose between `gh` and `glab`.
 5. Synthesize a concise imperative **title** and a body with EXACTLY these four
    sections:

@@ -39,7 +39,7 @@
 
 ## Length guardrail
 
-The Commit Manager hands the writer a distilled `whyBrief` that holds far more
+The Lawspeaker hands the runesmith a distilled `whyBrief` that holds far more
 "why" than belongs in a commit. Be terse on purpose — the commit records the
 change, not the whole investigation:
 

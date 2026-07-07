@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.5.2] - 2026-07-07
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.5.2` tag._
+
+### 🔧 Changed
+
+- **Internal sub-agent names were renamed to Norse mythology (e.g. `manager` → `lawspeaker`, `writer` → `runesmith`), aligning with the odin plugin family's naming.** Purely internal — no user-facing behaviour changed.
+
 ## [chronicle 0.5.1] - 2026-07-07
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.5.1` tag._
