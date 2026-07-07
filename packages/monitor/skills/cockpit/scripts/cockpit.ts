@@ -5,6 +5,8 @@
 //                  [--facet "LABEL: text" ...] [--file p ...] [--option o ...] [--diagram MERMAID] [--needs-call]
 //   cockpit scribe --type <kind> --text <body> [--title <headline>] [--file <path>]... [--diagram MERMAID] [--session <id>]
 //   cockpit scribe --recent [N]
+//   cockpit scribe --prep [--provider <p>]
+//   cockpit prep   [--provider <p>]
 //   cockpit wait   <sessionId>            # park (long-poll) until the user answers; prints the answer
 //   cockpit send   <sessionId> <answer>   # answer a parked session (CLI twin of a UI button)
 //   cockpit restart [--port N] [--no-open] # bounce the daemon onto this install's code (wins the MCP respawn race)
@@ -16,7 +18,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { findSession } from "./find-session";
 import { lintDiagram } from "./diagram-lint";
@@ -115,7 +117,7 @@ const SINGLE_FLAGS = new Set([
   "diagram",
 ]);
 const REPEATED_FLAGS = new Set(["file", "option", "facet"]);
-const BOOL_FLAGS = new Set(["needs-call"]);
+const BOOL_FLAGS = new Set(["needs-call", "prep"]);
 
 function parseArgs(argv: string[]): Args {
   const single: Record<string, string> = {};
@@ -296,6 +298,62 @@ function gateDiagram(cmd: string, src: string | undefined): void {
 
 // ---------- Subcommands ----------
 
+function printRecentScribeEntries(
+  project: string,
+  provider: Provider,
+  args: Args,
+): void {
+  const n = args.single["recent"] ? parseInt(args.single["recent"], 10) : 8;
+  const sessionId =
+    args.single["session"] || findSession(provider, project) || null;
+  if (!sessionId) return;
+  const logPath = logPathFor(project, sessionId);
+  if (!existsSync(logPath)) return;
+  const lines = readDecisionRecords(logPath);
+  // Keep only scribe-sourced entries; old entries without source default to "agent"
+  const scribeLines = lines.filter((r) => (r.source ?? "agent") === "scribe");
+  const recent = scribeLines.slice(-n);
+  for (const r of recent) {
+    const title = r.decision || "(untitled)";
+    const kind = r.kind ?? "decision";
+    console.log(`${kind} · ${title} · ${r.timestamp}`);
+  }
+}
+
+function printGitCommand(label: string, args: string[]): void {
+  console.log(`$ ${label}`);
+  const res = spawnSync("git", args, {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+  if (res.error) {
+    console.log(`(not available: ${res.error.message})`);
+    return;
+  }
+  if (res.status !== 0) {
+    const msg = (res.stderr || res.stdout || `exit ${res.status}`).trim();
+    console.log(`(not available: ${msg})`);
+    return;
+  }
+  const out = res.stdout.trimEnd();
+  console.log(out || "(no output)");
+}
+
+function cmdPrep(args: Args): void {
+  const project = process.cwd();
+  const provider = parseProvider(args.single["provider"]);
+  const sessionId = args.single["session"] || findSession(provider, project);
+  if (!sessionId) {
+    console.error("cockpit prep: could not auto-resolve the current session");
+    process.exit(1);
+  }
+  console.log("Session id:");
+  console.log(sessionId);
+  console.log("");
+  console.log("Decision-log language:");
+  console.log(getLanguage());
+}
+
 function cmdLog(args: Args): void {
   const project = process.cwd();
   const provider = parseProvider(args.single["provider"]);
@@ -362,29 +420,30 @@ function cmdLog(args: Args): void {
 function cmdScribe(args: Args): void {
   const project = process.cwd();
   const provider = parseProvider(args.single["provider"]);
+  const isPrep = args.flags.has("prep");
   const isRecent = args.flags.has("recent");
   const hasType = !!args.single["type"];
 
+  // ---- Prep mode: one-call setup for background scribe forks ----
+  if (isPrep && !hasType) {
+    console.log("Decision-log language:");
+    console.log(getLanguage());
+    console.log("");
+    console.log("Recent scribe entries:");
+    printRecentScribeEntries(project, provider, args);
+    console.log("");
+    console.log("Git change context:");
+    printGitCommand("git diff", ["diff"]);
+    console.log("");
+    printGitCommand("git diff --staged", ["diff", "--staged"]);
+    console.log("");
+    printGitCommand("git log --oneline -5", ["log", "--oneline", "-5"]);
+    process.exit(0);
+  }
+
   // ---- Recent mode: list last N scribe entries for dedup ----
   if (isRecent && !hasType) {
-    const n = args.single["recent"] ? parseInt(args.single["recent"], 10) : 8;
-    const sessionId =
-      args.single["session"] || findSession(provider, project) || null;
-    if (!sessionId) {
-      // No session in scope — nothing to list; exit cleanly
-      process.exit(0);
-    }
-    const logPath = logPathFor(project, sessionId);
-    if (!existsSync(logPath)) process.exit(0);
-    const lines = readDecisionRecords(logPath);
-    // Keep only scribe-sourced entries; old entries without source default to "agent"
-    const scribeLines = lines.filter((r) => (r.source ?? "agent") === "scribe");
-    const recent = scribeLines.slice(-n);
-    for (const r of recent) {
-      const title = r.decision || "(untitled)";
-      const kind = r.kind ?? "decision";
-      console.log(`${kind} · ${title} · ${r.timestamp}`);
-    }
+    printRecentScribeEntries(project, provider, args);
     process.exit(0);
   }
 
@@ -904,6 +963,9 @@ async function main(): Promise<void> {
     case "scribe":
       cmdScribe(parseArgs(rest));
       break;
+    case "prep":
+      cmdPrep(parseArgs(rest));
+      break;
     case "config":
       cmdConfig(rest);
       break;
@@ -922,7 +984,7 @@ async function main(): Promise<void> {
     default:
       console.error(`cockpit: unknown subcommand "${sub ?? ""}"`);
       console.error(
-        "usage: cockpit <log|scribe|config|wait|send|restart|nudge> [args]",
+        "usage: cockpit <log|scribe|prep|config|wait|send|restart|nudge> [args]",
       );
       process.exit(1);
   }
