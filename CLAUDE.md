@@ -231,6 +231,13 @@ bun packages/monitor/skills/cockpit/scripts/cockpit.ts restart            # [--p
 bun packages/monitor/skills/cockpit/scripts/cockpit.ts config get-language
 bun packages/monitor/skills/cockpit/scripts/cockpit.ts config --log-language zh-TW
 
+# Prune old decision logs — trash per-project .cockpit/logs/*.jsonl older than N
+# days (default 14, matching the registry TTL) + drop dead registry entries. The
+# registry self-reaps stale ENTRIES on write, but the jsonl FILES (and orphans
+# whose entry was already reaped) never age out on their own.
+bun packages/monitor/skills/cockpit/scripts/cockpit.ts prune --dry-run   # preview
+bun packages/monitor/skills/cockpit/scripts/cockpit.ts prune             # [--days N]
+
 # Enable best-effort thoughtful auto-logging in Codex or re-affirm it manually
 /thoughtful
 
