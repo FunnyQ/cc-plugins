@@ -88,6 +88,30 @@ stateDiagram-v2
     expect(lintDiagram("flowchart LR\n  A --> B[(rollup.db)]")).toEqual([]);
   });
 
+  test("a slash-command label [/release] is flagged with the quoted fix", () => {
+    const problems = lintDiagram("flowchart TD\n  A[/release]:::start --> B");
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("parallelogram/trapezoid");
+    expect(problems[0]).toContain('["/release"]');
+  });
+
+  test("a backslash-leading label is flagged the same way", () => {
+    const problems = lintDiagram("flowchart TD\n  A[\\undo] --> B");
+    expect(problems.some((p) => p.includes("never closes"))).toBe(true);
+  });
+
+  test("balanced parallelogram/trapezoid shapes pass", () => {
+    expect(lintDiagram("flowchart TD\n  A[/input/] --> B[/read\\]")).toEqual(
+      [],
+    );
+  });
+
+  test("quoting a slash-command label passes", () => {
+    expect(lintDiagram('flowchart TD\n  A["/release"]:::start --> B')).toEqual(
+      [],
+    );
+  });
+
   test("quoted label with parens passes", () => {
     expect(lintDiagram('flowchart TD\n  A["cache miss (L2)"] --> B')).toEqual(
       [],

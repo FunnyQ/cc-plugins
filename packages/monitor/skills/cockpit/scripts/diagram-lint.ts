@@ -128,6 +128,20 @@ export function lintDiagram(src: string): string[] {
     const c = m[1];
     if (c.startsWith('"') && c.endsWith('"')) continue;
     if (c.startsWith("(") && c.endsWith(")")) continue;
+    // `[/` and `[\` open the parallelogram/trapezoid shapes, which MUST close
+    // with a matching `/]` or `\]`. A label that only *starts* with a slash —
+    // e.g. a slash-command like [/release] — is read as an unterminated shape
+    // and fails the whole parse. Quoting opts out of shape parsing entirely.
+    // Balanced shapes ([/…/], [/…\], [\…/], [\…\]) end with a slash → skip.
+    if (
+      (c.startsWith("/") || c.startsWith("\\")) &&
+      !(c.endsWith("/") || c.endsWith("\\"))
+    ) {
+      problems.push(
+        `node label [${c}] opens a parallelogram/trapezoid ("[${c[0]}") that never closes — wrap the label in quotes: ["${c}"]`,
+      );
+      continue;
+    }
     if (/[()]/.test(c)) {
       problems.push(
         `unquoted "(" or ")" in node label [${c}] — wrap the label in quotes: ["${c}"]`,
