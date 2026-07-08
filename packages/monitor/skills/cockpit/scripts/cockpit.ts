@@ -289,9 +289,14 @@ function readDecisionRecords(logPath: string): DecisionRecord[] {
 // Gate a --diagram argument through the lint before anything is written. The
 // dashboard degrades a broken diagram to raw source where the author can't see
 // it — failing loudly here is the only point in the loop where they can fix it.
-function gateDiagram(cmd: string, src: string | undefined): void {
+async function gateDiagram(
+  cmd: string,
+  src: string | undefined,
+): Promise<void> {
+  // Early-out keeps the lint's cost (a headless mermaid parse) off every
+  // non-diagram log/scribe call.
   if (!src) return;
-  const problems = lintDiagram(src);
+  const problems = await lintDiagram(src);
   if (problems.length === 0) return;
   console.error(
     `cockpit ${cmd}: --diagram failed lint — fix the Mermaid source and re-run:`,
@@ -358,7 +363,7 @@ function cmdPrep(args: Args): void {
   console.log(getLanguage());
 }
 
-function cmdLog(args: Args): void {
+async function cmdLog(args: Args): Promise<void> {
   const project = process.cwd();
   const provider = parseProvider(args.single["provider"]);
   // Prefer an explicit --session, but fall back to the live session id so a
@@ -370,7 +375,7 @@ function cmdLog(args: Args): void {
     );
     process.exit(1);
   }
-  gateDiagram("log", args.single["diagram"]);
+  await gateDiagram("log", args.single["diagram"]);
   const rec: DecisionRecord = {
     id: crypto.randomUUID(),
     type: "decision",
@@ -421,7 +426,7 @@ function cmdLog(args: Args): void {
   if (rec.needs_your_call) console.log(`  call:  ${rec.id}`);
 }
 
-function cmdScribe(args: Args): void {
+async function cmdScribe(args: Args): Promise<void> {
   const project = process.cwd();
   const provider = parseProvider(args.single["provider"]);
   const isPrep = args.flags.has("prep");
@@ -485,7 +490,7 @@ function cmdScribe(args: Args): void {
     process.exit(1);
   }
 
-  gateDiagram("scribe", args.single["diagram"]);
+  await gateDiagram("scribe", args.single["diagram"]);
 
   const rec: DecisionRecord = {
     id: crypto.randomUUID(),
@@ -1077,10 +1082,10 @@ async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
   switch (sub) {
     case "log":
-      cmdLog(parseArgs(rest));
+      await cmdLog(parseArgs(rest));
       break;
     case "scribe":
-      cmdScribe(parseArgs(rest));
+      await cmdScribe(parseArgs(rest));
       break;
     case "prep":
       cmdPrep(parseArgs(rest));
