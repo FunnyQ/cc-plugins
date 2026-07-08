@@ -43,6 +43,13 @@ const CHANNEL_SCRIPT = resolve(
   "scripts",
   "cockpit-channel.ts",
 );
+const COCKPIT_SCRIPTS = resolve(
+  import.meta.dir,
+  "..",
+  "..",
+  "cockpit",
+  "scripts",
+);
 const COLLECTOR_SCRIPT = resolve(
   import.meta.dir,
   "..",
@@ -102,6 +109,12 @@ export function versionGte(a: string, b: string): boolean {
     if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false;
   }
   return true;
+}
+
+type ResolveDependency = (specifier: string, from: string) => string;
+
+function defaultResolve(specifier: string, from: string): string {
+  return Bun.resolveSync(specifier, from);
 }
 
 // A stale cockpit-channel entry in ~/.claude.json from an older version that
@@ -166,6 +179,35 @@ function channelChecks(): Check[] {
     "optional",
     `Found a hand-wired cockpit-channel in ~/.claude.json — the channel is plugin-packaged now.\n   Run: bun ${import.meta.path} --migrate to remove it.`,
   );
+  return checks;
+}
+
+export function cockpitChecks(
+  resolveDep: ResolveDependency = defaultResolve,
+): Check[] {
+  const checks: Check[] = [];
+  const add = (
+    label: string,
+    ok: boolean,
+    level: Check["level"],
+    hint?: string,
+  ) => checks.push({ label, ok, level, hint });
+
+  let happyDomResolves = false;
+  try {
+    resolveDep("happy-dom", COCKPIT_SCRIPTS);
+    happyDomResolves = true;
+  } catch {
+    happyDomResolves = false;
+  }
+
+  add(
+    "mermaid diagram lint (happy-dom)",
+    happyDomResolves,
+    "optional",
+    "Mermaid --diagram lint falls back to weaker heuristics that can pass source the dashboard cannot render.\n   Run bun install in the plugin directory, or let Bun auto-install it from ~/.bun/install/cache on first use (needs network once).",
+  );
+
   return checks;
 }
 
@@ -388,6 +430,7 @@ function main() {
   const { requiredFailed } = printReport([
     ...dashboardChecks(),
     ...channelChecks(),
+    ...cockpitChecks(),
     ...scriptPermissionChecks(),
   ]);
   console.log();
