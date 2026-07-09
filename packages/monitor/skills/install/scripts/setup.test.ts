@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { versionGte } from "./setup";
+import { cockpitChecks, versionGte } from "./setup";
 
 const SCRIPT = join(import.meta.dir, "setup.ts");
 const CHANNEL_SCRIPT = resolve(
@@ -93,6 +93,7 @@ describe("--check", () => {
     // cockpit side — channel is plugin-packaged; with no stale entry it's green
     expect(stdout).toContain("cockpit-channel script exists");
     expect(stdout).toContain("✓ no stale cockpit-channel entry");
+    expect(stdout).toContain("mermaid diagram lint (happy-dom)");
   });
 
   test("flags a stale hand-wired cockpit-channel entry", () => {
@@ -114,6 +115,40 @@ describe("--check", () => {
     const { code, stdout } = run();
     expect(code).toBe(1);
     expect(stdout).toContain("Required checks failed");
+  });
+});
+
+describe("cockpitChecks", () => {
+  test("reports happy-dom as an optional cockpit precheck", () => {
+    const checks = cockpitChecks();
+    const check = checks.find(
+      (c) => c.label === "mermaid diagram lint (happy-dom)",
+    );
+
+    expect(check).toBeDefined();
+    expect(check?.level).toBe("optional");
+  });
+
+  test("marks happy-dom ok when it resolves from cockpit scripts", () => {
+    const checks = cockpitChecks(() => "/fake/happy-dom.js");
+    const check = checks.find(
+      (c) => c.label === "mermaid diagram lint (happy-dom)",
+    );
+
+    expect(check?.ok).toBe(true);
+  });
+
+  test("includes a hint when happy-dom does not resolve", () => {
+    const checks = cockpitChecks(() => {
+      throw new Error("missing");
+    });
+    const check = checks.find(
+      (c) => c.label === "mermaid diagram lint (happy-dom)",
+    );
+
+    expect(check?.ok).toBe(false);
+    expect(check?.hint).toContain("falls back to weaker heuristics");
+    expect(check?.hint).toContain("bun install");
   });
 });
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [chronicle 0.6.0] - 2026-07-09
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.6.0` tag._
+
+### Added
+
+- **`/chronicle:commit` gained a `simple` mode.** Say "simple", "one commit", "single commit", or "快速 commit" and it forces a single commit for the whole change set, skipping the usual automatic simple-vs-atomic decision tree.
+
+## [monitor 3.18.5] - 2026-07-09
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.5` tag._
+
+Internal tooling hardening only — no user-facing behaviour change. The cockpit diagram lint now validates Mermaid source through a real parser (via happy-dom) instead of an approximation, and the install skill's setup gained a matching happy-dom precheck.
+
 ## [monitor 3.18.4] - 2026-07-08
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.4` tag._
