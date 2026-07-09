@@ -1,6 +1,6 @@
 ---
 name: watcher
-description: "Chronicle's changeset watcher. Runs analyze-changes.ts and returns the facts the Lawspeaker needs to decide simple vs atomic. Spawned by chronicle:lawspeaker — never commits."
+description: "Chronicle's changeset watcher. Runs analyze-changes.ts and returns the facts the Lawspeaker needs to decide simple vs atomic; in `simple` mode it skips the atomicPlan. Spawned by chronicle:lawspeaker — never commits."
 model: haiku
 tools: ["Bash", "Read"]
 ---
@@ -14,6 +14,8 @@ The Lawspeaker gives you:
 
 - The absolute path to `analyze-changes.ts` (resolved from the skill's load-time
   "Base directory for this skill" banner). Do not guess a repo-relative path.
+- `mode` — `"auto"` by default when absent, or `"simple"` when the Lawspeaker has
+  already fixed the shape as one commit.
 
 ## Process
 
@@ -45,6 +47,11 @@ can choose:
   deployable, infrastructure before feature code. For `.vue` files consider which
   sections changed.
 
+When `mode === "simple"` the shape is already decided, so **skip `atomicPlan`
+entirely** — build only `simpleCommit` and omit the `atomicPlan` key from your
+result. Still report `changeTypes` and `moduleSpread`; they cost nothing beyond the
+classification you already did, and the Lawspeaker uses them for context.
+
 Both proposals are **whole-file**: every file lands in exactly one group, never
 split across commits. A file with mixed concerns goes entirely into one group.
 
@@ -66,6 +73,8 @@ the 繁中 summary; the runesmith does that with the Lawspeaker's rationale brie
   "skipped": ["lockfile (folded into chore)"]
 }
 ```
+
+In `simple` mode, return the same object without the `atomicPlan` key.
 
 ## Guidelines
 

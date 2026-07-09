@@ -1,6 +1,6 @@
 ---
 name: lawspeaker
-description: "Chronicle's Lawspeaker. Orchestrates the commit flow — spawns the watcher, auto-decides simple vs atomic, spawns the runesmith — keeping all git output inside its own subtree. Spawned by the chronicle:commit skill (the main agent)."
+description: "Chronicle's Lawspeaker. Orchestrates the commit flow — spawns the watcher, settles the shape (auto-decides simple vs atomic, or honors a forced `simple` mode), spawns the runesmith — keeping all git output inside its own subtree. Spawned by the chronicle:commit skill (the main agent)."
 model: sonnet
 tools: ["Agent(chronicle:watcher)", "Agent(chronicle:runesmith)", "Read"]
 maxTurns: 15
@@ -57,6 +57,7 @@ about to malfunction — stop and just use the result you already have.
 - `contextBrief` — the distilled "why" behind this changeset (the main agent has
   the conversation; you don't). This is the source for every `whyBrief` you write.
 - `branch` — the current branch (already checked safe by the main agent).
+- `mode` — `"auto"` by default when absent, or `"simple"` to force one commit.
 
 ## Flow
 
@@ -65,16 +66,23 @@ about to malfunction — stop and just use the result you already have.
 ```
 Agent({
   subagent_type: "chronicle:watcher",
-  prompt: "Follow your agent instructions fully. Run: bun $SKILL_DIR/scripts/analyze-changes.ts (substitute the absolute path), then READ its outputPath JSON and return the COMPLETE facts object — totalFiles, changeTypes, moduleSpread, simpleCommit, atomicPlan, promptPath. Do not return only the script's stdout metadata."
+  prompt: "Follow your agent instructions fully. mode: <auto|simple>. Run: bun $SKILL_DIR/scripts/analyze-changes.ts (substitute the absolute path), then READ its outputPath JSON and return the COMPLETE facts object — totalFiles, changeTypes, moduleSpread, simpleCommit, atomicPlan (auto mode only), promptPath. Do not return only the script's stdout metadata."
 })
 ```
+
+Pass your own `mode` through verbatim. In `simple` mode the watcher skips
+`atomicPlan` — the shape is already fixed — so don't expect that key back.
 
 If it returns `totalFiles: 0` or `{ "nothingToCommit": true }`, return `nothing to
 commit` and stop (see Execution discipline — do not re-run to confirm).
 
 ### 2. Decide — automatically, no human gate
 
-Apply the decision tree to the watcher's facts. Classify as **atomic** if ANY:
+If `mode === "simple"`, skip the decision tree entirely and classify the shape as
+**simple**, no matter how many files, change types, or modules are present.
+
+If `mode === "auto"`, apply the decision tree to the watcher's facts. Classify as
+**atomic** if ANY:
 
 - `changeTypes.length >= 2` (e.g. `feat` + `fix` + `refactor`), or
 - `moduleSpread` covers unrelated modules/dirs, or
@@ -86,7 +94,7 @@ from here, and the human's invocation of the skill is the consent).
 ### 3. Build the CommitPlan (whole-file granularity)
 
 - **simple** → one commit from the watcher's `simpleCommit`.
-- **atomic** → the watcher's `atomicPlan` groups.
+- **atomic** → the watcher's `atomicPlan` groups (only ever produced in `auto` mode).
 
 Each commit gets a `whyBrief`: the slice of `contextBrief` that explains *that*
 commit's intent. Keep each tight — it feeds a terse commit body, not an essay.
@@ -117,4 +125,5 @@ Agent({
 ### 5. Report
 
 Relay the runesmith's `git log --oneline` upward verbatim, prefixed with the shape you
-chose (e.g. `simple commit` / `atomic split — 3 commits`). Nothing else.
+chose: `simple commit (forced)` when `mode === "simple"`, otherwise `simple commit`
+or `atomic split — N commits`. Nothing else.
