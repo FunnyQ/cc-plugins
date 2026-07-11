@@ -1,5 +1,17 @@
 # Chronicle Design Notes
 
+## Model mapping
+
+Codex roles mirror Claude model tiers:
+
+- Opus / Fable → `gpt-5.6-sol`
+- Sonnet → `gpt-5.6-terra`
+- Haiku → `gpt-5.6-luna`
+
+Claude agents live in `agents/*.md`. Codex role overlays live in
+`agents-codex/*.toml` and are copied to a stable `$CODEX_HOME` path by the
+Chronicle install skill before registration in `config.toml`.
+
 ## Commit Flow
 
 The Lawspeaker is spawned via `subagent_type`, never as a fork. A fork is a
