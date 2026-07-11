@@ -262,6 +262,7 @@ function runLiveHarness(options: {
     cwd: "/repo",
     waitTimeoutMs: options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
     keepPane: options.keepPane ?? false,
+    env: ["RELAY_DELEGATED=1"],
   };
 
   const deps: RunLiveDeps = {
@@ -319,6 +320,7 @@ describe("runLive", () => {
     expect(spawn.role).toBe("relay-codex-delegate");
     expect(spawn.agent).toBe("codex");
     expect(spawn.argv).toEqual(["-m", "gpt-6"]);
+    expect(spawn.env).toEqual(["RELAY_DELEGATED=1"]);
     // Opens its own tab; split stays as a fallback for an older herd.ts.
     expect(spawn.newTab).toBe(true);
     expect(spawn.split).toBe("down");

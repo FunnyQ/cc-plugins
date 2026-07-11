@@ -36,11 +36,18 @@ export function parseCsv(value: string): string[] {
 }
 
 // Bun.spawnSync wrapper
-export function run(args: string[], opts?: { stdin?: string }): RunResult {
+export function run(
+  args: string[],
+  opts?: {
+    stdin?: string;
+    env?: Record<string, string | undefined>;
+  },
+): RunResult {
   const proc = Bun.spawnSync(args, {
     stdin: opts?.stdin !== undefined ? Buffer.from(opts.stdin) : "pipe",
     stdout: "pipe",
     stderr: "pipe",
+    env: opts?.env,
   });
   return {
     ok: proc.exitCode === 0,

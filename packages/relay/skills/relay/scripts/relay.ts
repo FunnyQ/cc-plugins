@@ -59,7 +59,13 @@ export type RelayDeps = {
   writeFile: (path: string, text: string) => void;
   ensureDir: (path: string) => void;
   fileExists: (path: string) => boolean;
-  run: (argv: string[], opts?: { stdin?: string }) => RunResult;
+  run: (
+    argv: string[],
+    opts?: {
+      stdin?: string;
+      env?: Record<string, string | undefined>;
+    },
+  ) => RunResult;
   stderr: (text: string) => void;
   stdout: (text: string) => void;
   env: Record<string, string | undefined>;
@@ -436,6 +442,7 @@ export async function executeRelay(
       cwd: process.cwd(),
       waitTimeoutMs: parsed.flags.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
       keepPane: parsed.flags.keepPane ?? false,
+      env: ["RELAY_DELEGATED=1"],
     });
 
     if (liveResult.ok) {
@@ -504,7 +511,10 @@ export async function executeRelay(
 
   const invocation = backend.invoke(parsed.mode, opts);
   opts.runStartedAt = new Date();
-  const result = deps.run(invocation.argv, { stdin: invocation.stdin });
+  const result = deps.run(invocation.argv, {
+    stdin: invocation.stdin,
+    env: { ...deps.env, RELAY_DELEGATED: "1" },
+  });
 
   if (!result.ok) {
     deps.stderr(
