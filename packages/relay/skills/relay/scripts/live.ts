@@ -160,6 +160,7 @@ export type HerdClient = {
     split?: "right" | "down";
     newTab?: boolean;
     argv?: string[];
+    env?: string[];
   }): Promise<{ name: string }>;
   send(target: string, text: string): Promise<unknown>;
   keys(target: string, ...keys: string[]): Promise<unknown>;
@@ -191,6 +192,7 @@ export type RunLiveOpts = {
   cwd: string;
   waitTimeoutMs: number;
   keepPane: boolean;
+  env?: string[];
 };
 
 export type RunLiveDeps = {
@@ -292,6 +294,7 @@ export async function runLive(
       role,
       agent: opts.spec.agentBin,
       argv: opts.spec.argv.length ? opts.spec.argv : undefined,
+      env: opts.env,
       cwd: opts.cwd,
       // Open the agent in its OWN tab so the caller's pane keeps its full size.
       // `split` is kept as a fallback: an older herd.ts without newTab support

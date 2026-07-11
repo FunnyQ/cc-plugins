@@ -161,6 +161,48 @@ describe("parseFlags", () => {
 });
 
 describe("executeRelay", () => {
+  it("marks headless backend processes as relay-delegated", async () => {
+    let runOpts: { stdin?: string; env?: Record<string, string | undefined> } =
+      {};
+
+    await executeRelay(
+      ["claude", "delegate", "--task", "inspect it", "--headless"],
+      deps({
+        env: { PATH: "/test/bin" },
+        run: (_args, opts) => {
+          runOpts = opts ?? {};
+          return {
+            ok: true,
+            stdout: JSON.stringify({ result: "done" }),
+            stderr: "",
+            code: 0,
+          };
+        },
+      }),
+    );
+
+    expect(runOpts.env).toEqual({
+      PATH: "/test/bin",
+      RELAY_DELEGATED: "1",
+    });
+  });
+
+  it("marks live backend processes as relay-delegated", async () => {
+    let liveOpts: Parameters<RelayDeps["runLive"]>[0] | undefined;
+
+    await executeRelay(
+      ["claude", "review"],
+      liveDeps({
+        runLive: (opts) => {
+          liveOpts = opts;
+          return Promise.resolve(liveOk);
+        },
+      }),
+    );
+
+    expect(liveOpts?.env).toEqual(["RELAY_DELEGATED=1"]);
+  });
+
   it("merge-writes config set-model without running a backend", async () => {
     let spawned = false;
     const files = new Map<string, string>([

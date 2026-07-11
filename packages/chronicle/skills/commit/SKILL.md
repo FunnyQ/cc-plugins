@@ -69,11 +69,18 @@ forces one commit — and commits with whole-file granularity.
 
 ## Codex
 
-Codex has no named-agent registry. There the main agent runs the same flow inline
-(or via its own sub-agent mechanism with `fork_context` for the why): analyze →
-auto-decide → commit, honoring the same whole-file / no-hunk rule. It honors the
-same `simple` argument by forcing one commit from `simpleCommit` and skipping the
-decision tree.
+Codex uses the same topology through registered roles. Spawn exactly one
+`chronicle_lawspeaker` and pass `$SKILL_DIR`, `contextBrief`, `branch`, and `mode`.
+The Lawspeaker sequentially delegates to `chronicle_watcher` and
+`chronicle_runesmith`, then returns the final log. These roles are installed by
+`chronicle:install`; role configs use the Codex tier mapping documented in
+`DESIGN.md`.
+
+If `chronicle_lawspeaker` is unavailable, do not silently pretend the named flow
+ran. Tell the user to invoke `chronicle:install` and start a new Codex thread. The
+main agent may run the legacy inline analyze → decide → commit flow only when the
+user explicitly asks to continue without installing roles. The same `simple`
+argument still forces one commit from `simpleCommit` and skips the decision tree.
 
 ## Edge Cases
 
