@@ -1,5 +1,33 @@
 # Changelog
 
+## [chronicle 0.7.0] - 2026-07-11
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.7.0` tag._
+
+### Added
+
+- **Chronicle commit workflows can now use native Codex named agents.** The Lawspeaker, Watcher, and Runesmith roles have dedicated Codex model mappings and an idempotent install skill that preserves existing configuration while registering the trio at stable paths.
+
+### Changed
+
+- **`/chronicle:commit` now routes Codex through the same delegated topology as Claude.** Missing roles produce a clear install instruction instead of silently falling back while claiming named-agent execution.
+
+## [monitor 3.18.6] - 2026-07-11
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.6` tag._
+
+### Fixed
+
+- **Decision-log reminders now stay out of automated work.** Relay workers, SDK/headless sessions, and subagents skip both SessionStart guidance and Stop nudges, while interactive main sessions keep the reminder.
+
+## [relay 0.5.1] - 2026-07-11
+
+_relay is independently versioned; this entry tracks the `relay-v0.5.1` tag._
+
+### Fixed
+
+- **Relay now marks both headless and live delegated processes explicitly.** Claude workers can suppress interactive-only hooks without losing inherited environment such as `PATH` or `HOME`.
+
 ## [chronicle 0.6.0] - 2026-07-09
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.6.0` tag._
