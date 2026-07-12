@@ -97,18 +97,14 @@ split keeps drafting and creating in separate instructed roles.
 
        One extra rule for the `\|…\|` form only: it rejects brackets outright, where
        `-- text -->` tolerates them. When in doubt, use `-- text -->`.
-     - **Lint it — do not eyeball it.** Before you return the draft, run every
-       ```mermaid block through the checker. A rule in a prompt is a request; this is
-       the only thing that actually holds:
-
-       ```bash
-       printf '%s' "$DIAGRAM_SOURCE" | bun "$SKILL_DIR/scripts/diagram-lint.ts"
-       ```
-
-       Exit 0 → ship it. Non-zero → it prints what is wrong and how to fix it. **Fix and
-       re-lint.** If you cannot make it lint clean, **drop the diagram entirely** and
-       write the section in prose. A diagram that fails to parse is strictly worse than
-       no diagram — an unrendered red error box is the first thing the reviewer sees.
+     - **When in doubt, drop the diagram.** Nothing here validates the block before it
+       is posted, so the guidance above is the only guard — and guidance in a prompt is
+       a request, not a guarantee. A diagram that fails to parse is strictly worse than
+       no diagram: an unrendered red error box is the first thing the reviewer sees. If
+       you are not confident the block parses, write the section in prose instead.
+       (`monitor` has a real Mermaid linter — `skills/cockpit/scripts/diagram-lint.ts`,
+       which runs the vendored parser headless — but chronicle cannot import across
+       plugin boundaries. Wiring one up properly would close this hole for good.)
    - **What to focus on**: turn `tradeoff` fields, `kind:"caveat"` records, and
      `needs_your_call:true` records into review guidance; call out risky files from
      `decisions[].files`.
