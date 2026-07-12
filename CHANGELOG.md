@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.18.10] - 2026-07-13
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.10` tag._
+
+### Fixed
+
+- **Long session titles no longer stretch the Cockpit flight container.** Title labels are capped at 288px, still shrink responsively, and retain their existing single-line ellipsis behavior.
+
 ## [monitor 3.18.9] - 2026-07-13
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.9` tag._
