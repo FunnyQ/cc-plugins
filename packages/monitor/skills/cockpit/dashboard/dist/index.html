@@ -161,6 +161,12 @@
                       v-text="(s.provider || 'claude').toUpperCase()"
                     ></span>
                     <span
+                      v-if="s.title"
+                      class="leg__title"
+                      :title="s.title"
+                      v-text="s.title"
+                    ></span>
+                    <span
                       v-if="s.tracked === false"
                       class="leg__tag"
                       title="Running, but not a cockpit session (no decision trail)"
