@@ -1,17 +1,20 @@
 // cockpit registry — reads ~/.cockpit/registry.json, derives active/ended
 // status per session, and builds the /api/sessions + /api/projects payloads.
-import { readFileSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
 import { subagentCountFor } from "./subagents";
 import { hasChannel } from "./inbox";
 import { cockpitHome } from "./cockpit-home";
+import { resolveHistoricalSessionTitle } from "./session-title";
 
 export type RegistryEntry = {
   provider: Provider;
   project: string;
   sessionId: string;
+  title?: string;
+  titleResolved?: boolean;
   logPath: string;
   lastHeartbeat: string;
 };
@@ -153,6 +156,40 @@ function subagentsFor(
   return subagentCountFor(provider, sessionId, now);
 }
 
+type TitleUpdate = {
+  provider: Provider;
+  sessionId: string;
+  title: string;
+};
+
+function persistTitleUpdates(updates: TitleUpdate[]): void {
+  if (!updates.length) return;
+  const registry = readRegistry();
+  let changed = false;
+  for (const update of updates) {
+    const entry = registry.find(
+      (candidate) =>
+        candidate.provider === update.provider &&
+        candidate.sessionId === update.sessionId,
+    );
+    if (!entry) continue;
+    if (update.title && entry.title !== update.title) {
+      entry.title = update.title;
+      changed = true;
+    }
+    if (entry.titleResolved !== true) {
+      entry.titleResolved = true;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  mkdirSync(cockpitHome(), { recursive: true });
+  writeFileSync(
+    registryPath(),
+    JSON.stringify({ sessions: registry }, null, 2),
+  );
+}
+
 // ---------- views ----------
 
 function activeFirst<
@@ -174,17 +211,42 @@ export function buildSessions(now = Date.now()): SessionView[] {
     getLiveSessions(now).map((l) => [`${l.provider}:${l.id}`, l]),
   );
   const seen = new Set<string>();
+  const titleUpdates: TitleUpdate[] = [];
 
   const tracked = readRegistry().map((e): SessionView => {
     const key = `${e.provider}:${e.sessionId}`;
     seen.add(key);
     const live = liveByKey.get(key);
     const active = !!live || statusOf(e, now) === "active";
+    const liveTitle = live?.title.trim() ?? "";
+    let title = liveTitle || e.title?.trim() || "";
+    if (liveTitle) {
+      if (e.title !== liveTitle || e.titleResolved !== true) {
+        titleUpdates.push({
+          provider: e.provider,
+          sessionId: e.sessionId,
+          title: liveTitle,
+        });
+      }
+    } else if (!title && e.titleResolved !== true) {
+      title = resolveHistoricalSessionTitle(e.provider, e.sessionId);
+      titleUpdates.push({
+        provider: e.provider,
+        sessionId: e.sessionId,
+        title,
+      });
+    } else if (title && e.titleResolved !== true) {
+      titleUpdates.push({
+        provider: e.provider,
+        sessionId: e.sessionId,
+        title,
+      });
+    }
     return {
       provider: e.provider,
       project: e.project,
       sessionId: e.sessionId,
-      title: live?.title ?? "",
+      title,
       logPath: e.logPath,
       status: active ? "active" : "ended",
       liveStatus: deriveLiveStatus({
@@ -200,6 +262,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
       tracked: true,
     };
   });
+  persistTitleUpdates(titleUpdates);
 
   const untracked: SessionView[] = [];
   for (const l of liveByKey.values()) {
