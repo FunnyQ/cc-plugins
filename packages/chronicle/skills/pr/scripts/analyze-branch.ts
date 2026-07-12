@@ -325,6 +325,28 @@ function isDecisionRecord(value: unknown): value is DecisionRecord {
   );
 }
 
+// One unreadable log must not take its siblings down with it. The previous code
+// returned an empty harvest on the first failure, so a single deleted / half-written /
+// unreadable session log silently gutted the PR body's "Why" section — and reported
+// hasCockpit:false, which reads as "this project has no cockpit trail" rather than
+// "one file was unreadable".
+export async function collectDecisions(
+  logPaths: string[],
+  read: (path: string) => Promise<DecisionRecord[]> = readDecisionLog,
+): Promise<DecisionRecord[]> {
+  const records: DecisionRecord[] = [];
+
+  for (const path of logPaths) {
+    try {
+      records.push(...(await read(path)));
+    } catch {
+      continue;
+    }
+  }
+
+  return records;
+}
+
 async function readDecisionLog(path: string): Promise<DecisionRecord[]> {
   const text = await Bun.file(path).text();
   const records: DecisionRecord[] = [];
@@ -369,15 +391,9 @@ async function harvestCockpit(
         typeof entry.logPath === "string" &&
         projectMatches(entry.project, repoRoot),
     );
-    const records: DecisionRecord[] = [];
-
-    for (const entry of matching) {
-      try {
-        records.push(...(await readDecisionLog(entry.logPath!)));
-      } catch {
-        return { decisions: [], hasCockpit: false };
-      }
-    }
+    const records = await collectDecisions(
+      matching.map((entry) => entry.logPath!),
+    );
 
     const scoped = branchDecisions(records, changedFiles, branchStartISO);
     const deduped = new Map<string, DecisionRecord>();

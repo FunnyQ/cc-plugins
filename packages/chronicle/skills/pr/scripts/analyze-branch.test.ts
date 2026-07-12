@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   branchDecisions,
+  collectDecisions,
   fallbackPayloadForError,
   detectProvider,
   parseRepoSlug,
@@ -292,5 +293,38 @@ describe("remotePushUrlArgs", () => {
       "--push",
       "origin",
     ]);
+  });
+});
+
+// A cockpit registry can list several session logs. One of them being unreadable —
+// deleted out from under us, half-written, wrong permissions — used to discard every
+// decision harvested from its siblings and report hasCockpit:false, silently gutting
+// the PR body's "Why" section.
+describe("collectDecisions", () => {
+  const at = (id: string) => decision(id, "2026-01-01T00:00:00.000Z", []);
+
+  test("gathers records from every readable log", async () => {
+    const read = async (path: string) => [at(path)];
+    const records = await collectDecisions(["a.jsonl", "b.jsonl"], read);
+    expect(records.map((r) => r.id)).toEqual(["a.jsonl", "b.jsonl"]);
+  });
+
+  test("skips an unreadable log instead of discarding its siblings", async () => {
+    const read = async (path: string) => {
+      if (path === "bad.jsonl") throw new Error("EACCES");
+      return [at(path)];
+    };
+    const records = await collectDecisions(
+      ["a.jsonl", "bad.jsonl", "b.jsonl"],
+      read,
+    );
+    expect(records.map((r) => r.id)).toEqual(["a.jsonl", "b.jsonl"]);
+  });
+
+  test("returns empty when every log fails", async () => {
+    const read = async () => {
+      throw new Error("EACCES");
+    };
+    expect(await collectDecisions(["a.jsonl"], read)).toEqual([]);
   });
 });
