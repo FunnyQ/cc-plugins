@@ -26,17 +26,13 @@ export type SessionStatus = "active" | "ended";
 // `your-call` (parked on an unanswered needs_your_call) wins over any working
 // state, and a stale session always reads `ended`.
 export type LiveStatus =
-  | "working"
-  | "waiting"
-  | "your-call"
-  | "idle"
-  | "shell"
-  | "ended";
+  "working" | "waiting" | "your-call" | "idle" | "shell" | "ended";
 
 export type SessionView = {
   provider: Provider;
   project: string;
   sessionId: string;
+  title: string;
   logPath: string;
   status: SessionStatus;
   liveStatus: LiveStatus;
@@ -188,6 +184,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
       provider: e.provider,
       project: e.project,
       sessionId: e.sessionId,
+      title: live?.title ?? "",
       logPath: e.logPath,
       status: active ? "active" : "ended",
       liveStatus: deriveLiveStatus({
@@ -213,6 +210,7 @@ export function buildSessions(now = Date.now()): SessionView[] {
       provider: l.provider,
       project: l.cwd,
       sessionId: l.id,
+      title: l.title,
       logPath: "",
       status: "active",
       // No cockpit log, so no needs_your_call to be parked on — just the harness

@@ -17,6 +17,7 @@ export type LiveSession = {
   provider: Provider;
   id: string;
   cwd: string;
+  title: string;
   updatedAtMs: number;
   // Raw harness status. Claude writes this per-session (busy/idle/waiting/shell/
   // …); Codex has no equivalent, so we infer busy/idle from how recently the
@@ -47,6 +48,7 @@ type ClaudeSessionFile = {
   startedAt: number;
   updatedAt?: number;
   status?: string;
+  name?: string;
 };
 
 // Claude writes a JSON file per running session under ~/.claude/sessions/; an
@@ -75,6 +77,7 @@ function readClaudeLive(now: number): LiveSession[] {
         provider: "claude",
         id: d.sessionId,
         cwd: d.cwd,
+        title: typeof d.name === "string" ? d.name.trim() : "",
         updatedAtMs,
         status: typeof d.status === "string" ? d.status : "idle",
       });
@@ -88,6 +91,7 @@ function readClaudeLive(now: number): LiveSession[] {
 type CodexThreadRow = {
   id: string;
   cwd: string;
+  title: string;
   updated_at: number;
   updated_at_ms: number | null;
 };
@@ -95,6 +99,7 @@ type CodexThreadRow = {
 type OpenCodeSessionRow = {
   id: string;
   directory: string;
+  title: string;
   time_created: number;
   time_updated: number;
 };
@@ -112,7 +117,7 @@ function readCodexLive(now: number): LiveSession[] {
       const excludeSpawnedChildren = excludeCodexSpawnedChildrenSql(db);
       const rows = db
         .query(
-          `select id, cwd, updated_at, updated_at_ms
+          `select id, cwd, title, updated_at, updated_at_ms
            from threads
            where archived = 0 and rollout_path != ''
              ${excludeSpawnedChildren}
@@ -129,6 +134,7 @@ function readCodexLive(now: number): LiveSession[] {
           provider: "codex",
           id: r.id,
           cwd: r.cwd,
+          title: typeof r.title === "string" ? r.title.trim() : "",
           updatedAtMs,
           status: now - updatedAtMs <= CODEX_BUSY_MS ? "busy" : "idle",
         });
@@ -150,7 +156,7 @@ function readOpenCodeLive(now: number): LiveSession[] {
     try {
       const rows = db
         .query(
-          `select id, directory, time_created, time_updated
+          `select id, directory, title, time_created, time_updated
            from session
            where time_archived is null
            order by time_updated desc
@@ -170,6 +176,7 @@ function readOpenCodeLive(now: number): LiveSession[] {
           provider: "opencode",
           id: r.id,
           cwd: r.directory,
+          title: typeof r.title === "string" ? r.title.trim() : "",
           updatedAtMs,
           status: now - updatedAtMs <= CODEX_BUSY_MS ? "busy" : "idle",
         });

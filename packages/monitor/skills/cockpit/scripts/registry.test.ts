@@ -287,6 +287,7 @@ describe("buildSessions live merge", () => {
     sid: string,
     cwd: string,
     updatedAtMs = Date.now(),
+    name = "",
   ) {
     const sessDir = realpathSync(mkdtempSync(join(tmpdir(), "ck-sess-")));
     process.env.COCKPIT_CLAUDE_SESSIONS_DIR = sessDir;
@@ -297,6 +298,7 @@ describe("buildSessions live merge", () => {
         cwd,
         startedAt: updatedAtMs,
         updatedAt: updatedAtMs,
+        name,
       }),
     );
     return sessDir;
@@ -311,6 +313,23 @@ describe("buildSessions live merge", () => {
       expect(s.tracked).toBe(false);
       expect(s.status).toBe("active");
       expect(s.project).toBe("/Users/q/Projects/other");
+    } finally {
+      rmSync(sessDir, { recursive: true, force: true });
+    }
+  });
+
+  test("surfaces the live harness session title", () => {
+    const sid = "89898989-8989-8989-8989-898989898989";
+    const sessDir = liveClaudeSession(
+      sid,
+      "/Users/q/Projects/titled",
+      Date.now(),
+      "Refine cockpit session rail",
+    );
+    try {
+      expect(mod.buildSessions().find((x) => x.sessionId === sid)?.title).toBe(
+        "Refine cockpit session rail",
+      );
     } finally {
       rmSync(sessDir, { recursive: true, force: true });
     }
@@ -373,6 +392,7 @@ describe("buildSessions live merge", () => {
         `create table threads (
           id text primary key,
           cwd text not null,
+          title text not null,
           rollout_path text not null,
           updated_at integer not null,
           updated_at_ms integer,
@@ -388,12 +408,13 @@ describe("buildSessions live merge", () => {
       );
       const insertThread = db.query(
         `insert into threads
-         (id, cwd, rollout_path, updated_at, updated_at_ms, archived)
-         values (?, ?, ?, ?, ?, 0)`,
+         (id, cwd, title, rollout_path, updated_at, updated_at_ms, archived)
+         values (?, ?, ?, ?, ?, ?, 0)`,
       );
       insertThread.run(
         parent,
         "/Users/q/Projects/app",
+        "Parent flight",
         parentRollout,
         now / 1000,
         now,
@@ -401,6 +422,7 @@ describe("buildSessions live merge", () => {
       insertThread.run(
         child,
         "/Users/q/Projects/app",
+        "Child flight",
         childRollout,
         now / 1000,
         now,
@@ -420,6 +442,9 @@ describe("buildSessions live merge", () => {
       expect(ids).toContain(parent);
       expect(ids).not.toContain(child);
       expect(sessions.find((s) => s.sessionId === parent)?.subagents).toBe(1);
+      expect(sessions.find((s) => s.sessionId === parent)?.title).toBe(
+        "Parent flight",
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
