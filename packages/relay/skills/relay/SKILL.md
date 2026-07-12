@@ -100,6 +100,19 @@ relay.ts claude review --focus high
 | "review against main" | `relay.ts codex review --scope main` |
 | "review commit abc123" | `relay.ts codex review --scope abc123` |
 
+> ⚠️ **`--scope` is only enforced on backends with a native review.**
+>
+> | Backend | Review strategy | What `--scope` does |
+> |---|---|---|
+> | `codex` | native (`codex review`) | the CLI enforces it |
+> | `claude` | native (`/code-review`) | the CLI enforces it |
+> | `opencode` | **prompt-emulated** — no native review | **advisory only.** It is one line of the prompt, and the model is free to ignore it and audit the whole repo instead |
+>
+> This is not theoretical: `opencode review --scope uncommitted` has been observed
+> discarding the scope and returning a full-codebase audit. If you need opencode's
+> perspective on a bounded change, reach for **`--files`** (below) — it puts the file
+> contents *into* the prompt, so the scope holds by construction rather than by request.
+
 **Scope names specific files / a directory / cross-cutting concern** — collect context and run review with a custom prompt:
 
 1. Identify the files from the scope (ask if unclear).
