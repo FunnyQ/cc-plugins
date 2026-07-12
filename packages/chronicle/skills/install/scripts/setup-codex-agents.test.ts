@@ -56,6 +56,9 @@ describe("setup-codex-agents", () => {
       ]),
     );
     expect(installed.lawspeaker).toContain('model = "gpt-5.6-terra"');
+    expect(installed.lawspeaker).toContain("generic sub-agent runtime");
+    expect(installed.lawspeaker).toContain("watcher.toml");
+    expect(installed.lawspeaker).toContain("runesmith.toml");
     expect(installed.watcher).toContain('model = "gpt-5.6-luna"');
     expect(installed.runesmith).toContain('model = "gpt-5.6-luna"');
     for (const content of Object.values(installed)) {

@@ -69,18 +69,30 @@ forces one commit — and commits with whole-file granularity.
 
 ## Codex
 
-Codex uses the same topology through registered roles. Spawn exactly one
-`chronicle_lawspeaker` and pass `$SKILL_DIR`, `contextBrief`, `branch`, and `mode`.
-The Lawspeaker sequentially delegates to `chronicle_watcher` and
-`chronicle_runesmith`, then returns the final log. These roles are installed by
-`chronicle:install`; role configs use the Codex tier mapping documented in
-`DESIGN.md`.
+Codex uses the same topology through one of two role-loading paths:
 
-If `chronicle_lawspeaker` is unavailable, do not silently pretend the named flow
-ran. Tell the user to invoke `chronicle:install` and start a new Codex thread. The
-main agent may run the legacy inline analyze → decide → commit flow only when the
-user explicitly asks to continue without installing roles. The same `simple`
-argument still forces one commit from `simpleCommit` and skips the decision tree.
+1. **Named-role selector available**: spawn exactly one registered
+   `chronicle_lawspeaker` and pass `$SKILL_DIR`, `contextBrief`, `branch`, and
+   `mode`.
+2. **Generic sub-agent API only**: first verify the stable role files exist under
+   `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
+   exactly one non-fork generic agent with task name `chronicle_lawspeaker`, no
+   inherited turns, and a prompt that tells it to read and obey the
+   `developer_instructions` in `lawspeaker.toml` before handling the same four
+   inputs. Its stable instructions delegate sequentially to generic watcher and
+   runesmith children that self-load their own TOMLs. Do not paste or improvise the
+   role instructions in the spawn prompt.
+
+Both paths return only the final log and preserve the same Lawspeaker → Watcher →
+Runesmith isolation. These roles are installed by `chronicle:install`; role configs
+use the Codex tier mapping documented in `DESIGN.md`.
+
+If neither a named-role selector nor a non-fork generic sub-agent API is available,
+do not silently pretend the agent flow ran. If the stable role files are missing,
+tell the user to invoke `chronicle:install` and start a new Codex thread. The main
+agent may run the legacy inline analyze → decide → commit flow only when the user
+explicitly asks to continue without agents. The same `simple` argument still forces
+one commit from `simpleCommit` and skips the decision tree.
 
 ## Edge Cases
 
