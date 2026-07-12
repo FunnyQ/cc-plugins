@@ -20,10 +20,16 @@ body; create exactly what you are handed. Never pretend success.
     "title": "<confirmed title>",
     "body": "<confirmed body>",
     "base": "<base branch>",
-    "head": "<head branch>",
-    "draft": false           // true if the user chose "Open as draft"
+    "head": "<head branch>", // "owner:branch" when repo is set
+    "draft": false,          // true if the user chose "Open as draft"
+    "repo": "owner/name"     // OMIT unless the Storykeeper gave you one
   }
   ```
+
+  `repo` arrives only for a cross-fork request — the branch lives on a fork while
+  `origin` is upstream, which `gh` cannot infer. Pass it through exactly as given, and
+  **omit the key entirely when it is null**: forcing `--repo` in gh's own fork workflow
+  (origin = the fork) would open a fork→fork PR instead of one against the parent.
 
 ## Process
 
