@@ -10,11 +10,22 @@
 // 3.19.0 stops NEW orphans. It cannot retire the ones already on disk, so this sweep
 // does — once, on the first session after the upgrade.
 //
-// The selection is deliberately narrow. A foreign version root is NOT evidence of
-// orphanhood: a user can have an older session still open when a newer one starts, and
-// that session's channel is alive, correctly parented, and doing its job. Only PPID == 1
-// proves the parent is gone. (A daemon is legitimately PPID == 1 — reaping a stale one
-// is safe, since any live channel simply re-ensures it.)
+// The selection is deliberately narrow on TWO axes.
+//
+// WHICH PROCESSES — only the cockpit channel and its daemon. A stale cockpit daemon is
+// safe to signal because it self-heals: any live channel's next poll fails and calls
+// `ensureCockpitDaemon()`, which respawns it.
+//
+// `atlas-server` is deliberately NOT in scope, even though it orphans to PID 1 the same
+// way. It IS the usage dashboard — the thing the user has open in a browser tab — and
+// unlike the cockpit daemon, **nothing re-ensures it**: the channel never touches it, and
+// usage-dashboard's SKILL.md says the skill owns its lifecycle. Reaping it after an
+// upgrade would kill a dashboard the user is actively looking at, permanently. It was
+// never part of the leak (no polling loop, so it burns nothing); it is merely idle.
+//
+// WHICH OF THOSE — a foreign version root is NOT evidence of orphanhood: a user can have
+// an older session still open when a newer one starts, and that session's channel is
+// alive, correctly parented, and doing its job. Only PPID == 1 proves the parent is gone.
 
 import { execFileSync } from "node:child_process";
 
@@ -26,7 +37,7 @@ export type ProcRow = {
 };
 
 const MONITOR_SCRIPT =
-  /[/\\]monitor[/\\](\d+\.\d+\.\d+)[/\\]skills[/\\](?:cockpit|usage-dashboard)[/\\]scripts[/\\](?:cockpit-channel|cockpit-server|atlas-server)\.ts\b/;
+  /[/\\]monitor[/\\](\d+\.\d+\.\d+)[/\\]skills[/\\]cockpit[/\\]scripts[/\\](?:cockpit-channel|cockpit-server)\.ts\b/;
 
 export function parsePsRows(out: string): ProcRow[] {
   const rows: ProcRow[] = [];

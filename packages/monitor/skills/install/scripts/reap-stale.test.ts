@@ -31,12 +31,22 @@ describe("selectStaleMonitorPids", () => {
     ]);
   });
 
-  test("reaps orphaned daemons and atlas servers too", () => {
+  test("reaps a stale cockpit daemon — it self-heals", () => {
+    expect(select([row({ pid: 62198, command: server("3.18.4") })])).toEqual([
+      62198,
+    ]);
+  });
+
+  // The usage dashboard orphans to PID 1 the same way, but it IS the page the user has
+  // open in a browser, and nothing re-ensures it — the channel only respawns the cockpit
+  // daemon. Reaping it after an upgrade would kill a live dashboard for good. It never
+  // polled anything, so it was never part of the leak.
+  test("never reaps the usage dashboard, orphaned or not", () => {
     const rows = [
-      row({ pid: 62198, command: server("3.18.4") }),
-      row({ pid: 90091, command: atlas("3.17.0") }),
+      row({ pid: 90091, ppid: 1, command: atlas("3.17.0") }),
+      row({ pid: 90092, ppid: 42, command: atlas("3.17.0") }),
     ];
-    expect(select(rows).sort()).toEqual([62198, 90091]);
+    expect(select(rows)).toEqual([]);
   });
 
   // The predicate that keeps this sweep from being destructive. A user can have an

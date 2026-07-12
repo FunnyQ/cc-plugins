@@ -152,6 +152,13 @@ export function nextReconnectDelayMs(failureCount: number): number {
 // caller's SUCCESS path — and an unfloored loop re-polls at once. Two such loops
 // ping-pong at thousands of req/s. The floor bounds that; the jitter breaks the
 // lockstep between colliding pollers.
+//
+// The floor is charged on ELAPSED time, so a poll that parked for its full budget pays
+// nothing. It is NOT free on every path, though: inbox.ts answers a message that was
+// STASHED between polls immediately, so that poll returns at elapsed≈0 and the next one
+// waits out the whole floor. A burst of N stashed messages therefore drains at roughly
+// one per second. That is the price of bounding the spin, and it is only paid when the
+// daemon answers fast — which is exactly the ping-pong signature.
 export const POLL_FLOOR_MS = 1000;
 const POLL_JITTER_MS = 250;
 
@@ -165,8 +172,11 @@ export function pollFloorDelayMs(
   return remaining + Math.floor(rand() * POLL_JITTER_MS);
 }
 
-// Bun.sleep() ignores AbortSignal, so a shutdown landing mid-backoff would stall for
-// up to the full 30s reconnect delay before the process could exit.
+// Bun.sleep() ignores AbortSignal. Shutdown does not actually depend on this — `stop()`
+// calls process.exit(0) on the same tick — but `pullVerdict` does: registerPermissionRelay
+// aborts the in-flight controller when a NEWER permission_request arrives, and an
+// un-abortable backoff would hold the superseded pull for up to the full 30s reconnect
+// delay while the chained next request waits behind it.
 export function abortableSleep(
   ms: number,
   signal?: AbortSignal,
