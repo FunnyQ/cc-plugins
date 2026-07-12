@@ -27,6 +27,10 @@ export type BranchMaterial = {
   remoteUrl: string | null;
   base: string;
   head: string;
+  // The repo the request must be opened against, when it cannot be inferred —
+  // i.e. `origin` is upstream and the branch was pushed to a separate fork remote.
+  // null in every other case; see resolveCrossFork.
+  repo: string | null;
   mergeBase: string;
   commits: { sha: string; subject: string; body: string }[];
   diffStat: string;
@@ -59,6 +63,49 @@ export function projectMatches(
   repoRoot: string,
 ): boolean {
   return normalizePath(entryProject) === normalizePath(repoRoot);
+}
+
+// "owner/name" from any of the shapes git hands back:
+//   https://host/owner/name(.git)  |  git@host:owner/name.git  |  ssh://git@host/owner/name
+export function parseRepoSlug(remoteUrl: string | null): string | null {
+  if (!remoteUrl) return null;
+  const match = remoteUrl.trim().match(/[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/);
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+
+export function qualifyHead(
+  branch: string,
+  headSlug: string | null,
+  baseSlug: string | null,
+): string {
+  if (!headSlug || !baseSlug || headSlug === baseSlug) return branch;
+  return `${headSlug.split("/")[0]}:${branch}`;
+}
+
+// A fork contributor can be set up two ways, and only one of them needs our help:
+//
+//   origin = the fork      → `gh` already defaults the base repo to the parent.
+//                            Emitting --repo here would open a fork→fork PR.
+//   origin = upstream,     → `gh` has no way to know where the branch lives. It
+//   branch pushed to a       reads a bare --head as a branch of the BASE repo,
+//   separate fork remote     which does not exist, and the create fails.
+//
+// So we only speak up for the second case: qualify the head as `owner:branch` and
+// name the target repo explicitly. Anything we cannot parse falls back to today's
+// behavior rather than guessing.
+export function resolveCrossFork(
+  branch: string,
+  headRemoteUrl: string | null,
+  originRemoteUrl: string | null,
+): { head: string; repo: string | null } {
+  const headSlug = parseRepoSlug(headRemoteUrl);
+  const baseSlug = parseRepoSlug(originRemoteUrl);
+  const crossFork = !!headSlug && !!baseSlug && headSlug !== baseSlug;
+
+  return {
+    head: qualifyHead(branch, headSlug, baseSlug),
+    repo: crossFork ? baseSlug : null,
+  };
 }
 
 export function branchDecisions(
@@ -189,11 +236,18 @@ async function gatherGit(baseOverride: string | null) {
   const commits = parseCommits(commitsText);
   const changedFiles = lines(changedFilesText);
   const commitTimes = lines(commitTimesText);
+  const branch = head.trim();
+  const crossFork = resolveCrossFork(
+    branch,
+    await headRemoteUrl(branch),
+    remoteUrl,
+  );
 
   return {
     repoRoot,
     base,
-    head: head.trim(),
+    head: crossFork.head,
+    repo: crossFork.repo,
     mergeBase,
     remoteUrl,
     commits,
@@ -201,6 +255,22 @@ async function gatherGit(baseOverride: string | null) {
     changedFiles,
     branchStartISO: commitTimes[0] ?? null,
   };
+}
+
+// The remote this branch actually pushes to — which is NOT always `origin`. A
+// contributor who cloned upstream and added their fork as a second remote pushes to
+// the fork while `origin` stays upstream.
+async function headRemoteUrl(branch: string): Promise<string | null> {
+  const configured = await tryGitText([
+    "config",
+    "--get",
+    `branch.${branch}.remote`,
+  ]);
+  const name = configured?.trim();
+  if (!name) return null;
+  // A branch can be configured to push to a URL rather than a named remote.
+  if (name.includes(":") || name.includes("/")) return name;
+  return (await tryGitText(["remote", "get-url", name]))?.trim() || null;
 }
 
 function isDecisionRecord(value: unknown): value is DecisionRecord {
@@ -312,6 +382,7 @@ export function fallbackPayloadForError(error: unknown): BranchMaterial {
     remoteUrl: null,
     base: "",
     head: "",
+    repo: null,
     mergeBase: "",
     commits: [],
     diffStat: "",
@@ -335,6 +406,7 @@ async function main(): Promise<void> {
       remoteUrl: git.remoteUrl,
       base: git.base,
       head: git.head,
+      repo: git.repo,
       mergeBase: git.mergeBase,
       commits: git.commits,
       diffStat: git.diffStat,
@@ -348,6 +420,7 @@ async function main(): Promise<void> {
         provider,
         hasCockpit: cockpit.hasCockpit,
         commitCount: payload.commits.length,
+        crossFork: payload.repo !== null,
       }),
     );
   } catch (error) {
