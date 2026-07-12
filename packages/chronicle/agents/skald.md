@@ -27,31 +27,61 @@ split keeps drafting and creating in separate instructed roles.
    ```bash
    test -f "$SKILL_DIR/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
 
-   # Which branch did THIS branch actually fork from?
+   # Which branch does THIS branch belong to?
    #
    # The analyzer defaults to the repo's default branch. In a git-flow repo that is
    # usually `main`, even though features integrate into `develop` — so a 4-commit
    # branch gets based on `main` and shows up as 16 commits, dragging in everything
    # `develop` has not released yet. The PR looks insane and nobody notices why.
-   #
-   # This is not a guess. If `origin/develop..HEAD` is STRICTLY shorter than
-   # `origin/<default>..HEAD`, then HEAD's history provably contains commits that are in
-   # `develop` but not in the default branch — so it forked from `develop`, and basing it
-   # anywhere else would drag those commits in. When the two counts are EQUAL the diff is
-   # identical either way (a hotfix cut from `main` lands here), so we change nothing and
-   # let the analyzer's default stand.
    BASE=""
+   BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
    if git rev-parse --verify --quiet origin/develop >/dev/null; then
-     DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
-     DEFAULT=${DEFAULT:-main}
-     if [ "$DEFAULT" != "develop" ] && git rev-parse --verify --quiet "origin/$DEFAULT" >/dev/null; then
-       N_DEV=$(git rev-list --count "origin/develop..HEAD")
-       N_DEF=$(git rev-list --count "origin/$DEFAULT..HEAD")
-       if [ "$N_DEV" -lt "$N_DEF" ]; then
-         BASE=develop
-         echo "chronicle: base=develop — $N_DEV commits vs $N_DEF against '$DEFAULT' (git flow)" >&2
-       fi
-     fi
+     case "$BRANCH" in
+       hotfix/*|release/*)
+         # git-flow CONTRACT: these two are the only branches that land on the release
+         # line. A hotfix is cut FROM `main`. A release is cut from `develop` but is
+         # FINISHED by merging into `main` and tagging there. Both then back-merge to
+         # `develop`.
+         #
+         # This check must come FIRST, because the commit-count rule below does not merely
+         # fail on these — for a release branch it fails CONFIDENTLY:
+         #
+         #   hotfix/*  — after a back-merge `main` is an ancestor of `develop`, so both
+         #               candidate counts are identical. The rule ties and cannot tell.
+         #   release/* — it is cut from `develop`, so `origin/develop..HEAD` really is
+         #               strictly shorter. The rule would "prove" base=develop — and be
+         #               wrong, because a release branch targets `main`.
+         #
+         # A release branch's start and end are deliberately different branches, and git
+         # history only records the start. The prefix is the only thing that carries the
+         # intent, and in git-flow it is a contract rather than a hint.
+         BASE=main
+         echo "chronicle: base=main — '$BRANCH' is a git-flow ${BRANCH%%/*} branch (targets the release line)" >&2
+         ;;
+       *)
+         # Everything else integrates into `develop`. Prove it from the branch's own
+         # history rather than guessing from its name:
+         #
+         # If `origin/develop..HEAD` is STRICTLY shorter than `origin/<default>..HEAD`,
+         # then HEAD provably contains commits that are in `develop` but not in the
+         # default branch — so it forked from `develop`, and basing it anywhere else
+         # would drag those commits in.
+         #
+         # When the counts are EQUAL the diff is identical either way, so nothing can go
+         # wrong: change nothing and let the analyzer's default stand.
+         DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+         DEFAULT=${DEFAULT:-main}
+         if [ "$DEFAULT" != "develop" ] && git rev-parse --verify --quiet "origin/$DEFAULT" >/dev/null; then
+           N_DEV=$(git rev-list --count "origin/develop..HEAD")
+           N_DEF=$(git rev-list --count "origin/$DEFAULT..HEAD")
+           if [ "$N_DEV" -lt "$N_DEF" ]; then
+             BASE=develop
+             echo "chronicle: base=develop — $N_DEV commits vs $N_DEF against '$DEFAULT' (git flow)" >&2
+           fi
+         fi
+         ;;
+     esac
    fi
 
    if [ -n "$BASE" ]; then
