@@ -21,14 +21,50 @@ split keeps drafting and creating in separate instructed roles.
 
 ## Process
 
-1. Guard + run the analyzer:
+1. Guard, resolve the base, run the analyzer. Run this **verbatim** — the base decision
+   is deterministic shell, not something to reason about:
 
    ```bash
    test -f "$SKILL_DIR/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/analyze-branch.ts"
+
+   # Which branch did THIS branch actually fork from?
+   #
+   # The analyzer defaults to the repo's default branch. In a git-flow repo that is
+   # usually `main`, even though features integrate into `develop` — so a 4-commit
+   # branch gets based on `main` and shows up as 16 commits, dragging in everything
+   # `develop` has not released yet. The PR looks insane and nobody notices why.
+   #
+   # This is not a guess. If `origin/develop..HEAD` is STRICTLY shorter than
+   # `origin/<default>..HEAD`, then HEAD's history provably contains commits that are in
+   # `develop` but not in the default branch — so it forked from `develop`, and basing it
+   # anywhere else would drag those commits in. When the two counts are EQUAL the diff is
+   # identical either way (a hotfix cut from `main` lands here), so we change nothing and
+   # let the analyzer's default stand.
+   BASE=""
+   if git rev-parse --verify --quiet origin/develop >/dev/null; then
+     DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+     DEFAULT=${DEFAULT:-main}
+     if [ "$DEFAULT" != "develop" ] && git rev-parse --verify --quiet "origin/$DEFAULT" >/dev/null; then
+       N_DEV=$(git rev-list --count "origin/develop..HEAD")
+       N_DEF=$(git rev-list --count "origin/$DEFAULT..HEAD")
+       if [ "$N_DEV" -lt "$N_DEF" ]; then
+         BASE=develop
+         echo "chronicle: base=develop — $N_DEV commits vs $N_DEF against '$DEFAULT' (git flow)" >&2
+       fi
+     fi
+   fi
+
+   if [ -n "$BASE" ]; then
+     bun "$SKILL_DIR/scripts/analyze-branch.ts" --base "$BASE"
+   else
+     bun "$SKILL_DIR/scripts/analyze-branch.ts"
+   fi
    ```
 
    Parse its JSON: `{ outputPath, provider, hasCockpit, commitCount, error? }`.
+
+   Do not second-guess the resolved `base`, and do not "helpfully" pass a different one.
+   If it looks wrong, say so in your report — never quietly re-run with another value.
 
 2. If `error` is present, read the payload and relay the error plainly. If
    `commitCount === 0`, return `no commits to propose` and stop.
