@@ -12,6 +12,15 @@ Claude agents live in `agents/*.md`. Codex role overlays live in
 `agents-codex/*.toml` and are copied to a stable `$CODEX_HOME` path by the
 Chronicle install skill before registration in `config.toml`.
 
+Codex runtimes expose two different sub-agent APIs. When the API has a named-role
+selector, Chronicle selects the registered role directly. When it exposes only a
+generic, nestable sub-agent API, the main agent spawns one non-fork generic
+Lawspeaker with no inherited conversation and tells it to self-load the stable
+`lawspeaker.toml`. The Lawspeaker then spawns generic Watcher and Runesmith children
+that self-load their stable TOMLs. This is role loading, not an inline fallback: the
+same three-agent boundary, sequential flow, and git-output isolation remain intact.
+Fork agents are still invalid because the Lawspeaker must delegate.
+
 ## Commit Flow
 
 The Lawspeaker is spawned via `subagent_type`, never as a fork. A fork is a
