@@ -813,7 +813,8 @@ body {
   opacity: 0.5;
 }
 .leg__title {
-  flex: 1 1 auto;
+  flex: 0 1 288px;
+  max-inline-size: 288px;
   min-inline-size: 0;
   overflow: hidden;
   color: var(--ink-muted);
