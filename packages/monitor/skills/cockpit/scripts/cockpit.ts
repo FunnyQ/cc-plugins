@@ -78,6 +78,8 @@ type RegistryEntry = {
   provider: Provider;
   project: string;
   sessionId: string;
+  title?: string;
+  titleResolved?: boolean;
   logPath: string;
   lastHeartbeat: string;
 };
@@ -235,7 +237,7 @@ function writeRegistry(reg: Registry, now = Date.now()): void {
 function upsertSession(entry: RegistryEntry): void {
   const reg = readRegistry();
   const idx = reg.sessions.findIndex((s) => s.sessionId === entry.sessionId);
-  if (idx >= 0) reg.sessions[idx] = entry;
+  if (idx >= 0) reg.sessions[idx] = { ...reg.sessions[idx], ...entry };
   else reg.sessions.push(entry);
   writeRegistry(reg);
 }

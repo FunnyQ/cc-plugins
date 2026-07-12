@@ -76,6 +76,7 @@ afterEach(() => {
   rmSync(projectsRoot, { recursive: true, force: true });
   delete process.env.COCKPIT_HOME;
   delete process.env.COCKPIT_CLAUDE_SESSIONS_DIR;
+  delete process.env.COCKPIT_CLAUDE_PROJECTS_DIR;
   delete process.env.COCKPIT_CODEX_STATE_DB;
   delete process.env.COCKPIT_OPENCODE_DB;
 });
@@ -320,9 +321,15 @@ describe("buildSessions live merge", () => {
 
   test("surfaces the live harness session title", () => {
     const sid = "89898989-8989-8989-8989-898989898989";
+    const project = mkProject("titled");
+    start(project, sid);
+    const registryPath = join(homeDir, "registry.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+    registry.sessions[0].titleResolved = true;
+    writeFileSync(registryPath, JSON.stringify(registry));
     const sessDir = liveClaudeSession(
       sid,
-      "/Users/q/Projects/titled",
+      project,
       Date.now(),
       "Refine cockpit session rail",
     );
@@ -330,9 +337,69 @@ describe("buildSessions live merge", () => {
       expect(mod.buildSessions().find((x) => x.sessionId === sid)?.title).toBe(
         "Refine cockpit session rail",
       );
+      const stored = JSON.parse(
+        readFileSync(join(homeDir, "registry.json"), "utf8"),
+      ).sessions.find((x: any) => x.sessionId === sid);
+      expect(stored.title).toBe("Refine cockpit session rail");
+      expect(stored.titleResolved).toBe(true);
     } finally {
       rmSync(sessDir, { recursive: true, force: true });
     }
+  });
+
+  test("backfills and persists a historical Claude transcript title once", () => {
+    const p = mkProject("historical-title");
+    const sid = "87878787-8787-8787-8787-878787878787";
+    start(p, sid);
+    const transcriptDir = join(homeDir, "claude-projects", "fixture");
+    process.env.COCKPIT_CLAUDE_PROJECTS_DIR = join(homeDir, "claude-projects");
+    mkdirSync(transcriptDir, { recursive: true });
+    writeFileSync(
+      join(transcriptDir, `${sid}.jsonl`),
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "Recover this historical title" },
+      }),
+    );
+
+    expect(mod.buildSessions().find((x) => x.sessionId === sid)?.title).toBe(
+      "Recover this historical title",
+    );
+    const stored = JSON.parse(
+      readFileSync(join(homeDir, "registry.json"), "utf8"),
+    ).sessions.find((x: any) => x.sessionId === sid);
+    expect(stored.title).toBe("Recover this historical title");
+    expect(stored.titleResolved).toBe(true);
+  });
+
+  test("marks an empty historical lookup as resolved", () => {
+    const p = mkProject("missing-title");
+    const sid = "86868686-8686-8686-8686-868686868686";
+    start(p, sid);
+    const transcriptRoot = join(homeDir, "claude-projects");
+    process.env.COCKPIT_CLAUDE_PROJECTS_DIR = transcriptRoot;
+
+    expect(mod.buildSessions().find((x) => x.sessionId === sid)?.title).toBe(
+      "",
+    );
+    const stored = JSON.parse(
+      readFileSync(join(homeDir, "registry.json"), "utf8"),
+    ).sessions.find((x: any) => x.sessionId === sid);
+    expect(stored.title).toBeUndefined();
+    expect(stored.titleResolved).toBe(true);
+
+    const transcriptDir = join(transcriptRoot, "late-fixture");
+    mkdirSync(transcriptDir, { recursive: true });
+    writeFileSync(
+      join(transcriptDir, `${sid}.jsonl`),
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "This arrived too late" },
+      }),
+    );
+    expect(mod.buildSessions().find((x) => x.sessionId === sid)?.title).toBe(
+      "",
+    );
   });
 
   test("a registered session that is live shows active even with a stale log, no duplicate", () => {

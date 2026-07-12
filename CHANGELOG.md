@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.18.9] - 2026-07-13
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.9` tag._
+
+### Fixed
+
+- **Cockpit session titles now persist after sessions end.** Existing registry entries receive one provider-specific historical lookup when empty, misses are remembered to prevent repeated transcript scans, and a later live title can still refresh the stored value.
+
 ## [monitor 3.18.8] - 2026-07-12
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.8` tag._

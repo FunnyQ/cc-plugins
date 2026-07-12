@@ -333,6 +333,32 @@ describe("cockpit log", () => {
     expect(new Date(hb2).getTime()).toBeGreaterThan(new Date(hb1).getTime());
   });
 
+  test("heartbeat updates preserve a stored session title", () => {
+    writeFileSync(
+      join(cockpitHome, "registry.json"),
+      JSON.stringify({
+        sessions: [
+          {
+            provider: "claude",
+            project: projectDir,
+            sessionId: SID,
+            title: "Persisted flight title",
+            titleResolved: true,
+            logPath: join(projectDir, ".cockpit/logs", `${SID}.jsonl`),
+            lastHeartbeat: new Date(0).toISOString(),
+          },
+        ],
+      }),
+    );
+
+    run(["log", "--session", SID, "--decision", "d", "--reason", "r"]);
+    const entry = JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    ).sessions.find((s: any) => s.sessionId === SID);
+    expect(entry.title).toBe("Persisted flight title");
+    expect(entry.titleResolved).toBe(true);
+  });
+
   test("auto-registers a fresh session so it becomes tracked", () => {
     const before = Date.now();
     const r = run([
