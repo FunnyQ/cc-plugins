@@ -6,6 +6,7 @@ import {
   detectProvider,
   parseRepoSlug,
   pickPushRemote,
+  pickBase,
   projectMatches,
   qualifyHead,
   remotePushUrlArgs,
@@ -326,5 +327,56 @@ describe("collectDecisions", () => {
       throw new Error("EACCES");
     };
     expect(await collectDecisions(["a.jsonl"], read)).toEqual([]);
+  });
+});
+
+// Only reachable via `--base auto`. The default path is untouched, so a repo that is
+// happy today cannot be broken by this.
+describe("pickBase", () => {
+  const flow = { defaultBranch: "main", hasDevelop: true };
+
+  test("sends ordinary work to develop in a git-flow repo", () => {
+    expect(pickBase({ ...flow, branch: "fix/leak" })).toBe("develop");
+    expect(pickBase({ ...flow, branch: "feature/x" })).toBe("develop");
+    expect(pickBase({ ...flow, branch: "anything-at-all" })).toBe("develop");
+  });
+
+  // hotfix and release are the only branches that land on the release line. A hotfix is
+  // cut FROM the release branch; a release is cut from develop but FINISHED into it. Git
+  // history records where a branch started, never where it is meant to land — so the name
+  // is the only carrier of the intent, and in git-flow it is a contract, not a hint.
+  test("sends hotfix and release to the release line, whatever it is called", () => {
+    expect(pickBase({ ...flow, branch: "hotfix/urgent" })).toBe("main");
+    expect(pickBase({ ...flow, branch: "release/1.2.0" })).toBe("main");
+    // The separator is a team habit, not a spec. `release-1.2.0` is the same branch.
+    expect(pickBase({ ...flow, branch: "hotfix-urgent" })).toBe("main");
+    expect(pickBase({ ...flow, branch: "release-1.2.0" })).toBe("main");
+  });
+
+  test("never hardcodes 'main' — the release line is whatever origin/HEAD says", () => {
+    const master = { defaultBranch: "master", hasDevelop: true };
+    expect(pickBase({ ...master, branch: "hotfix/urgent" })).toBe("master");
+    expect(pickBase({ ...master, branch: "fix/leak" })).toBe("develop");
+  });
+
+  test("leaves a non-git-flow repo exactly as it is today", () => {
+    const plain = { defaultBranch: "main", hasDevelop: false };
+    expect(pickBase({ ...plain, branch: "fix/leak" })).toBe("main");
+    expect(pickBase({ ...plain, branch: "hotfix/urgent" })).toBe("main");
+  });
+
+  test("is a no-op when develop already IS the default branch", () => {
+    const devDefault = { defaultBranch: "develop", hasDevelop: true };
+    expect(pickBase({ ...devDefault, branch: "fix/leak" })).toBe("develop");
+    // A hotfix still has nowhere else to go — there is no separate release line.
+    expect(pickBase({ ...devDefault, branch: "hotfix/urgent" })).toBe(
+      "develop",
+    );
+  });
+
+  // The commit-count rule this replaces tied here and silently left the base on `main`,
+  // so an ordinary feature branch opened a PR against the release line.
+  test("does not depend on how far develop is ahead of the release branch", () => {
+    expect(pickBase({ ...flow, branch: "fix/leak" })).toBe("develop");
   });
 });
