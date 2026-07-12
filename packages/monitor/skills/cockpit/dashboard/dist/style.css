@@ -739,8 +739,8 @@ body {
 }
 .flight {
   display: flex;
+  flex: 0 0 clamp(320px, 32vw, 440px);
   flex-direction: column;
-  inline-size: clamp(208px, 22vw, 272px);
   padding: 10px 12px 12px;
   border-right: 1px solid var(--edge-soft);
 }
