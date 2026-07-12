@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   execFileSync,
@@ -18,7 +19,7 @@ import { findSession } from "./find-session";
 import { cockpitHome } from "./cockpit-home";
 
 export type DaemonCoords = { port: number; token: string };
-export type ProcessInfo = { pid: number; port: number };
+export type ProcessInfo = { pid: number; port: number; root?: string };
 type SpawnImpl = (
   command: string,
   args: string[],
@@ -55,12 +56,51 @@ export function readProcessInfo(path: string): ProcessInfo | null {
   try {
     const raw = JSON.parse(readFileSync(path, "utf8"));
     if (typeof raw?.pid === "number" && typeof raw?.port === "number") {
-      return { pid: raw.pid, port: raw.port };
+      return {
+        pid: raw.pid,
+        port: raw.port,
+        root: typeof raw.root === "string" ? raw.root : undefined,
+      };
     }
   } catch {
     // missing/corrupt info means "not up"
   }
   return null;
+}
+
+// The plugin cache encodes the version in the path
+// (.../monitor/3.19.0/skills/cockpit/scripts); a repo checkout does not.
+export function versionFromRoot(root: string): string | null {
+  return root.match(/[/\\]monitor[/\\](\d+\.\d+\.\d+)[/\\]/)?.[1] ?? null;
+}
+
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+// cockpit-server records the install root it was launched from. Superseding on ANY root
+// mismatch would start a kill war: two legitimately live channels on different versions
+// would each respawn their own daemon forever (the backoff never escalates — `failures`
+// resets on every success). Newest-version-wins is a total order, so it terminates: the
+// older channel stands down and shares the newer daemon.
+//
+// An unversioned root (repo checkout) can't be ordered, so reuse rather than fight.
+// `cockpit.ts restart` is the explicit, arbitrated path for forcing your own build.
+export function shouldSupersedeDaemon(
+  daemonRoot: string | undefined,
+  myRoot: string,
+): boolean {
+  if (!daemonRoot || daemonRoot === myRoot) return false;
+  const mine = versionFromRoot(myRoot);
+  const theirs = versionFromRoot(daemonRoot);
+  if (!mine || !theirs) return false;
+  return compareVersions(mine, theirs) > 0;
 }
 
 export function isAlive(pid: number): boolean {
@@ -85,8 +125,15 @@ export function ensureServer(
   infoPath: string,
   alive: (pid: number) => boolean = isAlive,
   spawnImpl: SpawnImpl = spawn,
+  myRoot: string = import.meta.dir,
 ): boolean {
-  if (isUp(infoPath, alive)) return false;
+  const info = readProcessInfo(infoPath);
+  // Liveness alone used to gate this, which meant an upgraded channel silently kept
+  // using the previous version's daemon — cockpit-server's own root-aware supersede
+  // (startupGuard) only runs if we actually launch it.
+  if (info && alive(info.pid) && !shouldSupersedeDaemon(info.root, myRoot)) {
+    return false;
+  }
   spawnImpl("bun", [scriptPath, "--no-open"], {
     detached: true,
     stdio: "ignore",
@@ -97,6 +144,44 @@ export function ensureServer(
 export function nextReconnectDelayMs(failureCount: number): number {
   const capped = Math.min(Math.max(failureCount, 0), 5);
   return Math.min(1000 * 2 ** capped, 30_000);
+}
+
+// The daemon paces the poll loops by parking each request for ~240s. That contract
+// holds only while ONE channel polls a session id: a second poller makes the daemon
+// evict the parked poll and answer {timeout:true} instantly — an HTTP 200, i.e. the
+// caller's SUCCESS path — and an unfloored loop re-polls at once. Two such loops
+// ping-pong at thousands of req/s. The floor bounds that; the jitter breaks the
+// lockstep between colliding pollers.
+export const POLL_FLOOR_MS = 1000;
+const POLL_JITTER_MS = 250;
+
+export function pollFloorDelayMs(
+  elapsedMs: number,
+  floorMs = POLL_FLOOR_MS,
+  rand: () => number = Math.random,
+): number {
+  const remaining = floorMs - elapsedMs;
+  if (remaining <= 0) return 0;
+  return remaining + Math.floor(rand() * POLL_JITTER_MS);
+}
+
+// Bun.sleep() ignores AbortSignal, so a shutdown landing mid-backoff would stall for
+// up to the full 30s reconnect delay before the process could exit.
+export function abortableSleep(
+  ms: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const finish = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    timer = setTimeout(finish, ms);
+    signal?.addEventListener("abort", finish, { once: true });
+  });
 }
 
 export function channelNotification(text: string) {
@@ -258,7 +343,7 @@ function sessionIdFromAncestors(startPid = process.ppid): string | null {
   });
 }
 
-function claudeSessionsDir(): string {
+export function claudeSessionsDir(): string {
   return (
     process.env.COCKPIT_CLAUDE_SESSIONS_DIR ||
     join(homedir(), ".claude", "sessions")
@@ -402,10 +487,12 @@ export async function pullVerdict(opts: {
   maxFailures?: number;
   signal?: AbortSignal;
   budgetMs?: number;
+  floorMs?: number;
 }): Promise<PullOutcome> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxFailures = opts.maxFailures ?? 6;
   const deadline = Date.now() + (opts.budgetMs ?? PULL_BUDGET_MS);
+  const floorMs = opts.floorMs ?? POLL_FLOOR_MS;
   let coords = opts.coords();
   let failures = 0;
   while (true) {
@@ -413,9 +500,10 @@ export async function pullVerdict(opts: {
     if (!coords) coords = await opts.ensure();
     if (!coords) {
       if (failures >= maxFailures) return null;
-      await Bun.sleep(nextReconnectDelayMs(failures++));
+      await abortableSleep(nextReconnectDelayMs(failures++), opts.signal);
       continue;
     }
+    const startedAt = Date.now();
     try {
       const r = await fetchImpl(
         `http://127.0.0.1:${coords.port}/api/permission-pull?session=${opts.sessionId}&token=${coords.token}`,
@@ -433,7 +521,15 @@ export async function pullVerdict(opts: {
       // Resolved elsewhere — stop pulling, send no verdict.
       if (body.abandoned === true) return ABANDONED;
       // Re-pollable sentinel — keep waiting (re-check budget/abort at loop top).
-      if (body.timeout === true) continue;
+      // Floored: permission.ts evicts a parked pull the same way inbox.ts does, so an
+      // unfloored re-poll ping-pongs with a second channel on this session id.
+      if (body.timeout === true) {
+        await abortableSleep(
+          pollFloorDelayMs(Date.now() - startedAt, floorMs),
+          opts.signal,
+        );
+        continue;
+      }
       if (
         typeof body.request_id === "string" &&
         (body.behavior === "allow" || body.behavior === "deny")
@@ -450,7 +546,7 @@ export async function pullVerdict(opts: {
         `cockpit-channel: permission-pull failed (${(err as Error).message}); retrying in ${delay}ms`,
       );
       coords = await opts.ensure();
-      await Bun.sleep(delay);
+      await abortableSleep(delay, opts.signal);
     }
   }
 }
@@ -466,6 +562,7 @@ export function registerPermissionRelay(opts: {
   coords: () => DaemonCoords | null;
   ensure: () => Promise<DaemonCoords | null>;
   fetchImpl?: typeof fetch;
+  floorMs?: number;
 }): void {
   const fetchImpl = opts.fetchImpl ?? fetch;
   let chain: Promise<void> = Promise.resolve();
@@ -508,6 +605,7 @@ export function registerPermissionRelay(opts: {
       ensure: opts.ensure,
       fetchImpl,
       signal,
+      floorMs: opts.floorMs,
     });
     // ABANDONED (aborted by a newer request / budget / resolved-elsewhere) or
     // null (gave up) → send no verdict; the terminal dialog resolved it locally.
@@ -571,14 +669,18 @@ export function registerPermissionRelay(opts: {
   };
 }
 
-async function pullInboxLoop(opts: {
+export async function pullInboxLoop(opts: {
   mcp: ChannelServer;
   sessionId: string;
   coords: () => DaemonCoords | null;
   ensure: () => Promise<DaemonCoords | null>;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
+  floorMs?: number;
 }): Promise<void> {
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const signal = opts.signal;
+  const floorMs = opts.floorMs ?? POLL_FLOOR_MS;
   let coords = opts.coords();
   let failures = 0;
   // Fire-and-forget delivery: never blocks the loop from re-parking the poll.
@@ -589,20 +691,22 @@ async function pullInboxLoop(opts: {
         `cockpit-channel: notification failed (${(err as Error).message})`,
       ),
   );
-  while (true) {
+  while (!signal?.aborted) {
     if (!coords) coords = await opts.ensure();
     if (!coords) {
       const delay = nextReconnectDelayMs(failures++);
       console.error(
         `cockpit-channel: cockpit daemon unavailable; retrying in ${delay}ms`,
       );
-      await Bun.sleep(delay);
+      await abortableSleep(delay, signal);
       continue;
     }
 
+    const startedAt = Date.now();
     try {
       const r = await fetchImpl(
         `http://127.0.0.1:${coords.port}/api/inbox?session=${opts.sessionId}&token=${coords.token}`,
+        { signal },
       );
       if (!r.ok) throw new Error(`inbox failed: ${r.status}`);
       const body = (await r.json()) as { message?: unknown };
@@ -611,13 +715,20 @@ async function pullInboxLoop(opts: {
         deliver(body.message);
       }
     } catch (err) {
+      // An aborted in-flight poll is a shutdown, not a failure — don't back off.
+      if (signal?.aborted) return;
       const delay = nextReconnectDelayMs(failures++);
       console.error(
         `cockpit-channel: inbox poll failed (${(err as Error).message}); reconnecting in ${delay}ms`,
       );
       coords = await opts.ensure();
-      await Bun.sleep(delay);
+      await abortableSleep(delay, signal);
+      continue;
     }
+    await abortableSleep(
+      pollFloorDelayMs(Date.now() - startedAt, floorMs),
+      signal,
+    );
   }
 }
 
@@ -651,12 +762,31 @@ async function main(): Promise<void> {
 
   await mcp.connect(new StdioServerTransport());
 
+  // The SDK's StdioServerTransport registers only 'data' and 'error' on stdin — it
+  // never fires onclose on EOF and never exits. Claude Code closes this pipe when the
+  // session ends, so without an explicit stop the channel is reparented to PID 1 and
+  // polls the daemon forever. Registered after connect(), which puts stdin in flowing
+  // mode so 'end' can fire at all.
+  const shutdown = new AbortController();
+  const stop = () => {
+    if (shutdown.signal.aborted) return;
+    shutdown.abort();
+    // Nothing to flush: once stdin is EOF the stdout pipe is gone too, so a delivered
+    // notification has nowhere to land. Exiting is the only guarantee we do not orphan.
+    process.exit(0);
+  };
+  process.stdin.on("end", stop);
+  process.stdin.on("close", stop);
+  process.on("SIGTERM", stop);
+  process.on("SIGINT", stop);
+
   if (!sessionId) return;
   await pullInboxLoop({
     mcp,
     sessionId,
     coords: readDaemonCoords,
     ensure: ensureCockpitDaemon,
+    signal: shutdown.signal,
   });
 }
 
