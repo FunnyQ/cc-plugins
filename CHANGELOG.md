@@ -1,5 +1,21 @@
 # Changelog
 
+## [chronicle 0.7.1] - 2026-07-12
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.7.1` tag._
+
+### Fixed
+
+- **Codex commit workflows now work when the runtime exposes only generic nested agents.** Chronicle preserves the Lawspeaker, Watcher, and Runesmith boundary by loading each role from its stable installed TOML instead of requiring a named-role selector.
+
+## [monitor 3.18.7] - 2026-07-12
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.7` tag._
+
+### Changed
+
+- **The cockpit flight panel now uses a wider responsive footprint.** More dashboard space is available for flight details without changing the surrounding workflow.
+
 ## [chronicle 0.7.0] - 2026-07-11
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.7.0` tag._
