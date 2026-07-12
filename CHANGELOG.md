@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.18.8] - 2026-07-12
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.18.8` tag._
+
+### Added
+
+- **Cockpit’s session rail now shows provider-native session titles.** Claude, Codex, and OpenCode sessions are easier to identify at a glance, while long titles stay on one line with an ellipsis and remain available in full on hover.
+
 ## [chronicle 0.7.1] - 2026-07-12
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.7.1` tag._
