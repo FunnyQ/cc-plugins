@@ -812,6 +812,15 @@ body {
 .leg.is-ended {
   opacity: 0.5;
 }
+.leg__title {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* A live session with no cockpit registry entry: dashed (not anchored) + muted,
    so it reads as "running, but no decision trail" without competing with the
    provider badge or the active LED. */
