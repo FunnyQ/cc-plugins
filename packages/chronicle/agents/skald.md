@@ -72,9 +72,22 @@ split keeps drafting and creating in separate instructed roles.
        `classDef bad fill:#5b1a1a,stroke:#e5605f,color:#fff;` then `node:::bad`).
        Otherwise keep the diagram uncolored. Everything the diagram needs must live
        inside the fenced block — it is plain, portable Mermaid.
-     - **Edge labels are plain text, never node syntax.** This is the one thing that
-       actually breaks. A label goes *between* the two halves of the link — it is not
-       a node, so it never takes `[...]`, `("...")`, or `{...}`:
+     - **Edge labels: quote all of it or none of it.** This is the one thing that
+       actually breaks, and the intuitive rule is the wrong one — brackets are *not*
+       the problem (`A -. N[t] .-> B` parses fine). **A stray quote is.** An edge label
+       is plain text: either the whole label is wrapped in `"…"`, or it contains no `"`
+       at all. A `"` in the middle kills the parse.
+
+       ```
+       ✅  A -. "Cut 1: exit on stdin EOF" .-> B     whole label quoted
+       ✅  A -. exits with parent .-> B              no quotes at all
+       ❌  A -.Cut1["Cut 1: exit on stdin EOF"].-> B  quotes in the middle
+       ```
+
+       That last form is node syntax smuggled into an edge. It is not Mermaid, it fails
+       to parse, and GitHub renders the whole block as a red error box in the PR body.
+       If you want the explanation to look like a node, then **make it a real node** and
+       draw a plain edge to it.
 
        | Link | With a label |
        |---|---|
@@ -82,21 +95,20 @@ split keeps drafting and creating in separate instructed roles.
        | `A -.-> B` | `A -. text .-> B` |
        | `A ==> B` | `A == text ==> B` |
 
-       ```
-       ✅  A -. "Cut 1: exit on stdin EOF" .-> B
-       ❌  A -.Cut1["Cut 1: exit on stdin EOF"].-> B
+       One extra rule for the `\|…\|` form only: it rejects brackets outright, where
+       `-- text -->` tolerates them. When in doubt, use `-- text -->`.
+     - **Lint it — do not eyeball it.** Before you return the draft, run every
+       ```mermaid block through the checker. A rule in a prompt is a request; this is
+       the only thing that actually holds:
+
+       ```bash
+       printf '%s' "$DIAGRAM_SOURCE" | bun "$SKILL_DIR/scripts/diagram-lint.ts"
        ```
 
-       The second form is not Mermaid at all — it fails to parse and the block renders
-       as a raw error box on GitHub. If a link needs a label, write the label as bare
-       text (quote it only if it contains `(`, `[`, `#`, `;` or a newline). If you want
-       the *explanation* to look like a node, then make it a real node and draw a plain
-       edge to it — do not smuggle node syntax into the edge.
-     - **Sanity-check before you return it.** Re-read the fenced block as if you were
-       the parser: every link is one of the forms above; every `[...]`/`(...)`/`{...}`
-       is attached to a node id, never to a link; every `classDef` you reference is
-       defined in the same block. A diagram that fails to parse is worse than no
-       diagram — it puts a red error box in the PR body.
+       Exit 0 → ship it. Non-zero → it prints what is wrong and how to fix it. **Fix and
+       re-lint.** If you cannot make it lint clean, **drop the diagram entirely** and
+       write the section in prose. A diagram that fails to parse is strictly worse than
+       no diagram — an unrendered red error box is the first thing the reviewer sees.
    - **What to focus on**: turn `tradeoff` fields, `kind:"caveat"` records, and
      `needs_your_call:true` records into review guidance; call out risky files from
      `decisions[].files`.
