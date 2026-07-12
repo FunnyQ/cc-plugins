@@ -30,6 +30,7 @@ import {
   pluginVersion,
   printReport,
 } from "./install";
+import { reapStaleMonitorProcesses } from "./reap-stale";
 import { applyStatusline } from "./setup-statusline";
 import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
 
@@ -363,6 +364,16 @@ function sessionCheck(): void {
     last = null;
   }
   if (last === version) return; // already reconciled for this version
+
+  // The version just changed (or this is a first run) — exactly when daemons from the
+  // previous version are still running. Before 3.19.0 the channel had no exit path, so
+  // those are immortal; retire them now. Only true orphans (PPID 1) are touched.
+  const reaped = reapStaleMonitorProcesses(version);
+  if (reaped) {
+    console.log(
+      `monitor: retired ${reaped} leftover process${reaped === 1 ? "" : "es"} from a previous version.`,
+    );
+  }
 
   const changed = migrate();
   if (changed.length) {
