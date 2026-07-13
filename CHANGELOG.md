@@ -1,5 +1,17 @@
 # Changelog
 
+## [monitor 3.19.1] - 2026-07-14
+
+_tracks tag `monitor-v3.19.1`_
+
+### Added
+
+- `/cockpit restart` is now documented as a first-class skill mode (the CLI command already worked — agents just weren't taught it). The new procedure covers running it in the foreground, `--port`/`--no-open` flags, how to read exit codes, and a caveat: restarting refreshes the daemon only, not an already-running session's cockpit channel process.
+
+### Removed
+
+- Dropped two stale cockpit docs — an unbuilt backlog wishlist and a README that had drifted out of sync with the root README. Cockpit setup docs now live in one place: the root README plus the skill's `SKILL.md`.
+
 ## [chronicle 0.8.0] - 2026-07-14
 
 _chronicle is independently versioned; this entry tracks the `chronicle-v0.8.0` tag._

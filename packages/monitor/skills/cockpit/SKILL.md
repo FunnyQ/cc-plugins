@@ -3,8 +3,9 @@ name: cockpit
 description: >-
   /cockpit opens the Claude Code or Codex cockpit dashboard and may set the
   global decision-log language; /cockpit scribe lets a fork distill recent work
-  into typed trail entries. This skill is EXPLICITLY invoked (opt-in) — do NOT
-  auto-fire on every session.
+  into typed trail entries; /cockpit restart bounces the dashboard daemon onto
+  this install's code after a plugin update or a script edit. This skill is
+  EXPLICITLY invoked (opt-in) — do NOT auto-fire on every session.
 ---
 
 # /cockpit
@@ -32,5 +33,8 @@ Use the provider reference exactly as the selected mode reference requires.
 - If invoked as `/cockpit scribe`, or the fork prompt says to run
   `/cockpit scribe`, read [references/scribe.md](references/scribe.md) and
   follow it.
+- If invoked as `/cockpit restart`, or the user asks to restart / bounce /
+  refresh the cockpit daemon onto updated code, read
+  [references/restart.md](references/restart.md) and follow it.
 - Otherwise, for plain `/cockpit`, read
   [references/pilot.md](references/pilot.md) and follow it.
