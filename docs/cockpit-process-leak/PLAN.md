@@ -251,14 +251,14 @@ filed in §7 rather than smuggled into this PR.
 
 ### Cut 3 — floor the poll interval *(defence in depth)*
 
-Both `pullInboxLoop` (`:592-621`) and `pullVerdict` (`:411-456`). Measure each iteration; if a
-poll returns under a floor (~1s), sleep the remainder plus jitter.
+Both `pullInboxLoop` (`:592-621`) and `pullVerdict` (`:411-456`). When the daemon returns the
+`{timeout:true}` eviction sentinel under a floor (~1s), sleep the remainder plus jitter.
 
 This removes the implicit "the server will park me for 240s" contract and bounds **any** future
 collision — regardless of which poller gets evicted. Jitter de-synchronises colliding pollers.
 
-Accepted cost: up to ~1s of extra send-box delivery latency after a poll resolves. Acceptable
-for a chat surface.
+Real inbox messages bypass the floor and re-park immediately, so rapid sends retain their normal
+delivery latency.
 
 ### Cut 4 — make `ensureServer` root-aware *(with arbitration)*
 
@@ -338,8 +338,8 @@ Two API notes for the reviewer:
   alongside the `fetchImpl` / `maxFailures` / `budgetMs` injectables they already had. The
   pre-existing relay round-trip test passes `floorMs: 0` because its mock answers the timeout
   sentinel instantly — which in production means an *evicted* poll and is exactly what should be
-  padded. The floor is elapsed-time based, so a normal 240s park expiry and a delivered message
-  both add **zero** delay; only a suspiciously fast return is slowed.
+  padded. The floor is elapsed-time based, so a normal 240s park expiry adds **zero** delay; real
+  messages bypass it entirely. Only a suspiciously fast timeout sentinel is slowed.
 - `ensureServer` gains a `myRoot` parameter (defaulting to `import.meta.dir`) so the
   newest-version-wins tiebreak is testable.
 
