@@ -4,7 +4,7 @@ A local Claude Code and Codex plugin marketplace for Q's coding workflow. It shi
 
 ## Development Workflow
 
-This repository uses GitHub Flow. Create feature and fix branches from `main`, then open pull requests back into `main`. The existing `develop` branch is historical and does not indicate that this repository uses git-flow.
+This repository uses GitHub Flow. Create feature and fix branches from `main`, then open pull requests back into `main`. The existing `develop` branch is historical and does not indicate that this repository uses git-flow. Chronicle records this machine-readable PR policy in [`.chronicle/pr.json`](./.chronicle/pr.json).
 
 ## Plugins
 
