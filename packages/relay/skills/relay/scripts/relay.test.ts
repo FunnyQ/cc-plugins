@@ -80,17 +80,17 @@ describe("parseFlags", () => {
     expect(parsed.positional).toBe("a quiet studio");
   });
 
-  it("extracts review focus from positional text and explicit flags win later", () => {
+  it("extracts a review task from positional text", () => {
     const parsed = parseFlags([
       "claude",
       "review",
-      "--focus",
-      "security",
-      "performance",
+      "review",
+      "auth.ts",
+      "for",
+      "races",
     ]);
 
-    expect(parsed.flags.focus).toBe("security");
-    expect(parsed.positional).toBe("performance");
+    expect(parsed.positional).toBe("review auth.ts for races");
   });
 
   it("parses every supported flag", () => {
@@ -101,10 +101,6 @@ describe("parseFlags", () => {
       "ship it",
       "--files",
       "a.ts, b.ts",
-      "--focus",
-      "api",
-      "--scope",
-      "custom-files",
       "--model",
       "p/m",
       "--out",
@@ -124,8 +120,6 @@ describe("parseFlags", () => {
     expect(parsed.flags).toEqual({
       task: "ship it",
       files: ["a.ts", "b.ts"],
-      focus: "api",
-      scope: "custom-files",
       model: "p/m",
       out: "x.png",
       gitScope: "none",
@@ -148,6 +142,15 @@ describe("parseFlags", () => {
     expect(() => parseFlags(["codex", "delegate", "--task"])).toThrow(
       "--task requires a value",
     );
+  });
+
+  it("rejects the removed review scope and focus flags", () => {
+    expect(() => parseFlags(["codex", "review", "--scope", "main"])).toThrow(
+      "Unknown flag: --scope",
+    );
+    expect(() =>
+      parseFlags(["claude", "review", "--focus", "security"]),
+    ).toThrow("Unknown flag: --focus");
   });
 
   it("rejects a non-positive --wait-timeout", () => {
@@ -376,7 +379,7 @@ describe("executeRelay", () => {
     let built = false;
 
     const result = await executeRelay(
-      ["codex", "review", "--scope", "uncommitted"],
+      ["codex", "review"],
       deps({
         buildPromptFile: () => {
           built = true;
@@ -433,31 +436,66 @@ describe("executeRelay", () => {
     expect(errors.join("")).toContain("image mode requires a prompt");
   });
 
-  it("routes a review naming --files to the custom-files prompt strategy", async () => {
-    let built = false;
-
+  it("reviews uncommitted changes when no review task is provided", async () => {
+    let invocation: string[] = [];
     const result = await executeRelay(
-      ["codex", "review", "--files", "a.ts,b.ts"],
+      ["codex", "review"],
       deps({
-        buildPromptFile: (args) => {
-          built = true;
-          // custom-files review must build a prompt (not native uncommitted)
-          expect(args).toMatchObject({
-            kind: "review",
-            files: ["a.ts", "b.ts"],
-          });
-          return "/tmp/prompt.md";
-        },
-        run: (argv) => {
-          // read-only exec prompt strategy, not `codex review --uncommitted`
-          expect(argv).toContain("read-only");
+        run: (argv, opts) => {
+          invocation = argv;
+          expect(opts?.stdin).toContain("Review only the uncommitted changes");
           return { ok: true, stdout: "done", stderr: "", code: 0 };
         },
       }),
     );
 
     expect(result.code).toBe(0);
-    expect(built).toBe(true);
+    expect(invocation).toEqual(["codex", "review", "--uncommitted", "-"]);
+  });
+
+  it("gives opencode the uncommitted review prompt when task is absent", async () => {
+    let invocation: string[] = [];
+    const result = await executeRelay(
+      ["opencode", "review"],
+      deps({
+        run: (argv) => {
+          invocation = argv;
+          return {
+            ok: true,
+            stdout: '{"type":"text","part":{"text":"done"}}',
+            stderr: "",
+            code: 0,
+          };
+        },
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(invocation.at(-1)).toContain("Review only the uncommitted changes");
+    expect(invocation.at(-1)).toContain("git diff --cached");
+  });
+
+  it("passes a provided review task without adding uncommitted scope", async () => {
+    let invocation: string[] = [];
+    const result = await executeRelay(
+      ["claude", "review", "Review", "auth.ts", "for", "races"],
+      deps({
+        run: (argv) => {
+          invocation = argv;
+          return {
+            ok: true,
+            stdout: JSON.stringify({ result: "done" }),
+            stderr: "",
+            code: 0,
+          };
+        },
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(invocation.join(" ")).toContain("Review auth.ts for races");
+    expect(invocation.join(" ")).not.toContain("uncommitted changes");
+    expect(invocation.join(" ")).not.toContain("/code-review");
   });
 
   it("exits non-zero when a post-run step fails", async () => {
@@ -594,18 +632,12 @@ describe("executeRelay live routing", () => {
     expect(errors.join("")).toContain("running headless");
   });
 
-  it("forces the prompt strategy for a live review (no native codex review in a TUI)", async () => {
-    let built = false;
+  it("uses the same review task in a live TUI", async () => {
     let liveOpts: Parameters<RelayDeps["runLive"]>[0] | undefined;
 
     const result = await executeRelay(
-      ["codex", "review", "--scope", "base:main"],
+      ["codex", "review", "Review", "changes", "since", "main"],
       liveDeps({
-        buildPromptFile: (args) => {
-          built = true;
-          expect(args).toMatchObject({ kind: "review" });
-          return "/tmp/prompt.md";
-        },
         runLive: (opts) => {
           liveOpts = opts;
           return Promise.resolve(liveOk);
@@ -617,18 +649,16 @@ describe("executeRelay live routing", () => {
     );
 
     expect(result.code).toBe(0);
-    // Headless codex review base:main is native — live must build a prompt.
-    expect(built).toBe(true);
     expect(liveOpts!.mode).toBe("review");
     expect(liveOpts!.spec.agentBin).toBe("codex");
   });
 
-  it("writes live-prompt.md with scope instruction + file contract, sends a one-line bootstrap", async () => {
+  it("writes live-prompt.md with the review task + file contract", async () => {
     const writes = new Map<string, string>();
     let liveOpts: Parameters<RelayDeps["runLive"]>[0] | undefined;
 
     await executeRelay(
-      ["codex", "review", "--scope", "base:main"],
+      ["codex", "review", "Review", "changes", "since", "main"],
       liveDeps({
         writeFile: (path, text) => writes.set(path, text),
         runLive: (opts) => {
@@ -639,8 +669,8 @@ describe("executeRelay live routing", () => {
     );
 
     const livePrompt = writes.get("/tmp/relay/test-run/live-prompt.md")!;
-    expect(livePrompt).toContain("built prompt");
-    expect(livePrompt).toContain("git diff main...");
+    expect(livePrompt).toContain("Review changes since main");
+    expect(livePrompt).not.toContain("uncommitted changes");
     expect(livePrompt).toContain("/tmp/relay/test-run/result.md");
     expect(livePrompt.trimEnd().split("\n")).toContain(
       "- The file's last line must be exactly: ==== RELAY RESULT END ====",
@@ -802,16 +832,14 @@ describe("executeRelay live routing", () => {
 describe("real backend strategy matrix", () => {
   it("selects strategy through backend objects", () => {
     expect(BACKENDS.codex.strategy("delegate", {})).toBe("prompt");
-    expect(BACKENDS.codex.strategy("review", { scope: "uncommitted" })).toBe(
+    expect(BACKENDS.codex.strategy("review", {})).toBe("native");
+    expect(BACKENDS.codex.strategy("review", { task: "review auth" })).toBe(
       "native",
-    );
-    expect(BACKENDS.codex.strategy("review", { scope: "custom-files" })).toBe(
-      "prompt",
     );
     expect(BACKENDS.codex.strategy("image", {})).toBe("native");
     expect(BACKENDS.opencode.strategy("delegate", {})).toBe("prompt");
     expect(BACKENDS.opencode.strategy("review", {})).toBe("prompt");
     expect(BACKENDS.claude.strategy("delegate", {})).toBe("prompt");
-    expect(BACKENDS.claude.strategy("review", {})).toBe("native");
+    expect(BACKENDS.claude.strategy("review", {})).toBe("prompt");
   });
 });

@@ -4,15 +4,14 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { collect } from "./context-collector";
 import { createTmpRunDir, parseCsv } from "./shared";
-import type { Mode, Scope } from "./types";
+import type { Mode } from "./types";
 
 export type PromptKind = "delegate" | "review";
 
 export type FormatOptions = {
   kind: PromptKind;
   context: string; // pre-collected git/file/project context (caller runs collect())
-  focus: string; // review concern
-  task: string; // delegate task
+  task: string;
   files: string[]; // for the delegate file-scope line
 };
 
@@ -21,22 +20,12 @@ export type FormatOptions = {
  * No filesystem I/O, no backend-specific naming.
  */
 export function formatPrompt(options: FormatOptions): string {
-  const { kind, context, focus, task, files } = options;
+  const { kind, context, task, files } = options;
 
   const separator = "\n\n---\n\n";
 
   if (kind === "review") {
-    const reviewFocus =
-      focus && focus.trim()
-        ? focus
-        : "general code quality, bugs, and improvements";
-    return (
-      context +
-      separator +
-      "Review the above for code quality, bugs, and improvements.\n" +
-      `Focus: ${reviewFocus}\n` +
-      "Analyze only — do not modify any files; produce findings as a report."
-    );
+    return context + separator + buildReviewPrompt(task);
   }
 
   if (kind === "delegate") {
@@ -66,6 +55,23 @@ export function formatPrompt(options: FormatOptions): string {
 // poll loop treats the file as final only once this line has landed.
 export const RESULT_END_MARKER = "==== RELAY RESULT END ====";
 
+const REVIEW_CONTRACT =
+  "Analyze only. Do not modify files. Return findings as a report.";
+
+export function buildReviewPrompt(task: string | undefined): string {
+  const request = task?.trim();
+  if (request) {
+    return `${REVIEW_CONTRACT}\nFollow the user's review request exactly.\n\nUser request:\n${request}`;
+  }
+
+  return (
+    `${REVIEW_CONTRACT}\n` +
+    "Review only the uncommitted changes in the working tree. " +
+    "Run `git status --short`, `git diff`, and `git diff --cached`; " +
+    "inspect relevant untracked files listed by status. Do not audit unrelated code."
+  );
+}
+
 /**
  * Append the live-run result-file contract to a prompt. The delegate runs in
  * an interactive TUI pane, so its final answer is captured via this file —
@@ -86,41 +92,17 @@ export function appendFileContract(prompt: string, resultPath: string): string {
 }
 
 /**
- * Live review runs in a TUI (no native `codex review`), so a git-ref scope
- * becomes an instruction telling the agent to produce the diff itself.
- * `custom-files` returns "" — the files are already inlined in the prompt.
- * Pure function.
- */
-export function scopeInstruction(scope: Scope | undefined): string {
-  if (!scope || scope === "uncommitted") {
-    return "Review scope: the uncommitted working-tree changes. Run `git diff` and `git status --short` to see them.";
-  }
-  if (scope === "custom-files") return "";
-  if (scope.startsWith("base:")) {
-    const ref = scope.slice(5);
-    return `Review scope: changes since ${ref}. Run \`git diff ${ref}...\` to see them.`;
-  }
-  if (scope.startsWith("commit:")) {
-    const sha = scope.slice(7);
-    return `Review scope: the single commit ${sha}. Run \`git show ${sha}\` to see it.`;
-  }
-  // Bare ref/SHA — same treatment as base:<ref> (mirrors the headless mapping).
-  return `Review scope: changes since ${scope}. Run \`git diff ${scope}...\` to see them.`;
-}
-
-/**
  * Impure: collects context, formats, writes <kind>-prompt.md to a tmp dir, returns the path.
  * Imported and called by the relay entry point directly.
  */
 export function buildPromptFile(options: {
   kind: PromptKind;
   files: string[];
-  focus: string;
   task: string;
   gitScope: "all" | "related" | "none";
   noProject: boolean;
 }): string {
-  const { kind, files, focus, task, gitScope, noProject } = options;
+  const { kind, files, task, gitScope, noProject } = options;
 
   // Validate delegate requires a task
   if (kind === "delegate" && !task) {
@@ -136,7 +118,6 @@ export function buildPromptFile(options: {
   const prompt = formatPrompt({
     kind,
     context,
-    focus,
     task,
     files,
   });
@@ -165,7 +146,7 @@ if (import.meta.main) {
 
     if (args.length === 0) {
       console.error(
-        "Usage: relay-prompt <delegate|review> --files <csv> [--focus <t>] [--task <t>] [--git-scope <s>] [--no-project]",
+        "Usage: relay-prompt <delegate|review> --files <csv> [--task <t>] [--git-scope <s>] [--no-project]",
       );
       process.exit(1);
     }
@@ -179,14 +160,12 @@ if (import.meta.main) {
     const opts: {
       kind: PromptKind;
       files: string[];
-      focus: string;
       task: string;
       gitScope: "all" | "related" | "none";
       noProject: boolean;
     } = {
       kind: kind as PromptKind,
       files: [],
-      focus: "",
       task: "",
       gitScope: "related",
       noProject: false,
@@ -197,8 +176,6 @@ if (import.meta.main) {
       const arg = args[i];
       if (arg === "--files" && i + 1 < args.length) {
         opts.files = parseCsv(args[++i]);
-      } else if (arg === "--focus" && i + 1 < args.length) {
-        opts.focus = args[++i];
       } else if (arg === "--task" && i + 1 < args.length) {
         opts.task = args[++i];
       } else if (arg === "--git-scope" && i + 1 < args.length) {
@@ -211,13 +188,10 @@ if (import.meta.main) {
       }
     }
 
-    // Read stdin fallbacks for task and focus
+    // Read stdin as the task fallback for both modes.
     const stdinData = await readStdin();
-    if (!opts.task && kind === "delegate") {
+    if (!opts.task) {
       opts.task = stdinData;
-    }
-    if (!opts.focus && kind === "review" && stdinData) {
-      opts.focus = stdinData;
     }
 
     // Build the prompt file

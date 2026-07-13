@@ -127,7 +127,7 @@ cc-plugins/
             │   ├── index.ts              # concrete BACKENDS registry (imports the three backends; built at the entry point)
             │   ├── codex.ts              # native review + exec + image PNG handling (postRun)
             │   ├── opencode.ts           # opencode run + JSONL parse + model defaults
-            │   └── claude.ts             # claude -p + /code-review native review
+            │   └── claude.ts             # claude -p prompt strategy for delegate + review
             └── *.test.ts                 # unit tests (bun test) — backends mock the CLI runner; live CLI behaviour is verified by manual smokes, not a committed integration test
 ```
 

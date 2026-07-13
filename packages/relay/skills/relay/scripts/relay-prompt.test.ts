@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
   formatPrompt,
   buildPromptFile,
+  buildReviewPrompt,
   appendFileContract,
-  scopeInstruction,
   RESULT_END_MARKER,
 } from "./relay-prompt";
 import { rmSync, existsSync, readFileSync } from "fs";
@@ -14,12 +14,11 @@ describe("formatPrompt", () => {
   const baseContext = "# Test Context\nSome git and file info";
 
   describe("review mode", () => {
-    it("should format a review prompt with focus", () => {
+    it("should format a review prompt with a task", () => {
       const options: FormatOptions = {
         kind: "review",
         context: baseContext,
-        focus: "null safety checks",
-        task: "",
+        task: "Check null safety",
         files: [],
       };
 
@@ -27,37 +26,29 @@ describe("formatPrompt", () => {
 
       expect(result).toContain(baseContext);
       expect(result).toContain("---");
-      expect(result).toContain(
-        "Review the above for code quality, bugs, and improvements.",
-      );
-      expect(result).toContain("Focus: null safety checks");
-      expect(result).toContain(
-        "Analyze only — do not modify any files; produce findings as a report.",
-      );
+      expect(result).toContain("Follow the user's review request exactly.");
+      expect(result).toContain("Check null safety");
+      expect(result).toContain("Analyze only. Do not modify files.");
     });
 
-    it("should use default focus when not provided", () => {
+    it("should default to uncommitted changes without a task", () => {
       const options: FormatOptions = {
         kind: "review",
         context: baseContext,
-        focus: "",
         task: "",
         files: [],
       };
 
       const result = formatPrompt(options);
 
-      expect(result).toContain(
-        "Focus: general code quality, bugs, and improvements",
-      );
+      expect(result).toContain("Review only the uncommitted changes");
     });
 
     it("should not contain backend-specific names", () => {
       const options: FormatOptions = {
         kind: "review",
         context: baseContext,
-        focus: "performance",
-        task: "",
+        task: "Review performance",
         files: [],
       };
 
@@ -72,14 +63,13 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "review",
         context: baseContext,
-        focus: "security",
-        task: "",
+        task: "Review security",
         files: [],
       };
 
       const result = formatPrompt(options);
 
-      expect(result).toContain("Analyze only — do not modify any files");
+      expect(result).toContain("Analyze only. Do not modify files");
     });
   });
 
@@ -88,7 +78,6 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "delegate",
         context: baseContext,
-        focus: "",
         task: "Add validation to user input",
         files: ["src/form.ts", "src/validator.ts"],
       };
@@ -114,7 +103,6 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "delegate",
         context: baseContext,
-        focus: "",
         task: "Refactor the parser",
         files: [],
       };
@@ -128,7 +116,6 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "delegate",
         context: baseContext,
-        focus: "",
         task: "",
         files: ["src/app.ts"],
       };
@@ -140,7 +127,6 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "delegate",
         context: baseContext,
-        focus: "",
         task: "Add a new feature",
         files: ["src/feature.ts"],
       };
@@ -156,7 +142,6 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "delegate",
         context: baseContext,
-        focus: "",
         task: "Fix the bug",
         files: ["src/bug.ts"],
       };
@@ -177,7 +162,6 @@ describe("formatPrompt", () => {
       const options = {
         kind: "invalid" as PromptKind,
         context: baseContext,
-        focus: "",
         task: "test",
         files: [],
       };
@@ -191,8 +175,7 @@ describe("formatPrompt", () => {
       const options: FormatOptions = {
         kind: "review",
         context: baseContext,
-        focus: "test",
-        task: "",
+        task: "Review the supplied context",
         files: [],
       };
 
@@ -201,7 +184,7 @@ describe("formatPrompt", () => {
 
       expect(parts.length).toBe(2);
       expect(parts[0]).toBe(baseContext);
-      expect(parts[1]).toContain("Review the above");
+      expect(parts[1]).toContain("Review the supplied context");
     });
   });
 });
@@ -227,24 +210,23 @@ describe("appendFileContract", () => {
   });
 });
 
-describe("scopeInstruction", () => {
-  it("maps uncommitted (and undefined) to a git diff/status instruction", () => {
-    expect(scopeInstruction("uncommitted")).toContain("git diff");
-    expect(scopeInstruction("uncommitted")).toContain("git status --short");
-    expect(scopeInstruction(undefined)).toBe(scopeInstruction("uncommitted"));
+describe("buildReviewPrompt", () => {
+  it("defaults to uncommitted changes when task is absent", () => {
+    const prompt = buildReviewPrompt("");
+
+    expect(prompt).toContain("Review only the uncommitted changes");
+    expect(prompt).toContain("git diff");
+    expect(prompt).toContain("git status --short");
+    expect(prompt).toContain("Do not modify files");
   });
 
-  it("returns empty for custom-files (files already inlined)", () => {
-    expect(scopeInstruction("custom-files")).toBe("");
-  });
+  it("follows a provided task without adding uncommitted scope", () => {
+    const prompt = buildReviewPrompt("Review auth.ts for race conditions");
 
-  it("maps base:<ref> and bare refs to git diff <ref>...", () => {
-    expect(scopeInstruction("base:main")).toContain("git diff main...");
-    expect(scopeInstruction("develop")).toContain("git diff develop...");
-  });
-
-  it("maps commit:<sha> to git show", () => {
-    expect(scopeInstruction("commit:abc123")).toContain("git show abc123");
+    expect(prompt).toContain("Review auth.ts for race conditions");
+    expect(prompt).toContain("Follow the user's review request exactly");
+    expect(prompt).not.toContain("uncommitted changes");
+    expect(prompt).toContain("Do not modify files");
   });
 });
 
@@ -275,8 +257,7 @@ describe("buildPromptFile", () => {
     const promptPath = buildPromptFile({
       kind: "review",
       files: [],
-      focus: "test focus",
-      task: "",
+      task: "test focus",
       gitScope: "none",
       noProject: true,
     });
@@ -285,7 +266,7 @@ describe("buildPromptFile", () => {
     expect(existsSync(promptPath)).toBe(true);
 
     const content = readFileSync(promptPath, "utf-8");
-    expect(content).toContain("Review the above");
+    expect(content).toContain("test focus");
     expect(content).toContain("Analyze only");
   });
 
@@ -293,7 +274,6 @@ describe("buildPromptFile", () => {
     const promptPath = buildPromptFile({
       kind: "delegate",
       files: ["test.ts"],
-      focus: "",
       task: "Test task",
       gitScope: "none",
       noProject: true,
@@ -326,7 +306,6 @@ describe("buildPromptFile", () => {
       buildPromptFile({
         kind: "delegate",
         files: [],
-        focus: "",
         task: "",
         gitScope: "none",
         noProject: true,
@@ -347,8 +326,7 @@ describe("buildPromptFile", () => {
     const promptPath = buildPromptFile({
       kind: "review",
       files: [],
-      focus: "test",
-      task: "",
+      task: "test",
       gitScope: "related", // explicitly set (would be default)
       noProject: true,
     });
@@ -360,7 +338,6 @@ describe("buildPromptFile", () => {
     const promptPath = buildPromptFile({
       kind: "review",
       files: [],
-      focus: "",
       task: "",
       gitScope: "none",
       noProject: true,

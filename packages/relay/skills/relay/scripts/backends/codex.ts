@@ -75,11 +75,8 @@ export const codexBackend: Backend = {
   name: "codex",
   supports: new Set(["delegate", "review", "image"]),
 
-  strategy(mode: Mode, opts: InvokeOpts) {
-    if (mode === "review") {
-      // Custom-file review degrades to prompt strategy; others are native
-      return opts.scope === "custom-files" ? "prompt" : "native";
-    }
+  strategy(mode: Mode, _opts: InvokeOpts) {
+    if (mode === "review") return "native";
     if (mode === "delegate") return "prompt";
     // image mode is native
     return "native";
@@ -113,42 +110,15 @@ export const codexBackend: Backend = {
     }
 
     if (mode === "review") {
-      if (opts.scope === "custom-files") {
-        // Custom-file review uses read-only exec with a prompt file
-        const argv = [
-          CODEX_BIN,
-          "exec",
-          "-s",
-          "read-only",
-          "-o",
-          opts.lastFile!,
-          "-",
-        ];
-        return { argv, stdin: opts.promptText };
-      }
-
-      // Native review: parse scope and build codex review flags
       const argv = [CODEX_BIN, "review"];
-      if (!opts.scope || opts.scope === "uncommitted") {
-        argv.push("--uncommitted");
-      } else if (opts.scope.startsWith("base:")) {
-        const ref = opts.scope.slice(5); // "base:<ref>" → "<ref>"
-        argv.push("--base", ref);
-      } else if (opts.scope.startsWith("commit:")) {
-        const sha = opts.scope.slice(7); // "commit:<sha>" → "<sha>"
-        argv.push("--commit", sha);
-      } else {
-        // Bare ref/SHA (e.g. "--scope main" or "--scope abc123"): treat as a
-        // base ref so it reviews against that point, instead of silently
-        // falling through to a plain `codex review` of the wrong diff.
-        argv.push("--base", opts.scope);
-      }
-      return { argv };
+      if (!opts.task?.trim()) argv.push("--uncommitted");
+      argv.push("-");
+      return { argv, stdin: opts.promptText };
     }
 
     if (mode === "image") {
       // image: codex exec with image prompt (no stdin)
-      const prompt = buildImagePrompt(opts.task || opts.focus || "an image");
+      const prompt = buildImagePrompt(opts.task || "an image");
       const argv = [CODEX_BIN, "exec", "-o", opts.lastFile!, prompt];
       return { argv };
     }

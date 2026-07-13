@@ -7,8 +7,8 @@ import { capabilityGate, getBackend } from "./backends/gate";
 import { BACKENDS } from "./backends";
 import {
   appendFileContract,
+  buildReviewPrompt,
   buildPromptFile,
-  scopeInstruction,
 } from "./relay-prompt";
 import {
   DEFAULT_WAIT_TIMEOUT_MS,
@@ -31,8 +31,6 @@ const MODES = new Set<Mode>(["delegate", "review", "image"]);
 export type RelayFlags = {
   task?: string;
   files: string[];
-  focus?: string;
-  scope?: string;
   model?: string;
   out?: string;
   gitScope: "all" | "related" | "none";
@@ -88,9 +86,8 @@ function usage(backends: string): string {
   return [
     `Usage: relay <${backends}> <delegate|review|image> [flags]`,
     `       relay config set-model <${backends}> <delegate|review|image> <model>`,
-    "flags: --task <text> | --files <csv> | --focus <text>",
-    "       --scope <uncommitted|base:<ref>|commit:<sha>|custom-files>",
-    "       --model <provider/model> | --out <path> | --git-scope <s> | --no-project",
+    "flags: --task <text> | --files <csv> | --model <provider/model>",
+    "       --out <path> | --git-scope <s> | --no-project",
     "       --prompt-file <p> | --dangerous",
     "       --headless | --keep-pane | --wait-timeout <ms>   (live-pane runs inside herdr)",
   ].join("\n");
@@ -124,12 +121,6 @@ export function parseFlags(argv: string[]): ParsedFlags {
       i++;
     } else if (arg === "--files") {
       flags.files = parseCsv(requireValue(rest, i, arg));
-      i++;
-    } else if (arg === "--focus") {
-      flags.focus = requireValue(rest, i, arg);
-      i++;
-    } else if (arg === "--scope") {
-      flags.scope = requireValue(rest, i, arg);
       i++;
     } else if (arg === "--model") {
       flags.model = requireValue(rest, i, arg);
@@ -262,15 +253,8 @@ async function executeConfigCommand(
   return { code: 0 };
 }
 
-function promptTextForMode(
-  mode: Mode,
-  flags: RelayFlags,
-  positional: string,
-): { task: string; focus: string } {
-  const task =
-    flags.task ?? (mode === "delegate" || mode === "image" ? positional : "");
-  const focus = flags.focus ?? (mode === "review" ? positional : "");
-  return { task, focus };
+function promptTextForMode(flags: RelayFlags, positional: string): string {
+  return flags.task ?? positional;
 }
 
 export async function executeRelay(
@@ -343,11 +327,7 @@ export async function executeRelay(
     return { code: 1 };
   }
 
-  const { task, focus } = promptTextForMode(
-    parsed.mode,
-    parsed.flags,
-    parsed.positional,
-  );
+  const task = promptTextForMode(parsed.flags, parsed.positional);
 
   if (parsed.mode === "image" && !task.trim()) {
     deps.stderr(
@@ -357,17 +337,14 @@ export async function executeRelay(
   }
 
   const dir = deps.createTmpRunDir();
-  // A review naming explicit files (without an explicit scope) is a custom-file
-  // review — route it to the prompt strategy instead of falling through to a
-  // native uncommitted-diff review that would ignore --files.
-  const defaultScope =
-    parsed.mode === "review" && parsed.flags.files.length > 0
-      ? "custom-files"
-      : "uncommitted";
+  const effectiveTask =
+    parsed.mode === "review" && parsed.flags.promptFile
+      ? deps.readFile(parsed.flags.promptFile)
+      : task;
   const opts: InvokeOpts = {
-    task,
-    focus,
-    scope: parsed.flags.scope ?? defaultScope,
+    task: effectiveTask,
+    promptText:
+      parsed.mode === "review" ? buildReviewPrompt(effectiveTask) : undefined,
     out: parsed.flags.out ?? "relay-image.png",
     model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
     lastFile: join(dir, "raw.txt"),
@@ -405,27 +382,22 @@ export async function executeRelay(
   }
 
   if (gate.live && liveSpec) {
-    // Live always uses the prompt strategy — there is no native `codex review`
-    // inside a TUI; a git-ref scope becomes a produce-the-diff-yourself
-    // instruction appended below.
-    const promptFile =
-      parsed.flags.promptFile ??
-      deps.buildPromptFile({
-        kind: parsed.mode as "delegate" | "review",
-        files: parsed.flags.files,
-        focus,
-        task,
-        gitScope: parsed.flags.gitScope,
-        noProject: parsed.flags.noProject,
-      });
-    const promptText = deps.readFile(promptFile);
+    const promptText =
+      parsed.mode === "review"
+        ? opts.promptText!
+        : parsed.flags.promptFile
+          ? deps.readFile(parsed.flags.promptFile)
+          : deps.readFile(
+              deps.buildPromptFile({
+                kind: "delegate",
+                files: parsed.flags.files,
+                task,
+                gitScope: parsed.flags.gitScope,
+                noProject: parsed.flags.noProject,
+              }),
+            );
     const resultPath = join(dir, "result.md");
-    const scopeNote =
-      parsed.mode === "review" ? scopeInstruction(opts.scope) : "";
-    const livePrompt = appendFileContract(
-      scopeNote ? `${promptText}\n\n${scopeNote}` : promptText,
-      resultPath,
-    );
+    const livePrompt = appendFileContract(promptText, resultPath);
     // The full prompt rides a file — a multi-line herd.send submits prematurely
     // in TUI inputs (and risks ARG_MAX); the pane only gets a one-line bootstrap.
     const livePromptPath = join(dir, "live-prompt.md");
@@ -496,17 +468,18 @@ export async function executeRelay(
       return { code: 1, dir, lastFile: opts.lastFile };
     }
 
-    opts.promptFile =
-      parsed.flags.promptFile ??
-      deps.buildPromptFile({
-        kind: parsed.mode,
-        files: parsed.flags.files,
-        focus,
-        task,
-        gitScope: parsed.flags.gitScope,
-        noProject: parsed.flags.noProject,
-      });
-    opts.promptText = deps.readFile(opts.promptFile);
+    if (parsed.mode !== "review") {
+      opts.promptFile =
+        parsed.flags.promptFile ??
+        deps.buildPromptFile({
+          kind: "delegate",
+          files: parsed.flags.files,
+          task,
+          gitScope: parsed.flags.gitScope,
+          noProject: parsed.flags.noProject,
+        });
+      opts.promptText = deps.readFile(opts.promptFile);
+    }
   }
 
   const invocation = backend.invoke(parsed.mode, opts);

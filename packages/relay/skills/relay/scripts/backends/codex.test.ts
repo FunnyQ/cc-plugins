@@ -48,24 +48,11 @@ describe("codexBackend", () => {
   });
 
   describe("strategy", () => {
-    it("should return native for default review", () => {
-      const opts: InvokeOpts = { scope: "uncommitted" };
-      expect(codexBackend.strategy("review", opts)).toBe("native");
-    });
-
-    it("should return native for review with base scope", () => {
-      const opts: InvokeOpts = { scope: "base:main" };
-      expect(codexBackend.strategy("review", opts)).toBe("native");
-    });
-
-    it("should return native for review with commit scope", () => {
-      const opts: InvokeOpts = { scope: "commit:abc123" };
-      expect(codexBackend.strategy("review", opts)).toBe("native");
-    });
-
-    it("should return prompt for review with custom-files scope", () => {
-      const opts: InvokeOpts = { scope: "custom-files" };
-      expect(codexBackend.strategy("review", opts)).toBe("prompt");
+    it("should return native for every headless review", () => {
+      expect(codexBackend.strategy("review", {})).toBe("native");
+      expect(
+        codexBackend.strategy("review", { task: "review the auth flow" }),
+      ).toBe("native");
     });
 
     it("should return prompt for delegate", () => {
@@ -121,62 +108,21 @@ describe("codexBackend", () => {
     });
 
     describe("review native mode", () => {
-      it("should build argv with --uncommitted for uncommitted scope", () => {
-        const opts: InvokeOpts = { scope: "uncommitted" };
+      it("reviews uncommitted changes when task is absent", () => {
+        const opts: InvokeOpts = { promptText: "uncommitted prompt" };
         const result = codexBackend.invoke("review", opts);
-        expect(result.argv).toEqual(["codex", "review", "--uncommitted"]);
-        expect(result.stdin).toBeUndefined();
+        expect(result.argv).toEqual(["codex", "review", "--uncommitted", "-"]);
+        expect(result.stdin).toBe("uncommitted prompt");
       });
 
-      it("should build argv with --base for base scope", () => {
-        const opts: InvokeOpts = { scope: "base:main" };
-        const result = codexBackend.invoke("review", opts);
-        expect(result.argv).toEqual(["codex", "review", "--base", "main"]);
-        expect(result.stdin).toBeUndefined();
-      });
-
-      it("should build argv with --commit for commit scope", () => {
-        const opts: InvokeOpts = { scope: "commit:abc123def456" };
-        const result = codexBackend.invoke("review", opts);
-        expect(result.argv).toEqual([
-          "codex",
-          "review",
-          "--commit",
-          "abc123def456",
-        ]);
-        expect(result.stdin).toBeUndefined();
-      });
-
-      it("should normalize a bare ref to --base instead of falling through", () => {
-        const opts: InvokeOpts = { scope: "main" };
-        const result = codexBackend.invoke("review", opts);
-        expect(result.argv).toEqual(["codex", "review", "--base", "main"]);
-      });
-
-      it("should default to --uncommitted when scope is absent", () => {
-        const result = codexBackend.invoke("review", {});
-        expect(result.argv).toEqual(["codex", "review", "--uncommitted"]);
-      });
-    });
-
-    describe("review custom-files (prompt fallback)", () => {
-      it("should build argv with read-only exec for custom-files scope", () => {
+      it("passes a provided review task without forcing uncommitted scope", () => {
         const opts: InvokeOpts = {
-          scope: "custom-files",
-          promptText: "review prompt",
-          lastFile: "/tmp/last.txt",
+          task: "review the auth flow",
+          promptText: "custom review prompt",
         };
         const result = codexBackend.invoke("review", opts);
-        expect(result.argv).toEqual([
-          "codex",
-          "exec",
-          "-s",
-          "read-only",
-          "-o",
-          "/tmp/last.txt",
-          "-",
-        ]);
-        expect(result.stdin).toBe("review prompt");
+        expect(result.argv).toEqual(["codex", "review", "-"]);
+        expect(result.stdin).toBe("custom review prompt");
       });
     });
 
@@ -197,18 +143,7 @@ describe("codexBackend", () => {
         expect(result.stdin).toBeUndefined();
       });
 
-      it("should use focus as fallback for image prompt", () => {
-        const opts: InvokeOpts = {
-          focus: "a cat",
-          lastFile: "/tmp/last.txt",
-        };
-        const result = codexBackend.invoke("image", opts);
-        expect(result.argv[result.argv.length - 1]).toBe(
-          "Generate an image of: a cat. Use gpt-image-2.",
-        );
-      });
-
-      it("should use generic prompt if neither task nor focus provided", () => {
+      it("should use generic prompt if task is absent", () => {
         const opts: InvokeOpts = { lastFile: "/tmp/last.txt" };
         const result = codexBackend.invoke("image", opts);
         expect(result.argv[result.argv.length - 1]).toBe(
