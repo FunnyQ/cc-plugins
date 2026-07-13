@@ -170,20 +170,9 @@ The send box at the bottom of the Decision Log column can send text into a runni
 - **Claude Code** uses the cockpit channel MCP server. The agent's answer comes back through the live transcript.
 - **Codex** uses the managed Codex remote-control daemon. Cockpit connects to the local app-server control socket, resumes the selected thread, and submits or steers a turn. Direct app-server is only a fallback when remote-control is unavailable.
 
-Channels require Claude Code 2.1.80 or later and are still behind the research-preview development flag. Register the channel MCP server once in `~/.claude.json`, pointing at the installed plugin's `cockpit-channel.ts` (note: `~/.claude.json` does not expand `$CLAUDE_PLUGIN_ROOT`, so use an absolute path):
+Channels require Claude Code 2.1.80 or later and are still behind the research-preview development flag. The channel MCP server is packaged in the plugin manifest (`mcpServers` + `channels` in `.claude-plugin/plugin.json`), so installing the plugin registers it — no hand-written `~/.claude.json` entry. (If you set one up for an older version, `/monitor:install` removes it; leaving it in place double-registers the channel.)
 
-```json
-{
-  "mcpServers": {
-    "cockpit-channel": {
-      "command": "bun",
-      "args": ["/absolute/path/to/monitor/skills/cockpit/scripts/cockpit-channel.ts"]
-    }
-  }
-}
-```
-
-Then launch an opted-in session — the channel only attaches to sessions started with the development channel flag and cannot retro-attach to an already-running session:
+Launch an opted-in session — the channel only attaches to sessions started with the development channel flag and cannot retro-attach to an already-running session:
 
 ```bash
 bun packages/monitor/skills/cockpit/scripts/monitor-up.ts

@@ -273,7 +273,7 @@ bun test packages/monitor/skills/install/scripts/
 
 ⚠️ Versions live **only** in each plugin's two `plugin.json` files (Claude + Codex). The marketplace registries (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) carry **no `version` field** — don't add one. The published version is the git tag plus the `plugin.json` values.
 
-**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.18.3`, dispatch `3.15.1`, relay `0.5.0`, chronicle `0.5.0`, herdr `0.1.4`.
+**Every plugin is versioned independently, on its own cadence.** There is no repo-wide version. Each plugin owns its version in its two `plugin.json` files and releases under a **plugin-scoped tag** `<plugin>-vX.Y.Z` (e.g. `chronicle-v0.1.0`). Current versions: monitor `3.19.0`, dispatch `3.15.1`, relay `0.5.2`, chronicle `0.8.0`, herdr `0.1.4`.
 
 **Bump only the plugin(s) you actually touched** — leave every other plugin's version alone. Each plugin's two files move together:
 
