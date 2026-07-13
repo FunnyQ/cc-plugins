@@ -66,13 +66,9 @@ One daemon serves every project's cockpit; you don't run a server per session.
   must be running before you park a `cockpit wait` (see below).
 - **Restarting onto new code.** Re-running `cockpit-server.ts` from the *same*
   install just reuses the live daemon — it won't pick up a plugin update or a
-  working-tree edit. To bounce it onto fresh code, run
-  `cockpit.ts restart [--port N] [--no-open]`: it kills the current daemon and
-  rebinds from the install you invoke it from, then verifies it won the port,
-  superseding+retrying past the channel MCP's auto-respawn. Offer this after a
-  `/monitor:install` or plugin update. (If the running session's channel MCP is
-  itself from an older cache, a session restart is still needed for the MCP — but
-  the daemon and dashboard will already be on the new version.)
+  working-tree edit. That's what `/cockpit restart` is for; offer it after a
+  `/monitor:install`, a plugin update, or an edit to any cockpit script. See
+  [references/restart.md](restart.md).
 
 ## Logging decisions afterward
 
