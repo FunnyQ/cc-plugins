@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  baseDetection,
   branchDecisions,
   collectDecisions,
   fallbackPayloadForError,
@@ -328,35 +327,6 @@ describe("collectDecisions", () => {
       throw new Error("EACCES");
     };
     expect(await collectDecisions(["a.jsonl"], read)).toEqual([]);
-  });
-});
-
-describe("baseDetection", () => {
-  test("uses the default branch when develop is absent", () => {
-    expect(baseDetection("main", false)).toEqual({
-      defaultBranch: "main",
-      hasDevelop: false,
-      needsChoice: false,
-      candidates: ["main"],
-    });
-  });
-
-  test("requires a choice when default and develop both exist", () => {
-    expect(baseDetection("main", true)).toEqual({
-      defaultBranch: "main",
-      hasDevelop: true,
-      needsChoice: true,
-      candidates: ["main", "develop"],
-    });
-  });
-
-  test("does not ask when develop is already the default", () => {
-    expect(baseDetection("develop", true)).toEqual({
-      defaultBranch: "develop",
-      hasDevelop: true,
-      needsChoice: false,
-      candidates: ["develop"],
-    });
   });
 });
 

@@ -27,9 +27,10 @@ main agent  (holds the conversation = the "why")
 Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
 rationale lives in `packages/chronicle/DESIGN.md`.
 
-There is **no human confirmation gate** — invoking the skill is the consent, and the
-flow auto-creates. `draft` defaults to `true` (a draft PR is the safe default for an
-auto-open; the main agent may pass `draft:false` to open it ready).
+There is **no final creation confirmation gate** — invoking the skill is the consent,
+and the flow auto-creates after any first-run config interview. `draft` defaults to
+`true` (a draft PR is the safe default for an auto-open; the main agent may pass
+`draft:false` to open it ready).
 
 The three agents live at `packages/chronicle/agents/{storykeeper,skald,messenger}.md`
 and auto-register as `chronicle:storykeeper` / `chronicle:skald` /
@@ -39,23 +40,36 @@ in those files.
 
 ## The main agent's job (thin)
 
-1. **Resolve the base branch before spawning.** Run:
+1. **Resolve the base branch before spawning.** Run the config resolver:
 
    ```bash
-   bun "$SKILL_DIR/scripts/analyze-branch.ts" --detect-base
+   bun "$SKILL_DIR/scripts/pr-config.ts"
    ```
 
-   Parse `{ defaultBranch, hasDevelop, needsChoice, candidates }`.
+   Parse its status:
 
-   - If `needsChoice === false`, use the only entry in `candidates`.
-   - If `needsChoice === true`, do **not** infer the workflow from branch names or
-     history. Use the harness's interactive question tool to ask which candidate this
-     PR targets. In Claude Code use `AskUserQuestion`; in Codex use
+   - `status === "configured"` → use its `base`. Do not ask again.
+   - `status === "needs-setup"` → this is the first run. Use the harness's interactive
+     question tool to ask whether the repository uses GitHub Flow or Git Flow. Always
+     offer both workflows; use the returned `suggestions` only to prefill and recommend
+     branch names detected from the repository. In Claude Code use `AskUserQuestion`; in Codex use
      `request_user_input` when available. If no structured question tool is available,
-     ask the user directly and resume only after they answer.
-   - Read the repository README only to label a documented choice as recommended; it
-     never overrides the user's answer. If the README is silent or contradicts the
-     answer, suggest documenting the repository's workflow/base there after the PR flow.
+     ask directly and resume only after the answer. State in the question that the
+     selection will create and commit `.chronicle/pr.json` on the current branch.
+     - GitHub Flow: confirm its PR base, then run
+       `bun "$SKILL_DIR/scripts/pr-config.ts" save github-flow <base> --commit`.
+     - Git Flow: confirm its production and development branches, then run
+       `bun "$SKILL_DIR/scripts/pr-config.ts" save git-flow <production> <development> --commit`.
+     - Parse the saved result and use its `base`. The command creates the committed
+       `.chronicle/pr.json`, stages only that file, and commits it with Chronicle's
+       config commit format so later runs do not ask again. Apply the existing protected
+       branch guard before running the save command; stop if that guard refuses a commit.
+   - `status === "error"` or invalid config → report the error and stop. Never ignore a
+     broken committed config and fall back to guessing.
+
+   A base explicitly named in the user's current request overrides the resolved base for
+   this invocation only; it does not rewrite config. See
+   [references/pr-config.md](references/pr-config.md) for the schema and routing rules.
 
 2. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
    drawn from this conversation (the Storykeeper and its children can't see the chat).
@@ -85,13 +99,17 @@ no commits or the provider is `unknown`.
 ## Codex
 
 Codex has no named-agent registry. There the main agent runs the same flow inline:
-resolve/ask for the base → distill the why → analyze + draft → create, honoring the
-same auto-create + `draft:true`-default behavior.
+load or first-run-create PR config → resolve the base → distill the why → analyze +
+draft → create, honoring the same auto-create + `draft:true`-default behavior.
 
 ## Edge Cases
 
 - **No commits**: skald reports it; the Storykeeper returns `nothing to propose` and
   stops.
+- **No `.chronicle/pr.json`**: run the first-use workflow interview and commit the
+  generated config with the current branch.
+- **Invalid `.chronicle/pr.json`**: report the validation error and stop; committed
+  intent must be fixed explicitly.
 - **Unknown provider** (no recognizable `github`/`gitlab` remote): the Storykeeper stops
   before creation — there is nothing it can open.
 - **Creation failure** (missing CLI / no remote / CLI error): the messenger returns

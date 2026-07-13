@@ -193,44 +193,6 @@ function lines(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-export type BaseDetection = {
-  defaultBranch: string;
-  hasDevelop: boolean;
-  needsChoice: boolean;
-  candidates: string[];
-};
-
-export function baseDetection(
-  defaultBranch: string,
-  hasDevelop: boolean,
-): BaseDetection {
-  const needsChoice = hasDevelop && defaultBranch !== "develop";
-  return {
-    defaultBranch,
-    hasDevelop,
-    needsChoice,
-    candidates: needsChoice ? [defaultBranch, "develop"] : [defaultBranch],
-  };
-}
-
-async function remoteDefaultBranch(): Promise<string> {
-  const ref = await tryGitText(["symbolic-ref", "refs/remotes/origin/HEAD"]);
-  return ref?.trim().replace(/^refs\/remotes\/origin\//, "") || "main";
-}
-
-async function detectBase(): Promise<BaseDetection> {
-  const defaultBranch = await remoteDefaultBranch();
-  const hasDevelop = !!(
-    (await tryGitText([
-      "rev-parse",
-      "--verify",
-      "--quiet",
-      "origin/develop",
-    ])) || (await tryGitText(["rev-parse", "--verify", "--quiet", "develop"]))
-  );
-  return baseDetection(defaultBranch, hasDevelop);
-}
-
 async function resolveBase(override: string | null): Promise<string> {
   if (override) return override;
 
@@ -269,21 +231,15 @@ async function baseRef(base: string): Promise<string> {
   return selectBaseRef(base, !!local, !!remote);
 }
 
-function parseArgs(argv: string[]): {
-  base: string | null;
-  detectBase: boolean;
-} {
+function parseArgs(argv: string[]): { base: string | null } {
   let base: string | null = null;
-  let shouldDetectBase = false;
   for (let index = 0; index < argv.length; index++) {
     if (argv[index] === "--base") {
       base = argv[index + 1] ?? null;
       index++;
-    } else if (argv[index] === "--detect-base") {
-      shouldDetectBase = true;
     }
   }
-  return { base, detectBase: shouldDetectBase };
+  return { base };
 }
 
 function parseCommits(
@@ -510,11 +466,7 @@ export function fallbackPayloadForError(error: unknown): BranchMaterial {
 
 async function main(): Promise<void> {
   try {
-    const { base, detectBase: shouldDetectBase } = parseArgs(Bun.argv.slice(2));
-    if (shouldDetectBase) {
-      console.log(JSON.stringify(await detectBase()));
-      return;
-    }
+    const { base } = parseArgs(Bun.argv.slice(2));
     const git = await gatherGit(base);
     const cockpit = await harvestCockpit(
       git.repoRoot,
