@@ -216,8 +216,8 @@ export function selectBaseRef(
   localExists: boolean,
   remoteExists: boolean,
 ): string {
-  if (localExists) return base;
-  return remoteExists ? `origin/${base}` : base;
+  if (remoteExists) return `origin/${base}`;
+  return base;
 }
 
 async function baseRef(base: string): Promise<string> {

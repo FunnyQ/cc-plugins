@@ -331,12 +331,16 @@ describe("collectDecisions", () => {
 });
 
 describe("selectBaseRef", () => {
-  test("preserves an explicit local base when it exists", () => {
-    expect(selectBaseRef("target", true, true)).toBe("target");
+  test("prefers the remote ref when local and remote both exist", () => {
+    expect(selectBaseRef("target", true, true)).toBe("origin/target");
   });
 
-  test("falls back to the remote ref in a fresh clone", () => {
+  test("uses the remote ref in a fresh clone", () => {
     expect(selectBaseRef("develop", false, true)).toBe("origin/develop");
+  });
+
+  test("falls back to the local ref when no remote ref exists", () => {
+    expect(selectBaseRef("local-only", true, false)).toBe("local-only");
   });
 
   test("leaves an unknown base unchanged so git reports the error", () => {
