@@ -100,12 +100,12 @@ relay.ts claude review --focus high
 | "review against main" | `relay.ts codex review --scope main` |
 | "review commit abc123" | `relay.ts codex review --scope abc123` |
 
-> ⚠️ **`--scope` is only enforced on backends with a native review.**
+> ⚠️ **`--scope` is only enforced on codex.**
 >
 > | Backend | Review strategy | What `--scope` does |
 > |---|---|---|
 > | `codex` | native (`codex review`) | the CLI enforces it |
-> | `claude` | native (`/code-review`) | the CLI enforces it |
+> | `claude` | native (`/code-review`) | **silently dropped.** The review argv is just `claude -p "/code-review …"` — scope is never passed through, so it always reviews the current diff (effort and focus ARE honored) |
 > | `opencode` | **prompt-emulated** — no native review | **advisory only.** It is one line of the prompt, and the model is free to ignore it and audit the whole repo instead |
 >
 > This is not theoretical: `opencode review --scope uncommitted` has been observed
