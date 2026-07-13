@@ -408,6 +408,27 @@ describe("poll floor", () => {
     expect(polls).toBeLessThanOrEqual(2);
   }, 3000);
 
+  test("pullInboxLoop re-parks immediately after delivering a real message", async () => {
+    const ac = new AbortController();
+    let polls = 0;
+    const fallbackAbort = setTimeout(() => ac.abort(), 100);
+    await pullInboxLoop({
+      mcp: { notification: async () => {} } as never,
+      sessionId: SID,
+      coords,
+      ensure: async () => coords(),
+      signal: ac.signal,
+      floorMs: 1000,
+      fetchImpl: (async () => {
+        polls++;
+        if (polls === 2) ac.abort();
+        return new Response(JSON.stringify({ message: `message-${polls}` }));
+      }) as unknown as typeof fetch,
+    });
+    clearTimeout(fallbackAbort);
+    expect(polls).toBe(2);
+  }, 2000);
+
   test("pullVerdict stays bounded on the timeout sentinel", async () => {
     const ac = new AbortController();
     let polls = 0;

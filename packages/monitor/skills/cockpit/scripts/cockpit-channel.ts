@@ -153,12 +153,9 @@ export function nextReconnectDelayMs(failureCount: number): number {
 // ping-pong at thousands of req/s. The floor bounds that; the jitter breaks the
 // lockstep between colliding pollers.
 //
-// The floor is charged on ELAPSED time, so a poll that parked for its full budget pays
-// nothing. It is NOT free on every path, though: inbox.ts answers a message that was
-// STASHED between polls immediately, so that poll returns at elapsed≈0 and the next one
-// waits out the whole floor. A burst of N stashed messages therefore drains at roughly
-// one per second. That is the price of bounding the spin, and it is only paid when the
-// daemon answers fast — which is exactly the ping-pong signature.
+// The floor is charged only to the {timeout:true} eviction sentinel and only for
+// the iteration's remaining time. Real messages re-park immediately, so rapid sends
+// keep their normal latency; a poll that parked for its full budget also pays nothing.
 export const POLL_FLOOR_MS = 1000;
 const POLL_JITTER_MS = 250;
 
@@ -719,10 +716,19 @@ export async function pullInboxLoop(opts: {
         { signal },
       );
       if (!r.ok) throw new Error(`inbox failed: ${r.status}`);
-      const body = (await r.json()) as { message?: unknown };
+      const body = (await r.json()) as {
+        message?: unknown;
+        timeout?: unknown;
+      };
       failures = 0;
       if (typeof body.message === "string" && body.message !== "") {
         deliver(body.message);
+      }
+      if (body.timeout === true) {
+        await abortableSleep(
+          pollFloorDelayMs(Date.now() - startedAt, floorMs),
+          signal,
+        );
       }
     } catch (err) {
       // An aborted in-flight poll is a shutdown, not a failure — don't back off.
@@ -735,10 +741,6 @@ export async function pullInboxLoop(opts: {
       await abortableSleep(delay, signal);
       continue;
     }
-    await abortableSleep(
-      pollFloorDelayMs(Date.now() - startedAt, floorMs),
-      signal,
-    );
   }
 }
 
