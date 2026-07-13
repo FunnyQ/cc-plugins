@@ -36,6 +36,40 @@ describe("buildArgs", () => {
     expect(buildArgs({ ...githubInput, draft: true })).toContain("--draft");
   });
 
+  // Cross-fork: the branch lives on the contributor's fork while the PR targets
+  // upstream. `gh` cannot infer that when `origin` IS upstream, so the target repo
+  // has to be explicit. `head` arrives already qualified as `owner:branch`.
+  test("targets an explicit repo when one is given", () => {
+    expect(
+      buildArgs({
+        ...githubInput,
+        repo: "UPSTREAM/repo",
+        head: "CONTRIBUTOR:feature/request-creator",
+      }),
+    ).toEqual([
+      "gh",
+      "pr",
+      "create",
+      "--repo",
+      "UPSTREAM/repo",
+      "--base",
+      "main",
+      "--head",
+      "CONTRIBUTOR:feature/request-creator",
+      "--title",
+      "Ship request creator",
+      "--body",
+      "Body text",
+    ]);
+  });
+
+  // Omitting --repo is what lets `gh` do the right thing in its own fork workflow
+  // (origin = your fork): it defaults the base repo to the parent. Emitting --repo
+  // unconditionally would turn those into fork→fork PRs.
+  test("omits --repo when none is given", () => {
+    expect(buildArgs(githubInput)).not.toContain("--repo");
+  });
+
   test("builds gitlab draft args with branch flags and confirmation", () => {
     expect(
       buildArgs({

@@ -7,8 +7,11 @@ description: >-
 
 # Chronicle install
 
-Register the Codex-native commit trio: `chronicle_lawspeaker`,
-`chronicle_watcher`, and `chronicle_runesmith`.
+Register the Codex-native commit roles (`chronicle_lawspeaker`,
+`chronicle_watcher`, `chronicle_runesmith`) and PR roles
+(`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), plus the
+release roles (`chronicle_seer`, `chronicle_oathkeeper`, `chronicle_smith`,
+`chronicle_annalist`, `chronicle_hammerbearer`).
 
 Resolve the plugin root from this skill's load-time base directory: the root is
 two directories above this `skills/install` directory. Never point Codex config

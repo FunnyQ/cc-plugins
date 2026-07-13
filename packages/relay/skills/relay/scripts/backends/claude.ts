@@ -1,50 +1,16 @@
 import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 
-// Effort levels supported by /code-review
-const EFFORT_LEVELS = new Set(["low", "medium", "high", "ultra"]);
-
-/**
- * Parse opts.focus to extract effort level and optional focus phrase.
- *
- * Rule: split focus by whitespace; if the first token is an effort level,
- * treat it as the effort and rejoin the rest as the focus phrase. Otherwise,
- * use default effort "high" and treat the whole focus as the focus phrase.
- * If focus is undefined, use default effort with no phrase.
- */
-function parseEffortAndFocus(focus: string | undefined): {
-  effort: string;
-  phrase?: string;
-} {
-  if (!focus) {
-    return { effort: "high" };
-  }
-
-  const tokens = focus.trim().split(/\s+/);
-  const firstToken = tokens[0];
-  if (EFFORT_LEVELS.has(firstToken)) {
-    const effort = firstToken;
-    const phrase = tokens.slice(1).join(" ");
-    return { effort, phrase: phrase || undefined };
-  }
-
-  // First token is not an effort level; use default and treat whole focus as phrase
-  return { effort: "high", phrase: focus };
-}
-
 export const claudeBackend: Backend = {
   name: "claude",
   supports: new Set(["delegate", "review"]),
 
-  strategy(mode: Mode) {
-    if (mode === "review") {
-      return "native";
-    }
+  strategy(_mode: Mode) {
     return "prompt";
   },
 
   invoke(mode: Mode, opts: InvokeOpts) {
-    if (mode === "delegate") {
-      // Delegate uses the prompt text that relay.ts has already read.
+    if (mode === "delegate" || mode === "review") {
+      // Both modes use the prompt text that relay.ts has already built.
       // Always use --output-format json to get a structured envelope.
       return {
         argv: [
@@ -54,16 +20,6 @@ export const claudeBackend: Backend = {
           "--output-format",
           "json",
         ],
-      };
-    }
-
-    if (mode === "review") {
-      // Review uses the native /code-review command.
-      // Parse effort and focus from opts.focus.
-      const { effort, phrase } = parseEffortAndFocus(opts.focus);
-      const reviewCmd = `/code-review ${effort}${phrase ? " " + phrase : ""}`;
-      return {
-        argv: ["claude", "-p", reviewCmd],
       };
     }
 
@@ -85,7 +41,7 @@ export const claudeBackend: Backend = {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Not JSON (e.g., review mode output from /code-review) — return raw text.
+      // Not JSON — return raw text.
       return raw.trim();
     }
 

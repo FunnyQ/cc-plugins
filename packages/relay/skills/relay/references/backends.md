@@ -39,18 +39,11 @@ Dangerous opt-in (only if user explicitly asks):
 codex exec --dangerously-bypass-approvals-and-sandbox -o <lastfile> -
 ```
 
-### Review (native — operates on git itself)
+### Review
 
 ```bash
-codex review --uncommitted
-codex review --base <ref>
-codex review --commit <sha>
-```
-
-### Review (custom-file scope — degrades to prompt-based)
-
-```bash
-codex exec -s read-only -o <lastfile> -
+codex review --uncommitted -  # no task; prompt arrives on stdin
+codex review -                # task provided; prompt arrives on stdin
 ```
 
 ### Image (codex-only)
@@ -124,13 +117,13 @@ claude -p "<prompt>" --output-format json
 
 Parse the JSON envelope for the final assistant text.
 
-### Review (native)
+### Review
 
 ```bash
-claude -p "/code-review <effort> [focus]"
+claude -p "<review prompt>" --output-format json
 ```
 
-Supports effort levels: low, medium, high, ultra. Relay does **not** pass `--fix` (review = report-only). Do not use `/review` (that is PR-scoped).
+Relay uses the same report-only prompt contract as the other backends. It does not invoke the PR-oriented `/code-review` command.
 
 ### Model
 
@@ -166,5 +159,4 @@ The skill's frontmatter (`name`, `description`) is portable across all three har
 
 - **#26855 (opencode):** JSON format output may exit before the terminal `step_finish` event. If using `--format json`, concatenate all `text` parts captured; do not block waiting for a closing event.
 - **Image (codex-only):** `/relay:relay opencode image` and `/relay:relay claude image` fail fast before any CLI invocation.
-- **Claude review:** Uses `/code-review`, not `/review` (the latter is PR-scoped and unavailable headlessly).
 - **codex trusted directory:** `codex exec` refuses to run outside a git repo ("Not inside a trusted directory and `--skip-git-repo-check` was not specified"). relay does not pass that flag by design — run `/relay:relay codex …` from inside the project's git repo (the normal case). Verified against codex-cli 0.139.0.

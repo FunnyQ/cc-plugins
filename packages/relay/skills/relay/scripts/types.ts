@@ -1,17 +1,6 @@
 export type Mode = "delegate" | "review" | "image";
 export type Strategy = "native" | "prompt";
 
-// Native review scope. The known forms are listed for editor autocomplete, but
-// the type stays open to ANY string on purpose: a bare git ref or SHA (e.g.
-// "main", "abc123") is valid and relay treats it as `--base <ref>`. Do NOT
-// narrow this to only the literal forms — that would reject legitimate bare refs.
-export type Scope =
-  | "uncommitted"
-  | "custom-files"
-  | `base:${string}`
-  | `commit:${string}`
-  | (string & {});
-
 export type RunResult = {
   ok: boolean;
   stdout: string;
@@ -24,9 +13,7 @@ export type RunResult = {
 export type InvokeOpts = {
   promptFile?: string; // path to the built prompt (strategy === "prompt"); codex feeds it on stdin
   promptText?: string; // prompt body already read from promptFile, for CLIs with no --prompt-file flag (opencode/claude)
-  task?: string; // raw task/focus text (e.g. codex image prompt source)
-  scope?: Scope; // native review scope (see Scope) — known forms + any bare git ref
-  focus?: string; // user's specific concern (review) / effort level
+  task?: string; // raw delegate, review, or image task
   out?: string; // image output path
   model?: string; // resolved model (may be undefined → CLI default)
   lastFile?: string; // pre-created output-capture path (codex `-o <lastFile>`); relay creates the tmp dir first

@@ -1,5 +1,47 @@
 # Changelog
 
+## [chronicle 0.8.0] - 2026-07-14
+
+_chronicle is independently versioned; this entry tracks the `chronicle-v0.8.0` tag._
+
+### Added
+
+- **Chronicle now opens correct PRs when you're working from a fork.** It detects fork remotes, qualifies the head ref as `owner:branch`, resolves the real push-remote URL, and can target an explicit repo — so cross-fork PRs no longer land on the wrong branch or repo.
+- **PR and release workflows register their own Codex agent roles.** Both flows now work even when the Codex runtime only exposes generic nested agents.
+- **Chronicle remembers each repository's PR workflow choices.** Once you've picked a workflow, the choice is persisted (as a locale-neutral config commit) and honored by branch guards on future runs.
+
+### Changed
+
+- **PR base branch selection is now correct by default.** The base is resolved from the branch's real fork point, `hotfix/` and `release/` branches are routed to `main`, and an explicit base is now required rather than silently falling back — the `--base auto` behavior moved into the analyzer.
+- **The skald's Mermaid diagrams are now constrained to syntax GitHub can actually render.** An earlier regex-based lint attempt was withdrawn after turning out to be unsound.
+
+### Fixed
+
+- **Reading cockpit's decision log no longer discards sibling entries when one log file is unreadable.**
+
+## [monitor 3.19.0] - 2026-07-14
+
+_monitor is independently versioned; this entry tracks the `monitor-v3.19.0` tag._
+
+### Added
+
+- **A stale monitor process reaper now runs on session start**, cleaning up leftover monitor processes without ever touching the usage dashboard.
+
+### Fixed
+
+- **Fixed a cockpit channel process leak and an inbox ping-pong CPU spin.**
+- **Real messages no longer wait behind the poll floor**, so they're delivered promptly.
+- **Stale sessions no longer roll configuration back**, preventing lost settings changes.
+
+## [relay 0.5.2] - 2026-07-14
+
+_relay is independently versioned; this entry tracks the `relay-v0.5.2` tag._
+
+### Changed
+
+- **Clarified relay's `--scope` behavior for code review tasks**: docs now correctly note that Claude's `/code-review` drops `--scope` rather than enforcing it, and that `--scope` is only advisory on opencode.
+- **Unified how relay handles review tasks internally across backends**, for more consistent behavior going forward.
+
 ## [monitor 3.18.10] - 2026-07-13
 
 _monitor is independently versioned; this entry tracks the `monitor-v3.18.10` tag._

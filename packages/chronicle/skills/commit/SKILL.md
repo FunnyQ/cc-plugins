@@ -25,8 +25,8 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:runesmith   (Haiku) — stages whole files + writes commits from the Lawspeaker's brief
 ```
 
-Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
-rationale lives in `packages/chronicle/DESIGN.md`.
+Spawn via `subagent_type`, never fork: the Lawspeaker must be able to spawn its
+children and does not inherit the main conversation.
 
 All diff/git output stays inside the Lawspeaker subtree; the main agent only sees the
 final `git log`. The three agents live at
@@ -84,8 +84,7 @@ Codex uses the same topology through one of two role-loading paths:
    role instructions in the spawn prompt.
 
 Both paths return only the final log and preserve the same Lawspeaker → Watcher →
-Runesmith isolation. These roles are installed by `chronicle:install`; role configs
-use the Codex tier mapping documented in `DESIGN.md`.
+Runesmith isolation. These roles are installed by `chronicle:install`.
 
 If neither a named-role selector nor a non-fork generic sub-agent API is available,
 do not silently pretend the agent flow ran. If the stable role files are missing,

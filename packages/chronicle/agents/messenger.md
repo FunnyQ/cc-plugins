@@ -20,20 +20,34 @@ body; create exactly what you are handed. Never pretend success.
     "title": "<confirmed title>",
     "body": "<confirmed body>",
     "base": "<base branch>",
-    "head": "<head branch>",
-    "draft": false           // true if the user chose "Open as draft"
+    "head": "<head branch>", // "owner:branch" when repo is set
+    "draft": false,          // true if the user chose "Open as draft"
+    "repo": "owner/name"     // OMIT unless the Storykeeper gave you one
   }
   ```
 
+  `repo` arrives only for a cross-fork request — the branch lives on a fork while
+  `origin` is upstream, which `gh` cannot infer. Pass it through exactly as given, and
+  **omit the key entirely when it is null**: forcing `--repo` in gh's own fork workflow
+  (origin = the fork) would open a fork→fork PR instead of one against the parent.
+
 ## Process
 
-1. Guard + run the creator, passing the `CreateInput` JSON as the first argument
-   (or on stdin):
+1. Guard + run the creator, feeding the `CreateInput` JSON on **stdin** via a
+   quoted heredoc:
 
    ```bash
    test -f "$SKILL_DIR/scripts/request-creator.ts" || { echo "creator missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/request-creator.ts" '<CreateInput JSON>'
+   bun "$SKILL_DIR/scripts/request-creator.ts" <<'CREATE_INPUT'
+   <CreateInput JSON>
+   CREATE_INPUT
    ```
+
+   **Never pass the JSON as a single-quoted argv argument.** A body is prose, and prose
+   has apostrophes — one `'` in `gh's own workflow` closes the shell quote and the JSON
+   arrives mangled (or the command fails outright). The quoted heredoc (`<<'CREATE_INPUT'`,
+   delimiter in quotes) disables every form of shell expansion, so the JSON reaches the
+   script byte-for-byte. `request-creator.ts` reads stdin whenever no argv is given.
 
 2. Parse the `CreateResult` and report:
 

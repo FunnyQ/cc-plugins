@@ -2,6 +2,10 @@
 
 A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic) and reviewer-legible PRs/MRs; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
+## Development Workflow
+
+This repository uses GitHub Flow. Create feature and fix branches from `main`, then open pull requests back into `main`. The existing `develop` branch is historical and does not indicate that this repository uses git-flow. Chronicle records this machine-readable PR policy in [`.chronicle/pr.json`](./.chronicle/pr.json).
+
 ## Plugins
 
 **monitor** bundles two skills:
@@ -225,12 +229,12 @@ One portable skill that delegates a task *out* to another harness's CLI, then ca
 
 ```
 /relay <codex|opencode|claude> delegate <task>
-/relay <codex|opencode|claude> review [scope]
+/relay <codex|opencode|claude> review [task]
 /relay codex image <prompt> --out <path>
 ```
 
 - **delegate** — ask a backend to *do* something (implement, refactor, debug); smart-applied when safe.
-- **review** — analysis only, no edits. codex/claude use native review; opencode emulates via a read-only prompt.
+- **review** — analysis only, no edits. No task reviews uncommitted changes; a provided task is followed as written.
 - **image** — generate an image via codex (gpt-image-2). codex-only; `opencode`/`claude` fail fast at the capability gate.
 
 A capability gate rejects unsupported (backend, mode) pairs before any CLI runs. Every run captures full output to `/tmp/relay/<ts>/last.md` and prints it. Models resolve by precedence: `--model` flag > config file (`~/.config/q-lab/cc-plugins/relay/config.json`) > built-in defaults. Per-CLI invocation details, headless output handling, and the OpenCode symlink install live in the [backend reference](./packages/relay/skills/relay/references/backends.md).
