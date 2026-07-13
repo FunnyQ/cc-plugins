@@ -9,6 +9,12 @@ export type CreateInput = {
   base: string;
   head: string;
   draft: boolean;
+  // Target repo ("owner/name"), set only when the request cannot be inferred from
+  // the remotes — i.e. `origin` is upstream and the branch lives on a fork remote,
+  // with `head` already qualified as "owner:branch". Left unset in gh's own fork
+  // workflow (origin = the fork), where gh correctly defaults to the parent repo
+  // and forcing --repo would open a fork→fork PR instead.
+  repo?: string;
 };
 
 export type CreateResult =
@@ -29,10 +35,13 @@ function binaryForProvider(provider: Provider): "gh" | "glab" {
 
 export function buildArgs(input: CreateInput): string[] {
   if (input.provider === "github") {
-    const args = [
-      "gh",
-      "pr",
-      "create",
+    const args = ["gh", "pr", "create"];
+
+    if (input.repo) {
+      args.push("--repo", input.repo);
+    }
+
+    args.push(
       "--base",
       input.base,
       "--head",
@@ -41,7 +50,7 @@ export function buildArgs(input: CreateInput): string[] {
       input.title,
       "--body",
       input.body,
-    ];
+    );
 
     if (input.draft) {
       args.push("--draft");

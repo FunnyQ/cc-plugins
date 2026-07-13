@@ -34,7 +34,11 @@ split keeps drafting and creating in separate instructed roles.
    `commitCount === 0`, return `no commits to propose` and stop.
 3. `Read` the `BranchMaterial` JSON from `outputPath` — `commits`, `diffStat`,
    `decisions[]` (each with `reason`, `tradeoff`, `kind`, `needs_your_call`,
-   `files`, `diagram`), `base`, `head`, `provider`.
+   `files`, `diagram`), `base`, `head`, `repo`, `provider`.
+
+   `repo` is non-null only for a cross-fork request (the branch lives on a fork while
+   `origin` is upstream); `head` then already carries the `owner:branch` prefix. Pass
+   both through untouched — do not rebuild them.
 4. If `provider === "unknown"`, return the material and tell the Storykeeper to stop
    before creation — Chronicle can't choose between `gh` and `glab`.
 5. Synthesize a concise imperative **title** and a body with EXACTLY these four
@@ -78,4 +82,4 @@ split keeps drafting and creating in separate instructed roles.
    all four sections from commits + diff; **Why** / **What to focus on** may be
    thinner but must be present.
 
-6. Return exactly: `{ title, body, base, head, provider }`.
+6. Return exactly: `{ title, body, base, head, repo, provider }`.

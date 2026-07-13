@@ -3,7 +3,12 @@ import {
   branchDecisions,
   fallbackPayloadForError,
   detectProvider,
+  parseRepoSlug,
+  pickPushRemote,
   projectMatches,
+  qualifyHead,
+  remotePushUrlArgs,
+  resolveCrossFork,
   type DecisionRecord,
 } from "./analyze-branch";
 
@@ -141,5 +146,151 @@ describe("fallbackPayloadForError", () => {
 
   test("stringifies non-error failures", () => {
     expect(fallbackPayloadForError("boom").error).toBe("boom");
+  });
+});
+
+describe("parseRepoSlug", () => {
+  test("reads owner/name from https and ssh remotes", () => {
+    expect(parseRepoSlug("https://github.com/FunnyQ/cc-plugins.git")).toBe(
+      "FunnyQ/cc-plugins",
+    );
+    expect(parseRepoSlug("https://github.com/FunnyQ/cc-plugins")).toBe(
+      "FunnyQ/cc-plugins",
+    );
+    expect(parseRepoSlug("git@github.com:Dylan0203/cc-plugins.git")).toBe(
+      "Dylan0203/cc-plugins",
+    );
+    expect(parseRepoSlug("ssh://git@github.com/Owner/repo.git")).toBe(
+      "Owner/repo",
+    );
+  });
+
+  test("returns null for nothing parseable", () => {
+    expect(parseRepoSlug(null)).toBeNull();
+    expect(parseRepoSlug("not-a-remote")).toBeNull();
+  });
+});
+
+describe("qualifyHead", () => {
+  test("prefixes the fork owner when head and base repos differ", () => {
+    expect(
+      qualifyHead("fix/foo", "Dylan0203/cc-plugins", "FunnyQ/cc-plugins"),
+    ).toBe("Dylan0203:fix/foo");
+  });
+
+  test("leaves head bare when both point at the same repo", () => {
+    expect(
+      qualifyHead("fix/foo", "FunnyQ/cc-plugins", "FunnyQ/cc-plugins"),
+    ).toBe("fix/foo");
+  });
+
+  test("leaves head bare when either slug is unknown", () => {
+    expect(qualifyHead("fix/foo", null, "FunnyQ/cc-plugins")).toBe("fix/foo");
+    expect(qualifyHead("fix/foo", "Dylan0203/cc-plugins", null)).toBe(
+      "fix/foo",
+    );
+  });
+});
+
+describe("resolveCrossFork", () => {
+  const UPSTREAM = "https://github.com/FunnyQ/cc-plugins.git";
+  const FORK = "git@github.com:Dylan0203/cc-plugins.git";
+
+  // origin = upstream, branch pushed to a separate fork remote. This is the case
+  // `gh` cannot infer, so the target repo must be made explicit.
+  test("qualifies head and names the target repo when origin is upstream", () => {
+    expect(resolveCrossFork("fix/foo", FORK, UPSTREAM, "github")).toEqual({
+      head: "Dylan0203:fix/foo",
+      repo: "FunnyQ/cc-plugins",
+    });
+  });
+
+  // gh's own fork workflow (origin = your fork). gh already defaults the base repo
+  // to the parent; emitting --repo here would open a fork→fork PR instead.
+  test("stays out of the way when the branch pushes to origin", () => {
+    expect(resolveCrossFork("fix/foo", UPSTREAM, UPSTREAM, "github")).toEqual({
+      head: "fix/foo",
+      repo: null,
+    });
+  });
+
+  test("falls back to today's behavior when a remote is unreadable", () => {
+    expect(resolveCrossFork("fix/foo", null, UPSTREAM, "github")).toEqual({
+      head: "fix/foo",
+      repo: null,
+    });
+    expect(resolveCrossFork("fix/foo", FORK, null, "github")).toEqual({
+      head: "fix/foo",
+      repo: null,
+    });
+  });
+
+  // `owner:branch` is gh's syntax, and only gh's. glab reads --source-branch as a
+  // plain branch name, so a qualified head would hand it a branch that cannot exist.
+  test("keeps a bare head on non-GitHub providers, fork or not", () => {
+    const GL_UPSTREAM = "git@gitlab.com:group/project.git";
+    const GL_FORK = "git@gitlab.com:me/project.git";
+    expect(resolveCrossFork("fix/foo", GL_FORK, GL_UPSTREAM, "gitlab")).toEqual(
+      { head: "fix/foo", repo: null },
+    );
+    expect(resolveCrossFork("fix/foo", FORK, UPSTREAM, "unknown")).toEqual({
+      head: "fix/foo",
+      repo: null,
+    });
+  });
+});
+
+// Git resolves the push destination through a chain — branch.<name>.pushRemote →
+// remote.pushDefault → branch.<name>.remote — not the tracking remote alone. The
+// triangular workflow (fetch upstream, push fork) lives entirely in the first two.
+describe("pickPushRemote", () => {
+  test("branch pushRemote outranks everything", () => {
+    expect(
+      pickPushRemote({
+        pushRemote: "fork",
+        pushDefault: "other",
+        trackingRemote: "origin",
+      }),
+    ).toBe("fork");
+  });
+
+  // The canonical triangular setup: the branch tracks origin (upstream) for fetch,
+  // while remote.pushDefault sends every push to the fork.
+  test("remote.pushDefault beats the tracking remote", () => {
+    expect(
+      pickPushRemote({
+        pushRemote: null,
+        pushDefault: "fork",
+        trackingRemote: "origin",
+      }),
+    ).toBe("fork");
+  });
+
+  test("falls back to the tracking remote, then to null", () => {
+    expect(
+      pickPushRemote({
+        pushRemote: null,
+        pushDefault: null,
+        trackingRemote: "origin",
+      }),
+    ).toBe("origin");
+    expect(
+      pickPushRemote({
+        pushRemote: null,
+        pushDefault: null,
+        trackingRemote: null,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("remotePushUrlArgs", () => {
+  test("requests the configured push URL for a named remote", () => {
+    expect(remotePushUrlArgs("origin")).toEqual([
+      "remote",
+      "get-url",
+      "--push",
+      "origin",
+    ]);
   });
 });
