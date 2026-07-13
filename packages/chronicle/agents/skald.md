@@ -18,6 +18,8 @@ split keeps drafting and creating in separate instructed roles.
   conversation; you don't). Use it for the **Why** section alongside the harvested
   cockpit records. Never invent rationale beyond it, the cockpit decisions, and the
   commits.
+- `base` — the explicit target branch already selected by the main agent/user. Use it
+  unchanged; never infer a different target.
 
 ## Process
 
@@ -25,7 +27,8 @@ split keeps drafting and creating in separate instructed roles.
 
    ```bash
    test -f "$SKILL_DIR/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/analyze-branch.ts"
+   test -n "$base" || { echo "base missing" >&2; exit 1; }
+   bun "$SKILL_DIR/scripts/analyze-branch.ts" --base "$base"
    ```
 
    Parse its JSON: `{ outputPath, provider, hasCockpit, commitCount, error? }`.

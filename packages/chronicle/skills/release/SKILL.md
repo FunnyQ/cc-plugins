@@ -46,8 +46,8 @@ main agent  (holds the "why"; the ONLY one that can prompt you)
        └─ chronicle:hammerbearer    (Haiku)  — auto only: commit + merge + tag + (push)
 ```
 
-Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
-rationale lives in `packages/chronicle/DESIGN.md`. The five agents live at
+Spawn via `subagent_type`, never fork: the Oathkeeper must be able to spawn its
+children and does not inherit the main conversation. The five agents live at
 `packages/chronicle/agents/{seer,oathkeeper,smith,annalist,hammerbearer}.md`.
 
 ## The main agent's job
@@ -122,9 +122,23 @@ don't re-implement branch protection. In `auto` the hammerbearer verifies it end
 
 ## Codex
 
-Codex has no named-agent registry. There the main agent runs the same flow inline:
-survey → (first-run interview) → version gate → bump + changelog → (auto) finish,
-honoring the same `.chronicle/release.json` contract and prepare-by-default.
+Codex uses the same Seer → main-agent gates → Oathkeeper topology through one of two
+role-loading paths:
+
+1. **Named-role selector available**: spawn the registered `chronicle_seer`, run the
+   first-run and version gates in the main agent, then spawn the registered
+   `chronicle_oathkeeper` with the resolved payload.
+2. **Generic sub-agent API only**: verify the corresponding stable files under
+   `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
+   non-fork generic agents named `chronicle_seer` and `chronicle_oathkeeper` at their
+   normal points in the flow, with no inherited turns, and tell each to read and obey
+   its stable TOML before handling the same payload. The Oathkeeper delegates
+   sequentially to generic Smith, Annalist, and Hammerbearer children that self-load
+   their TOMLs. Never paste or improvise role instructions in the spawn prompts.
+
+If neither registered roles nor stable TOMLs are available, tell the user to run
+`chronicle:install` and start a new Codex thread. Do not silently replace the role
+boundaries with an inline release flow.
 
 ## Edge cases
 

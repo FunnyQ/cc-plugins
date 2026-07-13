@@ -2,6 +2,10 @@
 
 A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic) and reviewer-legible PRs/MRs; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
+## Development Workflow
+
+This repository uses GitHub Flow. Create feature and fix branches from `main`, then open pull requests back into `main`. The existing `develop` branch is historical and does not indicate that this repository uses git-flow. Chronicle records this machine-readable PR policy in [`.chronicle/pr.json`](./.chronicle/pr.json).
+
 ## Plugins
 
 **monitor** bundles two skills:

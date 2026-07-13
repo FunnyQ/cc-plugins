@@ -43,6 +43,8 @@ something to create) one `chronicle:messenger`. That's it.
 - `$SKILL_DIR` — absolute path to the skill dir (`.../skills/pr`). Pass it to both
   children.
 - `contextBrief` — the distilled "why" behind this branch. Pass it to the skald.
+- `base` — the explicit target branch already resolved with the user. Pass it to the
+  skald unchanged; never infer or replace it.
 - `branch` — the current branch (already checked safe by the main agent).
 - `draft` — whether to open as a draft. **Default `true`** if the main agent didn't
   specify (auto-opening a non-draft PR is aggressive; a draft is the safe default).
@@ -54,7 +56,7 @@ something to create) one `chronicle:messenger`. That's it.
 ```
 Agent({
   subagent_type: "chronicle:skald",
-  prompt: "$SKILL_DIR=<...>; contextBrief=<...>. Follow your agent instructions: run analyze-branch.ts, harvest cockpit, synthesize the title + four-section body (+ optional overview diagram). Return { title, body, base, head, repo, provider } — or 'no commits to propose', or the material with provider:'unknown', or a plain analyzer error."
+  prompt: "$SKILL_DIR=<...>; contextBrief=<...>; base=<...>. Follow your agent instructions: run analyze-branch.ts with the explicit base, harvest cockpit, synthesize the title + four-section body (+ optional overview diagram). Return { title, body, base, head, repo, provider } — or 'no commits to propose', or the material with provider:'unknown', or a plain analyzer error."
 })
 ```
 

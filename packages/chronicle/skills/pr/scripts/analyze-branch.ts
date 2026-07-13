@@ -211,6 +211,26 @@ async function resolveBase(override: string | null): Promise<string> {
   return "main";
 }
 
+export function selectBaseRef(
+  base: string,
+  localExists: boolean,
+  remoteExists: boolean,
+): string {
+  if (remoteExists) return `origin/${base}`;
+  return base;
+}
+
+async function baseRef(base: string): Promise<string> {
+  const local = await tryGitText(["rev-parse", "--verify", "--quiet", base]);
+  const remote = await tryGitText([
+    "rev-parse",
+    "--verify",
+    "--quiet",
+    `origin/${base}`,
+  ]);
+  return selectBaseRef(base, !!local, !!remote);
+}
+
 function parseArgs(argv: string[]): { base: string | null } {
   let base: string | null = null;
   for (let index = 0; index < argv.length; index++) {
@@ -244,7 +264,9 @@ function parseCommits(
 async function gatherGit(baseOverride: string | null) {
   const repoRoot = (await gitText(["rev-parse", "--show-toplevel"])).trim();
   const base = await resolveBase(baseOverride);
-  const mergeBase = (await gitText(["merge-base", base, "HEAD"])).trim();
+  const mergeBase = (
+    await gitText(["merge-base", await baseRef(base), "HEAD"])
+  ).trim();
   const [
     head,
     remoteText,
