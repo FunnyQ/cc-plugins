@@ -93,11 +93,18 @@ export function qualifyHead(
 // So we only speak up for the second case: qualify the head as `owner:branch` and
 // name the target repo explicitly. Anything we cannot parse falls back to today's
 // behavior rather than guessing.
+//
+// `owner:branch` is gh's syntax, and only gh's. glab reads `--source-branch` as a
+// plain branch name (a cross-project MR needs --source-project, which the messenger
+// does not speak yet), so on any non-GitHub provider we keep today's bare head
+// rather than hand glab a head it cannot parse.
 export function resolveCrossFork(
   branch: string,
   headRemoteUrl: string | null,
   originRemoteUrl: string | null,
+  provider: Provider,
 ): { head: string; repo: string | null } {
+  if (provider !== "github") return { head: branch, repo: null };
   const headSlug = parseRepoSlug(headRemoteUrl);
   const baseSlug = parseRepoSlug(originRemoteUrl);
   const crossFork = !!headSlug && !!baseSlug && headSlug !== baseSlug;
@@ -106,6 +113,23 @@ export function resolveCrossFork(
     head: qualifyHead(branch, headSlug, baseSlug),
     repo: crossFork ? baseSlug : null,
   };
+}
+
+// Git resolves where `git push` actually lands through a chain, not one key:
+// branch.<name>.pushRemote → remote.pushDefault → branch.<name>.remote. Reading only
+// the tracking remote misses the triangular workflow git's own docs recommend to fork
+// contributors (fetch from upstream, push to the fork via remote.pushDefault).
+export function pickPushRemote(candidates: {
+  pushRemote: string | null;
+  pushDefault: string | null;
+  trackingRemote: string | null;
+}): string | null {
+  return (
+    candidates.pushRemote?.trim() ||
+    candidates.pushDefault?.trim() ||
+    candidates.trackingRemote?.trim() ||
+    null
+  );
 }
 
 export function branchDecisions(
@@ -241,6 +265,7 @@ async function gatherGit(baseOverride: string | null) {
     branch,
     await headRemoteUrl(branch),
     remoteUrl,
+    detectProvider(remoteUrl),
   );
 
   return {
@@ -257,16 +282,22 @@ async function gatherGit(baseOverride: string | null) {
   };
 }
 
-// The remote this branch actually pushes to — which is NOT always `origin`. A
-// contributor who cloned upstream and added their fork as a second remote pushes to
-// the fork while `origin` stays upstream.
+// The remote this branch actually pushes to — which is NOT always `origin`, and not
+// always the tracking remote either (see pickPushRemote for the resolution chain).
 async function headRemoteUrl(branch: string): Promise<string | null> {
-  const configured = await tryGitText([
-    "config",
-    "--get",
-    `branch.${branch}.remote`,
-  ]);
-  const name = configured?.trim();
+  const name = pickPushRemote({
+    pushRemote: await tryGitText([
+      "config",
+      "--get",
+      `branch.${branch}.pushRemote`,
+    ]),
+    pushDefault: await tryGitText(["config", "--get", "remote.pushDefault"]),
+    trackingRemote: await tryGitText([
+      "config",
+      "--get",
+      `branch.${branch}.remote`,
+    ]),
+  });
   if (!name) return null;
   // A branch can be configured to push to a URL rather than a named remote.
   if (name.includes(":") || name.includes("/")) return name;
