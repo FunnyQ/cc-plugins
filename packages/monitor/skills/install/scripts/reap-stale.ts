@@ -36,8 +36,40 @@ export type ProcRow = {
   command: string;
 };
 
-const MONITOR_SCRIPT =
-  /[/\\]monitor[/\\](\d+\.\d+\.\d+)[/\\]skills[/\\]cockpit[/\\]scripts[/\\](?:cockpit-channel|cockpit-server)\.ts\b/;
+export function compareMonitorVersions(a: string, b: string): number | null {
+  if (!/^\d+\.\d+\.\d+$/.test(a) || !/^\d+\.\d+\.\d+$/.test(b)) {
+    return null;
+  }
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const difference = pa[i]! - pb[i]!;
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+export function monitorCacheRoot(installRoot: string): string | null {
+  return (
+    installRoot.match(
+      /^(.*[/\\]monitor)[/\\]\d+\.\d+\.\d+[/\\]skills[/\\](?:install|cockpit)[/\\]scripts(?:[/\\]|$)/,
+    )?.[1] ?? null
+  );
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function monitorScriptVersion(
+  command: string,
+  cacheRoot: string,
+): string | null {
+  const script = new RegExp(
+    `${escapeRegExp(cacheRoot)}[/\\\\](\\d+\\.\\d+\\.\\d+)[/\\\\]skills[/\\\\]cockpit[/\\\\]scripts[/\\\\](?:cockpit-channel|cockpit-server)\\.ts\\b`,
+  );
+  return command.match(script)?.[1] ?? null;
+}
 
 export function parsePsRows(out: string): ProcRow[] {
   const rows: ProcRow[] = [];
@@ -56,7 +88,12 @@ export function parsePsRows(out: string): ProcRow[] {
 
 export function selectStaleMonitorPids(
   rows: ProcRow[],
-  opts: { version: string; uid: number; selfPid: number },
+  opts: {
+    version: string;
+    uid: number;
+    selfPid: number;
+    cacheRoot: string;
+  },
 ): number[] {
   if (!/^\d+\.\d+\.\d+$/.test(opts.version)) return [];
   return rows
@@ -64,8 +101,10 @@ export function selectStaleMonitorPids(
       if (r.pid <= 1 || r.pid === opts.selfPid) return false;
       if (r.ppid !== 1) return false; // parent alive → not an orphan → hands off
       if (r.uid !== opts.uid) return false;
-      const version = r.command.match(MONITOR_SCRIPT)?.[1];
-      return !!version && version !== opts.version;
+      const version = monitorScriptVersion(r.command, opts.cacheRoot);
+      return (
+        !!version && (compareMonitorVersions(version, opts.version) ?? 0) < 0
+      );
     })
     .map((r) => r.pid);
 }
@@ -79,13 +118,17 @@ export function reapStaleMonitorProcesses(
       encoding: "utf-8",
     }),
   kill: (pid: number) => void = (pid) => process.kill(pid, "SIGTERM"),
+  installRoot: string = import.meta.dir,
 ): number {
   let reaped = 0;
   try {
+    const cacheRoot = monitorCacheRoot(installRoot);
+    if (!cacheRoot) return 0;
     const pids = selectStaleMonitorPids(parsePsRows(run()), {
       version,
       uid: process.getuid?.() ?? -1,
       selfPid: process.pid,
+      cacheRoot,
     });
     for (const pid of pids) {
       try {

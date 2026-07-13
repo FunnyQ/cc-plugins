@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  monitorCacheRoot,
   parsePsRows,
+  reapStaleMonitorProcesses,
   selectStaleMonitorPids,
   type ProcRow,
 } from "./reap-stale";
@@ -22,7 +24,12 @@ const row = (p: Partial<ProcRow>): ProcRow => ({
 });
 
 const select = (rows: ProcRow[]) =>
-  selectStaleMonitorPids(rows, { version: "3.19.0", uid: 501, selfPid: 999 });
+  selectStaleMonitorPids(rows, {
+    version: "3.19.0",
+    uid: 501,
+    selfPid: 999,
+    cacheRoot: CACHE,
+  });
 
 describe("selectStaleMonitorPids", () => {
   test("reaps an orphaned channel from an older version", () => {
@@ -64,6 +71,15 @@ describe("selectStaleMonitorPids", () => {
     expect(select([row({ pid: 200, command: channel("3.19.0") })])).toEqual([]);
   });
 
+  test("never reaps a newer-version process", () => {
+    expect(select([row({ pid: 201, command: server("3.20.0") })])).toEqual([]);
+  });
+
+  test("never reaps a process from another monitor cache family", () => {
+    const other = channel("3.18.0").replace(CACHE, "/tmp/other/monitor");
+    expect(select([row({ pid: 202, command: other })])).toEqual([]);
+  });
+
   test("leaves other users' processes alone", () => {
     expect(select([row({ pid: 300, uid: 502 })])).toEqual([]);
   });
@@ -91,8 +107,36 @@ describe("selectStaleMonitorPids", () => {
   test("tolerates an unparseable version in the running plugin", () => {
     const rows = [row({ pid: 500, command: channel("3.18.5") })];
     expect(
-      selectStaleMonitorPids(rows, { version: "", uid: 501, selfPid: 999 }),
+      selectStaleMonitorPids(rows, {
+        version: "",
+        uid: 501,
+        selfPid: 999,
+        cacheRoot: CACHE,
+      }),
     ).toEqual([]);
+  });
+});
+
+describe("reaper scope", () => {
+  test("derives the shared monitor cache root from an installed script", () => {
+    expect(monitorCacheRoot(`${CACHE}/3.19.0/skills/install/scripts`)).toBe(
+      CACHE,
+    );
+  });
+
+  test("skips the process table outside a versioned plugin-cache install", () => {
+    let ran = false;
+    const count = reapStaleMonitorProcesses(
+      "3.19.0",
+      () => {
+        ran = true;
+        return "";
+      },
+      () => {},
+      "/Users/x/Projects/cc-plugins/packages/monitor/skills/install/scripts",
+    );
+    expect(count).toBe(0);
+    expect(ran).toBe(false);
   });
 });
 
