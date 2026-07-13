@@ -225,12 +225,12 @@ One portable skill that delegates a task *out* to another harness's CLI, then ca
 
 ```
 /relay <codex|opencode|claude> delegate <task>
-/relay <codex|opencode|claude> review [scope]
+/relay <codex|opencode|claude> review [task]
 /relay codex image <prompt> --out <path>
 ```
 
 - **delegate** — ask a backend to *do* something (implement, refactor, debug); smart-applied when safe.
-- **review** — analysis only, no edits. codex/claude use native review; opencode emulates via a read-only prompt.
+- **review** — analysis only, no edits. No task reviews uncommitted changes; a provided task is followed as written.
 - **image** — generate an image via codex (gpt-image-2). codex-only; `opencode`/`claude` fail fast at the capability gate.
 
 A capability gate rejects unsupported (backend, mode) pairs before any CLI runs. Every run captures full output to `/tmp/relay/<ts>/last.md` and prints it. Models resolve by precedence: `--model` flag > config file (`~/.config/q-lab/cc-plugins/relay/config.json`) > built-in defaults. Per-CLI invocation details, headless output handling, and the OpenCode symlink install live in the [backend reference](./packages/relay/skills/relay/references/backends.md).

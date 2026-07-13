@@ -12,7 +12,7 @@ Wraps the local `codex`, `opencode`, and `claude` CLIs to delegate tasks across 
 
 ```
 /relay:relay <codex|opencode|claude> delegate <task>
-/relay:relay <codex|opencode|claude> review [scope]
+/relay:relay <codex|opencode|claude> review [task]
 /relay:relay codex image [prompt] [--out <path>]
 ```
 
@@ -81,52 +81,18 @@ For non-review tasks: implementing features, refactoring, suggesting an approach
 
 ---
 
-## `/relay:relay <backend> review [scope]`
+## `/relay:relay <backend> review [task]`
 
-For code analysis: ask a backend for an opinion on existing code.
+Review is report-only. Never apply changes from review output unless the user asks separately.
 
-**No scope** — review uncommitted working tree changes:
+- No task: run `relay.ts <backend> review`. Relay reviews only uncommitted changes.
+- Task present: pass it unchanged as positional text. Do not translate it into `--scope`, `--files`, or `--focus`.
 
 ```bash
-relay.ts codex review --scope uncommitted
-relay.ts claude review --focus high
+relay.ts codex review
+relay.ts opencode review "Review auth.ts for race conditions"
+relay.ts claude review "Review changes since main"
 ```
-
-**Scope names a git reference** — call the backend's native review:
-
-| Scope intent | Command |
-|---|---|
-| "review uncommitted changes" | `relay.ts codex review --scope uncommitted` |
-| "review against main" | `relay.ts codex review --scope main` |
-| "review commit abc123" | `relay.ts codex review --scope abc123` |
-
-> ⚠️ **`--scope` is only enforced on codex.**
->
-> | Backend | Review strategy | What `--scope` does |
-> |---|---|---|
-> | `codex` | native (`codex review`) | the CLI enforces it |
-> | `claude` | native (`/code-review`) | **silently dropped.** The review argv is just `claude -p "/code-review …"` — scope is never passed through, so it always reviews the current diff (effort and focus ARE honored) |
-> | `opencode` | **prompt-emulated** — no native review | **advisory only.** It is one line of the prompt, and the model is free to ignore it and audit the whole repo instead |
->
-> This is not theoretical: `opencode review --scope uncommitted` has been observed
-> discarding the scope and returning a full-codebase audit. If you need opencode's
-> perspective on a bounded change, reach for **`--files`** (below) — it puts the file
-> contents *into* the prompt, so the scope holds by construction rather than by request.
-
-**Scope names specific files / a directory / cross-cutting concern** — collect context and run review with a custom prompt:
-
-1. Identify the files from the scope (ask if unclear).
-   - Prefer `git diff --name-only`, `git status --short`, and `rg --files` to discover candidate files.
-
-2. Run relay with a prompt:
-
-   ```bash
-   relay.ts <backend> review --files <file1,file2,...> --focus "<user's specific concern>"
-   ```
-
-   Supported backends: codex, opencode, claude.
-
-3. After receiving output, write the report. **Do not apply changes** from review output unless the user explicitly asks to apply them.
 
 ---
 
