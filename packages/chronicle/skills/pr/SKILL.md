@@ -98,9 +98,22 @@ no commits or the provider is `unknown`.
 
 ## Codex
 
-Codex has no named-agent registry. There the main agent runs the same flow inline:
-load or first-run-create PR config → resolve the base → distill the why → analyze +
-draft → create, honoring the same auto-create + `draft:true`-default behavior.
+Codex uses the same topology through one of two role-loading paths:
+
+1. **Named-role selector available**: spawn exactly one registered
+   `chronicle_storykeeper`, passing `$SKILL_DIR`, `contextBrief`, `base`, `branch`,
+   and `draft`.
+2. **Generic sub-agent API only**: first verify the stable role files exist under
+   `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
+   exactly one non-fork generic agent with task name `chronicle_storykeeper`, no
+   inherited turns, and tell it to read and obey the `developer_instructions` in
+   `storykeeper.toml` before handling the same five inputs. Its stable instructions
+   delegate sequentially to generic Skald and Messenger children that self-load their
+   own TOMLs. Do not paste or improvise the role instructions in the spawn prompt.
+
+If the registered role and stable TOMLs are both unavailable, tell the user to run
+`chronicle:install` and start a new Codex thread. Do not silently replace the
+Storykeeper → Skald → Messenger boundary with an inline flow.
 
 ## Edge Cases
 

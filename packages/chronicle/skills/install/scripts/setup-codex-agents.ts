@@ -9,7 +9,14 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-const ROLES = ["lawspeaker", "watcher", "runesmith"] as const;
+const ROLES = [
+  "lawspeaker",
+  "watcher",
+  "runesmith",
+  "storykeeper",
+  "skald",
+  "messenger",
+] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
 
@@ -30,6 +37,9 @@ function managedBlock(targetDir: string): string {
     lawspeaker: "Orchestrate Chronicle commit analysis and execution.",
     watcher: "Analyze the current changeset without committing.",
     runesmith: "Stage explicit files and write Chronicle commits.",
+    storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
+    skald: "Analyze a branch and draft pull request material.",
+    messenger: "Create a pull request from confirmed material.",
   };
   return [
     BEGIN,

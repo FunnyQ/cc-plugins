@@ -24,13 +24,16 @@ function run(...args: string[]) {
 }
 
 describe("setup-codex-agents", () => {
-  it("previews all three roles without writing", () => {
+  it("previews all commit and PR roles without writing", () => {
     const result = run("--dry-run");
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("chronicle_lawspeaker");
     expect(result.stdout.toString()).toContain("chronicle_watcher");
     expect(result.stdout.toString()).toContain("chronicle_runesmith");
+    expect(result.stdout.toString()).toContain("chronicle_storykeeper");
+    expect(result.stdout.toString()).toContain("chronicle_skald");
+    expect(result.stdout.toString()).toContain("chronicle_messenger");
     expect(existsSync(join(codexHome, "config.toml"))).toBe(false);
   });
 
@@ -45,9 +48,19 @@ describe("setup-codex-agents", () => {
     expect(config).toContain("[agents.chronicle_lawspeaker]");
     expect(config).toContain("[agents.chronicle_watcher]");
     expect(config).toContain("[agents.chronicle_runesmith]");
+    expect(config).toContain("[agents.chronicle_storykeeper]");
+    expect(config).toContain("[agents.chronicle_skald]");
+    expect(config).toContain("[agents.chronicle_messenger]");
 
     const installed = Object.fromEntries(
-      ["lawspeaker", "watcher", "runesmith"].map((role) => [
+      [
+        "lawspeaker",
+        "watcher",
+        "runesmith",
+        "storykeeper",
+        "skald",
+        "messenger",
+      ].map((role) => [
         role,
         readFileSync(
           join(codexHome, "agents", "chronicle", `${role}.toml`),
@@ -61,6 +74,11 @@ describe("setup-codex-agents", () => {
     expect(installed.lawspeaker).toContain("runesmith.toml");
     expect(installed.watcher).toContain('model = "gpt-5.6-luna"');
     expect(installed.runesmith).toContain('model = "gpt-5.6-luna"');
+    expect(installed.storykeeper).toContain('model = "gpt-5.6-terra"');
+    expect(installed.storykeeper).toContain("chronicle_skald");
+    expect(installed.storykeeper).toContain("chronicle_messenger");
+    expect(installed.skald).toContain('model = "gpt-5.6-terra"');
+    expect(installed.messenger).toContain('model = "gpt-5.6-luna"');
     for (const content of Object.values(installed)) {
       expect(content).toContain("developer_instructions");
     }
