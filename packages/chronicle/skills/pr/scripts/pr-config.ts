@@ -33,14 +33,7 @@ export type ConfiguredState = {
   branch: string;
   base: string;
   config: PrConfig;
-  commit?: string;
 };
-
-const CONFIG_COMMIT_MESSAGE = "🔧 chore: Configure Chronicle PR workflow";
-
-export function configCommitArgs(configPath: string): string[] {
-  return ["commit", "--only", "-m", CONFIG_COMMIT_MESSAGE, "--", configPath];
-}
 
 function nonEmptyString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") {
@@ -195,38 +188,39 @@ export async function inspectPrConfig(): Promise<
   });
 }
 
-export async function savePrConfig(
-  config: PrConfig,
-  commit = false,
-): Promise<ConfiguredState> {
+export async function savePrConfig(config: PrConfig): Promise<ConfiguredState> {
   const facts = await repoFacts();
   await mkdir(dirname(facts.configPath), { recursive: true });
   await Bun.write(facts.configPath, serializePrConfig(config));
-  let commitSha: string | undefined;
-  if (commit) {
-    await gitText(["add", "--", facts.configPath]);
-    await gitText(configCommitArgs(facts.configPath));
-    commitSha = (await gitText(["rev-parse", "HEAD"])).trim();
-  }
   return {
     status: "configured",
     configPath: facts.configPath,
     branch: facts.branch,
     base: resolveConfiguredBase(config, facts.branch),
     config,
-    ...(commitSha ? { commit: commitSha } : {}),
   };
 }
 
-function configFromArgs(argv: string[]): PrConfig {
+export function parseSaveArgs(argv: string[]): PrConfig {
+  if (argv.includes("--commit")) {
+    throw new Error(
+      "--commit is not supported; commit .chronicle/pr.json through the visible skill command",
+    );
+  }
   const workflow = argv[1];
   if (workflow === "github-flow") {
+    if (argv.length !== 3) {
+      throw new Error("usage: save github-flow <base>");
+    }
     return {
       workflow,
       base: nonEmptyString(argv[2], "base"),
     };
   }
   if (workflow === "git-flow") {
+    if (argv.length !== 4) {
+      throw new Error("usage: save git-flow <production> <development>");
+    }
     return {
       workflow,
       production: nonEmptyString(argv[2], "production"),
@@ -241,7 +235,7 @@ async function main(): Promise<void> {
     const argv = Bun.argv.slice(2);
     const result =
       argv[0] === "save"
-        ? await savePrConfig(configFromArgs(argv), argv.includes("--commit"))
+        ? await savePrConfig(parseSaveArgs(argv))
         : await inspectPrConfig();
     console.log(JSON.stringify(result));
   } catch (error) {

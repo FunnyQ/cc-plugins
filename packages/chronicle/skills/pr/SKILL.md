@@ -57,13 +57,24 @@ in those files.
      ask directly and resume only after the answer. State in the question that the
      selection will create and commit `.chronicle/pr.json` on the current branch.
      - GitHub Flow: confirm its PR base, then run
-       `bun "$SKILL_DIR/scripts/pr-config.ts" save github-flow <base> --commit`.
+       `bun "$SKILL_DIR/scripts/pr-config.ts" save github-flow <base>`.
      - Git Flow: confirm its production and development branches, then run
-       `bun "$SKILL_DIR/scripts/pr-config.ts" save git-flow <production> <development> --commit`.
-     - Parse the saved result and use its `base`. The command creates the committed
-       `.chronicle/pr.json`, stages only that file, and commits it with Chronicle's
-       config commit format so later runs do not ask again. Apply the existing protected
-       branch guard before running the save command; stop if that guard refuses a commit.
+       `bun "$SKILL_DIR/scripts/pr-config.ts" save git-flow <production> <development>`.
+     - Parse the saved result and use its `base`. The save command only writes
+       `.chronicle/pr.json`; it never stages or commits.
+     - Compare the current branch with the selected GitHub Flow `base` or Git Flow
+       `production`. Apply the existing protected-branch confirmation when they match,
+       then run this as a visible shell command so the PreToolUse guard can inspect the
+       literal `git commit` before anything is staged:
+
+       ```bash
+       git add -- .chronicle/pr.json && git commit --only \
+         -m "🔧 chore: Configure Chronicle PR workflow" -- .chronicle/pr.json
+       ```
+
+       The config-only pathspec preserves unrelated staged changes. If the guard
+       refuses or the commit fails, report it and stop; never hide the commit inside
+       `pr-config.ts`.
    - `status === "error"` or invalid config → report the error and stop. Never ignore a
      broken committed config and fall back to guessing.
 

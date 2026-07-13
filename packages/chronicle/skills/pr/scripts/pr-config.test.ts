@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import {
   buildFirstRunState,
-  configCommitArgs,
+  parseSaveArgs,
   parsePrConfig,
   resolveConfiguredBase,
   selectProductionBranch,
@@ -130,11 +133,97 @@ describe("serializePrConfig", () => {
   });
 });
 
-describe("configCommitArgs", () => {
-  test("commits only the config path", () => {
-    const args = configCommitArgs("/repo/.chronicle/pr.json");
-    expect(args.slice(0, 2)).toEqual(["commit", "--only"]);
-    expect(args[3]).toBe("🔧 chore: Configure Chronicle PR workflow");
-    expect(args.at(-1)).toBe("/repo/.chronicle/pr.json");
+describe("parseSaveArgs", () => {
+  test("parses a config save without committing", () => {
+    expect(parseSaveArgs(["save", "github-flow", "main"])).toEqual({
+      workflow: "github-flow",
+      base: "main",
+    });
+  });
+
+  test("rejects the hidden commit option", () => {
+    expect(() =>
+      parseSaveArgs(["save", "github-flow", "main", "--commit"]),
+    ).toThrow("--commit is not supported");
+  });
+});
+
+describe("save CLI", () => {
+  test("writes config without staging or committing it", () => {
+    const repo = mkdtempSync(join(tmpdir(), "chronicle-pr-config-save-"));
+    try {
+      Bun.spawnSync(["git", "init", "-b", "main"], { cwd: repo });
+      Bun.spawnSync(["git", "config", "user.name", "Chronicle Test"], {
+        cwd: repo,
+      });
+      Bun.spawnSync(["git", "config", "user.email", "test@example.invalid"], {
+        cwd: repo,
+      });
+      writeFileSync(join(repo, "README.md"), "# test\n");
+      Bun.spawnSync(["git", "add", "README.md"], { cwd: repo });
+      Bun.spawnSync(["git", "commit", "-m", "initial"], { cwd: repo });
+      writeFileSync(join(repo, "unrelated.txt"), "keep staged\n");
+      Bun.spawnSync(["git", "add", "unrelated.txt"], { cwd: repo });
+
+      const result = Bun.spawnSync(
+        [
+          "bun",
+          resolve(import.meta.dir, "pr-config.ts"),
+          "save",
+          "github-flow",
+          "main",
+        ],
+        { cwd: repo, stdout: "pipe", stderr: "pipe" },
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(readFileSync(join(repo, ".chronicle", "pr.json"), "utf8")).toBe(
+        '{\n  "workflow": "github-flow",\n  "base": "main"\n}\n',
+      );
+      expect(
+        Bun.spawnSync(["git", "status", "--porcelain"], {
+          cwd: repo,
+          stdout: "pipe",
+        }).stdout.toString(),
+      ).toBe("A  unrelated.txt\n?? .chronicle/\n");
+      expect(
+        Bun.spawnSync(["git", "rev-list", "--count", "HEAD"], {
+          cwd: repo,
+          stdout: "pipe",
+        }).stdout.toString(),
+      ).toBe("1\n");
+
+      Bun.spawnSync(["git", "add", "--", ".chronicle/pr.json"], {
+        cwd: repo,
+      });
+      const commit = Bun.spawnSync(
+        [
+          "git",
+          "commit",
+          "--only",
+          "-m",
+          "🔧 chore: Configure Chronicle PR workflow",
+          "--",
+          ".chronicle/pr.json",
+        ],
+        { cwd: repo, stdout: "pipe", stderr: "pipe" },
+      );
+
+      expect(commit.exitCode).toBe(0);
+      expect(
+        Bun.spawnSync(["git", "show", "--format=", "--name-only", "HEAD"], {
+          cwd: repo,
+          stdout: "pipe",
+        }).stdout.toString(),
+      ).toBe(".chronicle/pr.json\n");
+      expect(
+        Bun.spawnSync(["git", "status", "--porcelain"], {
+          cwd: repo,
+          stdout: "pipe",
+        }).stdout.toString(),
+      ).toBe("A  unrelated.txt\n");
+    } finally {
+      Bun.spawnSync(["trash", repo]);
+    }
   });
 });
