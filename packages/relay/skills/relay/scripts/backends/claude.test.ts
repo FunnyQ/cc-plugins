@@ -40,8 +40,8 @@ describe("claudeBackend", () => {
       expect(claudeBackend.strategy("delegate")).toBe("prompt");
     });
 
-    it("returns 'native' for review", () => {
-      expect(claudeBackend.strategy("review")).toBe("native");
+    it("returns 'prompt' for review", () => {
+      expect(claudeBackend.strategy("review", {})).toBe("prompt");
     });
   });
 
@@ -85,70 +85,19 @@ describe("claudeBackend", () => {
       });
     });
 
-    describe("review mode — effort and focus parsing", () => {
-      it("uses default effort 'high' when focus is undefined", () => {
-        const result = claudeBackend.invoke("review", {});
-        expect(result.argv).toEqual(["claude", "-p", "/code-review high"]);
-      });
-
-      it("uses effort token as the effort level", () => {
-        const result = claudeBackend.invoke("review", { focus: "low" });
-        expect(result.argv).toEqual(["claude", "-p", "/code-review low"]);
-      });
-
-      it("handles 'medium' effort", () => {
-        const result = claudeBackend.invoke("review", { focus: "medium" });
-        expect(result.argv).toEqual(["claude", "-p", "/code-review medium"]);
-      });
-
-      it("handles 'high' effort (explicit)", () => {
-        const result = claudeBackend.invoke("review", { focus: "high" });
-        expect(result.argv).toEqual(["claude", "-p", "/code-review high"]);
-      });
-
-      it("handles 'ultra' effort", () => {
-        const result = claudeBackend.invoke("review", { focus: "ultra" });
-        expect(result.argv).toEqual(["claude", "-p", "/code-review ultra"]);
-      });
-
-      it("includes focus phrase after effort level", () => {
+    describe("review mode", () => {
+      it("uses the generated review prompt instead of /code-review", () => {
         const result = claudeBackend.invoke("review", {
-          focus: "high consider performance",
+          promptText: "Analyze only. User request: review auth.ts",
         });
         expect(result.argv).toEqual([
           "claude",
           "-p",
-          "/code-review high consider performance",
+          "Analyze only. User request: review auth.ts",
+          "--output-format",
+          "json",
         ]);
-      });
-
-      it("treats non-effort token as focus phrase with default effort", () => {
-        const result = claudeBackend.invoke("review", {
-          focus: "security review",
-        });
-        expect(result.argv).toEqual([
-          "claude",
-          "-p",
-          "/code-review high security review",
-        ]);
-      });
-
-      it("handles focus phrase with multiple words after effort", () => {
-        const result = claudeBackend.invoke("review", {
-          focus: "ultra focus on edge cases and error handling",
-        });
-        expect(result.argv).toEqual([
-          "claude",
-          "-p",
-          "/code-review ultra focus on edge cases and error handling",
-        ]);
-      });
-
-      it("never includes --fix flag", () => {
-        const result = claudeBackend.invoke("review", {
-          focus: "high",
-        });
-        expect(result.argv.includes("--fix")).toBe(false);
+        expect(result.argv.join(" ")).not.toContain("/code-review");
       });
     });
   });
