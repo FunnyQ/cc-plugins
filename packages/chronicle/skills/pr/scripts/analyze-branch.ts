@@ -193,34 +193,24 @@ function lines(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-// git-flow puts ordinary work on `develop` while the repo's default branch stays on the
-// release line (`main`/`master`). Basing a PR on the default branch there silently drags
-// in everything `develop` has not released yet — a 4-commit branch arrives as 16.
-//
-// `hotfix/*` and `release/*` are the two exceptions: they are the only branches that land
-// on the release line. A hotfix is cut FROM it; a release is cut from `develop` but
-// FINISHED into it. Git history records where a branch STARTED, never where it is meant
-// to LAND — so for a release branch the history is not merely uninformative, it is
-// actively misleading. The name is the only thing carrying the intent, and in git-flow it
-// is a contract rather than a hint.
-//
-// (An earlier attempt inferred the base by comparing `origin/develop..HEAD` against
-// `origin/<default>..HEAD` and taking the shorter. That answers "what does the diff look
-// like", when the question is "where does this merge". It tied whenever `develop` had
-// nothing unreleased — and silently left an ordinary feature branch pointed at the
-// release line.)
-export function pickBase(opts: {
-  branch: string;
+export type BaseDetection = {
   defaultBranch: string;
   hasDevelop: boolean;
-}): string {
-  if (!opts.hasDevelop || opts.defaultBranch === "develop") {
-    return opts.defaultBranch;
-  }
-  // The separator is a team habit, not a spec: `release-1.2.0` is the same branch as
-  // `release/1.2.0`.
-  if (/^(hotfix|release)[/-]/.test(opts.branch)) return opts.defaultBranch;
-  return "develop";
+  needsChoice: boolean;
+  candidates: string[];
+};
+
+export function baseDetection(
+  defaultBranch: string,
+  hasDevelop: boolean,
+): BaseDetection {
+  const needsChoice = hasDevelop && defaultBranch !== "develop";
+  return {
+    defaultBranch,
+    hasDevelop,
+    needsChoice,
+    candidates: needsChoice ? [defaultBranch, "develop"] : [defaultBranch],
+  };
 }
 
 async function remoteDefaultBranch(): Promise<string> {
@@ -228,53 +218,72 @@ async function remoteDefaultBranch(): Promise<string> {
   return ref?.trim().replace(/^refs\/remotes\/origin\//, "") || "main";
 }
 
-// `--base auto` opts in to the git-flow rule above. An explicit value behaves exactly
-// as it does today. The no-value path carries ONE deliberate change: it used to fall
-// back to a LOCAL `develop` when `origin/HEAD` was unset (a repo wired up with
-// `git remote add` rather than cloned), and now resolves to the remote default (or
-// `main`). A local `develop` says nothing about where a PR should land — the git-flow
-// question is what `--base auto` is for, and it asks `origin/develop` instead.
-async function resolveBase(override: string | null): Promise<string> {
-  if (override && override !== "auto") return override;
-
+async function detectBase(): Promise<BaseDetection> {
   const defaultBranch = await remoteDefaultBranch();
-  if (override !== "auto") return defaultBranch;
-
-  const hasDevelop = !!(await tryGitText([
-    "rev-parse",
-    "--verify",
-    "--quiet",
-    "origin/develop",
-  ]));
-  const branch = (await gitText(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
-
-  return pickBase({ branch, defaultBranch, hasDevelop });
+  const hasDevelop = !!(
+    (await tryGitText([
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      "origin/develop",
+    ])) || (await tryGitText(["rev-parse", "--verify", "--quiet", "develop"]))
+  );
+  return baseDetection(defaultBranch, hasDevelop);
 }
 
-// The base is a BRANCH NAME (that is what `gh --base` wants), but git needs a ref that
-// actually exists locally. A fresh clone has only its default branch checked out, so
-// `merge-base develop HEAD` dies with "Not a valid object name develop" — precisely for
-// the fork contributor who cloned upstream and never checked `develop` out. Prefer the
-// remote-tracking ref, which a fetch always has.
+async function resolveBase(override: string | null): Promise<string> {
+  if (override) return override;
+
+  const defaultRef = await tryGitText([
+    "symbolic-ref",
+    "refs/remotes/origin/HEAD",
+  ]);
+  const defaultBranch = defaultRef
+    ?.trim()
+    .replace(/^refs\/remotes\/origin\//, "");
+  if (defaultBranch) return defaultBranch;
+
+  const develop = await tryGitText(["rev-parse", "--verify", "develop"]);
+  if (develop) return "develop";
+
+  return "main";
+}
+
+export function selectBaseRef(
+  base: string,
+  localExists: boolean,
+  remoteExists: boolean,
+): string {
+  if (localExists) return base;
+  return remoteExists ? `origin/${base}` : base;
+}
+
 async function baseRef(base: string): Promise<string> {
+  const local = await tryGitText(["rev-parse", "--verify", "--quiet", base]);
   const remote = await tryGitText([
     "rev-parse",
     "--verify",
     "--quiet",
     `origin/${base}`,
   ]);
-  return remote ? `origin/${base}` : base;
+  return selectBaseRef(base, !!local, !!remote);
 }
 
-function parseArgs(argv: string[]): { base: string | null } {
+function parseArgs(argv: string[]): {
+  base: string | null;
+  detectBase: boolean;
+} {
   let base: string | null = null;
+  let shouldDetectBase = false;
   for (let index = 0; index < argv.length; index++) {
     if (argv[index] === "--base") {
       base = argv[index + 1] ?? null;
       index++;
+    } else if (argv[index] === "--detect-base") {
+      shouldDetectBase = true;
     }
   }
-  return { base };
+  return { base, detectBase: shouldDetectBase };
 }
 
 function parseCommits(
@@ -501,7 +510,11 @@ export function fallbackPayloadForError(error: unknown): BranchMaterial {
 
 async function main(): Promise<void> {
   try {
-    const { base } = parseArgs(Bun.argv.slice(2));
+    const { base, detectBase: shouldDetectBase } = parseArgs(Bun.argv.slice(2));
+    if (shouldDetectBase) {
+      console.log(JSON.stringify(await detectBase()));
+      return;
+    }
     const git = await gatherGit(base);
     const cockpit = await harvestCockpit(
       git.repoRoot,

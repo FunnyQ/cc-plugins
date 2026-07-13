@@ -1,16 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import {
+  baseDetection,
   branchDecisions,
   collectDecisions,
   fallbackPayloadForError,
   detectProvider,
   parseRepoSlug,
   pickPushRemote,
-  pickBase,
   projectMatches,
   qualifyHead,
   remotePushUrlArgs,
   resolveCrossFork,
+  selectBaseRef,
   type DecisionRecord,
 } from "./analyze-branch";
 
@@ -330,54 +331,45 @@ describe("collectDecisions", () => {
   });
 });
 
-// Only reachable via `--base auto`. An explicit `--base <name>` is untouched; the
-// no-flag path changed in exactly one case — `origin/HEAD` unset (git remote add, not
-// clone) used to fall back to a local `develop` and now resolves to the remote default.
-describe("pickBase", () => {
-  const flow = { defaultBranch: "main", hasDevelop: true };
-
-  test("sends ordinary work to develop in a git-flow repo", () => {
-    expect(pickBase({ ...flow, branch: "fix/leak" })).toBe("develop");
-    expect(pickBase({ ...flow, branch: "feature/x" })).toBe("develop");
-    expect(pickBase({ ...flow, branch: "anything-at-all" })).toBe("develop");
+describe("baseDetection", () => {
+  test("uses the default branch when develop is absent", () => {
+    expect(baseDetection("main", false)).toEqual({
+      defaultBranch: "main",
+      hasDevelop: false,
+      needsChoice: false,
+      candidates: ["main"],
+    });
   });
 
-  // hotfix and release are the only branches that land on the release line. A hotfix is
-  // cut FROM the release branch; a release is cut from develop but FINISHED into it. Git
-  // history records where a branch started, never where it is meant to land — so the name
-  // is the only carrier of the intent, and in git-flow it is a contract, not a hint.
-  test("sends hotfix and release to the release line, whatever it is called", () => {
-    expect(pickBase({ ...flow, branch: "hotfix/urgent" })).toBe("main");
-    expect(pickBase({ ...flow, branch: "release/1.2.0" })).toBe("main");
-    // The separator is a team habit, not a spec. `release-1.2.0` is the same branch.
-    expect(pickBase({ ...flow, branch: "hotfix-urgent" })).toBe("main");
-    expect(pickBase({ ...flow, branch: "release-1.2.0" })).toBe("main");
+  test("requires a choice when default and develop both exist", () => {
+    expect(baseDetection("main", true)).toEqual({
+      defaultBranch: "main",
+      hasDevelop: true,
+      needsChoice: true,
+      candidates: ["main", "develop"],
+    });
   });
 
-  test("never hardcodes 'main' — the release line is whatever origin/HEAD says", () => {
-    const master = { defaultBranch: "master", hasDevelop: true };
-    expect(pickBase({ ...master, branch: "hotfix/urgent" })).toBe("master");
-    expect(pickBase({ ...master, branch: "fix/leak" })).toBe("develop");
+  test("does not ask when develop is already the default", () => {
+    expect(baseDetection("develop", true)).toEqual({
+      defaultBranch: "develop",
+      hasDevelop: true,
+      needsChoice: false,
+      candidates: ["develop"],
+    });
+  });
+});
+
+describe("selectBaseRef", () => {
+  test("preserves an explicit local base when it exists", () => {
+    expect(selectBaseRef("target", true, true)).toBe("target");
   });
 
-  test("leaves a non-git-flow repo exactly as it is today", () => {
-    const plain = { defaultBranch: "main", hasDevelop: false };
-    expect(pickBase({ ...plain, branch: "fix/leak" })).toBe("main");
-    expect(pickBase({ ...plain, branch: "hotfix/urgent" })).toBe("main");
+  test("falls back to the remote ref in a fresh clone", () => {
+    expect(selectBaseRef("develop", false, true)).toBe("origin/develop");
   });
 
-  test("is a no-op when develop already IS the default branch", () => {
-    const devDefault = { defaultBranch: "develop", hasDevelop: true };
-    expect(pickBase({ ...devDefault, branch: "fix/leak" })).toBe("develop");
-    // A hotfix still has nowhere else to go — there is no separate release line.
-    expect(pickBase({ ...devDefault, branch: "hotfix/urgent" })).toBe(
-      "develop",
-    );
-  });
-
-  // The commit-count rule this replaces tied here and silently left the base on `main`,
-  // so an ordinary feature branch opened a PR against the release line.
-  test("does not depend on how far develop is ahead of the release branch", () => {
-    expect(pickBase({ ...flow, branch: "fix/leak" })).toBe("develop");
+  test("leaves an unknown base unchanged so git reports the error", () => {
+    expect(selectBaseRef("missing", false, false)).toBe("missing");
   });
 });

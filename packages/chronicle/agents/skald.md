@@ -18,6 +18,8 @@ split keeps drafting and creating in separate instructed roles.
   conversation; you don't). Use it for the **Why** section alongside the harvested
   cockpit records. Never invent rationale beyond it, the cockpit decisions, and the
   commits.
+- `base` — the explicit target branch already selected by the main agent/user. Use it
+  unchanged; never infer a different target.
 
 ## Process
 
@@ -25,18 +27,11 @@ split keeps drafting and creating in separate instructed roles.
 
    ```bash
    test -f "$SKILL_DIR/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/analyze-branch.ts" --base auto
+   test -n "$base" || { echo "base missing" >&2; exit 1; }
+   bun "$SKILL_DIR/scripts/analyze-branch.ts" --base "$base"
    ```
 
    Parse its JSON: `{ outputPath, provider, hasCockpit, commitCount, error? }`.
-
-   `--base auto` makes the analyzer git-flow aware: ordinary work goes to `develop`, while
-   `hotfix/*` and `release/*` go to the release line. Without it the base is the repo's
-   default branch — which in a git-flow repo is `main`, so the PR silently swallows every
-   unreleased `develop` commit and a 4-commit branch arrives as 16.
-
-   Take the base the analyzer returns. Do not second-guess it and do not "helpfully" re-run
-   with a different one — if it looks wrong, say so in your report instead.
 
 2. If `error` is present, read the payload and relay the error plainly. If
    `commitCount === 0`, return `no commits to propose` and stop.

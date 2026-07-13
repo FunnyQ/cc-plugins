@@ -39,15 +39,34 @@ in those files.
 
 ## The main agent's job (thin)
 
-1. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
+1. **Resolve the base branch before spawning.** Run:
+
+   ```bash
+   bun "$SKILL_DIR/scripts/analyze-branch.ts" --detect-base
+   ```
+
+   Parse `{ defaultBranch, hasDevelop, needsChoice, candidates }`.
+
+   - If `needsChoice === false`, use the only entry in `candidates`.
+   - If `needsChoice === true`, do **not** infer the workflow from branch names or
+     history. Use the harness's interactive question tool to ask which candidate this
+     PR targets. In Claude Code use `AskUserQuestion`; in Codex use
+     `request_user_input` when available. If no structured question tool is available,
+     ask the user directly and resume only after they answer.
+   - Read the repository README only to label a documented choice as recommended; it
+     never overrides the user's answer. If the README is silent or contradicts the
+     answer, suggest documenting the repository's workflow/base there after the PR flow.
+
+2. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
    drawn from this conversation (the Storykeeper and its children can't see the chat).
    This is the only "why" they get beyond the cockpit trail and commits.
-2. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
+3. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
    - `$SKILL_DIR` — the skill's load-time "Base directory for this skill" banner
      value (so the children resolve `$SKILL_DIR/scripts/analyze-branch.ts` and
      `$SKILL_DIR/scripts/request-creator.ts`). Do not hard-code a repo-relative path
      or rely on `${CLAUDE_PLUGIN_ROOT}`.
-   - `contextBrief` (from step 1).
+   - `contextBrief` (from step 2).
+   - `base` — the explicit branch selected in step 1. Never pass `auto`.
    - `branch` — the current branch. If it is a protected branch, defer to the user's
      existing git-flow guard before spawning.
    - `draft` — optional; default `true`. Pass `false` only if the user asked to open
@@ -66,8 +85,8 @@ no commits or the provider is `unknown`.
 ## Codex
 
 Codex has no named-agent registry. There the main agent runs the same flow inline:
-distill the why → analyze + draft → create, honoring the same auto-create +
-`draft:true`-default behavior.
+resolve/ask for the base → distill the why → analyze + draft → create, honoring the
+same auto-create + `draft:true`-default behavior.
 
 ## Edge Cases
 
