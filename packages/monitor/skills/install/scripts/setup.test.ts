@@ -411,6 +411,24 @@ describe("--session-check (marker-gated)", () => {
     expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
   });
 
+  test("an older session that sees a newer marker does not roll config backward", () => {
+    const marker = join(dataDir, ".wired-version");
+    writeFileSync(marker, "999.0.0\n");
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
+    );
+
+    run(["--session-check"]);
+
+    expect(readFileSync(marker, "utf-8")).toBe("999.0.0\n");
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
+  });
+
   test("never fresh-wires on a clean install", () => {
     run(["--session-check"]);
     expect(existsSync(join(home, ".claude.json"))).toBe(false);

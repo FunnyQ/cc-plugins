@@ -1,11 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   ABANDONED,
+  abortableSleep,
   channelNotification,
+  claudeSessionsDir,
+  compareVersions,
   createMcpServer,
+  POLL_FLOOR_MS,
+  pollFloorDelayMs,
+  pullInboxLoop,
+  versionFromRoot,
   createSerialNotifier,
   ensureServer,
   isUp,
@@ -148,6 +155,322 @@ describe("session resolution", () => {
       finder: () => "dddddddd-4444-4444-4444-444444444444",
     });
     expect(resolved).toBe(SID);
+  });
+});
+
+// The MCP SDK's StdioServerTransport listens only for stdin 'data' and 'error' — it
+// never exits on EOF. Without an explicit abort path the channel outlives its Claude
+// session as a PPID=1 orphan, polling the daemon forever.
+describe("channel shutdown", () => {
+  const coords = () => ({ port: 1, token: "t" });
+  const mcp = { notification: async () => {} } as never;
+
+  const inboxLoop = (
+    signal: AbortSignal,
+    fetchImpl: typeof fetch,
+  ): Promise<void> =>
+    pullInboxLoop({
+      mcp,
+      sessionId: SID,
+      coords,
+      ensure: async () => coords(),
+      fetchImpl,
+      signal,
+    });
+
+  const parked = () =>
+    new Response(JSON.stringify({ message: null, timeout: true }));
+
+  test("abortableSleep returns at once when already aborted", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const started = Date.now();
+    await abortableSleep(30_000, ac.signal);
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+
+  // Bun.sleep() ignores AbortSignal, so a SIGTERM landing mid-backoff would otherwise
+  // be stalled for up to the full 30s reconnect delay.
+  test("abortableSleep wakes early when aborted mid-sleep", async () => {
+    const ac = new AbortController();
+    const started = Date.now();
+    const slept = abortableSleep(30_000, ac.signal);
+    setTimeout(() => ac.abort(), 10);
+    await slept;
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  test("pullInboxLoop resolves once the signal aborts", async () => {
+    const ac = new AbortController();
+    let polls = 0;
+    const loop = inboxLoop(ac.signal, (async () => {
+      polls++;
+      return parked();
+    }) as unknown as typeof fetch);
+    setTimeout(() => ac.abort(), 50);
+    await loop;
+    expect(polls).toBeGreaterThan(0);
+  }, 3000);
+
+  test("pullInboxLoop never polls if the signal is already aborted", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    let polls = 0;
+    await inboxLoop(ac.signal, (async () => {
+      polls++;
+      return parked();
+    }) as unknown as typeof fetch);
+    expect(polls).toBe(0);
+  }, 2000);
+
+  test("pullInboxLoop resolves when an in-flight poll is aborted", async () => {
+    const ac = new AbortController();
+    const loop = inboxLoop(
+      ac.signal,
+      ((_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        })) as unknown as typeof fetch,
+    );
+    setTimeout(() => ac.abort(), 20);
+    await loop;
+  }, 2000);
+});
+
+// ensureServer used to gate on liveness alone, so after an upgrade the new-version
+// channel kept reusing the OLD daemon and cockpit-server's own root-aware supersede
+// (startupGuard) never ran. Superseding on ANY root mismatch would instead start a kill
+// war between two legitimately live channels on different versions, so the tiebreak must
+// be a total order: newest version wins.
+describe("root-aware ensureServer", () => {
+  const V = (v: string) =>
+    `/Users/x/.claude/plugins/cache/q-lab-marketplace/monitor/${v}/skills/cockpit/scripts`;
+  const DEV =
+    "/Users/x/Projects/cc-plugins/packages/monitor/skills/cockpit/scripts";
+
+  const daemonAt = (root: string | undefined) => {
+    const path = join(dir, "daemon.json");
+    writeFileSync(
+      path,
+      JSON.stringify({ pid: 4242, port: 5858, token: "t", root }),
+    );
+    return path;
+  };
+
+  const spawns = () => {
+    const calls: string[][] = [];
+    const impl = ((_cmd: string, args: string[]) => {
+      calls.push(args);
+      return { unref() {} };
+    }) as never;
+    return { calls, impl };
+  };
+
+  test("parses the version out of a cached plugin root", () => {
+    expect(versionFromRoot(V("3.18.5"))).toBe("3.18.5");
+    expect(versionFromRoot(DEV)).toBeNull();
+  });
+
+  test("compares versions numerically, not lexically", () => {
+    expect(compareVersions("3.19.0", "3.9.0")).toBeGreaterThan(0);
+    expect(compareVersions("3.18.5", "3.18.10")).toBeLessThan(0);
+    expect(compareVersions("3.18.5", "3.18.5")).toBe(0);
+  });
+
+  test("reuses a live daemon from the same install", () => {
+    const { calls, impl } = spawns();
+    expect(
+      ensureServer(
+        "s.ts",
+        daemonAt(V("3.19.0")),
+        () => true,
+        impl,
+        V("3.19.0"),
+      ),
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("supersedes a live daemon from an older install", () => {
+    const { calls, impl } = spawns();
+    expect(
+      ensureServer(
+        "s.ts",
+        daemonAt(V("3.18.4")),
+        () => true,
+        impl,
+        V("3.19.0"),
+      ),
+    ).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  test("stands down for a live daemon from a NEWER install", () => {
+    const { calls, impl } = spawns();
+    expect(
+      ensureServer(
+        "s.ts",
+        daemonAt(V("3.19.0")),
+        () => true,
+        impl,
+        V("3.18.4"),
+      ),
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("reuses rather than fight when a root carries no version", () => {
+    const { calls, impl } = spawns();
+    expect(
+      ensureServer("s.ts", daemonAt(DEV), () => true, impl, V("3.19.0")),
+    ).toBe(false);
+    expect(
+      ensureServer("s.ts", daemonAt(V("3.19.0")), () => true, impl, DEV),
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("still spawns when no daemon is alive", () => {
+    const { calls, impl } = spawns();
+    expect(
+      ensureServer(
+        "s.ts",
+        daemonAt(V("3.19.0")),
+        () => false,
+        impl,
+        V("3.19.0"),
+      ),
+    ).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  // The regression the naive fix would introduce: two live channels on different
+  // versions each respawning their own daemon, forever.
+  test("two live channels on different versions converge instead of warring", () => {
+    const { calls, impl } = spawns();
+    const older = V("3.18.4");
+    const newer = V("3.19.0");
+    let daemonRoot = older;
+
+    for (let round = 0; round < 5; round++) {
+      // The newer channel supersedes exactly once, then both settle.
+      if (ensureServer("s.ts", daemonAt(daemonRoot), () => true, impl, newer)) {
+        daemonRoot = newer;
+      }
+      // The older channel must never take the port back.
+      expect(
+        ensureServer("s.ts", daemonAt(daemonRoot), () => true, impl, older),
+      ).toBe(false);
+    }
+    expect(daemonRoot).toBe(newer);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+// The daemon paces these loops by parking each poll for ~240s. That contract breaks the
+// moment a second poller shares the session id: the daemon evicts the parked poll and
+// answers {timeout:true} instantly (HTTP 200 — the SUCCESS path), so an unfloored loop
+// re-polls at once. Two such loops ping-pong at thousands of req/s.
+describe("poll floor", () => {
+  const coords = () => ({ port: 1, token: "t" });
+
+  test("no delay once the floor has already elapsed", () => {
+    expect(pollFloorDelayMs(POLL_FLOOR_MS)).toBe(0);
+    expect(pollFloorDelayMs(POLL_FLOOR_MS + 5_000)).toBe(0);
+  });
+
+  test("pads a fast poll up to the floor, plus jitter", () => {
+    expect(pollFloorDelayMs(0, 1000, () => 0)).toBe(1000);
+    expect(pollFloorDelayMs(900, 1000, () => 0)).toBe(100);
+    // Jitter de-synchronises pollers that would otherwise stay in lockstep.
+    expect(pollFloorDelayMs(0, 1000, () => 0.5)).toBeGreaterThan(1000);
+  });
+
+  test("pullInboxLoop stays bounded when the daemon answers instantly", async () => {
+    const ac = new AbortController();
+    let polls = 0;
+    const loop = pullInboxLoop({
+      mcp: { notification: async () => {} } as never,
+      sessionId: SID,
+      coords,
+      ensure: async () => coords(),
+      signal: ac.signal,
+      fetchImpl: (async () => {
+        polls++;
+        return new Response(JSON.stringify({ message: null, timeout: true }));
+      }) as unknown as typeof fetch,
+    });
+    setTimeout(() => ac.abort(), 400);
+    await loop;
+    // Unfloored this spins thousands of times in 400ms.
+    expect(polls).toBeLessThanOrEqual(2);
+  }, 3000);
+
+  test("pullInboxLoop re-parks immediately after delivering a real message", async () => {
+    const ac = new AbortController();
+    let polls = 0;
+    const fallbackAbort = setTimeout(() => ac.abort(), 100);
+    await pullInboxLoop({
+      mcp: { notification: async () => {} } as never,
+      sessionId: SID,
+      coords,
+      ensure: async () => coords(),
+      signal: ac.signal,
+      floorMs: 1000,
+      fetchImpl: (async () => {
+        polls++;
+        if (polls === 2) ac.abort();
+        return new Response(JSON.stringify({ message: `message-${polls}` }));
+      }) as unknown as typeof fetch,
+    });
+    clearTimeout(fallbackAbort);
+    expect(polls).toBe(2);
+  }, 2000);
+
+  test("pullVerdict stays bounded on the timeout sentinel", async () => {
+    const ac = new AbortController();
+    let polls = 0;
+    const pull = pullVerdict({
+      sessionId: SID,
+      coords,
+      ensure: async () => coords(),
+      signal: ac.signal,
+      fetchImpl: (async () => {
+        polls++;
+        return new Response(JSON.stringify({ verdict: null, timeout: true }));
+      }) as unknown as typeof fetch,
+    });
+    setTimeout(() => ac.abort(), 400);
+    await pull;
+    expect(polls).toBeLessThanOrEqual(2);
+  }, 3000);
+});
+
+// Every test above injects sessionFileFinder, so the real lookup never ran under
+// test — which is how a missing `homedir` import shipped. Unset the override so
+// claudeSessionsDir() takes the branch production actually takes.
+describe("claude sessions dir", () => {
+  let prev: string | undefined;
+
+  beforeEach(() => {
+    prev = process.env.COCKPIT_CLAUDE_SESSIONS_DIR;
+  });
+
+  afterEach(() => {
+    if (prev === undefined) delete process.env.COCKPIT_CLAUDE_SESSIONS_DIR;
+    else process.env.COCKPIT_CLAUDE_SESSIONS_DIR = prev;
+  });
+
+  test("falls back to ~/.claude/sessions when the override is unset", () => {
+    delete process.env.COCKPIT_CLAUDE_SESSIONS_DIR;
+    expect(claudeSessionsDir()).toBe(join(homedir(), ".claude", "sessions"));
+  });
+
+  test("honors the COCKPIT_CLAUDE_SESSIONS_DIR override", () => {
+    process.env.COCKPIT_CLAUDE_SESSIONS_DIR = "/tmp/cockpit-sessions";
+    expect(claudeSessionsDir()).toBe("/tmp/cockpit-sessions");
   });
 });
 
@@ -333,6 +656,10 @@ describe("permission relay — registration & round-trip", () => {
       coords: () => ({ port: 5858, token: "tok" }),
       ensure: async () => ({ port: 5858, token: "tok" }),
       fetchImpl,
+      // This asserts the round-trip, not the ping-pong floor: the mock answers the
+      // timeout sentinel instantly, which in production means an evicted poll and
+      // would (correctly) be padded to POLL_FLOOR_MS. See "poll floor" for that.
+      floorMs: 0,
     });
 
     const handler = (mcp as any)._notificationHandlers.get(
