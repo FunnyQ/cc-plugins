@@ -15,11 +15,12 @@ Chronicle install skill before registration in `config.toml`.
 Codex runtimes expose two different sub-agent APIs. When the API has a named-role
 selector, Chronicle selects the registered role directly. When it exposes only a
 generic, nestable sub-agent API, the main agent spawns one non-fork generic
-Lawspeaker with no inherited conversation and tells it to self-load the stable
-`lawspeaker.toml`. The Lawspeaker then spawns generic Watcher and Runesmith children
-that self-load their stable TOMLs. This is role loading, not an inline fallback: the
-same three-agent boundary, sequential flow, and git-output isolation remain intact.
-Fork agents are still invalid because the Lawspeaker must delegate.
+orchestrator with no inherited conversation and tells it to self-load its stable
+TOML. The orchestrator then spawns generic children that self-load their own TOMLs.
+This applies to both Lawspeaker → Watcher → Runesmith and Storykeeper → Skald →
+Messenger. It is role loading, not an inline fallback: both three-agent boundaries,
+sequential flows, and command-output isolation remain intact. Fork agents are still
+invalid because each orchestrator must delegate.
 
 ## Commit Flow
 

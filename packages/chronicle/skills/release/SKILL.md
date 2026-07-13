@@ -122,7 +122,7 @@ don't re-implement branch protection. In `auto` the hammerbearer verifies it end
 
 ## Codex
 
-Codex has no named-agent registry. There the main agent runs the same flow inline:
+Chronicle does not currently define dedicated Codex roles for release. The main agent runs the flow inline:
 survey → (first-run interview) → version gate → bump + changelog → (auto) finish,
 honoring the same `.chronicle/release.json` contract and prepare-by-default.
 
