@@ -1,9 +1,10 @@
 # `.chronicle/pr.json` — PR base configuration
 
-Chronicle writes and commits this repository config after the first `/chronicle:pr`
-workflow interview. The setup commit uses a config-only pathspec, so unrelated staged
-changes remain staged but are not included. Later runs resolve the PR base from it
-without asking again.
+Chronicle writes this repository config after the first `/chronicle:pr` workflow
+interview, then commits it through a visible config-only `git commit` command. This
+lets the protected-branch hook inspect the operation, while the pathspec keeps
+unrelated staged changes out of the commit. Later runs resolve the PR base from the
+config without asking again.
 
 ## GitHub Flow
 
@@ -38,3 +39,9 @@ other branch targets `development`. Branch names are explicit so repositories us
 
 An invalid committed config is an error. Chronicle never silently falls back to the
 remote default after repository intent has been recorded.
+
+## Analysis ref
+
+Branch analysis uses `origin/<base>` when that remote-tracking ref exists, because a
+PR host compares against its remote base. A local base is the offline fallback.
+Chronicle does not fetch automatically during analysis.
