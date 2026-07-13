@@ -16,6 +16,11 @@ const ROLES = [
   "storykeeper",
   "skald",
   "messenger",
+  "seer",
+  "oathkeeper",
+  "smith",
+  "annalist",
+  "hammerbearer",
 ] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
@@ -40,6 +45,11 @@ function managedBlock(targetDir: string): string {
     storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
     skald: "Analyze a branch and draft pull request material.",
     messenger: "Create a pull request from confirmed material.",
+    seer: "Analyze repository release configuration and version facts.",
+    oathkeeper: "Orchestrate Chronicle release preparation and finishing.",
+    smith: "Persist release config and apply verified version bumps.",
+    annalist: "Write user-facing release changelog entries.",
+    hammerbearer: "Commit, merge, tag, and optionally push a release.",
   };
   return [
     BEGIN,
