@@ -132,6 +132,10 @@ export function pickPushRemote(candidates: {
   );
 }
 
+export function remotePushUrlArgs(remote: string): string[] {
+  return ["remote", "get-url", "--push", remote];
+}
+
 export function branchDecisions(
   records: DecisionRecord[],
   changedFiles: string[],
@@ -301,7 +305,7 @@ async function headRemoteUrl(branch: string): Promise<string | null> {
   if (!name) return null;
   // A branch can be configured to push to a URL rather than a named remote.
   if (name.includes(":") || name.includes("/")) return name;
-  return (await tryGitText(["remote", "get-url", name]))?.trim() || null;
+  return (await tryGitText(remotePushUrlArgs(name)))?.trim() || null;
 }
 
 function isDecisionRecord(value: unknown): value is DecisionRecord {

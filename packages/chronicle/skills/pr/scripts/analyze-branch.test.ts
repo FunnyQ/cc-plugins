@@ -7,6 +7,7 @@ import {
   pickPushRemote,
   projectMatches,
   qualifyHead,
+  remotePushUrlArgs,
   resolveCrossFork,
   type DecisionRecord,
 } from "./analyze-branch";
@@ -280,5 +281,16 @@ describe("pickPushRemote", () => {
         trackingRemote: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("remotePushUrlArgs", () => {
+  test("requests the configured push URL for a named remote", () => {
+    expect(remotePushUrlArgs("origin")).toEqual([
+      "remote",
+      "get-url",
+      "--push",
+      "origin",
+    ]);
   });
 });
