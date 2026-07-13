@@ -228,9 +228,12 @@ async function remoteDefaultBranch(): Promise<string> {
   return ref?.trim().replace(/^refs\/remotes\/origin\//, "") || "main";
 }
 
-// `--base auto` opts in to the git-flow rule above. Every other value — including no
-// value at all — behaves exactly as it does today, so a repo that is happy now cannot be
-// broken by this.
+// `--base auto` opts in to the git-flow rule above. An explicit value behaves exactly
+// as it does today. The no-value path carries ONE deliberate change: it used to fall
+// back to a LOCAL `develop` when `origin/HEAD` was unset (a repo wired up with
+// `git remote add` rather than cloned), and now resolves to the remote default (or
+// `main`). A local `develop` says nothing about where a PR should land — the git-flow
+// question is what `--base auto` is for, and it asks `origin/develop` instead.
 async function resolveBase(override: string | null): Promise<string> {
   if (override && override !== "auto") return override;
 

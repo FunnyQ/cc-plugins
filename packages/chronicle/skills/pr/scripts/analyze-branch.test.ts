@@ -330,8 +330,9 @@ describe("collectDecisions", () => {
   });
 });
 
-// Only reachable via `--base auto`. The default path is untouched, so a repo that is
-// happy today cannot be broken by this.
+// Only reachable via `--base auto`. An explicit `--base <name>` is untouched; the
+// no-flag path changed in exactly one case — `origin/HEAD` unset (git remote add, not
+// clone) used to fall back to a local `develop` and now resolves to the remote default.
 describe("pickBase", () => {
   const flow = { defaultBranch: "main", hasDevelop: true };
 
