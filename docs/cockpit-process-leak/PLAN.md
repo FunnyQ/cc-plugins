@@ -214,7 +214,8 @@ This also explains the field observation: killing the 3.18.4 daemon made `isUp()
 
 Foreground-launched from the Bash tool, orphaned the same way. Its root-aware PID-file singleton
 (`atlas-lifecycle.ts:19-33`) works, but only when someone re-runs the skill. No polling loop, so
-it is an idle leak, not a spinner. Cut 5's sweep will reap it; no code change here.
+it is an idle leak, not a spinner. Cut 5 deliberately leaves it running because nothing
+re-ensures the dashboard after termination; no code change here.
 
 ## 3. The fix
 
@@ -289,7 +290,8 @@ land in the field.
 
 Predicate — **all** must hold:
 
-- script path under a **different** `monitor/<version>/` root than the running one, **and**
+- script path under an **older** version of the running install's exact
+  `monitor/<version>/` cache family, **and**
 - **`PPID == 1`**, **and**
 - same uid.
 
@@ -298,10 +300,12 @@ orphanhood: a user with two terminals (an older session still open, a new one st
 upgrade) has a *live, correctly-parented* old-version channel, and the first draft's sweep would
 have killed it.
 
-Placement: **after** the version-marker gate in `sessionCheck()` (`setup.ts:352-386`, which
-returns early at `:365` when the marker matches), so the sweep runs once per version rather than
-`ps`-scanning on every session start. Never signal PID 1. Swallow all failures — a SessionStart
-hook must never break a session.
+Placement: **after** the monotonic version-marker gate in `sessionCheck()`. A session still
+running an older plugin version returns early when the shared marker already names a newer one,
+so it cannot reap the newer daemon or roll migrated config backward. The sweep also refuses to
+scan outside a versioned plugin-cache install, keeping repo-checkout tests away from the real
+process table. Never signal PID 1. Swallow all failures — a SessionStart hook must never break a
+session.
 
 ## 4. Tests
 
@@ -314,7 +318,7 @@ TDD, `bun test`, alongside the existing suites (`cockpit-channel.test.ts`, `inbo
 | 2 | `claudeSessionsDir()` returns a real path (no `ReferenceError`) with `COCKPIT_CLAUDE_SESSIONS_DIR` **unset** — the existing tests miss this because they always inject `sessionFileFinder`; `resolveClaudeSessionId` prefers the session file over the mtime guess |
 | 3 | **Ping-pong regression (the important one):** two pollers on one session id produce bounded traffic (≤ N req/s), not an unbounded spin. Assert on request *count*, since the current code yields ~3704 req/s. Same test for `/api/permission-pull` |
 | 4 | `ensureServer`: live **same**-root daemon → no spawn; live **different**-root → spawns. Plus a **war test**: two alternating different-root `ensureServer` callers must converge, not oscillate |
-| 5 | The sweep selects only (foreign-root **∧** `PPID==1` **∧** same-uid); a live foreign-root channel with a real parent is **not** killed; PID 1 is never signalled; a kill failure is swallowed |
+| 5 | The sweep selects only (older root in the same cache family **∧** `PPID==1` **∧** same-uid); newer processes and a live older channel with a real parent are **not** killed; an older session cannot roll the shared marker backward; PID 1 is never signalled; a kill failure is swallowed |
 
 The two-poller regression test is the one that reproduces the actual field failure.
 
