@@ -178,7 +178,7 @@ Launch an opted-in session — the channel only attaches to sessions started wit
 bun packages/monitor/skills/cockpit/scripts/monitor-up.ts
 ```
 
-Extra arguments pass through to `claude` (e.g. `monitor-up.ts --resume`). See the [cockpit skill README](./packages/monitor/skills/cockpit) for the full setup.
+Extra arguments pass through to `claude` (e.g. `monitor-up.ts --resume`). See the [cockpit skill](./packages/monitor/skills/cockpit/SKILL.md) for the full setup.
 
 For Codex send support, install and enable the managed standalone Codex remote-control daemon:
 
