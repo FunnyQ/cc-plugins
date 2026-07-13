@@ -72,6 +72,39 @@ split keeps drafting and creating in separate instructed roles.
        `classDef bad fill:#5b1a1a,stroke:#e5605f,color:#fff;` then `node:::bad`).
        Otherwise keep the diagram uncolored. Everything the diagram needs must live
        inside the fenced block — it is plain, portable Mermaid.
+     - **Use the GitHub-compatible Mermaid subset, not the full grammar.** The PR host
+       controls its Mermaid version; acceptance by a different local parser does not
+       guarantee that GitHub or GitLab will render the same source. Only generate:
+
+       - nodes with quoted labels: `cut1["Cut 1: exit on stdin EOF"]`;
+       - unlabelled links: `A --> B`, `A -.-> B`, or `A ==> B`;
+       - when a solid link truly needs a short label containing only words, spaces, or
+         hyphens, GitHub's documented form: `A -->|plain text| B`.
+
+       Never put text on dotted or thick links, never use the alternative
+       `A -- text --> B` form, and never put quotes, brackets, code, version numbers,
+       or other punctuation inside an edge label. Make complex text a real quoted node
+       and connect it with plain links instead:
+
+       ```mermaid
+       flowchart LR
+         parent["Parent process"] --> cut1["Cut 1: exit on stdin EOF"]
+         cut1 --> child["Child process"]
+       ```
+
+       This is deliberately a compatibility whitelist, not a description of everything
+       Mermaid accepts. GitHub documents both the
+       [canonical labelled edge](https://docs.github.com/en/repositories/working-with-files/using-files/working-with-non-code-files#displaying-mermaid-files-on-github)
+       and how to
+       [check its current Mermaid version](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams#checking-your-version-of-mermaid).
+     - **When in doubt, drop the diagram.** Nothing here validates the block before it
+       is posted, so the guidance above is the only guard — and guidance in a prompt is
+       a request, not a guarantee. A diagram that fails to parse is strictly worse than
+       no diagram: an unrendered red error box is the first thing the reviewer sees. If
+       you are not confident the block parses, write the section in prose instead.
+       (`monitor` has a real Mermaid linter — `skills/cockpit/scripts/diagram-lint.ts`,
+       which runs the vendored parser headless — but chronicle cannot import across
+       plugin boundaries. Wiring one up properly would close this hole for good.)
    - **What to focus on**: turn `tradeoff` fields, `kind:"caveat"` records, and
      `needs_your_call:true` records into review guidance; call out risky files from
      `decisions[].files`.
