@@ -134,6 +134,7 @@ describe("configCommitArgs", () => {
   test("commits only the config path", () => {
     const args = configCommitArgs("/repo/.chronicle/pr.json");
     expect(args.slice(0, 2)).toEqual(["commit", "--only"]);
+    expect(args[3]).toBe("🔧 chore: Configure Chronicle PR workflow");
     expect(args.at(-1)).toBe("/repo/.chronicle/pr.json");
   });
 });

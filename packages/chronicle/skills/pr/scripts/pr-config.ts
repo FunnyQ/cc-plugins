@@ -36,13 +36,7 @@ export type ConfiguredState = {
   commit?: string;
 };
 
-const CONFIG_COMMIT_MESSAGE = `🔧 chore: Configure Chronicle PR workflow
-
-- Persist the repository's selected PR workflow and branch targets
-
----
-
-保存 Chronicle PR 工作流程設定，讓後續執行能直接解析目標分支。`;
+const CONFIG_COMMIT_MESSAGE = "🔧 chore: Configure Chronicle PR workflow";
 
 export function configCommitArgs(configPath: string): string[] {
   return ["commit", "--only", "-m", CONFIG_COMMIT_MESSAGE, "--", configPath];
