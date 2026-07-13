@@ -72,31 +72,31 @@ split keeps drafting and creating in separate instructed roles.
        `classDef bad fill:#5b1a1a,stroke:#e5605f,color:#fff;` then `node:::bad`).
        Otherwise keep the diagram uncolored. Everything the diagram needs must live
        inside the fenced block — it is plain, portable Mermaid.
-     - **Edge labels: quote all of it or none of it.** This is the one thing that
-       actually breaks, and the intuitive rule is the wrong one — brackets are *not*
-       the problem (`A -. N[t] .-> B` parses fine). **A stray quote is.** An edge label
-       is plain text: either the whole label is wrapped in `"…"`, or it contains no `"`
-       at all. A `"` in the middle kills the parse.
+     - **Use the GitHub-compatible Mermaid subset, not the full grammar.** The PR host
+       controls its Mermaid version; acceptance by a different local parser does not
+       guarantee that GitHub or GitLab will render the same source. Only generate:
 
+       - nodes with quoted labels: `cut1["Cut 1: exit on stdin EOF"]`;
+       - unlabelled links: `A --> B`, `A -.-> B`, or `A ==> B`;
+       - when a solid link truly needs a short label containing only words, spaces, or
+         hyphens, GitHub's documented form: `A -->|plain text| B`.
+
+       Never put text on dotted or thick links, never use the alternative
+       `A -- text --> B` form, and never put quotes, brackets, code, version numbers,
+       or other punctuation inside an edge label. Make complex text a real quoted node
+       and connect it with plain links instead:
+
+       ```mermaid
+       flowchart LR
+         parent["Parent process"] --> cut1["Cut 1: exit on stdin EOF"]
+         cut1 --> child["Child process"]
        ```
-       ✅  A -. "Cut 1: exit on stdin EOF" .-> B     whole label quoted
-       ✅  A -. exits with parent .-> B              no quotes at all
-       ❌  A -.Cut1["Cut 1: exit on stdin EOF"].-> B  quotes in the middle
-       ```
 
-       That last form is node syntax smuggled into an edge. It is not Mermaid, it fails
-       to parse, and GitHub renders the whole block as a red error box in the PR body.
-       If you want the explanation to look like a node, then **make it a real node** and
-       draw a plain edge to it.
-
-       | Link | With a label |
-       |---|---|
-       | `A --> B` | `A -->\|text\| B` or `A -- text --> B` |
-       | `A -.-> B` | `A -. text .-> B` |
-       | `A ==> B` | `A == text ==> B` |
-
-       One extra rule for the `\|…\|` form only: it rejects brackets outright, where
-       `-- text -->` tolerates them. When in doubt, use `-- text -->`.
+       This is deliberately a compatibility whitelist, not a description of everything
+       Mermaid accepts. GitHub documents both the
+       [canonical labelled edge](https://docs.github.com/en/repositories/working-with-files/using-files/working-with-non-code-files#displaying-mermaid-files-on-github)
+       and how to
+       [check its current Mermaid version](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams#checking-your-version-of-mermaid).
      - **When in doubt, drop the diagram.** Nothing here validates the block before it
        is posted, so the guidance above is the only guard — and guidance in a prompt is
        a request, not a guarantee. A diagram that fails to parse is strictly worse than
