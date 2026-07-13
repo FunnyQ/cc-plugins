@@ -33,13 +33,21 @@ body; create exactly what you are handed. Never pretend success.
 
 ## Process
 
-1. Guard + run the creator, passing the `CreateInput` JSON as the first argument
-   (or on stdin):
+1. Guard + run the creator, feeding the `CreateInput` JSON on **stdin** via a
+   quoted heredoc:
 
    ```bash
    test -f "$SKILL_DIR/scripts/request-creator.ts" || { echo "creator missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/request-creator.ts" '<CreateInput JSON>'
+   bun "$SKILL_DIR/scripts/request-creator.ts" <<'CREATE_INPUT'
+   <CreateInput JSON>
+   CREATE_INPUT
    ```
+
+   **Never pass the JSON as a single-quoted argv argument.** A body is prose, and prose
+   has apostrophes — one `'` in `gh's own workflow` closes the shell quote and the JSON
+   arrives mangled (or the command fails outright). The quoted heredoc (`<<'CREATE_INPUT'`,
+   delimiter in quotes) disables every form of shell expansion, so the JSON reaches the
+   script byte-for-byte. `request-creator.ts` reads stdin whenever no argv is given.
 
 2. Parse the `CreateResult` and report:
 
