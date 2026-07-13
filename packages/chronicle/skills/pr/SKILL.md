@@ -24,8 +24,8 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:messenger  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
 ```
 
-Spawn via `subagent_type`, never fork (a fork cannot spawn children); design
-rationale lives in `packages/chronicle/DESIGN.md`.
+Spawn via `subagent_type`, never fork: the Storykeeper must be able to spawn its
+children and does not inherit the main conversation.
 
 There is **no final creation confirmation gate** — invoking the skill is the consent,
 and the flow auto-creates after any first-run config interview. `draft` defaults to
