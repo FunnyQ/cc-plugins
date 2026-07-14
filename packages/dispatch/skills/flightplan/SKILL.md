@@ -1,7 +1,15 @@
 ---
 name: flightplan
 version: 0.6.0
-description: Heavyweight interviewer that writes a multi-file specification artifact to disk — `docs/<topic>/PLAN.md` plus a `tasks/` tree with shared `_context/` files and self-contained task files that sub-agents can pick up in later sessions. AUTO-TRIGGER when the user asks to "fully spec out", "break this down into tasks", "decompose into task files", "prep this for sub-agents", "write PLAN.md and tasks", "draft a project blueprint", "interview me thoroughly", or asks for a multi-file spec artifact written to disk for later execution. Also trigger when the user explicitly says "/flightplan" or mentions they will execute the work in a different session. Do NOT trigger when the user wants a lightweight in-conversation spec (use preflight instead), or when they give a clear, actionable instruction that can be executed directly.
+description: >-
+  Heavyweight interviewer that writes a multi-file spec artifact to disk —
+  docs/<topic>/PLAN.md plus a tasks/ tree for sub-agents to execute later.
+when_to_use: >-
+  When the work should be frozen to disk for a later/different session or
+  sub-agent to execute — decomposing into a task tree, "/flightplan". Do NOT
+  trigger for a lightweight in-conversation spec (use preflight instead), for
+  an existing task tree ready to run (use autopilot), or when a clear
+  instruction can just be executed directly.
 argument-hint: "[topic]"
 ---
 

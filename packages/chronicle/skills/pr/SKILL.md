@@ -1,10 +1,11 @@
 ---
 name: pr
-description: Open a PR (GitHub) or MR (GitLab) for the current branch, with a body a
-  reviewer can actually understand — why the change exists, what changed, what to focus
-  on, how to judge it — enriched by the cockpit decision trail when present. Triggers on
-  "/chronicle:pr", "create a PR", "open a pull request", "open an MR", "幫我開 PR",
-  "建立 merge request". Human-invoked only.
+description: >-
+  Open a PR (GitHub) or MR (GitLab) for the current branch, with a
+  reviewer-legible body enriched by the cockpit decision trail when present.
+when_to_use: >-
+  When the user wants a PR/MR opened for the current branch. Human-invoked
+  only — do NOT auto-fire from an incidental mention of a PR.
 ---
 
 # Chronicle PR Skill

@@ -1,8 +1,11 @@
 ---
 name: install
 description: >-
-  Register Chronicle's Codex named agents in config.toml. Use when the user asks
-  to install, enable, wire, or refresh Chronicle agents for Codex.
+  [codex only] Register Chronicle's Codex named agents in config.toml.
+when_to_use: >-
+  Setting up or refreshing Chronicle's commit/PR/release Codex agents
+  (chronicle_lawspeaker, chronicle_storykeeper, chronicle_oathkeeper, etc.).
+  Not monitor:install (that wires the usage-dashboard statusline).
 ---
 
 # Chronicle install

@@ -2,16 +2,11 @@
 name: usage-dashboard
 description: >-
   Launch a local web dashboard that visualizes Claude Code, Codex, and OpenCode
-  usage from ~/.claude/, ~/.codex/, and ~/.local/share/opencode/. Shows
-  overview cards (sessions, interactions, tokens, cost), daily token trend
-  chart, model distribution donut, activity heatmap, top projects, and recent
-  activity. Trigger phrases include:
-  "/token-atlas", "/cc-dashboard", "/stats-dashboard", "show my claude stats",
-  "claude usage dashboard", "open token atlas", "open stats dashboard",
-  "查看 claude 用量", "claude code 統計", "顯示我的 claude 使用情形",
-  "token atlas". AUTO-TRIGGER when the user wants a visual breakdown of their
-  Claude Code usage, costs, or project activity beyond the built-in /stats
-  text output.
+  usage — sessions, tokens, cost, model mix, activity heatmap, top projects.
+when_to_use: >-
+  When the user wants a visual breakdown of their AI coding usage, cost, or
+  project activity — beyond the built-in /stats text output. Also known as
+  "token atlas".
 ---
 
 # AI Code Stats Dashboard
