@@ -2,6 +2,7 @@
 name: preflight
 version: 0.1.0
 description: Interactive interviewer that gathers requirements through systematic questioning. AUTO-TRIGGER when (1) user's request is vague or ambiguous and needs clarification, (2) user explicitly asks to "dig deeper", "ask me questions", "interview me", or "help me think through this", (3) user wants to build a spec, PRD, or outline before implementation, (4) user says "I have an idea but not sure about details". Supports project specs, feature requirements, and writing outlines. Do NOT trigger when the user gives a clear, actionable instruction that can be executed directly.
+argument-hint: "[topic]"
 ---
 
 # Preflight

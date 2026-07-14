@@ -2,6 +2,7 @@
 name: waypoints
 version: 0.1.0
 description: Whole-project milestone roadmap interviewer for rolling-wave planning above flightplan. AUTO-TRIGGER when the user wants a multi-milestone project roadmap, asks to "plan this big project in milestones", asks for a rolling-wave plan, or says "/waypoints". Do NOT trigger for a small goal that only needs preflight, a single feature that should become one flightplan, or an existing `docs/<slug>/tasks/` tree that should be run with autopilot.
+argument-hint: "[project]"
 ---
 
 # Waypoints
