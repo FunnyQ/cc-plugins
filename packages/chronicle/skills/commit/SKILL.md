@@ -6,6 +6,7 @@ description: Craft git commit(s) for the current changes — auto-decides betwee
   "幫我 commit", "提交變更"; the forced single-commit mode triggers on
   "/chronicle:commit simple", "one commit", "single commit", "快速 commit". Do NOT
   auto-fire; human-invoked only.
+argument-hint: "[simple]"
 ---
 
 # Chronicle Commit

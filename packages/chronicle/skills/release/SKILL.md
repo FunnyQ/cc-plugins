@@ -5,6 +5,7 @@ description: Cut a release — bump version files, write the CHANGELOG entry, an
   per-component monorepos and remembers the choice in .chronicle/release.json.
   Triggers on "/chronicle:release", "cut a release", "ship a release", "bump the
   version", "發版", "發布新版本", "release this". Human-invoked only.
+argument-hint: "[auto|auto push] [version|component...]"
 ---
 
 # Chronicle Release
