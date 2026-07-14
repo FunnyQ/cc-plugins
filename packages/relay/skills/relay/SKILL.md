@@ -3,6 +3,7 @@ name: relay
 description: >-
   Use when the user invokes `/relay:relay <codex|opencode|claude> <delegate|review|image>` to
   delegate a task to another harness's CLI. Slash-command only; do NOT auto-trigger on "ask codex".
+argument-hint: "<codex|opencode|claude> <delegate|review|image> [task]"
 version: 0.3.0
 ---
 
