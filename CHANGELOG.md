@@ -1,5 +1,37 @@
 # Changelog
 
+## [chronicle 0.8.1] - 2026-07-14
+
+_tracks tag `chronicle-v0.8.1`_
+
+### Changed
+
+- **`/commit` and `/release` now show argument hints in slash-command autocomplete** — `commit [simple]` and `release [auto|auto push] [version|component...]` — so you can see the expected shape before typing. No behavior change.
+
+## [dispatch 3.15.2] - 2026-07-14
+
+_tracks tag `dispatch-v3.15.2`_
+
+### Changed
+
+- **`/preflight`, `/flightplan`, `/waypoints`, and `/autopilot` now show argument hints in slash-command autocomplete** — `preflight [topic]`, `flightplan [topic]`, `waypoints [project]`, `autopilot <slug|path>` — so you can see the expected shape before typing. No behavior change.
+
+## [monitor 3.19.2] - 2026-07-14
+
+_tracks tag `monitor-v3.19.2`_
+
+### Changed
+
+- **`/cockpit` now shows an argument hint in slash-command autocomplete** — `cockpit [scribe|restart]` — so you can see the expected shape before typing. No behavior change.
+
+## [relay 0.5.3] - 2026-07-14
+
+_tracks tag `relay-v0.5.3`_
+
+### Changed
+
+- **`/relay` now shows an argument hint in slash-command autocomplete** — `relay <codex|opencode|claude> <delegate|review|image> [task]` — so you can see the expected shape before typing. No behavior change.
+
 ## [monitor 3.19.1] - 2026-07-14
 
 _tracks tag `monitor-v3.19.1`_
