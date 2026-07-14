@@ -6,6 +6,7 @@ description: >-
   into typed trail entries; /cockpit restart bounces the dashboard daemon onto
   this install's code after a plugin update or a script edit. This skill is
   EXPLICITLY invoked (opt-in) — do NOT auto-fire on every session.
+argument-hint: "[scribe|restart]"
 ---
 
 # /cockpit
