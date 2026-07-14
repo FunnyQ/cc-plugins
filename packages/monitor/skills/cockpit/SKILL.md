@@ -1,11 +1,12 @@
 ---
 name: cockpit
 description: >-
-  /cockpit opens the Claude Code or Codex cockpit dashboard and may set the
-  global decision-log language; /cockpit scribe lets a fork distill recent work
-  into typed trail entries; /cockpit restart bounces the dashboard daemon onto
-  this install's code after a plugin update or a script edit. This skill is
-  EXPLICITLY invoked (opt-in) — do NOT auto-fire on every session.
+  Opens the Claude Code/Codex cockpit dashboard for live session transcripts
+  and decision logging.
+when_to_use: >-
+  `/cockpit` opens the dashboard; `/cockpit scribe` distills recent work into
+  decision-trail entries; /cockpit restart bounces the daemon onto updated
+  code. Explicitly invoked (opt-in) only — do NOT auto-fire on every session.
 argument-hint: "[scribe|restart]"
 ---
 

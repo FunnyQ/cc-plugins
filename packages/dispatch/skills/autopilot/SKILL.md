@@ -1,7 +1,14 @@
 ---
 name: autopilot
 version: 0.5.0
-description: Execute a flightplan task tree end-to-end with a multi-agent quality loop. For each ready task it runs Dev → an independent binary gate → a rubric judge → a deterministic score gate, retrying until the task passes its own `## Eval rubric`, then runs the closing `Final review` task as the whole-tree gate. AUTO-TRIGGER when the user says "/autopilot", "execute the flightplan", "run the task tree", "build out docs/<slug>", "work through the tasks", "fly the plan", or points at a `docs/<slug>/tasks/` tree and asks to implement it. Do NOT trigger when there is no flightplan on disk (use flightplan first), or when the user wants to do a single task by hand.
+description: >-
+  Execute a flightplan task tree end-to-end with a multi-agent dev → review →
+  score quality loop.
+when_to_use: >-
+  When a docs/<slug>/tasks/ flightplan tree exists and should be executed
+  ("/autopilot", "fly the plan", "work through the tasks"). Do NOT trigger
+  when no flightplan exists on disk yet (use flightplan first), or for a
+  single task done by hand.
 argument-hint: "<slug|path>"
 ---
 

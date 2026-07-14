@@ -1,11 +1,12 @@
 ---
 name: commit
-description: Craft git commit(s) for the current changes — auto-decides between one
-  simple commit and an atomic split, unless invoked with `simple`, which forces a
-  single commit. Triggers on "/chronicle:commit", "commit my changes", "commit this",
-  "幫我 commit", "提交變更"; the forced single-commit mode triggers on
-  "/chronicle:commit simple", "one commit", "single commit", "快速 commit". Do NOT
-  auto-fire; human-invoked only.
+description: >-
+  Craft git commit(s) for the current changes — auto-decides between one
+  simple commit and an atomic split.
+when_to_use: >-
+  When you want to commit the current changes now. The `simple` argument
+  forces one commit instead of the auto-decided atomic split. Human-invoked
+  only — do NOT auto-fire from an incidental mention of committing.
 argument-hint: "[simple]"
 ---
 

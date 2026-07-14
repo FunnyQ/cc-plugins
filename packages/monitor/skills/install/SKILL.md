@@ -1,10 +1,12 @@
 ---
 name: install
 description: >-
-  Check monitor prerequisites and wire the usage-dashboard statusline collector
-  in ~/.claude/settings.json. The cockpit channel is plugin-packaged now, so this
-  skill only cleans up a stale ~/.claude.json entry from older versions.
-  Command-triggered only.
+  Check monitor plugin prerequisites and wire the usage-dashboard statusline
+  collector in ~/.claude/settings.json.
+when_to_use: >-
+  Setting up or repairing the monitor plugin (dashboard + cockpit
+  prerequisites, statusline wiring). Also cleans up a stale cockpit-channel
+  entry from older versions. Command-triggered only.
 ---
 
 # monitor install

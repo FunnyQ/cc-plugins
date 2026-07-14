@@ -1,6 +1,12 @@
 ---
 name: herdr
-description: "Herdr terminal workspace manager: use for herdr config / config.toml, keybindings, themes, CLI commands, plugin development, and — when running inside a herdr pane (HERDR_ENV=1) — spawning, driving, or coordinating agents in other panes or tabs."
+description: >-
+  Help with Herdr configuration, CLI, plugins, and coordinating agents across
+  panes.
+when_to_use: >-
+  For herdr config.toml, keybindings, themes, CLI commands, or plugin
+  development; or — inside a herdr pane (HERDR_ENV=1) — spawning, driving, or
+  coordinating agents in other panes or tabs.
 version: 1
 ---
 

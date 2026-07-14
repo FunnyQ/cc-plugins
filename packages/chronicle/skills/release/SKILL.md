@@ -1,10 +1,12 @@
 ---
 name: release
-description: Cut a release — bump version files, write the CHANGELOG entry, and
-  (in auto mode) commit, merge, tag, and push. Auto-detects whole-repo vs
-  per-component monorepos and remembers the choice in .chronicle/release.json.
-  Triggers on "/chronicle:release", "cut a release", "ship a release", "bump the
-  version", "發版", "發布新版本", "release this". Human-invoked only.
+description: >-
+  Cut a release — bump version files, write the CHANGELOG entry, and (in auto
+  mode) commit, merge, tag, and push.
+when_to_use: >-
+  When the user wants to cut/ship a release. Auto-detects whole-repo vs
+  per-component monorepos, remembered in .chronicle/release.json.
+  Human-invoked only — do NOT auto-fire from release planning or talk.
 argument-hint: "[auto|auto push] [version|component...]"
 ---
 

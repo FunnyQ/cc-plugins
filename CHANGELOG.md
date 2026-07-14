@@ -1,5 +1,45 @@
 # Changelog
 
+## [chronicle 0.8.2] - 2026-07-14
+
+_tracks tag `chronicle-v0.8.2`_
+
+### Changed
+
+- **Skill manifests restructured for more precise triggering** — `commit`, `pr`, `release`, and `install` now split `description` (one-line what) from `when_to_use` (decision boundaries), dropping redundant trigger phrases in favor of semantic matching. Re-confirmed human-invoked-only guards on `commit`/`pr`/`release`; `install` is now labelled `[codex only]`.
+
+## [dispatch 3.15.3] - 2026-07-14
+
+_tracks tag `dispatch-v3.15.3`_
+
+### Changed
+
+- **Skill manifests restructured for more precise triggering** — `preflight`, `flightplan`, `waypoints`, and `autopilot` now split `description` from `when_to_use`, spelling out how the four skills hand off to each other (preflight → flightplan → autopilot, with waypoints above flightplan) instead of relying on trigger-phrase lists.
+
+## [herdr 0.1.5] - 2026-07-14
+
+_tracks tag `herdr-v0.1.5`_
+
+### Changed
+
+- **Skill manifest restructured for more precise triggering** — `description` now states what herdr help covers; `when_to_use` separately states config/CLI/plugin-dev help vs. in-pane agent orchestration (gated on `HERDR_ENV=1`).
+
+## [monitor 3.19.3] - 2026-07-14
+
+_tracks tag `monitor-v3.19.3`_
+
+### Changed
+
+- **`cockpit`, `install`, and `usage-dashboard` skill manifests restructured for more precise triggering** — each now splits `description` from `when_to_use`, dropping redundant trigger-phrase lists in favor of semantic matching; existing behavioral guards (opt-in only for `cockpit`, command-triggered only for `install`) are unchanged but restated more clearly.
+
+## [relay 0.5.4] - 2026-07-14
+
+_tracks tag `relay-v0.5.4`_
+
+### Changed
+
+- **Skill manifest restructured for more precise triggering, and the capability matrix fixed** — `when_to_use` now correctly states `image` is codex-only and inverts a previously-backwards negative-trigger boundary (asking another harness to do work now fires the skill; a passing mention like "codex said…" doesn't); `argument-hint` updated to match.
+
 ## [chronicle 0.8.1] - 2026-07-14
 
 _tracks tag `chronicle-v0.8.1`_
