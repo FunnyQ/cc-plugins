@@ -5,6 +5,7 @@ import {
   DEFAULT_WAIT_TIMEOUT_MS,
   extractFinalText,
   liveGate,
+  resolveCallerLocation,
   resolveHerdScript,
   runLive,
   type HerdClient,
@@ -167,6 +168,65 @@ describe("extractFinalText", () => {
 });
 
 // ---------------------------------------------------------------------------
+// resolveCallerLocation
+// ---------------------------------------------------------------------------
+
+describe("resolveCallerLocation", () => {
+  const agents = [
+    {
+      name: null,
+      type: "codex",
+      status: "working",
+      paneId: "wT:p1",
+      tabId: "wT:t1",
+      workspaceId: "wT",
+      cwd: "/repo",
+      foregroundCwd: "/repo",
+    },
+  ];
+
+  it("uses a valid caller pane from the inherited environment", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: { HERDR_PANE_ID: "wT:p1", CODEX_THREAD_ID: "thread" },
+        cwd: "/repo",
+      }),
+    ).toEqual({
+      workspaceId: "wT",
+      tabId: "wT:t1",
+      paneId: "wT:p1",
+      source: "env",
+    });
+  });
+
+  it("recovers from a stale Codex pane id via a unique cwd match", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+        cwd: "/repo",
+      }),
+    ).toEqual({
+      workspaceId: "wT",
+      tabId: "wT:t1",
+      paneId: "wT:p1",
+      source: "runtime",
+    });
+  });
+
+  it("refuses to guess when multiple active Codex panes share the cwd", () => {
+    expect(
+      resolveCallerLocation(
+        [...agents, { ...agents[0], paneId: "wT:p2", tabId: "wT:t2" }],
+        {
+          env: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+          cwd: "/repo",
+        },
+      ),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // runLive
 // ---------------------------------------------------------------------------
 
@@ -181,6 +241,16 @@ function fakeHerd(options: {
   preSpawnAgents?: string[]; // list() result before spawn (snapshot)
   postSpawnAgents?: string[]; // list() result after spawn (leak probe)
   visible?: string; // what read({source:"visible"}) returns (input-box probe)
+  callerAgents?: Array<{
+    name: string | null;
+    type: string | null;
+    status: string;
+    paneId: string;
+    tabId: string;
+    workspaceId: string;
+    cwd: string;
+    foregroundCwd?: string;
+  }>;
 }): { herd: HerdClient; calls: HerdCall[] } {
   const calls: HerdCall[] = [];
   let gets = 0;
@@ -197,7 +267,11 @@ function fakeHerd(options: {
         lists++ === 0
           ? (options.preSpawnAgents ?? [])
           : (options.postSpawnAgents ?? options.preSpawnAgents ?? []);
-      return names.map((name) => ({ name }));
+      const namedAgents = names.map((name) => ({ name }));
+      if (lists === 1 && options.callerAgents) {
+        return [...options.callerAgents, ...namedAgents];
+      }
+      return namedAgents;
     },
     async send(target, text) {
       calls.push({ verb: "send", args: [target, text] });
@@ -246,8 +320,22 @@ function runLiveHarness(options: {
   postSpawnAgents?: string[];
   visible?: string;
   keepPane?: boolean;
+  callerAgents?: Parameters<typeof fakeHerd>[0]["callerAgents"];
+  callerEnv?: Record<string, string | undefined>;
 }) {
-  const { herd, calls } = fakeHerd(options);
+  const callerAgents = options.callerAgents ?? [
+    {
+      name: null,
+      type: "codex",
+      status: "working",
+      paneId: "wT:p1",
+      tabId: "wT:t1",
+      workspaceId: "wT",
+      cwd: "/repo",
+      foregroundCwd: "/repo",
+    },
+  ];
+  const { herd, calls } = fakeHerd({ ...options, callerAgents });
   const errors: string[] = [];
   let clock = 0;
   let gets = 0;
@@ -263,6 +351,10 @@ function runLiveHarness(options: {
     waitTimeoutMs: options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
     keepPane: options.keepPane ?? false,
     env: ["RELAY_DELEGATED=1"],
+    callerEnv: options.callerEnv ?? {
+      HERDR_PANE_ID: "wT:p1",
+      CODEX_THREAD_ID: "thread",
+    },
   };
 
   const deps: RunLiveDeps = {
@@ -325,6 +417,7 @@ describe("runLive", () => {
     expect(spawn.newTab).toBe(true);
     expect(spawn.split).toBe("down");
     expect(spawn.cwd).toBe("/repo");
+    expect(spawn.workspace).toBe("wT");
 
     // Exactly one send, carrying the one-line bootstrap — never the prompt body.
     const sends = calls.filter((c) => c.verb === "send");
@@ -333,6 +426,62 @@ describe("runLive", () => {
 
     // Progress lines surfaced each poll.
     expect(errors.some((e) => e.includes("working"))).toBe(true);
+  });
+
+  it("pins the new tab to the runtime workspace when Codex env is stale", async () => {
+    const content = `# Result\n${RESULT_END_MARKER}\n`;
+    const { run, calls } = runLiveHarness({
+      statuses: ["working", "idle"],
+      resultAppearsAtGet: 2,
+      resultContent: content,
+      callerEnv: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+      callerAgents: [
+        {
+          name: null,
+          type: "codex",
+          status: "working",
+          paneId: "wT:p1",
+          tabId: "wT:t1",
+          workspaceId: "wT",
+          cwd: "/repo",
+          foregroundCwd: "/repo",
+        },
+      ],
+    });
+
+    expect((await run()).ok).toBe(true);
+    const spawn = calls.find((c) => c.verb === "spawn")!.args[0] as Record<
+      string,
+      unknown
+    >;
+    expect(spawn.workspace).toBe("wT");
+  });
+
+  it("fails before spawning when the caller workspace is ambiguous", async () => {
+    const shared = {
+      name: null,
+      type: "codex",
+      status: "working",
+      tabId: "wT:t1",
+      workspaceId: "wT",
+      cwd: "/repo",
+      foregroundCwd: "/repo",
+    };
+    const { run, calls } = runLiveHarness({
+      statuses: ["working"],
+      callerEnv: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+      callerAgents: [
+        { ...shared, paneId: "wT:p1" },
+        { ...shared, paneId: "wT:p2" },
+      ],
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || result.pending) throw new Error("expected failure");
+    expect(result.error).toContain("could not uniquely resolve");
+    expect(calls.some((call) => call.verb === "spawn")).toBe(false);
   });
 
   it("closes the pane by default after a verified success", async () => {
