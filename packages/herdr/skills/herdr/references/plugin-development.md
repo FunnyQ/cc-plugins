@@ -1,6 +1,6 @@
 # Herdr Plugin Development
 
-Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Plugins are shareable executable workflow packages. Any language — Bash, JS, Rust, Go, Lua, Python. Herdr owns the host surface; the plugin owns its implementation.
 
@@ -36,7 +36,7 @@ command = ["herdr", "workspace", "list"]
 [[panes]]
 id = "board"
 title = "Project board"
-placement = "overlay"    # "overlay" | "split" | "tab" | "zoomed"
+placement = "popup"      # "overlay" | "popup" | "split" | "tab" | "zoomed"
 command = ["herdr-board"]
 
 [[link_handlers]]
@@ -124,6 +124,10 @@ herdr plugin action invoke example.layout.apply
 # Open plugin pane
 herdr plugin pane open --plugin example.layout --entrypoint board
 
+# Override placement with a session-modal popup (cells or percentages)
+herdr plugin pane open --plugin example.layout --entrypoint board \
+  --placement popup --width '80%' --height '80%'
+
 # View logs
 herdr plugin log list --plugin example.layout
 
@@ -157,3 +161,4 @@ herdr plugin install owner/repo[/subdir] [--ref REF] [--yes]
 - Plugin ids can contain dots; action ids cannot — use qualified `plugin.id.action` for global uniqueness
 - `HERDR_PLUGIN_ROOT` is a managed checkout for GitHub installs — never store user data there
 - Windows: `PATHEXT` shims (`.cmd`) resolved automatically for build/action/event commands
+- Popup placement does not create a Herdr pane: no `HERDR_PANE_ID`, pane/agent API target, or tiled-layout change; custom-command popups can use `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane

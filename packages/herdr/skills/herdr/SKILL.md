@@ -1,12 +1,12 @@
 ---
 name: herdr
 description: >-
-  Help with Herdr configuration, CLI, plugins, and coordinating agents across
-  panes.
+  Help with Herdr configuration, CLI, popup and tiled panes, plugins, and
+  coordinating agents across panes.
 when_to_use: >-
-  For herdr config.toml, keybindings, themes, CLI commands, or plugin
-  development; or — inside a herdr pane (HERDR_ENV=1) — spawning, driving, or
-  coordinating agents in other panes or tabs.
+  For herdr config.toml, keybindings, themes, popup commands, CLI commands, or
+  plugin development; or — inside a herdr pane (HERDR_ENV=1) — spawning,
+  driving, or coordinating agents in other panes or tabs.
 version: 1
 ---
 
@@ -58,7 +58,7 @@ This skill's detail lives in `references/` — read only the file(s) relevant to
 
 | File | Read when the user asks about... |
 |---|---|
-| `references/config.md` | `config.toml` sections, keybindings config, themes, toast/sound notifications, environment variables, `herdr server reload-config` |
+| `references/config.md` | `config.toml` sections, keybindings and popup commands, themes, toast/sound notifications, environment variables, `herdr server reload-config` |
 | `references/cli.md` | Any `herdr <subcommand>` usage — session/workspace/tab/pane/agent management, waits, integrations, plugin CLI commands |
 | `references/plugin-development.md` | Writing or debugging a Herdr plugin — `herdr-plugin.toml` manifest, runtime env vars, dev workflow (`plugin link`), distribution, pitfalls |
 | `references/agent-orchestration.md` | Claude is running *inside* a herdr pane (`HERDR_ENV=1`) and needs to control herdr live — split panes, wait for output, spawn or coordinate with other agents |

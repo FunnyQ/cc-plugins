@@ -1,6 +1,6 @@
 # Herdr Agent Orchestration
 
-Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself — inspect sibling panes, split panes, spawn other agents, and coordinate with them over the CLI. This is a live-session operational guide; see `cli.md` for full command/flag syntax.
 

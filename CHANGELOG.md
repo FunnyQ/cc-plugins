@@ -1,5 +1,17 @@
 # Changelog
 
+## [herdr 0.1.7] - 2026-07-16
+
+_tracks tag `herdr-v0.1.7`_
+
+### Added
+
+- **Herdr popup terminals are now fully documented for custom keybindings and plugins.** The reference covers `popup` commands and placement, cell or percentage sizing, half-terminal defaults, and session-modal input behavior.
+
+### Changed
+
+- **Herdr guidance now reflects the 0.7.4 CLI and configuration surface.** Updated references cover new terminal, metadata, detection, integration, UI, and remote-keybinding options, and clarify that popups are not Herdr panes and cannot be targeted through pane or agent APIs.
+
 ## [herdr 0.1.6] - 2026-07-16
 
 _tracks tag `herdr-v0.1.6`_

@@ -1,6 +1,6 @@
 # Herdr Configuration Reference
 
-Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Config path: `~/.config/herdr/config.toml`
 
@@ -71,10 +71,16 @@ Custom command keybindings:
 ```toml
 [[keys.command]]
 key = "prefix+alt+g"
-type = "pane"              # "pane" | "shell" | "plugin_action"
+type = "popup"             # "popup" | "pane" | "shell" | "plugin_action"
 command = "lazygit"
 description = "run lazygit"
+width = "80%"              # terminal cells or percentage; popup only
+height = "80%"
 ```
+
+`popup` opens a session-modal terminal without changing the tab layout. It receives all input, including Escape, until the command exits. Omit `width`/`height` for half-size defaults. Popup commands receive `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane, but not `HERDR_PANE_ID`.
+
+`pane` opens a temporary zoomed pane, `shell` runs detached, and `plugin_action` invokes an installed plugin action.
 
 Reset to defaults: `herdr config reset-keys`
 
@@ -97,16 +103,36 @@ panel_bg = "reset"
 sidebar_width = 32
 sidebar_min_width = 18
 sidebar_max_width = 36
+sidebar_collapsed_mode = "compact"  # "compact" | "hidden"
 mobile_width_threshold = 64
 mouse_capture = true
+copy_on_select = true
+host_cursor = "auto"                # "auto" | "native" | "drawn"
+right_click_passthrough_modifier = ""
+redraw_on_focus_gained = true
+mouse_scroll_lines = 3
 confirm_close = true
 prompt_new_tab_name = true
 pane_borders = true
 pane_gaps = true
 show_agent_labels_on_pane_borders = false
+hide_tab_bar_when_single_tab = false
 agent_panel_sort = "spaces"  # "spaces" | "priority"
 accent = "cyan"
+
+[ui.sidebar.agents]
+row_gap = 0
+rows = [["state_icon", "workspace", "tab"], ["agent"]]
+
+[ui.sidebar.agents.rows_by_agent]
+claude = [["state_icon", "workspace", "tab"], ["terminal_title_stripped"], ["agent"]]
+
+[ui.sidebar.spaces]
+row_gap = 0
+rows = [["state_icon", "workspace"], ["branch", "git_status"]]
 ```
+
+Sidebar rows may use built-in tokens or custom `$name` values reported through `pane report-metadata --token` / `workspace report-metadata --token`. An agent-specific entry replaces the default agent rows; it does not extend them.
 
 ### Notifications (Toast)
 ```toml

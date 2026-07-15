@@ -1,6 +1,6 @@
 # Herdr CLI Reference
 
-Verified against herdr 0.7.1; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Most commands output JSON for scripting.
 
@@ -13,15 +13,18 @@ Workspace ids look like `1`, `2`; tab ids `1:1`, `1:2`; pane ids `1-1`, `1-2`. T
 herdr                           # launch or attach default session
 herdr --session work            # named session
 herdr --remote workbox          # SSH attach with local keybindings
+herdr --remote workbox --remote-keybindings server
 herdr --remote workbox --handoff
 herdr --no-session              # single-process escape hatch
 herdr --default-config          # print default config
+herdr completion zsh|bash|fish|powershell|elvish
 herdr update                    # install from configured channel
 herdr update --handoff          # live handoff
 herdr channel show
 herdr channel set <stable|preview>
 herdr --version
 herdr status [server|client] [--json]
+herdr api schema [--json | --output PATH]
 ```
 
 ## Server
@@ -50,6 +53,7 @@ herdr workspace create [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus|--
 herdr workspace get <id>
 herdr workspace focus <id>
 herdr workspace rename <id> <label>
+herdr workspace report-metadata <id> --source ID [--token NAME=VALUE] [--clear-token NAME] [--seq N] [--ttl-ms N]
 herdr workspace close <id>
 ```
 
@@ -95,7 +99,7 @@ herdr pane close <id>
 
 **Read output:**
 ```bash
-herdr pane read <id> --source visible|recent|recent-unwrapped [--lines N]
+herdr pane read <id> --source visible|recent|recent-unwrapped|detection [--lines N]
 herdr pane read <id> --source visible --ansi
 ```
 
@@ -104,6 +108,7 @@ herdr pane read <id> --source visible --ansi
 | `visible` | Current rendered screen |
 | `recent` | Recent scrollback with wrapping |
 | `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
+| `detection` | Bottom-buffer snapshot used by agent screen detection |
 
 `herdr wait output --source recent` matches against the **unwrapped** recent text (pane width/soft-wrapping don't affect the match) even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists; use `wait output` for output you expect to appear next.
 
@@ -119,7 +124,7 @@ herdr pane run <id> <command>                # text + Enter atomically (prefer o
 herdr pane report-agent <id> \
   --source ID --agent LABEL \
   --state idle|working|blocked|unknown \
-  [--message TEXT] [--custom-status TEXT] [--seq N] \
+  [--message TEXT] [--seq N] \
   [--agent-session-id ID] [--agent-session-path PATH]
 herdr pane report-agent-session <id> \
   --source ID --agent LABEL [--seq N] \
@@ -132,8 +137,8 @@ herdr pane release-agent <id> --source ID --agent LABEL [--seq N]
 herdr pane report-metadata <id> \
   --source ID [--agent LABEL] [--applies-to-source ID] \
   [--title TEXT|--clear-title] [--display-agent TEXT|--clear-display-agent] \
-  [--custom-status TEXT|--clear-custom-status] \
   [--state-label STATUS=TEXT] [--clear-state-labels] \
+  [--token NAME=VALUE] [--clear-token NAME] \
   [--seq N] [--ttl-ms N]
 ```
 
@@ -141,15 +146,15 @@ herdr pane report-metadata <id> \
 ```bash
 herdr agent list
 herdr agent get <target>
-herdr agent read <target> [--source ...] [--lines N] [--format text|ansi] [--ansi]
+herdr agent read <target> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi]
 herdr agent send <target> <text>
 herdr agent rename <target> <name>|--clear
 herdr agent focus <target>
 herdr agent wait <target> --status idle|working|blocked|unknown [--timeout MS]
 herdr agent attach <target> [--takeover]
 herdr agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>
-herdr agent explain <target> [--json]
-herdr agent explain --file PATH --agent LABEL [--json]
+herdr agent explain <target> [--json|--verbose]
+herdr agent explain --file PATH --agent LABEL [--json|--verbose]
 ```
 
 Targets: terminal IDs, unique agent names, detected/reported agent labels, or legacy pane IDs.
@@ -157,6 +162,8 @@ Targets: terminal IDs, unique agent names, detected/reported agent labels, or le
 ## Direct Terminal Attach
 ```bash
 herdr terminal attach <terminal_id> [--takeover]
+herdr terminal session control <target> [--takeover] [--cols N] [--rows N]
+herdr terminal session observe <target> [--cols N] [--rows N]
 herdr terminal title set <title>
 herdr terminal title clear
 # Detach: ctrl+b q  |  Send literal ctrl+b: ctrl+b ctrl+b
@@ -175,7 +182,7 @@ herdr notification show <title> [--body TEXT] [--position top-left|top-right|bot
 
 ## Integrations
 ```bash
-herdr integration install pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|cursor
+herdr integration install pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|cursor|mastracode
 herdr integration uninstall <name>
 herdr integration status [--outdated-only]
 ```
@@ -193,10 +200,12 @@ herdr plugin config-dir <plugin_id>         # print config dir (creates if neede
 herdr plugin action list [--plugin ID]
 herdr plugin action invoke <action_id> [--plugin ID]
 herdr plugin log list [--plugin ID] [--limit N]
-herdr plugin pane open --plugin ID --entrypoint ID [--placement overlay|split|tab|zoomed] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]
+herdr plugin pane open --plugin ID --entrypoint ID [--placement overlay|popup|split|tab|zoomed] [--width SIZE] [--height SIZE] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]
 herdr plugin pane focus <pane_id>
 herdr plugin pane close <pane_id>
 ```
+
+`popup` is session-modal and does not change the tab layout. Its size accepts cells or percentages such as `80%`; omitted dimensions default to half the terminal. A popup is not a Herdr pane, does not export `HERDR_PANE_ID`, and cannot be used with pane or agent APIs.
 
 ## Output format cheat sheet
 
