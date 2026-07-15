@@ -62,6 +62,7 @@ export type AgentInfo = {
   workspaceId: string;
   terminalId: string;
   cwd: string;
+  foregroundCwd?: string;
   focused: boolean;
 };
 
@@ -110,6 +111,7 @@ function normAgent(a: any): AgentInfo {
     workspaceId: a.workspace_id,
     terminalId: a.terminal_id,
     cwd: a.cwd,
+    foregroundCwd: a.foreground_cwd,
     focused: !!a.focused,
   };
 }
