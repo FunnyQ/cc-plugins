@@ -1,5 +1,21 @@
 # Changelog
 
+## [herdr 0.1.6] - 2026-07-16
+
+_tracks tag `herdr-v0.1.6`_
+
+### Fixed
+
+- **Relay can now identify the active Herdr caller even when inherited pane or workspace values are stale.** Herdr exposes the foreground agent directory so live delegation follows the current caller instead of an outdated pane.
+
+## [relay 0.5.5] - 2026-07-16
+
+_tracks tag `relay-v0.5.5`_
+
+### Fixed
+
+- **Live Relay sessions now open in the active caller's Herdr workspace.** Relay validates inherited pane IDs against current Herdr state, recovers from stale values when there is one clear match, and safely avoids spawning when the caller is ambiguous.
+
 ## [chronicle 0.8.2] - 2026-07-14
 
 _tracks tag `chronicle-v0.8.2`_
