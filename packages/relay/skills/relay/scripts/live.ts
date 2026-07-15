@@ -159,6 +159,7 @@ export type HerdClient = {
     cwd?: string;
     split?: "right" | "down";
     newTab?: boolean;
+    workspace?: string;
     argv?: string[];
     env?: string[];
   }): Promise<{ name: string }>;
@@ -173,9 +174,95 @@ export type HerdClient = {
     target: string,
     opts?: { lines?: number; source?: string },
   ): Promise<string>;
-  list(): Promise<Array<{ name: string | null }>>;
+  list(): Promise<HerdAgent[]>;
   close(target: string): Promise<unknown>;
 };
+
+export type HerdAgent = {
+  name: string | null;
+  type?: string | null;
+  status?: string;
+  paneId?: string;
+  tabId?: string;
+  workspaceId?: string;
+  cwd?: string;
+  foregroundCwd?: string;
+};
+
+export type CallerLocation = {
+  workspaceId: string;
+  tabId: string;
+  paneId: string;
+  source: "env" | "runtime";
+};
+
+function callerAgentType(
+  env: Record<string, string | undefined>,
+): string | null {
+  if (env.CODEX_THREAD_ID) return "codex";
+  if (env.OPENCODE_SESSION_ID) return "opencode";
+  if (env.CLAUDE_CODE_SESSION_ID) return "claude";
+  return null;
+}
+
+function hasLocation(agent: HerdAgent): agent is HerdAgent & {
+  paneId: string;
+  tabId: string;
+  workspaceId: string;
+} {
+  return !!(agent.paneId && agent.tabId && agent.workspaceId);
+}
+
+/** Resolve the live caller from Herdr's current runtime state. Codex tool
+ * subprocesses can inherit stale HERDR_* ids from its long-lived app-server,
+ * so inherited ids are accepted only when they still describe this cwd. */
+export function resolveCallerLocation(
+  agents: HerdAgent[],
+  input: {
+    env: Record<string, string | undefined>;
+    cwd: string;
+  },
+): CallerLocation | null {
+  const expectedType = callerAgentType(input.env);
+  const matchesCwd = (agent: HerdAgent) =>
+    agent.cwd === input.cwd || agent.foregroundCwd === input.cwd;
+  const matchesType = (agent: HerdAgent) =>
+    expectedType === null || agent.type === expectedType;
+
+  const inherited = agents.find(
+    (agent) =>
+      agent.paneId === input.env.HERDR_PANE_ID &&
+      hasLocation(agent) &&
+      matchesType(agent) &&
+      matchesCwd(agent),
+  );
+  if (inherited && hasLocation(inherited)) {
+    return {
+      workspaceId: inherited.workspaceId,
+      tabId: inherited.tabId,
+      paneId: inherited.paneId,
+      source: "env",
+    };
+  }
+
+  const candidates = agents.filter(
+    (agent) =>
+      hasLocation(agent) &&
+      matchesType(agent) &&
+      matchesCwd(agent) &&
+      (agent.status === "working" || agent.status === "blocked"),
+  );
+  if (candidates.length !== 1) return null;
+
+  const [resolved] = candidates;
+  if (!resolved || !hasLocation(resolved)) return null;
+  return {
+    workspaceId: resolved.workspaceId,
+    tabId: resolved.tabId,
+    paneId: resolved.paneId,
+    source: "runtime",
+  };
+}
 
 export type LiveRunResult =
   | { ok: true; agentName: string; text: string }
@@ -193,6 +280,7 @@ export type RunLiveOpts = {
   waitTimeoutMs: number;
   keepPane: boolean;
   env?: string[];
+  callerEnv: Record<string, string | undefined>;
 };
 
 export type RunLiveDeps = {
@@ -278,14 +366,26 @@ export async function runLive(
   // malformed/empty JSON or a transient non-zero). The diff below tells a
   // truly-failed spawn apart from one that leaked a live pane.
   let namesBefore = new Set<string>();
+  let callerLocation: CallerLocation | null = null;
   try {
+    const agents = await herd.list();
     namesBefore = new Set(
-      (await herd.list())
-        .map((a) => a.name)
-        .filter((n): n is string => n !== null),
+      agents.map((a) => a.name).filter((n): n is string => n !== null),
     );
+    callerLocation = resolveCallerLocation(agents, {
+      env: opts.callerEnv,
+      cwd: opts.cwd,
+    });
   } catch {
-    /* degrades to prefix-only detection — errs toward no-fallback */
+    /* handled by the caller-location guard below */
+  }
+  if (!callerLocation) {
+    return {
+      ok: false,
+      pending: false,
+      error:
+        "could not uniquely resolve the calling Herdr workspace from current agent state",
+    };
   }
 
   let agentName: string | undefined;
@@ -296,6 +396,7 @@ export async function runLive(
       argv: opts.spec.argv.length ? opts.spec.argv : undefined,
       env: opts.env,
       cwd: opts.cwd,
+      workspace: callerLocation.workspaceId,
       // Open the agent in its OWN tab so the caller's pane keeps its full size.
       // `split` is kept as a fallback: an older herd.ts without newTab support
       // ignores newTab and degrades to a down-split instead of failing.

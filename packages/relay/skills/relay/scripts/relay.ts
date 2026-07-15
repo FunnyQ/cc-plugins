@@ -415,6 +415,7 @@ export async function executeRelay(
       waitTimeoutMs: parsed.flags.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
       keepPane: parsed.flags.keepPane ?? false,
       env: ["RELAY_DELEGATED=1"],
+      callerEnv: deps.env,
     });
 
     if (liveResult.ok) {
