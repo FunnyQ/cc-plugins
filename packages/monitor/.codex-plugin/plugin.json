@@ -18,6 +18,7 @@
     "opencode"
   ],
   "skills": "./skills/",
+  "hooks": "./.codex-plugin/hooks.json",
   "interface": {
     "displayName": "Monitor",
     "shortDescription": "Usage dashboard for Claude Code, Codex, and OpenCode + session cockpit.",

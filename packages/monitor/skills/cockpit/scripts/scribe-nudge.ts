@@ -27,7 +27,10 @@ import { join } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { cockpitHome } from "./cockpit-home";
-import { shouldSkipDecisionLogReminder } from "./decision-log-reminder";
+import {
+  shouldSkipDecisionLogReminder,
+  type DecisionLogHookInput,
+} from "./decision-log-reminder";
 import { nudgeEnabledFor } from "./nudge-toggle";
 
 // ── Tunables ────────────────────────────────────────────────────────────────
@@ -169,7 +172,7 @@ function codeSignature(
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  let input: { session_id?: string; cwd?: string; agent_id?: string } = {};
+  let input: DecisionLogHookInput & { session_id?: string; cwd?: string } = {};
   try {
     input = JSON.parse(await Bun.stdin.text());
   } catch {
