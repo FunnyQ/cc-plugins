@@ -213,9 +213,34 @@ function hasLocation(agent: HerdAgent): agent is HerdAgent & {
   return !!(agent.paneId && agent.tabId && agent.workspaceId);
 }
 
+/** True when `base` is `target` or one of its ancestor directories. Compared on
+ * path segments, so /repo never matches a /repo-other sibling. */
+function isAncestorOrSame(base: string | undefined, target: string): boolean {
+  if (!base) return false;
+  if (base === target) return true;
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  return target.startsWith(prefix);
+}
+
+/** How closely a pane's cwd covers the caller's: the length of the deepest of
+ * its two cwds that contains `cwd`, or null when neither does. */
+function cwdMatchDepth(agent: HerdAgent, cwd: string): number | null {
+  const covering = [agent.cwd, agent.foregroundCwd].filter(
+    (base): base is string => isAncestorOrSame(base, cwd),
+  );
+  if (!covering.length) return null;
+  return Math.max(...covering.map((base) => base.length));
+}
+
 /** Resolve the live caller from Herdr's current runtime state. Codex tool
  * subprocesses can inherit stale HERDR_* ids from its long-lived app-server,
- * so inherited ids are accepted only when they still describe this cwd. */
+ * so inherited ids are accepted only when they still describe this cwd.
+ *
+ * A pane's cwd is where it was opened; relay's process.cwd() is wherever the
+ * agent happens to be running (a sub-agent, or a plain `cd` into a package),
+ * which is commonly NESTED under it. So "describes this cwd" means the pane's
+ * cwd contains ours — the deepest containing pane wins, and only a tie at that
+ * depth is genuinely ambiguous. */
 export function resolveCallerLocation(
   agents: HerdAgent[],
   input: {
@@ -224,8 +249,6 @@ export function resolveCallerLocation(
   },
 ): CallerLocation | null {
   const expectedType = callerAgentType(input.env);
-  const matchesCwd = (agent: HerdAgent) =>
-    agent.cwd === input.cwd || agent.foregroundCwd === input.cwd;
   const matchesType = (agent: HerdAgent) =>
     expectedType === null || agent.type === expectedType;
 
@@ -234,7 +257,7 @@ export function resolveCallerLocation(
       agent.paneId === input.env.HERDR_PANE_ID &&
       hasLocation(agent) &&
       matchesType(agent) &&
-      matchesCwd(agent),
+      cwdMatchDepth(agent, input.cwd) !== null,
   );
   if (inherited && hasLocation(inherited)) {
     return {
@@ -245,16 +268,22 @@ export function resolveCallerLocation(
     };
   }
 
-  const candidates = agents.filter(
-    (agent) =>
-      hasLocation(agent) &&
-      matchesType(agent) &&
-      matchesCwd(agent) &&
-      (agent.status === "working" || agent.status === "blocked"),
-  );
-  if (candidates.length !== 1) return null;
+  const candidates = agents
+    .filter(
+      (agent) =>
+        hasLocation(agent) &&
+        matchesType(agent) &&
+        (agent.status === "working" || agent.status === "blocked"),
+    )
+    .map((agent) => ({ agent, depth: cwdMatchDepth(agent, input.cwd) }))
+    .filter((c): c is { agent: HerdAgent; depth: number } => c.depth !== null);
+  if (!candidates.length) return null;
 
-  const [resolved] = candidates;
+  const deepest = Math.max(...candidates.map((c) => c.depth));
+  const best = candidates.filter((c) => c.depth === deepest);
+  if (best.length !== 1) return null;
+
+  const resolved = best[0]?.agent;
   if (!resolved || !hasLocation(resolved)) return null;
   return {
     workspaceId: resolved.workspaceId,
