@@ -224,6 +224,71 @@ describe("resolveCallerLocation", () => {
       ),
     ).toBeNull();
   });
+
+  it("accepts an inherited pane whose cwd is an ancestor of the caller cwd", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: { HERDR_PANE_ID: "wT:p1", CODEX_THREAD_ID: "thread" },
+        cwd: "/repo/packages/relay",
+      }),
+    ).toEqual({
+      workspaceId: "wT",
+      tabId: "wT:t1",
+      paneId: "wT:p1",
+      source: "env",
+    });
+  });
+
+  it("resolves a nested caller cwd via a unique ancestor pane", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+        cwd: "/repo/packages/relay",
+      }),
+    ).toEqual({
+      workspaceId: "wT",
+      tabId: "wT:t1",
+      paneId: "wT:p1",
+      source: "runtime",
+    });
+  });
+
+  it("prefers the deepest ancestor pane when several are ancestors", () => {
+    const deeper = {
+      ...agents[0],
+      paneId: "wT:p2",
+      tabId: "wT:t2",
+      cwd: "/repo/packages",
+      foregroundCwd: "/repo/packages",
+    };
+    expect(
+      resolveCallerLocation([...agents, deeper], {
+        env: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+        cwd: "/repo/packages/relay",
+      })?.paneId,
+    ).toBe("wT:p2");
+  });
+
+  it("does not treat a sibling path sharing a name prefix as an ancestor", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: { HERDR_PANE_ID: "wT:p1", CODEX_THREAD_ID: "thread" },
+        cwd: "/repo-other/packages",
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses to guess when equally deep ancestors are ambiguous", () => {
+    expect(
+      resolveCallerLocation(
+        [...agents, { ...agents[0], paneId: "wT:p2", tabId: "wT:t2" }],
+        {
+          env: { HERDR_PANE_ID: "wS:p6", CODEX_THREAD_ID: "thread" },
+          cwd: "/repo/packages/relay",
+        },
+      ),
+    ).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
