@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { assessComplexity, buildReminder, decideNudge } from "./scribe-nudge";
+import {
+  assessComplexity,
+  buildHookOutput,
+  buildReminder,
+  decideNudge,
+} from "./scribe-nudge";
 
 describe("assessComplexity", () => {
   it("counts files and added+deleted lines", () => {
@@ -107,5 +112,22 @@ describe("buildReminder", () => {
     expect(msg).toContain("5 files");
     expect(msg).toContain("200");
     expect(msg).toContain('subagent_type:"fork"');
+  });
+});
+
+describe("buildHookOutput", () => {
+  it("uses Codex's supported Stop output schema", () => {
+    expect(buildHookOutput("remember this", true)).toEqual({
+      systemMessage: "remember this",
+    });
+  });
+
+  it("keeps Claude Code's additionalContext output", () => {
+    expect(buildHookOutput("remember this", false)).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "Stop",
+        additionalContext: "remember this",
+      },
+    });
   });
 });

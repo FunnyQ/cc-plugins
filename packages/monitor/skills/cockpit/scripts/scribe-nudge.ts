@@ -120,6 +120,17 @@ export function buildReminder(c: Complexity): string {
   );
 }
 
+/** Build the runtime-specific Stop output accepted by each harness. */
+export function buildHookOutput(reminder: string, isCodex: boolean) {
+  if (isCodex) return { systemMessage: reminder };
+  return {
+    hookSpecificOutput: {
+      hookEventName: "Stop",
+      additionalContext: reminder,
+    },
+  };
+}
+
 // ── Marker store ─────────────────────────────────────────────────────────────
 
 type MarkerEntry = { lastNudgeMs: number; lastSig: string };
@@ -212,12 +223,7 @@ async function main() {
   writeMarker(marker, now);
 
   process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "Stop",
-        additionalContext: reminder,
-      },
-    }),
+    JSON.stringify(buildHookOutput(reminder, Boolean(process.env.PLUGIN_ROOT))),
   );
 }
 
