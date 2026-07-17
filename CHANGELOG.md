@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 3.19.5] - 2026-07-17
+
+_tracks tag `monitor-v3.19.5`_
+
+### Fixed
+
+- **Codex Stop hooks no longer fail when the cockpit scribe emits a reminder.** Monitor now uses Codex's supported `systemMessage` output under `PLUGIN_ROOT` while preserving Claude Code's `additionalContext` schema.
+
 ## [relay 0.5.6] - 2026-07-17
 
 _tracks tag `relay-v0.5.6`_
