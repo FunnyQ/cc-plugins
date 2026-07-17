@@ -1,5 +1,21 @@
 # Changelog
 
+## [relay 0.5.6] - 2026-07-17
+
+_tracks tag `relay-v0.5.6`_
+
+### Fixed
+
+- **`/relay` no longer fails to spawn a live Herdr pane when invoked from a nested working directory.** Herdr reports the *pane's* cwd (where it was opened), while relay runs from wherever the agent actually is — often a subdirectory or sub-agent cwd underneath it. Caller resolution previously required an exact cwd match and rejected these valid nested cases, including ones with a perfectly good inherited pane ID; it now matches "pane cwd is an ancestor of (or equal to) the caller cwd," picking the deepest containing pane, while still hard-failing on genuine equal-depth ambiguity.
+
+## [monitor 3.19.4] - 2026-07-17
+
+_tracks tag `monitor-v3.19.4`_
+
+### Changed
+
+- **Session-start guidance and scribe nudges now also run under Codex**, via a bundled Codex-specific hooks manifest, matching the behaviour Claude Code sessions already had. The Stop-hook nudge is now guarded against firing recursively when a Stop hook re-triggers itself.
+
 ## [herdr 0.1.7] - 2026-07-16
 
 _tracks tag `herdr-v0.1.7`_

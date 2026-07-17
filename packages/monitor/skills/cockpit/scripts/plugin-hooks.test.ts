@@ -1,15 +1,53 @@
 import { describe, expect, it } from "bun:test";
 import { resolve } from "node:path";
-import manifest from "../../../.claude-plugin/plugin.json";
+import claudeManifest from "../../../.claude-plugin/plugin.json";
+import codexManifest from "../../../.codex-plugin/plugin.json";
+import codexHooks from "../../../.codex-plugin/hooks.json";
 
 const pluginRoot = resolve(import.meta.dir, "../../..");
 
-const decisionLogHook = manifest.hooks.SessionStart.flatMap(
+const decisionLogHook = claudeManifest.hooks.SessionStart.flatMap(
   (group) => group.hooks,
 ).find((hook) => hook.command.includes("decision-log-start.ts"));
-const scribeNudgeHook = manifest.hooks.Stop.flatMap(
+const scribeNudgeHook = claudeManifest.hooks.Stop.flatMap(
   (group) => group.hooks,
 ).find((hook) => hook.command.includes("scribe-nudge.ts"));
+const codexDecisionLogHook = codexHooks.hooks.SessionStart.flatMap(
+  (group) => group.hooks,
+).find((hook) => hook.command.includes("decision-log-start.ts"));
+
+describe("Codex plugin hooks", () => {
+  it("loads the bundled hooks file from the Codex manifest", () => {
+    expect(codexManifest.hooks).toBe("./.codex-plugin/hooks.json");
+  });
+
+  it("uses the Codex plugin root for every command", () => {
+    const hooks = [
+      ...codexHooks.hooks.SessionStart.flatMap((group) => group.hooks),
+      ...codexHooks.hooks.Stop.flatMap((group) => group.hooks),
+    ];
+
+    expect(hooks).toHaveLength(3);
+    for (const hook of hooks) {
+      expect(hook.command).toContain("${PLUGIN_ROOT}");
+    }
+  });
+
+  it("runs SessionStart guidance with PLUGIN_ROOT", () => {
+    expect(codexDecisionLogHook).toBeDefined();
+    const result = Bun.spawnSync(["sh", "-c", codexDecisionLogHook!.command], {
+      env: { ...process.env, PLUGIN_ROOT: pluginRoot },
+      stdin: Buffer.from(
+        JSON.stringify({ hook_event_name: "SessionStart", source: "startup" }),
+      ),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString()).toContain("DECISION LOG ACTIVE");
+  });
+});
 
 describe("decision-log SessionStart hook", () => {
   it("stays quiet for relay-delegated sessions", () => {
@@ -78,7 +116,7 @@ describe("decision-log SessionStart hook", () => {
 });
 
 describe("scribe-nudge Stop hook", () => {
-  it("stays quiet for automated and subagent sessions", () => {
+  it("stays quiet for automated, subagent, and active Stop sessions", () => {
     expect(scribeNudgeHook).toBeDefined();
     for (const input of [
       {
@@ -92,6 +130,10 @@ describe("scribe-nudge Stop hook", () => {
       {
         env: { CLAUDE_CODE_ENTRYPOINT: "cli" },
         hookInput: { agent_id: "agent-123" },
+      },
+      {
+        env: {},
+        hookInput: { hook_event_name: "Stop", stop_hook_active: true },
       },
     ]) {
       const result = Bun.spawnSync(["sh", "-c", scribeNudgeHook!.command], {

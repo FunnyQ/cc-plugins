@@ -29,6 +29,15 @@ describe("shouldSkipDecisionLogReminder", () => {
     ).toBe(true);
   });
 
+  it("skips an already-active Stop hook", () => {
+    expect(
+      shouldSkipDecisionLogReminder(
+        {},
+        { hook_event_name: "Stop", stop_hook_active: true },
+      ),
+    ).toBe(true);
+  });
+
   it("keeps reminders for an interactive main session", () => {
     expect(
       shouldSkipDecisionLogReminder({ CLAUDE_CODE_ENTRYPOINT: "cli" }, {}),

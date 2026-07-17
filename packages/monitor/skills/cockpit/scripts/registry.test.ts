@@ -23,6 +23,7 @@ function setEnv() {
   // Neutralise live-session detection so buildSessions/buildProjects depend only
   // on the fixture registry — point at paths that don't exist → no live merge.
   process.env.COCKPIT_CLAUDE_SESSIONS_DIR = join(homeDir, "no-sessions");
+  process.env.COCKPIT_CLAUDE_PROJECTS_DIR = join(homeDir, "no-projects");
   process.env.COCKPIT_CODEX_STATE_DB = join(homeDir, "no-state.sqlite");
   process.env.COCKPIT_OPENCODE_DB = join(homeDir, "no-opencode.sqlite");
 }
