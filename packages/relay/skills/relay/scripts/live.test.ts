@@ -239,6 +239,78 @@ describe("resolveCallerLocation", () => {
     });
   });
 
+  it("accepts a fully validated inherited caller across sibling repos", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: {
+          HERDR_WORKSPACE_ID: "wT",
+          HERDR_TAB_ID: "wT:t1",
+          HERDR_PANE_ID: "wT:p1",
+          CODEX_THREAD_ID: "thread",
+        },
+        cwd: "/other-repo/packages/relay",
+      }),
+    ).toEqual({
+      workspaceId: "wT",
+      tabId: "wT:t1",
+      paneId: "wT:p1",
+      source: "env",
+    });
+  });
+
+  it("rejects stale inherited identity when its Herdr ids do not agree", () => {
+    expect(
+      resolveCallerLocation(agents, {
+        env: {
+          HERDR_WORKSPACE_ID: "wStale",
+          HERDR_TAB_ID: "wStale:t9",
+          HERDR_PANE_ID: "wT:p1",
+          CODEX_THREAD_ID: "thread",
+        },
+        cwd: "/other-repo/packages/relay",
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects an inactive stale pane even when its inherited ids still match", () => {
+    expect(
+      resolveCallerLocation([{ ...agents[0], status: "idle" }], {
+        env: {
+          HERDR_WORKSPACE_ID: "wT",
+          HERDR_TAB_ID: "wT:t1",
+          HERDR_PANE_ID: "wT:p1",
+          CODEX_THREAD_ID: "thread",
+        },
+        cwd: "/other-repo/packages/relay",
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects an ambiguous duplicated inherited identity across projects", () => {
+    expect(
+      resolveCallerLocation(
+        [
+          ...agents,
+          {
+            ...agents[0],
+            name: "duplicate",
+            cwd: "/other-repo",
+            foregroundCwd: "/other-repo",
+          },
+        ],
+        {
+          env: {
+            HERDR_WORKSPACE_ID: "wT",
+            HERDR_TAB_ID: "wT:t1",
+            HERDR_PANE_ID: "wT:p1",
+            CODEX_THREAD_ID: "thread",
+          },
+          cwd: "/third-repo",
+        },
+      ),
+    ).toBeNull();
+  });
+
   it("resolves a nested caller cwd via a unique ancestor pane", () => {
     expect(
       resolveCallerLocation(agents, {
