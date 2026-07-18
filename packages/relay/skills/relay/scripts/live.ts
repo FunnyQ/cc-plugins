@@ -234,7 +234,8 @@ function cwdMatchDepth(agent: HerdAgent, cwd: string): number | null {
 
 /** Resolve the live caller from Herdr's current runtime state. Codex tool
  * subprocesses can inherit stale HERDR_* ids from its long-lived app-server,
- * so inherited ids are accepted only when they still describe this cwd.
+ * so inherited identity is accepted only when its workspace/tab/pane triple
+ * uniquely matches an active caller, or its pane still describes this cwd.
  *
  * A pane's cwd is where it was opened; relay's process.cwd() is wherever the
  * agent happens to be running (a sub-agent, or a plain `cd` into a package),
@@ -251,6 +252,31 @@ export function resolveCallerLocation(
   const expectedType = callerAgentType(input.env);
   const matchesType = (agent: HerdAgent) =>
     expectedType === null || agent.type === expectedType;
+
+  const inheritedWorkspace = input.env.HERDR_WORKSPACE_ID;
+  const inheritedTab = input.env.HERDR_TAB_ID;
+  const inheritedPane = input.env.HERDR_PANE_ID;
+  if (inheritedWorkspace && inheritedTab && inheritedPane) {
+    const exactIdentity = agents.filter(
+      (agent) =>
+        hasLocation(agent) &&
+        matchesType(agent) &&
+        (agent.status === "working" || agent.status === "blocked") &&
+        agent.workspaceId === inheritedWorkspace &&
+        agent.tabId === inheritedTab &&
+        agent.paneId === inheritedPane,
+    );
+    if (exactIdentity.length > 1) return null;
+    const exact = exactIdentity[0];
+    if (exact && hasLocation(exact)) {
+      return {
+        workspaceId: exact.workspaceId,
+        tabId: exact.tabId,
+        paneId: exact.paneId,
+        source: "env",
+      };
+    }
+  }
 
   const inherited = agents.find(
     (agent) =>

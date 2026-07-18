@@ -1,5 +1,21 @@
 # Changelog
 
+## [monitor 3.19.6] - 2026-07-19
+
+_tracks tag `monitor-v3.19.6`_
+
+### Fixed
+
+- **`/thoughtful` auto-logging could write decision-trail entries to the wrong session.** The background fork running `/cockpit scribe` used to resolve the live session itself, but a background fork can get its own transcript (and on Codex its own newer thread), so entries sometimes landed on that child session instead of the one you were actually working in. The parent session id is now resolved before the fork spawns and passed to every scribe call explicitly; a fork that's missing this id now fails loudly instead of silently logging to the wrong place. Manual `/cockpit scribe` invocations are unaffected.
+
+## [relay 0.5.7] - 2026-07-19
+
+_tracks tag `relay-v0.5.7`_
+
+### Fixed
+
+- **`/relay` live mode no longer refuses to run when relaying from a sibling repo or a different project.** Cross-project callers used to fall back to a strict cwd match that couldn't succeed, losing the visible live tab. Relay now also accepts an inherited Herdr workspace/tab/pane identity when it uniquely matches one active agent of the expected type, even if the cwd differs — while still falling back to the cwd check (and refusing) on any id mismatch or ambiguous match, preserving the original stale-id protection.
+
 ## [monitor 3.19.5] - 2026-07-17
 
 _tracks tag `monitor-v3.19.5`_

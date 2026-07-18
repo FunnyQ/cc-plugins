@@ -23,6 +23,12 @@ project's cwd, and uses its thread id. The thread row normally exists once the
 session has written state, so if it exits non-zero, **retry once after a tool
 call** before falling back to `crypto.randomUUID()`.
 
+For thoughtful auto-logging, the main agent must run this command **before** it
+spawns the background fork and include the resulting literal id in the fork
+prompt. The fork must pass it as `--session <parent-session-id>` on every scribe
+call. Do not run this resolver inside the fork: the fork can have its own newer
+Codex thread, and spawn-edge bookkeeping is not a reliable parent handoff.
+
 ## Wait policy (needs_your_call)
 
 Run `cockpit wait <id>` in the **foreground as a blocking tool call**, and do not

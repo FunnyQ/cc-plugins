@@ -23,6 +23,21 @@ test -f "$CLI" || { echo "cockpit CLI not found at $CLI" >&2; exit 1; }
 The fork **must** substitute the real banner path — it cannot fall back to an
 env var. If the file guard fails, stop and surface the error; do not continue.
 
+### Session — honor the parent handoff
+
+A `/thoughtful` background-fork prompt includes the **initiating parent
+session** id. Copy that literal value and pass
+`--session <parent-session-id>` on every `cockpit scribe` call below: `--prep`,
+`--recent` if used, and every write. Never auto-resolve from inside a background
+fork: context inheritance gives the fork the parent's conversation, but the
+harness can still give the fork its own session/transcript id.
+
+If a prompt identifies this invocation as a background fork but omits the
+parent session id, stop and surface the missing handoff instead of risking a
+write to the child session. **Direct/manual** `/cockpit scribe` invocations have
+no parent handoff and preserve the existing behavior: omit `--session` and let
+the CLI auto-resolve the live session.
+
 ### Provider — set it explicitly when running under Codex
 
 `cockpit scribe` auto-resolves the session against **Claude** transcripts by
@@ -48,8 +63,10 @@ language of the inherited conversation or your spawn prompt. Resolve it now, as
 part of setup, so it is fixed before Step 2 writes a single entry:
 
 ```bash
-bun "$CLI" scribe --prep $PROVIDER_FLAG
+bun "$CLI" scribe --prep --session "<parent-session-id>" $PROVIDER_FLAG
 ```
+
+For a direct/manual invocation, omit the shown `--session` argument.
 
 This one call prints the configured language, the last 8 scribe-authored entries
 for dedup, and git change context (`git diff`, `git diff --staged`,
@@ -113,7 +130,7 @@ For each insight that is genuinely worth recording and not yet covered, pick a
 `kind` and call. Write `--title` and `--text` in the language printed by Step 1.
 
 ```bash
-bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" $PROVIDER_FLAG
+bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" --session "<parent-session-id>" $PROVIDER_FLAG
 ```
 
 ### Kind values and when to use them
@@ -148,7 +165,8 @@ cockpit scribe --prep [--provider <p>]
   Night Flight-themed SVG. Read [references/diagram.md](diagram.md) first.
 - `--prep` — prints the configured language, recent scribe entries, and git
   change context in one call.
-- `--session` / `--provider` — optional; omit to auto-resolve the live session.
+- `--session` / `--provider` — optional for direct/manual use. A thoughtful
+  background fork must use the parent session id handed to it in the prompt.
 
 ### Tone
 

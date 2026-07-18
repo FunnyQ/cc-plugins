@@ -4,6 +4,8 @@
 
 When the session runs inside herdr (`HERDR_ENV=1`), `delegate` and `review` automatically execute in a **visible, take-over-able TUI opened in its own new herdr tab** (your current pane keeps its full size — no split) instead of a blocking headless spawn. `image` always stays headless/native. Nothing changes in how you invoke `relay.ts` — the routing is automatic.
 
+The live tab stays in the caller's Herdr workspace even when Relay runs against a different project or sibling repository. Relay accepts that cross-project caller only when the inherited `HERDR_WORKSPACE_ID` / `HERDR_TAB_ID` / `HERDR_PANE_ID` triple uniquely matches an active caller in current Herdr state and the expected agent type. Stale or ambiguous identity still falls back to the cwd-based runtime check, or safely declines live mode when no unique caller can be proven.
+
 ### Choosing live vs headless
 
 Live and headless share the same CLI/model/write access, so editing capability is **identical** — never justify `--headless` with "more precise / deterministic / reliable for multi-file edits". Live is a *superset* (unattended **and** observable), so keep the default and force `--headless` only for a real reason: nested delegation, a mode with no live seam, or no pane surface.
