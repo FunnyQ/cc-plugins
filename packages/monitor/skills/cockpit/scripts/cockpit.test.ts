@@ -465,6 +465,29 @@ describe("cockpit log", () => {
 describe("cockpit scribe", () => {
   // Note: scribe auto-registers on first write.
 
+  test("thoughtful hands the initiating session to the background scribe", () => {
+    const command = readFileSync(
+      join(import.meta.dir, "../../../commands/thoughtful.md"),
+      "utf8",
+    );
+    const guide = readFileSync(
+      join(import.meta.dir, "../references/scribe.md"),
+      "utf8",
+    );
+    const sessionStart = readFileSync(
+      join(import.meta.dir, "decision-log-start.ts"),
+      "utf8",
+    );
+
+    expect(command).toContain("Before spawning");
+    expect(command).toContain("initiating parent session");
+    expect(command).toContain("--session <parent-session-id>");
+    expect(guide).toContain("--session <parent-session-id>");
+    expect(guide).toContain("Direct/manual");
+    expect(sessionStart).toContain("--session <parent-session-id>");
+    expect(sessionStart).toContain("fork must not resolve its own session");
+  });
+
   test("write mode: creates log file and record with correct shape", () => {
     const r = run([
       "scribe",
