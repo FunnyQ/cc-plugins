@@ -1,5 +1,18 @@
 # Changelog
 
+## [chronicle 0.9.0] - 2026-07-20
+
+_tracks tag `chronicle-v0.9.0`_
+
+### Added
+
+- **Commit analysis now applies a diff budget on large changesets.** When a change set produces a very large diff, the commit skill's analysis engine now caps how much diff it feeds into downstream decision-making instead of passing the whole thing through unbounded, avoiding slow or degraded analysis on big commits.
+
+### Changed
+
+- **More reliable agent orchestration across commit, pr, and release.** All six chronicle agent roles (Claude and Codex definitions alike) now consistently handle the asynchronous nature of agent spawning — a spawn returns a launch receipt rather than an immediate result, and the agent resumes only once notified — reducing the chance of a hang or a silent no-op being mistaken for success.
+- **Skill guides now include ground-truth verification steps.** The commit, pr, and release skill docs spell out how to independently confirm a run actually did what it claims, making it easier to catch a bad result before trusting it.
+
 ## [monitor 3.19.6] - 2026-07-19
 
 _tracks tag `monitor-v3.19.6`_

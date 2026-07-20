@@ -114,8 +114,19 @@ the Oathkeeper can't see the chat), then spawn it with: `$SKILL_DIR`, `mode`,
 `{ component, targetVersion, lastTag }`), `contextBrief`, and `branch`. The
 Oathkeeper derives each unit's tag name, changelog header, and path scope from
 `config` itself, and forwards each release's `lastTag` to the annalist. It returns
-the final report; relay it to the user — the touched files + next steps (prepare),
-or the tag(s) + push status (auto). Nothing else.
+the final report.
+
+**Verify ground truth before reporting:**
+
+- **prepare** → read every configured version target and confirm `targetVersion`;
+  confirm the changelog entry exists.
+- **auto / auto push** → take `mergeCommit` from the Oathkeeper's report (it relays the
+  hammerbearer's develop→main merge SHA); a merged release without one is a failed
+  release — stop and report it. Then for every tag require non-empty
+  `git tag --list <tag>` output and `git rev-list -n1 <tag>` equal to that commit; when
+  pushing, also require non-empty `git ls-remote --tags origin <tag>`.
+  Relay only verified results.
+- **Anything missing** → report partial progress. Never announce unverified tags or pushes.
 
 ## Protected branches
 
@@ -142,6 +153,10 @@ role-loading paths:
 If neither registered roles nor stable TOMLs are available, tell the user to run
 `chronicle:install` and start a new Codex thread. Do not silently replace the role
 boundaries with an inline release flow.
+
+After Codex returns, apply the ground-truth checks above: configured version values in
+prepare, each tag SHA against `mergeCommit` in auto modes, and remote tag presence
+when pushing.
 
 ## Edge cases
 

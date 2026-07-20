@@ -11,6 +11,7 @@ const DEFAULT_PROMPT_PATH = resolve(
 );
 const TEMP_OUTPUT_DIR = "/tmp/chronicle/commit";
 const MAX_DIFF_LINES = 400;
+const MAX_TOTAL_DIFF_LINES = 3000;
 const MAX_UNTRACKED_INLINE_BYTES = 256 * 1024;
 
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
@@ -31,6 +32,7 @@ type AnalysisResult = {
   summary: FileSummary[];
   files: AnalyzedFile[];
   recentCommits: string[];
+  elidedFiles: number;
 };
 
 type Numstat = {
@@ -213,7 +215,7 @@ function lineCount(content: string): number {
     : content.split("\n").length;
 }
 
-function parseNumstat(output: string): Numstat {
+export function parseNumstat(output: string): Numstat {
   const match = /^(\d+|-)\t(\d+|-)/.exec(output.trim());
   if (!match || match[1] === "-" || match[2] === "-") {
     return { insertions: 0, deletions: 0 };
@@ -237,6 +239,67 @@ export function capDiff(
     ...diffLines.slice(0, maxLines),
     `[diff truncated: ${maxLines} of ${diffLines.length} lines shown; +${stats.insertions}/-${stats.deletions} total]`,
   ].join("\n");
+}
+
+function omittedDiff(
+  file: AnalyzedFile,
+  totalFiles: number,
+  maxLines: number,
+): string {
+  return `[diff omitted: changeset exceeds the ${maxLines}-line aggregate budget; +${file.insertions}/-${file.deletions} in this file — ${totalFiles} files changed]`;
+}
+
+/**
+ * Per-file capping still lets a wide changeset blow past a usable context, so
+ * trim whole diffs — largest first — until the changeset fits. Stats survive,
+ * so the reader always keeps the shape of what was dropped.
+ */
+export function applyTotalDiffBudget<T extends AnalyzedFile>(
+  files: T[],
+  maxLines = MAX_TOTAL_DIFF_LINES,
+): T[] {
+  const counts = files.map((file) => lineCount(file.diff));
+  let total = counts.reduce((sum, count) => sum + count, 0);
+  if (total <= maxLines) return files;
+
+  const biggestFirst = counts
+    .map((count, index) => ({ count, index }))
+    .sort((a, b) => b.count - a.count);
+
+  const trimmed = new Set<number>();
+  for (const { count, index } of biggestFirst) {
+    if (total <= maxLines) break;
+    trimmed.add(index);
+    total =
+      total - count + lineCount(omittedDiff(files[index], files.length, maxLines));
+  }
+
+  return files.map((file, index) =>
+    trimmed.has(index)
+      ? { ...file, diff: omittedDiff(file, files.length, maxLines) }
+      : file,
+  );
+}
+
+/**
+ * Lock files never contribute a readable diff, but their stats still tell the
+ * story ("deps churned"). An untracked one is wholly new, so its line count IS
+ * the insertion count; a tracked one has to come from numstat or we'd report
+ * the entire file as added.
+ */
+async function lockfileStats(entry: ParsedStatus): Promise<Numstat> {
+  if (entry.status === "added" && !entry.staged) {
+    const content = await Bun.file(entry.path)
+      .text()
+      .catch(() => "");
+    return { insertions: lineCount(content), deletions: 0 };
+  }
+
+  const numstat = entry.staged
+    ? await gitText`git diff --cached --numstat -- ${entry.path}`
+    : await gitText`git diff --numstat -- ${entry.path}`;
+
+  return parseNumstat(numstat);
 }
 
 async function readUntrackedFile(path: string): Promise<AnalyzedFile> {
@@ -289,14 +352,10 @@ export async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
     }
 
     if (shouldSkipDiff(entry.path)) {
-      const content = await Bun.file(entry.path)
-        .text()
-        .catch(() => "");
       return {
         ...entry,
         diff: "[lock file - diff skipped]",
-        insertions: lineCount(content),
-        deletions: 0,
+        ...(await lockfileStats(entry)),
       };
     }
 
@@ -341,19 +400,26 @@ async function analyzeChanges(): Promise<AnalysisResult> {
   const statusOutput = (await gitText`git status --porcelain -uall`).trimEnd();
   const statusLines = statusOutput ? statusOutput.split("\n") : [];
   const entries = statusLines.flatMap(parseStatusLine);
-  const [files, logOutput] = await Promise.all([
+  const [analyzed, logOutput] = await Promise.all([
     Promise.all(entries.map(analyzeFile)),
     gitText`git log --oneline -10`.catch(() => ""),
   ]);
+  const files = applyTotalDiffBudget(analyzed);
+  const elidedFiles = files.filter((file) =>
+    file.diff.startsWith("[diff omitted:"),
+  ).length;
 
   return {
     summary: files.map(summarizeFile),
     files,
     recentCommits: logOutput.trimEnd() ? logOutput.trimEnd().split("\n") : [],
+    elidedFiles,
   };
 }
 
 async function main() {
+  const repoRoot = (await gitText`git rev-parse --show-toplevel`).trim();
+  if (repoRoot) process.chdir(repoRoot);
   const [analysis, promptPath] = await Promise.all([
     analyzeChanges(),
     resolvePromptPath(),
@@ -367,6 +433,7 @@ async function main() {
       outputPath,
       promptPath,
       totalFiles: analysis.files.length,
+      elidedFiles: analysis.elidedFiles,
     }),
   );
 }

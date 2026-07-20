@@ -1,11 +1,14 @@
-import { describe, expect, test } from "bun:test";
+import { $ } from "bun";
+import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   analyzeFile,
+  applyTotalDiffBudget,
   capDiff,
   isBinaryFile,
+  parseNumstat,
   parseStatusLine,
   shouldSkipDiff,
   unquoteGitPath,
@@ -113,7 +116,130 @@ describe("capDiff", () => {
   });
 });
 
+describe("parseNumstat", () => {
+  test("reads insertions and deletions", () => {
+    expect(parseNumstat("12\t3\tsrc/a.ts")).toEqual({
+      insertions: 12,
+      deletions: 3,
+    });
+  });
+
+  test("treats binary markers as zero", () => {
+    expect(parseNumstat("-\t-\timage.png")).toEqual({
+      insertions: 0,
+      deletions: 0,
+    });
+  });
+
+  test("treats empty output as zero", () => {
+    expect(parseNumstat("")).toEqual({ insertions: 0, deletions: 0 });
+  });
+});
+
+describe("applyTotalDiffBudget", () => {
+  const file = (path: string, lines: number, stats = { i: 1, d: 1 }) => ({
+    path,
+    staged: false,
+    status: "modified" as const,
+    diff: Array.from({ length: lines }, (_, n) => `line ${n}`).join("\n"),
+    insertions: stats.i,
+    deletions: stats.d,
+  });
+
+  test("leaves a changeset under budget untouched", () => {
+    const files = [file("a.ts", 10), file("b.ts", 10)];
+
+    expect(applyTotalDiffBudget(files, 100)).toEqual(files);
+  });
+
+  test("drops the largest diffs first until under budget", () => {
+    const result = applyTotalDiffBudget(
+      [file("small.ts", 10), file("huge.ts", 500), file("mid.ts", 60)],
+      100,
+    );
+
+    expect(result[1].diff).toContain("[diff omitted:");
+    expect(result[1].diff).toContain("100-line aggregate budget");
+    expect(result[0].diff).not.toContain("[diff omitted:");
+    expect(result[2].diff).not.toContain("[diff omitted:");
+  });
+
+  test("preserves original file order and stats when trimming", () => {
+    const result = applyTotalDiffBudget(
+      [file("a.ts", 500, { i: 400, d: 100 }), file("b.ts", 5)],
+      50,
+    );
+
+    expect(result.map((f) => f.path)).toEqual(["a.ts", "b.ts"]);
+    expect(result[0].insertions).toBe(400);
+    expect(result[0].deletions).toBe(100);
+    expect(result[0].diff).toContain("+400/-100");
+  });
+
+  test("keeps trimming when every diff is oversized", () => {
+    const result = applyTotalDiffBudget(
+      [file("a.ts", 300), file("b.ts", 300)],
+      50,
+    );
+
+    expect(result.every((f) => f.diff.startsWith("[diff omitted:"))).toBe(true);
+  });
+});
+
 describe("analyzeFile", () => {
+  const originalCwd = process.cwd();
+  afterEach(() => process.chdir(originalCwd));
+
+  test("reports real diff stats for a tracked lock file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-lock-"));
+    process.chdir(dir);
+    await $`git init -q .`.quiet();
+    await $`git config user.email t@t`.quiet();
+    await $`git config user.name t`.quiet();
+
+    // 100-line lock file, of which only 4 lines change
+    await writeFile(
+      join(dir, "bun.lock"),
+      `${Array.from({ length: 100 }, (_, n) => `"pkg-${n}": "1.0.0",`).join("\n")}\n`,
+    );
+    await $`git add -A`.quiet();
+    await $`git -c commit.gpgSign=false commit -qm init`.quiet();
+    await writeFile(
+      join(dir, "bun.lock"),
+      `${Array.from({ length: 100 }, (_, n) =>
+        n < 4 ? `"pkg-${n}": "2.0.0",` : `"pkg-${n}": "1.0.0",`,
+      ).join("\n")}\n`,
+    );
+
+    const result = await analyzeFile({
+      path: "bun.lock",
+      staged: false,
+      status: "modified",
+    });
+
+    expect(result.diff).toBe("[lock file - diff skipped]");
+    // the regression: this used to report the whole file (100) as insertions
+    expect(result.insertions).toBe(4);
+    expect(result.deletions).toBe(4);
+  });
+
+  test("falls back to file length for an untracked lock file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-newlock-"));
+    process.chdir(dir);
+    await $`git init -q .`.quiet();
+    await writeFile(join(dir, "bun.lock"), "a\nb\nc\n");
+
+    const result = await analyzeFile({
+      path: "bun.lock",
+      staged: false,
+      status: "added",
+    });
+
+    expect(result.diff).toBe("[lock file - diff skipped]");
+    expect(result.insertions).toBe(3);
+    expect(result.deletions).toBe(0);
+  });
+
   test("marks unreadable files without throwing", async () => {
     const result = await analyzeFile({
       path: "/tmp/chronicle-missing-file.txt",

@@ -98,15 +98,23 @@ in those files.
    - `draft` — optional; default `true`. Pass `false` only if the user asked to open
      the PR ready rather than as a draft.
 
-The Storykeeper returns the final result; the main agent relays it to the user (the PR/MR
-URL, noting draft vs ready, or the failure reason) and nothing else.
+**Verify before reporting:**
 
-## What the Storykeeper does (reference)
+- URL returned: confirm with `gh pr view <url>` or `glab mr view <id-or-url>`; a
+  non-zero check means treat it as no URL.
+- No URL (or failed check): before reporting failure, look for a request that already
+  exists for `<branch>` — the creation may have landed before the error:
 
-Full procedure in `agents/storykeeper.md`. In brief: spawn `chronicle:skald` → if there
-are commits and a known provider, spawn `chronicle:messenger` with the confirmed
-`CreateInput` → relay the `CreateResult` up. Stops without creating when there are
-no commits or the provider is `unknown`.
+  ```bash
+  gh pr list --repo <repo-if-cross-fork> --head <qualified-head-or-branch> \
+    --state open --json url --jq '.[0].url'
+  glab mr list --source-branch <branch> --state opened -F json \
+    | jq -r '.[0].web_url // empty'
+  ```
+
+  A hit is the result — report it as pre-existing/recovered, not newly created.
+  Empty output or a non-zero exit → report no PR/MR plus Storykeeper's reason.
+  Never infer a URL.
 
 ## Codex
 
@@ -126,6 +134,10 @@ Codex uses the same topology through one of two role-loading paths:
 If the registered role and stable TOMLs are both unavailable, tell the user to run
 `chronicle:install` and start a new Codex thread. Do not silently replace the
 Storykeeper → Skald → Messenger boundary with an inline flow.
+
+Apply the same verification after Codex returns: `gh pr view <url>` / `glab mr view
+<id-or-url>`, and on no/failed URL the `--head`/`--source-branch` lookup above before
+reporting failure. Never trust an unverified URL.
 
 ## Edge Cases
 

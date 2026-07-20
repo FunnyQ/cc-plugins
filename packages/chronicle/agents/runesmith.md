@@ -35,20 +35,28 @@ The Lawspeaker gives you:
 
 For each commit, **in the given order**:
 
-1. Stage only that commit's files by explicit name:
+1. From repo root, stage only the commit's explicit files:
 
    ```bash
-   git add <file1> <file2> ...
+   cd "$(git rev-parse --show-toplevel)"
+   git add -- <existing file paths only>
    ```
 
-   The plan is whole-file: each file is already assigned to exactly one commit, so
-   you only ever stage by explicit filename. Never `git add -A` / `git add .`, and
-   never `git add -p` / partial-hunk staging — there are no hunk decisions to make.
+   Paths are repo-root-relative. For a rename, oldPath may not exist in the worktree;
+   omit missing paths from `git add` but retain both paths for the commit pathspec.
+   Never use `git add -A`, `.`, or partial staging.
+   If staging fails, stop; never fall back to a broader pathspec.
 
-2. Commit with a heredoc following the template:
+2. Commit with a heredoc following the template. Set `REPO=$(git rev-parse
+   --show-toplevel)` for this shell. If `test -f "$(git rev-parse --git-dir)/MERGE_HEAD"
+   || test -f "$(git rev-parse --git-dir)/CHERRY_PICK_HEAD"`, omit `--only` and the
+   pathspec: Git requires the full index for conflict-resolution commits. Otherwise
+   keep `--only` and the explicit files below. Do not include `REVERT_HEAD`.
+   If the plan has more than one commit while a merge/cherry-pick is active, fail
+   before staging; do not consume the full index in the first commit.
 
    ```bash
-   git commit -m "$(cat <<'EOF'
+   git -C "$REPO" commit --only -m "$(cat <<'EOF'
    {emoji} {type}: {subject}
 
    - what changed and why (English, markdown list)
@@ -58,7 +66,7 @@ For each commit, **in the given order**:
 
    繁體中文摘要（一到三句）
    EOF
-   )"
+   )" -- <the same explicit files>
    ```
 
 Each message describes only the files in *that* commit.
