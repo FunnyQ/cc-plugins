@@ -44,7 +44,11 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
 
    ```bash
    git checkout <main>
+   mainBefore=$(git rev-parse HEAD)
    git merge --no-ff <develop> -m "Merge branch '<develop>' for <tags joined by ' + '>"
+   mergeCommit=$(git rev-parse HEAD)
+   test "$mergeCommit" != "$mainBefore" || { echo "merge created no new commit" >&2; exit 1; }
+   printf '%s\n' "$mergeCommit"              # the SHA every tag must point at
    ```
 
 3. **Annotated tag(s) on main** — cut **every** tag in `tags` on this one merge
@@ -68,7 +72,8 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
    git push origin <tag1> [<tag2> ...]        # all tags in `tags`
    ```
 
-6. Confirm `git branch --show-current` is `<develop>`.
+6. Confirm `git branch --show-current` is `<develop>`. Report the SHA printed in
+   step 2 verbatim — never re-derive or guess it.
 
 ## Failure handling
 
@@ -86,11 +91,14 @@ verified in the working tree; you commit them and cut the tag. Replicate a gitfl
   "committed": true,
   "tags": ["chronicle-v0.5.0", "monitor-v3.18.3"],
   "merged": ["develop→main", "main→develop"],
+  "mergeCommit": "<develop→main merge SHA>",
   "pushed": ["develop", "main", "chronicle-v0.5.0", "monitor-v3.18.3"],
   "branch": "develop",
   "log": "<git log --oneline -4>"
 }
 ```
 
-`tags` lists every tag cut (one for a single release). Set `pushed: []` when `push`
-was false. Report honestly — never claim a push or tag that didn't happen.
+`tags` lists every tag cut (one for a single release). `mergeCommit` is the step-2
+develop→main merge SHA and is **required** whenever you merged — the caller verifies
+every tag against it. Set `pushed: []` when `push` was false. Report honestly — never
+claim a push or tag that didn't happen.

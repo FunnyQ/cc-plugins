@@ -32,8 +32,25 @@ If the script prints `totalFiles === 0`, return `{ "nothingToCommit": true }` an
 Read the script's `outputPath` JSON. It is summary-first: `summary[]` lists every
 file's path, status (added/modified/deleted/renamed), staging state, and stats
 before the full `files[]` payload with diff content. Use `summary[]` if a truncated
-read cuts off later diff detail. Also use recent commits for style reference. Note
-the `promptPath` (the message template) and pass it back.
+read cuts off later diff detail. The JSON also carries `recentCommits` for style
+reference. `promptPath` comes from the script stdout metadata, not this JSON;
+pass that value back too.
+
+Treat the JSON as source of truth; do not repeat its git commands.
+
+Classify elided diffs from path and stats; do not fetch their content:
+
+- lock files: `chore`.
+- omitted, binary, large, or truncated markers: use path and stats. Treat
+  `elidedFiles > 0` as an incomplete diff, not a reason to fetch more content.
+
+### 2a. Paths
+
+JSON paths are repo-root-relative. Preserve them exactly. If git is unavoidable:
+
+```bash
+git -C "$(git rev-parse --show-toplevel)" diff -- <root-relative-path>
+```
 
 ### 3. Surface the decision signals + two proposals
 
@@ -52,8 +69,12 @@ entirely** — build only `simpleCommit` and omit the `atomicPlan` key from your
 result. Still report `changeTypes` and `moduleSpread`; they cost nothing beyond the
 classification you already did, and the Lawspeaker uses them for context.
 
-Both proposals are **whole-file**: every file lands in exactly one group, never
+Both proposals are **whole-file**: every path appears in exactly one group, never
 split across commits. A file with mixed concerns goes entirely into one group.
+For a rename, include both `oldPath` and `path` in `files` so the commit preserves
+the deletion.
+If status contains staged and unstaged entries for one path, deduplicate it into one
+group; never plan the same path in two commits.
 
 Subjects only — imperative mood, ≤ ~50 chars. Do **not** write commit bodies or
 the 繁中 summary; the runesmith does that with the Lawspeaker's rationale brief.
@@ -69,7 +90,8 @@ the 繁中 summary; the runesmith does that with the Lawspeaker's rationale brie
   "atomicPlan": [
     { "emoji": "✨", "type": "feat", "subject": "...", "files": ["..."] }
   ],
-  "promptPath": "<from script output>",
+  "promptPath": "<from script stdout>",
+  "elidedFiles": 0,
   "skipped": ["lockfile (folded into chore)"]
 }
 ```
