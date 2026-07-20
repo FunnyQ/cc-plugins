@@ -30,22 +30,21 @@ main agent  (holds the conversation = the "why")
 Spawn via `subagent_type`, never fork: the Lawspeaker must be able to spawn its
 children and does not inherit the main conversation.
 
-All diff/git output stays inside the Lawspeaker subtree; the main agent only sees the
-final `git log`. The three agents live at
+Diff analysis stays inside the Lawspeaker subtree; the main agent also performs the
+small final verification commands below. The three agents live at
 `packages/chronicle/agents/{lawspeaker,watcher,runesmith}.md` and auto-register as
 `chronicle:lawspeaker` / `chronicle:watcher` / `chronicle:runesmith`.
 
 ## The main agent's job (thin)
 
-The main agent does exactly three things, then waits for the Lawspeaker's report:
+The main agent does five things:
 
+0. **Record baseline** — run `git rev-parse HEAD 2>/dev/null || true`; an empty
+   baseline means an unborn branch.
 1. **Parse invocation mode** — if the argument is `simple` (case-insensitive), or
    the user's phrasing clearly asks for a single commit ("one commit", "快速 commit",
    "single commit"), set `mode: "simple"`; otherwise set `mode: "auto"`.
-2. **Distill the `contextBrief`** — a tight summary of *why* these changes were
-   made, drawn from this conversation. This cannot move into the Lawspeaker (the
-   Lawspeaker can't see the chat). Keep it to the rationale a commit body would want:
-   intent, the problem being solved, anything non-obvious from the diff.
+2. **Distill `contextBrief`** — terse intent and non-obvious rationale from this chat.
 3. **Spawn the Lawspeaker** (`subagent_type: "chronicle:lawspeaker"`), passing:
    - `$SKILL_DIR` — the skill's load-time "Base directory for this skill" banner
      value (so it can resolve `$SKILL_DIR/scripts/analyze-changes.ts` and
@@ -58,16 +57,11 @@ The main agent does exactly three things, then waits for the Lawspeaker's report
    - `mode` — `"auto"` by default, or `"simple"` when the invocation forces one
      commit.
 
-The Lawspeaker returns the final `git log --oneline`; the main agent relays it to the
-user (commit hash + subject line per commit) and nothing else.
+4. **Verify** — run `git rev-parse HEAD 2>/dev/null || true`, then compare with baseline:
 
-## What the Lawspeaker does (reference)
-
-Full procedure lives in `agents/lawspeaker.md`. In brief: spawn `chronicle:watcher` →
-auto-apply the decision tree → build a whole-file `CommitPlan` with a per-commit
-`whyBrief` → spawn `chronicle:runesmith` → relay its `git log` up.
-The Lawspeaker auto-decides simple vs atomic — unless `mode` is `"simple"`, which
-forces one commit — and commits with whole-file granularity.
+   - Changed: report `git log --oneline <baseline>..HEAD`; for an empty baseline,
+     report `git log --oneline`.
+   - Unchanged: report no commit plus Lawspeaker's reason. Do not respawn.
 
 ## Codex
 
@@ -87,6 +81,9 @@ Codex uses the same topology through one of two role-loading paths:
 
 Both paths return only the final log and preserve the same Lawspeaker → Watcher →
 Runesmith isolation. These roles are installed by `chronicle:install`.
+
+After Codex returns, apply the baseline HEAD check above and report only commits that
+actually landed.
 
 If neither a named-role selector nor a non-fork generic sub-agent API is available,
 do not silently pretend the agent flow ran. If the stable role files are missing,
