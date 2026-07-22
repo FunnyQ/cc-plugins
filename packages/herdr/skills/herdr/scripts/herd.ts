@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * herd.ts — a small, typed wrapper over the raw `herdr` CLI for in-session
- * agent orchestration. Collapses herdr's multi-step recipes (split → parse id →
- * run → wait → read) into seven verbs an agent can call without re-deriving the
+ * agent orchestration. Collapses herdr's multi-step recipes (create pane → start →
+ * prompt → wait → read) into seven verbs an agent can call without re-deriving the
  * CLI's sharp edges:
  *
  *   spawn  — start an agent in a fresh pane under a collision-proof name
@@ -14,10 +14,13 @@
  *   close  — close an agent's pane
  *
  * Design notes:
- * - Targets are addressed by NAME, never by pane id. herdr renumbers ids as
- *   panes open/close, so every call re-resolves name → pane id right before use.
- * - `agent send` writes LITERAL text (no Enter) — herdr's own help says so. So
- *   `send` always follows it with `pane send-keys <pane> enter` to submit.
+ * - Targets are addressed by NAME, never by pane id. For pane-level operations,
+ *   the wrapper re-resolves name → pane id immediately before use because
+ *   herdr renumbers ids as panes open and close.
+ * - `agent prompt` atomically writes and submits text, avoiding timing-sensitive
+ *   text + Enter sequences in agent TUIs.
+ * - `agent start` launches only in an existing pane, so `spawn` creates the pane
+ *   first and puts environment variables on that pane.
  * - Runnable both as a CLI (`bun herd.ts <verb> …`) and as a module
  *   (`import { createHerd } from "./herd.ts"`) so relay can consume the same
  *   layer for a future live-pane strategy.
@@ -68,7 +71,7 @@ export type AgentInfo = {
 
 export type SpawnOpts = {
   role: string; // human label, e.g. "reviewer" — the unique name is derived from it
-  agent: string; // binary to launch in the pane, e.g. "codex" | "claude" | "opencode"
+  agent: string; // herdr agent kind, e.g. "codex" | "claude" | "opencode"
   cwd?: string;
   split?: "right" | "down"; // default "down"
   newTab?: boolean; // open the agent in its OWN new tab instead of splitting the caller's pane (takes precedence over split)
@@ -198,7 +201,7 @@ export function createHerd(run: Runner = herdrRunner) {
       "agent",
       "wait",
       target,
-      "--status",
+      "--until",
       status,
       "--timeout",
       String(timeout),
@@ -232,26 +235,10 @@ export function createHerd(run: Runner = herdrRunner) {
     return r.read?.text ?? "";
   }
 
-  /** Write a prompt to a running agent and (by default) press Enter to submit it. */
-  async function send(
-    target: string,
-    text: string,
-    opts: { submit?: boolean } = {},
-  ): Promise<SendResult> {
-    const submit = opts.submit ?? true;
-    await callJson(["agent", "send", target, text]); // literal text, no Enter
-    let paneId: string | null = null;
-    if (submit) {
-      paneId = await resolvePane(target); // re-resolve right before use
-      // Let the TUI finish processing the pasted text before pressing Enter —
-      // an Enter that lands too fast can be swallowed (seen live with codex:
-      // the text sits in the input box, never submitted). Tune/disable via
-      // HERD_SUBMIT_SETTLE_MS.
-      const settleMs = Number(process.env.HERD_SUBMIT_SETTLE_MS ?? 400);
-      if (settleMs > 0) await Bun.sleep(settleMs);
-      await callVoid(["pane", "send-keys", paneId, "enter"]);
-    }
-    return { target, paneId, submitted: submit };
+  /** Atomically write and submit a prompt to a running agent. */
+  async function send(target: string, text: string): Promise<SendResult> {
+    await callJson(["agent", "prompt", target, text]);
+    return { target, paneId: null, submitted: true };
   }
 
   /** Send bare key chords to a target's pane (no text) — e.g. keys(name, "enter")
@@ -270,7 +257,7 @@ export function createHerd(run: Runner = herdrRunner) {
   }
 
   /** The currently-focused tab id, or null. Used to restore focus after a
-   *  new-tab spawn (agent start --tab steals focus despite --no-focus). */
+   *  new-tab spawn. */
   async function focusedTabId(): Promise<string | null> {
     try {
       const r = await callJson(["tab", "list"]);
@@ -281,12 +268,7 @@ export function createHerd(run: Runner = herdrRunner) {
     }
   }
 
-  /** Start the agent in a FRESH tab instead of splitting the caller's pane.
-   *  herdr has no "agent start in a new empty tab" primitive: `tab create`
-   *  leaves a shell root pane and `agent start --tab` splits within the tab. So
-   *  we create the tab, start the agent in it, close the leftover shell root, and
-   *  restore focus to the tab the caller was on. All post-start steps are
-   *  best-effort — a real spawn already succeeded. */
+  /** Start the agent in a FRESH tab instead of splitting the caller's pane. */
   async function startInNewTab(name: string, opts: SpawnOpts): Promise<any> {
     const prevTab = await focusedTabId();
 
@@ -298,29 +280,26 @@ export function createHerd(run: Runner = herdrRunner) {
     const workspace = opts.workspace ?? process.env.HERDR_WORKSPACE_ID;
     if (workspace) createArgs.push("--workspace", workspace);
     if (opts.cwd) createArgs.push("--cwd", opts.cwd);
+    for (const e of opts.env ?? []) createArgs.push("--env", e);
     // Label the tab so the caller can tell at a glance what it's for. Defaults
     // to the generated agent name (which encodes role + a unique suffix).
     createArgs.push("--label", opts.tabLabel ?? name);
     const created = await callJson(createArgs);
-    const tabId: string | undefined = created.tab?.tab_id;
-    const shellPaneId: string | undefined = created.root_pane?.pane_id;
+    const paneId: string | undefined = created.root_pane?.pane_id;
+    if (!paneId) throw new HerdrError("tab create did not return a root pane id");
 
-    const args = ["agent", "start", name];
-    if (opts.cwd) args.push("--cwd", opts.cwd);
-    if (tabId) args.push("--tab", tabId);
-    args.push("--no-focus");
-    for (const e of opts.env ?? []) args.push("--env", e);
-    args.push("--", opts.agent, ...(opts.argv ?? []));
+    const args = [
+      "agent",
+      "start",
+      name,
+      "--kind",
+      opts.agent,
+      "--pane",
+      paneId,
+      "--",
+      ...(opts.argv ?? []),
+    ];
     const started = await callJson(args);
-
-    // Drop the shell root pane so the tab holds only the agent.
-    if (shellPaneId) {
-      try {
-        await callJson(["pane", "close", shellPaneId]);
-      } catch {
-        /* best-effort — leave the shell pane rather than fail the spawn */
-      }
-    }
     // Give focus back to where the caller was.
     if (prevTab) {
       try {
@@ -332,6 +311,31 @@ export function createHerd(run: Runner = herdrRunner) {
     return started;
   }
 
+  /** Resolve an existing pane to split when the caller targets a tab/workspace. */
+  async function splitTargetPane(opts: SpawnOpts): Promise<string | null> {
+    if (!opts.tab && !opts.workspace) return null;
+
+    const listArgs = ["pane", "list"];
+    // Herdr tab ids are workspace-qualified (for example `w3:t2`), which lets
+    // tab-only callers scope pane discovery without a separate tab lookup.
+    const workspace = opts.workspace ?? opts.tab?.split(":", 1)[0];
+    if (workspace) listArgs.push("--workspace", workspace);
+    const listed = await callJson(listArgs);
+    const panes: any[] = listed.panes ?? [];
+    const pane = opts.tab
+      ? panes.find((candidate) => candidate.tab_id === opts.tab)
+      : panes[0];
+    if (!pane?.pane_id) {
+      const scope = opts.tab
+        ? `tab ${opts.tab}`
+        : `workspace ${opts.workspace}`;
+      throw new HerdrError(
+        `spawn requires an existing pane in ${scope} to split from`,
+      );
+    }
+    return pane.pane_id;
+  }
+
   async function spawn(opts: SpawnOpts): Promise<SpawnResult> {
     const name = await genName(opts.role);
 
@@ -339,21 +343,39 @@ export function createHerd(run: Runner = herdrRunner) {
     if (opts.newTab) {
       started = await startInNewTab(name, opts);
     } else {
-      const args = ["agent", "start", name];
-      if (opts.cwd) args.push("--cwd", opts.cwd);
-      if (opts.workspace) args.push("--workspace", opts.workspace);
-      if (opts.tab) args.push("--tab", opts.tab);
-      args.push("--split", opts.split ?? "down", "--no-focus");
-      for (const e of opts.env ?? []) args.push("--env", e);
-      args.push("--", opts.agent, ...(opts.argv ?? []));
-      started = await callJson(args);
+      const targetPaneId = await splitTargetPane(opts);
+      const splitArgs = [
+        "pane",
+        "split",
+        "--direction",
+        opts.split ?? "down",
+        "--no-focus",
+      ];
+      // With no explicit scope, preserve herdr's default of splitting the
+      // current pane. A scoped spawn must split a pane found in that scope.
+      if (targetPaneId) splitArgs.push("--pane", targetPaneId);
+      if (opts.cwd) splitArgs.push("--cwd", opts.cwd);
+      for (const e of opts.env ?? []) splitArgs.push("--env", e);
+      const created = await callJson(splitArgs);
+      const paneId: string | undefined = created.pane?.pane_id;
+      if (!paneId) throw new HerdrError("pane split did not return a pane id");
+      started = await callJson([
+        "agent",
+        "start",
+        name,
+        "--kind",
+        opts.agent,
+        "--pane",
+        paneId,
+        "--",
+        ...(opts.argv ?? []),
+      ]);
     }
     const info = normAgent(started.agent ?? started);
 
     let task: { sent: boolean } | undefined;
     if (opts.task) {
       // Best-effort: wait for the agent to settle, then submit the task.
-      // A non-agent binary (e.g. a bare shell) never reports idle — send anyway.
       try {
         await wait(name, {
           status: "idle",
@@ -404,7 +426,7 @@ function assertHerdrEnv(): void {
 }
 
 /** Flags that never take a value (so a following token — even one starting with `--` — is not consumed). */
-const BOOLEAN_FLAGS = new Set(["no-submit", "new-tab"]);
+const BOOLEAN_FLAGS = new Set(["new-tab"]);
 
 /** Minimal flag parser: returns { positionals, flags, rest } where rest is everything after a bare `--`.
  *  Value-flags always consume the next token as their value — including values that start with `--`
@@ -449,9 +471,9 @@ const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent or
 
 Usage:
   herd list
-  herd spawn <role> --agent <bin> [--cwd P] [--split down|right] [--new-tab] [--tab-label TEXT]
+  herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--tab-label TEXT]
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
-  herd send <target> <text> [--no-submit]
+  herd send <target> <text>
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k
   herd wait <target> [--status idle|working|blocked|unknown] [--timeout MS]
   herd read <target> [--lines N] [--source recent-unwrapped|recent|visible]
@@ -480,7 +502,7 @@ async function main() {
         const role = positionals[0];
         const agent = flags.agent as string;
         if (!role || !agent)
-          throw new HerdrError("spawn requires <role> and --agent <bin>");
+          throw new HerdrError("spawn requires <role> and --agent <kind>");
         const res = await herd.spawn({
           role,
           agent,
@@ -504,14 +526,10 @@ async function main() {
         // Parse from raw argv (not the generic flag parser) so prompt text that
         // starts with or contains `--` (e.g. "--please fix this") survives intact.
         const target = rest[0];
-        const submit = !rest.includes("--no-submit");
-        const text = rest
-          .slice(1)
-          .filter((t) => t !== "--no-submit")
-          .join(" ");
+        const text = rest.slice(1).join(" ");
         if (!target || !text)
           throw new HerdrError("send requires <target> and <text>");
-        const res = await herd.send(target, text, { submit });
+        const res = await herd.send(target, text);
         console.log(JSON.stringify(res, null, 2));
         break;
       }

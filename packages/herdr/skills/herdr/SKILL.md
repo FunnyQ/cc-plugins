@@ -18,7 +18,7 @@ Docs: <https://herdr.dev/docs/>
 
 ## Orchestrating agents — use the `herd` wrapper first
 
-When you are inside a herdr pane (`HERDR_ENV=1`) and need to spawn or drive other agents, prefer the bundled `scripts/herd.ts` wrapper over hand-rolling raw `herdr` CLI chains. It collapses herdr's multi-step recipes (split → parse pane id → send text → press Enter → wait → read) into seven typed verbs and handles the sharp edges for you: it addresses agents by a **collision-proof generated name** (never by non-durable pane ids), and its `send` writes the prompt **and presses Enter** (raw `agent send` only writes literal text).
+When you are inside a herdr pane (`HERDR_ENV=1`) and need to spawn or drive other agents, prefer the bundled `scripts/herd.ts` wrapper over hand-rolling raw `herdr` CLI chains. It collapses herdr's multi-step recipes (create pane → start agent → prompt → wait → read) into seven typed verbs and handles the sharp edges for you: it addresses agents by a **collision-proof generated name** (never by non-durable pane ids), creates the destination pane before `agent start`, and uses atomic `agent prompt` submission.
 
 Resolve the script from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`); `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call.
 
@@ -33,7 +33,7 @@ bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
 
-# Send a prompt to a running agent and submit it (Enter). --no-submit to stage only
+# Atomically send and submit a prompt to a running agent
 bun "$HERD" send reviewer-a3f9 "now check error handling"
 
 # Send bare key chords (no text) — submit what's in the box, or clear a line
@@ -48,7 +48,7 @@ bun "$HERD" list                 # all current agents as typed JSON
 bun "$HERD" close reviewer-a3f9  # close the agent's pane
 ```
 
-All verbs print JSON except `read` (prints the pane's text). `read` defaults to `--source visible` (the current screen) because agent TUIs render into the alternate-screen buffer, leaving `recent`/`recent-unwrapped` empty; pass `--source recent-unwrapped` for a scrolled log tail. The wrapper's `wait` cannot wait for status `done`; only raw `herdr wait agent-status <pane> --status done` supports the common "block until the other agent finishes" case. Run tests with `bun test scripts/herd.test.ts`.
+All verbs print JSON except `read` (prints the pane's text). `read` defaults to `--source visible` (the current screen) because agent TUIs render into the alternate-screen buffer, leaving `recent`/`recent-unwrapped` empty; pass `--source recent-unwrapped` for a scrolled log tail. The wrapper keeps its existing `wait({ status })` API and translates it to herdr 0.7.5's `agent wait --until`; use raw `agent wait --until done` when the `done` state is required. Run tests with `bun test scripts/herd.test.ts`.
 
 For anything the wrapper doesn't cover (worktrees, layout, notifications, waiting on arbitrary pane output, plugin panes), drop to the raw CLI — see `references/agent-orchestration.md` for live recipes and `references/cli.md` for the full command surface.
 

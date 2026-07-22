@@ -1,6 +1,6 @@
 # Herdr CLI Reference
 
-Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+Verified against herdr 0.7.5; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Most commands output JSON for scripting.
 
@@ -110,7 +110,7 @@ herdr pane read <id> --source visible --ansi
 | `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
 | `detection` | Bottom-buffer snapshot used by agent screen detection |
 
-`herdr wait output --source recent` matches against the **unwrapped** recent text (pane width/soft-wrapping don't affect the match) even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists; use `wait output` for output you expect to appear next.
+`herdr pane wait-output --source recent` matches against the **unwrapped** recent text (pane width/soft-wrapping don't affect the match) even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists; use `pane wait-output` for output you expect to appear next.
 
 **Send input:**
 ```bash
@@ -147,15 +147,20 @@ herdr pane report-metadata <id> \
 herdr agent list
 herdr agent get <target>
 herdr agent read <target> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi]
-herdr agent send <target> <text>
+herdr agent send-keys <target> <key> [key ...]
+herdr agent prompt <target> <text> [--wait] [--until <status>]... [--timeout MS]
 herdr agent rename <target> <name>|--clear
 herdr agent focus <target>
-herdr agent wait <target> --status idle|working|blocked|unknown [--timeout MS]
+herdr agent wait <target> [--until idle|working|blocked|done|unknown]... [--timeout MS]
 herdr agent attach <target> [--takeover]
-herdr agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>
+herdr agent start <name> --kind <kind> --pane <pane_id> [--timeout MS] -- [agent_arg...]
 herdr agent explain <target> [--json|--verbose]
 herdr agent explain --file PATH --agent LABEL [--json|--verbose]
 ```
+
+Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `maki`.
+
+`agent prompt` atomically writes the text and presses Enter. `agent wait` accepts repeated `--until`; when omitted, it waits for `idle`, `done`, or `blocked`.
 
 Targets: terminal IDs, unique agent names, detected/reported agent labels, or legacy pane IDs.
 
@@ -171,9 +176,10 @@ herdr terminal title clear
 
 ## Waits
 ```bash
-herdr wait output <pane_id> --match <text> [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--regex] [--raw]
-herdr wait agent-status <pane_id> --status idle|working|blocked|done|unknown [--timeout MS]
+herdr pane wait-output <pane_id> <--match TEXT | --regex PATTERN> [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
 ```
+
+For agent-status waits, use `herdr agent wait <target> --until <status>` (see Agents). The old top-level `wait output` / `wait agent-status` commands were removed in 0.7.5.
 
 ## Notifications
 ```bash
@@ -209,7 +215,7 @@ herdr plugin pane close <pane_id>
 
 ## Output format cheat sheet
 
-- `workspace list/create`, `tab list/create/get/focus/rename/close`, `pane list/get/split`, `wait output`, `wait agent-status` — print JSON on success.
+- `workspace list/create`, `tab list/create/get/focus/rename/close`, `pane list/get/split/wait-output`, `agent wait` — print JSON on success.
 - `pane read` — prints plain text, not JSON. `--format ansi` / `--ansi` returns a rendered ANSI snapshot for TUI feedback loops.
 - `pane send-text`, `pane send-keys`, `pane run` — print nothing on success.
 - `--no-focus` on `pane split` / `tab create` / `workspace create` keeps your current terminal focused instead of jumping to the new one.

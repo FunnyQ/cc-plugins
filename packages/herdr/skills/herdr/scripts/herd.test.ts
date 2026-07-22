@@ -7,9 +7,6 @@ import {
   type Runner,
 } from "./herd.ts";
 
-// Skip the real submit-settle pause (herd.send sleeps before pressing Enter).
-process.env.HERD_SUBMIT_SETTLE_MS = "0";
-
 /** A mock runner that records argv and replies from a scripted table. */
 function mockRunner(
   handler: (args: string[]) => Partial<RunResult> | undefined,
@@ -71,35 +68,18 @@ describe("list", () => {
 });
 
 describe("send", () => {
-  test("writes literal text then presses Enter, re-resolving the pane", async () => {
-    const { run, calls } = mockRunner((a) => {
-      if (a[0] === "agent" && a[1] === "send")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
-      if (a[0] === "agent" && a[1] === "get")
-        return { stdout: agentEnvelope({ name: "rev-1", pane_id: "w9:pB" }) };
-      if (a[0] === "pane" && a[1] === "send-keys") return { stdout: "" }; // prints nothing
-      return undefined;
-    });
-    const herd = createHerd(run);
-    const res = await herd.send("rev-1", "do the thing");
-
-    expect(res).toEqual({ target: "rev-1", paneId: "w9:pB", submitted: true });
-    expect(calls[0]).toEqual(["agent", "send", "rev-1", "do the thing"]);
-    expect(calls[1]).toEqual(["agent", "get", "rev-1"]);
-    expect(calls[2]).toEqual(["pane", "send-keys", "w9:pB", "enter"]);
-  });
-
-  test("--no-submit skips the Enter and pane resolution", async () => {
+  test("atomically writes and submits text with agent prompt", async () => {
     const { run, calls } = mockRunner((a) =>
-      a[1] === "send"
+      a[0] === "agent" && a[1] === "prompt"
         ? { stdout: JSON.stringify({ result: { type: "ok" } }) }
         : undefined,
     );
     const herd = createHerd(run);
-    const res = await herd.send("rev-1", "draft only", { submit: false });
-    expect(res).toEqual({ target: "rev-1", paneId: null, submitted: false });
+    const res = await herd.send("rev-1", "do the thing");
+
+    expect(res).toEqual({ target: "rev-1", paneId: null, submitted: true });
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual(["agent", "send", "rev-1", "draft only"]);
+    expect(calls[0]).toEqual(["agent", "prompt", "rev-1", "do the thing"]);
   });
 });
 
@@ -107,6 +87,12 @@ describe("spawn", () => {
   test("generates a unique name and starts the agent no-focus", async () => {
     const { run, calls } = mockRunner((a) => {
       if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({
+            result: { pane: { pane_id: "w1:pZ" } },
+          }),
+        };
       if (a[1] === "start")
         return {
           stdout: agentEnvelope({
@@ -126,6 +112,8 @@ describe("spawn", () => {
       role: "Code Reviewer!",
       agent: "codex",
       cwd: "/repo",
+      env: ["MODE=review"],
+      argv: ["--full-auto"],
     });
 
     expect(res.name).toMatch(/^code-reviewer-[0-9a-f]{4}$/);
@@ -133,19 +121,30 @@ describe("spawn", () => {
     expect(res.task).toBeUndefined();
 
     const startCall = calls.find((c) => c[1] === "start")!;
-    expect(startCall).toContain("--no-focus");
-    expect(startCall).toContain("--split");
-    expect(startCall[startCall.indexOf("--split") + 1]).toBe("down");
-    // name is passed as the third token, cwd forwarded, agent binary after `--`
+    const splitCall = calls.find((c) => c[0] === "pane" && c[1] === "split")!;
+    expect(splitCall).toContain("--no-focus");
+    expect(splitCall[splitCall.indexOf("--direction") + 1]).toBe("down");
+    expect(splitCall[splitCall.indexOf("--cwd") + 1]).toBe("/repo");
+    expect(splitCall[splitCall.indexOf("--env") + 1]).toBe("MODE=review");
     expect(startCall[2]).toBe(res.name);
-    expect(startCall[startCall.indexOf("--cwd") + 1]).toBe("/repo");
-    expect(startCall.slice(startCall.indexOf("--") + 1)).toEqual(["codex"]);
+    expect(startCall[startCall.indexOf("--kind") + 1]).toBe("codex");
+    expect(startCall[startCall.indexOf("--pane") + 1]).toBe("w1:pZ");
+    expect(startCall).not.toContain("--env");
+    expect(startCall.slice(startCall.indexOf("--") + 1)).toEqual([
+      "--full-auto",
+    ]);
   });
 
   test("regenerates when the first candidate name collides", async () => {
     const { run } = mockRunner((a) => {
       if (a[1] === "list")
         return { stdout: listEnvelope([{ name: "worker-aaaa" }]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({
+            result: { pane: { pane_id: "w1:p1" } },
+          }),
+        };
       if (a[1] === "start")
         return {
           stdout: agentEnvelope({
@@ -167,11 +166,94 @@ describe("spawn", () => {
     expect(res.name).toMatch(/^worker-[0-9a-f]{4}$/);
   });
 
+  test("resolves opts.tab to a pane in that tab before splitting", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              panes: [
+                { pane_id: "w7:p1", tab_id: "w7:t1" },
+                { pane_id: "w7:p2", tab_id: "w7:t2" },
+              ],
+            },
+          }),
+        };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w7:p3" } } }),
+        };
+      if (a[0] === "agent" && a[1] === "start")
+        return { stdout: agentEnvelope({ name: a[2], pane_id: "w7:p3" }) };
+      return undefined;
+    });
+
+    await createHerd(run).spawn({
+      role: "reviewer",
+      agent: "codex",
+      tab: "w7:t2",
+    });
+
+    expect(calls.find((c) => c[0] === "pane" && c[1] === "list")).toEqual([
+      "pane",
+      "list",
+      "--workspace",
+      "w7",
+    ]);
+    const splitCall = calls.find((c) => c[0] === "pane" && c[1] === "split")!;
+    expect(splitCall[splitCall.indexOf("--pane") + 1]).toBe("w7:p2");
+  });
+
+  test("resolves opts.workspace to a pane in that workspace before splitting", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              panes: [{ pane_id: "w8:p1", tab_id: "w8:t1" }],
+            },
+          }),
+        };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w8:p2" } } }),
+        };
+      if (a[0] === "agent" && a[1] === "start")
+        return { stdout: agentEnvelope({ name: a[2], pane_id: "w8:p2" }) };
+      return undefined;
+    });
+
+    await createHerd(run).spawn({
+      role: "worker",
+      agent: "claude",
+      workspace: "w8",
+    });
+
+    expect(calls.find((c) => c[0] === "pane" && c[1] === "list")).toEqual([
+      "pane",
+      "list",
+      "--workspace",
+      "w8",
+    ]);
+    const splitCall = calls.find((c) => c[0] === "pane" && c[1] === "split")!;
+    expect(splitCall[splitCall.indexOf("--pane") + 1]).toBe("w8:p1");
+  });
+
   test("with --task: waits then sends + submits", async () => {
     const seen: string[][] = [];
     const { run } = mockRunner((a) => {
       seen.push(a);
       if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({
+            result: { pane: { pane_id: "w2:p3" } },
+          }),
+        };
       if (a[1] === "start")
         return {
           stdout: agentEnvelope({
@@ -186,11 +268,8 @@ describe("spawn", () => {
         };
       if (a[1] === "wait")
         return { stdout: JSON.stringify({ result: { status: "idle" } }) };
-      if (a[0] === "agent" && a[1] === "send")
+      if (a[0] === "agent" && a[1] === "prompt")
         return { stdout: JSON.stringify({ result: { type: "ok" } }) };
-      if (a[1] === "get")
-        return { stdout: agentEnvelope({ name: a[2], pane_id: "w2:p3" }) };
-      if (a[0] === "pane" && a[1] === "send-keys") return { stdout: "" };
       return undefined;
     });
     const herd = createHerd(run);
@@ -203,17 +282,14 @@ describe("spawn", () => {
     expect(seen.some((c) => c[1] === "wait")).toBe(true);
     expect(
       seen.some(
-        (c) => c[0] === "agent" && c[1] === "send" && c[3] === "build X",
+        (c) => c[0] === "agent" && c[1] === "prompt" && c[3] === "build X",
       ),
     ).toBe(true);
-    expect(
-      seen.some(
-        (c) => c[0] === "pane" && c[1] === "send-keys" && c[3] === "enter",
-      ),
-    ).toBe(true);
+    const waitCall = seen.find((c) => c[0] === "agent" && c[1] === "wait")!;
+    expect(waitCall[waitCall.indexOf("--until") + 1]).toBe("idle");
   });
 
-  test("newTab: creates a tab, starts in it, closes the shell root, restores focus", async () => {
+  test("newTab: creates a tab, starts in its root pane, restores focus", async () => {
     const seen: string[][] = [];
     const { run } = mockRunner((a) => {
       seen.push(a);
@@ -251,8 +327,6 @@ describe("spawn", () => {
             agent_status: "unknown",
           }),
         };
-      if (a[0] === "pane" && a[1] === "close")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
       if (a[0] === "tab" && a[1] === "focus") return { stdout: "" };
       return undefined;
     });
@@ -272,15 +346,9 @@ describe("spawn", () => {
     expect(createCall[createCall.indexOf("--label") + 1]).toBe(res.name);
 
     const startCall = seen.find((c) => c[0] === "agent" && c[1] === "start")!;
-    // Started INTO the new tab, never as a split of the caller's pane.
-    expect(startCall[startCall.indexOf("--tab") + 1]).toBe("w3:t9");
+    expect(startCall[startCall.indexOf("--kind") + 1]).toBe("codex");
+    expect(startCall[startCall.indexOf("--pane") + 1]).toBe("w3:pShell");
     expect(startCall).not.toContain("--split");
-    // Leftover shell root pane dropped; focus restored to the caller's tab.
-    expect(
-      seen.some(
-        (c) => c[0] === "pane" && c[1] === "close" && c[2] === "w3:pShell",
-      ),
-    ).toBe(true);
     expect(
       seen.some((c) => c[0] === "tab" && c[1] === "focus" && c[2] === "w3:t2"),
     ).toBe(true);
@@ -320,8 +388,6 @@ describe("spawn", () => {
             agent_status: "unknown",
           }),
         };
-      if (a[0] === "pane" && a[1] === "close")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
       if (a[0] === "tab" && a[1] === "focus") return { stdout: "" };
       return undefined;
     });
@@ -393,8 +459,6 @@ describe("spawn", () => {
         };
       if (a[0] === "agent" && a[1] === "start")
         return { stdout: agentEnvelope({ name: a[2], pane_id: "w3:pAgent" }) };
-      if (a[0] === "pane" && a[1] === "close")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
       if (a[0] === "tab" && a[1] === "focus") return { stdout: "" };
       return undefined;
     });
@@ -409,9 +473,15 @@ describe("spawn", () => {
     expect(createCall[createCall.indexOf("--label") + 1]).toBe("PR #42 review");
   });
 
-  test("with --task: sends even if the idle wait errors (non-agent binary)", async () => {
+  test("with --task: sends even if the idle wait errors", async () => {
     const { run } = mockRunner((a) => {
       if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({
+            result: { pane: { pane_id: "w2:p3" } },
+          }),
+        };
       if (a[1] === "start")
         return {
           stdout: agentEnvelope({
@@ -425,17 +495,14 @@ describe("spawn", () => {
           }),
         };
       if (a[1] === "wait") return { code: 1, stderr: "timeout" };
-      if (a[0] === "agent" && a[1] === "send")
+      if (a[0] === "agent" && a[1] === "prompt")
         return { stdout: JSON.stringify({ result: { type: "ok" } }) };
-      if (a[1] === "get")
-        return { stdout: agentEnvelope({ name: a[2], pane_id: "w2:p3" }) };
-      if (a[0] === "pane" && a[1] === "send-keys") return { stdout: "" };
       return undefined;
     });
     const herd = createHerd(run);
     const res = await herd.spawn({
-      role: "shell",
-      agent: "bash",
+      role: "worker",
+      agent: "codex",
       task: "echo hi",
     });
     expect(res.task).toEqual({ sent: true });
@@ -558,16 +625,6 @@ describe("parseArgs", () => {
     expect(flags["new-tab"]).toBe(true);
     expect(flags.agent).toBe("codex");
     expect(positionals).toEqual(["reviewer"]);
-  });
-
-  test("no-submit is boolean and does not swallow the next token", () => {
-    const { flags, positionals } = parseArgs([
-      "rev-1",
-      "--no-submit",
-      "leftover",
-    ]);
-    expect(flags["no-submit"]).toBe(true);
-    expect(positionals).toEqual(["rev-1", "leftover"]);
   });
 
   test("a trailing value-flag with no value becomes boolean", () => {
