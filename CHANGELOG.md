@@ -1,5 +1,17 @@
 # Changelog
 
+## [chronicle 0.9.1] - 2026-07-22
+
+_tracks tag `chronicle-v0.9.1`_
+
+### Fixed
+
+- **Chronicle's commit, PR, and release flows could not delegate to their own sub-agents.** The three orchestrator roles (Lawspeaker, Storykeeper, Oathkeeper) declared their spawn permission using a scoped form — `tools: ["Agent(chronicle:watcher)", …]` — that a sub-agent definition does not honor. In practice each orchestrator started with read-only access and no ability to spawn the children it is built around, so the documented nested-agent topology did not actually work. All three now declare unscoped `tools: ["Agent", "Read"]`.
+
+### Changed
+
+- **Orchestrator spawn scope is now governed by each agent's `## Child protocol` prose** ("spawn exactly one X, then one Y; never spawn helpers, replacements, or both children together") rather than by frontmatter. This is not a loosening — the scoped frontmatter form never enforced anything; it only appeared to.
+
 ## [chronicle 0.9.0] - 2026-07-20
 
 _tracks tag `chronicle-v0.9.0`_

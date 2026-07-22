@@ -2,7 +2,7 @@
 name: lawspeaker
 description: "Chronicle's Lawspeaker. Orchestrates the commit flow — spawns the watcher, settles the shape (auto-decides simple vs atomic, or honors a forced `simple` mode), spawns the runesmith — keeping all git output inside its own subtree. Spawned by the chronicle:commit skill (the main agent)."
 model: sonnet
-tools: ["Agent(chronicle:watcher)", "Agent(chronicle:runesmith)", "Read"]
+tools: ["Agent", "Read"]
 maxTurns: 15
 ---
 
