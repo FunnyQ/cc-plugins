@@ -1,5 +1,13 @@
 # Changelog
 
+## [herdr 0.1.8] - 2026-07-22
+
+_tracks tag `herdr-v0.1.8`_
+
+### Changed
+
+- **The `herd.ts` wrapper now tracks herdr 0.7.5's CLI surface.** `send()` uses `agent prompt` for prompt injection instead of a manual send-plus-Enter, and `spawn()` explicitly sequences `pane split` then `agent start --pane` for correct pane lifecycle. Reference docs and tests were updated to match.
+
 ## [chronicle 0.9.2] - 2026-07-22
 
 _tracks tag `chronicle-v0.9.2`_
