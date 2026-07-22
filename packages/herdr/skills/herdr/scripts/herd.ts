@@ -119,7 +119,16 @@ function normAgent(a: any): AgentInfo {
   };
 }
 
-export function createHerd(run: Runner = herdrRunner) {
+/** Clock seam so the shell-readiness retry loop is testable without wall time. */
+export type HerdDeps = {
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
+  const now = deps.now ?? (() => Date.now());
+  const sleep = deps.sleep ?? ((ms: number) => Bun.sleep(ms));
+
   /** Run a herdr command that returns a JSON envelope; unwrap `.result`, throw on error. */
   async function callJson(args: string[]): Promise<any> {
     const { stdout, stderr, code } = await run(args);
@@ -268,6 +277,72 @@ export function createHerd(run: Runner = herdrRunner) {
     }
   }
 
+  /** How long to keep re-trying `agent start` while the target pane is still
+   *  booting its shell, and the backoff between attempts. */
+  const SHELL_READY_TIMEOUT_MS = 10_000;
+  const SHELL_RETRY_MIN_MS = 150;
+  const SHELL_RETRY_MAX_MS = 1_000;
+
+  /** True for the one error that means "the pane exists but hasn't reached its
+   *  interactive shell prompt yet" — the only condition worth re-trying. */
+  function isPaneNotReady(error: unknown): boolean {
+    if (!(error instanceof HerdrError)) return false;
+    return (
+      error.code === "agent_pane_busy" ||
+      /not an available shell/i.test(error.message)
+    );
+  }
+
+  /**
+   * Start `name` in an EXISTING pane, retrying while the pane is still booting.
+   *
+   * herdr's `agent start --pane` requires a pane sitting at its interactive
+   * shell prompt, but `pane split` / `tab create` return as soon as the pane
+   * exists — its shell is typically a beat behind. Starting immediately loses
+   * that race and fails with `agent_pane_busy`, so poll until the shell shows
+   * up. Every other error fails fast: only readiness is transient.
+   */
+  async function startAgentInPane(
+    name: string,
+    paneId: string,
+    opts: SpawnOpts,
+  ): Promise<any> {
+    const args = [
+      "agent",
+      "start",
+      name,
+      "--kind",
+      opts.agent,
+      "--pane",
+      paneId,
+      "--",
+      ...(opts.argv ?? []),
+    ];
+    const deadline = now() + SHELL_READY_TIMEOUT_MS;
+    let backoff = SHELL_RETRY_MIN_MS;
+    for (;;) {
+      try {
+        return await callJson(args);
+      } catch (error) {
+        if (!isPaneNotReady(error) || now() >= deadline) throw error;
+        await sleep(backoff);
+        backoff = Math.min(backoff * 2, SHELL_RETRY_MAX_MS);
+      }
+    }
+  }
+
+  /** `--env` flags for a pane/tab we are about to create. Spawned panes are for
+   *  agents, not humans, so the interactive shell banner is noise that also
+   *  muddies `read` output — suppress it the way the herdr zsh helpers do. A
+   *  caller that sets Q_NO_BANNER itself wins. */
+  function newPaneEnvArgs(opts: SpawnOpts): string[] {
+    const callerEnv = opts.env ?? [];
+    const env = callerEnv.some((e) => e.startsWith("Q_NO_BANNER="))
+      ? callerEnv
+      : ["Q_NO_BANNER=1", ...callerEnv];
+    return env.flatMap((e) => ["--env", e]);
+  }
+
   /** Start the agent in a FRESH tab instead of splitting the caller's pane. */
   async function startInNewTab(name: string, opts: SpawnOpts): Promise<any> {
     const prevTab = await focusedTabId();
@@ -280,26 +355,16 @@ export function createHerd(run: Runner = herdrRunner) {
     const workspace = opts.workspace ?? process.env.HERDR_WORKSPACE_ID;
     if (workspace) createArgs.push("--workspace", workspace);
     if (opts.cwd) createArgs.push("--cwd", opts.cwd);
-    for (const e of opts.env ?? []) createArgs.push("--env", e);
+    createArgs.push(...newPaneEnvArgs(opts));
     // Label the tab so the caller can tell at a glance what it's for. Defaults
     // to the generated agent name (which encodes role + a unique suffix).
     createArgs.push("--label", opts.tabLabel ?? name);
     const created = await callJson(createArgs);
     const paneId: string | undefined = created.root_pane?.pane_id;
-    if (!paneId) throw new HerdrError("tab create did not return a root pane id");
+    if (!paneId)
+      throw new HerdrError("tab create did not return a root pane id");
 
-    const args = [
-      "agent",
-      "start",
-      name,
-      "--kind",
-      opts.agent,
-      "--pane",
-      paneId,
-      "--",
-      ...(opts.argv ?? []),
-    ];
-    const started = await callJson(args);
+    const started = await startAgentInPane(name, paneId, opts);
     // Give focus back to where the caller was.
     if (prevTab) {
       try {
@@ -355,21 +420,11 @@ export function createHerd(run: Runner = herdrRunner) {
       // current pane. A scoped spawn must split a pane found in that scope.
       if (targetPaneId) splitArgs.push("--pane", targetPaneId);
       if (opts.cwd) splitArgs.push("--cwd", opts.cwd);
-      for (const e of opts.env ?? []) splitArgs.push("--env", e);
+      splitArgs.push(...newPaneEnvArgs(opts));
       const created = await callJson(splitArgs);
       const paneId: string | undefined = created.pane?.pane_id;
       if (!paneId) throw new HerdrError("pane split did not return a pane id");
-      started = await callJson([
-        "agent",
-        "start",
-        name,
-        "--kind",
-        opts.agent,
-        "--pane",
-        paneId,
-        "--",
-        ...(opts.argv ?? []),
-      ]);
+      started = await startAgentInPane(name, paneId, opts);
     }
     const info = normAgent(started.agent ?? started);
 

@@ -125,7 +125,9 @@ describe("spawn", () => {
     expect(splitCall).toContain("--no-focus");
     expect(splitCall[splitCall.indexOf("--direction") + 1]).toBe("down");
     expect(splitCall[splitCall.indexOf("--cwd") + 1]).toBe("/repo");
-    expect(splitCall[splitCall.indexOf("--env") + 1]).toBe("MODE=review");
+    expect(splitCall.filter((_, i) => splitCall[i - 1] === "--env")).toContain(
+      "MODE=review",
+    );
     expect(startCall[2]).toBe(res.name);
     expect(startCall[startCall.indexOf("--kind") + 1]).toBe("codex");
     expect(startCall[startCall.indexOf("--pane") + 1]).toBe("w1:pZ");
@@ -471,6 +473,233 @@ describe("spawn", () => {
     });
     const createCall = seen.find((c) => c[0] === "tab" && c[1] === "create")!;
     expect(createCall[createCall.indexOf("--label") + 1]).toBe("PR #42 review");
+  });
+
+  // A pane returned by `pane split` / `tab create` is not yet at its shell
+  // prompt, and `agent start --pane` rejects it with `agent_pane_busy` until it
+  // is. These tests pin the retry loop that closes that window.
+  const paneBusy = {
+    code: 1,
+    stdout: JSON.stringify({
+      error: {
+        code: "agent_pane_busy",
+        message: "agent target w1:pZ is not an available shell",
+      },
+    }),
+  };
+
+  /** Fake clock + sleep: advances instantly so retry tests cost no wall time. */
+  function fakeClock() {
+    let t = 0;
+    return {
+      now: () => t,
+      sleep: async (ms: number) => {
+        t += ms;
+      },
+    };
+  }
+
+  test("retries agent start until the fresh pane reaches its shell prompt", async () => {
+    let startAttempts = 0;
+    const { run } = mockRunner((a) => {
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w1:pZ" } } }),
+        };
+      if (a[1] === "start") {
+        startAttempts++;
+        if (startAttempts < 3) return paneBusy;
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w1:pZ",
+            tab_id: "w1:t1",
+            workspace_id: "w1",
+            terminal_id: "t",
+            cwd: "/repo",
+            agent_status: "idle",
+          }),
+        };
+      }
+      return undefined;
+    });
+    const herd = createHerd(run, fakeClock());
+    const res = await herd.spawn({ role: "worker", agent: "codex" });
+
+    expect(startAttempts).toBe(3);
+    expect(res.paneId).toBe("w1:pZ");
+    // The pane is split exactly once — retries re-run `agent start` only.
+    expect(res.name).toMatch(/^worker-[0-9a-f]{4}$/);
+  });
+
+  test("newTab: retries agent start on the fresh tab's root pane too", async () => {
+    let startAttempts = 0;
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([]) };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: { tabs: [{ tab_id: "w3:t2", focused: true }] },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "create")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              tab: { tab_id: "w3:t9" },
+              root_pane: { pane_id: "w3:pShell" },
+            },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "start") {
+        startAttempts++;
+        if (startAttempts < 2) return paneBusy;
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w3:pAgent",
+            tab_id: "w3:t9",
+            workspace_id: "w3",
+            terminal_id: "t",
+            cwd: "/repo",
+            agent_status: "idle",
+          }),
+        };
+      }
+      return undefined;
+    });
+    const herd = createHerd(run, fakeClock());
+    const res = await herd.spawn({
+      role: "reviewer",
+      agent: "codex",
+      newTab: true,
+    });
+
+    expect(startAttempts).toBe(2);
+    expect(res.paneId).toBe("w3:pAgent");
+    // One tab only — a retry must not create a second tab.
+    expect(
+      calls.filter((c) => c[0] === "tab" && c[1] === "create"),
+    ).toHaveLength(1);
+  });
+
+  test("gives up with herdr's message when the pane never frees up", async () => {
+    let startAttempts = 0;
+    const { run } = mockRunner((a) => {
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w1:pZ" } } }),
+        };
+      if (a[1] === "start") {
+        startAttempts++;
+        return paneBusy;
+      }
+      return undefined;
+    });
+    const herd = createHerd(run, fakeClock());
+    await expect(
+      herd.spawn({ role: "worker", agent: "codex" }),
+    ).rejects.toThrow("is not an available shell");
+    expect(startAttempts).toBeGreaterThan(1);
+  });
+
+  test("does not retry errors unrelated to shell readiness", async () => {
+    let startAttempts = 0;
+    const { run } = mockRunner((a) => {
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w1:pZ" } } }),
+        };
+      if (a[1] === "start") {
+        startAttempts++;
+        return {
+          code: 1,
+          stdout: JSON.stringify({
+            error: { code: "agent_kind_unsupported", message: "bad kind" },
+          }),
+        };
+      }
+      return undefined;
+    });
+    const herd = createHerd(run, fakeClock());
+    await expect(herd.spawn({ role: "worker", agent: "nope" })).rejects.toThrow(
+      "bad kind",
+    );
+    expect(startAttempts).toBe(1);
+  });
+
+  test("suppresses the shell banner in the new pane and keeps caller env", async () => {
+    const seen: string[][] = [];
+    const { run } = mockRunner((a) => {
+      seen.push(a);
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w1:pZ" } } }),
+        };
+      if (a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w1:pZ",
+            agent_status: "idle",
+          }),
+        };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    await herd.spawn({ role: "worker", agent: "codex", env: ["MODE=review"] });
+
+    const split = seen.find((c) => c[0] === "pane" && c[1] === "split")!;
+    const envs = split.filter((_, i) => split[i - 1] === "--env");
+    expect(envs).toContain("Q_NO_BANNER=1");
+    expect(envs).toContain("MODE=review");
+  });
+
+  test("newTab: suppresses the shell banner on tab create", async () => {
+    const seen: string[][] = [];
+    const { run } = newTabRunner(seen);
+    const herd = createHerd(run);
+    await herd.spawn({ role: "worker", agent: "codex", newTab: true });
+
+    const create = seen.find((c) => c[0] === "tab" && c[1] === "create")!;
+    const envs = create.filter((_, i) => create[i - 1] === "--env");
+    expect(envs).toContain("Q_NO_BANNER=1");
+  });
+
+  test("an explicit Q_NO_BANNER from the caller wins over the default", async () => {
+    const seen: string[][] = [];
+    const { run } = mockRunner((a) => {
+      seen.push(a);
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w1:pZ" } } }),
+        };
+      if (a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w1:pZ",
+            agent_status: "idle",
+          }),
+        };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    await herd.spawn({
+      role: "worker",
+      agent: "codex",
+      env: ["Q_NO_BANNER=0"],
+    });
+
+    const split = seen.find((c) => c[0] === "pane" && c[1] === "split")!;
+    const envs = split.filter((_, i) => split[i - 1] === "--env");
+    expect(envs).toEqual(["Q_NO_BANNER=0"]);
   });
 
   test("with --task: sends even if the idle wait errors", async () => {
