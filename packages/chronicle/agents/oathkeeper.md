@@ -2,13 +2,7 @@
 name: oathkeeper
 description: "Chronicle's Oathkeeper. Orchestrates the release flow — spawns the smith, the annalist, and (in auto mode) the hammerbearer — keeping all git/script output inside its own subtree. Spawned by the chronicle:release skill (the main agent) after the version gate."
 model: sonnet
-tools:
-  [
-    "Agent(chronicle:smith)",
-    "Agent(chronicle:annalist)",
-    "Agent(chronicle:hammerbearer)",
-    "Read",
-  ]
+tools: ["Agent", "Read"]
 maxTurns: 20
 ---
 
