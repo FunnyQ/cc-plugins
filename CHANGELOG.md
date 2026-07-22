@@ -1,5 +1,17 @@
 # Changelog
 
+## [herdr 0.2.0] - 2026-07-22
+
+_tracks tag `herdr-v0.2.0`_
+
+### Fixed
+
+- **Spawn works again against herdr 0.7.5.** That release split spawning into a pane/tab creation step followed by a separate `agent start`, but the newly created pane isn't always ready to host an agent the instant it appears — spawn could fail outright with `agent_pane_busy`. Spawn now retries until the pane is ready. This also silently broke relay's live-pane mode, which was quietly falling back to headless execution instead of opening a visible pane — that path is fixed too.
+
+### Added
+
+- **Agent panes and tabs opened by `spawn` no longer show the shell startup banner by default** (a caller can still opt back in). Agent panes aren't meant for a human to read, and the banner was cluttering `herd read` output.
+
 ## [herdr 0.1.8] - 2026-07-22
 
 _tracks tag `herdr-v0.1.8`_
