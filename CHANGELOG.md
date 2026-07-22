@@ -1,12 +1,24 @@
 # Changelog
 
+## [chronicle 0.9.2] - 2026-07-22
+
+_tracks tag `chronicle-v0.9.2`_
+
+### Fixed
+
+- **Chronicle's commit, PR, and release flows could fail outright with "Agent exists but is not enabled in this context" — no commit, nothing staged, nothing released.** Claude Code 2.1.217 changed nested sub-agent spawning to be disabled by default, and Chronicle's whole topology is orchestrator-shaped (main agent → orchestrator → children), so every flow tripped the new limit. Chronicle now owns this prerequisite itself: a new `SessionStart` hook writes `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` into `~/.claude/settings.json` whenever it's missing or too low, and only ever raises the value — never lowers it, since the setting is shared globally and shrinking it could break other plugins. **The fix needs a restart to take effect:** the env var is read once at session start, so the very session whose hook performs the write is still running without it — running a Chronicle command again in that same session will still fail and can look unfixed.
+
+### Added
+
+- **The install skill can now repair the spawn-depth setting by hand, not just via the automatic hook.** `check` / `dry-run` / `apply` modes let you inspect or apply the fix yourself instead of waiting on the next session start.
+
 ## [chronicle 0.9.1] - 2026-07-22
 
 _tracks tag `chronicle-v0.9.1`_
 
 ### Fixed
 
-- **Chronicle's commit, PR, and release flows could not delegate to their own sub-agents.** The three orchestrator roles (Lawspeaker, Storykeeper, Oathkeeper) declared their spawn permission using a scoped form — `tools: ["Agent(chronicle:watcher)", …]` — that a sub-agent definition does not honor. In practice each orchestrator started with read-only access and no ability to spawn the children it is built around, so the documented nested-agent topology did not actually work. All three now declare unscoped `tools: ["Agent", "Read"]`.
+- **Chronicle's commit, PR, and release flows declared their orchestrators' spawn permission using a scoped form** — `tools: ["Agent(chronicle:watcher)", …]`. All three roles (Lawspeaker, Storykeeper, Oathkeeper) now declare unscoped `tools: ["Agent", "Read"]` instead. _Correction (chronicle 0.9.2): this entry originally claimed the scoped form left the orchestrators read-only and unable to spawn at all. A later live probe on Claude Code 2.1.217 showed that's wrong — the scoped form does grant the Agent tool; it just doesn't restrict which agent types can be spawned. The orchestrators' actual breakage was the harness's new nested-subagent-spawn-depth default, fixed in chronicle 0.9.2, not this frontmatter. Switching to the unscoped form is still the right shape — the scoped form reads as a guarantee it doesn't provide — it just wasn't a fix for the read-only symptom originally described here._
 
 ### Changed
 
