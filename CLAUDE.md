@@ -9,7 +9,7 @@ A Claude Code (and Codex) plugin marketplace (`q-lab-marketplace`) containing fi
 - **monitor** — usage dashboard + per-project cockpit (documented in depth below).
 - **dispatch** — interview-driven planning + execution: `preflight` (lightweight in-conversation spec) + `flightplan` (multi-file blueprint written to disk for sub-agents) + `autopilot` (executes a flightplan tree via the Workflow tool: per-task dev→verify→judge→score loop gated on each task's `## Eval rubric`, then the closing `Final review` task, leaving a self-gitignored `docs/<slug>/.flightlog/` audit trail) + `waypoints` (a rolling-wave milestone-roadmap tier *above* flightplan: writes only `docs/<proj>/WAYPOINTS.md` and a `waypoints.ts` CLI — `active` / `leg-scaffold` / `advance` — so each leg's flightplan is generated just-in-time after the previous leg lands; flightplan gains a narrow "waypoint mode" to plan one leg into `docs/<proj>/legs/NN-slug/`). See `packages/dispatch/skills/*/SKILL.md`; the only repo-level wiring is its two entries in the marketplace registries and a PostToolUse `flightplan-lint.sh` hook in `packages/dispatch/.claude-plugin/plugin.json`.
 - **relay** — cross-harness delegation via `/relay <codex|opencode|claude> <delegate|review|image>`, with a backend-agnostic mode layer plus per-harness strategy layer and a capability matrix where `image` is codex-only.
-- **chronicle** — commit + PR/MR authoring + release automation: reshapes odin-git's simple/atomic commit ideas into one decision tree with no odin-git dependency, and treats cockpit's decision trail as a soft enrichment for PR context. Its third skill `release` is config-first release automation — it auto-detects whole-repo vs per-component monorepo layouts, persists the shape to a committed `.chronicle/release.json`, and bumps versions / writes the CHANGELOG entry / (in auto mode) commits, merges, tags, and pushes. All three skills use a thin-SKILL → nested no-Bash orchestrator → cheap child-agent topology (agents live in `packages/chronicle/agents/`). A PreToolUse `check-branch.sh` hook in `packages/chronicle/.claude-plugin/plugin.json` (ported from odin-git) blocks/asks-confirmation on `git commit` while on `main`/`master` in a git-flow repo.
+- **chronicle** — commit + PR/MR authoring + release automation: reshapes odin-git's simple/atomic commit ideas into one decision tree with no odin-git dependency, and treats cockpit's decision trail as a soft enrichment for PR context. Its third skill `release` is config-first release automation — it auto-detects whole-repo vs per-component monorepo layouts, persists the shape to a committed `.chronicle/release.json`, and bumps versions / writes the CHANGELOG entry / (in auto mode) commits, merges, tags, and pushes. All three skills use a thin-SKILL → nested no-Bash orchestrator → cheap child-agent topology (agents live in `packages/chronicle/agents/`). **That topology needs nested subagent spawning, which Claude Code 2.1.217 disabled by default** — without `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (Chronicle needs `2`) every orchestrator fails with `Agent exists but is not enabled in this context`. Its fourth skill `install` owns that prerequisite: a `SessionStart` hook runs `setup-spawn-depth.ts --session-check`, which writes the value into `~/.claude/settings.json` when missing or too low (only ever raising it) and tells the user to restart — the env var is read at session start, so the writing session still runs without it. The same skill registers Chronicle's Codex agent roles. A PreToolUse `check-branch.sh` hook in `packages/chronicle/.claude-plugin/plugin.json` (ported from odin-git) blocks/asks-confirmation on `git commit` while on `main`/`master` in a git-flow repo.
 - **herdr** — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager. A knowledge skill (config, CLI, plugin development, live pane/agent recipes) plus a typed Bun wrapper `scripts/herd.ts` that collapses herdr's raw CLI into seven verbs (spawn/send/keys/wait/read/list/close) for driving agents in sibling panes or their own tabs (`spawn --new-tab`) when running inside herdr (`HERDR_ENV=1`). See `packages/herdr/skills/herdr/SKILL.md`.
 
 **monitor** bundles three sibling skills:
@@ -78,7 +78,7 @@ cc-plugins/
 │               ├── setup-statusline.ts   # statusline wiring (exports applyStatusline; CLI too)
 │               └── statusline-decision.ts # pure wrap/stale/skip decision (unit-tested)
 ├── packages/chronicle/               # plugin: commit + PR/MR authoring + release automation; ships to both marketplaces at independent version (see "Releasing")
-│   ├── .claude-plugin/plugin.json    # Claude manifest
+│   ├── .claude-plugin/plugin.json    # Claude manifest + SessionStart hook → setup-spawn-depth.ts --session-check
 │   ├── .codex-plugin/plugin.json     # Codex manifest, skills: "./skills/"
 │   ├── agents/                       # nested child agents for all three skills (each skill = thin SKILL → no-Bash orchestrator → cheap children)
 │   │   ├── manager.md / analyst.md / writer.md          # commit: manager orchestrates → analyst decides simple/atomic → writer commits
@@ -98,12 +98,19 @@ cc-plugins/
 │       │       ├── analyze-branch.test.ts
 │       │       ├── request-creator.ts
 │       │       └── request-creator.test.ts
-│       └── release/                  # skill: config-first release automation (whole-repo vs per-component; prepare / auto / auto push)
-│           ├── SKILL.md              # thin router → main-agent version gate → nested releaser orchestrator
-│           ├── references/{release-config,monorepo-release,changelog-template}.md
+│       ├── release/                  # skill: config-first release automation (whole-repo vs per-component; prepare / auto / auto push)
+│       │   ├── SKILL.md              # thin router → main-agent version gate → nested releaser orchestrator
+│       │   ├── references/{release-config,monorepo-release,changelog-template}.md
+│       │   └── scripts/
+│       │       ├── analyze-release.ts    # pure core: version math, capture-group pattern read/write, shape detection, config I/O (32 tests)
+│       │       └── analyze-release.test.ts
+│       └── install/                  # skill: prerequisites for BOTH harnesses (Claude spawn depth + Codex agent roles)
 │           └── scripts/
-│               ├── analyze-release.ts    # pure core: version math, capture-group pattern read/write, shape detection, config I/O (32 tests)
-│               └── analyze-release.test.ts
+│               ├── spawn-depth-decision.ts      # pure: missing/too-low/sufficient/unparsable — only ever raises (11 tests)
+│               ├── spawn-depth-decision.test.ts
+│               ├── setup-spawn-depth.ts         # writes env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH into ~/.claude/settings.json; --check/--dry-run/--apply/--session-check
+│               ├── setup-codex-agents.ts        # copies role TOMLs + owns one marked block in $CODEX_HOME/config.toml
+│               └── setup-codex-agents.test.ts
 │   # .chronicle/release.json (committed, at repo root) is the source of truth for the release shape — whole-repo vs the set of independently-versioned/tagged components + their version-file patterns
 └── packages/relay/                   # plugin: cross-harness task delegation (relay)
     ├── .claude-plugin/plugin.json        # Claude manifest, version 0.1.0

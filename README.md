@@ -1,6 +1,6 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic) and reviewer-legible PRs/MRs; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, tag, and push; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
 ## Development Workflow
 
@@ -30,12 +30,27 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 |-------|-------------|
 | [relay](./packages/relay/skills/relay) | Delegate a task to another harness's CLI (codex / opencode / claude): `delegate` (do work), `review` (analysis only), or `image` (codex only) — capture the result, smart-apply when safe, and report back |
 
-**chronicle** bundles two skills:
+**chronicle** bundles four skills:
 
 | Skill | Description |
 |-------|-------------|
 | [commit](./packages/chronicle/skills/commit) | Craft git commit(s) for the current changes — auto-decides between one simple commit and an atomic split |
 | [pr](./packages/chronicle/skills/pr) | Open a reviewer-legible PR/MR for the current branch, enriched by the cockpit decision trail when present |
+| [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, and (in auto mode) commit, merge, tag, and push |
+| [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the nested-subagent spawn depth on Claude Code, the named agent roles on Codex |
+
+> **Claude Code 2.1.217+ requires one setting.** Chronicle's flows are orchestrator-shaped
+> (`main → lawspeaker → watcher/runesmith`), and 2.1.217 stopped letting subagents spawn
+> nested subagents by default. Without it every flow fails with
+> `Agent exists but is not enabled in this context`. A `SessionStart` hook writes
+> `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` into `~/.claude/settings.json` for you —
+> **restart Claude Code afterwards**, since the value is only read at session start.
+> To check or repair it by hand:
+>
+> ```bash
+> bun packages/chronicle/skills/install/scripts/setup-spawn-depth.ts           # report
+> bun packages/chronicle/skills/install/scripts/setup-spawn-depth.ts --apply   # write
+> ```
 
 **herdr** is a single skill:
 

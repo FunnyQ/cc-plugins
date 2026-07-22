@@ -1,6 +1,6 @@
 {
   "name": "chronicle",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Write and guard your project's history — craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail.",
   "author": { "name": "Q" },
   "license": "MIT",
@@ -15,6 +15,18 @@
     "history"
   ],
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup-spawn-depth.ts\" --session-check",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
