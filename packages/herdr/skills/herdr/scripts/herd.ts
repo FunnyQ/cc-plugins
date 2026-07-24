@@ -241,7 +241,45 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       "--lines",
       String(lines),
     ]);
-    return r.read?.text ?? "";
+    // A settled/idle pane can make `agent read` come back with a null envelope
+    // (the agent JSON is gone once its turn ends), so `r` itself may be null —
+    // guard it instead of dereferencing `.read` on null. Fall back to reading
+    // the pane's raw buffer directly, which still works after the agent settles.
+    if (typeof r?.read?.text === "string") return r.read.text;
+    return readPane(target, source, lines);
+  }
+
+  /** Read a pane's raw buffer as plain text — the fallback when `agent read`
+   *  returns no transcript (e.g. a settled/idle pane whose agent JSON is null).
+   *  `pane read` prints plain text rather than a JSON envelope. Resolve the pane
+   *  id from `list` (durable across a settled agent, unlike a transcript read),
+   *  treating an unmatched target as a pane id the caller passed directly. */
+  async function readPane(
+    target: string,
+    source: string,
+    lines: number,
+  ): Promise<string> {
+    const match = (await list()).find(
+      (a) => a.name === target || a.paneId === target,
+    );
+    const paneId = match?.paneId ?? target;
+    const { stdout, stderr, code } = await run([
+      "pane",
+      "read",
+      paneId,
+      "--source",
+      source,
+      "--lines",
+      String(lines),
+    ]);
+    if (code !== 0) {
+      throw new HerdrError(
+        stderr.trim() ||
+          stdout.trim() ||
+          `herdr pane read ${paneId} exited ${code}`,
+      );
+    }
+    return stdout;
   }
 
   /** Atomically write and submit a prompt to a running agent. */
