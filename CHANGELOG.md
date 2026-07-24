@@ -1,5 +1,21 @@
 # Changelog
 
+## [herdr 0.2.1] - 2026-07-24
+
+_tracks tag `herdr-v0.2.1`_
+
+### Fixed
+
+- **`herd read` no longer crashes on a settled or idle pane.** Reading a pane whose agent had already gone quiet could throw `null is not an object (…).read'`, since a settled pane's agent read returns a null envelope. `read()` now falls back to a plain pane-buffer read (resolving the pane id via the pane list) so the buffer still surfaces instead of erroring out.
+
+## [relay 0.5.8] - 2026-07-24
+
+_tracks tag `relay-v0.5.8`_
+
+### Changed
+
+- **A killed live run can now be reattached and recovered.** relay prints the `result.md` path and the `herd read <agent>` recovery command to stderr *before* the long poll begins, instead of only after it completes. If the foreground process gets cut off mid-run (e.g. by an exec time cap) rather than exiting cleanly, those recovery handles are already on screen — and, thanks to the herdr 0.2.1 fix above, `herd read` against the now-settled pane actually works.
+
 ## [herdr 0.2.0] - 2026-07-22
 
 _tracks tag `herdr-v0.2.0`_
