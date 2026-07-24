@@ -784,6 +784,66 @@ describe("read", () => {
     expect(c[c.indexOf("--source") + 1]).toBe("visible");
     expect(c[c.indexOf("--lines") + 1]).toBe("10");
   });
+
+  test("falls back to `pane read` when `agent read` returns a null envelope", async () => {
+    // A settled/idle pane: `agent read` comes back null, but the pane is still
+    // listed (name → pane id) and `pane read` returns its plain-text buffer.
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "read")
+        return { stdout: JSON.stringify({ result: null }) };
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([{ name: "rev-1", pane_id: "w2C:pB" }]),
+        };
+      if (a[0] === "pane" && a[1] === "read")
+        return { stdout: "settled pane text\n" };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    const text = await herd.read("rev-1", {
+      lines: 400,
+      source: "recent-unwrapped",
+    });
+    expect(text).toBe("settled pane text\n");
+    const paneRead = calls.find((c) => c[0] === "pane" && c[1] === "read")!;
+    expect(paneRead).toEqual([
+      "pane",
+      "read",
+      "w2C:pB",
+      "--source",
+      "recent-unwrapped",
+      "--lines",
+      "400",
+    ]);
+  });
+
+  test("treats an unmatched target as a pane id in the fallback", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "read") return { stdout: "null" };
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "read") return { stdout: "raw pane\n" };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    const text = await herd.read("w2C:pB");
+    expect(text).toBe("raw pane\n");
+    const paneRead = calls.find((c) => c[0] === "pane" && c[1] === "read")!;
+    expect(paneRead[2]).toBe("w2C:pB");
+  });
+
+  test("surfaces a clean error when the pane-read fallback also fails", async () => {
+    const { run } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "read") return { stdout: "null" };
+      if (a[0] === "agent" && a[1] === "list")
+        return { stdout: listEnvelope([{ name: "rev-1", pane_id: "w2C:pB" }]) };
+      if (a[0] === "pane" && a[1] === "read")
+        return { stderr: "pane not found", code: 1 };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    await expect(herd.read("rev-1")).rejects.toThrow(HerdrError);
+  });
 });
 
 describe("keys", () => {
