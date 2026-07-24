@@ -503,6 +503,17 @@ export async function runLive(
     };
   }
 
+  // Announce the recovery handles BEFORE the long poll begins. If this
+  // foreground process is KILLED mid-run (e.g. a caller's exec cap) rather than
+  // timing out cleanly, relay never reaches the pending report below — so the
+  // result path + reattach commands would be lost. Emitting them up front keeps
+  // the run recoverable from stderr alone.
+  deps.stderr(
+    `[relay live] ${agentName} running — recover if this call is interrupted:\n` +
+      `  cat ${opts.resultPath}   # the answer, once written\n` +
+      `  bun ${opts.herdScriptPath} read ${agentName}   # read the pane if result.md is missing\n`,
+  );
+
   // Stable head/tail tokens of the bootstrap, used to detect whether the line
   // is sitting in the pane's input box (fully, partially, or not at all).
   const bootWords = opts.bootstrapText.trim().split(/\s+/);
