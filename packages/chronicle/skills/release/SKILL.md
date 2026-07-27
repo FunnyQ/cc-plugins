@@ -24,13 +24,18 @@ git/script output out of this conversation.
 - `/chronicle:release` → **prepare**: bump version files + write the CHANGELOG
   entry + verify, then STOP. You review and commit (`/chronicle:commit`) and tag.
 - `/chronicle:release auto` → **finish, local only**: everything prepare does, then
-  commit the bump, merge `develop → main`, annotated tag, merge back — **no push**.
-- `/chronicle:release auto push` → **finish + push**: the above, then push both
-  branches and the tag.
+  commit the bump and cut the annotated tag — **no push**. How it finishes follows
+  the repo's `workflow` (`references/release-config.md`):
+  - **git-flow** — commit on `develop`, merge `develop → main`, tag that merge
+    commit, merge back, end on `develop`.
+  - **github-flow** — commit on `main`, tag that bump commit, end on `main`. One
+    long-lived branch, so there is nothing to merge.
+- `/chronicle:release auto push` → **finish + push**: the above, then push the
+  branch(es) and the tag.
 - A version token (`0.5.0`) or component token(s) (`chronicle`, or several like
   `chronicle monitor`) may follow any mode to skip that part of the gate. Naming
-  more than one component cuts a **coordinated release** — one commit + one
-  develop→main merge carrying N scoped tags (see the version gate).
+  more than one component cuts a **coordinated release** — one bump commit carrying
+  N scoped tags on a single commit (see the version gate).
 - A bare version token disambiguates **only a single-unit release** (one component,
   or whole-repo). When two or more components are named there is no single target,
   so a trailing version token is ambiguous — ignore it and ask each component's bump
@@ -59,19 +64,28 @@ children and does not inherit the main conversation. The five agents live at
 
 Pass `$SKILL_DIR` (the skill's load-time "Base directory for this skill" banner —
 do not hard-code a path or rely on `${CLAUDE_PLUGIN_ROOT}`). The seer returns
-the facts you need: `hasConfig`, `config`, `suggested`, `branch`, and — for a
-per-component repo — a `components[]` list each with `current`, `commitCount`, and
-`bumps`; for whole-repo a single `current` + `bumps`.
+the facts you need: `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`,
+`branch`, and — for a per-component repo — a `components[]` list each with `current`,
+`commitCount`, and `bumps`; for whole-repo a single `current` + `bumps`.
+
+If `workflowDrift` is set, the committed config still says git-flow but its
+`missingBranch` is gone — the repo moved to GitHub Flow. Say so **before the version
+gate** and offer the one-time config edit (`"workflow": "github-flow"`, drop
+`branches.develop`); with the user's yes, carry the corrected config into the release
+as `persistConfig`. Never apply it silently, and never run `auto` against the drifted
+config — the finish would look for a branch that no longer exists.
 
 ### 2. First run only — interview the shape
 
 If `hasConfig` is false, confirm/adjust `suggested` into a final `ReleaseConfig`
 (schema in `references/release-config.md`). Ask only what the defaults can't settle:
-confirm **mode** (whole-repo vs per-component), the **tag** template, which
-**version files** to bump (add a capture-group `pattern` for odd locations like a
-Rails `config/application.rb` — `suggested` won't include those), and the
-`develop`/`main` **branch** names. Mark this config to be persisted (the smith
-writes it, and it rides into the release commit / your `/chronicle:commit`).
+confirm **mode** (whole-repo vs per-component), the **workflow** (`git-flow` vs
+`github-flow` — `suggested.workflow` is `github-flow` when the repo has no `develop`
+branch), the **tag** template, which **version files** to bump (add a capture-group
+`pattern` for odd locations like a Rails `config/application.rb` — `suggested` won't
+include those), and the **branch** names (`main` alone for github-flow;
+`develop` + `main` for git-flow). Mark this config to be persisted (the smith writes
+it, and it rides into the release commit / your `/chronicle:commit`).
 
 If `hasConfig` is true, use `config` as-is and skip this step.
 
@@ -120,9 +134,10 @@ the final report.
 
 - **prepare** → read every configured version target and confirm `targetVersion`;
   confirm the changelog entry exists.
-- **auto / auto push** → take `mergeCommit` from the Oathkeeper's report (it relays the
-  hammerbearer's develop→main merge SHA); a merged release without one is a failed
-  release — stop and report it. Then for every tag require non-empty
+- **auto / auto push** → take `releaseCommit` from the Oathkeeper's report — the one
+  commit every tag points at (git-flow: the develop→main merge SHA, also reported as
+  `mergeCommit`; github-flow: the bump commit on `main`). A finished release without
+  one is a failed release — stop and report it. Then for every tag require non-empty
   `git tag --list <tag>` output and `git rev-list -n1 <tag>` equal to that commit; when
   pushing, also require non-empty `git ls-remote --tags origin <tag>`.
   Relay only verified results.
@@ -130,9 +145,14 @@ the final report.
 
 ## Protected branches
 
-Release operates on `develop`/`main`. Defer to the user's existing git-flow guard;
-don't re-implement branch protection. In `auto` the hammerbearer verifies it ends on
-`develop`.
+Release operates on the branches the config names — `develop` + `main` on git-flow,
+`main` alone on github-flow. Defer to the user's existing branch guard; don't
+re-implement branch protection. A github-flow release commits **on `main` by
+design**, so Chronicle's own `check-branch.sh` exempts exactly that commit (a
+`🔧 release:` subject on a `.chronicle/pr.json` github-flow base) and asks about
+every other commit there as usual. A different host guard may still prompt — answer
+it, don't work around it. In `auto` the hammerbearer verifies it ends on `develop`
+(git-flow) or `main` (github-flow).
 
 ## Codex
 
@@ -155,7 +175,7 @@ If neither registered roles nor stable TOMLs are available, tell the user to run
 boundaries with an inline release flow.
 
 After Codex returns, apply the ground-truth checks above: configured version values in
-prepare, each tag SHA against `mergeCommit` in auto modes, and remote tag presence
+prepare, each tag SHA against `releaseCommit` in auto modes, and remote tag presence
 when pushing.
 
 ## Edge cases
@@ -166,3 +186,9 @@ when pushing.
   user there's nothing to release and stop, unless they force an explicit version.
 - **Verify fails** after the bump (a file didn't move): the smith reports it; the
   Oathkeeper stops before any finish. Never tag a half-bumped tree.
+- **A repo that migrated to GitHub Flow** after its config was committed: the config
+  predates `workflow`, so it still reads as git-flow and `auto` would look for a
+  branch that's gone. The seer flags this as `workflowDrift`; fix it by setting
+  `"workflow": "github-flow"` and dropping `branches.develop`
+  (`references/release-config.md`). A missing field is never re-detected on its own,
+  because guessing would change how existing repos release.
