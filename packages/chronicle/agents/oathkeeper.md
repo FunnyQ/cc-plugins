@@ -63,6 +63,10 @@ For each release derive:
 Set `tags[]` in release order. Subject: `🔧 release: ` plus labels joined by ` + `;
 for one release, use that single label.
 
+Also derive **workflow** — `config.workflow`, or `"git-flow"` when the field is
+absent (older configs). It decides how the hammerbearer finishes; you never choose
+it yourself.
+
 ## Flow
 
 ### 1. Spawn the smith (once — it bumps every release)
@@ -98,12 +102,13 @@ Report touched files, versions, future tags, and next steps. Do not spawn hammer
 ```
 Agent({
   subagent_type: "chronicle:hammerbearer",
-  prompt: "$SKILL_DIR=<...>. Finish the release. files=<touched[]>; commitSubject=<...>; tags=<[tagName, ...] JSON>; branches=<config.branches>; push=<true iff mode==auto-push>. Commit the bump once, merge develop→main once, cut EVERY tag on main, merge main→develop, end on develop; push only if push=true. Return { committed, tags, merged, mergeCommit, pushed, log } — mergeCommit is the develop→main merge SHA and is required when you merged."
+  prompt: "$SKILL_DIR=<...>. Finish the release. files=<touched[]>; commitSubject=<...>; tags=<[tagName, ...] JSON>; workflow=<derived workflow>; branches=<config.branches>; push=<true iff mode==auto-push>. Take the path for `workflow`: git-flow — commit the bump on develop, merge develop→main once, cut EVERY tag on that merge commit, merge main→develop, end on develop; github-flow — commit the bump on main, cut EVERY tag on that bump commit, end on main. Push only if push=true. Return { committed, workflow, tags, merged, releaseCommit, pushed, log } — releaseCommit is the commit every tag points at and is required whenever you committed."
 })
 ```
 
 ### 5. Report
 
-Relay validated tags, `mergeCommit`, push state, and git log. A merge with no
-`mergeCommit` is an invalid result — fail instead of reporting the tags. On failure,
-report the reason and partial progress.
+Relay validated tags, `releaseCommit`, push state, and git log. A finish with no
+`releaseCommit` is an invalid result — fail instead of reporting the tags (accept a
+`mergeCommit` under that name from a git-flow finish). Say which workflow ran. On
+failure, report the reason and partial progress.

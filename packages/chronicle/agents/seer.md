@@ -33,6 +33,10 @@ fields the main agent needs; omit the raw `tags[]` list:
 - `hasConfig`, `config` — whether `.chronicle/release.json` already exists, and it.
 - `suggested` — the detected `ReleaseConfig` defaults (used only when `hasConfig` is
   false, to seed the interview).
+- `workflow` — the effective `git-flow` | `github-flow` for this repo (a config with
+  no `workflow` field is git-flow).
+- `workflowDrift` — non-null when the committed git-flow config names a develop
+  branch the repo no longer has. Pass it through as-is; the main agent decides.
 - `branch`, `root`, `outputPath`.
 - whole-repo: `current`, `bumps` (`{ patch, minor, major }`), `lastTag`.
 - per-component: `components[]`, each `{ name, path, lastTag, current, bumps,
