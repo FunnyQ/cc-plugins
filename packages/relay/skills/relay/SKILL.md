@@ -185,6 +185,8 @@ If the script exits non-zero, report the failure in zh-TW and stop — do not gu
 
 Capability gates (e.g., `/relay:relay opencode image` → unsupported) fail fast with a clear error message before any CLI runs.
 
+**Never call a backend CLI directly to work around a relay failure** — no `codex exec`, no `opencode run`, no `claude -p`. Every delegation goes through `relay.ts`, which owns the prompt contract, herdr live-pane routing, and the result-file protocol; a hand-rolled headless call silently discards all three. If `relay.ts` cannot run, report that and stop.
+
 ---
 
 ## Review Report Format
