@@ -24,6 +24,9 @@ import { parseArgs } from "node:util";
 
 export type VersionFileKind = "json" | "toml" | "text";
 
+/** How the repo finishes a release: a develop→main merge, or a commit on main. */
+export type Workflow = "git-flow" | "github-flow";
+
 /** A version source: either a known `kind` or a custom capture-group `pattern`. */
 export type VersionFileSpec =
   { path: string; kind: VersionFileKind } | { path: string; pattern: string };
@@ -36,15 +39,28 @@ export type ComponentSpec = {
 
 export type ReleaseConfig = {
   mode: "whole-repo" | "per-component";
+  /**
+   * Repo workflow. Absent means `git-flow` — configs written before this field
+   * existed keep the exact meaning they had.
+   */
+  workflow?: Workflow;
   /** Tag template. Supports `{version}` and (per-component) `{component}`. */
   tag: string;
   changelog: string;
-  branches: { develop: string; main: string };
+  /** `develop` is required for git-flow and unused for github-flow. */
+  branches: { main: string; develop?: string };
   /** whole-repo bump targets. Empty = changelog + tag only. */
   versionFiles: VersionFileSpec[];
   /** per-component bump targets, one entry per releasable unit. */
   components?: ComponentSpec[];
 };
+
+/** A missing `workflow` is git-flow — never silently a new default. */
+export function effectiveWorkflow(
+  config: Pick<ReleaseConfig, "workflow">,
+): Workflow {
+  return config.workflow ?? "git-flow";
+}
 
 export type ManifestFact = {
   path: string;
@@ -55,6 +71,10 @@ export type ManifestFact = {
 export type ShapeFacts = {
   manifests: ManifestFact[];
   tags: string[];
+  /** Local + remote branch names. Absent = unknown, which stays git-flow. */
+  branches?: string[];
+  /** Fallback long-lived branch when neither main nor master exists. */
+  currentBranch?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -238,8 +258,62 @@ function specOf(m: ManifestFact): VersionFileSpec {
 
 const DEFAULT_BRANCHES = { develop: "develop", main: "main" } as const;
 
+function hasBranch(branches: string[], name: string): boolean {
+  return branches.some((b) => b === name || b === `origin/${name}`);
+}
+
+/**
+ * Workflow + branch names read off the repo's actual branches. github-flow is only
+ * ever *detected* — an unknown branch list (older callers, a non-git dir) keeps the
+ * historical git-flow default, so nothing that works today changes shape.
+ */
+export function detectWorkflow(facts: ShapeFacts): {
+  workflow: Workflow;
+  branches: { main: string; develop?: string };
+} {
+  const branches = facts.branches;
+  if (!branches || branches.length === 0) {
+    return { workflow: "git-flow", branches: { ...DEFAULT_BRANCHES } };
+  }
+  const main =
+    ["main", "master"].find((n) => hasBranch(branches, n)) ??
+    facts.currentBranch ??
+    DEFAULT_BRANCHES.main;
+  return hasBranch(branches, "develop")
+    ? { workflow: "git-flow", branches: { develop: "develop", main } }
+    : { workflow: "github-flow", branches: { main } };
+}
+
+export type WorkflowDrift = {
+  configured: Workflow;
+  missingBranch: string;
+  suggest: Workflow;
+};
+
+/**
+ * A committed git-flow config whose develop branch no longer exists — the repo
+ * moved to GitHub Flow after recording its shape. Reported, never acted on: a
+ * missing `workflow` field keeps meaning git-flow, so the fix is an explicit config
+ * edit the user approves, not a silent re-detection.
+ */
+export function detectWorkflowDrift(
+  config: ReleaseConfig,
+  branches: string[] | undefined,
+): WorkflowDrift | null {
+  if (!branches || branches.length === 0) return null;
+  if (effectiveWorkflow(config) !== "git-flow") return null;
+  const develop = config.branches.develop;
+  if (!develop || hasBranch(branches, develop)) return null;
+  return {
+    configured: "git-flow",
+    missingBranch: develop,
+    suggest: "github-flow",
+  };
+}
+
 export function detectShape(facts: ShapeFacts): ReleaseConfig {
   const scoped = scopedTagComponents(facts.tags);
+  const { workflow, branches } = detectWorkflow(facts);
 
   if (scoped.size > 0) {
     const byComponent = new Map<string, ManifestFact[]>();
@@ -260,9 +334,10 @@ export function detectShape(facts: ShapeFacts): ReleaseConfig {
       );
       return {
         mode: "per-component",
+        workflow,
         tag: "{component}-v{version}",
         changelog: "CHANGELOG.md",
-        branches: { ...DEFAULT_BRANCHES },
+        branches,
         versionFiles: [],
         components,
       };
@@ -275,9 +350,10 @@ export function detectShape(facts: ShapeFacts): ReleaseConfig {
     facts.manifests.length === 1 ? [specOf(facts.manifests[0])] : [];
   return {
     mode: "whole-repo",
+    workflow,
     tag: "v{version}",
     changelog: "CHANGELOG.md",
-    branches: { ...DEFAULT_BRANCHES },
+    branches,
     versionFiles,
   };
 }
@@ -299,10 +375,19 @@ export function parseConfig(text: string): ReleaseConfig {
   }
   if (typeof raw.changelog !== "string") bad(`changelog must be a string`);
   if (
-    typeof raw.branches?.develop !== "string" ||
-    typeof raw.branches?.main !== "string"
+    raw.workflow !== undefined &&
+    raw.workflow !== "git-flow" &&
+    raw.workflow !== "github-flow"
   ) {
-    bad(`branches must name develop and main`);
+    bad(`unknown workflow ${raw.workflow}`);
+  }
+  if (typeof raw.branches?.main !== "string") bad(`branches must name main`);
+  // A config predating `workflow` is git-flow, so it still has to name develop.
+  if (
+    effectiveWorkflow(raw as ReleaseConfig) === "git-flow" &&
+    typeof raw.branches?.develop !== "string"
+  ) {
+    bad(`git-flow branches must name develop`);
   }
   if (raw.mode === "per-component") {
     if (!Array.isArray(raw.components) || raw.components.length === 0) {
@@ -406,6 +491,28 @@ async function discoverManifests(root: string): Promise<ManifestFact[]> {
 async function allTags(): Promise<string[]> {
   const out = await git`git tag`;
   return out ? out.split("\n").filter(Boolean) : [];
+}
+
+/**
+ * Branch names out of plain `git branch --all` output — the current-branch marker,
+ * `remotes/` prefix, detached-HEAD line, and `origin/HEAD -> …` alias all dropped.
+ * Plain output rather than `--format=%(refname:short)`: Bun's shell reads `(` as a
+ * subshell and the command never runs.
+ */
+export function parseBranchNames(out: string): string[] {
+  return out
+    .split("\n")
+    .map((line) => line.replace(/^[*+]?\s*/, "").trim())
+    .filter((line) => line && !line.startsWith("(") && !line.includes(" -> "))
+    .map((line) => line.replace(/^remotes\//, ""));
+}
+
+/** Local + remote branch names, or undefined when git can't tell us. */
+async function allBranches(): Promise<string[] | undefined> {
+  const out = await git`git branch --all --no-color`;
+  if (!out) return undefined;
+  const names = parseBranchNames(out);
+  return names.length > 0 ? names : undefined;
 }
 
 /**
@@ -627,9 +734,15 @@ async function main() {
   // default: detection facts for the interview / version gate
   const tags = await allTags();
   const manifests = await discoverManifests(root);
-  const suggested = detectShape({ manifests, tags });
-  const effective = config ?? suggested;
   const branch = await git`git branch --show-current`;
+  const branches = await allBranches();
+  const suggested = detectShape({
+    manifests,
+    tags,
+    branches,
+    currentBranch: branch || undefined,
+  });
+  const effective = config ?? suggested;
 
   const component =
     values.component ??
@@ -650,6 +763,8 @@ async function main() {
     root,
     branch,
     component,
+    workflow: effectiveWorkflow(effective),
+    workflowDrift: config ? detectWorkflowDrift(config, branches) : null,
     hasConfig: Boolean(config),
     config,
     suggested,

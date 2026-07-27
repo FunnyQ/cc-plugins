@@ -3,8 +3,12 @@ import {
   applyVersionToContent,
   computeBumps,
   detectShape,
+  detectWorkflow,
+  detectWorkflowDrift,
+  effectiveWorkflow,
   lastTagFor,
   normalizeVersion,
+  parseBranchNames,
   parseConfig,
   readVersionFromContent,
   scopedTagComponents,
@@ -245,6 +249,125 @@ describe("detectShape", () => {
   });
 });
 
+describe("parseBranchNames", () => {
+  test("reads local + remote names out of `git branch --all` output", () => {
+    const out = [
+      "* main",
+      "  feature/x",
+      "  remotes/origin/HEAD -> origin/main",
+      "  remotes/origin/main",
+    ].join("\n");
+    expect(parseBranchNames(out)).toEqual(["main", "feature/x", "origin/main"]);
+  });
+
+  test("drops a detached-HEAD line", () => {
+    const out = "* (HEAD detached at 1a2b3c4)\n  main";
+    expect(parseBranchNames(out)).toEqual(["main"]);
+  });
+});
+
+describe("detectWorkflow", () => {
+  const base = { manifests: [], tags: [] };
+
+  test("detects github-flow when the repo has no develop branch", () => {
+    expect(
+      detectWorkflow({ ...base, branches: ["main", "origin/main", "fix/x"] }),
+    ).toEqual({ workflow: "github-flow", branches: { main: "main" } });
+  });
+
+  test("stays git-flow when develop exists only as a remote branch", () => {
+    expect(
+      detectWorkflow({ ...base, branches: ["main", "origin/develop"] }),
+    ).toEqual({
+      workflow: "git-flow",
+      branches: { develop: "develop", main: "main" },
+    });
+  });
+
+  test("stays git-flow when the branch list is unknown (older callers)", () => {
+    expect(detectWorkflow(base)).toEqual({
+      workflow: "git-flow",
+      branches: { develop: "develop", main: "main" },
+    });
+  });
+
+  test("uses master as the long-lived branch when there is no main", () => {
+    expect(detectWorkflow({ ...base, branches: ["master", "topic"] })).toEqual({
+      workflow: "github-flow",
+      branches: { main: "master" },
+    });
+  });
+
+  test("falls back to the current branch when neither main nor master exists", () => {
+    expect(
+      detectWorkflow({
+        ...base,
+        branches: ["trunk", "origin/trunk"],
+        currentBranch: "trunk",
+      }),
+    ).toEqual({ workflow: "github-flow", branches: { main: "trunk" } });
+  });
+});
+
+describe("detectWorkflowDrift", () => {
+  const gitFlow: ReleaseConfig = {
+    mode: "whole-repo",
+    tag: "v{version}",
+    changelog: "CHANGELOG.md",
+    branches: { develop: "develop", main: "main" },
+    versionFiles: [],
+  };
+
+  test("flags a git-flow config whose develop branch is gone", () => {
+    expect(detectWorkflowDrift(gitFlow, ["main", "origin/main"])).toEqual({
+      configured: "git-flow",
+      missingBranch: "develop",
+      suggest: "github-flow",
+    });
+  });
+
+  test("stays quiet while develop still exists", () => {
+    expect(detectWorkflowDrift(gitFlow, ["main", "origin/develop"])).toBeNull();
+  });
+
+  test("stays quiet for a github-flow config", () => {
+    const githubFlow: ReleaseConfig = {
+      ...gitFlow,
+      workflow: "github-flow",
+      branches: { main: "main" },
+    };
+    expect(detectWorkflowDrift(githubFlow, ["main"])).toBeNull();
+  });
+
+  test("stays quiet when the branch list is unknown", () => {
+    expect(detectWorkflowDrift(gitFlow, undefined)).toBeNull();
+  });
+});
+
+describe("detectShape workflow", () => {
+  test("a github-flow suggestion carries no develop branch", () => {
+    const shape = detectShape({
+      manifests: [
+        { path: "frontend/package.json", version: "0.0.1", kind: "json" },
+      ],
+      tags: [],
+      branches: ["main"],
+    });
+    expect(shape.workflow).toBe("github-flow");
+    expect(shape.branches).toEqual({ main: "main" });
+  });
+
+  test("a develop branch still suggests git-flow", () => {
+    const shape = detectShape({
+      manifests: [],
+      tags: ["chronicle-v0.4.0"],
+      branches: ["main", "develop"],
+    });
+    expect(shape.workflow).toBe("git-flow");
+    expect(shape.branches).toEqual({ develop: "develop", main: "main" });
+  });
+});
+
 describe("tagPrefix", () => {
   const whole: ReleaseConfig = {
     mode: "whole-repo",
@@ -339,5 +462,56 @@ describe("config roundtrip", () => {
   test("parse accepts a whole-repo config with an empty versionFiles (changelog + tag only)", () => {
     const empty = { ...config, versionFiles: [] };
     expect(parseConfig(JSON.stringify(empty)).versionFiles).toEqual([]);
+  });
+});
+
+describe("workflow in the config", () => {
+  const gitFlow: ReleaseConfig = {
+    mode: "whole-repo",
+    tag: "v{version}",
+    changelog: "CHANGELOG.md",
+    branches: { develop: "develop", main: "main" },
+    versionFiles: [],
+  };
+  const githubFlow: ReleaseConfig = {
+    ...gitFlow,
+    workflow: "github-flow",
+    branches: { main: "main" },
+  };
+
+  test("a config predating the field means git-flow", () => {
+    expect(effectiveWorkflow(parseConfig(JSON.stringify(gitFlow)))).toBe(
+      "git-flow",
+    );
+  });
+
+  test("parse accepts a github-flow config with no develop branch", () => {
+    const parsed = parseConfig(JSON.stringify(githubFlow));
+    expect(effectiveWorkflow(parsed)).toBe("github-flow");
+    expect(parsed.branches).toEqual({ main: "main" });
+  });
+
+  test("serialize → parse is lossless for github-flow", () => {
+    expect(parseConfig(serializeConfig(githubFlow))).toEqual(githubFlow);
+  });
+
+  test("parse rejects a git-flow config that names no develop", () => {
+    expect(() =>
+      parseConfig(JSON.stringify({ ...gitFlow, branches: { main: "main" } })),
+    ).toThrow();
+  });
+
+  test("parse rejects any config that names no main", () => {
+    expect(() =>
+      parseConfig(
+        JSON.stringify({ ...githubFlow, branches: { develop: "develop" } }),
+      ),
+    ).toThrow();
+  });
+
+  test("parse rejects an unknown workflow", () => {
+    expect(() =>
+      parseConfig(JSON.stringify({ ...gitFlow, workflow: "trunk-flow" })),
+    ).toThrow();
   });
 });

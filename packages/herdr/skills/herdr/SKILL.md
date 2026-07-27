@@ -12,15 +12,17 @@ version: 1
 
 # Herdr
 
-Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file; add `~/.config/herdr/config.toml` when you need customization.
+Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file. If you need customization, add `~/.config/herdr/config.toml`.
 
 Docs: <https://herdr.dev/docs/>
 
 ## Orchestrating agents — use the `herd` wrapper first
 
-When you are inside a herdr pane (`HERDR_ENV=1`) and need to spawn or drive other agents, prefer the bundled `scripts/herd.ts` wrapper over hand-rolling raw `herdr` CLI chains. It collapses herdr's multi-step recipes (create pane → start agent → prompt → wait → read) into seven typed verbs and handles the sharp edges for you: it addresses agents by a **collision-proof generated name** (never by non-durable pane ids), creates the destination pane before `agent start`, and uses atomic `agent prompt` submission.
+Inside a herdr pane (`HERDR_ENV=1`) you may need to spawn or drive other agents. For that work, prefer the bundled `scripts/herd.ts` wrapper over hand-rolled raw `herdr` CLI chains.
 
-Resolve the script from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`); `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call.
+The wrapper collapses herdr's multi-step recipes, for example create pane → start agent → prompt → wait → read, into seven typed verbs. It also handles the sharp edges for you. It addresses agents by a **collision-proof generated name**, never by non-durable pane ids. It creates the destination pane before `agent start`. It uses atomic `agent prompt` submission.
+
+`${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call. Resolve the script instead from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`).
 
 ```bash
 HERD="$SKILL_DIR/scripts/herd.ts"
@@ -48,13 +50,13 @@ bun "$HERD" list                 # all current agents as typed JSON
 bun "$HERD" close reviewer-a3f9  # close the agent's pane
 ```
 
-All verbs print JSON except `read` (prints the pane's text). `read` defaults to `--source visible` (the current screen) because agent TUIs render into the alternate-screen buffer, leaving `recent`/`recent-unwrapped` empty; pass `--source recent-unwrapped` for a scrolled log tail. The wrapper keeps its existing `wait({ status })` API and translates it to herdr 0.7.5's `agent wait --until`; use raw `agent wait --until done` when the `done` state is required. Run tests with `bun test scripts/herd.test.ts`.
+All verbs print JSON. The exception is `read`, which prints the pane's text. Agent TUIs render into the alternate-screen buffer. This leaves `recent`/`recent-unwrapped` empty. So `read` defaults to `--source visible`, the current screen. If you need a scrolled log tail, pass `--source recent-unwrapped`. The wrapper keeps its existing `wait({ status })` API. It translates that call to herdr 0.7.5's `agent wait --until`. If you need the `done` state, use raw `agent wait --until done`. Run tests with `bun test scripts/herd.test.ts`.
 
-For anything the wrapper doesn't cover (worktrees, layout, notifications, waiting on arbitrary pane output, plugin panes), drop to the raw CLI — see `references/agent-orchestration.md` for live recipes and `references/cli.md` for the full command surface.
+If the wrapper doesn't cover something, for example worktrees, layout, notifications, waiting on arbitrary pane output, or plugin panes, drop to the raw CLI. See `references/agent-orchestration.md` for live recipes. See `references/cli.md` for the full command surface.
 
 ## Reference files
 
-This skill's detail lives in `references/` — read only the file(s) relevant to the question, not all of them.
+This skill's detail lives in `references/`. Read only the file(s) relevant to the question, not all of them.
 
 | File | Read when the user asks about... |
 |---|---|
@@ -63,4 +65,4 @@ This skill's detail lives in `references/` — read only the file(s) relevant to
 | `references/plugin-development.md` | Writing or debugging a Herdr plugin — `herdr-plugin.toml` manifest, runtime env vars, dev workflow (`plugin link`), distribution, pitfalls |
 | `references/agent-orchestration.md` | Claude is running *inside* a herdr pane (`HERDR_ENV=1`) and needs to control herdr live — split panes, wait for output, spawn or coordinate with other agents |
 
-Most CLI commands output JSON for scripting; `herdr --default-config` prints the full default config as a starting point.
+Most CLI commands output JSON for scripting. `herdr --default-config` prints the full default config as a starting point.

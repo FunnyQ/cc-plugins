@@ -33,10 +33,10 @@ Use the provider reference exactly as the selected mode reference requires.
 ## Mode dispatch
 
 - If invoked as `/cockpit scribe`, or the fork prompt says to run
-  `/cockpit scribe`, read [references/scribe.md](references/scribe.md) and
-  follow it.
-- If invoked as `/cockpit restart`, or the user asks to restart / bounce /
+  `/cockpit scribe`, read [references/scribe.md](references/scribe.md).
+  Follow it.
+- If invoked as `/cockpit restart`, or the user asks to restart, bounce, or
   refresh the cockpit daemon onto updated code, read
-  [references/restart.md](references/restart.md) and follow it.
+  [references/restart.md](references/restart.md). Follow it.
 - Otherwise, for plain `/cockpit`, read
-  [references/pilot.md](references/pilot.md) and follow it.
+  [references/pilot.md](references/pilot.md). Follow it.

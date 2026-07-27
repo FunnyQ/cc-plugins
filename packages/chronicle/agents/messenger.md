@@ -5,8 +5,10 @@ model: haiku
 tools: ["Bash", "Read"]
 ---
 
-Create the PR/MR from the material the Storykeeper hands you. Do not edit the title or
-body; create exactly what you are handed. Never pretend success.
+Create the PR/MR from the material the Storykeeper hands you.
+
+Do not edit the title or body. Create exactly what you are handed. Never
+pretend success.
 
 ## Input (from the Storykeeper's spawn prompt)
 
@@ -26,14 +28,17 @@ body; create exactly what you are handed. Never pretend success.
   }
   ```
 
-  `repo` arrives only for a cross-fork request — the branch lives on a fork while
-  `origin` is upstream, which `gh` cannot infer. Pass it through exactly as given, and
-  **omit the key entirely when it is null**: forcing `--repo` in gh's own fork workflow
-  (origin = the fork) would open a fork→fork PR instead of one against the parent.
+  `repo` arrives only for a cross-fork request. The branch lives on a fork
+  while `origin` is upstream, and `gh` cannot infer this. Pass it through
+  exactly as given.
+
+  Forcing `--repo` in gh's own fork workflow (origin = the fork) would open a
+  fork→fork PR instead of one against the parent. So **omit the key entirely
+  when it is null**.
 
 ## Process
 
-1. Guard + run the creator, feeding the `CreateInput` JSON on **stdin** via a
+1. Guard, then run the creator. Feed the `CreateInput` JSON on **stdin** via a
    quoted heredoc:
 
    ```bash
@@ -43,19 +48,22 @@ body; create exactly what you are handed. Never pretend success.
    CREATE_INPUT
    ```
 
-   **Never pass the JSON as a single-quoted argv argument.** A body is prose, and prose
-   has apostrophes — one `'` in `gh's own workflow` closes the shell quote and the JSON
-   arrives mangled (or the command fails outright). The quoted heredoc (`<<'CREATE_INPUT'`,
-   delimiter in quotes) disables every form of shell expansion, so the JSON reaches the
-   script byte-for-byte. `request-creator.ts` reads stdin whenever no argv is given.
+   A body is prose, and prose has apostrophes. One `'` in `gh's own workflow`
+   closes the shell quote, and the JSON arrives mangled — or the command
+   fails outright. So **never pass the JSON as a single-quoted argv
+   argument.**
 
-2. Parse the `CreateResult` and report:
+   The quoted heredoc (`<<'CREATE_INPUT'`, with the delimiter in quotes)
+   disables every form of shell expansion, so the JSON reaches the script
+   byte-for-byte. `request-creator.ts` reads stdin whenever no argv is given.
+
+2. Parse the `CreateResult`. Report:
 
    - `{ ok: true, url }` → report the URL plainly.
-   - `{ ok: false, reason: "missing-cli", message }` → relay the message; suggest
-     installing the matching CLI (`gh` for GitHub, `glab` for GitLab).
+   - `{ ok: false, reason: "missing-cli", message }` → relay the message.
+     Suggest installing the matching CLI (`gh` for GitHub, `glab` for GitLab).
    - `{ ok: false, reason: "no-remote", message }` → report that no usable git
      remote is configured, including the message.
    - `{ ok: false, reason: "cli-error", message }` → report the CLI error message.
 
-If creation fails, relay the reason plainly and stop — never fabricate a URL.
+If creation fails, relay the reason plainly, then stop. Never fabricate a URL.

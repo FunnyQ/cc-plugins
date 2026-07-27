@@ -1,5 +1,60 @@
 # Changelog
 
+## [chronicle 0.9.3] - 2026-07-28
+
+_tracks tag `chronicle-v0.9.3`_
+
+### Added
+
+- **The release skill now detects a repo's branching workflow — git-flow or GitHub Flow.** The analyzer reads branch structure and hands the result to the release agents (Seer, Oathkeeper, Hammerbearer), so a coordinated release finishes correctly under either workflow instead of assuming git-flow.
+- **The branch-guard hook no longer blocks a GitHub Flow release commit.** `check-branch.sh` now recognizes a release commit made under GitHub Flow and lets it through without the git-flow confirmation prompt, while still guarding plain commits to `main`/`master`.
+
+### Changed
+
+- **Release skill docs now explain git-flow vs. GitHub Flow** — branch naming and merge-strategy differences are spelled out so a reader picks the right release path for their repo.
+- **All 11 agent definitions, 4 skills, and 5 references were rewritten to a plain, one-instruction-per-sentence style.** Sentences over 20 words dropped from 355 to 108 repo-wide; wording only, no trigger phrases or frontmatter changed. Four adversarial codex review rounds caught eight real defects the mechanical checks alone couldn't see — broken inline code spans, lost scope qualifiers, and a few spots where splitting a sentence had quietly turned a preference into a prohibition.
+
+### Fixed
+
+- **A truncated sentence in the release orchestrator's instructions is now complete.** `agents/seer.md` used to cut off mid-clause ("...already exists, and it."); it now correctly describes that `config` is the parsed `.chronicle/release.json`, `null` when the file doesn't exist.
+
+## [dispatch 3.15.4] - 2026-07-28
+
+_tracks tag `dispatch-v3.15.4`_
+
+### Changed
+
+- **All four skills (`preflight`, `flightplan`, `waypoints`, `autopilot`) and their nine reference docs were rewritten to a plain, one-instruction-per-sentence style.** The 5,600-word autopilot orchestrator spec saw the biggest gain — long sentences (20+ words) fell from 26 to 9. Wording only; no trigger phrases or frontmatter changed.
+
+## [herdr 0.2.2] - 2026-07-28
+
+_tracks tag `herdr-v0.2.2`_
+
+### Changed
+
+- **The herdr skill and all four reference docs (config, CLI, plugin development, agent orchestration) were rewritten to a plain, one-instruction-per-sentence style.** Wording only; no trigger phrases or frontmatter changed.
+
+## [monitor 3.19.7] - 2026-07-28
+
+_tracks tag `monitor-v3.19.7`_
+
+### Changed
+
+- **Cockpit's six reference docs, the `install` and `usage-dashboard` skills, and all three commands (`/monitor:nudge`, `/monitor:prune-logs`, `/thoughtful`) were rewritten to a plain, one-instruction-per-sentence style.** Wording only; no trigger phrases or frontmatter changed.
+
+### Fixed
+
+- **The scribe reference no longer points auto-logging at a step that doesn't exist.** `references/scribe.md` told the scribe agent to check "the sweep in Step 4", but that file only has three steps and the sweep is actually in Step 2 — a dangling reference that shipped in every version from 3.18.10 through 3.19.6.
+
+## [relay 0.5.9] - 2026-07-28
+
+_tracks tag `relay-v0.5.9`_
+
+### Changed
+
+- **The relay command docs (`/relay:claude-cli`, `/relay:codex`, `/relay:opencode`) now state the delegation protocol more explicitly**, reducing ambiguity about how a delegated run reports back.
+- **The relay skill, both reference docs (`backends.md`, `live.md`), and all three command docs were rewritten to a plain, one-instruction-per-sentence style.** Wording only; no trigger phrases or frontmatter changed.
+
 ## [herdr 0.2.1] - 2026-07-24
 
 _tracks tag `herdr-v0.2.1`_

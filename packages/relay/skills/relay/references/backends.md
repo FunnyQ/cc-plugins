@@ -4,7 +4,11 @@
 
 ## Live-pane mode (herdr)
 
-Inside herdr (`HERDR_ENV=1`), delegate/review launch the backend's **interactive TUI** in **its own new tab** (not a split of the caller's pane, so your working pane keeps its full size) instead of the headless invocations below (`--headless` opts out). The prompt rides a file (`live-prompt.md`); the pane only receives a one-line bootstrap; the answer is captured from `result.md` via an end-marker contract. Motivation: the work becomes visible and take-over-able, and it sidesteps headless flakiness — opencode's `run` in particular can hang around the #26855 family.
+Inside herdr (`HERDR_ENV=1`), delegate and review launch the backend's **interactive TUI**. The TUI opens in **its own new tab**, not a split of the caller's pane, so your working pane keeps its full size. This launch replaces the headless invocations below (`--headless` opts out of it).
+
+The prompt rides a file (`live-prompt.md`). The pane only receives a one-line bootstrap. The answer is captured from `result.md` via an end-marker contract.
+
+This design makes the work visible and take-over-able. It also sidesteps headless flakiness: opencode's `run` in particular can hang around the #26855 family.
 
 Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 
@@ -14,11 +18,15 @@ Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 | claude | `claude` | `--model <model>` | `--dangerously-skip-permissions` |
 | opencode | `opencode` | `-m <model>` | `--auto` (auto-approve permissions not explicitly denied) |
 
-`--dangerous` is a **uniform YOLO switch** across all three live backends: it lets an **unattended** run proceed without stopping on approval prompts. Without `--dangerous`, no sandbox/approval-bypass flag is passed and the TUI's own approval prompts surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So: `--dangerous` = fire-and-forget; no flag = supervised. `image` has no live path (codex `invokeLive("image")` → null).
+`--dangerous` is a **uniform YOLO switch** across all three live backends. It lets an **unattended** run proceed without stopping on approval prompts.
 
-**New-tab placement** — `herd.ts` has no "start an agent in a fresh empty tab" primitive, so `spawn({ newTab: true })` does the dance: capture the focused tab → `tab create --no-focus --label <name>` → `agent start --tab <new>` → close the leftover shell root pane → restore focus to the caller's tab (`agent start --tab` steals focus despite `--no-focus`). The tab is **labelled with the agent name** (e.g. `relay-codex-delegate-8b6f`) so you can tell at a glance which tab is which live run. An older `herd.ts` without `newTab` support silently ignores it and falls back to the `--split down` that relay also passes.
+Without `--dangerous`, relay passes no sandbox or approval-bypass flag. The TUI's own approval prompts then surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So `--dangerous` means fire-and-forget; no flag means supervised. `image` has no live path (codex `invokeLive("image")` returns null).
 
-relay locates the herdr wrapper (`herd.ts`) via: `HERD_SCRIPT_PATH` env override → repo-sibling checkout (`packages/herdr/…`) → plugin caches of both harnesses (`~/.claude/plugins/cache`, `~/.codex/plugins/cache`), newest version first. Unresolvable → one stderr note + headless fallback; there is no hard herdr dependency (herd.ts is dynamically imported only on the live path).
+**New-tab placement.** `herd.ts` has no primitive to start an agent in a fresh empty tab, so `spawn({ newTab: true })` does the dance instead. Note first: `agent start --tab` steals focus despite `--no-focus`. The dance accounts for this: capture the focused tab → `tab create --no-focus --label <name>` → `agent start --tab <new>` → close the leftover shell root pane → restore focus to the caller's tab.
+
+The tab is **labelled with the agent name** (e.g. `relay-codex-delegate-8b6f`), so you can tell at a glance which tab is which live run. An older `herd.ts` without `newTab` support silently ignores it and falls back to the `--split down` that relay also passes.
+
+relay locates the herdr wrapper (`herd.ts`) in this order: `HERD_SCRIPT_PATH` env override, then a repo-sibling checkout (`packages/herdr/…`), then plugin caches of both harnesses (`~/.claude/plugins/cache`, `~/.codex/plugins/cache`), newest version first. If relay cannot resolve `herd.ts`, it prints one stderr note and falls back to headless mode. There is no hard herdr dependency: `herd.ts` is dynamically imported only on the live path.
 
 ## codex
 
@@ -30,9 +38,10 @@ Binary: `codex` (override via `CODEX_BIN`).
 codex exec -s workspace-write -o <lastfile> -
 ```
 
-> `codex exec` is non-interactive by default; `-s` sets the sandbox. The old
-> `-a never` approval flag was removed in codex ≥ 0.139 — passing it errors with
-> `unexpected argument '-a' found`. Verified against codex-cli 0.139.0.
+> `codex exec` is non-interactive by default. `-s` sets the sandbox.
+>
+> codex ≥ 0.139 removed the old `-a never` approval flag. Passing it now errors
+> with `unexpected argument '-a' found`. Verified against codex-cli 0.139.0.
 
 Dangerous opt-in (only if user explicitly asks):
 ```bash
@@ -52,15 +61,15 @@ codex review -                # task provided; prompt arrives on stdin
 codex exec -o <lastfile> "<image prompt>"
 ```
 
-Generated PNGs land under `~/.codex/generated_images/`; locate the newest after the run (or parse a `*.png` path from output) and `cp` it to `--out` (timestamp-suffixed).
+Generated PNGs land under `~/.codex/generated_images/`. After the run, locate the newest PNG, or parse a `*.png` path from output, then `cp` it to `--out` (timestamp-suffixed).
 
 ### Model
 
-Unset — codex uses its own configured/last-used model. Do not pass `-m`.
+Unset. codex uses its own configured or last-used model. Do not pass `-m`.
 
 ### Output capture
 
-`-o <lastfile>` writes the final message to a file; read it, fall back to stdout if absent.
+`-o <lastfile>` writes the final message to a file. Read the file, and fall back to stdout if it is absent.
 
 ---
 
@@ -82,7 +91,7 @@ Write-capable by default.
 opencode run -m opencode-go/qwen3.7-max "<read-only review prompt>"
 ```
 
-There is no native review; the prompt must instruct "analyze only, do not modify files." (Hard read-only via a `--agent` with `edit/bash: deny` is deferred.)
+There is no native review. The prompt must instruct "analyze only, do not modify files." (Hard read-only via a `--agent` with `edit/bash: deny` is deferred.)
 
 ### Relevant flags
 
@@ -92,16 +101,16 @@ There is no native review; the prompt must instruct "analyze only, do not modify
 
 ### Output parsing
 
-**Used:** `--format json` → JSONL (one event per line: `step_start`, `text`, `step_finish`). The answer lives in the `text` events; relay's `parseJsonl` concatenates every `part.text` from `type === "text"` lines.
+**Used:** `--format json` produces JSONL (one event per line: `step_start`, `text`, `step_finish`). The answer lives in the `text` events; relay's `parseJsonl` concatenates every `part.text` from lines where `type === "text"`.
 - Equivalent to: `jq -r 'select(.type=="text") | .part.text'`
-- Why not `--format default`: that stream interleaves the answer with TUI/progress noise, so a naive trim returns garbage. JSON gives a clean, structured extraction.
-- KNOWN BUG #26855: `run --format json` can exit before emitting the terminal `step_finish` event. `parseJsonl` never blocks on a terminal event — it just concatenates whatever `text` parts arrived, so this is a non-issue.
+- Why not `--format default`: that stream interleaves the answer with TUI and progress noise, so a naive trim returns garbage. JSON gives a clean, structured extraction.
+- KNOWN BUG #26855: `run --format json` can exit before it emits the terminal `step_finish` event. `parseJsonl` never blocks on a terminal event — it just concatenates whatever `text` parts arrived, so this is a non-issue.
 
-> **Invoke non-interactively with closed stdin.** `opencode run` inherits stdin; if stdin stays open (no TTY, never EOFs) it hangs waiting for input. relay calls it via `Bun.spawnSync` (stdin closed on spawn), so it returns normally. A bare shell `opencode run … > file` from a non-interactive context can hang — that is the harness, not opencode.
+> **Invoke non-interactively with closed stdin.** `opencode run` inherits stdin. If stdin stays open (no TTY, it never EOFs), the command hangs waiting for input. relay calls it via `Bun.spawnSync` (stdin closed on spawn), so it returns normally. A bare shell `opencode run … > file` can hang from a non-interactive context — that is a limit of the harness, not of opencode.
 
 ### Model
 
-Resolved per mode (opencode-go/kimi-k2.7-code for delegate; opencode-go/qwen3.7-max for review). `--model` flag overrides. Format is `provider/model`.
+Resolved per mode (opencode-go/kimi-k2.7-code for delegate; opencode-go/qwen3.7-max for review). The `--model` flag overrides this. Format is `provider/model`.
 
 ---
 
@@ -127,7 +136,7 @@ Relay uses the same report-only prompt contract as the other backends. It does n
 
 ### Model
 
-Unset — claude uses its session/configured default.
+Unset. claude uses its session or configured default.
 
 ---
 
@@ -157,6 +166,6 @@ The skill's frontmatter (`name`, `description`) is portable across all three har
 
 ## Known Caveats
 
-- **#26855 (opencode):** JSON format output may exit before the terminal `step_finish` event. If using `--format json`, concatenate all `text` parts captured; do not block waiting for a closing event.
+- **#26855 (opencode):** JSON format output can exit before the terminal `step_finish` event. If using `--format json`, concatenate all `text` parts captured. Do not block while waiting for a closing event.
 - **Image (codex-only):** `/relay:relay opencode image` and `/relay:relay claude image` fail fast before any CLI invocation.
-- **codex trusted directory:** `codex exec` refuses to run outside a git repo ("Not inside a trusted directory and `--skip-git-repo-check` was not specified"). relay does not pass that flag by design — run `/relay:relay codex …` from inside the project's git repo (the normal case). Verified against codex-cli 0.139.0.
+- **codex trusted directory:** `codex exec` refuses to run outside a git repo ("Not inside a trusted directory and `--skip-git-repo-check` was not specified"). relay does not pass that flag by design. Run `/relay:relay codex …` from inside the project's git repo — the normal case. Verified against codex-cli 0.139.0.

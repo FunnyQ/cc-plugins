@@ -17,21 +17,21 @@ argument-hint: "[topic]"
 
 ## Why Plan Mode and AskUserQuestion Matter
 
-Preflight's entire value comes from two things:
+Preflight's entire value comes from two things.
 
-1. **Plan mode** — The interview output is written to the plan file, giving the user a single document to approve or reject. Without plan mode, there's no approval gate and no structured output — the interview results scatter across chat history and lose their value.
+1. **Plan mode.** The interview output goes into the plan file. This gives the user one document to approve or reject. Without plan mode, there is no approval gate and no structured output. The interview results scatter across the chat history and lose their value.
 
-2. **AskUserQuestion tool** — This tool provides structured options and keeps the conversation interactive. Plain text questions get buried in output and miss the structured response format. Every question you ask during the interview must go through `AskUserQuestion`.
+2. **AskUserQuestion tool.** This tool gives structured options and keeps the conversation interactive. A plain text question gets buried in the output and misses the structured response format. Every question in the interview must go through `AskUserQuestion`.
 
-If you skip either of these, the skill produces no useful artifact and the user gets a worse experience than just chatting normally.
+If you skip either of these, the skill produces no useful artifact. The user then gets a worse experience than plain chatting.
 
-**Wrong — plain text question, no plan mode:**
+**Wrong: plain text question, no plan mode.**
 ```
 User: /preflight dark mode
 Claude: "Great! Let me ask you some questions. What platforms do you need?"
 ```
 
-**Right — plan mode first, then structured questions:**
+**Right: plan mode first, then structured questions.**
 ```
 User: /preflight dark mode
 Claude: [calls EnterPlanMode]
@@ -42,23 +42,23 @@ Claude: [calls EnterPlanMode]
 
 ### Step 1: Enter Plan Mode
 
-Call `EnterPlanMode` immediately — before any text output, before any questions. If already in plan mode, skip this step. Everything that follows depends on having a plan file to write to.
+Call `EnterPlanMode` immediately. Do this before any text output and before any questions. If you are already in plan mode, skip this step. Everything that follows depends on having a plan file to write to.
 
 ### Step 2: Interview
 
-Ask 1-2 questions per turn using `AskUserQuestion`. Follow the interview guide below based on the topic type.
+Ask 1-2 questions per turn with `AskUserQuestion`. Follow the interview guide below, based on the topic type.
 
-**When to stop:** End the interview when you have enough context to write actionable acceptance criteria for each requirement. This typically takes 2-4 rounds. Signs you're ready:
-- You understand the problem and who it's for
-- You know the core requirements and can distinguish MVP from nice-to-have
-- You've identified key constraints (tech, timeline, scope)
-- Edge cases are at least acknowledged, even if not fully resolved
+**When to stop:** End the interview when you have enough context to write actionable acceptance criteria for each requirement. This typically takes 2-4 rounds. Signs you are ready:
+- You understand the problem and who it is for.
+- You know the core requirements and can tell MVP apart from nice-to-have.
+- You have identified the key constraints: tech, timeline, scope.
+- Edge cases are at least noted, even when not fully resolved.
 
-Don't over-interview — if the user gives comprehensive answers, 2 rounds may be enough. If answers are terse or raise new questions, go up to 4-5 rounds.
+Do not over-interview. If the user gives comprehensive answers, 2 rounds may be enough. If answers are terse, or they raise new questions, go up to 4-5 rounds.
 
 ### Step 3: Write Plan
 
-Write the spec and implementation plan to the plan file using the template below. Tailor the depth to the topic — a small feature needs a lighter plan than a new project.
+Write the spec and implementation plan to the plan file. Use the template below. Tailor the depth to the topic: a small feature needs a lighter plan than a new project.
 
 ### Step 4: Exit Plan Mode
 
@@ -66,10 +66,10 @@ Call `ExitPlanMode` so the user can review and approve. Wait for their response.
 
 ### Step 5: Execute
 
-After approval, implement the plan. For larger plans:
-- Work in logical stages (e.g., data model → API → UI)
-- Remind the user to commit after each meaningful stage
-- If the plan spans multiple files or systems, confirm the order of operations before starting
+After approval, implement the plan. For larger plans, follow these steps:
+- Work in logical stages, for example data model → API → UI.
+- Remind the user to commit after each meaningful stage.
+- If the plan spans multiple files or systems, confirm the order of operations before you start.
 
 ## Interview Guide
 
@@ -124,7 +124,7 @@ Focus on audience and structure:
 [Unknowns that surfaced during interview, if any — omit this section if none]
 ```
 
-Adapt the template to fit the topic. A small feature might skip "Open Questions". A writing task might replace "Implementation Plan" with "Outline". Don't force every section if it doesn't add value.
+Adapt the template to fit the topic. A small feature might skip "Open Questions". A writing task might replace "Implementation Plan" with "Outline". Do not force every section if it does not add value.
 
 ## Examples
 

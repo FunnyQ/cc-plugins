@@ -1,6 +1,8 @@
 # Example Flow
 
-A concrete end-to-end invocation showing the interview → plan → write tree pattern. Use this as a mental model when running the skill; the real flow will have more rounds and per-topic variations.
+This is a concrete end-to-end invocation of the interview → plan → write
+tree pattern. Use it as a mental model when you run the skill. The real
+flow has more rounds, with variations per topic.
 
 ```
 User: /flightplan want to add a course player to the site, will hand off to sub-agents
@@ -38,8 +40,15 @@ Claude: [writes docs/course-player/PLAN.md]
 
 ## What to notice
 
-- **Slug collision check is in Step 2**, immediately after the slug is agreed — not after approval.
-- **Approval is explicit** — "yes, ship it" works; silence does not.
-- **All files are written together** — PLAN.md, every `_context/*.md`, every task file, and README.md, in one batch. No partial writes.
-- **The skill stops after writing.** It does not begin implementing `ui/01-fixture-shell.md`; that belongs to a future session with a fresh context budget.
-- **The hand-off message names a specific starting task file.** The executor doesn't have to guess where to begin.
+- **The slug collision check happens in Step 2**, immediately after the
+  slug is agreed. It does not happen after approval.
+- **Approval must be explicit.** "yes, ship it" works. Silence does not
+  count as approval.
+- **All files are written together, in one batch:** PLAN.md, every
+  `_context/*.md` file, every task file, and README.md. The skill makes no
+  partial writes.
+- **The skill stops after writing.** It does not begin implementing
+  `ui/01-fixture-shell.md`. That work belongs to a future session with a
+  fresh context budget.
+- **The hand-off message names a specific starting task file.** The
+  executor does not have to guess where to begin.
