@@ -1,6 +1,6 @@
 # PLAN.md Template
 
-PLAN.md is the master spec. It carries every decision, every constraint, and an index of tasks. When a decision changes, PLAN.md and the relevant `_context/` file get updated; individual task files rarely change.
+PLAN.md is the master spec. It carries every decision, every constraint, and an index of tasks. When a decision changes, update PLAN.md and the relevant `_context/` file. Individual task files rarely change.
 
 ## Template
 
@@ -117,9 +117,9 @@ backend/01 ─────┘
 
 ## Tailoring rules
 
-- **Small feature**: skip "Architecture", combine "Goals" and "Requirements", omit "Cross-bucket dependencies" if single-bucket.
+- **Small feature**: skip "Architecture". Combine "Goals" and "Requirements". If single-bucket, omit "Cross-bucket dependencies".
 - **Writing topic**: replace "Architecture" and "Bucketing" with "Outline" (the section structure). Replace "Tech decisions" with "Style decisions".
 - **Migration**: add a "Migration phases" section between "Architecture" and "Bucketing" with the phase definitions.
-- **Greenfield project**: keep all sections; this is what they're designed for.
+- **Greenfield project**: keep all sections. This is what they're designed for.
 
-Do not omit "Non-goals" — it is the single best lever against scope creep.
+Do not omit "Non-goals". It is the single best lever against scope creep.

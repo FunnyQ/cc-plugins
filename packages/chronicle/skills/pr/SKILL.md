@@ -10,11 +10,11 @@ when_to_use: >-
 
 # Chronicle PR Skill
 
-Spawn ONE **Storykeeper** that owns the whole flow: it spawns a skald to analyze the
-branch + synthesize a reviewer-legible body, then a messenger to open the request —
-keeping all branch/diff/`gh` output out of the main conversation while preserving
-the "why" behind the change. Human-invoked only; do not auto-trigger from incidental
-PR/MR mentions.
+Spawn ONE **Storykeeper**. The Storykeeper owns the whole flow. It spawns a skald
+to analyze the branch and synthesize a reviewer-legible body. It then spawns a
+messenger to open the request. This keeps all branch/diff/`gh` output out of the
+main conversation, and it preserves the "why" behind the change. This skill is
+human-invoked only. Do not auto-trigger it from incidental PR/MR mentions.
 
 ## Topology
 
@@ -25,19 +25,19 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:messenger  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
 ```
 
-Spawn via `subagent_type`, never fork: the Storykeeper must be able to spawn its
-children and does not inherit the main conversation.
+Spawn via `subagent_type`, never fork. The Storykeeper must be able to spawn its
+children. It does not inherit the main conversation.
 
-There is **no final creation confirmation gate** — invoking the skill is the consent,
-and the flow auto-creates after any first-run config interview. `draft` defaults to
-`true` (a draft PR is the safe default for an auto-open; the main agent may pass
-`draft:false` to open it ready).
+There is **no final creation confirmation gate**. Invoking the skill is the
+consent. The flow auto-creates after any first-run config interview. `draft`
+defaults to `true`. A draft PR is the safe default for an auto-open. The main
+agent may pass `draft:false` to open it ready.
 
-The three agents live at `packages/chronicle/agents/{storykeeper,skald,messenger}.md`
-and auto-register as `chronicle:storykeeper` / `chronicle:skald` /
-`chronicle:messenger`. Their full procedures (the four-section body spec, the
-optional Mermaid overview diagram, the `CreateInput`/`CreateResult` contract) live
-in those files.
+The three agents live at `packages/chronicle/agents/{storykeeper,skald,messenger}.md`.
+They auto-register as `chronicle:storykeeper` / `chronicle:skald` /
+`chronicle:messenger`. Their full procedures — the four-section body spec, the
+optional Mermaid overview diagram, and the `CreateInput`/`CreateResult` contract —
+live in those files.
 
 ## The main agent's job (thin)
 
@@ -52,21 +52,21 @@ in those files.
    - `status === "configured"` → use its `base`. Do not ask again.
    - `status === "needs-setup"` → this is the first run. Use the harness's interactive
      question tool to ask whether the repository uses GitHub Flow or Git Flow. Always
-     offer both workflows; use the returned `suggestions` only to prefill and recommend
-     branch names detected from the repository. In Claude Code use `AskUserQuestion`; in Codex use
-     `request_user_input` when available. If no structured question tool is available,
-     ask directly and resume only after the answer. State in the question that the
-     selection will create and commit `.chronicle/pr.json` on the current branch.
-     - GitHub Flow: confirm its PR base, then run
+     offer both workflows. Use the returned `suggestions` only to prefill and recommend
+     branch names detected from the repository. In Claude Code, use `AskUserQuestion`. In
+     Codex, use `request_user_input` when available. If no structured question tool is
+     available, ask directly and resume only after the answer. State in the question
+     that the selection will create and commit `.chronicle/pr.json` on the current branch.
+     - GitHub Flow: confirm its PR base. Then run
        `bun "$SKILL_DIR/scripts/pr-config.ts" save github-flow <base>`.
-     - Git Flow: confirm its production and development branches, then run
+     - Git Flow: confirm its production and development branches. Then run
        `bun "$SKILL_DIR/scripts/pr-config.ts" save git-flow <production> <development>`.
      - Parse the saved result and use its `base`. The save command only writes
-       `.chronicle/pr.json`; it never stages or commits.
+       `.chronicle/pr.json`. It never stages or commits.
      - Compare the current branch with the selected GitHub Flow `base` or Git Flow
-       `production`. Apply the existing protected-branch confirmation when they match,
-       then run this as a visible shell command so the PreToolUse guard can inspect the
-       literal `git commit` before anything is staged:
+       `production`. Apply the existing protected-branch confirmation when they match.
+       Then run this as a visible shell command. This lets the PreToolUse guard inspect
+       the literal `git commit` before anything is staged:
 
        ```bash
        git add -- .chronicle/pr.json && git commit --only \
@@ -74,13 +74,13 @@ in those files.
        ```
 
        The config-only pathspec preserves unrelated staged changes. If the guard
-       refuses or the commit fails, report it and stop; never hide the commit inside
+       refuses or the commit fails, report it and stop. Never hide the commit inside
        `pr-config.ts`.
    - `status === "error"` or invalid config → report the error and stop. Never ignore a
      broken committed config and fall back to guessing.
 
    A base explicitly named in the user's current request overrides the resolved base for
-   this invocation only; it does not rewrite config. See
+   this invocation only. It does not rewrite config. See
    [references/pr-config.md](references/pr-config.md) for the schema and routing rules.
 
 2. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
@@ -95,12 +95,12 @@ in those files.
    - `base` — the explicit branch selected in step 1. Never pass `auto`.
    - `branch` — the current branch. If it is a protected branch, defer to the user's
      existing git-flow guard before spawning.
-   - `draft` — optional; default `true`. Pass `false` only if the user asked to open
+   - `draft` — optional. Default `true`. Pass `false` only if the user asked to open
      the PR ready rather than as a draft.
 
 **Verify before reporting:**
 
-- URL returned: confirm with `gh pr view <url>` or `glab mr view <id-or-url>`; a
+- URL returned: confirm with `gh pr view <url>` or `glab mr view <id-or-url>`. A
   non-zero check means treat it as no URL.
 - No URL (or failed check): before reporting failure, look for a request that already
   exists for `<branch>` — the creation may have landed before the error:
@@ -112,7 +112,7 @@ in those files.
     | jq -r '.[0].web_url // empty'
   ```
 
-  A hit is the result — report it as pre-existing/recovered, not newly created.
+  A hit is the result. Report it as pre-existing/recovered, not newly created.
   Empty output or a non-zero exit → report no PR/MR plus Storykeeper's reason.
   Never infer a URL.
 
@@ -125,9 +125,9 @@ Codex uses the same topology through one of two role-loading paths:
    and `draft`.
 2. **Generic sub-agent API only**: first verify the stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
-   exactly one non-fork generic agent with task name `chronicle_storykeeper`, no
-   inherited turns, and tell it to read and obey the `developer_instructions` in
-   `storykeeper.toml` before handling the same five inputs. Its stable instructions
+   exactly one non-fork generic agent with task name `chronicle_storykeeper` and no
+   inherited turns. Tell it to read and obey the `developer_instructions` in
+   `storykeeper.toml` before it handles the same five inputs. Its stable instructions
    delegate sequentially to generic Skald and Messenger children that self-load their
    own TOMLs. Do not paste or improvise the role instructions in the spawn prompt.
 
@@ -135,13 +135,13 @@ If the registered role and stable TOMLs are both unavailable, tell the user to r
 `chronicle:install` and start a new Codex thread. Do not silently replace the
 Storykeeper → Skald → Messenger boundary with an inline flow.
 
-Apply the same verification after Codex returns: `gh pr view <url>` / `glab mr view
-<id-or-url>`, and on no/failed URL the `--head`/`--source-branch` lookup above before
-reporting failure. Never trust an unverified URL.
+Apply the same verification after Codex returns. Check with `gh pr view <url>` or
+`glab mr view <id-or-url>`. On a no or failed URL, run the `--head`/`--source-branch`
+lookup above before reporting failure. Never trust an unverified URL.
 
 ## Edge Cases
 
-- **No commits**: skald reports it; the Storykeeper returns `nothing to propose` and
+- **No commits**: skald reports it. The Storykeeper returns `nothing to propose` and
   stops.
 - **No `.chronicle/pr.json`**: run the first-use workflow interview and commit the
   generated config with the current branch.

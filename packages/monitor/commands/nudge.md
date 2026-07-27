@@ -3,9 +3,9 @@ description: Toggle the scribe Stop-hook auto-log reminders at session / project
 argument-hint: "[on|off|toggle|clear|status] [--scope session|project|user]"
 ---
 
-Toggle the cockpit **scribe nudges** — the 💭 "spawn a fork to run /cockpit scribe" reminders the Stop hook re-surfaces at the end of each turn.
+Toggle the cockpit **scribe nudges**. These are the 💭 "spawn a fork to run /cockpit scribe" reminders. The Stop hook re-surfaces them at the end of each turn.
 
-Run this exactly and report the printed result back to me:
+Run this exactly. Report the printed result back to me:
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS
@@ -18,4 +18,4 @@ bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS
 - `project` — the whole project (keyed by git root) — persists in the global config.
 - `user` — every project, every session (global default) — persists in the global config.
 
-The most-specific **defined** scope wins: `session → project → user → (default: on)`. So a broad off can be re-enabled at a narrower scope — e.g. `nudge off --scope user` to mute everywhere, then `nudge on` (session) to hear them in just this session. `status` prints the effective result plus the per-scope breakdown.
+The most-specific **defined** scope wins: `session → project → user → (default: on)`. So a broad off can be re-enabled at a narrower scope. For example, run `nudge off --scope user` to mute everywhere. Then run `nudge on` (session scope) to hear them again in just this session. `status` prints the effective result plus the per-scope breakdown.

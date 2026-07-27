@@ -16,7 +16,7 @@ Interview at milestone depth. The output is `WAYPOINTS.md`, not a task tree.
 - `flightplan`: one feature or one coherent build slice that needs tasks now.
 - `waypoints`: a whole project that should be planned as several milestone legs.
 
-If the interview starts turning into task files, stop and move back up. `waypoints` names the legs; `flightplan` later decomposes the active leg.
+If the interview starts turning into task files, stop. Move back up. `waypoints` names the legs; `flightplan` later decomposes the active leg.
 
 ## How to identify vertical slices
 
@@ -27,7 +27,7 @@ Prefer legs that leave the product in a usable or inspectable state:
 - Weak: "database schema exists"
 - Weak: "backend APIs are done"
 
-Technical foundations can be legs only when their done-state is externally verifiable enough to guide a flightplan, such as "the app boots with authenticated sessions and deployment plumbing in place."
+Technical foundations can be legs only when their done-state is externally verifiable. It must be clear enough to guide a flightplan, such as "the app boots with authenticated sessions and deployment plumbing in place."
 
 ## How to order legs
 
@@ -49,7 +49,7 @@ A leg is the right size when:
 - Its tasks would probably fit in a focused autopilot run.
 - The next leg can be planned with better information after this one lands.
 
-Split a leg when it has multiple unrelated user outcomes. Merge legs when one cannot be verified without the other.
+When a leg has multiple unrelated user outcomes, split it. When one leg cannot be verified without the other, merge them.
 
 ## Walking the tree examples
 
@@ -101,7 +101,7 @@ The first leg lands the riskiest parsing path early. Later legs are delayed unti
 
 ## Interview prompts
 
-Use 1-2 questions per turn. Recommend an answer when the shape is apparent.
+Use 1-2 questions per turn. When the shape is apparent, recommend an answer.
 
 - "What is the first milestone that would make this project real enough to inspect?"
 - "What would be true at the end of that leg, in one sentence?"
@@ -120,4 +120,4 @@ Stop interviewing when:
 - The order is defensible by dependency or risk.
 - No leg is secretly a task breakdown.
 
-Then write `docs/<proj>/WAYPOINTS.md` directly. Do not scaffold leg tasks until `flightplan` is invoked for the active leg.
+Then write `docs/<proj>/WAYPOINTS.md` directly. Until `flightplan` is invoked for the active leg, do not scaffold leg tasks.

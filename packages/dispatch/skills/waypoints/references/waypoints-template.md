@@ -38,7 +38,7 @@ Use this file shape for `docs/<proj>/WAYPOINTS.md`. The roadmap is the single so
 - Each leg is one top-level `- [ ]` / `- [~]` / `- [x]` list item under `## Legs`, numbered `N.`.
 - The **NN** leg directory prefix is the zero-padded number: leg `2.` -> `legs/02-<slug>/`.
 - Every leg carries a `→ legs/NN-slug/` pointer.
-- At most one leg is `[~]` active. Exactly one active leg while a roadmap is in progress; zero active legs only when every leg is `[x]`.
+- At most one leg is `[~]` active. Exactly one leg is active while a roadmap is in progress. Zero legs are active only when every leg is `[x]`.
 - The done-state is the text after the padded em dash ` — ` on the leg item line.
 - A landed leg's continuation line carries `· landed <date> · outcome: <one line>`.
 
@@ -62,4 +62,4 @@ Use this file shape for `docs/<proj>/WAYPOINTS.md`. The roadmap is the single so
       → legs/04-admin/
 ```
 
-This example has one landed leg, one active leg, and two pending legs. `flightplan` should scope only to `02-profile` until that leg lands.
+This example has one landed leg, one active leg, and two pending legs. Until that leg lands, `flightplan` should scope only to `02-profile`.

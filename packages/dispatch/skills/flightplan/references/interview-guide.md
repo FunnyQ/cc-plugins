@@ -1,10 +1,10 @@
 # Interview Guide
 
-Topic-specific question banks. Use these as a starting point; adapt to what the user says. Every question must go through `AskUserQuestion` with structured options — never plain text, and every question must include a recommended answer as the first option.
+Topic-specific question banks. Use these as a starting point. Adapt them to what the user says. Every question must go through `AskUserQuestion` with structured options. Never use plain text. Every question must include a recommended answer as the first option.
 
 ## Interview philosophy
 
-Don't stop interviewing the user until both sides fully understand every part of the plan. Treat the design as a tree of decisions — walk one branch at a time, and when one choice depends on another, resolve the upstream one first. For every question, propose the answer you'd pick and explain why; the user reacts to it.
+Don't stop the interview until both sides fully understand every part of the plan. Treat the design as a tree of decisions. Walk one branch at a time. When one choice depends on another, resolve the upstream choice first. For every question, propose the answer you would pick. Explain why. The user reacts to your proposal.
 
 There is no round cap. Stop when the tree is fully walked, not when a counter expires.
 
@@ -15,16 +15,16 @@ Stop when **all** of these hold:
 - A `topic-slug` is agreed.
 - Every requirement has writable acceptance criteria.
 - Every task has a quality bar captured as an Eval rubric (dimensions + weights + pass line). See **Eval rubric (ask per task)** below.
-- The plan ends with one **final review task** (marked `Final review: true`) that depends on all leaf tasks — the holistic closing gate. Confirm what it reviews (integration, meets-goal, consistency, regressions). Single-task plans are exempt.
+- The plan ends with one **final review task** (marked `Final review: true`) that depends on all leaf tasks. This is the holistic closing gate. Confirm what it reviews: integration, meets-goal, consistency, regressions. Single-task plans are exempt.
 - MVP vs later is explicit, with a one-line reason for each "later".
-- Bucketing has been decided (`ui/backend/api`, by phase, by feature, or single-bucket `work/`) with a clear reason. Task files always live one level deep under `tasks/<bucket>/` — never flat under `tasks/`.
+- Bucketing has been decided (`ui/backend/api`, by phase, by feature, or single-bucket `work/`) with a clear reason. Task files always live one level deep under `tasks/<bucket>/`. They never live flat under `tasks/`.
 - Cross-bucket dependencies, if any, are mapped.
 - Conventions worth freezing are captured (commit style, code style, naming, etc.).
 - Failure modes and rollback paths are acknowledged.
 - Edge cases are acknowledged (resolved or explicitly deferred to "Open Questions").
 - Reading back the running summary produces no new corrections from the user.
 
-When in doubt, ask one more question. The cost of one extra round is small; the cost of a missing decision discovered mid-execution is large.
+When in doubt, ask one more question. One extra round costs little. A missing decision discovered mid-execution costs much more.
 
 ## Project (new system or app)
 
@@ -32,13 +32,13 @@ Focus: scope a buildable MVP and the buckets that will get it there.
 
 **Round 1 — problem framing**
 
-- What problem does this solve, and who feels the pain today?
+- What problem does this solve? Who feels the pain today?
 - What's the smallest version that delivers value? (MVP vs later)
 
 **Round 2 — surface area**
 
 - What major surfaces does this touch? (CLI / web UI / mobile / API / data pipeline / etc.)
-- Are there existing systems to integrate with, or is this greenfield?
+- Are there existing systems to integrate with? Or is this greenfield?
 
 **Round 3 — tech stack**
 
@@ -49,7 +49,7 @@ Focus: scope a buildable MVP and the buckets that will get it there.
 **Round 4 — bucketing**
 
 - Do the surfaces map to bucket-able layers (ui / backend / api / infra)? Or is it phase-based (foundation → core → polish)? Or feature-based?
-- Which bucket can start first, and which depends on which?
+- Which bucket can start first? Which depends on which?
 
 **Round 5 — conventions**
 
@@ -67,7 +67,7 @@ Focus: precise behavior definition that fits into the current codebase.
 
 **Round 1 — user story & current state**
 
-- Who needs this, and why? What's broken or missing today?
+- Who needs this? Why? What's broken or missing today?
 - What happens currently when a user tries this?
 
 **Round 2 — desired behavior**
@@ -88,7 +88,7 @@ Focus: precise behavior definition that fits into the current codebase.
 **Round 5 — bucketing**
 
 - Frontend-only, backend-only, or both? Worth splitting into buckets?
-- For small features, single-bucket (`tasks/work/`) is often correct — still one bucket directory, not files directly under `tasks/`.
+- For small features, single-bucket (`tasks/work/`) is often correct. It is still one bucket directory, not files directly under `tasks/`.
 
 **Round 6+ — acceptance & verification**
 
@@ -117,7 +117,7 @@ Focus: define done, and avoid scope creep.
 **Round 4 — migration strategy**
 
 - Big-bang or incremental? Can both coexist during transition?
-- Backwards compatibility required, or is this a breaking change?
+- Is backwards compatibility required, or is this a breaking change?
 
 **Round 5 — bucketing**
 
@@ -127,7 +127,7 @@ Focus: define done, and avoid scope creep.
 **Round 6+ — safety & verification**
 
 - How do we verify each step before moving to the next?
-- Rollback plan if something goes wrong mid-migration?
+- What's the rollback plan if something goes wrong mid-migration?
 
 ## Writing (spec, outline, documentation)
 
@@ -155,7 +155,7 @@ Focus: audience and structure. Replace bucketing with section-bucketing.
 **Round 5 — bucketing**
 
 - For long pieces: bucket by section or by audience. Task files become "draft section X".
-- For short pieces: single-bucket (`tasks/draft/`) is fine; tasks are "outline", "draft", "revise".
+- For short pieces: single-bucket (`tasks/draft/`) is fine. Tasks are "outline", "draft", "revise".
 
 **Round 6+ — verification**
 
@@ -163,7 +163,7 @@ Focus: audience and structure. Replace bucketing with section-bucketing.
 
 ## Eval rubric (ask per task)
 
-A required dimension across **every** topic. Acceptance criteria answers "is it done?"; the rubric answers "is it good enough?" — the graded bar a judge agent or a workflow loops against. Don't skip it: a task with no rubric can't be scored, and `lint-task.ts` will reject it.
+A required dimension across **every** topic. Acceptance criteria answers "is it done?". The rubric answers "is it good enough?" — the graded bar a judge agent or a workflow loops against. Don't skip it. A task with no rubric can't be scored. `lint-task.ts` will reject it.
 
 For each task (or each bucket, if the bar is uniform), settle:
 
@@ -171,9 +171,11 @@ For each task (or each bucket, if the bar is uniform), settle:
 - **Weights** — which axis dominates? Default `×3 / ×2 / ×1 / ×1`. Correctness usually leads.
 - **Pass line** — weighted average threshold. Default `> 4.0` on a 0–5 scale.
 - **Hard-fail veto** — any axis that fails the whole task regardless of average? Default `Correctness < 4 is an automatic veto` (a wrong answer can't be redeemed by style).
-- **Anchors** — for the axes that matter most, what does a 0–1 vs 2–3 vs 4–5 concretely look like *for this task*? (e.g. "the computed total doesn't match the spec's 5,264" = 0–1.) Concrete anchors are what make the score reproducible.
+- **Anchors** — pick the axes that matter most. What does a 0–1 vs 2–3 vs 4–5 look like *for this task*? (e.g. "the computed total doesn't match the spec's 5,264" = 0–1.) Concrete anchors are what make the score reproducible.
 
-Recommend these defaults via `AskUserQuestion` (first option, `(Recommended)`), and only dig deeper when the user wants a different bar. Capture the result in each task's `## Eval rubric` per `task-template.md`; if the bar is shared, also write `_context/rubric.md` and have tasks reference it.
+Recommend these defaults via `AskUserQuestion`. Make the first option `(Recommended)`. Only dig deeper when the user wants a different bar.
+
+Capture the result in each task's `## Eval rubric` per `task-template.md`. If the bar is shared, also write `_context/rubric.md`. Have tasks reference it.
 
 ## Walking the design tree
 
@@ -189,13 +191,13 @@ stack? ─→ Nuxt 3
                          └─ tokens source? ─→ ...
 ```
 
-If the user defers a branch ("not sure yet, default to X"), record it as an Open Question in PLAN.md and move on. Don't abandon the walk; just mark the unresolved node.
+If the user defers a branch ("not sure yet, default to X"), record it as an Open Question in PLAN.md. Then move on. Don't abandon the walk. Just mark the unresolved node.
 
 ## Recommendation requirement
 
-Every `AskUserQuestion` call must include a recommended answer as the **first** option, suffixed `(Recommended)`. The description of that option explains the rationale ("default to X because Y is the cheaper safe path"). If genuinely undecided between two options, name the safer / more-reversible one as the recommendation and say so in the description.
+Every `AskUserQuestion` call must include a recommended answer as the **first** option, suffixed `(Recommended)`. The description of that option explains the rationale ("default to X because Y is the cheaper safe path"). If genuinely undecided between two options, name the safer or more reversible one as the recommendation. Say so in the description.
 
-This is not optional. Asking without a recommendation forces the user to design from scratch; asking with one lets them react, which is much faster and produces better answers.
+This is not optional. Asking without a recommendation forces the user to design from scratch. Asking with one lets the user react instead. Reacting is much faster and produces better answers.
 
 ## Question-design checklist
 

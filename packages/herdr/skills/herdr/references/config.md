@@ -1,6 +1,6 @@
 # Herdr Configuration Reference
 
-Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.7.4. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Config path: `~/.config/herdr/config.toml`
 
@@ -65,7 +65,7 @@ split_horizontal = "prefix+minus"
 # Indexed: switch_tab = "prefix+1..9"
 ```
 
-Key syntax: `prefix+n`, `ctrl+a`, `shift+n`, `alt+1`, `cmd+k`, special keys (`enter`, `tab`, `esc`, `left`…), named punctuation (`minus`, `comma`, `plus`, `backtick`).
+Key syntax examples: `prefix+n`, `ctrl+a`, `shift+n`, `alt+1`, `cmd+k`. Special keys include `enter`, `tab`, `esc`, and `left`. Named punctuation includes `minus`, `comma`, `plus`, and `backtick`.
 
 Custom command keybindings:
 ```toml
@@ -78,9 +78,9 @@ width = "80%"              # terminal cells or percentage; popup only
 height = "80%"
 ```
 
-`popup` opens a session-modal terminal without changing the tab layout. It receives all input, including Escape, until the command exits. Omit `width`/`height` for half-size defaults. Popup commands receive `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane, but not `HERDR_PANE_ID`.
+`popup` opens a session-modal terminal without changing the tab layout. It receives all input, including Escape, until the command exits. Omit `width`/`height` for half-size defaults. Popup commands receive `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane. They do not receive `HERDR_PANE_ID`.
 
-`pane` opens a temporary zoomed pane, `shell` runs detached, and `plugin_action` invokes an installed plugin action.
+`pane` opens a temporary zoomed pane. `shell` runs detached. `plugin_action` invokes an installed plugin action.
 
 Reset to defaults: `herdr config reset-keys`
 
@@ -132,7 +132,7 @@ row_gap = 0
 rows = [["state_icon", "workspace"], ["branch", "git_status"]]
 ```
 
-Sidebar rows may use built-in tokens or custom `$name` values reported through `pane report-metadata --token` / `workspace report-metadata --token`. An agent-specific entry replaces the default agent rows; it does not extend them.
+Sidebar rows may use built-in tokens or custom `$name` values. Herdr reports these through `pane report-metadata --token` / `workspace report-metadata --token`. An agent-specific entry replaces the default agent rows. It does not extend them.
 
 ### Notifications (Toast)
 ```toml

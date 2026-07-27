@@ -1,9 +1,9 @@
 # `.chronicle/release.json` — the release config
 
-Chronicle records a repo's release shape **once** in a committed
-`.chronicle/release.json`, then every later `/chronicle:release` reads it instead of
+Chronicle records a repo's release shape **once**, in a committed
+`.chronicle/release.json`. Every later `/chronicle:release` then reads it, instead of
 re-guessing. Auto-detection (`analyze-release.ts`'s `detectShape`) only seeds the
-first-run interview defaults — the committed config is the source of truth.
+first-run interview defaults. The committed config is the source of truth.
 
 Commit the file (it's shared team/session state, not a personal dotfile).
 
@@ -36,16 +36,16 @@ Commit the file (it's shared team/session state, not a personal dotfile).
 
 ### `workflow` / `branches`
 
-`workflow` says how `/chronicle:release auto` finishes, and which branches the config
-has to name. It uses the same vocabulary as `.chronicle/pr.json`:
+`workflow` says how `/chronicle:release auto` finishes. It also says which branches
+the config has to name. It uses the same vocabulary as `.chronicle/pr.json`:
 
 - **`"git-flow"`** — two long-lived branches. `branches` names both `develop` and
-  `main`. The finish commits the bump on `develop`, merges `develop → main`, cuts
-  every tag on that merge commit, merges back, and ends on `develop`.
-- **`"github-flow"`** — one long-lived branch. `branches` names only `main` (call it
-  whatever the repo calls it — `main`, `master`, `trunk`); a `develop` key is
-  ignored. The finish commits the bump on `main`, cuts every tag on **that bump
-  commit**, and ends on `main`. Nothing is merged.
+  `main`. The finish commits the bump on `develop`. It merges `develop → main` and
+  cuts every tag on that merge commit. It merges back, then ends on `develop`.
+- **`"github-flow"`** — one long-lived branch. `branches` names only `main` — call it
+  whatever the repo calls it: `main`, `master`, `trunk`. A `develop` key is ignored.
+  The finish commits the bump on `main`. It cuts every tag on **that bump commit**,
+  then ends on `main`. Nothing is merged.
 
 ```jsonc
 {
@@ -61,17 +61,18 @@ has to name. It uses the same vocabulary as `.chronicle/pr.json`:
 Either way **every tag of a coordinated release lands on one commit** — the merge
 commit on git-flow, the bump commit on github-flow.
 
-**A missing `workflow` means `git-flow`.** Configs written before the field existed
-keep working byte-for-byte, and Chronicle never re-detects the workflow behind a
-committed config — a repo that drops `develop` later edits its config (add
-`"workflow": "github-flow"`, remove `branches.develop`) rather than being silently
-re-shaped. Detection only seeds the first-run interview: no `develop` branch (local
-or `origin/`) suggests `github-flow`.
+**A missing `workflow` means `git-flow`.** A config written before the field existed
+keeps working byte-for-byte. Chronicle never re-detects the workflow behind a
+committed config. So, if a repo later drops `develop`, edit its config by hand: add
+`"workflow": "github-flow"` and remove `branches.develop`. Chronicle never re-shapes
+the config silently. Detection only seeds the first-run interview: no `develop`
+branch (local or `origin/`) suggests `github-flow`.
 
-That edit is the **only** migration this feature needs, and only for a repo whose
-committed config names a `develop` that no longer exists. The analyzer reports that
-case as `workflowDrift`, so `/chronicle:release` offers the fix instead of failing
-mid-finish. Every other committed config — `develop` still alive — needs no change.
+That edit is the **only** migration this feature needs. It applies only to a repo
+whose committed config names a `develop` that no longer exists. The analyzer reports
+that case as `workflowDrift`. So `/chronicle:release` offers the fix, instead of
+failing mid-finish. Every other committed config — `develop` still alive — needs no
+change.
 
 ### `versionFiles` / component `versionFiles` entries
 
@@ -85,7 +86,7 @@ Each entry is one of:
   group** is the version substring. This is the escape hatch for anything
   non-standard — a Rails `config/application.rb` constant, a `version.rb`, a
   `__version__` in Python, a version baked into a shell script. Chronicle rewrites
-  only the captured span, so surrounding formatting is untouched.
+  only the captured span. Surrounding formatting stays untouched.
 
 ### per-component mode
 
@@ -109,7 +110,7 @@ Each entry is one of:
 ```
 
 `path` scopes a component's changelog diff (`git log <tag>..HEAD -- <path>`) and its
-"did it change?" commit count. Each component lists **all** of its version files —
-in this repo that's the paired Claude + Codex `plugin.json` (marketplace registries
-carry no version and are never listed). The changelog header is per-component (e.g.
-`## [chronicle 0.5.0]`); see `monorepo-release.md`.
+"did it change?" commit count. Each component lists **all** of its version files. In
+this repo, that's the paired Claude + Codex `plugin.json`. Marketplace registries
+carry no version and are never listed. The changelog header is per-component (e.g.
+`## [chronicle 0.5.0]`). See `monorepo-release.md`.

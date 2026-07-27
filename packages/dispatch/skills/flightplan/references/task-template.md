@@ -76,13 +76,13 @@ export function foo(bar: Bar): Baz
 
 - List only files the executor actually needs. Don't include `_context/` files that aren't relevant to this task.
 - Use relative paths (`../_context/shared.md`), not absolute.
-- The bullet under the header phrase "do not need to open other files" is the contract: never list other task files or PLAN.md here.
+- The bullet phrase "do not need to open other files" is the contract. Never list another task file or PLAN.md here.
 
 ### `Depends on`
 
 - Use the form `<bucket>/NN` — same shorthand as the task index.
 - For foundation tasks with no deps, write `none — foundation task`.
-- If a dependency is cross-bucket, that's fine — make it explicit.
+- If a dependency is cross-bucket, that is fine. Make it explicit.
 
 ### `Status`
 
@@ -93,49 +93,49 @@ export function foo(bar: Bar): Baz
 
 Status is mutated in-place. Sub-agents update this when they pick up or finish a task.
 
-### `Final review` (the closing gate — exactly one per plan)
+### `Final review` (the closing gate, exactly one per plan)
 
-Every plan ends with **one terminal task that reviews the whole deliverable**. Mark it `> **Final review**: true`, and make its `Depends on` reach every other task (directly or transitively) so it cannot start until all the work is done. `lint-task.ts` enforces both: a plan with no marked task, or a marked task that misses some branch, fails the whole-tree lint.
+Every plan ends with **one terminal task that reviews the whole deliverable**. Mark it `> **Final review**: true`. Make its `Depends on` reach every other task, directly or transitively. Then it cannot start until all the work is done. `lint-task.ts` enforces both rules. If no task is marked, or a marked task misses some branch, the whole-tree lint fails.
 
-This is the holistic gate — per-task rubrics catch per-task quality; the final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes (e.g. **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, **No regressions**), not re-score individual tasks.
+This is the holistic gate. Per-task rubrics catch per-task quality. The final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes, for example **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, and **No regressions**. It does not re-score individual tasks.
 
-A plan with a single task is exempt (it's its own terminal). Don't mark more than one task — keep one unambiguous closing gate.
+A plan with a single task is exempt. That task is its own terminal. Don't mark more than one task. Keep one unambiguous closing gate.
 
 ### `Eval rubric` (required, machine-parseable)
 
-Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary gate** (pass/fail); the rubric is the **graded quality score** on top of it — what a judge agent (or you) uses to decide "good enough", and what a workflow loops against until it passes.
+Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary gate** (pass or fail). The rubric is the **graded quality score** on top of that gate. A judge agent, or you, uses the rubric to decide "good enough". A workflow loops against the rubric until the task passes.
 
-`lint-task.ts` enforces a parseable shape; `score-task.ts` consumes it. The contract is **operator-anchored**, so it works in any language:
+`lint-task.ts` enforces a parseable shape. `score-task.ts` consumes that shape. The contract is **operator-anchored**, so it works in any language:
 
-- **Threshold line** — a `>`-quoted line carrying the pass operator + number. `> 4.0` / `≥ 4` / `>= 4` all parse. State the scale (`0–5`) on the same line so the linter can range-check the threshold.
-- **Hard-fail veto (optional)** — `<dimension> < N` (`<` or `≤`) anywhere on the threshold line, e.g. `Correctness < 4 is an automatic veto`. The named dimension must match a row in the table.
-- **Dimension table** — header must include a `Weight` column; each row's weight is written `×N`. Rows without a positive weight (or the `|---|` separator) are ignored.
+- **Threshold line**: a `>`-quoted line that carries the pass operator and a number. `> 4.0`, `≥ 4`, and `>= 4` all parse. State the scale (`0–5`) on the same line. This lets the linter range-check the threshold.
+- **Hard-fail veto** (optional): write `<dimension> < N`, using `<` or `≤`, anywhere on the threshold line. For example: `Correctness < 4 is an automatic veto`. The named dimension must match a row in the table.
+- **Dimension table**: the header must include a `Weight` column. Each row's weight is written `×N`. Rows without a positive weight, or the `|---|` separator row, are ignored.
 
-Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–scaleMax scale. A task passes when the average meets the threshold **and** no veto fires. Customize the anchors per task; keep the threshold line + weighted table shape.
+Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–scaleMax scale. A task passes when the average meets the threshold **and** no veto fires. Customize the anchors for each task. Keep the threshold line and the weighted table shape.
 
-## Referring to other tasks — name the thing, not the id
+## Referring to other tasks: name the thing, not the id
 
-The most common lint failure: writing a sibling task id (`frontend/01`) into the body out of habit, because you just used it in `Depends on`. Don't. The dependency graph lives in the header; the body must never make the executor open another task.
+The most common lint failure is this: writing a sibling task id, such as `frontend/01`, into the body out of habit. This happens because you just used the id in `Depends on`. Don't do it. The dependency graph lives in the header. The body must never make the executor open another task.
 
 - ❌ `Built on the client from frontend/01.`
 - ✅ ``Built on the API client (`apiFetch(path): Promise<Res>` — signature below).``
 - ❌ `See ui/02 for the validation rules.`
 - ✅ Inline the rules here, or put them in `../_context/validation.md` and list that file in Required reading.
 
-`lint-task.ts` rejects any `bucket/NN`, `bucket/NN-slug`, or `bucket/NN-slug.md` reference in the body (your own file excluded). If it's a real dependency, capture it in `Depends on` — not in prose.
+`lint-task.ts` rejects any `bucket/NN`, `bucket/NN-slug`, or `bucket/NN-slug.md` reference in the body. Your own file is excluded. If it's a real dependency, capture it in `Depends on`, not in prose.
 
 ## Self-containment checklist
 
 Before finalizing a task file, verify each:
 
 - [ ] All function signatures, schemas, or interfaces the executor will write are inline.
-- [ ] Sample inputs / outputs are inline if behavior is non-obvious.
+- [ ] If behavior is non-obvious, sample inputs and outputs are inline.
 - [ ] File paths are absolute from project root (no "in the auth folder" hand-waving).
 - [ ] Every acceptance criterion is verifiable (no "looks good").
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
-- [ ] `## Eval rubric` is present with a threshold line + weighted dimension table, anchors filled in for this task (not the template placeholders).
+- [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
 - [ ] Nothing in this file requires opening PLAN.md or another task file to understand.
-- [ ] If duplication with `_context/` is needed for clarity, duplicate — don't make the executor cross-reference.
+- [ ] If duplication with `_context/` is needed for clarity, duplicate it. Don't make the executor cross-reference.
 
 ## Sizing
 
@@ -149,13 +149,13 @@ Aim for 1 task = 1 commit or 1 PR. Concretely:
 
 `<bucket>/NN-<kebab-slug>.md`
 
-- `<bucket>` matches a directory under `tasks/`. Must be a single kebab token (no internal dashes that resemble `NN`).
+- `<bucket>` matches a directory under `tasks/`. It must be a single kebab token, with no internal dashes that resemble `NN`.
 - `NN` is two-digit, zero-padded, locally sequential within the bucket (`01`, `02`, … `19`, `20`, …).
 - `<kebab-slug>` is 3–6 words, lowercase, hyphen-separated, describing the task outcome.
 
 ## H1 shape (strict)
 
-The H1 line must be `# BUCKET-NN: Title` where `BUCKET` is all-caps single token (`UI`, `BACKEND`, `API`, `WORK`), `NN` is two-digit zero-padded, separated by a single dash. The `lint-task.ts` and `build-readme.ts` scripts parse this exact shape — deviations will fail validation.
+The H1 line must be `# BUCKET-NN: Title`. `BUCKET` is an all-caps single token, for example `UI`, `BACKEND`, `API`, or `WORK`. `NN` is two-digit zero-padded. A single dash separates `BUCKET` from `NN`. The `lint-task.ts` and `build-readme.ts` scripts parse this exact shape. A deviation fails validation.
 
 Examples:
 

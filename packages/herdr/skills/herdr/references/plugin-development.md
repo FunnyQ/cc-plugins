@@ -1,8 +1,8 @@
 # Herdr Plugin Development
 
-Verified against herdr 0.7.4; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.7.4. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
-Plugins are shareable executable workflow packages. Any language — Bash, JS, Rust, Go, Lua, Python. Herdr owns the host surface; the plugin owns its implementation.
+Plugins are shareable executable workflow packages. You can write a plugin in any language, for example Bash, JS, Rust, Go, Lua, or Python. Herdr owns the host surface. The plugin owns its implementation.
 
 The entire Herdr CLI is the plugin API (see `cli.md`). Call back via `HERDR_BIN_PATH` (portable across Unix sockets and Windows named pipes).
 
@@ -47,9 +47,9 @@ action = "apply"
 ```
 
 **Required fields:** `id`, `name`, `version`, `min_herdr_version`.
-**ID rules:** Plugin id: ASCII letters, digits, dot, colon, underscore, hyphen. Action/pane/link-handler ids: same but no dots.
-**Platforms:** Top-level applies to all; item-level overrides.
-**Commands:** argv arrays, NOT shell-expanded.
+**ID rules:** A plugin id uses ASCII letters, digits, dot, colon, underscore, and hyphen. An action, pane, or link-handler id uses the same characters, but no dots.
+**Platforms:** The top-level field applies to all platforms. An item-level field overrides it.
+**Commands:** Commands are argv arrays. Herdr does NOT shell-expand them.
 
 ## Runtime Environment Variables
 
@@ -67,7 +67,7 @@ Link handler: `HERDR_PLUGIN_CLICKED_URL`, `HERDR_PLUGIN_LINK_HANDLER_ID`, `invoc
 ## Storage Rules
 - **Config** (`.env`, user-editable): `HERDR_PLUGIN_CONFIG_DIR`
 - **Runtime state**: `HERDR_PLUGIN_STATE_DIR`
-- **NOT in `HERDR_PLUGIN_ROOT`** — GitHub-installed roots are managed checkouts
+- **NOT in `HERDR_PLUGIN_ROOT`.** GitHub-installed roots are managed checkouts.
 
 ## First Plugin Example
 
@@ -154,11 +154,11 @@ herdr plugin install owner/repo[/subdir] [--ref REF] [--yes]
 ```
 
 ## Pitfalls
-- `command` is argv, not shell — no `$VAR` expansion, no pipes, no `&&`
-- Build commands don't receive runtime env or socket
-- `plugin link` does NOT run build commands — build yourself
-- No `plugin update` in v1 — reinstall from GitHub to refresh
-- Plugin ids can contain dots; action ids cannot — use qualified `plugin.id.action` for global uniqueness
-- `HERDR_PLUGIN_ROOT` is a managed checkout for GitHub installs — never store user data there
-- Windows: `PATHEXT` shims (`.cmd`) resolved automatically for build/action/event commands
-- Popup placement does not create a Herdr pane: no `HERDR_PANE_ID`, pane/agent API target, or tiled-layout change; custom-command popups can use `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane
+- `command` is argv, not shell. It supports no `$VAR` expansion, no pipes, and no `&&`.
+- Build commands do not receive the runtime env or socket.
+- `plugin link` does NOT run build commands. Build the plugin yourself.
+- Herdr v1 has no `plugin update` command. Reinstall from GitHub to refresh it.
+- Plugin ids can contain dots. Action ids cannot. Use the qualified form `plugin.id.action` for global uniqueness.
+- `HERDR_PLUGIN_ROOT` is a managed checkout for GitHub installs. Never store user data there.
+- On Windows, herdr resolves `PATHEXT` shims (`.cmd`) automatically for build, action, and event commands.
+- Popup placement does not create a Herdr pane. It has no `HERDR_PANE_ID`, no pane or agent API target, and no tiled-layout change. Custom-command popups can use `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane.

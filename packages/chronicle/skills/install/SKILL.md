@@ -17,13 +17,15 @@ when_to_use: >-
 
 Chronicle's flows are orchestrator-shaped: `main → lawspeaker → watcher/runesmith`
 (and the same for `storykeeper` / `oathkeeper`). Claude Code **2.1.217** stopped
-letting subagents spawn nested subagents by default, so those orchestrators fail
-with `Agent exists but is not enabled in this context` — no commit, nothing staged.
+letting subagents spawn nested subagents by default. Those orchestrators then fail
+with `Agent exists but is not enabled in this context`. No commit lands, and
+nothing is staged.
 
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` re-enables it. Chronicle needs `2`.
 
 A `SessionStart` hook runs this automatically and writes the setting when it is
-missing or too low, so a fresh install self-heals. Run it by hand to check or repair:
+missing or too low. A fresh install self-heals this way. Run it by hand to check
+or repair:
 
 ```bash
 bun "$SKILL_DIR/scripts/setup-spawn-depth.ts"            # report only (default)
@@ -31,13 +33,13 @@ bun "$SKILL_DIR/scripts/setup-spawn-depth.ts" --dry-run  # show the resulting fi
 bun "$SKILL_DIR/scripts/setup-spawn-depth.ts" --apply    # write it
 ```
 
-It only ever **raises** the value — a larger depth set by the user or another
-plugin is left alone — preserves unrelated settings, and backs the file up as
-`settings.json.bak-chronicle` before a changed write.
+It only ever **raises** the value. A larger depth set by the user or another
+plugin is left alone. It also preserves unrelated settings, and it backs up the
+file as `settings.json.bak-chronicle` before a changed write.
 
-⚠️ **The env var is read at session start.** A session that triggers the write is
-still running without it, so Chronicle's flows keep failing until Claude Code is
-restarted. Always say this when reporting the fix.
+⚠️ **The env var is read at session start.** A session that triggers the write
+still runs without it. Chronicle's flows keep failing until Claude Code
+restarts. Always say this when you report the fix.
 
 ## Codex — named agent roles
 
@@ -47,10 +49,10 @@ Register the Codex-native commit roles (`chronicle_lawspeaker`,
 release roles (`chronicle_seer`, `chronicle_oathkeeper`, `chronicle_smith`,
 `chronicle_annalist`, `chronicle_hammerbearer`).
 
-Resolve the plugin root from this skill's load-time base directory: the root is
+Resolve the plugin root from this skill's load-time base directory. The root is
 two directories above this `skills/install` directory. Never point Codex config
 at the versioned plugin cache. The setup script copies role TOMLs into the stable
-`$CODEX_HOME/agents/chronicle/` directory and owns one marked block in
+`$CODEX_HOME/agents/chronicle/` directory. It also owns one marked block in
 `$CODEX_HOME/config.toml`.
 
 Preview first:
@@ -65,6 +67,7 @@ After explicit user approval, apply:
 bun "$SKILL_DIR/scripts/setup-codex-agents.ts" --plugin-root "$PLUGIN_ROOT" --apply
 ```
 
-The script is idempotent, preserves unrelated config, and backs up an existing
-config as `config.toml.bak-chronicle` before a changed write. Tell the user to
-start a new Codex thread after applying so the role registry reloads.
+The script is idempotent. It preserves unrelated config, and it backs up an
+existing config as `config.toml.bak-chronicle` before a changed write. Tell the
+user to start a new Codex thread after applying. This lets the role registry
+reload.

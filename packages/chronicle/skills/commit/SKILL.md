@@ -12,10 +12,11 @@ argument-hint: "[simple]"
 
 # Chronicle Commit
 
-Spawn ONE **Lawspeaker** that owns the whole flow: it spawns a cheap Haiku
-watcher, settles the shape (auto-decided, or forced to one commit in `simple` mode),
-then spawns a cheap Haiku runesmith — keeping all git output out of the main
-conversation while preserving the "why" behind the changes.
+Spawn ONE **Lawspeaker**. The Lawspeaker owns the whole flow. It spawns a cheap
+Haiku watcher, then settles the shape itself — auto-decided, or forced to one
+commit in `simple` mode. It then spawns a cheap Haiku runesmith. This keeps all
+git output out of the main conversation, and it preserves the "why" behind the
+changes.
 
 ## Topology
 
@@ -27,23 +28,23 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:runesmith   (Haiku) — stages whole files + writes commits from the Lawspeaker's brief
 ```
 
-Spawn via `subagent_type`, never fork: the Lawspeaker must be able to spawn its
-children and does not inherit the main conversation.
+Spawn via `subagent_type`, never fork. The Lawspeaker must be able to spawn its
+children. It does not inherit the main conversation.
 
-Diff analysis stays inside the Lawspeaker subtree; the main agent also performs the
-small final verification commands below. The three agents live at
-`packages/chronicle/agents/{lawspeaker,watcher,runesmith}.md` and auto-register as
-`chronicle:lawspeaker` / `chronicle:watcher` / `chronicle:runesmith`.
+Diff analysis stays inside the Lawspeaker subtree. The main agent also performs
+the small final verification commands below. The three agents live at
+`packages/chronicle/agents/{lawspeaker,watcher,runesmith}.md`. They auto-register
+as `chronicle:lawspeaker` / `chronicle:watcher` / `chronicle:runesmith`.
 
 ## The main agent's job (thin)
 
 The main agent does five things:
 
-0. **Record baseline** — run `git rev-parse HEAD 2>/dev/null || true`; an empty
+0. **Record baseline**. Run `git rev-parse HEAD 2>/dev/null || true`. An empty
    baseline means an unborn branch.
-1. **Parse invocation mode** — if the argument is `simple` (case-insensitive), or
+1. **Parse invocation mode**. If the argument is `simple` (case-insensitive), or
    the user's phrasing clearly asks for a single commit ("one commit", "快速 commit",
-   "single commit"), set `mode: "simple"`; otherwise set `mode: "auto"`.
+   "single commit"), set `mode: "simple"`. Otherwise, set `mode: "auto"`.
 2. **Distill `contextBrief`** — terse intent and non-obvious rationale from this chat.
 3. **Spawn the Lawspeaker** (`subagent_type: "chronicle:lawspeaker"`), passing:
    - `$SKILL_DIR` — the skill's load-time "Base directory for this skill" banner
@@ -59,7 +60,7 @@ The main agent does five things:
 
 4. **Verify** — run `git rev-parse HEAD 2>/dev/null || true`, then compare with baseline:
 
-   - Changed: report `git log --oneline <baseline>..HEAD`; for an empty baseline,
+   - Changed: report `git log --oneline <baseline>..HEAD`. For an empty baseline,
      report `git log --oneline`.
    - Unchanged: report no commit plus Lawspeaker's reason. Do not respawn.
 
@@ -72,12 +73,12 @@ Codex uses the same topology through one of two role-loading paths:
    `mode`.
 2. **Generic sub-agent API only**: first verify the stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
-   exactly one non-fork generic agent with task name `chronicle_lawspeaker`, no
-   inherited turns, and a prompt that tells it to read and obey the
-   `developer_instructions` in `lawspeaker.toml` before handling the same four
+   exactly one non-fork generic agent with task name `chronicle_lawspeaker` and no
+   inherited turns. Give it a prompt that tells it to read and obey the
+   `developer_instructions` in `lawspeaker.toml` before it handles the same four
    inputs. Its stable instructions delegate sequentially to generic watcher and
-   runesmith children that self-load their own TOMLs. Do not paste or improvise the
-   role instructions in the spawn prompt.
+   runesmith children that self-load their own TOMLs. Do not paste or improvise
+   the role instructions in the spawn prompt.
 
 Both paths return only the final log and preserve the same Lawspeaker → Watcher →
 Runesmith isolation. These roles are installed by `chronicle:install`.

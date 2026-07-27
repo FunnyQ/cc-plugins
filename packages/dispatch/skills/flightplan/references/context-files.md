@@ -2,17 +2,17 @@
 
 `tasks/_context/` holds the **shared, decision-level** information that task files reference instead of duplicating. Every task file's `Required reading` header points here.
 
-Think of `_context/` as a surgical extract from PLAN.md — only the parts an executor needs while writing code. PLAN.md remains the source of truth; `_context/` mirrors the slices that matter at execution time.
+Think of `_context/` as a surgical extract from PLAN.md. It holds only the parts an executor needs while writing code. PLAN.md remains the source of truth. `_context/` mirrors the slices that matter at execution time.
 
 ## Inline, don't link
 
-`_context/` files must **inline** the substance executors need. Do not delegate to repo files with phrases like "see `eslint.config.js` for the rules" or "follow the convention in `app/components/`" — that breaks the self-containment contract, since an executor would have to open those files to know what to do.
+`_context/` files must **inline** the substance executors need. Do not delegate to repo files with phrases like "see `eslint.config.js` for the rules" or "follow the convention in `app/components/`". That breaks the self-containment contract. An executor would have to open those files to know what to do.
 
 Rules:
 
 - **Inline the rule** as plain prose or a bulleted list (e.g. "use 2-space indent; no semicolons; prefer `const`").
-- **Cite the source file** as a verification pointer ("authoritative source: `eslint.config.js`") so executors can confirm but don't have to read it.
-- If a convention is long enough that inlining feels heavy, that's the signal to extract it into its own `_context/<topic>.md` and reference *that*, not the repo file.
+- **Cite the source file** as a verification pointer (e.g. "authoritative source: `eslint.config.js`"). An executor can check it, but does not have to read it.
+- If a convention is long enough that inlining feels heavy, extract it into its own `_context/<topic>.md`. Reference that file, not the repo file.
 
 Executors should never need to open a file outside `tasks/` to understand a decision.
 
@@ -76,7 +76,7 @@ Any decision the user made during flightplan's interview that affects multiple t
 
 ## What sometimes exists
 
-Create additional `_context/*.md` files only when the same body of context is referenced by multiple tasks. Below are common patterns; create the ones that match the topic.
+Create additional `_context/*.md` files only when the same body of context is referenced by multiple tasks. The patterns below are common. Create the ones that match the topic.
 
 ### `api-contract.md`
 
@@ -150,15 +150,15 @@ Contents:
 
 ### `rubric.md`
 
-When tasks share one quality bar — the common case. Each task's `## Eval rubric` carries its own threshold line + weighted table (that's what `lint-task.ts` / `score-task.ts` parse, per task), but the **scale and the generic dimension definitions** are worth pinning once here so tasks can reference `../_context/rubric.md` instead of re-explaining what a 4–5 means.
+When tasks share one quality bar — the common case. Each task's `## Eval rubric` carries its own threshold line and weighted table. `lint-task.ts` and `score-task.ts` parse this, per task. The **scale** and the **generic dimension definitions** are worth pinning once here instead. Tasks can then reference `../_context/rubric.md` instead of re-explaining what a 4–5 means.
 
 Contents:
 
 - **Scoring scale** — what 0–1 / 2–3 / 4–5 mean in general (the bands every task reuses).
-- **Generic dimensions** — what `Correctness` / `Test coverage` / `Interface & readability` / `Assumptions & docs` look at, so per-task tables only need the task-specific anchors.
+- **Generic dimensions** — what `Correctness` / `Test coverage` / `Interface & readability` / `Assumptions & docs` look at. Per-task tables then only need the task-specific anchors.
 - **Scoring & pass line** — the weighted-average formula, the default pass threshold (`> 4.0`), and the hard-fail convention (`Correctness < 4 is an automatic veto`).
 
-Per-task rubrics still carry their own threshold line + weighted table (self-contained for the linter); this file just saves them from redefining the scale. See `task-template.md` → "`Eval rubric`" for the parseable contract.
+Per-task rubrics still carry their own threshold line and weighted table. This keeps them self-contained for the linter. This file just saves them from redefining the scale. See `task-template.md` → "`Eval rubric`" for the parseable contract.
 
 ## What does NOT belong in `_context/`
 
@@ -169,8 +169,8 @@ Per-task rubrics still carry their own threshold line + weighted table (self-con
 
 ## Sizing
 
-- `shared.md` aims for ≤ 300 lines. Bigger means it's doing too much; split out a topic file.
-- Each topic file aims for ≤ 400 lines. Bigger means the topic deserves multiple files.
+- `shared.md` aims for ≤ 300 lines. If it grows past that, it's doing too much. Split out a topic file.
+- Each topic file aims for ≤ 400 lines. If it grows past that, the topic deserves multiple files.
 
 ## Update rules
 
@@ -178,6 +178,6 @@ When a decision changes mid-execution:
 
 1. Update PLAN.md.
 2. Update the relevant `_context/*.md`.
-3. Notify executors (the task file itself usually doesn't need editing — it describes *what* to do, not *why*).
+3. Notify executors. The task file itself usually doesn't need editing. It describes *what* to do, not *why*.
 
-If a change *does* require editing task files, that's a signal the original task was leaking decision context. Move the decision to `_context/` and slim the task file.
+If a change *does* require editing task files, that's a signal the original task was leaking decision context. Move the decision to `_context/`. Slim the task file.

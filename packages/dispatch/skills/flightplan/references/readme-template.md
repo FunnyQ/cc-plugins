@@ -1,8 +1,8 @@
 # `tasks/README.md` Template
 
-`tasks/README.md` is the entry point for any executor (human or sub-agent). It explains how to read the tree, the status conventions, the dependency graph, and known gaps.
+`tasks/README.md` is the entry point for any executor, human or sub-agent. It explains how to read the tree, the status conventions, the dependency graph, and known gaps.
 
-**Most of this file is generated.** `scripts/build-readme.ts` parses every task header and regenerates the task index (Bucket / NN / Title / Status / **Pass line** / Depends on — the Pass line column shows each task's Eval-rubric pass threshold, e.g. `> 4`, or `—` if the rubric is unparseable), per-bucket dep graphs, and cross-bucket dep table between the markers:
+**Most of this file is generated.** `scripts/build-readme.ts` parses every task header. It then regenerates three things, all between the markers below: the task index (Bucket / NN / Title / Status / **Pass line** / Depends on), the per-bucket dep graphs, and the cross-bucket dep table. The Pass line column shows each task's Eval-rubric pass threshold, for example `> 4`, or `—` if the rubric is unparseable:
 
 ```
 <!-- flightplan:generated:start -->
@@ -10,7 +10,7 @@
 <!-- flightplan:generated:end -->
 ```
 
-The prologue (purpose, directory layout, reading order, naming) and epilogue (`## Known gaps`) are human-authored and preserved across regeneration. Rerun `build-readme.ts` whenever a task's header changes (status, deps, title).
+The prologue (purpose, directory layout, reading order, naming) and epilogue (`## Known gaps`) are human-authored. Regeneration preserves both. Rerun `build-readme.ts` whenever a task's header changes (status, deps, title).
 
 ## Template
 
@@ -121,10 +121,10 @@ Decisions or design questions that surfaced during planning but weren't resolved
 
 ## Tailoring rules
 
-- **Single-bucket plans**: drop the dependency-graph-per-bucket section and just show one graph. Task files still live under `tasks/<bucket-name>/`, never flat under `tasks/`.
+- **Single-bucket plans**: drop the dependency-graph-per-bucket section. Show one graph instead. Task files still live under `tasks/<bucket-name>/`, never flat under `tasks/`.
 - **No cross-bucket deps**: drop that table.
-- **No open gaps**: drop "Known gaps" — but verify there really are none rather than hiding them.
-- **Writing topic**: replace "Suggested execution order" with "Suggested drafting order" and dependency graphs become section-ordering graphs.
+- **No open gaps**: drop "Known gaps". First verify that no gaps exist rather than hiding them.
+- **Writing topic**: replace "Suggested execution order" with "Suggested drafting order". Dependency graphs become section-ordering graphs.
 
 ## Why this file matters
 

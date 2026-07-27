@@ -1,12 +1,12 @@
 # Herdr CLI Reference
 
-Verified against herdr 0.7.5; if live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.7.5. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
 
 Most commands output JSON for scripting.
 
 ## IDs are not durable
 
-Workspace ids look like `1`, `2`; tab ids `1:1`, `1:2`; pane ids `1-1`, `1-2`. These are compact ids for the *current* live session — they renumber when workspaces/tabs/panes close. Don't reuse an id you saw earlier in a conversation; re-read it from `workspace list` / `tab list` / `pane list`, or from a create/split response, right before you use it. New ids appear at: `workspace create` → `result.workspace` / `result.tab` / `result.root_pane`; `tab create` → `result.tab` / `result.root_pane`; `pane split` → `result.pane.pane_id`.
+Workspace ids look like `1`, `2`. Tab ids look like `1:1`, `1:2`. Pane ids look like `1-1`, `1-2`. These are compact ids for the *current* live session. They renumber when a workspace, tab, or pane closes. Do not reuse an id you saw earlier in a conversation. Before you use an id, re-read it from `workspace list`, `tab list`, or `pane list`, or from a create/split response. New ids appear in these places: `workspace create` returns `result.workspace`, `result.tab`, and `result.root_pane`. `tab create` returns `result.tab` and `result.root_pane`. `pane split` returns `result.pane.pane_id`.
 
 ## Launch & Status
 ```bash
@@ -110,7 +110,7 @@ herdr pane read <id> --source visible --ansi
 | `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
 | `detection` | Bottom-buffer snapshot used by agent screen detection |
 
-`herdr pane wait-output --source recent` matches against the **unwrapped** recent text (pane width/soft-wrapping don't affect the match) even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists; use `pane wait-output` for output you expect to appear next.
+`herdr pane wait-output --source recent` matches against the **unwrapped** recent text. Pane width and soft-wrapping do not affect the match. This is true even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists. Use `pane wait-output` for output you expect to appear next.
 
 **Send input:**
 ```bash
@@ -160,7 +160,7 @@ herdr agent explain --file PATH --agent LABEL [--json|--verbose]
 
 Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `maki`.
 
-`agent prompt` atomically writes the text and presses Enter. `agent wait` accepts repeated `--until`; when omitted, it waits for `idle`, `done`, or `blocked`.
+`agent prompt` atomically writes the text and presses Enter. `agent wait` accepts a repeated `--until` flag. When you omit `--until`, `agent wait` waits for `idle`, `done`, or `blocked`.
 
 Targets: terminal IDs, unique agent names, detected/reported agent labels, or legacy pane IDs.
 
@@ -179,7 +179,7 @@ herdr terminal title clear
 herdr pane wait-output <pane_id> <--match TEXT | --regex PATTERN> [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
 ```
 
-For agent-status waits, use `herdr agent wait <target> --until <status>` (see Agents). The old top-level `wait output` / `wait agent-status` commands were removed in 0.7.5.
+For agent-status waits, use `herdr agent wait <target> --until <status>` (see Agents). Herdr removed the old top-level `wait output` / `wait agent-status` commands in 0.7.5.
 
 ## Notifications
 ```bash
@@ -211,7 +211,7 @@ herdr plugin pane focus <pane_id>
 herdr plugin pane close <pane_id>
 ```
 
-`popup` is session-modal and does not change the tab layout. Its size accepts cells or percentages such as `80%`; omitted dimensions default to half the terminal. A popup is not a Herdr pane, does not export `HERDR_PANE_ID`, and cannot be used with pane or agent APIs.
+`popup` is session-modal. It does not change the tab layout. Its size accepts cells or percentages such as `80%`. If you omit a dimension, it defaults to half the terminal. A popup is not a Herdr pane. It does not export `HERDR_PANE_ID`. You cannot use a popup with pane or agent APIs.
 
 ## Output format cheat sheet
 
@@ -219,6 +219,6 @@ herdr plugin pane close <pane_id>
 - `pane read` — prints plain text, not JSON. `--format ansi` / `--ansi` returns a rendered ANSI snapshot for TUI feedback loops.
 - `pane send-text`, `pane send-keys`, `pane run` — print nothing on success.
 - `--no-focus` on `pane split` / `tab create` / `workspace create` keeps your current terminal focused instead of jumping to the new one.
-- Without `--label`, `workspace create` keeps cwd-based naming and `tab create` keeps numbered naming; `--label` applies a custom name immediately.
+- Without `--label`, `workspace create` keeps cwd-based naming, and `tab create` keeps numbered naming. `--label` applies a custom name immediately.
 
-For workflow examples that chain these commands together (spawning agents, waiting on servers/tests, coordinating between panes), see `agent-orchestration.md`.
+For workflow examples that chain these commands together (spawning agents, waiting on servers or tests, coordinating between panes), see `agent-orchestration.md`.

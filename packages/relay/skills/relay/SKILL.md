@@ -36,7 +36,13 @@ If the user says "生圖", "畫圖", "Generate image" → use `image` (codex onl
 
 ## Running the relay script
 
-Every command below runs the bundled `scripts/relay.ts`. `${CLAUDE_PLUGIN_ROOT}` is Claude Code's official plugin-root variable, but it is **not reliably set inside an agent Bash call** (and is empty under Codex) — so don't depend on it, and don't use a `packages/relay/...` repo-relative path (that only exists inside the source repo). Resolve the script from the load-time **"Base directory for this skill"** banner Claude Code prints when the skill loads:
+Every command below runs the bundled `scripts/relay.ts`.
+
+`${CLAUDE_PLUGIN_ROOT}` is Claude Code's official plugin-root variable. Inside an agent Bash call it is **not reliably set**. Under Codex it is empty. Do not depend on it.
+
+Do not use a repo-relative path such as `packages/relay/...`. That path exists only inside the source repo.
+
+Resolve the script from the **"Base directory for this skill"** banner. Claude Code prints this banner when the skill loads:
 
 ```bash
 # Substitute the real banner path for <BANNER_PATH>
@@ -45,7 +51,7 @@ RELAY="$SKILL_DIR/scripts/relay.ts"
 test -f "$RELAY" || { echo "relay.ts not found at $RELAY" >&2; exit 1; }
 ```
 
-For brevity the examples below write `relay.ts <backend> <mode> …` as shorthand for `bun "$RELAY" <backend> <mode> …`. Run it from the user's current project directory — `relay.ts` invokes the backend CLIs against that working tree's git context.
+For brevity, the examples below write `relay.ts <backend> <mode> …` as shorthand for `bun "$RELAY" <backend> <mode> …`. Run it from the user's current project directory. `relay.ts` invokes the backend CLIs against that working tree's git context.
 
 ---
 
@@ -56,7 +62,11 @@ Before running in that environment, read `references/live.md`.
 It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
 `image` stays headless/native.
 
-**Keep the default live — `--headless` needs a real reason.** Editing capability is identical (same CLI/model/write access), so "more precise/deterministic" is never it; override only for nested delegation, no live seam, or no pane surface. And `relay.ts` is one blocking call — don't poll it while it runs. See `references/live.md`.
+**Keep the default live.** `--headless` needs a real reason.
+
+Editing capability is identical: same CLI, model, and write access. So "more precise" or "deterministic" is never a valid reason. Override only for nested delegation, no live seam, or no pane surface.
+
+`relay.ts` is one blocking call. Do not poll it while it runs. See `references/live.md`.
 
 ---
 
@@ -64,7 +74,7 @@ It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous`
 
 For non-review tasks: implementing features, refactoring, suggesting an approach, debugging.
 
-1. Identify relevant files from the task context (ask the user if unclear).
+1. Identify relevant files from the task context. If it is unclear, ask the user.
    - Prefer `git diff --name-only`, `git status --short`, and `rg --files` to discover candidate files.
    - If the target files or ownership boundaries are unclear, ask before delegating.
 
@@ -83,13 +93,15 @@ For non-review tasks: implementing features, refactoring, suggesting an approach
    relay.ts claude delegate --task "implement the feature" --files main.ts
    ```
 
-3. Inspect the backend's result, run available verification (lint/types/tests), then write the report. Apply additional local fixes only when they are required to complete the delegated task and remain inside the agreed scope.
+3. Inspect the backend's result. Run available verification (lint, types, tests). Then write the report.
+
+   Apply additional local fixes only when they are required to complete the delegated task. Keep the fixes inside the agreed scope.
 
 ---
 
 ## `/relay:relay <backend> review [task]`
 
-Review is report-only. Never apply changes from review output unless the user asks separately.
+Review is report-only. Unless the user asks separately, do not apply changes from review output.
 
 - No task: run `relay.ts <backend> review`. Relay reviews only uncommitted changes.
 - Task present: pass it unchanged as positional text. Do not translate it into `--scope`, `--files`, or `--focus`.
@@ -114,7 +126,7 @@ AskUserQuestion("要生什麼圖？")
 
 If **--out** is missing, ask the user (offer default: `./generated/image.png`).
 
-In non-interactive contexts (invoked by a sub-agent or headless), do not block on AskUserQuestion; fail fast with a clear message naming the missing argument.
+In non-interactive contexts (invoked by a sub-agent or headless), do not block on AskUserQuestion. Fail fast with a clear message naming the missing argument.
 
 Once both are known, run:
 
@@ -122,7 +134,7 @@ Once both are known, run:
 relay.ts codex image "<prompt>" --out <path>
 ```
 
-The script auto-adds a timestamp suffix to the filename (e.g., `./foo.png` → `./foo_20260430-1708.png`) and returns the final path.
+The script auto-adds a timestamp suffix to the filename, for example `./foo.png` → `./foo_20260430-1708.png`. It returns the final path.
 
 Report the final saved path. If the user wants a different name, use a non-destructive rename command.
 
@@ -137,9 +149,11 @@ Evaluate each backend suggestion and act:
 - The change is inside the selected scope
 - The current agent can run verification afterward
 
-In delegate mode, backends are write-capable and may have already edited the working tree; this apply policy governs suggestions in the report, while already-applied changes are verified and reported under 已套用變更.
+In delegate mode, backends are write-capable. They may have already edited the working tree. This apply policy governs suggestions in the report. Already-applied changes are verified and reported under 已套用變更.
 
-After applying, run any available verification (lint / type check / tests) via Bash. If verification fails, undo only your own attempted edit and move the suggestion to "report only."
+After applying, run any available verification (lint / type check / tests) via Bash.
+
+If verification fails, undo only your own attempted edit. Move the suggestion to "report only."
 
 **Report only** (for review, or when uncertain):
 - Architectural changes
@@ -176,7 +190,11 @@ Config file location: `~/.config/q-lab/cc-plugins/relay/config.json`.
 
 ## Failure Handling
 
-If the script exits non-zero, report the failure in zh-TW and stop — do not guess or fabricate suggestions. (Exception: a live-mode **pending report** exits 0 by design — see `references/live.md`.) Include:
+If the script exits non-zero, report the failure in zh-TW. Then stop. Do not guess or fabricate suggestions.
+
+Exception: a live-mode **pending report** exits 0 by design. See `references/live.md`.
+
+Include:
 
 - Command intent
 - Exit code if available
@@ -185,7 +203,11 @@ If the script exits non-zero, report the failure in zh-TW and stop — do not gu
 
 Capability gates (e.g., `/relay:relay opencode image` → unsupported) fail fast with a clear error message before any CLI runs.
 
-**Never call a backend CLI directly to work around a relay failure** — no `codex exec`, no `opencode run`, no `claude -p`. Every delegation goes through `relay.ts`, which owns the prompt contract, herdr live-pane routing, and the result-file protocol; a hand-rolled headless call silently discards all three. If `relay.ts` cannot run, report that and stop.
+**Never call a backend CLI directly to work around a relay failure.** Do not use `codex exec`, `opencode run`, or `claude -p`.
+
+Every delegation goes through `relay.ts`. It owns the prompt contract, herdr live-pane routing, and the result-file protocol. A hand-rolled headless call silently discards all three.
+
+If `relay.ts` cannot run, report that and stop.
 
 ---
 
@@ -232,5 +254,5 @@ Capability gates (e.g., `/relay:relay opencode image` → unsupported) fail fast
 
 ## Additional Resources
 
-- **`references/backends.md`** — read only when installing the OpenCode symlink integration or debugging a backend CLI failure; `relay.ts` already encodes all CLI invocations, so normal runs never need it.
-- **`references/live.md`** — read only when `HERDR_ENV=1`; covers live-pane flags, output contract, pane lifecycle, and pending-report semantics.
+- **`references/backends.md`** — read this only when installing the OpenCode symlink integration or debugging a backend CLI failure. `relay.ts` already encodes all CLI invocations. Normal runs never need it.
+- **`references/live.md`** — read this only when `HERDR_ENV=1`. It covers live-pane flags, output contract, pane lifecycle, and pending-report semantics.
