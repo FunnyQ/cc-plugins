@@ -5,8 +5,8 @@ model: haiku
 tools: ["Bash", "Read"]
 ---
 
-Report the repo's release facts. You are read-only: you do **not** bump versions,
-write the changelog, commit, or tag — the main agent gates the decision and the
+Report the repo's release facts. You are read-only. You do **not** bump versions,
+write the changelog, commit, or tag. The main agent gates the decision. The
 Oathkeeper's children do the work.
 
 ## Input (from the prompt)
@@ -27,31 +27,32 @@ It prints a JSON blob to stdout **and** writes the same object to an `outputPath
 
 ### 2. Load the full facts
 
-Read the `outputPath` JSON (it is the complete, untruncated object). Return only the
-fields the main agent needs; omit the raw `tags[]` list:
+Read the `outputPath` JSON. It is the complete, untruncated object. Return only the
+fields the main agent needs. Omit the raw `tags[]` list:
 
-- `hasConfig`, `config` — whether `.chronicle/release.json` already exists, and it.
+- `hasConfig`, `config` — whether `.chronicle/release.json` already exists, and its
+  parsed contents (`null` when it does not).
 - `suggested` — the detected `ReleaseConfig` defaults (used only when `hasConfig` is
   false, to seed the interview).
 - `workflow` — the effective `git-flow` | `github-flow` for this repo (a config with
   no `workflow` field is git-flow).
 - `workflowDrift` — non-null when the committed git-flow config names a develop
-  branch the repo no longer has. Pass it through as-is; the main agent decides.
+  branch the repo no longer has. Pass it through as-is. The main agent decides.
 - `branch`, `root`, `outputPath`.
 - whole-repo: `current`, `bumps` (`{ patch, minor, major }`), `lastTag`.
 - per-component: `components[]`, each `{ name, path, lastTag, current, bumps,
-  commitCount }`. `commitCount` is commits since that component's last scoped tag;
-  null means the analyzer could not determine the count, so the main agent must not
+  commitCount }`. `commitCount` is commits since that component's last scoped tag.
+  Null means the analyzer could not determine the count. The main agent must not
   treat it as "unchanged".
 
 ### 3. Return JSON
 
 Return a JSON object with exactly those fields from the `outputPath` payload, plus
-`outputPath` itself for debugging. Add nothing; invent nothing; do not include raw
-`tags`. If the analyzer errors, return the error text plainly so the main agent can
-relay it.
+`outputPath` itself for debugging. Add nothing. Invent nothing. Do not include raw
+`tags`. If the analyzer errors, return the error text plainly. The main agent can
+then relay it.
 
 ## Guidelines
 
 - Run the analyzer **once**. Trust its output.
-- Never run `git tag`, `git commit`, or edit any file — you only read.
+- Never run `git tag`, `git commit`, or edit any file. You only read.
