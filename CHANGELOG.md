@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.9.4] - 2026-07-28
+
+_tracks tag `chronicle-v0.9.4`_
+
+### Changed
+
+- **Chronicle's agents now carry a reasoning-effort tier tuned to their job.** The purely mechanical executors (messenger, seer, watcher, smith, hammerbearer, runesmith) run at low effort; the orchestrators that just sequence child spawns (oathkeeper, storykeeper) run at medium; the agents making real judgment calls (lawspeaker, annalist, skald) keep the default. No behavior change for users — this only affects how much the agents "think" per step.
+
 ## [chronicle 0.9.3] - 2026-07-28
 
 _tracks tag `chronicle-v0.9.3`_
