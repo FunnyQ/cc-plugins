@@ -82,6 +82,29 @@ describe("check-branch", () => {
     expect(runHook().stdout.toString()).toContain('"permissionDecision":"ask"');
   });
 
+  test("exempts a Chronicle release commit on the GitHub Flow base", () => {
+    writePrConfig({ workflow: "github-flow", base: "main" });
+
+    const result = runHook(
+      `git commit -m "$(printf '%s' '🔧 release: chronicle 0.9.3')"`,
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString()).toBe("");
+  });
+
+  test("still asks for a release commit on the Git Flow production branch", () => {
+    writePrConfig({
+      workflow: "git-flow",
+      production: "main",
+      development: "develop",
+    });
+
+    expect(
+      runHook(`git commit -m "🔧 release: chronicle 0.9.3"`).stdout.toString(),
+    ).toContain('"permissionDecision":"ask"');
+  });
+
   test("ignores commands that do not commit", () => {
     writePrConfig({ workflow: "github-flow", base: "main" });
 
