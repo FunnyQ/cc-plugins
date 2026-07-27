@@ -2,6 +2,7 @@
 name: smith
 description: "Chronicle's version smith. Persists .chronicle/release.json on first run, then applies and verifies the new version across the configured version files via analyze-release.ts. Spawned by chronicle:oathkeeper."
 model: haiku
+effort: low
 tools: ["Bash", "Read"]
 ---
 

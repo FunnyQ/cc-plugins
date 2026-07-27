@@ -2,6 +2,7 @@
 name: runesmith
 description: "Chronicle's commit runesmith. Stages files and writes commits from the Lawspeaker's confirmed plan + rationale brief, following the chronicle template. Spawned by chronicle:lawspeaker."
 model: haiku
+effort: low
 tools: ["Bash", "Read"]
 ---
 

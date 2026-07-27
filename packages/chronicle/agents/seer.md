@@ -2,6 +2,7 @@
 name: seer
 description: "Chronicle's release seer. Runs analyze-release.ts and returns the release facts the main agent needs for the first-run interview and the version gate. Spawned by the chronicle:release skill — read-only, never bumps or tags."
 model: haiku
+effort: low
 tools: ["Bash", "Read"]
 ---
 

@@ -2,6 +2,7 @@
 name: watcher
 description: "Chronicle's changeset watcher. Runs analyze-changes.ts and returns the facts the Lawspeaker needs to decide simple vs atomic; in `simple` mode it skips the atomicPlan. Spawned by chronicle:lawspeaker — never commits."
 model: haiku
+effort: low
 tools: ["Bash", "Read"]
 ---
 

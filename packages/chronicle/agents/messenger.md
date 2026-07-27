@@ -2,6 +2,7 @@
 name: messenger
 description: "Chronicle's PR/MR messenger. Runs request-creator.ts to open the request from the Storykeeper's title/body, and reports the URL. Spawned by chronicle:storykeeper."
 model: haiku
+effort: low
 tools: ["Bash", "Read"]
 ---
 

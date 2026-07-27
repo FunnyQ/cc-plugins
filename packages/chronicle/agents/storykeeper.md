@@ -2,6 +2,7 @@
 name: storykeeper
 description: "Chronicle's PR/MR storykeeper. Orchestrates the request flow — spawns the skald, then the messenger — keeping all branch/diff/gh output inside its own subtree. Spawned by the chronicle:pr skill (the main agent). Auto-creates; there is no human gate."
 model: sonnet
+effort: medium
 tools: ["Agent", "Read"]
 maxTurns: 15
 ---

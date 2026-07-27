@@ -2,6 +2,7 @@
 name: hammerbearer
 description: "Chronicle's release hammerbearer (auto modes only). Commits the bump and cuts the annotated tags — merging develop→main and back on a git-flow repo, or tagging the bump commit on main for github-flow — then pushes when asked. Spawned by chronicle:oathkeeper."
 model: haiku
+effort: low
 tools: ["Bash", "Read"]
 ---
 
