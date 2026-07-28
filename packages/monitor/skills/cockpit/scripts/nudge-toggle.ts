@@ -22,9 +22,9 @@
  */
 
 import { join, dirname } from "node:path";
-import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { cockpitHome } from "./cockpit-home";
+import { gitRootOf } from "./log-root";
 import {
   getProjectNudge,
   getUserNudge,
@@ -147,18 +147,7 @@ function setSessionNudge(
 
 /** A stable project key = git root of cwd (so subdirs share one opinion), else cwd. */
 export function projectKey(cwd: string): string {
-  try {
-    const r = spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
-      encoding: "utf8",
-    });
-    if (r.status === 0) {
-      const top = (r.stdout ?? "").trim();
-      if (top) return top;
-    }
-  } catch {
-    /* not a git repo / git missing — fall back to cwd */
-  }
-  return cwd;
+  return gitRootOf(cwd) ?? cwd;
 }
 
 // ── Combined accessors (used by the hook + command) ──────────────────────────

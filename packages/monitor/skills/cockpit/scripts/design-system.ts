@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { readRegistry } from "./registry";
+import { resolveKnownProject } from "./log-root";
 
 export type DesignToken = {
   key: string;
@@ -183,10 +184,15 @@ function json(payload: object, status = 200): Response {
 export function handleDesignSystem(projectDir?: string | null): Response {
   if (!projectDir) return json({ error: "project required" }, 404);
   // Confine: only serve projects the daemon already knows from the registry.
-  const known = new Set(readRegistry().map((e) => e.project));
-  if (!known.has(projectDir)) return json({ error: "unknown project" }, 404);
+  // A deep link may carry a subdirectory of a registered root, so resolve it
+  // downward onto the owning project before the check.
+  const project = resolveKnownProject(
+    projectDir,
+    readRegistry().map((e) => e.project),
+  );
+  if (!project) return json({ error: "unknown project" }, 404);
   try {
-    return json(readProjectDesignSystem(projectDir));
+    return json(readProjectDesignSystem(project));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return json({ error: msg }, /not found/.test(msg) ? 404 : 500);

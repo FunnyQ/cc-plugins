@@ -25,22 +25,41 @@ function isInside(root: string, child: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
+// Same path, or one contains the other. Segment-wise (via relative()), so
+// "/repo" and "/repo-other" are unrelated.
+function arePathsRelated(a: string, b: string): boolean {
+  const x = resolve(a);
+  const y = resolve(b);
+  return x === y || isInside(x, y) || isInside(y, x);
+}
+
 // Resolve + confine the log path for a (project, session) pair. Returns the
 // absolute log path, or null if the request fails validation. The session regex
 // already blocks "/" and ".." so it can't escape the logs dir; we additionally
-// realpath-confine (defends against a symlinked logs dir) and prefer a matching
-// registry entry over a blindly-trusted query param.
+// realpath-confine (defends against a symlinked logs dir).
+//
+// The registry entry — not the query param — is authoritative for a tracked
+// session: callers deep-link with the live session's raw cwd, which can be a
+// subpackage of the repo root the trail actually lives at (and legacy entries
+// point the other way round). Matching the two would 400 both cases. Each
+// candidate is still confined to ITS OWN project's logs dir.
 export function resolveLogPath(
   project: string,
   session: string,
 ): string | null {
   if (!project || !SESSION_RE.test(session)) return null;
 
-  const entry = readRegistry().find(
-    (e) => e.sessionId === session && e.project === project,
-  );
+  const tracked = readRegistry().find((e) => e.sessionId === session);
+  // The entry wins only when the requested project is on the same branch as the
+  // one that owns it (either direction: a subpackage deep link pointing at the
+  // repo root, or a root request for a legacy subpackage entry). An unrelated
+  // project must not be able to stream a session just by knowing its id.
+  const entry =
+    tracked && arePathsRelated(tracked.project, project) ? tracked : undefined;
+  if (tracked && !entry) return null;
 
-  const logsDir = resolve(project, ".cockpit", "logs");
+  const root = entry?.logPath ? entry.project : project;
+  const logsDir = resolve(root, ".cockpit", "logs");
   const logPath = entry?.logPath
     ? resolve(entry.logPath)
     : resolve(logsDir, `${session}.jsonl`);

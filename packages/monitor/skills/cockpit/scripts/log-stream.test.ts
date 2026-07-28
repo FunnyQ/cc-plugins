@@ -1,10 +1,17 @@
 // Tests for the decision-log SSE handler (server/03).
 // Run: bun test packages/monitor/skills/cockpit/scripts/log-stream.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { appendFileSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { handleLogStream } from "./log-stream";
+import { handleLogStream, resolveLogPath } from "./log-stream";
 
 const CLI = join(import.meta.dir, "cockpit.ts");
 const SID = "22222222-2222-2222-2222-222222222222";
@@ -188,5 +195,102 @@ describe("handleLogStream", () => {
     u.searchParams.set("session", SID);
     const res = handleLogStream(new Request(u.toString()));
     expect(res.status).toBe(400);
+  });
+});
+
+describe("resolveLogPath", () => {
+  function seedRegistry(entry: Record<string, unknown>): void {
+    writeFileSync(
+      join(cockpitHome, "registry.json"),
+      JSON.stringify({ sessions: [entry] }),
+    );
+  }
+
+  test("trusts the registry entry's logPath over the requested project", () => {
+    // usage-dashboard deep-links with the live session's raw cwd, which is the
+    // subpackage the agent happened to be in — while the trail (and the entry)
+    // lives at the repo root. Matching on project would 400 the stream.
+    const frontend = join(projectDir, "frontend");
+    mkdirSync(frontend, { recursive: true });
+    seedRegistry({
+      provider: "claude",
+      project: projectDir,
+      sessionId: SID,
+      logPath,
+      lastHeartbeat: new Date().toISOString(),
+    });
+
+    expect(resolveLogPath(frontend, SID)).toBe(logPath);
+  });
+
+  test("still resolves a legacy entry recorded at a subpackage", () => {
+    // The mirror case: an entry registered before the storage root followed the
+    // repo. Its absolute logPath stays authoritative.
+    const frontend = join(projectDir, "frontend");
+    const legacyLog = join(frontend, ".cockpit", "logs", `${SID}.jsonl`);
+    mkdirSync(join(frontend, ".cockpit", "logs"), { recursive: true });
+    writeFileSync(legacyLog, "");
+    seedRegistry({
+      provider: "claude",
+      project: frontend,
+      sessionId: SID,
+      logPath: legacyLog,
+      lastHeartbeat: new Date().toISOString(),
+    });
+
+    expect(resolveLogPath(projectDir, SID)).toBe(legacyLog);
+  });
+
+  test("untracked session falls back to the requested project's trail", () => {
+    seedRegistry({
+      provider: "claude",
+      project: projectDir,
+      sessionId: "33333333-3333-3333-3333-333333333333",
+      logPath: join(projectDir, ".cockpit", "logs", "other.jsonl"),
+      lastHeartbeat: new Date().toISOString(),
+    });
+
+    expect(resolveLogPath(projectDir, SID)).toBe(logPath);
+  });
+
+  test("rejects a registry entry whose logPath escapes its own project", () => {
+    seedRegistry({
+      provider: "claude",
+      project: projectDir,
+      sessionId: SID,
+      logPath: join(projectDir, "..", "elsewhere.jsonl"),
+      lastHeartbeat: new Date().toISOString(),
+    });
+
+    expect(resolveLogPath(projectDir, SID)).toBeNull();
+  });
+
+  test("rejects a malformed session id", () => {
+    expect(resolveLogPath(projectDir, "../../etc/passwd")).toBeNull();
+    expect(resolveLogPath("", SID)).toBeNull();
+  });
+});
+
+describe("resolveLogPath project relation", () => {
+  test("rejects a known session requested under an unrelated project", () => {
+    // Trusting the entry must not degrade into "any known session id unlocks
+    // its log from anywhere" — the requested project still has to be on the
+    // same branch as the entry's (either direction).
+    writeFileSync(
+      join(cockpitHome, "registry.json"),
+      JSON.stringify({
+        sessions: [
+          {
+            provider: "claude",
+            project: projectDir,
+            sessionId: SID,
+            logPath,
+            lastHeartbeat: new Date().toISOString(),
+          },
+        ],
+      }),
+    );
+
+    expect(resolveLogPath("/some/unrelated/project", SID)).toBeNull();
   });
 });

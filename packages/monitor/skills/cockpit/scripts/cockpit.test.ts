@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   appendFileSync,
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -842,5 +844,128 @@ describe("cockpit scribe", () => {
     const decisions = lines.map((r: any) => r.decision);
     expect(decisions).toContain("write-one");
     expect(decisions).toContain("write-two");
+  });
+});
+
+describe("storage root in a monorepo", () => {
+  let repo: string;
+
+  function gitRepo(): string {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-repo-")));
+    Bun.spawnSync(["git", "init", "-q", dir]);
+    return dir;
+  }
+
+  function readEntry(sessionId: string) {
+    return JSON.parse(
+      readFileSync(join(cockpitHome, "registry.json"), "utf8"),
+    ).sessions.find((s: any) => s.sessionId === sessionId);
+  }
+
+  beforeEach(() => {
+    repo = gitRepo();
+  });
+
+  afterEach(() => {
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  test("a log written from a subpackage lands in the repo root's .cockpit", () => {
+    const frontend = join(repo, "frontend");
+    mkdirSync(frontend, { recursive: true });
+
+    const r = run(
+      ["log", "--session", SID, "--decision", "d", "--reason", "r"],
+      frontend,
+    );
+    expect(r.code).toBe(0);
+
+    const rootLog = join(repo, ".cockpit/logs", `${SID}.jsonl`);
+    expect(readLines(rootLog).length).toBe(1);
+    expect(existsSync(join(frontend, ".cockpit"))).toBe(false);
+    expect(readEntry(SID).project).toBe(repo);
+    expect(readEntry(SID).logPath).toBe(rootLog);
+  });
+
+  test("an existing subpackage .cockpit keeps its own trail", () => {
+    const frontend = join(repo, "frontend");
+    mkdirSync(join(frontend, ".cockpit"), { recursive: true });
+
+    const r = run(
+      ["log", "--session", SID, "--decision", "d", "--reason", "r"],
+      frontend,
+    );
+    expect(r.code).toBe(0);
+
+    expect(
+      readLines(join(frontend, ".cockpit/logs", `${SID}.jsonl`)).length,
+    ).toBe(1);
+    expect(existsSync(join(repo, ".cockpit"))).toBe(false);
+    expect(readEntry(SID).project).toBe(frontend);
+  });
+
+  test("scribe and log agree on the storage root", () => {
+    const api = join(repo, "packages", "api");
+    mkdirSync(api, { recursive: true });
+
+    run(["log", "--session", SID, "--decision", "d", "--reason", "r"], repo);
+    const s = run(
+      [
+        "scribe",
+        "--session",
+        SID,
+        "--type",
+        "learning",
+        "--title",
+        "t",
+        "--text",
+        "b",
+      ],
+      api,
+    );
+    expect(s.exitCode ?? s.code).toBe(0);
+
+    // Both writes land in the one root trail — not two.
+    expect(readLines(join(repo, ".cockpit/logs", `${SID}.jsonl`)).length).toBe(
+      2,
+    );
+    expect(existsSync(join(api, ".cockpit"))).toBe(false);
+  });
+
+  test("re-points a registry entry left at a stale subpackage root", () => {
+    // A session registered before the root fix: its entry still points at the
+    // subdir, so without a sync the daemon would keep reading the old file
+    // while new decisions land at the root.
+    const frontend = join(repo, "frontend");
+    mkdirSync(frontend, { recursive: true });
+    writeFileSync(
+      join(cockpitHome, "registry.json"),
+      JSON.stringify({
+        sessions: [
+          {
+            provider: "claude",
+            project: frontend,
+            sessionId: SID,
+            title: "Kept title",
+            titleResolved: true,
+            logPath: join(frontend, ".cockpit/logs", `${SID}.jsonl`),
+            lastHeartbeat: new Date(0).toISOString(),
+          },
+        ],
+      }),
+    );
+
+    const r = run(
+      ["log", "--session", SID, "--decision", "d", "--reason", "r"],
+      repo,
+    );
+    expect(r.code).toBe(0);
+
+    const entry = readEntry(SID);
+    expect(entry.project).toBe(repo);
+    expect(entry.logPath).toBe(join(repo, ".cockpit/logs", `${SID}.jsonl`));
+    // The re-point must not clobber unrelated stored fields.
+    expect(entry.title).toBe("Kept title");
+    expect(entry.titleResolved).toBe(true);
   });
 });

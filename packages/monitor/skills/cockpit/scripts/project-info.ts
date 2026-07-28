@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { readRegistry } from "./registry";
+import { resolveKnownProject } from "./log-root";
 import { jsonResponse as json } from "./http";
 
 export type ProjectTokens = {
@@ -231,10 +232,15 @@ export function buildProjectInfo(project: string): ProjectInfo {
 export function handleProjectInfo(req: Request): Response {
   try {
     const url = new URL(req.url);
-    const project = url.searchParams.get("project") || "";
+    const requested = url.searchParams.get("project") || "";
     // Confine: only serve projects the daemon already knows from the registry.
-    const known = new Set(readRegistry().map((e) => e.project));
-    if (!project || !known.has(project)) {
+    // A deep link may carry a subdirectory of a registered root, so resolve it
+    // downward onto the owning project before the check.
+    const project = resolveKnownProject(
+      requested,
+      readRegistry().map((e) => e.project),
+    );
+    if (!project) {
       return json({ error: "unknown project" }, 400);
     }
     return json(buildProjectInfo(project));

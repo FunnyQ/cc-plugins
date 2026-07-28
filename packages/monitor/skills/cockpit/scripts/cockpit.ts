@@ -29,6 +29,7 @@ import { latestOpenCallId } from "./call-log";
 import { getLanguage, setLanguage } from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
 import { cockpitHome } from "./cockpit-home";
+import { logRoot } from "./log-root";
 import { DEFAULT_PRUNE_DAYS, planPrune, type LogFile } from "./prune-plan";
 import {
   readScopes,
@@ -95,6 +96,13 @@ const DAEMON_PATH = join(COCKPIT_HOME, "daemon.json");
 
 function projectCockpitDir(project: string): string {
   return join(project, ".cockpit");
+}
+
+// Where this invocation's decision trail lives. Storage follows the repo (see
+// log-root.ts) so a cwd that drifted into a subpackage can't fork the trail;
+// session lookup keeps the raw cwd, since find-session resolves sessions BY cwd.
+function storageRoot(): string {
+  return logRoot(process.cwd());
 }
 
 function logPathFor(project: string, sessionId: string): string {
@@ -251,6 +259,13 @@ function refreshHeartbeat(
   const entry = reg.sessions.find((s) => s.sessionId === sessionId);
   const now = new Date().toISOString();
   if (entry) {
+    // Re-point the entry at where this write actually landed. An entry
+    // registered from a subpackage (or before the storage root followed the
+    // repo) would otherwise keep the daemon reading the old file while new
+    // decisions accumulate elsewhere. Title fields are left untouched.
+    entry.provider = provider;
+    entry.project = project;
+    entry.logPath = logPathFor(project, sessionId);
     entry.lastHeartbeat = now;
     writeRegistry(reg);
   } else {
@@ -311,12 +326,13 @@ async function gateDiagram(
 
 function printRecentScribeEntries(
   project: string,
+  cwd: string,
   provider: Provider,
   args: Args,
 ): void {
   const n = args.single["recent"] ? parseInt(args.single["recent"], 10) : 8;
   const sessionId =
-    args.single["session"] || findSession(provider, project) || null;
+    args.single["session"] || findSession(provider, cwd) || null;
   if (!sessionId) return;
   const logPath = logPathFor(project, sessionId);
   if (!existsSync(logPath)) return;
@@ -351,9 +367,9 @@ function printGitCommand(label: string, args: string[]): void {
 }
 
 function cmdPrep(args: Args): void {
-  const project = process.cwd();
   const provider = parseProvider(args.single["provider"]);
-  const sessionId = args.single["session"] || findSession(provider, project);
+  const sessionId =
+    args.single["session"] || findSession(provider, process.cwd());
   if (!sessionId) {
     console.error("cockpit prep: could not auto-resolve the current session");
     process.exit(1);
@@ -366,11 +382,12 @@ function cmdPrep(args: Args): void {
 }
 
 async function cmdLog(args: Args): Promise<void> {
-  const project = process.cwd();
+  const cwd = process.cwd();
+  const project = storageRoot();
   const provider = parseProvider(args.single["provider"]);
   // Prefer an explicit --session, but fall back to the live session id so a
   // decision can't be misfiled to the wrong (or a stale) session.
-  const sessionId = args.single["session"] || findSession(provider, project);
+  const sessionId = args.single["session"] || findSession(provider, cwd);
   if (!sessionId) {
     console.error(
       "cockpit log: --session <id> is required (could not auto-resolve the current session)",
@@ -429,7 +446,8 @@ async function cmdLog(args: Args): Promise<void> {
 }
 
 async function cmdScribe(args: Args): Promise<void> {
-  const project = process.cwd();
+  const cwd = process.cwd();
+  const project = storageRoot();
   const provider = parseProvider(args.single["provider"]);
   const isPrep = args.flags.has("prep");
   const isRecent = args.flags.has("recent");
@@ -441,7 +459,7 @@ async function cmdScribe(args: Args): Promise<void> {
     console.log(getLanguage());
     console.log("");
     console.log("Recent scribe entries:");
-    printRecentScribeEntries(project, provider, args);
+    printRecentScribeEntries(project, cwd, provider, args);
     console.log("");
     console.log("Git change context:");
     printGitCommand("git diff", ["diff"]);
@@ -454,7 +472,7 @@ async function cmdScribe(args: Args): Promise<void> {
 
   // ---- Recent mode: list last N scribe entries for dedup ----
   if (isRecent && !hasType) {
-    printRecentScribeEntries(project, provider, args);
+    printRecentScribeEntries(project, cwd, provider, args);
     process.exit(0);
   }
 
@@ -484,7 +502,7 @@ async function cmdScribe(args: Args): Promise<void> {
   }
 
   // Resolve session — explicit or live; error if unresolved
-  const sessionId = args.single["session"] || findSession(provider, project);
+  const sessionId = args.single["session"] || findSession(provider, cwd);
   if (!sessionId) {
     console.error(
       "cockpit scribe: --session <id> is required (could not auto-resolve the current session)",
