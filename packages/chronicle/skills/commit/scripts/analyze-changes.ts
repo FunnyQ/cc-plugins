@@ -79,6 +79,14 @@ export function parseStatusLine(line: string): ParsedStatus[] {
   }
 
   const unstagedStatus = statusFromCode(worktree);
+  // A worktree-side "added" with an empty index side is `git add -N`
+  // (intent-to-add): a brand-new file, staged only as a placeholder with no
+  // content. It has to be reported or the analysis silently loses the file.
+  // Guarded on `!stagedStatus` so an unmerged "AA" conflict keeps its single
+  // staged entry instead of being reported twice.
+  if (unstagedStatus === "added" && !stagedStatus) {
+    return [{ path, oldPath, staged: false, status: "added" }];
+  }
   if (unstagedStatus === "modified" || unstagedStatus === "deleted") {
     entries.push({
       path,
@@ -271,7 +279,9 @@ export function applyTotalDiffBudget<T extends AnalyzedFile>(
     if (total <= maxLines) break;
     trimmed.add(index);
     total =
-      total - count + lineCount(omittedDiff(files[index], files.length, maxLines));
+      total -
+      count +
+      lineCount(omittedDiff(files[index], files.length, maxLines));
   }
 
   return files.map((file, index) =>

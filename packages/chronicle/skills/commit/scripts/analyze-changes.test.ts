@@ -46,6 +46,22 @@ describe("parseStatusLine", () => {
     ]);
   });
 
+  test("parses intent-to-add files as unstaged additions", () => {
+    // `git add -N f` reports " A f": nothing in the index, an addition in the
+    // worktree. Dropping it hides a brand-new file from the whole analysis.
+    expect(parseStatusLine(" A f")).toEqual([
+      { path: "f", staged: false, status: "added" },
+    ]);
+  });
+
+  test("does not double-report an add-add conflict", () => {
+    // "AA" is an unmerged both-added conflict, not an intent-to-add. It keeps
+    // its single staged entry.
+    expect(parseStatusLine("AA f")).toEqual([
+      { path: "f", staged: true, status: "added" },
+    ]);
+  });
+
   test("ignores short lines", () => {
     expect(parseStatusLine("M")).toEqual([]);
   });
