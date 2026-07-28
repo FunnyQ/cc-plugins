@@ -9,6 +9,8 @@ import { readRegistry } from "./registry";
 import { jsonResponse as json } from "./http";
 import { callMatches, latestOpenCallId } from "./call-log";
 import { cockpitHome } from "./cockpit-home";
+import { hasVisibleSubscriber } from "./permission";
+import { getAnswerHere, setAnswerHere } from "./config";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -134,6 +136,35 @@ export function handleWait(req: Request): Response | Promise<Response> {
     }
   }
 
+  // Presence gate: the terminal is the default asking surface, and the cockpit
+  // is used only when it will actually be answered there. Refuse instead of
+  // parking for the full hop, so the agent can ask in the terminal it already
+  // shares with the user. The card stays in the trail either way.
+  //
+  // TWO factors, because neither alone is enough:
+  //   - intent   — the user's explicit answer-here switch. Visibility can't
+  //                supply this: a browser window sitting behind the terminal
+  //                still reports its tab visible, so an inferred signal stays
+  //                true for a user who is not looking at it.
+  //   - liveness — a subscribed permission stream, i.e. a tab really is
+  //                connected with this session selected. Without it, the switch
+  //                being on would park against a closed dashboard forever.
+  //
+  // Deliberately LAST of the three pre-park checks: a stashed answer must still
+  // be delivered (the user already answered), and a moot call must report the
+  // precise `superseded` rather than the vaguer `not_watching`.
+  //
+  // Opt-in via require_watcher=1: a daemon from one install may serve a
+  // `cockpit wait` from an older one, which would spin on an unknown sentinel.
+  if (url.searchParams.get("require_watcher") === "1") {
+    const reason = !getAnswerHere()
+      ? "toggle_off"
+      : !hasVisibleSubscriber(session)
+        ? "no_tab"
+        : null;
+    if (reason) return json({ answer: null, not_watching: true, reason });
+  }
+
   // Replace any stale resolver for this session — only one park at a time.
   pendingWaits.get(session)?.resolve(null);
 
@@ -156,6 +187,30 @@ export function handleWait(req: Request): Response | Promise<Response> {
     // Client hung up (e.g. cockpit wait killed) — drop the parked entry.
     req.signal?.addEventListener("abort", () => resolver(null));
   });
+}
+
+// ---------- GET/POST /api/answer-here ----------
+// The dashboard's own switch. GET reads it; POST { on } sets it. Global, not
+// per session: it states where the user wants to be asked, not which card.
+
+export async function handleAnswerHere(req: Request): Promise<Response> {
+  if (req.method === "POST") {
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: "invalid json" }, 400);
+    }
+    if (body?.token !== daemonToken())
+      return json({ error: "unauthorized" }, 401);
+    if (typeof body.on !== "boolean") return json({ error: "invalid on" }, 400);
+    setAnswerHere(body.on);
+    return json({ answer_here: body.on });
+  }
+
+  const token = new URL(req.url).searchParams.get("token") || "";
+  if (token !== daemonToken()) return json({ error: "unauthorized" }, 401);
+  return json({ answer_here: getAnswerHere() });
 }
 
 // ---------- POST /api/respond { session, answer, token } ----------

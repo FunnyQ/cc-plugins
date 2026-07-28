@@ -14,7 +14,7 @@ import {
   handleTranscriptHistory,
   handleTranscriptStream,
 } from "./transcript-stream";
-import { handleWait, handleRespond } from "./broker";
+import { handleWait, handleRespond, handleAnswerHere } from "./broker";
 import { handleInbox, handleSendMessage } from "./inbox";
 import {
   handlePermissionRequest,
@@ -215,6 +215,7 @@ function buildServer() {
         return handleTranscriptHistory(req);
       if (url.pathname === "/api/wait") return handleWait(req);
       if (url.pathname === "/api/respond") return handleRespond(req);
+      if (url.pathname === "/api/answer-here") return handleAnswerHere(req);
       if (url.pathname === "/api/inbox") return handleInbox(req);
       if (url.pathname === "/api/send-message") return handleSendMessage(req);
       if (url.pathname === "/api/codex-control/status")

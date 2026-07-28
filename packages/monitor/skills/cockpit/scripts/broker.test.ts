@@ -12,6 +12,7 @@ const DAEMON = join(import.meta.dir, "cockpit-server.ts");
 const SID_A = "aaaaaaaa-1111-1111-1111-111111111111";
 const SID_B = "bbbbbbbb-2222-2222-2222-222222222222";
 const SID_C = "cccccccc-3333-3333-3333-333333333333";
+const SID_D = "dddddddd-4444-4444-4444-444444444444";
 const PORT = 6000 + Math.floor(Math.random() * 800);
 const BASE = `http://127.0.0.1:${PORT}`;
 
@@ -19,6 +20,8 @@ let cockpitHome: string;
 let projA: string;
 let projB: string;
 let projC: string;
+let projD: string;
+let configHome: string;
 let daemon: Subprocess;
 let token: string;
 
@@ -72,13 +75,19 @@ beforeAll(async () => {
   projA = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projA-")));
   projB = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projB-")));
   projC = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projC-")));
+  projD = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-projD-")));
   seed(projA, SID_A);
   seed(projB, SID_B);
   seed(projC, SID_C);
+  seed(projD, SID_D);
+  configHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-config-")));
   daemon = Bun.spawn(["bun", DAEMON, "--no-open", "--port", String(PORT)], {
     env: {
       ...process.env,
       COCKPIT_HOME: cockpitHome,
+      // The answer-here switch lives in the global XDG config — point the
+      // daemon at a temp one so the suite never touches the real user's.
+      XDG_CONFIG_HOME: configHome,
       COCKPIT_WAIT_TIMEOUT_MS: "1500", // keep the timeout test fast
     },
     stdout: "ignore",
@@ -96,6 +105,8 @@ afterAll(() => {
   rmSync(projA, { recursive: true, force: true });
   rmSync(projB, { recursive: true, force: true });
   rmSync(projC, { recursive: true, force: true });
+  rmSync(projD, { recursive: true, force: true });
+  rmSync(configHome, { recursive: true, force: true });
 });
 
 describe("wait + respond round-trip", () => {
@@ -327,4 +338,145 @@ describe("callId binding", () => {
     ).then((r) => r.json());
     expect(res).toEqual({ answer: null, superseded: true });
   }, 5000);
+});
+
+// The cockpit is the exception, not the default: park an agent on a dashboard
+// answer only when BOTH factors hold — the user's explicit answer-here switch
+// (intent) and a live permission-stream subscriber (liveness, see
+// permission.ts). Opt-in via require_watcher=1 so a daemon serving an older
+// `cockpit wait` keeps the legacy always-park behavior.
+describe("presence gate on /api/wait", () => {
+  async function setAnswerHere(on: boolean): Promise<void> {
+    const r = await fetch(`${BASE}/api/answer-here`, {
+      method: "POST",
+      body: JSON.stringify({ on, token }),
+    }).then((x) => x.json());
+    expect(r).toEqual({ answer_here: on });
+  }
+
+  // A visible cockpit tab on this session = an open permission-stream SSE.
+  async function watch(sid: string): Promise<() => Promise<void>> {
+    const ctrl = new AbortController();
+    const res = await fetch(
+      `${BASE}/api/permission-stream?session=${sid}&token=${token}`,
+      { signal: ctrl.signal },
+    );
+    const reader = res.body!.getReader();
+    await reader.read(); // ": connected" — the subscriber is registered now
+    return async () => {
+      ctrl.abort();
+      await Bun.sleep(150); // let the daemon observe the hang-up
+    };
+  }
+
+  function logCallD(decision: string): string {
+    const r = Bun.spawnSync(
+      [
+        "bun",
+        CLI,
+        "log",
+        "--session",
+        SID_D,
+        "--decision",
+        decision,
+        "--needs-call",
+        "--option",
+        "x",
+      ],
+      { cwd: projD, env: { ...process.env, COCKPIT_HOME: cockpitHome } },
+    );
+    if (r.exitCode !== 0) throw new Error("log failed: " + r.stderr.toString());
+    const m = r.stdout.toString().match(/call:\s+([0-9a-f-]{36})/);
+    if (!m) throw new Error("no call id in: " + r.stdout.toString());
+    return m[1];
+  }
+
+  test("switch on but no tab → refused immediately, not parked", async () => {
+    await setAnswerHere(true);
+    const started = Date.now();
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_D}&token=${token}&require_watcher=1`,
+    ).then((r) => r.json());
+    expect(res).toEqual({ answer: null, not_watching: true, reason: "no_tab" });
+    // The daemon's single-hop budget is 1500ms here — returning fast proves it
+    // never parked.
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  test("a watching tab is not enough while the switch is off", async () => {
+    await setAnswerHere(false);
+    const stop = await watch(SID_D);
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_D}&token=${token}&require_watcher=1`,
+    ).then((r) => r.json());
+    expect(res).toEqual({
+      answer: null,
+      not_watching: true,
+      reason: "toggle_off",
+    });
+    await stop();
+  });
+
+  test("without require_watcher the legacy park still happens", async () => {
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_D}&token=${token}`,
+    ).then((r) => r.json());
+    expect(res).toEqual({ answer: null, timeout: true });
+  }, 5000);
+
+  test("switch on AND a watching tab lets the wait park and be woken", async () => {
+    await setAnswerHere(true);
+    const stop = await watch(SID_D);
+    const waitP = fetch(
+      `${BASE}/api/wait?session=${SID_D}&token=${token}&require_watcher=1`,
+    ).then((r) => r.json());
+    await Bun.sleep(150); // let the wait register
+    const resp = await fetch(`${BASE}/api/respond`, {
+      method: "POST",
+      body: JSON.stringify({ session: SID_D, answer: "from-ui", token }),
+    }).then((r) => r.json());
+    expect(resp).toEqual({ delivered: true });
+    expect(await waitP).toEqual({ answer: "from-ui" });
+    await stop();
+  }, 5000);
+
+  test("a stashed answer is delivered even when nobody is watching", async () => {
+    // Ordering guard: the gate must sit AFTER the stash drain, or an answer the
+    // user already gave would be thrown away.
+    await setAnswerHere(false);
+    const callId = logCallD("pick a path");
+    await fetch(`${BASE}/api/respond`, {
+      method: "POST",
+      body: JSON.stringify({
+        session: SID_D,
+        answer: "early",
+        call: callId,
+        token,
+      }),
+    });
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_D}&call=${callId}&token=${token}&require_watcher=1`,
+    ).then((r) => r.json());
+    expect(res).toEqual({ answer: "early" });
+  });
+
+  test("a superseded call reports superseded, not not_watching", async () => {
+    // Ordering guard: the gate must sit AFTER the superseded check, so the
+    // caller gets the precise reason.
+    const stale = logCallD("old question");
+    logCallD("new question");
+    const res = await fetch(
+      `${BASE}/api/wait?session=${SID_D}&call=${stale}&token=${token}&require_watcher=1`,
+    ).then((r) => r.json());
+    expect(res).toEqual({ answer: null, superseded: true });
+  });
+
+  test("`cockpit wait` opts in and exits 4 when nobody is watching", () => {
+    const r = Bun.spawnSync(["bun", CLI, "wait", SID_D], {
+      cwd: projD,
+      env: { ...process.env, COCKPIT_HOME: cockpitHome },
+    });
+    expect(r.exitCode).toBe(4);
+    expect(r.stderr.toString()).toContain("nobody is watching");
+  }, 10000);
 });
