@@ -39,3 +39,7 @@ Run `cockpit wait <id>` in the **foreground as a blocking tool call**. Do
 not send the final response while it is waiting. The wait's stdout is the
 wake-up signal. When the user clicks a dashboard option, the command prints
 the answer. This same turn should then continue from that answer.
+
+On exit `4` nobody is watching the cockpit — ask the same question in chat,
+then record the answer with `cockpit send`. See "Nobody is watching" in
+`pilot.md`.

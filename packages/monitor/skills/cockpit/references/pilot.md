@@ -214,6 +214,10 @@ context intact.
   Both are part of this plugin's control-loop bridge between a parked
   session and the user's answer.
 
+  `wait` exit codes: `0` an answer was delivered on stdout, `3` the call is no
+  longer open, `4` nobody is watching this session in the cockpit. On `4`, ask
+  in the terminal instead — see "Nobody is watching" below.
+
 ## While a session is live — decide in the open, ask through the cockpit
 
 **First decide whether this even needs a question.** The decision trail
@@ -251,6 +255,33 @@ the warm "your turn" moment. The user answers in the dashboard, or via
 trail. Falling back to `AskUserQuestion` splits the user's attention off
 the cockpit. It leaves the decision trail with a hole where a turn should
 be.
+
+### Nobody is watching — ask in the terminal
+
+The rule above assumes the user wants to be asked in the cockpit. By default
+they do not — the terminal is the default asking surface. `wait` exits `4`
+unless **both** hold:
+
+- the user turned on the cockpit's **Ask me here** switch, and
+- a cockpit tab is connected with this session selected.
+
+The switch is global and off by default. The user flips it in the dashboard,
+or with `cockpit config --answer-here on`. Never flip it for them: it states
+where they want to be interrupted, which is theirs to decide.
+
+On exit `4`, ask the same question with the harness tool (`AskUserQuestion`)
+or in chat. Then record their answer through the bridge, so the card still
+closes with a durable `response`:
+
+```bash
+bun <plugin-root>/skills/cockpit/scripts/cockpit.ts send <id> "<answer>"
+```
+
+Never re-run `wait` for that same call after falling back. The user is
+answering in the terminal, and a second park would strand the session.
+
+Keep logging the `--needs-call` card first, even on this path. The trail
+records the question wherever it was answered.
 
 If the session is already parked on a `needs_your_call` and the user
 answers in the agent UI or chat instead of the cockpit dashboard, treat

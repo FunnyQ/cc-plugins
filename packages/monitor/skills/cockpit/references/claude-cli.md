@@ -47,3 +47,7 @@ Run `cockpit wait <id>` as a **background task**, with
 output back into the conversation. The session can stay parked until the user answers in the
 dashboard. You are then re-invoked with the answer. Never block the
 foreground on it.
+
+The background task's exit code carries the outcome. On exit `4` nobody is
+watching the cockpit — ask the same question with `AskUserQuestion`, then
+record the answer with `cockpit send`. See "Nobody is watching" in `pilot.md`.
