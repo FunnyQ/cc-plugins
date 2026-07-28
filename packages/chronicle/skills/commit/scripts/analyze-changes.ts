@@ -427,9 +427,108 @@ async function analyzeChanges(): Promise<AnalysisResult> {
   };
 }
 
+export type PlanVerification = {
+  ok: boolean;
+  missing: string[];
+  leftover: string[];
+};
+
+function normalizePath(path: string): string {
+  const unquoted = unquoteGitPath(path.trim());
+  return unquoted.startsWith("./") ? unquoted.slice(2) : unquoted;
+}
+
+/**
+ * A commit run is only trustworthy when the plan and the repository agree, so
+ * check both directions. `missing` catches a planned file the commit never
+ * picked up; `leftover` catches a changed file the plan never knew about — the
+ * failure the reporting agent cannot see, because a file that is absent from
+ * the plan is absent from its success report too.
+ */
+export function verifyPlanLanded(
+  planned: string[],
+  committed: string[],
+  remaining: string[],
+): PlanVerification {
+  const committedPaths = new Set(committed.map(normalizePath));
+  const missing = [...new Set(planned.map(normalizePath))].filter(
+    (path) => !committedPaths.has(path),
+  );
+  const leftover = [...new Set(remaining.map(normalizePath))];
+
+  return {
+    ok: missing.length === 0 && leftover.length === 0,
+    missing,
+    leftover,
+  };
+}
+
+async function committedPathsSince(base: string): Promise<string[]> {
+  // --no-renames keeps a rename's old path in the list, matching the plan's
+  // habit of carrying both oldPath and path for one commit.
+  const output = (
+    await gitText`git -c core.quotePath=false diff --name-only --no-renames ${base} HEAD`
+  ).trimEnd();
+
+  return output ? output.split("\n") : [];
+}
+
+async function remainingPaths(): Promise<string[]> {
+  const output = (
+    await gitText`git -c core.quotePath=false status --porcelain -uall`
+  ).trimEnd();
+  if (!output) return [];
+
+  // Read the raw status lines instead of parseStatusLine: a status code the
+  // parser does not map would drop out here too, and that silent drop is
+  // exactly what this check exists to expose.
+  return output.split("\n").map((line) => {
+    const rawPath = line.slice(3);
+    const [rawOldPath, rawNewPath] = rawPath.split(" -> ");
+    return rawNewPath ?? rawOldPath;
+  });
+}
+
+async function verifyMain(argv: string[]) {
+  const baseIndex = argv.indexOf("--base");
+  const base = baseIndex === -1 ? "" : (argv[baseIndex + 1] ?? "");
+  const separator = argv.indexOf("--");
+  const planned = separator === -1 ? [] : argv.slice(separator + 1);
+
+  if (!base || planned.length === 0) {
+    console.error(
+      "usage: analyze-changes.ts verify --base <sha> -- <planned file> ...",
+    );
+    process.exit(2);
+  }
+
+  const [committed, remaining] = await Promise.all([
+    committedPathsSince(base),
+    remainingPaths(),
+  ]);
+  const verification = verifyPlanLanded(planned, committed, remaining);
+
+  console.log(
+    JSON.stringify(
+      {
+        base,
+        plannedFiles: planned.length,
+        committedFiles: committed.length,
+        ...verification,
+      },
+      null,
+      2,
+    ),
+  );
+
+  if (!verification.ok) process.exit(3);
+}
+
 async function main() {
   const repoRoot = (await gitText`git rev-parse --show-toplevel`).trim();
   if (repoRoot) process.chdir(repoRoot);
+  if (process.argv[2] === "verify") return await verifyMain(process.argv);
+
   const [analysis, promptPath] = await Promise.all([
     analyzeChanges(),
     resolvePromptPath(),

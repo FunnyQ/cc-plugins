@@ -12,6 +12,7 @@ import {
   parseStatusLine,
   shouldSkipDiff,
   unquoteGitPath,
+  verifyPlanLanded,
 } from "./analyze-changes";
 
 describe("parseStatusLine", () => {
@@ -280,5 +281,92 @@ describe("analyzeFile", () => {
     expect(result.diff).toContain("[large file - content skipped]");
     expect(result.diff).not.toContain("line\nline\nline");
     expect(result.insertions).toBe(70_000);
+  });
+
+  test("carries an intent-to-add file from real git status to a diff", async () => {
+    // End-to-end guard for the reported bug: `git add -N` files reached the
+    // commit flow as nothing at all, so they landed in no commit while the flow
+    // reported success. Parse git's own output rather than a hand-written line.
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-intent-"));
+    process.chdir(dir);
+    await $`git init -q .`.quiet();
+    await $`git config user.email t@t`.quiet();
+    await $`git config user.name t`.quiet();
+    await writeFile(join(dir, "existing.ts"), "export const a = 1;\n");
+    await $`git add -A`.quiet();
+    await $`git -c commit.gpgSign=false commit -qm init`.quiet();
+    await writeFile(join(dir, "existing.ts"), "export const a = 2;\n");
+    await writeFile(join(dir, "newmod.ts"), "export const b = 3;\n");
+    await $`git add -N newmod.ts`.quiet();
+
+    const status = (await $`git status --porcelain -uall`.text()).trimEnd();
+    const entries = status.split("\n").flatMap(parseStatusLine);
+
+    expect(entries).toContainEqual({
+      path: "newmod.ts",
+      staged: false,
+      status: "added",
+    });
+
+    const result = await analyzeFile({
+      path: "newmod.ts",
+      staged: false,
+      status: "added",
+    });
+
+    expect(result.diff).toContain("export const b = 3;");
+    expect(result.insertions).toBe(1);
+  });
+});
+
+describe("verifyPlanLanded", () => {
+  test("passes when every planned file landed and nothing is left", () => {
+    expect(verifyPlanLanded(["a.ts", "b.ts"], ["a.ts", "b.ts"], [])).toEqual({
+      ok: true,
+      missing: [],
+      leftover: [],
+    });
+  });
+
+  test("reports planned files that never landed", () => {
+    // The reported failure: the plan claimed the new files, the commit did not.
+    const result = verifyPlanLanded(
+      ["existing.ts", "feature.ts", "newmod.ts"],
+      ["existing.ts"],
+      ["feature.ts", "newmod.ts"],
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual(["feature.ts", "newmod.ts"]);
+  });
+
+  test("fails on a leftover change the plan never mentioned", () => {
+    const result = verifyPlanLanded(["a.ts"], ["a.ts"], ["untouched.ts"]);
+
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual([]);
+    expect(result.leftover).toEqual(["untouched.ts"]);
+  });
+
+  test("normalizes quoted and ./-prefixed paths on both sides", () => {
+    const result = verifyPlanLanded(
+      ["./a.ts", '"with space.ts"'],
+      ["a.ts", "with space.ts"],
+      [],
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  test("ignores duplicate paths in the plan", () => {
+    const result = verifyPlanLanded(["a.ts", "a.ts"], ["a.ts"], []);
+
+    expect(result).toEqual({ ok: true, missing: [], leftover: [] });
+  });
+
+  test("tolerates commits carrying more files than the plan named", () => {
+    const result = verifyPlanLanded(["a.ts"], ["a.ts", "b.ts"], []);
+
+    expect(result.ok).toBe(true);
   });
 });

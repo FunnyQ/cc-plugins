@@ -96,11 +96,26 @@ Do this only after validated watcher facts and a complete plan:
 ```
 Agent({
   subagent_type: "chronicle:runesmith",
-  prompt: "<the CommitPlan as JSON> + the template path ($SKILL_DIR/references/commit-template.md, or the watcher's promptPath). Stage each commit's files by explicit name and commit per the template; return git log --oneline."
+  prompt: "<the CommitPlan as JSON> + the template path ($SKILL_DIR/references/commit-template.md, or the watcher's promptPath) + the verify script path ($SKILL_DIR/scripts/analyze-changes.ts, substitute the absolute path). Stage each commit's files by explicit name and commit per the template; then run the mandatory verify step and return git log --oneline PLUS the verify JSON."
 })
 ```
 
-### 5. Report
+### 5. Check the evidence, then report
 
-With a real runesmith `git log --oneline`, relay it verbatim. Prefix it with `simple
-commit (forced)`, `simple commit`, or `atomic split — N commits`. Otherwise, fail.
+A commit run can lose a file and still look successful, so the runesmith's prose is
+not proof. Require both artifacts: a real `git log --oneline`, and the verify JSON
+with `"ok": true`.
+
+- Both present and `ok` is true → relay the log verbatim, prefixed with `simple
+  commit (forced)`, `simple commit`, or `atomic split — N commits`. Append the
+  verify JSON's `plannedFiles` / `committedFiles` counts as one line of evidence.
+- Verify JSON with `"ok": false`, or a `COMMIT VERIFICATION FAILED` report → do not
+  report success. Fail with the missing/leftover paths:
+
+  ```
+  COMMIT FAILED: verification found files the commits did not carry.
+  missing: <paths>   leftover: <paths>
+  Commits were created but the changeset is incomplete. Inspect before pushing.
+  ```
+
+- Verify JSON absent → fail. Never substitute the runesmith's word for it.
