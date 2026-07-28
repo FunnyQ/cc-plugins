@@ -26,7 +26,12 @@ import { join } from "node:path";
 import { findSession } from "./find-session";
 import { lintDiagram } from "./diagram-lint";
 import { latestOpenCallId } from "./call-log";
-import { getLanguage, setLanguage } from "./config";
+import {
+  getAnswerHere,
+  getLanguage,
+  setAnswerHere,
+  setLanguage,
+} from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
 import { cockpitHome } from "./cockpit-home";
 import { logRoot } from "./log-root";
@@ -575,8 +580,25 @@ function cmdConfig(rest: string[]): void {
     return;
   }
 
+  const answerHere = args.single["answer-here"];
+  if (answerHere) {
+    if (answerHere !== "on" && answerHere !== "off") {
+      console.error("cockpit config: --answer-here takes on | off");
+      process.exit(1);
+    }
+    setAnswerHere(answerHere === "on");
+    console.log(`cockpit: answer_here = ${answerHere}`);
+    return;
+  }
+
+  if (positionals(rest)[0] === "get-answer-here") {
+    console.log(getAnswerHere() ? "on" : "off");
+    return;
+  }
+
   console.error(
-    "usage: cockpit config --log-language <lang> | cockpit config get-language",
+    "usage: cockpit config --log-language <lang> | get-language" +
+      " | --answer-here on|off | get-answer-here",
   );
   process.exit(1);
 }
@@ -670,9 +692,13 @@ async function cmdWait(rest: string[]): Promise<void> {
     const v = parseInt(process.env.COCKPIT_WAIT_MAX_MS || "", 10);
     return Number.isFinite(v) && v > 0 ? v : 6 * 60 * 60 * 1000; // 6h ceiling
   })();
+  // require_watcher=1 opts this park into the daemon's presence gate: park only
+  // while a cockpit tab is actually watching this session. An older daemon
+  // ignores the param and parks as before.
   const url =
     `http://127.0.0.1:${d.port}/api/wait` +
     `?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(d.token)}` +
+    `&require_watcher=1` +
     (callId ? `&call=${encodeURIComponent(callId)}` : "");
 
   const start = Date.now();
@@ -726,6 +752,17 @@ async function cmdWait(rest: string[]): Promise<void> {
     if (data && data.superseded === true) {
       console.error("cockpit wait: call is no longer open (superseded)");
       process.exit(3);
+    }
+    // Nobody is watching this session in the cockpit, so no answer can arrive
+    // there. Exit 4 — distinct from a delivered answer (0), a dead daemon (1)
+    // and a superseded call (3) — so the caller asks in the terminal instead.
+    if (data && data.not_watching === true) {
+      console.error(
+        data.reason === "toggle_off"
+          ? "cockpit wait: nobody is watching — the answer-here switch is off"
+          : "cockpit wait: nobody is watching — no cockpit tab has this session open",
+      );
+      process.exit(4);
     }
   }
   console.error("cockpit wait: no answer received");
