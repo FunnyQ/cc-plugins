@@ -1,5 +1,21 @@
 # Changelog
 
+## [chronicle 0.9.5] - 2026-07-28
+
+_tracks tag `chronicle-v0.9.5`_
+
+### Fixed
+
+- **A newly-created file staged with `git add -N` (intent-to-add) is no longer dropped from commit analysis.** Chronicle's change analyzer skipped these files entirely, so a commit could get planned around a brand-new module that was never actually staged. The analyzer now reports the file's worktree-side addition, and still avoids double-reporting an unmerged (`AA`) conflict.
+
+## [monitor 3.20.0] - 2026-07-28
+
+_tracks tag `monitor-v3.20.0`_
+
+### Changed
+
+- **Cockpit's per-project decision trail is now anchored to the repo, not the working directory.** In a monorepo, an agent whose working directory drifted into a subpackage used to start a second, separate trail there — splitting one repo's history across several `.cockpit/` folders that showed up as unrelated "projects" in the dashboard sidebar. Storage now walks up from the current directory to find an existing `.cockpit/`, bounded by the git root, and falls back to the git root itself (or the working directory outside a repo). A deliberately hand-made `.cockpit/` in a subpackage still keeps its own trail as an escape hatch. Existing split trails are not merged automatically — this only changes where new activity is recorded.
+
 ## [chronicle 0.9.4] - 2026-07-28
 
 _tracks tag `chronicle-v0.9.4`_
