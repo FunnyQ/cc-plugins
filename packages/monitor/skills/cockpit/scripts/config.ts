@@ -7,6 +7,11 @@ export type NudgeState = "on" | "off";
 
 export type CockpitConfig = {
   log_language?: string;
+  // Explicit "I'll answer agent questions in the cockpit" switch. Global, and
+  // off by default: the terminal is the default asking surface. Presence alone
+  // can't carry this — a browser window behind the terminal still reports its
+  // tab visible — so the user declares the intent instead.
+  answer_here?: boolean;
   // Persistent scribe-nudge preferences. `user` is the global default; `projects`
   // overrides it per project root. The most-specific defined scope wins
   // (session → project → user), resolved in nudge-toggle.ts.
@@ -60,6 +65,15 @@ export function getLanguage(): string {
 
 export function setLanguage(language: string): void {
   writeConfig({ ...readConfig(), log_language: language });
+}
+
+/** True only when the user has explicitly opted into answering in cockpit. */
+export function getAnswerHere(): boolean {
+  return readConfig().answer_here === true;
+}
+
+export function setAnswerHere(on: boolean): void {
+  writeConfig({ ...readConfig(), answer_here: on });
 }
 
 function writeConfig(cfg: CockpitConfig): void {

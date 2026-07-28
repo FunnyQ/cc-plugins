@@ -9,7 +9,14 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { configPath, getLanguage, readConfig, setLanguage } from "./config";
+import {
+  configPath,
+  getAnswerHere,
+  getLanguage,
+  readConfig,
+  setAnswerHere,
+  setLanguage,
+} from "./config";
 
 function tempConfigHome(): string {
   return mkdtempSync(join(tmpdir(), "cockpit-config-"));
@@ -185,5 +192,60 @@ describe("cockpit global config", () => {
       process.env.XDG_CONFIG_HOME = oldXDG;
       rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+});
+
+// The explicit "I'll answer agent questions in cockpit" switch. Presence can be
+// inferred (a live SSE proves a tab is connected), but INTENT cannot — a browser
+// window sitting behind the terminal still reports itself visible. So the user
+// declares it, and the broker's wait gate reads it.
+describe("answer-here switch", () => {
+  function withTempConfig(fn: () => void): void {
+    const tempDir = tempConfigHome();
+    const oldXDG = process.env.XDG_CONFIG_HOME;
+    try {
+      process.env.XDG_CONFIG_HOME = tempDir;
+      fn();
+    } finally {
+      process.env.XDG_CONFIG_HOME = oldXDG;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  test("defaults to off — the terminal is the default asking surface", () => {
+    withTempConfig(() => {
+      expect(getAnswerHere()).toBe(false);
+    });
+  });
+
+  test("round-trips through the config file", () => {
+    withTempConfig(() => {
+      setAnswerHere(true);
+      expect(getAnswerHere()).toBe(true);
+      expect(JSON.parse(readFileSync(configPath(), "utf8"))).toEqual({
+        answer_here: true,
+      });
+      setAnswerHere(false);
+      expect(getAnswerHere()).toBe(false);
+    });
+  });
+
+  test("preserves unrelated keys", () => {
+    withTempConfig(() => {
+      setLanguage("zh-TW");
+      setAnswerHere(true);
+      expect(readConfig()).toEqual({
+        log_language: "zh-TW",
+        answer_here: true,
+      });
+    });
+  });
+
+  test("a non-boolean value reads as off, and does not throw", () => {
+    withTempConfig(() => {
+      writeConfig({ answer_here: "yes" });
+      expect(() => getAnswerHere()).not.toThrow();
+      expect(getAnswerHere()).toBe(false);
+    });
   });
 });

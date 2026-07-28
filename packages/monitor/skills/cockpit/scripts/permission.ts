@@ -32,8 +32,7 @@ type Behavior = "allow" | "deny";
 // treats {abandoned:true} like an abort — it stops pulling without echoing a
 // verdict.
 type PullResult =
-  | { requestId: string; behavior: Behavior }
-  | { abandoned: true };
+  { requestId: string; behavior: Behavior } | { abandoned: true };
 
 type PendingRequest = {
   requestId: string;
@@ -172,6 +171,36 @@ export function takePending(sessionId: string): PendingRequest | null {
 
 export function hasPendingRequest(sessionId: string): boolean {
   return takePending(sessionId) !== null;
+}
+
+// True iff a VISIBLE cockpit tab currently has this session selected — the
+// broker's presence signal (see broker.ts's gate on /api/wait).
+//
+// No separate heartbeat is needed: the UI already ties this stream's lifetime
+// to exactly that condition. It closes the EventSource on visibilitychange →
+// hidden and reopens it on return, and a session switch closes the old stream
+// before opening the new one (permission-modal.js:285-333). The transcript and
+// decision-log streams do NOT do this — they survive a hidden tab — so only
+// this one can answer "is a human watching?".
+//
+// Probe before answering: a socket that died without firing cancel() would
+// otherwise linger until the next 25s heartbeat sweeps it. A ":" line is an SSE
+// comment, so a live client ignores it.
+export function hasVisibleSubscriber(sessionId: string): boolean {
+  const subs = streams.get(sessionId);
+  if (!subs) return false;
+  for (const controller of [...subs]) {
+    try {
+      controller.enqueue(": probe\n\n");
+    } catch {
+      subs.delete(controller);
+    }
+  }
+  if (subs.size === 0) {
+    streams.delete(sessionId);
+    return false;
+  }
+  return true;
 }
 
 // Drain the stash for a session, but only if it's the verdict for the request

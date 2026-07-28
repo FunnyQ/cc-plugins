@@ -15,6 +15,7 @@ import {
   handlePermissionStream,
   handlePermissionVerdict,
   hasPendingRequest,
+  hasVisibleSubscriber,
   isForwardProgress,
 } from "./permission";
 
@@ -713,5 +714,57 @@ describe("auth + validation failures", () => {
       }),
     );
     expect(res.status).toBe(400);
+  });
+});
+
+// The permission stream doubles as the "is a human watching THIS session"
+// signal: the UI closes it on visibilitychange→hidden, reopens it on return,
+// and swaps it on a session switch (permission-modal.js:285-333).
+describe("visible-subscriber presence", () => {
+  // Open a stream and drain its ": connected" preamble, so the subscriber is
+  // registered before we assert on it.
+  async function subscribe(session: string) {
+    const res = handlePermissionStream(
+      req(`/api/permission-stream?session=${session}&token=${TOKEN}`),
+    );
+    const reader = res.body!.getReader();
+    await reader.read();
+    return reader;
+  }
+
+  test("a session with no open stream is not watched", () => {
+    expect(hasVisibleSubscriber(SID)).toBe(false);
+  });
+
+  test("a subscribed stream marks the session watched", async () => {
+    const reader = await subscribe(SID);
+    expect(hasVisibleSubscriber(SID)).toBe(true);
+    await reader.cancel();
+  });
+
+  test("closing the stream (tab hidden) clears the signal", async () => {
+    const reader = await subscribe(SID);
+    await reader.cancel();
+    await Bun.sleep(10);
+    expect(hasVisibleSubscriber(SID)).toBe(false);
+  });
+
+  test("presence is per-session — another session's tab does not count", async () => {
+    const other = crypto.randomUUID();
+    const reader = await subscribe(other);
+    expect(hasVisibleSubscriber(other)).toBe(true);
+    expect(hasVisibleSubscriber(SID)).toBe(false);
+    await reader.cancel();
+  });
+
+  test("two tabs — closing one keeps the session watched", async () => {
+    const a = await subscribe(SID);
+    const b = await subscribe(SID);
+    await a.cancel();
+    await Bun.sleep(10);
+    expect(hasVisibleSubscriber(SID)).toBe(true);
+    await b.cancel();
+    await Bun.sleep(10);
+    expect(hasVisibleSubscriber(SID)).toBe(false);
   });
 });
