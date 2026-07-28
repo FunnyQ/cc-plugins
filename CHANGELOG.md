@@ -1,5 +1,21 @@
 # Changelog
 
+## [monitor 3.21.0] - 2026-07-28
+
+_tracks tag `monitor-v3.21.0`_
+
+### Added
+
+- **New "Ask me here" switch for cockpit's decision gate.** A toggle pill in the dashboard's Decision Log column header, plus `cockpit config --answer-here on|off` / `get-answer-here`, lets you choose whether an agent should pause and wait for you on the dashboard. It's off by default.
+
+### Changed
+
+- **`needs_your_call` now only parks an agent on the cockpit dashboard when someone is actually there to answer.** Previously, `cockpit wait` blocked the agent for up to 240 seconds per question regardless of whether the dashboard was open. Now it only waits there if "Ask me here" is on *and* a cockpit tab has that session selected; otherwise the agent asks in your terminal instead and the answer still gets recorded into the decision trail. The decision card is logged either way, so the trail stays complete.
+
+### Fixed
+
+- **The permission approval modal is no longer dead on deep-linked cockpit tabs.** Opening cockpit via a deep link — exactly how usage-dashboard's "Live now" rows open it — left the permission stream unsubscribed, so a permission request could never surface a card to approve.
+
 ## [chronicle 0.9.5] - 2026-07-28
 
 _tracks tag `chronicle-v0.9.5`_
