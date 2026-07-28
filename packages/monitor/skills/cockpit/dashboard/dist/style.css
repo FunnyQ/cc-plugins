@@ -488,6 +488,50 @@ body {
     color-mix(in oklch, var(--signal) 30%, transparent);
 }
 
+/* ── Ask-me-here switch — the pilot's declared answering surface ──────────
+   A pill in the Decision Log head, because a needs_your_call card is what
+   lands there. Sized like .status-pill, and pushed to the trailing edge the
+   same way. Aurora, not signal: the switch being on is not the pilot being
+   asked to act, and signal stays reserved for that (see DESIGN.md). */
+.answer-here {
+  margin-inline-start: auto;
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.answer-here:hover,
+.answer-here:focus-visible {
+  border-color: color-mix(in oklch, var(--aurora) 40%, var(--edge));
+  color: var(--ink-muted);
+}
+.answer-here.is-on {
+  border-color: color-mix(in oklch, var(--aurora) 45%, var(--edge));
+  background: color-mix(in oklch, var(--aurora) 12%, transparent);
+  color: var(--aurora);
+}
+.answer-here__lamp {
+  inline-size: 6px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--edge);
+}
+.answer-here.is-on .answer-here__lamp {
+  background: var(--aurora);
+  box-shadow: 0 0 6px color-mix(in oklch, var(--aurora) 60%, transparent);
+}
+
 .design-toggle {
   position: fixed;
   z-index: 45;

@@ -265,6 +265,24 @@
         <section class="instrument" id="col-decision">
           <header class="instrument__head">
             <span class="instrument__legend">Decision Log</span>
+            <!-- Where the pilot wants to be asked. It lives on this column
+                 because a needs_your_call card is what lands here. Off =
+                 questions go to the terminal; on = they park here (a connected
+                 tab is still required). -->
+            <button
+              class="answer-here"
+              type="button"
+              :class="{ 'is-on': answerHere }"
+              :aria-pressed="answerHere ? 'true' : 'false'"
+              @click="toggleAnswerHere()"
+              title="On: agents ask their needs_your_call questions here. Off: they ask in the terminal."
+            >
+              <span class="answer-here__lamp" aria-hidden="true"></span>
+              <span
+                class="answer-here__label"
+                v-text="answerHere ? 'Ask me here' : 'Ask in terminal'"
+              ></span>
+            </button>
           </header>
           <div class="instrument__body" data-column="decision">
             <p class="placeholder">No decisions logged yet.</p>

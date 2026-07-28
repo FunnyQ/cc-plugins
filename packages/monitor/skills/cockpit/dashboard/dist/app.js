@@ -45,6 +45,11 @@ export const store = reactive({
   selectedSessionId: null,
   selectedProvider: null,
   loaded: false,
+  // The explicit "ask me here" switch. Agents park a needs_your_call on the
+  // cockpit only while this is on AND a tab is connected — otherwise they ask
+  // in the terminal. Visibility alone can't stand in for it: a browser window
+  // behind the terminal still reports its tab visible.
+  answerHere: false,
   // selection-change subscribers (column modules register here)
   _subscribers: [],
   // session-list subscribers (modules register when UI state depends on polled
@@ -563,6 +568,36 @@ export const store = reactive({
 
   // Column modules call this to be told when the active session changes.
   // Returns the current selection immediately is the caller's job.
+  async fetchAnswerHere() {
+    const token = await getToken();
+    try {
+      const r = await fetch(
+        `/api/answer-here?token=${encodeURIComponent(token || "")}`,
+      );
+      if (!r.ok) return;
+      this.answerHere = (await r.json()).answer_here === true;
+    } catch {
+      // daemon not reachable — leave the switch as-is
+    }
+  },
+
+  async toggleAnswerHere() {
+    const next = !this.answerHere;
+    this.answerHere = next; // optimistic; reconciled from the response below
+    const token = await getToken();
+    try {
+      const r = await fetch("/api/answer-here", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on: next, token }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      this.answerHere = (await r.json()).answer_here === true;
+    } catch {
+      this.answerHere = !next; // roll back a write the daemon never took
+    }
+  },
+
   subscribe(fn) {
     this._subscribers.push(fn);
   },
@@ -672,6 +707,7 @@ if (deepLinkSession && deepLinkSessionOk) {
 
 await store.fetchProjects();
 await store.fetchSessions();
+store.fetchAnswerHere();
 createApp(store).mount("#app");
 startPolling();
 

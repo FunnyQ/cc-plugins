@@ -317,6 +317,13 @@ export function initPermissionModal(rootEl) {
   // Re-subscribe on session switch (tied to the selected session like the other
   // streams). Close any open modal first so a request never leaks across sessions.
   store.subscribe((_project, session) => open(session));
+  // subscribe() only fires on LATER changes, and a deep-linked load sets the
+  // selection before this module registers (app.js:667-671) — and then
+  // fetchSessions skips its default-select, so no notify ever comes. Adopt the
+  // current selection explicitly, exactly like transcript.js:970. Without this
+  // a deep-linked tab never opens the stream: no permission card, and no
+  // presence signal for the broker's wait gate.
+  open(store.selectedSessionId);
 
   // Close the stream when the tab is hidden; reopen on return (mirrors app.js
   // polling lifecycle so no EventSource leaks while backgrounded).
