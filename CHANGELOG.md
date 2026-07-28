@@ -1,5 +1,18 @@
 # Changelog
 
+## [chronicle 0.9.6] - 2026-07-28
+
+_tracks tag `chronicle-v0.9.6`_
+
+### Added
+
+- **`analyze-changes.ts` gains a `verify` subcommand.** It checks a completed commit plan against what actually landed in git, catching both a planned file that never made it into any commit (`missing`) and a changed file the plan never accounted for (`leftover`). Exits non-zero on either mismatch.
+
+### Fixed
+
+- **`/chronicle:commit` no longer silently drops files staged with `git add -N` (intent-to-add).** Such a file previously reached the commit flow as nothing at all — it landed in no commit while the flow still reported success, leaving a feature commit that couldn't build. The watcher agent now recognizes `status: "added"` with `staged: false` as covering both untracked and intent-to-add files, so it's grouped and committed like any other new file.
+- **A false "success" report is no longer possible.** The runesmith now records a base commit sha before its first commit and runs the new verify check after its last, and the lawspeaker refuses to report success unless that check comes back clean — so a plan that silently fails to land is caught instead of reported as done.
+
 ## [monitor 3.21.0] - 2026-07-28
 
 _tracks tag `monitor-v3.21.0`_
