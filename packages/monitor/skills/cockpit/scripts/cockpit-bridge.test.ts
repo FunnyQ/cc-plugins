@@ -3,7 +3,13 @@
 //   bun test packages/monitor/skills/cockpit/scripts/cockpit-bridge.test.ts
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Subprocess } from "bun";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,6 +21,7 @@ const WAIT_TIMEOUT_MS = "1500";
 
 let projectDir: string;
 let cockpitHome: string;
+let configHome: string;
 let port: number;
 let daemon: Subprocess;
 
@@ -95,10 +102,14 @@ beforeAll(async () => {
   ]);
   if (seed.code !== 0) throw new Error("bridge seed failed: " + seed.stderr);
   port = freePort();
+  configHome = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-bridgecfg-")));
   daemon = Bun.spawn(["bun", DAEMON, "--no-open", "--port", String(port)], {
     env: {
       ...process.env,
       COCKPIT_HOME: cockpitHome,
+      // The answer-here switch lives in the global XDG config — keep the suite
+      // off the real user's.
+      XDG_CONFIG_HOME: configHome,
       COCKPIT_WAIT_TIMEOUT_MS: WAIT_TIMEOUT_MS,
     },
     stdout: "ignore",
@@ -115,7 +126,33 @@ afterAll(() => {
   }
   rmSync(projectDir, { recursive: true, force: true });
   rmSync(cockpitHome, { recursive: true, force: true });
+  rmSync(configHome, { recursive: true, force: true });
 });
+
+// `cockpit wait` now parks only while a cockpit tab is watching the session
+// (see the presence gate in broker.ts). Open a permission-stream SSE to stand
+// in for that visible tab; the returned closer plays the tab going away.
+async function watch(): Promise<() => Promise<void>> {
+  const token = JSON.parse(
+    readFileSync(join(cockpitHome, "daemon.json"), "utf8"),
+  ).token;
+  // Liveness alone no longer opens the gate — declare the intent too.
+  await fetch(`http://127.0.0.1:${port}/api/answer-here`, {
+    method: "POST",
+    body: JSON.stringify({ on: true, token }),
+  });
+  const ctrl = new AbortController();
+  const res = await fetch(
+    `http://127.0.0.1:${port}/api/permission-stream?session=${SID}&token=${token}`,
+    { signal: ctrl.signal },
+  );
+  const reader = res.body!.getReader();
+  await reader.read(); // ": connected" — the subscriber is registered now
+  return async () => {
+    ctrl.abort();
+    await Bun.sleep(150); // let the daemon observe the hang-up
+  };
+}
 
 describe("cockpit send", () => {
   test("with nothing parked → delivered: false (still logged)", () => {
@@ -125,8 +162,21 @@ describe("cockpit send", () => {
   });
 });
 
+describe("cockpit wait presence gate", () => {
+  test("with no cockpit tab watching, wait exits 4 instead of parking", () => {
+    // The answer-here switch defaults off, so this covers the default path.
+    const t0 = Date.now();
+    const r = runCli(["wait", SID]);
+    expect(r.code).toBe(4);
+    expect(r.stderr).toContain("nobody is watching");
+    // Far below one single-hop timeout — it refused rather than parked.
+    expect(Date.now() - t0).toBeLessThan(Number(WAIT_TIMEOUT_MS));
+  }, 10000);
+});
+
 describe("cockpit wait + send round-trip", () => {
   test("send wakes a parked wait and wait prints the answer", async () => {
+    const stop = await watch();
     const w = Bun.spawn(["bun", CLI, "wait", SID], {
       cwd: projectDir,
       env: { ...process.env, COCKPIT_HOME: cockpitHome },
@@ -140,9 +190,11 @@ describe("cockpit wait + send round-trip", () => {
     const out = await new Response(w.stdout).text();
     expect(exitCode).toBe(0);
     expect(out.trim()).toBe("go with B");
+    await stop();
   });
 
   test("wait survives a long-poll timeout cycle and still catches a later answer", async () => {
+    const stop = await watch();
     const w = Bun.spawn(["bun", CLI, "wait", SID], {
       cwd: projectDir,
       env: { ...process.env, COCKPIT_HOME: cockpitHome },
@@ -156,6 +208,7 @@ describe("cockpit wait + send round-trip", () => {
     const out = await new Response(w.stdout).text();
     expect(exitCode).toBe(0);
     expect(out.trim()).toBe("after timeout");
+    await stop();
   }, 15000);
 });
 
