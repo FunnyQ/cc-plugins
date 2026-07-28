@@ -34,10 +34,22 @@ The Lawspeaker gives you:
   ```
 
 - The template path (`references/commit-template.md`, or its format inline).
+- The absolute path to `scripts/analyze-changes.ts`, for the verification step.
+  It sits beside the template's skill dir. Do not guess a repo-relative path.
 
 ## Process
 
-For each commit, **in the given order**:
+Before the first commit, record the starting point. The verification step needs
+it, and a fresh repo has no HEAD:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+# --verify --quiet, not plain rev-parse: on an empty repo plain rev-parse
+# echoes "HEAD" to stdout and would poison BASE.
+BASE=$(git rev-parse --verify --quiet HEAD || git hash-object -t tree /dev/null)
+```
+
+Then, for each commit, **in the given order**:
 
 1. From repo root, stage only the commit's explicit files:
 
@@ -90,7 +102,36 @@ Be terse on purpose:
 - Trivial one-liners (typo, version bump) may omit the body but keep the subject.
 - When in doubt, shorter.
 
+## Verify (mandatory — never skip)
+
+A commit can succeed and still lose a file. `git add -N` (intent-to-add) files
+have done exactly that: the flow reported success while the new files stayed
+uncommitted and the feature commit was broken. Your own report is not evidence.
+
+After the **last** commit, run the script's verify mode once, with every file
+from every commit in the plan:
+
+```bash
+bun <analyze-changes.ts path> verify --base "$BASE" -- <every planned file>
+```
+
+It prints JSON and exits `0` when verified, `3` when not. Do not interpret the
+result yourself beyond the exit code.
+
+- Exit `0` → report normally.
+- Exit `3` → the commits are wrong. Stop. Do not commit again, amend, or retry.
+  Report this instead of a success, and paste the JSON verbatim:
+
+  ```
+  COMMIT VERIFICATION FAILED
+  missing (planned but not committed): <paths, or none>
+  leftover (still uncommitted): <paths, or none>
+  <the verify JSON>
+  <git log --oneline -n <count>>
+  ```
+
 ## Report
 
-After all commits are written, return `git log --oneline -n <count>` for the new
-commits so the Lawspeaker can relay it to the main agent.
+After all commits are written **and verified**, return `git log --oneline -n
+<count>` for the new commits, followed by the verify JSON, so the Lawspeaker can
+relay both to the main agent. Never return the log without the verify output.

@@ -114,6 +114,9 @@ In `simple` mode, return the same object without the `atomicPlan` key.
 ## Guidelines
 
 - Report facts. Let the Lawspeaker apply the decision tree.
+- `status: "added"` with `staged: false` covers both an untracked file and a
+  `git add -N` (intent-to-add) file. Both are brand-new files. Group them like
+  any other file — dropping one produces a commit that cannot build.
 - Prefer smaller, focused groups in `atomicPlan` over large ones.
 - Lock files (`*.lock`, `*.lockb`) go with `package.json` as `chore: update deps`.
 - Config changes are usually `chore`, unless they enable a new feature.
