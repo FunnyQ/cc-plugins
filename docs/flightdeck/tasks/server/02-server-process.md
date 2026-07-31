@@ -6,7 +6,7 @@
 >
 > **Depends on**: server/01, ui/01
 > **Blocks**: server/03, server/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -98,25 +98,25 @@ next launch try to supersede a dead pid.
 
 ## Acceptance criteria
 
-- [ ] Importing the module runs nothing; all side effects sit behind an `import.meta.main` guard.
-- [ ] `--serve` requires an absolute `--plan` holding a `tasks/` child, exiting `2` otherwise.
-- [ ] The server binds `127.0.0.1` only.
-- [ ] A busy port makes the process exit non-zero with a message naming it; it does not retry.
-- [ ] The record is written only after a successful bind, at the XDG-aware path.
-- [ ] `readRecord` returns null for an absent, corrupt, or truncated record rather than throwing.
-- [ ] Non-API requests are delegated to the existing static module; no path or MIME logic is duplicated.
-- [ ] `GET /` returns the design system's page; an unknown path returns `404`.
-- [ ] The record is removed on `SIGINT` and on `SIGTERM`.
+- [x] Importing the module runs nothing; all side effects sit behind an `import.meta.main` guard.
+- [x] `--serve` requires an absolute `--plan` holding a `tasks/` child, exiting `2` otherwise.
+- [x] The server binds `127.0.0.1` only.
+- [x] A busy port makes the process exit non-zero with a message naming it; it does not retry.
+- [x] The record is written only after a successful bind, at the XDG-aware path.
+- [x] `readRecord` returns null for an absent, corrupt, or truncated record rather than throwing.
+- [x] Non-API requests are delegated to the existing static module; no path or MIME logic is duplicated.
+- [x] `GET /` returns the design system's page; an unknown path returns `404`.
+- [x] The record is removed on `SIGINT` and on `SIGTERM`.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` — all green. The suite must not bind a port,
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` — all green. The suite must not bind a port,
       which proves the import guard works.
-- [ ] Check nothing is already on the port: `lsof -i :5757` returns nothing.
-- [ ] Start it in the foreground and confirm it serves:
+- [x] Check nothing is already on the port: `lsof -i :5757` returns nothing.
+- [x] Start it in the foreground and confirm it serves:
       `bun packages/dispatch/skills/autopilot/scripts/flightdeck.ts --serve --plan "$(git rev-parse --show-toplevel)/docs/waypoints-skill"`
-- [ ] `curl -s -o /dev/null -w '%{http_code}' localhost:5757/` → `200`.
-- [ ] Confirm the containment check is actually reached. curl collapses dot segments before sending, so
+- [x] `curl -s -o /dev/null -w '%{http_code}' localhost:5757/` → `200`.
+- [x] Confirm the containment check is actually reached. curl collapses dot segments before sending, so
       a bare traversal URL becomes `/etc/passwd` and a 404 would prove nothing. Use `--path-as-is`, and
       check the encoded form too:
       ```bash
@@ -124,12 +124,12 @@ next launch try to supersede a dead pid.
       curl -s -o /dev/null -w '%{http_code}\n' 'localhost:5757/%2e%2e%2f%2e%2e%2fetc/passwd'
       ```
       Both → `404`.
-- [ ] Confirm the record exists and names this process:
+- [x] Confirm the record exists and names this process:
       `cat "${XDG_DATA_HOME:-$HOME/.local/share}/q-lab/flightdeck/daemon.json" | jq '.port, .plan'`
-- [ ] Start a second instance on the same port and confirm it exits non-zero without retrying.
-- [ ] Send `SIGINT` to the first and confirm the record file is gone.
-- [ ] Relative plan path exits 2: `bun ... --serve --plan docs/waypoints-skill` → exit code `2`.
-- [ ] Absolute path with no `tasks/` child exits 2: `bun ... --serve --plan /tmp` → exit code `2`.
+- [x] Start a second instance on the same port and confirm it exits non-zero without retrying.
+- [x] Send `SIGINT` to the first and confirm the record file is gone.
+- [x] Relative plan path exits 2: `bun ... --serve --plan docs/waypoints-skill` → exit code `2`.
+- [x] Absolute path with no `tasks/` child exits 2: `bun ... --serve --plan /tmp` → exit code `2`.
 
 ## Eval rubric
 
