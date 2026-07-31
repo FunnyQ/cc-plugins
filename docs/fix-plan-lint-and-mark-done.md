@@ -36,8 +36,16 @@ rg -n "^> \*\*Status\*\*" docs/flightdeck/tasks/*/*.md | rg -v ": done"   # expe
 git -C . status --porcelain                                              # expect clean
 ```
 
-Items 1, 2, and 5 touch `packages/dispatch/`. Item 4 is in another repo and item 3 is docs-only, so
+Items 1, 2, 5, and 6 touch `packages/dispatch/`. Item 4 is in another repo and item 3 is docs-only, so
 both can proceed regardless.
+
+> **Checked 2026-08-01: the run has NOT landed.** Four tasks are still open — `ui/03-agent-fleet`
+> (`in-progress`), `ui/04-dependency-graph`, `wiring/03-fixture-flight`, and `wiring/04-final-review`
+> (all `todo`). The tree is dirty under `packages/dispatch/skills/autopilot/dashboard/dist/`.
+>
+> So **items 1, 2, 5, and 6 are blocked right now.** Item 6 is the sharpest conflict: it edits
+> `orchestrator.md`, the same file `wiring/01` owns. Do items 3 and 4 first, or wait for the run.
+> Re-run the two commands above before starting anything under `packages/dispatch/`.
 
 ---
 
@@ -198,13 +206,119 @@ Both were held back to keep the pending final-review diff clean. Neither is urge
 
 ---
 
+## 6. External-engine drivers improvise their own wait, and one improvisation stalls the run
+
+**This item does not fit the "silent success" shape of items 1, 2, and 5.** It is the mirror image: a
+gate that **silently stalls** instead of falsely passing. It is filed here because it was found in the
+same investigation and lands in the same file as item 5.
+
+### What happened
+
+The `review:codex` lens agent (Haiku, run `wf_8b109c9b-5c1`, agent `a5e4e7291bedf6925`) ran the wrapper
+its prompt told it to run:
+
+```bash
+bun <scripts>/codex-run.ts review --prompt-file <file>
+```
+
+That invocation took about nine minutes. The Bash tool's **default timeout is 120 s**, so the harness
+moved it to the background and returned:
+
+```
+Command did not complete within its 120s timeout and was moved to the background (ID: bqfbuv7je).
+```
+
+The agent then invented a completion sentinel and polled for it:
+
+```bash
+until [ -f .../tasks/bqfbuv7je.output.done ]; do sleep 2; done && cat .../bqfbuv7je.output
+```
+
+This harness has no `.done` convention. A background task signals completion through a
+task-notification, and the result lands at `<id>.output` with no marker file. The loop therefore spun
+from 17:16:47Z until it was unblocked by hand at 17:25:2xZ — about nine minutes of dead time on the
+Final review gate.
+
+### Correct two claims before acting on this
+
+Both are easy to overstate, and the record does not support either:
+
+- **The agent did not choose to background the command.** `run_in_background` was unset on that call.
+  It ran the wrapper in the foreground, exactly as instructed. The *harness* backgrounded it on the
+  120 s timeout. So "run it in the foreground, never background it" would not have prevented this — the
+  agent was already doing that.
+- **The loop was not an infinite hang.** The poll ran with `timeout: 600000`, the Bash tool's maximum.
+  It was roughly 80 seconds from expiring on its own when it was unblocked. The failure mode is a
+  ten-minute stall and a probable retry, not a permanent one.
+
+### The real defect is systemic, not one bad agent
+
+Auto-backgrounding is common, and every agent improvises its own recovery:
+
+| Run | Agents hitting auto-background |
+|---|---|
+| `wf_da653b70-a50` | 5 of 122 |
+| `wf_2f20905e-012` | 4 of 77 |
+| `wf_8b109c9b-5c1` | 2 of 15 |
+
+Recovery patterns observed across those 11 agents: `while true`, `while sleep 5`,
+`while [ $count -lt 120 ]`, `while [ ! -s <output> ]`, `until [ -f <output>.done ]`, `tail -f <output>`,
+and a plain `cat`. Only one invented the `.done` sentinel. But `tail -f` never exits either, and
+`while [ ! -s ... ]` is the only one that polls something real. Nothing in any prompt says what the
+contract is, so each agent guesses.
+
+### The relay branch is worse, and cannot be fixed the same way
+
+`devExternalPrompt`'s live branch runs relay with `--wait-timeout 900000` — fifteen minutes. The Bash
+tool's **maximum** timeout is 600 000 ms. So a full-length relay wait **cannot** be held in the
+foreground at all; it will always be backgrounded. For that branch, raising the timeout is not
+available and the recovery contract is the only fix.
+
+### Do
+
+1. Set an explicit `timeout` on the wrapper call in both external-engine prompts in
+   `packages/dispatch/skills/autopilot/references/orchestrator.md` — `devExternalPrompt` and the
+   `lens.external` branch of `reviewPrompt`. Use `600000`, the maximum. This removes the trigger for the
+   headless path, where a nine-minute review fits inside ten minutes.
+2. State the recovery contract in both prompts, for when backgrounding happens anyway. Name it exactly:
+   the result lands at `<id>.output`; **there is no sentinel file**; a task-notification fires on
+   completion. Tell the agent to poll the output file for content — `while [ ! -s <output> ]` — and
+   never to wait on a marker it has not seen created.
+3. Name the hazard explicitly. A negative instruction is justified here: a self-invented sentinel never
+   appears, and the agent burns its whole timeout window.
+4. Apply the same wording to the relay branch, where step 1 cannot help.
+
+### Verify
+
+Grep the two prompts for an explicit timeout and for the sentinel warning. Then re-run a flight with an
+external engine and confirm no agent issues a `until [ -f ... ]` or `tail -f` against a task output
+file.
+
+### On a code-level guard
+
+**The prompt fix alone is not enough, and one small code change is worth building.** Have `codex-run.ts`
+and `opencode-run.ts` print a start banner immediately and flush it. Today they print nothing until the
+CLI returns, so a driver watching `<id>.output` sees an empty file and cannot tell "still working" from
+"died". A first line written at t=0 makes `while [ ! -s <output> ]` unsafe as a completion test and makes
+progress visible, so pair it with a distinct end marker the driver can poll for.
+
+That is the one guard I would build. I would **not** add stall detection to the orchestrator for this:
+the Bash timeout already bounds the damage at ten minutes, and item 5's completeness check is the
+cheaper way to catch a run that ended wrong.
+
+---
+
 ## Suggested order
 
-1. Item 1 — the hook. One line plus a test; unblocks the detector for every future run.
-2. Item 2 — `mark-done.ts`. Needs the two design decisions made first.
-3. Item 4 — unstrand `rust-rewrite`. Independent of the others; can run in parallel.
-4. Item 3 — correct the doc, now that §C has a true story to tell.
-5. Item 5 — the two deferred orchestrator changes.
+While the flightdeck run is still open, only items 3 and 4 can start. Everything else waits.
+
+1. Item 4 — unstrand `rust-rewrite`. Another repo; unblocked now.
+2. Item 3 — correct the doc. Docs-only; unblocked now. Do it after item 1 if you can wait, so §C can
+   describe the fixed hook rather than the broken one.
+3. Item 1 — the hook. One line plus a test; unblocks the detector for every future run.
+4. Item 2 — `mark-done.ts`. Needs the two design decisions made first.
+5. Item 6 — the external-engine wait contract. Same file as item 5, so do them together.
+6. Item 5 — the two deferred orchestrator changes.
 
 ## What is already done
 

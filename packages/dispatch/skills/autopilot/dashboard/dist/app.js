@@ -1,5 +1,6 @@
 import { createApp, reactive } from "./vendor/petite-vue.es.js";
 import { Lanes } from "./modules/lanes.js";
+import { connectEvents, isInFlight, renderFleet, toggleRubric } from "./modules/fleet.js";
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -47,6 +48,38 @@ async function loadTree() {
 }
 
 let pollTimer;
+let fleetTimer;
+const fleetState = {
+  rows: [],
+  entryCount: 0,
+  logPresent: false,
+  connection: "reconnecting",
+};
+
+function drawFleet() {
+  const mount = document.querySelector(".deck-fleet");
+  if (!mount) return;
+
+  mount.replaceChildren(renderFleet(
+    fleetState.rows,
+    fleetState.entryCount,
+    fleetState.logPresent,
+    fleetState.connection,
+    (rowKey) => {
+      const row = fleetState.rows.find(({ key }) => key === rowKey);
+      if (!row?.score?.breakdown?.length) return;
+      toggleRubric(rowKey);
+      drawFleet();
+    },
+  ));
+}
+
+function syncFleetTicker() {
+  clearInterval(fleetTimer);
+  if (fleetState.rows.some((row) => isInFlight(row) && row.startedAt && row.elapsedMs === undefined)) {
+    fleetTimer = setInterval(drawFleet, 1_000);
+  }
+}
 
 function scheduleRefresh() {
   clearTimeout(pollTimer);
@@ -74,6 +107,21 @@ document.querySelector(".deck-top")?.insertAdjacentHTML(
 );
 createApp(store).mount("#app");
 window.__flightdeck = store;
+
+connectEvents({
+  onFleet(payload) {
+    fleetState.rows = Array.isArray(payload.rows) ? payload.rows : [];
+    fleetState.entryCount = payload.entryCount ?? 0;
+    fleetState.logPresent = payload.logPresent === true;
+    drawFleet();
+    syncFleetTicker();
+  },
+  onState(connection) {
+    fleetState.connection = connection;
+    drawFleet();
+  },
+});
+drawFleet();
 
 refreshWhenVisible();
 

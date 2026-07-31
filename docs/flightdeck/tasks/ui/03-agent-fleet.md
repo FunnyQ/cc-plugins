@@ -8,7 +8,7 @@
 >
 > **Depends on**: ui/01, server/05
 > **Blocks**: wiring/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -95,35 +95,35 @@ complete list.
 
 ## Acceptance criteria
 
-- [ ] The table renders the rows in the order received, without re-sorting or re-deriving them.
-- [ ] No pairing, label-parsing, ordering, or score-attachment logic exists in this component.
-- [ ] A snapshot replaces the local row set; a reconnect produces no duplicate rows.
-- [ ] An in-flight row shows a pulsing amber dot and an elapsed value ticking once per second.
-- [ ] A finished row prints the elapsed value from the payload without recomputing it.
-- [ ] Elapsed formats as seconds under a minute and minutes plus seconds above it.
-- [ ] `entryCount` is visible somewhere in the section.
-- [ ] A row with a score shows the meter, the threshold tick, and the numeric value; a row without one
+- [x] The table renders the rows in the order received, without re-sorting or re-deriving them.
+- [x] No pairing, label-parsing, ordering, or score-attachment logic exists in this component.
+- [x] A snapshot replaces the local row set; a reconnect produces no duplicate rows.
+- [x] An in-flight row shows a pulsing amber dot and an elapsed value ticking once per second.
+- [x] A finished row prints the elapsed value from the payload without recomputing it.
+- [x] Elapsed formats as seconds under a minute and minutes plus seconds above it.
+- [x] `entryCount` is visible somewhere in the section.
+- [x] A row with a score shows the meter, the threshold tick, and the numeric value; a row without one
       shows nothing in that column.
-- [ ] A hard-failed score is stated in words as well as colour.
-- [ ] Clicking a scored row expands its rubric breakdown.
-- [ ] An unparseable agent label renders as role `unknown` with the raw label visible.
-- [ ] Connection state is visible, and the pre-run waiting case does not read as an error.
-- [ ] Above 200 rows, the count of hidden rows is shown.
+- [x] A hard-failed score is stated in words as well as colour.
+- [x] Clicking a scored row expands its rubric breakdown.
+- [x] An unparseable agent label renders as role `unknown` with the raw label visible.
+- [x] Connection state is visible, and the pre-run waiting case does not read as an error.
+- [x] Above 200 rows, the count of hidden rows is shown.
 
 ## Verification
 
-- [ ] Copy a real trail to a scratch plan directory and start the daemon against it:
+- [x] Copy a real trail to a scratch plan directory and start the daemon against it:
       `docs/chronicle/.flightlog/run.jsonl` holds real score and note entries and no start entries,
       so every row must render as finished with a verdict.
-- [ ] Append a start entry by hand with the flightlog CLI and confirm a pulsing in-flight row appears
+- [x] Append a start entry by hand with the flightlog CLI and confirm a pulsing in-flight row appears
       within 2s with an elapsed value that ticks upward.
-- [ ] Append the matching end entry and confirm the row moves to finished with a fixed elapsed value.
-- [ ] Restart the daemon while the page is open; confirm the table repopulates without duplicate rows.
-- [ ] Open the page against a plan whose flightlog does not exist yet; confirm the waiting state renders
+- [x] Append the matching end entry and confirm the row moves to finished with a fixed elapsed value.
+- [x] Restart the daemon while the page is open; confirm the table repopulates without duplicate rows.
+- [x] Open the page against a plan whose flightlog does not exist yet; confirm the waiting state renders
       and no error is shown.
-- [ ] Append an entry with a nonsense agent label and confirm it renders as `unknown` with the raw text.
-- [ ] Confirm the reduced-motion setting stops the pulse: enable it at the OS level and reload.
-- [ ] Confirm no derivation leaked into the client:
+- [x] Append an entry with a nonsense agent label and confirm it renders as `unknown` with the raw text.
+- [x] Confirm the reduced-motion setting stops the pulse: enable it at the OS level and reload.
+- [x] Confirm no derivation leaked into the client:
       `rg -n "agentLabel|attempt.*#|sort\(" packages/dispatch/skills/autopilot/dashboard/dist/modules/fleet.js`
       shows no pairing, label-splitting, or re-sorting of the payload rows.
 

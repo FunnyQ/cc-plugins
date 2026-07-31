@@ -538,6 +538,239 @@ button {
   background: var(--surface);
 }
 
+.c-fleet {
+  --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px minmax(160px, 1fr) minmax(160px, 2fr);
+  --fleet-meter-height: var(--space-1);
+
+  container-type: inline-size;
+  font-size: var(--text-sm);
+  min-inline-size: 0;
+}
+
+.fleet-heading {
+  align-items: center;
+  background: var(--surface);
+  border-block-end: var(--border-width) solid var(--rule);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: var(--space-3) var(--space-4);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+}
+
+.fleet-heading > h2 {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  margin: 0;
+}
+
+.connection,
+.entry-count,
+.hidden-count {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.connection::before {
+  background: currentColor;
+  border-radius: var(--radius-sm);
+  content: "";
+  display: inline-block;
+  block-size: 6px;
+  inline-size: 6px;
+  margin-inline-end: var(--space-1);
+}
+
+.connection.-live { color: var(--state-done); }
+.connection.-waiting { color: var(--state-ready); }
+.connection.-reconnecting { color: var(--state-flight); }
+
+.fleet-table {
+  min-inline-size: 760px;
+}
+
+.fleet-row,
+.fleet-columns {
+  align-items: center;
+  border-block-end: var(--border-width) solid var(--rule);
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: var(--fleet-columns);
+  line-height: 1.2;
+  min-inline-size: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.fleet-columns {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  position: sticky;
+  inset-block-start: 42px;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.fleet-row.-expandable {
+  cursor: pointer;
+}
+
+.fleet-row.-expandable:hover,
+.fleet-row.-expandable:focus-visible {
+  background: var(--surface-2);
+}
+
+.fleet-row:focus-visible {
+  outline: var(--focus-width) solid var(--state-flight);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.fleet-cell {
+  min-inline-size: 0;
+}
+
+.fleet-status {
+  background: var(--state-done);
+  border-radius: var(--radius-sm);
+  display: block;
+  block-size: 6px;
+  inline-size: 6px;
+}
+
+.fleet-row.-flight .fleet-status {
+  animation: flight-pulse var(--flight-duration) ease-in-out infinite;
+  background: var(--state-flight);
+}
+
+.fleet-row.-failed .fleet-status { background: var(--state-alert); }
+
+.fleet-cell.-role {
+  align-items: center;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.role-badge {
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--radius-sm);
+  color: var(--state-done);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  padding: var(--space-1) var(--space-2);
+  text-transform: uppercase;
+}
+
+.fleet-row.-flight .role-badge { color: var(--state-flight); }
+.fleet-row.-failed .role-badge { color: var(--state-alert); }
+
+.raw-label,
+.fleet-cell.-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.raw-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  max-inline-size: 100%;
+}
+
+.c-fleet-score {
+  align-items: center;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(64px, 1fr) auto auto;
+}
+
+.c-fleet-score > .track {
+  background: var(--surface-2);
+  block-size: var(--fleet-meter-height);
+  position: relative;
+}
+
+.c-fleet-score > .track > .fill {
+  background: var(--state-flight);
+  block-size: 100%;
+  display: block;
+}
+
+.c-fleet-score.-passed > .track > .fill { background: var(--state-done); }
+.c-fleet-score.-failed > .track > .fill { background: var(--state-alert); }
+
+.c-fleet-score > .track > .threshold {
+  background: var(--text);
+  block-size: 100%;
+  inline-size: var(--border-width);
+  position: absolute;
+  inset-block-start: 0;
+}
+
+.c-fleet-score > .value,
+.c-fleet-score > .failure {
+  font-size: var(--text-xs);
+}
+
+.c-fleet-score > .failure { color: var(--state-alert); }
+
+.c-fleet-rubric {
+  background: var(--surface-2);
+  border-block-end: var(--border-width) solid var(--rule);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-8);
+}
+
+.c-fleet-rubric > .dimension {
+  align-items: center;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(96px, 1fr) minmax(0, 2fr) 40px;
+}
+
+.c-fleet-rubric .label,
+.c-fleet-rubric .score {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.c-fleet-rubric .bar {
+  background: var(--rule);
+  block-size: var(--fleet-meter-height);
+  display: block;
+}
+
+.c-fleet-rubric .fill {
+  background: var(--state-ready);
+  block-size: 100%;
+  display: block;
+}
+
+.fleet-empty,
+.hidden-count {
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.visually-hidden {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+@container (inline-size < 760px) {
+  .fleet-table {
+    overflow-x: auto;
+  }
+}
+
 @keyframes flight-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
