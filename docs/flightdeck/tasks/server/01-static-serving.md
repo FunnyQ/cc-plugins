@@ -102,8 +102,11 @@ and a cached stale bundle is a confusing failure to debug.
 ## Verification
 
 - [ ] `bun test packages/dispatch/skills/autopilot/scripts/static-serve.test.ts` — all green.
-- [ ] Confirm this task wrote nothing into the SPA directory:
-      `git status --porcelain packages/dispatch/skills/autopilot/dashboard/` returns nothing.
+- [ ] Confirm this task stayed in its own lane:
+      `git status --porcelain packages/dispatch/skills/autopilot/scripts/` lists only `static-serve.ts`
+      and `static-serve.test.ts`. Do **not** assert anything about `dashboard/` — the design-system task
+      runs in the same wave and legitimately fills that directory, so a check there fails on its output,
+      not on this task's.
 - [ ] Confirm the pure function is genuinely pure:
       `rg -n "statSync|existsSync|readFile|Bun\.file" packages/dispatch/skills/autopilot/scripts/static-serve.ts`
       shows hits only inside `serveStatic`.

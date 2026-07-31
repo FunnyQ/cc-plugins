@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: contract/02, wiring/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -111,22 +111,22 @@ exactly.
 
 ## Acceptance criteria
 
-- [ ] `NoteEntry` carries `phase?: "start" | "end"` and no other new field.
-- [ ] `parseLog` is unchanged and still parses every existing trail.
-- [ ] `renderRunlog` omits entries with `phase: "start"`.
-- [ ] Re-rendering **each of the four** committed trails reproduces its `RUNLOG.md` byte for byte. One
+- [x] `NoteEntry` carries `phase?: "start" | "end"` and no other new field.
+- [x] `parseLog` is unchanged and still parses every existing trail.
+- [x] `renderRunlog` omits entries with `phase: "start"`.
+- [x] Re-rendering **each of the four** committed trails reproduces its `RUNLOG.md` byte for byte. One
       spot check is not enough — the guarantee is about all of them.
-- [ ] `flightlog.ts log ... --phase start` works without `--message` and stores `message: ""`.
-- [ ] `flightlog.ts log ... --phase bogus` exits `2` with a message naming the allowed values.
-- [ ] A `log` call with no `--phase` produces a JSONL line identical to what the previous version wrote.
+- [x] `flightlog.ts log ... --phase start` works without `--message` and stores `message: ""`.
+- [x] `flightlog.ts log ... --phase bogus` exits `2` with a message naming the allowed values.
+- [x] A `log` call with no `--phase` produces a JSONL line identical to what the previous version wrote.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` — all green, including the existing tests.
-- [ ] Round-trip a start entry into a scratch file and read it back:
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` — all green, including the existing tests.
+- [x] Round-trip a start entry into a scratch file and read it back:
       `bun packages/dispatch/skills/flightplan/scripts/flightlog.ts log /tmp/fd-check.jsonl --task work/aa --role dev --phase start --agent probe`
       then confirm the line contains `"phase":"start"` and `"message":""`.
-- [ ] Re-render **every** committed trail and diff each against its committed run log. Loop over all
+- [x] Re-render **every** committed trail and diff each against its committed run log. Loop over all
       four rather than spot-checking one:
       ```bash
       for d in chronicle cockpit-autolog cockpit-thoughtful relay; do
@@ -136,7 +136,7 @@ exactly.
       done
       ```
       All four must print `ok` with no diff output.
-- [ ] Confirm the bad-value path: the `--phase bogus` call above exits non-zero.
+- [x] Confirm the bad-value path: the `--phase bogus` call above exits non-zero.
 
 ## Eval rubric
 

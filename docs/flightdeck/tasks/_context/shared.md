@@ -69,6 +69,19 @@ This list is the complete planned file set, and it is authoritative for **placem
 names. A task that needs one more small module may add it beside these; a task must not move code
 outside this tree or invent a second scripts directory.
 
+### Never touch another task's files
+
+Write only to the files in your own task's "Files to create / modify" list. **Never delete, move, or
+revert a file you did not create**, even when it looks out of scope, unexpected, or left over.
+
+Tasks run in parallel waves. A file that is absent from your task's list almost always belongs to a
+sibling task running right now — the whole file set above is shared across fifteen tasks. Deleting it
+destroys verified work that has no commit behind it yet.
+
+The same rule covers whole-tree commands. Never run `git clean`, `git checkout -- .`, `git restore`,
+`git stash`, or `rm -rf` on a directory. If you believe a stray file must go, leave it and say so in
+your summary instead.
+
 `dashboard/` sits beside `scripts/`, not inside it — the same shape monitor uses for
 `skills/cockpit/dashboard/dist/`. `flightdeck.ts` resolves it as
 `resolve(import.meta.dir, "..", "dashboard", "dist")`.
