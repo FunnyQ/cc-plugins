@@ -28,7 +28,23 @@ Output contract:
 
 With `--keep-pane`, continue the conversation directly with `herd send/wait/read`. Close it later with `bun <herd.ts> close <agent-name>`. Follow-ups are out of relay's scope. Relay is one-shot: spawn→capture.
 
-**Pending report (exit 0 + "still running")**: if the delegate outlives `--wait-timeout`, relay does NOT kill or close anything. It exits **0** and prints a report of copy-pasteable follow-ups (`herd wait/read/close <name>` + `cat <result.md>`). Treat this as "work in progress", not failure. Relay's non-zero = stop rule does not apply. Collect the answer later with `herd wait <name>`, then `cat` the result file.
+**Pending report (exit 0 + "still running")**: if the delegate outlives `--wait-timeout`, relay does NOT kill or close anything. It exits **0** and prints a report of copy-pasteable follow-ups. Treat this as "work in progress", not failure. Relay's non-zero = stop rule does not apply.
+
+### Collecting a pending run
+
+```bash
+relay.ts collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]
+```
+
+Reattach to the pane a pending report named and watch it for another bounded window. The pending report prints this exact command, filled in.
+
+**Repeat it as many times as the task needs.** Each call returns inside its own `--wait-timeout`, so a task may run far longer than any single caller's timeout cap. Output matches a normal live run: the answer on stdout, exit 0; another pending report, exit 0; a real failure, exit 1.
+
+`collect` never spawns a second pane and never re-sends the prompt — it only watches. On a verified result it closes the pane, like a normal live success.
+
+**Prefer `collect` over `herd wait`.** `herd wait` blocks until `idle`, and codex parks at `done` when it finishes, so waiting on `idle` can miss a completed run entirely. `collect` reuses relay's own settled test (`idle` **or** `done`, plus the result-file marker).
+
+Do not use `collect` to poll. One bounded call, then act on what it returns.
 
 If a pane exists, failures also leave it open. This leaves a postmortem target you can read or close manually.
 

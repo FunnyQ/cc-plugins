@@ -84,6 +84,8 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.reviewLensModel`, and `CFG.liveDevEngine` in Step 3. Whichever external engines get chosen, their `--version` check from Step 1 becomes load-bearing. If a picked engine is unreachable, say so before flying. Offer to fall back: Claude for the dev engine, the other CLI for the reviewer.
 
+When the user picks live, leave `CFG.liveCollectRounds` at its default `3`: a delegate that outlives relay's watch window is still working, so the driver reattaches with `relay collect` up to that many more times (~32 min total) instead of failing the attempt and putting a second writer on the same files. Lower it only when a fast fail matters more than finishing a slow task.
+
 If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false` and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks headless. In every one of these cases, the headless wrapper path is exactly today's behavior. The review lens is unaffected and always stays headless.
 
 Then show the user a one-screen brief. State the slug and how many tasks there are. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
@@ -102,7 +104,7 @@ Adapt `references/orchestrator.md`; it is the canonical script. Copy its `CFG` b
 - `baseRef`
 - `commitBetweenWaves`
 - `devEngine` and `reviewEngine`
-- `liveDevEngine` and absolute `relayPath`
+- `liveDevEngine`, absolute `relayPath`, and `liveCollectRounds`
 - `opencodeDevModel` and `opencodeReviewModel`
 - `reviewLensModel`
 

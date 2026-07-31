@@ -64,6 +64,8 @@ It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous`
 
 **Keep the default live.** `--headless` needs a real reason.
 
+If a run comes back with a **pending report**, the delegate is still working — that is not a failure. Reattach with `relay.ts collect --agent <name> --result <path>`, repeating as needed; the report prints the filled-in command. See `references/live.md`.
+
 Editing capability is identical: same CLI, model, and write access. So "more precise" or "deterministic" is never a valid reason. Override only for nested delegation, no live seam, or no pane surface.
 
 `relay.ts` is one blocking call. Do not poll it while it runs. See `references/live.md`.
