@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/03, contract/02
 > **Blocks**: server/05, ui/02
-> **Status**: todo
+> **Status**: in-progress (retry 2)
 
 ## Goal
 
@@ -97,34 +97,34 @@ Nothing from the monitor package.
 
 ## Acceptance criteria
 
-- [ ] `GET /api/tree` returns the documented payload with correct `state`, `blockedBy`, and `counts`.
-- [ ] `slug`, `planTitle`, and `buckets` follow their stated derivations.
-- [ ] A missing flightlog yields a valid payload rather than an error.
-- [ ] A task file that fails to parse appears in `errors` with its bucket, and the request returns `200`.
-- [ ] A bucket whose files all fail to parse still appears in `buckets`.
-- [ ] An empty bucket directory appears in `buckets` with no tasks.
-- [ ] `buildTreePayload` copies `bucketDirs` rather than deriving the list from parsed tasks.
-- [ ] An unreadable master spec falls back to the slug as the title.
-- [ ] The tree and the log are re-read on every request; no cache, watcher, or TTL exists.
-- [ ] `buildTreePayload` is pure and testable without a filesystem or a server.
+- [x] `GET /api/tree` returns the documented payload with correct `state`, `blockedBy`, and `counts`.
+- [x] `slug`, `planTitle`, and `buckets` follow their stated derivations.
+- [x] A missing flightlog yields a valid payload rather than an error.
+- [x] A task file that fails to parse appears in `errors` with its bucket, and the request returns `200`.
+- [x] A bucket whose files all fail to parse still appears in `buckets`.
+- [x] An empty bucket directory appears in `buckets` with no tasks.
+- [x] `buildTreePayload` copies `bucketDirs` rather than deriving the list from parsed tasks.
+- [x] An unreadable master spec falls back to the slug as the title.
+- [x] The tree and the log are re-read on every request; no cache, watcher, or TTL exists.
+- [x] `buildTreePayload` is pure and testable without a filesystem or a server.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` — all green.
-- [ ] Start the daemon against a real tree, which has 6 tasks in 3 buckets all marked done:
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` — all green.
+- [x] Start the daemon against a real tree, which has 6 tasks in 3 buckets all marked done:
       `bun packages/dispatch/skills/autopilot/scripts/flightdeck.ts --plan "$(git rev-parse --show-toplevel)/docs/waypoints-skill" --no-open`
-- [ ] `curl -s localhost:5757/api/tree | jq '.counts'` → `total` 6 and `done` 6.
-- [ ] `curl -s localhost:5757/api/tree | jq '[.tasks[] | select(.state != "done")] | length'` → `0`.
-- [ ] `curl -s localhost:5757/api/tree | jq '.errors | length'` → `0`.
-- [ ] Point the daemon at this plan's own tree and confirm a mix of `ready` and `blocked` with populated
+- [x] `curl -s localhost:5757/api/tree | jq '.counts'` → `total` 6 and `done` 6.
+- [x] `curl -s localhost:5757/api/tree | jq '[.tasks[] | select(.state != "done")] | length'` → `0`.
+- [x] `curl -s localhost:5757/api/tree | jq '.errors | length'` → `0`.
+- [x] Point the daemon at this plan's own tree and confirm a mix of `ready` and `blocked` with populated
       `blockedBy` arrays.
-- [ ] Copy a tree to a scratch directory, corrupt one task's header, restart, and confirm the response is
+- [x] Copy a tree to a scratch directory, corrupt one task's header, restart, and confirm the response is
       `200` with that file named in `errors` alongside its bucket.
-- [ ] Corrupt **every** file in one bucket and confirm that bucket still appears:
+- [x] Corrupt **every** file in one bucket and confirm that bucket still appears:
       `curl -s localhost:5757/api/tree | jq '.buckets'` still lists it, and `.errors` names each file.
-- [ ] Confirm freshness: with the daemon running, edit a task's `Status` on disk and re-request; the new
+- [x] Confirm freshness: with the daemon running, edit a task's `Status` on disk and re-request; the new
       state appears without a restart.
-- [ ] Confirm no cross-plugin import:
+- [x] Confirm no cross-plugin import:
       `rg -n "packages/monitor" packages/dispatch/skills/autopilot/scripts/` returns nothing.
 
 ## Eval rubric

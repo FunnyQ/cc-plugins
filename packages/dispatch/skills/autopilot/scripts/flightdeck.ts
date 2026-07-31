@@ -3,6 +3,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { removeRecord, writeRecord } from "./daemon-record";
 import { main as launchMain } from "./launch";
 import { serveStatic } from "./static-serve";
+import { buildTreePayload, loadPlan } from "./tree-api";
 
 const DEFAULT_PORT = 5757;
 const distRoot = resolve(import.meta.dir, "..", "dashboard", "dist");
@@ -70,8 +71,17 @@ export async function createServer(
     server = Bun.serve({
       hostname: "127.0.0.1",
       port,
-      fetch(request) {
-        return serveStatic(distRoot, new URL(request.url).pathname);
+      async fetch(request) {
+        const url = new URL(request.url);
+
+        if (url.pathname === "/api/tree") {
+          const result = buildTreePayload(await loadPlan(plan));
+          return new Response(JSON.stringify(result), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return serveStatic(distRoot, url.pathname);
       },
     });
   } catch {
