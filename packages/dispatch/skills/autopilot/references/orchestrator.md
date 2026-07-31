@@ -169,13 +169,17 @@ const JUDGE_SCHEMA = {
 
 // ── Prompts ───────────────────────────────────────────────────────────────
 const devPrompt = (ref, path, attempt, feedback) => `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase start
+Then proceed.
+Use the identical label in both start and end calls.
+
 You are implementing flightplan task ${ref} in the tree at ${CFG.tasksDir}.
 Read the task file at ${path} and every file in its "Required reading".
 Implement the task fully: create/modify the listed files, follow Implementation notes.
 ${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nAddress that specifically.' : ''}
 While working, set the task header "> **Status**:" to in-progress. When done, run the task's ## Verification commands yourself.
 Then log a narrative note:
-  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --message "<what you changed>"
+  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase end --message "<what you changed>"
 Return a one-paragraph summary of what you did.`
 
 // External-engine dev driver — used when CFG.devEngine is 'codex' or 'opencode'.
@@ -188,6 +192,10 @@ Return a one-paragraph summary of what you did.`
 // so the binary gate fails the attempt and the loop proceeds (the last attempt
 // falls back to Claude-Opus).
 const devExternalPrompt = (engine, ref, path, attempt, feedback) => `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "${engine.label}-delegate" --phase start
+Then proceed.
+Use the identical label expression "${engine.label}-delegate" in both start and end calls.
+
 You are the ${engine.label.toUpperCase()} DEV DRIVER for flightplan task ${ref} (tree: ${CFG.tasksDir}). You do NOT write the implementation yourself — you have the ${engine.label} CLI write it, then you verify.
 1. Read the task file at ${path} and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
 2. Set the task header "> **Status**:" to in-progress.
@@ -200,7 +208,7 @@ ${liveDev && COLLECT_ROUNDS > 0 ? `5. PENDING — relay prints a report starting
 5b. FAILURE PATH` : `5. FAILURE PATH`} — the command exits non-zero${liveDev ? `, or relay returns an empty/absent result${COLLECT_ROUNDS > 0 ? ', or the last allowed collect is still pending' : ', or relay prints a PENDING report ("still running after ... this is NOT a failure" — relay exits 0, but autopilot counts that delegate as NOT finished)'}` : `, or its output begins with "${engine.token}"`}. Then: do NOT hand-write the implementation yourself, and do NOT return early. Run steps 6 and 7 as usual, then return a summary whose FIRST word is FAILED, stating ${engine.label} was unreachable, failed, or timed out.${liveDev ? ' For a still-pending delegate, name the Agent from relay stdout in the step-7 log and note the pane was LEFT OPEN and is STILL WRITING the working tree.' : ''} Step 6 is the real correctness gate: it decides whether anything usable actually landed, so never skip it. The binary gate then fails this attempt and the loop moves on (the final attempt escalates to Claude-Opus automatically).
 6. Run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
 7. Log a narrative note:
-  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "${engine.label}-delegate" --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
+  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "${engine.label}-delegate" --phase end --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
 Return a one-paragraph summary: what ${engine.label} implemented and your verification result.`
 
 // ── Final review: orchestrator-level multi-lens review fan-out ──────────────
@@ -240,23 +248,33 @@ const reviewDir = (attempt) => `${CFG.logFile.replace(/\/[^/]+$/, '')}/review/at
 // The cross-vendor lens drives an external CLI (codex/opencode) through our
 // wrapper; the four Claude lenses review the diff themselves. Branch on
 // lens.external (the resolved ENGINES entry; undefined for a Claude lens).
-const reviewPrompt = (ref, lens, attempt) => lens.external ? `
+const reviewPrompt = (ref, lens, attempt) => `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role review --attempt ${attempt} --agent "<your label>" --phase start
+Then proceed.
+Use the identical label in both start and end calls.
+
+${lens.external ? `
 You are the ${lens.external.label.toUpperCase()} (cross-vendor) reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). You do NOT review the code yourself — you have the ${lens.external.label} CLI review it and you record its findings.
 1. Write a review instruction to a temp file: tell ${lens.external.label} to review THIS run's changes for BUGS & CORRECTNESS (logic errors, broken edge cases, regressions, security) — it should inspect both \`git diff ${CFG.baseRef}..HEAD\` (committed task changes) and \`git diff\` (uncommitted fixer edits) and report each issue with file:line and the concrete fix.
 2. Run this as ONE FOREGROUND Bash call with \`timeout: 600000\` (the Bash tool maximum): bun ${S}/${lens.external.wrapper} review${lens.external.modelFlag} --prompt-file <your-instruction-file>
    It reads the repo + diffs and prints the CLI's findings, leaving no scratch. Read that stdout — don't look for any temp/transcript files.
    WAIT RULE — do NOT set \`run_in_background\`, and never write a shell poll loop (\`while\`, \`jobs\`, \`wait\`): a fresh shell per Bash call means \`jobs\` can never see an earlier call's command, so the loop spins to the 600s cap long after ${lens.external.label} finished. If the harness moves the call to the background, wait for the completion notification and Read the output file it named, once.
-3. Write the printed findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first). If the wrapper exits non-zero or its output begins with "${lens.external.token}", write exactly "${lens.external.token}" as the first line of that file — do NOT skip silently (a missing cross-vendor pass must fail this task, not pass it quietly).
-You are a REVIEWER: do NOT edit any source file — only record. Return a one-line count of findings.` : `
+3. Write the printed findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first). If the wrapper exits non-zero or its output begins with "${lens.external.token}", write exactly "${lens.external.token}" as the first line of that file — do NOT skip silently (a missing cross-vendor pass must fail this task, not pass it quietly).` : `
 You are the ${lens.key.toUpperCase()} reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). Review the WHOLE autopilot diff — all changes committed during this run — through ONE lens only:
 ${lens.focus}
 Get the full diff with BOTH commands:
   git diff ${CFG.baseRef}..HEAD   # committed task changes from this run
   git diff                         # uncommitted edits (a previous Final review fixer retry may have left changes in the working tree)
 Combine both outputs — the working-tree diff covers any retry attempt's edits that are not yet committed.
-Write your findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first) as a short markdown bullet list — each finding carries file:line and the concrete fix. If nothing is material, write exactly "No findings.". You are a REVIEWER: do NOT edit any source file — only record. Return a one-line count of your findings.`
+Write your findings to ${reviewDir(attempt)}/${lens.key}.md (run \`mkdir -p ${reviewDir(attempt)}\` first) as a short markdown bullet list — each finding carries file:line and the concrete fix. If nothing is material, write exactly "No findings.".`}
+Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role review --attempt ${attempt} --agent "<your label>" --phase end --message "<findings count>"
+You are a REVIEWER: do NOT edit any source file — only record. Return a one-line count of findings.`
 
 const fixPrompt = (ref, path, attempt, feedback) => `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role fix --attempt ${attempt} --agent "<your label>" --phase start
+Then proceed.
+Use the identical label in both start and end calls.
+
 You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}), on Opus. Independent reviewers have each written findings to ${reviewDir(attempt)}/ (one file per lens: ${reviewEngine.label}, reuse, simplification, efficiency, altitude).
 1. Read EVERY file in ${reviewDir(attempt)}/. If ${reviewEngine.label}.md is MISSING, is empty, or begins with "${reviewEngine.token}", call that out prominently — the cross-vendor pass did not run.
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the four Claude lenses (behaviour-preserving). For any finding you reject, say why.
@@ -264,7 +282,7 @@ You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}), on Opus
 ${attempt > 1 ? 'This is re-loop attempt ' + attempt + ' (capped at ' + FINAL_MAX + '). The previous round was rejected:\n' + feedback + '\nEnsure the new findings + your fixes address that.' : ''}
 Set the task header "> **Status**:" to in-progress while working.
 Log a narrative note (which lenses fired, total findings, what you fixed, whether the cross-vendor lens ran):
-  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role final-review --attempt ${attempt} --agent "<your label>" --message "<summary>"
+  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role fix --attempt ${attempt} --agent "<your label>" --phase end --message "<summary>"
 Return a one-paragraph summary: lenses run, cross-vendor status, key fixes, verification result.`
 
 // Run the Final review "dev" step: fan out the lenses in parallel, then one
@@ -278,15 +296,25 @@ async function runFinalReview(ref, path, attempt, feedback) {
     { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
 }
 
-const verifyPrompt = (ref, path) => `
+const verifyPrompt = (ref, path, attempt) => `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role verify --attempt ${attempt} --agent "<your label>" --phase start
+Then proceed.
+Use the identical label in both start and end calls.
+
 You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
 Do NOT trust the dev's claims. Open the task file at ${path}, then:
   1. Run every concrete command in its ## Verification section yourself.
   2. Check every box in ## Acceptance criteria against the actual code/output.
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
-Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.`
+Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
+Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role verify --attempt ${attempt} --agent "<your label>" --phase end --message "<verification passed or failed>"
+`
 
 const judgePrompt = (ref, path, gateSummary, attempt) => `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase start
+Then proceed.
+Use the identical label in both start and end calls.
+
 You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
 The independent binary gate already PASSED with this evidence:
 ${gateSummary}
@@ -294,7 +322,9 @@ Open the task file at ${path} and its ## Eval rubric. Score EACH dimension 0–s
 Write the scores JSON to a temp file, then run score-task.ts to compute and persist the verdict:
   echo '<scores-json>' > /tmp/scores-${ref.replace('/','-')}.json
   bun ${S}/score-task.ts ${path} /tmp/scores-${ref.replace('/','-')}.json --json --log ${CFG.logFile} --attempt ${attempt} --agent "<your label>"
-If the command exits 1, that is a valid rubric failure; still return the printed JSON verdict. Return the CLI's printed verdict object VERBATIM as "verdict", plus your scores and rationale.`
+If the command exits 1, that is a valid rubric failure; still return the printed JSON verdict. Return the CLI's printed verdict object VERBATIM as "verdict", plus your scores and rationale.
+Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase end --message "<weighted score>"
+`
 
 const markDonePrompt = (ref, path) => `
 Finalize flightplan task ${ref} at ${path} by running:
@@ -332,7 +362,7 @@ async function executeTask(item) {
       }
     }
 
-    const gate = await agent(verifyPrompt(ref, path),
+    const gate = await agent(verifyPrompt(ref, path, attempt),
       { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
     if (!gate || !gate.passed) {
       feedback = `Binary gate failed (verification/acceptance):\n${gate?.summary ?? 'no output'}`
@@ -409,12 +439,16 @@ while (true) {
 
   const scout = await agent(
     commitPreamble
+    + `First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase start\n`
+    + `Then proceed.\n\n`
+    + `Use the identical label in both start and end calls.\n`
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --json\n`
     + `It prints a JSON array of the ready tasks (each with its finalReview flag and exact file path), e.g.\n`
     + `  [{"ref":"ui/03","finalReview":false,"path":"${CFG.tasksDir}/ui/03-build.md"},{"ref":"api/02","finalReview":false,"path":"${CFG.tasksDir}/api/02-endpoint.md"}]\n`
     + `or exactly [] when NOTHING is ready (all tasks done/blocked). An empty array means there is no work — that is the normal end state.\n`
     + `Return { refs: <the printed array, VERBATIM> }. If it printed [], return refs: []. Do NOT open task files, infer, or enumerate any task the command did not print — echo only what it printed.\n`
-    + `If the command exits non-zero, return refs: [] and put the stderr in error.`,
+    + `If the command exits non-zero, return refs: [] and put the stderr in error.\n`
+    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "<refs count>"`,
     { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: READY_SCHEMA })
 
   // A scout failure is NOT "no work to do" — surface it as an escalation so the
