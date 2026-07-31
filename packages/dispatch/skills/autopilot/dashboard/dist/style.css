@@ -272,6 +272,76 @@ button {
   border-block-end: var(--border-width) solid var(--rule);
 }
 
+.c-dependency-graph {
+  block-size: 100%;
+  display: grid;
+  min-inline-size: 0;
+  overflow: hidden;
+  padding: var(--space-2);
+}
+
+.dependency-graph {
+  block-size: 100%;
+  inline-size: 100%;
+  max-inline-size: 100%;
+
+  .graph-edge {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: var(--border-width);
+    vector-effect: non-scaling-stroke;
+  }
+
+  .graph-edge.-dimmed {
+    opacity: 0.3;
+  }
+
+  .graph-node > rect {
+    stroke-width: var(--border-width);
+    transition: fill var(--motion-duration), stroke var(--motion-duration);
+    vector-effect: non-scaling-stroke;
+  }
+
+  .graph-node.-done > rect { fill: var(--state-done); stroke: var(--state-done); }
+  .graph-node.-in-progress > rect { fill: var(--state-flight); stroke: var(--state-flight); }
+  .graph-node.-ready > rect { fill: var(--state-ready); stroke: var(--state-ready); }
+  .graph-node.-blocked > rect { fill: var(--state-blocked); stroke: var(--state-blocked); }
+  .graph-node.-alert > rect,
+  .graph-node.-cyclic > rect { fill: var(--state-alert); stroke: var(--state-alert); }
+
+  .graph-node.-in-progress > .graph-status {
+    animation: flight-pulse var(--flight-duration) ease-in-out infinite;
+    fill: var(--ground);
+  }
+
+  .graph-ref,
+  .graph-cycle-label,
+  .graph-cycle-note,
+  .graph-empty {
+    fill: var(--text);
+    font-family: var(--font-mono);
+    text-anchor: middle;
+  }
+
+  .graph-ref {
+    font-size: var(--text-sm);
+  }
+
+  .graph-cycle-label {
+    font-size: var(--text-xs);
+    letter-spacing: 0.02em;
+  }
+
+  .graph-cycle-note {
+    fill: var(--state-alert);
+    font-size: var(--text-xs);
+  }
+
+  .graph-empty {
+    font-size: var(--text-md);
+  }
+}
+
 .c-task-lanes {
   --task-lanes-lane-min: calc(var(--space-8) * 8);
   --task-lanes-lane-max: calc(var(--space-8) * 10);

@@ -8,7 +8,7 @@
 >
 > **Depends on**: ui/02, ui/03
 > **Blocks**: wiring/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -87,32 +87,32 @@ content of the top section only; the fleet table below is untouched and its stre
 
 ## Acceptance criteria
 
-- [ ] The header toggle switches the top section between lanes and graph without disturbing the fleet.
-- [ ] Node depth equals one more than the greatest depth among its dependencies.
-- [ ] Nodes within a layer are ordered by bucket then sequence, stably across renders.
-- [ ] Every dependency edge is drawn, not only a primary parent.
-- [ ] An edge whose upstream task is not done renders dimmed.
-- [ ] Node fill and border use the same state colours as the lane cards.
-- [ ] A state-only change recolours nodes without moving any of them.
-- [ ] A dependency cycle is detected, does not hang, and is rendered in the alert colour with a note.
-- [ ] The SVG scales to the container and the page body gains no horizontal scrollbar.
-- [ ] No file is added to `vendor/`.
+- [x] The header toggle switches the top section between lanes and graph without disturbing the fleet.
+- [x] Node depth equals one more than the greatest depth among its dependencies.
+- [x] Nodes within a layer are ordered by bucket then sequence, stably across renders.
+- [x] Every dependency edge is drawn, not only a primary parent.
+- [x] An edge whose upstream task is not done renders dimmed.
+- [x] Node fill and border use the same state colours as the lane cards.
+- [x] A state-only change recolours nodes without moving any of them.
+- [x] A dependency cycle is detected, does not hang, and is rendered in the alert colour with a note.
+- [x] The SVG scales to the container and the page body gains no horizontal scrollbar.
+- [x] No file is added to `vendor/`.
 
 ## Verification
 
-- [ ] `layoutGraph` has unit-style checks runnable in isolation: a linear chain, a diamond, a
+- [x] `layoutGraph` has unit-style checks runnable in isolation: a linear chain, a diamond, a
       disconnected pair, and a two-node cycle. Confirm the cycle case returns rather than hanging.
-- [ ] Start against a real tree with cross-bucket dependencies:
+- [x] Start against a real tree with cross-bucket dependencies:
       `bun packages/dispatch/skills/autopilot/scripts/flightdeck.ts --plan "$(git rev-parse --show-toplevel)/docs/waypoints-skill"`
       then switch to the graph view and confirm the layering matches that tree's declared dependencies.
-- [ ] Start against this plan's own tree and confirm all **three** dependency-free tasks sit together at
+- [x] Start against this plan's own tree and confirm all **three** dependency-free tasks sit together at
       depth 0, and that the final-review node sits alone in the deepest layer. Three is the expected
       count; approving a layout that shows two would mean a foundation node was misplaced.
-- [ ] Copy a tree to a scratch directory, flip one task's `Status` from `todo` to `done`, and confirm on
+- [x] Copy a tree to a scratch directory, flip one task's `Status` from `todo` to `done`, and confirm on
       the next poll that colours change and no node moves. Capture positions before and after to check.
-- [ ] Copy a tree and edit two tasks to depend on each other; confirm the page stays responsive and both
+- [x] Copy a tree and edit two tasks to depend on each other; confirm the page stays responsive and both
       nodes are marked.
-- [ ] Confirm the vendor directory still holds one file:
+- [x] Confirm the vendor directory still holds one file:
       `ls packages/dispatch/skills/autopilot/dashboard/dist/vendor/` → `petite-vue.es.js` only.
 
 ## Eval rubric

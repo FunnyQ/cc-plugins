@@ -1,6 +1,7 @@
 import { createApp, reactive } from "./vendor/petite-vue.es.js";
 import { Lanes } from "./modules/lanes.js";
 import { connectEvents, isInFlight, renderFleet, toggleRubric } from "./modules/fleet.js";
+import { layoutGraph, renderGraph } from "./modules/graph.js";
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -23,7 +24,30 @@ const store = reactive({
   loadError: null,
   tree: emptyTree(),
   Lanes,
+  graphSvg: "",
 });
+
+let graphLayout;
+let graphStructure = "";
+
+function taskStructure(tasks) {
+  return [...tasks]
+    .map((task) => [task.ref, [...(task.dependsOn ?? [])].sort()])
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([ref, dependencies]) => `${ref}:${dependencies.join(",")}`)
+    .join("|");
+}
+
+function updateGraph(tasks) {
+  const graphTasks = Array.isArray(tasks) ? tasks : [];
+  const structure = taskStructure(graphTasks);
+  // Keep coordinates frozen while polling changes only live task state.
+  if (!graphLayout || structure !== graphStructure) {
+    graphLayout = layoutGraph(graphTasks);
+    graphStructure = structure;
+  }
+  store.graphSvg = renderGraph(graphTasks, graphLayout);
+}
 
 async function loadTree() {
   try {
@@ -35,6 +59,7 @@ async function loadTree() {
 
     const tree = await response.json();
     Object.assign(store.tree, tree);
+    updateGraph(tree.tasks);
     store.planTitle = tree.planTitle ?? "";
     store.slug = tree.slug ?? "";
     store.counts = { ...store.counts, ...(tree.counts ?? {}) };
@@ -103,7 +128,8 @@ document.addEventListener("visibilitychange", refreshWhenVisible);
 
 document.querySelector(".deck-top")?.insertAdjacentHTML(
   "beforeend",
-  '<div v-if="view === \'lanes\'" v-scope="Lanes({ tree })"></div>',
+  `<div v-if="view === 'lanes'" v-scope="Lanes({ tree })"></div>
+   <div v-if="view === 'graph'" class="c-dependency-graph" v-html="graphSvg"></div>`,
 );
 createApp(store).mount("#app");
 window.__flightdeck = store;
