@@ -265,6 +265,20 @@ describe("aggregateFleet", () => {
     expect(rows[2].key).toBe("ui/01|dev|1");
   });
 
+  test("never closes another task's row when two agents share a label", () => {
+    const rows = aggregateFleet([
+      note("ui/01", "dev", 1, "2026-01-01T00:00:00Z", "start", "shared"),
+      note("ui/02", "dev", 1, "2026-01-01T00:00:01Z", "start", "shared"),
+      note("ui/02", "dev", 1, "2026-01-01T00:00:05Z", "end", "shared"),
+    ]);
+
+    expect(rows.find((row) => row.ref === "ui/02")).toMatchObject({
+      status: "finished",
+      elapsedMs: 4000,
+    });
+    expect(rows.find((row) => row.ref === "ui/01")?.status).toBe("in-flight");
+  });
+
   test("falls back to the triple when only one entry has a label", () => {
     const rows = aggregateFleet([
       note("ui/01", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev:ui/01#1"),

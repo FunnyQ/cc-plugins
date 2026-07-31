@@ -197,9 +197,9 @@ Return a one-paragraph summary of what you did.`
 // so the binary gate fails the attempt and the loop proceeds (the last attempt
 // falls back to Claude-Opus).
 const devExternalPrompt = (engine, ref, path, attempt, feedback) => `
-First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "${engine.label}-delegate" --phase start
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "dev-${engine.label}:${ref}#${attempt}" --phase start
 Then proceed.
-Use the identical label expression "${engine.label}-delegate" in both start and end calls.
+Use the identical label expression "dev-${engine.label}:${ref}#${attempt}" in both start and end calls. It names this task and attempt, so parallel delegates never close each other's row.
 
 You are the ${engine.label.toUpperCase()} DEV DRIVER for flightplan task ${ref} (tree: ${CFG.tasksDir}). You do NOT write the implementation yourself — you have the ${engine.label} CLI write it, then you verify.
 1. Read the task file at ${path} and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
@@ -213,7 +213,7 @@ ${liveDev && COLLECT_ROUNDS > 0 ? `5. PENDING — relay prints a report starting
 5b. FAILURE PATH` : `5. FAILURE PATH`} — the command exits non-zero${liveDev ? `, or relay returns an empty/absent result${COLLECT_ROUNDS > 0 ? ', or the last allowed collect is still pending' : ', or relay prints a PENDING report ("still running after ... this is NOT a failure" — relay exits 0, but autopilot counts that delegate as NOT finished)'}` : `, or its output begins with "${engine.token}"`}. Then: do NOT hand-write the implementation yourself, and do NOT return early. Run steps 6 and 7 as usual, then return a summary whose FIRST word is FAILED, stating ${engine.label} was unreachable, failed, or timed out.${liveDev ? ' For a still-pending delegate, name the Agent from relay stdout in the step-7 log and note the pane was LEFT OPEN and is STILL WRITING the working tree.' : ''} Step 6 is the real correctness gate: it decides whether anything usable actually landed, so never skip it. The binary gate then fails this attempt and the loop moves on (the final attempt escalates to Claude-Opus automatically).
 6. Run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
 7. Log a narrative note:
-  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "${engine.label}-delegate" --phase end --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
+  bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "dev-${engine.label}:${ref}#${attempt}" --phase end --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
 Return a one-paragraph summary: what ${engine.label} implemented and your verification result.`
 
 // ── Final review: orchestrator-level multi-lens review fan-out ──────────────

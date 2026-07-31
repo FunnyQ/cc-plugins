@@ -1,21 +1,25 @@
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import { refToString } from "../../flightplan/scripts/lib/parse-task";
+import { unmetDependencies } from "../../flightplan/scripts/next-ready";
 import type {
   FlightlogEntry,
   ScoreEntry,
 } from "../../flightplan/scripts/lib/flightlog";
 
-export type AgentRole =
-  | "scout"
-  | "dev"
-  | "verify"
-  | "judge"
-  | "review"
-  | "fix"
-  | "done"
-  | "block"
-  | "commit"
-  | "unknown";
+/** Every role the orchestrator logs. The type is derived so the two never drift. */
+const KNOWN_ROLES = [
+  "scout",
+  "dev",
+  "verify",
+  "judge",
+  "review",
+  "fix",
+  "done",
+  "block",
+  "commit",
+] as const;
+
+export type AgentRole = (typeof KNOWN_ROLES)[number] | "unknown";
 
 export type ParsedLabel = {
   role: AgentRole;
@@ -67,24 +71,15 @@ export type FleetRow = {
   score?: ScoreEntry;
 };
 
-const DEV_ENGINE = /^dev-([a-z]+):(.+)#(\d+)$/;
-const DEV = /^dev:(.+)#(\d+)$/;
+/** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */
+const DEV = /^dev(?:-[a-z]+)?:(.+)#(\d+)$/;
 const REF_ATTEMPT = /^(verify|judge|fix):(.+)#(\d+)$/;
 const REVIEW = /^review:([^#]+)#(\d+)$/;
 const TERMINAL = /^(done|block):(.+)$/;
 const SCOUT = /^scout-wave-(\d+)$/;
 
 export function parseAgentLabel(label: string): ParsedLabel {
-  let match = DEV_ENGINE.exec(label);
-  if (match) {
-    return {
-      role: "dev",
-      ref: match[2],
-      attempt: Number(match[3]),
-      raw: label,
-    };
-  }
-  match = DEV.exec(label);
+  let match = DEV.exec(label);
   if (match) {
     return {
       role: "dev",
@@ -200,9 +195,9 @@ export function deriveTaskViews(
     const aggregate = byTask.get(ref);
     const dependsOn = task.dependsOn.map(refToString);
     const blocks = task.blocks.map(refToString);
-    const blockedBy = dependsOn.filter(
-      (dependency) => byRef[dependency]?.status !== "done",
-    );
+    // The readiness rule lives in next-ready.ts alone, so the dashboard and the
+    // scout can never disagree about which task is blocked.
+    const blockedBy = unmetDependencies(task, byRef);
     let state: TaskState;
     if (task.status === "done") state = "done";
     else if (task.status === "blocked") state = "blocked";
@@ -248,22 +243,10 @@ type IndexedRow = FleetRow & {
   agentLabel?: string;
 };
 
-const KNOWN_ROLES: AgentRole[] = [
-  "scout",
-  "dev",
-  "verify",
-  "judge",
-  "review",
-  "fix",
-  "done",
-  "block",
-  "commit",
-];
-
 function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
   if (parsed.role !== "unknown") return parsed.role;
   if (entry.kind === "score") return "judge";
-  return KNOWN_ROLES.includes(entry.role as AgentRole)
+  return (KNOWN_ROLES as readonly string[]).includes(entry.role)
     ? (entry.role as AgentRole)
     : "unknown";
 }
@@ -272,6 +255,22 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   const rows: IndexedRow[] = [];
   // Only an in-flight row can be closed, so pairing scans the open rows, not every row.
   const open: IndexedRow[] = [];
+  // Judge rows still waiting for a verdict, oldest first, keyed by ref and attempt.
+  const unscoredJudges = new Map<string, IndexedRow[]>();
+  const scoreByAttempt = new Map<string, ScoreEntry>();
+
+  const trackJudge = (row: IndexedRow): void => {
+    if (
+      row.role !== "judge" ||
+      row.ref === undefined ||
+      row.score !== undefined
+    )
+      return;
+    const judgeKey = `${row.ref}|${row.attempt ?? "-"}`;
+    const waiting = unscoredJudges.get(judgeKey);
+    if (waiting) waiting.push(row);
+    else unscoredJudges.set(judgeKey, [row]);
+  };
 
   entries.forEach((entry, order) => {
     const parsed = parseAgentLabel(entry.agentLabel ?? "");
@@ -295,13 +294,11 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
     // A verdict is not the end of the judge's work — its own end note closes the row.
     // Closing here would leave that end note to open a second, duplicate row.
     if (entry.kind === "score") {
-      const judged = rows.find(
-        (row) =>
-          row.role === "judge" &&
-          row.ref === base.ref &&
-          row.attempt === base.attempt &&
-          row.score === undefined,
-      );
+      const scoreKey = `${entry.task}|${entry.attempt}`;
+      if (!scoreByAttempt.has(scoreKey)) scoreByAttempt.set(scoreKey, entry);
+
+      const judgeKey = `${base.ref}|${base.attempt ?? "-"}`;
+      const judged = unscoredJudges.get(judgeKey)?.shift();
       if (judged) {
         judged.score = entry;
         return;
@@ -324,14 +321,22 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
       };
       rows.push(row);
       open.push(row);
+      trackJudge(row);
       return;
     }
 
-    const index = open.findIndex((row) =>
-      row.agentLabel && entry.agentLabel
-        ? row.agentLabel === entry.agentLabel
-        : row.identity === identity,
-    );
+    // A label alone is not an identity — parallel external delegates share one
+    // label — so an end event must match the task, role, and attempt it closes.
+    let index =
+      entry.agentLabel === undefined
+        ? -1
+        : open.findIndex(
+            (row) =>
+              row.identity === identity && row.agentLabel === entry.agentLabel,
+          );
+    if (index === -1) {
+      index = open.findIndex((row) => row.identity === identity);
+    }
     if (index !== -1) {
       const [started] = open.splice(index, 1);
       started!.status = "finished";
@@ -342,20 +347,16 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
       return;
     }
 
-    rows.push({
+    const orphan: IndexedRow = {
       ...base,
       status: "finished",
       endedAt: entry.ts,
       message: entry.message,
-    });
+    };
+    rows.push(orphan);
+    trackJudge(orphan);
   });
 
-  const scoreByAttempt = new Map<string, ScoreEntry>();
-  for (const entry of entries) {
-    if (entry.kind !== "score") continue;
-    const scoreKey = `${entry.task}|${entry.attempt}`;
-    if (!scoreByAttempt.has(scoreKey)) scoreByAttempt.set(scoreKey, entry);
-  }
   for (const row of rows) {
     if (row.score || row.ref === undefined || row.attempt === undefined)
       continue;
