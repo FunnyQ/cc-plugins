@@ -144,6 +144,64 @@ commit `2b32f44` and fixed in its owning component.
    `http://localhost:5799/` and exited 0. It now requires the port to answer, discards the
    stale record, and starts a real daemon.
 
+### Second review round (wiring/04, attempt 1 re-review)
+
+All five lenses re-ran against the fixed tree. The cross-vendor lens **ran** — `codex.md`
+reports three findings in zh-TW and does not begin with `CODEX UNREACHABLE`.
+
+Fixed, cross-vendor:
+
+1. **A recycled pid could be signalled, and a foreign server could be reused.** The launcher
+   identified a daemon by "the pid is alive" plus "the port answers any HTTP". Both are weak:
+   the operating system recycles pids, and another service can hold the port. The daemon now
+   states its own pid and plan on `GET /api/health`; the launcher reuses a record only when
+   that endpoint names the recorded pid, and sends `SIGTERM` only to a process that
+   identified itself. An unidentified port is left alone and the bind fails loudly instead.
+   Verified live: a foreign server on the recorded port survived, was not reused, and a fresh
+   daemon started on the requested port.
+2. **Parallel external delegates shared one label and closed each other's rows.** Every
+   `codex`/`opencode` dev driver logged as `<engine>-delegate`, so with two tasks in flight
+   the first end event closed whichever row opened first. The orchestrator now logs
+   `dev-<engine>:<ref>#<attempt>` — the same label its Workflow agent already carries — and
+   `aggregateFleet` requires the task, role, and attempt to match before a label closes a row.
+   Covered by a regression test.
+
+Rejected, with reason:
+
+- **Shell-quoting every interpolated path in the orchestrator prompts.** Real, but pre-existing
+  and repo-wide: the `next-ready.ts`, `score-task.ts`, and `mark-done.ts` invocations predate
+  this plan and interpolate the same way. Quoting only the lines this plan added would leave
+  the file inconsistent and still broken for a repo path containing spaces. Recorded as a gap.
+- **Hoisting the phase-log preamble into an orchestrator helper.** The gain is cosmetic and the
+  cost is real: it would rewrite seven prompt builders in the file that drives every autopilot
+  run, and the resulting hunks would no longer match the permitted set this gate must verify.
+- **Unifying the fleet and lane expand/collapse state.** The two panels key expansion by
+  different things — a fleet row key and a task ref — so one store would conflate two
+  independent pieces of UI state.
+
+Recorded as gaps, not built:
+
+- **One shared tailer per log path.** Each SSE client still owns a watcher, a poll, and its own
+  aggregation, so N tabs cost N times the work over identical data. Correct today; the fix is a
+  broadcaster rewrite of `events-api.ts` and wants its own task.
+- **Caching the `PLAN.md` title.** Re-read on every 3-second poll for a value that never changes
+  mid-run. Left alone: a cache adds staleness for an unmeasurable gain.
+
+Quality fixes applied across the four Claude lenses, all behaviour-preserving: the readiness rule
+and the bucket-listing rule now live once in `next-ready.ts`; the two dev label patterns merged
+into one; `AgentRole` is derived from `KNOWN_ROLES`; score pairing and the score-by-attempt map
+moved into the single aggregation pass; `parseLines` replaced a join-then-split; the launcher's
+twin polling loops became one `poll` helper and its plan validation flattened; `flightdeck.ts`
+returns the launcher's discriminated union instead of an optional bag; the rubric dimension
+markup and the task-order comparator are shared from `format.js`; `formatElapsed(0, x, 0)` became
+`formatDuration(ms)` plus a flat `elapsedText`; the lanes trust the server's bucket order and
+memoise the grouping per payload; the graph stabilisation loop exits on a fixed point; and a
+repeated `EventSource` error no longer rebuilds the fleet table.
+
+One stray artifact from this plan's own range was removed: `docs/waypoints-skill/RUNLOG.md`, a
+one-line `# Run log — custom-slug` left by a manual smoke run and committed by mistake. The real
+run log for that plan lives at `docs/waypoints-skill/.flightlog/RUNLOG.md` and is untouched.
+
 ## Workflow Runtime Notes
 
 - The first flight completed 3 tasks with 21 agents and no escalation.

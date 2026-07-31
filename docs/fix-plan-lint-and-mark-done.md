@@ -308,6 +308,111 @@ cheaper way to catch a run that ended wrong.
 
 ---
 
+## 7. A task whose pipeline throws vanishes from the run
+
+**Severity: highest of the orchestrator items.** Observed live in run 4, on the Final review task.
+
+`references/orchestrator.md`, wave loop:
+
+```js
+const results = (await parallel(fresh.map(item => () => executeTask(item)))).filter(Boolean)
+...
+if (!results.some(r => r.passed)) break
+```
+
+`parallel()` converts a thrown thunk into `null`. `.filter(Boolean)` then **discards it**. So a task
+whose pipeline throws is neither pushed to `completed` nor to `escalations` — it disappears. The loop
+then sees no passing result and breaks, and the run returns `{completed: [...], escalations: []}`: a
+clean success.
+
+What triggered it: `wiring/04`'s verify agent ended without calling `StructuredOutput`, so `agent()`
+threw. The Final review had already done its real work — all five lenses fired, codex ran, the fixer
+applied 4 codex defects plus quality findings and committed them — but the round was never graded. The
+task was left at `in-progress`, and only a manual count of `done` tasks against the tree size revealed
+it.
+
+### Do
+
+1. Stop discarding nulls. Zip the results back against `fresh` by index so a dropped entry is
+   attributable to its task.
+2. Record a null result as an escalation with a reason naming the thrown error, and park the task.
+3. Keep `.filter(Boolean)` out of the path entirely, or apply it only after the escalation bookkeeping.
+
+### Verify
+
+Force a throw in one task's pipeline in a scratch tree. The run must return that task in `escalations`,
+and its file must read `blocked`.
+
+---
+
+## 8. An agent that dies is recorded as a failed verification
+
+Same wave loop, per-task pipeline:
+
+```js
+const gate = await agent(verifyPrompt(ref, path), {...})
+if (!gate || !gate.passed) {
+  feedback = `Binary gate failed (verification/acceptance):\n${gate?.summary ?? 'no output'}`
+  continue
+}
+```
+
+`!gate` (the agent died and returned nothing) and `gate.passed === false` (the code genuinely failed
+verification) collapse into one branch with one message.
+
+Observed in run 3: an Anthropic session limit killed all three `verify:ui/04` agents. The recorded
+escalation reason read `Binary gate failed (verification/acceptance): no output`, which says the code
+failed. It had not been checked at all. The loop then spent the remaining two attempts re-running a dev
+step that was never the problem — each hitting the same limit.
+
+### Do
+
+1. Branch on `!gate` separately from `gate.passed === false`.
+2. On a null gate, park the task as **infrastructure-blocked** with the underlying error, and do not
+   consume an attempt.
+3. Use wording that cannot be read as a quality verdict.
+
+### Verify
+
+Simulate a null gate return. The task must not burn its attempt budget, and its escalation reason must
+name the infrastructure cause rather than verification.
+
+---
+
+## 9. Guard against a hand-written `done`
+
+Run 3 left `ui/04` reading `> **Status**: done` with **16 unticked checkboxes**. `mark-done.ts` cannot
+produce that state — it ticks every gate checkbox in the same pass that sets the status — so a dev agent
+wrote it by hand. The task had never passed a binary gate or a rubric judge; all three of its verify
+agents had died. `next-ready.ts` reads only the Status line, so it promptly offered the dependent task
+as ready.
+
+The two failure modes are mirror images, and the checkbox state tells them apart:
+
+| Fingerprint | Meaning |
+|---|---|
+| all boxes ticked, Status **not** `done` | `mark-done.ts` regex missed — item 2 |
+| Status `done`, boxes **unticked** | an agent hand-wrote the status; no gate ran |
+
+### Do
+
+1. Add the invariant to `lint-task.ts`: a task at `done` with any unticked box in `## Acceptance
+   criteria` or `## Verification` is malformed.
+2. State in the orchestrator's dev prompts that only `mark-done.ts` may write `done`. A dev agent sets
+   `in-progress` and nothing else.
+
+### Verify
+
+```bash
+for f in $(rg -l '^> \*\*Status\*\*: done' docs/*/tasks/*/[0-9][0-9]-*.md); do
+  n=$(rg -c '^- \[ \]' "$f" || echo 0); [ "$n" != "0" ] && echo "$f: $n unticked"
+done
+```
+
+Expect no output. This is worth running as a pre-flight check on any tree before resuming a run.
+
+---
+
 ## Suggested order
 
 While the flightdeck run is still open, only items 3 and 4 can start. Everything else waits.
@@ -317,12 +422,17 @@ While the flightdeck run is still open, only items 3 and 4 can start. Everything
    describe the fixed hook rather than the broken one.
 3. Item 1 — the hook. One line plus a test; unblocks the detector for every future run.
 4. Item 2 — `mark-done.ts`. Needs the two design decisions made first.
-5. Item 6 — the external-engine wait contract. Same file as item 5, so do them together.
-6. Item 5 — the two deferred orchestrator changes.
+5. Item 9 — the hand-written-`done` guard. Extends `lint-task.ts`, which item 1 just made reachable.
+6. Items 7 and 8 — the two wave-loop reporting defects. Both in the same function; do them together.
+   Item 7 first: a run that silently drops a task is worse than one that mislabels why it failed.
+7. Item 6 — the external-engine wait contract. Same file as item 5, so do them together.
+8. Item 5 — the two deferred orchestrator changes.
 
 ## What is already done
 
 - Both stranded flightdeck tasks corrected to `done` (commit `7792026`).
 - `docs/flightdeck/tasks/_context/shared.md` gained the bare-Status rule and the no-delete rule.
 - `docs/flightdeck/tasks/server/01-static-serving.md` verification rescoped off a sibling task's output.
-- Seven cockpit decision-trail entries recorded across both defect families.
+- `ui/04` reset from a hand-written `done` back to `todo`, then re-run and genuinely passed (item 9).
+- `wiring/04` reset from the `in-progress` that item 7 stranded it at, and re-run for a graded verdict.
+- Nine cockpit decision-trail entries recorded across the defect families.
