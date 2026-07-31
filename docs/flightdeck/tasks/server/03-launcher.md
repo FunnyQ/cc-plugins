@@ -6,7 +6,7 @@
 >
 > **Depends on**: server/02
 > **Blocks**: server/04, wiring/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -117,36 +117,36 @@ with no opener must not fail the launch — the URL was already printed.
 
 ## Acceptance criteria
 
-- [ ] Importing the module runs nothing; side effects sit behind an `import.meta.main` guard.
-- [ ] `parseArgs` is pure, touches no filesystem, and rejects a missing `--plan`, a relative `--plan`, and
+- [x] Importing the module runs nothing; side effects sit behind an `import.meta.main` guard.
+- [x] `parseArgs` is pure, touches no filesystem, and rejects a missing `--plan`, a relative `--plan`, and
       an out-of-range `--port`.
-- [ ] `validatePlanDir` rejects a missing plan directory and one without a `tasks/` child.
-- [ ] `decideStartup` returns each of the five outcomes for the five documented input shapes, including a
+- [x] `validatePlanDir` rejects a missing plan directory and one without a `tasks/` child.
+- [x] `decideStartup` returns each of the five outcomes for the five documented input shapes, including a
       port override on an otherwise-matching server.
-- [ ] The launch returns control to its caller and leaves a running detached server.
-- [ ] A server that fails to answer within the timeout makes the launcher exit non-zero.
-- [ ] Launching twice from the same install for the same plan and port binds once and reuses the second time.
-- [ ] Launching for a different plan supersedes and rebinds.
-- [ ] Launching the same plan with a different `--port` supersedes and binds the requested port.
-- [ ] The browser opens on a reuse as well as on a fresh start, and `--no-open` suppresses it.
-- [ ] A missing platform opener does not fail the launch.
+- [x] The launch returns control to its caller and leaves a running detached server.
+- [x] A server that fails to answer within the timeout makes the launcher exit non-zero.
+- [x] Launching twice from the same install for the same plan and port binds once and reuses the second time.
+- [x] Launching for a different plan supersedes and rebinds.
+- [x] Launching the same plan with a different `--port` supersedes and binds the requested port.
+- [x] The browser opens on a reuse as well as on a fresh start, and `--no-open` suppresses it.
+- [x] A missing platform opener does not fail the launch.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` — all green, and the suite binds no port.
-- [ ] Check nothing is already on the port: `lsof -i :5757` returns nothing.
-- [ ] Confirm the launcher returns quickly and the server survives it:
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` — all green, and the suite binds no port.
+- [x] Check nothing is already on the port: `lsof -i :5757` returns nothing.
+- [x] Confirm the launcher returns quickly and the server survives it:
       `time bun packages/dispatch/skills/autopilot/scripts/flightdeck.ts --plan "$(git rev-parse --show-toplevel)/docs/waypoints-skill" --no-open`
       — returns in a few seconds, then `lsof -i :5757` shows a listener.
-- [ ] `curl -s -o /dev/null -w '%{http_code}' localhost:5757/` → `200`.
-- [ ] Run the same launch again and confirm exactly one listener remains.
-- [ ] Launch for a different plan directory and confirm the server rebinds to serve that one:
+- [x] `curl -s -o /dev/null -w '%{http_code}' localhost:5757/` → `200`.
+- [x] Run the same launch again and confirm exactly one listener remains.
+- [x] Launch for a different plan directory and confirm the server rebinds to serve that one:
       `curl -s localhost:5757/api/tree` is not yet available, so confirm via the record's `plan` field.
-- [ ] Relaunch the same plan with `--port 5758` and confirm `lsof -i :5758` shows one listener and
+- [x] Relaunch the same plan with `--port 5758` and confirm `lsof -i :5758` shows one listener and
       `lsof -i :5757` shows none.
-- [ ] Kill the server with `SIGKILL` so the record is left stale, then launch again and confirm it starts
+- [x] Kill the server with `SIGKILL` so the record is left stale, then launch again and confirm it starts
       cleanly rather than trying to reuse a dead pid.
-- [ ] Relative plan path exits 2: `bun ... --plan docs/waypoints-skill` → exit code `2`.
+- [x] Relative plan path exits 2: `bun ... --plan docs/waypoints-skill` → exit code `2`.
 
 ## Eval rubric
 
