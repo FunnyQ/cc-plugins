@@ -329,6 +329,25 @@ async function gateDiagram(
 
 // ---------- Subcommands ----------
 
+// Every log this session's trail could live in. The cwd-derived path is the
+// normal one, but a scribe run whose cwd drifted into a subdir holding its own
+// `.cockpit/` writes there instead and re-points the registry — so the registry
+// entry is the second candidate. Reading both is what keeps a dedup aid honest:
+// history it cannot see is history the next agent will duplicate.
+function scribeLogCandidates(project: string, sessionId: string): string[] {
+  const paths = [logPathFor(project, sessionId)];
+  try {
+    const entry = readRegistry().sessions.find(
+      (s) => s.sessionId === sessionId,
+    );
+    if (entry?.logPath && !paths.includes(entry.logPath))
+      paths.push(entry.logPath);
+  } catch {
+    /* registry unreadable — the cwd-derived path still stands on its own */
+  }
+  return paths;
+}
+
 function printRecentScribeEntries(
   project: string,
   cwd: string,
@@ -338,14 +357,46 @@ function printRecentScribeEntries(
   const n = args.single["recent"] ? parseInt(args.single["recent"], 10) : 8;
   const sessionId =
     args.single["session"] || findSession(provider, cwd) || null;
-  if (!sessionId) return;
-  const logPath = logPathFor(project, sessionId);
-  if (!existsSync(logPath)) return;
-  const lines = readDecisionRecords(logPath);
-  // Keep only scribe-sourced entries; old entries without source default to "agent"
-  const scribeLines = lines.filter((r) => (r.source ?? "agent") === "scribe");
-  const recent = scribeLines.slice(-n);
-  for (const r of recent) {
+  // Every "nothing to show" below is announced. Silence here reads as "you have
+  // no history", which is the one wrong conclusion: it invites a duplicate.
+  if (!sessionId) {
+    console.log("(no session resolved — pass --session <id> to name one)");
+    return;
+  }
+
+  const candidates = scribeLogCandidates(project, sessionId);
+  const found = candidates
+    .filter((p) => existsSync(p))
+    // Keep only scribe-sourced entries; old entries without source default to "agent"
+    .map((path) => ({
+      path,
+      entries: readDecisionRecords(path).filter(
+        (r) => (r.source ?? "agent") === "scribe",
+      ),
+    }));
+
+  if (found.length === 0) {
+    console.log(`(no decision log yet — looked in: ${candidates.join(", ")})`);
+    return;
+  }
+
+  const populated = found.filter((c) => c.entries.length > 0);
+  if (populated.length > 1) {
+    console.log(
+      "! this session's trail is SPLIT across several logs — showing all of them:",
+    );
+    for (const c of populated)
+      console.log(`!   ${c.path} (${c.entries.length})`);
+  }
+
+  const all = found
+    .flatMap((c) => c.entries)
+    .sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? ""));
+  if (all.length === 0) {
+    console.log("(no scribe entries yet)");
+    return;
+  }
+  for (const r of all.slice(-n)) {
     const title = r.decision || "(untitled)";
     const kind = r.kind ?? "decision";
     console.log(`${kind} · ${title} · ${r.timestamp}`);

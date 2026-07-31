@@ -642,10 +642,90 @@ describe("cockpit scribe", () => {
     expect(r.stderr).toContain("--text");
   });
 
-  test("--recent with no prior log exits 0 and prints nothing", () => {
+  test("--recent with no prior log SAYS so instead of printing nothing", () => {
     const r = run(["scribe", "--session", SID, "--recent"]);
     expect(r.code).toBe(0);
-    expect(r.stdout.trim()).toBe("");
+    // Silence would read as "no history", which invites a duplicate entry.
+    expect(r.stdout).toContain("no decision log yet");
+    expect(r.stdout).toContain(SID);
+  });
+
+  test("--recent reports an unresolvable session instead of printing nothing", () => {
+    // No --session, no session env var, and no transcript for this temp cwd.
+    const r = run(["scribe", "--recent"], projectDir, {
+      CLAUDE_CODE_SESSION_ID: "",
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("no session resolved");
+  });
+
+  test("--recent says so when the log holds no scribe entries", () => {
+    run(["log", "--session", SID, "--decision", "agent-only", "--reason", "r"]);
+
+    const r = run(["scribe", "--session", SID, "--recent"]);
+
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("no scribe entries yet");
+  });
+
+  test("--recent finds the trail via the registry when cwd points elsewhere", () => {
+    // Write the trail from the project, then read from an unrelated cwd: the
+    // cwd-derived path misses, and only the registry knows where it landed.
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "decision",
+      "--title",
+      "registry-found-me",
+      "--text",
+      "body",
+    ]);
+    const elsewhere = mkdtempSync(join(tmpdir(), "cockpit-elsewhere-"));
+
+    const r = run(["scribe", "--session", SID, "--recent"], elsewhere);
+
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("registry-found-me");
+  });
+
+  test("--recent flags a split trail and merges both logs in time order", () => {
+    run([
+      "scribe",
+      "--session",
+      SID,
+      "--type",
+      "decision",
+      "--title",
+      "first-here",
+      "--text",
+      "body",
+    ]);
+    // A second .cockpit under a subdir is exactly what a drifted cwd creates.
+    const sub = join(projectDir, "sub");
+    mkdirSync(join(sub, ".cockpit", "logs"), { recursive: true });
+    run(
+      [
+        "scribe",
+        "--session",
+        SID,
+        "--type",
+        "caveat",
+        "--title",
+        "then-there",
+        "--text",
+        "body",
+      ],
+      sub,
+    );
+
+    const r = run(["scribe", "--session", SID, "--recent"]);
+
+    expect(r.stdout).toContain("SPLIT across several logs");
+    expect(r.stdout.indexOf("first-here")).toBeLessThan(
+      r.stdout.indexOf("then-there"),
+    );
   });
 
   test("--recent prints only scribe entries, not agent entries", () => {
