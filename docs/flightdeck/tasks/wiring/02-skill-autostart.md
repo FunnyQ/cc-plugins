@@ -6,7 +6,7 @@
 >
 > **Depends on**: server/03
 > **Blocks**: wiring/03
-> **Status**: in-progress (attempt 3)
+> **Status**: done
 
 ## Goal
 

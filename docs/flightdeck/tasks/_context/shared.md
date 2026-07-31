@@ -69,6 +69,17 @@ This list is the complete planned file set, and it is authoritative for **placem
 names. A task that needs one more small module may add it beside these; a task must not move code
 outside this tree or invent a second scripts directory.
 
+### Write the Status value bare
+
+The header line must read exactly `> **Status**: in-progress` or `> **Status**: done`. Never decorate
+the value — no `in-progress (attempt 3)`, no `done ✓`, no trailing note.
+
+`mark-done.ts` matches `[A-Za-z-]+` to the end of the line. A parenthetical suffix makes that match
+fail, so the script leaves the line untouched, ticks the checkboxes anyway, and **still exits 0**. The
+task then passes its gate while `next-ready.ts` keeps reporting it unfinished, every dependent task
+stays blocked, and the run ends early reporting success. Put attempt numbers in the flightlog note,
+never in the Status line.
+
 ### Never touch another task's files
 
 Write only to the files in your own task's "Files to create / modify" list. **Never delete, move, or

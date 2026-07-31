@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/03, contract/02
 > **Blocks**: server/05, ui/02
-> **Status**: in-progress (retry 2)
+> **Status**: done
 
 ## Goal
 
