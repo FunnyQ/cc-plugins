@@ -11,10 +11,12 @@ import {
   buildPromptFile,
 } from "./relay-prompt";
 import {
+  collectLive,
   DEFAULT_WAIT_TIMEOUT_MS,
   liveGate,
   resolveHerdScript,
   runLive,
+  type CollectLiveOpts,
   type LiveRunResult,
   type RunLiveOpts,
 } from "./live";
@@ -69,6 +71,7 @@ export type RelayDeps = {
   env: Record<string, string | undefined>;
   resolveHerdScript: () => string | null;
   runLive: (opts: RunLiveOpts) => Promise<LiveRunResult>;
+  collectLive: (opts: CollectLiveOpts) => Promise<LiveRunResult>;
 };
 
 export type RelayExecution = {
@@ -86,6 +89,7 @@ function usage(backends: string): string {
   return [
     `Usage: relay <${backends}> <delegate|review|image> [flags]`,
     `       relay config set-model <${backends}> <delegate|review|image> <model>`,
+    `       relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]`,
     "flags: --task <text> | --files <csv> | --model <provider/model>",
     "       --out <path> | --git-scope <s> | --no-project",
     "       --prompt-file <p> | --dangerous",
@@ -257,6 +261,113 @@ function promptTextForMode(flags: RelayFlags, positional: string): string {
   return flags.task ?? positional;
 }
 
+const COLLECT_USAGE =
+  "Usage: relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]\n";
+
+/**
+ * `relay collect` — reattach to a live pane a previous run left pending.
+ *
+ * A pending report means the delegate outlived relay's watch, not that it
+ * failed. Killing it would throw away real work; starting over would put two
+ * writers on one working tree. So collect resumes watching the SAME pane for
+ * another bounded window, and is safe to repeat: a task may take far longer
+ * than any single call's timeout while every call still returns promptly.
+ *
+ * Backend-free by design — polling a pane needs no CLI, no prompt, no model —
+ * so it sits beside `config` as a top-level subcommand rather than a Mode.
+ */
+async function executeCollectCommand(
+  argv: string[],
+  deps: RelayDeps,
+): Promise<RelayExecution> {
+  const rest = argv.slice(1);
+  let agentName: string | undefined;
+  let resultPath: string | undefined;
+  let waitTimeoutMs = DEFAULT_WAIT_TIMEOUT_MS;
+  let keepPane = false;
+
+  try {
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (arg === "--agent") {
+        agentName = requireValue(rest, i, arg);
+        i++;
+      } else if (arg === "--result") {
+        resultPath = requireValue(rest, i, arg);
+        i++;
+      } else if (arg === "--wait-timeout") {
+        const value = Number(requireValue(rest, i, arg));
+        if (!Number.isFinite(value) || value <= 0) {
+          throw new UsageError(
+            "--wait-timeout must be a positive number of milliseconds",
+          );
+        }
+        waitTimeoutMs = value;
+        i++;
+      } else if (arg === "--keep-pane") {
+        keepPane = true;
+      } else {
+        throw new UsageError(`Unknown flag: ${arg}`);
+      }
+    }
+  } catch (error) {
+    deps.stderr(
+      `${error instanceof Error ? error.message : String(error)}\n${COLLECT_USAGE}`,
+    );
+    return { code: 1 };
+  }
+
+  if (!agentName) {
+    deps.stderr(`collect requires --agent <name>\n${COLLECT_USAGE}`);
+    return { code: 1 };
+  }
+  if (!resultPath) {
+    deps.stderr(`collect requires --result <path>\n${COLLECT_USAGE}`);
+    return { code: 1 };
+  }
+
+  const herdScriptPath = deps.resolveHerdScript();
+  if (!herdScriptPath) {
+    deps.stderr(
+      "collect needs herd.ts (herdr plugin missing?) — nothing to reattach to\n",
+    );
+    return { code: 1 };
+  }
+
+  const result = await deps.collectLive({
+    agentName,
+    herdScriptPath,
+    resultPath,
+    waitTimeoutMs,
+    keepPane,
+  });
+
+  if (result.ok) {
+    if (!result.text.trim()) {
+      deps.stderr("Collected an empty result\n");
+      return { code: 1, agentName: result.agentName };
+    }
+    deps.stdout(result.text);
+    deps.stderr(
+      `\n[relay live] agent ${result.agentName} — ${
+        keepPane ? "pane left open" : "pane closed after verified result"
+      }\n`,
+    );
+    return { code: 0, agentName: result.agentName };
+  }
+
+  if (result.pending) {
+    // Still running after another window — still not a failure.
+    deps.stdout(result.report);
+    return { code: 0, agentName: result.agentName, pending: true };
+  }
+
+  // Never fall back to a fresh run here: the pane may still be editing the
+  // working tree, and a second writer is worse than a reported failure.
+  deps.stderr(`Collect failed: ${result.error}\n`);
+  return { code: 1, agentName: result.agentName };
+}
+
 export async function executeRelay(
   argv: string[],
   deps: RelayDeps = {
@@ -280,6 +391,7 @@ export async function executeRelay(
     env: process.env,
     resolveHerdScript: () => resolveHerdScript(),
     runLive: (opts) => runLive(opts),
+    collectLive: (opts) => collectLive(opts),
   },
 ): Promise<RelayExecution> {
   let parsed: ParsedFlags;
@@ -287,6 +399,10 @@ export async function executeRelay(
 
   if (argv[0] === "config") {
     return executeConfigCommand(argv, deps, availableBackends);
+  }
+
+  if (argv[0] === "collect") {
+    return executeCollectCommand(argv, deps);
   }
 
   try {

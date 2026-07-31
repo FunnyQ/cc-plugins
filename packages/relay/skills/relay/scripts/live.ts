@@ -17,12 +17,32 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { dirname, join } from "path";
 import { homedir } from "os";
+import { fileURLToPath } from "url";
 import type { Backend, LiveSpec, Mode } from "./types";
 import { RESULT_END_MARKER } from "./relay-prompt";
 
 export const DEFAULT_WAIT_TIMEOUT_MS = 600_000; // 10 min
 export const POLL_INTERVAL_MS = 5_000;
 export const SPAWN_IDLE_WAIT_MS = 20_000;
+
+// relay.ts is this file's sibling by construction, so the pending report can
+// print a runnable `relay collect` line without relay.ts plumbing its own path
+// down here. fileURLToPath, NOT url.pathname: a plugin cache under a directory
+// with a space arrives percent-encoded, and %20 in a printed command is a path
+// that does not exist.
+const RELAY_SCRIPT_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "relay.ts",
+);
+
+// Quote a value for a command line we PRINT for someone to copy. Bare when it
+// is already shell-safe (the common case, so reports stay readable); single
+// quoted otherwise, since install paths really do contain spaces.
+export function shellArg(value: string): string {
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value)
+    ? value
+    : `'${value.replaceAll("'", `'\\''`)}'`;
+}
 
 // ---------------------------------------------------------------------------
 // herd.ts locator
@@ -39,7 +59,10 @@ export type LocatorDeps = {
 export function defaultLocatorDeps(): LocatorDeps {
   return {
     env: process.env,
-    scriptDir: dirname(new URL(import.meta.url).pathname),
+    // fileURLToPath, not url.pathname: an install path containing a space
+    // arrives percent-encoded, and the sibling probe would then miss herd.ts
+    // and silently fall back to headless.
+    scriptDir: dirname(fileURLToPath(import.meta.url)),
     homeDir: homedir(),
     fileExists: existsSync,
     listDir: (path) => {
@@ -324,6 +347,19 @@ export type LiveRunResult =
   | { ok: false; pending: true; agentName: string; report: string }
   | { ok: false; pending: false; agentName?: string; error: string };
 
+// Everything the result poll needs, independent of HOW the pane got there.
+// `selfHeal` is present only on the spawn path: re-delivering a bootstrap makes
+// sense only for a pane we just created, never for one already mid-task.
+type PollContext = {
+  agentName: string;
+  herdScriptPath: string;
+  resultPath: string;
+  waitTimeoutMs: number;
+  keepPane: boolean;
+  label: string; // "codex delegate" | "collect"
+  selfHeal?: { bootstrapText: string };
+};
+
 export type RunLiveOpts = {
   backend: string;
   mode: Mode;
@@ -336,6 +372,16 @@ export type RunLiveOpts = {
   keepPane: boolean;
   env?: string[];
   callerEnv: Record<string, string | undefined>;
+};
+
+// Reattach to a pane that is already running — no spawn, no bootstrap, so no
+// backend/spec/cwd is needed. Everything here comes off a pending report.
+export type CollectLiveOpts = {
+  agentName: string;
+  herdScriptPath: string;
+  resultPath: string;
+  waitTimeoutMs: number;
+  keepPane: boolean;
 };
 
 export type RunLiveDeps = {
@@ -370,24 +416,28 @@ export function extractFinalText(content: string): string | null {
   return lines.slice(0, -1).join("\n").trimEnd();
 }
 
-function pendingReport(
-  opts: RunLiveOpts,
-  agentName: string,
-  elapsedMs: number,
-): string {
-  const herd = `bun ${opts.herdScriptPath}`;
+function pendingReport(ctx: PollContext, elapsedMs: number): string {
+  const herd = `bun ${shellArg(ctx.herdScriptPath)}`;
+  const agent = shellArg(ctx.agentName);
+  const result = shellArg(ctx.resultPath);
+  // Carry --keep-pane forward: without it a copied collect command would close
+  // a pane the original caller explicitly asked to keep.
+  const keep = ctx.keepPane ? " --keep-pane" : "";
   return [
-    `Live ${opts.backend} ${opts.mode} still running after ${Math.round(elapsedMs / 1000)}s — this is NOT a failure.`,
+    `Live ${ctx.label} still running after ${Math.round(elapsedMs / 1000)}s — this is NOT a failure.`,
     `The pane was left open; the agent keeps working.`,
     ``,
-    `Agent: ${agentName}`,
-    `Result file: ${opts.resultPath}`,
+    `Agent: ${ctx.agentName}`,
+    `Result file: ${ctx.resultPath}`,
     ``,
-    `Follow up with:`,
-    `  ${herd} wait ${agentName} --timeout ${opts.waitTimeoutMs}   # block until it settles`,
-    `  cat ${opts.resultPath}   # collect the answer once written`,
-    `  ${herd} read ${agentName}                  # read the pane (holds the answer if result.md was never written)`,
-    `  ${herd} close ${agentName}                 # close the pane when done`,
+    `Keep waiting — this reattaches to the SAME pane, and is repeatable:`,
+    `  bun ${shellArg(RELAY_SCRIPT_PATH)} collect --agent ${agent} --result ${result} --wait-timeout ${ctx.waitTimeoutMs}${keep}`,
+    ``,
+    `Or drive the pane by hand:`,
+    `  cat ${result}   # collect the answer once written`,
+    `  ${herd} read ${agent}                  # read the pane (holds the answer if result.md was never written)`,
+    `  ${herd} close ${agent}                 # close the pane when done`,
+    `  ${herd} wait ${agent} --timeout ${ctx.waitTimeoutMs}   # blocks until \`idle\` ONLY — codex parks at \`done\`, so prefer collect`,
     ``,
   ].join("\n");
 }
@@ -514,9 +564,90 @@ export async function runLive(
       `  bun ${opts.herdScriptPath} read ${agentName}   # read the pane if result.md is missing\n`,
   );
 
+  return pollForResult(
+    herd,
+    {
+      agentName,
+      herdScriptPath: opts.herdScriptPath,
+      resultPath: opts.resultPath,
+      waitTimeoutMs: opts.waitTimeoutMs,
+      keepPane: opts.keepPane,
+      label: `${opts.backend} ${opts.mode}`,
+      selfHeal: { bootstrapText: opts.bootstrapText },
+    },
+    deps,
+  );
+}
+
+/**
+ * Reattach to an ALREADY-RUNNING live pane and poll for its result.
+ *
+ * This is the follow-up to a pending report: relay stopped watching, but the
+ * delegate kept working. Rather than killing it (losing the work) or declaring
+ * failure (spawning a second writer for the same task), the caller runs this
+ * for another bounded window — repeatably, so a task may take as long as it
+ * takes while every individual call still returns inside the caller's own
+ * timeout cap.
+ *
+ * It reuses runLive's settled+marker contract exactly, which is the point:
+ * `done` counts as settled, so it does not repeat the `herd wait --until idle`
+ * trap of never noticing a finished codex.
+ */
+export async function collectLive(
+  opts: CollectLiveOpts,
+  deps: RunLiveDeps = defaultRunLiveDeps(),
+): Promise<LiveRunResult> {
+  let herd: HerdClient;
+  try {
+    herd = await deps.loadHerd(opts.herdScriptPath);
+  } catch (error) {
+    return {
+      ok: false,
+      pending: false,
+      error: `failed to load herd.ts: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  // Probe once before committing to a long poll. Inside the loop a get()
+  // failure is treated as a transient herdr hiccup, so a typo'd or already-
+  // closed agent would otherwise burn the whole window before reporting.
+  try {
+    await herd.get(opts.agentName);
+  } catch (error) {
+    return {
+      ok: false,
+      pending: false,
+      error: `cannot reattach to ${opts.agentName}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  return pollForResult(
+    herd,
+    {
+      agentName: opts.agentName,
+      herdScriptPath: opts.herdScriptPath,
+      resultPath: opts.resultPath,
+      waitTimeoutMs: opts.waitTimeoutMs,
+      keepPane: opts.keepPane,
+      label: "collect",
+    },
+    deps,
+  );
+}
+
+// Poll a live pane until it settles with a verified result, or the budget runs
+// out. Shared by the spawn path (runLive) and the reattach path (collectLive).
+async function pollForResult(
+  herd: HerdClient,
+  ctx: PollContext,
+  deps: RunLiveDeps,
+): Promise<LiveRunResult> {
+  const agentName = ctx.agentName;
+
   // Stable head/tail tokens of the bootstrap, used to detect whether the line
   // is sitting in the pane's input box (fully, partially, or not at all).
-  const bootWords = opts.bootstrapText.trim().split(/\s+/);
+  const bootstrapText = ctx.selfHeal?.bootstrapText ?? "";
+  const bootWords = bootstrapText.trim().split(/\s+/);
   const bootHead = bootWords.slice(0, 3).join(" ");
   const bootTail = bootWords.slice(-3).join(" ");
 
@@ -528,9 +659,11 @@ export async function runLive(
   // idle and no result file exists, inspect the input box (at most twice) and
   // act on what's actually there instead of blindly re-sending — a blind
   // re-send would DUPLICATE the instruction when the text is already present.
-  let sawActivity = false;
-  let nudgesLeft = 2;
-  while (deps.now() - start < opts.waitTimeoutMs) {
+  // No self-heal on the reattach path: the pane is already mid-task, so a
+  // re-send would duplicate the instruction into a working agent.
+  let sawActivity = !ctx.selfHeal;
+  let nudgesLeft = ctx.selfHeal ? 2 : 0;
+  while (deps.now() - start < ctx.waitTimeoutMs) {
     await deps.sleep(POLL_INTERVAL_MS);
 
     let status = "unknown";
@@ -554,10 +687,10 @@ export async function runLive(
     // Complete only when the agent has settled AND the marker landed — a marker
     // while still working means the file may be a partial/older write.
     if (!settled) continue;
-    if (deps.fileExists(opts.resultPath)) {
-      const text = extractFinalText(deps.readFile(opts.resultPath));
+    if (deps.fileExists(ctx.resultPath)) {
+      const text = extractFinalText(deps.readFile(ctx.resultPath));
       if (text !== null) {
-        if (!opts.keepPane) {
+        if (!ctx.keepPane) {
           try {
             await herd.close(agentName);
           } catch (error) {
@@ -605,7 +738,7 @@ export async function runLive(
           /* best-effort */
         }
         try {
-          await herd.send(agentName, opts.bootstrapText);
+          await herd.send(agentName, bootstrapText);
         } catch {
           /* best-effort */
         }
@@ -614,7 +747,7 @@ export async function runLive(
           `[relay live] ${agentName}: idle with no result yet — re-sending the bootstrap (it may not have been delivered)\n`,
         );
         try {
-          await herd.send(agentName, opts.bootstrapText);
+          await herd.send(agentName, bootstrapText);
         } catch {
           /* best-effort */
         }
@@ -641,6 +774,6 @@ export async function runLive(
     ok: false,
     pending: true,
     agentName,
-    report: pendingReport(opts, agentName, deps.now() - start),
+    report: pendingReport(ctx, deps.now() - start),
   };
 }
