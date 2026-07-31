@@ -1,24 +1,21 @@
-const SCORE_MAX = 5;
-const RUBRIC_SCORE_MAX = 5;
-const PERCENT_MAX = 100;
-
-function clamp(value, maximum) {
-  return Math.min(Math.max(Number(value) || 0, 0), maximum);
-}
-
-function percentage(value, maximum = SCORE_MAX) {
-  return `${(clamp(value, maximum) / maximum) * PERCENT_MAX}%`;
-}
+import { formatScore, percent, scoreClass, weightWidth } from "./format.js";
 
 export function buildLanes(tree) {
   const tasks = Array.isArray(tree?.tasks) ? tree.tasks : [];
+  const byBucket = new Map();
+
+  for (const task of tasks) {
+    const laneTasks = byBucket.get(task.bucket);
+    if (laneTasks) laneTasks.push(task);
+    else byBucket.set(task.bucket, [task]);
+  }
 
   return [...(tree?.buckets ?? [])]
     .sort((left, right) => left.localeCompare(right))
     .map((bucket) => {
-      const laneTasks = tasks
-        .filter((task) => task.bucket === bucket)
-        .sort((left, right) => left.nn.localeCompare(right.nn, undefined, { numeric: true }));
+      const laneTasks = (byBucket.get(bucket) ?? []).sort((left, right) =>
+        left.nn.localeCompare(right.nn, undefined, { numeric: true }),
+      );
 
       return {
         bucket,
@@ -81,7 +78,7 @@ export function Lanes({ tree }) {
                   <div v-for="dimension in task.latestScore.breakdown" :key="dimension.name" class="dimension">
                     <span class="label">{{ dimension.name }}</span>
                     <span class="bar" :style="{ inlineSize: weightWidth(dimension.weight, task.latestScore.breakdown) }">
-                      <span class="fill" :style="{ inlineSize: rubricScoreWidth(dimension.score) }"></span>
+                      <span class="fill" :style="{ inlineSize: scorePosition(dimension.score) }"></span>
                     </span>
                     <span class="score">{{ formatScore(dimension.score) }}</span>
                   </div>
@@ -108,23 +105,11 @@ export function Lanes({ tree }) {
     hasBreakdown(task) {
       return Boolean(task.latestScore?.breakdown?.length);
     },
-    scoreClass(score) {
-      if (score.hardFailed) return "-failed";
-      if (score.passed) return "-passed";
-      return "-pending";
-    },
+    scoreClass,
     scorePosition(value) {
-      return percentage(value);
+      return percent(value);
     },
-    rubricScoreWidth(score) {
-      return percentage(score, RUBRIC_SCORE_MAX);
-    },
-    weightWidth(weight, breakdown) {
-      const largestWeight = Math.max(...breakdown.map((dimension) => dimension.weight), 1);
-      return percentage(weight, largestWeight);
-    },
-    formatScore(score) {
-      return Number(score).toFixed(2);
-    },
+    weightWidth,
+    formatScore,
   };
 }

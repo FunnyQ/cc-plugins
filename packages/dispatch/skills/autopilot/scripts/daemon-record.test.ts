@@ -57,7 +57,7 @@ describe("daemon record", () => {
     expect(readRecord()).toBeNull();
   });
 
-  test.each(["{\"pid\":", "not json"])(
+  test.each(['{"pid":', "not json"])(
     "returns null for an invalid record",
     (contents) => {
       writeRecord({ pid: 1, port: 1, root: "/tmp", plan: "/tmp/plan" });
@@ -66,6 +66,28 @@ describe("daemon record", () => {
       expect(readRecord()).toBeNull();
     },
   );
+
+  test.each([
+    ["missing pid", { port: 5757, root: "/tmp", plan: "/tmp/plan" }],
+    [
+      "non-integer pid",
+      { pid: 1.5, port: 5757, root: "/tmp", plan: "/tmp/plan" },
+    ],
+    [
+      "out-of-range port",
+      { pid: 1, port: 70000, root: "/tmp", plan: "/tmp/plan" },
+    ],
+    [
+      "relative root",
+      { pid: 1, port: 5757, root: "scripts", plan: "/tmp/plan" },
+    ],
+    ["missing plan", { pid: 1, port: 5757, root: "/tmp" }],
+  ])("returns null for a record with a %s", (_name, record) => {
+    writeRecord({ pid: 1, port: 1, root: "/tmp", plan: "/tmp/plan" });
+    writeFileSync(recordPath(), JSON.stringify(record));
+
+    expect(readRecord()).toBeNull();
+  });
 
   test("honors XDG_DATA_HOME", () => {
     expect(recordPath()).toBe(

@@ -1,8 +1,12 @@
+import {
+  escapeHtml,
+  formatScore,
+  percent,
+  scoreClass,
+  weightWidth,
+} from "./format.js";
+
 const MAX_ROWS = 200;
-// SCORE_MAX is the rubric scale, documented in the Eval rubric. ScoreEntry.weighted
-// is on this scale (0–5). The meter display must match this scale for visual accuracy.
-// If this value changes, meter thresholds and all score calculations must be reviewed.
-const SCORE_MAX = 5;
 const expandedRows = new Set();
 
 // Why we render rows as given: The server owns all derivation — pairing, ordering,
@@ -12,37 +16,19 @@ const expandedRows = new Set();
 // implementation in the browser would drift from the first the moment either changed,
 // and the two would disagree about something the user is watching in real time.
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function percent(value, maximum = SCORE_MAX) {
-  const number = Math.min(Math.max(Number(value) || 0, 0), maximum);
-  return `${(number / maximum) * 100}%`;
-}
-
-function scoreClass(score) {
-  if (score.hardFailed) return "-failed";
-  if (score.passed) return "-passed";
-  return "-pending";
-}
-
 function renderScore(score) {
   if (!score) return "";
 
-  const failure = score.hardFailed ? '<span class="failure">hard fail</span>' : "";
+  const failure = score.hardFailed
+    ? '<span class="failure">hard fail</span>'
+    : "";
   return `
     <span class="c-fleet-score ${scoreClass(score)}">
       <span class="track" aria-hidden="true">
         <span class="fill" style="inline-size: ${percent(score.weighted)}"></span>
         <span class="threshold" style="inset-inline-start: ${percent(score.threshold)}"></span>
       </span>
-      <span class="value">${Number(score.weighted).toFixed(2)}</span>
+      <span class="value">${formatScore(score.weighted)}</span>
       ${failure}
     </span>`;
 }
@@ -50,15 +36,19 @@ function renderScore(score) {
 function renderBreakdown(row) {
   if (!expandedRows.has(row.key) || !row.score?.breakdown?.length) return "";
 
-  const largestWeight = Math.max(...row.score.breakdown.map(({ weight }) => Number(weight) || 0), 1);
-  const dimensions = row.score.breakdown.map((dimension) => `
+  const breakdown = row.score.breakdown;
+  const dimensions = breakdown
+    .map(
+      (dimension) => `
     <div class="dimension">
       <span class="label">${escapeHtml(dimension.name)}</span>
-      <span class="bar" style="inline-size: ${percent(dimension.weight, largestWeight)}">
+      <span class="bar" style="inline-size: ${weightWidth(dimension.weight, breakdown)}">
         <span class="fill" style="inline-size: ${percent(dimension.score)}"></span>
       </span>
-      <span class="score">${Number(dimension.score).toFixed(2)}</span>
-    </div>`).join("");
+      <span class="score">${formatScore(dimension.score)}</span>
+    </div>`,
+    )
+    .join("");
 
   return `<div class="c-fleet-rubric" id="fleet-rubric-${escapeHtml(row.key)}">${dimensions}</div>`;
 }
@@ -66,7 +56,11 @@ function renderBreakdown(row) {
 function renderRow(row, nowMs) {
   const inFlight = isInFlight(row);
   const hardFailed = Boolean(row.score?.hardFailed);
-  const stateClass = hardFailed ? "-failed" : inFlight ? "-flight" : "-finished";
+  const stateClass = hardFailed
+    ? "-failed"
+    : inFlight
+      ? "-flight"
+      : "-finished";
   // The one derived value we own is the ticking elapsed display for an in-flight row.
   // A row that is still in flight arrives with startedAt set and elapsedMs undefined;
   // we tick it against the browser clock once per second for real-time feedback. Once
@@ -75,14 +69,25 @@ function renderRow(row, nowMs) {
   const elapsed = row.startedAt
     ? inFlight && row.elapsedMs === undefined
       ? formatElapsed(Date.parse(row.startedAt), undefined, nowMs)
-      : row.elapsedMs === undefined ? "" : formatElapsed(0, row.elapsedMs, 0)
+      : row.elapsedMs === undefined
+        ? ""
+        : formatElapsed(0, row.elapsedMs, 0)
     : "";
-  const unknownLabel = row.role === "unknown" ? `<span class="raw-label">${escapeHtml(row.label)}</span>` : "";
+  const unknownLabel =
+    row.role === "unknown"
+      ? `<span class="raw-label">${escapeHtml(row.label)}</span>`
+      : "";
   const expandable = Boolean(row.score?.breakdown?.length);
+  // A ticking row carries its own start time so the ticker can update this one
+  // cell without rebuilding the table and throwing away keyboard focus.
+  const ticking =
+    inFlight && row.startedAt && row.elapsedMs === undefined
+      ? ` data-started-at="${escapeHtml(row.startedAt)}"`
+      : "";
 
   return `
     <div class="fleet-row ${stateClass}${expandable ? " -expandable" : ""}" role="row"
-      data-row-key="${escapeHtml(row.key)}" tabindex="${expandable ? "0" : "-1"}"
+      data-row-key="${escapeHtml(row.key)}"${ticking} tabindex="${expandable ? "0" : "-1"}"
       aria-expanded="${expandable ? expandedRows.has(row.key) : false}">
       <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : "finished"}"></span></span>
       <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${unknownLabel}</span>
@@ -114,7 +119,8 @@ export function connectEvents({ onFleet, onState }) {
 }
 
 export function formatElapsed(startedMs, endedMs, nowMs) {
-  const elapsedMs = endedMs === undefined ? nowMs - startedMs : endedMs - startedMs;
+  const elapsedMs =
+    endedMs === undefined ? nowMs - startedMs : endedMs - startedMs;
   const seconds = Math.max(0, elapsedMs) / 1_000;
   if (seconds < 60) return `${seconds.toFixed(1)}s`;
   return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
@@ -124,17 +130,40 @@ export function isInFlight(row) {
   return row.status === "in-flight";
 }
 
+/** Advance the elapsed cell of every ticking row in place. */
+export function tickElapsed(root, nowMs = Date.now()) {
+  for (const row of root?.querySelectorAll?.("[data-started-at]") ?? []) {
+    const cell = row.querySelector(".fleet-cell.-elapsed");
+    if (!cell) continue;
+    cell.textContent = formatElapsed(
+      Date.parse(row.dataset.startedAt),
+      undefined,
+      nowMs,
+    );
+  }
+}
+
 export function toggleRubric(rowKey) {
   if (expandedRows.has(rowKey)) expandedRows.delete(rowKey);
   else expandedRows.add(rowKey);
 }
 
-export function renderFleet(rows, entryCount, logPresent, connectionState, onRowClick) {
+export function renderFleet(
+  rows,
+  entryCount,
+  logPresent,
+  connectionState,
+  onRowClick,
+) {
   const visibleRows = Array.isArray(rows) ? rows.slice(0, MAX_ROWS) : [];
   const hiddenCount = Math.max((rows?.length ?? 0) - visibleRows.length, 0);
-  const stateLabel = connectionState === "reconnecting"
-    ? "reconnecting"
-    : logPresent ? "live" : "waiting for the run";
+  const stateLabel =
+    connectionState === "reconnecting"
+      ? "reconnecting"
+      : logPresent
+        ? "live"
+        : "waiting for the run";
+  const nowMs = Date.now();
   const root = document.createElement("div");
   root.className = "c-fleet";
   root.innerHTML = `
@@ -151,7 +180,7 @@ export function renderFleet(rows, entryCount, logPresent, connectionState, onRow
         <span role="columnheader">Verdict</span><span role="columnheader">Message</span>
       </div>
       <div class="fleet-body" role="rowgroup">
-        ${visibleRows.map((row) => renderRow(row, Date.now())).join("") || '<p class="fleet-empty">No agents seen yet.</p>'}
+        ${visibleRows.map((row) => renderRow(row, nowMs)).join("") || '<p class="fleet-empty">No agents seen yet.</p>'}
       </div>
     </div>
     ${hiddenCount ? `<p class="hidden-count">${hiddenCount} older rows hidden</p>` : ""}`;
@@ -161,7 +190,10 @@ export function renderFleet(rows, entryCount, logPresent, connectionState, onRow
     if (row) onRowClick?.(row.dataset.rowKey);
   });
   root.addEventListener("keydown", (event) => {
-    if ((event.key === "Enter" || event.key === " ") && event.target.matches(".fleet-row[data-row-key]")) {
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      event.target.matches(".fleet-row[data-row-key]")
+    ) {
       event.preventDefault();
       onRowClick?.(event.target.dataset.rowKey);
     }

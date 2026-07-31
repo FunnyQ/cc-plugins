@@ -67,12 +67,30 @@ const task = (
 describe("parseAgentLabel", () => {
   test.each([
     ["scout-wave-3", { role: "scout", wave: 3, raw: "scout-wave-3" }],
-    ["dev:ui/03#2", { role: "dev", ref: "ui/03", attempt: 2, raw: "dev:ui/03#2" }],
-    ["dev-codex:ui/03#2", { role: "dev", ref: "ui/03", attempt: 2, raw: "dev-codex:ui/03#2" }],
-    ["verify:ui/03#2", { role: "verify", ref: "ui/03", attempt: 2, raw: "verify:ui/03#2" }],
-    ["judge:ui/03#2", { role: "judge", ref: "ui/03", attempt: 2, raw: "judge:ui/03#2" }],
-    ["review:reuse#1", { role: "review", lens: "reuse", attempt: 1, raw: "review:reuse#1" }],
-    ["fix:ui/03#1", { role: "fix", ref: "ui/03", attempt: 1, raw: "fix:ui/03#1" }],
+    [
+      "dev:ui/03#2",
+      { role: "dev", ref: "ui/03", attempt: 2, raw: "dev:ui/03#2" },
+    ],
+    [
+      "dev-codex:ui/03#2",
+      { role: "dev", ref: "ui/03", attempt: 2, raw: "dev-codex:ui/03#2" },
+    ],
+    [
+      "verify:ui/03#2",
+      { role: "verify", ref: "ui/03", attempt: 2, raw: "verify:ui/03#2" },
+    ],
+    [
+      "judge:ui/03#2",
+      { role: "judge", ref: "ui/03", attempt: 2, raw: "judge:ui/03#2" },
+    ],
+    [
+      "review:reuse#1",
+      { role: "review", lens: "reuse", attempt: 1, raw: "review:reuse#1" },
+    ],
+    [
+      "fix:ui/03#1",
+      { role: "fix", ref: "ui/03", attempt: 1, raw: "fix:ui/03#1" },
+    ],
     ["done:ui/03", { role: "done", ref: "ui/03", raw: "done:ui/03" }],
     ["block:ui/03", { role: "block", ref: "ui/03", raw: "block:ui/03" }],
     ["commit-post-loop", { role: "commit", raw: "commit-post-loop" }],
@@ -95,15 +113,22 @@ describe("parseAgentLabel", () => {
 
 describe("deriveTaskViews", () => {
   test("applies status precedence and keeps blockedBy off non-blocked rows", () => {
-    const views = deriveTaskViews({
-      "a/01": task("a/01", "done", ["missing/01"]),
-      "a/02": task("a/02", "blocked", ["a/01"]),
-      "a/03": task("a/03", "in-progress", ["missing/01"]),
-      "a/04": task("a/04", "todo", ["a/01"]),
-      "a/05": task("a/05", "todo", ["a/04", "missing/01"]),
-    }, []);
+    const views = deriveTaskViews(
+      {
+        "a/01": task("a/01", "done", ["missing/01"]),
+        "a/02": task("a/02", "blocked", ["a/01"]),
+        "a/03": task("a/03", "in-progress", ["missing/01"]),
+        "a/04": task("a/04", "todo", ["a/01"]),
+        "a/05": task("a/05", "todo", ["a/04", "missing/01"]),
+      },
+      [],
+    );
     expect(views.map((view) => view.state)).toEqual([
-      "done", "blocked", "in-progress", "ready", "blocked",
+      "done",
+      "blocked",
+      "in-progress",
+      "ready",
+      "blocked",
     ]);
     expect(views[0].blockedBy).toEqual([]);
     expect(views[2].blockedBy).toEqual([]);
@@ -125,6 +150,81 @@ describe("deriveTaskViews", () => {
     expect(view.state).toBe("in-progress");
     expect(view.attempts).toBe(2);
     expect(view.latestScore?.weighted).toBe(4.7);
+  });
+
+  test("keeps a task in progress until every parallel lens has ended", () => {
+    const lenses = [
+      "simplification",
+      "reuse",
+      "altitude",
+      "codex",
+      "efficiency",
+    ];
+    const entries = [
+      ...lenses.map((lens, index) =>
+        note(
+          "close/01",
+          "review",
+          1,
+          `2026-01-01T00:0${index}:00Z`,
+          "start",
+          `review:${lens}#1`,
+        ),
+      ),
+      note(
+        "close/01",
+        "review",
+        1,
+        "2026-01-01T00:10:00Z",
+        "end",
+        "review:reuse#1",
+      ),
+    ];
+
+    const [view] = deriveTaskViews({ "close/01": task("close/01") }, entries);
+
+    expect(view.state).toBe("in-progress");
+  });
+
+  test("leaves a task ready once every parallel lens has ended", () => {
+    const entries = [
+      note(
+        "close/01",
+        "review",
+        1,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "review:reuse#1",
+      ),
+      note(
+        "close/01",
+        "review",
+        1,
+        "2026-01-01T00:01:00Z",
+        "start",
+        "review:codex#1",
+      ),
+      note(
+        "close/01",
+        "review",
+        1,
+        "2026-01-01T00:02:00Z",
+        "end",
+        "review:reuse#1",
+      ),
+      note(
+        "close/01",
+        "review",
+        1,
+        "2026-01-01T00:03:00Z",
+        "end",
+        "review:codex#1",
+      ),
+    ];
+
+    const [view] = deriveTaskViews({ "close/01": task("close/01") }, entries);
+
+    expect(view.state).toBe("ready");
   });
 
   test("returns an empty view list for an empty tree", () => {
@@ -186,10 +286,54 @@ describe("aggregateFleet", () => {
       "2026-01-01T00:00:02Z",
       "2026-01-01T00:00:01Z",
     ]);
-    expect(rows.filter((row) => row.label === "same").map((row) => row.key)).toEqual([
-      "same#2", "same",
-    ]);
+    expect(
+      rows.filter((row) => row.label === "same").map((row) => row.key),
+    ).toEqual(["same#2", "same"]);
     expect(rows.find((row) => row.ref === "ui/01")?.score?.weighted).toBe(4.6);
+  });
+
+  test("attaches a verdict to the judge row without closing or duplicating it", () => {
+    const rows = aggregateFleet([
+      note(
+        "ui/03",
+        "judge",
+        1,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "judge:ui/03#1",
+      ),
+      score("ui/03", 1, "2026-01-01T00:00:02Z"),
+    ]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      key: "judge:ui/03#1",
+      status: "in-flight",
+    });
+    expect(rows[0].score?.weighted).toBe(4.6);
+  });
+
+  test("closes the judge row on its end note, not on its verdict", () => {
+    const rows = aggregateFleet([
+      note(
+        "ui/03",
+        "judge",
+        1,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "judge:ui/03#1",
+      ),
+      score("ui/03", 1, "2026-01-01T00:00:02Z"),
+      note("ui/03", "judge", 1, "2026-01-01T00:00:03Z", "end", "judge:ui/03#1"),
+    ]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      key: "judge:ui/03#1",
+      status: "finished",
+      elapsedMs: 3000,
+    });
+    expect(rows[0].score?.weighted).toBe(4.6);
   });
 
   test("uses first appearance to break equal timestamp ties", () => {
@@ -197,14 +341,27 @@ describe("aggregateFleet", () => {
       note("ui/01", "dev", 1, "2026-01-01T00:00:00Z"),
       note("ui/02", "dev", 1, "2026-01-01T00:00:00Z"),
     ];
-    expect(aggregateFleet(entries).map((row) => row.ref)).toEqual(["ui/01", "ui/02"]);
-    expect(aggregateFleet(entries).map((row) => row.ref)).toEqual(["ui/01", "ui/02"]);
+    expect(aggregateFleet(entries).map((row) => row.ref)).toEqual([
+      "ui/01",
+      "ui/02",
+    ]);
+    expect(aggregateFleet(entries).map((row) => row.ref)).toEqual([
+      "ui/01",
+      "ui/02",
+    ]);
   });
 
   test("handles empty and semantically odd logs without throwing", () => {
     expect(aggregateFleet([])).toEqual([]);
-    expect(() => aggregateFleet([
-      { kind: "note", ts: "bad", task: "outside/01", message: "odd" } as FlightlogEntry,
-    ])).not.toThrow();
+    expect(() =>
+      aggregateFleet([
+        {
+          kind: "note",
+          ts: "bad",
+          task: "outside/01",
+          message: "odd",
+        } as FlightlogEntry,
+      ]),
+    ).not.toThrow();
   });
 });

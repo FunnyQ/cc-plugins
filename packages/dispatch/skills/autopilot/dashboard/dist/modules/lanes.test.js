@@ -28,20 +28,25 @@ describe("Lanes", () => {
     expect(component.isExpanded("ui/02")).toBe(false);
     component.toggle("ui/02");
     expect(component.isExpanded("ui/02")).toBe(true);
-    expect(component.scoreClass({ passed: true, hardFailed: false })).toBe("-passed");
-    expect(component.scoreClass({ passed: true, hardFailed: true })).toBe("-failed");
-    expect(component.scoreClass({ passed: false, hardFailed: false })).toBe("-pending");
+    expect(component.scoreClass({ passed: true, hardFailed: false })).toBe(
+      "-passed",
+    );
+    expect(component.scoreClass({ passed: true, hardFailed: true })).toBe(
+      "-failed",
+    );
+    expect(component.scoreClass({ passed: false, hardFailed: false })).toBe(
+      "-pending",
+    );
   });
 
   test("scales score, threshold, rubric score, and dimension weight", () => {
     const component = Lanes({ tree });
-    const breakdown = [
-      { weight: 3 },
-      { weight: 1 },
-    ];
+    const breakdown = [{ weight: 3 }, { weight: 1 }];
 
     expect(component.scorePosition(4.1)).toBe("82%");
-    expect(component.rubricScoreWidth(4)).toBe("80%");
-    expect(Number.parseFloat(component.weightWidth(1, breakdown))).toBeCloseTo(100 / 3);
+    expect(component.scorePosition(4)).toBe("80%");
+    expect(Number.parseFloat(component.weightWidth(1, breakdown))).toBeCloseTo(
+      100 / 3,
+    );
   });
 });

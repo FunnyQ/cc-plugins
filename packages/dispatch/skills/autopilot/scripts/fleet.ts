@@ -77,11 +77,21 @@ const SCOUT = /^scout-wave-(\d+)$/;
 export function parseAgentLabel(label: string): ParsedLabel {
   let match = DEV_ENGINE.exec(label);
   if (match) {
-    return { role: "dev", ref: match[2], attempt: Number(match[3]), raw: label };
+    return {
+      role: "dev",
+      ref: match[2],
+      attempt: Number(match[3]),
+      raw: label,
+    };
   }
   match = DEV.exec(label);
   if (match) {
-    return { role: "dev", ref: match[1], attempt: Number(match[2]), raw: label };
+    return {
+      role: "dev",
+      ref: match[1],
+      attempt: Number(match[2]),
+      raw: label,
+    };
   }
   match = REF_ATTEMPT.exec(label);
   if (match) {
@@ -115,27 +125,79 @@ export function parseAgentLabel(label: string): ParsedLabel {
   return { role: "unknown", raw: label };
 }
 
-function entryIdentity(entry: FlightlogEntry): string | null {
-  if (entry.kind !== "note") return null;
-  return `${entry.task}|${entry.role}|${entry.attempt ?? "-"}`;
+/** The one place the fleet identity string is built. */
+function fleetIdentity(
+  task: string,
+  role: string,
+  attempt: number | undefined,
+): string {
+  return `${task}|${role}|${attempt ?? "-"}`;
 }
 
-function hasUnmatchedStart(ref: string, entries: FlightlogEntry[]): boolean {
-  const open = new Set<string>();
+type TaskAggregate = {
+  /** Open start count per identity — never a set. See `aggregateByTask`. */
+  openStarts: Map<string, number>;
+  attempts: number;
+  latestScore: ScoreEntry | null;
+};
+
+/**
+ * One pass over the whole trail, grouped by task.
+ *
+ * Parallel agents share a `(task, role, attempt)` identity — the five closing review
+ * lenses all log as `review` on the same attempt — so open starts are counted, not
+ * set-tracked. One end cancels exactly one start; otherwise the first lens to finish
+ * would take the task out of `in-progress` while four agents were still flying.
+ */
+function aggregateByTask(
+  entries: FlightlogEntry[],
+): Map<string, TaskAggregate> {
+  const byTask = new Map<string, TaskAggregate>();
+
   for (const entry of entries) {
-    if (entry.kind !== "note" || entry.task !== ref) continue;
-    const identity = entryIdentity(entry)!;
-    if (entry.phase === "start") open.add(identity);
-    else open.delete(identity);
+    let aggregate = byTask.get(entry.task);
+    if (aggregate === undefined) {
+      aggregate = { openStarts: new Map(), attempts: 0, latestScore: null };
+      byTask.set(entry.task, aggregate);
+    }
+
+    aggregate.attempts = Math.max(aggregate.attempts, entry.attempt ?? 0);
+
+    if (entry.kind === "score") {
+      if (
+        !aggregate.latestScore ||
+        entry.attempt > aggregate.latestScore.attempt
+      ) {
+        aggregate.latestScore = entry;
+      }
+      continue;
+    }
+
+    const identity = fleetIdentity(entry.task, entry.role, entry.attempt);
+    const open = aggregate.openStarts.get(identity) ?? 0;
+    if (entry.phase === "start") aggregate.openStarts.set(identity, open + 1);
+    else if (open > 0) aggregate.openStarts.set(identity, open - 1);
   }
-  return open.size > 0;
+
+  return byTask;
+}
+
+function hasOpenStart(aggregate: TaskAggregate | undefined): boolean {
+  if (aggregate === undefined) return false;
+  for (const count of aggregate.openStarts.values()) {
+    if (count > 0) return true;
+  }
+  return false;
 }
 
 export function deriveTaskViews(
   byRef: Record<string, ParsedTask>,
   entries: FlightlogEntry[],
 ): TaskView[] {
+  const byTask = aggregateByTask(entries);
+
   return Object.entries(byRef).map(([ref, task]) => {
+    const aggregate = byTask.get(ref);
     const dependsOn = task.dependsOn.map(refToString);
     const blocks = task.blocks.map(refToString);
     const blockedBy = dependsOn.filter(
@@ -145,23 +207,14 @@ export function deriveTaskViews(
     if (task.status === "done") state = "done";
     else if (task.status === "blocked") state = "blocked";
     else if (task.status === "in-progress") state = "in-progress";
-    else if (task.status === "todo" && hasUnmatchedStart(ref, entries)) {
+    else if (task.status === "todo" && hasOpenStart(aggregate)) {
       state = "in-progress";
-    } else if (task.status === "todo" && blockedBy.length === 0) state = "ready";
+    } else if (task.status === "todo" && blockedBy.length === 0)
+      state = "ready";
     else state = "blocked";
 
-    let attempts = 0;
-    let latestScore: ScoreEntry | null = null;
-    for (const entry of entries) {
-      if (entry.task !== ref) continue;
-      attempts = Math.max(attempts, entry.attempt ?? 0);
-      if (
-        entry.kind === "score" &&
-        (!latestScore || entry.attempt > latestScore.attempt)
-      ) {
-        latestScore = entry;
-      }
-    }
+    const attempts = aggregate?.attempts ?? 0;
+    const latestScore = aggregate?.latestScore ?? null;
 
     return {
       ref,
@@ -195,90 +248,118 @@ type IndexedRow = FleetRow & {
   agentLabel?: string;
 };
 
+const KNOWN_ROLES: AgentRole[] = [
+  "scout",
+  "dev",
+  "verify",
+  "judge",
+  "review",
+  "fix",
+  "done",
+  "block",
+  "commit",
+];
+
 function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
   if (parsed.role !== "unknown") return parsed.role;
   if (entry.kind === "score") return "judge";
-  const roles: AgentRole[] = [
-    "scout", "dev", "verify", "judge", "review",
-    "fix", "done", "block", "commit",
-  ];
-  return roles.includes(entry.role as AgentRole)
+  return KNOWN_ROLES.includes(entry.role as AgentRole)
     ? (entry.role as AgentRole)
     : "unknown";
 }
 
 export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   const rows: IndexedRow[] = [];
+  // Only an in-flight row can be closed, so pairing scans the open rows, not every row.
+  const open: IndexedRow[] = [];
 
   entries.forEach((entry, order) => {
     const parsed = parseAgentLabel(entry.agentLabel ?? "");
-    const fallbackIdentity = entry.kind === "note"
-      ? `${entry.task}|${entry.role}|${entry.attempt ?? "-"}`
-      : `${entry.task}|judge|${entry.attempt}`;
-    const identity = entry.agentLabel ?? fallbackIdentity;
-    const ref = parsed.ref ?? entry.task;
-    const attempt = parsed.attempt ?? entry.attempt;
-    const role = roleFromEntry(entry, parsed);
-    const label = entry.agentLabel ?? identity;
+    const identity =
+      entry.kind === "note"
+        ? fleetIdentity(entry.task, entry.role, entry.attempt)
+        : fleetIdentity(entry.task, "judge", entry.attempt);
+    const key = entry.agentLabel ?? identity;
+    const base = {
+      key,
+      identity,
+      agentLabel: entry.agentLabel,
+      order,
+      label: key,
+      role: roleFromEntry(entry, parsed),
+      ref: parsed.ref ?? entry.task,
+      attempt: parsed.attempt ?? entry.attempt,
+      lens: parsed.lens,
+    };
 
-    if (entry.kind === "note" && entry.phase === "start") {
+    // A verdict is not the end of the judge's work — its own end note closes the row.
+    // Closing here would leave that end note to open a second, duplicate row.
+    if (entry.kind === "score") {
+      const judged = rows.find(
+        (row) =>
+          row.role === "judge" &&
+          row.ref === base.ref &&
+          row.attempt === base.attempt &&
+          row.score === undefined,
+      );
+      if (judged) {
+        judged.score = entry;
+        return;
+      }
+
+      rows.push({
+        ...base,
+        status: "finished",
+        endedAt: entry.ts,
+        score: entry,
+      });
+      return;
+    }
+
+    if (entry.phase === "start") {
       const row: IndexedRow = {
-        key: identity,
-        identity: fallbackIdentity,
-        agentLabel: entry.agentLabel,
-        order,
-        label,
-        role,
-        ref,
-        attempt,
-        lens: parsed.lens,
+        ...base,
         status: "in-flight",
         startedAt: entry.ts,
       };
       rows.push(row);
+      open.push(row);
       return;
     }
 
-    const started = rows.find((row) => {
-      if (row.status !== "in-flight") return false;
-      if (row.agentLabel && entry.agentLabel) {
-        return row.agentLabel === entry.agentLabel;
-      }
-      return row.identity === fallbackIdentity;
-    });
-    if (started) {
-      started.status = "finished";
-      started.endedAt = entry.ts;
-      started.elapsedMs =
-        new Date(entry.ts).getTime() - new Date(started.startedAt!).getTime();
-      started.message = entry.kind === "note" ? entry.message : undefined;
-      if (entry.kind === "score") started.score = entry;
+    const index = open.findIndex((row) =>
+      row.agentLabel && entry.agentLabel
+        ? row.agentLabel === entry.agentLabel
+        : row.identity === identity,
+    );
+    if (index !== -1) {
+      const [started] = open.splice(index, 1);
+      started!.status = "finished";
+      started!.endedAt = entry.ts;
+      started!.elapsedMs =
+        new Date(entry.ts).getTime() - new Date(started!.startedAt!).getTime();
+      started!.message = entry.message;
       return;
     }
 
     rows.push({
-      key: identity,
-      identity: fallbackIdentity,
-      agentLabel: entry.agentLabel,
-      order,
-      label,
-      role,
-      ref,
-      attempt,
-      lens: parsed.lens,
+      ...base,
       status: "finished",
       endedAt: entry.ts,
-      message: entry.kind === "note" ? entry.message : undefined,
-      score: entry.kind === "score" ? entry : undefined,
+      message: entry.message,
     });
   });
 
-  const scores = entries.filter((entry): entry is ScoreEntry => entry.kind === "score");
+  const scoreByAttempt = new Map<string, ScoreEntry>();
+  for (const entry of entries) {
+    if (entry.kind !== "score") continue;
+    const scoreKey = `${entry.task}|${entry.attempt}`;
+    if (!scoreByAttempt.has(scoreKey)) scoreByAttempt.set(scoreKey, entry);
+  }
   for (const row of rows) {
-    if (row.score || row.ref === undefined || row.attempt === undefined) continue;
-    row.score = scores.find(
-      (score) => score.task === row.ref && score.attempt === row.attempt,
-    );
+    if (row.score || row.ref === undefined || row.attempt === undefined)
+      continue;
+    row.score = scoreByAttempt.get(`${row.ref}|${row.attempt}`);
   }
 
   const keyCounts = new Map<string, number>();
@@ -297,10 +378,8 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
     return a.order - b.order;
   });
 
-  return rows.map(({
-    order: _order,
-    identity: _identity,
-    agentLabel: _agentLabel,
-    ...row
-  }) => row);
+  return rows.map(
+    ({ order: _order, identity: _identity, agentLabel: _agentLabel, ...row }) =>
+      row,
+  );
 }

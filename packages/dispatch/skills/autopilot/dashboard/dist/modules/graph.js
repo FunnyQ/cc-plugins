@@ -1,3 +1,5 @@
+import { escapeHtml } from "./format.js";
+
 const DEFAULTS = {
   nodeWidth: 112,
   nodeHeight: 40,
@@ -7,14 +9,20 @@ const DEFAULTS = {
 };
 
 function compareNodes(left, right) {
-  return String(left.bucket ?? "").localeCompare(String(right.bucket ?? ""))
-    || String(left.nn ?? "").localeCompare(String(right.nn ?? ""), undefined, { numeric: true })
-    || String(left.ref).localeCompare(String(right.ref));
+  return (
+    String(left.bucket ?? "").localeCompare(String(right.bucket ?? "")) ||
+    String(left.nn ?? "").localeCompare(String(right.nn ?? ""), undefined, {
+      numeric: true,
+    }) ||
+    String(left.ref).localeCompare(String(right.ref))
+  );
 }
 
 export function layoutGraph(nodes, opts = {}) {
   const options = { ...DEFAULTS, ...opts };
-  const orderedNodes = [...(Array.isArray(nodes) ? nodes : [])].sort(compareNodes);
+  const orderedNodes = [...(Array.isArray(nodes) ? nodes : [])].sort(
+    compareNodes,
+  );
   const refs = new Set(orderedNodes.map(({ ref }) => ref));
   let depths = new Map();
   let stabilised = false;
@@ -25,7 +33,9 @@ export function layoutGraph(nodes, opts = {}) {
     const nextDepths = new Map(depths);
 
     for (const node of orderedNodes) {
-      const dependencies = (node.dependsOn ?? []).filter((ref) => refs.has(ref));
+      const dependencies = (node.dependsOn ?? []).filter((ref) =>
+        refs.has(ref),
+      );
       if (!dependencies.length) {
         nextDepths.set(node.ref, 0);
         continue;
@@ -37,9 +47,10 @@ export function layoutGraph(nodes, opts = {}) {
       }
     }
 
-    stabilised = nextDepths.size === orderedNodes.length
-      && nextDepths.size === depths.size
-      && [...nextDepths].every(([ref, depth]) => depths.get(ref) === depth);
+    stabilised =
+      nextDepths.size === orderedNodes.length &&
+      nextDepths.size === depths.size &&
+      [...nextDepths].every(([ref, depth]) => depths.get(ref) === depth);
     depths = nextDepths;
     if (stabilised) break;
   }
@@ -61,7 +72,8 @@ export function layoutGraph(nodes, opts = {}) {
   for (const [depth, layerNodes] of layerGroups) {
     layerNodes.sort(compareNodes).forEach((node, index) => {
       positions.set(node.ref, {
-        x: options.padding + index * (options.nodeWidth + options.horizontalGap),
+        x:
+          options.padding + index * (options.nodeWidth + options.horizontalGap),
         y: options.padding + depth * (options.nodeHeight + options.verticalGap),
       });
     });
@@ -72,15 +84,6 @@ export function layoutGraph(nodes, opts = {}) {
     layers: layerGroups.size,
     cyclic,
   };
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 export function renderGraph(nodes, layout, opts = {}) {
@@ -101,48 +104,57 @@ export function renderGraph(nodes, layout, opts = {}) {
   const cycleNoteHeight = cyclic.size ? options.nodeHeight / 2 : 0;
   const height = graphHeight + cycleNoteHeight;
 
-  const edges = graphNodes.flatMap((node) => {
-    const target = positions.get(node.ref);
-    if (!target) return [];
+  const edges = graphNodes
+    .flatMap((node) => {
+      const target = positions.get(node.ref);
+      if (!target) return [];
 
-    return (node.dependsOn ?? []).flatMap((dependencyRef) => {
-      const source = positions.get(dependencyRef);
-      const dependency = nodeByRef.get(dependencyRef);
-      if (!source || !dependency) return [];
+      return (node.dependsOn ?? []).flatMap((dependencyRef) => {
+        const source = positions.get(dependencyRef);
+        const dependency = nodeByRef.get(dependencyRef);
+        if (!source || !dependency) return [];
 
-      const x1 = source.x + options.nodeWidth / 2;
-      const y1 = source.y + options.nodeHeight;
-      const x2 = target.x + options.nodeWidth / 2;
-      const y2 = target.y;
-      const midpoint = y1 + (y2 - y1) / 2;
-      const dimmed = dependency.state === "done" ? "" : " -dimmed";
-      return [`<polyline class="graph-edge${dimmed}" points="${x1},${y1} ${x1},${midpoint} ${x2},${midpoint} ${x2},${y2}" />`];
-    });
-  }).join("");
+        const x1 = source.x + options.nodeWidth / 2;
+        const y1 = source.y + options.nodeHeight;
+        const x2 = target.x + options.nodeWidth / 2;
+        const y2 = target.y;
+        const midpoint = y1 + (y2 - y1) / 2;
+        const dimmed = dependency.state === "done" ? "" : " -dimmed";
+        return [
+          `<polyline class="graph-edge${dimmed}" points="${x1},${y1} ${x1},${midpoint} ${x2},${midpoint} ${x2},${y2}" />`,
+        ];
+      });
+    })
+    .join("");
 
-  const renderedNodes = graphNodes.flatMap((node) => {
-    const position = positions.get(node.ref);
-    if (!position) return [];
+  const renderedNodes = graphNodes
+    .flatMap((node) => {
+      const position = positions.get(node.ref);
+      if (!position) return [];
 
-    const isCyclic = cyclic.has(node.ref);
-    const hardFailed = node.latestScore?.hardFailed === true;
-    const state = isCyclic ? "cyclic" : hardFailed ? "alert" : node.state;
-    const centreX = position.x + options.nodeWidth / 2;
-    const labelY = position.y + (isCyclic ? 17 : 24);
-    const cycleLabel = isCyclic
-      ? `<text class="graph-cycle-label" x="${centreX}" y="${position.y + 31}">CYCLE</text>`
-      : "";
-    const statusDot = state === "in-progress"
-      ? `<rect class="graph-status" x="${position.x + 6}" y="${position.y + 6}" width="6" height="6" rx="2" ry="2" />`
-      : "";
-    return [`
+      const isCyclic = cyclic.has(node.ref);
+      const hardFailed = node.latestScore?.hardFailed === true;
+      const state = isCyclic ? "cyclic" : hardFailed ? "alert" : node.state;
+      const centreX = position.x + options.nodeWidth / 2;
+      const labelY = position.y + (isCyclic ? 17 : 24);
+      const cycleLabel = isCyclic
+        ? `<text class="graph-cycle-label" x="${centreX}" y="${position.y + 31}">CYCLE</text>`
+        : "";
+      const statusDot =
+        state === "in-progress"
+          ? `<rect class="graph-status" x="${position.x + 6}" y="${position.y + 6}" width="6" height="6" rx="2" ry="2" />`
+          : "";
+      return [
+        `
       <g class="graph-node -${escapeHtml(state)}" data-ref="${escapeHtml(node.ref)}">
         <rect x="${position.x}" y="${position.y}" width="${options.nodeWidth}" height="${options.nodeHeight}" rx="4" ry="4" />
         ${statusDot}
         <text class="graph-ref" x="${centreX}" y="${labelY}">${escapeHtml(node.ref)}</text>
         ${cycleLabel}
-      </g>`];
-  }).join("");
+      </g>`,
+      ];
+    })
+    .join("");
 
   const empty = graphNodes.length
     ? ""

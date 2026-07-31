@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
-import { parseLog } from "../../flightplan/scripts/lib/flightlog";
+import { readLog } from "../../flightplan/scripts/lib/flightlog";
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import { deriveTaskViews, type TaskView } from "./fleet";
 
@@ -30,7 +30,10 @@ export type TreePayload = {
 export async function loadPlan(planDir: string): Promise<{
   slug: string;
   planTitle: string;
-  /** Every directory under `tasks/`, from the listing — NOT derived from parsed tasks. */
+  /**
+   * Every directory under `tasks/`, in listing order — NOT derived from parsed
+   * tasks. `buildTreePayload` owns the ordering rule.
+   */
   bucketDirs: string[];
   loaded: Loaded;
   entries: FlightlogEntry[];
@@ -43,7 +46,7 @@ export async function loadPlan(planDir: string): Promise<{
     const plan = await readFile(join(planDir, "PLAN.md"), "utf-8");
     planTitle = plan.match(/^# (.+)$/m)?.[1] ?? slug;
   } catch {
-    planTitle = slug;
+    // An unreadable PLAN.md leaves the slug as the title.
   }
 
   const [taskResult, taskEntries] = await Promise.all([
@@ -52,19 +55,9 @@ export async function loadPlan(planDir: string): Promise<{
   ]);
   const bucketDirs = taskEntries
     .filter((entry) => entry.isDirectory() && entry.name !== "_context")
-    .map((entry) => entry.name)
-    .sort();
+    .map((entry) => entry.name);
 
-  let entries: FlightlogEntry[] = [];
-  try {
-    const content = await readFile(
-      join(planDir, ".flightlog", "run.jsonl"),
-      "utf-8",
-    );
-    entries = parseLog(content);
-  } catch {
-    entries = [];
-  }
+  const entries = await readLog(join(planDir, ".flightlog", "run.jsonl"));
 
   return {
     slug,

@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { decideStartup } from "./daemon-decision";
-import { readRecord } from "./daemon-record";
+import { readRecord, removeRecord } from "./daemon-record";
 
 const DEFAULT_PORT = 5757;
 const POLL_ATTEMPTS = 30;
@@ -72,10 +72,6 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-function delay(milliseconds: number): Promise<void> {
-  return Bun.sleep(milliseconds);
-}
-
 async function portAnswers(port: number): Promise<boolean> {
   try {
     await fetch(`http://127.0.0.1:${port}/`);
@@ -91,7 +87,7 @@ async function waitForPort(port: number, answers: boolean): Promise<boolean> {
       return true;
     }
 
-    await delay(POLL_INTERVAL_MS);
+    await Bun.sleep(POLL_INTERVAL_MS);
   }
 
   return false;
@@ -101,11 +97,15 @@ async function waitForServer(port: number, pid: number): Promise<boolean> {
   for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
     const record = readRecord();
 
-    if (record?.pid === pid && record.port === port && (await portAnswers(port))) {
+    if (
+      record?.pid === pid &&
+      record.port === port &&
+      (await portAnswers(port))
+    ) {
       return true;
     }
 
-    await delay(POLL_INTERVAL_MS);
+    await Bun.sleep(POLL_INTERVAL_MS);
   }
 
   return false;
@@ -130,7 +130,7 @@ function openBrowser(url: string): void {
 }
 
 export async function main(): Promise<void> {
-  const parsed = parseArgs(Bun.argv.slice(2).filter((arg) => arg !== "--serve"));
+  const parsed = parseArgs(Bun.argv.slice(2));
 
   if (!parsed.ok) {
     console.error(`flightdeck error: ${parsed.message}`);
@@ -161,13 +161,24 @@ export async function main(): Promise<void> {
     }
 
     if (!(await waitForPort(decision.info.port, false))) {
-      console.error(`flightdeck error: port ${decision.info.port} did not close`);
+      console.error(
+        `flightdeck error: port ${decision.info.port} did not close`,
+      );
       process.exitCode = 1;
       return;
     }
   }
 
-  if (decision.action !== "reuse") {
+  // A live pid is not a live daemon: the operating system recycles pids, and a
+  // hung server still holds one. Reuse only a record whose port actually answers,
+  // or the launcher prints a URL that opens nothing.
+  const reusable = decision.action === "reuse" && (await portAnswers(port));
+
+  if (decision.action === "reuse" && !reusable) {
+    removeRecord();
+  }
+
+  if (!reusable) {
     const scriptPath = join(import.meta.dir, "flightdeck.ts");
     const child = Bun.spawn(
       ["bun", scriptPath, "--serve", "--plan", plan, "--port", String(port)],
@@ -176,7 +187,9 @@ export async function main(): Promise<void> {
     child.unref();
 
     if (!(await waitForServer(port, child.pid))) {
-      console.error(`flightdeck error: server failed to answer on port ${port}`);
+      console.error(
+        `flightdeck error: server failed to answer on port ${port}`,
+      );
       process.exitCode = 1;
       return;
     }

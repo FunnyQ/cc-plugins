@@ -8,7 +8,7 @@
 >
 > **Depends on**: wiring/03, contract/02, server/05, ui/04
 > **Final review**: true
-> **Status**: todo
+> **Status**: in-progress
 
 ## Goal
 

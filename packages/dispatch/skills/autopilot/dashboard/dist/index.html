@@ -11,44 +11,44 @@
       <header class="deck-header">
         <div class="plan-identity">
           <span class="eyebrow">Flight plan</span>
-          <h1>{{ planTitle || "Hangar" }}</h1>
-          <span class="slug">{{ slug || "Awaiting tree data" }}</span>
+          <h1>{{ tree.planTitle || "Hangar" }}</h1>
+          <span class="slug">{{ tree.slug || "Awaiting tree data" }}</span>
         </div>
 
         <div class="plan-progress">
-          <svg class="progress-ring" viewBox="0 0 32 32" role="img" :aria-label="`${counts.done} of ${counts.total} done`">
+          <svg class="progress-ring" viewBox="0 0 32 32" role="img" :aria-label="`${tree.counts.done} of ${tree.counts.total} done`">
             <circle class="track" cx="16" cy="16" r="12"></circle>
             <circle
               class="value"
               cx="16"
               cy="16"
               r="12"
-              :stroke-dasharray="`${counts.total ? (counts.done / counts.total) * 75.398 : 0} 75.398`"
+              :stroke-dasharray="`${tree.counts.total ? (tree.counts.done / tree.counts.total) * 75.398 : 0} 75.398`"
             ></circle>
           </svg>
-          <span><strong>{{ counts.done }}</strong> of {{ counts.total }}</span>
+          <span><strong>{{ tree.counts.done }}</strong> of {{ tree.counts.total }}</span>
         </div>
 
         <dl class="plan-counts" aria-label="Flight plan counts">
           <div>
             <dt>Total</dt>
-            <dd>{{ counts.total }}</dd>
+            <dd>{{ tree.counts.total }}</dd>
           </div>
           <div class="-done">
             <dt>Done</dt>
-            <dd>{{ counts.done }}</dd>
+            <dd>{{ tree.counts.done }}</dd>
           </div>
           <div class="-flight">
             <dt>In flight</dt>
-            <dd><span v-if="counts.inProgress" class="status-dot" aria-hidden="true"></span>{{ counts.inProgress }}</dd>
+            <dd><span v-if="tree.counts.inProgress" class="status-dot" aria-hidden="true"></span>{{ tree.counts.inProgress }}</dd>
           </div>
           <div class="-ready">
             <dt>Ready</dt>
-            <dd>{{ counts.ready }}</dd>
+            <dd>{{ tree.counts.ready }}</dd>
           </div>
           <div class="-blocked">
             <dt>Blocked</dt>
-            <dd>{{ counts.blocked }}</dd>
+            <dd>{{ tree.counts.blocked }}</dd>
           </div>
         </dl>
 
@@ -62,10 +62,10 @@
           <strong>Tree unavailable</strong>
           <span>{{ loadError }}</span>
         </div>
-        <div v-else-if="errors.length" class="header-state -alert" role="alert">
-          <strong>{{ errors.length }} tree {{ errors.length === 1 ? "error" : "errors" }}</strong>
+        <div v-else-if="tree.errors.length" class="header-state -alert" role="alert">
+          <strong>{{ tree.errors.length }} tree {{ tree.errors.length === 1 ? "error" : "errors" }}</strong>
           <ul>
-            <li v-for="error in errors" :key="error">{{ typeof error === "string" ? error : (error.reason || error.message || JSON.stringify(error)) }}</li>
+            <li v-for="error in tree.errors" :key="error">{{ typeof error === "string" ? error : (error.reason || error.message || JSON.stringify(error)) }}</li>
           </ul>
         </div>
       </header>

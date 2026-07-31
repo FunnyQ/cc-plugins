@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { formatElapsed, isInFlight, renderFleet, toggleRubric } from "./fleet.js";
+import {
+  formatElapsed,
+  isInFlight,
+  renderFleet,
+  tickElapsed,
+  toggleRubric,
+} from "./fleet.js";
 
 const expandedKeys = new Set();
 
@@ -16,15 +22,20 @@ function isExpanded(rowKey) {
   };
 
   try {
-    const root = renderFleet([
-      {
-        key: rowKey,
-        role: "dev",
-        ref: "ui/01",
-        status: "finished",
-        score: { breakdown: [{ name: "Correctness", score: 5, weight: 1 }] },
-      },
-    ], 1, true, "connected");
+    const root = renderFleet(
+      [
+        {
+          key: rowKey,
+          role: "dev",
+          ref: "ui/01",
+          status: "finished",
+          score: { breakdown: [{ name: "Correctness", score: 5, weight: 1 }] },
+        },
+      ],
+      1,
+      true,
+      "connected",
+    );
     return root.innerHTML.includes('aria-expanded="true"');
   } finally {
     globalThis.document = originalDocument;
@@ -59,6 +70,35 @@ describe("formatElapsed", () => {
 
   test("clamps negative durations to zero", () => {
     expect(formatElapsed(0, undefined, -1_000)).toBe("0.0s");
+  });
+});
+
+describe("tickElapsed", () => {
+  function stubRow(startedAt) {
+    const cell = { className: "-elapsed", textContent: "" };
+    return {
+      cell,
+      dataset: { startedAt },
+      querySelector: () => cell,
+    };
+  }
+
+  test("updates only the elapsed cell of a ticking row", () => {
+    const row = stubRow("2026-01-01T00:00:00.000Z");
+    const root = { querySelectorAll: () => [row] };
+
+    tickElapsed(root, Date.parse("2026-01-01T00:00:12.000Z"));
+
+    expect(row.cell.textContent).toBe("12.0s");
+  });
+
+  test("tolerates a missing mount and a row without an elapsed cell", () => {
+    expect(() => tickElapsed(null)).not.toThrow();
+    expect(() =>
+      tickElapsed({
+        querySelectorAll: () => [{ dataset: {}, querySelector: () => null }],
+      }),
+    ).not.toThrow();
   });
 });
 

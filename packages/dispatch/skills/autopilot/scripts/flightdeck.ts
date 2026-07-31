@@ -1,68 +1,44 @@
-import { statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { removeRecord, writeRecord } from "./daemon-record";
 import { eventsHandler } from "./events-api";
-import { main as launchMain } from "./launch";
+import {
+  main as launchMain,
+  parseArgs as parsePlanArgs,
+  validatePlanDir,
+} from "./launch";
 import { serveStatic } from "./static-serve";
 import { buildTreePayload, loadPlan } from "./tree-api";
 
-const DEFAULT_PORT = 5757;
 const distRoot = resolve(import.meta.dir, "..", "dashboard", "dist");
 
 export type FlightdeckOptions = {
-  serve?: boolean;
   plan?: string;
   port?: number;
   error?: string;
 };
 
-function hasTasksDirectory(plan: string): boolean {
-  try {
-    return statSync(join(plan, "tasks")).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
+/** The serving entry point shares the launcher's flag shapes and plan rules. */
 export function parseArgs(argv: string[]): FlightdeckOptions {
-  let serve = false;
-  let plan: string | undefined;
-  let port = DEFAULT_PORT;
+  const parsed = parsePlanArgs(argv);
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const argument = argv[index];
-
-    if (argument === "--serve") {
-      serve = true;
-    } else if (argument === "--plan") {
-      plan = argv[index + 1];
-      index += 1;
-    } else if (argument === "--port") {
-      port = Number(argv[index + 1]);
-      index += 1;
-    }
+  if (!parsed.ok) {
+    return { error: parsed.message };
   }
 
-  if (plan === undefined || !isAbsolute(plan)) {
-    return { error: "--plan must be an absolute path" };
+  const validation = validatePlanDir(parsed.args.plan);
+
+  if (!validation.ok) {
+    return { error: validation.message };
   }
 
-  if (!hasTasksDirectory(plan)) {
-    return { error: "--plan must contain a tasks/ directory" };
-  }
-
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    return { error: "--port must be an integer from 1 to 65535" };
-  }
-
-  return { serve, plan, port };
+  return { plan: parsed.args.plan, port: parsed.args.port };
 }
 
 export async function createServer(
   plan: string,
   port: number,
 ): Promise<Bun.Server> {
-  if (!isAbsolute(plan) || !hasTasksDirectory(plan)) {
+  if (!isAbsolute(plan) || !validatePlanDir(plan).ok) {
     throw new Error("plan must be absolute and contain a tasks/ directory");
   }
 
@@ -83,11 +59,7 @@ export async function createServer(
         }
 
         if (url.pathname === "/api/events") {
-          return eventsHandler(
-            request,
-            plan,
-            join(plan, ".flightlog", "run.jsonl"),
-          );
+          return eventsHandler(request, join(plan, ".flightlog", "run.jsonl"));
         }
 
         return serveStatic(distRoot, url.pathname);

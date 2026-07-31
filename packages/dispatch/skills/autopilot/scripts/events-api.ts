@@ -50,7 +50,10 @@ export function decodeLogChunk(
   return { entries: parseLog(complete.join("\n")), partial };
 }
 
-export function createDebouncer(callback: () => void, delay: number): Debouncer {
+export function createDebouncer(
+  callback: () => void,
+  delay: number,
+): Debouncer {
   let timer: ReturnType<typeof setTimeout> | null = null;
   return {
     schedule() {
@@ -67,12 +70,7 @@ export function createDebouncer(callback: () => void, delay: number): Debouncer 
   };
 }
 
-export function eventsHandler(
-  request: Request,
-  planDir: string,
-  logPath: string,
-): Response {
-  void planDir;
+export function eventsHandler(request: Request, logPath: string): Response {
   let fileWatcher: FSWatcher | null = null;
   let directoryWatcher: FSWatcher | null = null;
   let poll: ReturnType<typeof setInterval> | null = null;

@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 
 const MIME_TYPES: Record<string, string> = {
@@ -22,7 +22,10 @@ const NO_CACHE_HEADERS = {
  * Returns null when the path cannot be decoded or escapes the root.
  * Performs NO filesystem access — existence and file-type are the caller's job.
  */
-export function resolveStaticPath(root: string, pathname: string): string | null {
+export function resolveStaticPath(
+  root: string,
+  pathname: string,
+): string | null {
   const mappedPathname = pathname === "/" ? "/index.html" : pathname;
   let decodedPathname: string;
 
@@ -44,13 +47,18 @@ export function resolveStaticPath(root: string, pathname: string): string | null
   const absoluteRoot = resolve(root);
   const resolvedPath = resolve(absoluteRoot, relativePathname);
   const isInside =
-    resolvedPath === absoluteRoot || resolvedPath.startsWith(absoluteRoot + sep);
+    resolvedPath === absoluteRoot ||
+    resolvedPath.startsWith(absoluteRoot + sep);
 
   return isInside ? resolvedPath : null;
 }
 
 export function mimeFor(path: string): string {
   return MIME_TYPES[extname(path).toLowerCase()] ?? "application/octet-stream";
+}
+
+function notFound(): Response {
+  return new Response("Not found", { status: 404, headers: NO_CACHE_HEADERS });
 }
 
 /** Impure: stats the resolved path and returns the response. */
@@ -61,24 +69,15 @@ export async function serveStatic(
   const filePath = resolveStaticPath(root, pathname);
 
   if (filePath === null) {
-    return new Response("Not found", {
-      status: 404,
-      headers: NO_CACHE_HEADERS,
-    });
+    return notFound();
   }
 
   try {
-    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
-      return new Response("Not found", {
-        status: 404,
-        headers: NO_CACHE_HEADERS,
-      });
+    if (!statSync(filePath).isFile()) {
+      return notFound();
     }
   } catch {
-    return new Response("Not found", {
-      status: 404,
-      headers: NO_CACHE_HEADERS,
-    });
+    return notFound();
   }
 
   return new Response(Bun.file(filePath), {

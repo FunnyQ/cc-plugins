@@ -107,6 +107,43 @@ The complete test output was captured at `/tmp/fd-final-verification.txt` before
 
 No product non-wiring defects were found. Visual-only browser assertions remain unverified because the execution context could not capture the desktop display.
 
+## Closing Gate Addendum (wiring/04, attempt 1)
+
+The fixture flight left three observations unconfirmed because its execution context
+could not capture the desktop display. The closing gate confirmed each one against a
+running daemon plus the rendered markup, without a browser.
+
+- [x] **Rising elapsed with role, task, and attempt at once.** One in-flight row rendered
+      `role=review task=close/01 attempt=1 elapsed=1m 1s`, then `elapsed=1m 4s` three
+      seconds later from the same payload. All four facts sit in one row.
+- [x] **Score meter renders.** `renderScore` emitted the fill and threshold widths from
+      the run's own verdict (`4.50`, `passed=true`) — the same numbers `/api/tree` reports.
+- [x] **Node recolouring and stable node positions.** Graph state classes map to the same
+      tokens as the lane cards (`-done` → `--state-done`, `-in-progress` → `--state-flight`,
+      `-ready` → `--state-ready`, `-blocked` → `--state-blocked`), and `app.js` re-lays out
+      only when the task structure string changes, so a state-only poll leaves coordinates frozen.
+
+### Defects this gate found and fixed
+
+Four defects came from the cross-vendor lens. Each was reproduced against the pre-gate
+commit `2b32f44` and fixed in its owning component.
+
+1. **A task left `in-progress` while agents were still flying.** `fleet.ts` tracked open
+   starts in a `Set` keyed by `(task, role, attempt)`, so five parallel review lenses
+   collapsed into one entry and the first lens to finish cleared the whole group.
+   Reproduced: five lens starts plus one end reported `state=ready`. Fixed by counting
+   open starts, so one end cancels exactly one start.
+2. **A duplicate judge row, and a short elapsed time.** Any non-start entry could close a
+   row, so a judge's `score` closed it and the judge's real end note opened a second row.
+   Reproduced: one judge produced 2 rows with `elapsed=2000`. Fixed by letting only a note
+   close a row; a verdict attaches to the judge row instead. Now 1 row, `elapsed=3000`.
+3. **An unvalidated daemon record reaching `process.kill`.** `readRecord` returned any JSON
+   object. It now validates pid, port, root, and plan, and returns null otherwise.
+4. **A launcher printing a URL that opens nothing.** The reuse path checked only that the
+   pid was alive. Reproduced with a live unrelated pid and a dead port: the launcher printed
+   `http://localhost:5799/` and exited 0. It now requires the port to answer, discards the
+   stale record, and starts a real daemon.
+
 ## Workflow Runtime Notes
 
 - The first flight completed 3 tasks with 21 agents and no escalation.

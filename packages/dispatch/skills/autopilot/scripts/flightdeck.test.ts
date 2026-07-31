@@ -38,9 +38,8 @@ describe("module import", () => {
 });
 
 describe("parseArgs", () => {
-  test("parses serve, plan, and port", () => {
+  test("parses plan and port", () => {
     expect(parseArgs(["--serve", "--plan", plan, "--port", "6000"])).toEqual({
-      serve: true,
       plan,
       port: 6000,
     });
@@ -48,10 +47,21 @@ describe("parseArgs", () => {
 
   test("uses the default port", () => {
     expect(parseArgs(["--serve", "--plan", plan])).toEqual({
-      serve: true,
       plan,
       port: 5757,
     });
+  });
+
+  test("rejects an out-of-range port", () => {
+    expect(
+      parseArgs(["--serve", "--plan", plan, "--port", "65536"]).error,
+    ).toContain("--port");
+  });
+
+  test("reports a plan directory that does not exist", () => {
+    expect(
+      parseArgs(["--serve", "--plan", join(fixtureRoot, "absent")]).error,
+    ).toContain("does not exist");
   });
 
   test("rejects a relative plan", () => {
