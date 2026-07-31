@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { join } from "path";
 import {
+  collectLive,
   compareVersionsDesc,
   DEFAULT_WAIT_TIMEOUT_MS,
   extractFinalText,
@@ -8,6 +9,8 @@ import {
   resolveCallerLocation,
   resolveHerdScript,
   runLive,
+  shellArg,
+  type CollectLiveOpts,
   type HerdClient,
   type LocatorDeps,
   type RunLiveDeps,
@@ -914,5 +917,241 @@ describe("runLive", () => {
     if (result.ok || result.pending) throw new Error("expected error");
     expect(result.agentName).toBe("relay-codex-delegate-ab12");
     expect(result.error).toContain("pane gone");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// collectLive — reattach to an ALREADY-RUNNING pane and poll for its result.
+// Same settled+marker contract as runLive, minus spawn/bootstrap/self-heal.
+// ---------------------------------------------------------------------------
+
+function collectHarness(options: {
+  statuses: string[];
+  resultAppearsAtGet?: number;
+  resultContent?: string;
+  waitTimeoutMs?: number;
+  keepPane?: boolean;
+  loadError?: Error;
+  getErrorAtGet?: number;
+  closeError?: Error;
+}) {
+  const { herd, calls } = fakeHerd(options);
+  const errors: string[] = [];
+  let clock = 0;
+  let gets = 0;
+
+  const opts: CollectLiveOpts = {
+    agentName: "relay-codex-delegate-ab12",
+    herdScriptPath: "/x/herd.ts",
+    resultPath: "/tmp/relay/run/result.md",
+    waitTimeoutMs: options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
+    keepPane: options.keepPane ?? false,
+  };
+
+  const deps: RunLiveDeps = {
+    loadHerd: async () => {
+      if (options.loadError) throw options.loadError;
+      return herd;
+    },
+    fileExists: (p) => {
+      if (p !== opts.resultPath) return false;
+      return (
+        options.resultAppearsAtGet !== undefined &&
+        gets >= options.resultAppearsAtGet
+      );
+    },
+    readFile: () => options.resultContent ?? "",
+    stderr: (text) => errors.push(text),
+    now: () => clock,
+    sleep: async (ms) => {
+      clock += ms;
+    },
+  };
+
+  const originalGet = herd.get.bind(herd);
+  herd.get = async (target) => {
+    gets++;
+    return originalGet(target);
+  };
+
+  return { run: () => collectLive(opts, deps), calls, errors, opts };
+}
+
+describe("collectLive", () => {
+  it("captures the marked result from a still-running pane and closes it", async () => {
+    const { run, calls } = collectHarness({
+      statuses: ["working", "done"],
+      resultAppearsAtGet: 2,
+      resultContent: `# Late\n\nFinished after the first window.\n${RESULT_END_MARKER}\n`,
+    });
+
+    const result = await run();
+
+    expect(result).toEqual({
+      ok: true,
+      agentName: "relay-codex-delegate-ab12",
+      text: "# Late\n\nFinished after the first window.",
+    });
+    // Reattach only — it must never spawn a second pane or re-send a prompt.
+    expect(calls.some((c) => c.verb === "spawn")).toBe(false);
+    expect(calls.some((c) => c.verb === "send")).toBe(false);
+    expect(calls.some((c) => c.verb === "close")).toBe(true);
+  });
+
+  it("treats `done` as settled (codex parks there, never reaching idle)", async () => {
+    const { run } = collectHarness({
+      statuses: ["done"],
+      resultAppearsAtGet: 1,
+      resultContent: `ok\n${RESULT_END_MARKER}\n`,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("keeps the pane open with keepPane", async () => {
+    const { run, calls } = collectHarness({
+      statuses: ["idle"],
+      resultAppearsAtGet: 1,
+      resultContent: `ok\n${RESULT_END_MARKER}\n`,
+      keepPane: true,
+    });
+
+    await run();
+
+    expect(calls.some((c) => c.verb === "close")).toBe(false);
+  });
+
+  it("returns pending again when the agent is STILL working at the timeout", async () => {
+    const { run } = collectHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 20_000,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || !result.pending) throw new Error("expected pending");
+    expect(result.report).toContain("still running");
+    // The report must teach the caller how to keep waiting.
+    expect(result.report).toContain("collect");
+  });
+
+  it("fails (not pending) when the agent settled without a verified result", async () => {
+    const { run } = collectHarness({
+      statuses: ["idle"],
+      waitTimeoutMs: 20_000,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || result.pending) throw new Error("expected failure");
+    expect(result.error).toContain("settled");
+  });
+
+  it("never self-heals — an idle pane with no result is not re-prompted", async () => {
+    const { run, calls } = collectHarness({
+      statuses: ["idle"],
+      waitTimeoutMs: 20_000,
+    });
+
+    await run();
+
+    expect(calls.some((c) => c.verb === "send")).toBe(false);
+    expect(calls.some((c) => c.verb === "keys")).toBe(false);
+  });
+
+  it("fails fast when the agent name is unknown", async () => {
+    const { run, calls } = collectHarness({
+      statuses: [],
+      getErrorAtGet: 1,
+      waitTimeoutMs: 600_000,
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || result.pending) throw new Error("expected failure");
+    expect(result.error).toContain("relay-codex-delegate-ab12");
+    // One probe, then out — never the full poll window.
+    expect(calls.filter((c) => c.verb === "get")).toHaveLength(1);
+  });
+
+  it("reports a herd.ts load failure", async () => {
+    const { run } = collectHarness({
+      statuses: [],
+      loadError: new Error("no herd"),
+    });
+
+    const result = await run();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || result.pending) throw new Error("expected failure");
+    expect(result.error).toContain("no herd");
+  });
+});
+
+describe("shellArg", () => {
+  it("leaves ordinary paths bare", () => {
+    expect(shellArg("/Users/q/.claude/plugins/cache/relay/0.5.9/relay.ts")).toBe(
+      "/Users/q/.claude/plugins/cache/relay/0.5.9/relay.ts",
+    );
+  });
+
+  it("quotes a path containing a space", () => {
+    expect(shellArg("/Users/q/Application Support/relay.ts")).toBe(
+      "'/Users/q/Application Support/relay.ts'",
+    );
+  });
+
+  it("escapes an embedded single quote", () => {
+    expect(shellArg("/tmp/q's run/result.md")).toBe(
+      `'/tmp/q'\\''s run/result.md'`,
+    );
+  });
+});
+
+describe("pendingReport (via a timed-out collect)", () => {
+  it("prints a runnable, decoded relay collect command", async () => {
+    const { run } = collectHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 20_000,
+    });
+
+    const result = await run();
+
+    if (result.ok || !result.pending) throw new Error("expected pending");
+    // The path must be a real filesystem path, never a percent-encoded URL one.
+    expect(result.report).not.toContain("%20");
+    expect(result.report).toMatch(
+      /collect --agent relay-codex-delegate-ab12 --result \/tmp\/relay\/run\/result\.md --wait-timeout 20000/,
+    );
+  });
+
+  it("carries --keep-pane into the follow-up command", async () => {
+    const { run } = collectHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 20_000,
+      keepPane: true,
+    });
+
+    const result = await run();
+
+    if (result.ok || !result.pending) throw new Error("expected pending");
+    expect(result.report).toContain("--wait-timeout 20000 --keep-pane");
+  });
+
+  it("omits --keep-pane when the pane is disposable", async () => {
+    const { run } = collectHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 20_000,
+    });
+
+    const result = await run();
+
+    if (result.ok || !result.pending) throw new Error("expected pending");
+    expect(result.report).not.toContain("--keep-pane");
   });
 });

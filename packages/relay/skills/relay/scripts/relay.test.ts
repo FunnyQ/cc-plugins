@@ -3,7 +3,11 @@ import { BACKENDS } from "./backends";
 import { executeRelay, parseFlags, type RelayDeps } from "./relay";
 import { CONFIG_PATH } from "./shared";
 import type { RunResult } from "./types";
-import type { LiveRunResult } from "./live";
+import {
+  DEFAULT_WAIT_TIMEOUT_MS,
+  type CollectLiveOpts,
+  type LiveRunResult,
+} from "./live";
 
 function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
   const files = new Map<string, string>([
@@ -841,5 +845,132 @@ describe("real backend strategy matrix", () => {
     expect(BACKENDS.opencode.strategy("review", {})).toBe("prompt");
     expect(BACKENDS.claude.strategy("delegate", {})).toBe("prompt");
     expect(BACKENDS.claude.strategy("review", {})).toBe("prompt");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `relay collect` — reattach to a pending pane (top-level subcommand, like
+// `relay config`: no backend, no mode, no prompt building)
+// ---------------------------------------------------------------------------
+
+describe("relay collect", () => {
+  function collectDeps(
+    result: LiveRunResult,
+    overrides: Partial<RelayDeps> = {},
+  ) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const seen: CollectLiveOpts[] = [];
+    const d = liveDeps({
+      stdout: (t) => out.push(t),
+      stderr: (t) => err.push(t),
+      collectLive: (opts) => {
+        seen.push(opts);
+        return Promise.resolve(result);
+      },
+      ...overrides,
+    });
+    return { d, out, err, seen };
+  }
+
+  const ARGV = [
+    "collect",
+    "--agent",
+    "relay-codex-delegate-ab12",
+    "--result",
+    "/tmp/relay/run/result.md",
+  ];
+
+  it("prints the collected answer on stdout and exits 0", async () => {
+    const { d, out, seen } = collectDeps({
+      ok: true,
+      agentName: "relay-codex-delegate-ab12",
+      text: "late answer",
+    });
+
+    const res = await executeRelay([...ARGV, "--wait-timeout", "480000"], d);
+
+    expect(res.code).toBe(0);
+    expect(out.join("")).toBe("late answer");
+    expect(seen[0]).toEqual({
+      agentName: "relay-codex-delegate-ab12",
+      herdScriptPath: "/x/herd.ts",
+      resultPath: "/tmp/relay/run/result.md",
+      waitTimeoutMs: 480000,
+      keepPane: false,
+    });
+  });
+
+  it("exits 0 and reprints the report when it is STILL pending", async () => {
+    const { d, out } = collectDeps({
+      ok: false,
+      pending: true,
+      agentName: "relay-codex-delegate-ab12",
+      report: "still running after 480s",
+    });
+
+    const res = await executeRelay(ARGV, d);
+
+    expect(res.code).toBe(0);
+    expect(res.pending).toBe(true);
+    expect(out.join("")).toContain("still running");
+  });
+
+  it("exits 1 on a real failure — it must never fall back to a fresh run", async () => {
+    const { d, err } = collectDeps({
+      ok: false,
+      pending: false,
+      error: "cannot reattach to relay-codex-delegate-ab12: gone",
+    });
+
+    const res = await executeRelay(ARGV, d);
+
+    expect(res.code).toBe(1);
+    expect(err.join("")).toContain("cannot reattach");
+  });
+
+  it("defaults the wait budget and honours --keep-pane", async () => {
+    const { d, seen } = collectDeps({
+      ok: true,
+      agentName: "a",
+      text: "x",
+    });
+
+    await executeRelay([...ARGV, "--keep-pane"], d);
+
+    expect(seen[0].waitTimeoutMs).toBe(DEFAULT_WAIT_TIMEOUT_MS);
+    expect(seen[0].keepPane).toBe(true);
+  });
+
+  it("requires --agent and --result", async () => {
+    const { d: d1, err: err1 } = collectDeps({
+      ok: true,
+      agentName: "a",
+      text: "x",
+    });
+    expect(
+      (await executeRelay(["collect", "--result", "/r.md"], d1)).code,
+    ).toBe(1);
+    expect(err1.join("")).toContain("--agent");
+
+    const { d: d2, err: err2 } = collectDeps({
+      ok: true,
+      agentName: "a",
+      text: "x",
+    });
+    expect((await executeRelay(["collect", "--agent", "a"], d2)).code).toBe(1);
+    expect(err2.join("")).toContain("--result");
+  });
+
+  it("fails clearly when herd.ts cannot be resolved", async () => {
+    const { d, err } = collectDeps(
+      { ok: true, agentName: "a", text: "x" },
+      { resolveHerdScript: () => null },
+    );
+
+    const res = await executeRelay(ARGV, d);
+
+    expect(res.code).toBe(1);
+    expect(err.join("")).toContain("herd.ts");
   });
 });
