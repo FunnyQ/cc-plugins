@@ -6,7 +6,7 @@
 >
 > **Depends on**: server/03
 > **Blocks**: wiring/03
-> **Status**: todo
+> **Status**: in-progress (attempt 3)
 
 ## Goal
 
@@ -78,32 +78,32 @@ Tell the user the URL in the confirmation output so they can reopen it after clo
 
 ## Acceptance criteria
 
-- [ ] The statement that autopilot ships no scripts of its own is gone, replaced by an accurate one.
-- [ ] The new scripts directory and its files are listed in that section.
-- [ ] The borrowed-tools table is unchanged.
-- [ ] The scout step resolves both the sibling scripts path and autopilot's own scripts path, with
+- [x] The statement that autopilot ships no scripts of its own is gone, replaced by an accurate one.
+- [x] The new scripts directory and its files are listed in that section.
+- [x] The borrowed-tools table is unchanged.
+- [x] The scout step resolves both the sibling scripts path and autopilot's own scripts path, with
       distinct names.
-- [ ] The warning against the plugin-root environment variable covers both paths.
-- [ ] A launch step exists after the confirmation step and before the workflow is constructed.
-- [ ] The launch step passes the absolute plan directory, not the tasks directory.
-- [ ] The step states that the command returns by itself, that a non-zero exit is non-blocking for the
+- [x] The warning against the plugin-root environment variable covers both paths.
+- [x] A launch step exists after the confirmation step and before the workflow is constructed.
+- [x] The launch step passes the absolute plan directory, not the tasks directory.
+- [x] The step states that the command returns by itself, that a non-zero exit is non-blocking for the
       flight, that repeat launches are safe, and that no extra skill-level readiness check should be added.
-- [ ] The URL is surfaced to the user.
-- [ ] No other step, model policy, or default in the file is changed.
+- [x] The URL is surfaced to the user.
+- [x] No other step, model policy, or default in the file is changed.
 
 ## Verification
 
-- [ ] Confirm the stale claim is gone:
+- [x] Confirm the stale claim is gone:
       `rg -n "ships no scripts" packages/dispatch/skills/autopilot/SKILL.md` returns nothing.
-- [ ] Confirm both path resolutions are present and named distinctly:
+- [x] Confirm both path resolutions are present and named distinctly:
       `rg -n "OWN|SCRIPTS" packages/dispatch/skills/autopilot/SKILL.md`
-- [ ] Confirm the launch command appears exactly once:
+- [x] Confirm the launch command appears exactly once:
       `rg -c "flightdeck\.ts" packages/dispatch/skills/autopilot/SKILL.md` → `1`.
-- [ ] Confirm it passes the plan directory rather than the tasks directory: the command has no trailing
+- [x] Confirm it passes the plan directory rather than the tasks directory: the command has no trailing
       `tasks` path segment.
-- [ ] Read the diff and confirm nothing outside the three intended edits changed:
+- [x] Read the diff and confirm nothing outside the three intended edits changed:
       `git diff -- packages/dispatch/skills/autopilot/SKILL.md`
-- [ ] Dry-run the resolution by hand: from the skill's directory, confirm `scripts/flightdeck.ts` exists
+- [x] Dry-run the resolution by hand: from the skill's directory, confirm `scripts/flightdeck.ts` exists
       at the path the new instruction describes.
 
 ## Eval rubric

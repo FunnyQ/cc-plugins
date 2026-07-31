@@ -51,7 +51,7 @@ Three hard constraints shape the design. Internalize them:
 
 Before touching Workflow, gather the work-list in the main conversation:
 
-1. **Resolve the scripts path once.** autopilot reuses flightplan's scripts; they are siblings under the plugin. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Do not use `${CLAUDE_PLUGIN_ROOT}/...` to reach them. Instead, take the skill's load-time *"Base directory for this skill"* banner. Resolve `<base>/../flightplan/scripts` to an absolute path, and call it `$SCRIPTS`. Use `$SCRIPTS` in every `bun` command below. This is the same value you bake into `CFG.scriptsDir` in Step 3.
+1. **Resolve both scripts paths once.** autopilot reuses flightplan's scripts; they are siblings under the plugin. Take the skill's load-time *"Base directory for this skill"* banner. Resolve `<base>/../flightplan/scripts` to an absolute path, and call it `$SCRIPTS`. Then resolve autopilot's own scripts directory at `<base>/scripts`, and call it `$OWN`. Resolving `$OWN` is simpler because it needs no parent traversal. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Do not use `${CLAUDE_PLUGIN_ROOT}/...` for either path. Use `$SCRIPTS` in every shared-tool `bun` command below. This is the same value you bake into `CFG.scriptsDir` in Step 3.
 2. Resolve the plan dir **as an absolute path**. The user names a slug or a path; the tree lives at `docs/<slug>/tasks/`. Capture the real repo root with `git rev-parse --show-toplevel` — it can be anywhere, for example `/Users/<name>/Projects/...`, `/opt/temp/project-repo`, or `/workspace/...`. Build absolute paths for `tasksDir`, `planPath`, and `logFile` from this root (`<root>/docs/<slug>/...`). Bake them into `CFG` in Step 3. These paths MUST be absolute. Workflow agents do not share a cwd, so a *relative* `logFile` resolves against whichever agent's working directory is current. An agent that `cd`s into the tree writes the flightlog to a nested `docs/<slug>/tasks/docs/<slug>/.flightlog/` and splits the audit trail. `~/...` is an optional shorthand, but only when the repo is under `$HOME`: Bash and the file tools expand a leading `~`, which avoids leaking the username. For a repo outside `$HOME`, use the full path. Never invent a `~` form.
 3. Read `docs/<slug>/PLAN.md` for the overall goal and the bucketing. The Final review task scores against "did we meet the PLAN goal". The orchestrator needs the goal in hand.
 4. Confirm there is ready work:
@@ -91,6 +91,28 @@ If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.
 Then show the user a one-screen brief. State the slug and how many tasks there are. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
 This is real compute, real edits, and an external code review. Get an explicit go from the user before calling Workflow.
+
+## Launch flightdeck after confirmation
+
+After the user confirms the flight, launch flightdeck once:
+
+```bash
+bun "$OWN"/flightdeck.ts --plan "<the absolute plan dir resolved during scout>"
+```
+
+Pass the plan directory, not the tasks directory. The daemon expects the parent. It reads the tasks tree and flightlog beneath it.
+
+The command returns on its own. It spawns the server detached, polls until the server answers, prints the URL, and exits. It takes a few seconds and then hands control back. It does not run the server in the foreground.
+
+The flight does not depend on flightdeck. If the command exits non-zero, note that the monitor is unavailable and fly anyway. A broken monitor must never block a run.
+
+The command opens the browser by default. `/autopilot` is human-invoked and needs an interactive user, so there is no headless case to detect. Use `--no-open` for manual testing only.
+
+Running the command twice is safe. The daemon is a singleton. A second launch for the same plan from the same install reuses the running daemon and opens the page again.
+
+Do not add a skill-level wait, poll, sleep, or health check around the command. Readiness is already the launcher's job. A second check would duplicate it and slow this step.
+
+Tell the user the URL in the confirmation output. They can use it to reopen flightdeck after closing the tab.
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
@@ -214,9 +236,19 @@ Everything lands in `docs/<slug>/.flightlog/`. It is **gitignored** via a self-i
 
 Each entry records an `agentLabel` so a suspicious verdict can be traced back to that agent's raw `agent-<id>.jsonl` in the harness transcript.
 
-## Bundled scripts (shared with flightplan)
+## Bundled scripts
 
-autopilot ships no scripts of its own. It reuses flightplan's scripts, which are siblings under `skills/flightplan/scripts/`:
+autopilot has its own `scripts/` directory — the flightdeck monitor. Each name below is a `.ts` module in `skills/autopilot/scripts/`, with a `.test.ts` beside it:
+
+- `flightdeck` — the server process and its route table. The launch step above runs this file.
+- `launch` — the CLI, singleton decision use, detached spawn, and readiness.
+- `daemon-decision` — the pure start, reuse, or supersede decision.
+- `daemon-record` — the daemon record's shape, path, and I/O.
+- `fleet` — pure derivation: task state, agent labels, and fleet rows.
+- `static-serve` — pure path resolution, MIME handling, and the file response.
+- `tree-api` — plan loading and the pure tree payload builder.
+
+It still borrows these shared tools from the sibling `skills/flightplan/scripts/` directory:
 
 - `next-ready.ts <tasks-dir> [--json]` — the per-wave ready-set scout. `--json` emits `[{ref,finalReview,path}]` (or `[]` when none ready); the scout echoes it verbatim so an empty set can't be misread as "everything is ready".
 - `score-task.ts <task> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]` — `scoreTask(rubric, scores)` exported. `--json` prints the machine verdict the orchestrator gates on; `--log` persists the same verdict to the flightlog.
