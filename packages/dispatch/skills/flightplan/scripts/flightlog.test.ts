@@ -21,6 +21,21 @@ describe("buildNoteEntry", () => {
     expect(e.message).toBe("did the thing");
     expect(e.attempt).toBe(2);
   });
+
+  test("passes phase through and omits it when absent", () => {
+    const base = {
+      task: "ui/03",
+      role: "dev",
+      message: "",
+      ts: "2026-06-01T10:00:00.000Z",
+    };
+    expect(buildNoteEntry({ ...base, phase: "start" }).phase).toBe("start");
+    const legacy = buildNoteEntry(base);
+    expect(legacy).not.toHaveProperty("phase");
+    expect(JSON.stringify(legacy)).toBe(
+      '{"kind":"note","ts":"2026-06-01T10:00:00.000Z","task":"ui/03","role":"dev","message":""}',
+    );
+  });
 });
 
 describe("slugFromLogPath", () => {
@@ -100,6 +115,54 @@ describe("flightlog CLI", () => {
       stderr: "pipe",
     });
     expect(await proc.exited).toBe(2);
+    await rm(root, { recursive: true });
+  });
+
+  test("start phase works without a message", async () => {
+    const root = await mkdtemp(join(tmpdir(), "flightlog-cli-"));
+    const logFile = join(root, "run.jsonl");
+    const proc = Bun.spawn([
+      "bun",
+      SCRIPT,
+      "log",
+      logFile,
+      "--task",
+      "ui/03",
+      "--role",
+      "dev",
+      "--phase",
+      "start",
+    ]);
+    expect(await proc.exited).toBe(0);
+    expect(JSON.parse(await readFile(logFile, "utf-8"))).toMatchObject({
+      phase: "start",
+      message: "",
+    });
+    await rm(root, { recursive: true });
+  });
+
+  test("rejects invalid phase values with allowed values", async () => {
+    const root = await mkdtemp(join(tmpdir(), "flightlog-cli-"));
+    const logFile = join(root, "run.jsonl");
+    const proc = Bun.spawn(
+      [
+        "bun",
+        SCRIPT,
+        "log",
+        logFile,
+        "--task",
+        "ui/03",
+        "--role",
+        "dev",
+        "--phase",
+        "bogus",
+        "--message",
+        "test",
+      ],
+      { stderr: "pipe" },
+    );
+    expect(await proc.exited).toBe(2);
+    expect(await new Response(proc.stderr).text()).toContain("start or end");
     await rm(root, { recursive: true });
   });
 });

@@ -10,7 +10,7 @@
  *
  * Usage:
  *   bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] \
- *       [--agent <label>] --message "<text>"
+ *       [--agent <label>] [--phase <start|end>] [--message "<text>"]
  *   bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]
  *
  * `report` parses the JSONL trail and writes a grouped, human-readable
@@ -33,6 +33,7 @@ export function buildNoteEntry(meta: {
   ts: string;
   attempt?: number;
   agentLabel?: string;
+  phase?: "start" | "end";
 }): NoteEntry {
   return {
     kind: "note",
@@ -41,6 +42,7 @@ export function buildNoteEntry(meta: {
     role: meta.role,
     attempt: meta.attempt,
     agentLabel: meta.agentLabel,
+    ...(meta.phase === undefined ? {} : { phase: meta.phase }),
     message: meta.message,
   };
 }
@@ -70,7 +72,12 @@ async function main() {
     const task = flagValue(rest, "--task");
     const role = flagValue(rest, "--role");
     const message = flagValue(rest, "--message");
-    if (!task || !role || !message) {
+    const phase = flagValue(rest, "--phase");
+    if (phase !== undefined && phase !== "start" && phase !== "end") {
+      console.error("flightlog --phase must be start or end");
+      process.exit(2);
+    }
+    if (!task || !role || (!message && phase !== "start")) {
       console.error("flightlog log requires --task, --role and --message");
       process.exit(2);
     }
@@ -78,10 +85,11 @@ async function main() {
     const entry = buildNoteEntry({
       task,
       role,
-      message,
+      message: message ?? "",
       ts: new Date().toISOString(),
       attempt: attemptRaw ? parseInt(attemptRaw, 10) : undefined,
       agentLabel: flagValue(rest, "--agent"),
+      phase,
     });
     await appendEntry(logFile, entry);
     return;
@@ -104,7 +112,7 @@ function usage(): never {
   console.error(
     [
       "Usage:",
-      "  bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] [--agent <label>] --message <text>",
+      "  bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] [--agent <label>] [--phase <start|end>] [--message <text>]",
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
     ].join("\n"),
   );

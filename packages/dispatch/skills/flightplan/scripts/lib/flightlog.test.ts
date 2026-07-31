@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   formatEntry,
   parseLog,
@@ -67,6 +67,13 @@ describe("formatEntry / parseLog", () => {
     const entries = parseLog(content);
     expect(entries).toHaveLength(2);
   });
+
+  test("parseLog accepts phase entries and legacy notes without phase", () => {
+    const start: NoteEntry = { ...NOTE, phase: "start", message: "" };
+    const entries = parseLog([formatEntry(start), formatEntry(NOTE)].join("\n"));
+    expect(entries).toEqual([start, NOTE]);
+    expect(entries[1]).not.toHaveProperty("phase");
+  });
 });
 
 describe("renderRunlog", () => {
@@ -102,6 +109,33 @@ describe("renderRunlog", () => {
     expect(md).toContain("## ui/03");
     expect(md).toContain("## backend/01");
   });
+
+  test("skips start entries and tasks containing only start entries", () => {
+    const start: NoteEntry = {
+      ...NOTE,
+      task: "ui/starting",
+      phase: "start",
+      message: "",
+    };
+    const md = renderRunlog([start, NOTE], { slug: "demo" });
+    expect(md).not.toContain("## ui/starting");
+    expect(md).toContain("## ui/03");
+  });
+
+  for (const slug of [
+    "chronicle",
+    "cockpit-autolog",
+    "cockpit-thoughtful",
+    "relay",
+  ]) {
+    test(`re-renders the committed ${slug} trail byte for byte`, async () => {
+      const root = resolve(import.meta.dir, "../../../../../..");
+      const dir = join(root, "docs", slug, ".flightlog");
+      const entries = parseLog(await readFile(join(dir, "run.jsonl"), "utf-8"));
+      const expected = await readFile(join(dir, "RUNLOG.md"), "utf-8");
+      expect(renderRunlog(entries, { slug })).toBe(expected);
+    });
+  }
 });
 
 describe("ensureFlightlogDir", () => {

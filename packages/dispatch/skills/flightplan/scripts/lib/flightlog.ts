@@ -54,6 +54,12 @@ export type NoteEntry = {
   role: string;
   attempt?: number;
   agentLabel?: string;
+  /**
+   * "start" marks the agent beginning its work. "end" (or an absent value) marks
+   * completion. Absent is the completion case because every entry written before
+   * this field existed has no `phase` — that keeps old trails valid without migration.
+   */
+  phase?: "start" | "end";
   message: string;
 };
 
@@ -93,7 +99,9 @@ export function renderRunlog(
   entries: FlightlogEntry[],
   opts: { slug: string },
 ): string {
-  const sorted = [...entries].sort((a, b) => a.ts.localeCompare(b.ts));
+  const sorted = [...entries]
+    .filter((e) => !(e.kind === "note" && e.phase === "start"))
+    .sort((a, b) => a.ts.localeCompare(b.ts));
 
   // Preserve first-seen order of tasks for stable headings.
   const order: string[] = [];
