@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: wiring/01, wiring/02, ui/03, ui/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -150,32 +150,32 @@ evidence file and stop rather than repairing another component's work from insid
 
 ## Acceptance criteria
 
-- [ ] The three-task fixture is built as specified, passes lint, is flown to completion, and is removed
+- [x] The three-task fixture is built as specified, passes lint, is flown to completion, and is removed
       afterwards with `trash`.
-- [ ] `docs/flightdeck/FIXTURE-FLIGHT.md` is written and committed, recording every observation, the
+- [x] `docs/flightdeck/FIXTURE-FLIGHT.md` is written and committed, recording every observation, the
       pasted verification output, and any defects with their fixes.
-- [ ] The browser opened once, unprompted, after the confirmation step.
-- [ ] Start entries were observed live for the scout, dev, verify, and judge agents during the work
+- [x] The browser opened once, unprompted, after the confirmation step.
+- [x] Start entries were observed live for the scout, dev, verify, and judge agents during the work
       waves, and for the review agents during the closing round.
-- [ ] If the closing review requested remediation, a fix agent was observed too. If it did not, the
+- [x] If the closing review requested remediation, a fix agent was observed too. If it did not, the
       evidence file records that no fixer ran and why — a clean flight producing no fixer is a pass.
-- [ ] Every observed in-flight row transitioned to finished with an elapsed value.
-- [ ] Task cards advanced through their states without a page reload.
-- [ ] A score meter rendered with a value matching the run's actual verdict.
-- [ ] The graph recoloured without any node moving.
-- [ ] Exactly one flightlog directory exists under the fixture plan when the run ends.
-- [ ] Every start entry has a matching end entry paired on the agent label.
-- [ ] The rendered run log contains no start entries.
-- [ ] Every wiring defect was fixed in this bucket's files and the flight repeated until clean.
-- [ ] Every non-wiring defect was recorded in the evidence file with its symptom and owning file, and
+- [x] Every observed in-flight row transitioned to finished with an elapsed value.
+- [x] Task cards advanced through their states without a page reload.
+- [x] A score meter rendered with a value matching the run's actual verdict.
+- [x] The graph recoloured without any node moving.
+- [x] Exactly one flightlog directory exists under the fixture plan when the run ends.
+- [x] Every start entry has a matching end entry paired on the agent label.
+- [x] The rendered run log contains no start entries.
+- [x] Every wiring defect was fixed in this bucket's files and the flight repeated until clean.
+- [x] Every non-wiring defect was recorded in the evidence file with its symptom and owning file, and
       was **not** fixed here.
-- [ ] The fixture tree is not committed.
+- [x] The fixture tree is not committed.
 
 ## Verification
 
-- [ ] Confirm a single trail directory:
+- [x] Confirm a single trail directory:
       `find docs/flightdeck-fixture -type d -name .flightlog` → exactly one path.
-- [ ] Confirm start entries were written for **every** instrumented role. The balance check below cannot
+- [x] Confirm start entries were written for **every** instrumented role. The balance check below cannot
       catch a role that emitted neither a start nor an end, so assert presence separately:
       ```bash
       jq -r 'select(.phase == "start") | .role' docs/flightdeck-fixture/.flightlog/run.jsonl | sort -u
@@ -187,7 +187,7 @@ evidence file and stop rather than repairing another component's work from insid
       something to fix, so a clean flight legitimately has no `fix` row. Do not manufacture a defect to
       force one. If the review did request remediation, then `fix` must appear and must balance; if it did
       not, record that in the evidence file and move on.
-- [ ] Assert start and end pairing mechanically. This must **fail** on an orphan, not merely print rows
+- [x] Assert start and end pairing mechanically. This must **fail** on an orphan, not merely print rows
       for eyeballing:
       ```bash
       jq -e -s '
@@ -204,16 +204,16 @@ evidence file and stop rather than repairing another component's work from insid
       ```
       Exit status `0` means every label balanced. A non-zero exit prints the offending labels with their
       counts; an unbalanced label is an agent that will render as permanently in flight.
-- [ ] Confirm the run log excludes start entries:
+- [x] Confirm the run log excludes start entries:
       `bun packages/dispatch/skills/flightplan/scripts/flightlog.ts report docs/flightdeck-fixture/.flightlog/run.jsonl --out /tmp/fd-fixture-runlog.md`
       then `rg -c "phase" /tmp/fd-fixture-runlog.md` returns no matches.
-- [ ] Confirm the daemon still answers after the flight:
+- [x] Confirm the daemon still answers after the flight:
       `curl -s localhost:5757/api/tree | jq '.slug'` → the fixture slug.
-- [ ] Confirm the evidence record exists and is staged before the fixture is removed:
+- [x] Confirm the evidence record exists and is staged before the fixture is removed:
       `git status --porcelain docs/flightdeck/FIXTURE-FLIGHT.md` shows it added.
-- [ ] Confirm the fixture is untracked and then removed:
+- [x] Confirm the fixture is untracked and then removed:
       `git status --porcelain docs/flightdeck-fixture` shows it untracked, then `trash docs/flightdeck-fixture`.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/ packages/dispatch/skills/flightplan/scripts/` — all green after any fix.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/ packages/dispatch/skills/flightplan/scripts/` — all green after any fix.
 
 ## Eval rubric
 
