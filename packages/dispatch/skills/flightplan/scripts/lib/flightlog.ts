@@ -78,8 +78,17 @@ export function formatEntry(entry: FlightlogEntry): string {
  * log is more useful than none when an agent died mid-write).
  */
 export function parseLog(content: string): FlightlogEntry[] {
+  return parseLines(content.split("\n"));
+}
+
+/**
+ * Same tolerant parse as `parseLog`, for a caller that already holds the lines.
+ * A tailer reads complete lines and would otherwise join them only for
+ * `parseLog` to split the joined string apart again.
+ */
+export function parseLines(lines: string[]): FlightlogEntry[] {
   const entries: FlightlogEntry[] = [];
-  for (const raw of content.split("\n")) {
+  for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
     try {

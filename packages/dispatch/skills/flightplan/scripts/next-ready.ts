@@ -29,6 +29,12 @@ export type LoadError = { file: string; reason: string };
 export type LoadResult = {
   byRef: Record<string, ParsedTask>;
   pathByRef: Record<string, string>;
+  /**
+   * Every bucket directory under `tasks/`, in listing order. Carried here so
+   * the "a bucket is a directory that is not `_context`" rule lives once — a
+   * consumer that needs empty buckets never re-lists the tree itself.
+   */
+  buckets: string[];
   errors: LoadError[];
 };
 
@@ -37,10 +43,12 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
   const pathByRef: Record<string, string> = {};
   const refToFile = new Map<string, string>();
   const errors: LoadError[] = [];
+  const bucketNames: string[] = [];
   const buckets = await readdir(tasksDir, { withFileTypes: true });
   for (const bucket of buckets) {
     if (!bucket.isDirectory()) continue;
     if (bucket.name === "_context") continue;
+    bucketNames.push(bucket.name);
     const bucketDir = join(tasksDir, bucket.name);
     const files = await readdir(bucketDir);
     for (const file of files) {
@@ -67,7 +75,23 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
       pathByRef[ref] = path;
     }
   }
-  return { byRef, pathByRef, errors };
+  return { byRef, pathByRef, buckets: bucketNames, errors };
+}
+
+/**
+ * The dependencies of `task` that are not satisfied yet, as refs.
+ *
+ * The readiness rule lives here alone: a dependency is satisfied only when the
+ * upstream task is `done`. `findReady` and the flightdeck's task views both
+ * read it, so the CLI and the dashboard can never disagree about what blocks.
+ */
+export function unmetDependencies(
+  task: ParsedTask,
+  byRef: Record<string, ParsedTask>,
+): string[] {
+  return task.dependsOn
+    .map(refToString)
+    .filter((ref) => byRef[ref]?.status !== "done");
 }
 
 /** A ready task ref plus whether it is the closing final-review task. */
@@ -99,11 +123,7 @@ export function findReady(byRef: Record<string, ParsedTask>): TaskRef[] {
   const ready: TaskRef[] = [];
   for (const task of Object.values(byRef)) {
     if (task.status !== "todo") continue;
-    const allDepsDone = task.dependsOn.every((dep) => {
-      const upstream = byRef[refToString(dep)];
-      return upstream?.status === "done";
-    });
-    if (allDepsDone) {
+    if (unmetDependencies(task, byRef).length === 0) {
       ready.push({ bucket: task.bucket, nn: task.nn });
     }
   }
