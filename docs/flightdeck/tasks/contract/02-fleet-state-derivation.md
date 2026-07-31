@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/01
 > **Blocks**: server/04, wiring/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -108,27 +108,27 @@ start produces a `finished` row with no `startedAt` and no `elapsedMs`.
 
 ## Acceptance criteria
 
-- [ ] `parseAgentLabel` returns the documented shape for every label form in the taxonomy table, and
+- [x] `parseAgentLabel` returns the documented shape for every label form in the taxonomy table, and
       `{ role: "unknown" }` for an unrecognised or empty label, without throwing.
-- [ ] An engine-prefixed dev label parses as role `dev` with the ref and attempt intact.
-- [ ] `deriveTaskViews` returns `in-progress` for a `todo` task with an unmatched start entry.
-- [ ] `deriveTaskViews` returns `blocked` with a populated `blockedBy` for a task with an unfinished
+- [x] An engine-prefixed dev label parses as role `dev` with the ref and attempt intact.
+- [x] `deriveTaskViews` returns `in-progress` for a `todo` task with an unmatched start entry.
+- [x] `deriveTaskViews` returns `blocked` with a populated `blockedBy` for a task with an unfinished
       dependency, and lists a dangling dependency ref rather than ignoring it.
-- [ ] `blockedBy` is empty for every task whose state is not `blocked`.
-- [ ] `aggregateFleet` pairs start and end entries, computes `elapsedMs` from the timestamps only, and
+- [x] `blockedBy` is empty for every task whose state is not `blocked`.
+- [x] `aggregateFleet` pairs start and end entries, computes `elapsedMs` from the timestamps only, and
       leaves an unpaired start `in-flight`.
-- [ ] In-flight rows sort ahead of finished rows.
-- [ ] Rows with no `startedAt` sort deterministically on `endedAt`, with first-appearance order breaking
+- [x] In-flight rows sort ahead of finished rows.
+- [x] Rows with no `startedAt` sort deterministically on `endedAt`, with first-appearance order breaking
       exact ties. A log of completion-only entries produces the same order on every run.
-- [ ] Row keys are unique, including for entries with no agent label.
-- [ ] No function in this module reads a file, calls the clock, or writes to stdout.
+- [x] Row keys are unique, including for entries with no agent label.
+- [x] No function in this module reads a file, calls the clock, or writes to stdout.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` — all green.
-- [ ] Confirm purity mechanically: `rg -n "Date\.now|new Date\(\)|readFile|console\." packages/dispatch/skills/autopilot/scripts/fleet.ts` returns nothing.
-- [ ] Confirm no cross-plugin import: `rg -n "packages/monitor|\.\./\.\./\.\./monitor" packages/dispatch/skills/autopilot/scripts/fleet.ts` returns nothing.
-- [ ] Feed a real trail through `aggregateFleet` in a scratch script and confirm it returns rows
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` — all green.
+- [x] Confirm purity mechanically: `rg -n "Date\.now|new Date\(\)|readFile|console\." packages/dispatch/skills/autopilot/scripts/fleet.ts` returns nothing.
+- [x] Confirm no cross-plugin import: `rg -n "packages/monitor|\.\./\.\./\.\./monitor" packages/dispatch/skills/autopilot/scripts/fleet.ts` returns nothing.
+- [x] Feed a real trail through `aggregateFleet` in a scratch script and confirm it returns rows
       without throwing: use `docs/chronicle/.flightlog/run.jsonl`, which contains real score and note
       entries and no start entries at all.
 

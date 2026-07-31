@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: server/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -88,31 +88,31 @@ and a cached stale bundle is a confusing failure to debug.
 
 ## Acceptance criteria
 
-- [ ] `resolveStaticPath` performs no filesystem access.
-- [ ] `resolveStaticPath` maps `/` to the index page.
-- [ ] `resolveStaticPath` resolves `/index.html` and `/app.js` successfully to files inside the root.
-- [ ] `resolveStaticPath` returns null for a plain traversal, an encoded traversal, a double-slash
+- [x] `resolveStaticPath` performs no filesystem access.
+- [x] `resolveStaticPath` maps `/` to the index page.
+- [x] `resolveStaticPath` resolves `/index.html` and `/app.js` successfully to files inside the root.
+- [x] `resolveStaticPath` returns null for a plain traversal, an encoded traversal, a double-slash
       prefix, a dot-padding trick, and a malformed percent-encoding.
-- [ ] Containment is separator-aware: a sibling directory whose name extends the root's is rejected.
-- [ ] `mimeFor` returns the right type for each listed extension and falls back to octet-stream.
-- [ ] Text responses carry `charset=utf-8`.
-- [ ] `serveStatic` returns `404` for a null resolve, a missing path, and a path that is not a regular file.
-- [ ] Every response carries `Cache-Control: no-cache`.
+- [x] Containment is separator-aware: a sibling directory whose name extends the root's is rejected.
+- [x] `mimeFor` returns the right type for each listed extension and falls back to octet-stream.
+- [x] Text responses carry `charset=utf-8`.
+- [x] `serveStatic` returns `404` for a null resolve, a missing path, and a path that is not a regular file.
+- [x] Every response carries `Cache-Control: no-cache`.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/static-serve.test.ts` — all green.
-- [ ] Confirm this task stayed in its own lane:
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/static-serve.test.ts` — all green.
+- [x] Confirm this task stayed in its own lane:
       `git status --porcelain packages/dispatch/skills/autopilot/scripts/` lists only `static-serve.ts`
       and `static-serve.test.ts`. Do **not** assert anything about `dashboard/` — the design-system task
       runs in the same wave and legitimately fills that directory, so a check there fails on its output,
       not on this task's.
-- [ ] Confirm the pure function is genuinely pure:
+- [x] Confirm the pure function is genuinely pure:
       `rg -n "statSync|existsSync|readFile|Bun\.file" packages/dispatch/skills/autopilot/scripts/static-serve.ts`
       shows hits only inside `serveStatic`.
-- [ ] Confirm no cross-plugin import:
+- [x] Confirm no cross-plugin import:
       `rg -n "packages/monitor" packages/dispatch/skills/autopilot/scripts/static-serve.ts` returns nothing.
-- [ ] Exercise both directions directly in the test file. Must resolve: `/`, `/index.html`, `/app.js`,
+- [x] Exercise both directions directly in the test file. Must resolve: `/`, `/index.html`, `/app.js`,
       `/modules/lanes.js`. Must return null: `/../../../etc/passwd`, `/%2e%2e%2f%2e%2e%2fetc/passwd`,
       `//etc/passwd`, `/....//etc/passwd`, and a root-prefix sibling such as a directory named like the
       root with `-evil` appended.

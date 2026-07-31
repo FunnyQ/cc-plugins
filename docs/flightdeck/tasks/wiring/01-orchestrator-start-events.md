@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/01
 > **Blocks**: wiring/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -114,42 +114,42 @@ modified — so review the diff against this list rather than against a blanket 
 
 ## Acceptance criteria
 
-- [ ] Each of the seven working agent prompts carries a start-log instruction as its first step.
-- [ ] Each of the same seven carries a matching end-log instruction as its last step.
-- [ ] The three agents that already logged a completion note gained `--phase end` on that existing line
+- [x] Each of the seven working agent prompts carries a start-log instruction as its first step.
+- [x] Each of the same seven carries a matching end-log instruction as its last step.
+- [x] The three agents that already logged a completion note gained `--phase end` on that existing line
       rather than a duplicate call.
-- [ ] Both lines of every pair pass the same role, task, attempt, and `--agent` expression — the
+- [x] Both lines of every pair pass the same role, task, attempt, and `--agent` expression — the
       placeholder for six agents, and the existing delegate expression for the external dev driver.
-- [ ] Each prompt tells the agent to reuse the identical label in both calls.
-- [ ] The done-transition, blocked-transition, and post-loop commit prompts are unchanged.
-- [ ] Every added line uses the baked absolute config values for the scripts directory and the log file,
+- [x] Each prompt tells the agent to reuse the identical label in both calls.
+- [x] The done-transition, blocked-transition, and post-loop commit prompts are unchanged.
+- [x] Every added line uses the baked absolute config values for the scripts directory and the log file,
       matching the existing log lines exactly.
-- [ ] The scout's line uses the literal task value `scout` and omits the attempt flag.
-- [ ] Each added line passes the role value from the table above.
-- [ ] No agent label, model, schema, phase, or stage ordering is changed.
-- [ ] Every hunk in the diff is one of the three permitted kinds: an added start line, an added end line,
+- [x] The scout's line uses the literal task value `scout` and omits the attempt flag.
+- [x] Each added line passes the role value from the table above.
+- [x] No agent label, model, schema, phase, or stage ordering is changed.
+- [x] Every hunk in the diff is one of the three permitted kinds: an added start line, an added end line,
       or an existing completion line gaining `--phase end` (plus the fixer's role change).
-- [ ] The workflow script's control flow is byte-identical: same agents, labels, models, schemas, and
+- [x] The workflow script's control flow is byte-identical: same agents, labels, models, schemas, and
       stage order.
 
 ## Verification
 
-- [ ] Confirm the count of each marker:
+- [x] Confirm the count of each marker:
       `rg -c -- "--phase start" packages/dispatch/skills/autopilot/references/orchestrator.md` → `7`, and
       `rg -c -- "--phase end" packages/dispatch/skills/autopilot/references/orchestrator.md` → `7`.
       Unequal counts mean some agent will render as permanently in flight.
-- [ ] Confirm every added line uses the baked config values and none uses a relative or home-shorthand
+- [x] Confirm every added line uses the baked config values and none uses a relative or home-shorthand
       path: `rg -n -- "--phase start" packages/dispatch/skills/autopilot/references/orchestrator.md`
       — every hit contains both the scripts-dir variable and the log-file variable.
-- [ ] Confirm no relative log path was introduced anywhere. Ripgrep's default engine has no
+- [x] Confirm no relative log path was introduced anywhere. Ripgrep's default engine has no
       negative lookahead, so use two stages rather than one pattern: list every log invocation, then
       subtract the ones that correctly interpolate a variable.
       `rg -n "flightlog\.ts log" packages/dispatch/skills/autopilot/references/orchestrator.md | rg -v 'flightlog\.ts log \$\{'`
       returns nothing.
-- [ ] Review the diff and confirm every changed hunk matches one of the three permitted kinds:
+- [x] Review the diff and confirm every changed hunk matches one of the three permitted kinds:
       `git diff -- packages/dispatch/skills/autopilot/references/orchestrator.md`
       Three hunks modify an existing line; the rest are pure additions. Anything else is out of scope.
-- [ ] Confirm the excluded agents were not touched: the diff contains no change to the done-transition,
+- [x] Confirm the excluded agents were not touched: the diff contains no change to the done-transition,
       blocked-transition, or commit prompts.
 
 ## Eval rubric

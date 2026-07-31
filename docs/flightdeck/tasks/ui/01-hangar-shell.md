@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: server/02, ui/02, ui/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -107,33 +107,33 @@ The panels themselves stay empty in this task. Leaving them as labelled empty re
 
 ## Acceptance criteria
 
-- [ ] `PRODUCT.md` exists, argues the direction, and includes the anti-goals list verbatim.
-- [ ] Every colour, font size, radius, and spacing token from the design context file is declared on
+- [x] `PRODUCT.md` exists, argues the direction, and includes the anti-goals list verbatim.
+- [x] Every colour, font size, radius, and spacing token from the design context file is declared on
       `:root`.
-- [ ] No rule outside `:root` contains a raw hex colour.
-- [ ] The `prefers-reduced-motion` block is present and disables animation and transition.
-- [ ] The shell renders header, top section, and fleet section in the specified grid.
-- [ ] The two sections scroll independently and the page body never scrolls horizontally.
-- [ ] Below 900px the layout stacks into a single column.
-- [ ] The store is reachable as `window.__flightdeck` after mount, so the header can be exercised without
+- [x] No rule outside `:root` contains a raw hex colour.
+- [x] The `prefers-reduced-motion` block is present and disables animation and transition.
+- [x] The shell renders header, top section, and fleet section in the specified grid.
+- [x] The two sections scroll independently and the page body never scrolls horizontally.
+- [x] Below 900px the layout stacks into a single column.
+- [x] The store is reachable as `window.__flightdeck` after mount, so the header can be exercised without
       an API.
-- [ ] The header renders the plan title, slug, counts, and a progress ring from a tree payload, verified
+- [x] The header renders the plan title, slug, counts, and a progress ring from a tree payload, verified
       against a stubbed payload since no API exists yet.
-- [ ] Loading, load-error, and tree-error states each render something visible.
-- [ ] petite-vue is the only file in `vendor/`.
-- [ ] Every file under `dashboard/dist/` at the end of this task was created here — no task outside the
+- [x] Loading, load-error, and tree-error states each render something visible.
+- [x] petite-vue is the only file in `vendor/`.
+- [x] Every file under `dashboard/dist/` at the end of this task was created here — no task outside the
       ui bucket contributed to that directory.
 
 ## Verification
 
-- [ ] The daemon does not exist yet, so serve the directory with any trivial static server and open it:
+- [x] The daemon does not exist yet, so serve the directory with any trivial static server and open it:
       `python3 -m http.server 8899 --directory packages/dispatch/skills/autopilot/dashboard/dist`
       then visit `http://localhost:8899/`.
-- [ ] With no API behind it, `/api/tree` 404s. Confirm the **load-error** state renders a visible message
+- [x] With no API behind it, `/api/tree` 404s. Confirm the **load-error** state renders a visible message
       rather than a blank page — that is exactly the path this setup exercises.
-- [ ] Confirm the shell itself: header, top section, and fleet section present, in the specified grid,
+- [x] Confirm the shell itself: header, top section, and fleet section present, in the specified grid,
       with the two sections scrolling independently.
-- [ ] Stub the payload to check the populated header without a server. In the browser console:
+- [x] Stub the payload to check the populated header without a server. In the browser console:
       ```js
       Object.assign(window.__flightdeck, {
         planTitle: "Waypoints skill", slug: "waypoints-skill", loading: false, loadError: null,
@@ -142,14 +142,14 @@ The panels themselves stay empty in this task. Leaving them as labelled empty re
       ```
       Then assert the DOM: the header shows `Waypoints skill`, the counts read 6 of 6, and the progress
       ring's `stroke-dasharray` shows a full circle with no remaining gap.
-- [ ] Confirm no stray hex outside the token block:
+- [x] Confirm no stray hex outside the token block:
       `rg -n "#[0-9a-fA-F]{3,8}\b" packages/dispatch/skills/autopilot/dashboard/dist/style.css | rg -v "^\s*\d+:\s*--"` returns only lines inside `:root`.
-- [ ] Confirm the reduced-motion block exists:
+- [x] Confirm the reduced-motion block exists:
       `rg -n "prefers-reduced-motion" packages/dispatch/skills/autopilot/dashboard/dist/style.css`
-- [ ] Confirm the vendor directory holds one file:
+- [x] Confirm the vendor directory holds one file:
       `ls packages/dispatch/skills/autopilot/dashboard/dist/vendor/` → `petite-vue.es.js` only.
-- [ ] Resize the window below 900px and confirm the sections stack with no horizontal page scrollbar.
-- [ ] Stop the static server and reload; the page still fails visibly rather than rendering blank.
+- [x] Resize the window below 900px and confirm the sections stack with no horizontal page scrollbar.
+- [x] Stop the static server and reload; the page still fails visibly rather than rendering blank.
 
 ## Eval rubric
 
