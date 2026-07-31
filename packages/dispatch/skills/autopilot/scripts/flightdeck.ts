@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { removeRecord, writeRecord } from "./daemon-record";
+import { eventsHandler } from "./events-api";
 import { main as launchMain } from "./launch";
 import { serveStatic } from "./static-serve";
 import { buildTreePayload, loadPlan } from "./tree-api";
@@ -79,6 +80,14 @@ export async function createServer(
           return new Response(JSON.stringify(result), {
             headers: { "Content-Type": "application/json" },
           });
+        }
+
+        if (url.pathname === "/api/events") {
+          return eventsHandler(
+            request,
+            plan,
+            join(plan, ".flightlog", "run.jsonl"),
+          );
         }
 
         return serveStatic(distRoot, url.pathname);
