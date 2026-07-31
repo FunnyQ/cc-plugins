@@ -168,6 +168,11 @@ const JUDGE_SCHEMA = {
 }
 
 // ── Prompts ───────────────────────────────────────────────────────────────
+// Status ownership is one policy shared by every worker prompt: workers may only
+// move a task to in-progress; only the post-judge mark-done step writes `done`.
+// Single-sourced here so the three prompts below can never drift apart.
+const STATUS_RULE = `Set the task header "> **Status**:" to in-progress and leave it in-progress when you finish. Do not set it to done: only the orchestrator's post-judge mark-done step may do that.`
+
 const devPrompt = (ref, path, attempt, feedback) => `
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase start
 Then proceed.
@@ -177,7 +182,7 @@ You are implementing flightplan task ${ref} in the tree at ${CFG.tasksDir}.
 Read the task file at ${path} and every file in its "Required reading".
 Implement the task fully: create/modify the listed files, follow Implementation notes.
 ${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nAddress that specifically.' : ''}
-While working, set the task header "> **Status**:" to in-progress. When done, run the task's ## Verification commands yourself.
+${STATUS_RULE} When done, run the task's ## Verification commands yourself.
 Then log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase end --message "<what you changed>"
 Return a one-paragraph summary of what you did.`
@@ -198,7 +203,7 @@ Use the identical label expression "${engine.label}-delegate" in both start and 
 
 You are the ${engine.label.toUpperCase()} DEV DRIVER for flightplan task ${ref} (tree: ${CFG.tasksDir}). You do NOT write the implementation yourself — you have the ${engine.label} CLI write it, then you verify.
 1. Read the task file at ${path} and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
-2. Set the task header "> **Status**:" to in-progress.
+2. ${STATUS_RULE} Tell the external engine to leave it in-progress too.
 3. Build the ${engine.label} instruction from the task file — the exact files to create/modify plus the full Goal, Implementation notes, and Acceptance criteria, telling ${engine.label} to implement the task fully and stay strictly within the listed files. It runs non-interactively, so give it EVERYTHING up front; it can never ask you anything.${attempt > 1 ? ' This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nFold this feedback into the instruction so ' + engine.label + ' fixes exactly that.' : ''}
 4. Write that instruction to a temp file, then run this as ONE FOREGROUND Bash call with \`timeout: 600000\` (the Bash tool maximum):
   ${liveDev ? `bun ${CFG.relayPath} ${engine.label} delegate --prompt-file <your-instruction-file> --git-scope none --dangerous --wait-timeout 480000` : `bun ${S}/${engine.wrapper} delegate${engine.modelFlag} --prompt-file <your-instruction-file>`}
@@ -280,7 +285,7 @@ You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}), on Opus
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the four Claude lenses (behaviour-preserving). For any finding you reject, say why.
 3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.
 ${attempt > 1 ? 'This is re-loop attempt ' + attempt + ' (capped at ' + FINAL_MAX + '). The previous round was rejected:\n' + feedback + '\nEnsure the new findings + your fixes address that.' : ''}
-Set the task header "> **Status**:" to in-progress while working.
+${STATUS_RULE}
 Log a narrative note (which lenses fired, total findings, what you fixed, whether the cross-vendor lens ran):
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role fix --attempt ${attempt} --agent "<your label>" --phase end --message "<summary>"
 Return a one-paragraph summary: lenses run, cross-vendor status, key fixes, verification result.`
