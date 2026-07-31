@@ -8,7 +8,7 @@
 >
 > **Depends on**: wiring/03, contract/02, server/05, ui/04
 > **Final review**: true
-> **Status**: in-progress
+> **Status**: done
 
 ## Goal
 
@@ -90,58 +90,58 @@ known gap, not a reason to keep building — the version boundary was drawn deli
 
 ## Acceptance criteria
 
-- [ ] The daemon was run against a real tree and every view was read as a user, not as the author.
-- [ ] The three views agree on what each state colour means.
-- [ ] The polled snapshot and the streamed log coexist without either clobbering the other.
-- [ ] No derivation rule is implemented twice, once on each side.
-- [ ] All four goal observations are confirmed against the fixture-flight evidence file: simultaneous
+- [x] The daemon was run against a real tree and every view was read as a user, not as the author.
+- [x] The three views agree on what each state colour means.
+- [x] The polled snapshot and the streamed log coexist without either clobbering the other.
+- [x] No derivation rule is implemented twice, once on each side.
+- [x] All four goal observations are confirmed against the fixture-flight evidence file: simultaneous
       live fleet detail, an observed task state change, a verdict matching the run's own, and a page the
       skill opened without a second command.
-- [ ] Repository conventions hold: runtime, types, purity, test placement.
-- [ ] Nothing under the dispatch package imports from the monitor package.
-- [ ] Exactly one vendored library is present.
-- [ ] The cross-skill import surface is still only the three permitted modules: the task loader, the
+- [x] Repository conventions hold: runtime, types, purity, test placement.
+- [x] Nothing under the dispatch package imports from the monitor package.
+- [x] Exactly one vendored library is present.
+- [x] The cross-skill import surface is still only the three permitted modules: the task loader, the
       flightlog module, and the task parser.
-- [ ] No stated design anti-goal is violated.
-- [ ] Both test suites are green.
-- [ ] All four pre-existing flightlogs parse and render unchanged.
-- [ ] Every orchestrator hunk matches the permitted set — added start lines, added end lines, existing
+- [x] No stated design anti-goal is violated.
+- [x] Both test suites are green.
+- [x] All four pre-existing flightlogs parse and render unchanged.
+- [x] Every orchestrator hunk matches the permitted set — added start lines, added end lines, existing
       completion lines gaining a phase flag, and the single fixer role change — with the control flow
       itself unchanged, judged against a stable pre-plan baseline commit rather than the working tree.
-- [ ] Every defect the fixture flight handed on was reproduced, fixed in its owning component, and its
+- [x] Every defect the fixture flight handed on was reproduced, fixed in its owning component, and its
       outcome recorded.
-- [ ] Every defect found here is fixed; every gap found is recorded rather than built.
+- [x] Every defect found here is fixed; every gap found is recorded rather than built.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/ packages/dispatch/skills/flightplan/scripts/` — all green.
-- [ ] Confirm no cross-plugin import:
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/ packages/dispatch/skills/flightplan/scripts/` — all green.
+- [x] Confirm no cross-plugin import:
       `rg -n "packages/monitor|\.\./\.\./\.\./monitor" packages/dispatch/` returns nothing.
-- [ ] Confirm the vendor surface:
+- [x] Confirm the vendor surface:
       `ls packages/dispatch/skills/autopilot/dashboard/dist/vendor/` → `petite-vue.es.js` only.
-- [ ] Confirm the cross-skill import surface:
+- [x] Confirm the cross-skill import surface:
       `rg -n "from \"\.\./\.\./flightplan" packages/dispatch/skills/autopilot/scripts/` — every hit
       resolves to one of the three permitted modules, nothing else.
-- [ ] Confirm the fixture flight left durable evidence: `docs/flightdeck/FIXTURE-FLIGHT.md` exists, is
+- [x] Confirm the fixture flight left durable evidence: `docs/flightdeck/FIXTURE-FLIGHT.md` exists, is
       committed, and records the observations and any defects that were found and fixed.
-- [ ] Re-render every pre-existing trail and diff against its committed run log; all four produce no
+- [x] Re-render every pre-existing trail and diff against its committed run log; all four produce no
       output from `diff`.
-- [ ] Establish the baseline first. By the time this gate runs, every earlier task has already been
+- [x] Establish the baseline first. By the time this gate runs, every earlier task has already been
       committed, so a plain working-tree diff shows nothing and proves nothing. Anchor on the commit that
       introduced this plan's task tree — everything after it is this plan's work:
       `BASE=$(git log --diff-filter=A --format=%H -1 -- docs/flightdeck/tasks/README.md)`
       If the run is flying under autopilot, its own recorded base ref is equivalent and may be used instead.
-- [ ] Confirm the workflow control flow is untouched across that whole range:
+- [x] Confirm the workflow control flow is untouched across that whole range:
       `git diff "$BASE"..HEAD -- packages/dispatch/skills/autopilot/references/orchestrator.md`
       Every hunk must be one of exactly three permitted kinds: an added start-log line, an added end-log
       line, or an existing completion line gaining a phase flag — plus one role value changed on the
       fixer's line. Three hunks legitimately modify existing lines, so "additions only" is the wrong test.
       What must be unchanged is the control flow itself: same agents, labels, models, schemas, stage order.
-- [ ] Review the full scope of the plan's changes over the same range:
+- [x] Review the full scope of the plan's changes over the same range:
       `git diff --stat "$BASE"..HEAD -- packages/dispatch/`
-- [ ] Run the daemon against a real tree and against this plan's own tree; read every view in both.
-- [ ] Check the design anti-goals one by one against the rendered page.
-- [ ] Confirm no raw hex outside the token block:
+- [x] Run the daemon against a real tree and against this plan's own tree; read every view in both.
+- [x] Check the design anti-goals one by one against the rendered page.
+- [x] Confirm no raw hex outside the token block:
       `rg -n "#[0-9a-fA-F]{3,8}\b" packages/dispatch/skills/autopilot/dashboard/dist/style.css | rg -v "^\s*\d+:\s*--"` returns only `:root` lines.
 
 ## Eval rubric
