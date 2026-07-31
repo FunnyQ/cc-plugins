@@ -35,9 +35,46 @@ export function formatScore(score) {
 
 /** A dimension bar is as wide as its weight against the heaviest dimension. */
 export function weightWidth(weight, breakdown) {
-  const largestWeight = Math.max(
+  return percent(weight, largestWeight(breakdown));
+}
+
+function largestWeight(breakdown) {
+  return Math.max(
     ...breakdown.map((dimension) => Number(dimension.weight) || 0),
     1,
   );
-  return percent(weight, largestWeight);
+}
+
+/**
+ * The dimension rows of a rubric breakdown, as markup.
+ *
+ * The fleet table builds HTML strings and the task lanes are a petite-vue
+ * template, but the user reads the same meter in both, so the rows are written
+ * once here. Each panel keeps its own wrapper element.
+ */
+export function renderDimensions(breakdown) {
+  const largest = largestWeight(breakdown);
+  return breakdown
+    .map(
+      (dimension) => `
+    <div class="dimension">
+      <span class="label">${escapeHtml(dimension.name)}</span>
+      <span class="bar" style="inline-size: ${percent(dimension.weight, largest)}">
+        <span class="fill" style="inline-size: ${percent(dimension.score)}"></span>
+      </span>
+      <span class="score">${formatScore(dimension.score)}</span>
+    </div>`,
+    )
+    .join("");
+}
+
+/** Bucket, then task number read as a number, then ref. The lanes and the graph share it. */
+export function compareTaskOrder(left, right) {
+  return (
+    String(left.bucket ?? "").localeCompare(String(right.bucket ?? "")) ||
+    String(left.nn ?? "").localeCompare(String(right.nn ?? ""), undefined, {
+      numeric: true,
+    }) ||
+    String(left.ref ?? "").localeCompare(String(right.ref ?? ""))
+  );
 }

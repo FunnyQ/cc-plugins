@@ -1,4 +1,4 @@
-import { escapeHtml } from "./format.js";
+import { compareTaskOrder, escapeHtml } from "./format.js";
 
 const DEFAULTS = {
   nodeWidth: 112,
@@ -8,51 +8,39 @@ const DEFAULTS = {
   padding: 8,
 };
 
-function compareNodes(left, right) {
-  return (
-    String(left.bucket ?? "").localeCompare(String(right.bucket ?? "")) ||
-    String(left.nn ?? "").localeCompare(String(right.nn ?? ""), undefined, {
-      numeric: true,
-    }) ||
-    String(left.ref).localeCompare(String(right.ref))
-  );
-}
-
 export function layoutGraph(nodes, opts = {}) {
   const options = { ...DEFAULTS, ...opts };
   const orderedNodes = [...(Array.isArray(nodes) ? nodes : [])].sort(
-    compareNodes,
+    compareTaskOrder,
   );
   const refs = new Set(orderedNodes.map(({ ref }) => ref));
-  let depths = new Map();
-  let stabilised = false;
+  const depths = new Map();
 
   // A valid longest path settles within node count passes. The cap leaves
   // cycles and anything downstream of them visibly unsettled instead of hanging.
+  // Each pass reads the depths the previous pass left, so a node settles only
+  // after its dependencies did; a pass that changes nothing is the fixed point.
   for (let pass = 0; pass < orderedNodes.length; pass += 1) {
-    const nextDepths = new Map(depths);
+    const previous = new Map(depths);
+    let changed = false;
 
     for (const node of orderedNodes) {
       const dependencies = (node.dependsOn ?? []).filter((ref) =>
         refs.has(ref),
       );
-      if (!dependencies.length) {
-        nextDepths.set(node.ref, 0);
-        continue;
-      }
+      const depth = dependencies.length
+        ? dependencies.every((ref) => previous.get(ref) !== undefined)
+          ? 1 + Math.max(...dependencies.map((ref) => previous.get(ref)))
+          : undefined
+        : 0;
 
-      const dependencyDepths = dependencies.map((ref) => depths.get(ref));
-      if (dependencyDepths.every((depth) => depth !== undefined)) {
-        nextDepths.set(node.ref, 1 + Math.max(...dependencyDepths));
+      if (depth !== undefined && previous.get(node.ref) !== depth) {
+        depths.set(node.ref, depth);
+        changed = true;
       }
     }
 
-    stabilised =
-      nextDepths.size === orderedNodes.length &&
-      nextDepths.size === depths.size &&
-      [...nextDepths].every(([ref, depth]) => depths.get(ref) === depth);
-    depths = nextDepths;
-    if (stabilised) break;
+    if (!changed) break;
   }
 
   const cyclic = orderedNodes
@@ -70,7 +58,7 @@ export function layoutGraph(nodes, opts = {}) {
 
   const positions = new Map();
   for (const [depth, layerNodes] of layerGroups) {
-    layerNodes.sort(compareNodes).forEach((node, index) => {
+    layerNodes.sort(compareTaskOrder).forEach((node, index) => {
       positions.set(node.ref, {
         x:
           options.padding + index * (options.nodeWidth + options.horizontalGap),

@@ -2,8 +2,8 @@ import {
   escapeHtml,
   formatScore,
   percent,
+  renderDimensions,
   scoreClass,
-  weightWidth,
 } from "./format.js";
 
 const MAX_ROWS = 200;
@@ -36,21 +36,7 @@ function renderScore(score) {
 function renderBreakdown(row) {
   if (!expandedRows.has(row.key) || !row.score?.breakdown?.length) return "";
 
-  const breakdown = row.score.breakdown;
-  const dimensions = breakdown
-    .map(
-      (dimension) => `
-    <div class="dimension">
-      <span class="label">${escapeHtml(dimension.name)}</span>
-      <span class="bar" style="inline-size: ${weightWidth(dimension.weight, breakdown)}">
-        <span class="fill" style="inline-size: ${percent(dimension.score)}"></span>
-      </span>
-      <span class="score">${formatScore(dimension.score)}</span>
-    </div>`,
-    )
-    .join("");
-
-  return `<div class="c-fleet-rubric" id="fleet-rubric-${escapeHtml(row.key)}">${dimensions}</div>`;
+  return `<div class="c-fleet-rubric" id="fleet-rubric-${escapeHtml(row.key)}">${renderDimensions(row.score.breakdown)}</div>`;
 }
 
 function renderRow(row, nowMs) {
@@ -61,18 +47,7 @@ function renderRow(row, nowMs) {
     : inFlight
       ? "-flight"
       : "-finished";
-  // The one derived value we own is the ticking elapsed display for an in-flight row.
-  // A row that is still in flight arrives with startedAt set and elapsedMs undefined;
-  // we tick it against the browser clock once per second for real-time feedback. Once
-  // a row finishes, we print elapsedMs as given and never recompute it. Ticking is a
-  // rendering concern, not a derivation one, so the server leaves it to us.
-  const elapsed = row.startedAt
-    ? inFlight && row.elapsedMs === undefined
-      ? formatElapsed(Date.parse(row.startedAt), undefined, nowMs)
-      : row.elapsedMs === undefined
-        ? ""
-        : formatElapsed(0, row.elapsedMs, 0)
-    : "";
+  const elapsed = elapsedText(row, nowMs);
   const unknownLabel =
     row.role === "unknown"
       ? `<span class="raw-label">${escapeHtml(row.label)}</span>`
@@ -118,12 +93,25 @@ export function connectEvents({ onFleet, onState }) {
   };
 }
 
-export function formatElapsed(startedMs, endedMs, nowMs) {
-  const elapsedMs =
-    endedMs === undefined ? nowMs - startedMs : endedMs - startedMs;
+export function formatDuration(elapsedMs) {
   const seconds = Math.max(0, elapsedMs) / 1_000;
   if (seconds < 60) return `${seconds.toFixed(1)}s`;
   return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
+}
+
+/**
+ * The one derived value we own is the elapsed display.
+ *
+ * A row still in flight arrives with `startedAt` set and `elapsedMs` undefined;
+ * we tick it against the browser clock once per second for real-time feedback.
+ * Once a row finishes we print `elapsedMs` as given and never recompute it.
+ * Ticking is a rendering concern, not a derivation one, so the server leaves it here.
+ */
+export function elapsedText(row, nowMs) {
+  if (!row.startedAt) return "";
+  if (row.elapsedMs !== undefined) return formatDuration(row.elapsedMs);
+  if (!isInFlight(row)) return "";
+  return formatDuration(nowMs - Date.parse(row.startedAt));
 }
 
 export function isInFlight(row) {
@@ -135,10 +123,8 @@ export function tickElapsed(root, nowMs = Date.now()) {
   for (const row of root?.querySelectorAll?.("[data-started-at]") ?? []) {
     const cell = row.querySelector(".fleet-cell.-elapsed");
     if (!cell) continue;
-    cell.textContent = formatElapsed(
-      Date.parse(row.dataset.startedAt),
-      undefined,
-      nowMs,
+    cell.textContent = formatDuration(
+      nowMs - Date.parse(row.dataset.startedAt),
     );
   }
 }

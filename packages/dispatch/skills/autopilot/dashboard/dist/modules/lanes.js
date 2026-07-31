@@ -1,4 +1,10 @@
-import { formatScore, percent, scoreClass, weightWidth } from "./format.js";
+import {
+  compareTaskOrder,
+  formatScore,
+  percent,
+  renderDimensions,
+  scoreClass,
+} from "./format.js";
 
 export function buildLanes(tree) {
   const tasks = Array.isArray(tree?.tasks) ? tree.tasks : [];
@@ -10,22 +16,24 @@ export function buildLanes(tree) {
     else byBucket.set(task.bucket, [task]);
   }
 
-  return [...(tree?.buckets ?? [])]
-    .sort((left, right) => left.localeCompare(right))
-    .map((bucket) => {
-      const laneTasks = (byBucket.get(bucket) ?? []).sort((left, right) =>
-        left.nn.localeCompare(right.nn, undefined, { numeric: true }),
-      );
+  // The bucket order arrives sorted from /api/tree, which owns that rule.
+  return (tree?.buckets ?? []).map((bucket) => {
+    const laneTasks = (byBucket.get(bucket) ?? []).sort(compareTaskOrder);
 
-      return {
-        bucket,
-        tasks: laneTasks,
-        done: laneTasks.filter((task) => task.state === "done").length,
-      };
-    });
+    return {
+      bucket,
+      tasks: laneTasks,
+      done: laneTasks.filter((task) => task.state === "done").length,
+    };
+  });
 }
 
 export function Lanes({ tree }) {
+  // Held in the closure, not on the scope: a cache written during a render must
+  // not be reactive, or storing it would schedule the very render that filled it.
+  let cachedFrom = null;
+  let cachedLanes = [];
+
   return {
     $template: `
       <div class="c-task-lanes">
@@ -63,8 +71,8 @@ export function Lanes({ tree }) {
                   </span>
                   <span v-if="task.latestScore" class="c-score-meter">
                     <span class="track" aria-hidden="true">
-                      <span class="fill" :class="scoreClass(task.latestScore)" :style="{ inlineSize: scorePosition(task.latestScore.weighted) }"></span>
-                      <span class="threshold" :style="{ insetInlineStart: scorePosition(task.latestScore.threshold) }"></span>
+                      <span class="fill" :class="scoreClass(task.latestScore)" :style="{ inlineSize: percent(task.latestScore.weighted) }"></span>
+                      <span class="threshold" :style="{ insetInlineStart: percent(task.latestScore.threshold) }"></span>
                     </span>
                     <span class="value">{{ formatScore(task.latestScore.weighted) }}</span>
                   </span>
@@ -74,15 +82,8 @@ export function Lanes({ tree }) {
                   v-show="isExpanded(task.ref)"
                   class="c-rubric-breakdown"
                   :id="\`rubric-\${task.ref.replace('/', '-')}\`"
-                >
-                  <div v-for="dimension in task.latestScore.breakdown" :key="dimension.name" class="dimension">
-                    <span class="label">{{ dimension.name }}</span>
-                    <span class="bar" :style="{ inlineSize: weightWidth(dimension.weight, task.latestScore.breakdown) }">
-                      <span class="fill" :style="{ inlineSize: scorePosition(dimension.score) }"></span>
-                    </span>
-                    <span class="score">{{ formatScore(dimension.score) }}</span>
-                  </div>
-                </div>
+                  v-html="renderDimensions(task.latestScore.breakdown)"
+                ></div>
               </article>
             </div>
           </section>
@@ -90,8 +91,15 @@ export function Lanes({ tree }) {
       </div>
     `,
     expandedRefs: {},
+    // The template re-reads lanes() on every render, including a rubric toggle.
+    // Each /api/tree payload replaces the tasks array, so its identity is what
+    // decides whether the grouping and the sorts have to run again.
     lanes() {
-      return buildLanes(tree);
+      if (cachedFrom !== tree.tasks) {
+        cachedFrom = tree.tasks;
+        cachedLanes = buildLanes(tree);
+      }
+      return cachedLanes;
     },
     isExpanded(ref) {
       return this.expandedRefs[ref] === true;
@@ -106,10 +114,8 @@ export function Lanes({ tree }) {
       return Boolean(task.latestScore?.breakdown?.length);
     },
     scoreClass,
-    scorePosition(value) {
-      return percent(value);
-    },
-    weightWidth,
+    percent,
+    renderDimensions,
     formatScore,
   };
 }

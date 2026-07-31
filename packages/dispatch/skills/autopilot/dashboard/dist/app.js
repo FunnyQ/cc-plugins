@@ -160,6 +160,9 @@ connectEvents({
     syncFleetTicker();
   },
   onState(connection) {
+    // EventSource repeats `error` while it reconnects. Rebuilding the table for
+    // a state it already shows would throw away focus for no visible change.
+    if (fleetState.connection === connection) return;
     fleetState.connection = connection;
     drawFleet();
   },

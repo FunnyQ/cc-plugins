@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  formatElapsed,
+  elapsedText,
+  formatDuration,
   isInFlight,
   renderFleet,
   tickElapsed,
@@ -52,24 +53,39 @@ afterEach(() => {
   expandedKeys.clear();
 });
 
-describe("formatElapsed", () => {
-  test("formats sub-minute ticking durations with one decimal place", () => {
-    expect(formatElapsed(0, undefined, 5_432)).toBe("5.4s");
-    expect(formatElapsed(0, undefined, 45_000)).toBe("45.0s");
+describe("formatDuration", () => {
+  test("formats sub-minute durations with one decimal place", () => {
+    expect(formatDuration(5_432)).toBe("5.4s");
+    expect(formatDuration(45_000)).toBe("45.0s");
   });
 
   test("formats durations at and above one minute", () => {
-    expect(formatElapsed(0, 60_000)).toBe("1m 0s");
-    expect(formatElapsed(0, 200_000)).toBe("3m 20s");
-  });
-
-  test("uses the end time for finished rows instead of the current time", () => {
-    expect(formatElapsed(100_000, 130_000, 900_000)).toBe("30.0s");
-    expect(formatElapsed(100_000, undefined, 140_000)).toBe("40.0s");
+    expect(formatDuration(60_000)).toBe("1m 0s");
+    expect(formatDuration(200_000)).toBe("3m 20s");
   });
 
   test("clamps negative durations to zero", () => {
-    expect(formatElapsed(0, undefined, -1_000)).toBe("0.0s");
+    expect(formatDuration(-1_000)).toBe("0.0s");
+  });
+});
+
+describe("elapsedText", () => {
+  const startedAt = "2026-01-01T00:00:00.000Z";
+  const now = Date.parse("2026-01-01T00:00:40.000Z");
+
+  test("ticks an in-flight row against the current time", () => {
+    expect(elapsedText({ status: "in-flight", startedAt }, now)).toBe("40.0s");
+  });
+
+  test("prints the recorded duration of a finished row as given", () => {
+    expect(
+      elapsedText({ status: "finished", startedAt, elapsedMs: 30_000 }, now),
+    ).toBe("30.0s");
+  });
+
+  test("prints nothing without a start time or a duration", () => {
+    expect(elapsedText({ status: "finished" }, now)).toBe("");
+    expect(elapsedText({ status: "finished", startedAt }, now)).toBe("");
   });
 });
 
