@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangar</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="app" v-scope>
+      <header class="deck-header">
+        <div class="plan-identity">
+          <span class="eyebrow">Flight plan</span>
+          <h1>{{ planTitle || "Hangar" }}</h1>
+          <span class="slug">{{ slug || "Awaiting tree data" }}</span>
+        </div>
+
+        <div class="plan-progress">
+          <svg class="progress-ring" viewBox="0 0 32 32" role="img" :aria-label="`${counts.done} of ${counts.total} done`">
+            <circle class="track" cx="16" cy="16" r="12"></circle>
+            <circle
+              class="value"
+              cx="16"
+              cy="16"
+              r="12"
+              :stroke-dasharray="`${counts.total ? (counts.done / counts.total) * 75.398 : 0} 75.398`"
+            ></circle>
+          </svg>
+          <span><strong>{{ counts.done }}</strong> of {{ counts.total }}</span>
+        </div>
+
+        <dl class="plan-counts" aria-label="Flight plan counts">
+          <div>
+            <dt>Total</dt>
+            <dd>{{ counts.total }}</dd>
+          </div>
+          <div class="-done">
+            <dt>Done</dt>
+            <dd>{{ counts.done }}</dd>
+          </div>
+          <div class="-flight">
+            <dt>In flight</dt>
+            <dd><span v-if="counts.inProgress" class="status-dot" aria-hidden="true"></span>{{ counts.inProgress }}</dd>
+          </div>
+          <div class="-ready">
+            <dt>Ready</dt>
+            <dd>{{ counts.ready }}</dd>
+          </div>
+          <div class="-blocked">
+            <dt>Blocked</dt>
+            <dd>{{ counts.blocked }}</dd>
+          </div>
+        </dl>
+
+        <div class="view-toggle" aria-label="Task view">
+          <button type="button" :aria-pressed="view === 'lanes'" @click="view = 'lanes'">Lanes</button>
+          <button type="button" :aria-pressed="view === 'graph'" @click="view = 'graph'">Graph</button>
+        </div>
+
+        <div v-if="loading" class="header-state" role="status">Loading flight tree...</div>
+        <div v-else-if="loadError" class="header-state -alert" role="alert">
+          <strong>Tree unavailable</strong>
+          <span>{{ loadError }}</span>
+        </div>
+        <div v-else-if="errors.length" class="header-state -alert" role="alert">
+          <strong>{{ errors.length }} tree {{ errors.length === 1 ? "error" : "errors" }}</strong>
+          <ul>
+            <li v-for="error in errors" :key="error">{{ typeof error === "string" ? error : (error.reason || error.message || JSON.stringify(error)) }}</li>
+          </ul>
+        </div>
+      </header>
+      <section class="deck-top" aria-label="Task view"></section>
+      <section class="deck-fleet" aria-label="Fleet view"></section>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
