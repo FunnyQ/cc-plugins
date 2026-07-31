@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/04
 > **Blocks**: ui/03, wiring/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -124,37 +124,37 @@ exhaust file handles over a long session.
 
 ## Acceptance criteria
 
-- [ ] Connecting emits one `fleet` snapshot derived from whatever the log already holds.
-- [ ] Each snapshot carries the full current row set, `entryCount`, and `logPresent`.
-- [ ] A line appended after connect produces a new snapshot within 2s.
-- [ ] Connecting when the log file does not exist holds the connection open and emits a snapshot with
+- [x] Connecting emits one `fleet` snapshot derived from whatever the log already holds.
+- [x] Each snapshot carries the full current row set, `entryCount`, and `logPresent`.
+- [x] A line appended after connect produces a new snapshot within 2s.
+- [x] Connecting when the log file does not exist holds the connection open and emits a snapshot with
       `logPresent: false` and no rows.
-- [ ] The backlog snapshot reflects only lines that parse; malformed and blank lines are excluded from
+- [x] The backlog snapshot reflects only lines that parse; malformed and blank lines are excluded from
       the rows and from `entryCount`.
-- [ ] A partial trailing line is not parsed; it is included once its newline arrives.
-- [ ] A multi-byte UTF-8 character split across two reads is reassembled intact: the resulting entry
+- [x] A partial trailing line is not parsed; it is included once its newline arrives.
+- [x] A multi-byte UTF-8 character split across two reads is reassembled intact: the resulting entry
       parses, its text is uncorrupted, and it is counted exactly once.
-- [ ] Truncating the file below the cursor clears the cursor, the held partial, and the entry list, then
+- [x] Truncating the file below the cursor clears the cursor, the held partial, and the entry list, then
       re-reads from the start.
-- [ ] The cursor advances to the full size read on every pass; no byte range is read twice.
-- [ ] A burst of appends within 250ms produces one snapshot, not many.
-- [ ] The browser receives no raw log entries; aggregation happens only on the server.
-- [ ] A `:heartbeat` comment is sent on an interval.
-- [ ] Disconnecting releases both watchers and every timer.
+- [x] The cursor advances to the full size read on every pass; no byte range is read twice.
+- [x] A burst of appends within 250ms produces one snapshot, not many.
+- [x] The browser receives no raw log entries; aggregation happens only on the server.
+- [x] A `:heartbeat` comment is sent on an interval.
+- [x] Disconnecting releases both watchers and every timer.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` — all green, including the pure helpers.
-- [ ] Copy a real trail to a scratch plan directory and start the daemon against it:
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` — all green, including the pure helpers.
+- [x] Copy a real trail to a scratch plan directory and start the daemon against it:
       `docs/chronicle/.flightlog/run.jsonl` holds real score and note entries.
       `curl -N -s localhost:5757/api/events | head -1` shows a `fleet` frame with a populated `rows` array.
-- [ ] Start against a scratch plan that has a `tasks/` tree but no flightlog; attach a client and confirm
+- [x] Start against a scratch plan that has a `tasks/` tree but no flightlog; attach a client and confirm
       it stays connected with a `logPresent: false` frame — no immediate exit, no 404.
-- [ ] With that client attached, create the log and append one entry with the flightlog CLI; confirm a
+- [x] With that client attached, create the log and append one entry with the flightlog CLI; confirm a
       new snapshot arrives with one row.
-- [ ] Append a line in two writes, splitting mid-JSON, and confirm no snapshot counts it until the
+- [x] Append a line in two writes, splitting mid-JSON, and confirm no snapshot counts it until the
       newline lands.
-- [ ] Split a multi-byte character across the boundary and confirm it survives. Write an entry whose
+- [x] Split a multi-byte character across the boundary and confirm it survives. Write an entry whose
       message contains non-ASCII text, then append it in two writes that cut **inside** one character's
       byte sequence:
       ```bash
@@ -164,11 +164,11 @@ exhaust file handles over a long session.
       printf '%s' "$LINE" | tail -c +91 >> <log>; printf '\n' >> <log>
       ```
       The resulting snapshot must show the message intact, with `entryCount` up by exactly one.
-- [ ] Append three entries within 250ms and confirm one snapshot arrives, not three.
-- [ ] Append a deliberately malformed line and confirm the stream continues and `entryCount` does not grow.
-- [ ] Truncate the file to zero, append a fresh line, and confirm the client receives a snapshot with one
+- [x] Append three entries within 250ms and confirm one snapshot arrives, not three.
+- [x] Append a deliberately malformed line and confirm the stream continues and `entryCount` does not grow.
+- [x] Truncate the file to zero, append a fresh line, and confirm the client receives a snapshot with one
       row rather than silence.
-- [ ] Confirm no cross-plugin import:
+- [x] Confirm no cross-plugin import:
       `rg -n "packages/monitor" packages/dispatch/skills/autopilot/scripts/` returns nothing.
 
 ## Eval rubric

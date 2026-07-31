@@ -8,7 +8,7 @@
 >
 > **Depends on**: ui/01, server/04
 > **Blocks**: ui/04, wiring/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -85,36 +85,36 @@ watching.
 
 ## Acceptance criteria
 
-- [ ] One lane per bucket, alphabetically ordered, each with a finished-over-total count.
-- [ ] Cards within a lane are ordered by their two-digit sequence.
-- [ ] Each card shows a status dot coloured by derived state, the ref in monospace, and the title.
-- [ ] A task on attempt 2 or higher shows its attempt count.
-- [ ] A blocked task shows one badge per unfinished dependency, naming that dependency's ref.
-- [ ] A task with a score shows the meter, the threshold tick, and the numeric value.
-- [ ] A task with no score shows no meter at all.
-- [ ] Clicking a card reveals its rubric breakdown bars; clicking again collapses them.
-- [ ] The lane strip scrolls horizontally; the page body does not.
-- [ ] Polling pauses while the tab is hidden and resumes on visibility.
-- [ ] A failed refresh keeps the last good render and surfaces the error in the header.
-- [ ] An empty tree renders an explicit empty state.
+- [x] One lane per bucket, alphabetically ordered, each with a finished-over-total count.
+- [x] Cards within a lane are ordered by their two-digit sequence.
+- [x] Each card shows a status dot coloured by derived state, the ref in monospace, and the title.
+- [x] A task on attempt 2 or higher shows its attempt count.
+- [x] A blocked task shows one badge per unfinished dependency, naming that dependency's ref.
+- [x] A task with a score shows the meter, the threshold tick, and the numeric value.
+- [x] A task with no score shows no meter at all.
+- [x] Clicking a card reveals its rubric breakdown bars; clicking again collapses them.
+- [x] The lane strip scrolls horizontally; the page body does not.
+- [x] Polling pauses while the tab is hidden and resumes on visibility.
+- [x] A failed refresh keeps the last good render and surfaces the error in the header.
+- [x] An empty tree renders an explicit empty state.
 
 ## Verification
 
-- [ ] Start against a real tree with 6 tasks in 3 buckets, all done:
+- [x] Start against a real tree with 6 tasks in 3 buckets, all done:
       `bun packages/dispatch/skills/autopilot/scripts/flightdeck.ts --plan "$(git rev-parse --show-toplevel)/docs/waypoints-skill"`
       — confirm 3 lanes, 6 cards, every dot in the done colour.
-- [ ] Start against this plan's own tree, whose tasks are mostly unstarted, and confirm the mix of
+- [x] Start against this plan's own tree, whose tasks are mostly unstarted, and confirm the mix of
       ready and blocked states with correct blocked-by badges.
-- [ ] Copy a plan tree to a scratch directory, edit one task's `Status` to `todo` and another's
+- [x] Copy a plan tree to a scratch directory, edit one task's `Status` to `todo` and another's
       dependency so it cannot be satisfied, restart, and confirm the ready and blocked rendering.
-- [ ] In that scratch copy, corrupt every file in one bucket and confirm its lane heading still renders
+- [x] In that scratch copy, corrupt every file in one bucket and confirm its lane heading still renders
       with the parse errors shown beneath it, rather than the bucket disappearing.
-- [ ] Click a card that has a score and confirm the breakdown bars appear with dimension names.
-- [ ] Background the tab for 30s, confirm no network requests fire, then focus it and confirm one fires
+- [x] Click a card that has a score and confirm the breakdown bars appear with dimension names.
+- [x] Background the tab for 30s, confirm no network requests fire, then focus it and confirm one fires
       immediately.
-- [ ] Stop the daemon while the page is open; confirm the lanes stay rendered and the header shows the
+- [x] Stop the daemon while the page is open; confirm the lanes stay rendered and the header shows the
       error.
-- [ ] Confirm no horizontal page scrollbar at 1000px, 900px, and 600px wide.
+- [x] Confirm no horizontal page scrollbar at 1000px, 900px, and 600px wide.
 
 ## Eval rubric
 
