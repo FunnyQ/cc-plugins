@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
@@ -49,20 +49,16 @@ export async function loadPlan(planDir: string): Promise<{
     // An unreadable PLAN.md leaves the slug as the title.
   }
 
-  const [taskResult, taskEntries] = await Promise.all([
+  const [taskResult, entries] = await Promise.all([
     loadAllTasks(tasksDir),
-    readdir(tasksDir, { withFileTypes: true }),
+    readLog(join(planDir, ".flightlog", "run.jsonl")),
   ]);
-  const bucketDirs = taskEntries
-    .filter((entry) => entry.isDirectory() && entry.name !== "_context")
-    .map((entry) => entry.name);
-
-  const entries = await readLog(join(planDir, ".flightlog", "run.jsonl"));
 
   return {
     slug,
     planTitle,
-    bucketDirs,
+    // The loader already applied the bucket rule; re-listing here would state it twice.
+    bucketDirs: taskResult.buckets,
     loaded: {
       byRef: taskResult.byRef,
       errors: taskResult.errors.map((error) => ({

@@ -8,7 +8,7 @@ import {
   type FSWatcher,
 } from "node:fs";
 import { dirname } from "node:path";
-import { parseLog } from "../../flightplan/scripts/lib/flightlog";
+import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
 import { nextCursor, splitCompleteLines } from "./tail";
@@ -47,7 +47,7 @@ export function decodeLogChunk(
 ): { entries: FlightlogEntry[]; partial: string } {
   const text = heldPartial + decoder.decode(bytes, { stream: true });
   const { complete, partial } = splitCompleteLines(text);
-  return { entries: parseLog(complete.join("\n")), partial };
+  return { entries: parseLines(complete), partial };
 }
 
 export function createDebouncer(
@@ -196,15 +196,16 @@ export function eventsHandler(request: Request, logPath: string): Response {
           logPresent = true;
           inode = stat.ino;
           const from = reset ? 0 : next.from;
-          if (stat.size > from) {
+          const grew = stat.size > from;
+          if (grew) {
             const bytes = readRange(from, stat.size);
             const decoded = decodeLogChunk(decoder, bytes, heldPartial);
             entries.push(...decoded.entries);
             heldPartial = decoded.partial;
             cursor = stat.size;
-            if (!initializing) debounce.schedule();
-          } else if (!wasPresent || reset) {
-            if (!initializing) debounce.schedule();
+          }
+          if ((grew || !wasPresent || reset) && !initializing) {
+            debounce.schedule();
           }
 
           if (fileWatcher === null) attachFileWatcher();
