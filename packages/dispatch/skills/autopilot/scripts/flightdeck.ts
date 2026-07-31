@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { removeRecord, writeRecord } from "./daemon-record";
+import { main as launchMain } from "./launch";
 import { serveStatic } from "./static-serve";
 
 const DEFAULT_PORT = 5757;
@@ -38,10 +39,6 @@ export function parseArgs(argv: string[]): FlightdeckOptions {
       port = Number(argv[index + 1]);
       index += 1;
     }
-  }
-
-  if (!serve) {
-    return { error: "--serve is required" };
   }
 
   if (plan === undefined || !isAbsolute(plan)) {
@@ -97,6 +94,11 @@ export async function createServer(
 }
 
 async function main(): Promise<void> {
+  if (!Bun.argv.slice(2).includes("--serve")) {
+    await launchMain();
+    return;
+  }
+
   const options = parseArgs(Bun.argv.slice(2));
 
   if (options.error !== undefined) {
