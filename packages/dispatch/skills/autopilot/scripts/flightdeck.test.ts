@@ -38,8 +38,14 @@ describe("module import", () => {
 });
 
 describe("parseArgs", () => {
+  function messageOf(argv: string[]): string {
+    const parsed = parseArgs(argv);
+    return parsed.ok ? "" : parsed.message;
+  }
+
   test("parses plan and port", () => {
     expect(parseArgs(["--serve", "--plan", plan, "--port", "6000"])).toEqual({
+      ok: true,
       plan,
       port: 6000,
     });
@@ -47,25 +53,26 @@ describe("parseArgs", () => {
 
   test("uses the default port", () => {
     expect(parseArgs(["--serve", "--plan", plan])).toEqual({
+      ok: true,
       plan,
       port: 5757,
     });
   });
 
   test("rejects an out-of-range port", () => {
-    expect(
-      parseArgs(["--serve", "--plan", plan, "--port", "65536"]).error,
-    ).toContain("--port");
+    expect(messageOf(["--serve", "--plan", plan, "--port", "65536"])).toContain(
+      "--port",
+    );
   });
 
   test("reports a plan directory that does not exist", () => {
     expect(
-      parseArgs(["--serve", "--plan", join(fixtureRoot, "absent")]).error,
+      messageOf(["--serve", "--plan", join(fixtureRoot, "absent")]),
     ).toContain("does not exist");
   });
 
   test("rejects a relative plan", () => {
-    expect(parseArgs(["--serve", "--plan", "relative/plan"]).error).toContain(
+    expect(messageOf(["--serve", "--plan", "relative/plan"])).toContain(
       "absolute",
     );
   });
@@ -74,9 +81,7 @@ describe("parseArgs", () => {
     const emptyPlan = join(fixtureRoot, "empty-plan");
     mkdirSync(emptyPlan);
 
-    expect(parseArgs(["--serve", "--plan", emptyPlan]).error).toContain(
-      "tasks/",
-    );
+    expect(messageOf(["--serve", "--plan", emptyPlan])).toContain("tasks/");
   });
 });
 
@@ -111,6 +116,19 @@ describe("createServer", () => {
       pid: process.pid,
       port: server.port,
       root: import.meta.dir,
+      plan,
+    });
+  });
+
+  test("identifies itself on the health endpoint", async () => {
+    const server = await createServer(plan, 0);
+    servers.push(server);
+
+    const response = await fetch(`http://127.0.0.1:${server.port}/api/health`);
+
+    expect(await response.json()).toEqual({
+      flightdeck: true,
+      pid: process.pid,
       plan,
     });
   });

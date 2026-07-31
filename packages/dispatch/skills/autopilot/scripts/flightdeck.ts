@@ -11,27 +11,25 @@ import { buildTreePayload, loadPlan } from "./tree-api";
 
 const distRoot = resolve(import.meta.dir, "..", "dashboard", "dist");
 
-export type FlightdeckOptions = {
-  plan?: string;
-  port?: number;
-  error?: string;
-};
+export type FlightdeckOptions =
+  | { ok: true; plan: string; port: number }
+  | { ok: false; message: string };
 
 /** The serving entry point shares the launcher's flag shapes and plan rules. */
 export function parseArgs(argv: string[]): FlightdeckOptions {
   const parsed = parsePlanArgs(argv);
 
   if (!parsed.ok) {
-    return { error: parsed.message };
+    return { ok: false, message: parsed.message };
   }
 
   const validation = validatePlanDir(parsed.args.plan);
 
   if (!validation.ok) {
-    return { error: validation.message };
+    return { ok: false, message: validation.message };
   }
 
-  return { plan: parsed.args.plan, port: parsed.args.port };
+  return { ok: true, plan: parsed.args.plan, port: parsed.args.port };
 }
 
 export async function createServer(
@@ -50,6 +48,17 @@ export async function createServer(
       port,
       async fetch(request) {
         const url = new URL(request.url);
+
+        // The launcher's identity check: a port answering HTTP is not proof of a
+        // flightdeck, and a pid can be recycled. This names the process it is safe
+        // to reuse or to signal.
+        if (url.pathname === "/api/health") {
+          return Response.json({
+            flightdeck: true,
+            pid: process.pid,
+            plan,
+          });
+        }
 
         if (url.pathname === "/api/tree") {
           const result = buildTreePayload(await loadPlan(plan));
@@ -92,12 +101,12 @@ async function main(): Promise<void> {
 
   const options = parseArgs(Bun.argv.slice(2));
 
-  if (options.error !== undefined) {
-    console.error(`flightdeck error: ${options.error}`);
+  if (!options.ok) {
+    console.error(`flightdeck error: ${options.message}`);
     process.exit(2);
   }
 
-  const server = await createServer(options.plan!, options.port!);
+  const server = await createServer(options.plan, options.port);
   const shutdown = async () => {
     removeRecord();
     await server.stop();
