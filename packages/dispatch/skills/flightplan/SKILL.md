@@ -72,7 +72,7 @@ See `references/interview-guide.md` for the canonical walking-the-tree examples,
 - **Cross-bucket dependencies** — which task in bucket A unblocks which task in bucket B.
 - **Acceptance criteria & verification** — for every requirement, how it gets validated.
 - **Eval rubric** — the graded quality bar for each task (dimensions, weights, pass line, hard-fail veto) on top of the binary acceptance gate. Recommend the defaults (`Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1`, pass `> 4.0`, `Correctness < 4` veto). Adapt them as needed. A shared bar goes in `_context/rubric.md`. See `references/interview-guide.md` → "Eval rubric (ask per task)".
-- **Final review** — every plan ends with one terminal task marked `> **Final review**: true` that depends (transitively) on every other task. It is the holistic gate: integration, consistency, regressions, and whether the PLAN goal was actually met. Its own rubric scores those axes — it does not re-score individual tasks. `lint-task.ts` requires it (single-task plans exempt).
+- **Final review** — every plan ends with one terminal task marked `> **Final review**: true` that depends (transitively) on every other task. It is the holistic gate: integration, consistency, regressions, and whether the PLAN goal was actually met. Its own rubric scores those axes — it does not re-score individual tasks. `lint-task.ts` requires it (single-task plans exempt). When the tree runs tests anywhere, the closing task's `## Verification` must run a suite too, and the linter enforces it.
 - **Conventions worth freezing** — commit style, code style, file layout, naming (these become `_context/shared.md`).
 - **Failure modes & rollback** — what could go wrong, and how to recover.
 

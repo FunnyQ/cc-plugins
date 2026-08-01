@@ -111,6 +111,8 @@ This is the holistic gate. Per-task rubrics catch per-task quality. The final re
 
 A plan with a single task is exempt. That task is its own terminal. Don't mark more than one task. Keep one unambiguous closing gate.
 
+If any task in the tree runs a test suite, the closing review task's `## Verification` must run one too. This requirement belongs on the closing task because it is the last writer: it applies edits after every other task has run, and only its own `## Verification` gates those edits. Recognized runners are `bun test`, `npm test` / `pnpm test` / `yarn test`, `cargo test`, `go test`, `rspec`, `make test`, and `pytest`. A docs-only tree that runs no tests anywhere needs nothing and triggers nothing. The linter enforces presence, not reach, so a narrow test path satisfies the rule; read the advisory report to judge whether the suite is broad enough.
+
 ### `Eval rubric` (required, machine-parseable)
 
 Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary gate** (pass or fail). The rubric is the **graded quality score** on top of that gate. A judge agent, or you, uses the rubric to decide "good enough". A workflow loops against the rubric until the task passes.
