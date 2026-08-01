@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: none
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -254,59 +254,59 @@ In `fleet.test.ts`, add one case that feeds a synthesized flightlog line carryin
 
 ## Acceptance criteria
 
-- [ ] `COMMIT_SCHEMA` exists inside the fenced ```` ```javascript ```` block with all four fields
+- [x] `COMMIT_SCHEMA` exists inside the fenced ```` ```javascript ```` block with all four fields
       (`committed`, `shas`, `failed`, `reason`) listed in `required`.
-- [ ] The inter-wave commit is its own `agent()` call labelled `commit-wave-<n>`, running on
+- [x] The inter-wave commit is its own `agent()` call labelled `commit-wave-<n>`, running on
       `MODEL.commit` with `schema: COMMIT_SCHEMA`.
-- [ ] That call sits after every scout guard and immediately before the `parallel()` dispatch; no commit
+- [x] That call sits after every scout guard and immediately before the `parallel()` dispatch; no commit
       text remains anywhere in the scout prompt, and the `commitPreamble` binding is gone.
-- [ ] The gating condition is still exactly `wave > 1 && CFG.commitBetweenWaves && escalations.length === 0`.
-- [ ] `SCOUT_SCHEMA` is byte-for-byte unchanged by this task.
-- [ ] A commit result with `failed: true` pushes one escalation with `task: '(commit)'`, `attempt: 0`,
+- [x] The gating condition is still exactly `wave > 1 && CFG.commitBetweenWaves && escalations.length === 0`.
+- [x] `SCOUT_SCHEMA` is byte-for-byte unchanged by this task.
+- [x] A commit result with `failed: true` pushes one escalation with `task: '(commit)'`, `attempt: 0`,
       `infrastructure: true`, `parked: false`, and a reason carrying the reported git error.
-- [ ] A null commit result pushes an escalation whose reason states the outcome is unknown, distinct from
+- [x] A null commit result pushes an escalation whose reason states the outcome is unknown, distinct from
       the reported-failure wording.
-- [ ] Neither commit escalation breaks the wave loop; ready tasks in that wave still run.
-- [ ] The commit instructions are built by a function taking the agent label, not a bare constant, and
+- [x] Neither commit escalation breaks the wave loop; ready tasks in that wave still run.
+- [x] The commit instructions are built by a function taking the agent label, not a bare constant, and
       each call site passes the same literal it uses as its `agent()` label.
-- [ ] The built string carries a `--phase start` flightlog call with `--role commit` **before** its
+- [x] The built string carries a `--phase start` flightlog call with `--role commit` **before** its
       `git status --porcelain` step, and a matching `--phase end` call after the
       `git log --oneline -n 5` confirmation and before the failure rule, with the remaining steps
       renumbered.
-- [ ] Both flightlog commands carry the interpolated label; no `<your label>` placeholder remains in
+- [x] Both flightlog commands carry the interpolated label; no `<your label>` placeholder remains in
       either, so an agent cannot pair its entries under a fabricated name.
-- [ ] The post-loop commit uses `COMMIT_SCHEMA` and the same `(commit)` escalation on failure or a null
+- [x] The post-loop commit uses `COMMIT_SCHEMA` and the same `(commit)` escalation on failure or a null
       result, with its own guard unchanged.
-- [ ] The `done === total` wave produces no inter-wave commit, so the last wave is committed exactly once.
-- [ ] `fleet.ts` source is unmodified.
+- [x] The `done === total` wave produces no inter-wave commit, so the last wave is committed exactly once.
+- [x] `fleet.ts` source is unmodified.
 
-- [ ] The wave-loop diagram and the affected gotchas in `orchestrator.md` describe the commit's new
+- [x] The wave-loop diagram and the affected gotchas in `orchestrator.md` describe the commit's new
       position, its schema, and the fact that a commit can now escalate — no stale claim about the
       commit survives outside the fenced block.
 
-- [ ] The commit instructions carry BOTH a `--phase start` announce call and a `--phase end`
+- [x] The commit instructions carry BOTH a `--phase start` announce call and a `--phase end`
       completion call, with the identical `--agent` label in each, matching the lifecycle every other
       worker prompt follows.
-- [ ] The end call is also required on the failure path, so a blocked commit closes its start event
+- [x] The end call is also required on the failure path, so a blocked commit closes its start event
       instead of leaving an unmatched entry.
 
 ## Verification
 
-- [ ] Every **executable-script** change lands inside the fenced ```` ```javascript ```` block of
+- [x] Every **executable-script** change lands inside the fenced ```` ```javascript ```` block of
       `orchestrator.md` — the fixture extracts that block verbatim by string search, so script logic
       written in the surrounding prose is invisible to both the runtime and the test.
-- [ ] The prose corrections listed under "Files to create / modify" are made **outside** that block, and
+- [x] The prose corrections listed under "Files to create / modify" are made **outside** that block, and
       no longer contradict the shipped script. These two checks are complementary, not in tension: script
       logic goes inside the fence, descriptions of it go outside.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling suites.
-- [ ] A fixture assertion proves the label order within one wave: `commit-wave-2` appears after
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` green.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling suites.
+- [x] A fixture assertion proves the label order within one wave: `commit-wave-2` appears after
       `scout-wave-2` and before that wave's first `dev:` label.
-- [ ] A fixture assertion proves a guard-aborted wave emits no label starting with `commit-`.
-- [ ] `grep -c "commit" packages/dispatch/skills/autopilot/scripts/fleet.ts` is unchanged from before the
+- [x] A fixture assertion proves a guard-aborted wave emits no label starting with `commit-`.
+- [x] `grep -c "commit" packages/dispatch/skills/autopilot/scripts/fleet.ts` is unchanged from before the
       task, confirming `fleet.ts` was not edited.
-- [ ] `git diff --stat packages/dispatch/skills/autopilot/scripts/fleet.ts` is empty.
+- [x] `git diff --stat packages/dispatch/skills/autopilot/scripts/fleet.ts` is empty.
 
 ## Eval rubric
 

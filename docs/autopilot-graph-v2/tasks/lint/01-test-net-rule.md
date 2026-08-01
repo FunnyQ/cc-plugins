@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: none
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -167,56 +167,56 @@ judge a closing gate, and — importantly — an execution run's dev driver lint
 
 ## Acceptance criteria
 
-- [ ] `testCommandsIn` is exported and returns the backticked test-runner commands from a task's
+- [x] `testCommandsIn` is exported and returns the backticked test-runner commands from a task's
       `## Verification` section, in document order. Each of these twelve command forms has its own
       test — this list is authoritative, so do not infer the set from a count:
       `bun test`, `npm test`, `npm run test`, `pnpm test`, `pnpm run test`, `yarn test`,
       `yarn run test`, `cargo test`, `pytest`, `go test`, `rspec`, `make test`.
-- [ ] All three `<pm> run test` forms are covered, not only the bare `<pm> test` forms — the regex's
+- [x] All three `<pm> run test` forms are covered, not only the bare `<pm> test` forms — the regex's
       optional `run ` group makes both valid, so testing one shape leaves the other unproven.
-- [ ] These near-misses have tests proving they do NOT match: `bun testify`, `make tested`, `rspecs`,
+- [x] These near-misses have tests proving they do NOT match: `bun testify`, `make tested`, `rspecs`,
       and `npm testx` — each blocked by the trailing word boundary.
-- [ ] `testCommandsIn` returns `[]` for a task with no `## Verification` section, and for a task whose
+- [x] `testCommandsIn` returns `[]` for a task with no `## Verification` section, and for a task whose
       only test command appears outside that section.
-- [ ] `checkFinalReviewTestNet` is exported and returns exactly one violation, with rule
+- [x] `checkFinalReviewTestNet` is exported and returns exactly one violation, with rule
       `final-review-test-net`, when some task carries a test command and the final-review-marked task
       carries none.
-- [ ] That violation's `detail` names the rule, the final-review task's ref, and the refs plus commands
+- [x] That violation's `detail` names the rule, the final-review task's ref, and the refs plus commands
       of the tasks whose suites are missing from the closing gate.
-- [ ] A tree with no test command in any task produces no violation from this rule.
-- [ ] A non-final-review task with no test command never produces a violation from this rule, even when
+- [x] A tree with no test command in any task produces no violation from this rule.
+- [x] A non-final-review task with no test command never produces a violation from this rule, even when
       other tasks have one.
-- [ ] A tree with no final-review marker produces no violation from this rule (the missing marker is
+- [x] A tree with no final-review marker produces no violation from this rule (the missing marker is
       already reported once by the existing final-review check).
-- [ ] A single-task tree produces no violation from this rule.
-- [ ] Running the linter on an individual task **file** never evaluates this rule, only a directory
+- [x] A single-task tree produces no violation from this rule.
+- [x] Running the linter on an individual task **file** never evaluates this rule, only a directory
       argument does.
-- [ ] `extractSection` in `lint-task.ts` is reused; no new section parser is added and nothing new is
+- [x] `extractSection` in `lint-task.ts` is reused; no new section parser is added and nothing new is
       exported from `parse-task.ts`.
 
-- [ ] A test command appearing only in Verification **prose** (not in a `- [ ]` / `- [x]` item) yields
+- [x] A test command appearing only in Verification **prose** (not in a `- [ ]` / `- [x]` item) yields
       `[]`, with a test proving it neither triggers the rule nor satisfies it.
-- [ ] Both `- [ ]` and `- [x]` item forms are recognised as executable.
+- [x] Both `- [ ]` and `- [x]` item forms are recognised as executable.
 
-- [ ] A checklist item whose backticked test command sits on a **continuation line** is detected, and a
+- [x] A checklist item whose backticked test command sits on a **continuation line** is detected, and a
       multi-span wrapped item yields every one of its test commands.
-- [ ] A blank line closes an item, so a prose test-command mention after one is not attributed to it.
+- [x] A blank line closes an item, so a prose test-command mention after one is not attributed to it.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` green — no regression in the sibling
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` green.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` green — no regression in the sibling
       script suites.
-- [ ] Build a temp tree where a non-final task carries `` `bun test some/dir` `` and the final-review task
+- [x] Build a temp tree where a non-final task carries `` `bun test some/dir` `` and the final-review task
       carries none, then run `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts <tmp>/tasks`:
       it exits 1 and stderr contains `final-review-test-net`.
-- [ ] Run the linter on that same tree's single final-review **file** rather than the directory: it exits
+- [x] Run the linter on that same tree's single final-review **file** rather than the directory: it exits
       0 and stderr contains no `final-review-test-net`.
-- [ ] Strip every test command from that temp tree and re-run against the directory: no
+- [x] Strip every test command from that temp tree and re-run against the directory: no
       `final-review-test-net` text appears in the output.
-- [ ] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks`
+- [x] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks`
       reports no `final-review-test-net` violation — this tree's own closing gate already runs a suite.
-- [ ] `grep -n "extractHeadingSection" packages/dispatch/skills/flightplan/scripts/lib/parse-task.ts`
+- [x] `grep -n "extractHeadingSection" packages/dispatch/skills/flightplan/scripts/lib/parse-task.ts`
       shows it is still unexported (no `export` on its declaration).
 
 ## Eval rubric
