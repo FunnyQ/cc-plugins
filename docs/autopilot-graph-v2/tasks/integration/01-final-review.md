@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: lint/03, orchestrator/05
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -123,53 +123,53 @@ manufacture a new stall class.
 
 ## Acceptance criteria
 
-- [ ] The wave loop's guard order is verified end to end and matches the sequence listed above, with the
+- [x] The wave loop's guard order is verified end to end and matches the sequence listed above, with the
       commit agent after every scout guard and the budget check between the commit and the dispatch.
-- [ ] No guard reads a tree field produced directly by the scout agent; every one reads a value derived
+- [x] No guard reads a tree field produced directly by the scout agent; every one reads a value derived
       in the script from the parsed command output.
-- [ ] A failing commit escalates without ending the run; a tripped budget floor escalates and ends it.
+- [x] A failing commit escalates without ending the run; a tripped budget floor escalates and ends it.
       Both escalations reach the returned `escalations` array.
-- [ ] Completion is still tested with `counts.done === counts.total`, the **derived** parse-errors list
+- [x] Completion is still tested with `counts.done === counts.total`, the **derived** parse-errors list
       (not a field on the scout result — that shape no longer exists) is still checked
       before that test, and reconciliation is still by index with no `.filter(Boolean)`.
-- [ ] `orchestrator.md`'s prose and gotchas describe the script that now ships, including the full set of
+- [x] `orchestrator.md`'s prose and gotchas describe the script that now ships, including the full set of
       terminal conditions and the scout's actual schema.
-- [ ] Every new `CFG` field has a one-line comment, and the prose defaults match the literals.
-- [ ] The template guidance and the flightplan `SKILL.md` describe the same trigger and severity the
+- [x] Every new `CFG` field has a one-line comment, and the prose defaults match the literals.
+- [x] The template guidance and the flightplan `SKILL.md` describe the same trigger and severity the
       linter enforces.
-- [ ] Both dispatch manifests read their pre-existing version and both marketplace registries are
+- [x] Both dispatch manifests read their pre-existing version and both marketplace registries are
       unmodified.
-- [ ] Every plan tree under `docs/` has been linted and each failure is recorded in this tree's
+- [x] Every plan tree under `docs/` has been linted and each failure is recorded in this tree's
       `tasks/README.md`, with no `done` tree retro-fitted and no checkbox hand-ticked.
-- [ ] The goal is met: the closing gate runs a real suite, the control path has no interpreting agent,
+- [x] The goal is met: the closing gate runs a real suite, the control path has no interpreting agent,
       commits have a failure channel, and retries carry full history.
-- [ ] The commit audit trail is judged on **emission**, which is what this tree can prove: the built commit
+- [x] The commit audit trail is judged on **emission**, which is what this tree can prove: the built commit
       instructions carry matched `--phase start` / `--phase end` calls with `--role commit` and the
       interpolated agent label, and the renderer displays such an entry. That real commit workers then write
       those records in a live run is **explicitly outside this gate** — it needs an actual execution run and
       is recorded as a Known gap. Do not mark this criterion on the strength of a live run you did not do,
       and do not perform one to satisfy it.
-- [ ] The two opt-in capabilities are verified as capabilities: with its switch set, the ladder's final
+- [x] The two opt-in capabilities are verified as capabilities: with its switch set, the ladder's final
       rung runs the configured external engine and a tripped floor stops dispatch with a `(budget)`
       escalation; with both switches at their defaults, neither changes any decision the run makes.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/ packages/dispatch/skills/flightplan/scripts/`
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/ packages/dispatch/skills/flightplan/scripts/`
       green — the whole regression net for both branches, in one command.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green on its own,
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green on its own,
       which also proves the fenced block still extracts and parses.
-- [ ] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); if(s<0||e<0) throw new Error('block missing'); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
+- [x] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); if(s<0||e<0) throw new Error('block missing'); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
       exits 0 — the block is syntactically valid JavaScript.
-- [ ] `for t in docs/*/tasks; do bun packages/dispatch/skills/flightplan/scripts/lint-task.ts "$t"; done`
+- [x] `for t in docs/*/tasks; do bun packages/dispatch/skills/flightplan/scripts/lint-task.ts "$t"; done`
       run and every reported failure transcribed into this tree's `tasks/README.md`.
-- [ ] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks`
+- [x] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks`
       exits 0 — this tree lints clean under its own new rule.
-- [ ] `bun -e "JSON.parse(await Bun.file('packages/dispatch/.claude-plugin/plugin.json').text()); JSON.parse(await Bun.file('packages/dispatch/.codex-plugin/plugin.json').text())"`
+- [x] `bun -e "JSON.parse(await Bun.file('packages/dispatch/.claude-plugin/plugin.json').text()); JSON.parse(await Bun.file('packages/dispatch/.codex-plugin/plugin.json').text())"`
       exits 0, and both `git diff --stat <base SHA>..HEAD -- packages/dispatch/.claude-plugin/plugin.json packages/dispatch/.codex-plugin/plugin.json .claude-plugin/marketplace.json .agents/plugins/marketplace.json CHANGELOG.md`
       and the same command without a revision range (working tree) print nothing. Both halves are needed:
       the range misses an uncommitted bump and the working-tree form misses a committed one.
-- [ ] `git status --porcelain` reviewed: nothing unexpected left in the working tree.
+- [x] `git status --porcelain` reviewed: nothing unexpected left in the working tree.
 
 ## Eval rubric
 
