@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -7,8 +7,10 @@ import {
   collectTaskFiles,
   inferRefFromPath,
   checkFinalReview,
+  testCommandsIn,
+  checkFinalReviewTestNet,
 } from "./lint-task";
-import type { ParsedTask } from "./lib/parse-task";
+import { parseTask, type ParsedTask } from "./lib/parse-task";
 
 // Minimal ParsedTask for graph checks — bucket/nn/dependsOn/finalReview read.
 const mk = (
@@ -392,6 +394,175 @@ describe("lintFile", () => {
   });
 });
 
+describe("testCommandsIn", () => {
+  test("finds bun test command in Verification", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      "- [ ] Run `bun test packages/foo`",
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([
+      "bun test packages/foo",
+    ]);
+    await rm(root, { recursive: true });
+  });
+
+  test("finds npm test variants", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [ ] Run \`npm test\` or \`npm run test\` or \`pnpm test\` or \`pnpm run test\` or \`yarn test\` or \`yarn run test\``,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([
+      "npm test",
+      "npm run test",
+      "pnpm test",
+      "pnpm run test",
+      "yarn test",
+      "yarn run test",
+    ]);
+    await rm(root, { recursive: true });
+  });
+
+  test("finds cargo test, pytest, go test, rspec, make test", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [ ] Run \`cargo test\`, \`pytest\`, \`go test ./...\`, \`rspec\`, or \`make test\``,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([
+      "cargo test",
+      "pytest",
+      "go test ./...",
+      "rspec",
+      "make test",
+    ]);
+    await rm(root, { recursive: true });
+  });
+
+  test("rejects near-misses: bun testify, make tested, rspecs, npm testx", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [ ] Do NOT run \`bun testify\`, \`make tested\`, \`rspecs\`, or \`npm testx\``,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
+  test("returns [] when no Verification section", async () => {
+    const task = VALID_TASK.replace("## Verification\n- [ ] Run `bun test`\n", "");
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
+  test("ignores test commands in prose (not checklist items)", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [ ] Check the output
+Note: do not run \`bun test\` in production.`,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
+  test("recognizes both - [ ] and - [x] forms", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [x] Run \`bun test\`
+- [ ] Run \`npm test\``,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([
+      "bun test",
+      "npm test",
+    ]);
+    await rm(root, { recursive: true });
+  });
+
+  test("finds test command on continuation line", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [ ] Run the build,
+      then \`bun test some/dir\` exits 0,
+      and \`git status\` shows nothing.`,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([
+      "bun test some/dir",
+    ]);
+    await rm(root, { recursive: true });
+  });
+
+  test("blank line closes an item, so prose after it is not attributed", async () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      `- [ ] Check the output
+
+Note: run \`bun test\` separately to verify.`,
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": task,
+    });
+    const parsed = parseTask(
+      await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
+    );
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+});
+
 describe("checkFinalReview", () => {
   test("single task is exempt", () => {
     expect(checkFinalReview([mk("work", "01")], "t")).toEqual([]);
@@ -457,6 +628,102 @@ describe("checkFinalReview", () => {
     const v = checkFinalReview(tasks, "t");
     expect(v.length).toBe(1);
     expect(v[0].detail).toMatch(/ingestion\/01/);
+  });
+});
+
+describe("checkFinalReviewTestNet", () => {
+  test("fires when tree has tests but final review does not", () => {
+    const tasks: ParsedTask[] = [
+      {
+        ...mk("lint", "01", [], false),
+        body: "## Verification\n- [ ] `bun test`",
+      } as unknown as ParsedTask,
+      {
+        ...mk("review", "01", [], true),
+        body: "## Verification\n- [ ] Check results",
+      } as unknown as ParsedTask,
+    ];
+    const violations = checkFinalReviewTestNet(tasks, "tasks");
+    expect(violations.length).toBe(1);
+    expect(violations[0].rule).toBe("final-review-test-net");
+    expect(violations[0].detail).toContain("lint/01");
+    expect(violations[0].detail).toContain("bun test");
+    expect(violations[0].detail).toContain("review/01");
+  });
+
+  test("silent when tree has no test commands", () => {
+    const tasks: ParsedTask[] = [
+      {
+        ...mk("docs", "01", [], false),
+        body: "## Verification\n- [ ] Check prose",
+      } as unknown as ParsedTask,
+      {
+        ...mk("review", "01", [], true),
+        body: "## Verification\n- [ ] Check results",
+      } as unknown as ParsedTask,
+    ];
+    expect(checkFinalReviewTestNet(tasks, "tasks")).toEqual([]);
+  });
+
+  test("silent when final review task has a test command", () => {
+    const tasks: ParsedTask[] = [
+      {
+        ...mk("lint", "01", [], false),
+        body: "## Verification\n- [ ] `bun test`",
+      } as unknown as ParsedTask,
+      {
+        ...mk("review", "01", [], true),
+        body: "## Verification\n- [ ] `pytest`",
+      } as unknown as ParsedTask,
+    ];
+    expect(checkFinalReviewTestNet(tasks, "tasks")).toEqual([]);
+  });
+
+  test("silent when tree is single-task", () => {
+    const tasks: ParsedTask[] = [
+      {
+        ...mk("review", "01", [], true),
+        body: "## Verification\n- [ ] Check it",
+      } as unknown as ParsedTask,
+    ];
+    expect(checkFinalReviewTestNet(tasks, "tasks")).toEqual([]);
+  });
+
+  test("silent when no final-review marker", () => {
+    const tasks: ParsedTask[] = [
+      {
+        ...mk("lint", "01", [], false),
+        body: "## Verification\n- [ ] `bun test`",
+      } as unknown as ParsedTask,
+      {
+        ...mk("review", "01", [], false),
+        body: "## Verification\n- [ ] Check results",
+      } as unknown as ParsedTask,
+    ];
+    expect(checkFinalReviewTestNet(tasks, "tasks")).toEqual([]);
+  });
+
+  test("violation includes refs of all tasks with tests", () => {
+    const tasks: ParsedTask[] = [
+      {
+        ...mk("feat", "01", [], false),
+        body: "## Verification\n- [ ] `bun test`",
+      } as unknown as ParsedTask,
+      {
+        ...mk("feat", "02", [], false),
+        body: "## Verification\n- [ ] `npm test`",
+      } as unknown as ParsedTask,
+      {
+        ...mk("review", "01", [], true),
+        body: "## Verification\n- [ ] No tests",
+      } as unknown as ParsedTask,
+    ];
+    const violations = checkFinalReviewTestNet(tasks, "tasks");
+    expect(violations.length).toBe(1);
+    expect(violations[0].detail).toContain("feat/01");
+    expect(violations[0].detail).toContain("feat/02");
+    expect(violations[0].detail).toContain("bun test");
+    expect(violations[0].detail).toContain("npm test");
   });
 });
 

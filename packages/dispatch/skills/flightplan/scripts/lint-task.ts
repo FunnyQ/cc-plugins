@@ -50,6 +50,51 @@ const SIBLING_TASK_REGEX =
   /(?<![\w/.-])([a-z][a-z0-9]*)\/(\d{2})(?:-([a-z0-9-]+))?(?:\.md)?\b/g;
 // Required reading must be exactly ../_context/<name>.md (sibling _context).
 const REQUIRED_READING_REGEX = /^\.\.\/_context\/[a-z0-9_-]+\.md$/;
+// Test-runner commands, matched at the head of a backticked span. The trailing
+// boundary keeps `bun testify` and `make tested` from counting as a suite.
+// It does NOT reject `pytest-cov`: `\b` matches between `t` and `-`, so a
+// hyphen-suffixed runner still counts. Left as-is — the false positives are
+// all plausible test invocations, and tightening it would reject `go test ./...`.
+const TEST_RUNNER_REGEX =
+  /^(bun test|(?:npm|pnpm|yarn) (?:run )?test|cargo test|pytest|go test|rspec|make test)\b/;
+
+/**
+ * Backticked commands in a task's `## Verification` section that invoke a known
+ * test runner. Returns the command strings as written, in document order.
+ */
+export function testCommandsIn(task: ParsedTask): string[] {
+  const section = extractSection(task.body, "Verification");
+  if (section === "") return [];
+
+  const lines = section.split("\n");
+  const items: string[] = [];
+  let currentItem = "";
+
+  for (const line of lines) {
+    const isChecklistStart = /^\s*[-*]\s+\[[ x]\]\s/.test(line);
+    if (isChecklistStart) {
+      if (currentItem) items.push(currentItem);
+      currentItem = line;
+    } else if (currentItem && line.trim() === "") {
+      items.push(currentItem);
+      currentItem = "";
+    } else if (currentItem && /^\s+\S/.test(line)) {
+      currentItem += `\n${line}`;
+    }
+  }
+  if (currentItem) items.push(currentItem);
+
+  const commands: string[] = [];
+  for (const item of items) {
+    const backtickRegex = /`([^`]+)`/g;
+    let match: RegExpExecArray | null;
+    while ((match = backtickRegex.exec(item)) !== null) {
+      const span = match[1].trim();
+      if (TEST_RUNNER_REGEX.test(span)) commands.push(span);
+    }
+  }
+  return commands;
+}
 
 export async function lintFile(filePath: string): Promise<Violation[]> {
   const violations: Violation[] = [];
@@ -257,6 +302,39 @@ export function checkFinalReview(
   return [];
 }
 
+/**
+ * Tree-level check (whole-tree lint only): when the plan has any test commands,
+ * the closing final-review task must run one too. This is a presence guarantee
+ * only: command strings cannot prove coverage breadth.
+ */
+export function checkFinalReviewTestNet(
+  tasks: ParsedTask[],
+  label: string,
+): Violation[] {
+  if (tasks.length <= 1) return [];
+
+  const ref = (t: ParsedTask) => `${t.bucket}/${t.nn}`;
+  const testsPresent = tasks.filter((t) => testCommandsIn(t).length > 0);
+  if (testsPresent.length === 0) return [];
+
+  const marked = tasks.find((t) => t.finalReview);
+  if (!marked) return [];
+  if (testCommandsIn(marked).length > 0) return [];
+
+  const missingFrom = testsPresent
+    .filter((t) => t !== marked)
+    .map((t) => `${ref(t)}: ${testCommandsIn(t).join(", ")}`)
+    .join("; ");
+
+  return [
+    {
+      file: label,
+      rule: "final-review-test-net",
+      detail: `final-review-test-net: the plan's test suite runs in task(s) ${missingFrom}, but the closing final-review task (${ref(marked)}) runs no tests. Add a test command to ${ref(marked)}'s \`## Verification\` section to gate the review's edits.`,
+    },
+  ];
+}
+
 /** Derive bucket + NN from a path like `.../tasks/ui/01-foo.md`. */
 export function inferRefFromPath(
   filePath: string,
@@ -365,6 +443,7 @@ async function main() {
   // mode) — a cherry-picked file list is too partial to judge the final gate.
   if (treeRoots.length > 0) {
     reportAll(checkFinalReview(parsed, treeRoots[0]));
+    reportAll(checkFinalReviewTestNet(parsed, treeRoots[0]));
   }
 
   if (total > 0) {
