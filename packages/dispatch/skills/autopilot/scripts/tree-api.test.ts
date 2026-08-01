@@ -3,10 +3,14 @@ import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import { buildTreePayload, type Loaded } from "./tree-api";
 
+/** A body whose Verification gate box is still unticked. */
+const UNTICKED_GATE = "## Verification\n\n- [ ] Run the suite\n";
+
 function task(
   ref: string,
   status: ParsedTask["status"] = "todo",
   dependsOn: string[] = [],
+  body = "",
 ): ParsedTask {
   const [bucket, nn] = ref.split("/");
   return {
@@ -23,7 +27,7 @@ function task(
     status,
     finalReview: false,
     sections: [],
-    body: "",
+    body,
     rubric: null,
   };
 }
@@ -130,6 +134,7 @@ describe("buildTreePayload", () => {
       inProgress: 0,
       ready: 0,
       blocked: 0,
+      invalid: 0,
     });
   });
 
@@ -173,8 +178,9 @@ describe("buildTreePayload", () => {
       ),
     );
 
-    expect(payload.tasks.find((view) => view.ref === "ui/01")?.blockedBy)
-      .toEqual(["api/02"]);
+    expect(
+      payload.tasks.find((view) => view.ref === "ui/01")?.blockedBy,
+    ).toEqual(["api/02"]);
   });
 
   test("tallies every task state", () => {
@@ -196,6 +202,33 @@ describe("buildTreePayload", () => {
       inProgress: 1,
       ready: 1,
       blocked: 1,
+      invalid: 0,
     });
+  });
+
+  test("counts a malformed completion as invalid, not as done", () => {
+    const payload = buildTreePayload(
+      input(
+        {
+          "api/01": task("api/01", "done", [], UNTICKED_GATE),
+          "api/02": task("api/02", "todo", ["api/01"]),
+        },
+        ["api"],
+      ),
+    );
+
+    expect(payload.counts).toEqual({
+      total: 2,
+      done: 0,
+      inProgress: 0,
+      ready: 0,
+      blocked: 1,
+      invalid: 1,
+    });
+    expect(payload.tasks.map((view) => view.state)).toEqual([
+      "invalid",
+      "blocked",
+    ]);
+    expect(payload.tasks[1].blockedBy).toEqual(["api/01"]);
   });
 });

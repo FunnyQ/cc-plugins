@@ -1,5 +1,8 @@
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
-import { refToString } from "../../flightplan/scripts/lib/parse-task";
+import {
+  refToString,
+  taskValidity,
+} from "../../flightplan/scripts/lib/parse-task";
 import { unmetDependencies } from "../../flightplan/scripts/next-ready";
 import type {
   FlightlogEntry,
@@ -30,7 +33,12 @@ export type ParsedLabel = {
   raw: string;
 };
 
-export type TaskState = "done" | "in-progress" | "ready" | "blocked";
+export type TaskState =
+  | "done"
+  | "in-progress"
+  | "ready"
+  | "blocked"
+  | "invalid";
 
 export type TaskView = {
   ref: string;
@@ -39,6 +47,8 @@ export type TaskView = {
   title: string;
   status: string | null;
   state: TaskState;
+  /** Why the task is `invalid`, straight from `taskValidity`. Null otherwise. */
+  invalidReason: string | null;
   blockedBy: string[];
   dependsOn: string[];
   blocks: string[];
@@ -198,8 +208,13 @@ export function deriveTaskViews(
     // The readiness rule lives in next-ready.ts alone, so the dashboard and the
     // scout can never disagree about which task is blocked.
     const blockedBy = unmetDependencies(task, byRef);
+    const validity = taskValidity(task);
     let state: TaskState;
-    if (task.status === "done") state = "done";
+    // Validity outranks the raw Status: a task claiming `done` over an unticked
+    // gate box must read as invalid, never as done, or the dashboard would show
+    // the tree as complete while the gate result is missing.
+    if (validity.kind === "invalid") state = "invalid";
+    else if (task.status === "done") state = "done";
     else if (task.status === "blocked") state = "blocked";
     else if (task.status === "in-progress") state = "in-progress";
     else if (task.status === "todo" && hasOpenStart(aggregate)) {
@@ -218,6 +233,7 @@ export function deriveTaskViews(
       title: task.title,
       status: task.status,
       state,
+      invalidReason: validity.kind === "invalid" ? validity.reason : null,
       blockedBy: state === "blocked" ? blockedBy : [],
       dependsOn,
       blocks,

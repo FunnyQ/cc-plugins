@@ -22,6 +22,11 @@ export type TreePayload = {
     inProgress: number;
     ready: number;
     blocked: number;
+    /**
+     * Tasks whose completion state is malformed. Counted separately so the
+     * dashboard can never present the tree as complete while one exists.
+     */
+    invalid: number;
   };
   errors: { file: string; bucket: string; reason: string }[];
 };
@@ -85,6 +90,7 @@ export function buildTreePayload(input: {
     inProgress: 0,
     ready: 0,
     blocked: 0,
+    invalid: 0,
   };
 
   for (const task of tasks) {
@@ -92,6 +98,7 @@ export function buildTreePayload(input: {
     if (task.state === "in-progress") counts.inProgress += 1;
     if (task.state === "ready") counts.ready += 1;
     if (task.state === "blocked") counts.blocked += 1;
+    if (task.state === "invalid") counts.invalid += 1;
   }
 
   return {

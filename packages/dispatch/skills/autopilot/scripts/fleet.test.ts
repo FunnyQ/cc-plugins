@@ -39,10 +39,14 @@ const score = (task: string, attempt: number, ts: string): ScoreEntry => ({
   breakdown: [{ name: "Correctness", weight: 2, score: 5 }],
 });
 
+/** A body whose Verification gate box is still unticked. */
+const UNTICKED_GATE = "## Verification\n\n- [ ] Run the suite\n";
+
 const task = (
   ref: string,
   status: ParsedTask["status"] = "todo",
   dependsOn: string[] = [],
+  body = "",
 ): ParsedTask => {
   const [bucket, nn] = ref.split("/");
   return {
@@ -59,7 +63,7 @@ const task = (
     status,
     finalReview: false,
     sections: [],
-    body: "",
+    body,
     rubric: null,
   };
 };
@@ -136,6 +140,34 @@ describe("deriveTaskViews", () => {
     expect(views[4].blockedBy).toEqual(["a/04", "missing/01"]);
     expect(views[3].dependsOn).toEqual(["a/01"]);
     expect(views[3].blocks).toEqual(["next/01"]);
+  });
+
+  test("malformed completion reads as invalid, never as done", () => {
+    const views = deriveTaskViews(
+      { "a/01": task("a/01", "done", [], UNTICKED_GATE) },
+      [],
+    );
+    expect(views[0].state).toBe("invalid");
+    expect(views[0].status).toBe("done");
+    expect(views[0].invalidReason).toMatch(/Do NOT tick the boxes by hand/);
+  });
+
+  test("a dependent of an invalid task stays blocked by that ref", () => {
+    const views = deriveTaskViews(
+      {
+        "a/01": task("a/01", "done", [], UNTICKED_GATE),
+        "a/02": task("a/02", "todo", ["a/01"]),
+      },
+      [],
+    );
+    expect(views[1].state).toBe("blocked");
+    expect(views[1].blockedBy).toEqual(["a/01"]);
+  });
+
+  test("a valid done task carries no invalidReason", () => {
+    const views = deriveTaskViews({ "a/01": task("a/01", "done") }, []);
+    expect(views[0].state).toBe("done");
+    expect(views[0].invalidReason).toBeNull();
   });
 
   test("treats only the open attempt as in progress", () => {
