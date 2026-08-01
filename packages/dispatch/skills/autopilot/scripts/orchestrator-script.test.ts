@@ -128,11 +128,14 @@ type RunLog = {
   result: RunResult;
   /** Every agent label, in call order. */
   labels: string[];
+  /** Every agent prompt, in call order. */
+  prompts: string[];
 };
 
 async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
   const src = await loadScript();
   const labels: string[] = [];
+  const prompts: string[] = [];
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
   const queues = new Map<string, unknown[]>();
@@ -149,9 +152,10 @@ async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
     return queue.length > 0 ? queue.shift() : fallback;
   };
 
-  const agent = async (_prompt: string, opts: { label: string }) => {
+  const agent = async (prompt: string, opts: { label: string }) => {
     const label = opts.label;
     labels.push(label);
+    prompts.push(prompt);
 
     if (label.startsWith("scout-wave-")) {
       return scouts.length > 0 ? scouts.shift() : null;
@@ -209,7 +213,7 @@ async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
     () => {},
     () => {},
   )) as RunResult;
-  return { result, labels };
+  return { result, labels, prompts };
 }
 
 const counts = (over: Partial<Counts> & { total: number }): Counts => ({
@@ -228,6 +232,12 @@ function accountsForEveryTask(result: RunResult, refs: string[]): boolean {
     const inEscalations = result.escalations.some((e) => e.task === ref);
     return inCompleted !== inEscalations;
   });
+}
+
+function promptFor(log: Pick<RunLog, "labels" | "prompts">, label: string): string {
+  const index = log.labels.indexOf(label);
+  if (index === -1) throw new Error(`agent label not found: ${label}`);
+  return log.prompts[index];
 }
 
 describe("orchestrator wave loop", () => {
@@ -446,21 +456,107 @@ describe("orchestrator failure handling", () => {
   });
 
   test("a genuine failed verifier is a quality failure and DOES retry dev", async () => {
-    const { result, labels } = await runOrchestrator({
+    const log = await runOrchestrator({
       scouts: [oneTask("ui/01")],
       gate: {
         "ui/01": [
-          { passed: false, summary: "tests red" },
-          { passed: false, summary: "tests red" },
-          { passed: false, summary: "tests red" },
+          { passed: false, summary: "attempt one tests red" },
+          { passed: false, summary: "attempt two lint red" },
+          { passed: false, summary: "attempt three types red" },
         ],
       },
     });
+    const { result, labels } = log;
     expect(labels.filter((l) => l.startsWith("dev:"))).toHaveLength(3);
+    const firstPrompt = promptFor(log, "dev:ui/01#1");
+    expect(firstPrompt).not.toContain("EARLIER ATTEMPTS");
+
+    const thirdPrompt = promptFor(log, "dev:ui/01#3");
+    expect(thirdPrompt).toContain(
+      "Binary gate failed (verification/acceptance):\nattempt two lint red",
+    );
+    expect(thirdPrompt).toContain(
+      "EARLIER ATTEMPTS on this task — already tried and rejected. Do not repeat them:",
+    );
+    expect(thirdPrompt).toContain(
+      "- attempt 1 (ran on sonnet): Binary gate failed (verification/acceptance):\nattempt one tests red",
+    );
+    expect(thirdPrompt.indexOf("attempt two lint red")).toBeLessThan(
+      thirdPrompt.indexOf("attempt one tests red"),
+    );
+    expect(thirdPrompt.match(/The previous attempt was rejected:/g)).toHaveLength(1);
+
     const [esc] = result.escalations;
     expect(esc.infrastructure).toBe(false);
     expect(esc.attempt).toBe(3);
-    expect(esc.reason).toMatch(/Binary gate failed/);
+    expect(esc.reason).toContain(
+      "Binary gate failed (verification/acceptance):\nattempt three types red",
+    );
+    expect(esc.reason).toContain("attempt one tests red");
+  });
+
+  test("a rubric retry preserves the exact veto and missing-dimension phrasing", async () => {
+    const log = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      judge: {
+        "ui/01": [
+          {
+            verdict: {
+              weighted: 2.1,
+              passed: false,
+              hardFailed: true,
+              missing: ["efficiency", "style"],
+            },
+            rationale: "too slow and inconsistent",
+          },
+        ],
+      },
+    });
+    const retryPrompt = promptFor(log, "dev:ui/01#2");
+    expect(retryPrompt).toContain(
+      "Rubric score 2.10 did not pass (hard-fail veto) (missing dims: efficiency, style):\ntoo slow and inconsistent",
+    );
+    expect(retryPrompt).not.toContain("EARLIER ATTEMPTS");
+  });
+
+  test("a closing-review retry labels its rejected round as final-review", async () => {
+    const log = await runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready("review/final", true)],
+        counts: counts({ total: 1, todo: 1 }),
+        unfinished: [{ ref: "review/final", state: "todo" }],
+        invalid: [],
+      })],
+      gate: {
+        "review/final": [
+          { passed: false, summary: "integration command failed" },
+          { passed: true, summary: "green" },
+        ],
+      },
+    });
+    const retryPrompt = promptFor(log, "fix:review/final#2");
+    expect(retryPrompt).toContain(
+      "Binary gate failed (verification/acceptance):\nintegration command failed",
+    );
+    expect(retryPrompt).toContain("previous round was rejected");
+
+    const exhausted = await runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready("review/final", true)],
+        counts: counts({ total: 1, todo: 1 }),
+        unfinished: [{ ref: "review/final", state: "todo" }],
+        invalid: [],
+      })],
+      gate: {
+        "review/final": [
+          { passed: false, summary: "round one failed" },
+          { passed: false, summary: "round two failed" },
+        ],
+      },
+    });
+    expect(exhausted.result.escalations[0].reason).toContain(
+      "attempt 1 (ran on final-review)",
+    );
   });
 
   test("a null judge is an infrastructure failure", async () => {

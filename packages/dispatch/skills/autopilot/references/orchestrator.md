@@ -327,11 +327,11 @@ Return a one-paragraph summary: lenses run, cross-vendor status, key fixes, veri
 // Run the Final review "dev" step: fan out the lenses in parallel, then one
 // Opus fixer applies every finding. Replaces the single dev agent for the
 // finalReview task; the binary gate + judge + score gate downstream are unchanged.
-async function runFinalReview(ref, path, attempt, feedback) {
+async function runFinalReview(ref, path, attempt, attempts) {
   await parallel(REVIEW_LENSES.map(lens => () =>
     agent(reviewPrompt(ref, lens, attempt),
       { label: `review:${lens.key}#${attempt}`, phase: 'Execute', model: lens.model })))
-  await agent(fixPrompt(ref, path, attempt, feedback),
+  await agent(fixPrompt(ref, path, attempt, renderHistory(attempts)),
     { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
 }
 
@@ -419,17 +419,38 @@ async function parkBlocked(ref, path, reason) {
   }
 }
 
+// Reproduces today's two feedback strings verbatim, so the prompt text a retry
+// sees does not regress — only its scope widens.
+const rejectionOf = (a) => a.weighted !== null
+  ? `Rubric score ${a.weighted.toFixed(2)} did not pass`
+    + (a.hardFailed ? ' (hard-fail veto)' : '')
+    + (a.missing.length ? ` (missing dims: ${a.missing.join(', ')})` : '')
+    + `:\n${a.rationale}`
+  : `Binary gate failed (verification/acceptance):\n${a.gateSummary ?? 'no output'}`
+
+const renderHistory = (attempts) => {
+  if (attempts.length === 0) return ''
+  const last = attempts[attempts.length - 1]
+  const prior = attempts.slice(0, -1)
+  return rejectionOf(last)
+    + (prior.length
+        ? `\n\nEARLIER ATTEMPTS on this task — already tried and rejected. Do not repeat them:\n`
+          + prior.map(a => `- attempt ${a.n} (ran on ${a.model}): ${rejectionOf(a)}`).join('\n')
+        : '')
+}
+
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item) {
   const { ref, finalReview, path } = item
   // The cross-vendor Final review round gets its own (smaller) cap; everything
   // else uses MAX. Past the cap the task is parked + escalated, never skipped.
   const cap = finalReview ? FINAL_MAX : MAX
-  let feedback = ''
+  const attempts = []
   for (let attempt = 1; attempt <= cap; attempt++) {
+    let attemptModel = 'final-review'
     if (finalReview) {
       // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
-      await runFinalReview(ref, path, attempt, feedback)
+      await runFinalReview(ref, path, attempt, attempts)
     } else {
       // Dev step. The last attempt before the cap is the "last shot": Claude
       // escalates Sonnet → Opus, and an external engine ALSO falls back to
@@ -438,11 +459,13 @@ async function executeTask(item) {
       // skipping it.
       const lastShot = attempt >= cap && cap > 1
       if (devEngine && !lastShot) {
-        await agent(devExternalPrompt(devEngine, ref, path, attempt, feedback),
+        attemptModel = devEngine.label
+        await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts)),
           { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
       } else {
         const devModel = attempt >= cap ? MODEL.devEscalated : MODEL.dev
-        await agent(devPrompt(ref, path, attempt, feedback),
+        attemptModel = devModel
+        await agent(devPrompt(ref, path, attempt, renderHistory(attempts)),
           { label: `dev:${ref}#${attempt}`, phase: 'Execute', model: devModel })
       }
     }
@@ -458,7 +481,15 @@ async function executeTask(item) {
       return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
     }
     if (!gate.passed) {
-      feedback = `Binary gate failed (verification/acceptance):\n${gate.summary ?? 'no output'}`
+      attempts.push({
+        n: attempt,
+        model: attemptModel,
+        gateSummary: gate.summary ?? 'no output',
+        rationale: null,
+        weighted: null,
+        hardFailed: false,
+        missing: [],
+      })
       continue
     }
 
@@ -488,13 +519,18 @@ async function executeTask(item) {
       // Park + escalate, never both complete and stalled for the same task.
       return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
     }
-    feedback = `Rubric score ${verdict.weighted.toFixed(2)} did not pass`
-      + (verdict.hardFailed ? ' (hard-fail veto)' : '')
-      + (verdict.missing.length ? ` (missing dims: ${verdict.missing.join(', ')})` : '')
-      + `:\n${judged.rationale}`
+    attempts.push({
+      n: attempt,
+      model: attemptModel,
+      gateSummary: gate.summary,
+      rationale: judged.rationale,
+      weighted: verdict.weighted,
+      hardFailed: verdict.hardFailed,
+      missing: verdict.missing,
+    })
   }
-  const parkedOk = await parkBlocked(ref, path, feedback)
-  return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: feedback }
+  const parkedOk = await parkBlocked(ref, path, renderHistory(attempts))
+  return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: renderHistory(attempts) }
 }
 
 // Wrap every task before it reaches parallel(). Do NOT depend on parallel()
@@ -547,6 +583,7 @@ const commitInstructions = agentLabel =>
   + '    )"'
 
 // ── Wave loop ───────────────────────────────────────────────────────────────
+return (async () => {
 phase('Execute')
 const completed = []
 const escalations = []
@@ -746,6 +783,7 @@ if (CFG.commitBetweenWaves && escalations.length === 0) {
 }
 
 return { slug: CFG.slug, completed, escalations }
+})()
 ```
 
 ## What the main agent does with the result
