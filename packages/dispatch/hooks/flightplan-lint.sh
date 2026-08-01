@@ -10,7 +10,9 @@
 #
 # Scope: this hook is plugin-wide, but two filters narrow it to flightplan tasks:
 #   1. Path matches docs/<slug>/tasks/<bucket>/NN-*.md
-#   2. File contains the `> **Required reading**:` marker
+#   2. File carries the Required-reading header, in either supported form:
+#        > **Required reading**:
+#        > **Required reading** (read before starting; ...):
 # Either check failing → silent exit 0, no false positives on unrelated files.
 
 set -e
@@ -27,8 +29,11 @@ if ! [[ "$file_path" =~ (^|/)docs/.+/tasks/[a-z][a-z0-9]*/[0-9]{2}-.+\.md$ ]]; t
   exit 0
 fi
 
-# 2. Content sniff — file has the flightplan header marker
-if ! grep -q "^> \*\*Required reading\*\*:" "$file_path" 2>/dev/null; then
+# 2. Content sniff — file has the flightplan header marker.
+# Accepts the current scaffolded header (an annotation in parentheses before the
+# colon) and the legacy bare-colon header. The `**` immediately after the label
+# keeps near misses such as `**Required reading later**:` out.
+if ! grep -Eq '^> \*\*Required reading\*\*([[:space:]]*\([^)]*\))?[[:space:]]*:' "$file_path" 2>/dev/null; then
   exit 0
 fi
 

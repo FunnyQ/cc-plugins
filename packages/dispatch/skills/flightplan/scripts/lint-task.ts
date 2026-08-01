@@ -10,7 +10,9 @@
  * Verifies for every task file:
  *  - H1 has shape "# BUCKET-NN: Title", and BUCKET-NN matches the file path
  *  - Required reading paths are sibling `../_context/<name>.md` and resolve
- *  - Status value is one of todo / in-progress / done / blocked
+ *  - Status value is one of todo / in-progress / done / blocked, written bare
+ *  - Completion state holds: `done` only with every `## Acceptance criteria`
+ *    and `## Verification` checkbox ticked
  *  - Body does not reference PLAN.md (any casing) or sibling task files
  *    (`bucket/NN`, `bucket/NN-slug`, `bucket/NN-slug.md` — own file excluded)
  *  - Has `## Acceptance criteria` with at least one checkbox in that section
@@ -26,7 +28,12 @@
  */
 import { readFile, access, stat, readdir } from "node:fs/promises";
 import { basename, dirname, resolve, relative, sep } from "node:path";
-import { parseTask, refToString, type ParsedTask } from "./lib/parse-task";
+import {
+  parseTask,
+  refToString,
+  taskValidity,
+  type ParsedTask,
+} from "./lib/parse-task";
 
 export type Violation = {
   file: string;
@@ -75,12 +82,10 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
     }
   }
 
-  // Status
-  if (task.status === null) {
-    push(
-      "status",
-      "Status missing or not one of todo/in-progress/done/blocked",
-    );
+  // Status + completion state — one shared rule, see taskValidity().
+  const validity = taskValidity(task);
+  if (validity.kind === "invalid") {
+    push(validity.rule, validity.reason);
   }
 
   // Required reading — exact shape ../_context/<name>.md and resolvable.

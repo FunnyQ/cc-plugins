@@ -36,6 +36,15 @@ One sentence.
 | Test coverage | ×1 | covers edges |
 `;
 
+/** The header flightplan actually scaffolds today — annotated before the colon. */
+const ANNOTATED_HEADER =
+  "> **Required reading** (read before starting; do not need to open other files):";
+
+const ANNOTATED_TASK = VALID_TASK.replace(
+  "> **Required reading**:",
+  ANNOTATED_HEADER,
+);
+
 type HookRun = {
   code: number;
   stderr: string;
@@ -141,6 +150,41 @@ describe("flightplan-lint hook", () => {
     const { code, stderr } = await runHook(payload(taskFile));
     expect(code).toBe(2);
     expect(stderr).toMatch(/status/);
+    await rm(root, { recursive: true });
+  });
+
+  test("current scaffolded header (annotated) → lint runs, valid task exits 0", async () => {
+    const { root, taskFile } = await makeTaskTree(ANNOTATED_TASK);
+    const { code, stderr, stdout } = await runHook(payload(taskFile));
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("");
+    await rm(root, { recursive: true });
+  });
+
+  test("current scaffolded header + malformed task → exit 2 with lint feedback", async () => {
+    const bad = ANNOTATED_TASK.replace(
+      "One sentence.",
+      "See PLAN.md for context.",
+    );
+    const { root, taskFile } = await makeTaskTree(bad);
+    const { code, stderr } = await runHook(payload(taskFile));
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/flightplan lint violations/);
+    expect(stderr).toMatch(/self-containment/);
+    await rm(root, { recursive: true });
+  });
+
+  test("near-miss marker `Required reading later` → silent exit 0", async () => {
+    // A malformed body, so a hook that DID fire would exit 2 and fail this test.
+    const nearMiss = VALID_TASK.replace(
+      "> **Required reading**:",
+      "> **Required reading later**:",
+    ).replace("One sentence.", "See PLAN.md for context.");
+    const { root, taskFile } = await makeTaskTree(nearMiss);
+    const { code, stderr } = await runHook(payload(taskFile));
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
     await rm(root, { recursive: true });
   });
 

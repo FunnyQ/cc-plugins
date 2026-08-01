@@ -297,6 +297,34 @@ describe("lintFile", () => {
     await rm(root, { recursive: true });
   });
 
+  test("done with an unticked gate box → completion-state violation", async () => {
+    const bad = VALID_TASK.replace("**Status**: todo", "**Status**: done");
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": bad,
+    });
+    const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+    const hit = violations.find((v) => v.rule === "completion-state");
+    expect(hit).toBeDefined();
+    expect(hit!.detail).toMatch(/Do NOT tick the boxes by hand/);
+    expect(hit!.detail).toMatch(/`in-progress` or `todo`/);
+    await rm(root, { recursive: true });
+  });
+
+  test("done with every gate box ticked → no completion-state violation", async () => {
+    const good = VALID_TASK.replace(
+      "**Status**: todo",
+      "**Status**: done",
+    ).replaceAll("- [ ]", "- [x]");
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": good,
+    });
+    const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+    expect(violations).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
   test("malformed file → parse violation", async () => {
     const root = await writeTree({
       "tasks/ui/01-foo.md": "no h1, no quote, just text",

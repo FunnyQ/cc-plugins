@@ -71,13 +71,45 @@ describe("markDone", () => {
     expect(markDone(once)).toBe(once);
   });
 
-  test("handles todo and blocked starting status", () => {
-    expect(markDone(TASK.replace("in-progress", "todo"))).toContain(
-      "**Status**: done",
+  test("accepts every bare status value", () => {
+    for (const status of ["todo", "in-progress", "done", "blocked"]) {
+      const input = TASK.replace(
+        "**Status**: in-progress",
+        `**Status**: ${status}`,
+      );
+      expect(markDone(input)).toContain("**Status**: done");
+    }
+  });
+
+  test("rejects a decorated status without producing content", () => {
+    const input = TASK.replace(
+      "**Status**: in-progress",
+      "**Status**: in-progress (attempt 3)",
     );
-    expect(markDone(TASK.replace("in-progress", "blocked"))).toContain(
-      "**Status**: done",
+    expect(() => markDone(input)).toThrow(/in-progress \(attempt 3\)/);
+  });
+
+  test("rejects a missing Status header", () => {
+    const input = TASK.replace("> **Status**: in-progress\n", "");
+    expect(() => markDone(input)).toThrow(/no `> \*\*Status\*\*:` line/);
+  });
+
+  test("rejects duplicate Status headers", () => {
+    const input = TASK.replace(
+      "> **Status**: in-progress",
+      "> **Status**: in-progress\n> **Status**: todo",
     );
+    expect(() => markDone(input)).toThrow(/must carry exactly one/);
+  });
+
+  test("a Status line in the body is not a duplicate header", () => {
+    const input = TASK.replace(
+      "## Goal\n",
+      "## Goal\n\nThe header should read `> **Status**: todo` before work starts.\n",
+    );
+    const out = markDone(input);
+    expect(out).toContain("> **Status**: done");
+    expect(out).toContain("`> **Status**: todo` before work starts");
   });
 
   test("CLI rewrites the file in place", async () => {
@@ -96,6 +128,25 @@ describe("markDone", () => {
     expect(out).toContain("**Status**: done");
     expect(out).toContain("- [x] Renders the empty state");
     expect(out).toContain("- [ ] deferred item — must stay unchecked");
+    await rm(root, { recursive: true });
+  });
+
+  test("CLI fails loudly and leaves the file byte-for-byte unchanged", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mark-done-"));
+    const file = join(root, "03-sample.md");
+    const input = TASK.replace(
+      "**Status**: in-progress",
+      "**Status**: in-progress (attempt 3)",
+    );
+    await writeFile(file, input);
+    const proc = Bun.spawn(
+      ["bun", join(import.meta.dir, "mark-done.ts"), file],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(await proc.exited).not.toBe(0);
+    const stderr = await new Response(proc.stderr).text();
+    expect(stderr).toContain(file);
+    expect(await readFile(file, "utf-8")).toBe(input);
     await rm(root, { recursive: true });
   });
 });

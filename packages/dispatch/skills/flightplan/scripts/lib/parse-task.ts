@@ -86,6 +86,31 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 const H1_REGEX = /^#\s+([A-Z][A-Z0-9]*)-(\d{2})\s*:\s*(.+?)\s*$/;
 const TASK_REF_REGEX = /([a-z][a-z0-9-]*)\/(\d{2})/g;
+const STATUS_LINE_REGEX = /^(\s*>?\s*\*\*Status\*\*\s*:\s*)(.*)$/i;
+
+/**
+ * Split a `> **Status**:` header line into its prefix and its raw value, or
+ * return null when the line is not a Status header. A caller that rewrites the
+ * line keeps `prefix` verbatim, so formatting never drifts.
+ */
+export function matchStatusLine(
+  line: string,
+): { prefix: string; raw: string } | null {
+  const match = STATUS_LINE_REGEX.exec(line);
+  return match ? { prefix: match[1], raw: match[2] } : null;
+}
+
+/**
+ * The one Status rule, shared by every consumer: the value must be a bare word
+ * from `TASK_STATUSES`. A decorated value such as `in-progress (attempt 3)` is
+ * not a status — it returns null, and callers treat that as malformed.
+ */
+export function parseStatusValue(raw: string): TaskStatus | null {
+  const value = raw.trim().toLowerCase();
+  return (TASK_STATUSES as readonly string[]).includes(value)
+    ? (value as TaskStatus)
+    : null;
+}
 
 /**
  * Parse a task-file string into structured fields.
@@ -287,15 +312,10 @@ function extractRefs(quote: string, label: string): TaskRef[] {
 function extractStatus(quote: string): TaskStatus | null {
   const lines = quote.split("\n").map((l) => l.replace(/^>\s?/, ""));
   for (const line of lines) {
-    // Anchor the trailing $ so trailing junk like "todo maybe" or
-    // "todo | in-progress | done" is rejected, not silently treated as todo.
-    const match = /^\*\*Status\*\*\s*:\s*([a-z-]+)\s*$/i.exec(line);
-    if (match) {
-      const value = match[1].toLowerCase() as TaskStatus;
-      return (TASK_STATUSES as readonly string[]).includes(value)
-        ? value
-        : null;
-    }
+    // Trailing junk like "todo maybe" or "todo | in-progress | done" is
+    // rejected by parseStatusValue, not silently treated as todo.
+    const match = matchStatusLine(line);
+    if (match) return parseStatusValue(match.raw);
   }
   return null;
 }
@@ -319,4 +339,67 @@ function extractSections(bodyLines: string[]): string[] {
 /** Format a task ref as "bucket/NN". */
 export function refToString(ref: TaskRef): string {
   return `${ref.bucket}/${ref.nn}`;
+}
+
+/**
+ * The two sections whose checkboxes are the pass/fail gate. Boxes anywhere else
+ * (Implementation notes, Out of scope, …) carry no completion meaning.
+ */
+export const GATE_SECTIONS = ["Acceptance criteria", "Verification"] as const;
+
+/** Unticked gate checkboxes, each labelled with the section it came from. */
+export function uncheckedGateItems(body: string): string[] {
+  const unchecked: string[] = [];
+  for (const heading of GATE_SECTIONS) {
+    const section = extractHeadingSection(body, heading);
+    if (section === null) continue;
+    for (const line of section.split("\n")) {
+      const item = /^\s*[-*]\s+\[ \]\s*(.*)$/.exec(line);
+      if (item) unchecked.push(`${heading}: ${item[1].trim()}`);
+    }
+  }
+  return unchecked;
+}
+
+/**
+ * How the executor repairs a malformed completion state. Single-sourced so the
+ * linter, readiness, and the dashboard all give the same instruction — and so
+ * none of them can accidentally suggest hand-ticking the boxes.
+ */
+export const COMPLETION_STATE_FIX =
+  "Do NOT tick the boxes by hand — that fakes a gate that never ran. Reset `> **Status**:` to `in-progress` or `todo`, then rerun the task's gates. Only mark-done.ts may write `done`, and it ticks the boxes in the same step.";
+
+/**
+ * Execution validity of a parsed task — the one rule every consumer reads.
+ *
+ * A dependency is satisfied only by a *valid* completed task, so the three
+ * outcomes must stay distinguishable: unfinished work, real completion, and a
+ * completion claim the file itself contradicts.
+ */
+export type TaskValidity =
+  | { kind: "unfinished"; status: Exclude<TaskStatus, "done"> }
+  | { kind: "complete" }
+  | { kind: "invalid"; rule: "status" | "completion-state"; reason: string };
+
+export function taskValidity(task: ParsedTask): TaskValidity {
+  if (task.status === null) {
+    return {
+      kind: "invalid",
+      rule: "status",
+      reason:
+        "Status missing or not one of todo/in-progress/done/blocked — write the value bare, with run notes on their own line",
+    };
+  }
+  if (task.status !== "done") {
+    return { kind: "unfinished", status: task.status };
+  }
+  const unchecked = uncheckedGateItems(task.body);
+  if (unchecked.length > 0) {
+    return {
+      kind: "invalid",
+      rule: "completion-state",
+      reason: `Status is done but ${unchecked.length} gate checkbox(es) are still unticked — ${unchecked.join("; ")}. ${COMPLETION_STATE_FIX}`,
+    };
+  }
+  return { kind: "complete" };
 }

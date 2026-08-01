@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { parseTask, parseRubric, refToString } from "./parse-task";
+import {
+  parseTask,
+  parseRubric,
+  refToString,
+  taskValidity,
+  uncheckedGateItems,
+} from "./parse-task";
 
 // Mirrors a real-world engine task rubric — the format flightplan rubrics
 // must stay compatible with.
@@ -262,5 +268,91 @@ describe("parseTask + rubric", () => {
 describe("refToString", () => {
   test("formats bucket/NN", () => {
     expect(refToString({ bucket: "ui", nn: "01" })).toBe("ui/01");
+  });
+});
+
+describe("taskValidity", () => {
+  const parse = (src: string) => {
+    const result = parseTask(src);
+    if (!result.ok)
+      throw new Error(`fixture failed to parse: ${result.reason}`);
+    return result.task;
+  };
+  const status = (src: string, value: string) =>
+    src.replace("> **Status**: todo", `> **Status**: ${value}`);
+  const DONE = status(VALID, "done").replaceAll("- [ ]", "- [x]");
+
+  test("todo is structurally valid and unfinished", () => {
+    expect(taskValidity(parse(VALID))).toEqual({
+      kind: "unfinished",
+      status: "todo",
+    });
+  });
+
+  test("done with every gate box ticked is complete", () => {
+    expect(taskValidity(parse(DONE))).toEqual({ kind: "complete" });
+  });
+
+  test("done with an unchecked acceptance box is malformed", () => {
+    const result = taskValidity(parse(DONE.replace("- [x] Two", "- [ ] Two")));
+    expect(result.kind).toBe("invalid");
+    if (result.kind !== "invalid") return;
+    expect(result.rule).toBe("completion-state");
+    expect(result.reason).toContain("Acceptance criteria: Two");
+    expect(result.reason).toMatch(/Do NOT tick the boxes by hand/);
+    expect(result.reason).toMatch(/`in-progress` or `todo`/);
+  });
+
+  test("done with an unchecked verification box is malformed", () => {
+    const result = taskValidity(parse(DONE.replace("- [x] Run", "- [ ] Run")));
+    expect(result.kind).toBe("invalid");
+    if (result.kind !== "invalid") return;
+    expect(result.rule).toBe("completion-state");
+    expect(result.reason).toContain("Verification: Run");
+  });
+
+  test("done with an unchecked NON-gate box stays complete", () => {
+    const src = `${DONE}\n## Out of scope\n\n- [ ] deferred item\n`;
+    expect(taskValidity(parse(src))).toEqual({ kind: "complete" });
+  });
+
+  test("a decorated Status is invalid, not a status", () => {
+    const result = taskValidity(
+      parse(status(VALID, "in-progress (attempt 3)")),
+    );
+    expect(result.kind).toBe("invalid");
+    if (result.kind !== "invalid") return;
+    expect(result.rule).toBe("status");
+  });
+
+  test("an unknown Status is invalid", () => {
+    const result = taskValidity(parse(status(VALID, "pending")));
+    expect(result.kind).toBe("invalid");
+    if (result.kind !== "invalid") return;
+    expect(result.rule).toBe("status");
+  });
+});
+
+describe("uncheckedGateItems", () => {
+  test("labels each unticked box with its gate section", () => {
+    const result = parseTask(VALID);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(uncheckedGateItems(result.task.body)).toEqual([
+      "Acceptance criteria: One",
+      "Acceptance criteria: Two",
+      "Verification: Run `bun test`",
+    ]);
+  });
+
+  test("ignores boxes outside the two gate sections", () => {
+    const result = parseTask(
+      `${VALID}\n## Implementation notes\n\n- [ ] prose bullet\n`,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(uncheckedGateItems(result.task.body)).not.toContain(
+      "Implementation notes: prose bullet",
+    );
   });
 });

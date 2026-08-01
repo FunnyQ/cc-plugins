@@ -11,10 +11,21 @@
  * Boxes in any other section (Implementation notes, Out of scope, …) are left
  * untouched — only the two gate sections represent "did it pass".
  *
+ * This is ONE state transition: Status and gate checkboxes move together, or
+ * nothing moves. `markDone()` validates the header before it rewrites anything,
+ * so a malformed task can never come back with ticked boxes and a stale Status.
+ * That pairing is the whole point — a half-applied transition reads downstream
+ * as "done but unverified", which is exactly the state readiness must reject.
+ *
  * Usage:
  *   bun mark-done.ts <task-file>
  */
 import { readFile, writeFile } from "node:fs/promises";
+import {
+  TASK_STATUSES,
+  matchStatusLine,
+  parseStatusValue,
+} from "./lib/parse-task";
 
 /** Sections whose checkboxes represent the pass/fail gate. Lowercased. */
 const GATE_SECTIONS = new Set(["acceptance criteria", "verification"]);
@@ -22,35 +33,61 @@ const GATE_SECTIONS = new Set(["acceptance criteria", "verification"]);
 /**
  * Set Status to `done` and tick the gate-section checkboxes. Pure — returns the
  * new file content. Idempotent.
+ *
+ * Throws when the header Status is missing, duplicated, or not one of the four
+ * bare values. Throwing before any rewrite is deliberate: the caller must never
+ * receive partially-transitioned content.
  */
 export function markDone(content: string): string {
   const lines = content.split("\n");
+
+  // Header scope: everything before the first `##` section heading. A Status
+  // line quoted in the body (a template, an example) is not a second header.
+  const firstSection = lines.findIndex((l) => /^##\s+/.test(l));
+  const headerEnd = firstSection === -1 ? lines.length : firstSection;
+
+  const statusLines: number[] = [];
+  for (let i = 0; i < headerEnd; i++) {
+    if (matchStatusLine(lines[i])) statusLines.push(i);
+  }
+
+  if (statusLines.length === 0) {
+    throw new Error(
+      "no `> **Status**:` line in the header blockquote (before the first `##` heading)",
+    );
+  }
+  if (statusLines.length > 1) {
+    const at = statusLines.map((i) => i + 1).join(", ");
+    throw new Error(
+      `${statusLines.length} \`> **Status**:\` lines in the header (lines ${at}) — a task must carry exactly one`,
+    );
+  }
+
+  const statusIndex = statusLines[0];
+  const status = matchStatusLine(lines[statusIndex])!;
+  if (parseStatusValue(status.raw) === null) {
+    throw new Error(
+      `Status value "${status.raw.trim()}" on line ${statusIndex + 1} is not one of ${TASK_STATUSES.join(" / ")} — write the value bare and put run notes on their own line`,
+    );
+  }
+
+  // Validation passed. Only now does anything get rewritten.
+  const out = [...lines];
+  out[statusIndex] = `${status.prefix}done`;
+
   let inGateSection = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Section boundary: track whether we're inside a gate section.
-    const heading = /^##\s+(.+?)\s*$/.exec(line);
+  for (let i = headerEnd; i < out.length; i++) {
+    const heading = /^##\s+(.+?)\s*$/.exec(out[i]);
     if (heading) {
       inGateSection = GATE_SECTIONS.has(heading[1].trim().toLowerCase());
       continue;
     }
-
-    // Status line lives in the header blockquote (before any `##`).
-    const status = /^(>\s*\*\*Status\*\*\s*:\s*)([A-Za-z-]+)\s*$/.exec(line);
-    if (status) {
-      lines[i] = `${status[1]}done`;
-      continue;
-    }
-
-    // Tick unchecked boxes only inside a gate section.
     if (inGateSection) {
-      lines[i] = line.replace(/^(\s*[-*]\s+)\[ \]/, "$1[x]");
+      out[i] = out[i].replace(/^(\s*[-*]\s+)\[ \]/, "$1[x]");
     }
   }
 
-  return lines.join("\n");
+  return out.join("\n");
 }
 
 async function main() {
@@ -60,12 +97,16 @@ async function main() {
     process.exit(2);
   }
   const content = await readFile(taskFile, "utf-8");
+  // markDone throws before producing content, so a failure leaves the file
+  // byte-for-byte unchanged.
   await writeFile(taskFile, markDone(content));
 }
 
 if (import.meta.main) {
   main().catch((err) => {
-    console.error("mark-done error:", err.message);
+    console.error(
+      `mark-done error: ${process.argv[2] ?? "<no file>"}: ${err.message}`,
+    );
     process.exit(2);
   });
 }
