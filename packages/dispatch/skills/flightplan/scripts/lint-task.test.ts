@@ -9,6 +9,9 @@ import {
   checkFinalReview,
   testCommandsIn,
   checkFinalReviewTestNet,
+  extractTestPaths,
+  formatTestNetReport,
+  testNetReport,
 } from "./lint-task";
 import { parseTask, type ParsedTask } from "./lib/parse-task";
 
@@ -64,6 +67,46 @@ async function writeTree(files: Record<string, string>): Promise<string> {
     await writeFile(abs, body);
   }
   return root;
+}
+
+const taskWith = ({
+  bucket,
+  nn,
+  dependsOn = "none",
+  finalReview = false,
+  verification = "bun test",
+}: {
+  bucket: string;
+  nn: string;
+  dependsOn?: string;
+  finalReview?: boolean;
+  verification?: string | null;
+}) =>
+  VALID_TASK.replace("# UI-01", `# ${bucket.toUpperCase()}-${nn}`)
+    .replace("**Depends on**: none", `**Depends on**: ${dependsOn}`)
+    .replace(
+      "> **Status**: todo",
+      `${finalReview ? "> **Final review**: true\n" : ""}> **Status**: todo`,
+    )
+    .replace(
+      "- [ ] Run `bun test`",
+      verification === null
+        ? "- [ ] Check output"
+        : `- [ ] Run \`${verification}\``,
+    );
+
+async function runCli(input: string) {
+  const proc = Bun.spawn(["bun", join(import.meta.dir, "lint-task.ts"), input], {
+    cwd: import.meta.dir,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    proc.stdout.text(),
+    proc.stderr.text(),
+    proc.exited,
+  ]);
+  return { stdout, stderr, exitCode };
 }
 
 describe("lintFile", () => {
@@ -559,6 +602,171 @@ Note: run \`bun test\` separately to verify.`,
       await readFile(join(root, "tasks/ui/01-foo.md"), "utf-8"),
     );
     expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+});
+
+describe("extractTestPaths", () => {
+  test.each([
+    ["bun test src/a.test.ts", ["src/a.test.ts"]],
+    ["cargo test crates/core", ["crates/core"]],
+    ["go test ./...", ["./..."]],
+    ["make test spec/unit", ["spec/unit"]],
+    ["npm test test/unit", ["test/unit"]],
+    ["pnpm test test/unit", ["test/unit"]],
+    ["yarn test test/unit", ["test/unit"]],
+    ["npm run test test/unit", ["test/unit"]],
+    ["pnpm run test test/unit", ["test/unit"]],
+    ["yarn run test test/unit", ["test/unit"]],
+    ["pytest tests/unit", ["tests/unit"]],
+    ["rspec spec/models", ["spec/models"]],
+  ])("fully consumes the runner prefix in %s", (command, expected) => {
+    const paths = extractTestPaths(command);
+    expect(paths).toEqual(expected);
+    expect(paths).not.toContain("test");
+    expect(paths).not.toContain("run");
+  });
+
+  test("drops flags and preserves path-ish arguments verbatim", () => {
+    expect(
+      extractTestPaths("bun test --watch ./Some-Path/{a,b}.test.ts -u"),
+    ).toEqual(["./Some-Path/{a,b}.test.ts"]);
+  });
+
+  test("returns no paths for an argument-less runner", () => {
+    expect(extractTestPaths("bun test")).toEqual([]);
+  });
+});
+
+describe("testNetReport", () => {
+  const withCommand = (
+    bucket: string,
+    nn: string,
+    command: string | null,
+    finalReview = false,
+  ) =>
+    ({
+      ...mk(bucket, nn, [], finalReview),
+      body:
+        command === null
+          ? "## Verification\n- [ ] Check output"
+          : `## Verification\n- [ ] Run \`${command}\``,
+    }) as unknown as ParsedTask;
+
+  test("omits tasks without tests and sorts final review last", () => {
+    expect(
+      testNetReport([
+        withCommand("review", "01", "bun test", true),
+        withCommand("docs", "01", null),
+        withCommand("ui", "01", "npm run test ui/", false),
+      ]),
+    ).toEqual([
+      {
+        ref: "ui/01",
+        finalReview: false,
+        commands: ["npm run test ui/"],
+        paths: ["ui/"],
+      },
+      {
+        ref: "review/01",
+        finalReview: true,
+        commands: ["bun test"],
+        paths: [],
+      },
+    ]);
+  });
+
+  test("returns [] when no task runs tests", () => {
+    expect(testNetReport([withCommand("docs", "01", null)])).toEqual([]);
+  });
+
+  test("formatter labels final review and renders empty paths as all", () => {
+    const output = formatTestNetReport([
+      {
+        ref: "ui/01",
+        finalReview: false,
+        commands: ["bun test ui/"],
+        paths: ["ui/"],
+      },
+      {
+        ref: "review/01",
+        finalReview: true,
+        commands: ["bun test"],
+        paths: [],
+      },
+    ]);
+    expect(output).toContain("Test net report:");
+    expect(output).toContain("ui/01");
+    expect(output).toContain("review/01 [final review]");
+    expect(output).toContain("paths: (all)");
+  });
+});
+
+describe("CLI test-net report", () => {
+  test("clean tree prints report to stdout and exits 0", async () => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-work.md": taskWith({ bucket: "ui", nn: "01" }),
+      "tasks/review/01-close.md": taskWith({
+        bucket: "review",
+        nn: "01",
+        dependsOn: "ui/01",
+        finalReview: true,
+      }),
+    });
+    const result = await runCli(join(root, "tasks"));
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Test net report:");
+    expect(result.stderr).toBe("");
+    await rm(root, { recursive: true });
+  });
+
+  test("violating tree reports stderr but still prints stdout report", async () => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-work.md": taskWith({ bucket: "ui", nn: "01" }),
+      "tasks/review/01-close.md": taskWith({
+        bucket: "review",
+        nn: "01",
+        finalReview: true,
+      }),
+    });
+    const result = await runCli(join(root, "tasks"));
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("[final-review]");
+    expect(result.stdout).toContain("Test net report:");
+    await rm(root, { recursive: true });
+  });
+
+  test("single task file prints no report", async () => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-work.md": taskWith({ bucket: "ui", nn: "01" }),
+    });
+    const result = await runCli(join(root, "tasks/ui/01-work.md"));
+    expect(result.stdout).not.toContain("Test net report:");
+    await rm(root, { recursive: true });
+  });
+
+  test("tree with no tests prints no report", async () => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-work.md": taskWith({
+        bucket: "ui",
+        nn: "01",
+        verification: null,
+      }),
+      "tasks/review/01-close.md": taskWith({
+        bucket: "review",
+        nn: "01",
+        dependsOn: "ui/01",
+        finalReview: true,
+        verification: null,
+      }),
+    });
+    const result = await runCli(join(root, "tasks"));
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("Test net report:");
     await rm(root, { recursive: true });
   });
 });

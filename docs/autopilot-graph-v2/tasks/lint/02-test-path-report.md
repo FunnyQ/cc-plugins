@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: lint/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -138,42 +138,42 @@ The report must appear on a clean tree too. Its purpose is routine review, not e
 
 ## Acceptance criteria
 
-- [ ] `testNetReport` is exported and returns one row per task carrying at least one test command, with
+- [x] `testNetReport` is exported and returns one row per task carrying at least one test command, with
       the final-review task's row last.
-- [ ] `testNetReport` returns `[]` when no task in the tree runs a test, and omits tasks that have no
+- [x] `testNetReport` returns `[]` when no task in the tree runs a test, and omits tasks that have no
       test command.
-- [ ] Path extraction drops the runner tokens and every token beginning with `-`, and keeps the
+- [x] Path extraction drops the runner tokens and every token beginning with `-`, and keeps the
       remaining tokens verbatim.
-- [ ] A command with no argument (for example a bare `bun test`) yields an empty `paths` array, and the
+- [x] A command with no argument (for example a bare `bun test`) yields an empty `paths` array, and the
       formatter renders that as `(all)`.
-- [ ] `formatTestNetReport` is exported, is pure, and marks the final-review row distinctly from the
+- [x] `formatTestNetReport` is exported, is pure, and marks the final-review row distinctly from the
       others.
-- [ ] Neither function touches the filesystem.
-- [ ] The report is written to **stdout** in whole-tree mode, and is not printed at all when the linter
+- [x] Neither function touches the filesystem.
+- [x] The report is written to **stdout** in whole-tree mode, and is not printed at all when the linter
       is given individual task files.
-- [ ] The exit code is unchanged by the report: a clean tree still exits 0 and a violating tree still
+- [x] The exit code is unchanged by the report: a clean tree still exits 0 and a violating tree still
       exits 1.
-- [ ] The report is printed for a violating tree as well as a clean one.
+- [x] The report is printed for a violating tree as well as a clean one.
 
-- [ ] Every recognised runner form has its prefix fully consumed, including the three-token
+- [x] Every recognised runner form has its prefix fully consumed, including the three-token
       `npm run test` / `pnpm run test` / `yarn run test` forms and the single-token `pytest` / `rspec`
       forms; no form leaves a literal `test` or `run` in `paths`.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` green — no regression in the sibling
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` green.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` green — no regression in the sibling
       script suites.
-- [ ] Drive the CLI as a subprocess with `Bun.spawn` over a clean temp tree that runs tests: exit code is
+- [x] Drive the CLI as a subprocess with `Bun.spawn` over a clean temp tree that runs tests: exit code is
       0 and stdout contains the report block. Calling the exported function alone cannot prove the exit
       code was untouched, so the subprocess check is required, not optional.
-- [ ] Drive the CLI as a subprocess over a temp tree that has a real violation: exit code is 1, stderr
+- [x] Drive the CLI as a subprocess over a temp tree that has a real violation: exit code is 1, stderr
       carries the violation, and stdout **still** carries the report block.
-- [ ] Drive the CLI as a subprocess with a single task file rather than a directory: stdout contains no
+- [x] Drive the CLI as a subprocess with a single task file rather than a directory: stdout contains no
       report block.
-- [ ] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks` prints
+- [x] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks` prints
       a report block naming this tree's own test paths, and still exits 0.
-- [ ] A temp tree whose tasks run no tests at all prints no report block.
+- [x] A temp tree whose tasks run no tests at all prints no report block.
 
 ## Eval rubric
 

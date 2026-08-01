@@ -33,13 +33,22 @@ type Counts = {
 };
 
 type ScoutResult = {
-  ready?: { ref: string; finalReview: boolean; path: string }[];
-  counts?: Counts;
-  unfinished?: { ref: string; state: string }[];
-  invalidRefs?: string[];
-  errors?: { file: string; reason: string }[];
-  error?: string;
+  stdout: string;
+  exitCode: number;
+  stderr: string;
 } | null;
+
+const snapshot = (tree: object, exitCode = 0): ScoutResult => ({
+  stdout: JSON.stringify({
+    ready: [],
+    unfinished: [],
+    invalid: [],
+    errors: [],
+    ...tree,
+  }),
+  exitCode,
+  stderr: "",
+});
 
 type RunResult = {
   slug: string;
@@ -225,18 +234,18 @@ describe("orchestrator wave loop", () => {
   test("a fresh tree runs its ready task and finishes clean", async () => {
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [ready("ui/01")],
           counts: counts({ total: 2, todo: 1, done: 1 }),
           unfinished: [{ ref: "ui/01", state: "todo" }],
-          invalidRefs: [],
-        },
-        {
+          invalid: [],
+        }),
+        snapshot({
           ready: [],
           counts: counts({ total: 2, done: 2 }),
           unfinished: [],
-          invalidRefs: [],
-        },
+          invalid: [],
+        }),
       ],
     });
     expect(result.completed).toEqual(["ui/01"]);
@@ -248,18 +257,18 @@ describe("orchestrator wave loop", () => {
     // a three-task tree — so a completed.length test would report a stall here.
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [ready("ui/03")],
           counts: counts({ total: 3, todo: 1, done: 2 }),
           unfinished: [{ ref: "ui/03", state: "todo" }],
-          invalidRefs: [],
-        },
-        {
+          invalid: [],
+        }),
+        snapshot({
           ready: [],
           counts: counts({ total: 3, done: 3 }),
           unfinished: [],
-          invalidRefs: [],
-        },
+          invalid: [],
+        }),
       ],
     });
     expect(result.completed).toEqual(["ui/03"]);
@@ -270,15 +279,15 @@ describe("orchestrator wave loop", () => {
   test("an empty ready set with unfinished tasks escalates as stalled", async () => {
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [],
           counts: counts({ total: 3, inProgress: 1, blocked: 1, done: 1 }),
           unfinished: [
             { ref: "ui/01", state: "inProgress" },
             { ref: "ui/02", state: "blocked" },
           ],
-          invalidRefs: [],
-        },
+          invalid: [],
+        }),
       ],
     });
     expect(result.completed).toEqual([]);
@@ -294,12 +303,12 @@ describe("orchestrator wave loop", () => {
   test("an invalid tree is a scout failure naming the refs", async () => {
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [ready("ui/02")],
           counts: counts({ total: 2, todo: 1, invalid: 1 }),
           unfinished: [{ ref: "ui/02", state: "todo" }],
-          invalidRefs: ["ui/01"],
-        },
+          invalid: [{ ref: "ui/01", rule: "", reason: "" }],
+        }),
       ],
     });
     expect(result.completed).toEqual([]);
@@ -313,7 +322,7 @@ describe("orchestrator wave loop", () => {
   test("counts that do not sum are a scout failure", async () => {
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [ready("ui/01")],
           counts: {
             total: 5,
@@ -324,8 +333,8 @@ describe("orchestrator wave loop", () => {
             invalid: 0,
           },
           unfinished: [{ ref: "ui/01", state: "todo" }],
-          invalidRefs: [],
-        },
+          invalid: [],
+        }),
       ],
     });
     expect(result.escalations[0].task).toBe("(scout)");
@@ -338,15 +347,15 @@ describe("orchestrator wave loop", () => {
     // holds a task nobody could read, and the run would report clean completion.
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [],
           counts: counts({ total: 1, done: 1 }),
           unfinished: [],
-          invalidRefs: [],
+          invalid: [],
           errors: [
             { file: "/abs/repo/.../ui/02-broken.md", reason: "missing H1" },
           ],
-        },
+        }),
       ],
     });
     expect(result.completed).toEqual([]);
@@ -364,14 +373,57 @@ describe("orchestrator wave loop", () => {
     expect(result.escalations[0].task).toBe("(scout)");
     expect(result.escalations[0].infrastructure).toBe(true);
   });
+
+  test("non-JSON scout stdout escalates instead of completing", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [{ stdout: "not json", exitCode: 0, stderr: "" }],
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].reason).toMatch(/stdout was not JSON/);
+  });
+
+  test("a snapshot missing counts escalates with the field name", async () => {
+    const { result } = await runOrchestrator({ scouts: [snapshot({})] });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].reason).toContain('"counts" is not an object');
+  });
+
+  test("an empty tree escalates before zero equals zero can complete", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [snapshot({ counts: counts({ total: 0 }) })],
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(tree)");
+    expect(result.escalations[0].reason).toMatch(/contains no parseable tasks/);
+  });
+
+  test("a non-zero scout exit with valid JSON reaches the invalid-tree guard", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        snapshot(
+          {
+            counts: counts({ total: 1, invalid: 1 }),
+            unfinished: [{ ref: "ui/01", state: "invalid" }],
+            invalid: [{ ref: "ui/01", rule: "", reason: "" }],
+          },
+          1,
+        ),
+      ],
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(tree)");
+    expect(result.escalations[0].reason).toContain("ui/01");
+  });
 });
 
 describe("orchestrator failure handling", () => {
-  const oneTask = (ref: string): ScoutResult => ({
+  const oneTask = (ref: string): ScoutResult => snapshot({
     ready: [ready(ref)],
     counts: counts({ total: 1, todo: 1 }),
     unfinished: [{ ref, state: "todo" }],
-    invalidRefs: [],
+    invalid: [],
   });
 
   test("a null verifier is an infrastructure failure and dev is not rerun", async () => {
@@ -494,21 +546,21 @@ describe("orchestrator failure handling", () => {
   test("a wave where one task passes and one infrastructure-fails accounts for both", async () => {
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: [ready("ui/01"), ready("api/01")],
           counts: counts({ total: 2, todo: 2 }),
           unfinished: [
             { ref: "api/01", state: "todo" },
             { ref: "ui/01", state: "todo" },
           ],
-          invalidRefs: [],
-        },
-        {
+          invalid: [],
+        }),
+        snapshot({
           ready: [],
           counts: counts({ total: 2, todo: 1, done: 1 }),
           unfinished: [{ ref: "api/01", state: "todo" }],
-          invalidRefs: [],
-        },
+          invalid: [],
+        }),
       ],
       gate: { "api/01": [null] },
     });
@@ -523,21 +575,21 @@ describe("orchestrator failure handling", () => {
     const refs = ["ui/01", "ui/02", "api/01"];
     const { result } = await runOrchestrator({
       scouts: [
-        {
+        snapshot({
           ready: refs.map((r) => ready(r)),
           counts: counts({ total: 3, todo: 3 }),
           unfinished: refs.map((ref) => ({ ref, state: "todo" })),
-          invalidRefs: [],
-        },
-        {
+          invalid: [],
+        }),
+        snapshot({
           ready: [],
           counts: counts({ total: 3, blocked: 2, done: 1 }),
           unfinished: [
             { ref: "api/01", state: "blocked" },
             { ref: "ui/02", state: "blocked" },
           ],
-          invalidRefs: [],
-        },
+          invalid: [],
+        }),
       ],
       gate: { "ui/02": [null] },
       devThrows: ["api/01"],
@@ -549,18 +601,18 @@ describe("orchestrator failure handling", () => {
 });
 
 describe("orchestrator commits", () => {
-  const wave = (ref: string, total: number, done: number): ScoutResult => ({
+  const wave = (ref: string, total: number, done: number): ScoutResult => snapshot({
     ready: [ready(ref)],
     counts: counts({ total, todo: total - done, done }),
     unfinished: [{ ref, state: "todo" }],
-    invalidRefs: [],
+    invalid: [],
     errors: [],
   });
-  const complete = (total: number): ScoutResult => ({
+  const complete = (total: number): ScoutResult => snapshot({
     ready: [],
     counts: counts({ total, done: total }),
     unfinished: [],
-    invalidRefs: [],
+    invalid: [],
     errors: [],
   });
 
@@ -627,23 +679,23 @@ describe("orchestrator commits", () => {
   test.each([
     {
       name: "parse errors",
-      scout: {
+      scout: snapshot({
         ready: [ready("ui/02")],
         counts: counts({ total: 1, todo: 1 }),
         unfinished: [{ ref: "ui/02", state: "todo" }],
-        invalidRefs: [],
+        invalid: [],
         errors: [{ file: "ui/02.md", reason: "missing H1" }],
-      },
+      }),
     },
     {
       name: "invalid counts",
-      scout: {
+      scout: snapshot({
         ready: [ready("ui/02")],
         counts: counts({ total: 1, invalid: 1 }),
         unfinished: [{ ref: "ui/02", state: "invalid" }],
-        invalidRefs: ["ui/02"],
+        invalid: [{ ref: "ui/02", rule: "", reason: "" }],
         errors: [],
-      },
+      }),
     },
   ])("a wave aborted by $name emits no commit label", async ({ scout }) => {
     const { labels } = await runOrchestrator({

@@ -121,62 +121,14 @@ const liveDev = !!(devEngine && CFG.liveDevEngine && CFG.relayPath)
 const COLLECT_ROUNDS = Math.max(0, Math.trunc(Number(CFG.liveCollectRounds ?? 3)) || 0)
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
-// The scout returns a WHOLE-TREE snapshot, not just a ready set. The wave loop's
-// own `completed` array covers only the current invocation, so a resumed run —
-// where earlier runs already finished most of the tree — can never test
-// completion with `completed.length === total`. `counts.done === counts.total`
-// can, because it counts the tree on disk.
 const SCOUT_SCHEMA = {
   type: 'object',
   properties: {
-    ready: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          ref: { type: 'string' },              // "ui/03"
-          finalReview: { type: 'boolean' },      // header carries `> **Final review**: true`
-          path: { type: 'string' },              // exact task file path from next-ready.ts
-        },
-        required: ['ref', 'finalReview', 'path'],
-      },
-    },
-    counts: {
-      type: 'object',
-      properties: {
-        total:      { type: 'number' },
-        todo:       { type: 'number' },
-        inProgress: { type: 'number' },
-        done:       { type: 'number' },
-        blocked:    { type: 'number' },
-        invalid:    { type: 'number' },   // malformed completion state — never counted as done
-      },
-      required: ['total', 'todo', 'inProgress', 'done', 'blocked', 'invalid'],
-    },
-    unfinished: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { ref: { type: 'string' }, state: { type: 'string' } },
-        required: ['ref', 'state'],
-      },
-    },
-    invalidRefs: { type: 'array', items: { type: 'string' } },
-    // Files that did not parse at all, or claim a duplicate ref. These tasks are
-    // NOT in byRef, so they are NOT in `counts` either — `counts` describes only
-    // what parsed. Dropping this field would let `done === total` hold over a
-    // tree that still contains unreadable task files.
-    errors: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { file: { type: 'string' }, reason: { type: 'string' } },
-        required: ['file', 'reason'],
-      },
-    },
-    error: { type: 'string' },
+    stdout:   { type: 'string' },   // verbatim stdout, uninterpreted
+    exitCode: { type: 'number' },
+    stderr:   { type: 'string' },
   },
-  required: ['ready', 'counts', 'unfinished', 'invalidRefs', 'errors'],
+  required: ['stdout', 'exitCode', 'stderr'],
 }
 
 const COMMIT_SCHEMA = {
@@ -608,32 +560,56 @@ while (true) {
     + `Then proceed.\n\n`
     + `Use the identical label in both start and end calls.\n`
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
-    + `It prints ONE JSON object on stdout describing the whole tree, e.g.\n`
-    + `  {"ready":[{"ref":"ui/03","finalReview":false,"path":"${CFG.tasksDir}/ui/03-build.md"}],"counts":{"total":8,"todo":5,"inProgress":0,"done":2,"blocked":0,"invalid":1},"unfinished":[{"ref":"ui/03","state":"todo"}],"invalid":[{"ref":"api/01","rule":"completion-state","reason":"..."}],"errors":[]}\n`
-    + `"ready" is exactly [] when NOTHING is ready. That is normal — it does NOT mean the run failed.\n`
-    + `The command prints this JSON even when it exits 1 (an invalid or unparseable tree). Read stdout either way.\n`
-    + `Return: ready = the printed "ready" array VERBATIM; counts = the printed "counts" object VERBATIM; unfinished = the printed "unfinished" array VERBATIM; invalidRefs = the "ref" of every entry in the printed "invalid" array; errors = the printed "errors" array VERBATIM.\n`
-    + `"errors" holds files that did not parse at all. Those tasks are absent from "counts", so returning [] when the command printed entries would make a broken tree look finished. Copy it exactly.\n`
-    + `Do NOT open task files, infer, recount, or enumerate anything the command did not print — echo only what it printed.\n`
-    + `ONLY if the command printed no JSON at all (it crashed): return ready: [], unfinished: [], invalidRefs: [], errors: [], counts with every field 0, and put the stderr in error.\n`
-    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "<ready count> ready, <done>/<total> done"`,
+    + `Return its stdout verbatim (unmodified), its exit code, and its stderr.\n`
+    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "command complete"`,
     { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: SCOUT_SCHEMA })
 
-  // A scout failure is NOT "no work to do" — surface it as an escalation so the
-  // run can't silently return empty (the classic `bun undefined/next-ready.ts`
-  // trap). Only a clean scout with a drained tree means the run is finished.
-  if (!scout || scout.error) {
-    const reason = `next-ready scout failed in wave ${wave}: ${scout?.error ?? 'no result'}`
+  // Pure in-memory work, so this needs no Workflow filesystem access.
+  let snap = null
+  let derailed = ''
+  if (!scout || typeof scout.stdout !== 'string' || scout.stdout.trim() === '') {
+    derailed = `the scout returned no stdout${scout?.stderr ? `: ${scout.stderr}` : ''}`
+  } else {
+    try {
+      snap = JSON.parse(scout.stdout)
+    } catch (err) {
+      derailed = `the scout's stdout was not JSON (${err?.message ?? String(err)}): ${scout.stdout.slice(0, 400)}`
+    }
+  }
+
+  // Validate the parsed object explicitly because a silently-missing field is the
+  // failure mode the old schema's `required` list existed to prevent.
+  if (!derailed && snap) {
+    if (!Array.isArray(snap.ready)) derailed = `"ready" is not an array`
+    else if (!Array.isArray(snap.unfinished)) derailed = `"unfinished" is not an array`
+    else if (!Array.isArray(snap.invalid)) derailed = `"invalid" is not an array`
+    else if (!Array.isArray(snap.errors)) derailed = `"errors" is not an array`
+    else if (!snap.counts || typeof snap.counts !== 'object') derailed = `"counts" is not an object`
+    else if (typeof snap.counts.total !== 'number') derailed = `"counts.total" is not a number`
+    else if (typeof snap.counts.todo !== 'number') derailed = `"counts.todo" is not a number`
+    else if (typeof snap.counts.inProgress !== 'number') derailed = `"counts.inProgress" is not a number`
+    else if (typeof snap.counts.done !== 'number') derailed = `"counts.done" is not a number`
+    else if (typeof snap.counts.blocked !== 'number') derailed = `"counts.blocked" is not a number`
+    else if (typeof snap.counts.invalid !== 'number') derailed = `"counts.invalid" is not a number`
+  }
+
+  if (derailed) {
+    const reason = `next-ready scout failed in wave ${wave}: ${derailed}`
     log(reason)
     escalations.push({ task: '(scout)', attempt: 0, infrastructure: true, parked: false, reason })
     break
   }
 
+  const ready       = snap.ready
+  const c           = snap.counts
+  const unfinished  = snap.unfinished
+  const invalidRefs = snap.invalid.map(i => i.ref)
+  const parseErrors = snap.errors
+
   // Unparseable files never reach `byRef`, so they never reach `counts` either.
   // `counts` therefore describes the tasks that PARSED, not the tree. Checking
   // this before the completion test is what stops `done === total` from holding
   // over a tree that still contains task files nobody could read.
-  const parseErrors = scout.errors ?? []
   if (parseErrors.length > 0) {
     const reason = `${parseErrors.length} task file(s) did not parse in wave ${wave}, so the tree is incomplete and its counts describe only what parsed: `
       + parseErrors.map(e => `${e.file} (${e.reason})`).join('; ')
@@ -643,7 +619,6 @@ while (true) {
     break
   }
 
-  const c = scout.counts
   const bucketSum = c.todo + c.inProgress + c.done + c.blocked + c.invalid
   if (bucketSum !== c.total) {
     const reason = `scout counts do not add up in wave ${wave}: total ${c.total} vs buckets summing to ${bucketSum} (${JSON.stringify(c)})`
@@ -656,8 +631,19 @@ while (true) {
   // whole point — "invalid: 2" alone tells the user nothing they can act on.
   if (c.invalid > 0) {
     const reason = `${c.invalid} task(s) hold an invalid completion state and the tree cannot be trusted: `
-      + `${(scout.invalidRefs ?? []).join(', ') || '(refs not reported)'}. `
+      + `${invalidRefs.join(', ') || '(refs not reported)'}. `
       + `Reset each one's Status to in-progress or todo and rerun its gates — do NOT tick the boxes by hand.`
+    log(reason)
+    escalations.push({ task: '(tree)', attempt: 0, infrastructure: true, parked: false, reason })
+    break
+  }
+
+  // A readable but EMPTY tasks dir yields all-zero counts, so `done === total`
+  // would hold and the run would report clean success over no work at all —
+  // after which the post-loop commit sweeps the working tree into a commit.
+  if (c.total === 0) {
+    const reason = `the tree at ${CFG.tasksDir} contains no parseable tasks (every count is zero), so there is nothing to execute. `
+      + `Check the path, and run lint-task.ts on the tree.`
     log(reason)
     escalations.push({ task: '(tree)', attempt: 0, infrastructure: true, parked: false, reason })
     break
@@ -674,14 +660,14 @@ while (true) {
   // Exclude both parked AND already-completed refs. next-ready won't re-offer a
   // done task, but this is defense-in-depth: even a misbehaving scout that
   // re-lists finished tasks can never trigger an infinite re-run of done work.
-  const fresh = (scout.ready ?? []).filter(
+  const fresh = ready.filter(
     i => !parked.has(i.ref) && !completed.includes(i.ref))
 
   // Empty ready set + unfinished tasks = stalled. Report the counts AND the refs.
   // Tasks this run already parked are excluded: they carry their own escalation,
   // and re-reporting them as a fresh stall would double-count every parked run.
   if (fresh.length === 0) {
-    const outstanding = (scout.unfinished ?? []).filter(u => !parked.has(u.ref))
+    const outstanding = unfinished.filter(u => !parked.has(u.ref))
     if (outstanding.length === 0) break   // nothing left but what we already escalated
     const remaining = outstanding.map(u => `${u.ref} (${u.state})`).join(', ')
     const reason = `stalled in wave ${wave}: no ready task, but ${c.total - c.done} of ${c.total} are unfinished. `
@@ -773,13 +759,13 @@ return { slug: CFG.slug, completed, escalations }
 ## Notes / gotchas
 
 - **Wave re-scout is non-negotiable.** Statuses change only inside the run. The orchestrator must recompute the ready set each wave. A task unblocked by a wave-N completion is picked up in wave N+1.
-- **The scout echoes `next-ready.ts --summary` verbatim. It does not interpret.** Use the `--summary` mode. It emits one object: `{ready, counts, unfinished, invalid, errors}`, where `ready` is `[]` when nothing is ready. Have the agent return those fields as-is. An earlier line-oriented scout had a fatal blind spot. When `next-ready` printed nothing — meaning all tasks were done — the agent did not map "empty" to `[]`. Instead, it re-listed every task as ready, and the whole tree re-ran. A JSON object is unambiguous. The `!completed.includes` filter is the backstop. Note `--summary` prints its JSON **before** exiting non-zero on a malformed tree, so the scout reads stdout either way and can name the invalid refs.
+- **The scout TRANSCRIBES.** It runs one command and hands back exactly what the command printed (`stdout`, `exitCode`, `stderr`). The script does every interpretation. Nothing the agent returns requires it to understand the tree. The script parses and validates the summary before deriving `{ready, counts, unfinished, invalidRefs, parseErrors}`. Note `--summary` prints its JSON **before** exiting non-zero on a malformed tree, so a non-zero exit alone is not a scout failure.
 
 - **`completed.length` is not a completion count. `counts.done` is.** The wave loop's `completed` array only holds tasks *this invocation* finished. A resumed run inherits `done` tasks from earlier runs, so comparing `completed.length` with the tree size reports a false stall on every resume. The scout's `counts.done === counts.total` counts the tree on disk, which is the only place completion actually lives. The loop also asserts `total === todo + inProgress + done + blocked + invalid` before trusting any bucket.
 
-- **Six terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a scout failure. `invalid > 0` is a scout failure naming the invalid refs. A counts mismatch is a scout failure. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)`, and the escalation-free guard blocks later commits without stopping task dispatch.
+- **Seven terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a tree failure. `invalid > 0` is a tree failure naming the invalid refs. A counts mismatch is a scout failure. A readable but empty tasks directory, where every count is zero, escalates as `(tree)` before the `done === total` completion test. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)`, and the escalation-free guard blocks later commits without stopping task dispatch.
 
-- **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop checks `scout.errors` **before** the completion test, and why `errors` is a required field of the scout schema rather than something the agent may summarize away.
+- **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop validates and checks the parsed `errors` array **before** the completion test instead of asking the scout to understand it.
 
 - **The stall check excludes tasks this run already parked.** Every parked task carries its own escalation, and the very next wave necessarily sees it as unfinished-and-not-ready. Counting it again would append a phantom `(tree)` stall to every run that parked anything, so the run would report two problems where there is one. When the only unfinished tasks are ones already escalated, the loop just breaks.
 

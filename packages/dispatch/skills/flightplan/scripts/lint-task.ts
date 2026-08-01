@@ -335,6 +335,64 @@ export function checkFinalReviewTestNet(
   ];
 }
 
+export type TestNetReportRow = {
+  ref: string;
+  finalReview: boolean;
+  commands: string[];
+  paths: string[];
+};
+
+/**
+ * Keep extraction crude because this report is advisory, not a shell parser or
+ * a coverage gate.
+ */
+export function extractTestPaths(command: string): string[] {
+  const runner = TEST_RUNNER_REGEX.exec(command);
+  if (!runner) return [];
+
+  const tokens = command.split(/\s+/);
+  const runnerTokenCount = runner[0].split(/\s+/).length;
+  return tokens
+    .slice(runnerTokenCount)
+    .filter((token) => !token.startsWith("-"));
+}
+
+/**
+ * Advisory view of which paths each task's test commands touch. One row per task
+ * that runs at least one test; the final-review task sorts last so a reader
+ * compares the closing gate against the tree above it. Returns [] when no task
+ * in the tree runs a test at all.
+ */
+export function testNetReport(tasks: ParsedTask[]): TestNetReportRow[] {
+  // Describe the detected command strings only; advisory reach never becomes a gate.
+  return tasks
+    .map((task) => {
+      const commands = testCommandsIn(task);
+      return {
+        ref: `${task.bucket}/${task.nn}`,
+        finalReview: task.finalReview,
+        commands,
+        paths: commands.flatMap(extractTestPaths),
+      };
+    })
+    .filter((row) => row.commands.length > 0)
+    .sort((a, b) => Number(a.finalReview) - Number(b.finalReview));
+}
+
+/** Render the rows as an indented, human-scannable block. Pure. */
+export function formatTestNetReport(rows: TestNetReportRow[]): string {
+  const lines = ["Test net report:"];
+  for (const row of rows) {
+    const label = row.finalReview ? " [final review]" : "";
+    lines.push(`  ${row.ref}${label}`);
+    lines.push(`    commands: ${row.commands.join(", ")}`);
+    lines.push(
+      `    paths: ${row.paths.length > 0 ? row.paths.join(", ") : "(all)"}`,
+    );
+  }
+  return lines.join("\n");
+}
+
 /** Derive bucket + NN from a path like `.../tasks/ui/01-foo.md`. */
 export function inferRefFromPath(
   filePath: string,
@@ -444,6 +502,9 @@ async function main() {
   if (treeRoots.length > 0) {
     reportAll(checkFinalReview(parsed, treeRoots[0]));
     reportAll(checkFinalReviewTestNet(parsed, treeRoots[0]));
+    const rows = testNetReport(parsed);
+    // Keep this on stdout and before exit: it cannot affect total or disappear on failure.
+    if (rows.length > 0) console.log(formatTestNetReport(rows));
   }
 
   if (total > 0) {

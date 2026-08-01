@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: orchestrator/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -202,48 +202,48 @@ Then add:
 
 ## Acceptance criteria
 
-- [ ] `SCOUT_SCHEMA` is exactly `{ stdout: string, exitCode: number, stderr: string }` with all three in
+- [x] `SCOUT_SCHEMA` is exactly `{ stdout: string, exitCode: number, stderr: string }` with all three in
       `required`.
-- [ ] The scout prompt asks only for a verbatim stdout transcription plus exit code and stderr; it
+- [x] The scout prompt asks only for a verbatim stdout transcription plus exit code and stderr; it
       contains no instruction about interpreting, mapping, recounting, or defaulting any tree field.
-- [ ] The script parses `scout.stdout` with `JSON.parse` inside a try/catch and derives `ready`, `counts`,
+- [x] The script parses `scout.stdout` with `JSON.parse` inside a try/catch and derives `ready`, `counts`,
       `unfinished`, `invalidRefs` (mapped from the `invalid` array's `ref` values), and the parse-errors
       list in plain JS.
-- [ ] Absent, empty, or non-JSON stdout produces a `(scout)` escalation with `infrastructure: true` and a
+- [x] Absent, empty, or non-JSON stdout produces a `(scout)` escalation with `infrastructure: true` and a
       reason that includes the underlying cause.
-- [ ] A snapshot missing any of `ready`, `counts`, `unfinished`, `invalid`, `errors` — or a `counts` lacking
+- [x] A snapshot missing any of `ready`, `counts`, `unfinished`, `invalid`, `errors` — or a `counts` lacking
       any of its six numeric fields — produces a `(scout)` escalation whose reason names the offending
       field.
-- [ ] `exitCode !== 0` alone never produces an escalation; a non-zero exit that still printed a valid tree
+- [x] `exitCode !== 0` alone never produces an escalation; a non-zero exit that still printed a valid tree
       flows into the normal guards.
-- [ ] `counts.total === 0` produces a `(tree)` escalation, and it is evaluated before the
+- [x] `counts.total === 0` produces a `(tree)` escalation, and it is evaluated before the
       `done === total` completion test.
-- [ ] Every pre-existing guard keeps its order and its semantics; no guard is defaulted, softened, or
+- [x] Every pre-existing guard keeps its order and its semantics; no guard is defaulted, softened, or
       reordered.
-- [ ] No field is silently defaulted to an empty array when the snapshot omits it.
-- [ ] `next-ready.ts` is unmodified.
+- [x] No field is silently defaulted to an empty array when the snapshot omits it.
+- [x] `next-ready.ts` is unmodified.
 
-- [ ] The scout gotcha and the terminal-conditions gotcha in `orchestrator.md` describe the transcription
+- [x] The scout gotcha and the terminal-conditions gotcha in `orchestrator.md` describe the transcription
       schema and the empty-tree condition — no stale claim about the scout survives outside the fenced
       block.
 
 ## Verification
 
-- [ ] Every **executable-script** change lands inside the fenced ```` ```javascript ```` block of
+- [x] Every **executable-script** change lands inside the fenced ```` ```javascript ```` block of
       `orchestrator.md` — the fixture extracts that block verbatim by string search, so script logic
       written in the surrounding prose is invisible to both the runtime and the test.
-- [ ] The prose corrections listed under "Files to create / modify" are made **outside** that block, and
+- [x] The prose corrections listed under "Files to create / modify" are made **outside** that block, and
       no longer contradict the shipped script. These two checks are complementary, not in tension: script
       logic goes inside the fence, descriptions of it go outside.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling suites.
-- [ ] Every existing fixture scenario is expressed through the raw-stdout helper; `grep -c "invalidRefs:"`
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling suites.
+- [x] Every existing fixture scenario is expressed through the raw-stdout helper; `grep -c "invalidRefs:"`
       in the fixture returns 0 for scenario definitions, since scenarios now carry an `invalid` array.
-- [ ] A fixture case with non-JSON stdout asserts `escalations[0].task === '(scout)'` and
+- [x] A fixture case with non-JSON stdout asserts `escalations[0].task === '(scout)'` and
       `completed` is empty.
-- [ ] A fixture case with `counts.total === 0` asserts `escalations[0].task === '(tree)'`.
-- [ ] `git diff --stat packages/dispatch/skills/flightplan/scripts/next-ready.ts` is empty.
-- [ ] Create an empty directory, run
+- [x] A fixture case with `counts.total === 0` asserts `escalations[0].task === '(tree)'`.
+- [x] `git diff --stat packages/dispatch/skills/flightplan/scripts/next-ready.ts` is empty.
+- [x] Create an empty directory, run
       `bun packages/dispatch/skills/flightplan/scripts/next-ready.ts <empty-dir> --summary`, and confirm it
       exits 0 with all counts zero — the input condition the new guard exists to catch.
 
