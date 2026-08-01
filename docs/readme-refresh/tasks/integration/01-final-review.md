@@ -61,7 +61,9 @@ plan's scope, do not fix it — record it in the summary as a reported problem.
 - [ ] No version number appears in README prose.
 - [ ] The `git diff` for this plan removes no factual claim that was true before it.
 - [ ] Any finding left unfixed is recorded in the summary with the reason it was out of scope.
-- [ ] No file other than `README.md` is modified.
+- [ ] No source file other than `README.md` is modified. This task's own file does not count: the runner
+      rewrites its `Status` line and ticks its gate boxes as bookkeeping, and reverting that to satisfy
+      this criterion is forbidden.
 
 ## Verification
 
@@ -73,7 +75,8 @@ plan's scope, do not fix it — record it in the summary as a reported problem.
       both lists.
 - [ ] Run `git diff -- README.md | grep '^-' | grep -v '^---'` and confirm every removed line was
       replaced by something equivalent or better. Quote anything dropped outright and justify it.
-- [ ] Run `git status --short` — expect `README.md` as the only modified path.
+- [ ] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file — the
+      runner edits its `Status` line and gate boxes. Any OTHER modified path is a real scope violation.
 
 ## Eval rubric
 
