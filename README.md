@@ -258,6 +258,27 @@ codex plugin add relay@q-lab-marketplace
 ln -s "$(pwd)/packages/relay/skills/relay" ~/.claude/skills/relay
 ```
 
+## chronicle
+
+Chronicle authors your git history: commits that auto-decide between a simple commit and an atomic split, reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, tag, and push. It runs as thin `SKILL.md` files over nested orchestrators and cheap child agents.
+
+- **commit** — auto-decides between one simple commit and an atomic split
+- **pr** — opens a GitHub PR or GitLab MR with a reviewer-legible body, enriched by the cockpit decision trail when one exists
+- **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, bumps version files, writes the CHANGELOG entry, and in auto mode commits, tags, and pushes
+- **install** — sets up the prerequisites for both harnesses
+
+Chronicle requires the nested-subagent spawn-depth setting documented in the Plugins section above.
+
+### Installation
+
+```bash
+# Claude Code
+claude plugins install chronicle@q-lab-marketplace
+
+# Codex
+codex plugin add chronicle@q-lab-marketplace
+```
+
 ## herdr
 
 Reference and in-session agent orchestration for [Herdr](https://herdr.dev), a terminal workspace manager with workspaces, tabs, split panes, and agent detection. Two halves:

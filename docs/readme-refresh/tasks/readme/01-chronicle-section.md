@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: readme/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -51,24 +51,24 @@ prerequisite is enough, and it must not contradict what that blockquote says.
 
 ## Acceptance criteria
 
-- [ ] `README.md` contains exactly one `## chronicle` heading.
-- [ ] The `## chronicle` heading sits after the `## relay` heading and before the `## herdr` heading.
-- [ ] The section names all four skills — `commit`, `pr`, `release`, `install` — one bullet each.
-- [ ] The section ends with an `### Installation` fenced `bash` block containing both
+- [x] `README.md` contains exactly one `## chronicle` heading.
+- [x] The `## chronicle` heading sits after the `## relay` heading and before the `## herdr` heading.
+- [x] The section names all four skills — `commit`, `pr`, `release`, `install` — one bullet each.
+- [x] The section ends with an `### Installation` fenced `bash` block containing both
       `claude plugins install chronicle@q-lab-marketplace` and
       `codex plugin add chronicle@q-lab-marketplace`.
-- [ ] The section mentions the spawn-depth prerequisite in one sentence without duplicating the existing
+- [x] The section mentions the spawn-depth prerequisite in one sentence without duplicating the existing
       blockquote.
-- [ ] No file other than `README.md` is modified.
-- [ ] No version number appears in the added prose.
+- [x] No file other than `README.md` is modified.
+- [x] No version number appears in the added prose.
 
 ## Verification
 
-- [ ] Run `grep -c '^## chronicle' README.md` — expect `1`.
-- [ ] Run `grep -n '^## ' README.md` and confirm the printed order is `... relay, chronicle, herdr,
+- [x] Run `grep -c '^## chronicle' README.md` — expect `1`.
+- [x] Run `grep -n '^## ' README.md` and confirm the printed order is `... relay, chronicle, herdr,
       Adding a New Plugin, License`. Quote the output.
-- [ ] Run `grep -n 'chronicle@q-lab-marketplace' README.md` — expect two matching lines.
-- [ ] Run `git status --short` — expect `README.md` as the only modified path.
+- [x] Run `grep -n 'chronicle@q-lab-marketplace' README.md` — expect two matching lines.
+- [x] Run `git status --short` — expect `README.md` as the only modified path.
 
 ## Eval rubric
 
