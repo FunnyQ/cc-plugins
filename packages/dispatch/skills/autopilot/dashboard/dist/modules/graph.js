@@ -96,6 +96,47 @@ export function layoutGraph(nodes, opts = {}) {
   };
 }
 
+/**
+ * Every node on the hovered node's lineage: itself, everything it transitively
+ * depends on, and everything that transitively depends on it. Two breadth-first
+ * walks over a `seen` set, so a cycle terminates instead of spinning.
+ *
+ * Lineage rather than immediate neighbours, because the two questions a
+ * dependency graph gets asked are "what is holding this up" and "what starts
+ * moving when this lands" — both reach past one hop.
+ */
+export function relatedRefs(nodes, ref) {
+  const graphNodes = Array.isArray(nodes) ? nodes : [];
+  const known = new Set(graphNodes.map((node) => node.ref));
+  if (!known.has(ref)) return new Set();
+
+  const dependencies = new Map(
+    graphNodes.map((node) => [
+      node.ref,
+      (node.dependsOn ?? []).filter((dep) => known.has(dep)),
+    ]),
+  );
+  const dependents = new Map(graphNodes.map((node) => [node.ref, []]));
+  for (const [target, deps] of dependencies) {
+    for (const dep of deps) dependents.get(dep).push(target);
+  }
+
+  const related = new Set([ref]);
+  for (const edges of [dependencies, dependents]) {
+    const queue = [ref];
+    const seen = new Set([ref]);
+    while (queue.length) {
+      for (const next of edges.get(queue.shift()) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        related.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return related;
+}
+
 export function renderGraph(nodes, layout, opts = {}) {
   const options = resolve(opts);
   const graphNodes = Array.isArray(nodes) ? nodes : [];
@@ -131,7 +172,7 @@ export function renderGraph(nodes, layout, opts = {}) {
         const midpoint = x1 + (x2 - x1) / 2;
         const dimmed = dependency.state === "done" ? "" : " -dimmed";
         return [
-          `<polyline class="graph-edge${dimmed}" marker-end="url(#${ARROW_ID})" points="${x1},${y1} ${midpoint},${y1} ${midpoint},${y2} ${x2},${y2}" />`,
+          `<polyline class="graph-edge${dimmed}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" marker-end="url(#${ARROW_ID})" points="${x1},${y1} ${midpoint},${y1} ${midpoint},${y2} ${x2},${y2}" />`,
         ];
       });
     })

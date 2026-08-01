@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { layoutGraph, renderGraph } from "./graph.js";
+import { layoutGraph, relatedRefs, renderGraph } from "./graph.js";
 
 function makeNode(ref, bucket, nn, dependsOn = []) {
   return {
@@ -249,5 +249,75 @@ describe("graph geometry overrides", () => {
     expect(svg).toContain('markerWidth="40"');
     expect(svg).toContain('markerHeight="24"');
     expect(svg).toContain('class="graph-ref" font-size="14"');
+  });
+});
+
+describe("relatedRefs", () => {
+  //  A ──→ B ──→ D        E is unrelated to the A/B/C/D lineage.
+  //   └──→ C ──→ D
+  const diamond = [
+    makeNode("A", "work", "01"),
+    makeNode("B", "work", "02", ["A"]),
+    makeNode("C", "work", "03", ["A"]),
+    makeNode("D", "work", "04", ["B", "C"]),
+    makeNode("E", "side", "01"),
+  ];
+
+  test("takes the whole lineage in both directions", () => {
+    expect([...relatedRefs(diamond, "B")].sort()).toEqual(["A", "B", "D"]);
+  });
+
+  test("a root reaches every descendant", () => {
+    expect([...relatedRefs(diamond, "A")].sort()).toEqual([
+      "A",
+      "B",
+      "C",
+      "D",
+    ]);
+  });
+
+  test("a leaf reaches every ancestor", () => {
+    expect([...relatedRefs(diamond, "D")].sort()).toEqual([
+      "A",
+      "B",
+      "C",
+      "D",
+    ]);
+  });
+
+  test("an isolated node is related only to itself", () => {
+    expect([...relatedRefs(diamond, "E")]).toEqual(["E"]);
+  });
+
+  test("returns nothing for a ref that is not in the tree", () => {
+    expect([...relatedRefs(diamond, "nope")]).toEqual([]);
+  });
+
+  test("terminates on a cycle", () => {
+    const cyclic = [
+      makeNode("A", "cycle", "01", ["B"]),
+      makeNode("B", "cycle", "02", ["A"]),
+    ];
+
+    expect([...relatedRefs(cyclic, "A")].sort()).toEqual(["A", "B"]);
+  });
+
+  test("ignores a dependency on a node the tree does not contain", () => {
+    const dangling = [makeNode("A", "work", "01", ["ghost/01"])];
+
+    expect([...relatedRefs(dangling, "A")]).toEqual(["A"]);
+  });
+});
+
+describe("edge identity", () => {
+  test("each edge names the pair it connects", () => {
+    const nodes = [
+      makeNode("A", "chain", "01"),
+      makeNode("B", "chain", "02", ["A"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain('data-from="A"');
+    expect(svg).toContain('data-to="B"');
   });
 });

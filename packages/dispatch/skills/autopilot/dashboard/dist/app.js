@@ -10,7 +10,7 @@ import {
   toggleFleet,
   toggleRubric,
 } from "./modules/fleet.js";
-import { layoutGraph, renderGraph } from "./modules/graph.js";
+import { layoutGraph, relatedRefs, renderGraph } from "./modules/graph.js";
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -44,6 +44,7 @@ const store = reactive({
 
 let graphLayout;
 let graphStructure = "";
+let graphNodes = [];
 
 function taskStructure(tasks) {
   return [...tasks]
@@ -62,6 +63,46 @@ function updateGraph(tasks) {
     graphStructure = structure;
   }
   store.graphSvg = renderGraph(graphTasks, graphLayout);
+  graphNodes = graphTasks;
+}
+
+/**
+ * Hover lineage. The SVG is replaced wholesale on every poll, so the handlers
+ * live on the container that survives — one listener pair, not one per node.
+ * Classes go on the elements rather than inline styles so the CSS owns how a
+ * dimmed node looks, and a redraw mid-hover simply clears them.
+ */
+function litRefs(target) {
+  const node = target?.closest?.(".graph-node");
+  return node ? relatedRefs(graphNodes, node.dataset.ref) : null;
+}
+
+function paintLineage(container, lit) {
+  const svg = container.querySelector(".dependency-graph");
+  if (!svg) return;
+
+  svg.classList.toggle("-focus", lit !== null);
+  for (const node of svg.querySelectorAll(".graph-node")) {
+    node.classList.toggle("-lit", lit?.has(node.dataset.ref) === true);
+  }
+  for (const edge of svg.querySelectorAll(".graph-edge")) {
+    edge.classList.toggle(
+      "-lit",
+      lit?.has(edge.dataset.from) === true && lit.has(edge.dataset.to),
+    );
+  }
+}
+
+function bindGraphHover(container) {
+  container.addEventListener("pointerover", (event) => {
+    const lit = litRefs(event.target);
+    if (lit) paintLineage(container, lit);
+  });
+  container.addEventListener("pointerout", (event) => {
+    // Leaving one node for another fires out before over; only clear when the
+    // pointer has actually left every node.
+    if (!litRefs(event.relatedTarget)) paintLineage(container, null);
+  });
 }
 
 async function loadTree() {
@@ -173,6 +214,10 @@ document.querySelector(".deck-top")?.insertAdjacentHTML(
    <div v-if="view === 'graph'" class="c-dependency-graph" v-html="graphSvg"></div>`,
 );
 createApp(store).mount("#app");
+// petite-vue owns the SVG's innerHTML, so the listeners go on its parent, which
+// is created once by the insertAdjacentHTML above and never replaced.
+const graphMount = document.querySelector(".deck-top");
+if (graphMount) bindGraphHover(graphMount);
 window.__flightdeck = store;
 
 connectEvents({

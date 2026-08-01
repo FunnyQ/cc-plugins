@@ -350,6 +350,30 @@ button {
   .graph-node.-invalid > rect,
   .graph-node.-cyclic > rect { fill: var(--state-alert); stroke: var(--state-alert); }
 
+  /* Hover lineage: everything on the hovered node's ancestry or descent stays
+     lit, the rest recedes. Opacity, not colour, so a state colour never turns
+     into a different state's colour. */
+  &.-focus .graph-node:not(.-lit),
+  &.-focus .graph-edge:not(.-lit) {
+    opacity: 0.16;
+  }
+
+  &.-focus .graph-edge.-lit {
+    opacity: 1;
+    stroke-width: calc(var(--graph-edge-width) * 1.6);
+  }
+
+  &.-focus .graph-node.-lit > rect {
+    filter: brightness(1.12);
+  }
+
+  .graph-node,
+  .graph-edge {
+    transition:
+      opacity var(--motion-duration) ease,
+      stroke-width var(--motion-duration) ease;
+  }
+
   .graph-node.-in-progress > .graph-status {
     animation: flight-pulse var(--flight-duration) ease-in-out infinite;
     fill: var(--ground);
