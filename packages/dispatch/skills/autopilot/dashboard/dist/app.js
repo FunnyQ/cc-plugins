@@ -16,7 +16,14 @@ const emptyTree = () => ({
   slug: "",
   buckets: [],
   tasks: [],
-  counts: { total: 0, done: 0, inProgress: 0, ready: 0, blocked: 0 },
+  counts: {
+    total: 0,
+    done: 0,
+    inProgress: 0,
+    ready: 0,
+    blocked: 0,
+    invalid: 0,
+  },
   errors: [],
 });
 

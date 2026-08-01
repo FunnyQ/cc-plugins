@@ -189,6 +189,12 @@ button {
   color: var(--state-blocked);
 }
 
+/* A malformed completion state is an alert, not a status — it reuses the alert
+   colour so an invalid task can never read as ordinary progress. */
+.plan-counts .-invalid dd {
+  color: var(--state-alert);
+}
+
 .status-dot {
   animation: flight-pulse var(--flight-duration) ease-in-out infinite;
   background: var(--state-flight);
@@ -307,6 +313,7 @@ button {
   .graph-node.-ready > rect { fill: var(--state-ready); stroke: var(--state-ready); }
   .graph-node.-blocked > rect { fill: var(--state-blocked); stroke: var(--state-blocked); }
   .graph-node.-alert > rect,
+  .graph-node.-invalid > rect,
   .graph-node.-cyclic > rect { fill: var(--state-alert); stroke: var(--state-alert); }
 
   .graph-node.-in-progress > .graph-status {
@@ -519,6 +526,8 @@ button {
     &.-ready > .summary .badge { color: var(--state-ready); }
     &.-blocked > .summary .status { background: var(--state-blocked); }
     &.-blocked > .summary .badge { color: var(--state-blocked); }
+    &.-invalid > .summary .status { background: var(--state-alert); }
+    &.-invalid > .summary .badge { color: var(--state-alert); }
   }
 
   .c-score-meter {

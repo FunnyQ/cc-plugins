@@ -50,6 +50,10 @@
             <dt>Blocked</dt>
             <dd>{{ tree.counts.blocked }}</dd>
           </div>
+          <div class="-invalid" v-if="tree.counts.invalid">
+            <dt>Invalid</dt>
+            <dd>{{ tree.counts.invalid }}</dd>
+          </div>
         </dl>
 
         <div class="view-toggle" aria-label="Task view">
