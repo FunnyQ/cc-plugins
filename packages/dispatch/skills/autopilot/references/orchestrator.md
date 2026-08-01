@@ -6,7 +6,7 @@ Read the three hard constraints in `SKILL.md` first. They explain every awkward-
 The main agent scouts inline. It then calls `Workflow({ script: <this> })`. **Bake the
 scouted values into the `CFG` block at the top of the script as literals.**
 
-Wave loop: `scout → seven guards → inter-wave commit → parallel task dispatch → reconciliation`.
+Wave loop: `scout → tree guards → derive fresh ready tasks → stall guard → inter-wave commit → budget-floor check → parallel task dispatch → reconciliation → no-progress stop`.
 
 Do NOT rely on the Workflow `args` global. It does not reliably reach the orchestrator.
 An unset `args` becomes `undefined`. The scout then runs `bun undefined/next-ready.ts`
@@ -56,6 +56,7 @@ const CFG = {
   scriptsDir:            '/abs/.claude/plugins/cache/.../skills/flightplan/scripts',  // ABSOLUTE
   baseRef:               '<output of `git rev-parse HEAD` captured before calling Workflow>',
   commitBetweenWaves:    true,   // set false to skip inter-wave atomic-commits
+  budgetFloor:           0,     // output-token floor: below this, stop dispatching new tasks (0 = off)
   devEngine:             'claude',  // 'claude' (default), 'codex', or 'opencode' — who writes code in the dev step; an external engine has each task written by that CLI via its <engine>-run.ts wrapper (last attempt before the cap still falls back to Claude-Opus)
   lastShotEngine:        '',   // 'codex' | 'opencode' | '' (off) — appends ONE external rung to the END of a Claude dev ladder
   liveDevEngine:         false,   // when devEngine is external and HERDR_ENV=1 + relayPath are fulfilled, run the dev delegate in a visible herdr live pane via relay; headless stays default
@@ -125,6 +126,22 @@ const liveDev = !!(devEngine && CFG.liveDevEngine && CFG.relayPath)
 // Interpolated into a prompt as a countable instruction, so a fractional or
 // negative value would render an incoherent one.
 const COLLECT_ROUNDS = Math.max(0, Math.trunc(Number(CFG.liveCollectRounds ?? 3)) || 0)
+// Interpolated into an operator-facing reason string and compared against a token
+// count, so a negative or fractional value would render an incoherent one.
+const BUDGET_FLOOR = Math.max(0, Math.trunc(Number(CFG.budgetFloor ?? 0)) || 0)
+
+// Returns the remaining budget when it has fallen below the floor, else null.
+// Both "no floor configured" and "no budget declared" are null — not a throw and
+// not a stop.
+const budgetBelowFloor = () => {
+  if (BUDGET_FLOOR <= 0) return null
+  // `total === null` is the documented "no target declared" value. Do NOT use
+  // a falsy test: a legitimate total of 0 would disable a configured floor at
+  // exactly the moment it matters most.
+  if (typeof budget === 'undefined' || !budget || budget.total === null) return null
+  const left = budget.remaining()
+  return left < BUDGET_FLOOR ? left : null
+}
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 const SCOUT_SCHEMA = {
@@ -743,6 +760,17 @@ while (true) {
     }
   }
 
+  const left = budgetBelowFloor()
+  if (left !== null) {
+    const reason = `budget floor reached before wave ${wave} dispatch: ${left} of ${budget.total} output tokens remain, `
+      + `below the configured floor of ${BUDGET_FLOOR}. Not dispatched: ${fresh.map(f => f.ref).join(', ')}. `
+      + `${c.total - c.done} of ${c.total} task(s) remain unfinished. No task was parked and nothing is in flight — `
+      + `raise or clear the budget floor, or grant more budget, then re-run autopilot to resume.`
+    log(reason)
+    escalations.push({ task: '(budget)', attempt: 0, infrastructure: true, parked: false, reason })
+    break
+  }
+
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
   // No `.filter(Boolean)` — reconciliation is by INDEX against `fresh`, so a
   // null result still lands on its own task instead of disappearing.
@@ -816,7 +844,7 @@ return { slug: CFG.slug, completed, escalations }
 
 - **`completed.length` is not a completion count. `counts.done` is.** The wave loop's `completed` array only holds tasks *this invocation* finished. A resumed run inherits `done` tasks from earlier runs, so comparing `completed.length` with the tree size reports a false stall on every resume. The scout's `counts.done === counts.total` counts the tree on disk, which is the only place completion actually lives. The loop also asserts `total === todo + inProgress + done + blocked + invalid` before trusting any bucket.
 
-- **Seven terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a tree failure. `invalid > 0` is a tree failure naming the invalid refs. A counts mismatch is a scout failure. A readable but empty tasks directory, where every count is zero, escalates as `(tree)` before the `done === total` completion test. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)`, and the escalation-free guard blocks later commits without stopping task dispatch.
+- **Eight terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a tree failure. `invalid > 0` is a tree failure naming the invalid refs. A counts mismatch is a scout failure. A readable but empty tasks directory, where every count is zero, escalates as `(tree)` before the `done === total` completion test. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A configured budget floor stops the loop between the inter-wave commit and dispatch when the remaining output-token balance is below that floor. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)`, and the escalation-free guard blocks later commits without stopping task dispatch.
 
 - **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop validates and checks the parsed `errors` array **before** the completion test instead of asking the scout to understand it.
 
@@ -830,6 +858,7 @@ return { slug: CFG.slug, completed, escalations }
 
 - **Wrap the task thunk; reconcile by index; never `.filter(Boolean)`.** `parallel()` resolves a thrown thunk to `null`, and a `null` carries neither the task ref nor the cause. `runTaskGuarded` catches around `executeTask` so both survive, and it still attempts `markBlockedPrompt` and records whether the park worked. The wave then reconciles `results[i]` against `fresh[i]`, so even a `null` lands on its own task instead of vanishing. Filtering first would drop the task from `completed` and `escalations` both, and an unparked task stays `in-progress` — which `next-ready` never offers again.
 - **There is exactly one scoring implementation.** The judge agent runs `score-task.ts --json --log` with its scores. The orchestrator gates on that printed verdict object. If the formula changes, change `score-task.ts`. Do NOT duplicate the arithmetic in the orchestrator.
+- **`CFG.budgetFloor` defaults to `0` (off).** `budget.total` is `null` unless the user declares a target, so enabling a floor by default would manufacture a surprise stall class for existing runs. When configured above zero, it stops dispatching a ready wave when the remaining output-token balance falls below the floor.
 - **Final review needs no special phase.** Its transitive `Depends on` reaches every task. So `next-ready` offers it only once everything else is `done`. When the `finalReview` flag is set, the orchestrator runs `runFinalReview` instead of a single dev agent — the multi-lens fan-out described below. It also uses the smaller `FINAL_MAX` cap. The binary gate, the rubric judge, and the score gate stay unchanged. They evaluate the round's output against the Final review task's own `## Eval rubric`: integration, consistency, no regressions, and whether it meets the PLAN goal.
 - **The *orchestrator* runs the review fan-out, not one agent.** A Workflow agent has `Skill` and `Bash`, so the external CLI is reachable. But it has **no `Agent` tool**. So it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that. `runFinalReview` issues one `agent()` per lens via `parallel()`. One lens is the cross-vendor lens (`CFG.reviewEngine`: codex or opencode), driven through the `<engine>-run.ts review` wrapper over Bash. The other four are the `/simplify` lenses — reuse, simplification, efficiency, altitude — and each runs on Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing. A single Opus **fixer** then reads all the files and applies the changes. The external engine gives the deliberate cross-*vendor* signal that an all-Claude dev+judge cannot produce. If it is unreachable, that reviewer writes its `<ENGINE> UNREACHABLE` token instead. The fixer then flags this, and the gate fails the task rather than pass an un-reviewed deliverable. Codex review is sandbox-enforced read-only. Opencode review is prompt-enforced read-only instead — its wrapper prepends a hard "analyze only" guard.
 - **The fixer is not the judge.** The reviewers and the fixer form the "dev" side of the Final review. The binary gate and the rubric judge stay independent. So the dev≠judge anti-self-grading split still holds, even though this round is more elaborate.

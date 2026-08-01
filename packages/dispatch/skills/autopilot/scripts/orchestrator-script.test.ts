@@ -65,6 +65,8 @@ type RunResult = {
 type Scenario = {
   /** One entry per wave, consumed in order. */
   scouts: ScoutResult[];
+  /** Omit to leave the Workflow runtime's `budget` global undeclared. */
+  budget?: { total: number | null; spent: number; spendAfterDev?: number };
   commit?: (
     | { committed: boolean; shas: string[]; failed: boolean; reason: string }
     | null
@@ -153,6 +155,7 @@ async function runOrchestrator(
   const labels: string[] = [];
   const prompts: string[] = [];
   const models: (string | undefined)[] = [];
+  let budgetSpent = scenario.budget?.spent ?? 0;
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
   const queues = new Map<string, unknown[]>();
@@ -203,6 +206,9 @@ async function runOrchestrator(
     }
     if (label.startsWith("dev:") || label.startsWith("dev-")) {
       const ref = refOf(rest);
+      if (scenario.budget?.spendAfterDev !== undefined) {
+        budgetSpent = scenario.budget.spendAfterDev;
+      }
       if (scenario.devThrows?.includes(ref)) {
         throw new Error(`dev exploded for ${ref}`);
       }
@@ -221,19 +227,18 @@ async function runOrchestrator(
       ),
     );
 
+  const parameterNames = ["agent", "parallel", "log", "phase"];
+  const parameterValues: unknown[] = [agent, parallel, () => {}, () => {}];
+  if (scenario.budget) {
+    const { total } = scenario.budget;
+    parameterNames.push("budget");
+    parameterValues.push({ total, remaining: () => total === null ? 0 : total - budgetSpent });
+  }
   const factory = new Function(
-    "agent",
-    "parallel",
-    "log",
-    "phase",
+    ...parameterNames,
     `return (async () => {\n${src}\n})()`,
   );
-  const result = (await factory(
-    agent,
-    parallel,
-    () => {},
-    () => {},
-  )) as RunResult;
+  const result = (await factory(...parameterValues)) as RunResult;
   return { result, labels, prompts, models };
 }
 
@@ -460,6 +465,173 @@ describe("orchestrator wave loop", () => {
     expect(result.completed).toEqual([]);
     expect(result.escalations[0].task).toBe("(tree)");
     expect(result.escalations[0].reason).toContain("ui/01");
+  });
+});
+
+describe("orchestrator budget floor", () => {
+  const pendingWave = () => snapshot({
+    ready: [ready("api/01"), ready("ui/02")],
+    counts: counts({ total: 3, todo: 2, done: 1 }),
+    unfinished: [
+      { ref: "api/01", state: "todo" },
+      { ref: "ui/02", state: "todo" },
+    ],
+    invalid: [],
+  });
+
+  test("stops before dispatch with one synthetic escalation and a complete reason", async () => {
+    const { result, labels } = await runOrchestrator(
+      { scouts: [pendingWave()], budget: { total: 100, spent: 91 } },
+      { budgetFloor: "10" },
+    );
+
+    expect(result.completed).toEqual([]);
+    expect(result.escalations).toHaveLength(1);
+    expect(result.escalations[0]).toMatchObject({
+      task: "(budget)",
+      attempt: 0,
+      infrastructure: true,
+      parked: false,
+    });
+    expect(result.escalations[0].reason).toContain("9 of 100 output tokens remain");
+    expect(result.escalations[0].reason).toContain("configured floor of 10");
+    expect(result.escalations[0].reason).toContain("Not dispatched: api/01, ui/02");
+    expect(result.escalations[0].reason).toContain("2 of 3 task(s) remain unfinished");
+    expect(labels.some((label) => label.startsWith("dev:"))).toBe(false);
+    expect(labels.some((label) => /^(verify|judge|done|block):/.test(label))).toBe(false);
+  });
+
+  test("commits the completed wave before stopping the next dispatch", async () => {
+    const { result, labels } = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("api/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "api/01", state: "todo" },
+              { ref: "ui/02", state: "todo" },
+            ],
+            invalid: [],
+          }),
+          snapshot({
+            ready: [ready("ui/02")],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "ui/02", state: "todo" }],
+            invalid: [],
+          }),
+        ],
+        budget: { total: 100, spent: 0, spendAfterDev: 95 },
+      },
+      { budgetFloor: "10" },
+    );
+
+    expect(result.completed).toEqual(["api/01"]);
+    expect(result.escalations.map((item) => item.task)).toEqual(["(budget)"]);
+    expect(labels).toContain("commit-wave-2");
+    expect(labels.indexOf("commit-wave-2")).toBeGreaterThan(labels.indexOf("done:api/01"));
+    expect(labels.some((label) => label.startsWith("dev:ui/02"))).toBe(false);
+  });
+
+  test("the default zero floor leaves a nearly exhausted run unchanged", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        snapshot({
+          ready: [ready("ui/01")],
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref: "ui/01", state: "todo" }],
+          invalid: [],
+        }),
+        snapshot({
+          ready: [],
+          counts: counts({ total: 1, done: 1 }),
+          unfinished: [],
+          invalid: [],
+        }),
+      ],
+      budget: { total: 1, spent: 1 },
+    });
+
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+  });
+
+  test("a null total never trips a configured floor", async () => {
+    const { result } = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "ui/01", state: "todo" }],
+            invalid: [],
+          }),
+          snapshot({
+            ready: [],
+            counts: counts({ total: 1, done: 1 }),
+            unfinished: [],
+            invalid: [],
+          }),
+        ],
+        budget: { total: null, spent: 999 },
+      },
+      { budgetFloor: "1000000" },
+    );
+
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+  });
+
+  test("an absent budget global does not throw or stop dispatch", async () => {
+    const { result } = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "ui/01", state: "todo" }],
+            invalid: [],
+          }),
+          snapshot({
+            ready: [],
+            counts: counts({ total: 1, done: 1 }),
+            unfinished: [],
+            invalid: [],
+          }),
+        ],
+      },
+      { budgetFloor: "10" },
+    );
+
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+  });
+
+  test("normalizes negative and fractional floors", async () => {
+    for (const budgetFloor of ["-5", "10.9"]) {
+      const { result } = await runOrchestrator(
+        {
+          scouts: [
+            snapshot({
+              ready: [ready("ui/01")],
+              counts: counts({ total: 1, todo: 1 }),
+              unfinished: [{ ref: "ui/01", state: "todo" }],
+              invalid: [],
+            }),
+            snapshot({
+              ready: [],
+              counts: counts({ total: 1, done: 1 }),
+              unfinished: [],
+              invalid: [],
+            }),
+          ],
+          budget: { total: 100, spent: 90 },
+        },
+        { budgetFloor },
+      );
+      expect(result.completed).toEqual(["ui/01"]);
+      expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+    }
   });
 });
 

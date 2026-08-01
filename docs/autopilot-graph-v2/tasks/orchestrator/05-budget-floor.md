@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: orchestrator/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -156,53 +156,53 @@ Two consequences to accept rather than work around:
 
 ## Acceptance criteria
 
-- [ ] A new config field defaults to `0`, and with it at `0` the run's behaviour is identical to current
+- [x] A new config field defaults to `0`, and with it at `0` the run's behaviour is identical to current
       behaviour — no budget read affects any decision.
-- [ ] The field is normalised so a negative or fractional value cannot reach the comparison or the
+- [x] The field is normalised so a negative or fractional value cannot reach the comparison or the
       reason string.
-- [ ] The budget read tolerates a completely absent `budget` global without throwing, using a
+- [x] The budget read tolerates a completely absent `budget` global without throwing, using a
       `typeof` guard rather than optional chaining on the bare identifier.
-- [ ] A `budget.total` of `null` never trips the floor, at any configured floor value.
-- [ ] With a floor configured and the remaining budget below it, the loop pushes exactly one escalation
+- [x] A `budget.total` of `null` never trips the floor, at any configured floor value.
+- [x] With a floor configured and the remaining budget below it, the loop pushes exactly one escalation
       with task `(budget)`, `attempt: 0`, `infrastructure: true`, `parked: false`, then breaks.
-- [ ] That escalation's reason states the remaining budget, the configured floor, the refs that were
+- [x] That escalation's reason states the remaining budget, the configured floor, the refs that were
       ready but not dispatched, and the count of unfinished tasks.
-- [ ] The check runs **after** the wave's commit agent call and **before** the `parallel()` dispatch, so
+- [x] The check runs **after** the wave's commit agent call and **before** the `parallel()` dispatch, so
       the finished wave is committed and no ready task is started.
-- [ ] When the floor trips, no dev, verify, judge, or mark-done agent runs for that wave.
-- [ ] No task's status is written when the floor trips — nothing is parked and nothing is left
+- [x] When the floor trips, no dev, verify, judge, or mark-done agent runs for that wave.
+- [x] No task's status is written when the floor trips — nothing is parked and nothing is left
       `in-progress` by this code path.
-- [ ] The `escalations.length === 0` guard on both commit paths is unchanged.
-- [ ] Every change to the executable script sits inside the fenced ```` ```javascript ```` block;
+- [x] The `escalations.length === 0` guard on both commit paths is unchanged.
+- [x] Every change to the executable script sits inside the fenced ```` ```javascript ```` block;
       the only edits outside it are the prose corrections listed above.
 
-- [ ] The terminal-conditions gotcha in `orchestrator.md` includes the budget stop, the new config field
+- [x] The terminal-conditions gotcha in `orchestrator.md` includes the budget stop, the new config field
       is documented alongside the others, and the wave-loop diagram in the Context section matches the
       shipped loop end to end.
 
-- [ ] An undeclared budget is detected as `budget.total === null` specifically; a `total` of `0` does
+- [x] An undeclared budget is detected as `budget.total === null` specifically; a `total` of `0` does
       **not** disable a configured floor, and has its own test.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling
       dashboard suites.
-- [ ] The fixture injects a `budget` stub through the `new Function` parameter list, with a scenario
+- [x] The fixture injects a `budget` stub through the `new Function` parameter list, with a scenario
       field supplying `total` and `spent` and a `remaining()` derived from them; omitting the field
       leaves the parameter `undefined` so the absent-global path is exercised by every pre-existing test.
-- [ ] A fixture case with a floor above the remaining budget asserts a single `(budget)` escalation with
+- [x] A fixture case with a floor above the remaining budget asserts a single `(budget)` escalation with
       `infrastructure: true` and `parked: false`, and that no label beginning `dev:` was recorded.
-- [ ] A fixture case with the floor at its default and a nearly-exhausted budget asserts the run
+- [x] A fixture case with the floor at its default and a nearly-exhausted budget asserts the run
       completes normally with no `(budget)` escalation.
-- [ ] A fixture case with a floor configured and `total: null` asserts no `(budget)` escalation.
-- [ ] A fixture case asserts the reason string contains the undispatched refs and the configured floor.
-- [ ] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
+- [x] A fixture case with a floor configured and `total: null` asserts no `(budget)` escalation.
+- [x] A fixture case asserts the reason string contains the undispatched refs and the configured floor.
+- [x] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
       exits 0 — the block still parses as a function body.
-- [ ] `grep -c "budgetFloor" packages/dispatch/skills/autopilot/references/orchestrator.md` is ≥ 2 (the
+- [x] `grep -c "budgetFloor" packages/dispatch/skills/autopilot/references/orchestrator.md` is ≥ 2 (the
       config field and its normalisation), confirming the change landed in the script rather than only
       in prose.
-- [ ] `grep -n "escalations.length === 0" packages/dispatch/skills/autopilot/references/orchestrator.md`
+- [x] `grep -n "escalations.length === 0" packages/dispatch/skills/autopilot/references/orchestrator.md`
       still shows two occurrences — the wave commit guard and the post-loop commit guard, both untouched.
 
 ## Eval rubric
