@@ -1184,3 +1184,76 @@ describe("orchestrator commits", () => {
     );
   });
 });
+
+describe("orchestrator cross-vendor review lens", () => {
+  /** One wave offering only the Final review task, then a drained tree. */
+  const finalWave: ScoutResult = snapshot({
+    ready: [ready("integration/01", true)],
+    counts: counts({ total: 1, todo: 1 }),
+    unfinished: [{ ref: "integration/01", state: "todo" }],
+  });
+
+  const reviewPrompt = async (overrides: ConfigOverrides = {}) => {
+    const log = await runOrchestrator(
+      { scouts: [finalWave, complete(1)] },
+      overrides,
+    );
+    return promptFor(log, "review:codex#1");
+  };
+
+  test("defaults to the headless wrapper", async () => {
+    const prompt = await reviewPrompt();
+
+    expect(prompt).toContain("codex-run.ts review");
+    expect(prompt).not.toContain("relay.ts");
+  });
+
+  test("runs through relay in a live pane when live review is on", async () => {
+    const prompt = await reviewPrompt({
+      liveReviewEngine: "true",
+      relayPath: "'/abs/relay/relay.ts'",
+    });
+
+    expect(prompt).toContain("bun /abs/relay/relay.ts codex review");
+    expect(prompt).toContain("--wait-timeout 480000");
+    expect(prompt).not.toContain("codex-run.ts review");
+  });
+
+  test("never passes a permission-bypass flag — a reviewer edits nothing", async () => {
+    const prompt = await reviewPrompt({
+      liveReviewEngine: "true",
+      relayPath: "'/abs/relay/relay.ts'",
+    });
+
+    expect(prompt).not.toContain("--dangerous");
+  });
+
+  test("keeps waiting through relay collect instead of failing a pending review", async () => {
+    const prompt = await reviewPrompt({
+      liveReviewEngine: "true",
+      relayPath: "'/abs/relay/relay.ts'",
+      liveCollectRounds: "2",
+    });
+
+    expect(prompt).toContain("relay ... collect --agent <name> --result <path>");
+    expect(prompt).toContain("at most 2 times");
+  });
+
+  test("falls back to headless when relayPath did not resolve", async () => {
+    const prompt = await reviewPrompt({ liveReviewEngine: "true" });
+
+    expect(prompt).toContain("codex-run.ts review");
+    expect(prompt).not.toContain("relay.ts");
+  });
+
+  test("the four Claude lenses stay headless whatever the review engine does", async () => {
+    const log = await runOrchestrator(
+      { scouts: [finalWave, complete(1)] },
+      { liveReviewEngine: "true", relayPath: "'/abs/relay/relay.ts'" },
+    );
+
+    for (const lens of ["reuse", "simplification", "efficiency", "altitude"]) {
+      expect(promptFor(log, `review:${lens}#1`)).not.toContain("relay.ts");
+    }
+  });
+});

@@ -71,22 +71,24 @@ Before touching Workflow, gather the work-list in the main conversation:
    opencode --version   # needed if devEngine or reviewEngine is 'opencode'
    ```
    If a selected engine is not installed, tell the user before flying. The per-task Claude work still runs without it. Only the external dev engine and the closing review round need it.
-8. If the dev engine is external, also probe whether live dev panes are available: check that `HERDR_ENV=1` **and** relay's `relay.ts` resolves. Resolve `relay.ts` the same way relay's live locator resolves herdr. Try the repo-sibling path first. Then scan both harness plugin caches (`~/.claude/plugins/cache` and `~/.codex/plugins/cache`) for the newest relay version's `skills/relay/scripts/relay.ts`. Capture the absolute path as `CFG.relayPath`. Use `''` when `relay.ts` is not found.
+8. Probe whether live panes are available: check that `HERDR_ENV=1` **and** relay's `relay.ts` resolves. Probe this on every flight, not only an external-dev one — the closing cross-vendor review lens can run live even when Claude writes every task. Resolve `relay.ts` the same way relay's live locator resolves herdr. Try the repo-sibling path first. Then scan both harness plugin caches (`~/.claude/plugins/cache` and `~/.codex/plugins/cache`) for the newest relay version's `skills/relay/scripts/relay.ts`. Capture the absolute path as `CFG.relayPath`. Use `''` when `relay.ts` is not found.
 
 ## Step 2 — Confirm the flight with the user
 
-**Ask the user three things: which dev engine, which cross-vendor reviewer, and which final-review lens model.** Do not silently default. These are **independent** choices. Use `AskUserQuestion`:
+**Ask the user three things: which dev engine, which cross-vendor reviewer, and which final-review lens model — plus a fourth, live panes, when the env allows it.** Do not silently default. These are **independent** choices. Use `AskUserQuestion`:
 
 - **Dev engine** (`CFG.devEngine`) — **Claude** (default; Sonnet writes, Opus on the last attempt), **Codex** (`'codex'` — the OpenAI codex CLI writes each task via `codex-run.ts`), or **OpenCode** (`'opencode'` — the opencode CLI writes each task via `opencode-run.ts`). With Codex or OpenCode, the dev step is a cheap Haiku driver, and Claude still judges. This gives a cross-vendor dev≠judge split.
 - **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
 - **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the four Claude `/simplify` lenses (reuse / simplification / efficiency / altitude) in the closing Final review. This choice affects **only** those four lenses. The fixer and rubric judge stay Opus regardless.
-- **Live dev pane** (`CFG.liveDevEngine`) — only when the chosen dev engine is external **and** `HERDR_ENV=1` + `relay.ts` resolved, ask this fourth question: **Headless** (default) or **Visible herdr live pane via relay**. `CFG.liveDevEngine` is true only when the user chooses live.
+- **Live panes** (`CFG.liveDevEngine`, `CFG.liveReviewEngine`) — only when `HERDR_ENV=1` + `relay.ts` resolved, ask this fourth question, `multiSelect`: which steps run in a visible herdr live pane via relay, defaulting to neither (headless). Offer the **dev delegate** option only when the chosen dev engine is external — a Claude dev step has no delegate to make live. Always offer the **closing cross-vendor review** option; the review lens is external on every flight. Each picked step sets its own flag.
 
-The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.reviewLensModel`, and `CFG.liveDevEngine` in Step 3. Whichever external engines get chosen, their `--version` check from Step 1 becomes load-bearing. If a picked engine is unreachable, say so before flying. Offer to fall back: Claude for the dev engine, the other CLI for the reviewer.
+The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.reviewLensModel`, `CFG.liveDevEngine`, and `CFG.liveReviewEngine` in Step 3. Whichever external engines get chosen, their `--version` check from Step 1 becomes load-bearing. If a picked engine is unreachable, say so before flying. Offer to fall back: Claude for the dev engine, the other CLI for the reviewer.
 
-When the user picks live, leave `CFG.liveCollectRounds` at its default `3`: a delegate that outlives relay's watch window is still working, so the driver reattaches with `relay collect` up to that many more times (~32 min total) instead of failing the attempt and putting a second writer on the same files. Lower it only when a fast fail matters more than finishing a slow task.
+When the user picks live, leave `CFG.liveCollectRounds` at its default `3`: a delegate or reviewer that outlives relay's watch window is still working, so the agent reattaches with `relay collect` up to that many more times (~32 min total) instead of failing the attempt and putting a second writer on the same files. Lower it only when a fast fail matters more than finishing a slow task. The same rounds apply to both live steps.
 
-If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false` and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks headless. In every one of these cases, the headless wrapper path is exactly today's behavior. The review lens is unaffected and always stays headless.
+The live review lens passes **no** permission-bypass flag, unlike the live dev delegate. A reviewer edits nothing, so relay's read-only prompt contract is the guard, and anything that does ask for approval surfaces in the visible pane for a human.
+
+If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, the headless wrapper path is exactly today's behavior. The four Claude `/simplify` lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
 
 Then show the user a one-screen brief. State the slug and how many tasks there are. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
@@ -126,7 +128,7 @@ Adapt `references/orchestrator.md`; it is the canonical script. Copy its `CFG` b
 - `baseRef`
 - `commitBetweenWaves`
 - `devEngine` and `reviewEngine`
-- `liveDevEngine`, absolute `relayPath`, and `liveCollectRounds`
+- `liveDevEngine`, `liveReviewEngine`, absolute `relayPath`, and `liveCollectRounds`
 - `opencodeDevModel` and `opencodeReviewModel`
 - `reviewLensModel`
 
