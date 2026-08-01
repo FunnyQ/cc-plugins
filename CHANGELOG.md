@@ -1,5 +1,24 @@
 # Changelog
 
+## [dispatch 3.17.0] - 2026-08-01
+
+_tracks tag `dispatch-v3.17.0`_
+
+### Added
+
+- **A tree that owns a test suite can no longer ship a Final review task that runs no test at all.** A new lint rule checks the Final review task's `## Verification` section against every test command declared elsewhere in the tree, and a companion advisory report prints each task's test paths on every tree lint.
+- **Two opt-in stopping behaviours for autopilot, both off by default.** `CFG.lastShotEngine` lets a failing Claude-Opus retry ladder end with one genuine cross-vendor attempt instead of giving up. `CFG.budgetFloor` lets a run with a declared token budget stop cleanly between waves once it's within a set floor of running out, rather than starting a wave it can't finish.
+
+### Changed
+
+- **The scout now only transcribes, it no longer interprets.** It echoes `next-ready.ts --summary` output verbatim; all parsing and shape validation moved into the orchestrator itself, ahead of the checks that decide whether a run is actually finished. A new guard also makes sure a genuinely empty tree can never be mistaken for a completed one.
+- **A failed inter-wave commit now surfaces as a real escalation instead of failing silently.** The commit step runs as its own tracked call with a clear success/failure result and a matching audit-log entry.
+- **A retried task now sees the full history of prior attempts**, not just the most recent rejection — so if a fix is rejected twice, the third attempt sees what both earlier attempts were told, instead of repeating a mistake it was already warned about.
+
+### Fixed
+
+- **A subagent that never returns its structured result no longer swallows an otherwise-finished wave.** Autopilot previously read this failure mode inconsistently across its scout and commit steps; it's now handled the same way everywhere and always reported instead of silently dropped.
+
 ## [dispatch 3.16.0] - 2026-08-01
 
 _tracks tag `dispatch-v3.16.0`_
