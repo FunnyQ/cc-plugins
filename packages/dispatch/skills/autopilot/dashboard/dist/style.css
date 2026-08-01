@@ -3,14 +3,14 @@
   --surface: #171B20;
   --surface-2: #1E242B;
   --rule: #262C33;
-  --text: #D6DCE2;
+  --text: #d2d8df;
   --muted: #7C8794;
   --faint: #4C555F;
-  --state-flight: #F0A830;
-  --state-done: #4FB6C4;
-  --state-ready: #6E8CA0;
-  --state-blocked: #414A55;
-  --state-alert: #E05B4A;
+  --state-flight: #c3843f;
+  --state-done: #38a613;
+  --state-ready: #4e97a1;
+  --state-blocked: #4f5b69;
+  --state-alert: #fa6b66;
 
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
