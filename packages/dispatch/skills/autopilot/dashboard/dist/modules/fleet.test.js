@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   elapsedText,
   formatDuration,
@@ -244,5 +245,40 @@ describe("fleet collapse", () => {
 
     expect(second.className).toContain("-collapsed");
     expect(isFleetCollapsed()).toBe(true);
+  });
+});
+
+describe("fleet sticky offsets", () => {
+  // The column header used to stick at a hardcoded 42px, guessed from the
+  // heading's rendered height. Adding a control to the heading grew it past 42
+  // and the ROLE bar slid over the panel title. Both offsets must now come from
+  // the same declaration, so neither can drift again.
+  const css = readFileSync(new URL("../style.css", import.meta.url), "utf-8");
+  // A selector can head more than one block (`.fleet-row, .fleet-columns` and
+  // `.fleet-columns` alone), so read them all, not the first one found.
+  const rule = (selector) =>
+    (css.match(new RegExp(`\\${selector}[,\\s][^{]*\\{[^}]*\\}`, "g")) ?? []).join(
+      "\n",
+    );
+
+  test("the heading declares its own height", () => {
+    expect(rule(".fleet-heading")).toContain(
+      "block-size: var(--fleet-heading-height)",
+    );
+    expect(rule(".fleet-heading")).toContain("box-sizing: border-box");
+  });
+
+  test("the column header sticks at exactly that height", () => {
+    expect(rule(".fleet-columns")).toContain(
+      "inset-block-start: var(--fleet-heading-height)",
+    );
+    expect(rule(".fleet-columns")).not.toMatch(/inset-block-start:\s*\d+px/);
+  });
+
+  test("the heading stacks above the column header", () => {
+    const layer = (selector) =>
+      Number(rule(selector).match(/z-index:\s*(\d+)/)?.[1] ?? 0);
+
+    expect(layer(".fleet-heading")).toBeGreaterThan(layer(".fleet-columns"));
   });
 });

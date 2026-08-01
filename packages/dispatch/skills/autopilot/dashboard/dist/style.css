@@ -669,6 +669,10 @@ button {
 .c-fleet {
   --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px minmax(160px, 1fr) minmax(160px, 2fr);
   --fleet-meter-height: var(--space-1);
+  /* The heading is pinned to this height and the column header sticks exactly
+     below it. One declaration for both, because the two used to be a rendered
+     height and a guess at it — and the guess lost the moment the heading grew. */
+  --fleet-heading-height: 44px;
 
   container-type: inline-size;
   font-size: var(--text-sm);
@@ -678,14 +682,16 @@ button {
 .fleet-heading {
   align-items: center;
   background: var(--surface);
+  block-size: var(--fleet-heading-height);
   border-block-end: var(--border-width) solid var(--rule);
+  box-sizing: border-box;
   display: grid;
   gap: var(--space-3);
   grid-template-columns: minmax(0, 1fr) auto auto auto;
-  padding: var(--space-3) var(--space-4);
+  padding: 0 var(--space-4);
   position: sticky;
   inset-block-start: 0;
-  z-index: 1;
+  z-index: 2;
 }
 
 .fleet-heading > h2 {
@@ -774,7 +780,7 @@ button {
   font-size: var(--text-xs);
   letter-spacing: 0.02em;
   position: sticky;
-  inset-block-start: 42px;
+  inset-block-start: var(--fleet-heading-height);
   text-transform: uppercase;
   z-index: 1;
 }
