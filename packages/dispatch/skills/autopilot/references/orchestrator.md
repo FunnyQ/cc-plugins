@@ -386,7 +386,8 @@ Do NOT trust the dev's claims. Open the task file at ${path}, then:
   2. Check every box in ## Acceptance criteria against the actual code/output.
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
-Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role verify --attempt ${attempt} --agent "<your label>" --phase end --message "<verification passed or failed>"
+Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role verify --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
+The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
 `
 
 const judgePrompt = (ref, path, gateSummary, attempt) => `

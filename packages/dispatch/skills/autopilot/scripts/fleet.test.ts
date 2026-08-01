@@ -431,3 +431,71 @@ describe("aggregateFleet", () => {
     ).not.toThrow();
   });
 });
+
+describe("gate outcome", () => {
+  const verifyNote = (message: string): FlightlogEntry => ({
+    kind: "note",
+    task: "ui/01",
+    role: "verify",
+    attempt: 1,
+    ts: "2026-01-01T00:00:01Z",
+    phase: "end",
+    agentLabel: "verify:ui/01#1",
+    message,
+  });
+
+  const outcomeOf = (entries: FlightlogEntry[]) =>
+    aggregateFleet(entries).find((row) => row.role === "verify" || row.role === "judge")
+      ?.outcome;
+
+  test("reads the verifier's PASS prefix", () => {
+    expect(outcomeOf([verifyNote("PASS — every command green")])).toBe("passed");
+  });
+
+  test("reads the verifier's FAIL prefix", () => {
+    expect(outcomeOf([verifyNote("FAIL — bun test exited 1")])).toBe("failed");
+  });
+
+  test("still catches the older free-text failure phrasing", () => {
+    expect(
+      outcomeOf([verifyNote("VERIFICATION FAILED: Scope violation")]),
+    ).toBe("failed");
+  });
+
+  test("leaves an unrecognised verifier message unjudged", () => {
+    expect(outcomeOf([verifyNote("looked at the tree")])).toBeUndefined();
+  });
+
+  test("takes the judge's outcome from its verdict, not its prose", () => {
+    const rejected: ScoreEntry = {
+      kind: "score",
+      task: "ui/01",
+      attempt: 1,
+      ts: "2026-01-01T00:00:02Z",
+      agentLabel: "judge:ui/01#1",
+      weighted: 3.2,
+      passed: false,
+      hardFailed: false,
+      missing: [],
+      threshold: 4,
+      passOp: ">",
+      breakdown: [],
+    };
+
+    expect(outcomeOf([rejected])).toBe("failed");
+  });
+
+  test("a passing judge verdict is not marked failed", () => {
+    expect(outcomeOf([score("ui/01", 1, "2026-01-01T00:00:02Z")])).toBe(
+      "passed",
+    );
+  });
+
+  test("says nothing about roles that have no gate", () => {
+    const rows = aggregateFleet([
+      note("ui/01", "dev", 1, "2026-01-01T00:00:00Z", "end", "dev:ui/01#1"),
+    ]);
+
+    expect(rows[0].outcome).toBeUndefined();
+  });
+});

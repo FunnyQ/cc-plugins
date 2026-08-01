@@ -45,11 +45,16 @@ function renderBreakdown(row) {
 function renderRow(row, nowMs) {
   const inFlight = isInFlight(row);
   const hardFailed = Boolean(row.score?.hardFailed);
+  // A gate that rejected the attempt reads as a rejection, not as a finish.
+  // -failed stays reserved for a rubric veto, which is the louder of the two.
+  const rejected = !hardFailed && row.outcome === "failed";
   const stateClass = hardFailed
     ? "-failed"
-    : inFlight
-      ? "-flight"
-      : "-finished";
+    : rejected
+      ? "-rejected"
+      : inFlight
+        ? "-flight"
+        : "-finished";
   const elapsed = elapsedText(row, nowMs);
   const unknownLabel =
     row.role === "unknown"
@@ -67,7 +72,7 @@ function renderRow(row, nowMs) {
     <div class="fleet-row ${stateClass}${expandable ? " -expandable" : ""}" role="row"
       data-row-key="${escapeHtml(row.key)}"${ticking} tabindex="${expandable ? "0" : "-1"}"
       aria-expanded="${expandable ? expandedRows.has(row.key) : false}">
-      <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : "finished"}"></span></span>
+      <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : rejected ? "did not pass" : "finished"}"></span></span>
       <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${unknownLabel}</span>
       <span class="fleet-cell -ref" role="cell">${escapeHtml(row.ref)}</span>
       <span class="fleet-cell -attempt" role="cell">${row.attempt === undefined ? "" : escapeHtml(row.attempt)}</span>

@@ -282,3 +282,58 @@ describe("fleet sticky offsets", () => {
     expect(layer(".fleet-heading")).toBeGreaterThan(layer(".fleet-columns"));
   });
 });
+
+describe("gate outcome colouring", () => {
+  const rowHtml = (row) => {
+    const originalDocument = globalThis.document;
+    globalThis.document = {
+      createElement() {
+        return { addEventListener() {}, className: "", innerHTML: "" };
+      },
+    };
+    try {
+      return renderFleet([row], 1, true, "connected").innerHTML;
+    } finally {
+      globalThis.document = originalDocument;
+    }
+  };
+
+  test("marks a rejected verifier row", () => {
+    const html = rowHtml({
+      key: "verify:ui/01#1",
+      role: "verify",
+      ref: "ui/01",
+      status: "finished",
+      outcome: "failed",
+    });
+
+    expect(html).toContain("-rejected");
+  });
+
+  test("leaves a passing verifier row alone", () => {
+    const html = rowHtml({
+      key: "verify:ui/01#1",
+      role: "verify",
+      ref: "ui/01",
+      status: "finished",
+      outcome: "passed",
+    });
+
+    expect(html).not.toContain("-rejected");
+    expect(html).toContain("-finished");
+  });
+
+  test("keeps the hard-fail state distinct from a plain rejection", () => {
+    const html = rowHtml({
+      key: "judge:ui/01#1",
+      role: "judge",
+      ref: "ui/01",
+      status: "finished",
+      outcome: "failed",
+      score: { weighted: 1.2, passed: false, hardFailed: true, breakdown: [] },
+    });
+
+    expect(html).toContain("-failed");
+    expect(html).not.toContain("-rejected");
+  });
+});

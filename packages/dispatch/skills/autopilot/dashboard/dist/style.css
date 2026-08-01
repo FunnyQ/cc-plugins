@@ -817,6 +817,7 @@ button {
 }
 
 .fleet-row.-failed .fleet-status { background: var(--state-alert); }
+.fleet-row.-rejected .fleet-status { background: var(--state-alert); }
 
 .fleet-cell.-role {
   align-items: center;
@@ -837,6 +838,9 @@ button {
 
 .fleet-row.-flight .role-badge { color: var(--state-flight); }
 .fleet-row.-failed .role-badge { color: var(--state-alert); }
+.fleet-row.-rejected .role-badge { color: var(--state-alert); }
+/* The message is where a rejected gate says WHY, so it stops being secondary. */
+.fleet-row.-rejected .fleet-cell.-message { color: var(--text); }
 
 .raw-label,
 .fleet-cell.-message {

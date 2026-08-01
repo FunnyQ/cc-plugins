@@ -66,6 +66,9 @@ export type TaskView = {
 
 export type FleetStatus = "in-flight" | "finished";
 
+/** Whether a gate role let the attempt through. Absent for every other role. */
+export type GateOutcome = "passed" | "failed";
+
 export type FleetRow = {
   key: string;
   label: string;
@@ -79,6 +82,7 @@ export type FleetRow = {
   elapsedMs?: number;
   message?: string;
   score?: ScoreEntry;
+  outcome?: GateOutcome;
 };
 
 /** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */
@@ -267,6 +271,30 @@ function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
     : "unknown";
 }
 
+/**
+ * The two gate roles carry a pass/fail the dashboard should colour differently.
+ *
+ * A judge always has a verdict object, so read that. A verifier has only prose:
+ * the orchestrator asks it to lead with PASS or FAIL, but older logs (and any
+ * agent that ignores the convention) just say what happened, so fall back to
+ * looking for a failure word — and check failure first, because "3 passed, 1
+ * failed" is a failure. A message that says neither stays unjudged rather than
+ * being guessed into a colour.
+ */
+function gateOutcome(row: FleetRow): GateOutcome | undefined {
+  if (row.role === "judge") {
+    if (!row.score) return undefined;
+    return row.score.passed ? "passed" : "failed";
+  }
+  if (row.role !== "verify") return undefined;
+
+  const message = row.message?.trim();
+  if (!message) return undefined;
+  if (/\bfail(ed|ure|s|ing)?\b/i.test(message)) return "failed";
+  if (/\bpass(ed|es|ing)?\b/i.test(message)) return "passed";
+  return undefined;
+}
+
 export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   const rows: IndexedRow[] = [];
   // Only an in-flight row can be closed, so pairing scans the open rows, not every row.
@@ -377,6 +405,11 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
     if (row.score || row.ref === undefined || row.attempt === undefined)
       continue;
     row.score = scoreByAttempt.get(`${row.ref}|${row.attempt}`);
+  }
+
+  for (const row of rows) {
+    const outcome = gateOutcome(row);
+    if (outcome) row.outcome = outcome;
   }
 
   const keyCounts = new Map<string, number>();
