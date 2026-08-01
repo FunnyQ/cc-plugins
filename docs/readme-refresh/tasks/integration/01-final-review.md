@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: readme/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -54,28 +54,28 @@ plan's scope, do not fix it — record it in the summary as a reported problem.
 
 ## Acceptance criteria
 
-- [ ] `README.md` has exactly one heading per plugin and no duplicate `## ` headings.
-- [ ] Every skill named in the README exists under `packages/<plugin>/skills/`.
-- [ ] Every skill directory under `packages/<plugin>/skills/` appears in the README's plugin tables.
-- [ ] Every relative link in `README.md` resolves to a path that exists.
-- [ ] No version number appears in README prose.
-- [ ] The `git diff` for this plan removes no factual claim that was true before it.
-- [ ] Any finding left unfixed is recorded in the summary with the reason it was out of scope.
-- [ ] No source file other than `README.md` is modified. This task's own file does not count: the runner
+- [x] `README.md` has exactly one heading per plugin and no duplicate `## ` headings.
+- [x] Every skill named in the README exists under `packages/<plugin>/skills/`.
+- [x] Every skill directory under `packages/<plugin>/skills/` appears in the README's plugin tables.
+- [x] Every relative link in `README.md` resolves to a path that exists.
+- [x] No version number appears in README prose.
+- [x] The `git diff` for this plan removes no factual claim that was true before it.
+- [x] Any finding left unfixed is recorded in the summary with the reason it was out of scope.
+- [x] No source file other than `README.md` is modified. This task's own file does not count: the runner
       rewrites its `Status` line and ticks its gate boxes as bookkeeping, and reverting that to satisfy
       this criterion is forbidden.
 
 ## Verification
 
-- [ ] Run `grep -n '^## ' README.md` and quote the full output; confirm one section per plugin, in a
+- [x] Run `grep -n '^## ' README.md` and quote the full output; confirm one section per plugin, in a
       sensible order.
-- [ ] Run the broken-link loop from the Implementation notes and quote its output; expect no `BROKEN:`
+- [x] Run the broken-link loop from the Implementation notes and quote its output; expect no `BROKEN:`
       lines.
-- [ ] Run `ls packages/*/skills/` and diff the result by eye against the README's plugin tables; quote
+- [x] Run `ls packages/*/skills/` and diff the result by eye against the README's plugin tables; quote
       both lists.
-- [ ] Run `git diff -- README.md | grep '^-' | grep -v '^---'` and confirm every removed line was
+- [x] Run `git diff -- README.md | grep '^-' | grep -v '^---'` and confirm every removed line was
       replaced by something equivalent or better. Quote anything dropped outright and justify it.
-- [ ] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file — the
+- [x] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file — the
       runner edits its `Status` line and gate boxes. Any OTHER modified path is a real scope violation.
 
 ## Eval rubric

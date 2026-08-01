@@ -1,6 +1,6 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, tag, and push; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
+A local Claude Code and Codex plugin marketplace for Q's coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, and cut the tag; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
 ## Development Workflow
 
@@ -37,7 +37,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 |-------|-------------|
 | [commit](./packages/chronicle/skills/commit) | Craft git commit(s) for the current changes — auto-decides between one simple commit and an atomic split |
 | [pr](./packages/chronicle/skills/pr) | Open a reviewer-legible PR/MR for the current branch, enriched by the cockpit decision trail when present |
-| [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, and (in auto mode) commit, merge, tag, and push |
+| [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, and (in the `auto` modes) commit, merge, tag, and push |
 | [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the nested-subagent spawn depth on Claude Code, the named agent roles on Codex |
 
 > **Claude Code 2.1.217+ requires one setting.** Chronicle's flows are orchestrator-shaped
@@ -263,14 +263,12 @@ ln -s "$(pwd)/packages/relay/skills/relay" ~/.claude/skills/relay
 
 ## chronicle
 
-Chronicle authors your git history: commits that auto-decide between a simple commit and an atomic split, reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, tag, and push. It runs as thin `SKILL.md` files over nested orchestrators and cheap child agents.
+Chronicle authors your git history — what a commit says, what a pull request argues, and what a release ships. Every skill has the same shape: a thin `SKILL.md` spawns a nested orchestrator that holds the decision, and the orchestrator delegates the mechanical work to cheap child agents. Diff-reading and git output stay out of your conversation.
 
-- **commit** — auto-decides between one simple commit and an atomic split
-- **pr** — opens a GitHub PR or GitLab MR with a reviewer-legible body, enriched by the cockpit decision trail when one exists
-- **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, bumps version files, writes the CHANGELOG entry, and in auto mode commits, tags, and pushes
-- **install** — sets up the prerequisites for both harnesses
-
-Chronicle requires the nested-subagent spawn-depth setting documented in the Plugins section above.
+- **commit** — a Haiku watcher reports the changeset, the orchestrator picks one commit or an atomic split, and a second Haiku agent stages whole files and writes the messages. Pass `simple` to force one commit.
+- **pr** — reads the branch, harvests the cockpit decision trail when one exists, and opens a GitHub PR or GitLab MR with a title, a four-section body, and an optional Mermaid overview diagram. The trail is an enrichment, not a requirement; an unrecognized remote stops the flow rather than guessing.
+- **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, then bumps the version files and writes the CHANGELOG entry. `auto` also commits and tags, locally; only `auto push` pushes.
+- **install** — sets up each harness's prerequisite: on Claude Code the nested-subagent spawn-depth setting described in the Plugins section above, on Codex the named agent roles the orchestrators are addressed by.
 
 ### Installation
 
