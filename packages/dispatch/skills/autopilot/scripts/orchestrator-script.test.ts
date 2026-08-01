@@ -9,7 +9,10 @@
  * a lost result turns into a run that looks clean.
  *
  * Keep the stubs faithful to the real runtime contract:
- *   - `agent()` returns null on a terminal failure; it does not throw.
+ *   - `agent()` returns null on a terminal API failure.
+ *   - `agent({schema})` THROWS when the subagent never calls StructuredOutput —
+ *     it does not return null, so a null-guard alone never sees that failure.
+ *     Model it with the THROWS sentinel.
  *   - `parallel()` resolves a thrown thunk to null; the call itself never rejects.
  */
 import { describe, expect, test } from "bun:test";
@@ -31,6 +34,18 @@ type Counts = {
   blocked: number;
   invalid: number;
 };
+
+/**
+ * The stubbed agent throws on this sentinel instead of returning. It models the
+ * one failure a null-guard cannot see: a subagent that text-emits
+ * `<StructuredOutput>…</StructuredOutput>` rather than calling the tool, which
+ * makes the real `agent({schema})` reject.
+ */
+const THROWS = "__throws__" as const;
+type Throws = typeof THROWS;
+
+const NO_STRUCTURED_OUTPUT =
+  "agent({schema}): subagent completed without calling StructuredOutput (after in-conversation nudge)";
 
 type ScoutResult = {
   stdout: string;
@@ -63,16 +78,20 @@ type RunResult = {
 };
 
 type Scenario = {
-  /** One entry per wave, consumed in order. */
-  scouts: ScoutResult[];
+  /** One entry per wave, consumed in order. THROWS models a rejecting agent. */
+  scouts: (ScoutResult | Throws)[];
   /** Omit to leave the Workflow runtime's `budget` global undeclared. */
   budget?: { total: number | null; spent: number; spendAfterDev?: number };
-  commit?: ({
-    committed: boolean;
-    shas: string[];
-    failed: boolean;
-    reason: string;
-  } | null)[];
+  commit?: (
+    | {
+        committed: boolean;
+        shas: string[];
+        failed: boolean;
+        reason: string;
+      }
+    | Throws
+    | null
+  )[];
   /** Keyed by task ref; null models an agent that returned no structured result. */
   gate?: Record<string, ({ passed: boolean; summary: string } | null)[]>;
   judge?: Record<string, ({ verdict: Verdict; rationale: string } | null)[]>;
@@ -186,12 +205,17 @@ async function runOrchestrator(
     models.push(opts.model);
 
     if (label.startsWith("scout-wave-")) {
-      return scouts.length > 0 ? scouts.shift() : null;
+      const next = scouts.length > 0 ? scouts.shift() : null;
+      if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
+      return next;
     }
     if (label.startsWith("commit-")) {
-      return commits.length > 0
-        ? commits.shift()
-        : { committed: true, shas: ["abc1234"], failed: false, reason: "" };
+      const next =
+        commits.length > 0
+          ? commits.shift()
+          : { committed: true, shas: ["abc1234"], failed: false, reason: "" };
+      if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
+      return next;
     }
     const [role, rest] = [label.slice(0, label.indexOf(":")), label];
     const refOf = (l: string) => l.slice(l.indexOf(":") + 1).split("#")[0];
@@ -268,7 +292,11 @@ const wave = (ref: string, total: number, done: number): ScoutResult =>
 
 /** The scout every finished run ends on: nothing ready, everything done. */
 const complete = (total: number): ScoutResult =>
-  snapshot({ ready: [], counts: counts({ total, done: total }), unfinished: [] });
+  snapshot({
+    ready: [],
+    counts: counts({ total, done: total }),
+    unfinished: [],
+  });
 
 /** The invariant the whole plan exists to protect. */
 function accountsForEveryTask(result: RunResult, refs: string[]): boolean {
@@ -446,6 +474,28 @@ describe("orchestrator wave loop", () => {
     expect(result.escalations[0].infrastructure).toBe(true);
   });
 
+  // The failure a null-guard cannot see. `agent({schema})` rejects when the
+  // subagent text-emits its payload instead of calling StructuredOutput, so an
+  // unguarded scout call takes the whole run down with it — and every finished
+  // wave's `completed` and `escalations` die with the throw, leaving the tree
+  // reading `done` on disk while the run reports nothing at all.
+  test("a scout that throws escalates instead of killing the run", async () => {
+    const { result } = await runOrchestrator({ scouts: [THROWS] });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].infrastructure).toBe(true);
+    expect(result.escalations[0].reason).toMatch(/StructuredOutput/);
+  });
+
+  test("a mid-run scout throw keeps the waves that already finished", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), THROWS],
+    });
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].reason).toMatch(/wave 2/);
+  });
+
   test("non-JSON scout stdout escalates instead of completing", async () => {
     const { result } = await runOrchestrator({
       scouts: [{ stdout: "not json", exitCode: 0, stderr: "" }],
@@ -590,10 +640,7 @@ describe("orchestrator budget floor", () => {
 
   test("the default zero floor leaves a nearly exhausted run unchanged", async () => {
     const { result } = await runOrchestrator({
-      scouts: [
-        wave("ui/01", 1, 0),
-        complete(1),
-      ],
+      scouts: [wave("ui/01", 1, 0), complete(1)],
       budget: { total: 1, spent: 1 },
     });
 
@@ -606,10 +653,7 @@ describe("orchestrator budget floor", () => {
   test("a null total never trips a configured floor", async () => {
     const { result } = await runOrchestrator(
       {
-        scouts: [
-          wave("ui/01", 1, 0),
-          complete(1),
-        ],
+        scouts: [wave("ui/01", 1, 0), complete(1)],
         budget: { total: null, spent: 999 },
       },
       { budgetFloor: "1000000" },
@@ -624,10 +668,7 @@ describe("orchestrator budget floor", () => {
   test("an absent budget global does not throw or stop dispatch", async () => {
     const { result } = await runOrchestrator(
       {
-        scouts: [
-          wave("ui/01", 1, 0),
-          complete(1),
-        ],
+        scouts: [wave("ui/01", 1, 0), complete(1)],
       },
       { budgetFloor: "10" },
     );
@@ -642,10 +683,7 @@ describe("orchestrator budget floor", () => {
     for (const budgetFloor of ["-5", "10.9"]) {
       const { result } = await runOrchestrator(
         {
-          scouts: [
-            wave("ui/01", 1, 0),
-            complete(1),
-          ],
+          scouts: [wave("ui/01", 1, 0), complete(1)],
           budget: { total: 100, spent: 90 },
         },
         { budgetFloor },
@@ -1072,6 +1110,22 @@ describe("orchestrator commits", () => {
     });
     expect(result.escalations[0].reason).toMatch(/unknown/);
     expect(result.escalations[0].reason).not.toMatch(/commit failed/);
+    expect(accountsForEveryTask(result, refs)).toBe(true);
+  });
+
+  test("a commit agent that throws escalates like a null one", async () => {
+    const refs = ["ui/01", "ui/02"];
+    const { result } = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1), complete(2)],
+      commit: [THROWS],
+    });
+
+    expect(result.escalations[0]).toMatchObject({
+      task: "(commit)",
+      infrastructure: true,
+      parked: false,
+    });
+    expect(result.escalations[0].reason).toMatch(/StructuredOutput/);
     expect(accountsForEveryTask(result, refs)).toBe(true);
   });
 

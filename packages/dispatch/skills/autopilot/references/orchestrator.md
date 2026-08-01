@@ -624,35 +624,58 @@ const escalations = []
 const parked = new Set()
 let wave = 0
 
+// A schema'd agent has TWO failure modes, not one. A terminal API failure
+// returns null — every guard below tests for that. But `agent({schema})`
+// REJECTS when the subagent text-emits `<StructuredOutput>…</StructuredOutput>`
+// instead of calling the tool, and a null-guard can never see a throw. Both
+// calls in this loop sit OUTSIDE `runTaskGuarded`, so an unguarded throw here
+// takes the whole run with it: `completed` and `escalations` for every wave
+// already finished die with it, while the tree on disk still reads `done`. That
+// is the worst possible shape — the work happened and the run reports nothing.
+// Live: wf_993ede2c-a44, a Haiku scout, on the final wave of a 9/9 tree.
+// Take a thunk, not a promise, so a synchronous throw is caught too.
+const settled = async (call) => {
+  try {
+    return { value: await call(), threw: '' }
+  } catch (error) {
+    return { value: null, threw: error?.message ?? String(error) }
+  }
+}
+
 // Both commit sites (inter-wave and post-loop) report a failure identically —
-// only the label differs. One helper so the two wordings cannot drift apart.
+// only the label differs. One helper so the three wordings cannot drift apart.
 // A null result is NOT a failure report: it means the agent returned no
-// structured result at all, so whether anything was committed is unknowable.
+// structured result at all, so whether anything was committed is unknowable. A
+// throw is the same unknown, with a cause attached.
 // Never terminal — the caller decides; the escalation-free guard is what stops
 // every later commit.
-const escalateCommitFailure = (committed, what) => {
-  const reason = committed
-    ? `the ${what} commit failed: ${committed.reason || 'no reason reported'}`
-    : `the ${what} commit agent returned no structured result, so whether anything was committed is unknown`
+const escalateCommitFailure = (committed, what, threw) => {
+  const reason = threw
+    ? `the ${what} commit agent failed: ${threw}`
+    : committed
+      ? `the ${what} commit failed: ${committed.reason || 'no reason reported'}`
+      : `the ${what} commit agent returned no structured result, so whether anything was committed is unknown`
   log(reason)
   escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
 }
 
 while (true) {
   wave++
-  const scout = await agent(
+  const { value: scout, threw: scoutThrew } = await settled(() => agent(
     `First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase start\n`
     + `Then proceed.\n\n`
     + `Use the identical label in both start and end calls.\n`
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
     + `Return its stdout verbatim (unmodified), its exit code, and its stderr.\n`
     + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "command complete"`,
-    { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: SCOUT_SCHEMA })
+    { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: SCOUT_SCHEMA }))
 
   // Pure in-memory work, so this needs no Workflow filesystem access.
   let snap = null
   let derailed = ''
-  if (!scout || typeof scout.stdout !== 'string' || scout.stdout.trim() === '') {
+  if (scoutThrew) {
+    derailed = `the scout agent failed: ${scoutThrew}`
+  } else if (!scout || typeof scout.stdout !== 'string' || scout.stdout.trim() === '') {
     derailed = `the scout returned no stdout${scout?.stderr ? `: ${scout.stderr}` : ''}`
   } else {
     try {
@@ -767,11 +790,11 @@ while (true) {
   }
 
   if (wave > 1 && CFG.commitBetweenWaves && escalations.length === 0) {
-    const committed = await agent(
+    const { value: committed, threw } = await settled(() => agent(
       `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`)}`,
-      { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
-    if (!committed || committed.failed) {
-      escalateCommitFailure(committed, `wave ${wave - 1}`)
+      { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA }))
+    if (threw || !committed || committed.failed) {
+      escalateCommitFailure(committed, `wave ${wave - 1}`, threw)
       // Continue this wave; the escalation-free guard prevents every later commit.
     }
   }
@@ -828,12 +851,12 @@ while (true) {
 // Only commit when the whole run finished cleanly (no escalations) — same guard
 // as the inter-wave commits: don't commit a run that has blocked/dirty task edits.
 if (CFG.commitBetweenWaves && escalations.length === 0) {
-  const committed = await agent(
+  const { value: committed, threw } = await settled(() => agent(
     `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes).\n`
     + commitInstructions('commit-post-loop'),
-    { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
-  if (!committed || committed.failed) {
-    escalateCommitFailure(committed, 'post-loop')
+    { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA }))
+  if (threw || !committed || committed.failed) {
+    escalateCommitFailure(committed, 'post-loop', threw)
   }
 }
 
@@ -868,6 +891,7 @@ return { slug: CFG.slug, completed, escalations }
 
 - **Both status transitions are confirmed by a reread, not by the agent's word.** `markDonePrompt` and `markBlockedPrompt` each return `{ ok, status, error }` and each must reopen the file and read the Status line back. An agent can return a fluent summary having edited nothing, and for parking that is the *likely* case — the task is often being parked because its header was malformed to begin with. An unconfirmed park reported as success is worse than a failed one: the file still reads `in-progress`, `next-ready` never re-offers it, and the `parked: false` signal that tells the user to reset it by hand never fires.
 
+- **A schema'd `agent()` throws as well as returning `null` — guard for both.** `agent(prompt, {schema})` resolves to `null` on a terminal API failure, and that is what every `if (!gate)` / `if (!judged)` / `if (!committed)` guard tests. But it **rejects** when the subagent never calls the StructuredOutput tool — typically because it text-emitted `<StructuredOutput>…</StructuredOutput>` as a message instead. A null-guard can never see a throw. Inside a task that is already handled: `runTaskGuarded` catches around the whole pipeline. The two calls that sit *outside* it — the wave-loop scout and both commit agents — are wrapped in `settled()`, which turns either failure into the same reportable shape. Do not remove those wrappers. An unguarded throw at the top of the wave loop discards `completed` and `escalations` for every wave that already finished, so the run returns nothing while the tree on disk reads `done` — the work happened and no one is told. Observed live in run `wf_993ede2c-a44`: a Haiku scout text-emitted its payload on the final wave of a 9/9 tree, argued with the harness's `[structured-output-enforce]` nudge, and killed the workflow after every task was complete and committed. Cheap models are likeliest to do this, and every one of these three calls runs on `MODEL.verify`/`MODEL.commit` (Haiku).
 - **Wrap the task thunk; reconcile by index; never `.filter(Boolean)`.** `parallel()` resolves a thrown thunk to `null`, and a `null` carries neither the task ref nor the cause. `runTaskGuarded` catches around `executeTask` so both survive, and it still attempts `markBlockedPrompt` and records whether the park worked. The wave then reconciles `results[i]` against `fresh[i]`, so even a `null` lands on its own task instead of vanishing. Filtering first would drop the task from `completed` and `escalations` both, and an unparked task stays `in-progress` — which `next-ready` never offers again.
 - **There is exactly one scoring implementation.** The judge agent runs `score-task.ts --json --log` with its scores. The orchestrator gates on that printed verdict object. If the formula changes, change `score-task.ts`. Do NOT duplicate the arithmetic in the orchestrator.
 - **`CFG.budgetFloor` defaults to `0` (off).** `budget.total` is `null` unless the user declares a target, so enabling a floor by default would manufacture a surprise stall class for existing runs. When configured above zero, it stops dispatching a ready wave when the remaining output-token balance falls below the floor.

@@ -268,6 +268,8 @@ A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or
 
 **Quality failure vs infrastructure failure.** A verifier returning `passed: false` is a quality failure: real work was judged, so the dev loop retries. A verifier or judge returning *no structured result*, a thrown task pipeline, or a `mark-done` that does not confirm a bare `Status: done` is an infrastructure failure: nothing was judged, so the task parks and escalates on the spot and dev is **not** rerun in that invocation. The attempt number is reported as it actually was — compute was consumed. When the harness exposes no original cause for a null agent result, the escalation says exactly that instead of inventing one.
 
+**A schema'd agent has two failure modes.** `agent(prompt, {schema})` returns `null` on a terminal API failure, and **throws** when the subagent never calls the StructuredOutput tool. A null-guard cannot see a throw. Every schema'd call inside a task is already covered by the task-pipeline catch; the wave-loop scout and the two commit agents are wrapped in the orchestrator's `settled()` helper for the same reason. Keep both guards on any schema'd call you add — an unguarded throw at the top of the wave loop discards the results of every wave that already finished, so the run reports nothing while the tree on disk reads `done`.
+
 Crash recovery note: an interrupted run can leave task files at `Status: in-progress`. `next-ready` only offers `todo`. Reset stale `in-progress` tasks to `todo` before re-running autopilot.
 
 The orchestrator never asks the user anything mid-run; Workflow cannot pause for input. Escalation is always post-return.
