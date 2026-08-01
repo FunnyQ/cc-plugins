@@ -120,7 +120,7 @@ falls through to `unknown`.
 ## Task shape
 
 `loadAllTasks(tasksDir)` in `packages/dispatch/skills/flightplan/scripts/next-ready.ts` returns
-`{ byRef, pathByRef, errors }`, where each task is:
+`{ byRef, pathByRef, buckets, errors, invalid }`, where each task is:
 
 ```ts
 export type ParsedTask = {
@@ -140,24 +140,48 @@ export type ParsedTask = {
 ```
 
 `refToString({ bucket, nn })` yields `"ui/01"`. `errors` is non-empty when a file fails to parse or a
-ref is duplicated; the API must surface those rather than silently dropping tasks.
+ref is duplicated; the API must surface those rather than silently dropping tasks. `invalid` lists tasks
+that parsed but hold a malformed execution state (see below). Those tasks stay in `byRef` on purpose —
+the dashboard must render them as invalid rather than drop them.
+
+## Execution validity
+
+`taskValidity(task)` in `scripts/lib/parse-task.ts` is the one rule every consumer reads — the linter,
+readiness, and this dashboard. It returns `unfinished`, `complete`, or `invalid`. Two things make a task
+invalid:
+
+- **`status`** — the Status value is missing, decorated, or not one of the four bare words.
+- **`completion-state`** — `Status: done` with any unticked checkbox in `## Acceptance criteria` or
+  `## Verification`. Boxes in every other section carry no completion meaning.
+
+A dependency is satisfied only by a **valid** completed task, so a task claiming `done` over an unticked
+gate box keeps blocking its dependents instead of unlocking them.
 
 ## Derived task state
 
-The task files record only `status`. The four states below are what the UI actually needs, and none of
+The task files record only `status`. The five states below are what the UI actually needs, and none of
 them exists on disk. Derivation rules, in precedence order:
 
-1. `status === "done"` → **`done`**
-2. `status === "blocked"` → **`blocked`**
-3. `status === "in-progress"` → **`in-progress`**
-4. `status === "todo"` and the flightlog holds an unmatched `phase: "start"` entry for this ref →
+1. `taskValidity(task).kind === "invalid"` → **`invalid`**. This outranks the raw Status: a task
+   claiming `done` over an unticked gate box must never read as done, or the dashboard would show the
+   tree complete while the gate result is missing.
+2. `status === "done"` → **`done`**
+3. `status === "blocked"` → **`blocked`**
+4. `status === "in-progress"` → **`in-progress`**
+5. `status === "todo"` and the flightlog holds an unmatched `phase: "start"` entry for this ref →
    **`in-progress`**. This case matters: autopilot only writes `Status: done` at the very end, so a
    task actively being worked still reads `todo` on disk.
-5. `status === "todo"` and every dependency is `done` → **`ready`**
-6. otherwise → **`blocked`**, with `blockedBy` listing the dependency refs that are not `done`
+6. `status === "todo"` and every dependency is validly complete → **`ready`**
+7. otherwise → **`blocked`**, with `blockedBy` listing the dependency refs that are not validly
+   complete — an invalid dependency appears here too
 
 ```ts
-export type TaskState = "done" | "in-progress" | "ready" | "blocked";
+export type TaskState =
+  | "done"
+  | "in-progress"
+  | "ready"
+  | "blocked"
+  | "invalid";
 
 export type TaskView = {
   ref: string;
@@ -166,6 +190,7 @@ export type TaskView = {
   title: string;
   status: string | null;      // raw file status
   state: TaskState;           // derived
+  invalidReason: string | null;  // why state is "invalid"; null otherwise
   blockedBy: string[];        // unfinished dependency refs; empty unless state is "blocked"
   dependsOn: string[];
   blocks: string[];
@@ -249,7 +274,7 @@ Both endpoints bind `127.0.0.1` only.
   "planTitle": "Waypoints skill",       // see the derivation note below
   "buckets": ["integration", "scripts", "skill"],
   "tasks": [ /* TaskView[] */ ],
-  "counts": { "total": 6, "done": 6, "inProgress": 0, "ready": 0, "blocked": 0 },
+  "counts": { "total": 6, "done": 6, "inProgress": 0, "ready": 0, "blocked": 0, "invalid": 0 },
   "errors": []                           // parse errors, surfaced not swallowed — shape below
 }
 ```

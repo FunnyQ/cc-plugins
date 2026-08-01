@@ -93,6 +93,16 @@ export function foo(bar: Bar): Baz
 
 Status is mutated in-place. Sub-agents update this when they pick up or finish a task.
 
+**Write the value bare.** The line must read exactly `> **Status**: <value>`, where `<value>` is one of the four words above and nothing else follows it. `parseTask()`, `lint-task.ts`, `next-ready.ts`, and `mark-done.ts` all read this one rule, and a decorated value is not a status — it is an unparseable task that fails lint and stalls readiness.
+
+- ❌ `> **Status**: in-progress (attempt 3)`
+- ❌ `> **Status**: done — pending review`
+- ✅ `> **Status**: in-progress`
+
+Put run notes on their own line, outside the Status line.
+
+**`done` also means every gate box is ticked.** A task is validly complete only when its Status is `done` **and** every checkbox in `## Acceptance criteria` and `## Verification` is `[x]`. `Status: done` with an unticked gate box is a malformed completion state: lint reports it, readiness refuses to unlock dependents, and the dashboard counts it as invalid. Do not repair it by hand-ticking the boxes. Reset Status to `in-progress` or `todo` and rerun the gates. `mark-done.ts` writes both halves in one step, so the two never drift when the pipeline does the work.
+
 ### `Final review` (the closing gate, exactly one per plan)
 
 Every plan ends with **one terminal task that reviews the whole deliverable**. Mark it `> **Final review**: true`. Make its `Depends on` reach every other task, directly or transitively. Then it cannot start until all the work is done. `lint-task.ts` enforces both rules. If no task is marked, or a marked task misses some branch, the whole-tree lint fails.

@@ -54,11 +54,11 @@ Before touching Workflow, gather the work-list in the main conversation:
 1. **Resolve both scripts paths once.** autopilot reuses flightplan's scripts; they are siblings under the plugin. Take the skill's load-time *"Base directory for this skill"* banner. Resolve `<base>/../flightplan/scripts` to an absolute path, and call it `$SCRIPTS`. Then resolve autopilot's own scripts directory at `<base>/scripts`, and call it `$OWN`. Resolving `$OWN` is simpler because it needs no parent traversal. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Do not use `${CLAUDE_PLUGIN_ROOT}/...` for either path. Use `$SCRIPTS` in every shared-tool `bun` command below. This is the same value you bake into `CFG.scriptsDir` in Step 3.
 2. Resolve the plan dir **as an absolute path**. The user names a slug or a path; the tree lives at `docs/<slug>/tasks/`. Capture the real repo root with `git rev-parse --show-toplevel` — it can be anywhere, for example `/Users/<name>/Projects/...`, `/opt/temp/project-repo`, or `/workspace/...`. Build absolute paths for `tasksDir`, `planPath`, and `logFile` from this root (`<root>/docs/<slug>/...`). Bake them into `CFG` in Step 3. These paths MUST be absolute. Workflow agents do not share a cwd, so a *relative* `logFile` resolves against whichever agent's working directory is current. An agent that `cd`s into the tree writes the flightlog to a nested `docs/<slug>/tasks/docs/<slug>/.flightlog/` and splits the audit trail. `~/...` is an optional shorthand, but only when the repo is under `$HOME`: Bash and the file tools expand a leading `~`, which avoids leaking the username. For a repo outside `$HOME`, use the full path. Never invent a `~` form.
 3. Read `docs/<slug>/PLAN.md` for the overall goal and the bucketing. The Final review task scores against "did we meet the PLAN goal". The orchestrator needs the goal in hand.
-4. Confirm there is ready work:
+4. Confirm there is ready work, and read the whole-tree shape at the same time:
    ```bash
-   bun $SCRIPTS/next-ready.ts docs/<slug>/tasks
+   bun $SCRIPTS/next-ready.ts docs/<slug>/tasks --summary
    ```
-   If it errors, the tree is malformed. Run `lint-task.ts` and fix the tree before flying. If it prints nothing and no task is `in-progress`, the tree is already done.
+   A non-zero exit means the tree is malformed — the printed `invalid` array names each offending task and why. Run `lint-task.ts` and fix the tree before flying. If `counts.done === counts.total`, the tree is already done. If `ready` is empty while tasks remain unfinished, the tree is stalled: reset any stale `in-progress` task to `todo` before flying.
 5. **Capture the base ref** for the Final review diff scope:
    ```bash
    git rev-parse HEAD
@@ -136,7 +136,7 @@ Then call `Workflow({ script: <the adapted script> })`. No `args` needed.
 
 **Picking the opencode model.** Leave `CFG.opencodeDevModel` and `CFG.opencodeReviewModel` empty for wrapper defaults. Or set either to a `provider/model` override for that role. These fields are opencode-only. codex ignores them.
 
-The orchestrator runs a **wave loop**. Each wave asks an agent to run `next-ready.ts`, then executes the wave's ready tasks **in parallel**. Status changes only happen *inside* the run, so the ready set must be re-scouted every wave — a static list misses tasks unblocked mid-flight. Each task is a retry pipeline:
+The orchestrator runs a **wave loop**. Each wave asks an agent to run `next-ready.ts --summary`, then executes the wave's ready tasks **in parallel**. Status changes only happen *inside* the run, so the snapshot must be re-scouted every wave — a static list misses tasks unblocked mid-flight. Each task is a retry pipeline:
 
 ```
 Dev (Sonnet) ─ implements + edits Status, logs a note
@@ -152,7 +152,14 @@ Rubric judge (Opus) ─ scores each ## Eval rubric dimension, runs score-task --
 Score gate ─ consumes score-task.ts --json verdict
    ├─ fail → loop back to Dev with the judge's rationale
    ▼ pass
-done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes   (next wave's next-ready will see it)
+done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes
+   │      in ONE transition, then reread and confirm a bare `Status: done`
+   ├─ not confirmed → infrastructure failure: park + escalate (never retried)
+   ▼ confirmed
+completed   (next wave's next-ready will see it)
+
+[at ANY step above — an agent returns no structured result, or the pipeline throws]
+   infrastructure failure ─ park the task, escalate immediately, do NOT rerun dev
 
 [between waves, wave > 1 — inside the scout agent before next-ready.ts runs]
    atomic-commit (inline git, NOT the skill) ─ commits all changes from the completed wave
@@ -161,6 +168,40 @@ done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verificat
 [post-loop — after the wave loop exits]
    final atomic-commit (inline git) ─ commits Final review's changes (or any tail changes from the last wave)
 ```
+
+### Scout result and termination rules
+
+`next-ready.ts --summary` prints one whole-tree snapshot, and the scout echoes it verbatim:
+
+```json
+{
+  "ready": [{ "ref": "ui/03", "finalReview": false, "path": "/abs/.../ui/03-build.md" }],
+  "counts": { "total": 8, "todo": 5, "inProgress": 0, "done": 2, "blocked": 0, "invalid": 1 },
+  "unfinished": [{ "ref": "ui/03", "state": "todo" }],
+  "invalid": [{ "ref": "api/01", "rule": "completion-state", "reason": "…" }],
+  "errors": [{ "file": "…/ui/09-broken.md", "reason": "missing H1" }]
+}
+```
+
+`invalid` tasks parsed but hold a malformed execution state; they ARE counted (as `invalid`). `errors` files did not parse at all; they are **not** in `counts`.
+
+The command prints this JSON **before** exiting non-zero on a malformed tree, so the scout reads stdout either way.
+
+The wave loop terminates on exactly one of these, and only the first is clean:
+
+| Condition | Outcome |
+|---|---|
+| `done === total` | clean completion — the whole tree is done |
+| `errors` non-empty | scout failure — some task file did not parse at all |
+| `total !== todo + inProgress + done + blocked + invalid` | scout failure — the snapshot is incoherent |
+| `invalid > 0` | scout failure, naming every invalid ref |
+| ready set non-empty | start the next wave |
+| ready set empty with unfinished tasks | **stalled** — escalate with the counts and every remaining `ref (state)` |
+| a wave in which no task passed | stop; nothing new can unblock |
+
+**Why `counts`, not `completed.length`.** The run's `completed` array only covers *this* invocation. A resumed run inherits `done` tasks from earlier runs, so comparing `completed.length` with the tree size reports a false stall on every resume. `counts.done` reads the tree on disk, which is where completion actually lives.
+
+**Why `errors` is checked before completion.** A file that fails to parse never enters the task map, so it never enters `counts`. `counts` describes what *parsed*, not the tree. Break four files in a five-task tree and `counts` reads `{total: 1, done: 1}` — `done === total` holds and the run reports success over a tree it could not read. The `errors` gate sits ahead of the completion test for exactly that reason.
 
 The `Final review` task (`> **Final review**: true`) depends transitively on every other task. The wave loop **naturally schedules it last**; it only becomes ready once everything else is `done`. No special phase is needed.
 
@@ -214,12 +255,18 @@ A judge cannot score correctness high while the binary gate failed; the orchestr
 
 ## Escalation — park & continue, then resume
 
-When a task exhausts its cap (`maxAttempts`, or `finalReviewMaxAttempts` for the Final review), the orchestrator follows these steps:
+A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or `finalReviewMaxAttempts` for the Final review), or an infrastructure failure stopped it from being judged at all. Either way:
 
-1. The orchestrator **parks** the task. It records an escalation, and the dev agent sets its `Status: blocked` so the parked state is visible. The orchestrator **keeps flying** the other independent tasks. Dependents of a parked task simply never become ready, so they wait.
-2. When the workflow returns, it hands back `{ slug, completed: [...], escalations: [{ task, attempt, reason }] }`. The `reason` string already embeds the last verdict: the judge's rationale, the binary gate's output, or the scout error.
+1. The orchestrator **parks** the task by setting its `Status: blocked`, records an escalation, and **keeps flying** the other independent tasks. Dependents of a parked task simply never become ready, so they wait.
+2. When the workflow returns, it hands back `{ slug, completed: [...], escalations: [{ task, attempt, infrastructure, parked, reason }] }`. The `reason` string already embeds the last verdict: the judge's rationale, the binary gate's output, the infrastructure cause, or the scout error.
 3. **You** (the main agent) surface the escalations to the user. In an active cockpit session, hand the stick back via `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Show the task and its `reason`.
 4. After the user unblocks the task — a decision, a spec fix, a manual nudge — **resume**: reset the parked task's `Status` to `todo`, and re-run autopilot. The wave loop picks up where it left off. Completed tasks stay `done`, so `next-ready` only re-offers the unblocked work.
+
+**Read the two flags before you report.** `infrastructure: true` means nothing was judged — say that verification did not run or returned no verdict, not that the work was rejected. `parked: false` means the park itself failed, so the file still reads `in-progress` and `next-ready` will not re-offer it; tell the user to reset that Status by hand before resuming.
+
+**Both status transitions are confirmed by a reread.** `mark-done` and the park step each return `{ ok, status, error }`, and each must reopen the file and read the Status line back before claiming success. An agent can return a fluent summary having edited nothing — and for parking that is the likely case, since the task is often parked *because* its header was malformed. So `parked: true` means the file was verified to read a bare `Status: blocked`, never that an agent said so.
+
+**Quality failure vs infrastructure failure.** A verifier returning `passed: false` is a quality failure: real work was judged, so the dev loop retries. A verifier or judge returning *no structured result*, a thrown task pipeline, or a `mark-done` that does not confirm a bare `Status: done` is an infrastructure failure: nothing was judged, so the task parks and escalates on the spot and dev is **not** rerun in that invocation. The attempt number is reported as it actually was — compute was consumed. When the harness exposes no original cause for a null agent result, the escalation says exactly that instead of inventing one.
 
 Crash recovery note: an interrupted run can leave task files at `Status: in-progress`. `next-ready` only offers `todo`. Reset stale `in-progress` tasks to `todo` before re-running autopilot.
 
@@ -250,11 +297,11 @@ autopilot has its own `scripts/` directory — the flightdeck monitor. Each name
 
 It still borrows these shared tools from the sibling `skills/flightplan/scripts/` directory:
 
-- `next-ready.ts <tasks-dir> [--json]` — the per-wave ready-set scout. `--json` emits `[{ref,finalReview,path}]` (or `[]` when none ready); the scout echoes it verbatim so an empty set can't be misread as "everything is ready".
+- `next-ready.ts <tasks-dir> [--json | --summary]` — the per-wave scout. **`--summary` is what the orchestrator uses**: one object `{ready, counts, unfinished, invalid, errors}`, printed even when the command exits 1, so a malformed tree still names its refs. `--json` remains the older ready-only array `[{ref,finalReview,path}]` (or `[]`) for any other consumer. Both exit non-zero on a parse error or an invalid completion state rather than returning a ready set that would unlock work behind a fake `done`.
 - `score-task.ts <task> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]` — `scoreTask(rubric, scores)` exported. `--json` prints the machine verdict the orchestrator gates on; `--log` persists the same verdict to the flightlog.
-- `mark-done.ts <task>` — the done-transition: sets `Status: done` and ticks every `## Acceptance criteria` / `## Verification` checkbox. Run when a task passes the gate.
+- `mark-done.ts <task>` — the done-transition, as ONE state change: validates the header first, then sets `Status: done` and ticks every `## Acceptance criteria` / `## Verification` checkbox together. It exits non-zero and writes nothing when the header is missing, duplicated, or decorated, so the file never lands half-transitioned. Run when a task passes the gate, then reread and confirm.
 - `flightlog.ts log|report` — narrative entries + `RUNLOG.md`.
-- `lint-task.ts <tasks-dir>` — run during scout if `next-ready` reports a malformed tree.
+- `lint-task.ts <tasks-dir | task-file>` — run during scout if `next-ready` reports a malformed tree, and inside the external-engine dev driver after the delegate returns (that engine writes outside the harness, so the Edit/Write lint hook never sees its work).
 - `codex-run.ts <delegate|review> [--prompt-file <path>]` — thin wrapper over the `codex` CLI used by the codex dev engine + the codex review lens. `delegate` runs `codex exec -s workspace-write` and appends a `git status --short`; `review` runs `codex exec -s read-only`. Captures codex's clean last message, prints it, and deletes its own scratch (no temp left to mine). Exits non-zero with a `CODEX UNREACHABLE` stderr line when the CLI is missing/fails. Prompt from `--prompt-file` or stdin.
 - `opencode-run.ts <delegate|review> [--prompt-file <path>] [--model <m>]` — the opencode counterpart of `codex-run.ts`, used when `devEngine`/`reviewEngine` is `'opencode'`. `delegate` runs `opencode run -m <model> --format json` (write-capable) and appends a `git status --short`; `review` prepends a hard read-only guard (opencode has no sandbox read-only). Parses the JSONL `text` parts, prints the clean answer, exits non-zero with an `OPENCODE UNREACHABLE` stderr line when the CLI is missing/fails. Model: `--model` > `OPENCODE_MODEL` env > per-mode default (delegate `opencode-go/kimi-k2.7-code`, review `opencode-go/qwen3.7-max`). Prompt from `--prompt-file` or stdin.
 

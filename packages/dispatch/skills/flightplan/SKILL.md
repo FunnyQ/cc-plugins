@@ -216,9 +216,18 @@ Reach for these instead of doing the mechanical work by hand. Each one has a tes
 
 ## Automatic hook
 
-The dispatch plugin registers `hooks/flightplan-lint.sh` as a PostToolUse hook on `Edit|Write`. It auto-lints any file that (a) lives at `docs/<slug>/tasks/<bucket>/NN-*.md` and (b) contains the `> **Required reading**:` marker. Anything else is a silent no-op.
+The dispatch plugin registers `hooks/flightplan-lint.sh` as a PostToolUse hook on `Edit|Write`. It auto-lints any file that (a) lives at `docs/<slug>/tasks/<bucket>/NN-*.md` and (b) carries the Required-reading header. Both header forms count:
+
+```markdown
+> **Required reading** (read before starting; do not need to open other files):
+> **Required reading**:
+```
+
+The signature stays narrow on purpose. A near miss such as `> **Required reading later**:` is a silent no-op. Anything else is a silent no-op too.
 
 When a task file violates the self-containment contract or is missing its Eval rubric, the hook exits 2 with stderr feedback. The violation then surfaces to the LLM immediately, rather than waiting for the Step 5 whole-tree lint. Write `_context/` files before task files (see Step 5, point 2) to keep the hook quiet during normal flow.
+
+**The hook observes harness `Edit|Write` calls only.** It cannot see a file written by an external CLI, by relay, or by Bash. Treat it as early feedback for flightplan authors, not as the execution boundary. `autopilot`'s binary gate and rubric gate own that boundary.
 
 ## Waypoint mode
 
