@@ -173,9 +173,14 @@ export function renderGraph(nodes, layout, opts = {}) {
   // <defs> would still parse, but an empty tree should render nothing but text.
   // markerUnits stays at strokeWidth so the head scales with the 2px edge; the
   // size itself is another multiple of the font, like every other measurement.
-  const arrowSize = options.fontSize / 4;
+  // Slender, and measured in user space rather than stroke widths: tying the
+  // head to the line weight made a squat triangle barely wider than the line
+  // it capped, which read as a blob instead of an arrow. Length beats height
+  // so the silhouette is a chevron, and the line meets it well behind the tip.
+  const arrowLength = options.fontSize * 0.7;
+  const arrowHeight = options.fontSize * 0.5;
   const arrowDefs = edges
-    ? `<defs><marker id="${ARROW_ID}" class="graph-arrow" markerWidth="${arrowSize}" markerHeight="${arrowSize}" refX="${arrowSize}" refY="${arrowSize / 2}" orient="auto"><path d="M 0 0 L ${arrowSize} ${arrowSize / 2} L 0 ${arrowSize} z" /></marker></defs>`
+    ? `<defs><marker id="${ARROW_ID}" class="graph-arrow" markerUnits="userSpaceOnUse" markerWidth="${arrowLength}" markerHeight="${arrowHeight}" refX="${arrowLength}" refY="${arrowHeight / 2}" orient="auto"><path d="M 0 0 L ${arrowLength} ${arrowHeight / 2} L 0 ${arrowHeight} z" /></marker></defs>`
     : "";
 
   const empty = graphNodes.length
