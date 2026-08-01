@@ -112,7 +112,9 @@ const ready = (ref: string, finalReview = false) => ({
 });
 
 /** Pull the canonical script out of the markdown, ready for `new Function`. */
-async function loadScript(): Promise<string> {
+type ConfigOverrides = Record<string, string>;
+
+async function loadScript(overrides: ConfigOverrides = {}): Promise<string> {
   const doc = await readFile(ORCHESTRATOR, "utf-8");
   const start = doc.indexOf("```javascript");
   if (start === -1)
@@ -120,8 +122,17 @@ async function loadScript(): Promise<string> {
   const bodyStart = doc.indexOf("\n", start) + 1;
   const end = doc.indexOf("\n```", bodyStart);
   if (end === -1) throw new Error("unterminated ```javascript block");
+  let script = doc.slice(bodyStart, end);
+  for (const [field, literal] of Object.entries(overrides)) {
+    const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`^(\\s*${escaped}:\\s*)[^,\\n]+(,.*)$`, "m");
+    if (!pattern.test(script)) {
+      throw new Error(`config field not found in orchestrator script: ${field}`);
+    }
+    script = script.replace(pattern, `$1${literal}$2`);
+  }
   // `export` is invalid inside a Function body; the runtime hoists meta itself.
-  return doc.slice(bodyStart, end).replace(/^export const meta/m, "const meta");
+  return script.replace(/^export const meta/m, "const meta");
 }
 
 type RunLog = {
@@ -130,12 +141,18 @@ type RunLog = {
   labels: string[];
   /** Every agent prompt, in call order. */
   prompts: string[];
+  /** Every agent model, in call order. */
+  models: (string | undefined)[];
 };
 
-async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
-  const src = await loadScript();
+async function runOrchestrator(
+  scenario: Scenario,
+  overrides: ConfigOverrides = {},
+): Promise<RunLog> {
+  const src = await loadScript(overrides);
   const labels: string[] = [];
   const prompts: string[] = [];
+  const models: (string | undefined)[] = [];
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
   const queues = new Map<string, unknown[]>();
@@ -152,10 +169,14 @@ async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
     return queue.length > 0 ? queue.shift() : fallback;
   };
 
-  const agent = async (prompt: string, opts: { label: string }) => {
+  const agent = async (
+    prompt: string,
+    opts: { label: string; model?: string },
+  ) => {
     const label = opts.label;
     labels.push(label);
     prompts.push(prompt);
+    models.push(opts.model);
 
     if (label.startsWith("scout-wave-")) {
       return scouts.length > 0 ? scouts.shift() : null;
@@ -213,7 +234,7 @@ async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
     () => {},
     () => {},
   )) as RunResult;
-  return { result, labels, prompts };
+  return { result, labels, prompts, models };
 }
 
 const counts = (over: Partial<Counts> & { total: number }): Counts => ({
@@ -239,6 +260,20 @@ function promptFor(log: Pick<RunLog, "labels" | "prompts">, label: string): stri
   if (index === -1) throw new Error(`agent label not found: ${label}`);
   return log.prompts[index];
 }
+
+function modelFor(log: Pick<RunLog, "labels" | "models">, label: string) {
+  const index = log.labels.indexOf(label);
+  if (index === -1) throw new Error(`agent label not found: ${label}`);
+  return log.models[index];
+}
+
+describe("orchestrator config fixture", () => {
+  test("a config override throws when its field does not exist", async () => {
+    await expect(loadScript({ missingField: "'codex'" })).rejects.toThrow(
+      "config field not found in orchestrator script: missingField",
+    );
+  });
+});
 
 describe("orchestrator wave loop", () => {
   test("a fresh tree runs its ready task and finishes clean", async () => {
@@ -493,6 +528,115 @@ describe("orchestrator failure handling", () => {
       "Binary gate failed (verification/acceptance):\nattempt three types red",
     );
     expect(esc.reason).toContain("attempt one tests red");
+  });
+
+  test("the default Claude ladder remains sonnet, sonnet, opus", async () => {
+    const log = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      gate: {
+        "ui/01": [
+          { passed: false, summary: "attempt one failed" },
+          { passed: false, summary: "attempt two failed" },
+          { passed: false, summary: "attempt three failed" },
+        ],
+      },
+    });
+    const devLabels = log.labels.filter((label) => label.startsWith("dev"));
+    expect(devLabels).toEqual([
+      "dev:ui/01#1",
+      "dev:ui/01#2",
+      "dev:ui/01#3",
+    ]);
+    expect(devLabels.map((label) => modelFor(log, label))).toEqual([
+      "sonnet",
+      "sonnet",
+      "opus",
+    ]);
+    expect(log.result.escalations[0].attempt).toBe(3);
+  });
+
+  test("an opted-in vendor rung is appended after Claude Opus", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [oneTask("ui/01")],
+        gate: {
+          "ui/01": [
+            { passed: false, summary: "attempt one failed" },
+            { passed: false, summary: "attempt two failed" },
+            { passed: false, summary: "attempt three failed" },
+            { passed: false, summary: "attempt four failed" },
+          ],
+        },
+      },
+      { lastShotEngine: "'codex'" },
+    );
+    const devLabels = log.labels.filter((label) => label.startsWith("dev"));
+    expect(devLabels).toEqual([
+      "dev:ui/01#1",
+      "dev:ui/01#2",
+      "dev:ui/01#3",
+      "dev-codex:ui/01#4",
+    ]);
+    expect(modelFor(log, "dev:ui/01#3")).toBe("opus");
+    expect(modelFor(log, "dev-codex:ui/01#4")).toBe("haiku");
+    expect(log.result.escalations[0].attempt).toBe(4);
+  });
+
+  test("an external dev engine keeps its existing ladder when lastShotEngine is set", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [oneTask("ui/01")],
+        gate: {
+          "ui/01": [
+            { passed: false, summary: "attempt one failed" },
+            { passed: false, summary: "attempt two failed" },
+            { passed: false, summary: "attempt three failed" },
+          ],
+        },
+      },
+      { devEngine: "'codex'", lastShotEngine: "'opencode'" },
+    );
+    const devLabels = log.labels.filter((label) => label.startsWith("dev"));
+    expect(devLabels).toEqual([
+      "dev-codex:ui/01#1",
+      "dev-codex:ui/01#2",
+      "dev:ui/01#3",
+    ]);
+    expect(devLabels.map((label) => modelFor(log, label))).toEqual([
+      "haiku",
+      "haiku",
+      "opus",
+    ]);
+    expect(log.result.escalations[0].attempt).toBe(3);
+  });
+
+  test("a one-attempt Claude ladder gets one Claude rung then the vendor rung", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [oneTask("ui/01")],
+        gate: {
+          "ui/01": [
+            { passed: false, summary: "attempt one failed" },
+            { passed: false, summary: "attempt two failed" },
+          ],
+        },
+      },
+      { maxAttempts: "1", lastShotEngine: "'codex'" },
+    );
+    expect(log.labels.filter((label) => label.startsWith("dev"))).toEqual([
+      "dev:ui/01#1",
+      "dev-codex:ui/01#2",
+    ]);
+    expect(log.result.escalations[0].attempt).toBe(2);
+  });
+
+  test("an unknown lastShotEngine fails at script start", async () => {
+    await expect(
+      runOrchestrator(
+        { scouts: [oneTask("ui/01")] },
+        { lastShotEngine: "'typo'" },
+      ),
+    ).rejects.toThrow('unknown engine "typo"');
   });
 
   test("a rubric retry preserves the exact veto and missing-dimension phrasing", async () => {
