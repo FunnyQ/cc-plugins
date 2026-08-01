@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: lint/01, lint/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -134,42 +134,42 @@ check guards against an accidental edit, not against a known gap.
 
 ## Acceptance criteria
 
-- [ ] The `### \`Final review\`` section of `references/task-template.md` states the regression-net
+- [x] The `### \`Final review\`` section of `references/task-template.md` states the regression-net
       requirement, why it applies to the closing task specifically, the recognized runner commands, and
       the docs-only exemption.
-- [ ] That section also states that the rule enforces presence rather than reach, and points the reader at
+- [x] That section also states that the rule enforces presence rather than reach, and points the reader at
       the advisory report for breadth.
-- [ ] The **Final review** bullet in `SKILL.md` gains exactly one sentence covering the requirement and
+- [x] The **Final review** bullet in `SKILL.md` gains exactly one sentence covering the requirement and
       naming the linter as its enforcer.
-- [ ] Every `docs/*/tasks` tree in the repo appears exactly once in the "Sweep results" ledger in this
+- [x] Every `docs/*/tasks` tree in the repo appears exactly once in the "Sweep results" ledger in this
       tree's `tasks/README.md`, with its observed exit status — passing trees included.
-- [ ] Every failing row carries the rule, the closing task's ref, and the tasks whose suites are missing.
-- [ ] "Known gaps" carries a one-line pointer to the ledger when at least one tree fails, and does not
+- [x] Every failing row carries the rule, the closing task's ref, and the tasks whose suites are missing.
+- [x] "Known gaps" carries a one-line pointer to the ledger when at least one tree fails, and does not
       duplicate the ledger's rows.
-- [ ] A fully-passing sweep still produces a complete ledger — that is how "no findings" is stated, so no
+- [x] A fully-passing sweep still produces a complete ledger — that is how "no findings" is stated, so no
       separate prose claim is needed or accepted in its place.
-- [ ] No task file outside `docs/autopilot-graph-v2/` is modified.
-- [ ] No checkbox anywhere is hand-ticked or unticked.
-- [ ] `lint-task.ts` is unchanged by this task.
+- [x] No task file outside `docs/autopilot-graph-v2/` is modified.
+- [x] No checkbox anywhere is hand-ticked or unticked.
+- [x] `lint-task.ts` is unchanged by this task.
 
 ## Verification
 
-- [ ] `grep -n "Final review" packages/dispatch/skills/flightplan/references/task-template.md` locates the
+- [x] `grep -n "Final review" packages/dispatch/skills/flightplan/references/task-template.md` locates the
       section, and reading it shows all four points plus the presence-not-reach note.
-- [ ] `grep -c "test" packages/dispatch/skills/flightplan/SKILL.md` increases relative to the pre-task
+- [x] `grep -c "test" packages/dispatch/skills/flightplan/SKILL.md` increases relative to the pre-task
       count, and the **Final review** bullet reads as one added sentence rather than a new paragraph.
-- [ ] Run the sweep loop above and confirm the ledger matches reality row for row: every tree the glob
+- [x] Run the sweep loop above and confirm the ledger matches reality row for row: every tree the glob
       matches has a row, every row's exit status is the one observed, no row records a finding the sweep did
       not produce, and no failure is missing.
-- [ ] `ls -d docs/*/tasks | wc -l` equals the number of ledger rows — the check that catches a tree the
+- [x] `ls -d docs/*/tasks | wc -l` equals the number of ledger rows — the check that catches a tree the
       sweep skipped entirely.
-- [ ] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks` exits 0.
-- [ ] `bun packages/dispatch/skills/flightplan/scripts/build-readme.ts docs/autopilot-graph-v2/tasks` then
+- [x] `bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/autopilot-graph-v2/tasks` exits 0.
+- [x] `bun packages/dispatch/skills/flightplan/scripts/build-readme.ts docs/autopilot-graph-v2/tasks` then
       `grep -n "Known gaps" -A 12 docs/autopilot-graph-v2/tasks/README.md` still shows every recorded
       entry, proving they sit outside the generated markers.
-- [ ] `git status --short docs/` lists changes only under `docs/autopilot-graph-v2/`.
-- [ ] `git diff --stat packages/dispatch/skills/flightplan/scripts/` is empty — no script was touched.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` green, guarding against an accidental code
+- [x] `git status --short docs/` lists changes only under `docs/autopilot-graph-v2/`.
+- [x] `git diff --stat packages/dispatch/skills/flightplan/scripts/` is empty — no script was touched.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` green, guarding against an accidental code
       edit while working in the same package.
 
 ## Eval rubric

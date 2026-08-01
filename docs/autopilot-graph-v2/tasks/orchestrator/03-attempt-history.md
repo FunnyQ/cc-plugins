@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: orchestrator/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -160,45 +160,45 @@ Extend `runOrchestrator` to record `{ label, prompt }` per call and return that 
 
 ## Acceptance criteria
 
-- [ ] The per-task loop accumulates one record per rejected attempt, in order, and no longer overwrites a
+- [x] The per-task loop accumulates one record per rejected attempt, in order, and no longer overwrites a
       single feedback string.
-- [ ] Every record carries all seven fields — `n`, `model`, `gateSummary`, `rationale`, `weighted`,
+- [x] Every record carries all seven fields — `n`, `model`, `gateSummary`, `rationale`, `weighted`,
       `hardFailed`, `missing`. A five-field shape is not acceptable: it silently drops the hard-fail and
       missing-dimension annotations.
-- [ ] `rationale` and `weighted` are `null` for a binary-gate failure and populated for a rubric rejection;
+- [x] `rationale` and `weighted` are `null` for a binary-gate failure and populated for a rubric rejection;
       the renderer emits the matching one of the two existing feedback strings, including the hard-fail and
       missing-dimension annotations.
-- [ ] `model` records the model or engine label that actually ran each attempt's dev step.
-- [ ] A closing-review-round attempt records `model` as the literal `'final-review'`, not a fixer model
+- [x] `model` records the model or engine label that actually ran each attempt's dev step.
+- [x] A closing-review-round attempt records `model` as the literal `'final-review'`, not a fixer model
       name and not a list of lens models.
-- [ ] On the third attempt of a task, the dev prompt contains the first attempt's rejection text **and**
+- [x] On the third attempt of a task, the dev prompt contains the first attempt's rejection text **and**
       the second's, newest first, with the earlier one under a labelled prior-attempts block.
-- [ ] The renderer emits no "previous attempt was rejected" preamble of its own, so no prompt states it
+- [x] The renderer emits no "previous attempt was rejected" preamble of its own, so no prompt states it
       twice.
-- [ ] The park reason and the returned quality-failure `reason` both carry the rendered history rather than
+- [x] The park reason and the returned quality-failure `reason` both carry the rendered history rather than
       only the last rejection.
-- [ ] The three prompt-builder signatures are unchanged — the history rides the existing argument slot.
-- [ ] The fixture records each agent call's prompt as well as its label, and the existing `labels` array is
+- [x] The three prompt-builder signatures are unchanged — the history rides the existing argument slot.
+- [x] The fixture records each agent call's prompt as well as its label, and the existing `labels` array is
       still returned unchanged.
-- [ ] Every change to the executable script sits inside the fenced ```` ```javascript ```` block.
+- [x] Every change to the executable script sits inside the fenced ```` ```javascript ```` block.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling
       dashboard suites.
-- [ ] A fixture case where a task's gate fails three times asserts the **third** dev prompt contains the
+- [x] A fixture case where a task's gate fails three times asserts the **third** dev prompt contains the
       rejection text of attempts 1 **and** 2, with attempt 1 under the prior-attempts heading. It cannot
       contain attempt 3's own rejection — that prompt is built before attempt 3's gate runs — so do not
       assert it there.
-- [ ] The same fixture case asserts the final parked escalation reason accounts for all three attempts,
+- [x] The same fixture case asserts the final parked escalation reason accounts for all three attempts,
       which is the only place the complete history is observable.
-- [ ] A fixture case whose judge returns a hard-failed verdict with missing dimensions asserts the retry
+- [x] A fixture case whose judge returns a hard-failed verdict with missing dimensions asserts the retry
       prompt contains both `(hard-fail veto)` and the `missing dims:` list.
-- [ ] A fixture case where the closing-review task's first round is rejected asserts the second round's
+- [x] A fixture case where the closing-review task's first round is rejected asserts the second round's
       prompt records the prior attempt as having run on `final-review`.
-- [ ] A fixture case asserts a first attempt's prompt contains no prior-attempts block at all.
-- [ ] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
+- [x] A fixture case asserts a first attempt's prompt contains no prior-attempts block at all.
+- [x] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
       exits 0 — the block still parses as a function body.
 
 ## Eval rubric
