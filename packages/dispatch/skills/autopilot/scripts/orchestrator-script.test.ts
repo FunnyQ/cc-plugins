@@ -67,10 +67,12 @@ type Scenario = {
   scouts: ScoutResult[];
   /** Omit to leave the Workflow runtime's `budget` global undeclared. */
   budget?: { total: number | null; spent: number; spendAfterDev?: number };
-  commit?: (
-    | { committed: boolean; shas: string[]; failed: boolean; reason: string }
-    | null
-  )[];
+  commit?: ({
+    committed: boolean;
+    shas: string[];
+    failed: boolean;
+    reason: string;
+  } | null)[];
   /** Keyed by task ref; null models an agent that returned no structured result. */
   gate?: Record<string, ({ passed: boolean; summary: string } | null)[]>;
   judge?: Record<string, ({ verdict: Verdict; rationale: string } | null)[]>;
@@ -129,7 +131,9 @@ async function loadScript(overrides: ConfigOverrides = {}): Promise<string> {
     const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(`^(\\s*${escaped}:\\s*)[^,\\n]+(,.*)$`, "m");
     if (!pattern.test(script)) {
-      throw new Error(`config field not found in orchestrator script: ${field}`);
+      throw new Error(
+        `config field not found in orchestrator script: ${field}`,
+      );
     }
     script = script.replace(pattern, `$1${literal}$2`);
   }
@@ -232,7 +236,10 @@ async function runOrchestrator(
   if (scenario.budget) {
     const { total } = scenario.budget;
     parameterNames.push("budget");
-    parameterValues.push({ total, remaining: () => total === null ? 0 : total - budgetSpent });
+    parameterValues.push({
+      total,
+      remaining: () => (total === null ? 0 : total - budgetSpent),
+    });
   }
   const factory = new Function(
     ...parameterNames,
@@ -251,6 +258,18 @@ const counts = (over: Partial<Counts> & { total: number }): Counts => ({
   ...over,
 });
 
+/** One wave offering `ref` as the only ready task in a tree of `total`. */
+const wave = (ref: string, total: number, done: number): ScoutResult =>
+  snapshot({
+    ready: [ready(ref)],
+    counts: counts({ total, todo: total - done, done }),
+    unfinished: [{ ref, state: "todo" }],
+  });
+
+/** The scout every finished run ends on: nothing ready, everything done. */
+const complete = (total: number): ScoutResult =>
+  snapshot({ ready: [], counts: counts({ total, done: total }), unfinished: [] });
+
 /** The invariant the whole plan exists to protect. */
 function accountsForEveryTask(result: RunResult, refs: string[]): boolean {
   return refs.every((ref) => {
@@ -260,7 +279,10 @@ function accountsForEveryTask(result: RunResult, refs: string[]): boolean {
   });
 }
 
-function promptFor(log: Pick<RunLog, "labels" | "prompts">, label: string): string {
+function promptFor(
+  log: Pick<RunLog, "labels" | "prompts">,
+  label: string,
+): string {
   const index = log.labels.indexOf(label);
   if (index === -1) throw new Error(`agent label not found: ${label}`);
   return log.prompts[index];
@@ -433,6 +455,28 @@ describe("orchestrator wave loop", () => {
     expect(result.escalations[0].reason).toMatch(/stdout was not JSON/);
   });
 
+  // A primitive parses fine, so only a shape test catches it. `null` and `0` are
+  // also falsy, so a truthiness guard would skip validation entirely and let the
+  // first field read throw past the (scout) escalation.
+  test.each([
+    ["null", "null"],
+    ["0", "number"],
+    ['"done"', "string"],
+    ["[]", "an array"],
+  ])(
+    "scout stdout %s escalates as a non-object shape",
+    async (stdout, shape) => {
+      const { result } = await runOrchestrator({
+        scouts: [{ stdout, exitCode: 0, stderr: "" }],
+      });
+      expect(result.completed).toEqual([]);
+      expect(result.escalations).toHaveLength(1);
+      expect(result.escalations[0].task).toBe("(scout)");
+      expect(result.escalations[0].infrastructure).toBe(true);
+      expect(result.escalations[0].reason).toContain(`parsed to ${shape}`);
+    },
+  );
+
   test("a snapshot missing counts escalates with the field name", async () => {
     const { result } = await runOrchestrator({ scouts: [snapshot({})] });
     expect(result.completed).toEqual([]);
@@ -469,15 +513,16 @@ describe("orchestrator wave loop", () => {
 });
 
 describe("orchestrator budget floor", () => {
-  const pendingWave = () => snapshot({
-    ready: [ready("api/01"), ready("ui/02")],
-    counts: counts({ total: 3, todo: 2, done: 1 }),
-    unfinished: [
-      { ref: "api/01", state: "todo" },
-      { ref: "ui/02", state: "todo" },
-    ],
-    invalid: [],
-  });
+  const pendingWave = () =>
+    snapshot({
+      ready: [ready("api/01"), ready("ui/02")],
+      counts: counts({ total: 3, todo: 2, done: 1 }),
+      unfinished: [
+        { ref: "api/01", state: "todo" },
+        { ref: "ui/02", state: "todo" },
+      ],
+      invalid: [],
+    });
 
   test("stops before dispatch with one synthetic escalation and a complete reason", async () => {
     const { result, labels } = await runOrchestrator(
@@ -493,12 +538,20 @@ describe("orchestrator budget floor", () => {
       infrastructure: true,
       parked: false,
     });
-    expect(result.escalations[0].reason).toContain("9 of 100 output tokens remain");
+    expect(result.escalations[0].reason).toContain(
+      "9 of 100 output tokens remain",
+    );
     expect(result.escalations[0].reason).toContain("configured floor of 10");
-    expect(result.escalations[0].reason).toContain("Not dispatched: api/01, ui/02");
-    expect(result.escalations[0].reason).toContain("2 of 3 task(s) remain unfinished");
+    expect(result.escalations[0].reason).toContain(
+      "Not dispatched: api/01, ui/02",
+    );
+    expect(result.escalations[0].reason).toContain(
+      "2 of 3 task(s) remain unfinished",
+    );
     expect(labels.some((label) => label.startsWith("dev:"))).toBe(false);
-    expect(labels.some((label) => /^(verify|judge|done|block):/.test(label))).toBe(false);
+    expect(
+      labels.some((label) => /^(verify|judge|done|block):/.test(label)),
+    ).toBe(false);
   });
 
   test("commits the completed wave before stopping the next dispatch", async () => {
@@ -529,49 +582,33 @@ describe("orchestrator budget floor", () => {
     expect(result.completed).toEqual(["api/01"]);
     expect(result.escalations.map((item) => item.task)).toEqual(["(budget)"]);
     expect(labels).toContain("commit-wave-2");
-    expect(labels.indexOf("commit-wave-2")).toBeGreaterThan(labels.indexOf("done:api/01"));
+    expect(labels.indexOf("commit-wave-2")).toBeGreaterThan(
+      labels.indexOf("done:api/01"),
+    );
     expect(labels.some((label) => label.startsWith("dev:ui/02"))).toBe(false);
   });
 
   test("the default zero floor leaves a nearly exhausted run unchanged", async () => {
     const { result } = await runOrchestrator({
       scouts: [
-        snapshot({
-          ready: [ready("ui/01")],
-          counts: counts({ total: 1, todo: 1 }),
-          unfinished: [{ ref: "ui/01", state: "todo" }],
-          invalid: [],
-        }),
-        snapshot({
-          ready: [],
-          counts: counts({ total: 1, done: 1 }),
-          unfinished: [],
-          invalid: [],
-        }),
+        wave("ui/01", 1, 0),
+        complete(1),
       ],
       budget: { total: 1, spent: 1 },
     });
 
     expect(result.completed).toEqual(["ui/01"]);
-    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(
+      false,
+    );
   });
 
   test("a null total never trips a configured floor", async () => {
     const { result } = await runOrchestrator(
       {
         scouts: [
-          snapshot({
-            ready: [ready("ui/01")],
-            counts: counts({ total: 1, todo: 1 }),
-            unfinished: [{ ref: "ui/01", state: "todo" }],
-            invalid: [],
-          }),
-          snapshot({
-            ready: [],
-            counts: counts({ total: 1, done: 1 }),
-            unfinished: [],
-            invalid: [],
-          }),
+          wave("ui/01", 1, 0),
+          complete(1),
         ],
         budget: { total: null, spent: 999 },
       },
@@ -579,32 +616,26 @@ describe("orchestrator budget floor", () => {
     );
 
     expect(result.completed).toEqual(["ui/01"]);
-    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(
+      false,
+    );
   });
 
   test("an absent budget global does not throw or stop dispatch", async () => {
     const { result } = await runOrchestrator(
       {
         scouts: [
-          snapshot({
-            ready: [ready("ui/01")],
-            counts: counts({ total: 1, todo: 1 }),
-            unfinished: [{ ref: "ui/01", state: "todo" }],
-            invalid: [],
-          }),
-          snapshot({
-            ready: [],
-            counts: counts({ total: 1, done: 1 }),
-            unfinished: [],
-            invalid: [],
-          }),
+          wave("ui/01", 1, 0),
+          complete(1),
         ],
       },
       { budgetFloor: "10" },
     );
 
     expect(result.completed).toEqual(["ui/01"]);
-    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+    expect(result.escalations.some((item) => item.task === "(budget)")).toBe(
+      false,
+    );
   });
 
   test("normalizes negative and fractional floors", async () => {
@@ -612,36 +643,23 @@ describe("orchestrator budget floor", () => {
       const { result } = await runOrchestrator(
         {
           scouts: [
-            snapshot({
-              ready: [ready("ui/01")],
-              counts: counts({ total: 1, todo: 1 }),
-              unfinished: [{ ref: "ui/01", state: "todo" }],
-              invalid: [],
-            }),
-            snapshot({
-              ready: [],
-              counts: counts({ total: 1, done: 1 }),
-              unfinished: [],
-              invalid: [],
-            }),
+            wave("ui/01", 1, 0),
+            complete(1),
           ],
           budget: { total: 100, spent: 90 },
         },
         { budgetFloor },
       );
       expect(result.completed).toEqual(["ui/01"]);
-      expect(result.escalations.some((item) => item.task === "(budget)")).toBe(false);
+      expect(result.escalations.some((item) => item.task === "(budget)")).toBe(
+        false,
+      );
     }
   });
 });
 
 describe("orchestrator failure handling", () => {
-  const oneTask = (ref: string): ScoutResult => snapshot({
-    ready: [ready(ref)],
-    counts: counts({ total: 1, todo: 1 }),
-    unfinished: [{ ref, state: "todo" }],
-    invalid: [],
-  });
+  const oneTask = (ref: string): ScoutResult => wave(ref, 1, 0);
 
   test("a null verifier is an infrastructure failure and dev is not rerun", async () => {
     const { result, labels } = await runOrchestrator({
@@ -691,7 +709,9 @@ describe("orchestrator failure handling", () => {
     expect(thirdPrompt.indexOf("attempt two lint red")).toBeLessThan(
       thirdPrompt.indexOf("attempt one tests red"),
     );
-    expect(thirdPrompt.match(/The previous attempt was rejected:/g)).toHaveLength(1);
+    expect(
+      thirdPrompt.match(/The previous attempt was rejected:/g),
+    ).toHaveLength(1);
 
     const [esc] = result.escalations;
     expect(esc.infrastructure).toBe(false);
@@ -714,11 +734,7 @@ describe("orchestrator failure handling", () => {
       },
     });
     const devLabels = log.labels.filter((label) => label.startsWith("dev"));
-    expect(devLabels).toEqual([
-      "dev:ui/01#1",
-      "dev:ui/01#2",
-      "dev:ui/01#3",
-    ]);
+    expect(devLabels).toEqual(["dev:ui/01#1", "dev:ui/01#2", "dev:ui/01#3"]);
     expect(devLabels.map((label) => modelFor(log, label))).toEqual([
       "sonnet",
       "sonnet",
@@ -837,12 +853,14 @@ describe("orchestrator failure handling", () => {
 
   test("a closing-review retry labels its rejected round as final-review", async () => {
     const log = await runOrchestrator({
-      scouts: [snapshot({
-        ready: [ready("review/final", true)],
-        counts: counts({ total: 1, todo: 1 }),
-        unfinished: [{ ref: "review/final", state: "todo" }],
-        invalid: [],
-      })],
+      scouts: [
+        snapshot({
+          ready: [ready("review/final", true)],
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref: "review/final", state: "todo" }],
+          invalid: [],
+        }),
+      ],
       gate: {
         "review/final": [
           { passed: false, summary: "integration command failed" },
@@ -857,12 +875,14 @@ describe("orchestrator failure handling", () => {
     expect(retryPrompt).toContain("previous round was rejected");
 
     const exhausted = await runOrchestrator({
-      scouts: [snapshot({
-        ready: [ready("review/final", true)],
-        counts: counts({ total: 1, todo: 1 }),
-        unfinished: [{ ref: "review/final", state: "todo" }],
-        invalid: [],
-      })],
+      scouts: [
+        snapshot({
+          ready: [ready("review/final", true)],
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref: "review/final", state: "todo" }],
+          invalid: [],
+        }),
+      ],
       gate: {
         "review/final": [
           { passed: false, summary: "round one failed" },
@@ -1013,21 +1033,6 @@ describe("orchestrator failure handling", () => {
 });
 
 describe("orchestrator commits", () => {
-  const wave = (ref: string, total: number, done: number): ScoutResult => snapshot({
-    ready: [ready(ref)],
-    counts: counts({ total, todo: total - done, done }),
-    unfinished: [{ ref, state: "todo" }],
-    invalid: [],
-    errors: [],
-  });
-  const complete = (total: number): ScoutResult => snapshot({
-    ready: [],
-    counts: counts({ total, done: total }),
-    unfinished: [],
-    invalid: [],
-    errors: [],
-  });
-
   test("a failed inter-wave commit escalates without disturbing task accounting", async () => {
     const refs = ["ui/01", "ui/02"];
     const { result } = await runOrchestrator({
@@ -1072,11 +1077,7 @@ describe("orchestrator commits", () => {
 
   test("an inter-wave commit runs after scout guards and before task dispatch", async () => {
     const { labels } = await runOrchestrator({
-      scouts: [
-        wave("ui/01", 2, 0),
-        wave("ui/02", 2, 1),
-        complete(2),
-      ],
+      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1), complete(2)],
     });
 
     const scout = labels.indexOf("scout-wave-2");
@@ -1118,13 +1119,14 @@ describe("orchestrator commits", () => {
 
   test("a completed wave skips inter-wave commit and only runs post-loop commit", async () => {
     const { labels } = await runOrchestrator({
-      scouts: [
-        wave("ui/01", 1, 0),
-        complete(1),
-      ],
+      scouts: [wave("ui/01", 1, 0), complete(1)],
     });
 
-    expect(labels.filter((label) => label.startsWith("commit-wave-"))).toEqual([]);
-    expect(labels.filter((label) => label === "commit-post-loop")).toHaveLength(1);
+    expect(labels.filter((label) => label.startsWith("commit-wave-"))).toEqual(
+      [],
+    );
+    expect(labels.filter((label) => label === "commit-post-loop")).toHaveLength(
+      1,
+    );
   });
 });

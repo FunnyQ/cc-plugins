@@ -561,8 +561,10 @@ async function executeTask(item) {
       missing: verdict.missing,
     })
   }
-  const parkedOk = await parkBlocked(ref, path, renderHistory(attempts))
-  return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: renderHistory(attempts) }
+  // Render once: the parked file and the returned reason must carry the same text.
+  const history = renderHistory(attempts)
+  const parkedOk = await parkBlocked(ref, path, history)
+  return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: history }
 }
 
 // Wrap every task before it reaches parallel(). Do NOT depend on parallel()
@@ -622,6 +624,20 @@ const escalations = []
 const parked = new Set()
 let wave = 0
 
+// Both commit sites (inter-wave and post-loop) report a failure identically —
+// only the label differs. One helper so the two wordings cannot drift apart.
+// A null result is NOT a failure report: it means the agent returned no
+// structured result at all, so whether anything was committed is unknowable.
+// Never terminal — the caller decides; the escalation-free guard is what stops
+// every later commit.
+const escalateCommitFailure = (committed, what) => {
+  const reason = committed
+    ? `the ${what} commit failed: ${committed.reason || 'no reason reported'}`
+    : `the ${what} commit agent returned no structured result, so whether anything was committed is unknown`
+  log(reason)
+  escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
+}
+
 while (true) {
   wave++
   const scout = await agent(
@@ -647,19 +663,23 @@ while (true) {
   }
 
   // Validate the parsed object explicitly because a silently-missing field is the
-  // failure mode the old schema's `required` list existed to prevent.
-  if (!derailed && snap) {
+  // failure mode the old schema's `required` list existed to prevent. The shape
+  // test comes first and is not a truthiness test: `JSON.parse("null")` (and any
+  // other primitive) parses fine and is falsy, so a truthiness guard would skip
+  // every check below and let `snap.ready` throw past the (scout) escalation.
+  if (!derailed && (snap === null || typeof snap !== 'object' || Array.isArray(snap))) {
+    const shape = snap === null ? 'null' : Array.isArray(snap) ? 'an array' : typeof snap
+    derailed = `the scout's stdout parsed to ${shape}, not a JSON object: ${scout.stdout.slice(0, 400)}`
+  }
+  if (!derailed) {
     if (!Array.isArray(snap.ready)) derailed = `"ready" is not an array`
     else if (!Array.isArray(snap.unfinished)) derailed = `"unfinished" is not an array`
     else if (!Array.isArray(snap.invalid)) derailed = `"invalid" is not an array`
     else if (!Array.isArray(snap.errors)) derailed = `"errors" is not an array`
     else if (!snap.counts || typeof snap.counts !== 'object') derailed = `"counts" is not an object`
-    else if (typeof snap.counts.total !== 'number') derailed = `"counts.total" is not a number`
-    else if (typeof snap.counts.todo !== 'number') derailed = `"counts.todo" is not a number`
-    else if (typeof snap.counts.inProgress !== 'number') derailed = `"counts.inProgress" is not a number`
-    else if (typeof snap.counts.done !== 'number') derailed = `"counts.done" is not a number`
-    else if (typeof snap.counts.blocked !== 'number') derailed = `"counts.blocked" is not a number`
-    else if (typeof snap.counts.invalid !== 'number') derailed = `"counts.invalid" is not a number`
+    else for (const k of ['total', 'todo', 'inProgress', 'done', 'blocked', 'invalid']) {
+      if (typeof snap.counts[k] !== 'number') { derailed = `"counts.${k}" is not a number`; break }
+    }
   }
 
   if (derailed) {
@@ -751,11 +771,7 @@ while (true) {
       `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`)}`,
       { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
     if (!committed || committed.failed) {
-      const reason = committed
-        ? `the wave ${wave - 1} commit failed: ${committed.reason || 'no reason reported'}`
-        : `the wave ${wave - 1} commit agent returned no structured result, so whether anything was committed is unknown`
-      log(reason)
-      escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
+      escalateCommitFailure(committed, `wave ${wave - 1}`)
       // Continue this wave; the escalation-free guard prevents every later commit.
     }
   }
@@ -817,11 +833,7 @@ if (CFG.commitBetweenWaves && escalations.length === 0) {
     + commitInstructions('commit-post-loop'),
     { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
   if (!committed || committed.failed) {
-    const reason = committed
-      ? `the post-loop commit failed: ${committed.reason || 'no reason reported'}`
-      : `the post-loop commit agent returned no structured result, so whether anything was committed is unknown`
-    log(reason)
-    escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
+    escalateCommitFailure(committed, 'post-loop')
   }
 }
 
