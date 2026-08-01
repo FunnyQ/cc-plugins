@@ -29,9 +29,9 @@ describe("layoutGraph", () => {
     const layout = layoutGraph(nodes);
     const secondLayout = layoutGraph(nodes);
 
-    expect(layout.positions.get("A")).toEqual({ x: 8, y: 8 });
-    expect(layout.positions.get("B")).toEqual({ x: 246, y: 8 });
-    expect(layout.positions.get("C")).toEqual({ x: 484, y: 8 });
+    expect(layout.positions.get("A")).toEqual({ x: 7, y: 7 });
+    expect(layout.positions.get("B")).toEqual({ x: 245, y: 7 });
+    expect(layout.positions.get("C")).toEqual({ x: 483, y: 7 });
     expect(layout.positions.get("A").x).toBeLessThan(layout.positions.get("B").x);
     expect(layout.positions.get("B").x).toBeLessThan(layout.positions.get("C").x);
     expect([...secondLayout.positions]).toEqual([...layout.positions]);
@@ -51,10 +51,10 @@ describe("layoutGraph", () => {
     const positionC = layout.positions.get("C");
     const positionD = layout.positions.get("D");
 
-    expect(positionA.x).toBe(8);
-    expect(positionB.x).toBe(246);
-    expect(positionC.x).toBe(246);
-    expect(positionD.x).toBe(484);
+    expect(positionA.x).toBe(7);
+    expect(positionB.x).toBe(245);
+    expect(positionC.x).toBe(245);
+    expect(positionD.x).toBe(483);
     expect(positionB.y).toBeLessThan(positionC.y);
     expect(compare(nodes.filter(({ ref }) => ref === "B" || ref === "C"))).toEqual(["B", "C"]);
   });
@@ -66,8 +66,8 @@ describe("layoutGraph", () => {
     ];
     const layout = layoutGraph(nodes);
 
-    expect(layout.positions.get("X").x).toBe(8);
-    expect(layout.positions.get("Y").x).toBe(8);
+    expect(layout.positions.get("X").x).toBe(7);
+    expect(layout.positions.get("Y").x).toBe(7);
     expect(layout.positions.get("X").y).toBeLessThan(layout.positions.get("Y").y);
     expect(compare(nodes)).toEqual(["X", "Y"]);
   });
@@ -135,7 +135,7 @@ describe("renderGraph", () => {
 
     expect(startX).toBeGreaterThan(source.x);
     expect(startY).toBeGreaterThan(source.y);
-    expect(startY).toBeLessThan(source.y + 44);
+    expect(startY).toBeLessThan(source.y + 42);
     expect(endX).toBe(target.x);
     expect(endY).toBe(startY);
   });
@@ -167,5 +167,37 @@ describe("renderGraph sizing", () => {
     expect(svg).toContain(`width="${viewBox[1]}"`);
     expect(svg).toContain(`height="${viewBox[2]}"`);
     expect(Number(viewBox[1])).toBeGreaterThan(Number(viewBox[2]));
+  });
+});
+
+describe("graph typography", () => {
+  test("stamps a fixed font size on every label", () => {
+    const nodes = [makeNode("chain/01", "chain", "01")];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain('class="graph-ref" font-size="14"');
+  });
+
+  test("derives node geometry from that font size", () => {
+    const nodes = [
+      makeNode("A", "chain", "01"),
+      makeNode("B", "chain", "02", ["A"]),
+    ];
+    const wide = layoutGraph(nodes, { fontSize: 28 });
+    const normal = layoutGraph(nodes);
+
+    // Double the type, double the box and the gaps that separate the boxes.
+    expect(wide.positions.get("B").x - wide.positions.get("A").x).toBe(
+      (normal.positions.get("B").x - normal.positions.get("A").x) * 2,
+    );
+  });
+
+  test("a node is wide enough for a full bucket/NN ref", () => {
+    const nodes = [makeNode("integration/01", "integration", "01")];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+    const width = Number(svg.match(/width="(\d+(?:\.\d+)?)"/)[1]);
+
+    // 14 chars of 14px mono ≈ 118px, plus padding on both sides.
+    expect(width).toBeGreaterThan(134);
   });
 });

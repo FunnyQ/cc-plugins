@@ -30,7 +30,6 @@
   --radius-md: 4px;
 
   --border-width: 1px;
-  --graph-ref-size: 16px;
   --graph-edge-width: 2px;
   --header-min-height: 64px;
   --ring-size: 32px;
@@ -307,10 +306,10 @@ button {
 }
 
 .c-dependency-graph {
-  align-content: start;
+  align-content: safe center;
   block-size: 100%;
   display: grid;
-  justify-content: start;
+  justify-content: safe center;
   min-inline-size: 0;
   overflow: auto;
   padding: var(--space-2);
@@ -372,13 +371,14 @@ button {
     fill: var(--ground);
   }
 
+  /* Size comes from the font-size attribute graph.js stamps on each label —
+     the same number its box geometry is derived from, so type and boxes can
+     never drift apart. Only weight and tracking live here. */
   .graph-ref {
-    font-size: var(--graph-ref-size);
     font-weight: 600;
   }
 
   .graph-cycle-label {
-    font-size: var(--text-sm);
     letter-spacing: 0.02em;
   }
 
