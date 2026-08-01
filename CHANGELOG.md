@@ -1,5 +1,28 @@
 # Changelog
 
+## [dispatch 3.18.0] - 2026-08-01
+
+_tracks tag `dispatch-v3.18.0`_
+
+### Added
+
+- **The closing cross-vendor review lens can now run in a visible herdr live pane**, the same way the dev delegate already could (`CFG.liveReviewEngine`). It's gated only on `CFG.relayPath`, not on the dev-side live settings, because the review lens runs an external vendor on every flight — even an all-Claude one. It passes `--dangerous` since a live pane has no sandbox flag: without it, an unwatched approval prompt would stall the lens through the whole wait-and-collect cycle and then report a false unreachable result. Read-only mode still enforces prompts as before. Verified end-to-end on a live smoke flight.
+- **Flightdeck's dependency graph now lays out left-to-right at full readable size** instead of scaling every label down to fit a fixed box — a wide task tree scrolls instead. Type size is fixed at 14px and every other dimension (box, gaps, padding, arrowheads) scales from it. Edges now show arrowheads, and node labels use near-black ink on the light state fills for contrast.
+- **Hovering a node in flightdeck's dependency graph highlights its whole lineage** — everything it depends on and everything that depends on it — while dimming the rest of the tree.
+- **Flightdeck's Agent fleet panel can collapse to its heading**, and the header now shows total flight time, from the earliest agent start to now while a run is in progress, or frozen at the last finish once it's done.
+- **A new `dashboard/dist/playground.html`** lets you tune flightdeck's graph colours and box geometry against the real renderer and copy the resulting values back into the source.
+- **Fleet rows for a failed verify or judge step now render in the alert colour** instead of looking like a clean finish, so a scan of the fleet panel surfaces failures at a glance.
+
+### Fixed
+
+- **No dev step was ever explicitly told not to commit its own work.** A shared no-commit rule is now included in the Claude dev prompt, the external driver's prompt, the instruction it writes for its own CLI, and the final-review fixer — since only the dedicated commit agents should be committing, and an external engine writes outside the harness where no hook can catch it.
+- **A new lint rule catches a task whose scope-check can never pass under autopilot** — one that gates on `git status --short` expecting a single changed path, when the runner itself edits the task file as part of running it. This trap bit a real flight, where a delegate "fixed" its own failing gate by reverting the very status change that was supposed to mark it done. The task template now documents the trap and the working form.
+- **Flightdeck's fleet column header no longer overlaps the panel title on scroll.** The header offset was a hardcoded pixel value that no longer matched once the fleet panel gained a collapse toggle; both offsets now come from a single shared value.
+
+### Changed
+
+- **The state palette was retuned for contrast**, and the "done" state colour was desaturated — it's used for lane fills, fleet role badges, and verdict text throughout flightdeck, not just node fills, so the change is visible across the dashboard.
+
 ## [dispatch 3.17.0] - 2026-08-01
 
 _tracks tag `dispatch-v3.17.0`_
