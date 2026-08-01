@@ -119,10 +119,15 @@ const liveDev = !!(devEngine && CFG.liveDevEngine && CFG.relayPath)
 const COLLECT_ROUNDS = Math.max(0, Math.trunc(Number(CFG.liveCollectRounds ?? 3)) || 0)
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
-const READY_SCHEMA = {
+// The scout returns a WHOLE-TREE snapshot, not just a ready set. The wave loop's
+// own `completed` array covers only the current invocation, so a resumed run —
+// where earlier runs already finished most of the tree — can never test
+// completion with `completed.length === total`. `counts.done === counts.total`
+// can, because it counts the tree on disk.
+const SCOUT_SCHEMA = {
   type: 'object',
   properties: {
-    refs: {
+    ready: {
       type: 'array',
       items: {
         type: 'object',
@@ -134,9 +139,71 @@ const READY_SCHEMA = {
         required: ['ref', 'finalReview', 'path'],
       },
     },
+    counts: {
+      type: 'object',
+      properties: {
+        total:      { type: 'number' },
+        todo:       { type: 'number' },
+        inProgress: { type: 'number' },
+        done:       { type: 'number' },
+        blocked:    { type: 'number' },
+        invalid:    { type: 'number' },   // malformed completion state — never counted as done
+      },
+      required: ['total', 'todo', 'inProgress', 'done', 'blocked', 'invalid'],
+    },
+    unfinished: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { ref: { type: 'string' }, state: { type: 'string' } },
+        required: ['ref', 'state'],
+      },
+    },
+    invalidRefs: { type: 'array', items: { type: 'string' } },
+    // Files that did not parse at all, or claim a duplicate ref. These tasks are
+    // NOT in byRef, so they are NOT in `counts` either — `counts` describes only
+    // what parsed. Dropping this field would let `done === total` hold over a
+    // tree that still contains unreadable task files.
+    errors: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { file: { type: 'string' }, reason: { type: 'string' } },
+        required: ['file', 'reason'],
+      },
+    },
     error: { type: 'string' },
   },
-  required: ['refs'],
+  required: ['ready', 'counts', 'unfinished', 'invalidRefs', 'errors'],
+}
+
+// Both status transitions are infrastructure boundaries: each can silently not
+// happen. So each reports a verdict instead of a narrative, confirmed by a
+// reread rather than by the agent's say-so.
+const MARK_DONE_SCHEMA = {
+  type: 'object',
+  properties: {
+    ok:     { type: 'boolean' },   // command exited 0 AND the reread shows a bare `Status: done`
+    status: { type: 'string' },    // the Status value actually read back
+    error:  { type: 'string' },    // stderr / what went wrong
+  },
+  required: ['ok', 'status'],
+}
+
+// Parking is the SAME boundary. An agent can return a fluent summary having
+// changed nothing — most likely exactly when parking matters, because the task
+// is being parked for a malformed header in the first place. An unconfirmed
+// park that reports success is worse than a failed one: the file still reads
+// `in-progress`, next-ready never re-offers it, and the user is never told to
+// reset it by hand.
+const PARK_SCHEMA = {
+  type: 'object',
+  properties: {
+    ok:     { type: 'boolean' },   // the reread shows a bare `Status: blocked`
+    status: { type: 'string' },    // the Status value actually read back
+    error:  { type: 'string' },    // what went wrong
+  },
+  required: ['ok', 'status'],
 }
 
 const GATE_SCHEMA = {
@@ -211,7 +278,9 @@ You are the ${engine.label.toUpperCase()} DEV DRIVER for flightplan task ${ref} 
    ${liveDev ? `Relay runs ${engine.label} in a visible herdr live pane, edits the working tree directly, prints the delegate result on stdout, then closes the pane on success. Read that stdout — do NOT go looking for any temp/transcript files.` : `The headless wrapper has ${engine.label} edit the working tree directly, then prints its summary plus a \`git status --short\` of what changed, and cleans up its own scratch. Read that stdout — do NOT go looking for any temp/transcript files.`}
 ${liveDev && COLLECT_ROUNDS > 0 ? `5. PENDING — relay prints a report starting "Live ... still running after ...". ${engine.label} is NOT finished and has NOT failed: it is still writing the working tree, and the pane is still open. Do NOT retry, do NOT hand-write anything, and do NOT go to step 6 yet. Keep waiting instead: copy the \`relay ... collect --agent <name> --result <path>\` command the report prints, and run it — again ONE foreground Bash call with \`timeout: 600000\`, and the same WAIT RULE. It reattaches to that same pane and watches for another window. Run collect **at most ${COLLECT_ROUNDS} times in total** — the first collect is round 1, so after round ${COLLECT_ROUNDS} you stop. The moment any collect prints the delegate's result, continue at step 6 as a normal success. Only when round ${COLLECT_ROUNDS} still reports pending, go to step 5b.
 5b. FAILURE PATH` : `5. FAILURE PATH`} — the command exits non-zero${liveDev ? `, or relay returns an empty/absent result${COLLECT_ROUNDS > 0 ? ', or the last allowed collect is still pending' : ', or relay prints a PENDING report ("still running after ... this is NOT a failure" — relay exits 0, but autopilot counts that delegate as NOT finished)'}` : `, or its output begins with "${engine.token}"`}. Then: do NOT hand-write the implementation yourself, and do NOT return early. Run steps 6 and 7 as usual, then return a summary whose FIRST word is FAILED, stating ${engine.label} was unreachable, failed, or timed out.${liveDev ? ' For a still-pending delegate, name the Agent from relay stdout in the step-7 log and note the pane was LEFT OPEN and is STILL WRITING the working tree.' : ''} Step 6 is the real correctness gate: it decides whether anything usable actually landed, so never skip it. The binary gate then fails this attempt and the loop moves on (the final attempt escalates to Claude-Opus automatically).
-6. Run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
+6. Lint the task file, then verify. The lint runs FIRST, before any verification:
+     bun ${S}/lint-task.ts ${path}
+   The external engine edits files outside the harness, so the Edit/Write lint hook never saw its work — this call is the only structural check on the task file. A non-zero exit means the engine left the task file malformed (a decorated Status, a hand-ticked gate box, a sibling-task reference). Repair the header yourself until it lints clean: reset "> **Status**:" to a bare \`in-progress\`, and never hand-tick an Acceptance criteria or Verification box. Only then run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
 7. Log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "dev-${engine.label}:${ref}#${attempt}" --phase end --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
 Return a one-paragraph summary: what ${engine.label} implemented and your verification result.`
@@ -332,12 +401,58 @@ Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${re
 `
 
 const markDonePrompt = (ref, path) => `
-Finalize flightplan task ${ref} at ${path} by running:
-  bun ${S}/mark-done.ts ${path}
-That deterministically sets "> **Status**: done" AND ticks every checkbox in the task's ## Acceptance criteria and ## Verification sections (the task passed the gate, so all hold). Change nothing else by hand.`
+Finalize flightplan task ${ref} at ${path}. Do this in three steps and report a verdict.
+1. Run: bun ${S}/mark-done.ts ${path}
+   It deterministically sets "> **Status**: done" AND ticks every checkbox in the task's ## Acceptance criteria and ## Verification sections in ONE transition (the task passed the gate, so all hold). It validates the header FIRST: on a malformed header it exits non-zero and writes nothing at all.
+2. Re-read ${path} and find the "> **Status**:" line in the header blockquote.
+3. Return ok=true ONLY if the command exited 0 AND that line reads exactly "> **Status**: done" with nothing after the value. Put the value you actually read into status.
+   Otherwise return ok=false, the value you read into status, and the command's stderr into error.
+Change nothing else by hand. NEVER edit the Status line or tick a checkbox yourself — if mark-done.ts failed, report the failure. A hand-written "done" would fake a gate result that the tree then trusts forever.`
 
 const markBlockedPrompt = (ref, path, reason) => `
-Set the "> **Status**:" line in flightplan task ${ref}'s file (${path}) to: blocked. Change nothing else. (Parked by autopilot: ${reason})`
+Park flightplan task ${ref} at ${path}. Do this in three steps and report a verdict.
+1. Edit the "> **Status**:" line in the header blockquote to read exactly "> **Status**: blocked" — the value bare, with nothing after it. If that line is currently malformed (decorated, duplicated, or missing), REPAIR it to that exact bare form. Change nothing else in the file.
+2. Re-read ${path} and find the "> **Status**:" line in the header blockquote.
+3. Return ok=true ONLY if that line now reads exactly "> **Status**: blocked" with nothing after the value. Put the value you actually read into status.
+   Otherwise return ok=false, the value you read into status, and what stopped you into error.
+Do not tick or untick any checkbox. (Parked by autopilot: ${reason})`
+
+// ── Failure shapes ──────────────────────────────────────────────────────────
+// Two kinds of failure, handled differently:
+//   QUALITY        — the work was judged and found wanting (gate failed, rubric
+//                    below threshold). Retrying the dev loop is the right move.
+//   INFRASTRUCTURE — nothing was judged at all: an agent returned no structured
+//                    result, or the pipeline threw. Retrying dev would burn a
+//                    second attempt on top of an unknown state, so the task is
+//                    parked and escalated immediately.
+// The distinction has to survive to the wave loop, so it rides in the result.
+const infrastructureFailure = (ref, attempt, cause, parked) => ({
+  task: ref,
+  passed: false,
+  infrastructure: true,
+  // The attempt that was actually running. Compute WAS consumed; reporting 0
+  // here would misrepresent the run.
+  attempt,
+  parked,
+  reason: cause,
+})
+
+// Best-effort park. Every catch path must try this, and must record whether it
+// worked — an unparked task stays `in-progress`, which next-ready never offers
+// again, so it would vanish from the tree without a trace.
+//
+// "Worked" means the file was REREAD and shows a bare `Status: blocked`. An
+// agent that returns a fluent summary having changed nothing is the failure mode
+// this guards, so a non-null result is not evidence of anything.
+async function parkBlocked(ref, path, reason) {
+  try {
+    const result = await agent(markBlockedPrompt(ref, path, reason),
+      { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify, schema: PARK_SCHEMA })
+    return result?.ok === true
+  } catch {
+    return false
+  }
+}
 
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item) {
@@ -367,29 +482,66 @@ async function executeTask(item) {
       }
     }
 
+    // A verifier that returns NO structured result did not verify anything. That
+    // is not the same as `passed: false`, which is a real verdict on real work.
+    // Conflating them retries the dev loop against an unknown state.
     const gate = await agent(verifyPrompt(ref, path, attempt),
       { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
-    if (!gate || !gate.passed) {
-      feedback = `Binary gate failed (verification/acceptance):\n${gate?.summary ?? 'no output'}`
+    if (!gate) {
+      const cause = `verification did not run or did not return a verdict on attempt ${attempt}`
+        + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
+      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
+    }
+    if (!gate.passed) {
+      feedback = `Binary gate failed (verification/acceptance):\n${gate.summary ?? 'no output'}`
       continue
     }
 
     const judged = await agent(judgePrompt(ref, path, gate.summary, attempt),
       { label: `judge:${ref}#${attempt}`, phase: 'Execute', model: MODEL.judge, schema: JUDGE_SCHEMA })
-    if (!judged) { feedback = 'Judge produced no verdict.'; continue }
+    if (!judged) {
+      const cause = `the rubric judge returned no structured result on attempt ${attempt}`
+        + ` — the task was never scored. The harness exposes no original cause for a null agent result, so none is reported here.`
+      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
+    }
 
     const verdict = judged.verdict
     if (verdict.passed) {
-      await agent(markDonePrompt(ref, path), { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify })
-      return { task: ref, passed: true, attempt, weighted: verdict.weighted }
+      // The post-judge transition is its own infrastructure boundary — a task
+      // that passed but never got written `done` would be re-offered forever, or
+      // (worse) counted as complete by a run that never checked.
+      const finalized = await agent(markDonePrompt(ref, path),
+        { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify, schema: MARK_DONE_SCHEMA })
+      if (finalized && finalized.ok) {
+        return { task: ref, passed: true, attempt, weighted: verdict.weighted }
+      }
+      const cause = finalized
+        ? `the task passed its rubric but mark-done did not confirm a bare "Status: done" (read "${finalized.status}")`
+          + (finalized.error ? `: ${finalized.error}` : '')
+        : `the task passed its rubric but the mark-done step returned no structured result`
+          + ` — the harness exposes no original cause for a null agent result, so none is reported here.`
+      // Park + escalate, never both complete and stalled for the same task.
+      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
     }
     feedback = `Rubric score ${verdict.weighted.toFixed(2)} did not pass`
       + (verdict.hardFailed ? ' (hard-fail veto)' : '')
       + (verdict.missing.length ? ` (missing dims: ${verdict.missing.join(', ')})` : '')
       + `:\n${judged.rationale}`
   }
-  await agent(markBlockedPrompt(ref, path, feedback), { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify })
-  return { task: ref, passed: false, attempt: cap, reason: feedback }
+  const parkedOk = await parkBlocked(ref, path, feedback)
+  return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: feedback }
+}
+
+// Wrap every task before it reaches parallel(). Do NOT depend on parallel()
+// surfacing an error object: a thrown pipeline resolves to null there, and a
+// null carries neither the task ref nor the cause. Catching here keeps both.
+async function runTaskGuarded(item) {
+  try {
+    return await executeTask(item)
+  } catch (error) {
+    const cause = `the task pipeline threw: ${error?.message ?? String(error)}`
+    return infrastructureFailure(item.ref, 0, cause, await parkBlocked(item.ref, item.path, cause))
+  }
 }
 
 // ── Inline atomic-commit instructions ───────────────────────────────────────
@@ -447,51 +599,123 @@ while (true) {
     + `First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase start\n`
     + `Then proceed.\n\n`
     + `Use the identical label in both start and end calls.\n`
-    + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --json\n`
-    + `It prints a JSON array of the ready tasks (each with its finalReview flag and exact file path), e.g.\n`
-    + `  [{"ref":"ui/03","finalReview":false,"path":"${CFG.tasksDir}/ui/03-build.md"},{"ref":"api/02","finalReview":false,"path":"${CFG.tasksDir}/api/02-endpoint.md"}]\n`
-    + `or exactly [] when NOTHING is ready (all tasks done/blocked). An empty array means there is no work — that is the normal end state.\n`
-    + `Return { refs: <the printed array, VERBATIM> }. If it printed [], return refs: []. Do NOT open task files, infer, or enumerate any task the command did not print — echo only what it printed.\n`
-    + `If the command exits non-zero, return refs: [] and put the stderr in error.\n`
-    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "<refs count>"`,
-    { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: READY_SCHEMA })
+    + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
+    + `It prints ONE JSON object on stdout describing the whole tree, e.g.\n`
+    + `  {"ready":[{"ref":"ui/03","finalReview":false,"path":"${CFG.tasksDir}/ui/03-build.md"}],"counts":{"total":8,"todo":5,"inProgress":0,"done":2,"blocked":0,"invalid":1},"unfinished":[{"ref":"ui/03","state":"todo"}],"invalid":[{"ref":"api/01","rule":"completion-state","reason":"..."}],"errors":[]}\n`
+    + `"ready" is exactly [] when NOTHING is ready. That is normal — it does NOT mean the run failed.\n`
+    + `The command prints this JSON even when it exits 1 (an invalid or unparseable tree). Read stdout either way.\n`
+    + `Return: ready = the printed "ready" array VERBATIM; counts = the printed "counts" object VERBATIM; unfinished = the printed "unfinished" array VERBATIM; invalidRefs = the "ref" of every entry in the printed "invalid" array; errors = the printed "errors" array VERBATIM.\n`
+    + `"errors" holds files that did not parse at all. Those tasks are absent from "counts", so returning [] when the command printed entries would make a broken tree look finished. Copy it exactly.\n`
+    + `Do NOT open task files, infer, recount, or enumerate anything the command did not print — echo only what it printed.\n`
+    + `ONLY if the command printed no JSON at all (it crashed): return ready: [], unfinished: [], invalidRefs: [], errors: [], counts with every field 0, and put the stderr in error.\n`
+    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "<ready count> ready, <done>/<total> done"`,
+    { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: SCOUT_SCHEMA })
 
   // A scout failure is NOT "no work to do" — surface it as an escalation so the
   // run can't silently return empty (the classic `bun undefined/next-ready.ts`
-  // trap). Only a clean scout with zero fresh refs means the tree is drained.
+  // trap). Only a clean scout with a drained tree means the run is finished.
   if (!scout || scout.error) {
     const reason = `next-ready scout failed in wave ${wave}: ${scout?.error ?? 'no result'}`
     log(reason)
-    escalations.push({ task: '(scout)', attempt: 0, reason })
+    escalations.push({ task: '(scout)', attempt: 0, infrastructure: true, parked: false, reason })
     break
   }
+
+  // Unparseable files never reach `byRef`, so they never reach `counts` either.
+  // `counts` therefore describes the tasks that PARSED, not the tree. Checking
+  // this before the completion test is what stops `done === total` from holding
+  // over a tree that still contains task files nobody could read.
+  const parseErrors = scout.errors ?? []
+  if (parseErrors.length > 0) {
+    const reason = `${parseErrors.length} task file(s) did not parse in wave ${wave}, so the tree is incomplete and its counts describe only what parsed: `
+      + parseErrors.map(e => `${e.file} (${e.reason})`).join('; ')
+      + `. Fix those files — run lint-task.ts on the tree — then re-run autopilot.`
+    log(reason)
+    escalations.push({ task: '(tree)', attempt: 0, infrastructure: true, parked: false, reason })
+    break
+  }
+
+  const c = scout.counts
+  const bucketSum = c.todo + c.inProgress + c.done + c.blocked + c.invalid
+  if (bucketSum !== c.total) {
+    const reason = `scout counts do not add up in wave ${wave}: total ${c.total} vs buckets summing to ${bucketSum} (${JSON.stringify(c)})`
+    log(reason)
+    escalations.push({ task: '(scout)', attempt: 0, infrastructure: true, parked: false, reason })
+    break
+  }
+
+  // A malformed tree is a scout failure, not a stall. Naming the refs is the
+  // whole point — "invalid: 2" alone tells the user nothing they can act on.
+  if (c.invalid > 0) {
+    const reason = `${c.invalid} task(s) hold an invalid completion state and the tree cannot be trusted: `
+      + `${(scout.invalidRefs ?? []).join(', ') || '(refs not reported)'}. `
+      + `Reset each one's Status to in-progress or todo and rerun its gates — do NOT tick the boxes by hand.`
+    log(reason)
+    escalations.push({ task: '(tree)', attempt: 0, infrastructure: true, parked: false, reason })
+    break
+  }
+
+  // Whole-tree completion, resume-safe. `completed` only covers THIS run, so a
+  // resumed run's `completed.length` is smaller than the tree and can never
+  // prove completion. The on-disk count can.
+  if (c.done === c.total) {
+    log(`Tree complete: ${c.done}/${c.total} done.`)
+    break
+  }
+
   // Exclude both parked AND already-completed refs. next-ready won't re-offer a
   // done task, but this is defense-in-depth: even a misbehaving scout that
   // re-lists finished tasks can never trigger an infinite re-run of done work.
-  const fresh = (scout.refs ?? []).filter(
+  const fresh = (scout.ready ?? []).filter(
     i => !parked.has(i.ref) && !completed.includes(i.ref))
-  if (fresh.length === 0) break
+
+  // Empty ready set + unfinished tasks = stalled. Report the counts AND the refs.
+  // Tasks this run already parked are excluded: they carry their own escalation,
+  // and re-reporting them as a fresh stall would double-count every parked run.
+  if (fresh.length === 0) {
+    const outstanding = (scout.unfinished ?? []).filter(u => !parked.has(u.ref))
+    if (outstanding.length === 0) break   // nothing left but what we already escalated
+    const remaining = outstanding.map(u => `${u.ref} (${u.state})`).join(', ')
+    const reason = `stalled in wave ${wave}: no ready task, but ${c.total - c.done} of ${c.total} are unfinished. `
+      + `Counts: ${JSON.stringify(c)}. Remaining: ${remaining}.`
+    log(reason)
+    escalations.push({ task: '(tree)', attempt: 0, infrastructure: true, parked: false, reason })
+    break
+  }
 
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
-  const results = (await parallel(fresh.map(item => () => executeTask(item)))).filter(Boolean)
+  // No `.filter(Boolean)` — reconciliation is by INDEX against `fresh`, so a
+  // null result still lands on its own task instead of disappearing.
+  const results = await parallel(fresh.map(item => () => runTaskGuarded(item)))
 
-  for (const r of results) {
-    if (r.passed) completed.push(r.task)
-    else { escalations.push(r); parked.add(r.task) }
-  }
-  // Reconcile the wave. `parallel()` yields null for a task whose pipeline
-  // threw, so a dropped task lands in NO list. Its dev step already set the
-  // task to in-progress and next-ready only offers `todo`, so it can never be
-  // re-offered: the run would end "clean" and the post-loop commit would sweep
-  // its ungated edits into a commit. Escalating it parks the task AND (via the
-  // escalation-free guard) blocks those commits.
-  for (const item of fresh) {
-    if (completed.includes(item.ref) || parked.has(item.ref)) continue
-    escalations.push({ task: item.ref, attempt: 0, reason: 'no result returned — the task pipeline threw or was skipped' })
+  // Reconcile every input task. A dropped task would land in NO list: its dev
+  // step already set the task to in-progress, and next-ready only offers `todo`,
+  // so it could never be re-offered — the run would end "clean" and the
+  // post-loop commit would sweep its ungated edits into a commit. Escalating it
+  // parks the task AND (via the escalation-free guard) blocks those commits.
+  let passedThisWave = false
+  for (let i = 0; i < fresh.length; i++) {
+    const item = fresh[i]
+    const r = results[i]
+    // Never read r.passed without this guard — r is null when even the guarded
+    // wrapper could not return.
+    if (r && r.passed) {
+      completed.push(item.ref)
+      passedThisWave = true
+      continue
+    }
+    escalations.push({
+      task: item.ref,
+      attempt: r?.attempt ?? 0,
+      infrastructure: r?.infrastructure ?? true,
+      parked: r?.parked ?? false,
+      reason: r?.reason
+        ?? 'no result returned for this task and the harness exposed no cause — the pipeline was dropped, so the task state on disk is unknown',
+    })
     parked.add(item.ref)
   }
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
-  if (!results.some(r => r.passed)) break
+  if (!passedThisWave) break
 }
 
 // ── Post-loop commit ────────────────────────────────────────────────────────
@@ -511,15 +735,32 @@ return { slug: CFG.slug, completed, escalations }
 
 ## What the main agent does with the result
 
-- `completed` — tasks that passed their rubric. It includes the Final review task, if the run finished cleanly.
-- `escalations` — `[{ task, attempt, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale or the gate output.
+- `completed` — tasks that passed their rubric **and** whose `mark-done` transition was confirmed, this invocation only. It includes the Final review task, if the run finished cleanly. It is not a tree-completion count; see the note on `counts.done` below.
+- `escalations` — `[{ task, attempt, infrastructure, parked, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` means nothing was judged, so tell the user that verification did not run rather than that the work was rejected. `parked: false` means the task was NOT written back as `blocked`, so its file still reads `in-progress` and `next-ready` will not re-offer it — say so, because the user has to reset that Status by hand before resuming.
+- A task ref appears in `completed` or in `escalations`, never in both.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
 - **Resume**: after the user unblocks a parked task, reset its `Status` to `todo`. Then re-run autopilot. Completed tasks stay `done`, so the run re-offers only the unblocked work.
 
 ## Notes / gotchas
 
 - **Wave re-scout is non-negotiable.** Statuses change only inside the run. The orchestrator must recompute the ready set each wave. A task unblocked by a wave-N completion is picked up in wave N+1.
-- **The scout echoes `next-ready.ts --json` verbatim. It does not interpret.** Use the `--json` mode. It emits `[{ref,finalReview,path}]`, or `[]` when nothing is ready. Have the agent return that array as-is. An earlier line-oriented scout had a fatal blind spot. When `next-ready` printed nothing — meaning all tasks were done — the agent did not map "empty" to `[]`. Instead, it re-listed every task as ready, and the whole tree re-ran. `[]` from `--json` is unambiguous. The `!completed.includes` filter is the backstop.
+- **The scout echoes `next-ready.ts --summary` verbatim. It does not interpret.** Use the `--summary` mode. It emits one object: `{ready, counts, unfinished, invalid, errors}`, where `ready` is `[]` when nothing is ready. Have the agent return those fields as-is. An earlier line-oriented scout had a fatal blind spot. When `next-ready` printed nothing — meaning all tasks were done — the agent did not map "empty" to `[]`. Instead, it re-listed every task as ready, and the whole tree re-ran. A JSON object is unambiguous. The `!completed.includes` filter is the backstop. Note `--summary` prints its JSON **before** exiting non-zero on a malformed tree, so the scout reads stdout either way and can name the invalid refs.
+
+- **`completed.length` is not a completion count. `counts.done` is.** The wave loop's `completed` array only holds tasks *this invocation* finished. A resumed run inherits `done` tasks from earlier runs, so comparing `completed.length` with the tree size reports a false stall on every resume. The scout's `counts.done === counts.total` counts the tree on disk, which is the only place completion actually lives. The loop also asserts `total === todo + inProgress + done + blocked + invalid` before trusting any bucket.
+
+- **Six terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a scout failure. `invalid > 0` is a scout failure naming the invalid refs. A counts mismatch is a scout failure. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly.
+
+- **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop checks `scout.errors` **before** the completion test, and why `errors` is a required field of the scout schema rather than something the agent may summarize away.
+
+- **The stall check excludes tasks this run already parked.** Every parked task carries its own escalation, and the very next wave necessarily sees it as unfinished-and-not-ready. Counting it again would append a phantom `(tree)` stall to every run that parked anything, so the run would report two problems where there is one. When the only unfinished tasks are ones already escalated, the loop just breaks.
+
+- **The script has a deterministic fixture.** `scripts/orchestrator-script.test.ts` extracts this exact fenced block, runs it with stubbed `agent`/`parallel`, and asserts the termination rules, the quality-vs-infrastructure split, and the "every task lands in `completed` XOR `escalations`" invariant. No agent is spawned. **Edit the block and run `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts`** — a syntax error or a broken loop shows up there instead of mid-flight.
+
+- **Quality failures retry; infrastructure failures park immediately.** A verifier returning `passed: false` judged real work and found it wanting — that feeds the dev loop another attempt. A verifier or judge returning *no structured result* judged nothing at all, so retrying dev would stack a second attempt on an unknown state. Same for a thrown pipeline and for a post-judge `mark-done` that does not confirm a bare `Status: done`. Each of those parks the task and escalates on the spot, and the escalation says plainly that verification did not run or did not return a verdict. The attempt number is reported as it actually was — compute was consumed, and claiming otherwise would mislead the audit. **The harness exposes no original cause for a null agent result**; the escalation says so rather than inventing an error message.
+
+- **Both status transitions are confirmed by a reread, not by the agent's word.** `markDonePrompt` and `markBlockedPrompt` each return `{ ok, status, error }` and each must reopen the file and read the Status line back. An agent can return a fluent summary having edited nothing, and for parking that is the *likely* case — the task is often being parked because its header was malformed to begin with. An unconfirmed park reported as success is worse than a failed one: the file still reads `in-progress`, `next-ready` never re-offers it, and the `parked: false` signal that tells the user to reset it by hand never fires.
+
+- **Wrap the task thunk; reconcile by index; never `.filter(Boolean)`.** `parallel()` resolves a thrown thunk to `null`, and a `null` carries neither the task ref nor the cause. `runTaskGuarded` catches around `executeTask` so both survive, and it still attempts `markBlockedPrompt` and records whether the park worked. The wave then reconciles `results[i]` against `fresh[i]`, so even a `null` lands on its own task instead of vanishing. Filtering first would drop the task from `completed` and `escalations` both, and an unparked task stays `in-progress` — which `next-ready` never offers again.
 - **There is exactly one scoring implementation.** The judge agent runs `score-task.ts --json --log` with its scores. The orchestrator gates on that printed verdict object. If the formula changes, change `score-task.ts`. Do NOT duplicate the arithmetic in the orchestrator.
 - **Final review needs no special phase.** Its transitive `Depends on` reaches every task. So `next-ready` offers it only once everything else is `done`. When the `finalReview` flag is set, the orchestrator runs `runFinalReview` instead of a single dev agent — the multi-lens fan-out described below. It also uses the smaller `FINAL_MAX` cap. The binary gate, the rubric judge, and the score gate stay unchanged. They evaluate the round's output against the Final review task's own `## Eval rubric`: integration, consistency, no regressions, and whether it meets the PLAN goal.
 - **The *orchestrator* runs the review fan-out, not one agent.** A Workflow agent has `Skill` and `Bash`, so the external CLI is reachable. But it has **no `Agent` tool**. So it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that. `runFinalReview` issues one `agent()` per lens via `parallel()`. One lens is the cross-vendor lens (`CFG.reviewEngine`: codex or opencode), driven through the `<engine>-run.ts review` wrapper over Bash. The other four are the `/simplify` lenses — reuse, simplification, efficiency, altitude — and each runs on Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing. A single Opus **fixer** then reads all the files and applies the changes. The external engine gives the deliberate cross-*vendor* signal that an all-Claude dev+judge cannot produce. If it is unreachable, that reviewer writes its `<ENGINE> UNREACHABLE` token instead. The fixer then flags this, and the gate fails the task rather than pass an un-reviewed deliverable. Codex review is sandbox-enforced read-only. Opencode review is prompt-enforced read-only instead — its wrapper prepends a hard "analyze only" guard.

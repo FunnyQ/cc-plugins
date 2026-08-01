@@ -1,0 +1,539 @@
+/**
+ * Deterministic fixture for the canonical orchestrator script.
+ *
+ * The script lives in `references/orchestrator.md` as a fenced JS block, because
+ * the Workflow runtime takes it as source — it cannot import a module. So this
+ * test extracts that exact block and runs it with stubbed `agent` / `parallel` /
+ * `log` / `phase`. No agent is spawned and no file is touched; what is under
+ * test is the wave loop's termination and reconciliation logic, which is where
+ * a lost result turns into a run that looks clean.
+ *
+ * Keep the stubs faithful to the real runtime contract:
+ *   - `agent()` returns null on a terminal failure; it does not throw.
+ *   - `parallel()` resolves a thrown thunk to null; the call itself never rejects.
+ */
+import { describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+const ORCHESTRATOR = join(
+  import.meta.dir,
+  "..",
+  "references",
+  "orchestrator.md",
+);
+
+type Counts = {
+  total: number;
+  todo: number;
+  inProgress: number;
+  done: number;
+  blocked: number;
+  invalid: number;
+};
+
+type ScoutResult = {
+  ready?: { ref: string; finalReview: boolean; path: string }[];
+  counts?: Counts;
+  unfinished?: { ref: string; state: string }[];
+  invalidRefs?: string[];
+  errors?: { file: string; reason: string }[];
+  error?: string;
+} | null;
+
+type RunResult = {
+  slug: string;
+  completed: string[];
+  escalations: {
+    task: string;
+    attempt: number;
+    infrastructure?: boolean;
+    parked?: boolean;
+    reason: string;
+  }[];
+};
+
+type Scenario = {
+  /** One entry per wave, consumed in order. */
+  scouts: ScoutResult[];
+  /** Keyed by task ref; null models an agent that returned no structured result. */
+  gate?: Record<string, ({ passed: boolean; summary: string } | null)[]>;
+  judge?: Record<string, ({ verdict: Verdict; rationale: string } | null)[]>;
+  markDone?: Record<
+    string,
+    ({ ok: boolean; status: string; error?: string } | null)[]
+  >;
+  /** Keyed by ref; models a park that reports failure, or returns nothing at all. */
+  park?: Record<
+    string,
+    ({ ok: boolean; status: string; error?: string } | null)[]
+  >;
+  /** Refs whose dev step throws, simulating a pipeline that dies mid-flight. */
+  devThrows?: string[];
+};
+
+type Verdict = {
+  weighted: number;
+  passed: boolean;
+  hardFailed: boolean;
+  missing: string[];
+};
+
+const pass: Verdict = {
+  weighted: 4.6,
+  passed: true,
+  hardFailed: false,
+  missing: [],
+};
+const fail: Verdict = {
+  weighted: 2.1,
+  passed: false,
+  hardFailed: false,
+  missing: [],
+};
+
+const ready = (ref: string, finalReview = false) => ({
+  ref,
+  finalReview,
+  path: `/abs/repo/docs/my-plan/tasks/${ref}.md`,
+});
+
+/** Pull the canonical script out of the markdown, ready for `new Function`. */
+async function loadScript(): Promise<string> {
+  const doc = await readFile(ORCHESTRATOR, "utf-8");
+  const start = doc.indexOf("```javascript");
+  if (start === -1)
+    throw new Error("no ```javascript block in orchestrator.md");
+  const bodyStart = doc.indexOf("\n", start) + 1;
+  const end = doc.indexOf("\n```", bodyStart);
+  if (end === -1) throw new Error("unterminated ```javascript block");
+  // `export` is invalid inside a Function body; the runtime hoists meta itself.
+  return doc.slice(bodyStart, end).replace(/^export const meta/m, "const meta");
+}
+
+type RunLog = {
+  result: RunResult;
+  /** Every agent label, in call order. */
+  labels: string[];
+};
+
+async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
+  const src = await loadScript();
+  const labels: string[] = [];
+  const scouts = [...scenario.scouts];
+  const queues = new Map<string, unknown[]>();
+  const take = (bucket: string, ref: string, fallback: unknown) => {
+    const key = `${bucket}:${ref}`;
+    if (!queues.has(key)) {
+      const source =
+        (scenario[bucket as "gate" | "judge" | "markDone" | "park"] ?? {})[
+          ref
+        ] ?? undefined;
+      queues.set(key, source ? [...source] : []);
+    }
+    const queue = queues.get(key)!;
+    return queue.length > 0 ? queue.shift() : fallback;
+  };
+
+  const agent = async (_prompt: string, opts: { label: string }) => {
+    const label = opts.label;
+    labels.push(label);
+
+    if (label.startsWith("scout-wave-")) {
+      return scouts.length > 0 ? scouts.shift() : null;
+    }
+    const [role, rest] = [label.slice(0, label.indexOf(":")), label];
+    const refOf = (l: string) => l.slice(l.indexOf(":") + 1).split("#")[0];
+
+    if (role === "verify") {
+      return take("gate", refOf(rest), { passed: true, summary: "green" });
+    }
+    if (role === "judge") {
+      return take("judge", refOf(rest), { verdict: pass, rationale: "solid" });
+    }
+    if (label.startsWith("done:")) {
+      return take("markDone", refOf(rest), { ok: true, status: "done" });
+    }
+    if (label.startsWith("block:")) {
+      return take("park", refOf(rest), { ok: true, status: "blocked" });
+    }
+    if (label.startsWith("dev:") || label.startsWith("dev-")) {
+      const ref = refOf(rest);
+      if (scenario.devThrows?.includes(ref)) {
+        throw new Error(`dev exploded for ${ref}`);
+      }
+      return "implemented";
+    }
+    return "ok";
+  };
+
+  // Mirrors the runtime: a thrown thunk resolves to null, the call never rejects.
+  const parallel = async (thunks: (() => Promise<unknown>)[]) =>
+    Promise.all(
+      thunks.map((thunk) =>
+        Promise.resolve()
+          .then(thunk)
+          .catch(() => null),
+      ),
+    );
+
+  const factory = new Function(
+    "agent",
+    "parallel",
+    "log",
+    "phase",
+    `return (async () => {\n${src}\n})()`,
+  );
+  const result = (await factory(
+    agent,
+    parallel,
+    () => {},
+    () => {},
+  )) as RunResult;
+  return { result, labels };
+}
+
+const counts = (over: Partial<Counts> & { total: number }): Counts => ({
+  todo: 0,
+  inProgress: 0,
+  done: 0,
+  blocked: 0,
+  invalid: 0,
+  ...over,
+});
+
+/** The invariant the whole plan exists to protect. */
+function accountsForEveryTask(result: RunResult, refs: string[]): boolean {
+  return refs.every((ref) => {
+    const inCompleted = result.completed.includes(ref);
+    const inEscalations = result.escalations.some((e) => e.task === ref);
+    return inCompleted !== inEscalations;
+  });
+}
+
+describe("orchestrator wave loop", () => {
+  test("a fresh tree runs its ready task and finishes clean", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [ready("ui/01")],
+          counts: counts({ total: 2, todo: 1, done: 1 }),
+          unfinished: [{ ref: "ui/01", state: "todo" }],
+          invalidRefs: [],
+        },
+        {
+          ready: [],
+          counts: counts({ total: 2, done: 2 }),
+          unfinished: [],
+          invalidRefs: [],
+        },
+      ],
+    });
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(result.escalations).toEqual([]);
+  });
+
+  test("a resumed tree counts earlier-run done tasks and does not false-stall", async () => {
+    // Wave 2 shows done === total. `completed` holds only ui/03 — one entry for
+    // a three-task tree — so a completed.length test would report a stall here.
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [ready("ui/03")],
+          counts: counts({ total: 3, todo: 1, done: 2 }),
+          unfinished: [{ ref: "ui/03", state: "todo" }],
+          invalidRefs: [],
+        },
+        {
+          ready: [],
+          counts: counts({ total: 3, done: 3 }),
+          unfinished: [],
+          invalidRefs: [],
+        },
+      ],
+    });
+    expect(result.completed).toEqual(["ui/03"]);
+    expect(result.completed.length).not.toBe(3);
+    expect(result.escalations).toEqual([]);
+  });
+
+  test("an empty ready set with unfinished tasks escalates as stalled", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [],
+          counts: counts({ total: 3, inProgress: 1, blocked: 1, done: 1 }),
+          unfinished: [
+            { ref: "ui/01", state: "inProgress" },
+            { ref: "ui/02", state: "blocked" },
+          ],
+          invalidRefs: [],
+        },
+      ],
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations).toHaveLength(1);
+    const [stall] = result.escalations;
+    expect(stall.task).toBe("(tree)");
+    expect(stall.reason).toMatch(/stalled/);
+    expect(stall.reason).toContain("ui/01 (inProgress)");
+    expect(stall.reason).toContain("ui/02 (blocked)");
+    expect(stall.reason).toContain('"total":3');
+  });
+
+  test("an invalid tree is a scout failure naming the refs", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [ready("ui/02")],
+          counts: counts({ total: 2, todo: 1, invalid: 1 }),
+          unfinished: [{ ref: "ui/02", state: "todo" }],
+          invalidRefs: ["ui/01"],
+        },
+      ],
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(tree)");
+    expect(result.escalations[0].reason).toContain("ui/01");
+    expect(result.escalations[0].reason).toMatch(
+      /do NOT tick the boxes by hand/i,
+    );
+  });
+
+  test("counts that do not sum are a scout failure", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [ready("ui/01")],
+          counts: {
+            total: 5,
+            todo: 1,
+            inProgress: 0,
+            done: 1,
+            blocked: 0,
+            invalid: 0,
+          },
+          unfinished: [{ ref: "ui/01", state: "todo" }],
+          invalidRefs: [],
+        },
+      ],
+    });
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].reason).toMatch(/do not add up/);
+  });
+
+  test("unparseable files escalate even when every PARSED task is done", async () => {
+    // The trap: a file that fails to parse never enters byRef, so it never
+    // enters counts either. counts reads done === total over a tree that still
+    // holds a task nobody could read, and the run would report clean completion.
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [],
+          counts: counts({ total: 1, done: 1 }),
+          unfinished: [],
+          invalidRefs: [],
+          errors: [
+            { file: "/abs/repo/.../ui/02-broken.md", reason: "missing H1" },
+          ],
+        },
+      ],
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations).toHaveLength(1);
+    const [esc] = result.escalations;
+    expect(esc.task).toBe("(tree)");
+    expect(esc.reason).toContain("did not parse");
+    expect(esc.reason).toContain("02-broken.md");
+    expect(esc.reason).toContain("missing H1");
+  });
+
+  test("a scout that returns nothing escalates instead of reading as drained", async () => {
+    const { result } = await runOrchestrator({ scouts: [null] });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].infrastructure).toBe(true);
+  });
+});
+
+describe("orchestrator failure handling", () => {
+  const oneTask = (ref: string): ScoutResult => ({
+    ready: [ready(ref)],
+    counts: counts({ total: 1, todo: 1 }),
+    unfinished: [{ ref, state: "todo" }],
+    invalidRefs: [],
+  });
+
+  test("a null verifier is an infrastructure failure and dev is not rerun", async () => {
+    const { result, labels } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      gate: { "ui/01": [null] },
+    });
+    expect(result.completed).toEqual([]);
+    expect(result.escalations).toHaveLength(1);
+    const [esc] = result.escalations;
+    expect(esc.task).toBe("ui/01");
+    expect(esc.infrastructure).toBe(true);
+    expect(esc.attempt).toBe(1);
+    expect(esc.parked).toBe(true);
+    expect(esc.reason).toMatch(/verification did not run or did not return/);
+    expect(esc.reason).toMatch(/no original cause/);
+    // Exactly one dev attempt: an infrastructure failure never retries.
+    expect(labels.filter((l) => l.startsWith("dev:"))).toHaveLength(1);
+    expect(labels).toContain("block:ui/01");
+  });
+
+  test("a genuine failed verifier is a quality failure and DOES retry dev", async () => {
+    const { result, labels } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      gate: {
+        "ui/01": [
+          { passed: false, summary: "tests red" },
+          { passed: false, summary: "tests red" },
+          { passed: false, summary: "tests red" },
+        ],
+      },
+    });
+    expect(labels.filter((l) => l.startsWith("dev:"))).toHaveLength(3);
+    const [esc] = result.escalations;
+    expect(esc.infrastructure).toBe(false);
+    expect(esc.attempt).toBe(3);
+    expect(esc.reason).toMatch(/Binary gate failed/);
+  });
+
+  test("a null judge is an infrastructure failure", async () => {
+    const { result, labels } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      judge: { "ui/01": [null] },
+    });
+    const [esc] = result.escalations;
+    expect(esc.infrastructure).toBe(true);
+    expect(esc.reason).toMatch(/rubric judge returned no structured result/);
+    expect(labels.filter((l) => l.startsWith("dev:"))).toHaveLength(1);
+  });
+
+  test("an unconfirmed mark-done parks instead of completing", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      markDone: {
+        "ui/01": [
+          { ok: false, status: "in-progress", error: "malformed header" },
+        ],
+      },
+    });
+    expect(result.completed).toEqual([]);
+    const [esc] = result.escalations;
+    expect(esc.infrastructure).toBe(true);
+    expect(esc.reason).toMatch(
+      /passed its rubric but mark-done did not confirm/,
+    );
+    expect(esc.reason).toContain("in-progress");
+    expect(esc.reason).toContain("malformed header");
+    expect(accountsForEveryTask(result, ["ui/01"])).toBe(true);
+  });
+
+  test("a park that does not confirm reports parked: false", async () => {
+    // The agent answered, but the reread still shows in-progress. Reporting
+    // parked: true here would hide the one instruction the user needs — reset
+    // that Status by hand, because next-ready will never re-offer the task.
+    const { result } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      gate: { "ui/01": [null] },
+      park: {
+        "ui/01": [
+          { ok: false, status: "in-progress", error: "edit did not land" },
+        ],
+      },
+    });
+    const [esc] = result.escalations;
+    expect(esc.task).toBe("ui/01");
+    expect(esc.infrastructure).toBe(true);
+    expect(esc.parked).toBe(false);
+  });
+
+  test("a park agent that returns nothing also reports parked: false", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      gate: { "ui/01": [null] },
+      park: { "ui/01": [null] },
+    });
+    expect(result.escalations[0].parked).toBe(false);
+  });
+
+  test("a confirmed park reports parked: true", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      gate: { "ui/01": [null] },
+      park: { "ui/01": [{ ok: true, status: "blocked" }] },
+    });
+    expect(result.escalations[0].parked).toBe(true);
+  });
+
+  test("a thrown task pipeline keeps the ref and the cause", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [oneTask("ui/01")],
+      devThrows: ["ui/01"],
+    });
+    const [esc] = result.escalations;
+    expect(esc.task).toBe("ui/01");
+    expect(esc.infrastructure).toBe(true);
+    expect(esc.parked).toBe(true);
+    expect(esc.reason).toMatch(/task pipeline threw: dev exploded for ui\/01/);
+  });
+
+  test("a wave where one task passes and one infrastructure-fails accounts for both", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: [ready("ui/01"), ready("api/01")],
+          counts: counts({ total: 2, todo: 2 }),
+          unfinished: [
+            { ref: "api/01", state: "todo" },
+            { ref: "ui/01", state: "todo" },
+          ],
+          invalidRefs: [],
+        },
+        {
+          ready: [],
+          counts: counts({ total: 2, todo: 1, done: 1 }),
+          unfinished: [{ ref: "api/01", state: "todo" }],
+          invalidRefs: [],
+        },
+      ],
+      gate: { "api/01": [null] },
+    });
+    expect(result.completed).toEqual(["ui/01"]);
+    // api/01 was parked with its own escalation; the next wave's empty ready set
+    // must NOT be re-reported as a fresh tree stall.
+    expect(result.escalations.map((e) => e.task)).toEqual(["api/01"]);
+    expect(accountsForEveryTask(result, ["ui/01", "api/01"])).toBe(true);
+  });
+
+  test("no incomplete task disappears from both completed and escalations", async () => {
+    const refs = ["ui/01", "ui/02", "api/01"];
+    const { result } = await runOrchestrator({
+      scouts: [
+        {
+          ready: refs.map((r) => ready(r)),
+          counts: counts({ total: 3, todo: 3 }),
+          unfinished: refs.map((ref) => ({ ref, state: "todo" })),
+          invalidRefs: [],
+        },
+        {
+          ready: [],
+          counts: counts({ total: 3, blocked: 2, done: 1 }),
+          unfinished: [
+            { ref: "api/01", state: "blocked" },
+            { ref: "ui/02", state: "blocked" },
+          ],
+          invalidRefs: [],
+        },
+      ],
+      gate: { "ui/02": [null] },
+      devThrows: ["api/01"],
+      judge: { "ui/01": [{ verdict: fail, rationale: "weak" }] },
+    });
+    expect(accountsForEveryTask(result, refs)).toBe(true);
+    expect(result.escalations).toHaveLength(2);
+  });
+});
