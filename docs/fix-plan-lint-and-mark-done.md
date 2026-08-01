@@ -1,438 +1,389 @@
-# Fix plan — the silent-gate defects
+# Fix plan — make flightplan and autopilot fail closed
 
 > **Status**: ready to execute
 > **Owner**: Q
-> **Written**: 2026-08-01
-> **Source**: review of `docs/handoff-mark-done-silent-strand.md` plus findings from three
-> `/dispatch:autopilot flightdeck` runs on 2026-07-31.
+> **Rewritten**: 2026-08-01
+> **Scope**: remaining work after the flightdeck and rust-rewrite recovery runs
 
-## Why these are one plan
+## Goal
 
-Every defect below is the same shape: **a gate reports success while doing nothing.** A caller cannot
-tell "checked, all clear" from "skipped". Two separate safety layers were present when a flightplan
-tree stranded, and both were silent, so nothing surfaced.
+Preserve one reliable contract across the real workflow:
 
-Fix the two silent gates first. They prevent recurrence. Everything else is cleanup.
+1. `flightplan` writes and validates a complete task tree.
+2. `autopilot` executes only valid task states.
+3. Only a passed binary gate and rubric gate may transition a task to `done`.
+4. A run may report success only when every task in the tree is `done`.
+5. Infrastructure failures must remain attributable to their task and cause.
 
-## Scope crosses two repos
+The implementation must fail closed. A malformed task, lost pipeline result, or stalled tree must
+produce a non-zero command result or an autopilot escalation. It must never look like clean completion.
 
-| Repo | What lives there |
-|---|---|
-| `cc-plugins` (this repo) | the plugin source — the hook, `mark-done.ts`, `lint-task.ts`, and the handoff doc |
-| `herdr-workbench` | the stranded `docs/rust-rewrite` tree that the handoff doc describes |
+## Current state
 
-The handoff doc sits in this repo but narrates work done in `herdr-workbench`. Read a path in that doc
-as `herdr-workbench`-relative unless it names `packages/`.
+The original incident recovery is complete:
 
-## Blocking constraint — read before starting
+- `docs/flightdeck/tasks/` is fully `done`.
+- `herdr-workbench/docs/rust-rewrite/tasks/` is fully `done`.
+- The rust-rewrite flightlog records passing verdicts for `cutover/02` and `cutover/03`.
+- The orchestrator tells dev agents to leave tasks `in-progress`; only `mark-done.ts` may write `done`.
+- External-engine prompts use bounded foreground calls and a defined notification-based wait rule.
+- The wave loop reconciles a missing parallel result to its task, but it loses the original error.
 
-A `/dispatch:autopilot flightdeck` run may still be in flight. Its `wiring/01` task edits
-`packages/dispatch/skills/autopilot/references/orchestrator.md`, and later tasks edit
-`packages/dispatch/skills/autopilot/`. **Confirm that run has landed before touching
-`packages/dispatch/`:**
+The following defects remain:
 
-```bash
-rg -n "^> \*\*Status\*\*" docs/flightdeck/tasks/*/*.md | rg -v ": done"   # expect no output
-git -C . status --porcelain                                              # expect clean
+- The automatic flightplan hook does not recognize the current scaffolded Required-reading header.
+- `mark-done.ts` can tick gate checkboxes without updating Status.
+- Readiness does not reject `done` tasks with unticked gate checkboxes.
+- A resumed run cannot use its current-run `completed` array to prove whole-tree completion.
+- Pipeline and agent failures lose their original infrastructure cause.
+- The incident handoff document contains stale or incorrect claims.
+
+## Safety boundary
+
+Do not require the entire repository to be clean. Unrelated user changes may exist.
+
+Before editing a file:
+
+1. Confirm no active workflow, external delegate, or live pane is writing that file.
+2. Inspect its current diff and recent history.
+3. Preserve unrelated changes.
+
+The only product paths in this plan are:
+
+```text
+packages/dispatch/hooks/flightplan-lint.sh
+packages/dispatch/hooks/flightplan-lint.test.ts
+packages/dispatch/skills/flightplan/SKILL.md
+packages/dispatch/skills/flightplan/references/task-template.md
+packages/dispatch/skills/flightplan/scripts/lib/parse-task.ts
+packages/dispatch/skills/flightplan/scripts/lib/parse-task.test.ts
+packages/dispatch/skills/flightplan/scripts/lint-task.ts
+packages/dispatch/skills/flightplan/scripts/lint-task.test.ts
+packages/dispatch/skills/flightplan/scripts/next-ready.ts
+packages/dispatch/skills/flightplan/scripts/next-ready.test.ts
+packages/dispatch/skills/flightplan/scripts/mark-done.ts
+packages/dispatch/skills/flightplan/scripts/mark-done.test.ts
+packages/dispatch/skills/autopilot/SKILL.md
+packages/dispatch/skills/autopilot/references/orchestrator.md
+packages/dispatch/skills/autopilot/scripts/fleet.ts
+packages/dispatch/skills/autopilot/scripts/fleet.test.ts
+packages/dispatch/skills/autopilot/scripts/tree-api.ts
+packages/dispatch/skills/autopilot/scripts/tree-api.test.ts
+docs/flightdeck/tasks/_context/data-model.md
+docs/handoff-mark-done-silent-strand.md
 ```
 
-Items 1, 2, 5, and 6 touch `packages/dispatch/`. Item 4 is in another repo and item 3 is docs-only, so
-both can proceed regardless.
+Do not modify `herdr-workbench`. Its recovery is evidence for this plan, not remaining work.
 
-> **Checked 2026-08-01: the run has NOT landed.** Four tasks are still open — `ui/03-agent-fleet`
-> (`in-progress`), `ui/04-dependency-graph`, `wiring/03-fixture-flight`, and `wiring/04-final-review`
-> (all `todo`). The tree is dirty under `packages/dispatch/skills/autopilot/dashboard/dist/`.
->
-> So **items 1, 2, 5, and 6 are blocked right now.** Item 6 is the sharpest conflict: it edits
-> `orchestrator.md`, the same file `wiring/01` owns. Do items 3 and 4 first, or wait for the run.
-> Re-run the two commands above before starting anything under `packages/dispatch/`.
+## Implementation plan
 
----
+### 1. Repair the flightplan hook contract
 
-## 1. `flightplan-lint.sh` never runs — fix the content sniff
+`flightplan` currently scaffolds this header:
 
-**Severity: highest.** This is dead code across every flightplan tree and every harness.
-
-`packages/dispatch/hooks/flightplan-lint.sh:31` is gate 2 of 2:
-
-```bash
-if ! grep -q "^> \*\*Required reading\*\*:" "$file_path" 2>/dev/null; then
-  exit 0
-fi
-```
-
-The pattern demands a colon immediately after `**`. Every file `flightplan` scaffolds writes:
-
-```
+```markdown
 > **Required reading** (read before starting; do not need to open other files):
 ```
 
-Measured, not inferred:
+The hook only recognizes a colon immediately after `**Required reading**`, so it silently skips every
+current task file.
 
-| Tree | Task files | Pass gate 2 |
-|---|---|---|
-| `cc-plugins` `docs/*/tasks/` (7 trees) | 65 | **0** |
-| `herdr-workbench` `docs/rust-rewrite/tasks/` | 30 | **0** |
+Change the content signature to accept the current annotated header and the legacy colon header. Keep
+the signature narrow enough to reject near misses such as `**Required reading later**`.
 
-The hook clears its path filter, then exits 0 at the sniff for all 95 files. `lint-task.ts` behind it
-is unreachable.
+Update the flightplan skill text so its documented hook signature matches the supported formats.
+Add the bare-Status rule to the task template. A Status value must be exactly `todo`, `in-progress`,
+`done`, or `blocked`. Put run notes on a separate line.
 
-This matters because `lint-task.ts` **does** catch the defect in item 2. Verified on a fixture: given
-`> **Status**: in-progress (attempt 3)` it reports `[status] Status missing or not one of
-todo/in-progress/done/blocked` and exits 1. The detector worked. The gate in front of it never opened.
+This hook only observes harness `Edit|Write` calls. It cannot observe files written by external CLIs,
+relay, or Bash. Keep it as early feedback for flightplan authors. Items 2–5 provide the fail-closed
+execution boundary. Also require the external-engine dev driver to run `lint-task.ts <task-file>` after
+the delegate returns and before the binary gate starts.
 
-### Do
+Tests must cover:
 
-1. Drop the trailing colon from the pattern so it matches the marker regardless of what follows.
-2. Add a case to `packages/dispatch/hooks/flightplan-lint.test.ts` using a **real** scaffolded header —
-   copy the exact line from a live task file, do not hand-write a simplified one. A test that asserts
-   against an invented header is what let this survive.
-3. Re-measure. Expect 65 of 65 to pass gate 2 in this repo.
+- A current scaffolded header invokes lint.
+- A legacy colon header invokes lint.
+- An unrelated Markdown file remains a silent no-op.
+- A near-miss marker remains a silent no-op.
+- A malformed task under the current header exits `2` with lint feedback.
 
-### Verify
+Verify:
 
 ```bash
 bun test packages/dispatch/hooks/flightplan-lint.test.ts
-rg -l '^> \*\*Required reading\*\*' docs/*/tasks/*/[0-9][0-9]-*.md | wc -l   # expect 65
+bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/flightdeck/tasks
 ```
 
----
+### 2. Make `mark-done.ts` atomic and fail loud
 
-## 2. `mark-done.ts` silently skips a decorated Status line
+Treat `markDone(content)` as one state transition. It may update Status and gate checkboxes together,
+or it may fail without producing partial output.
 
-`packages/dispatch/skills/flightplan/scripts/mark-done.ts:41`:
+Required behaviour:
 
-```js
-const status = /^(>\s*\*\*Status\*\*\s*:\s*)([A-Za-z-]+)\s*$/.exec(line);
-```
+- Accept only the four bare Status values defined by the shared parser.
+- Reject a decorated value such as `in-progress (attempt 3)`.
+- Locate Status only in the header blockquote before the first `##` heading.
+- Require exactly one valid Status header in that scope.
+- Throw when the Status header is missing, duplicated, or malformed.
+- Do not return content with ticked gate boxes after any validation failure.
+- Keep the pure function idempotent.
+- Make the CLI name the task file on stderr and exit non-zero on failure.
+- Leave the original file unchanged when the CLI fails.
+- Reuse the parser's Status rule. Do not maintain a second set of accepted values.
 
-`[A-Za-z-]+` is anchored to end-of-line, so the value must be a bare token. A dev agent that wrote
-`> **Status**: in-progress (attempt 3)` made the match fail. The script then left the Status line
-untouched, ticked every gate checkbox anyway, and **exited 0**.
+Use a validation pass before the rewrite pass. Do not write the file until `markDone()` returns.
 
-The consequence is not cosmetic. `next-ready.ts` derives the ready set from Status, so a task that
-passed its rubric still read as unfinished, its dependents stayed blocked, and the wave loop exited on
-an empty ready set — reporting a clean successful run with 6 of 15 tasks never started.
+Tests must cover:
 
-Its fingerprint: **every checkbox ticked, Status unchanged.**
+- `todo`, `in-progress`, `blocked`, and `done`.
+- A decorated Status value that fails without changing content.
+- A missing Status header.
+- Duplicate Status headers.
+- A Status example in the body that does not count as a duplicate header.
+- Gate and non-gate checkboxes.
+- Idempotence.
+- CLI success.
+- CLI failure with byte-for-byte unchanged input.
 
-### Design constraints — do not skip these
-
-Two traps, both surfaced in review of the handoff doc:
-
-- **`markDone` is a single forward pass, and the Status line precedes the gate sections.** So "also skip
-  the checkbox pass when the Status never matched" is not a small edit. It needs a pre-validation pass
-  over the lines, or buffered writes. Decide which before coding.
-- **Exiting non-zero when no Status line matched changes behaviour for a file that has no Status line at
-  all.** `mark-done.test.ts` covers idempotence only for files that have one. Decide explicitly whether
-  a missing Status line is an error or a no-op, and add the test either way.
-
-### Do
-
-1. Match the status token leniently — capture the leading word, allow trailing text.
-2. Fail loudly when no Status line matched at all: non-zero exit plus a message naming the file.
-3. Resolve both design constraints above, with a test for each.
-4. Keep `markDone` pure and idempotent; that contract is documented at `mark-done.ts:22-25`.
-
-### Verify
+Verify:
 
 ```bash
 bun test packages/dispatch/skills/flightplan/scripts/mark-done.test.ts
 ```
 
-Plus a fixture round-trip: a file with `> **Status**: in-progress (attempt 3)` must come out `done`, and
-a file with no Status line must produce the decided behaviour, not a silent pass.
+### 3. Put execution validity beside the shared task parser
 
----
+A dependency is satisfied only by a valid completed task. The invalid fingerprint is:
 
-## 3. Correct the handoff document
-
-`docs/handoff-mark-done-silent-strand.md`. Its core diagnosis is right and reproduces exactly. Seven
-defects, most severe first:
-
-| # | Line | Defect | Correct fact |
-|---|---|---|---|
-| 1 | 133–135 | Claims the hook filters on path and marker, "**both of which the failing files satisfied**", and that the detector "already works" | 0 of 30 files satisfied gate 2. The hook is dead for all of them. §C's conclusion survives; its stated reason does not. Rewrite the section, and note the hook as its own defect |
-| 2 | 178 | Path `packages/dispatch/hooks/flightplan-lint.ts` | The file is `flightplan-lint.sh`. (`flightplan-lint.test.ts` on 179 is correct) |
-| 3 | 61 | "31 tasks" | 30. The `_context/` directory holds 4 non-task files, the likely source of the miscount |
-| 4 | 65 | The `picker/01` status string appears in no commit on any branch; the file is now `done` | Mark it as reconstructed. Its context corroborates it, but the table presents it with the same authority as the fully reproducible `cutover/01` row |
-| 5 | 103–104 | "Also skip the checkbox pass in that case" | Not achievable as a small edit — see the single-forward-pass constraint in item 2 |
-| 6 | 102 | Proposes exiting non-zero with no Status line matched | Unstated new failure mode for files with no Status line at all — see item 2 |
-| 7 | 6 vs 79 | "twice in one autopilot run" against "cost a whole extra autopilot run" | Internally inconsistent. Not resolvable from the append-only `run.jsonl`; pick one and say which is uncertain |
-
-Do this **after** items 1 and 2, so §C can describe the fixed hook rather than the broken one.
-
----
-
-## 4. Unstrand the `rust-rewrite` tree (`herdr-workbench`)
-
-Current state:
-
-```
-cutover/02-docs.md:9   > **Status**: in-progress
-cutover/03-final-review.md:9   > **Status**: todo
+```text
+Status: done + any unticked checkbox in Acceptance criteria or Verification
 ```
 
-`cutover/02` reads a **bare** `in-progress`, so this is **not** the item-2 defect. It is an interrupted
-run — `next-ready` only offers `todo`, so nothing is ready and the final review can never start.
+Implement one shared validation function beside `parseTask()`. Do not duplicate Markdown section
+parsing in `lint-task.ts` and `next-ready.ts`. Do not add a required `ParsedTask` field unless every
+typed consumer and fixture is updated and type-checked.
 
-### Do
+The shared result must let consumers distinguish:
 
-1. Establish whether `cutover/02` actually completed. Check its gate checkboxes and the flightlog, not
-   its Status line.
-2. Set it to `done` if it passed, `todo` if it did not.
-3. Re-run autopilot so `cutover/03`, the Final review, can close the tree.
+- structurally valid and unfinished;
+- structurally valid and completed;
+- malformed completion state.
 
-### Verify
+Then enforce it in both consumers:
+
+- `lint-task.ts` reports a `completion-state` violation.
+- `next-ready.ts` exits non-zero instead of unlocking dependents or returning an empty ready set.
+- A parsed task with `status === null` is invalid and makes readiness exit non-zero.
+- `fleet.ts` derives malformed completion as `invalid`, never `done`.
+- A dashboard dependency on an invalid task remains `blocked` and lists that ref in `blockedBy`.
+- `tree-api.ts` includes `invalid` in its counts instead of presenting the tree as complete.
+- `data-model.md` records the same precedence before the ordinary `done` rule.
+
+Apply the invariant only to checkboxes inside `## Acceptance criteria` and `## Verification`.
+Unchecked boxes in other sections remain valid.
+
+Tests must cover:
+
+- `done` with all gate boxes checked.
+- `done` with an unchecked acceptance box.
+- `done` with an unchecked verification box.
+- `done` with an unchecked non-gate box.
+- A dependent task is never returned when its dependency has malformed completion state.
+- CLI `--json` fails loudly on malformed completion state.
+- A decorated or unknown Status fails readiness instead of disappearing from the graph.
+- Dashboard state and counts expose malformed completion as invalid.
+- Dashboard dependents remain blocked by an invalid task.
+
+The `completion-state` message must instruct the executor to reset Status to `in-progress` or `todo`
+and rerun the gates. It must explicitly forbid manually checking the boxes.
+
+Verify:
 
 ```bash
-cd /Users/funnyq/Projects/q-lab/herdr-workbench
-bun <scripts>/next-ready.ts docs/rust-rewrite/tasks --json    # expect a non-empty array
+bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts
+bun test packages/dispatch/skills/flightplan/scripts/next-ready.test.ts
+bun test packages/dispatch/skills/flightplan/scripts/lib/parse-task.test.ts
+bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts
+bun test packages/dispatch/skills/autopilot/scripts/tree-api.test.ts
 ```
 
----
+### 4. Make whole-tree completion resume-safe
 
-## 5. Deferred from the flightdeck runs
+The current-run `completed` array is not a tree completion count. A resumed autopilot run excludes
+tasks completed by earlier runs, so comparing `completed.length` with tree size is incorrect.
 
-Both were held back to keep the pending final-review diff clean. Neither is urgent; both are real.
+Extend the readiness scout output, or add a sibling script mode, to return one authoritative snapshot:
 
-- **Global "never touch another task's files" rule.** Currently only in
-  `docs/flightdeck/tasks/_context/shared.md`, so it protects one tree. It belongs in
-  `packages/dispatch/skills/autopilot/references/orchestrator.md` where every flight inherits it. Written
-  after a dev driver ran `rm -rf` on a sibling task's verified, uncommitted work.
-- **A completeness check in the wave loop.** The loop exits when nothing is ready and cannot distinguish
-  *drained* from *stalled*. Compare `completed.length` against the tree size before returning success,
-  and report a stall as an escalation. This is what would have caught item 2 on the day.
-
----
-
-## 6. External-engine drivers improvise their own wait, and one improvisation stalls the run
-
-**This item does not fit the "silent success" shape of items 1, 2, and 5.** It is the mirror image: a
-gate that **silently stalls** instead of falsely passing. It is filed here because it was found in the
-same investigation and lands in the same file as item 5.
-
-### What happened
-
-The `review:codex` lens agent (Haiku, run `wf_8b109c9b-5c1`, agent `a5e4e7291bedf6925`) ran the wrapper
-its prompt told it to run:
-
-```bash
-bun <scripts>/codex-run.ts review --prompt-file <file>
-```
-
-That invocation took about nine minutes. The Bash tool's **default timeout is 120 s**, so the harness
-moved it to the background and returned:
-
-```
-Command did not complete within its 120s timeout and was moved to the background (ID: bqfbuv7je).
-```
-
-The agent then invented a completion sentinel and polled for it:
-
-```bash
-until [ -f .../tasks/bqfbuv7je.output.done ]; do sleep 2; done && cat .../bqfbuv7je.output
-```
-
-This harness has no `.done` convention. A background task signals completion through a
-task-notification, and the result lands at `<id>.output` with no marker file. The loop therefore spun
-from 17:16:47Z until it was unblocked by hand at 17:25:2xZ — about nine minutes of dead time on the
-Final review gate.
-
-### Correct two claims before acting on this
-
-Both are easy to overstate, and the record does not support either:
-
-- **The agent did not choose to background the command.** `run_in_background` was unset on that call.
-  It ran the wrapper in the foreground, exactly as instructed. The *harness* backgrounded it on the
-  120 s timeout. So "run it in the foreground, never background it" would not have prevented this — the
-  agent was already doing that.
-- **The loop was not an infinite hang.** The poll ran with `timeout: 600000`, the Bash tool's maximum.
-  It was roughly 80 seconds from expiring on its own when it was unblocked. The failure mode is a
-  ten-minute stall and a probable retry, not a permanent one.
-
-### The real defect is systemic, not one bad agent
-
-Auto-backgrounding is common, and every agent improvises its own recovery:
-
-| Run | Agents hitting auto-background |
-|---|---|
-| `wf_da653b70-a50` | 5 of 122 |
-| `wf_2f20905e-012` | 4 of 77 |
-| `wf_8b109c9b-5c1` | 2 of 15 |
-
-Recovery patterns observed across those 11 agents: `while true`, `while sleep 5`,
-`while [ $count -lt 120 ]`, `while [ ! -s <output> ]`, `until [ -f <output>.done ]`, `tail -f <output>`,
-and a plain `cat`. Only one invented the `.done` sentinel. But `tail -f` never exits either, and
-`while [ ! -s ... ]` is the only one that polls something real. Nothing in any prompt says what the
-contract is, so each agent guesses.
-
-### The relay branch is worse, and cannot be fixed the same way
-
-`devExternalPrompt`'s live branch runs relay with `--wait-timeout 900000` — fifteen minutes. The Bash
-tool's **maximum** timeout is 600 000 ms. So a full-length relay wait **cannot** be held in the
-foreground at all; it will always be backgrounded. For that branch, raising the timeout is not
-available and the recovery contract is the only fix.
-
-### Do
-
-1. Set an explicit `timeout` on the wrapper call in both external-engine prompts in
-   `packages/dispatch/skills/autopilot/references/orchestrator.md` — `devExternalPrompt` and the
-   `lens.external` branch of `reviewPrompt`. Use `600000`, the maximum. This removes the trigger for the
-   headless path, where a nine-minute review fits inside ten minutes.
-2. State the recovery contract in both prompts, for when backgrounding happens anyway. Name it exactly:
-   the result lands at `<id>.output`; **there is no sentinel file**; a task-notification fires on
-   completion. Tell the agent to poll the output file for content — `while [ ! -s <output> ]` — and
-   never to wait on a marker it has not seen created.
-3. Name the hazard explicitly. A negative instruction is justified here: a self-invented sentinel never
-   appears, and the agent burns its whole timeout window.
-4. Apply the same wording to the relay branch, where step 1 cannot help.
-
-### Verify
-
-Grep the two prompts for an explicit timeout and for the sentinel warning. Then re-run a flight with an
-external engine and confirm no agent issues a `until [ -f ... ]` or `tail -f` against a task output
-file.
-
-### On a code-level guard
-
-**The prompt fix alone is not enough, and one small code change is worth building.** Have `codex-run.ts`
-and `opencode-run.ts` print a start banner immediately and flush it. Today they print nothing until the
-CLI returns, so a driver watching `<id>.output` sees an empty file and cannot tell "still working" from
-"died". A first line written at t=0 makes `while [ ! -s <output> ]` unsafe as a completion test and makes
-progress visible, so pair it with a distinct end marker the driver can poll for.
-
-That is the one guard I would build. I would **not** add stall detection to the orchestrator for this:
-the Bash timeout already bounds the damage at ten minutes, and item 5's completeness check is the
-cheaper way to catch a run that ended wrong.
-
----
-
-## 7. A task whose pipeline throws vanishes from the run
-
-**Severity: highest of the orchestrator items.** Observed live in run 4, on the Final review task.
-
-`references/orchestrator.md`, wave loop:
-
-```js
-const results = (await parallel(fresh.map(item => () => executeTask(item)))).filter(Boolean)
-...
-if (!results.some(r => r.passed)) break
-```
-
-`parallel()` converts a thrown thunk into `null`. `.filter(Boolean)` then **discards it**. So a task
-whose pipeline throws is neither pushed to `completed` nor to `escalations` — it disappears. The loop
-then sees no passing result and breaks, and the run returns `{completed: [...], escalations: []}`: a
-clean success.
-
-What triggered it: `wiring/04`'s verify agent ended without calling `StructuredOutput`, so `agent()`
-threw. The Final review had already done its real work — all five lenses fired, codex ran, the fixer
-applied 4 codex defects plus quality findings and committed them — but the round was never graded. The
-task was left at `in-progress`, and only a manual count of `done` tasks against the tree size revealed
-it.
-
-### Do
-
-1. Stop discarding nulls. Zip the results back against `fresh` by index so a dropped entry is
-   attributable to its task.
-2. Record a null result as an escalation with a reason naming the thrown error, and park the task.
-3. Keep `.filter(Boolean)` out of the path entirely, or apply it only after the escalation bookkeeping.
-
-### Verify
-
-Force a throw in one task's pipeline in a scratch tree. The run must return that task in `escalations`,
-and its file must read `blocked`.
-
----
-
-## 8. An agent that dies is recorded as a failed verification
-
-Same wave loop, per-task pipeline:
-
-```js
-const gate = await agent(verifyPrompt(ref, path), {...})
-if (!gate || !gate.passed) {
-  feedback = `Binary gate failed (verification/acceptance):\n${gate?.summary ?? 'no output'}`
-  continue
+```json
+{
+  "ready": [],
+  "counts": {
+    "total": 0,
+    "todo": 0,
+    "inProgress": 0,
+    "done": 0,
+    "blocked": 0,
+    "invalid": 0
+  }
 }
 ```
 
-`!gate` (the agent died and returned nothing) and `gate.passed === false` (the code genuinely failed
-verification) collapse into one branch with one message.
+Use the shared parser from item 3. Do not let the orchestrator count task files or parse Markdown.
 
-Observed in run 3: an Anthropic session limit killed all three `verify:ui/04` agents. The recorded
-escalation reason read `Binary gate failed (verification/acceptance): no output`, which says the code
-failed. It had not been checked at all. The loop then spent the remaining two attempts re-running a dev
-step that was never the problem — each hitting the same limit.
+Wave-loop termination rules:
 
-### Do
+- `done === total` means clean completion.
+- `total` must equal the sum of every status bucket.
+- `invalid > 0` is a scout failure that lists the invalid task refs.
+- A non-empty ready set starts the next wave.
+- An empty ready set with unfinished tasks means stalled.
+- A stalled run returns an escalation containing the remaining status counts and task refs.
+- A malformed tree remains a scout failure.
+- Existing `done` tasks count toward completion during resume.
 
-1. Branch on `!gate` separately from `gate.passed === false`.
-2. On a null gate, park the task as **infrastructure-blocked** with the underlying error, and do not
-   consume an attempt.
-3. Use wording that cannot be read as a quality verdict.
+Keep the current `next-ready.ts --json` interface compatible if another consumer relies on its array
+shape. Prefer a new flag or a separate summary function over an unannounced breaking change.
 
-### Verify
+Tests must cover:
 
-Simulate a null gate return. The task must not burn its attempt budget, and its escalation reason must
-name the infrastructure cause rather than verification.
+- A fresh tree.
+- A fully completed tree.
+- A resumed tree containing earlier `done` tasks.
+- A stale `in-progress` task with no ready work.
+- A blocked dependency chain.
+- A mixed tree where independent ready work may continue.
+- A malformed Status counted as invalid and rejected.
 
----
-
-## 9. Guard against a hand-written `done`
-
-Run 3 left `ui/04` reading `> **Status**: done` with **16 unticked checkboxes**. `mark-done.ts` cannot
-produce that state — it ticks every gate checkbox in the same pass that sets the status — so a dev agent
-wrote it by hand. The task had never passed a binary gate or a rubric judge; all three of its verify
-agents had died. `next-ready.ts` reads only the Status line, so it promptly offered the dependent task
-as ready.
-
-The two failure modes are mirror images, and the checkbox state tells them apart:
-
-| Fingerprint | Meaning |
-|---|---|
-| all boxes ticked, Status **not** `done` | `mark-done.ts` regex missed — item 2 |
-| Status `done`, boxes **unticked** | an agent hand-wrote the status; no gate ran |
-
-### Do
-
-1. Add the invariant to `lint-task.ts`: a task at `done` with any unticked box in `## Acceptance
-   criteria` or `## Verification` is malformed.
-2. State in the orchestrator's dev prompts that only `mark-done.ts` may write `done`. A dev agent sets
-   `in-progress` and nothing else.
-
-### Verify
+Verify:
 
 ```bash
-for f in $(rg -l '^> \*\*Status\*\*: done' docs/*/tasks/*/[0-9][0-9]-*.md); do
-  n=$(rg -c '^- \[ \]' "$f" || echo 0); [ "$n" != "0" ] && echo "$f: $n unticked"
-done
+bun test packages/dispatch/skills/flightplan/scripts/next-ready.test.ts
 ```
 
-Expect no output. This is worth running as a pre-flight check on any tree before resuming a run.
+Use unit tests for the snapshot function. Verify the Markdown orchestrator with a disposable fixture
+tree under a session-created temporary directory. Before running it, record the exact expected result
+for a resumed tree and the exact escalation fields for a stale `in-progress` tree. Do not reuse or
+modify the completed flightdeck tree.
 
----
+### 5. Preserve infrastructure failures through the task pipeline
 
-## Suggested order
+Do not depend on `parallel()` returning an error object. Wrap each task thunk before passing it to
+`parallel()` so the task ref and thrown error survive:
 
-While the flightdeck run is still open, only items 3 and 4 can start. Everything else waits.
+```js
+async () => {
+  try {
+    return await executeTask(item)
+  } catch (error) {
+    const parked = await tryParkBlocked(item, error)
+    return infrastructureFailure(item.ref, error, parked)
+  }
+}
+```
 
-1. Item 4 — unstrand `rust-rewrite`. Another repo; unblocked now.
-2. Item 3 — correct the doc. Docs-only; unblocked now. Do it after item 1 if you can wait, so §C can
-   describe the fixed hook rather than the broken one.
-3. Item 1 — the hook. One line plus a test; unblocks the detector for every future run.
-4. Item 2 — `mark-done.ts`. Needs the two design decisions made first.
-5. Item 9 — the hand-written-`done` guard. Extends `lint-task.ts`, which item 1 just made reachable.
-6. Items 7 and 8 — the two wave-loop reporting defects. Both in the same function; do them together.
-   Item 7 first: a run that silently drops a task is worse than one that mislabels why it failed.
-7. Item 6 — the external-engine wait contract. Same file as item 5, so do them together.
-8. Item 5 — the two deferred orchestrator changes.
+Use one explicit infrastructure-failure result shape. Reconcile every input task by index or task ref.
+Do not use `.filter(Boolean)` before reconciliation. Ensure the result-processing loop handles a null
+defensively without reading `r.passed`.
 
-## What is already done
+Handle agent failures separately from quality failures:
 
-- Both stranded flightdeck tasks corrected to `done` (commit `7792026`).
-- `docs/flightdeck/tasks/_context/shared.md` gained the bare-Status rule and the no-delete rule.
-- `docs/flightdeck/tasks/server/01-static-serving.md` verification rescoped off a sibling task's output.
-- `ui/04` reset from a hand-written `done` back to `todo`, then re-run and genuinely passed (item 9).
-- `wiring/04` reset from the `in-progress` that item 7 stranded it at, and re-run for a graded verdict.
-- Nine cockpit decision-trail entries recorded across the defect families.
+- A verifier returning `passed: false` is a quality failure and may retry the dev loop.
+- A verifier returning no structured result is an infrastructure failure.
+- A judge returning no structured result is an infrastructure failure.
+- A thrown task pipeline is an infrastructure failure.
+- Infrastructure failure parks the task and returns an escalation immediately.
+- Catch wrappers must attempt `markBlockedPrompt`; record whether parking succeeded.
+- The escalation must say that verification did not run or did not return a verdict.
+- Do not rerun dev after an infrastructure failure in the same autopilot invocation.
+- Record the current attempt for audit purposes. Do not claim that no compute was consumed.
+
+If the harness exposes no original cause for a null agent result, report that limitation precisely.
+Do not invent an error message.
+
+Tests or a deterministic workflow fixture must cover:
+
+- A task pipeline throw.
+- A null verifier result.
+- A genuine failed verifier result.
+- A null judge result.
+- A parallel wave where one task passes and one infrastructure-fails.
+- No incomplete task disappears from both `completed` and `escalations`.
+
+Treat the post-judge transition as another infrastructure boundary. Give `markDonePrompt` a structured
+result such as `{ ok, status, error }`. Require it to run `mark-done.ts`, reread the task, and confirm a
+bare `Status: done`. Add the task to `completed` only after that result passes. Otherwise park and
+escalate it; never return both completion and stall records for the same task.
+
+Verify that the returned escalation names the task and available cause, and that the task is parked as
+`blocked`.
+
+### 6. Align the autopilot contract and incident record
+
+After items 1–5 pass:
+
+1. Update `packages/dispatch/skills/autopilot/SKILL.md` with the new scout result and termination rules.
+2. Update `docs/handoff-mark-done-silent-strand.md` with verified facts only.
+3. Mark reconstructed evidence as reconstructed.
+4. Correct stale next-ready line references, the task count, and the hook-marker diagnosis.
+5. Remove the old suggestion that checkbox updates can be skipped inside the existing single pass.
+6. State that rust-rewrite recovery is complete and retain its passing verdicts as evidence.
+
+Verify documentation claims against current source and flightlogs with `rg`. Do not retain fixed line
+numbers unless they still resolve after the implementation.
+
+## Required execution order
+
+Run the items in dependency order:
+
+```text
+hook contract ───────────────┐
+                            ├─> documentation alignment
+atomic mark-done ────────────┤
+                            │
+shared completion validity ─┼─> resume-safe tree completion ─> orchestrator termination
+                            │
+infrastructure preservation ┘
+```
+
+Items 1 and 2 may run independently. Item 3 must precede item 4. Implement item 4 before item 5 because
+both change the wave-loop contract. Item 6 runs last.
+
+## Final verification
+
+Run focused tests first, then the dispatch package suite:
+
+```bash
+bun test packages/dispatch/hooks/flightplan-lint.test.ts
+bun test packages/dispatch/skills/flightplan/scripts/mark-done.test.ts
+bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts
+bun test packages/dispatch/skills/flightplan/scripts/next-ready.test.ts
+bun test packages/dispatch/skills/flightplan/scripts/lib/parse-task.test.ts
+bun test packages/dispatch
+```
+
+Then run these artifact checks:
+
+```bash
+bun packages/dispatch/skills/flightplan/scripts/lint-task.ts docs/flightdeck/tasks
+bun packages/dispatch/skills/flightplan/scripts/next-ready.ts docs/flightdeck/tasks --summary
+```
+
+Expected result:
+
+- All tests pass.
+- The flightdeck tree lints cleanly.
+- The completed flightdeck tree reports no ready tasks and an all-done summary.
+- A scratch malformed-completion fixture fails lint and readiness.
+- A scratch stalled tree returns an autopilot escalation.
+- A scratch resumed tree completes without a false stall.
+
+## Out of scope
+
+- Re-running the completed flightdeck or rust-rewrite plans.
+- Changing scoring arithmetic or rubric thresholds.
+- Changing dev, reviewer, or judge model policy.
+- Adding worktree isolation to individual agents.
+- Changing dashboard layout or visual design; task-state consistency is in scope.
+- Replacing the existing external-engine wait design unless a new reproduction shows it still fails.

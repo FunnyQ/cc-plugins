@@ -10,3 +10,4 @@ node_modules/
 
 # impeccable per-directory hook cache (generated, not source)
 **/.impeccable/hook.cache.json
+.handoffs/
