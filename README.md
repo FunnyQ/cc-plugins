@@ -8,12 +8,13 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 
 ## Plugins
 
-**monitor** bundles two skills:
+**monitor** bundles three skills:
 
 | Skill | Description |
 |-------|-------------|
 | [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
 | [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
+| [install](./packages/monitor/skills/install) | One-stop prerequisite check and statusline wiring for the whole plugin, command-triggered |
 
 **dispatch** bundles four skills:
 
@@ -65,6 +66,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 ```bash
 claude plugins marketplace add FunnyQ/cc-plugins
 claude plugins install monitor@q-lab-marketplace
+# Any of these plugin ids works: monitor, dispatch, relay, chronicle, herdr
 ```
 
 ### TUI
@@ -72,7 +74,7 @@ claude plugins install monitor@q-lab-marketplace
 1. Open Claude Code
 2. Type `/plugins` to open the plugin manager
 3. Select **Add Marketplace** → enter `FunnyQ/cc-plugins`
-4. Select **Install Plugin** → choose `monitor`
+4. Select **Install Plugin** → choose the plugin you want
 
 The usage-dashboard skill runs a prerequisite check automatically before launching the dashboard, so there's no manual setup step. If something is missing, the hint is surfaced in the terminal. The most common case is `stats-cache.json` not existing yet; run `/stats` once in Claude Code to seed it.
 
@@ -84,11 +86,12 @@ bun $CLAUDE_PLUGIN_ROOT/skills/install/scripts/install.ts
 
 ## Codex Installation
 
-Codex reads this marketplace from `.agents/plugins/marketplace.json`. The Codex marketplace entry installs `monitor` (both skills).
+Codex reads this marketplace from `.agents/plugins/marketplace.json`. The registry lists all five plugins, and each is installed by id.
 
 ```bash
 codex plugin marketplace add FunnyQ/cc-plugins
 codex plugin add monitor@q-lab-marketplace
+# Any of these plugin ids works: monitor, dispatch, relay, chronicle, herdr
 ```
 
 Check the install:

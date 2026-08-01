@@ -6,7 +6,7 @@
 >
 > **Depends on**: readme/01
 > **Blocks**: integration/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -68,24 +68,24 @@ list one. Those are correct. Do not touch them.
 
 ## Acceptance criteria
 
-- [ ] The `## Claude Code Installation` section names all five plugin ids.
-- [ ] The `## Codex Installation` section names all five plugin ids.
-- [ ] The Claude `### TUI` step 4 no longer presents `monitor` as the only installable plugin.
-- [ ] The Codex opening sentence no longer claims the entry installs `monitor` (both skills).
-- [ ] `README.md` contains no occurrence of the string `bundles two skills`.
-- [ ] The monitor skill table has three rows — `usage-dashboard`, `cockpit`, `install`.
-- [ ] The `install` row links to `./packages/monitor/skills/install`.
-- [ ] No file other than `README.md` is modified.
+- [x] The `## Claude Code Installation` section names all five plugin ids.
+- [x] The `## Codex Installation` section names all five plugin ids.
+- [x] The Claude `### TUI` step 4 no longer presents `monitor` as the only installable plugin.
+- [x] The Codex opening sentence no longer claims the entry installs `monitor` (both skills).
+- [x] `README.md` contains no occurrence of the string `bundles two skills`.
+- [x] The monitor skill table has three rows — `usage-dashboard`, `cockpit`, `install`.
+- [x] The `install` row links to `./packages/monitor/skills/install`.
+- [x] No file other than `README.md` is modified.
 
 ## Verification
 
-- [ ] Run `grep -c 'bundles two skills' README.md` — expect `0` (grep exits 1 on no match; that is the
+- [x] Run `grep -c 'bundles two skills' README.md` — expect `0` (grep exits 1 on no match; that is the
       pass).
-- [ ] Run `grep -n 'monitor\|dispatch\|relay\|chronicle\|herdr' README.md | sed -n '1,40p'` and confirm
+- [x] Run `grep -n 'monitor\|dispatch\|relay\|chronicle\|herdr' README.md | sed -n '1,40p'` and confirm
       by eye that both installation sections list all five ids. Quote the relevant lines.
-- [ ] Run `grep -n 'packages/monitor/skills/install' README.md` — expect at least one match inside the
+- [x] Run `grep -n 'packages/monitor/skills/install' README.md` — expect at least one match inside the
       monitor skill table.
-- [ ] Run `git status --short` — expect `README.md` as the only modified path.
+- [x] Run `git status --short` — expect `README.md` as the only modified path.
 
 ## Eval rubric
 
