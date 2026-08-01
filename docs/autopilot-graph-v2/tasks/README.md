@@ -60,12 +60,12 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 | Bucket | NN | Title | Status | Pass line | Depends on |
 |---|---|---|---|---|---|
 | integration | 01 | final review | todo | > 4 | lint/03, orchestrator/05 |
-| lint | 01 | test-runner detection and the final-review regression-net rule | todo | > 4 | — |
-| lint | 02 | informational test-path report | todo | > 4 | lint/01 |
+| lint | 01 | test-runner detection and the final-review regression-net rule | done | > 4 | — |
+| lint | 02 | informational test-path report | done | > 4 | lint/01 |
 | lint | 03 | template guidance and the existing-tree sweep | todo | > 4 | lint/01, lint/02 |
-| orchestrator | 01 | give the commit step its own agent | todo | > 4 | — |
-| orchestrator | 02 | the scout transcribes, the script interprets | todo | > 4 | orchestrator/01 |
-| orchestrator | 03 | cross-attempt retry history | todo | > 4 | orchestrator/02 |
+| orchestrator | 01 | give the commit step its own agent | done | > 4 | — |
+| orchestrator | 02 | the scout transcribes, the script interprets | done | > 4 | orchestrator/01 |
+| orchestrator | 03 | cross-attempt retry history | in-progress | > 4 | orchestrator/02 |
 | orchestrator | 04 | an opt-in vendor-switch last rung | todo | > 4 | orchestrator/03 |
 | orchestrator | 05 | budget floor | todo | > 4 | orchestrator/04 |
 
@@ -123,9 +123,20 @@ Recorded deliberately. None blocks execution; each is a limit the executor shoul
    ready dependents idle; if it is ever built, "commit once at the end" is the commit point, and
    `Promise.race` must first be proven inside the Workflow runtime.
 
+The existing-tree sweep found failures; see the "Sweep results" table for the exact findings.
+
 ### Sweep results
 
 <!-- The existing-tree sweep records its findings here. State "no findings" explicitly if the sweep found
      nothing — a silent absence is indistinguishable from a sweep that never ran. -->
 
-_Not yet run — owned by the template-guidance-and-sweep task._
+| Tree | Exit | Finding |
+|---|---:|---|
+| `docs/autopilot-graph-v2/tasks` | 0 | — |
+| `docs/chronicle/tasks` | 0 | — |
+| `docs/cockpit-autolog/tasks` | 0 | — |
+| `docs/cockpit-thoughtful/tasks` | 1 | `[final-review-test-net] final-review-test-net: the plan's test suite runs in task(s) backend/01: bun test packages/monitor/skills/cockpit/scripts/cockpit.test.ts, but the closing final-review task (release/02) runs no tests. Add a test command to release/02's ## Verification section to gate the review's edits.` |
+| `docs/flightdeck/tasks` | 0 | — |
+| `docs/permission-relay/tasks` | 1 | `[status] Status missing or not one of todo/in-progress/done/blocked — write the value bare, with run notes on their own line` (`ui/01-permission-modal.md`, `ui/02-attention.md`, `channel/01-permission-relay.md`); `[rubric] missing ## Eval rubric section — every task must carry a graded rubric (see references/task-template.md)` (`ui/01-permission-modal.md`, `ui/02-attention.md`, `backend/02-wire-routes.md`, `backend/01-permission-broker.md`, `channel/01-permission-relay.md`); `[self-containment] body references sibling task file(s): ui/01, backend/01. Task files must be self-contained — fix one of two ways: (1) if it's a dependency, it already belongs in the Depends on header, so delete the inline pointer; (2) if the executor needs that detail, inline it here (or move it into ../_context/). Refer to the thing (the API client, the schema), not the task id.` (`channel/01-permission-relay.md`); `[final-review] no final review task — mark the closing task with > **Final review**: true in its header. It must depend (transitively) on every other task so it reviews the whole deliverable.` Because there is no closing final-review task, the linter reports no closing task ref or missing suite list. |
+| `docs/relay/tasks` | 0 | — |
+| `docs/waypoints-skill/tasks` | 0 | — |
