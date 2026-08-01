@@ -3,7 +3,12 @@
 > **Status**: ready to execute
 > **Owner**: Q
 > **Last updated**: 2026-08-01
-> **Supersedes**: the design spec at `docs/autopilot-graph/PLAN.md`, which stays as the review record.
+> **Supersedes**: an earlier design spec at `docs/autopilot-graph/PLAN.md`, since removed. Its content is
+> carried forward here; the original text is recoverable with
+> `git show a53b5de:docs/autopilot-graph/PLAN.md`. The one thing not carried forward is R4's
+> continuous-scheduling code sketch (an in-flight `Map` driven by `Promise.race`) and the observation that
+> `fleet.ts` parses a `wave` number nothing downstream reads — both concern R4, which is rejected below.
+> Start from that commit if R4 is ever revisited.
 
 ## Overview
 
