@@ -177,8 +177,8 @@ export function renderGraph(nodes, layout, opts = {}) {
   // head to the line weight made a squat triangle barely wider than the line
   // it capped, which read as a blob instead of an arrow. Length beats height
   // so the silhouette is a chevron, and the line meets it well behind the tip.
-  const arrowLength = options.fontSize * 0.7;
-  const arrowHeight = options.fontSize * 0.5;
+  const arrowLength = options.fontSize * 1.1;
+  const arrowHeight = options.fontSize * 0.75;
   const arrowDefs = edges
     ? `<defs><marker id="${ARROW_ID}" class="graph-arrow" markerUnits="userSpaceOnUse" markerWidth="${arrowLength}" markerHeight="${arrowHeight}" refX="${arrowLength}" refY="${arrowHeight / 2}" orient="auto"><path d="M 0 0 L ${arrowLength} ${arrowHeight / 2} L 0 ${arrowHeight} z" /></marker></defs>`
     : "";
