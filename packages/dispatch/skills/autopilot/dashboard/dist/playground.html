@@ -7,6 +7,20 @@
     <link rel="stylesheet" href="./style.css">
     <style>
     /* Tool chrome only. Everything inside .stage is the real dashboard CSS. */
+
+    /* The dashboard never renders a form, so style.css never had to declare a
+       scheme. This page is all sliders and colour swatches, and without this the
+       browser paints every one of them in its light default. */
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      background: var(--ground);
+      color: var(--text);
+      margin: 0;
+    }
+
     .c-playground {
       block-size: 100vh;
       display: grid;
@@ -24,6 +38,7 @@
       }
 
       > .stage {
+        background: var(--ground);
         display: grid;
         grid-template-rows: minmax(0, 1fr) auto;
         min-inline-size: 0;
