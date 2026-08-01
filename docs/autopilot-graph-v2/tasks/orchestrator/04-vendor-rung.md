@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: orchestrator/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -138,45 +138,45 @@ reporting it as the new feature working.
 
 ## Acceptance criteria
 
-- [ ] A new config field defaults to `''`, and with it unset every dev label, model choice, and cap is
+- [x] A new config field defaults to `''`, and with it unset every dev label, model choice, and cap is
       identical to current behaviour.
-- [ ] With the field set and a Claude dev engine, the effective cap is `MAX + 1` and the final attempt runs
+- [x] With the field set and a Claude dev engine, the effective cap is `MAX + 1` and the final attempt runs
       the external dev driver under a `dev-<engine>:<ref>#<attempt>` label.
-- [ ] Opus still runs as the last **Claude** rung when the field is set — the appended rung does not replace
+- [x] Opus still runs as the last **Claude** rung when the field is set — the appended rung does not replace
       it. At `MAX: 3` the ladder is sonnet, sonnet, opus, then the external engine.
-- [ ] The escalation tier keys off a separate Claude cap, not off the raised cap.
-- [ ] With `devEngine` set to an external engine, the new field is inert: the cap and every dev label match
+- [x] The escalation tier keys off a separate Claude cap, not off the raised cap.
+- [x] With `devEngine` set to an external engine, the new field is inert: the cap and every dev label match
       current behaviour exactly.
-- [ ] With `MAX: 1` and the field set, the cap is 2 — one Claude attempt, then the external rung.
-- [ ] An unrecognised value in the new field surfaces as the existing `withModel` throw, not as a later
+- [x] With `MAX: 1` and the field set, the cap is 2 — one Claude attempt, then the external rung.
+- [x] An unrecognised value in the new field surfaces as the existing `withModel` throw, not as a later
       failure inside a dev prompt.
-- [ ] A parked quality failure reports the attempt that actually ran, which may be `MAX + 1`.
-- [ ] The closing review round's cap and dispatch are unchanged.
-- [ ] The fixture can override a named config field, and throws when the named field is absent from the
+- [x] A parked quality failure reports the attempt that actually ran, which may be `MAX + 1`.
+- [x] The closing review round's cap and dispatch are unchanged.
+- [x] The fixture can override a named config field, and throws when the named field is absent from the
       script block.
-- [ ] Every change to the executable script sits inside the fenced ```` ```javascript ```` block; the only
+- [x] Every change to the executable script sits inside the fenced ```` ```javascript ```` block; the only
       edits outside it are the prose corrections listed above.
-- [ ] The external-engine gotcha in `orchestrator.md` accounts for a Claude ladder that can now end on an
+- [x] The external-engine gotcha in `orchestrator.md` accounts for a Claude ladder that can now end on an
       external engine, and the new config field's behaviour and default are documented alongside the other
       config fields.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` green.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` green — no regression in the sibling
       dashboard suites.
-- [ ] A fixture case with the new field overridden to `codex` asserts a final `dev-codex:`-prefixed label at
+- [x] A fixture case with the new field overridden to `codex` asserts a final `dev-codex:`-prefixed label at
       attempt `MAX + 1`, **and** that the attempt before it ran the Claude dev agent on the escalated model.
       Assert the Opus rung explicitly — asserting only the final label passes even when Opus was skipped.
-- [ ] A fixture case with the field left at its default asserts the dev labels and their count are identical
+- [x] A fixture case with the field left at its default asserts the dev labels and their count are identical
       to the current ladder.
-- [ ] A fixture case with an external `devEngine` and the field set asserts the dev labels and cap are
+- [x] A fixture case with an external `devEngine` and the field set asserts the dev labels and cap are
       unchanged from the external-engine ladder.
-- [ ] A fixture case asserts the config override throws when handed a field name that does not exist in the
+- [x] A fixture case asserts the config override throws when handed a field name that does not exist in the
       block.
-- [ ] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
+- [x] `bun -e "const d=await Bun.file('packages/dispatch/skills/autopilot/references/orchestrator.md').text(); const s=d.indexOf('\`\`\`javascript'); const b=d.indexOf('\n',s)+1; const e=d.indexOf('\n\`\`\`',b); new Function(d.slice(b,e).replace(/^export const meta/m,'const meta'))"`
       exits 0 — the block still parses as a function body.
-- [ ] `grep -c "lastShotEngine" packages/dispatch/skills/autopilot/references/orchestrator.md` is ≥ 3 (the
+- [x] `grep -c "lastShotEngine" packages/dispatch/skills/autopilot/references/orchestrator.md` is ≥ 3 (the
       config field, its resolution, and the dispatch branch), confirming the change landed in the script
       rather than only in prose.
 
