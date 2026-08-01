@@ -9,6 +9,7 @@ import { compareTaskOrder, escapeHtml } from "./format.js";
 // multiple of it. Change FONT_SIZE and the whole diagram rescales in
 // proportion; nothing has to be re-tuned by hand.
 const FONT_SIZE = 14;
+const ARROW_ID = "graph-arrowhead";
 
 const geometry = (fontSize) => ({
   fontSize,
@@ -128,7 +129,7 @@ export function renderGraph(nodes, layout, opts = {}) {
         const midpoint = x1 + (x2 - x1) / 2;
         const dimmed = dependency.state === "done" ? "" : " -dimmed";
         return [
-          `<polyline class="graph-edge${dimmed}" points="${x1},${y1} ${midpoint},${y1} ${midpoint},${y2} ${x2},${y2}" />`,
+          `<polyline class="graph-edge${dimmed}" marker-end="url(#${ARROW_ID})" points="${x1},${y1} ${midpoint},${y1} ${midpoint},${y2} ${x2},${y2}" />`,
         ];
       });
     })
@@ -168,6 +169,15 @@ export function renderGraph(nodes, layout, opts = {}) {
     })
     .join("");
 
+  // One shared marker, defined only when an edge references it — an unreferenced
+  // <defs> would still parse, but an empty tree should render nothing but text.
+  // markerUnits stays at strokeWidth so the head scales with the 2px edge; the
+  // size itself is another multiple of the font, like every other measurement.
+  const arrowSize = options.fontSize / 4;
+  const arrowDefs = edges
+    ? `<defs><marker id="${ARROW_ID}" class="graph-arrow" markerWidth="${arrowSize}" markerHeight="${arrowSize}" refX="${arrowSize}" refY="${arrowSize / 2}" orient="auto"><path d="M 0 0 L ${arrowSize} ${arrowSize / 2} L 0 ${arrowSize} z" /></marker></defs>`
+    : "";
+
   const empty = graphNodes.length
     ? ""
     : '<text class="graph-empty" x="50%" y="50%">No tasks in this flight tree.</text>';
@@ -176,5 +186,5 @@ export function renderGraph(nodes, layout, opts = {}) {
     : "";
   // The natural size ships with the SVG so a wide tree scrolls inside its
   // container instead of scaling every label down to unreadable.
-  return `<svg class="dependency-graph" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency graph" xmlns="http://www.w3.org/2000/svg">${edges}${renderedNodes}${cycleNote}${empty}</svg>`;
+  return `<svg class="dependency-graph" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency graph" xmlns="http://www.w3.org/2000/svg">${arrowDefs}${edges}${renderedNodes}${cycleNote}${empty}</svg>`;
 }

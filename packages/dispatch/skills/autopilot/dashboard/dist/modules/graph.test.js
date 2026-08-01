@@ -201,3 +201,35 @@ describe("graph typography", () => {
     expect(width).toBeGreaterThan(134);
   });
 });
+
+describe("edge arrows", () => {
+  const chain = [
+    makeNode("A", "chain", "01"),
+    makeNode("B", "chain", "02", ["A"]),
+  ];
+
+  test("points every edge at its dependent", () => {
+    const svg = renderGraph(chain, layoutGraph(chain));
+    const markerId = svg.match(/<marker id="([^"]+)"/)[1];
+
+    expect(svg).toContain(`marker-end="url(#${markerId})"`);
+    expect(svg).toContain('orient="auto"');
+  });
+
+  test("sizes the arrow from the same font size as everything else", () => {
+    const svg = renderGraph(chain, layoutGraph(chain), { fontSize: 28 });
+    const normal = renderGraph(chain, layoutGraph(chain));
+    const size = (markup) =>
+      Number(markup.match(/<marker[^>]*markerWidth="(\d+(?:\.\d+)?)"/)[1]);
+
+    expect(size(svg)).toBe(size(normal) * 2);
+  });
+
+  test("omits the marker definition when nothing connects", () => {
+    const lone = [makeNode("A", "chain", "01")];
+    const svg = renderGraph(lone, layoutGraph(lone));
+
+    expect(svg).not.toContain("<marker");
+    expect(svg).not.toContain("marker-end");
+  });
+});

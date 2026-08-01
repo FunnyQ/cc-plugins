@@ -330,6 +330,12 @@ button {
     opacity: 0.55;
   }
 
+  /* The marker inherits the referencing edge's opacity, so a dimmed edge gets a
+     dimmed head for free. Only the fill has to be stated. */
+  .graph-arrow > path {
+    fill: var(--text);
+  }
+
   .graph-node > rect {
     stroke-width: var(--border-width);
     transition: fill var(--motion-duration), stroke var(--motion-duration);
