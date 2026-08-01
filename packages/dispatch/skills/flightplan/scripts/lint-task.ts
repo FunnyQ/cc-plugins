@@ -62,10 +62,8 @@ const TEST_RUNNER_REGEX =
  * Backticked commands in a task's `## Verification` section that invoke a known
  * test runner. Returns the command strings as written, in document order.
  */
-export function testCommandsIn(task: ParsedTask): string[] {
-  const section = extractSection(task.body, "Verification");
-  if (section === "") return [];
-
+/** Checklist items of one section, each including its indented continuation lines. */
+function checklistItems(section: string): string[] {
   const lines = section.split("\n");
   const items: string[] = [];
   let currentItem = "";
@@ -83,7 +81,14 @@ export function testCommandsIn(task: ParsedTask): string[] {
     }
   }
   if (currentItem) items.push(currentItem);
+  return items;
+}
 
+export function testCommandsIn(task: ParsedTask): string[] {
+  const section = extractSection(task.body, "Verification");
+  if (section === "") return [];
+
+  const items = checklistItems(section);
   const commands: string[] = [];
   for (const item of items) {
     const backtickRegex = /`([^`]+)`/g;
@@ -94,6 +99,29 @@ export function testCommandsIn(task: ParsedTask): string[] {
     }
   }
   return commands;
+}
+
+// An exclusivity claim next to a `git status` check. Autopilot edits the task
+// file itself — `Status: todo → in-progress`, then mark-done ticks every gate
+// box — so "only <file> is modified" is false from the first attempt onwards.
+const EXCLUSIVITY_REGEX = /\b(only|sole|nothing else|no other)\b/i;
+
+/**
+ * Checklist items that gate scope with `git status` plus an exclusivity claim.
+ * Returns the offending items, first line only, in document order.
+ */
+export function scopeGitStatusChecks(task: ParsedTask): string[] {
+  const hits: string[] = [];
+  for (const heading of ["Acceptance criteria", "Verification"]) {
+    const section = extractSection(task.body, heading);
+    if (section === "") continue;
+    for (const item of checklistItems(section)) {
+      if (!/git status\b/.test(item)) continue;
+      if (!EXCLUSIVITY_REGEX.test(item)) continue;
+      hits.push(item.split("\n")[0].trim());
+    }
+  }
+  return hits;
 }
 
 export async function lintFile(filePath: string): Promise<Violation[]> {
@@ -204,6 +232,13 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
   }
   if (!sectionSet.has("Verification")) {
     push("sections", "missing `## Verification` section");
+  }
+
+  for (const item of scopeGitStatusChecks(task)) {
+    push(
+      "scope-git-status",
+      `a \`git status\` scope gate that claims exclusivity cannot pass under autopilot — the runner edits this very file (Status → in-progress, then mark-done ticks every gate box), and a dev agent will revert that bookkeeping to satisfy it. Judge the OTHER paths instead, e.g. "expect <file>, plus at most this task file": ${item}`,
+    );
   }
 
   // Eval rubric — mandatory and machine-parseable (strict). Acceptance criteria

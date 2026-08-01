@@ -954,3 +954,68 @@ describe("inferRefFromPath", () => {
     expect(inferRefFromPath("/abs/tasks/my-bucket/01-foo.md")).toBeNull();
   });
 });
+
+describe("scope-git-status rule", () => {
+  const withVerification = (items: string) =>
+    VALID_TASK.replace("- [ ] Run `bun test`", items);
+
+  const lintOne = async (body: string) => {
+    const root = await writeTree({ "tasks/ui/01-fixture-state-shell.md": body });
+    const violations = await lintFile(
+      join(root, "tasks/ui/01-fixture-state-shell.md"),
+    );
+    await rm(root, { recursive: true, force: true });
+    return violations;
+  };
+
+  test("flags a git status check that expects one path", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short` — expect `README.md` as the only modified path.",
+      ),
+    );
+
+    const scope = violations.find((v) => v.rule === "scope-git-status");
+    expect(scope).toBeDefined();
+    expect(scope!.detail).toContain("Status");
+  });
+
+  test("flags the same trap phrased as nothing else", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short` and confirm nothing else is modified.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
+  });
+
+  test("allows a git status check that judges the other paths", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(false);
+  });
+
+  test("ignores an exclusivity claim that has no git status command", async () => {
+    const violations = await lintOne(
+      withVerification("- [ ] Confirm `bun test` is the only suite that runs."),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(false);
+  });
+
+  test("reads the acceptance criteria section too", async () => {
+    const violations = await lintOne(
+      VALID_TASK.replace(
+        "- [ ] One",
+        "- [ ] `git status --short` shows only `README.md`.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
+  });
+});

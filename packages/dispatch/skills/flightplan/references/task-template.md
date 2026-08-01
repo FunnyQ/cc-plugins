@@ -145,9 +145,24 @@ Before finalizing a task file, verify each:
 - [ ] File paths are absolute from project root (no "in the auth folder" hand-waving).
 - [ ] Every acceptance criterion is verifiable (no "looks good").
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
+- [ ] No scope gate claims a single modified path. See "Never gate scope on `git status`" below.
 - [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
 - [ ] Nothing in this file requires opening PLAN.md or another task file to understand.
 - [ ] If duplication with `_context/` is needed for clarity, duplicate it. Don't make the executor cross-reference.
+
+## Never gate scope on `git status`
+
+Do not write an acceptance criterion or a verification step that claims one modified path:
+
+- ❌ `` Run `git status --short` — expect `README.md` as the only modified path. ``
+- ❌ `` `git status --short` shows nothing else modified. ``
+- ✅ `` Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation. ``
+
+The runner edits the task file as bookkeeping: the dev step sets `Status: in-progress`, and `mark-done.ts` ticks every `## Acceptance criteria` and `## Verification` box. So an exclusivity claim is false from the first attempt, and the binary gate reports a scope violation on work that was correct.
+
+The second failure is worse than the first. A dev agent under a failing gate reverts the runner's own `Status` edit to make the check pass — observed live, with the agent reporting "task file correctly restored". A reverted `Status` un-schedules the task: `next-ready.ts` only offers `todo`, and `mark-done.ts` validates the header before it writes.
+
+`lint-task.ts` enforces this as the `scope-git-status` rule. Name the paths that must not change, and judge the *other* entries `git status` prints.
 
 ## Sizing
 

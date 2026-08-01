@@ -1259,3 +1259,60 @@ describe("orchestrator cross-vendor review lens", () => {
     }
   });
 });
+
+describe("orchestrator commit ownership", () => {
+  const BAN = "Never run `git commit`";
+
+  const devWave: ScoutResult = snapshot({
+    ready: [ready("ui/01")],
+    counts: counts({ total: 2, todo: 2 }),
+    unfinished: [
+      { ref: "ui/01", state: "todo" },
+      { ref: "review/01", state: "todo" },
+    ],
+  });
+
+  const finalWave: ScoutResult = snapshot({
+    ready: [ready("review/01", true)],
+    counts: counts({ total: 2, todo: 1, done: 1 }),
+    unfinished: [{ ref: "review/01", state: "todo" }],
+  });
+
+  test("the Claude dev step is told never to commit", async () => {
+    const log = await runOrchestrator({ scouts: [devWave, complete(2)] });
+
+    expect(promptFor(log, "dev:ui/01#1")).toContain(BAN);
+  });
+
+  test("the external dev driver is told never to commit", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+
+    expect(promptFor(log, "dev-codex:ui/01#1")).toContain(BAN);
+  });
+
+  test("the external driver passes the ban on to the CLI it drives", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+    const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+    expect(prompt).toContain("Include the no-commit rule in that instruction");
+  });
+
+  test("the final-review fixer is told never to commit", async () => {
+    const log = await runOrchestrator({ scouts: [finalWave, complete(2)] });
+
+    expect(promptFor(log, "fix:review/01#1")).toContain(BAN);
+  });
+
+  test("the commit agents are the exception and still commit", async () => {
+    const log = await runOrchestrator({ scouts: [devWave, complete(2)] });
+
+    expect(promptFor(log, "commit-post-loop")).toContain("git commit");
+    expect(promptFor(log, "commit-post-loop")).not.toContain(BAN);
+  });
+});
