@@ -251,8 +251,45 @@ export function checkFinalReview(
 ): Violation[] {
   if (tasks.length <= 1) return [];
 
-  const ref = (t: ParsedTask) => `${t.bucket}/${t.nn}`;
-  const byRef = new Map(tasks.map((t) => [ref(t), t] as const));
+  const resolved = resolveFinalReview(tasks);
+  if (!resolved) {
+    return [
+      {
+        file: label,
+        rule: "final-review",
+        detail:
+          "no final review task — mark the closing task with `> **Final review**: true` in its header. It must depend (transitively) on every other task so it reviews the whole deliverable.",
+      },
+    ];
+  }
+  if (resolved.missing.length > 0) {
+    return [
+      {
+        file: label,
+        rule: "final-review",
+        detail: `final review task ${refToString(resolved.task)} does not reach all results — its \`Depends on\` is missing: ${resolved.missing.join(", ")}. Add these (directly or transitively) so it reviews the whole deliverable.`,
+      },
+    ];
+  }
+  return [];
+}
+
+/**
+ * The one task both final-review rules judge: the marked task whose transitive
+ * `Depends on` closure covers the most of the tree, and a covering one whenever
+ * the tree has any. Returns null when no task carries the marker.
+ *
+ * Both rules resolve through this so a tree carrying more than one marker can
+ * never have its coverage judged on one task and its test net on another —
+ * which would let the actual closing review ship with no test at all.
+ */
+export function resolveFinalReview(
+  tasks: ParsedTask[],
+): { task: ParsedTask; missing: string[] } | null {
+  const marked = tasks.filter((t) => t.finalReview);
+  if (marked.length === 0) return null;
+
+  const byRef = new Map(tasks.map((t) => [refToString(t), t] as const));
 
   // Transitive dependency closure of a task (cycle-safe).
   const closureOf = (t: ParsedTask): Set<string> => {
@@ -268,38 +305,17 @@ export function checkFinalReview(
     return seen;
   };
 
-  const marked = tasks.filter((t) => t.finalReview);
-  if (marked.length === 0) {
-    return [
-      {
-        file: label,
-        rule: "final-review",
-        detail:
-          "no final review task — mark the closing task with `> **Final review**: true` in its header. It must depend (transitively) on every other task so it reviews the whole deliverable.",
-      },
-    ];
-  }
-
-  // At least one marked task must cover everything else.
   const missingFor = (t: ParsedTask): string[] => {
     const closure = closureOf(t);
-    return tasks.map(ref).filter((r) => r !== ref(t) && !closure.has(r));
+    const self = refToString(t);
+    return tasks.map(refToString).filter((r) => r !== self && !closure.has(r));
   };
-  const covering = marked.find((t) => missingFor(t).length === 0);
-  if (!covering) {
-    // Report the marked task that comes closest, with what it misses.
-    const best = marked
-      .map((t) => ({ t, missing: missingFor(t) }))
-      .sort((a, b) => a.missing.length - b.missing.length)[0];
-    return [
-      {
-        file: label,
-        rule: "final-review",
-        detail: `final review task ${ref(best.t)} does not reach all results — its \`Depends on\` is missing: ${best.missing.join(", ")}. Add these (directly or transitively) so it reviews the whole deliverable.`,
-      },
-    ];
-  }
-  return [];
+
+  // Stable sort, so among equally-covering markers the first in document order
+  // wins — the same task the old `find` picked.
+  return marked
+    .map((task) => ({ task, missing: missingFor(task) }))
+    .sort((a, b) => a.missing.length - b.missing.length)[0];
 }
 
 /**
@@ -313,24 +329,29 @@ export function checkFinalReviewTestNet(
 ): Violation[] {
   if (tasks.length <= 1) return [];
 
-  const ref = (t: ParsedTask) => `${t.bucket}/${t.nn}`;
-  const testsPresent = tasks.filter((t) => testCommandsIn(t).length > 0);
-  if (testsPresent.length === 0) return [];
+  // One `testCommandsIn` pass over the tree — it re-scans a whole section per
+  // call, so the commands are carried alongside their task from here on.
+  const withTests = tasks
+    .map((task) => ({ task, commands: testCommandsIn(task) }))
+    .filter((row) => row.commands.length > 0);
+  if (withTests.length === 0) return [];
 
-  const marked = tasks.find((t) => t.finalReview);
-  if (!marked) return [];
-  if (testCommandsIn(marked).length > 0) return [];
+  const resolved = resolveFinalReview(tasks);
+  if (!resolved) return [];
+  const marked = resolved.task;
+  // Membership is exactly "the closing review runs a test": it is in `withTests`
+  // iff it has at least one command.
+  if (withTests.some((row) => row.task === marked)) return [];
 
-  const missingFrom = testsPresent
-    .filter((t) => t !== marked)
-    .map((t) => `${ref(t)}: ${testCommandsIn(t).join(", ")}`)
+  const missingFrom = withTests
+    .map((row) => `${refToString(row.task)}: ${row.commands.join(", ")}`)
     .join("; ");
 
   return [
     {
       file: label,
       rule: "final-review-test-net",
-      detail: `final-review-test-net: the plan's test suite runs in task(s) ${missingFrom}, but the closing final-review task (${ref(marked)}) runs no tests. Add a test command to ${ref(marked)}'s \`## Verification\` section to gate the review's edits.`,
+      detail: `final-review-test-net: the plan's test suite runs in task(s) ${missingFrom}, but the closing final-review task (${refToString(marked)}) runs no tests. Add a test command to ${refToString(marked)}'s \`## Verification\` section to gate the review's edits.`,
     },
   ];
 }
@@ -369,7 +390,7 @@ export function testNetReport(tasks: ParsedTask[]): TestNetReportRow[] {
     .map((task) => {
       const commands = testCommandsIn(task);
       return {
-        ref: `${task.bucket}/${task.nn}`,
+        ref: refToString(task),
         finalReview: task.finalReview,
         commands,
         paths: commands.flatMap(extractTestPaths),
