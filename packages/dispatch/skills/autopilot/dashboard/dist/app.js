@@ -2,9 +2,12 @@ import { createApp, reactive } from "./vendor/petite-vue.es.js";
 import { Lanes } from "./modules/lanes.js";
 import {
   connectEvents,
+  formatDuration,
   isInFlight,
   renderFleet,
+  runElapsed,
   tickElapsed,
+  toggleFleet,
   toggleRubric,
 } from "./modules/fleet.js";
 import { layoutGraph, renderGraph } from "./modules/graph.js";
@@ -34,6 +37,9 @@ const store = reactive({
   tree: emptyTree(),
   Lanes,
   graphSvg: "",
+  // Total flight time, from the first agent start. Empty until one starts.
+  elapsed: "",
+  elapsedLive: false,
 });
 
 let graphLayout;
@@ -94,6 +100,12 @@ const fleetState = {
   connection: "reconnecting",
 };
 
+function syncElapsed(nowMs = Date.now()) {
+  const total = runElapsed(fleetState.rows, nowMs);
+  store.elapsed = total ? formatDuration(total.ms) : "";
+  store.elapsedLive = total?.live === true;
+}
+
 function drawFleet() {
   const mount = document.querySelector(".deck-fleet");
   if (!mount) return;
@@ -112,6 +124,11 @@ function drawFleet() {
       },
     ),
   );
+
+  mount.querySelector(".fleet-toggle")?.addEventListener("click", () => {
+    toggleFleet();
+    drawFleet();
+  });
 }
 
 function syncFleetTicker() {
@@ -123,10 +140,10 @@ function syncFleetTicker() {
   ) {
     // Tick the elapsed cells in place. Rebuilding the table every second would
     // drop keyboard focus and restart any selection the user is holding.
-    fleetTimer = setInterval(
-      () => tickElapsed(document.querySelector(".deck-fleet")),
-      1_000,
-    );
+    fleetTimer = setInterval(() => {
+      tickElapsed(document.querySelector(".deck-fleet"));
+      syncElapsed();
+    }, 1_000);
   }
 }
 
@@ -163,6 +180,7 @@ connectEvents({
     fleetState.rows = Array.isArray(payload.rows) ? payload.rows : [];
     fleetState.entryCount = payload.entryCount ?? 0;
     fleetState.logPresent = payload.logPresent === true;
+    syncElapsed();
     drawFleet();
     syncFleetTicker();
   },

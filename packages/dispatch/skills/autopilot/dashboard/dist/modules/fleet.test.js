@@ -2,9 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   elapsedText,
   formatDuration,
+  isFleetCollapsed,
   isInFlight,
   renderFleet,
+  runElapsed,
   tickElapsed,
+  toggleFleet,
   toggleRubric,
 } from "./fleet.js";
 
@@ -37,7 +40,10 @@ function isExpanded(rowKey) {
       true,
       "connected",
     );
-    return root.innerHTML.includes('aria-expanded="true"');
+    // Scope past the heading: the panel's own collapse toggle carries an
+    // aria-expanded too, and matching the whole string would always find it.
+    const body = root.innerHTML.split("</header>")[1] ?? "";
+    return body.includes('aria-expanded="true"');
   } finally {
     globalThis.document = originalDocument;
   }
@@ -148,5 +154,95 @@ describe("toggleRubric", () => {
 
     expand("toggle-row");
     expect(isExpanded("toggle-row")).toBe(true);
+  });
+});
+
+describe("runElapsed", () => {
+  const t0 = Date.parse("2026-08-01T12:00:00.000Z");
+  const at = (offsetMs) => new Date(t0 + offsetMs).toISOString();
+
+  test("returns null when no row has started", () => {
+    expect(runElapsed([], t0)).toBeNull();
+    expect(runElapsed([{ key: "a", status: "finished" }], t0)).toBeNull();
+  });
+
+  test("ticks against the clock while any row is in flight", () => {
+    const rows = [
+      { key: "a", status: "finished", startedAt: at(0), elapsedMs: 5_000 },
+      { key: "b", status: "in-flight", startedAt: at(4_000) },
+    ];
+
+    expect(runElapsed(rows, t0 + 30_000)).toEqual({ ms: 30_000, live: true });
+  });
+
+  test("freezes at the last finish once nothing is in flight", () => {
+    const rows = [
+      { key: "a", status: "finished", startedAt: at(0), elapsedMs: 5_000 },
+      { key: "b", status: "finished", startedAt: at(4_000), elapsedMs: 6_000 },
+    ];
+
+    expect(runElapsed(rows, t0 + 90_000)).toEqual({ ms: 10_000, live: false });
+  });
+
+  test("measures from the earliest start, whatever order rows arrive in", () => {
+    const rows = [
+      { key: "b", status: "in-flight", startedAt: at(9_000) },
+      { key: "a", status: "in-flight", startedAt: at(1_000) },
+    ];
+
+    expect(runElapsed(rows, t0 + 11_000).ms).toBe(10_000);
+  });
+});
+
+describe("fleet collapse", () => {
+  const render = () => {
+    const originalDocument = globalThis.document;
+    globalThis.document = {
+      createElement() {
+        return { addEventListener() {}, className: "", innerHTML: "" };
+      },
+    };
+    try {
+      return renderFleet(
+        [{ key: "a", role: "dev", ref: "ui/01", status: "in-flight" }],
+        1,
+        true,
+        "connected",
+      );
+    } finally {
+      globalThis.document = originalDocument;
+    }
+  };
+
+  afterEach(() => {
+    if (isFleetCollapsed()) toggleFleet();
+  });
+
+  test("renders expanded with a toggle that says so", () => {
+    const root = render();
+
+    expect(root.className).not.toContain("-collapsed");
+    expect(root.innerHTML).toContain('class="fleet-toggle"');
+    expect(root.innerHTML).toContain('aria-expanded="true"');
+    expect(root.innerHTML).toContain("fleet-table");
+  });
+
+  test("drops the table but keeps the heading when collapsed", () => {
+    toggleFleet();
+    const root = render();
+
+    expect(root.className).toContain("-collapsed");
+    expect(root.innerHTML).toContain('aria-expanded="false"');
+    expect(root.innerHTML).toContain("Agent fleet");
+    expect(root.innerHTML).not.toContain("fleet-table");
+  });
+
+  test("keeps the collapsed choice across re-renders", () => {
+    toggleFleet();
+    render();
+    const second = render();
+
+    expect(second.className).toContain("-collapsed");
+    expect(isFleetCollapsed()).toBe(true);
   });
 });

@@ -30,6 +30,8 @@
   --radius-md: 4px;
 
   --border-width: 1px;
+  --graph-ref-size: 16px;
+  --graph-edge-width: 2px;
   --header-min-height: 64px;
   --ring-size: 32px;
   --ring-stroke: 2px;
@@ -86,7 +88,7 @@ button {
   box-shadow: 0 var(--border-width) 0 var(--rule);
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   min-height: var(--header-min-height);
   padding: var(--space-2) var(--space-4);
   position: sticky;
@@ -123,6 +125,32 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.plan-elapsed {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+
+  > .label {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  > .value {
+    align-items: center;
+    display: grid;
+    font-size: var(--text-lg);
+    font-variant-numeric: tabular-nums;
+    gap: var(--space-2);
+    grid-auto-flow: column;
+  }
+
+  &.-live > .value {
+    color: var(--state-flight);
+  }
 }
 
 .plan-progress {
@@ -279,27 +307,28 @@ button {
 }
 
 .c-dependency-graph {
+  align-content: start;
   block-size: 100%;
   display: grid;
+  justify-content: start;
   min-inline-size: 0;
-  overflow: hidden;
+  overflow: auto;
   padding: var(--space-2);
 }
 
 .dependency-graph {
-  block-size: 100%;
-  inline-size: 100%;
-  max-inline-size: 100%;
+  /* Natural size from the width/height attributes — the container scrolls.
+     Scaling a wide tree down to fit is what made the refs unreadable. */
 
   .graph-edge {
     fill: none;
-    stroke: var(--muted);
-    stroke-width: var(--border-width);
+    stroke: var(--text);
+    stroke-width: var(--graph-edge-width);
     vector-effect: non-scaling-stroke;
   }
 
   .graph-edge.-dimmed {
-    opacity: 0.3;
+    opacity: 0.55;
   }
 
   .graph-node > rect {
@@ -330,12 +359,26 @@ button {
     text-anchor: middle;
   }
 
+  /* Each node is a saturated fill, so the label takes the ink that actually
+     contrasts with it: near-black on the four light states, and the light text
+     only on -blocked, which is the one dark fill. */
+  .graph-node.-done > .graph-ref,
+  .graph-node.-in-progress > .graph-ref,
+  .graph-node.-ready > .graph-ref,
+  .graph-node.-alert > .graph-ref,
+  .graph-node.-invalid > .graph-ref,
+  .graph-node.-cyclic > .graph-ref,
+  .graph-node.-cyclic > .graph-cycle-label {
+    fill: var(--ground);
+  }
+
   .graph-ref {
-    font-size: var(--text-sm);
+    font-size: var(--graph-ref-size);
+    font-weight: 600;
   }
 
   .graph-cycle-label {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     letter-spacing: 0.02em;
   }
 
@@ -632,7 +675,7 @@ button {
   border-block-end: var(--border-width) solid var(--rule);
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   padding: var(--space-3) var(--space-4);
   position: sticky;
   inset-block-start: 0;
@@ -645,8 +688,45 @@ button {
   margin: 0;
 }
 
+.fleet-toggle {
+  align-items: center;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-2);
+  grid-auto-flow: column;
+  justify-content: start;
+  padding: 0;
+
+  > .chevron {
+    border-inline-start: 5px solid currentColor;
+    border-block: 4px solid transparent;
+    block-size: 0;
+    color: var(--muted);
+    inline-size: 0;
+    rotate: 90deg;
+    transition: rotate var(--motion-duration);
+  }
+
+  &[aria-expanded="false"] > .chevron {
+    rotate: 0deg;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-width) solid var(--state-ready);
+    outline-offset: var(--focus-offset);
+  }
+}
+
+/* Collapsed, the panel is just its heading — hand the height back to the tree. */
+#app:has(.c-fleet.-collapsed) {
+  grid-template-rows: auto minmax(40vh, 1fr) auto;
+}
+
 .connection,
 .entry-count,
+.row-count,
 .hidden-count {
   color: var(--muted);
   font-size: var(--text-xs);

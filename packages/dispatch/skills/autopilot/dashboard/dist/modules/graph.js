@@ -1,10 +1,13 @@
 import { compareTaskOrder, escapeHtml } from "./format.js";
 
+// Left-to-right layout: a dependency chain reads along the reading direction,
+// and a wide node fits a full `bucket/NN` ref at a legible size instead of
+// shrinking to fit a narrow column.
 const DEFAULTS = {
-  nodeWidth: 112,
-  nodeHeight: 40,
-  horizontalGap: 80,
-  verticalGap: 64,
+  nodeWidth: 150,
+  nodeHeight: 44,
+  horizontalGap: 88, // between depth layers (x)
+  verticalGap: 26, // between siblings inside one layer (y)
   padding: 8,
 };
 
@@ -61,8 +64,9 @@ export function layoutGraph(nodes, opts = {}) {
     layerNodes.sort(compareTaskOrder).forEach((node, index) => {
       positions.set(node.ref, {
         x:
-          options.padding + index * (options.nodeWidth + options.horizontalGap),
-        y: options.padding + depth * (options.nodeHeight + options.verticalGap),
+          options.padding + depth * (options.nodeWidth + options.horizontalGap),
+        y:
+          options.padding + index * (options.nodeHeight + options.verticalGap),
       });
     });
   }
@@ -102,14 +106,14 @@ export function renderGraph(nodes, layout, opts = {}) {
         const dependency = nodeByRef.get(dependencyRef);
         if (!source || !dependency) return [];
 
-        const x1 = source.x + options.nodeWidth / 2;
-        const y1 = source.y + options.nodeHeight;
-        const x2 = target.x + options.nodeWidth / 2;
-        const y2 = target.y;
-        const midpoint = y1 + (y2 - y1) / 2;
+        const x1 = source.x + options.nodeWidth;
+        const y1 = source.y + options.nodeHeight / 2;
+        const x2 = target.x;
+        const y2 = target.y + options.nodeHeight / 2;
+        const midpoint = x1 + (x2 - x1) / 2;
         const dimmed = dependency.state === "done" ? "" : " -dimmed";
         return [
-          `<polyline class="graph-edge${dimmed}" points="${x1},${y1} ${x1},${midpoint} ${x2},${midpoint} ${x2},${y2}" />`,
+          `<polyline class="graph-edge${dimmed}" points="${x1},${y1} ${midpoint},${y1} ${midpoint},${y2} ${x2},${y2}" />`,
         ];
       });
     })
@@ -124,13 +128,13 @@ export function renderGraph(nodes, layout, opts = {}) {
       const hardFailed = node.latestScore?.hardFailed === true;
       const state = isCyclic ? "cyclic" : hardFailed ? "alert" : node.state;
       const centreX = position.x + options.nodeWidth / 2;
-      const labelY = position.y + (isCyclic ? 17 : 24);
+      const labelY = position.y + (isCyclic ? 19 : options.nodeHeight / 2 + 5);
       const cycleLabel = isCyclic
-        ? `<text class="graph-cycle-label" x="${centreX}" y="${position.y + 31}">CYCLE</text>`
+        ? `<text class="graph-cycle-label" x="${centreX}" y="${position.y + 35}">CYCLE</text>`
         : "";
       const statusDot =
         state === "in-progress"
-          ? `<rect class="graph-status" x="${position.x + 6}" y="${position.y + 6}" width="6" height="6" rx="2" ry="2" />`
+          ? `<rect class="graph-status" x="${position.x + 7}" y="${position.y + 7}" width="7" height="7" rx="2" ry="2" />`
           : "";
       return [
         `
@@ -150,5 +154,7 @@ export function renderGraph(nodes, layout, opts = {}) {
   const cycleNote = cyclic.size
     ? `<text class="graph-cycle-note" x="${width / 2}" y="${height - options.padding}">Cycle: ${escapeHtml([...cyclic].join(", "))}</text>`
     : "";
-  return `<svg class="dependency-graph" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Task dependency graph" xmlns="http://www.w3.org/2000/svg">${edges}${renderedNodes}${cycleNote}${empty}</svg>`;
+  // The natural size ships with the SVG so a wide tree scrolls inside its
+  // container instead of scaling every label down to unreadable.
+  return `<svg class="dependency-graph" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency graph" xmlns="http://www.w3.org/2000/svg">${edges}${renderedNodes}${cycleNote}${empty}</svg>`;
 }

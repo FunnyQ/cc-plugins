@@ -20,7 +20,7 @@ function compare(nodes) {
 }
 
 describe("layoutGraph", () => {
-  test("lays out a linear chain at increasing depths", () => {
+  test("lays out a linear chain left to right", () => {
     const nodes = [
       makeNode("A", "chain", "01"),
       makeNode("B", "chain", "02", ["A"]),
@@ -30,10 +30,10 @@ describe("layoutGraph", () => {
     const secondLayout = layoutGraph(nodes);
 
     expect(layout.positions.get("A")).toEqual({ x: 8, y: 8 });
-    expect(layout.positions.get("B")).toEqual({ x: 8, y: 112 });
-    expect(layout.positions.get("C")).toEqual({ x: 8, y: 216 });
-    expect(layout.positions.get("A").y).toBeLessThan(layout.positions.get("B").y);
-    expect(layout.positions.get("B").y).toBeLessThan(layout.positions.get("C").y);
+    expect(layout.positions.get("B")).toEqual({ x: 246, y: 8 });
+    expect(layout.positions.get("C")).toEqual({ x: 484, y: 8 });
+    expect(layout.positions.get("A").x).toBeLessThan(layout.positions.get("B").x);
+    expect(layout.positions.get("B").x).toBeLessThan(layout.positions.get("C").x);
     expect([...secondLayout.positions]).toEqual([...layout.positions]);
     expect(secondLayout.cyclic).toEqual([]);
   });
@@ -51,11 +51,11 @@ describe("layoutGraph", () => {
     const positionC = layout.positions.get("C");
     const positionD = layout.positions.get("D");
 
-    expect(positionA.y).toBe(8);
-    expect(positionB.y).toBe(112);
-    expect(positionC.y).toBe(112);
-    expect(positionD.y).toBe(216);
-    expect(positionB.x).toBeLessThan(positionC.x);
+    expect(positionA.x).toBe(8);
+    expect(positionB.x).toBe(246);
+    expect(positionC.x).toBe(246);
+    expect(positionD.x).toBe(484);
+    expect(positionB.y).toBeLessThan(positionC.y);
     expect(compare(nodes.filter(({ ref }) => ref === "B" || ref === "C"))).toEqual(["B", "C"]);
   });
 
@@ -66,9 +66,9 @@ describe("layoutGraph", () => {
     ];
     const layout = layoutGraph(nodes);
 
-    expect(layout.positions.get("X").y).toBe(8);
-    expect(layout.positions.get("Y").y).toBe(8);
-    expect(layout.positions.get("X").x).toBeLessThan(layout.positions.get("Y").x);
+    expect(layout.positions.get("X").x).toBe(8);
+    expect(layout.positions.get("Y").x).toBe(8);
+    expect(layout.positions.get("X").y).toBeLessThan(layout.positions.get("Y").y);
     expect(compare(nodes)).toEqual(["X", "Y"]);
   });
 
@@ -83,11 +83,11 @@ describe("layoutGraph", () => {
 
     expect(elapsedMs).toBeLessThan(50);
     expect(layout.cyclic).toEqual(["A", "B"]);
-    expect(layout.positions.get("A").y).toBe(layout.positions.get("B").y);
-    expect(layout.positions.get("A").x).toBeLessThan(layout.positions.get("B").x);
+    expect(layout.positions.get("A").x).toBe(layout.positions.get("B").x);
+    expect(layout.positions.get("A").y).toBeLessThan(layout.positions.get("B").y);
   });
 
-  test("orders a layer by bucket then numeric sequence", () => {
+  test("orders a layer top to bottom by bucket then numeric sequence", () => {
     const nodes = [
       makeNode("ui/10", "ui", "10"),
       makeNode("api/02", "api", "02"),
@@ -96,7 +96,7 @@ describe("layoutGraph", () => {
     ];
     const layout = layoutGraph(nodes);
     const positionedOrder = [...layout.positions]
-      .sort(([, left], [, right]) => left.x - right.x)
+      .sort(([, left], [, right]) => left.y - right.y)
       .map(([ref]) => ref);
 
     expect(positionedOrder).toEqual(compare(nodes));
@@ -120,6 +120,26 @@ describe("renderGraph", () => {
     expect(svg).toContain('class="graph-edge -dimmed"');
   });
 
+  test("draws a dependency edge from the right edge into the left edge", () => {
+    const nodes = [
+      makeNode("A", "chain", "01"),
+      makeNode("B", "chain", "02", ["A"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+    const points = svg.match(/points="([^"]+)"/)[1].split(" ");
+    const [startX, startY] = points[0].split(",").map(Number);
+    const [endX, endY] = points[points.length - 1].split(",").map(Number);
+    const source = layout.positions.get("A");
+    const target = layout.positions.get("B");
+
+    expect(startX).toBeGreaterThan(source.x);
+    expect(startY).toBeGreaterThan(source.y);
+    expect(startY).toBeLessThan(source.y + 44);
+    expect(endX).toBe(target.x);
+    expect(endY).toBe(startY);
+  });
+
   test("marks cyclic nodes and lists their refs", () => {
     const nodes = [
       makeNode("A", "cycle", "01", ["B"]),
@@ -131,5 +151,21 @@ describe("renderGraph", () => {
     expect(svg.match(/class="graph-node -cyclic"/g)?.length).toBe(2);
     expect(svg).toContain('class="graph-cycle-note"');
     expect(svg).toContain("Cycle: A, B");
+  });
+});
+
+describe("renderGraph sizing", () => {
+  test("carries its natural pixel size so a wide tree scrolls instead of shrinking", () => {
+    const nodes = [
+      makeNode("A", "chain", "01"),
+      makeNode("B", "chain", "02", ["A"]),
+      makeNode("C", "chain", "03", ["B"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+    const viewBox = svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/);
+
+    expect(svg).toContain(`width="${viewBox[1]}"`);
+    expect(svg).toContain(`height="${viewBox[2]}"`);
+    expect(Number(viewBox[1])).toBeGreaterThan(Number(viewBox[2]));
   });
 });

@@ -8,6 +8,9 @@ import {
 
 const MAX_ROWS = 200;
 const expandedRows = new Set();
+// Collapse state lives here, not in the DOM: every SSE frame rebuilds the panel,
+// so a class on the old node would be thrown away a second later.
+let fleetCollapsed = false;
 
 // Why we render rows as given: The server owns all derivation — pairing, ordering,
 // label parsing, and score attachment. We receive fully aggregated FleetRow objects
@@ -129,6 +132,37 @@ export function tickElapsed(root, nowMs = Date.now()) {
   }
 }
 
+/**
+ * How long the whole run has been flying: earliest start to now while anything
+ * is in flight, else to the last finish. Returns null before the first agent
+ * starts. `live` tells the caller whether the value still needs ticking.
+ */
+export function runElapsed(rows, nowMs = Date.now()) {
+  const started = (Array.isArray(rows) ? rows : []).filter(
+    (row) => row.startedAt,
+  );
+  if (!started.length) return null;
+
+  const startMs = Math.min(...started.map((row) => Date.parse(row.startedAt)));
+  const live = started.some((row) => isInFlight(row));
+  if (live) return { ms: nowMs - startMs, live: true };
+
+  const endMs = Math.max(
+    ...started.map(
+      (row) => Date.parse(row.startedAt) + (Number(row.elapsedMs) || 0),
+    ),
+  );
+  return { ms: endMs - startMs, live: false };
+}
+
+export function isFleetCollapsed() {
+  return fleetCollapsed;
+}
+
+export function toggleFleet() {
+  fleetCollapsed = !fleetCollapsed;
+}
+
 export function toggleRubric(rowKey) {
   if (expandedRows.has(rowKey)) expandedRows.delete(rowKey);
   else expandedRows.add(rowKey);
@@ -151,13 +185,8 @@ export function renderFleet(
         : "waiting for the run";
   const nowMs = Date.now();
   const root = document.createElement("div");
-  root.className = "c-fleet";
-  root.innerHTML = `
-    <header class="fleet-heading">
-      <h2>Agent fleet</h2>
-      <span class="connection -${connectionState === "reconnecting" ? "reconnecting" : logPresent ? "live" : "waiting"}">${stateLabel}</span>
-      <span class="entry-count">${Number(entryCount) || 0} entries</span>
-    </header>
+  root.className = `c-fleet${fleetCollapsed ? " -collapsed" : ""}`;
+  const table = `
     <div class="fleet-table" role="table" aria-label="Agent fleet">
       <div class="fleet-row fleet-columns" role="row">
         <span role="columnheader"><span class="visually-hidden">Status</span></span>
@@ -170,6 +199,17 @@ export function renderFleet(
       </div>
     </div>
     ${hiddenCount ? `<p class="hidden-count">${hiddenCount} older rows hidden</p>` : ""}`;
+  root.innerHTML = `
+    <header class="fleet-heading">
+      <button type="button" class="fleet-toggle" aria-expanded="${fleetCollapsed ? "false" : "true"}">
+        <span class="chevron" aria-hidden="true"></span>
+        <h2>Agent fleet</h2>
+      </button>
+      <span class="connection -${connectionState === "reconnecting" ? "reconnecting" : logPresent ? "live" : "waiting"}">${stateLabel}</span>
+      <span class="entry-count">${Number(entryCount) || 0} entries</span>
+      <span class="row-count">${rows?.length ?? 0} agents</span>
+    </header>
+    ${fleetCollapsed ? "" : table}`;
 
   root.addEventListener("click", (event) => {
     const row = event.target.closest(".fleet-row[data-row-key]");
