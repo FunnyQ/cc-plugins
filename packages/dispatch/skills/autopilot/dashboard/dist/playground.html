@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangar — graph playground</title>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+    /* Tool chrome only. Everything inside .stage is the real dashboard CSS. */
+    .c-playground {
+      block-size: 100vh;
+      display: grid;
+      grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+      overflow: hidden;
+
+      > .controls {
+        background: var(--surface);
+        border-inline-end: var(--border-width) solid var(--rule);
+        display: grid;
+        align-content: start;
+        gap: var(--space-4);
+        overflow-y: auto;
+        padding: var(--space-4);
+      }
+
+      > .stage {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        min-inline-size: 0;
+        overflow: hidden;
+      }
+    }
+
+    .c-control-group {
+      display: grid;
+      gap: var(--space-2);
+
+      > h2 {
+        border-block-end: var(--border-width) solid var(--rule);
+        font-family: var(--font-sans);
+        font-size: var(--text-xs);
+        letter-spacing: 0.08em;
+        margin: 0;
+        padding-block-end: var(--space-1);
+        text-transform: uppercase;
+      }
+
+      > label {
+        align-items: center;
+        display: grid;
+        gap: var(--space-2);
+        grid-template-columns: 1fr auto;
+        font-size: var(--text-xs);
+      }
+
+      > label > .field {
+        align-items: center;
+        display: grid;
+        gap: var(--space-2);
+        grid-auto-flow: column;
+      }
+
+      input[type="range"] {
+        inline-size: 120px;
+      }
+      input[type="color"] {
+        background: none;
+        border: var(--border-width) solid var(--rule);
+        block-size: 22px;
+        inline-size: 34px;
+        padding: 0;
+      }
+      output {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        inline-size: 46px;
+        text-align: end;
+      }
+    }
+
+    .playground-actions {
+      display: grid;
+      gap: var(--space-2);
+      grid-auto-flow: column;
+      justify-content: start;
+
+      > button {
+        background: var(--surface-2);
+        border: var(--border-width) solid var(--rule);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: var(--text-xs);
+        padding: var(--space-2) var(--space-3);
+      }
+      > button:hover {
+        border-color: var(--state-ready);
+      }
+    }
+
+    .c-output {
+      border-block-start: var(--border-width) solid var(--rule);
+      display: grid;
+      gap: var(--space-2);
+      max-block-size: 34vh;
+      overflow: auto;
+      padding: var(--space-3) var(--space-4);
+
+      > h2 {
+        color: var(--muted);
+        font-family: var(--font-sans);
+        font-size: var(--text-xs);
+        letter-spacing: 0.08em;
+        margin: 0;
+        text-transform: uppercase;
+      }
+
+      > pre {
+        background: var(--surface);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        line-height: 1.5;
+        margin: 0;
+        overflow-x: auto;
+        padding: var(--space-3);
+      }
+    }
+    </style>
+  </head>
+  <body>
+    <div class="c-playground">
+      <aside class="controls">
+        <div class="c-control-group">
+          <h2>Type &amp; geometry</h2>
+          <label
+            >Font size<span class="field"
+              ><input type="range" id="fontSize" min="9" max="28" step="1">
+              <output id="fontSizeOut"></output></span
+            ></label
+          >
+          <label
+            >Node width ×<span class="field"
+              ><input type="range" id="widthRatio" min="6" max="18" step="0.25">
+              <output id="widthRatioOut"></output></span
+            ></label
+          >
+          <label
+            >Node height ×<span class="field"
+              ><input
+                type="range"
+                id="heightRatio"
+                min="1.5"
+                max="6"
+                step="0.25"
+              ><output id="heightRatioOut"></output></span
+            ></label
+          >
+          <label
+            >Layer gap ×<span class="field"
+              ><input type="range" id="hGapRatio" min="1" max="14" step="0.5">
+              <output id="hGapRatioOut"></output></span
+            ></label
+          >
+          <label
+            >Sibling gap ×<span class="field"
+              ><input type="range" id="vGapRatio" min="0.5" max="8" step="0.25">
+              <output id="vGapRatioOut"></output></span
+            ></label
+          >
+          <label
+            >Corner radius<span class="field"
+              ><input type="range" id="radius" min="0" max="16" step="1">
+              <output id="radiusOut"></output></span
+            ></label
+          >
+        </div>
+
+        <div class="c-control-group">
+          <h2>Edges &amp; arrows</h2>
+          <label
+            >Edge width<span class="field"
+              ><input type="range" id="edgeWidth" min="0.5" max="4" step="0.25">
+              <output id="edgeWidthOut"></output></span
+            ></label
+          >
+          <label
+            >Dimmed opacity<span class="field"
+              ><input type="range" id="dimmed" min="0.1" max="1" step="0.05">
+              <output id="dimmedOut"></output></span
+            ></label
+          >
+          <label
+            >Arrow length ×<span class="field"
+              ><input
+                type="range"
+                id="arrowLength"
+                min="0.4"
+                max="2.5"
+                step="0.05"
+              ><output id="arrowLengthOut"></output></span
+            ></label
+          >
+          <label
+            >Arrow height ×<span class="field"
+              ><input
+                type="range"
+                id="arrowHeight"
+                min="0.3"
+                max="2"
+                step="0.05"
+              ><output id="arrowHeightOut"></output></span
+            ></label
+          >
+        </div>
+
+        <div class="c-control-group">
+          <h2>State colours</h2>
+          <label
+            >done<span class="field"
+              ><input type="color" id="stateDone">
+              <output id="stateDoneOut"></output></span
+            ></label
+          >
+          <label
+            >in flight<span class="field"
+              ><input type="color" id="stateFlight">
+              <output id="stateFlightOut"></output></span
+            ></label
+          >
+          <label
+            >ready<span class="field"
+              ><input type="color" id="stateReady">
+              <output id="stateReadyOut"></output></span
+            ></label
+          >
+          <label
+            >blocked<span class="field"
+              ><input type="color" id="stateBlocked">
+              <output id="stateBlockedOut"></output></span
+            ></label
+          >
+          <label
+            >alert<span class="field"
+              ><input type="color" id="stateAlert">
+              <output id="stateAlertOut"></output></span
+            ></label
+          >
+        </div>
+
+        <div class="c-control-group">
+          <h2>Surface &amp; ink</h2>
+          <label
+            >Background<span class="field"
+              ><input type="color" id="ground">
+              <output id="groundOut"></output></span
+            ></label
+          >
+          <label
+            >Text / edges<span class="field"
+              ><input type="color" id="text">
+              <output id="textOut"></output></span
+            ></label
+          >
+          <label
+            >Dark label ink<span class="field"
+              ><input type="checkbox" id="darkInk"></span
+            ></label
+          >
+        </div>
+
+        <div class="playground-actions">
+          <button type="button" id="reset">Reset to shipped</button>
+          <button type="button" id="copy">Copy values</button>
+        </div>
+      </aside>
+
+      <main class="stage">
+        <div class="c-dependency-graph" id="preview"></div>
+        <section class="c-output">
+          <h2>Paste these back</h2>
+          <pre id="output"></pre>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+    import { layoutGraph, renderGraph } from "./modules/graph.js";
+
+    // One node per rendered state, plus a fan-out and a join, so a colour or
+    // size change can be judged on the shapes the real tree actually makes.
+    const NODES = [
+      {
+        ref: "setup/01",
+        bucket: "setup",
+        nn: "01",
+        dependsOn: [],
+        state: "done",
+      },
+      {
+        ref: "api/01",
+        bucket: "api",
+        nn: "01",
+        dependsOn: ["setup/01"],
+        state: "done",
+      },
+      {
+        ref: "ui/01",
+        bucket: "ui",
+        nn: "01",
+        dependsOn: ["setup/01"],
+        state: "in-progress",
+      },
+      {
+        ref: "ui/02",
+        bucket: "ui",
+        nn: "02",
+        dependsOn: ["setup/01"],
+        state: "blocked",
+      },
+      {
+        ref: "api/02",
+        bucket: "api",
+        nn: "02",
+        dependsOn: ["api/01"],
+        state: "ready",
+      },
+      {
+        ref: "integration/01",
+        bucket: "integration",
+        nn: "01",
+        dependsOn: ["api/02", "ui/01", "ui/02"],
+        state: "ready",
+        latestScore: { hardFailed: true },
+      },
+    ];
+
+    const SHIPPED = {
+      fontSize: 14,
+      widthRatio: 11,
+      heightRatio: 3,
+      hGapRatio: 6,
+      vGapRatio: 2,
+      radius: 4,
+      edgeWidth: 1.25,
+      dimmed: 0.55,
+      arrowLength: 1.1,
+      arrowHeight: 0.75,
+      stateDone: "#4FB6C4",
+      stateFlight: "#F0A830",
+      stateReady: "#6E8CA0",
+      stateBlocked: "#414A55",
+      stateAlert: "#E05B4A",
+      ground: "#0E1114",
+      text: "#D6DCE2",
+      darkInk: true,
+    };
+
+    const state = { ...SHIPPED };
+    const el = (id) => document.getElementById(id);
+    const preview = el("preview");
+    const output = el("output");
+
+    const round = (value) => Math.round(value * 100) / 100;
+
+    function geometry() {
+      const f = state.fontSize;
+      return {
+        fontSize: f,
+        nodeWidth: round(f * state.widthRatio),
+        nodeHeight: round(f * state.heightRatio),
+        horizontalGap: round(f * state.hGapRatio),
+        verticalGap: round(f * state.vGapRatio),
+        padding: f / 2,
+        arrowLength: round(f * state.arrowLength),
+        arrowHeight: round(f * state.arrowHeight),
+      };
+    }
+
+    function draw() {
+      const options = geometry();
+      preview.innerHTML = renderGraph(
+        NODES,
+        layoutGraph(NODES, options),
+        options,
+      );
+
+      const style = document.documentElement.style;
+      style.setProperty("--state-done", state.stateDone);
+      style.setProperty("--state-flight", state.stateFlight);
+      style.setProperty("--state-ready", state.stateReady);
+      style.setProperty("--state-blocked", state.stateBlocked);
+      style.setProperty("--state-alert", state.stateAlert);
+      style.setProperty("--ground", state.ground);
+      style.setProperty("--text", state.text);
+      style.setProperty("--graph-edge-width", `${state.edgeWidth}px`);
+
+      // The shipped rule puts near-black ink on the four light fills. Turning
+      // it off is the honest way to see why it exists.
+      for (const label of preview.querySelectorAll(
+        ".graph-node:not(.-blocked) .graph-ref",
+      )) {
+        label.style.fill = state.darkInk ? state.ground : state.text;
+      }
+      for (const edge of preview.querySelectorAll(".graph-edge.-dimmed")) {
+        edge.style.opacity = state.dimmed;
+      }
+      for (const rect of preview.querySelectorAll(".graph-node > rect")) {
+        rect.setAttribute("rx", state.radius);
+        rect.setAttribute("ry", state.radius);
+      }
+
+      writeOutput(options);
+    }
+
+    function writeOutput(options) {
+      const changed = Object.entries(state)
+        .filter(([key, value]) => SHIPPED[key] !== value)
+        .map(([key]) => key);
+
+      output.textContent = [
+        "// modules/graph.js",
+        `const FONT_SIZE = ${state.fontSize};`,
+        "",
+        "const geometry = (fontSize) => ({",
+        "  fontSize,",
+        `  nodeWidth: fontSize * ${state.widthRatio},`,
+        `  nodeHeight: fontSize * ${state.heightRatio},`,
+        `  horizontalGap: fontSize * ${state.hGapRatio},`,
+        `  verticalGap: fontSize * ${state.vGapRatio},`,
+        "  padding: fontSize / 2,",
+        `  arrowLength: fontSize * ${state.arrowLength},`,
+        `  arrowHeight: fontSize * ${state.arrowHeight},`,
+        "});",
+        `// rendered at ${state.fontSize}px: node ${options.nodeWidth} × ${options.nodeHeight}, arrow ${options.arrowLength} × ${options.arrowHeight}`,
+        "",
+        "/* style.css */",
+        ":root {",
+        `  --graph-edge-width: ${state.edgeWidth}px;`,
+        `  --state-done: ${state.stateDone};`,
+        `  --state-flight: ${state.stateFlight};`,
+        `  --state-ready: ${state.stateReady};`,
+        `  --state-blocked: ${state.stateBlocked};`,
+        `  --state-alert: ${state.stateAlert};`,
+        `  --ground: ${state.ground};`,
+        `  --text: ${state.text};`,
+        "}",
+        `.graph-edge.-dimmed { opacity: ${state.dimmed}; }`,
+        `/* node corner radius: rx/ry ${state.radius} in renderGraph */`,
+        "",
+        changed.length
+          ? `// changed from shipped: ${changed.join(", ")}`
+          : "// unchanged from shipped",
+      ].join("\n");
+    }
+
+    function bind(id, { numeric = true, format = (value) => value } = {}) {
+      const input = el(id);
+      const out = el(`${id}Out`);
+      const sync = () => {
+        state[id] =
+          input.type === "checkbox"
+            ? input.checked
+            : numeric
+              ? Number(input.value)
+              : input.value;
+        if (out) out.textContent = format(state[id]);
+        draw();
+      };
+      input.addEventListener("input", sync);
+      return () => {
+        if (input.type === "checkbox") input.checked = state[id];
+        else input.value = state[id];
+        if (out) out.textContent = format(state[id]);
+      };
+    }
+
+    const px = (value) => `${value}px`;
+    const times = (value) => `×${value}`;
+    const setters = [
+      bind("fontSize", { format: px }),
+      bind("widthRatio", { format: times }),
+      bind("heightRatio", { format: times }),
+      bind("hGapRatio", { format: times }),
+      bind("vGapRatio", { format: times }),
+      bind("radius", { format: px }),
+      bind("edgeWidth", { format: px }),
+      bind("dimmed", { format: (value) => value.toFixed(2) }),
+      bind("arrowLength", { format: times }),
+      bind("arrowHeight", { format: times }),
+      bind("stateDone", { numeric: false }),
+      bind("stateFlight", { numeric: false }),
+      bind("stateReady", { numeric: false }),
+      bind("stateBlocked", { numeric: false }),
+      bind("stateAlert", { numeric: false }),
+      bind("ground", { numeric: false }),
+      bind("text", { numeric: false }),
+      bind("darkInk"),
+    ];
+
+    const syncInputs = () => setters.forEach((set) => set());
+
+    el("reset").addEventListener("click", () => {
+      Object.assign(state, SHIPPED);
+      syncInputs();
+      draw();
+    });
+
+    el("copy").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(output.textContent);
+      el("copy").textContent = "Copied";
+      setTimeout(() => (el("copy").textContent = "Copy values"), 1_200);
+    });
+
+    syncInputs();
+    draw();
+    </script>
+  </body>
+</html>

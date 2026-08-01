@@ -18,6 +18,8 @@ const geometry = (fontSize) => ({
   horizontalGap: fontSize * 6, // between depth layers (x)
   verticalGap: fontSize * 2, // between siblings inside one layer (y)
   padding: fontSize / 2,
+  arrowLength: fontSize * 1.1,
+  arrowHeight: fontSize * 0.75,
 });
 
 const DEFAULTS = geometry(FONT_SIZE);
@@ -177,8 +179,7 @@ export function renderGraph(nodes, layout, opts = {}) {
   // head to the line weight made a squat triangle barely wider than the line
   // it capped, which read as a blob instead of an arrow. Length beats height
   // so the silhouette is a chevron, and the line meets it well behind the tip.
-  const arrowLength = options.fontSize * 1.1;
-  const arrowHeight = options.fontSize * 0.75;
+  const { arrowLength, arrowHeight } = options;
   const arrowDefs = edges
     ? `<defs><marker id="${ARROW_ID}" class="graph-arrow" markerUnits="userSpaceOnUse" markerWidth="${arrowLength}" markerHeight="${arrowHeight}" refX="${arrowLength}" refY="${arrowHeight / 2}" orient="auto"><path d="M 0 0 L ${arrowLength} ${arrowHeight / 2} L 0 ${arrowHeight} z" /></marker></defs>`
     : "";

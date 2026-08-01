@@ -233,3 +233,21 @@ describe("edge arrows", () => {
     expect(svg).not.toContain("marker-end");
   });
 });
+
+describe("graph geometry overrides", () => {
+  const chain = [
+    makeNode("A", "chain", "01"),
+    makeNode("B", "chain", "02", ["A"]),
+  ];
+
+  test("takes an explicit arrow size without touching the rest", () => {
+    const svg = renderGraph(chain, layoutGraph(chain), {
+      arrowLength: 40,
+      arrowHeight: 24,
+    });
+
+    expect(svg).toContain('markerWidth="40"');
+    expect(svg).toContain('markerHeight="24"');
+    expect(svg).toContain('class="graph-ref" font-size="14"');
+  });
+});
