@@ -6,6 +6,8 @@ Read the three hard constraints in `SKILL.md` first. They explain every awkward-
 The main agent scouts inline. It then calls `Workflow({ script: <this> })`. **Bake the
 scouted values into the `CFG` block at the top of the script as literals.**
 
+Wave loop: `scout → seven guards → inter-wave commit → parallel task dispatch → reconciliation`.
+
 Do NOT rely on the Workflow `args` global. It does not reliably reach the orchestrator.
 An unset `args` becomes `undefined`. The scout then runs `bun undefined/next-ready.ts`
 and fails. The failure looks like "no work to do", so it is silent.
@@ -36,7 +38,7 @@ export const meta = {
   name: 'autopilot-run',
   description: 'Execute a flightplan task tree: per-task dev→verify→judge→score loop, then the final review gate',
   phases: [
-    { title: 'Execute', detail: 'wave loop: scout ready tasks, run each through the retry pipeline' },
+    { title: 'Execute', detail: 'wave loop: scout ready tasks, guard the result, commit the prior wave, then run each task through the retry pipeline' },
   ],
 }
 
@@ -175,6 +177,17 @@ const SCOUT_SCHEMA = {
     error: { type: 'string' },
   },
   required: ['ready', 'counts', 'unfinished', 'invalidRefs', 'errors'],
+}
+
+const COMMIT_SCHEMA = {
+  type: 'object',
+  properties: {
+    committed: { type: 'boolean' },                        // at least one commit was created
+    shas:      { type: 'array', items: { type: 'string' } },// the commits actually created
+    failed:    { type: 'boolean' },                        // a git command failed
+    reason:    { type: 'string' },                         // the git error, or why nothing was committed
+  },
+  required: ['committed', 'shas', 'failed', 'reason'],
 }
 
 // Both status transitions are infrastructure boundaries: each can silently not
@@ -552,14 +565,18 @@ async function runTaskGuarded(item) {
 // Bash). So we inline the skill's contract here — same atomic principles, same
 // commit-message template — and let the agent commit over plain git itself.
 // Self-contained on purpose: no Skill tool, no sub-agent, no cross-plugin path.
-const COMMIT_INSTRUCTIONS =
+const commitInstructions = agentLabel =>
   'Commit the current working-tree changes as one or more ATOMIC commits using plain git over Bash. '
   + 'Do NOT use the Skill tool and do NOT spawn any sub-agent — do it yourself with git commands.\n'
-  + '1. Run `git status --porcelain`. If it prints nothing, the tree is clean — skip committing and continue.\n'
-  + '2. Run `git diff` and `git diff --cached` to see every change. Group the files into atomic commits — each commit does ONE thing (single responsibility, independently revertable). Keep related code + its tests + its docs together; split unrelated changes apart.\n'
-  + '3. For each group, in a sensible order: stage exactly that group by name (`git add <file>...`; never `git add -A`, never the interactive `git add -p`), then commit with the template below.\n'
-  + '4. After all commits, run `git log --oneline -n 5` to confirm.\n'
-  + '5. If any git command FAILS — a hook blocks the commit, a merge conflict, anything — stop committing, and say so explicitly in your summary. Never report a commit that did not happen.\n'
+  + `1. Record start: bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase start\n`
+  + '2. Run `git status --porcelain`. If it prints nothing, the tree is clean — skip committing and continue.\n'
+  + '3. Run `git diff` and `git diff --cached` to see every change. Group the files into atomic commits — each commit does ONE thing (single responsibility, independently revertable). Keep related code + its tests + its docs together; split unrelated changes apart.\n'
+  + '4. For each group, in a sensible order, stage exactly that group by name (`git add <file>...`; never `git add -A`, never the interactive `git add -p`).\n'
+  + '5. Commit each staged group with the template below.\n'
+  + '6. After all commits, run `git log --oneline -n 5` to confirm.\n'
+  + `7. Record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase end --message "committed shas: <shas, or none>"\n`
+  + `8. If any git command FAILS — a hook blocks the commit, a merge conflict, anything — stop committing, record the failure with bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase end --message "<git error message>", and return failed: true with that git error in reason. Never report a commit that did not happen.\n`
+  + 'Return committed, the shas actually created, failed, and reason as the structured result.\n'
   + '\n'
   + 'Commit message template (MUST follow):\n'
   + '  Subject: `<emoji> <type>: <imperative summary>` — lowercase, no trailing period, <=50 chars.\n'
@@ -586,17 +603,8 @@ let wave = 0
 
 while (true) {
   wave++
-  // Commit previous wave's changes before scouting the next ready set, but only
-  // while the entire run is escalation-free. A blocked task's dirty edits can
-  // persist across later waves, so a per-wave guard would still risk committing
-  // incomplete/rejected work after a later clean wave.
-  const commitPreamble = (wave > 1 && CFG.commitBetweenWaves && escalations.length === 0)
-    ? `First, commit all changes from the previous wave.\n${COMMIT_INSTRUCTIONS}\n\nThen: `
-    : ``
-
   const scout = await agent(
-    commitPreamble
-    + `First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase start\n`
+    `First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase start\n`
     + `Then proceed.\n\n`
     + `Use the identical label in both start and end calls.\n`
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
@@ -683,6 +691,20 @@ while (true) {
     break
   }
 
+  if (wave > 1 && CFG.commitBetweenWaves && escalations.length === 0) {
+    const committed = await agent(
+      `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`)}`,
+      { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
+    if (!committed || committed.failed) {
+      const reason = committed
+        ? `the wave ${wave - 1} commit failed: ${committed.reason || 'no reason reported'}`
+        : `the wave ${wave - 1} commit agent returned no structured result, so whether anything was committed is unknown`
+      log(reason)
+      escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
+      // Continue this wave; the escalation-free guard prevents every later commit.
+    }
+  }
+
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
   // No `.filter(Boolean)` — reconciliation is by INDEX against `fresh`, so a
   // null result still lands on its own task instead of disappearing.
@@ -724,10 +746,17 @@ while (true) {
 // Only commit when the whole run finished cleanly (no escalations) — same guard
 // as the inter-wave commits: don't commit a run that has blocked/dirty task edits.
 if (CFG.commitBetweenWaves && escalations.length === 0) {
-  await agent(
+  const committed = await agent(
     `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes).\n`
-    + COMMIT_INSTRUCTIONS,
-    { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit })
+    + commitInstructions('commit-post-loop'),
+    { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
+  if (!committed || committed.failed) {
+    const reason = committed
+      ? `the post-loop commit failed: ${committed.reason || 'no reason reported'}`
+      : `the post-loop commit agent returned no structured result, so whether anything was committed is unknown`
+    log(reason)
+    escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
+  }
 }
 
 return { slug: CFG.slug, completed, escalations }
@@ -748,7 +777,7 @@ return { slug: CFG.slug, completed, escalations }
 
 - **`completed.length` is not a completion count. `counts.done` is.** The wave loop's `completed` array only holds tasks *this invocation* finished. A resumed run inherits `done` tasks from earlier runs, so comparing `completed.length` with the tree size reports a false stall on every resume. The scout's `counts.done === counts.total` counts the tree on disk, which is the only place completion actually lives. The loop also asserts `total === todo + inProgress + done + blocked + invalid` before trusting any bucket.
 
-- **Six terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a scout failure. `invalid > 0` is a scout failure naming the invalid refs. A counts mismatch is a scout failure. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly.
+- **Six terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a scout failure. `invalid > 0` is a scout failure naming the invalid refs. A counts mismatch is a scout failure. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)`, and the escalation-free guard blocks later commits without stopping task dispatch.
 
 - **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop checks `scout.errors` **before** the completion test, and why `errors` is a required field of the scout schema rather than something the agent may summarize away.
 
@@ -766,6 +795,6 @@ return { slug: CFG.slug, completed, escalations }
 - **The *orchestrator* runs the review fan-out, not one agent.** A Workflow agent has `Skill` and `Bash`, so the external CLI is reachable. But it has **no `Agent` tool**. So it cannot spawn fan-out skills like `/simplify` or `/code-review` itself. The orchestrator sidesteps that. `runFinalReview` issues one `agent()` per lens via `parallel()`. One lens is the cross-vendor lens (`CFG.reviewEngine`: codex or opencode), driven through the `<engine>-run.ts review` wrapper over Bash. The other four are the `/simplify` lenses — reuse, simplification, efficiency, altitude — and each runs on Claude. Every reviewer writes findings to `.flightlog/review/attempt-N/<lens>.md` and edits nothing. A single Opus **fixer** then reads all the files and applies the changes. The external engine gives the deliberate cross-*vendor* signal that an all-Claude dev+judge cannot produce. If it is unreachable, that reviewer writes its `<ENGINE> UNREACHABLE` token instead. The fixer then flags this, and the gate fails the task rather than pass an un-reviewed deliverable. Codex review is sandbox-enforced read-only. Opencode review is prompt-enforced read-only instead — its wrapper prepends a hard "analyze only" guard.
 - **The fixer is not the judge.** The reviewers and the fixer form the "dev" side of the Final review. The binary gate and the rubric judge stay independent. So the dev≠judge anti-self-grading split still holds, even though this round is more elaborate.
 - **`CFG.devEngine: 'codex'` (or `'opencode'`) hands the dev step to that CLI.** The default is `'claude'` (Sonnet→Opus). When set to an external engine, each non-finalReview task's dev step becomes a cheap Haiku *driver*. That driver runs the `<engine>-run.ts delegate` wrapper — the same wrapper the cross-vendor review lens uses, reachable from a Workflow agent's Bash. So the external CLI writes the implementation. If `CFG.liveDevEngine` is true and `CFG.relayPath` resolved under `HERDR_ENV=1`, the driver instead runs the same delegate through relay in a visible herdr live pane. Otherwise it uses the headless wrapper exactly as before. The verify → judge → score pipeline stays Claude. This *strengthens* the dev≠judge split into a cross-vendor one: the external CLI writes, and Claude-Opus judges. The last attempt before the cap still falls back to Claude-Opus, so a task the external engine cannot clear gets one strong Claude try before parking — **except at `maxAttempts: 1`**, where the `cap > 1` guard keeps that single attempt on the external engine rather than skipping it entirely, and there is no Claude fallback. If the CLI is unreachable, or relay returns no result, the driver never fabricates. The binary gate fails that attempt, and the loop reaches the Opus fallback. The live path passes `--wait-timeout 480000` (8 min), and the driver is told to make ONE foreground Bash call with `timeout: 600000`. **That pairing is load-bearing: the wait must expire inside the Bash tool's 600s hard cap — with margin.** The margin is not optional: relay's poll clock starts *after* it spawns the pane and waits up to `SPAWN_IDLE_WAIT_MS` (20s) for the TUI to settle, so the Bash call's wall time is that setup plus the wait plus cleanup. 480s leaves roughly 90s of slack; 540s did not. A command that outruns the cap is moved to the background, and a cheap Haiku driver left to invent its own wait writes a `while sleep 5; do ... jobs %1 ...; done` poll loop — which can never work, because every Bash call gets a fresh shell where `jobs` sees nothing. Live transcript: the loop spun the full 600s and the driver read a *complete* result the instant it returned. Ten minutes burned after codex had already finished, plus an orphaned loop. So the driver prompt bans `run_in_background` and shell poll loops outright, and the wait is bounded below the cap so the one call returns on its own. Relay's poll loop returns the instant the result lands, so the budget costs nothing for normal-speed tasks. **A `pending` outcome is not a failure and must not be treated as one.** Relay checks the pane's status before reporting it: an agent that has settled without a verified result is reported as a real failure instead, so `pending` specifically means the delegate is *still working* — and still writing the working tree, with its pane still open. Failing the attempt there would start a second writer on the same files. So the driver keeps waiting instead: `CFG.liveCollectRounds` (default 3) more `relay collect` calls, each reattaching to that same pane for another 8-minute window. A task can therefore run ~32 min while every individual Bash call still returns inside the 600s cap. Only when the last allowed collect is still pending does the attempt fail. Do not wait indefinitely, and do not use `herd wait` for this — it blocks until `idle`, and codex parks at `done`, so it can miss a finished delegate entirely; `collect` reuses relay's own `idle`-or-`done`-plus-marker test. `devEngine` and `reviewEngine` are independent. You can have opencode write and codex review, or the reverse. Only the dev step changes. finalReview's multi-lens round, and everything else, stay untouched.
-- **Commits use inline git, not the atomic-commit skill — the same `no Agent tool` constraint applies.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`. That skill spawns the vör + bragi sub-agents, and a Workflow agent cannot do that. Its analysis script also lives in a *different* plugin's cache, which the agent cannot resolve — there is no `CLAUDE_PLUGIN_ROOT` in agent Bash. The `COMMIT_INSTRUCTIONS` constant inlines the skill's whole contract instead: the atomic grouping principles, plus the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary). So the agent commits over plain git, self-contained. If the commit convention changes, edit the template in that one constant.
+- **Commits use inline git, not the atomic-commit skill — the same `no Agent tool` constraint applies.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`. That skill spawns the vör + bragi sub-agents, and a Workflow agent cannot do that. Its analysis script also lives in a *different* plugin's cache, which the agent cannot resolve — there is no `CLAUDE_PLUGIN_ROOT` in agent Bash. The `commitInstructions` builder inlines the skill's whole contract instead: the matched flightlog lifecycle, the atomic grouping principles, plus the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary). So each labeled agent commits over plain git, self-contained. If the commit convention changes, edit the template in that one builder.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`). Passing a wide wave is safe — excess tasks queue.
 - **Do NOT give the dev agent `isolation: 'worktree'`.** It looks like the fix for tasks that mutate shared files in parallel, and it breaks every run: the dev's edits land in a private worktree that is never merged back, while `verify` and `judge` run in the main tree and see nothing. Every attempt then fails its binary gate and every task parks. Isolation would have to wrap a task's whole dev→verify→judge→score pipeline, which separate `agent()` calls cannot express. For real parallel conflicts, sequence the conflicting tasks instead — add a `Depends on` edge between them in the flightplan so `next-ready` never offers them in the same wave.

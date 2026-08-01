@@ -56,6 +56,10 @@ type RunResult = {
 type Scenario = {
   /** One entry per wave, consumed in order. */
   scouts: ScoutResult[];
+  commit?: (
+    | { committed: boolean; shas: string[]; failed: boolean; reason: string }
+    | null
+  )[];
   /** Keyed by task ref; null models an agent that returned no structured result. */
   gate?: Record<string, ({ passed: boolean; summary: string } | null)[]>;
   judge?: Record<string, ({ verdict: Verdict; rationale: string } | null)[]>;
@@ -121,6 +125,7 @@ async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
   const src = await loadScript();
   const labels: string[] = [];
   const scouts = [...scenario.scouts];
+  const commits = [...(scenario.commit ?? [])];
   const queues = new Map<string, unknown[]>();
   const take = (bucket: string, ref: string, fallback: unknown) => {
     const key = `${bucket}:${ref}`;
@@ -141,6 +146,11 @@ async function runOrchestrator(scenario: Scenario): Promise<RunLog> {
 
     if (label.startsWith("scout-wave-")) {
       return scouts.length > 0 ? scouts.shift() : null;
+    }
+    if (label.startsWith("commit-")) {
+      return commits.length > 0
+        ? commits.shift()
+        : { committed: true, shas: ["abc1234"], failed: false, reason: "" };
     }
     const [role, rest] = [label.slice(0, label.indexOf(":")), label];
     const refOf = (l: string) => l.slice(l.indexOf(":") + 1).split("#")[0];
@@ -535,5 +545,122 @@ describe("orchestrator failure handling", () => {
     });
     expect(accountsForEveryTask(result, refs)).toBe(true);
     expect(result.escalations).toHaveLength(2);
+  });
+});
+
+describe("orchestrator commits", () => {
+  const wave = (ref: string, total: number, done: number): ScoutResult => ({
+    ready: [ready(ref)],
+    counts: counts({ total, todo: total - done, done }),
+    unfinished: [{ ref, state: "todo" }],
+    invalidRefs: [],
+    errors: [],
+  });
+  const complete = (total: number): ScoutResult => ({
+    ready: [],
+    counts: counts({ total, done: total }),
+    unfinished: [],
+    invalidRefs: [],
+    errors: [],
+  });
+
+  test("a failed inter-wave commit escalates without disturbing task accounting", async () => {
+    const refs = ["ui/01", "ui/02"];
+    const { result } = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1), complete(2)],
+      commit: [
+        {
+          committed: false,
+          shas: [],
+          failed: true,
+          reason: "hook rejected commit",
+        },
+      ],
+    });
+
+    expect(result.escalations).toHaveLength(1);
+    expect(result.escalations[0]).toMatchObject({
+      task: "(commit)",
+      attempt: 0,
+      infrastructure: true,
+      parked: false,
+    });
+    expect(result.escalations[0].reason).toContain("hook rejected commit");
+    expect(accountsForEveryTask(result, refs)).toBe(true);
+  });
+
+  test("a null inter-wave commit escalates with an unknown outcome", async () => {
+    const refs = ["ui/01", "ui/02"];
+    const { result } = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1), complete(2)],
+      commit: [null],
+    });
+
+    expect(result.escalations[0]).toMatchObject({
+      task: "(commit)",
+      infrastructure: true,
+      parked: false,
+    });
+    expect(result.escalations[0].reason).toMatch(/unknown/);
+    expect(result.escalations[0].reason).not.toMatch(/commit failed/);
+    expect(accountsForEveryTask(result, refs)).toBe(true);
+  });
+
+  test("an inter-wave commit runs after scout guards and before task dispatch", async () => {
+    const { labels } = await runOrchestrator({
+      scouts: [
+        wave("ui/01", 2, 0),
+        wave("ui/02", 2, 1),
+        complete(2),
+      ],
+    });
+
+    const scout = labels.indexOf("scout-wave-2");
+    const commit = labels.indexOf("commit-wave-2");
+    const dev = labels.findIndex(
+      (label, index) => index > scout && label.startsWith("dev:"),
+    );
+    expect(commit).toBeGreaterThan(scout);
+    expect(commit).toBeLessThan(dev);
+  });
+
+  test.each([
+    {
+      name: "parse errors",
+      scout: {
+        ready: [ready("ui/02")],
+        counts: counts({ total: 1, todo: 1 }),
+        unfinished: [{ ref: "ui/02", state: "todo" }],
+        invalidRefs: [],
+        errors: [{ file: "ui/02.md", reason: "missing H1" }],
+      },
+    },
+    {
+      name: "invalid counts",
+      scout: {
+        ready: [ready("ui/02")],
+        counts: counts({ total: 1, invalid: 1 }),
+        unfinished: [{ ref: "ui/02", state: "invalid" }],
+        invalidRefs: ["ui/02"],
+        errors: [],
+      },
+    },
+  ])("a wave aborted by $name emits no commit label", async ({ scout }) => {
+    const { labels } = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), scout],
+    });
+    expect(labels.some((label) => label.startsWith("commit-"))).toBe(false);
+  });
+
+  test("a completed wave skips inter-wave commit and only runs post-loop commit", async () => {
+    const { labels } = await runOrchestrator({
+      scouts: [
+        wave("ui/01", 1, 0),
+        complete(1),
+      ],
+    });
+
+    expect(labels.filter((label) => label.startsWith("commit-wave-"))).toEqual([]);
+    expect(labels.filter((label) => label === "commit-post-loop")).toHaveLength(1);
   });
 });

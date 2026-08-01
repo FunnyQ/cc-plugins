@@ -4,6 +4,10 @@ import type {
   FlightlogEntry,
   ScoreEntry,
 } from "../../flightplan/scripts/lib/flightlog";
+import {
+  formatEntry,
+  parseLog,
+} from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet, deriveTaskViews, parseAgentLabel } from "./fleet";
 
 const note = (
@@ -265,6 +269,22 @@ describe("deriveTaskViews", () => {
 });
 
 describe("aggregateFleet", () => {
+  test("preserves the commit role through the flightlog parse path", () => {
+    const line = formatEntry(
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "commit-post-loop",
+      ),
+    );
+    const rows = aggregateFleet(parseLog(line));
+
+    expect(rows[0]).toMatchObject({ role: "commit", label: "commit-post-loop" });
+  });
+
   test("pairs by label and computes elapsed time from entry timestamps", () => {
     const rows = aggregateFleet([
       note("ui/03", "dev", 2, "2026-01-01T00:00:00Z", "start", "dev:ui/03#2"),
