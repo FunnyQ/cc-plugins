@@ -1219,13 +1219,13 @@ describe("orchestrator cross-vendor review lens", () => {
     expect(prompt).not.toContain("codex-run.ts review");
   });
 
-  test("never passes a permission-bypass flag — a reviewer edits nothing", async () => {
+  test("auto-approves so an approval prompt cannot stall an unattended run", async () => {
     const prompt = await reviewPrompt({
       liveReviewEngine: "true",
       relayPath: "'/abs/relay/relay.ts'",
     });
 
-    expect(prompt).not.toContain("--dangerous");
+    expect(prompt).toContain("--dangerous");
   });
 
   test("keeps waiting through relay collect instead of failing a pending review", async () => {
@@ -1235,7 +1235,9 @@ describe("orchestrator cross-vendor review lens", () => {
       liveCollectRounds: "2",
     });
 
-    expect(prompt).toContain("relay ... collect --agent <name> --result <path>");
+    expect(prompt).toContain(
+      "relay ... collect --agent <name> --result <path>",
+    );
     expect(prompt).toContain("at most 2 times");
   });
 

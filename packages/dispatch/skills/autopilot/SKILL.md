@@ -86,7 +86,7 @@ The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.reviewLensModel`, `CFG.l
 
 When the user picks live, leave `CFG.liveCollectRounds` at its default `3`: a delegate or reviewer that outlives relay's watch window is still working, so the agent reattaches with `relay collect` up to that many more times (~32 min total) instead of failing the attempt and putting a second writer on the same files. Lower it only when a fast fail matters more than finishing a slow task. The same rounds apply to both live steps.
 
-The live review lens passes **no** permission-bypass flag, unlike the live dev delegate. A reviewer edits nothing, so relay's read-only prompt contract is the guard, and anything that does ask for approval surfaces in the visible pane for a human.
+The live review lens passes `--dangerous`, same as the live dev delegate. A live pane carries no sandbox flag of its own, so an approval prompt with nobody watching stalls the lens for the full wait plus every collect round and then reports a false `UNREACHABLE`. Read-only stays prompt-enforced — relay's review contract plus the lens prompt's own "record, never edit" — and the fixer's verification catches a reviewer that edits anyway.
 
 If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, the headless wrapper path is exactly today's behavior. The four Claude `/simplify` lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
 
