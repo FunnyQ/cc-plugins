@@ -1,5 +1,41 @@
 # Changelog
 
+## [dispatch 3.16.0] - 2026-08-01
+
+_tracks tag `dispatch-v3.16.0`_
+
+### Added
+
+- **`next-ready.ts --summary` returns a whole-tree snapshot** — `{ready, counts, unfinished, invalid, errors}` — so autopilot's wave loop can tell a genuinely finished tree from a stalled one instead of guessing from partial reads.
+- **A new `invalid` task state is surfaced end-to-end.** A task marked `Status: done` while an Acceptance-criteria or Verification box is still unticked is now flagged as malformed, reported by `lint-task.ts`, blocked from unlocking dependents by `next-ready.ts`, and shown with its own count in the flightdeck dashboard.
+
+### Changed
+
+- **Malformed "done" tasks now fail loudly instead of passing quietly.** Previously an agent could write a decorated Status line that silently failed to register as done while every gate checkbox still ticked green, and autopilot would report clean completion with a task subtree actually stranded. An existing task tree carrying this pattern will now fail lint and readiness checks the next time it's touched.
+- **`mark-done.ts` is now one atomic status transition:** it validates the task header first and writes nothing at all on failure, instead of leaving the file half-updated. The duplicated status-line regex is gone — `matchStatusLine()`/`parseStatusValue()` in `lib/parse-task.ts` are now the single source of truth.
+- **`flightplan-lint.sh` now recognizes the annotated Required-reading header** flightplan scaffolds actually use, instead of silently skipping every current task file.
+- **Infrastructure failures now survive the pipeline instead of vanishing.** Task thunks are wrapped before running in parallel and reconciled by index; a verifier or judge that returns no structured result now parks and escalates immediately, distinct from an ordinary quality failure (`passed: false`), which still retries as before.
+
+### Fixed
+
+- **Autopilot no longer false-stalls on a resumed run**, because wave-loop termination is now read directly off the on-disk task-count snapshot rather than inferred.
+
+## [monitor 3.22.0] - 2026-08-01
+
+_tracks tag `monitor-v3.22.0`_
+
+### Added
+
+- **Cockpit now detects and reports split scribe decision logs**, so a decision trail that got divided across multiple log files is surfaced instead of silently appearing incomplete.
+
+## [relay 0.6.0] - 2026-08-01
+
+_tracks tag `relay-v0.6.0`_
+
+### Added
+
+- **New `relay collect` command reattaches to a pending live delegate run.** If a delegate is still working when you'd otherwise time out or walk away, you can now come back and keep waiting on it instead of the attempt being counted as failed.
+
 ## [chronicle 0.9.6] - 2026-07-28
 
 _tracks tag `chronicle-v0.9.6`_
