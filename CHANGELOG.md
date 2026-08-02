@@ -1,5 +1,14 @@
 # Changelog
 
+## [dispatch 3.18.2] - 2026-08-02
+
+_tracks tag `dispatch-v3.18.2`_
+
+### Changed
+
+- **Documentation-only release: no change to how flightplan behaves.** The flightplan skill's execution model and subagent guidance were clarified — repairable errors vs. unrecoverable scaffold failures, when to fork a subagent vs. write inline, and why reviewers start context-less to avoid self-bias.
+- **`SKILL.md` was trimmed 25% (3871 → 2892 words)** by removing text duplicated in `references/interview-guide.md` and `references/task-template.md`, and moving the rarely-used waypoint branch into a new `references/waypoint-mode.md`. Every command, flag, path, and constraint carried over unchanged, so flightplan loads fewer tokens per run with an identical planning flow.
+
 ## [herdr 0.2.3] - 2026-08-02
 
 _tracks tag `herdr-v0.2.3`_
