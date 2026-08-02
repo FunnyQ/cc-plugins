@@ -1,5 +1,13 @@
 # Changelog
 
+## [dispatch 3.18.7] - 2026-08-03
+
+_tracks tag `dispatch-v3.18.7`_
+
+### Fixed
+
+- **The Flightdeck agent fleet no longer leaves dead agents running forever.** When a replacement step for the same task starts, an earlier agent that never logged its end is now marked abandoned instead of staying in-flight at the top of the fleet and keeping the run timer alive. Abandoned rows remain visible as unfinished work without inventing a completion time or verdict.
+
 ## [dispatch 3.18.6] - 2026-08-03
 
 _tracks tag `dispatch-v3.18.6`_
