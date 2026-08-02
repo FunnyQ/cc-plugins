@@ -1,5 +1,14 @@
 # Changelog
 
+## [dispatch 3.18.3] - 2026-08-02
+
+_tracks tag `dispatch-v3.18.3`_
+
+### Fixed
+
+- **Autopilot no longer stalls with a misleading message when a parallel wave rolls back a sibling task's file.** A live run had stalled at 7/11: one task's writer ran `git checkout` over a task file that a sibling task had already confirmed done, reverting its `Status: done` line. The wave loop kept trusting its in-memory completed list, so the reverted task could never be re-dispatched, and several waves later it died with a generic "no ready task" message instead of naming the real cause. The shared no-commit rule given to every writer agent now explicitly forbids the working-tree-restore family (`git checkout`, `git restore`, `git reset`, `git clean`) as its own rule, separate from the (still allowed) case of editing a shared source file under a different task. The wave loop also now checks for memory/disk divergence before building the ready set, so a run stops immediately and names the affected task file instead of stalling later with no explanation.
+- **A flightplan's "Known gaps" now reach the executor again.** The 3.18.2 token-efficiency trim of `SKILL.md` accidentally dropped two of the seven mentions of `tasks/README.md`, both in the Step 6 review-loop instructions — exactly the step where gaps get produced. With no destination named there, a clean-session run wrote Known gaps into `PLAN.md` instead, which an executor never opens. The build-readme step now names both human-authored sections (`## Where to start` and `## Known gaps`) and says to revisit them after the review loop as well as after the interview.
+
 ## [dispatch 3.18.2] - 2026-08-02
 
 _tracks tag `dispatch-v3.18.2`_
