@@ -410,3 +410,41 @@ describe("svg extent", () => {
     }
   });
 });
+
+describe("lane placement", () => {
+  test("a chain longer than the sweep count still settles beside its edge", () => {
+    // The barycentre sweep reindexes per layer, not per pass. Per pass, a
+    // position advances only one layer per pass, so a placeholder chain longer
+    // than ORDER_PASSES never hears where its edge starts and strands itself at
+    // the bottom of every layer it crosses — placeholders are appended last.
+    //
+    // `X` sorts above the chain and is unreachable from it, so `X -> Z` survives
+    // the reduction and every one of its eight placeholders belongs at the TOP
+    // of its layer. Reaching that from the bottom is exactly the propagation the
+    // per-layer reindex buys.
+    const chain = Array.from({ length: 9 }, (_, index) =>
+      makeNode(
+        `A${index}`,
+        "chain",
+        String(index + 1).padStart(2, "0"),
+        index === 0 ? [] : [`A${index - 1}`],
+      ),
+    );
+    const nodes = [
+      ...chain,
+      makeNode("X", "aaa", "01"),
+      makeNode("Z", "tail", "01", ["A8", "X"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const lanes = [...layout.waypoints.values()].flat();
+    expect(lanes.length).toBe(8);
+
+    // Every placeholder sits above the chain node sharing its column.
+    const nodeAtColumn = new Map(
+      [...layout.positions.values()].map(({ x, y }) => [x, y]),
+    );
+    for (const lane of lanes) {
+      expect(lane.y).toBeLessThan(nodeAtColumn.get(lane.left));
+    }
+  });
+});

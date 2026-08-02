@@ -166,8 +166,12 @@ function orderLayers(layerGroups, orderedNodes, refs) {
         depth,
         keyed.map(({ node }) => node),
       );
+      // Reindex per layer, not per pass. A layer must read the ranks the sweep
+      // just settled upstream of it, or a position advances one layer per pass
+      // and a chain longer than the pass count never converges — which is what
+      // stranded long-edge placeholders at the bottom of every layer they crossed.
+      reindex();
     }
-    reindex();
   }
 }
 
