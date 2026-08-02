@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 3.18.4] - 2026-08-03
+
+_tracks tag `dispatch-v3.18.4`_
+
+### Fixed
+
+- **A task could fail its own scope check because of a sibling's work.** Autopilot runs all tasks in a parallel wave in one shared working tree, but a verification step like "run `git status --short` and expect only these files" reads the whole tree — so a sibling task's correct, uncommitted edits showed up and made an otherwise-passing task report itself in violation. One live run failed a task three times and parked it despite 7/7 acceptance criteria and 245 passing tests, purely on paths that belonged to the task running alongside it. The `scope-git-status` lint rule now requires every `git status` inside "## Acceptance criteria" or "## Verification" to name a path (e.g. `git status --short -- src/state.rs`); `task-template.md`'s example, which used to teach the unscoped form, is rewritten. Autopilot also lints the whole plan up front in Step 1, and the dev agent is no longer allowed to reword a gate just to make it pass.
+
+  **Upgrade note:** flightplan trees generated before this release will start failing this lint. Fix is per task file — narrow each `git status` with a `--` pathspec naming that task's own files.
+
+- **A single parked task no longer blocks every later commit in the run.** The inter-wave commit gate refused to commit anything once any escalation had occurred, and the only escalation that reached it without stopping the run was a flaky (commit) failure — so one bad commit attempt silently disabled commits for the rest of the run, letting uncommitted changes pile up across every remaining wave. The gate is now scoped: a parked task's declared files are held back and left uncommitted (its task file still commits, since `Status: blocked` is real state), while everything else keeps committing normally.
+
 ## [dispatch 3.18.3] - 2026-08-02
 
 _tracks tag `dispatch-v3.18.3`_
