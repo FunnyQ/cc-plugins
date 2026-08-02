@@ -135,7 +135,7 @@ Either way, never leave a half-written tree.
    ```bash
    bun "$SCRIPTS"/build-readme.ts docs/<slug>/tasks
    ```
-   It fails loudly on malformed or duplicate-ref tasks rather than dropping them, and preserves human-authored prologue/epilogue between the generated markers. Fill in any Known gaps from the interview by hand.
+   It fails loudly on malformed or duplicate-ref tasks rather than dropping them, and preserves the human-authored prologue/epilogue between the generated markers. Two of those sections are yours to fill, and the template ships them as placeholder comments that will otherwise be delivered as-is: **`## Where to start`** (name the first task file) and **`## Known gaps`**. `tasks/README.md` is what an executor opens, so a gap recorded only in PLAN.md never reaches them. Revisit both after Step 6 — most gaps surface during the review loop, not the interview.
 
 ### Step 6 — Review the written artifact (engine-selectable; iterate to convergence)
 
@@ -157,14 +157,14 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
   2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."* **Omit `subagent_type`** — the reviewer must start context-less. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 5's fan-out).
   3. Take the findings back to the loop. A fresh subagent each pass keeps reviewer ≠ author — the same anti-bias split autopilot uses.
 
-**Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings; the loop is where most of the quality comes from, because the first pass catches the loud problems and the *revised* plan then exposes what they were masking. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap with the reason, and don't re-fix it when a later pass raises it again.
+**Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings; the loop is where most of the quality comes from, because the first pass catches the loud problems and the *revised* plan then exposes what they were masking. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap in `tasks/README.md` with the reason, and don't re-fix it when a later pass raises it again.
 
 **How many passes, within bounds:**
 
 - **At least 2** full review→fix cycles. The second, on the improved plan, is the high-value one.
 - **Keep going** while a pass still surfaces *material* findings.
 - **Stop when a pass comes back clean** — only nitpicks or already-recorded intent. That's the "plan is complete" signal.
-- **Ceiling ~4–5.** Past that it's usually over-polishing. Bank remaining real items as Known gaps and move on.
+- **Ceiling ~4–5.** Past that it's usually over-polishing. Bank remaining real items as Known gaps in `tasks/README.md` and move on.
 
 ### Step 7 — Stop. Do not execute.
 
