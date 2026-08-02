@@ -1,6 +1,6 @@
 ---
 name: flightplan
-version: 0.6.0
+version: 0.7.0
 description: >-
   Heavyweight interviewer that writes a multi-file spec artifact to disk —
   docs/<topic>/PLAN.md plus a tasks/ tree for sub-agents to execute later.
@@ -90,7 +90,12 @@ Once PLAN.md's content is drafted, call `ExitPlanMode`. Always exit, even if ope
 
 **What counts as approval**: explicit acceptance (clicks approve, types "yes/approved/go ahead", or equivalent). Silence, "looks ok-ish", or "but can you also…" are **not** approval. They mean continue revising. If the user requests any change, do not write any files. Revise the plan, and re-confirm with the user.
 
-**Atomicity note**: the writing sequence is not transactional. Once `scaffold.ts` runs, the `docs/<slug>/` tree exists. If a later step fails, recover by running `trash docs/<slug>/` and re-running from scaffold. Do not leave the user with a half-written tree.
+**Atomicity note**: the writing sequence is not transactional. Once `scaffold.ts` runs, the `docs/<slug>/` tree exists. Two failure classes, two responses — do not confuse them:
+
+- **Repairable** — a missing task file, a lint violation, a fork that died. Fix that file in place and re-run the step. Never delete the tree for these.
+- **Unrecoverable** — the scaffold itself is wrong (bad slug, wrong buckets), or the tree is too damaged to reason about. Run `trash docs/<slug>/` and re-run from scaffold. Only ever trash a tree this run created; if `docs/<slug>/` predates this run, stop and ask the user.
+
+Either way, do not leave the user with a half-written tree.
 
 **Bucket names must be single kebab tokens** with no internal dashes (`ui`, `backend`, `api`, `work`). The H1 parser used by `lint-task.ts` and `build-readme.ts` treats `BUCKET` as one uppercase token. Dashed bucket names will scaffold but fail validation.
 
@@ -102,21 +107,52 @@ Once PLAN.md's content is drafted, call `ExitPlanMode`. Always exit, even if ope
    ```
    Creates `docs/<slug>/tasks/_context/` and one dir per bucket. The root `docs/<slug>/` is created non-recursively. This guards against a TOCTOU race: if the slug is created between Step 2's `--check` and now, the script throws EEXIST instead of silently overwriting.
 
-2. **Write the content in this order.** Fill files in dependency order. This keeps the automatic lint hook (see below) from firing false positives on unresolved `Required reading` paths:
-   - First: PLAN.md and every `_context/*.md` (especially `_context/shared.md`).
-   - Then: each `tasks/<bucket>/NN-<slug>.md`.
+2. **Write PLAN.md and every `_context/*.md` yourself.** Do not delegate these. They are the shared contract every task file agrees to, and a single author is what keeps them from drifting. PLAN.md is also already drafted in plan mode, so writing it is transcription, not authoring. Write `_context/rubric.md` before the other context files when the quality bar is shared.
 
-   Use the four reference templates listed under "Additional resources". Do not improvise structure. **Every task file must carry a `## Eval rubric`** (threshold line + weighted dimension table). `lint-task.ts` rejects a task without a parseable one. If the quality bar is shared, write `_context/rubric.md` first. Have each task's rubric reference it. **End the tree with one terminal task marked `> **Final review**: true`.** Its `Depends on` must reach every other task. This is the closing holistic gate (see `references/task-template.md` → "`Final review`").
+   Write them before spawning anything. Step 3's forks list these files under `Required reading` and read them off disk, so the finalized file is the contract — not whatever the fork inherited from the transcript.
 
-   **Automatic lint hook**: every time a task file is written, the `flightplan-lint.sh` hook runs `lint-task.ts` on just that file. Violations are surfaced as stderr feedback (exit 2). The hook skips files that don't match flightplan's path + content signature, so it won't false-positive on unrelated Edit/Write calls.
+   Use `references/plan-template.md` and `references/context-files.md`. Do not improvise structure.
 
-3. **Lint the whole tree** to catch cross-file issues the per-file hook misses (duplicate `bucket/NN`, broken cross-bucket deps):
+3. **Fan out the task files to forked subagents.** Spawn one `Agent` per task file, all in a single message so they run concurrently. Use `subagent_type: "fork"` — and only that. Omitting it starts a fresh, context-less agent that never saw the interview and will invent the decisions.
+
+   **Write them inline instead, serially, when either holds:** the tree has 3 or fewer task files (spawn overhead beats the gain), or the `Agent` tool is unavailable because flightplan is itself running inside a subagent (a fork is a leaf and cannot spawn). Beyond ~10 tasks, spawn one batch per bucket rather than one giant fan-out, so a failed batch is contained.
+
+   Decide the whole task list first — bucket, `NN`, slug, title, `Depends on`, `Blocks`, and which task carries `> **Final review**: true`. The forks fill in prose; they must not choose numbering or dependency edges, or two of them will pick the same `NN`.
+
+   Give each fork:
+   - the absolute output path `docs/<slug>/tasks/<bucket>/NN-<slug>.md`;
+   - the absolute path to `references/task-template.md`;
+   - the exact H1 and every header field value you decided above;
+   - the `_context/*.md` files it must list under `Required reading`, by relative path;
+   - the substance from the interview this task needs — goal, files to create/modify, signatures, schemas, acceptance criteria, verification commands, and the rubric anchors (or "reuse the shared bar in `../_context/rubric.md`").
+
+   **Tell each fork to read `task-template.md` and every `_context/*.md` it will list, before writing.** A fork inherits the parent transcript, not the files. Relying on the inherited copy is how a task file ends up citing `../_context/shared.md` while contradicting what that file actually says — and no linter checks that agreement.
+
+   Bound each fork explicitly. A fork inherits the parent's full tool access and autonomy, and will overstep a narrow brief unless the brief says otherwise:
+   - Write exactly that one file. Edit nothing else.
+   - Do not run `scaffold.ts`, `lint-task.ts`, `build-readme.ts`, or `review-plan.ts`.
+   - Do not implement any of the work the task describes. This is a spec, not the code.
+   - If the write is rejected with lint feedback, fix that file and rewrite until it is clean, then stop.
+   - Report one line: the path written, plus any violation left unresolved.
+
+   **Join before moving on.** A fork can die on an API error, time out, or report success without leaving a file, and none of that raises anything on its own. Keep the list of expected paths from the step above. Once every fork has come back:
+   ```bash
+   ls docs/<slug>/tasks/*/*.md      # every expected path present?
+   git status --short               # anything touched outside docs/<slug>/?
+   ```
+   Write any missing task file yourself, inline. Do not re-spawn the whole batch, and do not trash the tree — a missing file is repairable (see the Atomicity note). If a fork touched a path outside `docs/<slug>/`, revert that path before continuing; the brief above forbids it, but nothing enforces it.
+
+   **Every task file must carry a `## Eval rubric`** (threshold line + weighted dimension table). `lint-task.ts` rejects a task without a parseable one. **End the tree with one terminal task marked `> **Final review**: true`.** Its `Depends on` must reach every other task. This is the closing holistic gate (see `references/task-template.md` → "`Final review`").
+
+   **Automatic lint hook**: every time a task file is written through `Edit|Write`, the `flightplan-lint.sh` hook runs `lint-task.ts` on just that file. Violations are surfaced as stderr feedback (exit 2). The hook skips files that don't match flightplan's path + content signature, so it won't false-positive on unrelated Edit/Write calls. Treat it as early per-file feedback, not as the gate — step 4 lints the whole tree regardless of who wrote what.
+
+4. **Lint the whole tree** to catch cross-file issues the per-file hook misses (duplicate `bucket/NN`, broken cross-bucket deps). Run this yourself after every fork has reported, never inside a fork:
    ```bash
    bun "$SCRIPTS"/lint-task.ts docs/<slug>/tasks
    ```
    Pass the **tasks directory**, not a glob. The script walks bucket dirs, and it auto-skips `_context/` and any `README.md`. If any violation is reported, fix it and re-run. Violations include: PLAN.md refs in any casing, sibling-task refs, missing sections, missing or unparseable `## Eval rubric`, a pass threshold outside the scale, no final-review task (or one that doesn't reach every task), broken Required reading paths, an H1-vs-path mismatch, and a bad Status. Do not finish with violations outstanding.
 
-4. **Generate `tasks/README.md`** from the task headers — index, dep graphs, cross-bucket table:
+5. **Generate `tasks/README.md`** from the task headers — index, dep graphs, cross-bucket table:
    ```bash
    bun "$SCRIPTS"/build-readme.ts docs/<slug>/tasks
    ```
@@ -152,7 +188,7 @@ Each pass, by engine:
      ```bash
      bun "$SCRIPTS"/review-plan.ts docs/<slug> --print
      ```
-  2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."*
+  2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."* **Omit `subagent_type` here.** The reviewer must start context-less. A fork inherits the interview and reviews its own reasoning, which is the bias this step exists to defeat — the opposite of the task-writing fan-out in Step 5.
   3. Take its findings back to the loop. **You are the fixer, never the reviewer.** A new subagent each pass keeps every review independent: reviewer ≠ author. This is the same anti-bias split autopilot uses.
 
 **Act on findings between every pass.** Rewrite vague criteria, split tasks that mix concerns, fix goal drift, and add missing `Depends on:` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Only skip a finding when it conflicts with an intentional design decision already recorded. If you skip one, add it as a Known gap in `tasks/README.md` with the reason. Do not "re-fix" it when a later pass raises it again.
@@ -225,7 +261,7 @@ The dispatch plugin registers `hooks/flightplan-lint.sh` as a PostToolUse hook o
 
 The signature stays narrow on purpose. A near miss such as `> **Required reading later**:` is a silent no-op. Anything else is a silent no-op too.
 
-When a task file violates the self-containment contract or is missing its Eval rubric, the hook exits 2 with stderr feedback. The violation then surfaces to the LLM immediately, rather than waiting for the Step 5 whole-tree lint. Write `_context/` files before task files (see Step 5, point 2) to keep the hook quiet during normal flow.
+When a task file violates the self-containment contract or is missing its Eval rubric, the hook exits 2 with stderr feedback. The violation then surfaces to the LLM immediately, rather than waiting for the Step 5 whole-tree lint. Write `_context/` files before task files (see Step 5, points 2–3) to keep the hook quiet during normal flow.
 
 **The hook observes harness `Edit|Write` calls only.** It cannot see a file written by an external CLI, by relay, or by Bash. Treat it as early feedback for flightplan authors, not as the execution boundary. `autopilot`'s binary gate and rubric gate own that boundary.
 
@@ -250,6 +286,6 @@ Resolve the sibling waypoint script as `WAYPOINTS_SCRIPT="<base-dir>/../waypoint
 1. Run `bun "$WAYPOINTS_SCRIPT" active <proj>` to get the active leg's `NN-slug`, `DONE-STATE`, and prior-legs digest.
 2. Interview only for that leg's done-state, using the prior-legs digest as rolling-wave context (do NOT re-plan the whole project).
 3. Scaffold with `bun "$WAYPOINTS_SCRIPT" leg-scaffold <proj> <NN-slug> <buckets>` (NOT `scaffold.ts`).
-4. Write the leg's flightplan spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`.
+4. Write the leg's flightplan spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`, using the same split as Step 5: author the spec and `_context/` yourself, fan the task files out to one forked subagent each.
 5. Run the existing lint-task.ts, build-readme.ts, and review-plan.ts pointed at that leg path (they already accept arbitrary paths).
 6. Note that execution is unchanged: `/autopilot docs/<proj>/legs/<NN-slug>`.
