@@ -1,5 +1,20 @@
 # Changelog
 
+## [dispatch 3.18.5] - 2026-08-03
+
+_tracks tag `dispatch-v3.18.5`_
+
+### Fixed
+
+- **A passing verify step could render red on the flightdeck dashboard.** Verify-row colouring scanned a verifier's whole message for the word "fail," so a message like `"PASS — bun test (7 pass, 0 fail)"` matched on its own passing test summary and showed as a rejection — the reverse could also happen, with a failing message showing green. The dashboard now reads the leading `PASS`/`FAIL` verdict a verifier's message is contracted to start with, falling back to the old prose scan only for off-contract messages.
+
+### Changed
+
+- **The dependency graph on a large flightplan is now readable.** Watching a real 30-task plan render surfaced a tangle of crossing lines; four fixes address it: the graph now draws its transitive reduction (edges implied by other edges are dropped, cutting a measured 53 declared edges to 44 drawn with reachability unchanged), each layer orders its nodes by their neighbours' positions so a node sits near its parents (vertical travel down 28%, straight edges up from 11 to 15), edges that skip a layer get a reserved lane instead of running through an intermediate node's box (12 of 44 edges down to zero), and edges are drawn as rounded paths with each crossing fanned into its own column instead of stacking on one. The graph itself is shorter too, 756px down to 490px.
+- **Hovering a task now separates its direct dependencies from the wider lineage.** The direct parent's edge and ring highlight amber, the direct child's highlight violet, and the rest of the ancestry/descendants are quieted — so "what's holding this up" and "what moves when this lands" are answered at a glance instead of by tracing lines.
+
+Both changes are dashboard-only: the plan format, lint rules, and execution loop are unchanged.
+
 ## [dispatch 3.18.4] - 2026-08-03
 
 _tracks tag `dispatch-v3.18.4`_
