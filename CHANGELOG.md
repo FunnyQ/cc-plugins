@@ -1,5 +1,37 @@
 # Changelog
 
+## [herdr 0.2.3] - 2026-08-02
+
+_tracks tag `herdr-v0.2.3`_
+
+### Added
+
+- **`herd wait` can now wait for `done`, and take repeated `--status` flags** to wait on more than one target state at once (e.g. done or blocked). It throws on an empty status list instead of silently falling back, so a misconfigured call fails loudly rather than hanging forever. The default stays `idle` on purpose: widening it to include `blocked` was considered and rejected, since `blocked` means the agent is parked on a human approval — a wait that quietly returned there would hand a stuck pane to a caller with nobody watching.
+
+### Changed
+
+- **The `parseArgs` helper now supports repeatable flags** rather than keeping only the last value for a flag passed more than once, which the new multi-status `wait` depends on.
+
+### Docs
+
+- **A new `references/socket-api.md` documents herdr's underlying Unix-socket protocol.** Measurement showed the CLI is a thin, faithful pass-through over the socket (identical JSON payloads and error envelope), so migrating the wrapper to talk to the socket directly was evaluated and declined — the one capability the CLI still can't reach is `events.subscribe`. SKILL.md and `plugin-development.md` now point to the new reference.
+
+## [relay 0.6.1] - 2026-08-02
+
+_tracks tag `relay-v0.6.1`_
+
+### Fixed
+
+- **`references/live.md` no longer contradicts itself about how to wait on a live pane.** One passage told readers to block with `herd wait`, another told them to prefer `collect`; the guidance is now consistent, and the real reason to prefer `collect` is spelled out — it verifies the result-file marker, which a plain status wait can't stand in for.
+
+## [dispatch 3.18.1] - 2026-08-02
+
+_tracks tag `dispatch-v3.18.1`_
+
+### Changed
+
+- **Autopilot's `SKILL.md` was streamlined.** The intro is now one sentence, the "when to use vs doing it by hand" section is gone, Steps 1-4 are condensed, and detailed technical reasoning moved into `references/orchestrator.md`. The bundled-scripts list now covers only the three user-facing tools (`next-ready.ts`, `lint-task.ts`, `flightlog.ts report`), and verbose escalation/infrastructure-failure explanations were removed.
+
 ## [dispatch 3.18.0] - 2026-08-01
 
 _tracks tag `dispatch-v3.18.0`_
