@@ -82,6 +82,8 @@ describe("elapsedText", () => {
 
   test("ticks an in-flight row against the current time", () => {
     expect(elapsedText({ status: "in-flight", startedAt }, now)).toBe("40.0s");
+    // No end was ever logged, so there is no duration to claim.
+    expect(elapsedText({ status: "abandoned", startedAt }, now)).toBe("");
   });
 
   test("prints the recorded duration of a finished row as given", () => {
@@ -129,6 +131,7 @@ describe("isInFlight", () => {
   test("returns true only for an in-flight row", () => {
     expect(isInFlight({ status: "in-flight" })).toBe(true);
     expect(isInFlight({ status: "finished" })).toBe(false);
+    expect(isInFlight({ status: "abandoned" })).toBe(false);
   });
 });
 
@@ -183,6 +186,17 @@ describe("runElapsed", () => {
     ];
 
     expect(runElapsed(rows, t0 + 90_000)).toEqual({ ms: 10_000, live: false });
+  });
+
+  test("freezes when the only unfinished row was abandoned", () => {
+    // Before rows could be abandoned, a dead agent's row stayed in-flight and
+    // the run timer ticked forever on a run that had already stopped.
+    const rows = [
+      { key: "a", status: "finished", startedAt: at(0), elapsedMs: 5_000 },
+      { key: "b", status: "abandoned", startedAt: at(4_000) },
+    ];
+
+    expect(runElapsed(rows, t0 + 90_000)).toEqual({ ms: 5_000, live: false });
   });
 
   test("measures from the earliest start, whatever order rows arrive in", () => {
@@ -257,9 +271,9 @@ describe("fleet sticky offsets", () => {
   // A selector can head more than one block (`.fleet-row, .fleet-columns` and
   // `.fleet-columns` alone), so read them all, not the first one found.
   const rule = (selector) =>
-    (css.match(new RegExp(`\\${selector}[,\\s][^{]*\\{[^}]*\\}`, "g")) ?? []).join(
-      "\n",
-    );
+    (
+      css.match(new RegExp(`\\${selector}[,\\s][^{]*\\{[^}]*\\}`, "g")) ?? []
+    ).join("\n");
 
   test("the heading declares its own height", () => {
     expect(rule(".fleet-heading")).toContain(

@@ -1,18 +1,19 @@
 :root {
-  --ground: #0E1114;
-  --surface: #171B20;
-  --surface-2: #1E242B;
-  --rule: #262C33;
+  --ground: #0e1114;
+  --surface: #171b20;
+  --surface-2: #1e242b;
+  --rule: #262c33;
   --text: #d2d8df;
-  --muted: #7C8794;
-  --faint: #4C555F;
+  --muted: #7c8794;
+  --faint: #4c555f;
   --state-flight: #c3843f;
   --state-done: #5fa249;
   --state-ready: #4e97a1;
   --state-blocked: #4f5b69;
   --state-alert: #fa6b66;
 
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --text-xs: 11px;
   --text-sm: 12px;
@@ -345,17 +346,34 @@ button {
 
   .graph-node > rect {
     stroke-width: var(--border-width);
-    transition: fill var(--motion-duration), stroke var(--motion-duration);
+    transition:
+      fill var(--motion-duration),
+      stroke var(--motion-duration);
     vector-effect: non-scaling-stroke;
   }
 
-  .graph-node.-done > rect { fill: var(--state-done); stroke: var(--state-done); }
-  .graph-node.-in-progress > rect { fill: var(--state-flight); stroke: var(--state-flight); }
-  .graph-node.-ready > rect { fill: var(--state-ready); stroke: var(--state-ready); }
-  .graph-node.-blocked > rect { fill: var(--state-blocked); stroke: var(--state-blocked); }
+  .graph-node.-done > rect {
+    fill: var(--state-done);
+    stroke: var(--state-done);
+  }
+  .graph-node.-in-progress > rect {
+    fill: var(--state-flight);
+    stroke: var(--state-flight);
+  }
+  .graph-node.-ready > rect {
+    fill: var(--state-ready);
+    stroke: var(--state-ready);
+  }
+  .graph-node.-blocked > rect {
+    fill: var(--state-blocked);
+    stroke: var(--state-blocked);
+  }
   .graph-node.-alert > rect,
   .graph-node.-invalid > rect,
-  .graph-node.-cyclic > rect { fill: var(--state-alert); stroke: var(--state-alert); }
+  .graph-node.-cyclic > rect {
+    fill: var(--state-alert);
+    stroke: var(--state-alert);
+  }
 
   /* Hover lineage: everything on the hovered node's ancestry or descent stays
      lit, the rest recedes. Opacity, not colour, so a state colour never turns
@@ -497,7 +515,10 @@ button {
     block-size: 100%;
     display: grid;
     gap: var(--space-3);
-    grid-auto-columns: minmax(var(--task-lanes-lane-min), var(--task-lanes-lane-max));
+    grid-auto-columns: minmax(
+      var(--task-lanes-lane-min),
+      var(--task-lanes-lane-max)
+    );
     grid-auto-flow: column;
     justify-content: start;
     min-inline-size: 0;
@@ -642,16 +663,36 @@ button {
       text-transform: uppercase;
     }
 
-    &.-done > .summary .status { background: var(--state-done); }
-    &.-done > .summary .badge { color: var(--state-done); }
-    &.-in-progress > .summary .status { background: var(--state-flight); }
-    &.-in-progress > .summary .badge { color: var(--state-flight); }
-    &.-ready > .summary .status { background: var(--state-ready); }
-    &.-ready > .summary .badge { color: var(--state-ready); }
-    &.-blocked > .summary .status { background: var(--state-blocked); }
-    &.-blocked > .summary .badge { color: var(--state-blocked); }
-    &.-invalid > .summary .status { background: var(--state-alert); }
-    &.-invalid > .summary .badge { color: var(--state-alert); }
+    &.-done > .summary .status {
+      background: var(--state-done);
+    }
+    &.-done > .summary .badge {
+      color: var(--state-done);
+    }
+    &.-in-progress > .summary .status {
+      background: var(--state-flight);
+    }
+    &.-in-progress > .summary .badge {
+      color: var(--state-flight);
+    }
+    &.-ready > .summary .status {
+      background: var(--state-ready);
+    }
+    &.-ready > .summary .badge {
+      color: var(--state-ready);
+    }
+    &.-blocked > .summary .status {
+      background: var(--state-blocked);
+    }
+    &.-blocked > .summary .badge {
+      color: var(--state-blocked);
+    }
+    &.-invalid > .summary .status {
+      background: var(--state-alert);
+    }
+    &.-invalid > .summary .badge {
+      color: var(--state-alert);
+    }
   }
 
   .c-score-meter {
@@ -671,9 +712,15 @@ button {
       display: block;
     }
 
-    > .track > .fill.-passed { background: var(--state-done); }
-    > .track > .fill.-failed { background: var(--state-alert); }
-    > .track > .fill.-pending { background: var(--state-flight); }
+    > .track > .fill.-passed {
+      background: var(--state-done);
+    }
+    > .track > .fill.-failed {
+      background: var(--state-alert);
+    }
+    > .track > .fill.-pending {
+      background: var(--state-flight);
+    }
 
     > .track > .threshold {
       background: var(--text);
@@ -701,7 +748,10 @@ button {
       align-items: center;
       display: grid;
       gap: var(--space-2);
-      grid-template-columns: minmax(calc(var(--space-8) * 3), 1fr) minmax(0, 2fr) auto;
+      grid-template-columns: minmax(calc(var(--space-8) * 3), 1fr) minmax(
+          0,
+          2fr
+        ) auto;
     }
 
     > .dimension > .label {
@@ -732,7 +782,10 @@ button {
 
   @container (inline-size < 600px) {
     > .strip {
-      grid-auto-columns: minmax(var(--task-lanes-lane-min), calc(100cqi - var(--space-6)));
+      grid-auto-columns: minmax(
+        var(--task-lanes-lane-min),
+        calc(100cqi - var(--space-6))
+      );
     }
   }
 }
@@ -742,7 +795,8 @@ button {
 }
 
 .c-fleet {
-  --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px minmax(160px, 1fr) minmax(160px, 2fr);
+  --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px
+    minmax(160px, 1fr) minmax(160px, 2fr);
   --fleet-meter-height: var(--space-1);
   /* The heading is pinned to this height and the column header sticks exactly
      below it. One declaration for both, because the two used to be a rendered
@@ -829,9 +883,15 @@ button {
   margin-inline-end: var(--space-1);
 }
 
-.connection.-live { color: var(--state-done); }
-.connection.-waiting { color: var(--state-ready); }
-.connection.-reconnecting { color: var(--state-flight); }
+.connection.-live {
+  color: var(--state-done);
+}
+.connection.-waiting {
+  color: var(--state-ready);
+}
+.connection.-reconnecting {
+  color: var(--state-flight);
+}
 
 .fleet-table {
   min-inline-size: 760px;
@@ -891,8 +951,17 @@ button {
   background: var(--state-flight);
 }
 
-.fleet-row.-failed .fleet-status { background: var(--state-alert); }
-.fleet-row.-rejected .fleet-status { background: var(--state-alert); }
+.fleet-row.-failed .fleet-status {
+  background: var(--state-alert);
+}
+.fleet-row.-rejected .fleet-status {
+  background: var(--state-alert);
+}
+/* Muted, not alarming: an abandoned agent reported no verdict either way, and
+   the default dot is the green of a clean finish. */
+.fleet-row.-abandoned .fleet-status {
+  background: var(--state-blocked);
+}
 
 .fleet-cell.-role {
   align-items: center;
@@ -911,11 +980,22 @@ button {
   text-transform: uppercase;
 }
 
-.fleet-row.-flight .role-badge { color: var(--state-flight); }
-.fleet-row.-failed .role-badge { color: var(--state-alert); }
-.fleet-row.-rejected .role-badge { color: var(--state-alert); }
+.fleet-row.-flight .role-badge {
+  color: var(--state-flight);
+}
+.fleet-row.-failed .role-badge {
+  color: var(--state-alert);
+}
+.fleet-row.-rejected .role-badge {
+  color: var(--state-alert);
+}
+.fleet-row.-abandoned .role-badge {
+  color: var(--state-blocked);
+}
 /* The message is where a rejected gate says WHY, so it stops being secondary. */
-.fleet-row.-rejected .fleet-cell.-message { color: var(--text); }
+.fleet-row.-rejected .fleet-cell.-message {
+  color: var(--text);
+}
 
 .raw-label,
 .fleet-cell.-message {
@@ -949,8 +1029,12 @@ button {
   display: block;
 }
 
-.c-fleet-score.-passed > .track > .fill { background: var(--state-done); }
-.c-fleet-score.-failed > .track > .fill { background: var(--state-alert); }
+.c-fleet-score.-passed > .track > .fill {
+  background: var(--state-done);
+}
+.c-fleet-score.-failed > .track > .fill {
+  background: var(--state-alert);
+}
 
 .c-fleet-score > .track > .threshold {
   background: var(--text);
@@ -965,7 +1049,9 @@ button {
   font-size: var(--text-xs);
 }
 
-.c-fleet-score > .failure { color: var(--state-alert); }
+.c-fleet-score > .failure {
+  color: var(--state-alert);
+}
 
 .c-fleet-rubric {
   background: var(--surface-2);
@@ -1022,8 +1108,13 @@ button {
 }
 
 @keyframes flight-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 @media (max-width: 899px) {

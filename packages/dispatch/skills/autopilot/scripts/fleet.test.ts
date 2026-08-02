@@ -4,10 +4,7 @@ import type {
   FlightlogEntry,
   ScoreEntry,
 } from "../../flightplan/scripts/lib/flightlog";
-import {
-  formatEntry,
-  parseLog,
-} from "../../flightplan/scripts/lib/flightlog";
+import { formatEntry, parseLog } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet, deriveTaskViews, parseAgentLabel } from "./fleet";
 
 const note = (
@@ -282,7 +279,10 @@ describe("aggregateFleet", () => {
     );
     const rows = aggregateFleet(parseLog(line));
 
-    expect(rows[0]).toMatchObject({ role: "commit", label: "commit-post-loop" });
+    expect(rows[0]).toMatchObject({
+      role: "commit",
+      label: "commit-post-loop",
+    });
   });
 
   test("pairs by label and computes elapsed time from entry timestamps", () => {
@@ -417,6 +417,75 @@ describe("aggregateFleet", () => {
     ]);
   });
 
+  test("abandons an open row once a later role for the same attempt starts", () => {
+    // Live case: dev-codex:core/03#2 logged start, died without logging end,
+    // and the verifier for that same attempt started anyway. The dev row would
+    // otherwise read in-flight forever, pinned to the top of the fleet panel.
+    const rows = aggregateFleet([
+      note("core/03", "dev", 2, "2026-01-01T00:00:00Z", "start", "dev#2"),
+      note("core/03", "verify", 2, "2026-01-01T00:05:00Z", "start", "verify#2"),
+      note("core/03", "verify", 2, "2026-01-01T00:06:00Z", "end", "verify#2"),
+    ]);
+    const dev = rows.find((row) => row.key === "dev#2");
+    expect(dev).toMatchObject({ status: "abandoned" });
+    // Nothing is invented: no end was logged, so no end time and no duration.
+    expect(dev?.endedAt).toBeUndefined();
+    expect(dev?.elapsedMs).toBeUndefined();
+  });
+
+  test("abandons an open row once a later attempt for the same ref starts", () => {
+    const rows = aggregateFleet([
+      note("core/03", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev#1"),
+      note("core/03", "dev", 2, "2026-01-01T00:05:00Z", "start", "dev#2"),
+    ]);
+    expect(rows.find((row) => row.key === "dev#1")).toMatchObject({
+      status: "abandoned",
+    });
+    expect(rows.find((row) => row.key === "dev#2")).toMatchObject({
+      status: "in-flight",
+    });
+  });
+
+  test("leaves a genuinely running row in flight", () => {
+    // The newest agent of a live run has nothing after it. Reaping this would
+    // blank the elapsed ticker on every currently-working agent.
+    const rows = aggregateFleet([
+      note("core/03", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev#1"),
+      note("core/03", "dev", 1, "2026-01-01T00:01:00Z", "end", "dev#1"),
+      note("core/03", "verify", 1, "2026-01-01T00:02:00Z", "start", "verify#1"),
+    ]);
+    expect(rows.find((row) => row.key === "verify#1")).toMatchObject({
+      status: "in-flight",
+    });
+  });
+
+  test("does not let parallel review lenses abandon each other", () => {
+    // The final-review fan-out runs every lens at the same identity
+    // (ref, role, attempt). They are concurrent, not sequential.
+    const rows = aggregateFleet([
+      note("core/05", "review", 1, "2026-01-01T00:00:00Z", "start", "lens-a"),
+      note("core/05", "review", 1, "2026-01-01T00:00:01Z", "start", "lens-b"),
+      note("core/05", "review", 1, "2026-01-01T00:02:00Z", "end", "lens-b"),
+    ]);
+    expect(rows.find((row) => row.key === "lens-a")).toMatchObject({
+      status: "in-flight",
+    });
+  });
+
+  test("sorts in-flight first, then abandoned, then finished", () => {
+    const rows = aggregateFleet([
+      note("core/01", "dev", 1, "2026-01-01T00:00:00Z", "start", "dead"),
+      note("core/01", "verify", 1, "2026-01-01T00:01:00Z", "start", "done"),
+      note("core/01", "verify", 1, "2026-01-01T00:02:00Z", "end", "done"),
+      note("core/02", "dev", 1, "2026-01-01T00:03:00Z", "start", "live"),
+    ]);
+    expect(rows.map((row) => row.status)).toEqual([
+      "in-flight",
+      "abandoned",
+      "finished",
+    ]);
+  });
+
   test("handles empty and semantically odd logs without throwing", () => {
     expect(aggregateFleet([])).toEqual([]);
     expect(() =>
@@ -445,11 +514,14 @@ describe("gate outcome", () => {
   });
 
   const outcomeOf = (entries: FlightlogEntry[]) =>
-    aggregateFleet(entries).find((row) => row.role === "verify" || row.role === "judge")
-      ?.outcome;
+    aggregateFleet(entries).find(
+      (row) => row.role === "verify" || row.role === "judge",
+    )?.outcome;
 
   test("reads the verifier's PASS prefix", () => {
-    expect(outcomeOf([verifyNote("PASS — every command green")])).toBe("passed");
+    expect(outcomeOf([verifyNote("PASS — every command green")])).toBe(
+      "passed",
+    );
   });
 
   test("reads the verifier's FAIL prefix", () => {

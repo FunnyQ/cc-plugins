@@ -64,7 +64,14 @@ export type TaskView = {
   } | null;
 };
 
-export type FleetStatus = "in-flight" | "finished";
+/**
+ * `abandoned` is a row that logged `start` and never logged `end`, while the run
+ * moved on past it. Agents write their own lifecycle notes over Bash, so an agent
+ * that dies mid-flight simply never writes the `end` — and the Workflow script
+ * driving them has no filesystem access to write it on their behalf. Without this
+ * the row reads in-flight forever and sorts to the top of the fleet panel.
+ */
+export type FleetStatus = "in-flight" | "abandoned" | "finished";
 
 /** Whether a gate role let the attempt through. Absent for every other role. */
 export type GateOutcome = "passed" | "failed";
@@ -305,6 +312,62 @@ function gateOutcome(row: FleetRow): GateOutcome | undefined {
   return undefined;
 }
 
+/**
+ * How far through one attempt a role sits. The per-task loop is strictly
+ * dev → review → fix → verify → judge, so a role starting proves every lower
+ * role of that attempt is over. Review shares one rank on purpose: the
+ * final-review fan-out runs its lenses concurrently at the same identity, and
+ * they must never close each other.
+ */
+const ROLE_PROGRESS: Partial<Record<AgentRole, number>> = {
+  dev: 0,
+  review: 1,
+  fix: 2,
+  verify: 3,
+  judge: 4,
+};
+
+/** Ordinal of (attempt, role) within one ref. Monotonic as the run advances. */
+function progressOf(row: IndexedRow): number | undefined {
+  const rank = ROLE_PROGRESS[row.role];
+  if (rank === undefined) return undefined;
+  return (row.attempt ?? 0) * 10 + rank;
+}
+
+/**
+ * Close rows the run has moved past. A row still open at the end of the log is
+ * only genuinely running if nothing for its ref got further — the newest agent
+ * of a live run must keep ticking.
+ *
+ * Roles outside `ROLE_PROGRESS` (commit, scout) are left alone: successive
+ * commit agents share one ref and one undefined attempt, so there is no
+ * ordering here to reap them by. A hung commit agent still reads in-flight.
+ */
+function reapAbandoned(rows: IndexedRow[], open: IndexedRow[]): void {
+  if (open.length === 0) return;
+
+  // Scanned over every row, not just the open ones: the row proving the run
+  // moved on has usually closed itself already.
+  const furthest = new Map<string, number>();
+  for (const row of rows) {
+    if (row.ref === undefined) continue;
+    const progress = progressOf(row);
+    if (progress === undefined) continue;
+    furthest.set(
+      row.ref,
+      Math.max(furthest.get(row.ref) ?? progress, progress),
+    );
+  }
+
+  for (const row of open) {
+    if (row.ref === undefined) continue;
+    const progress = progressOf(row);
+    if (progress === undefined) continue;
+    if (progress < (furthest.get(row.ref) ?? progress))
+      row.status = "abandoned";
+  }
+}
+
 export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   const rows: IndexedRow[] = [];
   // Only an in-flight row can be closed, so pairing scans the open rows, not every row.
@@ -417,6 +480,8 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
     row.score = scoreByAttempt.get(`${row.ref}|${row.attempt}`);
   }
 
+  reapAbandoned(rows, open);
+
   for (const row of rows) {
     const outcome = gateOutcome(row);
     if (outcome) row.outcome = outcome;
@@ -429,8 +494,18 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
     if (count > 1) row.key = `${row.key}#${count}`;
   }
 
+  // Ranked, not a two-way test: with three statuses `x === "in-flight" ? -1 : 1`
+  // answers 1 in both directions for the other two, which is not a valid
+  // comparator. Live work first, then rows that died without reporting.
+  const statusRank: Record<FleetStatus, number> = {
+    "in-flight": 0,
+    abandoned: 1,
+    finished: 2,
+  };
+
   rows.sort((a, b) => {
-    if (a.status !== b.status) return a.status === "in-flight" ? -1 : 1;
+    if (a.status !== b.status)
+      return statusRank[a.status] - statusRank[b.status];
     if (a.status === "finished") {
       const time = (b.endedAt ?? "").localeCompare(a.endedAt ?? "");
       if (time !== 0) return time;

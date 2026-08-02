@@ -48,13 +48,18 @@ function renderRow(row, nowMs) {
   // A gate that rejected the attempt reads as a rejection, not as a finish.
   // -failed stays reserved for a rubric veto, which is the louder of the two.
   const rejected = !hardFailed && row.outcome === "failed";
+  // An agent that died without logging its end reported no verdict at all, so it
+  // must not borrow the finished look — nothing here was completed.
+  const abandoned = row.status === "abandoned";
   const stateClass = hardFailed
     ? "-failed"
     : rejected
       ? "-rejected"
       : inFlight
         ? "-flight"
-        : "-finished";
+        : abandoned
+          ? "-abandoned"
+          : "-finished";
   const elapsed = elapsedText(row, nowMs);
   const unknownLabel =
     row.role === "unknown"
@@ -72,7 +77,7 @@ function renderRow(row, nowMs) {
     <div class="fleet-row ${stateClass}${expandable ? " -expandable" : ""}" role="row"
       data-row-key="${escapeHtml(row.key)}"${ticking} tabindex="${expandable ? "0" : "-1"}"
       aria-expanded="${expandable ? expandedRows.has(row.key) : false}">
-      <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : rejected ? "did not pass" : "finished"}"></span></span>
+      <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : rejected ? "did not pass" : abandoned ? "no end reported" : "finished"}"></span></span>
       <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${unknownLabel}</span>
       <span class="fleet-cell -ref" role="cell">${escapeHtml(row.ref)}</span>
       <span class="fleet-cell -attempt" role="cell">${row.attempt === undefined ? "" : escapeHtml(row.attempt)}</span>
