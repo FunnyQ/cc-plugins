@@ -456,6 +456,23 @@ describe("gate outcome", () => {
     expect(outcomeOf([verifyNote("FAIL — bun test exited 1")])).toBe("failed");
   });
 
+  // The normal shape of a passing message: the verifier quotes its test summary,
+  // and that summary contains the word `fail`. Scanning the whole message paints
+  // a green run red.
+  test("the leading PASS wins over a `0 fail` in the quoted test summary", () => {
+    expect(
+      outcomeOf([
+        verifyNote("PASS — bun test (7 pass, 0 fail) and all criteria met"),
+      ]),
+    ).toBe("passed");
+  });
+
+  test("the leading FAIL wins over passing prose after it", () => {
+    expect(
+      outcomeOf([verifyNote("FAIL — 6 of 7 passing, scope gate rejected")]),
+    ).toBe("failed");
+  });
+
   test("still catches the older free-text failure phrasing", () => {
     expect(
       outcomeOf([verifyNote("VERIFICATION FAILED: Scope violation")]),

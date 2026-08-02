@@ -274,12 +274,11 @@ function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
 /**
  * The two gate roles carry a pass/fail the dashboard should colour differently.
  *
- * A judge always has a verdict object, so read that. A verifier has only prose:
- * the orchestrator asks it to lead with PASS or FAIL, but older logs (and any
- * agent that ignores the convention) just say what happened, so fall back to
- * looking for a failure word — and check failure first, because "3 passed, 1
- * failed" is a failure. A message that says neither stays unjudged rather than
- * being guessed into a colour.
+ * A judge always has a verdict object, so read that. A verifier has only prose,
+ * and the orchestrator requires it to lead with PASS or FAIL — so read that word
+ * and stop. Only an off-contract message (older logs, an agent that ignored the
+ * convention) falls through to scanning the prose, failure first. A message that
+ * says neither stays unjudged rather than being guessed into a colour.
  */
 function gateOutcome(row: FleetRow): GateOutcome | undefined {
   if (row.role === "judge") {
@@ -290,6 +289,17 @@ function gateOutcome(row: FleetRow): GateOutcome | undefined {
 
   const message = row.message?.trim();
   if (!message) return undefined;
+
+  // The leading verdict is authoritative and settles the row on its own. It has
+  // to win outright: a verifier quoting its test summary writes "PASS — bun test
+  // (7 pass, 0 fail)", and scanning the whole message finds `fail` there and
+  // paints a green run red. That is the normal shape of a passing message, not
+  // an edge case.
+  const verdict = /^(PASS|FAIL)\b/i.exec(message);
+  if (verdict) return verdict[1].toUpperCase() === "FAIL" ? "failed" : "passed";
+
+  // Off-contract message. Scan it, failure first — "3 passed, 1 failed" is a
+  // failure, and reading a real failure as uncoloured is the worse mistake.
   if (/\bfail(ed|ure|s|ing)?\b/i.test(message)) return "failed";
   if (/\bpass(ed|es|ing)?\b/i.test(message)) return "passed";
   return undefined;
