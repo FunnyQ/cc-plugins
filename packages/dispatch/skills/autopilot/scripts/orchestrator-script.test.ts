@@ -1359,3 +1359,52 @@ describe("orchestrator commit ownership", () => {
     expect(promptFor(log, "commit-post-loop")).not.toContain(BAN);
   });
 });
+
+describe("held-back paths", () => {
+  // A parked task used to disable every later commit, leaving the whole tree
+  // dirty for the rest of the run. Now only its own paths are held back.
+  test("a parked task holds back its own path and no longer blocks the commit", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          ready: [ready("ui/01"), ready("ui/02")],
+          counts: counts({ total: 3, todo: 3 }),
+          unfinished: [
+            { ref: "ui/01", state: "todo" },
+            { ref: "ui/02", state: "todo" },
+            { ref: "ui/03", state: "todo" },
+          ],
+        }),
+        snapshot({
+          ready: [ready("ui/03")],
+          counts: counts({ total: 3, done: 1, blocked: 1, todo: 1 }),
+          unfinished: [{ ref: "ui/03", state: "todo" }],
+        }),
+        snapshot({
+          counts: counts({ total: 3, done: 2, blocked: 1 }),
+          unfinished: [{ ref: "ui/02", state: "blocked" }],
+        }),
+      ],
+      gate: {
+        "ui/02": [
+          { passed: false, summary: "one" },
+          { passed: false, summary: "two" },
+          { passed: false, summary: "three" },
+        ],
+      },
+    });
+
+    expect(log.labels).toContain("commit-wave-2");
+    const prompt = promptFor(log, "commit-wave-2");
+    expect(prompt).toContain("/abs/repo/docs/my-plan/tasks/ui/02.md");
+    expect(prompt).toContain("Files to create / modify");
+    expect(prompt).not.toContain("/abs/repo/docs/my-plan/tasks/ui/01.md");
+  });
+
+  test("a clean wave carries no held-back block", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1)],
+    });
+    expect(promptFor(log, "commit-wave-2")).not.toContain("HELD BACK");
+  });
+});

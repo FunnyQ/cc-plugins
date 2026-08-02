@@ -285,7 +285,7 @@ ${liveDev && COLLECT_ROUNDS > 0 ? `5. PENDING — relay prints a report starting
 5b. FAILURE PATH` : `5. FAILURE PATH`} — the command exits non-zero${liveDev ? `, or relay returns an empty/absent result${COLLECT_ROUNDS > 0 ? ', or the last allowed collect is still pending' : ', or relay prints a PENDING report ("still running after ... this is NOT a failure" — relay exits 0, but autopilot counts that delegate as NOT finished)'}` : `, or its output begins with "${engine.token}"`}. Then: do NOT hand-write the implementation yourself, and do NOT return early. Run steps 6 and 7 as usual, then return a summary whose FIRST word is FAILED, stating ${engine.label} was unreachable, failed, or timed out.${liveDev ? ' For a still-pending delegate, name the Agent from relay stdout in the step-7 log and note the pane was LEFT OPEN and is STILL WRITING the working tree.' : ''} Step 6 is the real correctness gate: it decides whether anything usable actually landed, so never skip it. The binary gate then fails this attempt; the loop moves to the next rung when one remains, or parks after the cap.
 6. Lint the task file, then verify. The lint runs FIRST, before any verification:
      bun ${S}/lint-task.ts ${path}
-   The external engine edits files outside the harness, so the Edit/Write lint hook never saw its work — this call is the only structural check on the task file. A non-zero exit means the engine left the task file malformed (a decorated Status, a hand-ticked gate box, a sibling-task reference). Repair the header yourself until it lints clean: reset "> **Status**:" to a bare \`in-progress\`, and never hand-tick an Acceptance criteria or Verification box. Only then run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
+   The external engine edits files outside the harness, so the Edit/Write lint hook never saw its work — this call is the only structural check on the task file. A non-zero exit means the engine left the task file malformed (a decorated Status, a hand-ticked gate box, a sibling-task reference). Repair the header yourself until it lints clean: reset "> **Status**:" to a bare \`in-progress\`, and never hand-tick an Acceptance criteria or Verification box. Repair the HEADER only — never reword an Acceptance criteria or Verification item, even when lint names that item (a \`scope-git-status\` violation is a plan defect, not yours to edit). Rewriting a gate to make it pass is the same failure as ticking its box. Leave the violation standing and let the binary gate judge the work. Only then run the task's ## Verification commands YOURSELF to confirm the changes actually hold.
 7. Log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "dev-${engine.label}:${ref}#${attempt}" --phase end --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
 Return a one-paragraph summary: what ${engine.label} implemented and your verification result.`
@@ -607,16 +607,29 @@ async function runTaskGuarded(item) {
 // Bash). So we inline the skill's contract here — same atomic principles, same
 // commit-message template — and let the agent commit over plain git itself.
 // Self-contained on purpose: no Skill tool, no sub-agent, no cross-plugin path.
-const commitInstructions = agentLabel =>
+// `heldBack` is the task-file path of every task parked so far. Their source
+// edits never passed a gate, so committing them would write failed work into
+// the history the closing Final review reads as the deliverable. Excluding just
+// those paths is what lets every OTHER task's work still land — the alternative,
+// blocking the commit outright, leaves the whole tree dirty for every later
+// wave, and every later gate then runs against a tree full of foreign changes.
+const commitInstructions = (agentLabel, heldBack = []) =>
   'Commit the current working-tree changes as one or more ATOMIC commits using plain git over Bash. '
   + 'Do NOT use the Skill tool and do NOT spawn any sub-agent — do it yourself with git commands.\n'
+  + (heldBack.length > 0
+    ? `0. HELD BACK — these task(s) were PARKED and their work must NOT be committed:\n`
+      + heldBack.map(p => `   - ${p}\n`).join('')
+      + `   Read each of those task files and collect every path listed under its "## Files to create / modify" heading. Leave every one of those paths uncommitted, exactly as it is now. Commit the parked TASK FILES themselves (their Status is real state), but none of the source paths they declare.\n`
+      + `   A path a parked task declares is held back even when another task also changed it — you cannot tell the two edits apart, so keep it.\n`
+      + `   In step 7, list every path you held back.\n`
+    : '')
   + `1. Record start: bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase start\n`
   + '2. Run `git status --porcelain`. If it prints nothing, the tree is clean — skip committing and continue.\n'
   + '3. Run `git diff` and `git diff --cached` to see every change. Group the files into atomic commits — each commit does ONE thing (single responsibility, independently revertable). Keep related code + its tests + its docs together; split unrelated changes apart.\n'
   + '4. For each group, in a sensible order, stage exactly that group by name (`git add <file>...`; never `git add -A`, never the interactive `git add -p`).\n'
   + '5. Commit each staged group with the template below.\n'
   + '6. After all commits, run `git log --oneline -n 5` to confirm.\n'
-  + `7. Record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase end --message "committed shas: <shas, or none>"\n`
+  + `7. Record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase end --message "committed shas: <shas, or none>${heldBack.length > 0 ? '; held back: <paths left uncommitted>' : ''}"\n`
   + `8. If any git command FAILS — a hook blocks the commit, a merge conflict, anything — stop committing, record the failure with bun ${S}/flightlog.ts log ${CFG.logFile} --task commit --role commit --agent "${agentLabel}" --phase end --message "<git error message>", and return failed: true with that git error in reason. Never report a commit that did not happen.\n`
   + 'Return committed, the shas actually created, failed, and reason as the structured result.\n'
   + '\n'
@@ -642,6 +655,16 @@ phase('Execute')
 const completed = []
 const escalations = []
 const parked = new Set()
+// Task-file paths whose work must stay out of every commit. See commitInstructions.
+const heldBack = new Set()
+
+// Only an escalation that makes the TREE untrustworthy blocks a commit. A parked
+// task does not: its paths are held back by pathspec instead, so the rest of the
+// wave still lands. A `(commit)` failure does not either — blocking on it was
+// collective punishment, disabling every later commit over one flaky agent.
+const COMMIT_SAFE = new Set(['(commit)'])
+const commitBlocked = () =>
+  escalations.some(e => e.infrastructure && !parked.has(e.task) && !COMMIT_SAFE.has(e.task))
 let wave = 0
 
 // A schema'd agent has TWO failure modes, not one. A terminal API failure
@@ -667,7 +690,7 @@ const settled = async (call) => {
 // A null result is NOT a failure report: it means the agent returned no
 // structured result at all, so whether anything was committed is unknowable. A
 // throw is the same unknown, with a cause attached.
-// Never terminal — the caller decides; the escalation-free guard is what stops
+// Never terminal — the caller decides; `commitBlocked()` is what stops
 // every later commit.
 const escalateCommitFailure = (committed, what, threw) => {
   const reason = threw
@@ -828,13 +851,14 @@ while (true) {
     break
   }
 
-  if (wave > 1 && CFG.commitBetweenWaves && escalations.length === 0) {
+  if (wave > 1 && CFG.commitBetweenWaves && !commitBlocked()) {
     const { value: committed, threw } = await settled(() => agent(
-      `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`)}`,
+      `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`, [...heldBack])}`,
       { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA }))
     if (threw || !committed || committed.failed) {
       escalateCommitFailure(committed, `wave ${wave - 1}`, threw)
-      // Continue this wave; the escalation-free guard prevents every later commit.
+      // Continue this wave. A failed commit does NOT block the next one: the
+      // work is still in the tree, so the next wave's commit sweeps it up.
     }
   }
 
@@ -858,7 +882,7 @@ while (true) {
   // step already set the task to in-progress, and next-ready only offers `todo`,
   // so it could never be re-offered — the run would end "clean" and the
   // post-loop commit would sweep its ungated edits into a commit. Escalating it
-  // parks the task AND (via the escalation-free guard) blocks those commits.
+  // parks the task AND (via `heldBack`) keeps its paths out of those commits.
   let passedThisWave = false
   for (let i = 0; i < fresh.length; i++) {
     const item = fresh[i]
@@ -879,6 +903,9 @@ while (true) {
         ?? 'no result returned for this task and the harness exposed no cause — the pipeline was dropped, so the task state on disk is unknown',
     })
     parked.add(item.ref)
+    // Held back for the rest of the run, never cleared: this task's edits never
+    // passed a gate, and no later wave re-runs it to change that.
+    heldBack.add(item.path)
   }
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
   if (!passedThisWave) break
@@ -887,12 +914,14 @@ while (true) {
 // ── Post-loop commit ────────────────────────────────────────────────────────
 // The last wave (typically Final review) has no subsequent scout to trigger a
 // commit. Run one final atomic-commit here to capture those remaining changes.
-// Only commit when the whole run finished cleanly (no escalations) — same guard
-// as the inter-wave commits: don't commit a run that has blocked/dirty task edits.
-if (CFG.commitBetweenWaves && escalations.length === 0) {
+// Same guard as the inter-wave commits: a parked task holds back its own paths,
+// but an untrustworthy tree — a divergence, a parse failure, a bad scout — blocks
+// the commit entirely. Those escalations broke the loop, so the tree state that
+// reached here is exactly the one nobody could vouch for.
+if (CFG.commitBetweenWaves && !commitBlocked()) {
   const { value: committed, threw } = await settled(() => agent(
     `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes).\n`
-    + commitInstructions('commit-post-loop'),
+    + commitInstructions('commit-post-loop', [...heldBack]),
     { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA }))
   if (threw || !committed || committed.failed) {
     escalateCommitFailure(committed, 'post-loop', threw)
@@ -918,7 +947,7 @@ return { slug: CFG.slug, completed, escalations }
 
 - **`completed.length` is not a completion count. `counts.done` is.** The wave loop's `completed` array only holds tasks *this invocation* finished. A resumed run inherits `done` tasks from earlier runs, so comparing `completed.length` with the tree size reports a false stall on every resume. The scout's `counts.done === counts.total` counts the tree on disk, which is the only place completion actually lives. The loop also asserts `total === todo + inProgress + done + blocked + invalid` before trusting any bucket.
 
-- **Nine terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a tree failure. `invalid > 0` is a tree failure naming the invalid refs. A counts mismatch is a scout failure. A readable but empty tasks directory, where every count is zero, escalates as `(tree)` before the `done === total` completion test. A ref that is in `completed` *and* still unfinished on disk is a **divergence**, escalated as `(divergence)` before the ready set is filtered. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A configured budget floor stops the loop between the inter-wave commit and dispatch when the remaining output-token balance is below that floor. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)`, and the escalation-free guard blocks later commits without stopping task dispatch.
+- **Nine terminal conditions, all explicit.** `done === total` is clean completion. A non-empty `errors` is a tree failure. `invalid > 0` is a tree failure naming the invalid refs. A counts mismatch is a scout failure. A readable but empty tasks directory, where every count is zero, escalates as `(tree)` before the `done === total` completion test. A ref that is in `completed` *and* still unfinished on disk is a **divergence**, escalated as `(divergence)` before the ready set is filtered. An empty ready set with unfinished tasks is a **stall**, escalated with the counts plus every remaining `ref (state)`. A configured budget floor stops the loop between the inter-wave commit and dispatch when the remaining output-token balance is below that floor. A wave where no task passed stops the loop, because nothing new can unblock. Only the first ends the run cleanly. A commit failure is not a terminal condition: it escalates as synthetic task `(commit)` and does **not** block later commits — the work stays in the tree, so the next wave's commit sweeps it up. Blocking on it was collective punishment: one flaky commit agent disabled every commit for the rest of the run.
 
 - **Divergence is a set intersection, never a count comparison.** `completed` is memory, the scout's `unfinished` is disk, and a ref in both means a task file was rewritten after its `mark-done` was confirmed. The tempting check is `completed.length > counts.done`, and it is wrong: a resumed run inherits `done` tasks from earlier runs, so `counts.done` already exceeds `completed.length` and the inequality never fires — silent on precisely the runs where a rollback is hardest to see. The intersection holds on fresh and resumed runs alike, and it *is* the ref list the escalation has to print. It must run **before** the `fresh` filter, because that filter drops already-completed refs: after it, the diverged task is neither re-dispatched nor reported, and the run dies waves later as a generic `(tree)` stall blaming the wrong thing. Observed live in run `wf_5903a02b-b6e`: a parallel sibling ran `git checkout` over another task's file, reverting a confirmed `Status: done` to `todo`, and the run stalled at 7/11 with a message that never named the rolled-back task.
 

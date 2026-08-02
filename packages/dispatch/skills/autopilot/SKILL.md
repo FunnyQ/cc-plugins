@@ -52,19 +52,26 @@ Before touching Workflow, gather the work-list in the main conversation:
    bun $SCRIPTS/next-ready.ts docs/<slug>/tasks --summary
    ```
    A non-zero exit means the tree is malformed — the printed `invalid` array names each offending task and why; run `lint-task.ts` and fix it before flying. If `counts.done === counts.total`, the tree is already done — report that and stop before Step 2. If `ready` is empty while tasks remain unfinished, reset any stale `in-progress` task to `todo` first.
-5. **Capture the base ref** for the Final review diff scope:
+5. **Lint the whole tree before flying:**
+   ```bash
+   bun $SCRIPTS/lint-task.ts docs/<slug>/tasks
+   ```
+   The in-flight lint at `orchestrator.md` step 6 only ever sees one task file, and the flightplan Edit/Write hook only ran on files written in this repo — neither reaches a plan authored by an older flightplan or by hand. Run it here so a defect fails in the conversation instead of parking a correct task three attempts later.
+
+   **`scope-git-status` is the one to expect on an older plan.** Flightplan used to recommend a whole-tree `git status` gate, and that gate fails a correct task the moment a sibling in the same wave leaves its own legitimate edits uncommitted. Fix it in the task file — narrow the command with a `--` pathspec listing that task's own files — before flying. Do not fly a tree with violations outstanding.
+6. **Capture the base ref** for the Final review diff scope:
    ```bash
    git rev-parse HEAD
    ```
    Bake this as `CFG.baseRef`. The Final review lenses read `git diff <baseRef>..HEAD`, because the working-tree diff is empty after inter-wave commits.
-6. Decide `maxAttempts` (default **3**, per task) and `finalReviewMaxAttempts` (default **2**, the Final review round). Confirm the rest of the model policy only if the user wants to change it.
-7. Version-check whichever external CLIs Step 2 will offer — an external dev engine and the closing review round both shell out to them:
+7. Decide `maxAttempts` (default **3**, per task) and `finalReviewMaxAttempts` (default **2**, the Final review round). Confirm the rest of the model policy only if the user wants to change it.
+8. Version-check whichever external CLIs Step 2 will offer — an external dev engine and the closing review round both shell out to them:
    ```bash
    codex --version      # needed if devEngine or reviewEngine is 'codex'
    opencode --version   # needed if devEngine or reviewEngine is 'opencode'
    ```
    If a selected engine is not installed, tell the user before flying. Only that engine's step needs it; the per-task Claude work still runs.
-8. Probe whether live panes are available: `HERDR_ENV=1` **and** relay's `relay.ts` resolves. Probe on every flight, not only an external-dev one — the closing review lens can run live even when Claude writes every task. Resolve `relay.ts` as relay's own live locator does: the repo-sibling path first, then the newest relay version's `skills/relay/scripts/relay.ts` under `~/.claude/plugins/cache` or `~/.codex/plugins/cache`. Capture the absolute path as `CFG.relayPath`, or `''` when it is not found.
+9. Probe whether live panes are available: `HERDR_ENV=1` **and** relay's `relay.ts` resolves. Probe on every flight, not only an external-dev one — the closing review lens can run live even when Claude writes every task. Resolve `relay.ts` as relay's own live locator does: the repo-sibling path first, then the newest relay version's `skills/relay/scripts/relay.ts` under `~/.claude/plugins/cache` or `~/.codex/plugins/cache`. Capture the absolute path as `CFG.relayPath`, or `''` when it is not found.
 
 ## Step 2 — Confirm the flight with the user
 
