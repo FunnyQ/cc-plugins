@@ -1,5 +1,13 @@
 # Changelog
 
+## [dispatch 3.18.6] - 2026-08-03
+
+_tracks tag `dispatch-v3.18.6`_
+
+### Fixed
+
+- **The dependency graph's reserved lanes (added in 3.18.5) could land in the wrong place.** On a real 30-task plan, 10 of 40 reserved lanes sank below every task in the graph, stretching a band of long horizontal runs underneath the diagram and sending long edges on a needless detour down and back up before heading to their target. The layer-ordering sweep was rebuilding its position index only once per pass, so a reserved row could travel at most one layer per pass — a lane whose edge spanned more layers than there were passes never learned where its edge started and stayed stuck at the bottom. Rebuilding the index after every layer fixes it: on that same plan, stranded lanes went from 10 of 40 to zero, vertical travel dropped by roughly a third, and the graph got shorter. Edges still never cross a node's box. Dashboard-only: the plan format, lint rules, and execution loop are unchanged.
+
 ## [dispatch 3.18.5] - 2026-08-03
 
 _tracks tag `dispatch-v3.18.5`_
