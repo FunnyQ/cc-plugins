@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { layoutGraph, relatedRefs, renderGraph } from "./graph.js";
+import {
+  drawableEdges,
+  layoutGraph,
+  relatedRefs,
+  renderGraph,
+} from "./graph.js";
 
 function makeNode(ref, bucket, nn, dependsOn = []) {
   return {
@@ -116,7 +121,7 @@ describe("renderGraph", () => {
     expect(svg).toContain('data-ref="A"');
     expect(svg).toContain('data-ref="B"');
     expect(svg.match(/<g class="graph-node/g)?.length).toBe(2);
-    expect(svg.match(/<polyline /g)?.length).toBe(1);
+    expect(svg.match(/<path class="graph-edge/g)?.length).toBe(1);
     expect(svg).toContain('class="graph-edge -dimmed"');
   });
 
@@ -127,9 +132,12 @@ describe("renderGraph", () => {
     ];
     const layout = layoutGraph(nodes);
     const svg = renderGraph(nodes, layout);
-    const points = svg.match(/points="([^"]+)"/)[1].split(" ");
-    const [startX, startY] = points[0].split(",").map(Number);
-    const [endX, endY] = points[points.length - 1].split(",").map(Number);
+    const d = svg.match(/<path class="graph-edge[^>]* d="([^"]+)"/)[1];
+    const coords = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(
+      ([, x, y]) => [Number(x), Number(y)],
+    );
+    const [startX, startY] = coords[0];
+    const [endX, endY] = coords[coords.length - 1];
     const source = layout.positions.get("A");
     const target = layout.positions.get("B");
 
@@ -319,5 +327,86 @@ describe("edge identity", () => {
 
     expect(svg).toContain('data-from="A"');
     expect(svg).toContain('data-to="B"');
+  });
+});
+
+describe("drawable edges", () => {
+  test("drops an edge another dependency already reaches", () => {
+    // The shape lint-task.ts forces on every plan: the closing task names the
+    // whole tree, so all but the nearest edge is implied by a path.
+    const nodes = [
+      makeNode("A", "core", "01"),
+      makeNode("B", "core", "02", ["A"]),
+      makeNode("C", "core", "03", ["A", "B"]),
+    ];
+    const drawn = drawableEdges(nodes);
+
+    expect(drawn.has("B->C")).toBe(true);
+    expect(drawn.has("A->B")).toBe(true);
+    expect(drawn.has("A->C")).toBe(false);
+  });
+
+  test("keeps two dependencies that do not reach each other", () => {
+    const nodes = [
+      makeNode("A", "core", "01"),
+      makeNode("B", "core", "02"),
+      makeNode("C", "core", "03", ["A", "B"]),
+    ];
+    const drawn = drawableEdges(nodes);
+
+    expect(drawn.has("A->C")).toBe(true);
+    expect(drawn.has("B->C")).toBe(true);
+  });
+
+  test("keeps every edge touching a cyclic node", () => {
+    // Inside a cycle each node reaches the others, so reduction would erase the
+    // edges the reader most needs.
+    const nodes = [
+      makeNode("A", "core", "01", ["B"]),
+      makeNode("B", "core", "02", ["A"]),
+    ];
+    const drawn = drawableEdges(nodes, new Set(["A", "B"]));
+
+    expect(drawn.has("A->B")).toBe(true);
+    expect(drawn.has("B->A")).toBe(true);
+  });
+
+  test("renderGraph omits the redundant edge", () => {
+    const nodes = [
+      makeNode("A", "core", "01"),
+      makeNode("B", "core", "02", ["A"]),
+      makeNode("C", "core", "03", ["A", "B"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain('data-from="B" data-to="C"');
+    expect(svg).not.toContain('data-from="A" data-to="C"');
+  });
+});
+
+describe("svg extent", () => {
+  test("declares a height that covers the reserved lane rows", () => {
+    // A long edge reserves a row in each layer it crosses. Measuring only the
+    // real nodes declared an SVG shorter than its own content, and the panel
+    // scrolls to the declared size — everything past it was unreachable.
+    // `X` is unreachable from the chain, so `X -> D` survives the reduction and
+    // is the long edge that has to reserve rows.
+    const nodes = [
+      makeNode("A", "core", "01"),
+      makeNode("B", "core", "02", ["A"]),
+      makeNode("C", "core", "03", ["B"]),
+      makeNode("D", "core", "04", ["C", "X"]),
+      makeNode("X", "extra", "01"),
+    ];
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+    const declared = Number(svg.match(/height="([\d.]+)"/)[1]);
+
+    const lanes = [...layout.waypoints.values()].flat();
+    expect(lanes.length).toBeGreaterThan(0);
+    for (const lane of lanes) expect(declared).toBeGreaterThan(lane.y);
+    for (const point of layout.positions.values()) {
+      expect(declared).toBeGreaterThanOrEqual(point.y + 42);
+    }
   });
 });

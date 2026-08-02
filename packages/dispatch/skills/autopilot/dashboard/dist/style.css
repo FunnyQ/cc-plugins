@@ -31,6 +31,10 @@
 
   --border-width: 1px;
   --graph-edge-width: 1.25px;
+  /* Hover hops. Deliberately outside the state palette: an edge carries no
+     state, so these can never be mistaken for done / ready / blocked / alert. */
+  --graph-edge-parent: #d8a657;
+  --graph-edge-child: #a48ce0;
   --header-min-height: 64px;
   --ring-size: 32px;
   --ring-stroke: 2px;
@@ -331,9 +335,12 @@ button {
   }
 
   /* The marker inherits the referencing edge's opacity, so a dimmed edge gets a
-     dimmed head for free. Only the fill has to be stated. */
+     dimmed head for free. `context-stroke` makes the head follow the edge's
+     colour too — without it one shared marker would leave every highlighted
+     edge with a grey head. The plain fill stays first as the fallback. */
   .graph-arrow > path {
     fill: var(--text);
+    fill: context-stroke;
   }
 
   .graph-node > rect {
@@ -363,8 +370,52 @@ button {
     stroke-width: calc(var(--graph-edge-width) * 1.6);
   }
 
+  /* The rest of the lineage sits between the two hops and everything outside it:
+     present enough to trace, quiet enough that the one-hop pair stays the
+     subject. Stated after the `.-lit` rules so it wins over their opacity. */
+  &.-focus .graph-edge.-lit:not(.-parent):not(.-child),
+  &.-focus .graph-node.-lit:not(.-parent):not(.-child):not(.-self) {
+    opacity: 0.8;
+  }
+
+  /* Three tiers inside the lit lineage, so the eye lands on the subject first,
+     then its immediate neighbours, then the rest of the ancestry. Brightness and
+     stroke only — the fill stays the state colour it earned. */
   &.-focus .graph-node.-lit > rect {
     filter: brightness(1.12);
+  }
+
+  &.-focus .graph-node.-parent > rect,
+  &.-focus .graph-node.-child > rect {
+    filter: brightness(1.35);
+    stroke-width: calc(var(--border-width) * 2);
+  }
+
+  /* The ring repeats its edge's colour, which is what ties a neighbour to the
+     line reaching it when several are lit at once. */
+  &.-focus .graph-node.-parent > rect {
+    stroke: var(--graph-edge-parent);
+  }
+
+  &.-focus .graph-node.-child > rect {
+    stroke: var(--graph-edge-child);
+  }
+
+  /* Without this the hovered node would be the dimmest of its own cluster. */
+  &.-focus .graph-node.-self > rect {
+    filter: brightness(1.5);
+    stroke: var(--text);
+    stroke-width: calc(var(--border-width) * 2);
+  }
+
+  /* One hop from the hovered node, coloured by direction. Listed after `.-lit`
+     so the colour wins over its neutral stroke, and both keep its weight. */
+  &.-focus .graph-edge.-parent {
+    stroke: var(--graph-edge-parent);
+  }
+
+  &.-focus .graph-edge.-child {
+    stroke: var(--graph-edge-child);
   }
 
   .graph-node,

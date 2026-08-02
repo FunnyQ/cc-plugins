@@ -74,29 +74,51 @@ function updateGraph(tasks) {
  */
 function litRefs(target) {
   const node = target?.closest?.(".graph-node");
-  return node ? relatedRefs(graphNodes, node.dataset.ref) : null;
+  if (!node) return null;
+  const ref = node.dataset.ref;
+  return { ref, lit: relatedRefs(graphNodes, ref) };
 }
 
-function paintLineage(container, lit) {
+function paintLineage(container, focus) {
   const svg = container.querySelector(".dependency-graph");
   if (!svg) return;
 
-  svg.classList.toggle("-focus", lit !== null);
-  for (const node of svg.querySelectorAll(".graph-node")) {
-    node.classList.toggle("-lit", lit?.has(node.dataset.ref) === true);
-  }
+  const lit = focus?.lit ?? null;
+  svg.classList.toggle("-focus", focus !== null);
+
+  // Edges first: the one-hop node sets are collected from the edges that were
+  // actually drawn, not from `dependsOn`. The graph draws its transitive
+  // reduction, so a declared-but-implied parent has no edge — marking that node
+  // as a direct one would light a neighbour with nothing connecting it.
+  const parents = new Set();
+  const children = new Set();
   for (const edge of svg.querySelectorAll(".graph-edge")) {
-    edge.classList.toggle(
-      "-lit",
-      lit?.has(edge.dataset.from) === true && lit.has(edge.dataset.to),
-    );
+    const { from, to } = edge.dataset;
+    edge.classList.toggle("-lit", lit?.has(from) === true && lit.has(to));
+    // One hop, in each direction. The rest of the lineage stays neutral, so the
+    // two questions the graph gets asked — what is holding this up, and what
+    // moves when it lands — are answered at a glance instead of by tracing.
+    const isParent = to === focus?.ref;
+    const isChild = from === focus?.ref;
+    edge.classList.toggle("-parent", isParent);
+    edge.classList.toggle("-child", isChild);
+    if (isParent) parents.add(from);
+    if (isChild) children.add(to);
+  }
+
+  for (const node of svg.querySelectorAll(".graph-node")) {
+    const ref = node.dataset.ref;
+    node.classList.toggle("-lit", lit?.has(ref) === true);
+    node.classList.toggle("-self", ref === focus?.ref);
+    node.classList.toggle("-parent", parents.has(ref));
+    node.classList.toggle("-child", children.has(ref));
   }
 }
 
 function bindGraphHover(container) {
   container.addEventListener("pointerover", (event) => {
-    const lit = litRefs(event.target);
-    if (lit) paintLineage(container, lit);
+    const focus = litRefs(event.target);
+    if (focus) paintLineage(container, focus);
   });
   container.addEventListener("pointerout", (event) => {
     // Leaving one node for another fires out before over; only clear when the
