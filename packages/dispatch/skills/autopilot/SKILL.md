@@ -135,7 +135,7 @@ completed   (next wave's next-ready will see it)
 
 ### Scout result and termination rules
 
-The scout runs `next-ready.ts --summary` and echoes its `{ready, counts, unfinished, invalid, errors}` snapshot verbatim; the script does every interpretation. **`references/orchestrator.md` owns the eight terminal conditions and their guards** — do not restate or re-derive them here.
+The scout runs `next-ready.ts --summary` and echoes its `{ready, counts, unfinished, invalid, errors}` snapshot verbatim; the script does every interpretation. **`references/orchestrator.md` owns the nine terminal conditions and their guards** — do not restate or re-derive them here.
 
 The `Final review` task (`> **Final review**: true`) depends transitively on every other task, so the wave loop **naturally schedules it last** — no special phase is needed. Its dev step is **not** a Claude self-review but the multi-lens fan-out below; the binary gate, rubric judge, and score gate are unchanged, grading that round against the Final review task's own `## Eval rubric`.
 
@@ -193,6 +193,8 @@ A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or
 4. After the user unblocks a task, **resume**: reset its `Status` to `todo` and re-run autopilot. Completed tasks stay `done`, so `next-ready` only re-offers the unblocked work.
 
 **Read the two flags before you report.** `infrastructure: true` means nothing was judged — say that verification did not run or returned no verdict, not that the work was rejected. `parked: false` means the park itself failed, so the file still reads `in-progress` and `next-ready` will not re-offer it; tell the user to reset that Status by hand before resuming.
+
+**A `(divergence)` escalation is not a park.** It means a task passed, was confirmed `done`, and then something rewrote its file back to unfinished — a parallel task running `git checkout`/`git restore`, or a hand edit. Do not just reset and re-run: find what rolled the file back first, or the next run loses the same work again. The `reason` names the affected refs, and their code changes are often already committed, so check that before deciding whether to restore each `Status` to `done` or reset it to `todo`.
 
 Crash recovery note: an interrupted run can leave task files at `Status: in-progress`. `next-ready` only offers `todo`. Reset stale `in-progress` tasks to `todo` before re-running autopilot.
 

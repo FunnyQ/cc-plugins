@@ -376,6 +376,49 @@ describe("orchestrator wave loop", () => {
     expect(result.escalations).toEqual([]);
   });
 
+  test("a task rolled back after passing escalates as divergence, naming the ref", async () => {
+    // Wave 1 passes ui/01 and ui/02. Wave 2's disk snapshot has only ui/01 done:
+    // something rewrote ui/02's task file after mark-done confirmed it, so the
+    // scout still lists ui/02 as todo. `completed` and `unfinished` now overlap.
+    // Note counts.done (1) is BELOW completed.length (2) here, but the check is
+    // the intersection — see the resume test above, where the counts point the
+    // other way and nothing must fire.
+    const { result } = await runOrchestrator({
+      scouts: [
+        snapshot({
+          ready: [ready("ui/01"), ready("ui/02")],
+          counts: counts({ total: 3, todo: 3 }),
+          unfinished: [
+            { ref: "ui/01", state: "todo" },
+            { ref: "ui/02", state: "todo" },
+            { ref: "ui/03", state: "todo" },
+          ],
+          invalid: [],
+        }),
+        snapshot({
+          ready: [ready("ui/02"), ready("ui/03")],
+          counts: counts({ total: 3, todo: 2, done: 1 }),
+          unfinished: [
+            { ref: "ui/02", state: "todo" },
+            { ref: "ui/03", state: "todo" },
+          ],
+          invalid: [],
+        }),
+      ],
+    });
+    expect(result.completed).toEqual(["ui/01", "ui/02"]);
+    expect(result.escalations).toHaveLength(1);
+    const [divergence] = result.escalations;
+    expect(divergence.task).toBe("(divergence)");
+    expect(divergence.infrastructure).toBe(true);
+    expect(divergence.reason).toMatch(/divergence/);
+    expect(divergence.reason).toContain("ui/02");
+    // The untouched sibling must not be blamed.
+    expect(divergence.reason).not.toContain("ui/03");
+    // It must NOT be reported as a stall — that is the wrong cause.
+    expect(divergence.reason).not.toMatch(/stalled/);
+  });
+
   test("an empty ready set with unfinished tasks escalates as stalled", async () => {
     const { result } = await runOrchestrator({
       scouts: [
