@@ -6,6 +6,8 @@ Plugins are shareable executable workflow packages. You can write a plugin in an
 
 The entire Herdr CLI is the plugin API (see `cli.md`). Call back via `HERDR_BIN_PATH` (portable across Unix sockets and Windows named pipes).
 
+The CLI is itself a thin client over herdr's socket at `HERDR_SOCKET_PATH`, so it exposes almost the whole API. The exception is event streaming, which has no subcommand. Read `socket-api.md` if you need `events.subscribe`, or if a hot loop makes the per-spawn cost matter.
+
 ## Manifest (`herdr-plugin.toml`)
 
 ```toml
