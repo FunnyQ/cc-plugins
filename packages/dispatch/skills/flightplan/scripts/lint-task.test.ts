@@ -960,7 +960,9 @@ describe("scope-git-status rule", () => {
     VALID_TASK.replace("- [ ] Run `bun test`", items);
 
   const lintOne = async (body: string) => {
-    const root = await writeTree({ "tasks/ui/01-fixture-state-shell.md": body });
+    const root = await writeTree({
+      "tasks/ui/01-fixture-state-shell.md": body,
+    });
     const violations = await lintFile(
       join(root, "tasks/ui/01-fixture-state-shell.md"),
     );
@@ -977,7 +979,7 @@ describe("scope-git-status rule", () => {
 
     const scope = violations.find((v) => v.rule === "scope-git-status");
     expect(scope).toBeDefined();
-    expect(scope!.detail).toContain("Status");
+    expect(scope!.detail).toContain("pathspec");
   });
 
   test("flags the same trap phrased as nothing else", async () => {
@@ -990,14 +992,81 @@ describe("scope-git-status rule", () => {
     expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
   });
 
-  test("allows a git status check that judges the other paths", async () => {
+  // The shape task-template.md used to recommend. It survives an exclusivity
+  // regex by wording alone, yet it still reads the whole tree — a parallel
+  // sibling's uncommitted edits fail a correct implementation.
+  test("flags a whole-tree check that only judges the other paths", async () => {
     const violations = await lintOne(
       withVerification(
-        "- [ ] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file.",
+        "- [ ] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation.",
+      ),
+    );
+
+    const scope = violations.find((v) => v.rule === "scope-git-status");
+    expect(scope).toBeDefined();
+    expect(scope!.detail).toContain("pathspec");
+  });
+
+  test("allows a git status check narrowed by a pathspec", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short -- README.md src/app.ts` and confirm both paths are dirty.",
       ),
     );
 
     expect(violations.some((v) => v.rule === "scope-git-status")).toBe(false);
+  });
+
+  test("still flags an exclusivity claim wrapped around a pathspec check", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short -- README.md`; it must be the only modified path.",
+      ),
+    );
+
+    const scope = violations.find((v) => v.rule === "scope-git-status");
+    expect(scope).toBeDefined();
+    expect(scope!.detail).toContain("exclusivity");
+  });
+
+  test("allows a path operand written without the -- separator", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short bin/workbench` and confirm it is modified.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(false);
+  });
+
+  test("reads no pathspec out of bare prose", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run git status --short and quote every entry it prints.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
+  });
+
+  test("flags an item that narrows one invocation but not the other", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short -- src/app.ts`, then `git status --short` for the whole tree.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
+  });
+
+  test("does not accept an option flag as a pathspec", async () => {
+    const violations = await lintOne(
+      withVerification(
+        "- [ ] Run `git status --short --branch` and review every entry it prints.",
+      ),
+    );
+
+    expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
   });
 
   test("ignores an exclusivity claim that has no git status command", async () => {

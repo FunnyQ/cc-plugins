@@ -129,7 +129,9 @@ Either way, never leave a half-written tree.
    ```bash
    bun "$SCRIPTS"/lint-task.ts docs/<slug>/tasks
    ```
-   Pass the **tasks directory**, not a glob; the script walks bucket dirs and auto-skips `_context/` and `README.md`. Violations include PLAN.md refs in any casing, sibling-task refs, missing sections, a missing or unparseable `## Eval rubric`, an out-of-scale pass threshold, no final-review task (or one that doesn't reach every task), broken Required reading paths, an H1-vs-path mismatch, and a bad Status. Fix and re-run. Do not finish with violations outstanding.
+   Pass the **tasks directory**, not a glob; the script walks bucket dirs and auto-skips `_context/` and `README.md`. Violations include PLAN.md refs in any casing, sibling-task refs, missing sections, a missing or unparseable `## Eval rubric`, an out-of-scale pass threshold, no final-review task (or one that doesn't reach every task), broken Required reading paths, an H1-vs-path mismatch, a `git status` gate with no `--` pathspec, and a bad Status. Fix and re-run. Do not finish with violations outstanding.
+
+   **Every task in this tree may run beside another one.** Autopilot dispatches all ready tasks of a wave in parallel into one shared working tree, and forbids each of them to commit. So no task's verification may assert anything about the state of the whole tree — a sibling's correct, uncommitted edits are indistinguishable from a scope violation. Assert on this task's own declared files, by name.
 
 5. **Generate `tasks/README.md`** — index, dep graphs, cross-bucket table:
    ```bash

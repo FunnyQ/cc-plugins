@@ -145,24 +145,31 @@ Before finalizing a task file, verify each:
 - [ ] File paths are absolute from project root (no "in the auth folder" hand-waving).
 - [ ] Every acceptance criterion is verifiable (no "looks good").
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
-- [ ] No scope gate claims a single modified path. See "Never gate scope on `git status`" below.
+- [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
 - [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
 - [ ] Nothing in this file requires opening PLAN.md or another task file to understand.
 - [ ] If duplication with `_context/` is needed for clarity, duplicate it. Don't make the executor cross-reference.
 
-## Never gate scope on `git status`
+## Always narrow a `git status` gate to a pathspec
 
-Do not write an acceptance criterion or a verification step that claims one modified path:
+A gate that reads `git status` without a `--` pathspec reads the **whole working tree**, and no task owns that tree. Write the pathspec:
 
 - ❌ `` Run `git status --short` — expect `README.md` as the only modified path. ``
 - ❌ `` `git status --short` shows nothing else modified. ``
-- ✅ `` Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation. ``
+- ❌ `` Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation. ``
+- ✅ `` Run `git status --short -- README.md docs/<slug>/tasks/<bucket>/NN-<slug>.md` and confirm both paths are dirty. ``
 
-The runner edits the task file as bookkeeping: the dev step sets `Status: in-progress`, and `mark-done.ts` ticks every `## Acceptance criteria` and `## Verification` box. So an exclusivity claim is false from the first attempt, and the binary gate reports a scope violation on work that was correct.
+Two separate failures made every whole-tree form unusable.
 
-The second failure is worse than the first. A dev agent under a failing gate reverts the runner's own `Status` edit to make the check pass — observed live, with the agent reporting "task file correctly restored". A reverted `Status` un-schedules the task: `next-ready.ts` only offers `todo`, and `mark-done.ts` validates the header before it writes.
+**The runner edits the task file.** The dev step sets `Status: in-progress`, and `mark-done.ts` ticks every `## Acceptance criteria` and `## Verification` box. So an exclusivity claim is false from the first attempt. Worse, a dev agent under a failing gate reverts the runner's own `Status` edit to make the check pass — observed live, with the agent reporting "task file correctly restored". A reverted `Status` un-schedules the task: `next-ready.ts` only offers `todo`, and `mark-done.ts` validates the header before it writes.
 
-`lint-task.ts` enforces this as the `scope-git-status` rule. Name the paths that must not change, and judge the *other* entries `git status` prints.
+**Sibling tasks share the tree.** Autopilot dispatches every ready task of a wave in parallel into one working tree, and forbids each of them to commit. So a correct task sees its siblings' correct, uncommitted edits in `git status` and reports them as its own violation. Observed live: a task passed all 7 acceptance criteria and 245 tests, then failed three attempts and parked, on four paths that were the declared file list of a task running beside it. The exemption `plus at most this task file` only ever covered the runner's self-edits; it never covered siblings.
+
+You cannot recover the missing information by rewording. In a shared tree a dirty path looks identical whether your task dirtied it or a sibling did.
+
+**What the pathspec form buys, and what it doesn't.** It asserts your own declared paths changed, which still catches a dev engine that implemented nothing. It cannot detect edits outside your declared list — treat that as a weak signal, not a scope gate, and let the acceptance criteria and tests carry correctness.
+
+`lint-task.ts` enforces this as the `scope-git-status` rule: a `git status` in `## Acceptance criteria` or `## Verification` with no `--` pathspec fails, and a pathspec-limited one still fails if it claims exclusivity. Option flags such as `--short` and `--porcelain` do not count as a pathspec.
 
 ## Sizing
 

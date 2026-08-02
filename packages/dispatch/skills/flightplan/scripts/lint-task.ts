@@ -105,20 +105,56 @@ export function testCommandsIn(task: ParsedTask): string[] {
 // file itself — `Status: todo → in-progress`, then mark-done ticks every gate
 // box — so "only <file> is modified" is false from the first attempt onwards.
 const EXCLUSIVITY_REGEX = /\b(only|sole|nothing else|no other)\b/i;
+// A `git status` invocation anywhere in the item, backticked or bare.
+const GIT_STATUS_REGEX = /git status\b/;
+// Backticked spans that invoke it. Only a backticked span is read for a
+// pathspec: in bare prose ("run git status and quote it") every following word
+// would parse as an operand, so an unquoted gate is always treated as unscoped.
+const GIT_STATUS_SPAN_REGEX = /`([^`\n]*\bgit status\b[^`\n]*)`/g;
+
+/** True when a backticked `git status` command names at least one path operand. */
+function hasPathspec(span: string): boolean {
+  const after = span.slice(span.indexOf("git status") + "git status".length);
+  // An operand is any token that is not an option flag. `--` itself is the
+  // separator, never the path — so `--short` and a lone `--` both fail here.
+  return after
+    .split(/\s+/)
+    .some((token) => token !== "" && token !== "--" && !token.startsWith("-"));
+}
+
+export type ScopeGitStatusHit = {
+  /** First line of the offending checklist item. */
+  item: string;
+  /** `unscoped` — no `--` pathspec; `exclusivity` — pathspec plus an exclusivity claim. */
+  kind: "unscoped" | "exclusivity";
+};
 
 /**
- * Checklist items that gate scope with `git status` plus an exclusivity claim.
+ * Checklist items whose scope gate reads `git status` unsafely.
+ *
+ * A bare `git status` reports the WHOLE working tree, and under autopilot that
+ * tree is never attributable to one task: siblings in the same wave leave their
+ * legitimate edits uncommitted next to yours. So any gate without a `--`
+ * pathspec is rejected outright — no wording survives that. A pathspec-limited
+ * gate is fine, unless it also claims exclusivity over what it prints.
+ *
  * Returns the offending items, first line only, in document order.
  */
-export function scopeGitStatusChecks(task: ParsedTask): string[] {
-  const hits: string[] = [];
+export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
+  const hits: ScopeGitStatusHit[] = [];
   for (const heading of ["Acceptance criteria", "Verification"]) {
     const section = extractSection(task.body, heading);
     if (section === "") continue;
     for (const item of checklistItems(section)) {
-      if (!/git status\b/.test(item)) continue;
-      if (!EXCLUSIVITY_REGEX.test(item)) continue;
-      hits.push(item.split("\n")[0].trim());
+      if (!GIT_STATUS_REGEX.test(item)) continue;
+      const first = item.split("\n")[0].trim();
+      const spans = [...item.matchAll(GIT_STATUS_SPAN_REGEX)].map((m) => m[1]);
+      // Every invocation in the item must be narrowed, not just one of them.
+      if (spans.length === 0 || !spans.every(hasPathspec)) {
+        hits.push({ item: first, kind: "unscoped" });
+      } else if (EXCLUSIVITY_REGEX.test(item)) {
+        hits.push({ item: first, kind: "exclusivity" });
+      }
     }
   }
   return hits;
@@ -234,11 +270,12 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
     push("sections", "missing `## Verification` section");
   }
 
-  for (const item of scopeGitStatusChecks(task)) {
-    push(
-      "scope-git-status",
-      `a \`git status\` scope gate that claims exclusivity cannot pass under autopilot — the runner edits this very file (Status → in-progress, then mark-done ticks every gate box), and a dev agent will revert that bookkeeping to satisfy it. Judge the OTHER paths instead, e.g. "expect <file>, plus at most this task file": ${item}`,
-    );
+  for (const hit of scopeGitStatusChecks(task)) {
+    const detail =
+      hit.kind === "unscoped"
+        ? `a \`git status\` scope gate with no \`--\` pathspec reads the WHOLE working tree, which no task owns: autopilot runs tasks in parallel in one tree, so a sibling's legitimate uncommitted edits land in your output and fail a correct implementation. Narrow it to this task's own files, e.g. \`git status --short -- <this task's files>\`: ${hit.item}`
+        : `a \`git status\` scope gate that claims exclusivity cannot pass under autopilot — the runner edits this very file (Status → in-progress, then mark-done ticks every gate box). Assert that your own paths changed; never claim what else did not: ${hit.item}`;
+    push("scope-git-status", detail);
   }
 
   // Eval rubric — mandatory and machine-parseable (strict). Acceptance criteria
