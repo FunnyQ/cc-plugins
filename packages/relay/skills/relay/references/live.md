@@ -10,7 +10,7 @@ The live tab stays in the caller's Herdr workspace, even when Relay runs against
 
 Live and headless share the same CLI, model, and write access. Editing capability is **identical**. Never justify `--headless` with "more precise / deterministic / reliable for multi-file edits". Live is a *superset*: it is unattended **and** observable. Keep live as the default. Force `--headless` only for a real reason: nested delegation, a mode with no live seam, or no pane surface.
 
-`relay.ts` is one blocking call. Wait for its single result. Do not poll `tail`, `cat`, or status while it runs. If you drive `herd` directly, block with `herd wait <agent>` instead of looping `herd read`.
+`relay.ts` is one blocking call. Wait for its single result. Do not poll `tail`, `cat`, or pane status while it runs. If it reports a pending run, resume it with the printed `relay.ts collect` command rather than a hand-rolled wait.
 
 Flags:
 
@@ -26,7 +26,7 @@ Output contract:
 
 **After a successful live run**, relay closes the pane by default. It closes the pane only after the agent has settled and the result-file marker verifies the captured answer. To leave the pane open for follow-up conversation, pass `--keep-pane`.
 
-With `--keep-pane`, continue the conversation directly with `herd send/wait/read`. Close it later with `bun <herd.ts> close <agent-name>`. Follow-ups are out of relay's scope. Relay is one-shot: spawn→capture.
+With `--keep-pane`, continue the conversation directly with `herd send/wait/read`. Block on `herd wait` instead of looping `herd read`, and pass the status you actually mean — it defaults to `idle`, which means "ready for input", not "finished". Close it later with `bun <herd.ts> close <agent-name>`. Follow-ups are out of relay's scope. Relay is one-shot: spawn→capture.
 
 **Pending report (exit 0 + "still running")**: if the delegate outlives `--wait-timeout`, relay does NOT kill or close anything. It exits **0** and prints a report of copy-pasteable follow-ups. Treat this as "work in progress", not failure. Relay's non-zero = stop rule does not apply.
 
@@ -42,7 +42,7 @@ Reattach to the pane a pending report named and watch it for another bounded win
 
 `collect` never spawns a second pane and never re-sends the prompt — it only watches. On a verified result it closes the pane, like a normal live success.
 
-**Prefer `collect` over `herd wait`.** `herd wait` blocks until `idle`, and codex parks at `done` when it finishes, so waiting on `idle` can miss a completed run entirely. `collect` reuses relay's own settled test (`idle` **or** `done`, plus the result-file marker).
+**For a pending run, use `collect`, not a hand-rolled `herd wait`.** A status wait only reports what the pane's agent is doing, and it defaults to `idle` — which codex never returns to, because it parks at `done` when it finishes. `collect` gates on relay's own settled test instead: `idle` **or** `done`, **plus** the result-file marker. The marker is the part a status wait cannot replace. Without it, a settled pane is indistinguishable from one that never started work.
 
 Do not use `collect` to poll. One bounded call, then act on what it returns.
 
