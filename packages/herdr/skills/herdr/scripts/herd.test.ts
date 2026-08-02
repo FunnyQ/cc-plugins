@@ -897,6 +897,59 @@ describe("close", () => {
   });
 });
 
+describe("wait", () => {
+  const waitEnvelope = JSON.stringify({ result: { type: "wait_matched" } });
+  const waitRunner = () =>
+    mockRunner((a) => (a[1] === "wait" ? { stdout: waitEnvelope } : undefined));
+
+  test("defaults to --until idle — readiness, not completion", async () => {
+    const { run, calls } = waitRunner();
+    await createHerd(run).wait("rev-1");
+    expect(calls[0]).toEqual([
+      "agent",
+      "wait",
+      "rev-1",
+      "--until",
+      "idle",
+      "--timeout",
+      "15000",
+    ]);
+  });
+
+  test("accepts done, which herdr supports but the wrapper used to reject", async () => {
+    const { run, calls } = waitRunner();
+    await createHerd(run).wait("rev-1", { status: "done" });
+    expect(calls[0].slice(3, 5)).toEqual(["--until", "done"]);
+  });
+
+  test("emits one repeated --until per status, in order", async () => {
+    const { run, calls } = waitRunner();
+    await createHerd(run).wait("rev-1", {
+      status: ["idle", "done"],
+      timeoutMs: 5000,
+    });
+    expect(calls[0]).toEqual([
+      "agent",
+      "wait",
+      "rev-1",
+      "--until",
+      "idle",
+      "--until",
+      "done",
+      "--timeout",
+      "5000",
+    ]);
+  });
+
+  test("rejects an empty status array rather than sending a bare wait", async () => {
+    const { run, calls } = waitRunner();
+    await expect(createHerd(run).wait("rev-1", { status: [] })).rejects.toThrow(
+      HerdrError,
+    );
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe("parseArgs", () => {
   test("a value-flag consumes a value that starts with -- (not treated as boolean)", () => {
     const { flags } = parseArgs(["--agent", "codex", "--task", "--check src"]);
@@ -933,5 +986,20 @@ describe("parseArgs", () => {
     ]);
     expect(env).toEqual(["A=1", "B=2"]);
     expect(rest).toEqual(["-l", "--color"]);
+  });
+
+  test("a repeatable flag collects into an array instead of overwriting", () => {
+    const { flags } = parseArgs(["--status", "idle", "--status", "done"]);
+    expect(flags.status).toEqual(["idle", "done"]);
+  });
+
+  test("a repeatable flag given once stays a plain string", () => {
+    const { flags } = parseArgs(["--status", "idle"]);
+    expect(flags.status).toBe("idle");
+  });
+
+  test("a non-repeatable flag still takes the last value", () => {
+    const { flags } = parseArgs(["--agent", "codex", "--agent", "claude"]);
+    expect(flags.agent).toBe("claude");
   });
 });

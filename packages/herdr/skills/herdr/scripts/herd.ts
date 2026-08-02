@@ -55,6 +55,10 @@ export class HerdrError extends Error {
   }
 }
 
+/** herdr's agent_status enum, in full. `done` means the agent finished but its
+ *  pane has not been looked at — codex parks there instead of returning to `idle`. */
+export type AgentStatus = "idle" | "working" | "blocked" | "done" | "unknown";
+
 /** Normalized agent record — the shape callers actually want. */
 export type AgentInfo = {
   name: string | null; // manual name given at `agent start`, if any
@@ -197,21 +201,48 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return `${base}-${randHex(8)}`;
   }
 
+  /**
+   * Block until `target` reports one of `status`.
+   *
+   * The default stays `idle` — the ONE status that means "the TUI will accept
+   * input". That is what spawn()'s settle-before-send needs, and it is what
+   * every existing caller already passes explicitly. herdr's own bare `agent
+   * wait` defaults to idle|done|blocked instead, but that set is a MONITORING
+   * predicate, not a readiness one: `blocked` means the agent is parked on a
+   * human approval, so a wait that returns there hands a stuck pane to an
+   * unattended caller.
+   *
+   * Pass an array for a completion wait — codex parks at `done` rather than
+   * returning to `idle`, so `["idle", "done"]` is the settled test. That is
+   * still only a status check: it cannot tell a finished agent from one that
+   * has not started yet (a fresh agent reports `idle` before its first turn).
+   * Callers needing a real completion signal pair it with their own evidence,
+   * the way relay's `collect` gates on a result-file marker.
+   */
   async function wait(
     target: string,
     opts: {
-      status?: "idle" | "working" | "blocked" | "unknown";
+      status?: AgentStatus | AgentStatus[];
       timeoutMs?: number;
     } = {},
   ): Promise<any> {
-    const status = opts.status ?? "idle";
+    const statuses =
+      opts.status === undefined
+        ? ["idle"]
+        : Array.isArray(opts.status)
+          ? opts.status
+          : [opts.status];
+    // A bare `agent wait` would silently fall back to herdr's idle|done|blocked
+    // default, which is not what an empty array asked for. Fail instead.
+    if (statuses.length === 0) {
+      throw new HerdrError("wait requires at least one status");
+    }
     const timeout = opts.timeoutMs ?? 15000;
     return callJson([
       "agent",
       "wait",
       target,
-      "--until",
-      status,
+      ...statuses.flatMap((s) => ["--until", s]),
       "--timeout",
       String(timeout),
     ]);
@@ -521,18 +552,24 @@ function assertHerdrEnv(): void {
 /** Flags that never take a value (so a following token — even one starting with `--` — is not consumed). */
 const BOOLEAN_FLAGS = new Set(["new-tab"]);
 
+/** Flags that may be given more than once. The second occurrence turns the value
+ *  into an array instead of overwriting the first — `herdr agent wait` takes a
+ *  repeated `--until`, so `--status idle --status done` has to survive the parse. */
+const REPEATABLE_FLAGS = new Set(["status"]);
+
 /** Minimal flag parser: returns { positionals, flags, rest } where rest is everything after a bare `--`.
  *  Value-flags always consume the next token as their value — including values that start with `--`
  *  (e.g. `--task "--check src"`); only BOOLEAN_FLAGS and a missing token yield a boolean.
- *  Exported for unit testing. */
+ *  A REPEATABLE_FLAGS key collects into an array once it appears twice; every other key keeps the
+ *  last value. Exported for unit testing. */
 export function parseArgs(argv: string[]): {
   positionals: string[];
-  flags: Record<string, string | boolean>;
+  flags: Record<string, string | boolean | string[]>;
   env: string[];
   rest: string[];
 } {
   const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
+  const flags: Record<string, string | boolean | string[]> = {};
   const env: string[] = [];
   let rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -548,6 +585,12 @@ export function parseArgs(argv: string[]): {
         flags[key] = true;
       } else if (key === "env") {
         env.push(next);
+        i++;
+      } else if (REPEATABLE_FLAGS.has(key) && key in flags) {
+        const prev = flags[key];
+        flags[key] = Array.isArray(prev)
+          ? [...prev, next]
+          : [prev as string, next];
         i++;
       } else {
         flags[key] = next;
@@ -568,7 +611,7 @@ Usage:
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
   herd send <target> <text>
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k
-  herd wait <target> [--status idle|working|blocked|unknown] [--timeout MS]
+  herd wait <target> [--status idle|working|blocked|done|unknown]... [--timeout MS]
   herd read <target> [--lines N] [--source recent-unwrapped|recent|visible]
   herd close <target>
 
@@ -640,7 +683,10 @@ async function main() {
         const target = positionals[0];
         if (!target) throw new HerdrError("wait requires <target>");
         const res = await herd.wait(target, {
-          status: (flags.status as any) ?? "idle",
+          // `--status` is repeatable, so parseArgs hands back a string OR an
+          // array. Leave it undefined when absent so wait() applies its own
+          // default rather than this layer duplicating it.
+          status: flags.status as AgentStatus | AgentStatus[] | undefined,
           timeoutMs: flags.timeout ? Number(flags.timeout) : undefined,
         });
         console.log(JSON.stringify(res, null, 2));
