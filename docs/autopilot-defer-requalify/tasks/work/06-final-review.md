@@ -6,7 +6,7 @@
 > - `../_context/orchestrator-anatomy.md`
 >
 > **Depends on**: work/04, work/05
-> **Status**: todo
+> **Status**: blocked
 > **Final review**: true
 
 ## Goal
