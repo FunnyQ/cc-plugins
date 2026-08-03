@@ -12,7 +12,7 @@
         <div class="plan-identity">
           <span class="eyebrow">Flight plan</span>
           <h1>{{ tree.planTitle || "Hangar" }}</h1>
-          <span class="slug">{{ tree.slug || "Awaiting tree data" }}</span>
+          <span class="slug"><span class="repo" v-if="tree.repo">{{ tree.repo }}</span>{{ tree.slug || "Awaiting tree data" }}</span>
         </div>
 
         <div class="plan-progress">

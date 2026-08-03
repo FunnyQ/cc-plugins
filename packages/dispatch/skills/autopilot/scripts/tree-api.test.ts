@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
-import { buildTreePayload, type Loaded } from "./tree-api";
+import { buildTreePayload, type Loaded, repoName } from "./tree-api";
 
 /** A body whose Verification gate box is still unticked. */
 const UNTICKED_GATE = "## Verification\n\n- [ ] Run the suite\n";
@@ -41,6 +44,7 @@ function input(
   return {
     slug: "sample-plan",
     planTitle: "Sample Plan",
+    repo: "sample-repo",
     bucketDirs,
     loaded: { byRef, errors },
     entries,
@@ -138,6 +142,10 @@ describe("buildTreePayload", () => {
     });
   });
 
+  test("carries the repo name", () => {
+    expect(buildTreePayload(input()).repo).toBe("sample-repo");
+  });
+
   test("preserves a slug title fallback", () => {
     const fallback = input();
     fallback.planTitle = fallback.slug;
@@ -230,5 +238,38 @@ describe("buildTreePayload", () => {
       "blocked",
     ]);
     expect(payload.tasks[1].blockedBy).toEqual(["api/01"]);
+  });
+});
+
+describe("repoName", () => {
+  function scratch(): string {
+    return mkdtempSync(join(tmpdir(), "flightdeck-repo-"));
+  }
+
+  test("names the nearest repo above the plan", () => {
+    const root = scratch();
+    const repo = join(root, "my-repo");
+    const plan = join(repo, "docs", "sample-plan");
+    mkdirSync(plan, { recursive: true });
+    mkdirSync(join(repo, ".git"));
+
+    expect(repoName(plan)).toBe("my-repo");
+  });
+
+  test("accepts a worktree, where .git is a file", () => {
+    const root = scratch();
+    const repo = join(root, "linked-tree");
+    const plan = join(repo, "docs", "sample-plan");
+    mkdirSync(plan, { recursive: true });
+    writeFileSync(join(repo, ".git"), "gitdir: /elsewhere/.git/worktrees/x\n");
+
+    expect(repoName(plan)).toBe("linked-tree");
+  });
+
+  test("returns an empty name outside a repo", () => {
+    const plan = join(scratch(), "docs", "sample-plan");
+    mkdirSync(plan, { recursive: true });
+
+    expect(repoName(plan)).toBe("");
   });
 });

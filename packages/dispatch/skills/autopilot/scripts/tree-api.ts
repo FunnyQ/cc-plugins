@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
@@ -14,6 +15,8 @@ export type Loaded = {
 export type TreePayload = {
   slug: string;
   planTitle: string;
+  /** Repo the plan lives in — empty when the plan sits outside one. */
+  repo: string;
   buckets: string[];
   tasks: TaskView[];
   counts: {
@@ -31,10 +34,27 @@ export type TreePayload = {
   errors: { file: string; bucket: string; reason: string }[];
 };
 
+/**
+ * Impure: walks up for the repo the plan belongs to. `.git` is a directory in a
+ * clone and a file in a linked worktree, so presence — not type — is the test.
+ */
+export function repoName(planDir: string): string {
+  let dir = planDir;
+
+  while (true) {
+    if (existsSync(join(dir, ".git"))) return basename(dir);
+
+    const parent = dirname(dir);
+    if (parent === dir) return "";
+    dir = parent;
+  }
+}
+
 /** Impure: reads the tasks tree and the flightlog. */
 export async function loadPlan(planDir: string): Promise<{
   slug: string;
   planTitle: string;
+  repo: string;
   /**
    * Every directory under `tasks/`, in listing order — NOT derived from parsed
    * tasks. `buildTreePayload` owns the ordering rule.
@@ -62,6 +82,7 @@ export async function loadPlan(planDir: string): Promise<{
   return {
     slug,
     planTitle,
+    repo: repoName(planDir),
     // The loader already applied the bucket rule; re-listing here would state it twice.
     bucketDirs: taskResult.buckets,
     loaded: {
@@ -79,6 +100,7 @@ export async function loadPlan(planDir: string): Promise<{
 export function buildTreePayload(input: {
   slug: string;
   planTitle: string;
+  repo: string;
   bucketDirs: string[];
   loaded: Loaded;
   entries: FlightlogEntry[];
@@ -104,6 +126,7 @@ export function buildTreePayload(input: {
   return {
     slug: input.slug,
     planTitle: input.planTitle,
+    repo: input.repo,
     buckets: [...input.bucketDirs].sort(),
     tasks,
     counts,

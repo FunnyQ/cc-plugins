@@ -131,6 +131,17 @@ button {
   white-space: nowrap;
 }
 
+/* The repo anchors the plan: same line as the slug, read as one path. */
+.repo {
+  color: var(--text);
+
+  &::after {
+    color: var(--faint);
+    content: "/";
+    margin-inline: var(--space-1);
+  }
+}
+
 .plan-elapsed {
   display: grid;
   gap: var(--space-1);

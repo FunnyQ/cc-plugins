@@ -17,6 +17,7 @@ const POLL_INTERVAL_MS = 3_000;
 const emptyTree = () => ({
   planTitle: "",
   slug: "",
+  repo: "",
   buckets: [],
   tasks: [],
   counts: {
@@ -141,6 +142,7 @@ async function loadTree() {
     Object.assign(store.tree, payload, {
       planTitle: payload.planTitle ?? "",
       slug: payload.slug ?? "",
+      repo: payload.repo ?? "",
       counts: { ...emptyTree().counts, ...(payload.counts ?? {}) },
       errors: Array.isArray(payload.errors) ? payload.errors : [],
     });
