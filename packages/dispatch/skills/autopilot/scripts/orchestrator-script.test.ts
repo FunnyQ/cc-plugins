@@ -106,6 +106,12 @@ type Scenario = {
   >;
   /** Refs whose dev step throws, simulating a pipeline that dies mid-flight. */
   devThrows?: string[];
+  /** Keyed by ref; the stubbed dev step awaits this before returning. */
+  devHolds?: Record<string, Promise<void>>;
+  /** Keyed by ref; the stubbed park agent awaits this before returning. */
+  parkHolds?: Record<string, Promise<void>>;
+  /** Keyed by ref; the stubbed mark-done agent awaits this before returning. */
+  doneHolds?: Record<string, Promise<void>>;
 };
 
 type Verdict = {
@@ -227,13 +233,24 @@ async function runOrchestrator(
       return take("judge", refOf(rest), { verdict: pass, rationale: "solid" });
     }
     if (label.startsWith("done:")) {
-      return take("markDone", refOf(rest), { ok: true, status: "done" });
+      const ref = refOf(rest);
+      if (scenario.doneHolds?.[ref]) {
+        await scenario.doneHolds[ref];
+      }
+      return take("markDone", ref, { ok: true, status: "done" });
     }
     if (label.startsWith("block:")) {
-      return take("park", refOf(rest), { ok: true, status: "blocked" });
+      const ref = refOf(rest);
+      if (scenario.parkHolds?.[ref]) {
+        await scenario.parkHolds[ref];
+      }
+      return take("park", ref, { ok: true, status: "blocked" });
     }
     if (label.startsWith("dev:") || label.startsWith("dev-")) {
       const ref = refOf(rest);
+      if (scenario.devHolds?.[ref]) {
+        await scenario.devHolds[ref];
+      }
       if (scenario.budget?.spendAfterDev !== undefined) {
         budgetSpent = scenario.budget.spendAfterDev;
       }
@@ -1418,4 +1435,135 @@ describe("held-back paths", () => {
     });
     expect(promptFor(log, "commit-wave-2")).not.toContain("HELD BACK");
   });
+});
+
+// WRITER ACCOUNTING TESTS
+// ══════════════════════════════════════════════════════════════════════════
+// What these tests deliberately cannot prove, and why:
+// - The count has no observable effect until something waits on it, and nothing
+//   in this task waits. A test that releases a held dev promise only proves the
+//   agent finished; a test that observes the park's label only proves the park
+//   ran, which is equally true with the wrapper removed. So the accounting —
+//   that dev, mark-done and the catch-path park each open a counted window — is
+//   only testable once a consumer waits on the quiet signal, and it is asserted
+//   there rather than here.
+//
+// What these tests do own: the threading is correct, the wrapping does not
+// disturb a normal wave, and the run's shape is unchanged. Note that once a
+// consumer does await quiet(), a miscounted latch will present as a **hang**
+// rather than a failure — so a timeout in the suite that adds that consumer is
+// a real defect and must never be "fixed" by raising the limit.
+test("the watch does not disturb a normal wave", async () => {
+  // A multi-task wave with no holds completes with the same completed set and
+  // the same agent-label order as before the watch existed.
+  const { result, labels } = await runOrchestrator({
+    scouts: [
+      snapshot({
+        ready: [ready("ui/01"), ready("ui/02")],
+        counts: counts({ total: 2, todo: 2 }),
+        unfinished: [
+          { ref: "ui/01", state: "todo" },
+          { ref: "ui/02", state: "todo" },
+        ],
+        invalid: [],
+      }),
+      complete(2),
+    ],
+  });
+  expect(result.completed).toEqual(["ui/01", "ui/02"]);
+  expect(result.escalations).toEqual([]);
+  // The agent sequence is unchanged by the watch: dev, verify, judge, done for
+  // each task, in any order (parallel tasks in wave 1, then the next wave).
+  const waveOneDev = labels.filter(
+    (l) => l.startsWith("dev") && l.includes("#1"),
+  ).length;
+  const waveOneVerify = labels.filter(
+    (l) => l.startsWith("verify") && l.includes("#1"),
+  ).length;
+  expect(waveOneDev).toBe(2);
+  expect(waveOneVerify).toBe(2);
+});
+
+test("a wave whose every dev step is held, then released, completes", async () => {
+  // All holds are released after the wave is known to be in flight. This proves
+  // the wrapping does not change when a wave finishes. It is NOT a deadlock test:
+  // nothing in this task awaits quiet(), so completion depends only on the holds
+  // being released, and this would still pass if leave() never decremented. Leak
+  // detection belongs to the capability that waits — do not claim it here.
+  let releaseUI01: () => void;
+  let releaseUI02: () => void;
+  const heldUI01 = new Promise<void>((r) => (releaseUI01 = r));
+  const heldUI02 = new Promise<void>((r) => (releaseUI02 = r));
+
+  const run = runOrchestrator({
+    scouts: [
+      snapshot({
+        ready: [ready("ui/01"), ready("ui/02")],
+        counts: counts({ total: 2, todo: 2 }),
+        unfinished: [
+          { ref: "ui/01", state: "todo" },
+          { ref: "ui/02", state: "todo" },
+        ],
+        invalid: [],
+      }),
+      complete(2),
+    ],
+    devHolds: {
+      "ui/01": heldUI01,
+      "ui/02": heldUI02,
+    },
+  });
+
+  await Promise.resolve();
+  releaseUI01!();
+  releaseUI02!();
+  const { result } = await run;
+
+  expect(result.completed).toEqual(["ui/01", "ui/02"]);
+  expect(result.escalations).toEqual([]);
+});
+
+test("a held catch-path park still reconciles", async () => {
+  // Hold a sibling's dev step so it throws into the guarded wrapper's catch,
+  // hold its park, release both, and assert the task is escalated and parked
+  // exactly as it is today. This proves the extra wrapping did not break the
+  // catch path; it does NOT prove the park is counted.
+  let releaseDev: () => void;
+  let releasePark: () => void;
+  const heldDev = new Promise<void>((r) => (releaseDev = r));
+  const heldPark = new Promise<void>((r) => (releasePark = r));
+
+  const run = runOrchestrator({
+    scouts: [
+      snapshot({
+        ready: [ready("ui/01"), ready("ui/02")],
+        counts: counts({ total: 2, todo: 2 }),
+        unfinished: [
+          { ref: "ui/01", state: "todo" },
+          { ref: "ui/02", state: "todo" },
+        ],
+        invalid: [],
+      }),
+      complete(2),
+    ],
+    devThrows: ["ui/01"],
+    devHolds: {
+      "ui/01": heldDev,
+    },
+    parkHolds: {
+      "ui/01": heldPark,
+    },
+  });
+
+  await Promise.resolve();
+  releaseDev!();
+  await Promise.resolve();
+  releasePark!();
+  const { result } = await run;
+
+  expect(result.completed).toEqual(["ui/02"]);
+  expect(result.escalations).toHaveLength(1);
+  const [escalation] = result.escalations;
+  expect(escalation.task).toBe("ui/01");
+  expect(escalation.parked).toBe(true);
 });

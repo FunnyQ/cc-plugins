@@ -7,7 +7,7 @@
 >
 > **Depends on**: work/01
 > **Blocks**: work/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -202,35 +202,35 @@ raising the limit.
 
 ## Acceptance criteria
 
-- [ ] `makeTreeWatch(size)` exists in the fence with exactly the five members `size`, `enter`,
+- [x] `makeTreeWatch(size)` exists in the fence with exactly the five members `size`, `enter`,
       `leave`, `active`, `quiet`; `active()` takes no argument; and `quiet()` returns an
       already-resolved promise when the count is zero rather than registering a waiter.
-- [ ] The watch is created with the wave's dispatched task count, so `watch.size` reports how
+- [x] The watch is created with the wave's dispatched task count, so `watch.size` reports how
       many tasks share the tree.
-- [ ] `withWriter(watch, fn)` exists and releases through `finally`, so a throwing `fn`
+- [x] `withWriter(watch, fn)` exists and releases through `finally`, so a throwing `fn`
       still decrements the count and still propagates its error.
-- [ ] Exactly one watch is created per wave, inside the wave loop before the parallel dispatch;
+- [x] Exactly one watch is created per wave, inside the wave loop before the parallel dispatch;
       no watch is stored at module scope.
-- [ ] The watch is threaded by explicit parameter through the guarded task wrapper, the task
+- [x] The watch is threaded by explicit parameter through the guarded task wrapper, the task
       pipeline, and the park helper — none of the three reads it from an outer binding.
-- [ ] All three dev-agent branches, the final-review call, the mark-done agent, and the body of
+- [x] All three dev-agent branches, the final-review call, the mark-done agent, and the body of
       the park helper each run inside a `withWriter` window.
-- [ ] The rubric-judge call, the verifier call, and each individual review-lens call carry
+- [x] The rubric-judge call, the verifier call, and each individual review-lens call carry
       **no** wrapper of their own — the lenses being enclosed by the single final-review window
       is expected and is not a violation — and the judge's exclusion carries a comment giving
       the reason.
-- [ ] `orchestrator-script.test.ts` accepts `devHolds`, `parkHolds` and `doneHolds` scenario
+- [x] `orchestrator-script.test.ts` accepts `devHolds`, `parkHolds` and `doneHolds` scenario
       fields, and a ref absent from any of them behaves exactly as it did before.
-- [ ] The three tests above exist and pass, and the run's agent sequence for a hold-free
+- [x] The three tests above exist and pass, and the run's agent sequence for a hold-free
       scenario is unchanged from the current behaviour.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes with 0 failures and a total
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes with 0 failures and a total
       test count strictly greater than the 198-test baseline.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes,
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes,
       and completes without hitting a per-test timeout.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts docs/autopilot-defer-requalify/tasks/work/02-wave-tree-watch.md`
+- [x] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts docs/autopilot-defer-requalify/tasks/work/02-wave-tree-watch.md`
       shows all three paths dirty.
 
 ## Eval rubric

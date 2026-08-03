@@ -460,14 +460,16 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
 // "Worked" means the file was REREAD and shows a bare `Status: blocked`. An
 // agent that returns a fluent summary having changed nothing is the failure mode
 // this guards, so a non-null result is not evidence of anything.
-async function parkBlocked(ref, path, reason) {
-  try {
-    const result = await agent(markBlockedPrompt(ref, path, reason),
-      { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify, schema: PARK_SCHEMA })
-    return result?.ok === true
-  } catch {
-    return false
-  }
+async function parkBlocked(ref, path, reason, watch) {
+  return await withWriter(watch, async () => {
+    try {
+      const result = await agent(markBlockedPrompt(ref, path, reason),
+        { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify, schema: PARK_SCHEMA })
+      return result?.ok === true
+    } catch {
+      return false
+    }
+  })
 }
 
 // Reproduces today's two feedback strings verbatim, so the prompt text a retry
@@ -490,8 +492,30 @@ const renderHistory = (attempts) => {
         : '')
 }
 
+// How many writers in this wave are mutating the tracked tree right now. A task
+// that fails its gate retries dev and writes again, so "all first devs returned"
+// is not a stable notion of quiet — this is a live count whose waiters resolve on
+// the next zero-crossing, not a one-shot barrier.
+const makeTreeWatch = (size) => {
+  let writers = 0
+  let waiters = []
+  return {
+    // A later consumer uses the dispatch count to distinguish parallel waves.
+    size,
+    enter: () => { writers++ },
+    leave: () => {
+      if (--writers === 0) { const w = waiters; waiters = []; w.forEach(r => r()) }
+    },
+    // A later consumer reads whether any sibling is writing when a gate returns.
+    active: () => writers,
+    quiet: () => writers === 0 ? Promise.resolve() : new Promise(r => waiters.push(r)),
+  }
+}
+
+const withWriter = async (watch, fn) => { watch.enter(); try { return await fn() } finally { watch.leave() } }
+
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
-async function executeTask(item) {
+async function executeTask(item, watch) {
   const { ref, finalReview, path } = item
   // The cross-vendor Final review round gets its own (smaller) cap; everything
   // else uses MAX. Past the cap the task is parked + escalated, never skipped.
@@ -501,7 +525,9 @@ async function executeTask(item) {
     let attemptModel = 'final-review'
     if (finalReview) {
       // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
-      await runFinalReview(ref, path, attempt, attempts)
+      await withWriter(watch, async () => {
+        await runFinalReview(ref, path, attempt, attempts)
+      })
     } else {
       // Dev step. An external devEngine falls back to Claude-Opus at its cap.
       // `cap > 1` keeps a single-attempt external ladder on its configured engine.
@@ -516,20 +542,29 @@ async function executeTask(item) {
       const claudeCap = cap - (lastShotEngine ? 1 : 0)
       if (vendorRung) {
         attemptModel = lastShotEngine.label
-        await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts)),
-          { label: `dev-${lastShotEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
+        await withWriter(watch, async () => {
+          await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts)),
+            { label: `dev-${lastShotEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
+        })
       } else if (devEngine && !lastShot) {
         attemptModel = devEngine.label
-        await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts)),
-          { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
+        await withWriter(watch, async () => {
+          await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts)),
+            { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
+        })
       } else {
         const devModel = attempt >= claudeCap ? MODEL.devEscalated : MODEL.dev
         attemptModel = devModel
-        await agent(devPrompt(ref, path, attempt, renderHistory(attempts)),
-          { label: `dev:${ref}#${attempt}`, phase: 'Execute', model: devModel })
+        await withWriter(watch, async () => {
+          await agent(devPrompt(ref, path, attempt, renderHistory(attempts)),
+            { label: `dev:${ref}#${attempt}`, phase: 'Execute', model: devModel })
+        })
       }
     }
 
+    // The verifier is deliberately not a writer: it must only inspect the tree.
+    // Individual review lenses are also not wrapped; the one final-review window
+    // encloses their fan-out because the fixer in that operation does write.
     // A verifier that returns NO structured result did not verify anything. That
     // is not the same as `passed: false`, which is a real verdict on real work.
     // Conflating them retries the dev loop against an unknown state.
@@ -538,7 +573,7 @@ async function executeTask(item) {
     if (!gate) {
       const cause = `verification did not run or did not return a verdict on attempt ${attempt}`
         + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
-      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
+      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
     }
     if (!gate.passed) {
       attempts.push({
@@ -553,12 +588,16 @@ async function executeTask(item) {
       continue
     }
 
+    // The rubric judge reads the task file and appends only to the self-gitignored
+    // flightlog directory, so it is not a tree writer. Counting it would make the
+    // quiet signal fire later than it should for no gain. This is a deliberate
+    // exclusion, and a later reader will otherwise "fix" it.
     const judged = await agent(judgePrompt(ref, path, gate.summary, attempt),
       { label: `judge:${ref}#${attempt}`, phase: 'Execute', model: MODEL.judge, schema: JUDGE_SCHEMA })
     if (!judged) {
       const cause = `the rubric judge returned no structured result on attempt ${attempt}`
         + ` — the task was never scored. The harness exposes no original cause for a null agent result, so none is reported here.`
-      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
+      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
     }
 
     const verdict = judged.verdict
@@ -566,8 +605,10 @@ async function executeTask(item) {
       // The post-judge transition is its own infrastructure boundary — a task
       // that passed but never got written `done` would be re-offered forever, or
       // (worse) counted as complete by a run that never checked.
-      const finalized = await agent(markDonePrompt(ref, path),
-        { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify, schema: MARK_DONE_SCHEMA })
+      const finalized = await withWriter(watch, async () => {
+        return await agent(markDonePrompt(ref, path),
+          { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify, schema: MARK_DONE_SCHEMA })
+      })
       if (finalized && finalized.ok) {
         return { task: ref, passed: true, attempt, weighted: verdict.weighted }
       }
@@ -577,7 +618,7 @@ async function executeTask(item) {
         : `the task passed its rubric but the mark-done step returned no structured result`
           + ` — the harness exposes no original cause for a null agent result, so none is reported here.`
       // Park + escalate, never both complete and stalled for the same task.
-      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
+      return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
     }
     attempts.push({
       n: attempt,
@@ -591,19 +632,19 @@ async function executeTask(item) {
   }
   // Render once: the parked file and the returned reason must carry the same text.
   const history = renderHistory(attempts)
-  const parkedOk = await parkBlocked(ref, path, history)
+  const parkedOk = await parkBlocked(ref, path, history, watch)
   return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: history }
 }
 
 // Wrap every task before it reaches parallel(). Do NOT depend on parallel()
 // surfacing an error object: a thrown pipeline resolves to null there, and a
 // null carries neither the task ref nor the cause. Catching here keeps both.
-async function runTaskGuarded(item) {
+async function runTaskGuarded(item, watch) {
   try {
-    return await executeTask(item)
+    return await executeTask(item, watch)
   } catch (error) {
     const cause = `the task pipeline threw: ${error?.message ?? String(error)}`
-    return infrastructureFailure(item.ref, 0, cause, await parkBlocked(item.ref, item.path, cause))
+    return infrastructureFailure(item.ref, 0, cause, await parkBlocked(item.ref, item.path, cause, watch))
   }
 }
 
@@ -883,9 +924,27 @@ while (true) {
   }
 
   log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
+  // The watch is created per wave, not at module scope, because:
+  // - size is a per-wave fact (how many tasks fresh contains this wave), so a
+  //   surviving watch either reports a stale dispatch count or has to be mutated
+  //   between waves — and the consumer that reads it uses size to decide whether
+  //   a task had any sibling at all. A wrong answer there silently changes which
+  //   deferrals are accepted.
+  // - Per-wave scope also keeps the object's lifetime equal to the thing it
+  //   describes: parallel() awaits every task thunk before the loop advances, so
+  //   an instance created there is provably unobservable to any later wave, and no
+  //   cross-wave state can accumulate.
+  // Why this cannot deadlock:
+  // - A task that awaits quiet() has already left the writer set — its own
+  //   mutation window closed before its gate ran — so it never waits on itself.
+  // - Every writer leaves through a finally, so a throwing writer still decrements.
+  //   The count cannot strand.
+  // - If every task in a wave awaits at once, no writer remains, writers is 0, and
+  //   quiet() returns an already-resolved promise rather than registering a waiter.
+  const watch = makeTreeWatch(fresh.length)
   // No `.filter(Boolean)` — reconciliation is by INDEX against `fresh`, so a
   // null result still lands on its own task instead of disappearing.
-  const results = await parallel(fresh.map(item => () => runTaskGuarded(item)))
+  const results = await parallel(fresh.map(item => () => runTaskGuarded(item, watch)))
 
   // Reconcile every input task. A dropped task would land in NO list: its dev
   // step already set the task to in-progress, and next-ready only offers `todo`,
