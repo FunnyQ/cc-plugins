@@ -7,7 +7,7 @@
 >
 > **Depends on**: work/02
 > **Blocks**: work/04, work/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -228,36 +228,36 @@ Cover:
 
 ## Acceptance criteria
 
-- [ ] `GATE_SCHEMA` carries an optional boolean `deferred`, and its `required` list is still
+- [x] `GATE_SCHEMA` carries an optional boolean `deferred`, and its `required` list is still
       exactly `['passed', 'summary']`.
-- [ ] An accepted deferral awaits the tree watch's quiet signal and then issues exactly one
+- [x] An accepted deferral awaits the tree watch's quiet signal and then issues exactly one
       further verify agent, labelled `requalify:<ref>#<attempt>`, whose verdict is final.
-- [ ] A deferral consumes no attempt: the same `attempt` number covers both verify calls, and a
+- [x] A deferral consumes no attempt: the same `attempt` number covers both verify calls, and a
       failing requalify falls through to the existing dev-retry `continue`.
-- [ ] All four guards — verdict is a failure, wave size above one, `SUSPECTED SIBLING
+- [x] All four guards — verdict is a failure, wave size above one, `SUSPECTED SIBLING
       INTERFERENCE` present in `summary`, and another writer live right now — are enforced in
       the script itself, not only asked for in prompt text.
-- [ ] A rejected deferral is discarded and the gate is handled by its own `passed` value, and no
+- [x] A rejected deferral is discarded and the gate is handled by its own `passed` value, and no
       requalify agent is spawned in any rejected case.
-- [ ] A `deferred` flag returned by the requalify call is ignored, and a null requalify result
+- [x] A `deferred` flag returned by the requalify call is ignored, and a null requalify result
       is treated as an infrastructure failure rather than a plain gate failure.
-- [ ] `verifyPrompt` takes a mode: normal mode states the parallel-tree, no-restore,
+- [x] `verifyPrompt` takes a mode: normal mode states the parallel-tree, no-restore,
       no-waiver and marker rules; requalify mode states that the sibling explanation no longer
       applies and that `deferred` is ignored.
-- [ ] The guarded task wrapper still returns only pass/fail shapes — no deferral state reaches
+- [x] The guarded task wrapper still returns only pass/fail shapes — no deferral state reaches
       wave reconciliation, the held-back list, the commit agents or the divergence detector.
-- [ ] Both verify modes still log an end message leading with `PASS` or `FAIL`; no message
+- [x] Both verify modes still log an end message leading with `PASS` or `FAIL`; no message
       announces a deferral, so a refused deferral cannot leave a granted-looking audit entry.
-- [ ] Tests hold a sibling inside its mark-done step and inside its catch-path park, and prove
+- [x] Tests hold a sibling inside its mark-done step and inside its catch-path park, and prove
       the requalify waits for each — the only observable proof that those windows are counted.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes, with a strictly larger
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes, with a strictly larger
       total test count than the 198 recorded before this task.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes
       and its output names the new defer, requalify, guard and held-writer cases.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts docs/autopilot-defer-requalify/tasks/work/03-defer-and-requalify.md`
+- [x] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts docs/autopilot-defer-requalify/tasks/work/03-defer-and-requalify.md`
       shows all three paths dirty.
 
 ## Eval rubric
