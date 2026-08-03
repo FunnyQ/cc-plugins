@@ -6,7 +6,7 @@
 > - `../_context/orchestrator-anatomy.md`
 >
 > **Depends on**: work/04, work/05
-> **Status**: blocked
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -188,12 +188,12 @@ than leaving it silently unaddressed.
 
 ## Acceptance criteria
 
-- [ ] The restore-family ban is present in all seven intended prompt builders, absent from the
+- [x] The restore-family ban is present in all seven intended prompt builders, absent from the
       two intentionally-excluded ones and from the wave scout, and the three prompts that
       already carried it before this plan render unchanged text.
-- [ ] The external review lens instructs its driver to write the ban into the instruction file
+- [x] The external review lens instructs its driver to write the ban into the instruction file
       handed to the external CLI.
-- [ ] Both rendered verifier-prompt modes are captured from the deterministic fixture and each
+- [x] Both rendered verifier-prompt modes are captured from the deterministic fixture and each
       is checked mechanically, not by impression. **Required in both**: a clause mapping any
       non-zero exit to `passed=false`, and the restore-family ban. **Required in the normal mode
       only**: the literal evidence marker string, and a statement that an unsupported request
@@ -202,32 +202,32 @@ than leaving it silently unaddressed.
       **Forbidden in both**: any conditional attached to the non-zero-exit rule — search the
       captured text for `unless`, `except`, `may still pass`, `can be ignored` and `disregard`
       near that clause, and treat any hit as a finding to quote rather than to judge.
-- [ ] Every condition that refuses a postponement is enforced by a branch in the script, and a
+- [x] Every condition that refuses a postponement is enforced by a branch in the script, and a
       refused postponement spawns no second verify agent.
-- [ ] Every counted mutation window releases its count on both success and failure paths,
+- [x] Every counted mutation window releases its count on both success and failure paths,
       including the park inside the guarded wrapper's catch; the rubric judge is not counted.
-- [ ] Wave reconciliation, the held-back path list, the commit agents and the divergence
+- [x] Wave reconciliation, the held-back path list, the commit agents and the divergence
       detector are unchanged, established two ways rather than by assertion: every pre-existing
       test covering them passes untouched — none was edited, skipped or reworded to accommodate
       this work — and `git diff` over their source regions shows only the threading of the new
       per-wave object, with no change to any condition or branch.
-- [ ] Both gate rows carry their own binary outcome downstream — the first check's failure
+- [x] Both gate rows carry their own binary outcome downstream — the first check's failure
       renders as a failure, and the follow-up check's label parses to a known role, ranks
       between that check and scoring, and has its own verdict read. The presence of the second
       row is the only postponement signal; no third outcome value exists.
-- [ ] No comment, design note, or test-file header still describes the gate as two-state.
+- [x] No comment, design note, or test-file header still describes the gate as two-state.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes; report the pass/fail counts
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes; report the pass/fail counts
       against the recorded baseline of 198 pass / 0 fail across 10 files, and account for the
       difference.
-- [ ] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` passes; report its
+- [x] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` passes; report its
       pass/fail counts.
-- [ ] Read the verifier prompt builder in
+- [x] Read the verifier prompt builder in
       `packages/dispatch/skills/autopilot/references/orchestrator.md` from its first line to its
       last and quote the clause that states a non-zero exit is a failure.
-- [ ] Confirm the restore-family ban reaches all seven intended builders **as rendered text**,
+- [x] Confirm the restore-family ban reaches all seven intended builders **as rendered text**,
       not as source occurrences. Grepping the script cannot show this: the ban is deliberately
       stored once in a single constant, so every builder holds an interpolation or a
       concatenation reference rather than the words themselves. Use the deterministic fixture,
@@ -236,7 +236,7 @@ than leaving it silently unaddressed.
       builders, with the verifier counted twice because its two modes render separately: dev,
       external-dev, fixer, verify, requalify, judge, review and commit-agent. Report any capture
       it does not reach.
-- [ ] If this review edited any file, run
+- [x] If this review edited any file, run
       `git status --short -- <each path you edited> docs/autopilot-defer-requalify/tasks/work/06-final-review.md`
       and confirm those paths are dirty.
 

@@ -511,27 +511,25 @@ describe("aggregateFleet", () => {
 });
 
 describe("gate outcome", () => {
-  const verifyNote = (message: string): FlightlogEntry => ({
+  // One factory for both gate checks. Hand-copied twins drifted once already: the
+  // requalify copy carried `agentLabel: "requalify:task/name#1"` against
+  // `task: "ui/01"`, and only passed because `outcomeOf` matches on role.
+  const gateNote = (
+    role: "verify" | "requalify",
+    message: string,
+  ): FlightlogEntry => ({
     kind: "note",
     task: "ui/01",
-    role: "verify",
+    role,
     attempt: 1,
-    ts: "2026-01-01T00:00:01Z",
+    ts: role === "verify" ? "2026-01-01T00:00:01Z" : "2026-01-01T00:00:02Z",
     phase: "end",
-    agentLabel: "verify:ui/01#1",
+    agentLabel: `${role}:ui/01#1`,
     message,
   });
 
-  const requalifyNote = (message: string): FlightlogEntry => ({
-    kind: "note",
-    task: "ui/01",
-    role: "requalify",
-    attempt: 1,
-    ts: "2026-01-01T00:00:02Z",
-    phase: "end",
-    agentLabel: "requalify:task/name#1",
-    message,
-  });
+  const verifyNote = (message: string) => gateNote("verify", message);
+  const requalifyNote = (message: string) => gateNote("requalify", message);
 
   const outcomeOf = (entries: FlightlogEntry[]) =>
     aggregateFleet(entries).find(
@@ -575,9 +573,7 @@ describe("gate outcome", () => {
   });
 
   test("a requalifier's leading PASS wins over a later `0 fail`", () => {
-    expect(
-      outcomeOf([requalifyNote("PASS: something 0 fail")]),
-    ).toBe("passed");
+    expect(outcomeOf([requalifyNote("PASS: something 0 fail")])).toBe("passed");
   });
 
   test("verify and requalify keep separate outcomes at the same attempt", () => {

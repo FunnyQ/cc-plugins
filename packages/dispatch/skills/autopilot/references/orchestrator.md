@@ -384,8 +384,7 @@ async function runFinalReview(ref, path, attempt, attempts) {
     { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
 }
 
-const verifyPrompt = (ref, path, attempt, opts = {}) => {
-  const requalify = opts.requalify === true
+const verifyPrompt = (ref, path, attempt, requalify = false) => {
   const role = requalify ? 'requalify' : 'verify'
   const closing = requalify
     ? `This is the requalify run. Every other task in this wave has stopped writing.
@@ -475,7 +474,7 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
 // agent that returns a fluent summary having changed nothing is the failure mode
 // this guards, so a non-null result is not evidence of anything.
 async function parkBlocked(ref, path, reason, watch) {
-  return await withWriter(watch, async () => {
+  return withWriter(watch, async () => {
     try {
       const result = await agent(markBlockedPrompt(ref, path, reason),
         { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify, schema: PARK_SCHEMA })
@@ -514,13 +513,14 @@ const makeTreeWatch = (size) => {
   let writers = 0
   let waiters = []
   return {
-    // A later consumer uses the dispatch count to distinguish parallel waves.
+    // `deferralAccepted` reads size to tell a solo wave from a parallel one.
     size,
     enter: () => { writers++ },
     leave: () => {
       if (--writers === 0) { const w = waiters; waiters = []; w.forEach(r => r()) }
     },
-    // A later consumer reads whether any sibling is writing when a gate returns.
+    // `deferralAccepted` reads this to refuse a deferral when no sibling is
+    // actually writing at the moment the gate returns.
     active: () => writers,
     quiet: () => writers === 0 ? Promise.resolve() : new Promise(r => waiters.push(r)),
   }
@@ -530,8 +530,12 @@ const withWriter = async (watch, fn) => { watch.enter(); try { return await fn()
 
 const SIBLING_MARKER = 'SUSPECTED SIBLING INTERFERENCE'
 
+// Every condition a deferral has to clear lives here. A predicate that left the
+// "did this gate even ask to defer?" test outboard would return true for a gate
+// that never requested one, which is a trap for the next caller.
 const deferralAccepted = (gate, watch) =>
-  gate.passed === false
+  gate.deferred === true
+  && gate.passed === false
   && watch.size > 1
   && typeof gate.summary === 'string'
   && gate.summary.includes(SIBLING_MARKER)
@@ -549,44 +553,41 @@ async function executeTask(item, watch) {
   const attempts = []
   for (let attempt = 1; attempt <= cap; attempt++) {
     let attemptModel = 'final-review'
-    if (finalReview) {
-      // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
-      await withWriter(watch, async () => {
+    // One counted window for the whole write step. Every branch below writes the
+    // tree, exactly one of them runs, and none outlives this await — so four
+    // wrappers opening and closing at the same two points would say nothing more.
+    await withWriter(watch, async () => {
+      if (finalReview) {
+        // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
         await runFinalReview(ref, path, attempt, attempts)
-      })
-    } else {
-      // Dev step. An external devEngine falls back to Claude-Opus at its cap.
-      // `cap > 1` keeps a single-attempt external ladder on its configured engine.
-      // An opted-in Claude ladder instead appends its external rung after Opus.
-      const lastShot = attempt >= cap && cap > 1
-      // The appended rung is the final attempt, and only exists on a Claude ladder.
-      const vendorRung = !!lastShotEngine && attempt === cap
-      // The last CLAUDE rung. With an appended rung cap is MAX + 1, so the escalation
-      // tier must key off the Claude cap. Keying off `cap` makes `attempt >= cap` false
-      // at attempt MAX, so the ladder would run sonnet, sonnet, sonnet, external and
-      // Opus would never execute — silently turning this append into a replace.
-      const claudeCap = cap - (lastShotEngine ? 1 : 0)
-      if (vendorRung) {
-        attemptModel = lastShotEngine.label
-        await withWriter(watch, async () => {
+      } else {
+        // Dev step. An external devEngine falls back to Claude-Opus at its cap.
+        // `cap > 1` keeps a single-attempt external ladder on its configured engine.
+        // An opted-in Claude ladder instead appends its external rung after Opus.
+        const lastShot = attempt >= cap && cap > 1
+        // The appended rung is the final attempt, and only exists on a Claude ladder.
+        const vendorRung = !!lastShotEngine && attempt === cap
+        // The last CLAUDE rung. With an appended rung cap is MAX + 1, so the escalation
+        // tier must key off the Claude cap. Keying off `cap` makes `attempt >= cap` false
+        // at attempt MAX, so the ladder would run sonnet, sonnet, sonnet, external and
+        // Opus would never execute — silently turning this append into a replace.
+        const claudeCap = cap - (lastShotEngine ? 1 : 0)
+        if (vendorRung) {
+          attemptModel = lastShotEngine.label
           await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts)),
             { label: `dev-${lastShotEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
-        })
-      } else if (devEngine && !lastShot) {
-        attemptModel = devEngine.label
-        await withWriter(watch, async () => {
+        } else if (devEngine && !lastShot) {
+          attemptModel = devEngine.label
           await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts)),
             { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
-        })
-      } else {
-        const devModel = attempt >= claudeCap ? MODEL.devEscalated : MODEL.dev
-        attemptModel = devModel
-        await withWriter(watch, async () => {
+        } else {
+          const devModel = attempt >= claudeCap ? MODEL.devEscalated : MODEL.dev
+          attemptModel = devModel
           await agent(devPrompt(ref, path, attempt, renderHistory(attempts)),
             { label: `dev:${ref}#${attempt}`, phase: 'Execute', model: devModel })
-        })
+        }
       }
-    }
+    })
 
     // The verifier is deliberately not a writer: it must only inspect the tree.
     // Individual review lenses are also not wrapped; the one final-review window
@@ -601,18 +602,19 @@ async function executeTask(item, watch) {
         + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
       return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
     }
-    if (gate.deferred && deferralAccepted(gate, watch)) {
+    if (deferralAccepted(gate, watch)) {
       await watch.quiet()
-      const requalified = await agent(verifyPrompt(ref, path, attempt, { requalify: true }),
+      const requalified = await agent(verifyPrompt(ref, path, attempt, true),
         { label: `requalify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
       if (!requalified) {
         const cause = `requalification did not run or did not return a verdict on attempt ${attempt}`
           + ` — the requalify agent produced no structured result.`
         return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
       }
-      // One defer per attempt: the requalify verdict is final, so its own `deferred`
-      // is dropped rather than re-entering this branch.
-      gate = { ...requalified, deferred: false }
+      // One defer per attempt: the requalify verdict is final. Nothing below reads
+      // `deferred` again, and the next attempt reassigns `gate` from a fresh verify,
+      // so the flag needs no clearing — only the verdict carries forward.
+      gate = requalified
     }
     if (!gate.passed) {
       attempts.push({
@@ -644,10 +646,9 @@ async function executeTask(item, watch) {
       // The post-judge transition is its own infrastructure boundary — a task
       // that passed but never got written `done` would be re-offered forever, or
       // (worse) counted as complete by a run that never checked.
-      const finalized = await withWriter(watch, async () => {
-        return await agent(markDonePrompt(ref, path),
-          { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify, schema: MARK_DONE_SCHEMA })
-      })
+      const finalized = await withWriter(watch, () =>
+        agent(markDonePrompt(ref, path),
+          { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify, schema: MARK_DONE_SCHEMA }))
       if (finalized && finalized.ok) {
         return { task: ref, passed: true, attempt, weighted: verdict.weighted }
       }
@@ -1079,7 +1080,7 @@ return { slug: CFG.slug, completed, escalations }
 - **`CFG.devEngine: 'codex'` (or `'opencode'`) hands the dev step to that CLI.** The default is `'claude'` (Sonnet→Opus). `CFG.lastShotEngine` defaults to `''` (off); on a Claude ladder, setting it to `'codex'` or `'opencode'` appends one external attempt after the Opus rung without replacing Opus. It is ignored when `devEngine` is already external, because that ladder already ends on Claude-Opus. When `devEngine` is set to an external engine, each non-finalReview task's dev step becomes a cheap Haiku *driver*. That driver runs the `<engine>-run.ts delegate` wrapper — the same wrapper the cross-vendor review lens uses, reachable from a Workflow agent's Bash. So the external CLI writes the implementation. If `CFG.liveDevEngine` is true and `CFG.relayPath` resolved under `HERDR_ENV=1`, the driver instead runs the same delegate through relay in a visible herdr live pane. Otherwise it uses the headless wrapper exactly as before. The verify → judge → score pipeline stays Claude. This *strengthens* the dev≠judge split into a cross-vendor one: the external CLI writes, and Claude-Opus judges. An external-engine ladder's last attempt before the cap still falls back to Claude-Opus, so a task the external engine cannot clear gets one strong Claude try before parking — **except at `maxAttempts: 1`**, where the `cap > 1` guard keeps that single attempt on the external engine rather than skipping it entirely, and there is no Claude fallback. A Claude ladder can instead end on the configured `lastShotEngine` after its Opus rung. If the CLI is unreachable, or relay returns no result, the driver never fabricates. The binary gate fails that attempt, and the loop reaches the next rung. The live path passes `--wait-timeout 480000` (8 min), and the driver is told to make ONE foreground Bash call with `timeout: 600000`. **That pairing is load-bearing: the wait must expire inside the Bash tool's 600s hard cap — with margin.** The margin is not optional: relay's poll clock starts *after* it spawns the pane and waits up to `SPAWN_IDLE_WAIT_MS` (20s) for the TUI to settle, so the Bash call's wall time is that setup plus the wait plus cleanup. 480s leaves roughly 90s of slack; 540s did not. A command that outruns the cap is moved to the background, and a cheap Haiku driver left to invent its own wait writes a `while sleep 5; do ... jobs %1 ...; done` poll loop — which can never work, because every Bash call gets a fresh shell where `jobs` sees nothing. Live transcript: the loop spun the full 600s and the driver read a *complete* result the instant it returned. Ten minutes burned after codex had already finished, plus an orphaned loop. So the driver prompt bans `run_in_background` and shell poll loops outright, and the wait is bounded below the cap so the one call returns on its own. Relay's poll loop returns the instant the result lands, so the budget costs nothing for normal-speed tasks. **A `pending` outcome is not a failure and must not be treated as one.** Relay checks the pane's status before reporting it: an agent that has settled without a verified result is reported as a real failure instead, so `pending` specifically means the delegate is *still working* — and still writing the working tree, with its pane still open. Failing the attempt there would start a second writer on the same files. So the driver keeps waiting instead: `CFG.liveCollectRounds` (default 3) more `relay collect` calls, each reattaching to that same pane for another 8-minute window. A task can therefore run ~32 min while every individual Bash call still returns inside the 600s cap. Only when the last allowed collect is still pending does the attempt fail. Do not wait indefinitely, and do not use `herd wait` for this — it blocks until `idle`, and codex parks at `done`, so it can miss a finished delegate entirely; `collect` reuses relay's own `idle`-or-`done`-plus-marker test. `devEngine` and `reviewEngine` are independent. You can have opencode write and codex review, or the reverse. Only the dev step changes. finalReview's multi-lens round, and everything else, stay untouched.
 - **The destructive-git ban belongs to every prompt that lets its agent choose what to run, not only to the prompts whose agents write source code.** The restore-family ban first reached only the dev prompt, the external dev driver prompt, and the fixer prompt because "writer" looked like the dangerous role. Universal Bash tool access made that boundary imaginary: every Workflow agent has Bash, including the verifier, rubric judge, review lenses, and commit agents, so role never bounded who *could* run a destructive command. Bash access is not the replacement boundary either. The two fixed task-status transitions (`mark-done` and `mark-blocked`) and the wave scout also have Bash, but each receives one scripted step rather than a decision: the transitions perform their single status edit and reread, and the scout runs exactly `bun .../next-ready.ts` with specified arguments. They are excluded on purpose because the real boundary is command discretion. The commit agents are included even though their job needs `git add`, `git commit`, `git status`, `git diff`, and `git log`, never the restore family: their instructions explicitly anticipate blocking hooks and merge conflicts, precisely the pressure under which an agent reaches for `reset` to tidy the tree before retrying. This is defense-in-depth, not enforcement. Workflow `agent()` accepts no tool allowlist, agent-frontmatter tool lists do not constrain Workflow subagents, an absolute path to `git` bypasses a PATH wrapper, and a before/after tree comparison detects damage only after `reset --hard` has made it unrecoverable. Worktree isolation is no answer because it would hide the uncommitted edits the verifier exists to verify. The prompt is the only lever the script has. The failure was observed live in the `herdr-workbench` repository's `tab-layout-selector` flightplan on 2026-08-03 (`docs/tab-layout-selector/.flightlog/run.jsonl`): a module-extraction task and a config task were dispatched together at 06:17Z, then the extraction task's verifier attempted `git reset --hard` between 06:26Z and 06:33Z while the config task was still editing a shared source file. A human denied it. The verifier had seen test failures caused by its sibling's in-progress edits, had no sanctioned response to red output it did not create, and locally wiping the tree before another try was rational.
 
-- **A verifier may delay a judgement; it may never avoid one.** A sibling-attribution waiver — "this failure is the sibling's, not mine, so I pass on my own criteria" — contradicts the gate's rule that every verification command must succeed. The files a task declares are not a causal boundary: a sibling can break this task's verification through a shared dependency, while this task's own regression can surface in a file it never declared. Yet unconditional strict fail is also wrong: failing as soon as red appears rejects green code whose shared dependencies are temporarily broken, wastes an attempt, and sends dev back to fruitlessly rewrite work that was already right. The gate therefore defers rather than waives to postpone the verdict: it waits for the tree to go quiet, reruns the verification commands exactly once, and treats that rerun's verdict as final. Quiet is a zero-crossing of the wave's live-writer count, not a one-shot "every first write finished" barrier, because a task that fails its gate retries dev and becomes a writer again. Waiting for siblings to reach terminal `blocked` or `done` state would deadlock two deferred tasks: each needs the other to terminate, and neither can terminate while waiting. The live-writer guard is load-bearing: deferral is refused unless another writer is active at that moment, or a verifier whose siblings already finished would gain a free second roll on a flaky failure or its own real regression, making the gate weaker than strict failure. A residual race remains: a sibling can begin a retry immediately after a zero-crossing releases the waiter, so the rerun can still meet a dirty tree. That outcome is a strict failure — never a better verdict or a different classification — which preserves the pre-existing behavior. The same `herdr-workbench` `tab-layout-selector` run on 2026-08-03 (`docs/tab-layout-selector/.flightlog/run.jsonl`) proved why the verdict cannot be reclassified: after the denied reset, the verifier reported `PASS` over two tests that were still failing and attributed them to the sibling on its own initiative. That false positive is already in the wild, so "failed tests are the sibling's problem" is not a verdict type the script permits.
+- **A verifier may delay a judgement; it may never avoid one.** A sibling-attribution waiver — "this failure is the sibling's, not mine, so I pass on my own criteria" — contradicts the gate's rule that every verification command must succeed. The files a task declares are not a causal boundary: a sibling can break this task's verification through a shared dependency, while this task's own regression can surface in a file it never declared. Yet unconditional strict fail is also wrong: failing as soon as red appears rejects green code whose shared dependencies are temporarily broken, wastes an attempt, and sends dev back to fruitlessly rewrite work that was already right. The gate therefore defers rather than waives to postpone the verdict: it waits for the tree to go quiet, reruns the verification commands exactly once, and treats that rerun's verdict as final. Quiet is a zero-crossing of the wave's live-writer count, not a one-shot "every first write finished" barrier, because a task that fails its gate retries dev and becomes a writer again. Waiting for siblings to reach terminal `blocked` or `done` state would deadlock two deferred tasks: each needs the other to terminate, and neither can terminate while waiting. The live-writer guard is load-bearing: deferral is refused unless another writer is active at that moment, or a verifier whose siblings already finished would gain a free second roll on a flaky failure or its own real regression, making the gate weaker than strict failure. A residual race remains: a sibling can begin a retry immediately after a zero-crossing releases the waiter, so the rerun can still meet a dirty tree. That outcome is a strict failure — never a better verdict or a different classification — which preserves the pre-existing behavior. A second residual has the same shape and the same outcome, and is worth naming because it looks like a hole: the external-engine dev driver can return while its live relay pane is still open and still writing — its own failure path says exactly that ("the pane was LEFT OPEN and is STILL WRITING") — so an abandoned delegate's writes fall outside the counted window and a sibling's `quiet()` can fire while that delegate works. Closing it means holding the lease until the pane terminates, which is the terminal-state wait rejected two sentences above, and it would deadlock on the same mutual-defer shape. It is left open deliberately, because the safety argument does not depend on the count being complete: the rerun is strict either way, so an uncounted writer can only cost a task an attempt, never buy one a pass. The count is an optimisation over strict failure, not the thing that makes the verdict sound. The same `herdr-workbench` `tab-layout-selector` run on 2026-08-03 (`docs/tab-layout-selector/.flightlog/run.jsonl`) proved why the verdict cannot be reclassified: after the denied reset, the verifier reported `PASS` over two tests that were still failing and attributed them to the sibling on its own initiative. That false positive is already in the wild, so "failed tests are the sibling's problem" is not a verdict type the script permits.
 
 - **Only the commit agents commit — every other writer leaves its work unstaged.** `NO_COMMIT_RULE` goes into the Claude dev prompt, the external dev driver's prompt *and* the instruction that driver writes for its CLI, and the final-review fixer's prompt. It is one shared constant so the three writers cannot drift apart. Two things break when a task commits itself. The wave stops being one atomic commit — the inter-wave commit agent finds a partially committed tree and writes a second, incoherent commit for the remainder. And in a parallel wave, whatever the committing task stages sweeps up a sibling task's half-finished edits, so a commit message describes work its diff does not contain and a later revert takes an unrelated task with it. The external engines need the ban twice over: `codex` and `opencode` write the tree outside the harness, where no hook can stop them, and both are trained to finish a job by committing it.
 
