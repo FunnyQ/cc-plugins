@@ -93,7 +93,14 @@ type Scenario = {
     | null
   )[];
   /** Keyed by task ref; null models an agent that returned no structured result. */
-  gate?: Record<string, ({ passed: boolean; summary: string } | null)[]>;
+  gate?: Record<
+    string,
+    ({ passed: boolean; deferred?: boolean; summary: string } | null)[]
+  >;
+  requalify?: Record<
+    string,
+    ({ passed: boolean; deferred?: boolean; summary: string } | null)[]
+  >;
   judge?: Record<string, ({ verdict: Verdict; rationale: string } | null)[]>;
   markDone?: Record<
     string,
@@ -112,6 +119,8 @@ type Scenario = {
   parkHolds?: Record<string, Promise<void>>;
   /** Keyed by ref; the stubbed mark-done agent awaits this before returning. */
   doneHolds?: Record<string, Promise<void>>;
+  /** Optional live call sink for tests that coordinate held writer windows. */
+  agentCalls?: string[];
 };
 
 type Verdict = {
@@ -192,9 +201,9 @@ async function runOrchestrator(
     const key = `${bucket}:${ref}`;
     if (!queues.has(key)) {
       const source =
-        (scenario[bucket as "gate" | "judge" | "markDone" | "park"] ?? {})[
-          ref
-        ] ?? undefined;
+        (scenario[
+          bucket as "gate" | "requalify" | "judge" | "markDone" | "park"
+        ] ?? {})[ref] ?? undefined;
       queues.set(key, source ? [...source] : []);
     }
     const queue = queues.get(key)!;
@@ -207,6 +216,7 @@ async function runOrchestrator(
   ) => {
     const label = opts.label;
     labels.push(label);
+    scenario.agentCalls?.push(label);
     prompts.push(prompt);
     models.push(opts.model);
 
@@ -228,6 +238,12 @@ async function runOrchestrator(
 
     if (role === "verify") {
       return take("gate", refOf(rest), { passed: true, summary: "green" });
+    }
+    if (role === "requalify") {
+      return take("requalify", refOf(rest), {
+        passed: true,
+        summary: "green after quiet",
+      });
     }
     if (role === "judge") {
       return take("judge", refOf(rest), { verdict: pass, rationale: "solid" });
@@ -337,6 +353,14 @@ function modelFor(log: Pick<RunLog, "labels" | "models">, label: string) {
   const index = log.labels.indexOf(label);
   if (index === -1) throw new Error(`agent label not found: ${label}`);
   return log.models[index];
+}
+
+async function waitForCall(calls: string[], label: string): Promise<void> {
+  for (let turn = 0; turn < 100; turn++) {
+    if (calls.includes(label)) return;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error(`agent call did not arrive: ${label}`);
 }
 
 describe("orchestrator config fixture", () => {
@@ -1434,6 +1458,283 @@ describe("held-back paths", () => {
       scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1)],
     });
     expect(promptFor(log, "commit-wave-2")).not.toContain("HELD BACK");
+  });
+});
+
+describe("defer and requalify gate", () => {
+  const siblingMarker = "SUSPECTED SIBLING INTERFERENCE";
+  const twoTaskScouts = () => [
+    snapshot({
+      ready: [ready("ui/main"), ready("ui/sibling")],
+      counts: counts({ total: 2, todo: 2 }),
+      unfinished: [
+        { ref: "ui/main", state: "todo" },
+        { ref: "ui/sibling", state: "todo" },
+      ],
+    }),
+    complete(2),
+  ];
+
+  test("a deferred failure passes after one requalify without rerunning dev", async () => {
+    let releaseSibling!: () => void;
+    const siblingHeld = new Promise<void>((resolve) => (releaseSibling = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: false, deferred: true, summary: `${siblingMarker}: test exited 1` }],
+      },
+      requalify: { "ui/main": [{ passed: true, summary: "test exited 0" }] },
+      devHolds: { "ui/sibling": siblingHeld },
+      agentCalls: calls,
+    });
+
+    await waitForCall(calls, "verify:ui/main#1");
+    expect(calls).not.toContain("requalify:ui/main#1");
+    releaseSibling();
+    const { result, labels } = await run;
+
+    expect(result.completed).toEqual(["ui/main", "ui/sibling"]);
+    expect(labels.filter((label) => label === "dev:ui/main#1")).toHaveLength(1);
+    expect(labels.filter((label) => label.startsWith("requalify:ui/main"))).toEqual([
+      "requalify:ui/main#1",
+    ]);
+  });
+
+  test("a failing requalify falls through to the next dev attempt", async () => {
+    let releaseSibling!: () => void;
+    const siblingHeld = new Promise<void>((resolve) => (releaseSibling = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [
+          { passed: false, deferred: true, summary: `${siblingMarker}: test exited 1` },
+          { passed: true, summary: "retry passed" },
+        ],
+      },
+      requalify: { "ui/main": [{ passed: false, summary: "still red" }] },
+      devHolds: { "ui/sibling": siblingHeld },
+      agentCalls: calls,
+    });
+
+    await waitForCall(calls, "verify:ui/main#1");
+    releaseSibling();
+    const { result, labels } = await run;
+
+    expect(result.completed).toContain("ui/main");
+    expect(labels).toContain("requalify:ui/main#1");
+    expect(labels).toContain("dev:ui/main#2");
+    expect(labels).not.toContain("requalify:ui/main#2");
+  });
+
+  test("requalify waits for a sibling held inside mark-done", async () => {
+    let releaseMainDev!: () => void;
+    let releaseDone!: () => void;
+    const mainDevHeld = new Promise<void>((resolve) => (releaseMainDev = resolve));
+    const doneHeld = new Promise<void>((resolve) => (releaseDone = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: false, deferred: true, summary: `${siblingMarker}: test exited 1` }],
+      },
+      devHolds: { "ui/main": mainDevHeld },
+      doneHolds: { "ui/sibling": doneHeld },
+      agentCalls: calls,
+    });
+
+    await waitForCall(calls, "done:ui/sibling");
+    releaseMainDev();
+    await waitForCall(calls, "verify:ui/main#1");
+    expect(calls).not.toContain("requalify:ui/main#1");
+    releaseDone();
+    const { labels } = await run;
+    expect(labels.indexOf("requalify:ui/main#1")).toBeGreaterThan(
+      labels.indexOf("done:ui/sibling"),
+    );
+  });
+
+  test("passed=true rejects deferral", async () => {
+    const { labels, result } = await runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: true, deferred: true, summary: siblingMarker }],
+      },
+    });
+    expect(result.completed).toContain("ui/main");
+    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
+  });
+
+  test("a one-task wave rejects deferral", async () => {
+    const { labels } = await runOrchestrator({
+      scouts: [wave("ui/main", 1, 0), complete(1)],
+      gate: {
+        "ui/main": [
+          { passed: false, deferred: true, summary: siblingMarker },
+          { passed: true, summary: "retry passed" },
+        ],
+      },
+    });
+    expect(labels).toContain("dev:ui/main#2");
+    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
+  });
+
+  test("a missing sibling marker rejects deferral", async () => {
+    const { labels } = await runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [
+          { passed: false, deferred: true, summary: "error: something else" },
+          { passed: true, summary: "retry passed" },
+        ],
+      },
+    });
+    expect(labels).toContain("dev:ui/main#2");
+    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
+  });
+
+  test("no live sibling writer rejects deferral", async () => {
+    const { labels } = await runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [
+          { passed: false, deferred: true, summary: siblingMarker },
+          { passed: true, summary: "retry passed" },
+        ],
+      },
+    });
+    expect(labels).toContain("dev:ui/main#2");
+    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
+  });
+
+  test("a deferred flag from requalify is ignored", async () => {
+    let releaseSibling!: () => void;
+    const siblingHeld = new Promise<void>((resolve) => (releaseSibling = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [
+          { passed: false, deferred: true, summary: siblingMarker },
+          { passed: true, summary: "retry passed" },
+        ],
+      },
+      requalify: {
+        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
+      },
+      devHolds: { "ui/sibling": siblingHeld },
+      agentCalls: calls,
+    });
+    await waitForCall(calls, "verify:ui/main#1");
+    releaseSibling();
+    const { labels } = await run;
+    expect(labels.filter((label) => label.startsWith("requalify:ui/main"))).toEqual([
+      "requalify:ui/main#1",
+    ]);
+    expect(labels).toContain("dev:ui/main#2");
+  });
+
+  test("when every task defers the last request is rejected and the wave settles", async () => {
+    const refs = ["ui/01", "ui/02", "ui/03"];
+    const { result, labels } = await runOrchestrator({
+      scouts: [
+        snapshot({
+          ready: refs.map((ref) => ready(ref)),
+          counts: counts({ total: 3, todo: 3 }),
+          unfinished: refs.map((ref) => ({ ref, state: "todo" })),
+        }),
+        complete(3),
+      ],
+      gate: Object.fromEntries(
+        refs.map((ref) => [
+          ref,
+          [
+            { passed: false, deferred: true, summary: siblingMarker },
+            { passed: true, summary: "retry passed" },
+          ],
+        ]),
+      ),
+    });
+    expect(result.completed).toEqual(refs);
+    expect(labels.filter((label) => label.startsWith("requalify:"))).toHaveLength(2);
+    expect(labels.filter((label) => label.endsWith("#2") && label.startsWith("dev:"))).toHaveLength(1);
+  });
+
+  test("requalify waits for a sibling held inside catch-path park", async () => {
+    let releaseMainDev!: () => void;
+    let releasePark!: () => void;
+    const mainDevHeld = new Promise<void>((resolve) => (releaseMainDev = resolve));
+    const parkHeld = new Promise<void>((resolve) => (releasePark = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
+      },
+      devThrows: ["ui/sibling"],
+      devHolds: { "ui/main": mainDevHeld },
+      parkHolds: { "ui/sibling": parkHeld },
+      agentCalls: calls,
+    });
+    await waitForCall(calls, "block:ui/sibling");
+    releaseMainDev();
+    await waitForCall(calls, "verify:ui/main#1");
+    expect(calls).not.toContain("requalify:ui/main#1");
+    releasePark();
+    const { result, labels } = await run;
+    expect(labels.indexOf("requalify:ui/main#1")).toBeGreaterThan(
+      labels.indexOf("block:ui/sibling"),
+    );
+    expect(result.escalations.some((item) => item.task === "ui/sibling")).toBe(true);
+  });
+
+  test("a null requalify result is an infrastructure failure", async () => {
+    let releaseSibling!: () => void;
+    const siblingHeld = new Promise<void>((resolve) => (releaseSibling = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
+      },
+      requalify: { "ui/main": [null] },
+      devHolds: { "ui/sibling": siblingHeld },
+      agentCalls: calls,
+    });
+    await waitForCall(calls, "verify:ui/main#1");
+    releaseSibling();
+    const { result, labels } = await run;
+    const failure = result.escalations.find((item) => item.task === "ui/main");
+    expect(labels).toContain("requalify:ui/main#1");
+    expect(failure?.infrastructure).toBe(true);
+    expect(failure?.attempt).toBe(1);
+    expect(failure?.reason).toMatch(/requalification did not run/);
+  });
+
+  test("verify prompts keep PASS or FAIL logging and switch role by mode", async () => {
+    let releaseSibling!: () => void;
+    const siblingHeld = new Promise<void>((resolve) => (releaseSibling = resolve));
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
+      },
+      devHolds: { "ui/sibling": siblingHeld },
+      agentCalls: calls,
+    });
+    await waitForCall(calls, "verify:ui/main#1");
+    releaseSibling();
+    const log = await run;
+    const normal = promptFor(log, "verify:ui/main#1");
+    const requalify = promptFor(log, "requalify:ui/main#1");
+    expect(normal).toContain("--role verify");
+    expect(normal).toContain(siblingMarker);
+    expect(requalify).toContain("--role requalify");
+    expect(requalify).toContain("deferred is ignored");
+    expect(normal).toContain('message MUST start with the bare word PASS or FAIL');
+    expect(requalify).toContain('message MUST start with the bare word PASS or FAIL');
   });
 });
 

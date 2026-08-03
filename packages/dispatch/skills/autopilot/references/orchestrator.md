@@ -204,6 +204,7 @@ const GATE_SCHEMA = {
   type: 'object',
   properties: {
     passed: { type: 'boolean' },     // every Verification command + Acceptance criterion passed
+    deferred: { type: 'boolean' },   // the red output looks like a sibling's in-flight edits
     summary: { type: 'string' },     // raw evidence: commands run, exit codes, failing output
   },
   required: ['passed', 'summary'],
@@ -383,8 +384,19 @@ async function runFinalReview(ref, path, attempt, attempts) {
     { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
 }
 
-const verifyPrompt = (ref, path, attempt) => `
-First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role verify --attempt ${attempt} --agent "<your label>" --phase start
+const verifyPrompt = (ref, path, attempt, opts = {}) => {
+  const requalify = opts.requalify === true
+  const role = requalify ? 'requalify' : 'verify'
+  const closing = requalify
+    ? `This is the requalify run. Every other task in this wave has stopped writing.
+The sibling explanation no longer applies. Any non-zero exit is passed=false. deferred is ignored on this run.`
+    : `Tasks in this wave run in PARALLEL in one shared working tree.
+Never clean, restore, reset, stash or otherwise rewrite the tree to obtain a clean run.
+Run every Verification command exactly as written. Any non-zero exit is passed=false.
+If — and only if — the evidence points at a sibling task's in-flight edits, also return deferred=true, prefix summary with the exact string SUSPECTED SIBLING INTERFERENCE, give the exact command and exit code, failing cases, and concrete evidence for attribution. The commands will then be run again once other tasks stop writing.
+Deferring waives nothing and never changes a verdict on its own. An unsupported deferral is counted as a plain failure.`
+  return `
+First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase start
 Then proceed.
 Use the identical label in both start and end calls.
 
@@ -395,9 +407,11 @@ Do NOT trust the dev's claims. Open the task file at ${path}, then:
   2. Check every box in ## Acceptance criteria against the actual code/output.
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
-Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role verify --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
+${closing}
+Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
 `
+}
 
 const judgePrompt = (ref, path, gateSummary, attempt) => `
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase start
@@ -514,6 +528,18 @@ const makeTreeWatch = (size) => {
 
 const withWriter = async (watch, fn) => { watch.enter(); try { return await fn() } finally { watch.leave() } }
 
+const SIBLING_MARKER = 'SUSPECTED SIBLING INTERFERENCE'
+
+const deferralAccepted = (gate, watch) =>
+  gate.passed === false
+  && watch.size > 1
+  && typeof gate.summary === 'string'
+  && gate.summary.includes(SIBLING_MARKER)
+  // Wave size is historical, not current state. Without a live-writer check, a
+  // verifier whose siblings have all finished wins a free re-run of a red
+  // command, which is weaker than simply failing.
+  && watch.active() > 0
+
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item, watch) {
   const { ref, finalReview, path } = item
@@ -568,12 +594,25 @@ async function executeTask(item, watch) {
     // A verifier that returns NO structured result did not verify anything. That
     // is not the same as `passed: false`, which is a real verdict on real work.
     // Conflating them retries the dev loop against an unknown state.
-    const gate = await agent(verifyPrompt(ref, path, attempt),
+    let gate = await agent(verifyPrompt(ref, path, attempt),
       { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
     if (!gate) {
       const cause = `verification did not run or did not return a verdict on attempt ${attempt}`
         + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
       return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
+    }
+    if (gate.deferred && deferralAccepted(gate, watch)) {
+      await watch.quiet()
+      const requalified = await agent(verifyPrompt(ref, path, attempt, { requalify: true }),
+        { label: `requalify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
+      if (!requalified) {
+        const cause = `requalification did not run or did not return a verdict on attempt ${attempt}`
+          + ` — the requalify agent produced no structured result.`
+        return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
+      }
+      // One defer per attempt: the requalify verdict is final, so its own `deferred`
+      // is dropped rather than re-entering this branch.
+      gate = { ...requalified, deferred: false }
     }
     if (!gate.passed) {
       attempts.push({
