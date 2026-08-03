@@ -14,6 +14,7 @@ const KNOWN_ROLES = [
   "scout",
   "dev",
   "verify",
+  "requalify",
   "judge",
   "review",
   "fix",
@@ -94,7 +95,7 @@ export type FleetRow = {
 
 /** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */
 const DEV = /^dev(?:-[a-z]+)?:(.+)#(\d+)$/;
-const REF_ATTEMPT = /^(verify|judge|fix):(.+)#(\d+)$/;
+const REF_ATTEMPT = /^(verify|requalify|judge|fix):(.+)#(\d+)$/;
 const REVIEW = /^review:([^#]+)#(\d+)$/;
 const TERMINAL = /^(done|block):(.+)$/;
 const SCOUT = /^scout-wave-(\d+)$/;
@@ -112,7 +113,7 @@ export function parseAgentLabel(label: string): ParsedLabel {
   match = REF_ATTEMPT.exec(label);
   if (match) {
     return {
-      role: match[1] as "verify" | "judge" | "fix",
+      role: match[1] as "verify" | "requalify" | "judge" | "fix",
       ref: match[2],
       attempt: Number(match[3]),
       raw: label,
@@ -292,7 +293,7 @@ function gateOutcome(row: FleetRow): GateOutcome | undefined {
     if (!row.score) return undefined;
     return row.score.passed ? "passed" : "failed";
   }
-  if (row.role !== "verify") return undefined;
+  if (row.role !== "verify" && row.role !== "requalify") return undefined;
 
   const message = row.message?.trim();
   if (!message) return undefined;
@@ -324,7 +325,8 @@ const ROLE_PROGRESS: Partial<Record<AgentRole, number>> = {
   review: 1,
   fix: 2,
   verify: 3,
-  judge: 4,
+  requalify: 4, // The second gate check runs after verify and before judge.
+  judge: 5,
 };
 
 /** Ordinal of (attempt, role) within one ref. Monotonic as the run advances. */

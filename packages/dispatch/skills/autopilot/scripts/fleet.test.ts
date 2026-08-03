@@ -85,6 +85,15 @@ describe("parseAgentLabel", () => {
       { role: "verify", ref: "ui/03", attempt: 2, raw: "verify:ui/03#2" },
     ],
     [
+      "requalify:alpha/beta#2",
+      {
+        role: "requalify",
+        ref: "alpha/beta",
+        attempt: 2,
+        raw: "requalify:alpha/beta#2",
+      },
+    ],
+    [
       "judge:ui/03#2",
       { role: "judge", ref: "ui/03", attempt: 2, raw: "judge:ui/03#2" },
     ],
@@ -513,9 +522,23 @@ describe("gate outcome", () => {
     message,
   });
 
+  const requalifyNote = (message: string): FlightlogEntry => ({
+    kind: "note",
+    task: "ui/01",
+    role: "requalify",
+    attempt: 1,
+    ts: "2026-01-01T00:00:02Z",
+    phase: "end",
+    agentLabel: "requalify:task/name#1",
+    message,
+  });
+
   const outcomeOf = (entries: FlightlogEntry[]) =>
     aggregateFleet(entries).find(
-      (row) => row.role === "verify" || row.role === "judge",
+      (row) =>
+        row.role === "verify" ||
+        row.role === "requalify" ||
+        row.role === "judge",
     )?.outcome;
 
   test("reads the verifier's PASS prefix", () => {
@@ -528,6 +551,18 @@ describe("gate outcome", () => {
     expect(outcomeOf([verifyNote("FAIL — bun test exited 1")])).toBe("failed");
   });
 
+  test("reads a requalifier's PASS prefix", () => {
+    expect(outcomeOf([requalifyNote("PASS — follow-up gate cleared")])).toBe(
+      "passed",
+    );
+  });
+
+  test("reads a requalifier's FAIL prefix", () => {
+    expect(outcomeOf([requalifyNote("FAIL — follow-up gate rejected")])).toBe(
+      "failed",
+    );
+  });
+
   // The normal shape of a passing message: the verifier quotes its test summary,
   // and that summary contains the word `fail`. Scanning the whole message paints
   // a green run red.
@@ -537,6 +572,28 @@ describe("gate outcome", () => {
         verifyNote("PASS — bun test (7 pass, 0 fail) and all criteria met"),
       ]),
     ).toBe("passed");
+  });
+
+  test("a requalifier's leading PASS wins over a later `0 fail`", () => {
+    expect(
+      outcomeOf([requalifyNote("PASS: something 0 fail")]),
+    ).toBe("passed");
+  });
+
+  test("verify and requalify keep separate outcomes at the same attempt", () => {
+    const entries = [
+      verifyNote("PASS — initial gate cleared"),
+      requalifyNote("FAIL — follow-up gate rejected"),
+    ];
+    const rows = aggregateFleet(entries);
+
+    expect(rows.find((row) => row.role === "verify")?.outcome).toBe("passed");
+    expect(rows.find((row) => row.role === "requalify")?.outcome).toBe(
+      "failed",
+    );
+    expect(
+      deriveTaskViews({ "ui/01": task("ui/01") }, entries)[0].attempts,
+    ).toBe(1);
   });
 
   test("the leading FAIL wins over passing prose after it", () => {
