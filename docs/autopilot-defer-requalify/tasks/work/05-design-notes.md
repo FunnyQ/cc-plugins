@@ -7,7 +7,7 @@
 >
 > **Depends on**: work/03
 > **Blocks**: work/06
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -132,35 +132,35 @@ Substance to carry:
 
 ## Acceptance criteria
 
-- [ ] Two new entries exist in the `## Notes / gotchas` section of
+- [x] Two new entries exist in the `## Notes / gotchas` section of
       `packages/dispatch/skills/autopilot/references/orchestrator.md`, both placed after the
       closing fence of the ` ```javascript ` block.
-- [ ] The first entry states that the ban is scoped by **command discretion** rather than by
+- [x] The first entry states that the ban is scoped by **command discretion** rather than by
       role or by Bash access, names the prompts excluded for running one fixed command, names
       the denied `git reset --hard` attempt by a verify agent as the observed failure, cites the
       originating run by repository, plan slug, date and trail path — there is no workflow id to
       quote, so do not invent one — gives the reason the commit agents are included, and states
       that the prompt is defense-in-depth rather than enforcement.
-- [ ] The second entry names both rejected alternatives — the sibling-attribution waiver and
+- [x] The second entry names both rejected alternatives — the sibling-attribution waiver and
       the unconditional strict fail — and says specifically why each is wrong.
-- [ ] The second entry records the terminal-state deadlock argument and the requirement that a
+- [x] The second entry records the terminal-state deadlock argument and the requirement that a
       deferral needs a live sibling writer, including what breaks without that requirement.
-- [ ] The second entry records the residual race in which a sibling starts writing again just
+- [x] The second entry records the residual race in which a sibling starts writing again just
       after the tree goes quiet, and states that the outcome there is a strict failure.
-- [ ] Both entries follow the section's existing shape: a bolded lede sentence followed by
+- [x] Both entries follow the section's existing shape: a bolded lede sentence followed by
       prose, with no sub-bullets or headings introduced.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes. The fixture extracts and
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes. The fixture extracts and
       executes the fenced script, so any accidental edit inside the fence fails here.
-- [ ] Both entries sit outside the fenced script, in the notes section. The `## Notes / gotchas`
+- [x] Both entries sit outside the fenced script, in the notes section. The `## Notes / gotchas`
       heading is itself after the closing fence, so a match below that line is necessarily
       outside the script. Run this and confirm it prints a line for each new entry:
       `ANCHOR=$(grep -n '^## Notes / gotchas$' packages/dispatch/skills/autopilot/references/orchestrator.md | cut -d: -f1); grep -n -e 'tool access' -e 'postpone' packages/dispatch/skills/autopilot/references/orchestrator.md | awk -F: -v a="$ANCHOR" '$1 > a {print "IN NOTES SECTION line " $1}'`
-- [ ] Read the four entries surrounding the insertion point and confirm the two new ones match
+- [x] Read the four entries surrounding the insertion point and confirm the two new ones match
       their register — bolded lede, dense prose, concrete failure named, no sub-bullets.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md docs/autopilot-defer-requalify/tasks/work/05-design-notes.md`
+- [x] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md docs/autopilot-defer-requalify/tasks/work/05-design-notes.md`
       shows both paths dirty.
 
 ## Eval rubric

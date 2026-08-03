@@ -6,7 +6,7 @@
 >
 > **Depends on**: work/03
 > **Blocks**: work/06
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -118,30 +118,30 @@ Reuse the existing seams — neither `gateOutcome` nor the render path is export
 
 ## Acceptance criteria
 
-- [ ] `requalify` is a member of `KNOWN_ROLES` and therefore of the `AgentRole` union.
-- [ ] `requalify:<ref>#<attempt>` parses to role `requalify` with the correct ref and attempt,
+- [x] `requalify` is a member of `KNOWN_ROLES` and therefore of the `AgentRole` union.
+- [x] `requalify:<ref>#<attempt>` parses to role `requalify` with the correct ref and attempt,
       and the widened cast on that branch keeps the file typechecking.
-- [ ] `ROLE_PROGRESS` ranks `requalify` after `verify` and before `judge`, with the other
+- [x] `ROLE_PROGRESS` ranks `requalify` after `verify` and before `judge`, with the other
       entries renumbered so the sequence stays contiguous.
-- [ ] `gateOutcome()` reads a `PASS`/`FAIL` verdict off a requalify row using the same
+- [x] `gateOutcome()` reads a `PASS`/`FAIL` verdict off a requalify row using the same
       authoritative leading-verdict rule it applies to a verify row.
-- [ ] `GateOutcome` still has exactly two values, and no new state class, colour token or
+- [x] `GateOutcome` still has exactly two values, and no new state class, colour token or
       `aria-label` branch was added under `dashboard/dist/`.
-- [ ] A verify row and a requalify row sharing one attempt number each carry their own outcome,
+- [x] A verify row and a requalify row sharing one attempt number each carry their own outcome,
       and the task's attempt count is unchanged by the second row.
-- [ ] The label-parsing table and the gate-outcome block both cover the new role, including a
+- [x] The label-parsing table and the gate-outcome block both cover the new role, including a
       leading verdict that contradicts prose appearing later in the same message.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes with 0 failures and a total
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes with 0 failures and a total
       test count strictly greater than the count before this task.
-- [ ] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` passes with 0
+- [x] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` passes with 0
       failures — this task changes nothing there, so any change in that result is a regression.
-- [ ] `grep -n 'requalify' packages/dispatch/skills/autopilot/scripts/fleet.ts` shows it at four
+- [x] `grep -n 'requalify' packages/dispatch/skills/autopilot/scripts/fleet.ts` shows it at four
       distinct sites: the known-roles tuple, the label regex, the role-progress map, and the
       gate-outcome guard.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot/scripts/fleet.ts packages/dispatch/skills/autopilot/scripts/fleet.test.ts docs/autopilot-defer-requalify/tasks/work/04-dashboard-defer-state.md`
+- [x] `git status --short -- packages/dispatch/skills/autopilot/scripts/fleet.ts packages/dispatch/skills/autopilot/scripts/fleet.test.ts docs/autopilot-defer-requalify/tasks/work/04-dashboard-defer-state.md`
       shows all three paths dirty.
 
 ## Eval rubric
