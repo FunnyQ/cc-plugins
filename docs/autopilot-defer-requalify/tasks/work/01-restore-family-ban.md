@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: work/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -154,37 +154,37 @@ running beside you.
 
 ## Acceptance criteria
 
-- [ ] `NO_RESTORE_RULE` exists in the fenced script, defined immediately before
+- [x] `NO_RESTORE_RULE` exists in the fenced script, defined immediately before
       `NO_COMMIT_RULE`, and contains both the restore-family paragraph and the
       another-task's-file paragraph.
-- [ ] Both paragraphs are byte-identical to the text they were moved from — no rewording,
+- [x] Both paragraphs are byte-identical to the text they were moved from — no rewording,
       no re-wrapping.
-- [ ] `NO_COMMIT_RULE` retains only its commit-ban paragraph and interpolates
+- [x] `NO_COMMIT_RULE` retains only its commit-ban paragraph and interpolates
       `NO_RESTORE_RULE`, so the text it renders is unchanged from before this task.
-- [ ] `verifyPrompt`, `judgePrompt` and `reviewPrompt` each interpolate `NO_RESTORE_RULE`.
-- [ ] `commitInstructions` includes `NO_RESTORE_RULE`, written in that builder's own
+- [x] `verifyPrompt`, `judgePrompt` and `reviewPrompt` each interpolate `NO_RESTORE_RULE`.
+- [x] `commitInstructions` includes `NO_RESTORE_RULE`, written in that builder's own
       string-concatenation style rather than as a template literal.
-- [ ] The external-lens branch of `reviewPrompt` instructs the driver to write the
+- [x] The external-lens branch of `reviewPrompt` instructs the driver to write the
       restore-family ban into the instruction file it hands the external CLI.
-- [ ] `markDonePrompt`, `markBlockedPrompt` and the inline wave-scout prompt are unchanged.
-- [ ] The test fixture asserts the rule reaches the dev prompt, the verify prompt, the judge
+- [x] `markDonePrompt`, `markBlockedPrompt` and the inline wave-scout prompt are unchanged.
+- [x] The test fixture asserts the rule reaches the dev prompt, the verify prompt, the judge
       prompt, the review prompt and the commit instructions.
-- [ ] The byte-identity of the three writer prompts is proved by an exact string comparison
+- [x] The byte-identity of the three writer prompts is proved by an exact string comparison
       against the pre-change revision, not inferred from substring assertions.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes with no failures — the
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes with no failures — the
       baseline before this task is 198 pass, 0 fail, and the new assertions add to that.
-- [ ] `grep -n 'NO_RESTORE_RULE' packages/dispatch/skills/autopilot/references/orchestrator.md`
+- [x] `grep -n 'NO_RESTORE_RULE' packages/dispatch/skills/autopilot/references/orchestrator.md`
       prints at least 6 lines: the definition, the interpolation inside `NO_COMMIT_RULE`, and
       one in each of `verifyPrompt`, `judgePrompt`, `reviewPrompt` and `commitInstructions`.
-- [ ] `grep -c 'do not reason your way past this one' packages/dispatch/skills/autopilot/references/orchestrator.md`
+- [x] `grep -c 'do not reason your way past this one' packages/dispatch/skills/autopilot/references/orchestrator.md`
       prints `1` — the sentence lives in exactly one constant now, not copy-pasted per builder.
-- [ ] `grep -c '\${NO_COMMIT_RULE}' packages/dispatch/skills/autopilot/references/orchestrator.md`
+- [x] `grep -c '\${NO_COMMIT_RULE}' packages/dispatch/skills/autopilot/references/orchestrator.md`
       prints `3`, confirming the three writer prompts still take the composed rule and were not
       switched to the narrower constant.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts docs/autopilot-defer-requalify/tasks/work/01-restore-family-ban.md`
+- [x] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts docs/autopilot-defer-requalify/tasks/work/01-restore-family-ban.md`
       shows all three paths dirty.
 
 ## Eval rubric

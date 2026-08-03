@@ -234,14 +234,18 @@ const JUDGE_SCHEMA = {
 // Single-sourced here so the three prompts below can never drift apart.
 const STATUS_RULE = `Set the task header "> **Status**:" to in-progress and leave it in-progress when you finish. Do not set it to done: only the orchestrator's post-judge mark-done step may do that.`
 
+// The restore-family ban belongs to every prompt whose agent chooses what to run,
+// not only to writers, so it stays separate from the commit ownership rule.
+const NO_RESTORE_RULE = `Never run \`git checkout\`, \`git restore\`, \`git reset\`, or \`git clean\` either. Those discard working-tree changes instead of changing git state, so the sentence above does not cover them — do not reason your way past this one. Tasks run in PARALLEL in one shared working tree, so the uncommitted changes around you belong to sibling tasks that are still running. Restoring any path to its HEAD version destroys work that was already finished and graded, and nothing detects it until the run dies much later. If your own edit went wrong, fix it forward by editing the file.
+Editing a source file that a sibling task also edits is fine — the plan allows it. What you must never touch is another task's file under the tasks/ tree: it carries that task's Status line, and overwriting it un-schedules work that already passed.`
+
 // Every writer in the run — Claude dev, an external dev delegate, the final-review
 // fixer — must leave its work unstaged. Only the labeled commit agents commit.
 // A task that commits itself breaks two things at once: the wave's history stops
 // being one atomic commit per wave, and a task running in parallel gets its
 // half-finished edits swept into someone else's commit.
 const NO_COMMIT_RULE = `Never run \`git commit\`, \`git add\`, \`git push\`, \`git stash\`, or any other command that changes git state — not even if the task file asks for it. Leave every change unstaged in the working tree. A dedicated commit agent commits each wave; a task that commits itself splits the wave's atomic history and can sweep a parallel task's half-finished edits into its commit.
-Never run \`git checkout\`, \`git restore\`, \`git reset\`, or \`git clean\` either. Those discard working-tree changes instead of changing git state, so the sentence above does not cover them — do not reason your way past this one. Tasks run in PARALLEL in one shared working tree, so the uncommitted changes around you belong to sibling tasks that are still running. Restoring any path to its HEAD version destroys work that was already finished and graded, and nothing detects it until the run dies much later. If your own edit went wrong, fix it forward by editing the file.
-Editing a source file that a sibling task also edits is fine — the plan allows it. What you must never touch is another task's file under the tasks/ tree: it carries that task's Status line, and overwriting it un-schedules work that already passed.`
+${NO_RESTORE_RULE}`
 
 const devPrompt = (ref, path, attempt, feedback) => `
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase start
@@ -332,9 +336,11 @@ First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref}
 Then proceed.
 Use the identical label in both start and end calls.
 
+${NO_RESTORE_RULE}
+
 ${lens.external ? `
 You are the ${lens.external.label.toUpperCase()} (cross-vendor) reviewer in the FINAL REVIEW of flightplan ${CFG.slug} (task ${ref}). You do NOT review the code yourself — you have the ${lens.external.label} CLI review it and you record its findings.
-1. Write a review instruction to a temp file: tell ${lens.external.label} to review THIS run's changes for BUGS & CORRECTNESS (logic errors, broken edge cases, regressions, security) — it should inspect both \`git diff ${CFG.baseRef}..HEAD\` (committed task changes) and \`git diff\` (uncommitted fixer edits) and report each issue with file:line and the concrete fix.
+1. Write a review instruction to a temp file: tell ${lens.external.label} to review THIS run's changes for BUGS & CORRECTNESS (logic errors, broken edge cases, regressions, security) — it should inspect both \`git diff ${CFG.baseRef}..HEAD\` (committed task changes) and \`git diff\` (uncommitted fixer edits) and report each issue with file:line and the concrete fix. Include the restore-family ban in that instruction, in your own words but with the same force.
 2. Run this as ONE FOREGROUND Bash call with \`timeout: 600000\` (the Bash tool maximum): ${liveReview ? `bun ${CFG.relayPath} ${lens.external.label} review${lens.external.modelFlag} --git-scope none --dangerous --wait-timeout 480000 --prompt-file <your-instruction-file>` : `bun ${S}/${lens.external.wrapper} review${lens.external.modelFlag} --prompt-file <your-instruction-file>`}
    ${liveReview ? `Relay runs ${lens.external.label} in a visible herdr live pane, prints its findings on stdout, then closes the pane. It is a REVIEW: relay's prompt contract tells ${lens.external.label} to analyze only, and you must not let it edit anything either. Read that stdout — don't look for any temp/transcript files.` : `It reads the repo + diffs and prints the CLI's findings, leaving no scratch. Read that stdout — don't look for any temp/transcript files.`}
    WAIT RULE — do NOT set \`run_in_background\`, and never write a shell poll loop (\`while\`, \`jobs\`, \`wait\`): a fresh shell per Bash call means \`jobs\` can never see an earlier call's command, so the loop spins to the 600s cap long after ${lens.external.label} finished. ${liveReview ? `The \`--wait-timeout 480000\` above is sized to expire inside that 600s cap with margin for relay's pane spawn and cleanup, so this one call normally returns on its own. ` : ''}If the harness moves the call to the background, wait for the completion notification and Read the output file it named, once.
@@ -383,6 +389,7 @@ Then proceed.
 Use the identical label in both start and end calls.
 
 You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
+${NO_RESTORE_RULE}
 Do NOT trust the dev's claims. Open the task file at ${path}, then:
   1. Run every concrete command in its ## Verification section yourself.
   2. Check every box in ## Acceptance criteria against the actual code/output.
@@ -398,6 +405,7 @@ Then proceed.
 Use the identical label in both start and end calls.
 
 You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
+${NO_RESTORE_RULE}
 The independent binary gate already PASSED with this evidence:
 ${gateSummary}
 Open the task file at ${path} and its ## Eval rubric. Score EACH dimension 0–scaleMax based on the real code and the verification evidence above — ground the correctness dimension in that evidence, not opinion.
@@ -616,6 +624,7 @@ async function runTaskGuarded(item) {
 const commitInstructions = (agentLabel, heldBack = []) =>
   'Commit the current working-tree changes as one or more ATOMIC commits using plain git over Bash. '
   + 'Do NOT use the Skill tool and do NOT spawn any sub-agent — do it yourself with git commands.\n'
+  + NO_RESTORE_RULE + '\n'
   + (heldBack.length > 0
     ? `0. HELD BACK — these task(s) were PARKED and their work must NOT be committed:\n`
       + heldBack.map(p => `   - ${p}\n`).join('')

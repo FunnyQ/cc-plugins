@@ -1305,6 +1305,7 @@ describe("orchestrator cross-vendor review lens", () => {
 
 describe("orchestrator commit ownership", () => {
   const BAN = "Never run `git commit`";
+  const RESTORE_BAN = "do not reason your way past this one";
 
   const devWave: ScoutResult = snapshot({
     ready: [ready("ui/01")],
@@ -1325,6 +1326,9 @@ describe("orchestrator commit ownership", () => {
     const log = await runOrchestrator({ scouts: [devWave, complete(2)] });
 
     expect(promptFor(log, "dev:ui/01#1")).toContain(BAN);
+    expect(promptFor(log, "dev:ui/01#1")).toContain(RESTORE_BAN);
+    expect(promptFor(log, "verify:ui/01#1")).toContain(RESTORE_BAN);
+    expect(promptFor(log, "judge:ui/01#1")).toContain(RESTORE_BAN);
   });
 
   test("the external dev driver is told never to commit", async () => {
@@ -1334,6 +1338,7 @@ describe("orchestrator commit ownership", () => {
     );
 
     expect(promptFor(log, "dev-codex:ui/01#1")).toContain(BAN);
+    expect(promptFor(log, "dev-codex:ui/01#1")).toContain(RESTORE_BAN);
   });
 
   test("the external driver passes the ban on to the CLI it drives", async () => {
@@ -1350,6 +1355,11 @@ describe("orchestrator commit ownership", () => {
     const log = await runOrchestrator({ scouts: [finalWave, complete(2)] });
 
     expect(promptFor(log, "fix:review/01#1")).toContain(BAN);
+    expect(promptFor(log, "fix:review/01#1")).toContain(RESTORE_BAN);
+    expect(promptFor(log, "review:codex#1")).toContain(RESTORE_BAN);
+    expect(promptFor(log, "review:codex#1")).toContain(
+      "Include the restore-family ban in that instruction",
+    );
   });
 
   test("the commit agents are the exception and still commit", async () => {
@@ -1357,6 +1367,7 @@ describe("orchestrator commit ownership", () => {
 
     expect(promptFor(log, "commit-post-loop")).toContain("git commit");
     expect(promptFor(log, "commit-post-loop")).not.toContain(BAN);
+    expect(promptFor(log, "commit-post-loop")).toContain(RESTORE_BAN);
   });
 });
 
