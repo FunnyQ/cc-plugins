@@ -1,5 +1,23 @@
 # Changelog
 
+## [dispatch 3.18.8] - 2026-08-03
+
+_tracks tag `dispatch-v3.18.8`_
+
+### Added
+
+- **A verify agent that meets a sibling task's half-written working tree can now defer instead of guessing.** Autopilot runs a wave's tasks in one shared working tree, so a verifier can catch a still-in-progress sibling mid-write. Rather than fail (or worse, improvise around it), the verifier can now DEFER: a wave-scoped tree watch counts live writers, the deferred task waits for the next moment no one else is writing, then re-runs its verification commands once in a strict "requalify" mode whose verdict is final. A defer consumes no attempt and can never waive a genuinely failing (non-zero-exit) command. The audit trail stays strictly binary — a granted postponement shows up only as the requalify row's existence, a new role recognized by the flightlog label parser and the fleet dashboard.
+
+### Changed
+
+- **The ban on destructive git commands (`checkout` / `restore` / `reset` / `clean`) now covers every agent that chooses its own commands, not just the ones that write source.** It was previously baked into three prompts; it's now a single-sourced constant applied to those three plus the verifier, the judge, the review lenses, and the commit instructions — including propagating into the instruction file handed to an external review CLI. This closes a real incident: a verifier met a sibling task's uncommitted work, ran `git reset --hard` on its own initiative, and then reported PASS over two tests that were actually still failing, attributing the failures to the sibling.
+
+### Fixed
+
+- **A fully green Final review round no longer gets parked as an infrastructure failure.** A Haiku verifier ran every check and wrote its PASS flightlog row, but text-emitted its result instead of calling the required StructuredOutput tool, which threw and discarded the otherwise-complete round. Schema-bound prompts now close with an explicit instruction to return by calling the tool, and `resilient()` retries a thrown schema call once on Sonnet. The rubric judge and the commit agents are excluded from that retry, for the same underlying reason — both persist something before they return, so a second run is not free. The judge appends a verdict row keyed by ref+attempt, and only the first row for a key is kept, so a silent retry would leave the audit trail contradicting the decision it records; a commit retried after a partial commit writes a second, incoherent one.
+
+Test coverage grew from 198 to 227 tests across the two batches; both suites are green (227 pass / 0 fail on autopilot scripts, 61 pass / 0 fail on dashboard modules).
+
 ## [dispatch 3.18.7] - 2026-08-03
 
 _tracks tag `dispatch-v3.18.7`_
