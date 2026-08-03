@@ -85,7 +85,10 @@ const CFG = {
 //     (via <engine>-run.ts delegate) and verifies. The coding intelligence lives
 //     in the external CLI, so the driver just invokes + checks. An external-engine
 //     ladder ends on Claude-Opus; an opted-in Claude ladder ends on the external rung.
-const MODEL = { dev: 'sonnet', devEscalated: 'opus', devExternal: 'haiku', verify: 'haiku', judge: 'opus', reviewExternal: 'haiku', reviewLens: CFG.reviewLensModel ?? 'opus', fix: 'opus', commit: 'haiku' }
+//   structuredRetry (Sonnet) — the model a schema'd call is retried on after the
+//     subagent text-emitted its payload instead of calling the tool. One rung
+//     above the Haiku that every cheap schema'd step runs on; see `resilient`.
+const MODEL = { dev: 'sonnet', devEscalated: 'opus', devExternal: 'haiku', verify: 'haiku', judge: 'opus', reviewExternal: 'haiku', reviewLens: CFG.reviewLensModel ?? 'opus', fix: 'opus', commit: 'haiku', structuredRetry: 'sonnet' }
 const MAX = CFG.maxAttempts ?? 3
 const FINAL_MAX = CFG.finalReviewMaxAttempts ?? 2   // the Final review round loops at most this many times before parking
 const S = CFG.scriptsDir   // abs path to flightplan/scripts
@@ -234,6 +237,14 @@ const JUDGE_SCHEMA = {
 // move a task to in-progress; only the post-judge mark-done step writes `done`.
 // Single-sourced here so the three prompts below can never drift apart.
 const STATUS_RULE = `Set the task header "> **Status**:" to in-progress and leave it in-progress when you finish. Do not set it to done: only the orchestrator's post-judge mark-done step may do that.`
+
+// The schema is invisible to the agent. Nothing else in a prompt says HOW to
+// return, so a model that has just finished a long, tool-heavy turn can write
+// its payload as message text and genuinely believe it answered — which is the
+// failure `resilient` below exists to retry. One explicit sentence makes it
+// rarer. Every schema'd prompt closes on it, including the two the retry
+// deliberately skips.
+const RETURN_CONTRACT = `Return your result by CALLING the StructuredOutput tool. Writing the JSON as message text — including inside <StructuredOutput> tags — does not return it: the harness rejects the call and the work you just did is discarded.`
 
 // The restore-family ban belongs to every prompt whose agent chooses what to run,
 // not only to writers, so it stays separate from the commit ownership rule.
@@ -409,6 +420,7 @@ Put the raw evidence (commands, exit codes, failing output) in summary. Do not m
 ${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
+${RETURN_CONTRACT}
 `
 }
 
@@ -427,6 +439,7 @@ Write the scores JSON to a temp file, then run score-task.ts to compute and pers
   bun ${S}/score-task.ts ${path} /tmp/scores-${ref.replace('/','-')}.json --json --log ${CFG.logFile} --attempt ${attempt} --agent "<your label>"
 If the command exits 1, that is a valid rubric failure; still return the printed JSON verdict. Return the CLI's printed verdict object VERBATIM as "verdict", plus your scores and rationale.
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase end --message "<weighted score>"
+${RETURN_CONTRACT}
 `
 
 const markDonePrompt = (ref, path) => `
@@ -436,7 +449,8 @@ Finalize flightplan task ${ref} at ${path}. Do this in three steps and report a 
 2. Re-read ${path} and find the "> **Status**:" line in the header blockquote.
 3. Return ok=true ONLY if the command exited 0 AND that line reads exactly "> **Status**: done" with nothing after the value. Put the value you actually read into status.
    Otherwise return ok=false, the value you read into status, and the command's stderr into error.
-Change nothing else by hand. NEVER edit the Status line or tick a checkbox yourself — if mark-done.ts failed, report the failure. A hand-written "done" would fake a gate result that the tree then trusts forever.`
+Change nothing else by hand. NEVER edit the Status line or tick a checkbox yourself — if mark-done.ts failed, report the failure. A hand-written "done" would fake a gate result that the tree then trusts forever.
+${RETURN_CONTRACT}`
 
 const markBlockedPrompt = (ref, path, reason) => `
 Park flightplan task ${ref} at ${path}. Do this in three steps and report a verdict.
@@ -444,7 +458,45 @@ Park flightplan task ${ref} at ${path}. Do this in three steps and report a verd
 2. Re-read ${path} and find the "> **Status**:" line in the header blockquote.
 3. Return ok=true ONLY if that line now reads exactly "> **Status**: blocked" with nothing after the value. Put the value you actually read into status.
    Otherwise return ok=false, the value you read into status, and what stopped you into error.
-Do not tick or untick any checkbox. (Parked by autopilot: ${reason})`
+Do not tick or untick any checkbox. (Parked by autopilot: ${reason})
+${RETURN_CONTRACT}`
+
+// ── Structured-output resilience ────────────────────────────────────────────
+// A schema'd `agent()` fails two ways. It resolves to `null` on a terminal API
+// failure — that is what every `if (!gate)` guard below tests for. And it
+// REJECTS when the subagent writes its payload as message text instead of
+// calling the StructuredOutput tool. The harness nudges once and gives up, so
+// the throw is what reaches us.
+//
+// Catching that throw is not the same as recovering from it. By the time it
+// happens the agent has usually done all of the real work: live in run
+// `wf_b03e0034-f95` the Final review verifier ran every check and wrote its
+// `PASS` flightlog row, then emitted the verdict as text — and parking that as
+// an infrastructure failure threw away a complete, green review round.
+//
+// So retry once, and only once. What makes a second run cost time and nothing
+// else is that every call wrapped here is IDEMPOTENT: `verify` and `requalify`
+// only read, `mark-done.ts` validates the header before it writes anything, the
+// park is an idempotent edit, and the scout runs one read-only command. The
+// retry runs on `retryModel` because the models that text-emit are the cheap ones.
+//
+// Two callers are deliberately NOT wrapped, both for the same reason — they
+// persist something before they return, so a second run is not free:
+//   - the commit agents, where a retry after a partial commit writes a second,
+//     incoherent commit. They keep `settled()`: report, never re-run.
+//   - the rubric judge, which appends a verdict row via `score-task.ts --log`.
+//     See the call site.
+// A wrapped call may still duplicate its narrative flightlog rows. That is the
+// accepted cost: the retry genuinely happened, so a trail showing both attempts
+// is truthful. Duplicating a persisted VERDICT is not, which is where the line sits.
+const resilient = async (make, retryModel) => {
+  try {
+    return await make(null)
+  } catch (error) {
+    log(`retrying a structured call on ${retryModel}: ${error?.message ?? String(error)}`)
+    return await make(retryModel)
+  }
+}
 
 // ── Failure shapes ──────────────────────────────────────────────────────────
 // Two kinds of failure, handled differently:
@@ -476,8 +528,9 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
 async function parkBlocked(ref, path, reason, watch) {
   return withWriter(watch, async () => {
     try {
-      const result = await agent(markBlockedPrompt(ref, path, reason),
-        { label: `block:${ref}`, phase: 'Execute', model: MODEL.verify, schema: PARK_SCHEMA })
+      const result = await resilient(retryModel => agent(markBlockedPrompt(ref, path, reason),
+        { label: `block:${ref}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: PARK_SCHEMA }),
+        MODEL.structuredRetry)
       return result?.ok === true
     } catch {
       return false
@@ -595,8 +648,9 @@ async function executeTask(item, watch) {
     // A verifier that returns NO structured result did not verify anything. That
     // is not the same as `passed: false`, which is a real verdict on real work.
     // Conflating them retries the dev loop against an unknown state.
-    let gate = await agent(verifyPrompt(ref, path, attempt),
-      { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
+    let gate = await resilient(retryModel => agent(verifyPrompt(ref, path, attempt),
+      { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: GATE_SCHEMA }),
+      MODEL.structuredRetry)
     if (!gate) {
       const cause = `verification did not run or did not return a verdict on attempt ${attempt}`
         + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
@@ -604,8 +658,9 @@ async function executeTask(item, watch) {
     }
     if (deferralAccepted(gate, watch)) {
       await watch.quiet()
-      const requalified = await agent(verifyPrompt(ref, path, attempt, true),
-        { label: `requalify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
+      const requalified = await resilient(retryModel => agent(verifyPrompt(ref, path, attempt, true),
+        { label: `requalify:${ref}#${attempt}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: GATE_SCHEMA }),
+        MODEL.structuredRetry)
       if (!requalified) {
         const cause = `requalification did not run or did not return a verdict on attempt ${attempt}`
           + ` — the requalify agent produced no structured result.`
@@ -633,6 +688,15 @@ async function executeTask(item, watch) {
     // flightlog directory, so it is not a tree writer. Counting it would make the
     // quiet signal fire later than it should for no gain. This is a deliberate
     // exclusion, and a later reader will otherwise "fix" it.
+    // NOT wrapped in `resilient`, unlike every other schema'd call in this
+    // pipeline. The judge runs `score-task.ts --log` BEFORE it returns, and that
+    // appends a verdict row keyed by ref+attempt. A retry would score the same
+    // attempt twice: `fleet.ts` keeps the FIRST row for a ref|attempt while the
+    // orchestrator would act on the SECOND, so two honest-but-different Opus
+    // scorings leave the trail contradicting the decision it records. Recovering
+    // this one means reading the persisted verdict back, not re-judging — the
+    // score row already holds the whole structured verdict. Until that exists,
+    // a judge throw parks, which is the pre-existing behaviour and never worse.
     const judged = await agent(judgePrompt(ref, path, gate.summary, attempt),
       { label: `judge:${ref}#${attempt}`, phase: 'Execute', model: MODEL.judge, schema: JUDGE_SCHEMA })
     if (!judged) {
@@ -647,8 +711,9 @@ async function executeTask(item, watch) {
       // that passed but never got written `done` would be re-offered forever, or
       // (worse) counted as complete by a run that never checked.
       const finalized = await withWriter(watch, () =>
-        agent(markDonePrompt(ref, path),
-          { label: `done:${ref}`, phase: 'Execute', model: MODEL.verify, schema: MARK_DONE_SCHEMA }))
+        resilient(retryModel => agent(markDonePrompt(ref, path),
+          { label: `done:${ref}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: MARK_DONE_SCHEMA }),
+          MODEL.structuredRetry))
       if (finalized && finalized.ok) {
         return { task: ref, passed: true, attempt, weighted: verdict.weighted }
       }
@@ -737,7 +802,8 @@ const commitInstructions = (agentLabel, heldBack = []) =>
   + '\n'
   + '    繁體中文一句摘要\n'
   + '    EOF\n'
-  + '    )"'
+  + '    )"\n'
+  + RETURN_CONTRACT
 
 // ── Wave loop ───────────────────────────────────────────────────────────────
 return (async () => {
@@ -794,14 +860,18 @@ const escalateCommitFailure = (committed, what, threw) => {
 
 while (true) {
   wave++
-  const { value: scout, threw: scoutThrew } = await settled(() => agent(
+  // `settled` still wraps the retry: it converts a SECOND throw into the same
+  // reportable shape, which is what keeps every finished wave's results alive.
+  const { value: scout, threw: scoutThrew } = await settled(() => resilient(retryModel => agent(
     `First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase start\n`
     + `Then proceed.\n\n`
     + `Use the identical label in both start and end calls.\n`
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
     + `Return its stdout verbatim (unmodified), its exit code, and its stderr.\n`
-    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "command complete"`,
-    { label: `scout-wave-${wave}`, phase: 'Execute', model: MODEL.verify, schema: SCOUT_SCHEMA }))
+    + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "command complete"\n`
+    + RETURN_CONTRACT,
+    { label: `scout-wave-${wave}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: SCOUT_SCHEMA }),
+    MODEL.structuredRetry))
 
   // Pure in-memory work, so this needs no Workflow filesystem access.
   let snap = null
@@ -1070,6 +1140,8 @@ return { slug: CFG.slug, completed, escalations }
 - **Both status transitions are confirmed by a reread, not by the agent's word.** `markDonePrompt` and `markBlockedPrompt` each return `{ ok, status, error }` and each must reopen the file and read the Status line back. An agent can return a fluent summary having edited nothing, and for parking that is the *likely* case — the task is often being parked because its header was malformed to begin with. An unconfirmed park reported as success is worse than a failed one: the file still reads `in-progress`, `next-ready` never re-offers it, and the `parked: false` signal that tells the user to reset it by hand never fires.
 
 - **A schema'd `agent()` throws as well as returning `null` — guard for both.** `agent(prompt, {schema})` resolves to `null` on a terminal API failure, and that is what every `if (!gate)` / `if (!judged)` / `if (!committed)` guard tests. But it **rejects** when the subagent never calls the StructuredOutput tool — typically because it text-emitted `<StructuredOutput>…</StructuredOutput>` as a message instead. A null-guard can never see a throw. Inside a task that is already handled: `runTaskGuarded` catches around the whole pipeline. The two calls that sit *outside* it — the wave-loop scout and both commit agents — are wrapped in `settled()`, which turns either failure into the same reportable shape. Do not remove those wrappers. An unguarded throw at the top of the wave loop discards `completed` and `escalations` for every wave that already finished, so the run returns nothing while the tree on disk reads `done` — the work happened and no one is told. Observed live in run `wf_993ede2c-a44`: a Haiku scout text-emitted its payload on the final wave of a 9/9 tree, argued with the harness's `[structured-output-enforce]` nudge, and killed the workflow after every task was complete and committed. Cheap models are likeliest to do this, and every one of these three calls runs on `MODEL.verify`/`MODEL.commit` (Haiku).
+
+- **Catching that throw is not recovering from it — `resilient()` retries once.** The guards above keep the run *reportable*; they do not get the verdict back. By the time a schema'd call rejects, the agent has usually done all of the real work. Live in run `wf_b03e0034-f95`: the Final review verifier ran every check, wrote its `PASS` row to the flightlog, then emitted the verdict as message text — and `runTaskGuarded` correctly parked a complete, green review round as an infrastructure failure, discarding the most expensive round in the flight. So every schema'd call whose re-run is free of side effects is wrapped in `resilient()`, which retries exactly once on `MODEL.structuredRetry`. **Idempotence is the whole licence for the retry**: `verify` and `requalify` only read, `mark-done.ts` validates the header before it writes anything, the park is an idempotent edit, and the scout runs one read-only command. **Two callers are excluded, both because they persist something before they return.** The commit agents: a retry after a partial commit writes a second, incoherent commit. And the **rubric judge**, which is the subtle one — it runs `score-task.ts --log` *before* returning, appending a verdict row keyed by ref+attempt, and `fleet.ts` keeps the FIRST row for that key while the orchestrator would act on the SECOND. Two honest-but-different Opus scorings of one attempt would then leave the trail contradicting the decision it records, which is the same class of defect the deferral design exists to prevent. Recovering the judge means reading the persisted verdict back — the score row already holds the whole structured verdict — not re-judging; until that exists a judge throw parks, exactly as before. A wrapped call can still duplicate its *narrative* rows, and that is the accepted cost: the retry genuinely happened, so a trail showing both attempts is truthful. Duplicating a persisted verdict is not, and that is where the line sits. A retry is not a loop — the second throw propagates exactly as the first one used to, so a genuinely stuck agent still parks rather than burning the run. `RETURN_CONTRACT` is the cheap companion to all of this: the schema is invisible to the agent, so without one explicit sentence nothing in the prompt says *how* to return, and a model closing a long tool-heavy turn writes the payload as text believing it answered. Every schema'd prompt carries it, including the commit instructions the retry skips.
 - **Wrap the task thunk; reconcile by index; never `.filter(Boolean)`.** `parallel()` resolves a thrown thunk to `null`, and a `null` carries neither the task ref nor the cause. `runTaskGuarded` catches around `executeTask` so both survive, and it still attempts `markBlockedPrompt` and records whether the park worked. The wave then reconciles `results[i]` against `fresh[i]`, so even a `null` lands on its own task instead of vanishing. Filtering first would drop the task from `completed` and `escalations` both, and an unparked task stays `in-progress` — which `next-ready` never offers again.
 - **There is exactly one scoring implementation.** The judge agent runs `score-task.ts --json --log` with its scores. The orchestrator gates on that printed verdict object. If the formula changes, change `score-task.ts`. Do NOT duplicate the arithmetic in the orchestrator.
 - **`CFG.budgetFloor` defaults to `0` (off).** `budget.total` is `null` unless the user declares a target, so enabling a floor by default would manufacture a surprise stall class for existing runs. When configured above zero, it stops dispatching a ready wave when the remaining output-token balance falls below the floor.

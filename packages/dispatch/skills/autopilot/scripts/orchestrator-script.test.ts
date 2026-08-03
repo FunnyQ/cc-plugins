@@ -95,21 +95,24 @@ type Scenario = {
   /** Keyed by task ref; null models an agent that returned no structured result. */
   gate?: Record<
     string,
-    ({ passed: boolean; deferred?: boolean; summary: string } | null)[]
+    ({ passed: boolean; deferred?: boolean; summary: string } | Throws | null)[]
   >;
   requalify?: Record<
     string,
-    ({ passed: boolean; deferred?: boolean; summary: string } | null)[]
+    ({ passed: boolean; deferred?: boolean; summary: string } | Throws | null)[]
   >;
-  judge?: Record<string, ({ verdict: Verdict; rationale: string } | null)[]>;
+  judge?: Record<
+    string,
+    ({ verdict: Verdict; rationale: string } | Throws | null)[]
+  >;
   markDone?: Record<
     string,
-    ({ ok: boolean; status: string; error?: string } | null)[]
+    ({ ok: boolean; status: string; error?: string } | Throws | null)[]
   >;
   /** Keyed by ref; models a park that reports failure, or returns nothing at all. */
   park?: Record<
     string,
-    ({ ok: boolean; status: string; error?: string } | null)[]
+    ({ ok: boolean; status: string; error?: string } | Throws | null)[]
   >;
   /** Refs whose dev step throws, simulating a pipeline that dies mid-flight. */
   devThrows?: string[];
@@ -207,7 +210,11 @@ async function runOrchestrator(
       queues.set(key, source ? [...source] : []);
     }
     const queue = queues.get(key)!;
-    return queue.length > 0 ? queue.shift() : fallback;
+    const next = queue.length > 0 ? queue.shift() : fallback;
+    // Faithful to the runtime at EVERY schema'd call, not just the scout and the
+    // commit agents: queue THROWS to model a subagent that text-emits its payload.
+    if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
+    return next;
   };
 
   const agent = async (
@@ -581,8 +588,10 @@ describe("orchestrator wave loop", () => {
   // unguarded scout call takes the whole run down with it — and every finished
   // wave's `completed` and `escalations` die with the throw, leaving the tree
   // reading `done` on disk while the run reports nothing at all.
-  test("a scout that throws escalates instead of killing the run", async () => {
-    const { result } = await runOrchestrator({ scouts: [THROWS] });
+  // Two throws, because the first one is retried; see "structured-output
+  // resilience" for the retry itself.
+  test("a scout that throws twice escalates instead of killing the run", async () => {
+    const { result } = await runOrchestrator({ scouts: [THROWS, THROWS] });
     expect(result.completed).toEqual([]);
     expect(result.escalations[0].task).toBe("(scout)");
     expect(result.escalations[0].infrastructure).toBe(true);
@@ -591,7 +600,7 @@ describe("orchestrator wave loop", () => {
 
   test("a mid-run scout throw keeps the waves that already finished", async () => {
     const { result } = await runOrchestrator({
-      scouts: [wave("ui/01", 2, 0), THROWS],
+      scouts: [wave("ui/01", 2, 0), THROWS, THROWS],
     });
     expect(result.completed).toEqual(["ui/01"]);
     expect(result.escalations[0].task).toBe("(scout)");
@@ -1908,4 +1917,157 @@ test("a held catch-path park still reconciles", async () => {
   const [escalation] = result.escalations;
   expect(escalation.task).toBe("ui/01");
   expect(escalation.parked).toBe(true);
+});
+
+// STRUCTURED-OUTPUT RESILIENCE
+// ══════════════════════════════════════════════════════════════════════════
+// A schema'd agent that text-emits its payload has usually already done all of
+// the real work — the live case wrote a green PASS row to the flightlog first.
+// Catching the throw records that failure; only a retry recovers from it. What
+// these tests pin is that the retry happens exactly once, on the intended model,
+// at every idempotent call site — and at no other.
+const callsTo = (labels: string[], label: string) =>
+  labels.filter((seen) => seen === label).length;
+
+/** Every model a given label ran on, in call order. */
+const modelsFor = (log: Pick<RunLog, "labels" | "models">, label: string) =>
+  log.labels.flatMap((seen, index) =>
+    seen === label ? [log.models[index]] : [],
+  );
+
+describe("structured-output resilience", () => {
+  const siblingMarker = "SUSPECTED SIBLING INTERFERENCE";
+  const twoTaskScouts = () => [
+    multiWave(["ui/main", "ui/sibling"]),
+    complete(2),
+  ];
+
+  test("a verifier that text-emits its payload is retried one rung stronger", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      gate: { "ui/01": [THROWS, { passed: true, summary: "green" }] },
+    });
+    expect(log.result.completed).toEqual(["ui/01"]);
+    expect(log.result.escalations).toEqual([]);
+    expect(callsTo(log.labels, "verify:ui/01#1")).toBe(2);
+    expect(modelsFor(log, "verify:ui/01#1")).toEqual(["haiku", "sonnet"]);
+  });
+
+  test("the retry does not consume an attempt", async () => {
+    // The throw is an infrastructure fault, not a verdict on the work. Charging
+    // it to the attempt budget would park a task the dev could still have fixed.
+    const log = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      gate: {
+        "ui/01": [THROWS, { passed: false, summary: "red" }],
+      },
+    });
+    expect(callsTo(log.labels, "dev:ui/01#2")).toBe(1);
+  });
+
+  test("a second text-emitted payload parks the task", async () => {
+    const { result, labels } = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      gate: { "ui/01": [THROWS, THROWS] },
+    });
+    expect(result.completed).toEqual([]);
+    const [escalation] = result.escalations;
+    expect(escalation.task).toBe("ui/01");
+    expect(escalation.infrastructure).toBe(true);
+    expect(escalation.reason).toMatch(/StructuredOutput/);
+    // Once, and only once: a retry loop would burn the run instead of parking.
+    expect(callsTo(labels, "verify:ui/01#1")).toBe(2);
+  });
+
+  test("a scout that text-emits is retried before the run gives up", async () => {
+    const log = await runOrchestrator({
+      scouts: [THROWS, wave("ui/01", 1, 0), complete(1)],
+    });
+    expect(log.result.completed).toEqual(["ui/01"]);
+    expect(log.result.escalations).toEqual([]);
+    expect(modelsFor(log, "scout-wave-1")).toEqual(["haiku", "sonnet"]);
+  });
+
+  test("the judge is NOT retried — it persists a verdict before it returns", async () => {
+    // `score-task.ts --log` appends a row keyed by ref+attempt, and fleet.ts
+    // keeps the FIRST row for that key. Retrying would score the same attempt
+    // twice and the orchestrator would act on the second, leaving the trail
+    // contradicting the decision it records. Parking is what happened before
+    // this helper existed, and it is never worse than a lying trail.
+    const { result, labels } = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      judge: { "ui/01": [THROWS] },
+    });
+    expect(callsTo(labels, "judge:ui/01#1")).toBe(1);
+    expect(result.completed).toEqual([]);
+    expect(result.escalations[0].infrastructure).toBe(true);
+    expect(result.escalations[0].reason).toMatch(/StructuredOutput/);
+  });
+
+  test("mark-done and the park are both retried", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      markDone: { "ui/01": [THROWS, { ok: true, status: "done" }] },
+    });
+    expect(log.result.completed).toEqual(["ui/01"]);
+    expect(callsTo(log.labels, "done:ui/01")).toBe(2);
+
+    const parked = await runOrchestrator({
+      scouts: [wave("ui/02", 1, 0), complete(1)],
+      gate: { "ui/02": [null] },
+      park: { "ui/02": [THROWS, { ok: true, status: "blocked" }] },
+    });
+    expect(parked.result.escalations[0].parked).toBe(true);
+    expect(callsTo(parked.labels, "block:ui/02")).toBe(2);
+  });
+
+  test("the commit agents are NOT retried", async () => {
+    // The one call here that is not idempotent: a retry after a partial commit
+    // writes a second, incoherent one. It keeps settled() — report, never re-run.
+    const { result, labels } = await runOrchestrator({
+      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1), complete(2)],
+      commit: [THROWS],
+    });
+    expect(callsTo(labels, "commit-wave-2")).toBe(1);
+    expect(result.escalations[0].task).toBe("(commit)");
+  });
+
+  test("every schema'd prompt states the return contract", async () => {
+    // The schema is invisible to the agent: without this sentence nothing in the
+    // prompt says HOW to return, and a model that has just finished a long
+    // tool-heavy turn writes the payload as text believing it answered.
+    const sibling = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: twoTaskScouts(),
+      gate: {
+        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
+      },
+      devHolds: { "ui/sibling": sibling.held },
+      agentCalls: calls,
+    });
+    await waitForCall(calls, "verify:ui/main#1");
+    sibling.release();
+    const log = await run;
+
+    for (const label of [
+      "scout-wave-1",
+      "verify:ui/main#1",
+      "requalify:ui/main#1",
+      "judge:ui/main#1",
+      "done:ui/main",
+      "commit-post-loop",
+    ]) {
+      // Position, not mere presence. An instruction placed AFTER the contract
+      // tells the agent to keep working past the call it was just told to make
+      // — which is how the scout lost its completion flightlog row in review.
+      expect(promptFor(log, label).trimEnd()).toEndWith(
+        "the harness rejects the call and the work you just did is discarded.",
+      );
+    }
+    // The clause must not read as a hedge on the verifier's exit rule.
+    expect(promptFor(log, "verify:ui/main#1")).not.toMatch(
+      /unless|except|may still pass|can be ignored|disregard/i,
+    );
+  });
 });
