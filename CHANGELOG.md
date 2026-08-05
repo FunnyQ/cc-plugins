@@ -1,5 +1,14 @@
 # Changelog
 
+## [chronicle 0.10.1] - 2026-08-06
+
+_tracks tag `chronicle-v0.10.1`_
+
+### Fixed
+
+- Documentation-only fix: the `commit`, `pr`, `release`, and `adr` skills now hold their internal agent topology more reliably. Each skill's guidance previously banned only direct forking, but left a loophole — an orchestrator could still fan out via team-mode (naming a child, spawning it directly, or batching two agents in one message), which could break the required order of steps (for example, an analysis step running before or alongside the decision step it's supposed to inform). All four skills now close that loophole explicitly.
+- The `adr` skill's internal orchestrator was missing the "child protocol" instructions its three siblings already had; it now has them, so `chronicle:adr` runs are as consistent as the rest of the suite.
+
 ## [chronicle 0.10.0] - 2026-08-06
 
 _tracks tag `chronicle-v0.10.0`_
