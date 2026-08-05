@@ -7,7 +7,7 @@
 >
 > **Depends on**: triage/01
 > **Blocks**: triage/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -194,49 +194,49 @@ byte-identical at its destination.
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/scripts/archive-logs.ts` and its `.test.ts` both exist, and the
+- [x] `packages/chronicle/skills/adr/scripts/archive-logs.ts` and its `.test.ts` both exist, and the
       types come from the planner module rather than being redeclared.
-- [ ] `applyArchive` takes the trusted root as a parameter resolved by its caller from cwd, never
+- [x] `applyArchive` takes the trusted root as a parameter resolved by its caller from cwd, never
       from `plan.trailRoot`, and aborts on a mismatch before touching anything.
-- [ ] `validatePlan` rejects, before any directory is created: a `from` whose parent is not the
+- [x] `validatePlan` rejects, before any directory is created: a `from` whose parent is not the
       realpathed source bucket, a non-`.jsonl` basename, a `to` disagreeing with the derived
       destination, a `target` outside `done` | `watch`, a `fromBucket` outside `inbox` | `watch`, and
       an existing `.cockpit`, `archive`, or bucket directory that `lstat` reports as a symlink.
-- [ ] A structural violation aborts non-zero having created no directory and moved no file; an
+- [x] A structural violation aborts non-zero having created no directory and moved no file; an
       apply-time refusal is reported in `failed` while the rest of the plan proceeds and the exit code
       stays `0`.
-- [ ] The source is validated lexically against its realpathed directory, never by realpathing the
+- [x] The source is validated lexically against its realpathed directory, never by realpathing the
       file, so a source that vanished between plan and apply yields a per-file `missing` refusal
       instead of aborting the run; the pre-move check `lstat`s the source and refuses a symlink.
-- [ ] `applyArchive` re-stats each move's source and destination immediately before moving, skipping
+- [x] `applyArchive` re-stats each move's source and destination immediately before moving, skipping
       any that became `live`, `missing`, or a `collision` since the plan was made, and never moving a
       path the plan did not list.
-- [ ] The archive directories are created only after the whole plan validates, and only when there is
+- [x] The archive directories are created only after the whole plan validates, and only when there is
       at least one move to make.
-- [ ] Omitting `--apply`, or passing anything other than `--plan`, is a usage error; no invocation of
+- [x] Omitting `--apply`, or passing anything other than `--plan`, is a usage error; no invocation of
       this script recomputes a plan from assignments.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/adr/scripts/archive-logs.test.ts` passes with zero failures.
-- [ ] The suite covers a tampered plan, each case aborting non-zero, creating no directory and moving
+- [x] `bun test packages/chronicle/skills/adr/scripts/archive-logs.test.ts` passes with zero failures.
+- [x] The suite covers a tampered plan, each case aborting non-zero, creating no directory and moving
       nothing: a `from` rewritten to `../../etc/passwd`, a `to` pointing outside the archive, a
       symlinked source parent, a pre-existing `.cockpit/archive` that is a symlink pointing outside
       the trail, a `fromBucket` of `done`, and a bucket that disagrees with `move.target`.
-- [ ] The suite covers the plan-then-apply seam: a source that goes live between plan and apply is
+- [x] The suite covers the plan-then-apply seam: a source that goes live between plan and apply is
       skipped and reported in `failed` while the rest proceeds and the exit code stays `0`; a source
       deleted between plan and apply yields `missing` rather than a crash; and a plan whose
       `trailRoot` does not match the current one is refused.
-- [ ] `grep -nE 'unlink|rm |rmdir|\brm\(' packages/chronicle/skills/adr/scripts/archive-logs.ts`
+- [x] `grep -nE 'unlink|rm |rmdir|\brm\(' packages/chronicle/skills/adr/scripts/archive-logs.ts`
       returns nothing — the applier has no deletion path.
-- [ ] End to end against a scratch fixture: build a `.cockpit/logs/` holding two `.jsonl` files, one
+- [x] End to end against a scratch fixture: build a `.cockpit/logs/` holding two `.jsonl` files, one
       touched just now and one backdated an hour; run the planner to get a plan path; run this script
       with `--plan <that path> --apply`; confirm the backdated file now sits in `.cockpit/archive/done/`
       byte-identical to its original, the freshly touched file is still in the inbox and reported
       `live`, and the exit code is `0`.
-- [ ] `git status --short -- packages/chronicle/skills/adr/scripts/archive-logs.ts packages/chronicle/skills/adr/scripts/archive-logs.test.ts`
+- [x] `git status --short -- packages/chronicle/skills/adr/scripts/archive-logs.ts packages/chronicle/skills/adr/scripts/archive-logs.test.ts`
       shows both paths dirty.
-- [ ] Do NOT run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repo.
+- [x] Do NOT run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repo.
 
 ## Eval rubric
 

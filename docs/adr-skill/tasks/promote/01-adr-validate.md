@@ -7,7 +7,7 @@
 >
 > **Depends on**: foundation/02, foundation/04
 > **Blocks**: promote/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -174,38 +174,38 @@ It creates nothing. It writes nothing. It never renames.
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/scripts/adr-validate.ts` and its `.test.ts` both exist.
-- [ ] The validator consumes the ADR index reader for parsing and link facts, and contains no second
+- [x] `packages/chronicle/skills/adr/scripts/adr-validate.ts` and its `.test.ts` both exist.
+- [x] The validator consumes the ADR index reader for parsing and link facts, and contains no second
       Markdown parser of its own.
-- [ ] `validateDir` enumerates `index.skipped` as well as `index.adrs`, so a file that failed to
+- [x] `validateDir` enumerates `index.skipped` as well as `index.adrs`, so a file that failed to
       parse produces a violation rather than disappearing; `README.md` is the only exemption.
-- [ ] All eleven rule names in the `Violation` union are implemented and reachable.
-- [ ] Every rule the ADR template's prose states is implemented here under the same name, and every
+- [x] All eleven rule names in the `Violation` union are implemented and reachable.
+- [x] Every rule the ADR template's prose states is implemented here under the same name, and every
       rule implemented here appears there. Read the two side by side and confirm neither carries a
       rule the other lacks — the template is the human-readable rulebook and this script is its
       executable counterpart, so a rule in only one of them is a silent divergence.
-- [ ] A `Superseded` record with no successor link, and a `Deprecated` record carrying one, each
+- [x] A `Superseded` record with no successor link, and a `Deprecated` record carrying one, each
       produce an `error`.
-- [ ] `empty-evidence` is emitted with severity `warning` and does not make `ok` false.
-- [ ] A missing or empty directory returns `checked: 0` with no violations and exits 0.
-- [ ] The process exit code is 1 if and only if at least one `error` violation was produced.
-- [ ] `validateOne` performs no filesystem access and is callable with a plain string.
+- [x] `empty-evidence` is emitted with severity `warning` and does not make `ok` false.
+- [x] A missing or empty directory returns `checked: 0` with no violations and exits 0.
+- [x] The process exit code is 1 if and only if at least one `error` violation was produced.
+- [x] `validateOne` performs no filesystem access and is callable with a plain string.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/adr/scripts/adr-validate.test.ts` passes with zero
+- [x] `bun test packages/chronicle/skills/adr/scripts/adr-validate.test.ts` passes with zero
       failures, holding at least one case per rule plus a clean ADR that produces no violations.
-- [ ] Write a temporary fixture directory holding one valid ADR and one `Superseded` ADR with no
+- [x] Write a temporary fixture directory holding one valid ADR and one `Superseded` ADR with no
       successor link, run `bun packages/chronicle/skills/adr/scripts/adr-validate.ts <that dir>`,
       and confirm exit code 1 with exactly one error line.
-- [ ] Run `bun packages/chronicle/skills/adr/scripts/adr-validate.ts <empty temp dir>` and confirm
+- [x] Run `bun packages/chronicle/skills/adr/scripts/adr-validate.ts <empty temp dir>` and confirm
       exit code 0 with `checked: 0`.
-- [ ] Run the validator with `--file` against a single ADR that names an absent successor and confirm
+- [x] Run the validator with `--file` against a single ADR that names an absent successor and confirm
       no cross-file link rule fires; then run it against one that names itself and confirm `self-link`
       does fire.
-- [ ] `git status --short -- packages/chronicle/skills/adr/scripts/adr-validate.ts packages/chronicle/skills/adr/scripts/adr-validate.test.ts`
+- [x] `git status --short -- packages/chronicle/skills/adr/scripts/adr-validate.ts packages/chronicle/skills/adr/scripts/adr-validate.test.ts`
       shows both paths dirty.
-- [ ] Do not run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repo.
+- [x] Do not run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repo.
 
 ## Eval rubric
 

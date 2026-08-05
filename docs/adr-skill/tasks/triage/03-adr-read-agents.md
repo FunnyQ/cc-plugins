@@ -7,7 +7,7 @@
 >
 > **Depends on**: foundation/03, foundation/04, triage/01
 > **Blocks**: triage/04, triage/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -156,23 +156,23 @@ The plan path then travels through both gates **unchanged**. The main agent hold
 
 ## Acceptance criteria
 
-- [ ] All three files exist at the paths listed above.
-- [ ] Each carries `name` / `description` / `model` / `effort` / `tools` frontmatter matching the table.
-- [ ] No file uses the scoped `Agent(...)` tools form, and none lists `Write`.
-- [ ] `gleaner.md` and `reckoner.md` each state explicitly what they may run and forbid applying an archive plan — the tools list is documented as intent, not as a sandbox.
-- [ ] `gleaner.md` runs the collector before the index reader and states that it takes `adrDir` from the collector's stdout summary and passes it to the index reader — never deriving the directory itself, never opening the payload to find it.
-- [ ] `lorekeeper.md` states that it holds no confirmation gate and asks the user nothing, and defines all three phase invocations — `collect`, `draft`, `commit` — with the exact carry-over each requires and the rule that a phase missing its input stops and reports rather than re-running the previous one.
-- [ ] `reckoner.md` reproduces the promotion threshold in full, specifies the cluster-then-fetch-bodies-for-the-shortlist order with the reason the threshold cannot be judged from skeletons, and emits an `assignments` array folded by the `watch`-wins rule, including a row for a session that fed no candidate and a `from` field naming each session's current bucket so a woken watched session can be settled into `done`.
-- [ ] `reckoner.md` runs `archive-plan.ts` before the first gate and returns the plan path, and names the applier as a script it never runs.
-- [ ] Every file names who spawns it and states that it expects absolute script paths from its caller.
+- [x] All three files exist at the paths listed above.
+- [x] Each carries `name` / `description` / `model` / `effort` / `tools` frontmatter matching the table.
+- [x] No file uses the scoped `Agent(...)` tools form, and none lists `Write`.
+- [x] `gleaner.md` and `reckoner.md` each state explicitly what they may run and forbid applying an archive plan — the tools list is documented as intent, not as a sandbox.
+- [x] `gleaner.md` runs the collector before the index reader and states that it takes `adrDir` from the collector's stdout summary and passes it to the index reader — never deriving the directory itself, never opening the payload to find it.
+- [x] `lorekeeper.md` states that it holds no confirmation gate and asks the user nothing, and defines all three phase invocations — `collect`, `draft`, `commit` — with the exact carry-over each requires and the rule that a phase missing its input stops and reports rather than re-running the previous one.
+- [x] `reckoner.md` reproduces the promotion threshold in full, specifies the cluster-then-fetch-bodies-for-the-shortlist order with the reason the threshold cannot be judged from skeletons, and emits an `assignments` array folded by the `watch`-wins rule, including a row for a session that fed no candidate and a `from` field naming each session's current bucket so a woken watched session can be settled into `done`.
+- [x] `reckoner.md` runs `archive-plan.ts` before the first gate and returns the plan path, and names the applier as a script it never runs.
+- [x] Every file names who spawns it and states that it expects absolute script paths from its caller.
 
 ## Verification
 
-- [ ] `grep -L 'model:' packages/chronicle/agents/{lorekeeper,gleaner,reckoner}.md` prints nothing — every file has frontmatter.
-- [ ] `grep -n 'Agent(' packages/chronicle/agents/{lorekeeper,gleaner,reckoner}.md` returns nothing, or only prose that is not a `tools` entry.
-- [ ] `grep -l '"Write"' packages/chronicle/agents/{lorekeeper,gleaner,reckoner}.md` prints nothing.
-- [ ] `grep -c 'apply' packages/chronicle/agents/reckoner.md` is at least 1, and reading those hits confirms every one is a prohibition.
-- [ ] `git status --short -- packages/chronicle/agents/lorekeeper.md packages/chronicle/agents/gleaner.md packages/chronicle/agents/reckoner.md` shows all three paths dirty.
+- [x] `grep -L 'model:' packages/chronicle/agents/{lorekeeper,gleaner,reckoner}.md` prints nothing — every file has frontmatter.
+- [x] `grep -n 'Agent(' packages/chronicle/agents/{lorekeeper,gleaner,reckoner}.md` returns nothing, or only prose that is not a `tools` entry.
+- [x] `grep -l '"Write"' packages/chronicle/agents/{lorekeeper,gleaner,reckoner}.md` prints nothing.
+- [x] `grep -c 'apply' packages/chronicle/agents/reckoner.md` is at least 1, and reading those hits confirms every one is a prohibition.
+- [x] `git status --short -- packages/chronicle/agents/lorekeeper.md packages/chronicle/agents/gleaner.md packages/chronicle/agents/reckoner.md` shows all three paths dirty.
 
 **Do not verify these roles by starting a session and looking for them in the agent list.** A session loads chronicle's agents from the version-pinned plugin cache — `~/.claude/plugins/cache/<marketplace>/chronicle/<version>/agents/` — which is populated from a git clone tracking `main`. A file in this working tree is invisible to every session, fresh or not, until it is committed, pushed, and the plugin reinstalled. Committing is the runner's job and releasing is out of scope for this whole tree, so that check cannot pass here no matter how correct the files are. The greps above are the real gate; live resolution is confirmed once, after release.
 
