@@ -1,12 +1,12 @@
 # Herdr CLI Reference
 
-This document is verified against herdr 0.7.5. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.8.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 Most commands output JSON for scripting.
 
-## IDs are not durable
+## IDs are stable opaque handles
 
-Workspace ids look like `1`, `2`. Tab ids look like `1:1`, `1:2`. Pane ids look like `1-1`, `1-2`. These are compact ids for the *current* live session. They renumber when a workspace, tab, or pane closes. Do not reuse an id you saw earlier in a conversation. Before you use an id, re-read it from `workspace list`, `tab list`, or `pane list`, or from a create/split response. New ids appear in these places: `workspace create` returns `result.workspace`, `result.tab`, and `result.root_pane`. `tab create` returns `result.tab` and `result.root_pane`. `pane split` returns `result.pane.pane_id`.
+Workspace, tab, and pane ids look like `w1`, `w1:t1`, and `w1:p1`. Closed ids are not reused. A cross-workspace `pane move` gives the pane a new workspace-qualified id; continue with `result.move_result.pane.pane_id` or its live agent name. The response keeps the old value at `result.move_result.previous_pane_id`. Creation responses expose new ids at `result.workspace`, `result.tab`, `result.root_pane`, or `result.pane`.
 
 ## Launch & Status
 ```bash
@@ -17,6 +17,7 @@ herdr --remote workbox --remote-keybindings server
 herdr --remote workbox --handoff
 herdr --no-session              # single-process escape hatch
 herdr --default-config          # print default config
+herdr --skill                   # print the agent guide bundled with this binary
 herdr completion zsh|bash|fish|powershell|elvish
 herdr update                    # install from configured channel
 herdr update --handoff          # live handoff
@@ -25,6 +26,8 @@ herdr channel set <stable|preview>
 herdr --version
 herdr status [server|client] [--json]
 herdr api schema [--json | --output PATH]
+herdr config check
+herdr config reset-keys
 ```
 
 ## Server
@@ -59,10 +62,10 @@ herdr workspace close <id>
 
 ## Worktrees
 ```bash
-herdr worktree list [--workspace ID | --cwd PATH] [--json]
-herdr worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus|--no-focus] [--json]
-herdr worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) [--label TEXT] [--focus|--no-focus] [--json]
-herdr worktree remove --workspace ID [--force] [--json]
+herdr worktree list [--workspace ID | --cwd PATH]
+herdr worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus|--no-focus]
+herdr worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) [--label TEXT] [--focus|--no-focus]
+herdr worktree remove --workspace ID [--force]
 ```
 
 ## Tabs
@@ -109,6 +112,8 @@ herdr pane read <id> --source visible --ansi
 | `recent` | Recent scrollback with wrapping |
 | `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
 | `detection` | Bottom-buffer snapshot used by agent screen detection |
+
+`pane read` and `agent read` print plain text. Recent sources default to 80 rows when `--lines` is omitted. `visible` and `detection` return the full snapshot unless `--lines` limits them. An idle recognized agent at the transcript bottom can collect alternate-screen history when the requested line count exceeds its visible rows. A history request that needs this collection while the agent is working, blocked, or unknown returns `agent_not_idle`.
 
 `herdr pane wait-output --source recent` matches against the **unwrapped** recent text. Pane width and soft-wrapping do not affect the match. This is true even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists. Use `pane wait-output` for output you expect to appear next.
 
@@ -160,9 +165,9 @@ herdr agent explain --file PATH --agent LABEL [--json|--verbose]
 
 Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `maki`.
 
-`agent prompt` atomically writes the text and presses Enter. `agent wait` accepts a repeated `--until` flag. When you omit `--until`, `agent wait` waits for `idle`, `done`, or `blocked`.
+`agent prompt` handles bracketed paste, waits briefly after writing text, and then presses Enter. `agent wait` accepts a repeated `--until` flag. When you omit `--until`, `agent wait` waits for `idle`, `done`, or `blocked`.
 
-Targets: terminal IDs, unique agent names, detected/reported agent labels, or legacy pane IDs.
+Targets: a unique live agent name or the pane id currently hosting that agent.
 
 ## Direct Terminal Attach
 ```bash
@@ -188,7 +193,7 @@ herdr notification show <title> [--body TEXT] [--position top-left|top-right|bot
 
 ## Integrations
 ```bash
-herdr integration install pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|cursor|mastracode
+herdr integration install pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|cursor|mastracode|antigravity|grok
 herdr integration uninstall <name>
 herdr integration status [--outdated-only]
 ```
@@ -216,9 +221,11 @@ herdr plugin pane close <pane_id>
 ## Output format cheat sheet
 
 - `workspace list/create`, `tab list/create/get/focus/rename/close`, `pane list/get/split/wait-output`, `agent wait` — print JSON on success.
-- `pane read` — prints plain text, not JSON. `--format ansi` / `--ansi` returns a rendered ANSI snapshot for TUI feedback loops.
+- `pane read` and `agent read` — print plain text, not JSON. `--format ansi` / `--ansi` returns a rendered ANSI snapshot for TUI feedback loops.
 - `pane send-text`, `pane send-keys`, `pane run` — print nothing on success.
 - `--no-focus` on `pane split` / `tab create` / `workspace create` keeps your current terminal focused instead of jumping to the new one.
 - Without `--label`, `workspace create` keeps cwd-based naming, and `tab create` keeps numbered naming. `--label` applies a custom name immediately.
 
 For workflow examples that chain these commands together (spawning agents, waiting on servers or tests, coordinating between panes), see `agent-orchestration.md`.
+
+Socket commands return JSON errors on stderr with exit status 1, including `server_not_running` when no compatible server is available. CLI usage errors exit with status 2.

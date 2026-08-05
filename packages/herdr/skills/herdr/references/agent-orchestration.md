@@ -1,6 +1,6 @@
 # Herdr Agent Orchestration
 
-This document is verified against herdr 0.7.5. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.8.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself. This includes inspecting sibling panes, splitting panes, spawning other agents, and coordinating with them over the CLI. This is a live-session operational guide. See `cli.md` for the full command and flag syntax.
 
@@ -14,7 +14,7 @@ Before you do any of this, confirm `HERDR_ENV=1` is set in the environment. If i
 - **Tabs** are subcontexts inside a workspace. Each tab has one or more panes.
 - **Panes** are terminal splits inside a tab. Each pane runs its own process: a shell, an agent, a server, or a log stream.
 - **Agent status** (`agent_status` field): `idle`, `working`, `blocked`, `done`, `unknown`. `done` means the agent finished, but the pane has not been looked at yet. `herdr agent wait --until` accepts `done` as a value. Plain shells exist as panes too. The sidebar's agent section only surfaces detected agents.
-- **IDs are not durable.** See the IDs note in `cli.md`. Re-read ids from a `list` command or a create/split response right before you use them. Do not reuse a stale id from earlier in the conversation.
+- **IDs are stable opaque handles.** Workspace, tab, and pane ids look like `w1`, `w1:t1`, and `w1:p1`. A pane moved across workspaces receives a new id; continue with `result.move_result.pane.pane_id` or the live agent name.
 
 ## Discover yourself
 

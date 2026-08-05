@@ -1,6 +1,6 @@
 # Herdr Configuration Reference
 
-This document is verified against herdr 0.7.4. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.8.0. If live CLI output disagrees with this doc, trust `herdr --default-config`.
 
 Config path: `~/.config/herdr/config.toml`
 
@@ -100,7 +100,7 @@ panel_bg = "reset"
 ### UI / Sidebar
 ```toml
 [ui]
-sidebar_width = 32
+sidebar_width = 26
 sidebar_min_width = 18
 sidebar_max_width = 36
 sidebar_collapsed_mode = "compact"  # "compact" | "hidden"
@@ -114,9 +114,13 @@ mouse_scroll_lines = 3
 confirm_close = true
 prompt_new_tab_name = true
 pane_borders = true
+pane_scrollbars = true
 pane_gaps = true
 show_agent_labels_on_pane_borders = false
 hide_tab_bar_when_single_tab = false
+tab_bar_position = "top"                # "top" | "bottom"
+sidebar_start_collapsed = false
+prompt_new_workspace_name = false
 agent_panel_sort = "spaces"  # "spaces" | "priority"
 accent = "cyan"
 
@@ -173,7 +177,7 @@ kitty_graphics = false
 reveal_hidden_cursor_for_cjk_ime = false
 cjk_ime_agents = []
 cjk_ime_cursor_shape = "steady_block"
-switch_ascii_input_source_in_prefix = false  # macOS only
+switch_ascii_input_source_in_prefix = false  # macOS and Windows
 ```
 
 ### Scrollback
@@ -190,3 +194,4 @@ scrollback_limit_bytes = 10000000  # ~10 MB
 | `HERDR_SOCKET_PATH` | Low-level socket override |
 | `HERDR_LOG` | Log filter (e.g. `herdr=debug`) |
 | `HERDR_DISABLE_SOUND` | Disable sound even if enabled in config |
+| `HERDR_PROCESS_DETECTION` | Set `child-groups` on Linux runtimes without foreground process groups |

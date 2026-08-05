@@ -1,6 +1,6 @@
 # Herdr Plugin Development
 
-This document is verified against herdr 0.7.4. If live CLI output disagrees with this doc, trust `herdr --help` / `herdr --default-config`.
+This document is verified against herdr 0.8.0. If live CLI output disagrees with this doc, trust `herdr --help`.
 
 Plugins are shareable executable workflow packages. You can write a plugin in any language, for example Bash, JS, Rust, Go, Lua, or Python. Herdr owns the host surface. The plugin owns its implementation.
 
@@ -157,6 +157,7 @@ herdr plugin install owner/repo[/subdir] [--ref REF] [--yes]
 
 ## Pitfalls
 - `command` is argv, not shell. It supports no `$VAR` expansion, no pipes, and no `&&`.
+- Relative command paths resolve from the plugin root.
 - Build commands do not receive the runtime env or socket.
 - `plugin link` does NOT run build commands. Build the plugin yourself.
 - Herdr v1 has no `plugin update` command. Reinstall from GitHub to refresh it.

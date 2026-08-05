@@ -7,20 +7,20 @@ when_to_use: >-
   For herdr config.toml, keybindings, themes, popup commands, CLI commands, or
   plugin development; or — inside a herdr pane (HERDR_ENV=1) — spawning,
   driving, or coordinating agents in other panes or tabs.
-version: 1
+version: 2
 ---
 
 # Herdr
 
 Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file. If you need customization, add `~/.config/herdr/config.toml`.
 
-Docs: <https://herdr.dev/docs/>
+Docs: <https://herdr.dev/docs/>. Run `herdr --skill` for the agent guide bundled with the installed binary; it is authoritative when this skill and the live CLI disagree.
 
 ## Orchestrating agents — use the `herd` wrapper first
 
 Inside a herdr pane (`HERDR_ENV=1`) you may need to spawn or drive other agents. For that work, prefer the bundled `scripts/herd.ts` wrapper over hand-rolled raw `herdr` CLI chains.
 
-The wrapper collapses herdr's multi-step recipes, for example create pane → start agent → prompt → wait → read, into seven typed verbs. It also handles the sharp edges for you. It addresses agents by a **collision-proof generated name**, never by non-durable pane ids. It creates the destination pane before `agent start`. It uses atomic `agent prompt` submission.
+The wrapper collapses herdr's multi-step recipes, for example create pane → start agent → prompt → wait → read, into seven typed verbs. It also handles the sharp edges for you. It addresses agents by a **collision-proof generated name**, which follows an agent if a cross-workspace move changes its pane id. It creates the destination pane before `agent start`. It uses `agent prompt`, which handles paste mode and submission timing in one command.
 
 `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call. Resolve the script instead from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`).
 
@@ -53,7 +53,7 @@ bun "$HERD" list                 # all current agents as typed JSON
 bun "$HERD" close reviewer-a3f9  # close the agent's pane
 ```
 
-All verbs print JSON. The exception is `read`, which prints the pane's text. Agent TUIs render into the alternate-screen buffer. This leaves `recent`/`recent-unwrapped` empty. So `read` defaults to `--source visible`, the current screen. If you need a scrolled log tail, pass `--source recent-unwrapped`. `wait` takes the full herdr status enum, `done` included, and `--status` is repeatable — it becomes one `--until` per value. Its default stays `idle`, deliberately. `idle` is the only status meaning "the TUI will accept input", which is what a settle-before-send needs. herdr's own bare `agent wait` defaults to idle|done|blocked instead, but do not copy that set: `blocked` means the agent is parked on a human approval, so a wait returning there hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done`. Treat even that as a hint, not proof — a fresh agent reports `idle` before its first turn, so a status wait alone cannot tell a finished agent from one that never started. Pair it with your own evidence, the way relay's `collect` gates on a result-file marker. Run tests with `bun test scripts/herd.test.ts`.
+All verbs print JSON. The exception is `read`, which prints the agent's terminal text. It defaults to `--source visible`, which works while an agent is active. For a longer transcript, pass `--source recent-unwrapped --lines N`. Herdr 0.8.0 can collect alternate-screen history when the agent is recognized, idle, at the transcript bottom, and `N` exceeds the visible rows; otherwise an explicit history read may return `agent_not_idle`. `wait` takes the full herdr status enum, `done` included, and `--status` is repeatable — it becomes one `--until` per value. Its default stays `idle`, deliberately. `idle` is the only status meaning "the TUI will accept input", which is what a settle-before-send needs. herdr's own bare `agent wait` defaults to idle|done|blocked instead, but do not copy that set: `blocked` means the agent is parked on a human approval, so a wait returning there hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done`. Treat even that as a hint, not proof — a fresh agent reports `idle` before its first turn, so a status wait alone cannot tell a finished agent from one that never started. Pair it with your own evidence, the way relay's `collect` gates on a result-file marker. Run tests with `bun test scripts/herd.test.ts`.
 
 If the wrapper doesn't cover something, for example worktrees, layout, notifications, waiting on arbitrary pane output, or plugin panes, drop to the raw CLI. See `references/agent-orchestration.md` for live recipes. See `references/cli.md` for the full command surface.
 

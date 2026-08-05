@@ -1,6 +1,6 @@
 # Herdr Socket API
 
-This document is verified against herdr 0.7.5, protocol 17. If live output disagrees with this doc, trust `herdr api schema --json`.
+This document is verified against herdr 0.8.0, protocol 19. If live output disagrees with this doc, trust `herdr api schema --json`.
 
 Herdr's control surface is a Unix domain socket. The `herdr` CLI is a thin client over it. Every subcommand opens the socket, sends one request, prints the response, and exits.
 
@@ -8,14 +8,14 @@ Herdr's control surface is a Unix domain socket. The `herdr` CLI is a thin clien
 
 Reach for the socket only when you have a reason from the next section. Otherwise use `cli.md`.
 
-The CLI returns the socket's response **verbatim**. Measured on `agent list`, both surfaces produce the same 13 keys with the same values. Errors match too:
+Most CLI commands return the socket response verbatim. `pane read` and `agent read` are exceptions: the CLI unwraps and prints terminal text, while the socket returns it at `result.read.text`. Errors match across both surfaces:
 
 ```
 CLI     {"error":{"code":"agent_not_found","message":"agent target nope not found"},"id":"cli:agent:get"}   exit 1
 socket  {"id":"1","error":{"code":"agent_not_found","message":"agent target nope not found"}}
 ```
 
-So a client that already parses the CLI's JSON gains no field, no error code, and no detail by switching transports. It gains latency, and it takes on the framing rules below.
+Apart from read envelopes and event streaming, a client that already parses the CLI's JSON gains no field, error code, or detail by switching transports. It gains latency, and it takes on the framing rules below.
 
 ## Use the socket for these three
 
@@ -60,7 +60,7 @@ Send `id`, `method`, and `params`. All three are required — omitting `params` 
 Success returns the request's `id` and a `result` whose `type` names the variant:
 
 ```json
-{"id":"1","result":{"type":"pong","version":"0.7.5","protocol":17,
+{"id":"1","result":{"type":"pong","version":"0.8.0","protocol":19,
   "capabilities":{"live_handoff":true,"detached_server_daemon":true}}}
 ```
 
@@ -70,13 +70,15 @@ Errors return `code` and `message`, both required:
 {"id":"1","error":{"code":"agent_not_found","message":"agent target nope not found"}}
 ```
 
+CLI socket commands use `server_not_running` when no compatible server is available. Alternate-screen history reads can use `agent_not_idle` when the target is not safe to scroll.
+
 **Do not key error handling on `id`.** A request that fails to deserialise comes back with `id: ""`, because the server never read the id.
 
-Gate on `ping` before assuming a shape. It reports `protocol`, which is `17` here.
+Gate on `ping` before assuming a shape. Protocol 19 is current here. Treat a supported protocol as a minimum floor unless your client has a verified reason to reject additive future protocols.
 
 ## Methods
 
-There are 89 methods: `agent.*` (12), `client.*` (2), `events.*` (2), `integration.*` (2), `layout.*` (3), `notification.show`, `pane.*` (29), `ping`, `plugin.*` (11), `popup.close`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (8), `worktree.*` (4).
+There are 90 methods: `agent.*` (12), `client.*` (2), `events.*` (2), `integration.*` (2), `layout.*` (3), `notification.show`, `pane.*` (29), `ping`, `plugin.*` (11), `popup.close`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). Protocol 19 adds `workspace.move_block` with `{workspace_ids, before_workspace_id}` for atomic worktree-group ordering.
 
 Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. The mapping for the calls `scripts/herd.ts` makes:
 
@@ -100,7 +102,7 @@ Each CLI subcommand maps to the dotted method of the same name, with flags becom
 
 Note the shape changes, not just the names. `--env K=V` repeated becomes an `env` **object**. `--until` repeated becomes an `until` **array**. `-- ARGS` becomes `args`. `--no-focus` becomes `focus: false`, which is already the default.
 
-Result variants you will unwrap: `agent_list.agents`, `agent_info.agent`, `agent_started.agent`, `pane_list.panes`, `pane_info.pane`, `pane_read.read`, `tab_created.{tab,root_pane}`, `workspace_created.{workspace,tab,root_pane}`, `wait_matched.event`. Simple mutations return `{"type":"ok"}`.
+Result variants you will unwrap: `agent_list.agents`, `agent_info.agent`, `agent_started.agent`, `pane_list.panes`, `pane_info.pane`, `pane_read.read`, `tab_created.{tab,root_pane}`, `workspace_created.{workspace,tab,root_pane}`, `wait_matched.event`. `PaneReadResult.truncated` is required and reports when older rows were omitted. Simple mutations return `{"type":"ok"}`.
 
 ## Enum spellings differ from the CLI
 
@@ -147,7 +149,7 @@ Every line after it is an event, and **carries no `id`**:
 
 A client that routes lines by `id` will drop every event. Route on the presence of `event` instead.
 
-Topics: `workspace.created|updated|metadata_updated|renamed|moved|closed|focused`, `worktree.created|opened|removed`, `tab.created|closed|focused|renamed|moved`, `pane.created|closed|updated|focused|moved|exited|agent_detected|agent_status_changed|scroll_changed|output_matched`, `layout.updated`.
+Topics: `workspace.created|updated|metadata_updated|renamed|moved|reordered|closed|focused`, `worktree.created|opened|removed`, `tab.created|closed|focused|renamed|moved`, `pane.created|closed|updated|focused|moved|exited|agent_detected|agent_status_changed|scroll_changed|output_matched`, `layout.updated`.
 
 Most topics take no extra fields. Three do:
 
