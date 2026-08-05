@@ -6,7 +6,7 @@
 >
 > **Depends on**: triage/03, triage/04
 > **Blocks**: promote/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -98,24 +98,24 @@ Applying the config does not affect a thread that is already running. The setup 
 
 ## Acceptance criteria
 
-- [ ] All five new `.toml` files exist under `packages/chronicle/agents-codex/`, each with a `model` key, a `model_reasoning_effort` key, and a `developer_instructions` block.
-- [ ] The `ROLES` array in `setup-codex-agents.ts` lists sixteen roles — the original eleven plus the five new ones.
-- [ ] Every new role has a matching entry in the `descriptions` map, so the generated config block carries a description line for each.
-- [ ] `setup-codex-agents.test.ts` asserts, for each of the five new roles, both that it appears as an `[agents.chronicle_<role>]` section in the written config and that its `.toml` was copied into the target agents directory.
-- [ ] The Codex role list in `packages/chronicle/skills/install/SKILL.md` names all five new roles.
-- [ ] Each new `.toml`'s model tier matches the `model:` frontmatter of the same role's Claude definition under `packages/chronicle/agents/`.
-- [ ] Every refusal listed in the parity table above appears in the matching `.toml` — checked role by role, not just for the writing role. Read each `.md` and its `.toml` side by side and confirm nothing on the refusal side was lost to compression.
-- [ ] The setup script still exits non-zero with a `missing` message when a role listed in `ROLES` has no source `.toml`.
+- [x] All five new `.toml` files exist under `packages/chronicle/agents-codex/`, each with a `model` key, a `model_reasoning_effort` key, and a `developer_instructions` block.
+- [x] The `ROLES` array in `setup-codex-agents.ts` lists sixteen roles — the original eleven plus the five new ones.
+- [x] Every new role has a matching entry in the `descriptions` map, so the generated config block carries a description line for each.
+- [x] `setup-codex-agents.test.ts` asserts, for each of the five new roles, both that it appears as an `[agents.chronicle_<role>]` section in the written config and that its `.toml` was copied into the target agents directory.
+- [x] The Codex role list in `packages/chronicle/skills/install/SKILL.md` names all five new roles.
+- [x] Each new `.toml`'s model tier matches the `model:` frontmatter of the same role's Claude definition under `packages/chronicle/agents/`.
+- [x] Every refusal listed in the parity table above appears in the matching `.toml` — checked role by role, not just for the writing role. Read each `.md` and its `.toml` side by side and confirm nothing on the refusal side was lost to compression.
+- [x] The setup script still exits non-zero with a `missing` message when a role listed in `ROLES` has no source `.toml`.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/install/scripts/setup-codex-agents.test.ts` passes with zero failures.
-- [ ] `CODEX_HOME=$(mktemp -d) bun packages/chronicle/skills/install/scripts/setup-codex-agents.ts --plugin-root packages/chronicle --dry-run | grep -c '^\[agents\.chronicle_'` prints `16`.
-- [ ] `CODEX_HOME=$(mktemp -d) bun packages/chronicle/skills/install/scripts/setup-codex-agents.ts --plugin-root packages/chronicle --dry-run | grep -E 'chronicle_(lorekeeper|gleaner|reckoner|codifier|barrowkeeper)'` prints all five role sections.
-- [ ] `grep -c 'developer_instructions' packages/chronicle/agents-codex/lorekeeper.toml packages/chronicle/agents-codex/gleaner.toml packages/chronicle/agents-codex/reckoner.toml packages/chronicle/agents-codex/codifier.toml packages/chronicle/agents-codex/barrowkeeper.toml` prints `1` for each file.
-- [ ] `bun test packages/chronicle/` reports zero failures.
-- [ ] `git status --short -- packages/chronicle/agents-codex packages/chronicle/skills/install` shows the five new files and the three modified ones as dirty.
-- [ ] Do not run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repository.
+- [x] `bun test packages/chronicle/skills/install/scripts/setup-codex-agents.test.ts` passes with zero failures.
+- [x] `CODEX_HOME=$(mktemp -d) bun packages/chronicle/skills/install/scripts/setup-codex-agents.ts --plugin-root packages/chronicle --dry-run | grep -c '^\[agents\.chronicle_'` prints `16`.
+- [x] `CODEX_HOME=$(mktemp -d) bun packages/chronicle/skills/install/scripts/setup-codex-agents.ts --plugin-root packages/chronicle --dry-run | grep -E 'chronicle_(lorekeeper|gleaner|reckoner|codifier|barrowkeeper)'` prints all five role sections.
+- [x] `grep -c 'developer_instructions' packages/chronicle/agents-codex/lorekeeper.toml packages/chronicle/agents-codex/gleaner.toml packages/chronicle/agents-codex/reckoner.toml packages/chronicle/agents-codex/codifier.toml packages/chronicle/agents-codex/barrowkeeper.toml` prints `1` for each file.
+- [x] `bun test packages/chronicle/` reports zero failures.
+- [x] `git status --short -- packages/chronicle/agents-codex packages/chronicle/skills/install` shows the five new files and the three modified ones as dirty.
+- [x] Do not run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repository.
 
 ## Eval rubric
 
