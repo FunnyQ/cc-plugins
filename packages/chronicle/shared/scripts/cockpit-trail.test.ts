@@ -121,6 +121,15 @@ describe("readDecisionLog", () => {
 // decision harvested from its siblings and report hasCockpit:false, silently gutting
 // the PR body's "Why" section.
 describe("collectDecisions", () => {
+  test("gathers records from every readable log, in path order", async () => {
+    const records = await collectDecisions(
+      ["a.jsonl", "b.jsonl"],
+      async (path) => [decision(path)],
+    );
+
+    expect(records.map((record) => record.id)).toEqual(["a.jsonl", "b.jsonl"]);
+  });
+
   test("continues after a reader throws", async () => {
     const records = await collectDecisions(
       ["broken", "valid"],
@@ -143,6 +152,12 @@ describe("collectDecisions", () => {
 });
 
 describe("projectMatches", () => {
+  test("matches exact resolved paths", () => {
+    const root = tempDir();
+
+    expect(projectMatches(root, root)).toBe(true);
+  });
+
   test("normalizes relative segments and trailing slashes", () => {
     const root = tempDir();
 
