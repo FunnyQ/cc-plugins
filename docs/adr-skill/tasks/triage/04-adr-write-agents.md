@@ -7,7 +7,7 @@
 >
 > **Depends on**: triage/02, triage/03
 > **Blocks**: triage/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -103,22 +103,22 @@ Ordering and partial failure both need stating, because there is no transaction 
 
 ## Acceptance criteria
 
-- [ ] Both files exist at the paths listed above.
-- [ ] Each carries `name` / `description` / `model` / `effort` / `tools` frontmatter matching the table, and `barrowkeeper` is the one holding `Write`.
-- [ ] Neither file uses a scoped tools entry.
-- [ ] `codifier.md` states that it runs no mutating command, returns the draft without saving it, and never invokes the archiver.
-- [ ] `codifier.md` states that status comes from implementation state, that evidence never cites a filesystem path, and what is excluded from evidence.
-- [ ] `barrowkeeper.md` accepts `newAdr` and `metadataUpdate` as separate write kinds, refuses an existing target for the first, requires an existing target for the second, restricts the second to lifecycle fields, and states that either or both may be absent.
-- [ ] `barrowkeeper.md` takes `planPath` and never raw assignments, invoking the archiver as `--plan <planPath> --apply`, and never deletes a log file.
-- [ ] `barrowkeeper.md` runs the record validator after the writes and before archiving, skips archiving and reports on any validation error, does not block on warnings, and never attempts a repair.
-- [ ] `barrowkeeper.md` states the write order — write, then lifecycle update, then validate, then archive — and the do-not-roll-back-and-skip-archiving behaviour on partial failure.
+- [x] Both files exist at the paths listed above.
+- [x] Each carries `name` / `description` / `model` / `effort` / `tools` frontmatter matching the table, and `barrowkeeper` is the one holding `Write`.
+- [x] Neither file uses a scoped tools entry.
+- [x] `codifier.md` states that it runs no mutating command, returns the draft without saving it, and never invokes the archiver.
+- [x] `codifier.md` states that status comes from implementation state, that evidence never cites a filesystem path, and what is excluded from evidence.
+- [x] `barrowkeeper.md` accepts `newAdr` and `metadataUpdate` as separate write kinds, refuses an existing target for the first, requires an existing target for the second, restricts the second to lifecycle fields, and states that either or both may be absent.
+- [x] `barrowkeeper.md` takes `planPath` and never raw assignments, invoking the archiver as `--plan <planPath> --apply`, and never deletes a log file.
+- [x] `barrowkeeper.md` runs the record validator after the writes and before archiving, skips archiving and reports on any validation error, does not block on warnings, and never attempts a repair.
+- [x] `barrowkeeper.md` states the write order — write, then lifecycle update, then validate, then archive — and the do-not-roll-back-and-skip-archiving behaviour on partial failure.
 
 ## Verification
 
-- [ ] `grep -L 'model:' packages/chronicle/agents/{codifier,barrowkeeper}.md` prints nothing — both files have frontmatter.
-- [ ] `grep -l '"Write"' packages/chronicle/agents/codifier.md` prints nothing, and `grep -c '"Write"' packages/chronicle/agents/barrowkeeper.md` is 1.
-- [ ] `grep -n 'assignments' packages/chronicle/agents/barrowkeeper.md` returns nothing, or only prose stating that raw assignments are refused.
-- [ ] `git status --short -- packages/chronicle/agents/codifier.md packages/chronicle/agents/barrowkeeper.md` shows both paths dirty.
+- [x] `grep -L 'model:' packages/chronicle/agents/{codifier,barrowkeeper}.md` prints nothing — both files have frontmatter.
+- [x] `grep -l '"Write"' packages/chronicle/agents/codifier.md` prints nothing, and `grep -c '"Write"' packages/chronicle/agents/barrowkeeper.md` is 1.
+- [x] `grep -n 'assignments' packages/chronicle/agents/barrowkeeper.md` returns nothing, or only prose stating that raw assignments are refused.
+- [x] `git status --short -- packages/chronicle/agents/codifier.md packages/chronicle/agents/barrowkeeper.md` shows both paths dirty.
 
 **Do not verify these roles by starting a session and looking for them in the agent list.** A session loads chronicle's agents from the version-pinned plugin cache, populated from a git clone tracking `main` — so an uncommitted file in this working tree is invisible to every session, fresh or not. Committing is the runner's job and releasing is out of scope for this tree, so that check cannot pass here regardless of correctness. The greps above are the real gate; live resolution is confirmed once, after release.
 
