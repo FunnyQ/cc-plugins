@@ -15,12 +15,34 @@ A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP serve
 
 ## Run
 
-Run the precheck first. Launch the dashboard only if it exits 0.
+Run the precheck in the **foreground**. Its exit code is the gate.
 
 ```bash
-bun <plugin-root>/skills/install/scripts/install.ts \
-  && bun <plugin-root>/skills/usage-dashboard/scripts/atlas-server.ts
+bun <plugin-root>/skills/install/scripts/install.ts
 ```
+
+If it exits 0, launch the server in the **background**.
+
+```bash
+bun <plugin-root>/skills/usage-dashboard/scripts/atlas-server.ts
+```
+
+The server holds the process open and never returns on its own. A foreground
+launch blocks until the tool times out, then reports a failure for a dashboard
+that is actually running fine. Under Claude Code, pass `run_in_background: true`
+to the Bash tool. Under a harness with no background flag, detach it (`… &`).
+Never chain the two commands with `&&` — that puts the precheck in the
+background too and throws away the gate.
+
+The server opens the browser itself. After launching, check the background output
+once, then report the URL and stop. Do not poll the port and do not tail the
+output — the process stays open by design.
+
+One failure survives the precheck: a foreign process already holding the port.
+The server prints `atlas: port <n> is in use by another process` and exits 1.
+If you see that line, surface it and offer `--port <n>`. A port held by a
+previous dashboard is not this case — the server reuses or supersedes it and
+prints the URL as usual.
 
 **`<plugin-root>`** resolves per runtime. Under Claude Code, use
 `${CLAUDE_PLUGIN_ROOT}`. Under Codex, resolve it from the installed skill root
