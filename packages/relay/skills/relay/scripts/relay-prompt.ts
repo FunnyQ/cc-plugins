@@ -74,8 +74,9 @@ export function buildReviewPrompt(task: string | undefined): string {
 
 /**
  * Append the live-run result-file contract to a prompt. The delegate runs in
- * an interactive TUI pane, so its final answer is captured via this file —
- * pane reads are lossy (alt-screen TUIs leave scrollback empty).
+ * an interactive TUI pane, so its final answer is captured via this file.
+ * Pane reads may be unavailable while the agent is active, and visible or
+ * truncated history cannot prove that one turn's answer is complete.
  * Pure function.
  */
 export function appendFileContract(prompt: string, resultPath: string): string {

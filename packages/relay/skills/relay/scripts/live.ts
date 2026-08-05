@@ -10,8 +10,9 @@
  *
  * Result capture is a file contract (see relay-prompt.appendFileContract):
  * the delegate writes its final answer to <dir>/result.md ending with
- * RESULT_END_MARKER; relay polls for agent-idle + marker. Pane reads are a
- * dead end — alt-screen TUIs leave scrollback empty.
+ * RESULT_END_MARKER; relay polls for agent-idle + marker. Pane reads cannot
+ * replace that contract: active agents may have no readable history, and a
+ * visible or truncated capture cannot prove that one turn's answer is final.
  */
 
 import { existsSync, readFileSync, readdirSync } from "fs";
