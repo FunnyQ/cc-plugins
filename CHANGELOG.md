@@ -1,5 +1,28 @@
 # Changelog
 
+## [chronicle 0.10.0] - 2026-08-06
+
+_tracks tag `chronicle-v0.10.0`_
+
+### Added
+
+- A new `chronicle:adr` skill turns cockpit's decision trail into a triage inbox: it surfaces past decisions worth writing down and helps you promote them into Architecture Decision Records under `docs/adr/`, or mark an existing one superseded. Three modes — `triage`, `promote`, `supersede` — each pause for your confirmation before anything is written or moved.
+- ADR promotion never deletes evidence. Triaged sessions move into an archive under `.cockpit/archive/`, and every move is re-validated and re-checked against live sessions immediately before it happens.
+- A shared decision-log reader (`cockpit-trail.ts`) now backs both `chronicle:pr` and `chronicle:adr`, so decision context stays consistent across both skills.
+
+## [monitor 4.0.0] - 2026-08-06
+
+_tracks tag `monitor-v4.0.0`_
+
+### Removed
+
+- **Breaking:** `cockpit prune` and its supporting tooling are gone. It expired un-triaged decision logs after 14 days, deleting sessions before anyone had a chance to review them. Log retention now belongs to `chronicle:adr`, which archives rather than discards.
+
+### Changed
+
+- The cockpit dashboard now hides sessions whose decision log has already been triaged and archived by `chronicle:adr`, instead of showing a row that can only ever render an empty trail. A session missing its log for any other reason, or still live, keeps showing normally. Sidebar project counts update to match.
+- This behaviour needs a reinstall of the plugin and a `cockpit restart`, since the running daemon serves from the cached plugin code.
+
 ## [herdr v0.2.4] - 2026-08-05
 
 _tracks tag `herdr-v0.2.4`_
