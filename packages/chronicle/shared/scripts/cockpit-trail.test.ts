@@ -116,14 +116,29 @@ describe("readDecisionLog", () => {
   });
 });
 
+// A cockpit registry can list several session logs. One of them being unreadable —
+// deleted out from under us, half-written, wrong permissions — used to discard every
+// decision harvested from its siblings and report hasCockpit:false, silently gutting
+// the PR body's "Why" section.
 describe("collectDecisions", () => {
   test("continues after a reader throws", async () => {
-    const records = await collectDecisions(["broken", "valid"], async (path) => {
-      if (path === "broken") throw new Error("unreadable");
-      return [decision("kept")];
-    });
+    const records = await collectDecisions(
+      ["broken", "valid"],
+      async (path) => {
+        if (path === "broken") throw new Error("unreadable");
+        return [decision("kept")];
+      },
+    );
 
     expect(records.map((record) => record.id)).toEqual(["kept"]);
+  });
+
+  test("returns empty when every log fails", async () => {
+    const read = async () => {
+      throw new Error("EACCES");
+    };
+
+    expect(await collectDecisions(["a.jsonl"], read)).toEqual([]);
   });
 });
 

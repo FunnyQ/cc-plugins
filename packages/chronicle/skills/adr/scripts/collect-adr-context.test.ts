@@ -12,6 +12,7 @@ import { basename, join } from "node:path";
 import {
   collectContext,
   fetchBodies,
+  parseCliArgs,
   toSkeleton,
   type DecisionRecord,
 } from "./collect-adr-context";
@@ -210,7 +211,46 @@ describe("fetchBodies", () => {
   });
 });
 
+// Every agent file that reaches this script names its flags in prose. A drifted flag
+// used to be ignored, so `--ids` silently produced a skeleton run and the caller only
+// noticed three steps later, by the evidence that never arrived.
+describe("parseCliArgs", () => {
+  test("accepts the two supported flags", () => {
+    expect(parseCliArgs([])).toEqual({ includeDone: false, bodyIds: null });
+    expect(parseCliArgs(["--include-done"])).toEqual({
+      includeDone: true,
+      bodyIds: null,
+    });
+    expect(parseCliArgs(["--bodies", "a, b ,,c"])).toEqual({
+      includeDone: false,
+      bodyIds: ["a", "b", "c"],
+    });
+  });
+
+  test("rejects an unknown flag instead of ignoring it", () => {
+    expect(() => parseCliArgs(["--ids", "a"])).toThrow(/Usage/);
+    expect(() => parseCliArgs(["--include-archived"])).toThrow(/Usage/);
+  });
+
+  test("rejects --bodies with no value", () => {
+    expect(() => parseCliArgs(["--bodies"])).toThrow(/Usage/);
+  });
+});
+
 describe("CLI", () => {
+  test("exits non-zero on an unknown flag", async () => {
+    const script = join(import.meta.dir, "collect-adr-context.ts");
+    const run = Bun.spawn([process.execPath, script, "--ids", "a"], {
+      cwd: temporaryRoot(),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const stderr = await new Response(run.stderr).text();
+    expect(await run.exited).toBe(1);
+    expect(stderr).toContain("Usage");
+  });
+
   test("exits successfully and writes an empty context without a trail", async () => {
     const root = temporaryRoot();
     const script = join(import.meta.dir, "collect-adr-context.ts");

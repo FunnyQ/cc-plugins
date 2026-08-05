@@ -1,10 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 
-export type AdrStatus =
-  | "Proposed"
-  | "Accepted"
-  | "Superseded"
-  | "Deprecated";
+export type AdrStatus = "Proposed" | "Accepted" | "Superseded" | "Deprecated";
 
 export type AdrMeta = {
   id: string;
@@ -40,11 +36,11 @@ export type AdrIndex = {
   }[];
 };
 
-type SkipReason = AdrIndex["skipped"][number]["reason"];
-
+// `unreadable` is deliberately absent: only buildIndex's readFile can produce it.
+// Parsing is pure string work that cannot fail, so it reports only shape problems.
 type ParseResult =
   | { adr: AdrMeta; reason: null }
-  | { adr: null; reason: SkipReason };
+  | { adr: null; reason: "no-h1" | "bad-h1" };
 
 const ADR_STATUSES: AdrStatus[] = [
   "Proposed",
@@ -82,53 +78,49 @@ function adrIds(value: string | null): string[] {
 }
 
 function parseAdrResult(content: string, path: string): ParseResult {
-  try {
-    const lines = content.split(/\r?\n/);
-    const h1 = lines.find((line) => /^# ADR-/.test(line));
-    if (!h1) return { adr: null, reason: "no-h1" };
+  const lines = content.split(/\r?\n/);
+  const h1 = lines.find((line) => /^# ADR-/.test(line));
+  if (!h1) return { adr: null, reason: "no-h1" };
 
-    const heading = /^# ADR-(\d{4}): (.+)$/.exec(h1);
-    if (!heading) return { adr: null, reason: "bad-h1" };
+  const heading = /^# ADR-(\d{4}): (.+)$/.exec(h1);
+  if (!heading) return { adr: null, reason: "bad-h1" };
 
-    const sections: string[] = [];
-    let evidenceEntries = 0;
-    let inEvidence = false;
-    for (const line of lines) {
-      const h2 = /^##\s+(.+?)\s*$/.exec(line);
-      if (h2) {
-        sections.push(h2[1]);
-        inEvidence = h2[1] === "Evidence";
-        continue;
-      }
-      if (inEvidence && /^(?:[-*+] |\d+[.)] )/.test(line)) {
-        evidenceEntries += 1;
-      }
+  const sections: string[] = [];
+  let evidenceEntries = 0;
+  let inEvidence = false;
+  for (const line of lines) {
+    const h2 = /^##\s+(.+?)\s*$/.exec(line);
+    if (h2) {
+      sections.push(h2[1]);
+      inEvidence = h2[1] === "Evidence";
+      continue;
     }
-
-    const statusValue = metadataValue(lines, "Status");
-    const status = ADR_STATUSES.includes(statusValue as AdrStatus)
-      ? (statusValue as AdrStatus)
-      : null;
-    const number = Number.parseInt(heading[1], 10);
-
-    return {
-      adr: {
-        id: formatAdrId(number),
-        number,
-        title: heading[2],
-        status,
-        date: metadataValue(lines, "Date"),
-        supersedes: adrIds(metadataValue(lines, "Supersedes")),
-        supersededBy: adrIds(metadataValue(lines, "Superseded by")),
-        path,
-        sections,
-        evidenceEntries,
-      },
-      reason: null,
-    };
-  } catch {
-    return { adr: null, reason: "unreadable" };
+    if (inEvidence && /^(?:[-*+] |\d+[.)] )/.test(line)) {
+      evidenceEntries += 1;
+    }
   }
+
+  const statusValue = metadataValue(lines, "Status");
+  const status = ADR_STATUSES.includes(statusValue as AdrStatus)
+    ? (statusValue as AdrStatus)
+    : null;
+  const number = Number.parseInt(heading[1], 10);
+
+  return {
+    adr: {
+      id: formatAdrId(number),
+      number,
+      title: heading[2],
+      status,
+      date: metadataValue(lines, "Date"),
+      supersedes: adrIds(metadataValue(lines, "Supersedes")),
+      supersededBy: adrIds(metadataValue(lines, "Superseded by")),
+      path,
+      sections,
+      evidenceEntries,
+    },
+    reason: null,
+  };
 }
 
 export function parseAdr(content: string, path: string): AdrMeta | null {
@@ -232,8 +224,7 @@ export async function buildIndex(dir: string): Promise<AdrIndex> {
 
   adrs.sort((a, b) => a.number - b.number);
   // Gaps are never reused because reusing a number would make an id ambiguous across git history.
-  const nextNumber =
-    adrs.length === 0 ? 1 : adrs[adrs.length - 1].number + 1;
+  const nextNumber = adrs.length === 0 ? 1 : adrs[adrs.length - 1].number + 1;
   return {
     dir,
     exists: true,

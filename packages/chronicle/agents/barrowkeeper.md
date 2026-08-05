@@ -29,9 +29,13 @@ write kinds:
     "path": "docs/adr/0003-....md",
     "set": { "Status": "Superseded", "Superseded by": "ADR-0007" }
   },
-  "planPath": "/tmp/chronicle/adr/plan-1754438400000-51234.json"
+  "planPath": "/tmp/chronicle/adr/archive-plan-1754438400000-51234.json",
+  "validatorPath": ".../skills/adr/scripts/adr-validate.ts",
+  "archiverPath": ".../skills/adr/scripts/archive-logs.ts"
 }
 ```
+
+`planPath`, `validatorPath`, and `archiverPath` are always present.
 
 Keep `newAdr` and `metadataUpdate` distinct. Either may be absent, and both
 absences are normal. A plain promotion sends only `newAdr`. A lifecycle
@@ -56,9 +60,10 @@ target directory, then archive with the plan.
    The new record is valid on its own, and the missing back-link is repairable
    by hand. Report both paths and the exact failed step. Skip archiving.
 4. After all requested writes, run the supplied record validator over the
-   target directory. This check must run before archiving because archiving is
-   irreversible. Treat warnings as non-blocking; an empty evidence section is
-   legal.
+   target directory, as `bun <validatorPath> <docs/adr directory>`. This check
+   must run before archiving because archiving is irreversible. It exits `0`
+   when only warnings fired. Treat warnings as non-blocking; an empty evidence
+   section is legal.
 5. If validation reports errors, report the violations. Leave both records
    exactly as written. Do not attempt repair. Skip archiving entirely.
 6. If validation passes, invoke the supplied archiver exactly as

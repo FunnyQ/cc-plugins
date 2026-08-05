@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { $ } from "bun";
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 import {
   collectDecisions,
   projectMatches,
@@ -10,9 +9,7 @@ import {
   type DecisionRecord,
   type RegistryEntry,
 } from "../../../shared/scripts/cockpit-trail";
-
-export { collectDecisions, projectMatches };
-export type { DecisionRecord };
+import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 
 export type Provider = "github" | "gitlab" | "unknown";
 
@@ -352,14 +349,7 @@ async function harvestCockpit(
 }
 
 async function writePayload(payload: BranchMaterial): Promise<string> {
-  const outputDir = join("/tmp", "chronicle", "pr");
-  mkdirSync(outputDir, { recursive: true });
-  const outputPath = join(
-    outputDir,
-    `branch-material-${Date.now()}-${process.pid}.json`,
-  );
-  await Bun.write(outputPath, JSON.stringify(payload, null, 2) + "\n");
-  return outputPath;
+  return writeTempPayload("pr", "branch-material", payload);
 }
 
 function errorMessage(error: unknown): string {

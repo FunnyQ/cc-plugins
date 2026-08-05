@@ -183,7 +183,7 @@ describe("applyArchive", () => {
       const result = await applyArchive(archivePlan, item.root);
 
       expect(result).toEqual({
-        moved: 1,
+        moved: [staleMove],
         failed: [expect.objectContaining({ sessionId: "live", reason: "live" })],
       });
       expect(existsSync(liveMove.from)).toBe(true);
@@ -202,7 +202,7 @@ describe("applyArchive", () => {
       unlinkSync(missingMove.from);
 
       expect(await applyArchive(archivePlan, item.root)).toEqual({
-        moved: 0,
+        moved: [],
         failed: [expect.objectContaining({ reason: "missing" })],
       });
     } finally {
@@ -221,7 +221,7 @@ describe("applyArchive", () => {
       const result = await applyArchive(plan(item.root, [linkedMove]), item.root);
 
       expect(result).toEqual({
-        moved: 0,
+        moved: [],
         failed: [expect.objectContaining({ reason: "collision" })],
       });
       expect(existsSync(target)).toBe(true);
@@ -280,7 +280,7 @@ describe("applyArchive", () => {
         item.root,
       );
 
-      expect(result.moved).toBe(0);
+      expect(result.moved).toEqual([]);
       expect(result.failed.map(({ reason }) => reason)).toEqual([
         "collision",
         "collision",
@@ -297,7 +297,7 @@ describe("applyArchive", () => {
     const movable = fixture();
     try {
       expect(await applyArchive(plan(empty.root, []), empty.root)).toEqual({
-        moved: 0,
+        moved: [],
         failed: [],
       });
       expect(existsSync(join(empty.root, ".cockpit", "archive"))).toBe(false);
@@ -326,7 +326,7 @@ describe("applyArchive", () => {
 
       const result = await applyArchive(plan(item.root, [oldMove, freshMove]), item.root);
 
-      expect(result.moved).toBe(1);
+      expect(result.moved).toHaveLength(1);
       expect(result.failed[0]).toEqual(
         expect.objectContaining({ sessionId: "fresh", reason: "live" }),
       );

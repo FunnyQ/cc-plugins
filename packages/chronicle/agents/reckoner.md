@@ -24,17 +24,17 @@ an apply path is the enforceable guarantee.
 The caller passes absolute script paths. Resolve them from the skill's load-time "Base
 directory for this skill" banner.
 
-- `payloadPath` — the skeleton payload path from gleaner.
+- `outputPath` — the skeleton payload path from gleaner.
 - `adrIndex` — the record index from gleaner.
-- `bodyFetchPath` — absolute path to the body-fetch capability from the trail collector
-  script.
+- `bodyFetchPath` — absolute path to the trail collector script. Its `--bodies` flag is
+  the body-fetch capability; it is the same script gleaner ran without that flag.
 - `plannerPath` — absolute path to `archive-plan.ts`.
 
 ## Process
 
 ### 1. Load and analyze the skeleton payload
 
-Read and parse `payloadPath`. Extract its sessions and skeleton entries. Skeletons carry
+Read and parse `outputPath`. Extract its sessions and skeleton entries. Skeletons carry
 `id`, `sessionId`, `kind`, `decision`, `timestamp`, and `files`; preserve each session's
 source bucket for the later `from` field.
 
@@ -82,14 +82,19 @@ skeletons alone would guess at evidence the threshold requires.
 
 #### Phase B — Shortlist bodies
 
-- Build one JSON array containing only the ids in shortlisted clusters. Run:
+- Join the ids in shortlisted clusters with commas — not JSON, and no spaces. Run:
 
   ```bash
-  bun <bodyFetchPath> --ids '<JSON array of shortlisted entry ids>'
+  bun <bodyFetchPath> --bodies <id1,id2,id3>
   ```
 
-- Parse the returned full records, including `reason`, `tradeoff`, `facets`, `options`,
-  and `diagram`. Associate them with their decision clusters by entry id.
+  `--bodies` is the flag's only spelling. The script exits `1` on anything else,
+  including `--ids`.
+
+- The command prints one JSON line, not the records. Read `outputPath` from that line
+  and parse the file it names: a JSON array of full records carrying `reason`,
+  `tradeoff`, `facets`, `options`, `diagram`, and `sessionId`. Associate them with their
+  decision clusters by entry id.
 - Disposition each shortlisted candidate against its full text.
 - Bound body loading to the shortlist. Do not interpret this bound as a ban on loading
   all shortlisted bodies.
@@ -158,8 +163,9 @@ Pass that file, not the candidate output, to the planner:
 bun <plannerPath> --assignments <temporary assignments JSON path>
 ```
 
-Parse the planner's stdout. Require the returned serialized plan path and copy it to the
-top-level `planPath` field. If the planner fails or returns no plan path, stop and report
+The planner prints the serialized plan path alone on one line — a bare path, not JSON.
+Copy that line verbatim to the top-level `planPath` field. If the planner fails or
+prints no path, stop and report
 the failure instead of returning an incomplete result. The planner is the planning half
 of the archive flow. The archive applier is separate. Never run the applier.
 

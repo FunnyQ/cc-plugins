@@ -21,10 +21,11 @@ The caller passes absolute script paths. Resolve them from the skill's load-time
 directory for this skill" banner.
 
 - `collectorPath` — absolute path to the trail collector script, for example
-  `.../skills/adr/scripts/trail-collector.ts`.
+  `.../skills/adr/scripts/collect-adr-context.ts`.
 - `indexReaderPath` — absolute path to the record index reader script, for example
   `.../skills/adr/scripts/adr-index.ts`.
-- `includeArchived` — optional boolean. Default to `false`.
+- `includeDone` — optional boolean. Default to `false`. True pulls the `done` archive
+  bucket into the skeleton pass as well.
 
 ## Process
 
@@ -33,11 +34,15 @@ directory for this skill" banner.
 Always run the collector first.
 
 ```bash
-bun <collectorPath> [--include-archived]
+bun <collectorPath> [--include-done]
 ```
 
-Parse its stdout JSON. It contains the summary, including `adrDir`, `sessionCount`,
-`skeletonCount`, and `payloadPath`.
+These are the collector's only two flags, and it exits `1` on any other. Pass
+`--include-done` only when `includeDone` is true. Never invent a flag name.
+
+Parse its stdout JSON. It carries exactly five fields: `outputPath`, `hasTrail`,
+`sessionCount`, `entryCount`, and `adrDir`. Use those names as written — the payload
+itself lives at `outputPath`, and `entryCount` is the number of skeletons in it.
 
 ### 2. Extract `adrDir` from the collector summary
 
@@ -65,12 +70,15 @@ If the collector reports `hasTrail: false`, return `{ "hasTrail": false }` and s
 
 ## Output
 
+Pass the collector's `outputPath` and `entryCount` through unchanged. Renaming either
+one here breaks the reckoner, which reads the payload by that exact field name.
+
 ```json
 {
   "hasTrail": true,
-  "payloadPath": "/tmp/chronicle-trail-...",
+  "outputPath": "/tmp/chronicle/adr/context-1754438400000-51234.json",
   "sessionCount": 63,
-  "skeletonCount": 352,
+  "entryCount": 352,
   "adrIndex": {
     "dir": "docs/adr",
     "exists": true,
@@ -89,5 +97,7 @@ If the collector reports `hasTrail: false`, return `{ "hasTrail": false }` and s
 - Run the collector first, then the index reader. Refuse any other order.
 - Take `adrDir` only from the collector's output and pass it as the index reader's
   argument.
+- Use only `--include-done`. The collector exits `1` on an unknown flag; report that
+  exit rather than retrying with a guessed spelling.
 - Never run the archive applier or the planner.
 - Never open payload entries to find `adrDir` or entry bodies.

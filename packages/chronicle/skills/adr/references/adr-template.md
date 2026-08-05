@@ -151,7 +151,7 @@ both the finding and the measurement without opening anything.
 | `id-mismatch` | The H1's `ADR-NNNN` number equals the filename's number. | Error |
 | `missing-section` | All five section headings are present: Context, Considered alternatives, Decision, Consequences, and Evidence. | Error |
 | `bad-status` | The Status line is present and its value is exactly one of `Accepted`, `Proposed`, `Superseded`, or `Deprecated`. | Error |
-| `bad-date` | The Date line is present and uses `YYYY-MM-DD`. | Error |
+| `bad-date` | The Date line is present and names a real calendar date in `YYYY-MM-DD`. `2026-99-99` and `2025-02-30` match the shape and are rejected. | Error |
 | `superseded-no-link` | A `Superseded` record carries a `Superseded by:` line. | Error |
 | `deprecated-linked` | A `Deprecated` record carries no successor link. | Error |
 | `link-missing` | Every referenced `ADR-NNNN` names a record that exists. | Error |

@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 import {
   gitRootOf,
-  isDecisionRecord,
   logRoot,
   readDecisionLog,
   type DecisionRecord,
@@ -47,6 +47,9 @@ type SessionRecords = {
   records: DecisionRecord[];
 };
 
+/** Trail root and record directory, resolved from ONE `git rev-parse`. */
+type Roots = { trailRoot: string; adrDir: string };
+
 export function toSkeleton(
   record: DecisionRecord,
   sessionId: string,
@@ -58,6 +61,16 @@ export function toSkeleton(
     decision: record.decision,
     timestamp: record.timestamp,
     files: record.files,
+  };
+}
+
+// Both roots come from the same `git rev-parse`. Resolving them separately spawned
+// git up to three times per run and let the two answers drift under a symlinked cwd.
+function resolveRoots(cwd: string): Roots {
+  const gitRoot = gitRootOf(cwd);
+  return {
+    trailRoot: logRoot(cwd, { gitRoot: () => gitRoot }),
+    adrDir: join(gitRoot ?? cwd, "docs", "adr"),
   };
 }
 
@@ -77,11 +90,11 @@ async function readSession(
   bucket: Bucket,
 ): Promise<SessionRecords | null> {
   try {
-    const [metadata, parsed] = await Promise.all([
+    // readDecisionLog already drops every line that fails isDecisionRecord.
+    const [metadata, records] = await Promise.all([
       stat(path),
       readDecisionLog(path),
     ]);
-    const records = parsed.filter(isDecisionRecord);
     const sessionId = basename(path, ".jsonl");
 
     return {
@@ -113,47 +126,51 @@ async function readBucket(
   );
 }
 
-function emptyContext(cwd: string): AdrContext {
-  return {
-    trailRoot: "",
-    hasTrail: false,
-    sessions: [],
-    skeletons: [],
-    adrDir: join(gitRootOf(cwd) ?? cwd, "docs", "adr"),
-  };
+// Always read inbox and watched sessions. Only optionally read the done archive,
+// because pulling the whole archive into a triage run defeats the point of an inbox.
+// Sessions come from .cockpit/logs/ and .cockpit/archive/watch/, not the cockpit
+// registry, because the registry reaps entries older than 14 days on every write.
+// This repo measured 63 log files in `.cockpit/logs/` against 27 matching registry
+// entries. Reading the directories instead preserves the full session history.
+async function readBuckets(
+  trailRoot: string,
+  includeDone: boolean,
+): Promise<SessionRecords[]> {
+  const buckets = [
+    readBucket(trailRoot, "logs", "inbox"),
+    readBucket(trailRoot, "archive/watch", "watch"),
+  ];
+  if (includeDone) {
+    buckets.push(readBucket(trailRoot, "archive/done", "done"));
+  }
+  return (await Promise.all(buckets)).flat();
 }
 
 export async function collectContext(
   cwd: string,
   opts: { includeDone?: boolean } = {},
 ): Promise<AdrContext> {
-  const resolvedTrailRoot = logRoot(cwd);
-  const cockpitDir = join(resolvedTrailRoot, ".cockpit");
-  if (!existsSync(cockpitDir)) return emptyContext(cwd);
-
-  // Always read inbox and watched sessions. Only optionally read the done archive,
-  // because pulling the whole archive into a triage run defeats the point of an inbox.
-  // Sessions come from .cockpit/logs/ and .cockpit/archive/watch/, not the cockpit
-  // registry, because the registry reaps entries older than 14 days on every write.
-  // This repo measured 63 log files in `.cockpit/logs/` against 27 matching registry
-  // entries. Reading the directories instead preserves the full session history.
-  const buckets = [
-    readBucket(resolvedTrailRoot, "logs", "inbox"),
-    readBucket(resolvedTrailRoot, "archive/watch", "watch"),
-  ];
-  if (opts.includeDone) {
-    buckets.push(readBucket(resolvedTrailRoot, "archive/done", "done"));
+  const { trailRoot, adrDir } = resolveRoots(cwd);
+  if (!existsSync(join(trailRoot, ".cockpit"))) {
+    return {
+      trailRoot: "",
+      hasTrail: false,
+      sessions: [],
+      skeletons: [],
+      adrDir,
+    };
   }
-  const collected = (await Promise.all(buckets)).flat();
+
+  const collected = await readBuckets(trailRoot, opts.includeDone === true);
 
   return {
-    trailRoot: resolvedTrailRoot,
+    trailRoot,
     hasTrail: true,
     sessions: collected.map(({ session }) => session),
     skeletons: collected.flatMap(({ session, records }) =>
       records.map((record) => toSkeleton(record, session.sessionId)),
     ),
-    adrDir: join(gitRootOf(cwd) ?? cwd, "docs", "adr"),
+    adrDir,
   };
 }
 
@@ -163,72 +180,86 @@ export async function fetchBodies(
 ): Promise<EntryBody[]> {
   if (ids.length === 0) return [];
 
-  const resolvedTrailRoot = logRoot(cwd);
-  if (!existsSync(join(resolvedTrailRoot, ".cockpit"))) return [];
+  const { trailRoot } = resolveRoots(cwd);
+  if (!existsSync(join(trailRoot, ".cockpit"))) return [];
 
   const requested = new Set(ids);
-  const buckets = await Promise.all([
-    readBucket(resolvedTrailRoot, "logs", "inbox"),
-    readBucket(resolvedTrailRoot, "archive/watch", "watch"),
-    readBucket(resolvedTrailRoot, "archive/done", "done"),
-  ]);
+  // Bodies are fetched for an already-shortlisted set, so the done archive is in
+  // scope here even when the skeleton pass excluded it.
+  const collected = await readBuckets(trailRoot, true);
 
-  return buckets
-    .flat()
-    .flatMap(({ session, records }) =>
-      records
-        .filter((record) => requested.has(record.id))
-        .map((record) => ({ ...record, sessionId: session.sessionId })),
-    );
+  return collected.flatMap(({ session, records }) =>
+    records
+      .filter((record) => requested.has(record.id))
+      .map((record) => ({ ...record, sessionId: session.sessionId })),
+  );
 }
 
-function parseCliArgs(argv: string[]): {
+export function parseCliArgs(argv: string[]): {
   includeDone: boolean;
   bodyIds: string[] | null;
 } {
-  const bodiesIndex = argv.indexOf("--bodies");
-  const bodyIds =
-    bodiesIndex === -1
-      ? null
-      : (argv[bodiesIndex + 1] ?? "")
-          .split(",")
-          .map((id) => id.trim())
-          .filter((id) => id.length > 0);
+  let includeDone = false;
+  let bodyIds: string[] | null = null;
 
-  return { includeDone: argv.includes("--include-done"), bodyIds };
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === "--include-done") {
+      includeDone = true;
+    } else if (argument === "--bodies") {
+      // Reject rather than ignore. An agent file that drifted to `--ids` or
+      // `--include-archived` used to be silently downgraded to a skeleton run,
+      // and the caller only noticed by the missing evidence three steps later.
+      const value = argv[index + 1];
+      if (value === undefined) throw new Error(usage());
+      bodyIds = value
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+      index += 1;
+    } else {
+      throw new Error(usage());
+    }
+  }
+
+  return { includeDone, bodyIds };
+}
+
+function usage(): string {
+  return "Usage: bun collect-adr-context.ts [--include-done] [--bodies <id,id,...>]";
 }
 
 async function main(): Promise<void> {
   const cwd = process.cwd();
   const { includeDone, bodyIds } = parseCliArgs(process.argv.slice(2));
-  const context = await collectContext(cwd, { includeDone });
-  const payload = bodyIds === null ? context : await fetchBodies(cwd, bodyIds);
-  const outputDir = "/tmp/chronicle/adr";
-  const outputPath = join(
-    outputDir,
-    `context-${Date.now()}-${process.pid}.json`,
-  );
+  const { trailRoot, adrDir } = resolveRoots(cwd);
+  const hasTrail = existsSync(join(trailRoot, ".cockpit"));
 
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`);
-
-  const sessionCount =
+  // Bodies mode skips the skeleton pass entirely: running both read every session
+  // log twice per invocation for two fields main already has.
+  const payload =
     bodyIds === null
-      ? context.sessions.length
-      : new Set(payload.map(({ sessionId }) => sessionId)).size;
-  const entryCount =
-    bodyIds === null ? context.skeletons.length : payload.length;
+      ? await collectContext(cwd, { includeDone })
+      : await fetchBodies(cwd, bodyIds);
+  const outputPath = await writeTempPayload("adr", "context", payload);
+
+  const sessionCount = Array.isArray(payload)
+    ? new Set(payload.map(({ sessionId }) => sessionId)).size
+    : payload.sessions.length;
+  const entryCount = Array.isArray(payload)
+    ? payload.length
+    : payload.skeletons.length;
+
   console.log(
-    JSON.stringify({
-      outputPath,
-      hasTrail: context.hasTrail,
-      sessionCount,
-      entryCount,
-      adrDir: context.adrDir,
-    }),
+    JSON.stringify({ outputPath, hasTrail, sessionCount, entryCount, adrDir }),
   );
 }
 
 if (import.meta.main) {
-  await main();
+  try {
+    await main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

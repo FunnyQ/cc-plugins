@@ -7,14 +7,16 @@ import { validateDir, validateOne } from "./adr-validate";
 const scriptPath = join(import.meta.dir, "adr-validate.ts");
 const tempDirs: string[] = [];
 
-function adr(overrides: {
-  id?: string;
-  status?: string | null;
-  date?: string | null;
-  links?: string;
-  sections?: string[];
-  evidence?: string;
-} = {}): string {
+function adr(
+  overrides: {
+    id?: string;
+    status?: string | null;
+    date?: string | null;
+    links?: string;
+    sections?: string[];
+    evidence?: string;
+  } = {},
+): string {
   const sections = overrides.sections ?? [
     "Context",
     "Considered alternatives",
@@ -26,7 +28,9 @@ function adr(overrides: {
     overrides.status === null
       ? null
       : `- Status: ${overrides.status ?? "Accepted"}`,
-    overrides.date === null ? null : `- Date: ${overrides.date ?? "2026-08-06"}`,
+    overrides.date === null
+      ? null
+      : `- Date: ${overrides.date ?? "2026-08-06"}`,
     overrides.links,
   ]
     .filter(Boolean)
@@ -92,15 +96,15 @@ describe("validateOne", () => {
   });
 
   test("reports filename", () => {
-    expect(validateOne(adr(), "1 Example.md").map((item) => item.rule)).toContain(
-      "filename",
-    );
+    expect(
+      validateOne(adr(), "1 Example.md").map((item) => item.rule),
+    ).toContain("filename");
   });
 
   test("reports id-mismatch for a different id", () => {
-    expect(validateOne(adr({ id: "ADR-0002" }), "0001-example.md")).toContainEqual(
-      expect.objectContaining({ rule: "id-mismatch" }),
-    );
+    expect(
+      validateOne(adr({ id: "ADR-0002" }), "0001-example.md"),
+    ).toContainEqual(expect.objectContaining({ rule: "id-mismatch" }));
   });
 
   test("reports only id-mismatch after an unparseable H1", () => {
@@ -123,9 +127,9 @@ describe("validateOne", () => {
   });
 
   test("reports bad-status when absent or invalid", () => {
-    expect(validateOne(adr({ status: null }), "0001-example.md")).toContainEqual(
-      expect.objectContaining({ rule: "bad-status" }),
-    );
+    expect(
+      validateOne(adr({ status: null }), "0001-example.md"),
+    ).toContainEqual(expect.objectContaining({ rule: "bad-status" }));
     expect(
       validateOne(adr({ status: "accepted" }), "0001-example.md"),
     ).toContainEqual(expect.objectContaining({ rule: "bad-status" }));
@@ -138,6 +142,27 @@ describe("validateOne", () => {
     expect(
       validateOne(adr({ date: "August 6" }), "0001-example.md"),
     ).toContainEqual(expect.objectContaining({ rule: "bad-date" }));
+  });
+
+  test("reports bad-date for a YYYY-MM-DD string that is not a real date", () => {
+    for (const date of [
+      "2026-99-99",
+      "2025-02-30",
+      "2026-00-10",
+      "2026-13-01",
+    ]) {
+      expect(validateOne(adr({ date }), "0001-example.md")).toContainEqual(
+        expect.objectContaining({ rule: "bad-date" }),
+      );
+    }
+  });
+
+  test("accepts a leap day and a month boundary", () => {
+    for (const date of ["2024-02-29", "2026-01-31", "2026-12-31"]) {
+      expect(validateOne(adr({ date }), "0001-example-decision.md")).toEqual(
+        [],
+      );
+    }
   });
 
   test("reports superseded-no-link", () => {
@@ -226,11 +251,7 @@ describe("validateDir", () => {
       "0001-first.md",
       adr({ id: "ADR-0001", links: "- Superseded by: ADR-0002" }),
     );
-    await writeAdr(
-      dir,
-      "0002-second.md",
-      adr({ id: "ADR-0002" }),
-    );
+    await writeAdr(dir, "0002-second.md", adr({ id: "ADR-0002" }));
 
     expect((await validateDir(dir)).violations).toContainEqual(
       expect.objectContaining({ rule: "link-not-mutual" }),
@@ -246,7 +267,10 @@ describe("validateDir", () => {
         checked: 1,
         ok: true,
         violations: [
-          expect.objectContaining({ rule: "empty-evidence", severity: "warning" }),
+          expect.objectContaining({
+            rule: "empty-evidence",
+            severity: "warning",
+          }),
         ],
       }),
     );

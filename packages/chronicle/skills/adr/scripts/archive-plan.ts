@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
-import { randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { logRoot, STALE_MS } from "../../../shared/scripts/cockpit-trail";
+import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 
 export type ArchiveTarget = "done" | "watch";
 
@@ -46,13 +45,7 @@ function archivePath(
   sessionId: string,
   bucket: ArchiveTarget,
 ): string {
-  return join(
-    trailRoot,
-    ".cockpit",
-    "archive",
-    bucket,
-    `${sessionId}.jsonl`,
-  );
+  return join(trailRoot, ".cockpit", "archive", bucket, `${sessionId}.jsonl`);
 }
 
 function sourcePath(
@@ -94,11 +87,7 @@ export function planArchive(
     if (mtimeMs === null) {
       const done = archivePath(trailRoot, assignment.sessionId, "done");
       const watch = archivePath(trailRoot, assignment.sessionId, "watch");
-      if (
-        fromBucket === "inbox" &&
-        deps.exists(done) &&
-        !deps.exists(watch)
-      ) {
+      if (fromBucket === "inbox" && deps.exists(done) && !deps.exists(watch)) {
         refused.push({
           sessionId: assignment.sessionId,
           reason: "already-archived",
@@ -145,20 +134,14 @@ export function planArchive(
 
 /** Writes the plan to a temp path and returns it. The only write this module performs. */
 export async function writePlan(plan: ArchivePlan): Promise<string> {
-  const outputDirectory = join("/tmp", "chronicle", "adr");
-  await mkdir(outputDirectory, { recursive: true });
-  const outputPath = join(
-    outputDirectory,
-    `archive-plan-${Date.now()}-${randomUUID()}.json`,
-  );
-  await Bun.write(outputPath, JSON.stringify(plan, null, 2) + "\n");
-  return outputPath;
+  return writeTempPayload("adr", "archive-plan", plan);
 }
 
 function assignmentsPath(argv: string[]): string {
   const flagIndex = argv.indexOf("--assignments");
   const path = flagIndex === -1 ? undefined : argv[flagIndex + 1];
-  if (!path) throw new Error("Missing required --assignments <assignments.json>");
+  if (!path)
+    throw new Error("Missing required --assignments <assignments.json>");
   return path;
 }
 

@@ -1,11 +1,5 @@
 #!/usr/bin/env bun
-import {
-  lstatSync,
-  mkdirSync,
-  realpathSync,
-  renameSync,
-  statSync,
-} from "node:fs";
+import { lstatSync, mkdirSync, realpathSync, renameSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { logRoot, STALE_MS } from "../../../shared/scripts/cockpit-trail";
 import type {
@@ -16,7 +10,8 @@ import type {
   SourceBucket,
 } from "./archive-plan";
 
-export type ApplyResult = { moved: number; failed: Refusal[] };
+/** `moved` carries the moves that actually ran, so callers never re-probe the filesystem to find out which. */
+export type ApplyResult = { moved: Move[]; failed: Refusal[] };
 
 function probeLstat(path: string): ReturnType<typeof lstatSync> | null {
   try {
@@ -30,10 +25,7 @@ function sessionIdOf(move: Move): string {
   return basename(move.from, ".jsonl");
 }
 
-function sourceDirectory(
-  trustedRoot: string,
-  bucket: SourceBucket,
-): string {
+function sourceDirectory(trustedRoot: string, bucket: SourceBucket): string {
   const path =
     bucket === "inbox"
       ? join(trustedRoot, ".cockpit", "logs")
@@ -109,7 +101,9 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
       // Validate source strings lexically. Realpathing the file would turn a source
       // removed after planning into a structural failure instead of a missing refusal.
       if (!expectedSource || dirname(move.from) !== expectedSource) {
-        errors.push(`Source escapes its ${move.fromBucket} bucket: ${move.from}`);
+        errors.push(
+          `Source escapes its ${move.fromBucket} bucket: ${move.from}`,
+        );
       }
       if (
         !filename.endsWith(".jsonl") ||
@@ -139,7 +133,9 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
     }
 
     if (move.fromBucket === "watch" && move.target === "watch") {
-      errors.push(`Invalid terminal transition: watch to watch for ${move.from}`);
+      errors.push(
+        `Invalid terminal transition: watch to watch for ${move.from}`,
+      );
     }
   }
 
@@ -208,7 +204,10 @@ export async function applyArchive(
       );
       continue;
     }
-    if (Date.now() - statSync(move.from).mtimeMs < STALE_MS) {
+    // `source` is the lstat of a path just proven not to be a symlink, so its mtime
+    // is the file's own. A second statSync would also throw unguarded if the file
+    // vanished between the two calls.
+    if (Date.now() - source.mtimeMs < STALE_MS) {
       failed.push(
         refusal(move, "live", `Source may still be active: ${move.from}`),
       );
@@ -230,7 +229,7 @@ export async function applyArchive(
   for (const move of eligible) mkdirSync(dirname(move.to), { recursive: true });
   for (const move of eligible) renameSync(move.from, move.to);
 
-  return { moved: eligible.length, failed };
+  return { moved: eligible, failed };
 }
 
 function usage(): string {
@@ -263,16 +262,14 @@ async function main(): Promise<void> {
     const plan = JSON.parse(await Bun.file(path).text()) as ArchivePlan;
     const result = await applyArchive(plan, logRoot(process.cwd()));
 
-    for (const move of plan.moves) {
-      if (!probeLstat(move.from) && probeLstat(move.to)) {
-        console.log(`Moved: ${move.from} → ${move.to}`);
-      }
+    for (const move of result.moved) {
+      console.log(`Moved: ${move.from} → ${move.to}`);
     }
     for (const item of result.failed) {
       console.log(`Skipped ${item.sessionId}: ${item.reason}: ${item.detail}`);
     }
     console.log(
-      `Summary: moved ${result.moved}, skipped ${result.failed.length}`,
+      `Summary: moved ${result.moved.length}, skipped ${result.failed.length}`,
     );
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

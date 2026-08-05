@@ -36,14 +36,14 @@ Require:
 
 - `collectorPath` — absolute path to the trail collector script.
 - `indexReaderPath` — absolute path to the record index reader script.
-- `bodyFetchPath` — absolute path to the body-fetch capability from the trail collector.
+- `bodyFetchPath` — absolute path to the trail collector script, whose `--bodies` flag
+  is the body-fetch capability.
 - `plannerPath` — absolute path to `archive-plan.ts`.
-- `includeArchived` — optional boolean. Default to `false`.
+- `includeDone` — optional boolean. Default to `false`.
 
-1. Spawn `chronicle:gleaner` with `collectorPath`, `indexReaderPath`, and
-   `includeArchived`.
-2. Receive the payload path, session count, skeleton count, and record index.
-3. Spawn `chronicle:reckoner` with the gleaner result's `payloadPath` and `adrIndex`,
+1. Spawn `chronicle:gleaner` with `collectorPath`, `indexReaderPath`, and `includeDone`.
+2. Receive `outputPath`, `sessionCount`, `entryCount`, and `adrIndex`.
+3. Spawn `chronicle:reckoner` with the gleaner result's `outputPath` and `adrIndex`,
    plus `bodyFetchPath` and `plannerPath`.
 4. Receive the candidate list, conflicts, assignments, and serialized archive plan path.
 5. Return the reckoner result to the main agent. Do not return the intermediate gleaner
@@ -53,28 +53,41 @@ Require:
 
 Require:
 
-- `candidates` — the array of approved candidate objects from the `collect` gate.
-- `draftAgentPath` — absolute path to the drafting agent. Do not resolve it; the caller
-  provides it.
+- `candidateIds` — the entry ids of the approved candidates from the `collect` gate.
+- `bodyFetchPath` — absolute path to the trail collector script, for `--bodies`.
+- `templatePath` — absolute path to `references/adr-template.md`.
+- `adrIndex` — the record index, so the draft can propose the next number.
 
-1. Spawn the drafting agent at `draftAgentPath` with `candidates`.
-2. Receive the draft text and proposed target path.
+1. Spawn `chronicle:codifier` with `candidateIds`, `bodyFetchPath`, `templatePath`, and
+   `adrIndex`.
+2. Receive `draftText` and `proposedPath`.
 3. Return both values to the main agent.
 
 ### Phase: `commit`
 
 Require:
 
-- `draftPath` — path to the approved draft file, or the approved draft text inline.
-- `targetPath` — the ADR target path approved by the gate.
 - `planPath` — path to the approved archive plan produced by reckoner. Preserve it
-  unchanged through both gates.
-- `archiverPath` — absolute path to the writing and archiving agent.
+  unchanged through both gates. **This is the only always-required input.**
+- `validatorPath` — absolute path to `adr-validate.ts`.
+- `archiverPath` — absolute path to `archive-logs.ts`.
 
-1. Spawn the archiving agent at `archiverPath` with `draftPath`, `targetPath`, and
-   `planPath`.
+Optional, and each independently so:
+
+- `newAdr` — `{ "path": <approved target path>, "content": <approved draft text> }`.
+  Assemble it from the values the gate-2 confirmation returned. Omit it entirely when
+  the run promoted nothing.
+- `metadataUpdate` — `{ "path": ..., "set": { ... } }` for a supersession back-link.
+
+1. Spawn `chronicle:barrowkeeper` with `planPath`, `validatorPath`, `archiverPath`, and
+   whichever of `newAdr` and `metadataUpdate` the gate approved.
 2. Receive what was written, what was archived, and what was refused.
 3. Return the result to the main agent.
+
+**A commit with neither `newAdr` nor `metadataUpdate` is the normal no-promotion path,
+not a missing input.** A triage run where every candidate was `watch` or `skip` still
+has an approved archive plan to apply, and refusing it there would strand the plan and
+leave the inbox untriageable. Refuse only when `planPath` itself is absent.
 
 ## Output
 
@@ -98,7 +111,7 @@ Return each phase result as JSON.
 {
   "phase": "draft",
   "draftText": "...",
-  "targetPath": "/Users/.../docs/adr/0001-title.md"
+  "proposedPath": "docs/adr/0001-title.md"
 }
 ```
 
