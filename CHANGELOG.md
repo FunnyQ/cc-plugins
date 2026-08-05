@@ -1,5 +1,28 @@
 # Changelog
 
+## [herdr v0.2.4] - 2026-08-05
+
+_tracks tag `herdr-v0.2.4`_
+
+### Added
+
+- A protocol-upgrade checker now compares the running Herdr API only with the methods and response shapes a plugin actually uses, so compatible protocol updates can be assessed without manually reviewing the full schema.
+
+### Changed
+
+- Herdr guidance and references now cover the 0.8.0 CLI and protocol 19, including stable workspace-qualified IDs, `interactive_ready`, and the conditions for reading alternate-screen history.
+
+### Fixed
+
+- The `herd` wrapper now returns plain-text agent reads correctly, preserves structured errors such as `agent_not_idle`, and drains process output streams concurrently so commands cannot stall.
+
+## [relay v0.6.2] - 2026-08-05
+
+_tracks tag `relay-v0.6.2`_
+
+### Changed
+
+- Relay documentation now makes clear that a marker-terminated result file remains the authoritative completion signal: Herdr pane reads can be unavailable, visible, or truncated and cannot prove a delegate's final answer is complete.
 ## [dispatch 3.18.8] - 2026-08-03
 
 _tracks tag `dispatch-v3.18.8`_
