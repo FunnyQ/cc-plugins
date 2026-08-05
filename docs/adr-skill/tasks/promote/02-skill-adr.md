@@ -7,7 +7,7 @@
 >
 > **Depends on**: triage/03, triage/04, triage/05, promote/01
 > **Blocks**: promote/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -138,24 +138,24 @@ Three places, all of them concrete:
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/SKILL.md` exists with `name`, `description`, `when_to_use`, and `argument-hint` frontmatter, matching the shape of the sibling chronicle skill files.
-- [ ] It documents all three modes — triage, promote, supersede — each with its own section, including the no-promotion branch: skip the draft phase and the second gate, and go straight to commit with only the approved plan.
-- [ ] The topology block places both confirmation gates in the main agent, not in the orchestrator.
-- [ ] Both gates specify `cockpit wait`; `AskUserQuestion` is not used as the gating mechanism.
-- [ ] The promotion threshold appears in full, with its one-mandatory-plus-one-more structure and the reason a flat "any two of five" was rejected.
-- [ ] The wake condition for the watched bucket is specified, including that watched items never re-queue on their own.
-- [ ] The constraints section carries all six rules: read-the-directory, never-archive-live, archive-never-delete, status-from-implementation-state, evidence-never-cites-a-path, and the exclusion list.
-- [ ] `CLAUDE.md` names the adr skill in the plugin table, the chronicle summary paragraph, and the architecture tree, and its chronicle agent comment lists the live roster instead of the stale names.
+- [x] `packages/chronicle/skills/adr/SKILL.md` exists with `name`, `description`, `when_to_use`, and `argument-hint` frontmatter, matching the shape of the sibling chronicle skill files.
+- [x] It documents all three modes — triage, promote, supersede — each with its own section, including the no-promotion branch: skip the draft phase and the second gate, and go straight to commit with only the approved plan.
+- [x] The topology block places both confirmation gates in the main agent, not in the orchestrator.
+- [x] Both gates specify `cockpit wait`; `AskUserQuestion` is not used as the gating mechanism.
+- [x] The promotion threshold appears in full, with its one-mandatory-plus-one-more structure and the reason a flat "any two of five" was rejected.
+- [x] The wake condition for the watched bucket is specified, including that watched items never re-queue on their own.
+- [x] The constraints section carries all six rules: read-the-directory, never-archive-live, archive-never-delete, status-from-implementation-state, evidence-never-cites-a-path, and the exclusion list.
+- [x] `CLAUDE.md` names the adr skill in the plugin table, the chronicle summary paragraph, and the architecture tree, and its chronicle agent comment lists the live roster instead of the stale names.
 
 ## Verification
 
-- [ ] `grep -c 'cockpit wait' packages/chronicle/skills/adr/SKILL.md` returns at least 2 — one per gate.
-- [ ] `grep -n 'AskUserQuestion' packages/chronicle/skills/adr/SKILL.md` returns nothing, or only a line explaining why it is not used for the gates.
-- [ ] `grep -nE 'releaser|surveyor|bumper|chronicler' CLAUDE.md` returns nothing — the stale agent comment is gone.
-- [ ] `grep -n 'adr' CLAUDE.md` shows the skill named in all three places: the plugin table row, the chronicle summary paragraph, and the architecture tree block.
-- [ ] `wc -l packages/chronicle/skills/adr/SKILL.md` reports between 150 and 200 lines.
-- [ ] Run `git status --short -- packages/chronicle/skills/adr/SKILL.md CLAUDE.md` and confirm both paths are dirty.
-- [ ] `grep -nE 'collect|draft|commit' packages/chronicle/skills/adr/SKILL.md` shows all three modes named in the skill's own description frontmatter.
+- [x] `grep -c 'cockpit wait' packages/chronicle/skills/adr/SKILL.md` returns at least 2 — one per gate.
+- [x] `grep -n 'AskUserQuestion' packages/chronicle/skills/adr/SKILL.md` returns nothing, or only a line explaining why it is not used for the gates.
+- [x] `grep -nE 'releaser|surveyor|bumper|chronicler' CLAUDE.md` returns nothing — the stale agent comment is gone.
+- [x] `grep -n 'adr' CLAUDE.md` shows the skill named in all three places: the plugin table row, the chronicle summary paragraph, and the architecture tree block.
+- [x] `wc -l packages/chronicle/skills/adr/SKILL.md` reports between 150 and 200 lines.
+- [x] Run `git status --short -- packages/chronicle/skills/adr/SKILL.md CLAUDE.md` and confirm both paths are dirty.
+- [x] `grep -nE 'collect|draft|commit' packages/chronicle/skills/adr/SKILL.md` shows all three modes named in the skill's own description frontmatter.
 
 **Do not verify by starting a session and checking that `/chronicle:adr` resolves.** A session loads chronicle's skills from the version-pinned plugin cache, populated from a git clone tracking `main`. An uncommitted skill in this working tree does not resolve in any session, fresh or not, and committing and releasing are both outside this tree's scope. The greps above are the real gate; live resolution is confirmed once, after release.
 

@@ -11,7 +11,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | **monitor** | Usage analytics + live session cockpit | `usage-dashboard`, `cockpit`, `install` |
 | **dispatch** | Interview-driven planning and execution | `preflight`, `flightplan`, `autopilot`, `waypoints` |
 | **relay** | Delegate a task to another harness CLI | `relay` |
-| **chronicle** | Commit, PR/MR, and release automation | `commit`, `pr`, `release`, `install` |
+| **chronicle** | ADR curation, commit, PR/MR, and release automation | `adr`, `commit`, `pr`, `release`, `install` |
 | **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `herdr-protocol-upgrade` |
 
 Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: the repo layout, monitor's dashboard internals, and the release rules.
@@ -22,7 +22,7 @@ Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents 
 
 **relay** — `/relay <codex|opencode|claude> <delegate|review|image>`. A backend-agnostic mode layer sits over a per-harness strategy layer. The capability matrix makes `image` codex-only.
 
-**chronicle** — all four skills use one topology: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents (`packages/chronicle/agents/`). `release` is config-first: it detects whole-repo versus per-component layouts, persists the shape to a committed `.chronicle/release.json`, then bumps versions, writes the CHANGELOG entry, and (in auto mode) commits, tags, and pushes.
+**chronicle** — all five skills use one topology: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents. `adr` triages the cockpit decision trail and promotes decisions into Architecture Decision Records. `release` is config-first: it detects whole-repo versus per-component layouts, persists the shape to a committed `.chronicle/release.json`, then bumps versions, writes the CHANGELOG entry, and (in auto mode) commits, tags, and pushes.
 
 **monitor** — `usage-dashboard` is the rear-view: a local web dashboard for sessions, tokens, cost, model mix, and project activity. `cockpit` is the windshield: a live decision trail, transcript, and a `needs_your_call` wait/send bridge for running sessions. `install` owns every prerequisite check and config write for the whole plugin.
 
@@ -80,10 +80,12 @@ cc-plugins/
     │       # flightplan/scripts/ also hosts autopilot's shared tools:
     │       # next-ready / score-task (--log) / flightlog
     ├── chronicle/
-    │   ├── agents/                       # manager+analyst+writer / editor+drafter+publisher /
-    │   │                                 # releaser+surveyor+bumper+chronicler+finisher
+    │   ├── shared/scripts/               # code imported by more than one skill
+    │   ├── agents/                       # lawspeaker+watcher+runesmith / storykeeper+skald+messenger /
+    │   │                                 # lorekeeper+gleaner+reckoner+codifier+barrowkeeper / oathkeeper+smith+annalist+hammerbearer / seer
+    │   ├── agents-codex/                 # Codex agent definitions (TOML format)
     │   ├── hooks/check-branch.sh         # PreToolUse, guards commits on main/master
-    │   └── skills/{commit,pr,release,install}/
+    │   └── skills/{adr,commit,pr,release,install}/
     ├── relay/
     │   ├── commands/                     # backend-fixed aliases: codex / opencode / claude-cli
     │   └── skills/relay/
