@@ -55,8 +55,11 @@ main agent  (holds the "why"; the ONLY one that can prompt you)
        └─ chronicle:hammerbearer    (Haiku)  — auto only: commit + merge + tag + (push)
 ```
 
-Spawn via `subagent_type`, never fork. The Oathkeeper must be able to spawn its
-children. It does not inherit the main conversation. The five agents live at
+Spawn via `subagent_type`, never fork. Spawn the seer and the Oathkeeper one at a
+time, each in its own `Agent` call, with no `name`. This chain is nested and
+sequential, not a team: never spawn the smith, the annalist, or the hammerbearer
+yourself, and never put two agents in one message. The Oathkeeper must be able to
+spawn its children. It does not inherit the main conversation. The five agents live at
 `packages/chronicle/agents/{seer,oathkeeper,smith,annalist,hammerbearer}.md`.
 
 ## The main agent's job

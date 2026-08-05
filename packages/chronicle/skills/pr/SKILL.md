@@ -25,8 +25,11 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:messenger  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
 ```
 
-Spawn via `subagent_type`, never fork. The Storykeeper must be able to spawn its
-children. It does not inherit the main conversation.
+Spawn via `subagent_type`, never fork. Spawn exactly one Storykeeper, in one
+`Agent` call, with no `name`. This chain is nested and sequential, not a team:
+never spawn the skald or the messenger yourself, and never put two agents in one
+message. The Storykeeper must be able to spawn its children. It does not inherit
+the main conversation.
 
 There is **no final creation confirmation gate**. Invoking the skill is the
 consent. The flow auto-creates after any first-run config interview. `draft`

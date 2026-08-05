@@ -28,8 +28,11 @@ main agent  (holds the conversation = the "why")
        └─ chronicle:runesmith   (Haiku) — stages whole files + writes commits from the Lawspeaker's brief
 ```
 
-Spawn via `subagent_type`, never fork. The Lawspeaker must be able to spawn its
-children. It does not inherit the main conversation.
+Spawn via `subagent_type`, never fork. Spawn exactly one Lawspeaker, in one
+`Agent` call, with no `name`. This chain is nested and sequential, not a team:
+never spawn the watcher or the runesmith yourself, and never put two agents in
+one message. The Lawspeaker must be able to spawn its children. It does not
+inherit the main conversation.
 
 Diff analysis stays inside the Lawspeaker subtree. The main agent also performs
 the small final verification commands below. The three agents live at

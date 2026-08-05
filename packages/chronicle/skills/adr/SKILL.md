@@ -30,7 +30,11 @@ chronicle:adr  (this skill — the main agent; owns both gates)
   └─ lorekeeper(commit)  → barrowkeeper        write, apply any link update, validate, archive
 ```
 
-Spawn each Lorekeeper as a nested custom agent, never a fork. It does not inherit
+Spawn each Lorekeeper as a nested custom agent, never a fork. Spawn one Lorekeeper
+per phase, in one `Agent` call, with no `name`. This chain is nested and
+sequential, not a team: never spawn the gleaner, the reckoner, the codifier, or
+the barrowkeeper yourself, never run two phases at once, and never put two agents
+in one message. It does not inherit
 the main conversation. At gate 1, log `needs_your_call`, then use `cockpit wait`
 in the main agent to receive Q's confirmed dispositions. At gate 2, present the
 complete draft and target path, log `needs_your_call`, then use `cockpit wait`
