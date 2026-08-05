@@ -7,7 +7,7 @@
 >
 > **Depends on**: foundation/01, foundation/02
 > **Blocks**: triage/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -161,25 +161,25 @@ State these in code and cover them in tests:
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/scripts/collect-adr-context.ts` and `packages/chronicle/skills/adr/scripts/collect-adr-context.test.ts` both exist.
-- [ ] The collector imports `logRoot`, `DecisionRecord`, `isDecisionRecord`, and `readDecisionLog` from `packages/chronicle/shared/scripts/cockpit-trail.ts` rather than re-implementing them, and imports nothing from `packages/monitor/`.
-- [ ] It builds its session list by globbing `.cockpit/logs/` and `.cockpit/archive/watch/` under the resolved trail root, and never derives that list from the cockpit registry.
-- [ ] `adrDir` resolves from `gitRootOf(cwd) ?? cwd`, never from `trailRoot`, so a nested `.cockpit/` still points ADRs at the repository-level `docs/adr/`.
-- [ ] `toSkeleton` returns an object with no `reason`, `tradeoff`, `facets`, `options`, or `diagram` key.
-- [ ] `fetchBodies` returns `EntryBody` records — full record plus `sessionId` — only for the requested ids, ignores unknown ids without throwing, and resolves an id that lives in `archive/done/` as readily as one in the inbox. The `--bodies` CLI payload carries `sessionId` on every record too, asserted by a test at the CLI level and not only at the function level.
-- [ ] A repository with no `.cockpit/` returns `hasTrail: false` with empty arrays, and the CLI exits 0.
-- [ ] The script creates no directory under `.cockpit/` and modifies no file there.
-- [ ] The payload is written to a path under `/tmp/chronicle/adr/` and that path is printed on stdout as the `outputPath` field of a one-line JSON summary.
-- [ ] That stdout summary also carries `adrDir`, so a caller that never opens the payload can pass the directory straight to the ADR index reader.
+- [x] `packages/chronicle/skills/adr/scripts/collect-adr-context.ts` and `packages/chronicle/skills/adr/scripts/collect-adr-context.test.ts` both exist.
+- [x] The collector imports `logRoot`, `DecisionRecord`, `isDecisionRecord`, and `readDecisionLog` from `packages/chronicle/shared/scripts/cockpit-trail.ts` rather than re-implementing them, and imports nothing from `packages/monitor/`.
+- [x] It builds its session list by globbing `.cockpit/logs/` and `.cockpit/archive/watch/` under the resolved trail root, and never derives that list from the cockpit registry.
+- [x] `adrDir` resolves from `gitRootOf(cwd) ?? cwd`, never from `trailRoot`, so a nested `.cockpit/` still points ADRs at the repository-level `docs/adr/`.
+- [x] `toSkeleton` returns an object with no `reason`, `tradeoff`, `facets`, `options`, or `diagram` key.
+- [x] `fetchBodies` returns `EntryBody` records — full record plus `sessionId` — only for the requested ids, ignores unknown ids without throwing, and resolves an id that lives in `archive/done/` as readily as one in the inbox. The `--bodies` CLI payload carries `sessionId` on every record too, asserted by a test at the CLI level and not only at the function level.
+- [x] A repository with no `.cockpit/` returns `hasTrail: false` with empty arrays, and the CLI exits 0.
+- [x] The script creates no directory under `.cockpit/` and modifies no file there.
+- [x] The payload is written to a path under `/tmp/chronicle/adr/` and that path is printed on stdout as the `outputPath` field of a one-line JSON summary.
+- [x] That stdout summary also carries `adrDir`, so a caller that never opens the payload can pass the directory straight to the ADR index reader.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/adr/scripts/collect-adr-context.test.ts` passes with zero failures, covering: no trail at all, an empty log directory, a malformed JSONL line, the watch directory included in the session list, an unknown id passed to a body request, a skeleton asserted to have no `reason` key, and a nested `.cockpit/` under a git root where `trailRoot` is the subdirectory while `adrDir` still resolves to the repository-level `docs/adr/`.
-- [ ] Run `bun packages/chronicle/skills/adr/scripts/collect-adr-context.ts` from this repository root, read the printed payload, and confirm its session count matches the **combined** count of both source directories: `ls .cockpit/logs/*.jsonl 2>/dev/null | wc -l` plus `ls .cockpit/archive/watch/*.jsonl 2>/dev/null | wc -l`. Comparing against the inbox alone would fail a correct implementation the moment any watched session exists. Also confirm the per-bucket split in the payload matches those two numbers individually.
-- [ ] Record `md5 .cockpit/logs/*.jsonl` before and after that run and confirm every sum is unchanged, proving the collector writes nothing.
-- [ ] Run `bun packages/chronicle/skills/adr/scripts/collect-adr-context.ts` in a scratch directory that is not a git repository and confirm it exits 0 with `hasTrail: false`.
-- [ ] `git status --short -- packages/chronicle/skills/adr/scripts/collect-adr-context.ts packages/chronicle/skills/adr/scripts/collect-adr-context.test.ts` shows both paths dirty.
-- [ ] Do not run `bunx tsc --noEmit` — `@types/bun` is absent in this repo, so it floods with pre-existing errors unrelated to this change. `bun test` is the type-and-behaviour gate here.
+- [x] `bun test packages/chronicle/skills/adr/scripts/collect-adr-context.test.ts` passes with zero failures, covering: no trail at all, an empty log directory, a malformed JSONL line, the watch directory included in the session list, an unknown id passed to a body request, a skeleton asserted to have no `reason` key, and a nested `.cockpit/` under a git root where `trailRoot` is the subdirectory while `adrDir` still resolves to the repository-level `docs/adr/`.
+- [x] Run `bun packages/chronicle/skills/adr/scripts/collect-adr-context.ts` from this repository root, read the printed payload, and confirm its session count matches the **combined** count of both source directories: `ls .cockpit/logs/*.jsonl 2>/dev/null | wc -l` plus `ls .cockpit/archive/watch/*.jsonl 2>/dev/null | wc -l`. Comparing against the inbox alone would fail a correct implementation the moment any watched session exists. Also confirm the per-bucket split in the payload matches those two numbers individually.
+- [x] Record `md5 .cockpit/logs/*.jsonl` before and after that run and confirm every sum is unchanged, proving the collector writes nothing.
+- [x] Run `bun packages/chronicle/skills/adr/scripts/collect-adr-context.ts` in a scratch directory that is not a git repository and confirm it exits 0 with `hasTrail: false`.
+- [x] `git status --short -- packages/chronicle/skills/adr/scripts/collect-adr-context.ts packages/chronicle/skills/adr/scripts/collect-adr-context.test.ts` shows both paths dirty.
+- [x] Do not run `bunx tsc --noEmit` — `@types/bun` is absent in this repo, so it floods with pre-existing errors unrelated to this change. `bun test` is the type-and-behaviour gate here.
 
 ## Eval rubric
 

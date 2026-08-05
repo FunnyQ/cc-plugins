@@ -7,7 +7,7 @@
 >
 > **Depends on**: foundation/02
 > **Blocks**: triage/02, promote/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -138,23 +138,23 @@ The index **reports** broken links. It does not repair them, does not sort them 
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/scripts/adr-index.ts` and `packages/chronicle/skills/adr/scripts/adr-index.test.ts` both exist and export the surface listed above.
-- [ ] `formatAdrId` zero-pads to four digits: `1` → `ADR-0001`, `42` → `ADR-0042`.
-- [ ] `adrFilename(1, "Cockpit trail is an inbox")` returns exactly `0001-cockpit-trail-is-an-inbox.md`.
-- [ ] `parseAdr` returns `null` for a file whose H1 is not `# ADR-NNNN: Title`, without throwing, and `buildIndex` records that file in `skipped` with a reason — every `.md` in the directory appears in exactly one of `adrs` or `skipped`.
-- [ ] `buildIndex` returns `adrs` sorted ascending by number, with `nextNumber` equal to the highest number plus one even when numbering has gaps.
-- [ ] `buildIndex` on a directory that does not exist returns `exists: false`, an empty `adrs` array, `nextNumber: 1`, and no broken links.
-- [ ] All three `BrokenLink.reason` values — `missing`, `not-mutual`, `self` — are produced by the detector against fixtures that trigger each.
-- [ ] `parseAdr` fills `sections` with the H2 headings in document order and `evidenceEntries` with the count of top-level list items under `## Evidence`, returning `0` when that section is absent or holds no list.
-- [ ] No exported function creates a directory, writes a file, or modifies one.
+- [x] `packages/chronicle/skills/adr/scripts/adr-index.ts` and `packages/chronicle/skills/adr/scripts/adr-index.test.ts` both exist and export the surface listed above.
+- [x] `formatAdrId` zero-pads to four digits: `1` → `ADR-0001`, `42` → `ADR-0042`.
+- [x] `adrFilename(1, "Cockpit trail is an inbox")` returns exactly `0001-cockpit-trail-is-an-inbox.md`.
+- [x] `parseAdr` returns `null` for a file whose H1 is not `# ADR-NNNN: Title`, without throwing, and `buildIndex` records that file in `skipped` with a reason — every `.md` in the directory appears in exactly one of `adrs` or `skipped`.
+- [x] `buildIndex` returns `adrs` sorted ascending by number, with `nextNumber` equal to the highest number plus one even when numbering has gaps.
+- [x] `buildIndex` on a directory that does not exist returns `exists: false`, an empty `adrs` array, `nextNumber: 1`, and no broken links.
+- [x] All three `BrokenLink.reason` values — `missing`, `not-mutual`, `self` — are produced by the detector against fixtures that trigger each.
+- [x] `parseAdr` fills `sections` with the H2 headings in document order and `evidenceEntries` with the count of top-level list items under `## Evidence`, returning `0` when that section is absent or holds no list.
+- [x] No exported function creates a directory, writes a file, or modifies one.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/adr/scripts/adr-index.test.ts` passes with zero failures, covering: a missing directory, an empty directory, a stray non-ADR file that lands in `skipped` with a reason rather than vanishing, a numbering gap (`0001` and `0004` present, expect `5`), a one-directional supersession link, a link to an absent id, and a self-reference.
-- [ ] Run `bun packages/chronicle/skills/adr/scripts/adr-index.ts` against a temporary fixture directory and confirm the printed `nextNumber` equals the highest number in that fixture plus one.
-- [ ] Confirm the run created nothing in this repository: `test ! -d docs/adr && echo "not created"` prints `not created`.
-- [ ] Run `git status --short -- packages/chronicle/skills/adr/scripts/adr-index.ts packages/chronicle/skills/adr/scripts/adr-index.test.ts` and confirm both paths are dirty.
-- [ ] Do **not** run `bunx tsc --noEmit`. `@types/bun` is not installed in this repo, so it floods with pre-existing `Cannot find name 'Bun'` errors unrelated to this change.
+- [x] `bun test packages/chronicle/skills/adr/scripts/adr-index.test.ts` passes with zero failures, covering: a missing directory, an empty directory, a stray non-ADR file that lands in `skipped` with a reason rather than vanishing, a numbering gap (`0001` and `0004` present, expect `5`), a one-directional supersession link, a link to an absent id, and a self-reference.
+- [x] Run `bun packages/chronicle/skills/adr/scripts/adr-index.ts` against a temporary fixture directory and confirm the printed `nextNumber` equals the highest number in that fixture plus one.
+- [x] Confirm the run created nothing in this repository: `test ! -d docs/adr && echo "not created"` prints `not created`.
+- [x] Run `git status --short -- packages/chronicle/skills/adr/scripts/adr-index.ts packages/chronicle/skills/adr/scripts/adr-index.test.ts` and confirm both paths are dirty.
+- [x] Do **not** run `bunx tsc --noEmit`. `@types/bun` is not installed in this repo, so it floods with pre-existing `Cannot find name 'Bun'` errors unrelated to this change.
 
 ## Eval rubric
 

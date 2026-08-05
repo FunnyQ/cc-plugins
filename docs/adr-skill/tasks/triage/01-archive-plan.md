@@ -7,7 +7,7 @@
 >
 > **Depends on**: foundation/01
 > **Blocks**: triage/02, triage/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -204,39 +204,39 @@ there is no space pressure to trade against.
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/scripts/archive-plan.ts` and its `.test.ts` both exist, and the
+- [x] `packages/chronicle/skills/adr/scripts/archive-plan.ts` and its `.test.ts` both exist, and the
       file contains no `--apply` flag, no `rename`, and no `mkdir` targeting `.cockpit/`.
-- [ ] `planArchive` performs no filesystem access — every fact about the disk arrives through the
+- [x] `planArchive` performs no filesystem access — every fact about the disk arrives through the
       injected `PlanDeps`.
-- [ ] A session whose mtime is within `STALE_MS` of `nowMs` is refused `live` and never appears in
+- [x] A session whose mtime is within `STALE_MS` of `nowMs` is refused `live` and never appears in
       `plan.moves`; one exactly `STALE_MS` old is planned.
-- [ ] A destination collision is refused `collision`; the plan never proposes overwriting a file.
-- [ ] Each bucket state resolves to its own outcome: a session in `archive/done/` is refused
+- [x] A destination collision is refused `collision`; the plan never proposes overwriting a file.
+- [x] Each bucket state resolves to its own outcome: a session in `archive/done/` is refused
       `already-archived`; one in `archive/watch/` re-assigned `watch` is refused `no-op`; one in
       `archive/watch/` assigned `done` is **planned as a move**, because that is the wake path
       settling a session.
-- [ ] Running the CLI writes a plan file under `/tmp/chronicle/adr/`, prints its path, exits `0`, and
+- [x] Running the CLI writes a plan file under `/tmp/chronicle/adr/`, prints its path, exits `0`, and
       leaves everything under `.cockpit/` byte-identical.
-- [ ] The written plan round-trips: `JSON.parse` of the file deep-equals the `ArchivePlan` returned
+- [x] The written plan round-trips: `JSON.parse` of the file deep-equals the `ArchivePlan` returned
       by `planArchive`, with no wrapper object.
-- [ ] No code path calls `unlink`, `rm`, `rmdir`, or any other deletion primitive.
+- [x] No code path calls `unlink`, `rm`, `rmdir`, or any other deletion primitive.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/skills/adr/scripts/archive-plan.test.ts` passes with zero
+- [x] `bun test packages/chronicle/skills/adr/scripts/archive-plan.test.ts` passes with zero
       failures, covering: mtime exactly at the `STALE_MS` boundary and one millisecond either side, a
       missing session id, a destination collision, all four rows of the transition table, a repeated
       run over the same assignments, and a plan that round-trips through JSON.
-- [ ] `grep -nE 'unlink|rmdir|renameSync|--apply' packages/chronicle/skills/adr/scripts/archive-plan.ts`
+- [x] `grep -nE 'unlink|rmdir|renameSync|--apply' packages/chronicle/skills/adr/scripts/archive-plan.ts`
       returns nothing — the planner has no execution path at all.
-- [ ] Build a temporary fixture trail in a scratch directory (a `.cockpit/logs/` holding two `.jsonl`
+- [x] Build a temporary fixture trail in a scratch directory (a `.cockpit/logs/` holding two `.jsonl`
       files, one touched just now and one backdated an hour). Record `md5` of both, run the script
       against it, then confirm both sums are unchanged, both files are still in the inbox, no
       `.cockpit/archive/` was created, and the printed plan path holds valid `ArchivePlan` JSON
       listing exactly one move and one `live` refusal.
-- [ ] `git status --short -- packages/chronicle/skills/adr/scripts/archive-plan.ts packages/chronicle/skills/adr/scripts/archive-plan.test.ts`
+- [x] `git status --short -- packages/chronicle/skills/adr/scripts/archive-plan.ts packages/chronicle/skills/adr/scripts/archive-plan.test.ts`
       shows both paths dirty.
-- [ ] Do NOT run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repo.
+- [x] Do NOT run `bunx tsc --noEmit`; it floods with pre-existing unrelated errors in this repo.
 
 ## Eval rubric
 
