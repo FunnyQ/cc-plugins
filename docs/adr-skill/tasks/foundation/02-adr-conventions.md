@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: foundation/03, foundation/04, promote/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -153,25 +153,25 @@ State the exclusion list plainly: no secrets, no credentials, no personal data, 
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/skills/adr/references/adr-template.md` exists.
-- [ ] Its copyable template block contains all five section headings, **no** placeholder lifecycle links, and exactly three substitution slots — `NNNN`, `Title`, and the date. Filling those three and nothing else produces a record that passes validation; leaving any of them is the only way the copied shape can fail. The two optional link lines appear separately, each shown filled in with a real id, alongside the rule that a literal `ADR-NNNN` must never survive into a written record.
-- [ ] It states the numbering rule and shows one worked example pairing a `docs/adr/` filename with its `ADR-NNNN` heading.
-- [ ] It reproduces the four-row status table with the "Requires" column filled for every row.
-- [ ] It records why the promote path writes `Accepted`, including the rejection of a `Proposed` default and the reason that rejection stands.
-- [ ] It states the bidirectional supersession rule, the create-replacement-first ordering, and the rule that an ADR's body is never rewritten when its lifecycle metadata changes.
-- [ ] It contains a filled-in example evidence entry carrying a summary, a session id, an entry id, and a date, and citing no filesystem path.
-- [ ] It states the exclusion list: secrets, credentials, personal data, and raw transcript text.
-- [ ] All eleven rule names appear in the file, each stating the requirement it enforces: `filename`, `id-mismatch`, `missing-section`, `bad-status`, `bad-date`, `superseded-no-link`, `deprecated-linked`, `link-missing`, `link-not-mutual`, `self-link`, `empty-evidence` — with `empty-evidence` marked a warning rather than an error.
+- [x] `packages/chronicle/skills/adr/references/adr-template.md` exists.
+- [x] Its copyable template block contains all five section headings, **no** placeholder lifecycle links, and exactly three substitution slots — `NNNN`, `Title`, and the date. Filling those three and nothing else produces a record that passes validation; leaving any of them is the only way the copied shape can fail. The two optional link lines appear separately, each shown filled in with a real id, alongside the rule that a literal `ADR-NNNN` must never survive into a written record.
+- [x] It states the numbering rule and shows one worked example pairing a `docs/adr/` filename with its `ADR-NNNN` heading.
+- [x] It reproduces the four-row status table with the "Requires" column filled for every row.
+- [x] It records why the promote path writes `Accepted`, including the rejection of a `Proposed` default and the reason that rejection stands.
+- [x] It states the bidirectional supersession rule, the create-replacement-first ordering, and the rule that an ADR's body is never rewritten when its lifecycle metadata changes.
+- [x] It contains a filled-in example evidence entry carrying a summary, a session id, an entry id, and a date, and citing no filesystem path.
+- [x] It states the exclusion list: secrets, credentials, personal data, and raw transcript text.
+- [x] All eleven rule names appear in the file, each stating the requirement it enforces: `filename`, `id-mismatch`, `missing-section`, `bad-status`, `bad-date`, `superseded-no-link`, `deprecated-linked`, `link-missing`, `link-not-mutual`, `self-link`, `empty-evidence` — with `empty-evidence` marked a warning rather than an error.
 
 ## Verification
 
-- [ ] Run `grep -n '^## \(Context\|Considered alternatives\|Decision\|Consequences\|Evidence\)$' packages/chronicle/skills/adr/references/adr-template.md` and confirm all five ADR section headings are present.
-- [ ] Run `grep -n 'Supersede' packages/chronicle/skills/adr/references/adr-template.md` and confirm every hit sits in the lifecycle addendum or the rules prose — **none inside the copyable block**. A link line in that block is the placeholder defect this task exists to prevent.
-- [ ] Confirm the copyable block's only substitution slots are `NNNN`, `Title`, and the date, and that a worked filled-in example (`# ADR-0001: …` with a real date) appears beside it.
-- [ ] Run `grep -n 'cockpit' packages/chronicle/skills/adr/references/adr-template.md` and confirm every hit is prohibition or provenance prose — none inside the example evidence entry.
-- [ ] Read the example evidence entry and confirm a reader could understand the decision and its measurement from it alone, without opening any log file.
-- [ ] Hand a copy of the file to a fresh reader (or reread it cold) and draft one throwaway ADR from it without consulting anything else. If a field's rule had to be guessed, the file is incomplete.
-- [ ] Run `git status --short -- packages/chronicle/skills/adr/references/adr-template.md` and confirm the path is dirty.
+- [x] Run `grep -n '^## \(Context\|Considered alternatives\|Decision\|Consequences\|Evidence\)$' packages/chronicle/skills/adr/references/adr-template.md` and confirm all five ADR section headings are present.
+- [x] Run `grep -n 'Supersede' packages/chronicle/skills/adr/references/adr-template.md` and confirm every hit sits in the lifecycle addendum or the rules prose — **none inside the copyable block**. A link line in that block is the placeholder defect this task exists to prevent.
+- [x] Confirm the copyable block's only substitution slots are `NNNN`, `Title`, and the date, and that a worked filled-in example (`# ADR-0001: …` with a real date) appears beside it.
+- [x] Run `grep -n 'cockpit' packages/chronicle/skills/adr/references/adr-template.md` and confirm every hit is prohibition or provenance prose — none inside the example evidence entry.
+- [x] Read the example evidence entry and confirm a reader could understand the decision and its measurement from it alone, without opening any log file.
+- [x] Hand a copy of the file to a fresh reader (or reread it cold) and draft one throwaway ADR from it without consulting anything else. If a field's rule had to be guessed, the file is incomplete.
+- [x] Run `git status --short -- packages/chronicle/skills/adr/references/adr-template.md` and confirm the path is dirty.
 
 ## Eval rubric
 
