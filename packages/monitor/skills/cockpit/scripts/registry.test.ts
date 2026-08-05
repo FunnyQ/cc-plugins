@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   utimesSync,
   writeFileSync,
@@ -266,6 +267,79 @@ describe("buildSessions", () => {
       false,
     );
     delete process.env.COCKPIT_CHANNEL_TTL_MS;
+  });
+});
+
+// `chronicle:adr` triage moves a dispositioned session's log out of the inbox
+// into `.cockpit/archive/{done,watch}/`. log-stream.ts confines reads to
+// `logs/`, so the row could only ever render an empty trail — hide it instead.
+describe("buildSessions archived", () => {
+  // Age the entry past STALE_MS so it reads ended, as a real archived session
+  // must: archive-plan.ts refuses any log whose mtime is within STALE_MS.
+  function age(sid: string) {
+    const regPath = join(homeDir, "registry.json");
+    const reg = JSON.parse(readFileSync(regPath, "utf8"));
+    reg.sessions.find((s: any) => s.sessionId === sid).lastHeartbeat = new Date(
+      Date.now() - 20 * 60 * 1000,
+    ).toISOString();
+    writeFileSync(regPath, JSON.stringify(reg));
+  }
+
+  function archive(project: string, sid: string, bucket: "done" | "watch") {
+    const toDir = join(project, ".cockpit", "archive", bucket);
+    mkdirSync(toDir, { recursive: true });
+    renameSync(
+      join(project, ".cockpit", "logs", `${sid}.jsonl`),
+      join(toDir, `${sid}.jsonl`),
+    );
+    age(sid);
+  }
+
+  test("hides a session archived to done/", () => {
+    const p = mkProject("archived-done");
+    const sid = "aaaaaaaa-0000-0000-0000-000000000001";
+    start(p, sid);
+    archive(p, sid, "done");
+
+    expect(
+      mod.buildSessions().find((s) => s.sessionId === sid),
+    ).toBeUndefined();
+  });
+
+  test("hides a session archived to watch/", () => {
+    const p = mkProject("archived-watch");
+    const sid = "aaaaaaaa-0000-0000-0000-000000000002";
+    start(p, sid);
+    archive(p, sid, "watch");
+
+    expect(
+      mod.buildSessions().find((s) => s.sessionId === sid),
+    ).toBeUndefined();
+  });
+
+  // The deliberate boundary: only an archived log hides a row. A log deleted by
+  // hand, or one on a detached volume, keeps its session visible — hiding those
+  // would be a behaviour change nobody asked for.
+  test("keeps an ended session whose log is merely missing", () => {
+    const p = mkProject("deleted-log");
+    const sid = "aaaaaaaa-0000-0000-0000-000000000003";
+    start(p, sid);
+    rmSync(join(p, ".cockpit", "logs", `${sid}.jsonl`));
+    age(sid);
+
+    expect(mod.buildSessions().find((s) => s.sessionId === sid)).toBeDefined();
+  });
+
+  test("drops the archived session from its project's counts", () => {
+    const p = mkProject("counts");
+    const kept = "aaaaaaaa-0000-0000-0000-000000000004";
+    const gone = "aaaaaaaa-0000-0000-0000-000000000005";
+    start(p, kept);
+    start(p, gone);
+    archive(p, gone, "done");
+
+    const entry = mod.projectsPayload().projects.find((x) => x.project === p)!;
+    expect(entry.sessionCount).toBe(1);
   });
 });
 
