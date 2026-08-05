@@ -7,7 +7,7 @@
 >
 > **Depends on**: promote/02
 > **Blocks**: promote/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -133,29 +133,29 @@ because the copy is its own git root.
 
 ## Acceptance criteria
 
-- [ ] All six case directories exist. Five carry the `.cockpit/` trail layout described (and a `docs/adr/` directory for the already-recorded case); `empty-repo/` deliberately carries **no** `.cockpit/` at all — that absence is the condition it tests, and shipping a trail there would make the case test nothing.
-- [ ] The spread-decision case really spans four separate session files, not one file with four entries.
-- [ ] The already-recorded case ships an ADR inside its own `docs/adr/` directory, following the four-digit numbering.
-- [ ] The watch-wake case ships the watched session plus the two inbox variants as **separately installable** subfixtures — `variant-matching/` and `variant-quiet/` — with a setup command that stages exactly one into the inbox per run. Both must be executed and verified independently; leaving both in place at once means the matching entry wakes the session while the quiet behaviour is supposedly being observed, so the negative half is never actually tested.
-- [ ] At least one fixture contains two deliberately conflicting entries, with the later one being the wrong conclusion.
-- [ ] The checklist carries a runnable setup step that copies the case to a scratch directory, `git init`s it, and backdates the copied log mtimes beyond the ten-minute live-session window — and every case is run from that copy, never in place. Do not assert on the mtimes of the committed files themselves: git does not preserve mtimes, so a fresh clone stamps every fixture with the checkout time and a correct artifact would fail.
-- [ ] The checklist covers all six cases plus the conflicting-evidence condition, each with a stated expected result and a checkbox.
-- [ ] The fixture tree is committable — the gitignore exception holds, or the documented fallback is in place.
+- [x] All six case directories exist. Five carry the `.cockpit/` trail layout described (and a `docs/adr/` directory for the already-recorded case); `empty-repo/` deliberately carries **no** `.cockpit/` at all — that absence is the condition it tests, and shipping a trail there would make the case test nothing.
+- [x] The spread-decision case really spans four separate session files, not one file with four entries.
+- [x] The already-recorded case ships an ADR inside its own `docs/adr/` directory, following the four-digit numbering.
+- [x] The watch-wake case ships the watched session plus the two inbox variants as **separately installable** subfixtures — `variant-matching/` and `variant-quiet/` — with a setup command that stages exactly one into the inbox per run. Both must be executed and verified independently; leaving both in place at once means the matching entry wakes the session while the quiet behaviour is supposedly being observed, so the negative half is never actually tested.
+- [x] At least one fixture contains two deliberately conflicting entries, with the later one being the wrong conclusion.
+- [x] The checklist carries a runnable setup step that copies the case to a scratch directory, `git init`s it, and backdates the copied log mtimes beyond the ten-minute live-session window — and every case is run from that copy, never in place. Do not assert on the mtimes of the committed files themselves: git does not preserve mtimes, so a fresh clone stamps every fixture with the checkout time and a correct artifact would fail.
+- [x] The checklist covers all six cases plus the conflicting-evidence condition, each with a stated expected result and a checkbox.
+- [x] The fixture tree is committable — the gitignore exception holds, or the documented fallback is in place.
 
 ## Verification
 
-- [ ] `ls packages/chronicle/skills/adr/references/fixtures/` lists all six case directories plus `README.md`.
-- [ ] `find packages/chronicle/skills/adr/references/fixtures -name '*.jsonl' | wc -l` prints at least 9.
-- [ ] Every fixture log parses: `bun -e 'for (const f of new Bun.Glob("packages/chronicle/skills/adr/references/fixtures/**/*.jsonl").scanSync(".")) { const t = await Bun.file(f).text(); t.split("\n").filter((l) => l.trim()).forEach((l) => JSON.parse(l)); }' && echo "all JSONL valid"`
-- [ ] `git check-ignore -v packages/chronicle/skills/adr/references/fixtures/single-decision/.cockpit/logs` exits non-zero — the fixture trails are not being ignored. If it exits 0, the negation did not hold; apply the documented fallback.
-- [ ] Stage one case with the README's setup step — copy to a scratch directory, `git init`, backdate
+- [x] `ls packages/chronicle/skills/adr/references/fixtures/` lists all six case directories plus `README.md`.
+- [x] `find packages/chronicle/skills/adr/references/fixtures -name '*.jsonl' | wc -l` prints at least 9.
+- [x] Every fixture log parses: `bun -e 'for (const f of new Bun.Glob("packages/chronicle/skills/adr/references/fixtures/**/*.jsonl").scanSync(".")) { const t = await Bun.file(f).text(); t.split("\n").filter((l) => l.trim()).forEach((l) => JSON.parse(l)); }' && echo "all JSONL valid"`
+- [x] `git check-ignore -v packages/chronicle/skills/adr/references/fixtures/single-decision/.cockpit/logs` exits non-zero — the fixture trails are not being ignored. If it exits 0, the negation did not hold; apply the documented fallback.
+- [x] Stage one case with the README's setup step — copy to a scratch directory, `git init`, backdate
       — then `find <scratch> -name '*.jsonl' -newermt '-10 minutes' | wc -l` prints 0. Run this
       against the copy, never against the committed tree: the committed mtimes are whatever the last
       checkout stamped, and mutating them in place would both break the no-assert rule and leave the
       source fixtures dirty for no reason.
-- [ ] Run the triage flow by hand against a staged copy of the spread-decision fixture and confirm the result is one candidate, not four. Record the outcome in the checklist.
-- [ ] Run the triage flow by hand against a staged copy of the empty-repo fixture and confirm it exits cleanly without creating a `.cockpit/` directory in that copy.
-- [ ] `git status --short -- packages/chronicle/skills/adr/references/fixtures .gitignore` shows the fixture tree and the ignore rule dirty.
+- [x] Run the triage flow by hand against a staged copy of the spread-decision fixture and confirm the result is one candidate, not four. Record the outcome in the checklist.
+- [x] Run the triage flow by hand against a staged copy of the empty-repo fixture and confirm it exits cleanly without creating a `.cockpit/` directory in that copy.
+- [x] `git status --short -- packages/chronicle/skills/adr/references/fixtures .gitignore` shows the fixture tree and the ignore rule dirty.
 
 ## Eval rubric
 

@@ -3,6 +3,7 @@ node_modules/
 
 # cockpit runtime state (per-project meta + session logs)
 .cockpit/
+!packages/chronicle/skills/adr/references/fixtures/**/.cockpit/
 
 # impeccable live mode (local dev artifacts)
 .impeccable-live.json
