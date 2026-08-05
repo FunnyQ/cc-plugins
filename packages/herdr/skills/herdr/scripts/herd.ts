@@ -14,11 +14,9 @@
  *   close  — close an agent's pane
  *
  * Design notes:
- * - Targets are addressed by NAME, never by pane id. For pane-level operations,
- *   the wrapper re-resolves name → pane id immediately before use because
- *   herdr renumbers ids as panes open and close.
- * - `agent prompt` atomically writes and submits text, avoiding timing-sensitive
- *   text + Enter sequences in agent TUIs.
+ * - Targets are addressed by NAME, never by pane id. Names follow an agent when
+ *   a cross-workspace move gives its pane a new workspace-qualified id.
+ * - One `agent prompt` command handles text, paste mode, submission timing, and Enter.
  * - `agent start` launches only in an existing pane, so `spawn` creates the pane
  *   first and puts environment variables on that pane.
  * - Runnable both as a CLI (`bun herd.ts <verb> …`) and as a module
@@ -38,11 +36,11 @@ export const herdrRunner: Runner = async (args) => {
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [stdout, stderr] = await Promise.all([
+  const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
+    proc.exited,
   ]);
-  const code = await proc.exited;
   return { stdout, stderr, code };
 };
 
@@ -63,13 +61,14 @@ export type AgentStatus = "idle" | "working" | "blocked" | "done" | "unknown";
 export type AgentInfo = {
   name: string | null; // manual name given at `agent start`, if any
   type: string | null; // detected agent type (claude/codex/opencode), if any
-  status: string; // idle | working | blocked | unknown
+  status: string; // idle | working | blocked | done | unknown
   paneId: string;
   tabId: string;
   workspaceId: string;
   terminalId: string;
   cwd: string;
   foregroundCwd?: string;
+  interactiveReady?: boolean;
   focused: boolean;
 };
 
@@ -119,6 +118,7 @@ function normAgent(a: any): AgentInfo {
     terminalId: a.terminal_id,
     cwd: a.cwd,
     foregroundCwd: a.foreground_cwd,
+    interactiveReady: a.interactive_ready,
     focused: !!a.focused,
   };
 }
@@ -166,6 +166,25 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     }
   }
 
+  /** Run a read command whose successful stdout is terminal text, not JSON. */
+  async function callText(args: string[]): Promise<string> {
+    const { stdout, stderr, code } = await run(args);
+    if (code === 0) return stdout;
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(stderr.trim() || stdout.trim());
+    } catch {
+      /* preserve the plain CLI error below */
+    }
+    throw new HerdrError(
+      parsed?.error?.message ||
+        stderr.trim() ||
+        stdout.trim() ||
+        `herdr ${args.join(" ")} exited ${code}`,
+      parsed?.error?.code,
+    );
+  }
+
   async function list(): Promise<AgentInfo[]> {
     const r = await callJson(["agent", "list"]);
     return (r.agents ?? []).map(normAgent);
@@ -176,7 +195,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return normAgent(r.agent ?? r);
   }
 
-  /** Re-resolve a target name → its current pane id (ids are not durable). */
+  /** Resolve a live name after any cross-workspace move may have changed its pane id. */
   async function resolvePane(target: string): Promise<string> {
     return (await get(target)).paneId;
   }
@@ -256,14 +275,10 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     } = {},
   ): Promise<string> {
     const lines = opts.lines ?? 40;
-    // Default to `visible` (the current screen), not `recent`: agent TUIs
-    // (claude/codex) render into the alternate screen buffer, so their
-    // scrollback — what `recent`/`recent-unwrapped` read — is often empty.
-    // Pass `--source recent-unwrapped` explicitly for a scrolled log tail.
+    // `visible` works while an agent is active. For a longer idle transcript,
+    // callers opt into recent-unwrapped with enough lines to exceed the viewport.
     const source = opts.source ?? "visible";
-    // `agent read` returns a JSON envelope (unlike `pane read`'s plain text);
-    // the transcript lives at result.read.text.
-    const r = await callJson([
+    return callText([
       "agent",
       "read",
       target,
@@ -272,48 +287,9 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       "--lines",
       String(lines),
     ]);
-    // A settled/idle pane can make `agent read` come back with a null envelope
-    // (the agent JSON is gone once its turn ends), so `r` itself may be null —
-    // guard it instead of dereferencing `.read` on null. Fall back to reading
-    // the pane's raw buffer directly, which still works after the agent settles.
-    if (typeof r?.read?.text === "string") return r.read.text;
-    return readPane(target, source, lines);
   }
 
-  /** Read a pane's raw buffer as plain text — the fallback when `agent read`
-   *  returns no transcript (e.g. a settled/idle pane whose agent JSON is null).
-   *  `pane read` prints plain text rather than a JSON envelope. Resolve the pane
-   *  id from `list` (durable across a settled agent, unlike a transcript read),
-   *  treating an unmatched target as a pane id the caller passed directly. */
-  async function readPane(
-    target: string,
-    source: string,
-    lines: number,
-  ): Promise<string> {
-    const match = (await list()).find(
-      (a) => a.name === target || a.paneId === target,
-    );
-    const paneId = match?.paneId ?? target;
-    const { stdout, stderr, code } = await run([
-      "pane",
-      "read",
-      paneId,
-      "--source",
-      source,
-      "--lines",
-      String(lines),
-    ]);
-    if (code !== 0) {
-      throw new HerdrError(
-        stderr.trim() ||
-          stdout.trim() ||
-          `herdr pane read ${paneId} exited ${code}`,
-      );
-    }
-    return stdout;
-  }
-
-  /** Atomically write and submit a prompt to a running agent. */
+  /** Submit through herdr's paste-aware, timing-safe agent prompt path. */
   async function send(target: string, text: string): Promise<SendResult> {
     await callJson(["agent", "prompt", target, text]);
     return { target, paneId: null, submitted: true };
