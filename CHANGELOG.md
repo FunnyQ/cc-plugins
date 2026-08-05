@@ -1,5 +1,14 @@
 # Changelog
 
+## [monitor 4.0.1] - 2026-08-06
+
+_tracks tag `monitor-v4.0.1`_
+
+### Fixed
+
+- Asking Claude to open the usage dashboard now works instead of appearing to hang and fail. The old launch instructions chained the precheck and the server into one command; since the server never exits, the chain blocked until the agent's tool timed out and reported a failure — even though the dashboard was actually running fine. The two steps are now separate: the precheck runs in the foreground so its exit code and failure hints still gate the launch, and only the server itself moves to the background.
+- Documented the one launch failure that survives the precheck: another process already holding port 5938, which makes the server print an `EADDRINUSE` line and exit. This is now distinguished from a port already held by a previous dashboard instance, which is reused or superseded normally.
+
 ## [chronicle 0.10.1] - 2026-08-06
 
 _tracks tag `chronicle-v0.10.1`_
