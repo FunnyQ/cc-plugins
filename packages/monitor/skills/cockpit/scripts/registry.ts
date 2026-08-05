@@ -1,7 +1,13 @@
 // cockpit registry — reads ~/.cockpit/registry.json, derives active/ended
 // status per session, and builds the /api/sessions + /api/projects payloads.
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
 import { subagentCountFor } from "./subagents";
@@ -29,7 +35,12 @@ export type SessionStatus = "active" | "ended";
 // `your-call` (parked on an unanswered needs_your_call) wins over any working
 // state, and a stale session always reads `ended`.
 export type LiveStatus =
-  "working" | "waiting" | "your-call" | "idle" | "shell" | "ended";
+  | "working"
+  | "waiting"
+  | "your-call"
+  | "idle"
+  | "shell"
+  | "ended";
 
 export type SessionView = {
   provider: Provider;
@@ -96,6 +107,24 @@ function logMtime(logPath: string): number {
   } catch {
     return 0;
   }
+}
+
+// `chronicle:adr` triage moves a dispositioned session's log out of the inbox
+// into `.cockpit/archive/{done,watch}/`. `resolveLogPath` in log-stream.ts
+// confines every read to `logs/`, so such a row can only ever render an empty
+// trail — hide the session instead of leaving a dead entry behind.
+//
+// Deliberately narrower than "the log is gone": a log deleted by hand, or one on
+// a detached volume, keeps its session visible. Only a log we can still see
+// sitting in an archive bucket earns the hide.
+function isArchivedAway(logPath: string): boolean {
+  if (!logPath || existsSync(logPath)) return false;
+  const cockpitDir = dirname(dirname(logPath));
+  const file = basename(logPath);
+  return (
+    existsSync(join(cockpitDir, "archive", "done", file)) ||
+    existsSync(join(cockpitDir, "archive", "watch", file))
+  );
 }
 
 export function statusOf(e: RegistryEntry, now = Date.now()): SessionStatus {
@@ -213,55 +242,64 @@ export function buildSessions(now = Date.now()): SessionView[] {
   const seen = new Set<string>();
   const titleUpdates: TitleUpdate[] = [];
 
-  const tracked = readRegistry().map((e): SessionView => {
-    const key = `${e.provider}:${e.sessionId}`;
-    seen.add(key);
-    const live = liveByKey.get(key);
-    const active = !!live || statusOf(e, now) === "active";
-    const liveTitle = live?.title.trim() ?? "";
-    let title = liveTitle || e.title?.trim() || "";
-    if (liveTitle) {
-      if (e.title !== liveTitle || e.titleResolved !== true) {
+  // A live session is never hidden: archive-plan.ts refuses any log younger than
+  // STALE_MS, so an archived-yet-live pairing means something outside the skill
+  // moved the file — keep the row rather than lose a running session.
+  const tracked = readRegistry()
+    .filter(
+      (e) =>
+        liveByKey.has(`${e.provider}:${e.sessionId}`) ||
+        !isArchivedAway(e.logPath),
+    )
+    .map((e): SessionView => {
+      const key = `${e.provider}:${e.sessionId}`;
+      seen.add(key);
+      const live = liveByKey.get(key);
+      const active = !!live || statusOf(e, now) === "active";
+      const liveTitle = live?.title.trim() ?? "";
+      let title = liveTitle || e.title?.trim() || "";
+      if (liveTitle) {
+        if (e.title !== liveTitle || e.titleResolved !== true) {
+          titleUpdates.push({
+            provider: e.provider,
+            sessionId: e.sessionId,
+            title: liveTitle,
+          });
+        }
+      } else if (!title && e.titleResolved !== true) {
+        title = resolveHistoricalSessionTitle(e.provider, e.sessionId);
         titleUpdates.push({
           provider: e.provider,
           sessionId: e.sessionId,
-          title: liveTitle,
+          title,
+        });
+      } else if (title && e.titleResolved !== true) {
+        titleUpdates.push({
+          provider: e.provider,
+          sessionId: e.sessionId,
+          title,
         });
       }
-    } else if (!title && e.titleResolved !== true) {
-      title = resolveHistoricalSessionTitle(e.provider, e.sessionId);
-      titleUpdates.push({
+      return {
         provider: e.provider,
+        project: e.project,
         sessionId: e.sessionId,
         title,
-      });
-    } else if (title && e.titleResolved !== true) {
-      titleUpdates.push({
-        provider: e.provider,
-        sessionId: e.sessionId,
-        title,
-      });
-    }
-    return {
-      provider: e.provider,
-      project: e.project,
-      sessionId: e.sessionId,
-      title,
-      logPath: e.logPath,
-      status: active ? "active" : "ended",
-      liveStatus: deriveLiveStatus({
-        active,
-        // Only an active session can be parked on a live "your turn"; skip the
-        // log read entirely for ended ones.
-        openCall: active && hasOpenCall(e.logPath),
-        harnessStatus: live?.status,
-      }),
-      subagents: subagentsFor(active, e.provider, e.sessionId, now),
-      channel: hasChannel(e.sessionId),
-      lastHeartbeat: e.lastHeartbeat,
-      tracked: true,
-    };
-  });
+        logPath: e.logPath,
+        status: active ? "active" : "ended",
+        liveStatus: deriveLiveStatus({
+          active,
+          // Only an active session can be parked on a live "your turn"; skip the
+          // log read entirely for ended ones.
+          openCall: active && hasOpenCall(e.logPath),
+          harnessStatus: live?.status,
+        }),
+        subagents: subagentsFor(active, e.provider, e.sessionId, now),
+        channel: hasChannel(e.sessionId),
+        lastHeartbeat: e.lastHeartbeat,
+        tracked: true,
+      };
+    });
   persistTitleUpdates(titleUpdates);
 
   const untracked: SessionView[] = [];
