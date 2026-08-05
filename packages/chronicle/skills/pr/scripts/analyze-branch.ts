@@ -1,26 +1,20 @@
 #!/usr/bin/env bun
 import { $ } from "bun";
 import { existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import {
+  collectDecisions,
+  projectMatches,
+  readRegistrySessions,
+  registryPath,
+  type DecisionRecord,
+  type RegistryEntry,
+} from "../../../shared/scripts/cockpit-trail";
+
+export { collectDecisions, projectMatches };
+export type { DecisionRecord };
 
 export type Provider = "github" | "gitlab" | "unknown";
-
-export type DecisionRecord = {
-  id: string;
-  type: "decision";
-  kind?: "decision" | "rationale" | "learning" | "caveat";
-  source?: "agent" | "scribe";
-  decision: string;
-  reason: string;
-  tradeoff: string;
-  facets: { label: string; text: string }[];
-  needs_your_call: boolean;
-  options: string[];
-  files: string[];
-  diagram?: string;
-  timestamp: string;
-};
 
 export type BranchMaterial = {
   provider: Provider;
@@ -38,11 +32,6 @@ export type BranchMaterial = {
   error?: string;
 };
 
-type RegistryEntry = {
-  project?: string;
-  logPath?: string;
-};
-
 type CockpitHarvest = {
   decisions: DecisionRecord[];
   hasCockpit: boolean;
@@ -56,13 +45,6 @@ export function detectProvider(remoteUrl: string | null): Provider {
   if (host === "gitlab.com" || host.includes("gitlab")) return "gitlab";
 
   return "unknown";
-}
-
-export function projectMatches(
-  entryProject: string,
-  repoRoot: string,
-): boolean {
-  return normalizePath(entryProject) === normalizePath(repoRoot);
 }
 
 // "owner/name" from any of the shapes git hands back:
@@ -168,10 +150,6 @@ function remoteHost(remoteUrl: string): string | null {
     const sshLike = remoteUrl.match(/^[^@]+@([^/]+)\//);
     return sshLike?.[1] ?? null;
   }
-}
-
-function normalizePath(path: string): string {
-  return resolve(path.replace(/\/+$/, ""));
 }
 
 async function gitText(args: string[]): Promise<string> {
@@ -330,62 +308,6 @@ async function headRemoteUrl(branch: string): Promise<string | null> {
   return (await tryGitText(remotePushUrlArgs(name)))?.trim() || null;
 }
 
-function isDecisionRecord(value: unknown): value is DecisionRecord {
-  if (value === null || typeof value !== "object") return false;
-  const record = value as Partial<DecisionRecord>;
-  return (
-    record.type === "decision" &&
-    typeof record.id === "string" &&
-    typeof record.decision === "string" &&
-    typeof record.reason === "string" &&
-    typeof record.tradeoff === "string" &&
-    Array.isArray(record.facets) &&
-    typeof record.needs_your_call === "boolean" &&
-    Array.isArray(record.options) &&
-    Array.isArray(record.files) &&
-    typeof record.timestamp === "string"
-  );
-}
-
-// One unreadable log must not take its siblings down with it. The previous code
-// returned an empty harvest on the first failure, so a single deleted / half-written /
-// unreadable session log silently gutted the PR body's "Why" section — and reported
-// hasCockpit:false, which reads as "this project has no cockpit trail" rather than
-// "one file was unreadable".
-export async function collectDecisions(
-  logPaths: string[],
-  read: (path: string) => Promise<DecisionRecord[]> = readDecisionLog,
-): Promise<DecisionRecord[]> {
-  const records: DecisionRecord[] = [];
-
-  for (const path of logPaths) {
-    try {
-      records.push(...(await read(path)));
-    } catch {
-      continue;
-    }
-  }
-
-  return records;
-}
-
-async function readDecisionLog(path: string): Promise<DecisionRecord[]> {
-  const text = await Bun.file(path).text();
-  const records: DecisionRecord[] = [];
-
-  for (const line of text.split("\n")) {
-    if (line.trim() === "") continue;
-    try {
-      const parsed = JSON.parse(line);
-      if (isDecisionRecord(parsed)) records.push(parsed);
-    } catch {
-      continue;
-    }
-  }
-
-  return records;
-}
-
 async function harvestCockpit(
   repoRoot: string,
   changedFiles: string[],
@@ -393,26 +315,21 @@ async function harvestCockpit(
 ): Promise<CockpitHarvest> {
   if (!branchStartISO) return { decisions: [], hasCockpit: false };
 
-  const dataHome =
-    process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
-  const cockpitHome =
-    process.env.COCKPIT_HOME || join(dataHome, "q-lab", "cockpit");
-  const registryPath = join(cockpitHome, "registry.json");
-  if (!existsSync(registryPath)) {
+  if (!existsSync(registryPath())) {
     return { decisions: [], hasCockpit: false };
   }
 
   try {
-    const registry = JSON.parse(await Bun.file(registryPath).text());
-    const sessions = Array.isArray(registry?.sessions)
-      ? (registry.sessions as RegistryEntry[])
-      : [];
+    const sessions: RegistryEntry[] = await readRegistrySessions();
     const matching = sessions.filter(
       (entry) =>
         typeof entry.project === "string" &&
         typeof entry.logPath === "string" &&
         projectMatches(entry.project, repoRoot),
     );
+    if (matching.length === 0) {
+      return { decisions: [], hasCockpit: false };
+    }
     const records = await collectDecisions(
       matching.map((entry) => entry.logPath!),
     );

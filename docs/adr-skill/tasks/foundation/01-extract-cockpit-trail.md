@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: foundation/03, triage/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -145,23 +145,23 @@ Use `LogRootDeps.gitRoot` to inject in tests rather than shelling out to real gi
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/shared/scripts/cockpit-trail.ts` exports every symbol in the export surface above, with those exact names and signatures.
-- [ ] `packages/chronicle/skills/pr/scripts/analyze-branch.ts` contains no local definition of `DecisionRecord`, `RegistryEntry`, `projectMatches`, `normalizePath`, `isDecisionRecord`, `readDecisionLog`, or `collectDecisions`, and imports them by relative path instead.
-- [ ] `harvestCockpit` and `branchDecisions` produce the same results as before for the same inputs: same dedup by `id`, same `timestamp` sort, same `hasCockpit` values, same empty-harvest fallbacks.
-- [ ] `logRoot` never returns a directory above the git root, in any input combination.
-- [ ] `readDecisionLog` returns the valid records from a file that also contains a blank line, an unparseable line, and a well-formed JSON object that is not a decision record — without throwing.
-- [ ] `collectDecisions` still accepts an injectable `read` parameter defaulting to `readDecisionLog`, and still continues past a path whose read throws.
-- [ ] Every ported constant and function carries a comment naming its monitor source file as the spec.
-- [ ] The new test file covers all five of: walk-up bounded by the git root, nearest `.cockpit` wins, a symlinked temp directory, a malformed JSONL line, and cwd resolving outside the reported git root.
+- [x] `packages/chronicle/shared/scripts/cockpit-trail.ts` exports every symbol in the export surface above, with those exact names and signatures.
+- [x] `packages/chronicle/skills/pr/scripts/analyze-branch.ts` contains no local definition of `DecisionRecord`, `RegistryEntry`, `projectMatches`, `normalizePath`, `isDecisionRecord`, `readDecisionLog`, or `collectDecisions`, and imports them by relative path instead.
+- [x] `harvestCockpit` and `branchDecisions` produce the same results as before for the same inputs: same dedup by `id`, same `timestamp` sort, same `hasCockpit` values, same empty-harvest fallbacks.
+- [x] `logRoot` never returns a directory above the git root, in any input combination.
+- [x] `readDecisionLog` returns the valid records from a file that also contains a blank line, an unparseable line, and a well-formed JSON object that is not a decision record — without throwing.
+- [x] `collectDecisions` still accepts an injectable `read` parameter defaulting to `readDecisionLog`, and still continues past a path whose read throws.
+- [x] Every ported constant and function carries a comment naming its monitor source file as the spec.
+- [x] The new test file covers all five of: walk-up bounded by the git root, nearest `.cockpit` wins, a symlinked temp directory, a malformed JSONL line, and cwd resolving outside the reported git root.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle/shared/scripts/cockpit-trail.test.ts` passes with zero failures.
-- [ ] `bun test packages/chronicle/skills/pr/scripts/analyze-branch.test.ts` reports 35 pass, 0 fail — the pre-task baseline.
-- [ ] `git diff --stat -- packages/chronicle/skills/pr/scripts/analyze-branch.test.ts` prints nothing. The existing PR test file must not be edited; if it needs editing, the extraction changed behaviour and the task is not done.
-- [ ] `git status --short -- packages/chronicle/shared/scripts/cockpit-trail.ts packages/chronicle/shared/scripts/cockpit-trail.test.ts packages/chronicle/skills/pr/scripts/analyze-branch.ts` shows all three paths dirty.
-- [ ] `grep -rn "packages/monitor" packages/chronicle/shared/scripts/cockpit-trail.ts` returns only comment lines, never an `import`.
-- [ ] Do **not** run `bunx tsc --noEmit`. It floods with pre-existing unrelated errors in this repo because `@types/bun` is not installed. `bun test` is the verification.
+- [x] `bun test packages/chronicle/shared/scripts/cockpit-trail.test.ts` passes with zero failures.
+- [x] `bun test packages/chronicle/skills/pr/scripts/analyze-branch.test.ts` reports 35 pass, 0 fail — the pre-task baseline.
+- [x] `git diff --stat -- packages/chronicle/skills/pr/scripts/analyze-branch.test.ts` prints nothing. The existing PR test file must not be edited; if it needs editing, the extraction changed behaviour and the task is not done.
+- [x] `git status --short -- packages/chronicle/shared/scripts/cockpit-trail.ts packages/chronicle/shared/scripts/cockpit-trail.test.ts packages/chronicle/skills/pr/scripts/analyze-branch.ts` shows all three paths dirty.
+- [x] `grep -rn "packages/monitor" packages/chronicle/shared/scripts/cockpit-trail.ts` returns only comment lines, never an `import`.
+- [x] Do **not** run `bunx tsc --noEmit`. It floods with pre-existing unrelated errors in this repo because `@types/bun` is not installed. `bun test` is the verification.
 
 ## Eval rubric
 
