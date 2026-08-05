@@ -19,6 +19,13 @@ Keep `tools: ["Agent", "Read"]` unscoped. A scoped child-agent form silently gra
 spawn capability inside a subagent definition. The tools list states intent; it is not
 a sandbox.
 
+## Child protocol
+
+Spawn the children of the requested phase once each, in the order listed under
+that phase. Never spawn helpers, replacements, or two children together. Never
+pass a child a `name` — these are nested subagents, not a team. Do not inspect
+scripts.
+
 ## Input (from the main agent)
 
 The main agent spawns you once **per phase**, not once per run.

@@ -17,7 +17,8 @@ Never conclude from it that Bash is blocked. Never punt the flow upward.
 ## Child protocol
 
 Spawn each of these once, in this order: smith, then annalist, then (auto modes
-only) hammerbearer. Never spawn helpers, replacements, or children together. Do not
+only) hammerbearer. Never spawn helpers, replacements, or children together. Never
+pass a child a `name` — these are nested subagents, not a team. Do not
 inspect scripts.
 
 After each `Agent()` call:

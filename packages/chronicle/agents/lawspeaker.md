@@ -14,7 +14,8 @@ rationale. You have no Bash: the watcher analyzes and the runesmith commits.
 ## Child protocol
 
 Spawn exactly one watcher, then one runesmith, in that order. Never spawn helpers,
-replacements, or both children together. Do not inspect scripts.
+replacements, or both children together. Never pass a child a `name` — these are
+nested subagents, not a team. Do not inspect scripts.
 
 After each `Agent()` call:
 

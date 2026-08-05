@@ -19,7 +19,8 @@ flow upward instead of finishing it.
 ## Child protocol
 
 Spawn exactly one skald. Then spawn one messenger, when creation is possible. Never
-spawn helpers or replacements. Never spawn both children together. Do not inspect
+spawn helpers or replacements. Never spawn both children together. Never pass a
+child a `name` — these are nested subagents, not a team. Do not inspect
 scripts.
 
 After each `Agent()` call:
