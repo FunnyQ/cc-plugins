@@ -21,6 +21,11 @@ const ROLES = [
   "smith",
   "annalist",
   "hammerbearer",
+  "lorekeeper",
+  "gleaner",
+  "reckoner",
+  "codifier",
+  "barrowkeeper",
 ] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
@@ -50,6 +55,11 @@ function managedBlock(targetDir: string): string {
     smith: "Persist release config and apply verified version bumps.",
     annalist: "Write user-facing release changelog entries.",
     hammerbearer: "Commit, merge, tag, and optionally push a release.",
+    lorekeeper: "Orchestrate Chronicle ADR triage, promotion, and supersession.",
+    gleaner: "Collect cockpit decision-trail skeletons without writing.",
+    reckoner: "Cluster trail entries and assign ADR dispositions.",
+    codifier: "Draft an Architecture Decision Record from confirmed evidence.",
+    barrowkeeper: "Write the confirmed ADR and archive its source sessions.",
   };
   return [
     BEGIN,

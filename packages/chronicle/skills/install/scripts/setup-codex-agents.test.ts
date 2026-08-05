@@ -24,21 +24,32 @@ function run(...args: string[]) {
 }
 
 describe("setup-codex-agents", () => {
-  it("previews all commit and PR roles without writing", () => {
+  it("previews all roles without writing", () => {
     const result = run("--dry-run");
+    const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.toString()).toContain("chronicle_lawspeaker");
-    expect(result.stdout.toString()).toContain("chronicle_watcher");
-    expect(result.stdout.toString()).toContain("chronicle_runesmith");
-    expect(result.stdout.toString()).toContain("chronicle_storykeeper");
-    expect(result.stdout.toString()).toContain("chronicle_skald");
-    expect(result.stdout.toString()).toContain("chronicle_messenger");
-    expect(result.stdout.toString()).toContain("chronicle_seer");
-    expect(result.stdout.toString()).toContain("chronicle_oathkeeper");
-    expect(result.stdout.toString()).toContain("chronicle_smith");
-    expect(result.stdout.toString()).toContain("chronicle_annalist");
-    expect(result.stdout.toString()).toContain("chronicle_hammerbearer");
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(16);
+    for (const role of [
+      "lawspeaker",
+      "watcher",
+      "runesmith",
+      "storykeeper",
+      "skald",
+      "messenger",
+      "seer",
+      "oathkeeper",
+      "smith",
+      "annalist",
+      "hammerbearer",
+      "lorekeeper",
+      "gleaner",
+      "reckoner",
+      "codifier",
+      "barrowkeeper",
+    ]) {
+      expect(output).toContain(`[agents.chronicle_${role}]`);
+    }
     expect(existsSync(join(codexHome, "config.toml"))).toBe(false);
   });
 
@@ -75,6 +86,11 @@ describe("setup-codex-agents", () => {
         "smith",
         "annalist",
         "hammerbearer",
+        "lorekeeper",
+        "gleaner",
+        "reckoner",
+        "codifier",
+        "barrowkeeper",
       ].map((role) => [
         role,
         readFileSync(
@@ -102,6 +118,11 @@ describe("setup-codex-agents", () => {
     expect(installed.smith).toContain('model = "gpt-5.6-luna"');
     expect(installed.annalist).toContain('model = "gpt-5.6-terra"');
     expect(installed.hammerbearer).toContain('model = "gpt-5.6-luna"');
+    expect(installed.lorekeeper).toContain('model = "gpt-5.6-terra"');
+    expect(installed.gleaner).toContain('model = "gpt-5.6-luna"');
+    expect(installed.reckoner).toContain('model = "gpt-5.6-terra"');
+    expect(installed.codifier).toContain('model = "gpt-5.6-terra"');
+    expect(installed.barrowkeeper).toContain('model = "gpt-5.6-luna"');
     for (const content of Object.values(installed)) {
       expect(content).toContain("developer_instructions");
     }
