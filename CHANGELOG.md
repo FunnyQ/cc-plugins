@@ -1,5 +1,14 @@
 # Changelog
 
+## [chronicle 0.10.2] - 2026-08-06
+
+_tracks tag `chronicle-v0.10.2`_
+
+### Fixed
+
+- The `chronicle:adr` skill's `lorekeeper` subagent could fail to resolve its own scripts. It relied on a "Base directory" banner shown only at the main agent's load time, which a subagent never sees. `skills/adr/SKILL.md` now hands `lorekeeper` all four script paths explicitly as absolute paths, and every chronicle subagent role spec (`lorekeeper`, `gleaner`, `reckoner`, `watcher`, and the Codex `lorekeeper` config) is now forbidden from searching for a missing script — a missing path now returns a clear refusal instead of guessing.
+- Fixed a contradiction in `lorekeeper`'s commit phase: the exception that skips promotion when there is no new ADR or metadata update no longer accidentally waives the requirement for the plan, validator, and archiver paths, which stay mandatory in every case.
+
 ## [monitor 4.0.1] - 2026-08-06
 
 _tracks tag `monitor-v4.0.1`_
