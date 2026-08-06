@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: agents/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -171,43 +171,43 @@ been rewritten instead of compressed.
 
 ## Acceptance criteria
 
-- [ ] `model = "gpt-5.6-terra"` and `model_reasoning_effort = "medium"` are byte-identical
+- [x] `model = "gpt-5.6-terra"` and `model_reasoning_effort = "medium"` are byte-identical
       to their current values.
-- [ ] `developer_instructions` is still one triple-quoted string holding 6 paragraphs, in
+- [x] `developer_instructions` is still one triple-quoted string holding 6 paragraphs, in
       the same topic order, at 382 words or fewer.
-- [ ] The draft-phase requirements name `groups`, `bodyFetchPath`, and `templatePath`.
+- [x] The draft-phase requirements name `groups`, `bodyFetchPath`, and `templatePath`.
       `candidateIds` appears nowhere in the file.
-- [ ] `adrIndex` still appears exactly once, in the collect-phase sentence.
-- [ ] The commit-phase optional input is `newAdrs`, an array of `{path, content}`, and the
+- [x] `adrIndex` still appears exactly once, in the collect-phase sentence.
+- [x] The commit-phase optional input is `newAdrs`, an array of `{path, content}`, and the
       no-promotion exception names `newAdrs` too.
-- [ ] The bare token `newAdr` appears exactly once, inside the refusal clause that names it
+- [x] The bare token `newAdr` appears exactly once, inside the refusal clause that names it
       an unknown field and gives the reason.
-- [ ] The draft return literal shows `drafts`; the collect literal and the commit literal
+- [x] The draft return literal shows `drafts`; the collect literal and the commit literal
       are unchanged.
-- [ ] The three required commit paths, the `PHASE MISSING INPUT` refusal, the no-promotion
+- [x] The three required commit paths, the `PHASE MISSING INPUT` refusal, the no-promotion
       exception, and all four `chronicle_*` selector names are still present.
 
 ## Verification
 
-- [ ] Run `grep -nE 'groups|newAdrs|drafts' packages/chronicle/agents-codex/lorekeeper.toml`
+- [x] Run `grep -nE 'groups|newAdrs|drafts' packages/chronicle/agents-codex/lorekeeper.toml`
       and confirm all three new field names are present.
-- [ ] Run `grep -c 'candidateIds' packages/chronicle/agents-codex/lorekeeper.toml` and
+- [x] Run `grep -c 'candidateIds' packages/chronicle/agents-codex/lorekeeper.toml` and
       confirm it prints `0`.
-- [ ] Run `grep -nE 'newAdr([^s]|$)' packages/chronicle/agents-codex/lorekeeper.toml` and
+- [x] Run `grep -nE 'newAdr([^s]|$)' packages/chronicle/agents-codex/lorekeeper.toml` and
       confirm exactly one hit, inside the refusal clause.
-- [ ] Run `grep -o 'adrIndex' packages/chronicle/agents-codex/lorekeeper.toml | wc -l` and
+- [x] Run `grep -o 'adrIndex' packages/chronicle/agents-codex/lorekeeper.toml | wc -l` and
       confirm it prints `1`, then read that line to confirm it is the collect-phase
       sentence. Count occurrences this way, never with `grep -c`, which counts matching
       lines and would report `1` while both occurrences sit on one line.
-- [ ] Run `grep -nE 'chronicle_gleaner|chronicle_reckoner|chronicle_codifier|chronicle_barrowkeeper|PHASE MISSING INPUT|CODEX_HOME' packages/chronicle/agents-codex/lorekeeper.toml`
+- [x] Run `grep -nE 'chronicle_gleaner|chronicle_reckoner|chronicle_codifier|chronicle_barrowkeeper|PHASE MISSING INPUT|CODEX_HOME' packages/chronicle/agents-codex/lorekeeper.toml`
       and confirm every preserved rule is still there.
-- [ ] Run `bun -e 'const t = Bun.TOML.parse(await Bun.file("packages/chronicle/agents-codex/lorekeeper.toml").text()); console.log(Object.keys(t), t.model, t.model_reasoning_effort, t.developer_instructions.trim().split(/\s+/).length)'`
+- [x] Run `bun -e 'const t = Bun.TOML.parse(await Bun.file("packages/chronicle/agents-codex/lorekeeper.toml").text()); console.log(Object.keys(t), t.model, t.model_reasoning_effort, t.developer_instructions.trim().split(/\s+/).length)'`
       and confirm it parses, prints the three keys, the two unchanged values, and a word
       count at 382 or below. If `Bun.TOML.parse` is unavailable in the installed Bun, read
       the file top to bottom instead and confirm the triple quotes still close.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it still passes. No
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it still passes. No
       script changed, so a failure means something out of scope was edited.
-- [ ] Read `packages/chronicle/agents/lorekeeper.md` and the finished mirror side by side.
+- [x] Read `packages/chronicle/agents/lorekeeper.md` and the finished mirror side by side.
       Confirm every field name matches character for character.
 
 ## Eval rubric

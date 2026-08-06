@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -209,60 +209,60 @@ field names change.
 
 ## Acceptance criteria
 
-- [ ] `SKILL.md` documents that the main agent folds confirmed `promote` rows into
+- [x] `SKILL.md` documents that the main agent folds confirmed `promote` rows into
       `groups`, and assigns each group `adrIndex.nextNumber + i` with `i` zero-based.
-- [ ] `SKILL.md` inlines the `groups` payload with `groupId`, `entryIds`, and `adrNumber`.
-- [ ] `SKILL.md` states the 12-group cap, checks it on Q's folded reply before gate-1
+- [x] `SKILL.md` inlines the `groups` payload with `groupId`, `entryIds`, and `adrNumber`.
+- [x] `SKILL.md` states the 12-group cap, checks it on Q's folded reply before gate-1
       confirmation, tells the main agent to re-surface an over-cap reply rather than pick
       the excess itself, and states that 12 is a judgment call from one 26-group run.
-- [ ] `SKILL.md` states that the main agent assigns each group a positional `groupId`
+- [x] `SKILL.md` states that the main agent assigns each group a positional `groupId`
       (`g1`, `g2`, `g3`), and that Q never supplies one.
-- [ ] `SKILL.md` states that the Codifier never counts and never reads
+- [x] `SKILL.md` states that the Codifier never counts and never reads
       `adrIndex.nextNumber` for itself.
-- [ ] `SKILL.md` tells the main agent to build `newAdrs` from the `approve` verdicts, to map
+- [x] `SKILL.md` tells the main agent to build `newAdrs` from the `approve` verdicts, to map
       `proposedPath` to `path` and `draftText` to `content`, to prefer a verdict's own
       `draftText`, and to omit `newAdrs` when every verdict was `drop`.
-- [ ] `SKILL.md` documents the gate-2 `drop` re-plan, including the re-fold across every
+- [x] `SKILL.md` documents the gate-2 `drop` re-plan, including the re-fold across every
       session those candidates touch, the untouched `from`, the
       `bun <plannerPath> --assignments` re-run, and the fresh `planPath` into `commit`.
-- [ ] `SKILL.md` states that `plannerPath` is retained through gate 2.
-- [ ] `SKILL.md` still forbids hand-editing `moves[]`.
-- [ ] Constraint 7 no longer says that `draft` and `commit` write exactly one ADR per
+- [x] `SKILL.md` states that `plannerPath` is retained through gate 2.
+- [x] `SKILL.md` still forbids hand-editing `moves[]`.
+- [x] Constraint 7 no longer says that `draft` and `commit` write exactly one ADR per
       invocation, and now states the up-to-12 batch rule, `drafts`, and `newAdrs`.
-- [ ] Constraint 7 states that `supersede <adr-id>` and `metadataUpdate` stay singular.
-- [ ] A section titled `Recovering a failed batch` exists between `## Constraints` and
+- [x] Constraint 7 states that `supersede <adr-id>` and `metadataUpdate` stay singular.
+- [x] A section titled `Recovering a failed batch` exists between `## Constraints` and
       `## Edge Cases`, and it names `/tmp/chronicle/adr/`, `.cockpit/`, and the three
       self-heal reasons.
-- [ ] The recovery section states that there is no archive-only entry point.
-- [ ] The no-promotion branch says `newAdrs`, and its behavior is otherwise unchanged.
-- [ ] No occurrence of the bare field name `newAdr` remains anywhere in `SKILL.md`.
-- [ ] The `promote` and `supersede` sections each name a one-entry `newAdrs`, and neither
+- [x] The recovery section states that there is no archive-only entry point.
+- [x] The no-promotion branch says `newAdrs`, and its behavior is otherwise unchanged.
+- [x] No occurrence of the bare field name `newAdr` remains anywhere in `SKILL.md`.
+- [x] The `promote` and `supersede` sections each name a one-entry `newAdrs`, and neither
       is batched.
 
 ## Verification
 
-- [ ] Run `grep -n "adrNumber" packages/chronicle/skills/adr/SKILL.md` and confirm the
+- [x] Run `grep -n "adrNumber" packages/chronicle/skills/adr/SKILL.md` and confirm the
       `groups` payload and the pre-allocation rule appear.
-- [ ] Run `grep -n "nextNumber" packages/chronicle/skills/adr/SKILL.md` and confirm both
+- [x] Run `grep -n "nextNumber" packages/chronicle/skills/adr/SKILL.md` and confirm both
       the `+ i` allocation rule and the self-heal reason appear.
-- [ ] Run `grep -n "12 groups" packages/chronicle/skills/adr/SKILL.md` and confirm the cap
+- [x] Run `grep -n "12 groups" packages/chronicle/skills/adr/SKILL.md` and confirm the cap
       appears with its rationale nearby, inside the gate-1 step rather than the `draft`
       payload step.
-- [ ] Run `grep -n "groupId" packages/chronicle/skills/adr/SKILL.md` and confirm the
+- [x] Run `grep -n "groupId" packages/chronicle/skills/adr/SKILL.md` and confirm the
       positional assignment rule appears.
-- [ ] Run `grep -n "newAdr\b" packages/chronicle/skills/adr/SKILL.md` and confirm it
+- [x] Run `grep -n "newAdr\b" packages/chronicle/skills/adr/SKILL.md` and confirm it
       returns nothing.
-- [ ] Run `grep -n "newAdrs" packages/chronicle/skills/adr/SKILL.md` and confirm the
+- [x] Run `grep -n "newAdrs" packages/chronicle/skills/adr/SKILL.md` and confirm the
       no-promotion branch, Constraint 7, and both single-record modes appear.
-- [ ] Run `grep -n "exactly one ADR per invocation" packages/chronicle/skills/adr/SKILL.md`
+- [x] Run `grep -n "exactly one ADR per invocation" packages/chronicle/skills/adr/SKILL.md`
       and confirm it returns nothing.
-- [ ] Run `grep -n "Recovering a failed batch" packages/chronicle/skills/adr/SKILL.md` and
+- [x] Run `grep -n "Recovering a failed batch" packages/chronicle/skills/adr/SKILL.md` and
       confirm exactly one heading matches.
-- [ ] Run `grep -n "tmp/chronicle/adr" packages/chronicle/skills/adr/SKILL.md` and confirm
+- [x] Run `grep -n "tmp/chronicle/adr" packages/chronicle/skills/adr/SKILL.md` and confirm
       the recovery section names the surviving plan file.
-- [ ] Run `grep -n "plannerPath" packages/chronicle/skills/adr/SKILL.md` and confirm the
+- [x] Run `grep -n "plannerPath" packages/chronicle/skills/adr/SKILL.md` and confirm the
       gate-2 re-plan and the retention rule appear.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. No
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. No
       script changes here, so a failure means an edit landed outside this file.
 
 ## Eval rubric

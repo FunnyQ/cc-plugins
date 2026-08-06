@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: agents/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -137,50 +137,50 @@ carried, so some growth is the honest cost. Add no sentence that carries no rule
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/agents-codex/codifier.toml` contains `groups`, `groupId`, and
+- [x] `packages/chronicle/agents-codex/codifier.toml` contains `groups`, `groupId`, and
       `adrNumber`.
-- [ ] The file contains the `drafts` array literal, with `groupId`, `draftText`, and
+- [x] The file contains the `drafts` array literal, with `groupId`, `draftText`, and
       `proposedPath` inside one array entry.
-- [ ] The file contains no `candidateIds`.
-- [ ] `adrIndex` survives in exactly one place: the clause stating that the Codifier never
+- [x] The file contains no `candidateIds`.
+- [x] `adrIndex` survives in exactly one place: the clause stating that the Codifier never
       reads `adrIndex.nextNumber` for itself. It is gone from the received-input list.
-- [ ] The file contains no top-level singular return literal starting with
+- [x] The file contains no top-level singular return literal starting with
       `{"draftText":`.
-- [ ] `model = "gpt-5.6-terra"` and `model_reasoning_effort = "high"` are byte-identical to
+- [x] `model = "gpt-5.6-terra"` and `model_reasoning_effort = "high"` are byte-identical to
       their current values.
-- [ ] The file parses as TOML and holds exactly one `developer_instructions` string key.
-- [ ] The brief states the one-call body fetch over the union of every group's `entryIds`,
+- [x] The file parses as TOML and holds exactly one `developer_instructions` string key.
+- [x] The brief states the one-call body fetch over the union of every group's `entryIds`,
       and keeps the comma-joined, no-spaces, `--bodies`-only, exit-`1`, and `outputPath`
       warnings.
-- [ ] The brief states that `adrNumber` sets both the H1 and the proposed path, and names
+- [x] The brief states that `adrNumber` sets both the H1 and the proposed path, and names
       the `adr-validate.ts` rule `id-mismatch` as the reason.
-- [ ] The brief states the 12-group cap and refuses above it.
-- [ ] The brief still carries every preserved rule: no mutating command, never save, never
+- [x] The brief states the 12-group cap and refuses above it.
+- [x] The brief still carries every preserved rule: no mutating command, never save, never
       invoke the archiver, status from implementation state, evidence with session ID and
       entry ID and date, no `.cockpit` path, no secrets or raw transcript text.
-- [ ] No file outside `packages/chronicle/agents-codex/codifier.toml` is modified.
+- [x] No file outside `packages/chronicle/agents-codex/codifier.toml` is modified.
 
 ## Verification
 
-- [ ] Run `grep -n "groups\|groupId\|adrNumber\|drafts" packages/chronicle/agents-codex/codifier.toml`
+- [x] Run `grep -n "groups\|groupId\|adrNumber\|drafts" packages/chronicle/agents-codex/codifier.toml`
       and confirm every one of the four strings appears.
-- [ ] Run `grep -n "candidateIds" packages/chronicle/agents-codex/codifier.toml`
+- [x] Run `grep -n "candidateIds" packages/chronicle/agents-codex/codifier.toml`
       and confirm it exits `1` with no output.
-- [ ] Run `grep -o "adrIndex" packages/chronicle/agents-codex/codifier.toml | wc -l` and
+- [x] Run `grep -o "adrIndex" packages/chronicle/agents-codex/codifier.toml | wc -l` and
       confirm the count is `1`. Use `grep -o … | wc -l`, not `grep -c`: this file packs a
       paragraph onto one line, so `grep -c` would report `1` for any number of mentions.
-- [ ] Run `grep -n '{"draftText"' packages/chronicle/agents-codex/codifier.toml` and
+- [x] Run `grep -n '{"draftText"' packages/chronicle/agents-codex/codifier.toml` and
       confirm it exits `1` with no output.
-- [ ] Run `grep -n '^model = "gpt-5.6-terra"$' packages/chronicle/agents-codex/codifier.toml`
+- [x] Run `grep -n '^model = "gpt-5.6-terra"$' packages/chronicle/agents-codex/codifier.toml`
       and `grep -n '^model_reasoning_effort = "high"$' packages/chronicle/agents-codex/codifier.toml`,
       and confirm each returns exactly one line.
-- [ ] Run `bun -e 'const t = Bun.TOML.parse(await Bun.file("packages/chronicle/agents-codex/codifier.toml").text()); console.log(Object.keys(t).join(","), typeof t.developer_instructions)'`
+- [x] Run `bun -e 'const t = Bun.TOML.parse(await Bun.file("packages/chronicle/agents-codex/codifier.toml").text()); console.log(Object.keys(t).join(","), typeof t.developer_instructions)'`
       and confirm it prints `model,model_reasoning_effort,developer_instructions string`.
       `Bun.TOML.parse` exists in Bun 1.3.13. If your runtime lacks it, read the file
       instead and confirm one opening `"""` and one closing `"""`.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. This task
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. This task
       changes no script, so a failure means an edit landed out of scope.
-- [ ] Read `packages/chronicle/agents-codex/codifier.toml` end to end beside
+- [x] Read `packages/chronicle/agents-codex/codifier.toml` end to end beside
       `packages/chronicle/agents/codifier.md`, and confirm every rule in the Markdown source
       survives in the mirror.
 

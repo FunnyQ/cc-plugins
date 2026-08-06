@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: agents/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -163,34 +163,34 @@ hand needs the full list.
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/agents-codex/barrowkeeper.toml` names `newAdrs` as an array of
+- [x] `packages/chronicle/agents-codex/barrowkeeper.toml` names `newAdrs` as an array of
       `{path, content}`.
-- [ ] No bare `newAdr` field name survives in the file.
-- [ ] No bare `newAdrPath` field name survives in the file.
-- [ ] All four return literals carry `newAdrPaths`, or `collisions` for the collision
+- [x] No bare `newAdr` field name survives in the file.
+- [x] No bare `newAdrPath` field name survives in the file.
+- [x] All four return literals carry `newAdrPaths`, or `collisions` for the collision
       shape.
-- [ ] The `path-collision` reason string is present.
-- [ ] The documented order puts the collision pre-check ahead of every write, and states
+- [x] The `path-collision` reason string is present.
+- [x] The documented order puts the collision pre-check ahead of every write, and states
       why.
-- [ ] `metadataUpdate` is still described as a single object.
-- [ ] `model = "gpt-5.6-luna"` and `model_reasoning_effort = "low"` are unchanged.
-- [ ] `developer_instructions` is still one triple-quoted string with three paragraphs.
+- [x] `metadataUpdate` is still described as a single object.
+- [x] `model = "gpt-5.6-luna"` and `model_reasoning_effort = "low"` are unchanged.
+- [x] `developer_instructions` is still one triple-quoted string with three paragraphs.
 
 ## Verification
 
-- [ ] Run `grep -c 'newAdrs' packages/chronicle/agents-codex/barrowkeeper.toml` and
+- [x] Run `grep -c 'newAdrs' packages/chronicle/agents-codex/barrowkeeper.toml` and
       confirm the count is at least 1.
-- [ ] Run `grep -nE 'newAdr[^sP]|newAdrPath[^s]' packages/chronicle/agents-codex/barrowkeeper.toml`
+- [x] Run `grep -nE 'newAdr[^sP]|newAdrPath[^s]' packages/chronicle/agents-codex/barrowkeeper.toml`
       and confirm it prints nothing.
-- [ ] Run `grep -n 'path-collision\|newAdrPaths\|collisions' packages/chronicle/agents-codex/barrowkeeper.toml`
+- [x] Run `grep -n 'path-collision\|newAdrPaths\|collisions' packages/chronicle/agents-codex/barrowkeeper.toml`
       and confirm all three strings appear.
-- [ ] Run `grep -n 'gpt-5.6-luna\|model_reasoning_effort = "low"' packages/chronicle/agents-codex/barrowkeeper.toml`
+- [x] Run `grep -n 'gpt-5.6-luna\|model_reasoning_effort = "low"' packages/chronicle/agents-codex/barrowkeeper.toml`
       and confirm both lines are intact.
-- [ ] Run `bun -e 'const t = Bun.TOML.parse(await Bun.file("packages/chronicle/agents-codex/barrowkeeper.toml").text()); console.log(Object.keys(t).join(","), t.model, t.model_reasoning_effort)'`
+- [x] Run `bun -e 'const t = Bun.TOML.parse(await Bun.file("packages/chronicle/agents-codex/barrowkeeper.toml").text()); console.log(Object.keys(t).join(","), t.model, t.model_reasoning_effort)'`
       and confirm it prints `model,model_reasoning_effort,developer_instructions gpt-5.6-luna low`.
       `Bun.TOML.parse` exists in Bun 1.3.13. If your runtime lacks it, read the file
       instead and confirm the three keys and the closing `"""` by eye.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it still passes.
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it still passes.
       This task changes no script, so a failure means an edit landed out of scope.
 
 ## Eval rubric
