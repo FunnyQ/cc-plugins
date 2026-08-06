@@ -780,6 +780,45 @@ describe("checkFinalReview", () => {
     expect(v.length).toBe(1);
     expect(v[0].detail).toMatch(/ingestion\/01/);
   });
+
+  test("marked task outside review/01 → location violation", () => {
+    const tasks = [
+      mk("ui", "01"),
+      mk("ui", "02", [["ui", "01"]], true), // covers everything, wrong home
+    ];
+    const v = checkFinalReview(tasks, "t");
+    expect(v.length).toBe(1);
+    expect(v[0].rule).toBe("final-review-location");
+    expect(v[0].detail).toMatch(/ui\/02/);
+    expect(v[0].detail).toMatch(/review\/01/);
+  });
+
+  test("a review bucket numbered past 01 is still the wrong home", () => {
+    const tasks = [mk("ui", "01"), mk("review", "02", [["ui", "01"]], true)];
+    const v = checkFinalReview(tasks, "t");
+    expect(v.length).toBe(1);
+    expect(v[0].rule).toBe("final-review-location");
+  });
+
+  /**
+   * Coverage is the load-bearing rule; location is presentational. Reporting
+   * both at once would bury the one that actually breaks autopilot.
+   */
+  test("a miscovered final review reports coverage, not location", () => {
+    const tasks = [
+      mk("ui", "01"),
+      mk("ingestion", "01"),
+      mk("ui", "02", [["ui", "01"]], true), // wrong home AND misses ingestion
+    ];
+    const v = checkFinalReview(tasks, "t");
+    expect(v.length).toBe(1);
+    expect(v[0].rule).toBe("final-review");
+    expect(v[0].detail).toMatch(/ingestion\/01/);
+  });
+
+  test("a single-task plan needs no review bucket", () => {
+    expect(checkFinalReview([mk("work", "01", [], true)], "t")).toEqual([]);
+  });
 });
 
 describe("checkFinalReviewTestNet", () => {

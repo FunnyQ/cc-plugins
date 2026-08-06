@@ -107,7 +107,11 @@ Put run notes on their own line, outside the Status line.
 
 Every plan ends with **one terminal task that reviews the whole deliverable**. Mark it `> **Final review**: true`. Make its `Depends on` reach every other task, directly or transitively. Then it cannot start until all the work is done. `lint-task.ts` enforces both rules. If no task is marked, or a marked task misses some branch, the whole-tree lint fails.
 
+**Put it at `review/01`, in its own bucket.** Do not append it to a feature bucket as that bucket's next number. `ui/05` reads as the fifth UI task and hides the fact that it is the gate every other task feeds; `review/01` says what it is at a glance, in the task index, in `Depends on` lines, and in autopilot's run log. The `review` bucket is reserved for this one task — nothing else belongs in it. A single-task plan is exempt and needs no `review` bucket at all.
+
 This is the holistic gate. Per-task rubrics catch per-task quality. The final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes, for example **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, and **No regressions**. It does not re-score individual tasks.
+
+Consider one more axis at a low weight: **Leanness** — did the tree ship abstractions with one caller, config nobody sets, or hand-rolled versions of what the stdlib and the platform already provide? Per-task rubrics may miss the accumulated effect, because each task looks proportionate on its own and only the whole diff shows the pile-up. Score the *judgement*, never a line count: a plan that legitimately adds a lot of code should still score well here. Autopilot's closing round runs a `leanness` review lens against exactly this question, so the axis gives the judge a reason to care whether the fixer acted on what that lens found.
 
 A plan with a single task is exempt. That task is its own terminal. Don't mark more than one task. Keep one unambiguous closing gate.
 
