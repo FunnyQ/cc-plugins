@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/02, codex/01, codex/02, codex/03
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -188,41 +188,41 @@ have.
 
 ## Acceptance criteria
 
-- [ ] Every payload shape in all seven files matches `../_context/contract.md` field for
+- [x] Every payload shape in all seven files matches `../_context/contract.md` field for
       field.
-- [ ] Each Markdown agent and its Codex mirror agree on every literal JSON shape.
-- [ ] `newAdr` as a field name, `candidateIds`, and the gate-1 `notes` field return zero
+- [x] Each Markdown agent and its Codex mirror agree on every literal JSON shape.
+- [x] `newAdr` as a field name, `candidateIds`, and the gate-1 `notes` field return zero
       hits across the seven files, except inside an unknown-field refusal.
-- [ ] In every fenced JSON block that defines a phase return or an agent output, neither
+- [x] In every fenced JSON block that defines a phase return or an agent output, neither
       `draftText` nor `proposedPath` is a top-level field. Both sit inside a `drafts[]`
       entry or a gate-2 verdict entry. Prose mentions of either token are legal anywhere and
       are not checked.
-- [ ] `newAdrs`, `drafts`, `groups`, `adrNumber`, `verdicts`, and the gate-1 `group` field
+- [x] `newAdrs`, `drafts`, `groups`, `adrNumber`, `verdicts`, and the gate-1 `group` field
       each appear in the files that should carry them.
-- [ ] `supersede` still replaces one record per run, `metadataUpdate` is still a single
+- [x] `supersede` still replaces one record per run, `metadataUpdate` is still a single
       object, and no rollback, delete, or renumbering semantics appeared anywhere.
-- [ ] The five preserved rules of check 5 are present and unchanged in meaning.
-- [ ] Every addition the frozen contract does not require is either removed or justified in
+- [x] The five preserved rules of check 5 are present and unchanged in meaning.
+- [x] Every addition the frozen contract does not require is either removed or justified in
       the report by the failure it prevents.
-- [ ] The report states a plain verdict on the 12-group cap, and says the cap is a judgment
+- [x] The report states a plain verdict on the 12-group cap, and says the cap is a judgment
       call rather than a measured limit.
 
 ## Verification
 
-- [ ] Run `bun test packages/chronicle/` and confirm it passes. No task in this tree
+- [x] Run `bun test packages/chronicle/` and confirm it passes. No task in this tree
       changes a script, so a failure means an edit landed out of scope.
-- [ ] Set `FILES` to the seven paths, then run `grep -n 'newAdr\b' $FILES` and confirm
+- [x] Set `FILES` to the seven paths, then run `grep -n 'newAdr\b' $FILES` and confirm
       every hit is an unknown-field refusal.
-- [ ] Run `grep -n 'candidateIds' $FILES` and confirm zero hits.
-- [ ] Run `grep -n 'notes' $FILES` and confirm no hit is the gate-1 response field.
-- [ ] Run `grep -n 'draftText\|proposedPath' $FILES` and confirm no hit is a top-level
+- [x] Run `grep -n 'candidateIds' $FILES` and confirm zero hits.
+- [x] Run `grep -n 'notes' $FILES` and confirm no hit is the gate-1 response field.
+- [x] Run `grep -n 'draftText\|proposedPath' $FILES` and confirm no hit is a top-level
       phase-return field.
-- [ ] Run `grep -c 'newAdrs' $FILES`, `grep -c 'drafts' $FILES`, `grep -c 'groups' $FILES`,
+- [x] Run `grep -c 'newAdrs' $FILES`, `grep -c 'drafts' $FILES`, `grep -c 'groups' $FILES`,
       `grep -c 'adrNumber' $FILES`, and `grep -c 'verdicts' $FILES`, then confirm each
       count against the table in the notes above.
-- [ ] Run `git diff --stat -- packages/chronicle/skills/adr/scripts/` and confirm it prints
+- [x] Run `git diff --stat -- packages/chronicle/skills/adr/scripts/` and confirm it prints
       nothing.
-- [ ] Read all seven files end to end once, after every fix, and confirm each reads as one
+- [x] Read all seven files end to end once, after every fix, and confirm each reads as one
       voice with no half-converted section.
 
 ## Eval rubric
