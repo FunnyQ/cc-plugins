@@ -35,31 +35,49 @@ per phase, in one `Agent` call, with no `name`. This chain is nested and
 sequential, not a team: never spawn the gleaner, the reckoner, the codifier, or
 the barrowkeeper yourself, never run two phases at once, and never put two agents
 in one message. It does not inherit
-the main conversation. At gate 1, log `needs_your_call`, then use `cockpit wait`
-in the main agent to receive Q's confirmed dispositions. At gate 2, present
-every draft and its target path, log `needs_your_call`, then use `cockpit wait`
-again. Do not put either gate inside Lorekeeper. Do not use `AskUserQuestion` for
-these gates because the cockpit wait/send bridge must hand control back to Q.
+the main conversation. Do not put either gate inside Lorekeeper.
 
-**If `cockpit wait --require-watcher` exits `4`** (`nobody is watching` — Q's
-`answer-here` switch is off), fall back instead of retrying the wait or
-silently switching to `AskUserQuestion`:
+**Both gates are one local HTML page.** Never hand-write that page and never
+hand-design it — `gatePagePath` renders it. Build the payload, render it, end the
+turn, and let Q paste the response block back:
 
-- **On Claude Code**, build a custom interactive HTML review page with the
-  `Artifact` tool: gate 1 is a disposition ledger (one row per candidate, its
-  disposition and reason, a `group` column, and controls to confirm or
-  override it) with a live-updating decision summary and a "copy for chat"
-  button; gate 2 shows every proposed draft, collapsible per record, with an
-  approve-or-drop control per record, for a verbatim read-through.
-- **On Codex**, which has no `Artifact` tool, print the same content as
-  structured markdown directly in the transcript — the candidate ledger for
-  gate 1 with its `group` column, the full draft text for every proposed
-  record at gate 2 — and ask Q to reply in the same terminal with the response
-  block below. This is not `AskUserQuestion`: it is the same plaintext
-  round-trip the Artifact path uses, over the terminal instead of a copy
-  button.
+1. Write a payload JSON to the scratchpad. Gate 1 takes `gate: 1`, `nextAdr`,
+   `candidates` (each with `entryIds`, `title`, `reason`, `disposition`, and an
+   optional `matchesAdr` and `hint`), an optional `conflicts`, and an optional
+   `scan` for the header facts. Gate 2 takes `gate: 2` and `drafts`, each with
+   `groupId`, `adrNumber`, `proposedPath`, and the codifier's `draftText` verbatim.
+2. Run `bun <gatePagePath> --data <payload.json> --open`. Pass
+   `--lang zh-TW` when the cockpit decision-log language is zh-TW.
+3. Report the rendered path to Q and stop. The page carries its own consistency
+   checks, so a reply copied from it is already internally consistent — you still
+   run the checks below, because Q may type one by hand instead.
 
-Either path produces the same plaintext gate-1 response, which Q pastes or
+The page is self-contained, so it needs no host. A local repo's decision trail
+and its full draft text never leave the machine to be read.
+
+**Do not call `cockpit wait` for either gate, and do not log `needs_your_call`.**
+The wait only succeeds while Q's `answer-here` switch is on and a tab is
+subscribed, and a gate carrying twelve full records reads badly in a cockpit card
+either way. Parking on a call nobody will answer strands the run. Log a plain
+decision entry recording that the gate was reached, then end the turn. Do not use
+`AskUserQuestion` either — it would skip the decision trail entirely.
+
+**When `--open` exits `3`**, the platform opener failed and there is no local
+browser: a headless run, a remote environment, or Claude Code on the web. Fall
+back in this order:
+
+- **`Artifact`**, when the tool is available. Publish the file `gate-page.ts`
+  already rendered. Do not rebuild its markup.
+- **Structured markdown in the transcript**, when it is not — the candidate
+  ledger with its `group` column at gate 1, the full draft text for every
+  proposed record at gate 2. This is not `AskUserQuestion`: it is the same
+  plaintext round-trip, over the transcript instead of a copy button.
+
+This cascade is about the browser, not about the harness. Codex writes files and
+spawns processes like Claude Code does, so it renders and opens the same page
+through the same script.
+
+Every path produces the same plaintext gate-1 response, which Q pastes or
 types back. Require the complete set, not only the changed rows — a partial
 reply is ambiguous about which candidates it leaves untouched:
 
@@ -89,9 +107,8 @@ id field. `conflictResolutions` covers every entry in the reckoner's
   `groupId`. The main agent uses `group` only to decide which rows share a record, then
   assigns positional `groupId`s when it builds the `draft` payload (step 5).
 
-Treat the parsed response as the gate response exactly as `cockpit wait` would
-return it, including the consistency check below. Gate 2's response follows
-this schema:
+Run the consistency check below on the parsed response, whichever surface it came
+back over. Gate 2's response follows this schema:
 
 ```json
 {
@@ -124,10 +141,12 @@ find a script starts searching the plugin cache — that is the caller's bug.
 | `templatePath` | `$SKILL_DIR/references/adr-template.md` |
 | `validatorPath` | `$SKILL_DIR/scripts/adr-validate.ts` |
 | `archiverPath` | `$SKILL_DIR/scripts/archive-logs.ts` |
+| `gatePagePath` | `$SKILL_DIR/scripts/gate-page.ts` |
 
 `collect` takes `collectorPath`, `indexReaderPath`, `bodyFetchPath`, and
 `plannerPath`. `draft` takes `bodyFetchPath` and `templatePath`. `commit` takes
-`validatorPath` and `archiverPath`.
+`validatorPath` and `archiverPath`. `gatePagePath` belongs to no phase — the main
+agent runs it at both gates and never passes it to a Lorekeeper.
 
 ## `triage` — process the inbox
 
