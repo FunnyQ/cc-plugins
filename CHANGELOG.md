@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 3.19.0] - 2026-08-06
+
+_tracks tag `dispatch-v3.19.0`_
+
+### Changed
+
+- Autopilot's closing Final review now runs a different set of Claude quality lenses. `simplification` and `altitude` are gone; `reuse` and a new `leanness` lens take their place, alongside the existing cross-vendor engine lens (codex/opencode) and `efficiency`. `altitude` used to flag both over-engineering and under-engineering on the same span of code, so it could ask the fixer to inline an abstraction and extract a helper at once — the fixer reads every findings file with no arbitration rule, so a self-contradicting lens left it guessing. The new split gives each direction its own lens: `reuse` owns "needs more structure" (and now also catches hand-rolled stdlib or dependency reinvention, which the old reuse lens missed by only searching inside the codebase), while `leanness` is cut-only, tagging findings `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` and closing with a `net: -N lines possible.` summary. This is visible under `.flightlog/review/attempt-N/<lens>.md` (renamed files) and in `CFG.reviewLensModel`, which now governs three lenses instead of four — one fewer parallel Opus agent per Final review attempt.
+- Flightplan now reserves a `review` bucket for the closing Final review task, fixed at `tasks/review/01-<slug>.md`. `lint-task.ts` enforces the location with a new `final-review-location` violation.
+- **Upgrade note:** any existing plan tree whose Final review task lives in a feature bucket (for example `ui/05`) now fails the whole-tree lint, and autopilot's Step 1 runs that lint before flying. Move the closing task to `tasks/review/01-<slug>.md` before flying an older plan.
+
+### Added
+
+- The Final review task's rubric can now carry an optional, low-weight Leanness axis matching the new lens. It scores judgement, not a line count.
+
 ## [chronicle 0.10.2] - 2026-08-06
 
 _tracks tag `chronicle-v0.10.2`_
