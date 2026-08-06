@@ -79,9 +79,14 @@ Require:
 Require:
 
 - `planPath` — path to the approved archive plan produced by reckoner. Preserve it
-  unchanged through both gates. **This is the only always-required input.**
+  unchanged through both gates.
 - `validatorPath` — absolute path to `adr-validate.ts`.
 - `archiverPath` — absolute path to `archive-logs.ts`.
+
+**All three are always required.** Missing any one of them is a `PHASE MISSING INPUT`
+refusal: report it and do not spawn the barrowkeeper. The barrowkeeper's own spec
+assumes all three are present and has no fallback, so passing a gap through means it
+runs the validator or the archiver against an empty path.
 
 Optional, and each independently so:
 
@@ -98,7 +103,8 @@ Optional, and each independently so:
 **A commit with neither `newAdr` nor `metadataUpdate` is the normal no-promotion path,
 not a missing input.** A triage run where every candidate was `watch` or `skip` still
 has an approved archive plan to apply, and refusing it there would strand the plan and
-leave the inbox untriageable. Refuse only when `planPath` itself is absent.
+leave the inbox untriageable. This exception covers the two optional inputs only. It
+never softens the three required paths above.
 
 ## Output
 
