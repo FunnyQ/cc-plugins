@@ -17,7 +17,7 @@ three Lorekeeper invocations: collect, draft, and commit. The nested
 **Lorekeeper** orchestrator owns each phase and delegates its mechanics. It cannot
 run the whole flow and return control at both gates because its first return ends
 that orchestrator run. Pass the collected plan into draft, then pass the confirmed
-draft, target path, metadata update, and archive plan into commit.
+drafts, `newAdrs`, the optional `metadataUpdate`, and the archive plan into commit.
 
 ## Topology
 
@@ -142,7 +142,22 @@ This is the primary entry point.
    their source sessions.
 3. Present every disposition at gate 1. A triage is done when every stale session
    was dispositioned and every retained candidate is named, not when the inbox is
-   empty. Deliberately leave sessions written in the last ten minutes behind.
+   empty. Deliberately leave sessions written in the last ten minutes behind. If
+   the reckoner produced more than 12 `promote` candidates, say so, and say that
+   grouping may still bring the run under the cap.
+
+   At most 12 groups may reach `draft` in one run. Enforce the cap before Q
+   confirms, never after: once gate 1 is confirmed, the disposition set is
+   complete and the archive plan already covers every candidate, so dropping
+   groups after confirmation would archive an unrecorded decision to `done`.
+   Fold Q's reply into groups. If the folded count exceeds 12, re-surface it
+   before treating the reply as confirmed. Ask Q to group further, or to
+   disposition the excess as `watch` in this run — a `watch` candidate archives
+   to the watched bucket and re-queues on the next `triage` run, so nothing is
+   lost. The main agent never picks the excess itself; which decisions wait is
+   Q's call. 12 is a judgment call from one measured run of 26 groups, not a
+   measured ceiling — Q reports the limit on that run was review fatigue, not a
+   failure.
 
    Before treating Q's gate-1 response as final, check it for internal
    contradictions the reckoner cannot see, since a group or a conflict
@@ -158,8 +173,8 @@ This is the primary entry point.
      agree. If they don't, re-surface both choices for Q rather than guessing
      which one wins.
 
-   Re-run this check after any correction Q makes in response to a flagged
-   contradiction — a fix to one contradiction can introduce another.
+   Re-run the contradiction check and the group-count check after any correction
+   Q makes — a fix to one contradiction can introduce another.
 4. After Q confirms, derive the archive target per session. **`watch` wins**: if
    any candidate drawn from a session is `watch`, archive that session to the
    watched bucket. Otherwise archive it to `done`.
@@ -175,9 +190,62 @@ This is the primary entry point.
    candidate from the same session may still be `watch`), keep each row's
    original `from` untouched, serialize the corrected `assignments`, and
    re-run `bun <plannerPath> --assignments <corrected assignments JSON>`
-   using the `plannerPath` retained from the collect-phase inputs. Pass the
-   fresh `planPath` this produces — never a prose description of the
-   overrides — into `commit`.
+   using the `plannerPath` retained from the collect-phase inputs, kept
+   through gate 2 as well. Pass the fresh `planPath` this produces — never a
+   prose description of the overrides — into `commit`.
+5. Build the `draft` payload from the confirmed `promote` rows. Fold rows that
+   share a `group` value into one entry, in the order the `promote` rows appear
+   in Q's confirmed response. A `promote` row with no `group` becomes its own
+   single-member entry.
+
+   Assign each entry a `groupId` by position: `g1`, `g2`, `g3`, and so on. Never
+   carry Q's `group` value through as the `groupId` — a Q-invented label would
+   collide with a single-member group Q never labelled, and two entries would
+   share one `groupId`.
+
+   Assign each entry a record number before spawning `draft`. Group `i` takes
+   `adrIndex.nextNumber + i`, with `i` zero-based. The codifier never counts and
+   never reads `adrIndex.nextNumber` for itself — two groups drafted against one
+   `nextNumber` would collide on one path, and the barrowkeeper would refuse the
+   whole batch.
+
+   ```json
+   {
+     "groups": [
+       { "groupId": "g1", "entryIds": ["id-1", "id-2"], "adrNumber": 27 },
+       { "groupId": "g2", "entryIds": ["id-3"], "adrNumber": 28 }
+     ]
+   }
+   ```
+6. After gate 2, build `newAdrs` from the verdicts. Keep every `approve`
+   verdict, in the order the drafts were proposed. Drop every `drop` verdict.
+   For each kept verdict, set `path` to its `proposedPath`, and set `content`
+   to the verdict's own `draftText` when it carries one, otherwise to the
+   codifier's `draftText` for that draft. A verdict's `draftText` is Q's edit,
+   and it always wins over the codifier's text.
+
+   If every verdict was `drop`, the run promoted nothing. Omit `newAdrs`
+   entirely. Never send `[]`.
+7. A gate-2 `drop` defers a group. Its candidates were `promote` at gate 1, so
+   the reckoner already assigned their source sessions `target: "done"`. If
+   nothing corrects that, the dropped decision archives to `done` unrecorded
+   and leaves triage forever.
+
+   Before `commit`, treat every dropped group's candidates as `watch`. This is
+   the same recipe step 4's gate-1 override already uses, with gate 2 as a
+   second trigger rather than a second recipe:
+
+   - Re-fold the `watch`-wins rule across every session those candidates
+     touch, not only the dropped ones — another candidate from the same
+     session may already be `watch`.
+   - Keep each row's original `from` untouched.
+   - Serialize the corrected `assignments`.
+   - Re-run `bun <plannerPath> --assignments <corrected assignments JSON>`.
+   - Pass the fresh `planPath` into `commit`.
+
+   Never hand-edit `moves[]` or any other field of the serialized plan — a
+   plan's `target`, `to`, and `from` fields are derived together, so patching
+   one desyncs the rest.
 
 During collection, when a fresh candidate cluster matches an entry in the watched
 bucket, pull the watched entry back in and re-judge the combined evidence. Watched
@@ -209,7 +277,7 @@ documentation.
 
 At gate 1, if no candidate is `promote`, say that approving the dispositions is
 the last decision in this run. Skip draft and gate 2. Invoke commit with only the
-approved plan; pass no `newAdr` and no `metadataUpdate`.
+approved plan; pass no `newAdrs` and no `metadataUpdate`.
 
 A promotion whose source sessions all proved live can produce a draft with an
 empty archive plan. Writing and archiving are independently optional. If the run
@@ -223,9 +291,10 @@ for material information the logs cannot establish. Apply the same promotion
 threshold and identify any existing ADR before drafting.
 
 Pass the reconstructed candidate, confirmed facts, source assignments, and
-archive plan into `draft`. Present the complete draft and proposed path at gate 2
-before writing. Its gate-2 reply uses the same `verdicts` shape, with one entry.
-Pass only the confirmed draft, path, and archive plan into `commit`.
+archive plan into `draft`, as a one-entry `groups` payload. Present the complete
+draft and proposed path at gate 2 before writing. Its gate-2 reply uses the same
+`verdicts` shape, with one entry. Pass a one-entry `newAdrs`, the path, and the
+archive plan into `commit` — the same contract `triage` uses.
 
 ## `supersede <adr-id>` — replace an accepted record
 
@@ -239,6 +308,9 @@ the replacement lands, do not roll anything back. The new record is valid alone,
 and its missing back-link is repairable by hand. Skip archiving in this mode:
 archiving a session while its record is half-written removes the evidence needed
 to finish the repair.
+
+The replacement travels into `commit` as a one-entry `newAdrs`, beside the single
+`metadataUpdate`.
 
 ## Codex
 
@@ -275,12 +347,31 @@ Codex thread. Do not replace the role boundary with an inline flow.
    enters git, so path references are guaranteed to rot.
 6. **Exclude secrets, credentials, personal data, and raw transcript text from
    evidence.** Preserve the decision without leaking its surrounding conversation.
-7. **`draft` and `commit` write exactly one ADR per invocation.** The codifier
-   returns one `draftText`/`proposedPath` pair, and the barrowkeeper writes one
-   `newAdr`. A triage with several `promote` candidates currently needs one
-   `draft`/gate-2/`commit` cycle per candidate — there is no batched or merged
-   multi-ADR path yet. Do not invent one inline; this is tracked as follow-up
-   work, not a gap to paper over with an ad hoc multi-record payload.
+7. **One `draft`, gate-2, and `commit` cycle promotes up to 12 records.** The
+   codifier returns `drafts`, one entry per input group. The barrowkeeper takes
+   `newAdrs`, and writes every entry in one batch. `supersede <adr-id>` still
+   replaces one record per run. `metadataUpdate` stays a single object and is
+   never batched.
+
+## Recovering a failed batch
+
+After the barrowkeeper reports `validation-error`:
+
+- The written records are on disk, uncommitted.
+- The session logs are untouched in `.cockpit/`.
+- The plan file survives at `/tmp/chronicle/adr/`.
+
+Q fixes the offending record by hand, then re-runs `triage`. There is no
+archive-only entry point, and this change adds none.
+
+The re-run self-heals for three reasons:
+
+1. `adrIndex.nextNumber` has advanced past the written records, so no path
+   collides.
+2. The reckoner skips clusters that match an existing ADR, so the same
+   decisions disposition to `skip`.
+3. The run then takes the no-promotion branch, and the archive plan finally
+   applies.
 
 ## Edge Cases
 
