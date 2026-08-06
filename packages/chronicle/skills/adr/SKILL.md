@@ -85,10 +85,9 @@ id field. `conflictResolutions` covers every entry in the reckoner's
 - `group` is optional.
 - Rows that share a `group` value become one ADR.
 - A `promote` row with no `group` is its own single-member group.
-- A `group` value is an opaque clustering label. Q chooses it. The main agent uses it only
-  to decide which rows share a record, and then assigns each group its own positional
-  `groupId` (`g1`, `g2`, `g3`). Q never supplies a `groupId`. A carried-through
-  label would collide with a single-member group that Q never labelled.
+- A `group` value is an opaque clustering label. Q chooses it, and Q never supplies a
+  `groupId`. The main agent uses `group` only to decide which rows share a record, then
+  assigns positional `groupId`s when it builds the `draft` payload (step 5).
 
 Treat the parsed response as the gate response exactly as `cockpit wait` would
 return it, including the consistency check below. Gate 2's response follows
@@ -155,9 +154,8 @@ This is the primary entry point.
    disposition the excess as `watch` in this run — a `watch` candidate archives
    to the watched bucket and re-queues on the next `triage` run, so nothing is
    lost. The main agent never picks the excess itself; which decisions wait is
-   Q's call. 12 is a judgment call from one measured run of 26 groups, not a
-   measured ceiling — Q reports the limit on that run was review fatigue, not a
-   failure.
+   Q's call. 12 is a judgment call, not a measured ceiling: in one 26-group run
+   the limit was review fatigue, not failure.
 
    Before treating Q's gate-1 response as final, check it for internal
    contradictions the reckoner cannot see, since a group or a conflict
@@ -179,20 +177,11 @@ This is the primary entry point.
    any candidate drawn from a session is `watch`, archive that session to the
    watched bucket. Otherwise archive it to `done`.
 
-   If gate 1 changed any disposition the reckoner assumed — overriding a
-   candidate, or declining one half of a proposed `merge` — the reckoner's
-   `assignments` and its `planPath` no longer match Q's decision. Never edit
-   `moves[]` or any other field of the serialized plan by hand: a plan's
-   `target`, `to`, and `from`/`fromBucket` are derived together, and hand
-   patching one desyncs the rest. Instead: apply the confirmed overrides to
-   the candidate dispositions, re-fold the `watch`-wins rule across every
-   session those candidates touch (not just the overridden session — another
-   candidate from the same session may still be `watch`), keep each row's
-   original `from` untouched, serialize the corrected `assignments`, and
-   re-run `bun <plannerPath> --assignments <corrected assignments JSON>`
-   using the `plannerPath` retained from the collect-phase inputs, kept
-   through gate 2 as well. Pass the fresh `planPath` this produces — never a
-   prose description of the overrides — into `commit`.
+   Gate 1 is the first re-plan trigger. If it changed any disposition the
+   reckoner assumed — overriding a candidate, or declining one half of a
+   proposed `merge` — the reckoner's `assignments` and its `planPath` no longer
+   match Q's decision. Apply the confirmed overrides to the candidate
+   dispositions now, and re-plan by **Re-planning the archive** below.
 5. Build the `draft` payload from the confirmed `promote` rows. Fold rows that
    share a `group` value into one entry, in the order the `promote` rows appear
    in Q's confirmed response. A `promote` row with no `group` becomes its own
@@ -204,10 +193,11 @@ This is the primary entry point.
    share one `groupId`.
 
    Assign each entry a record number before spawning `draft`. Group `i` takes
-   `adrIndex.nextNumber + i`, with `i` zero-based. The codifier never counts and
-   never reads `adrIndex.nextNumber` for itself — two groups drafted against one
-   `nextNumber` would collide on one path, and the barrowkeeper would refuse the
-   whole batch.
+   `adrIndex.nextNumber + i`, with `i` zero-based. `adrIndex` arrives in the
+   collect return; retain it through gate 1, the same way `plannerPath` is
+   retained. The codifier never counts and never reads `adrIndex.nextNumber` for
+   itself — two groups drafted against one `nextNumber` would collide on one
+   path, and the barrowkeeper would refuse the whole batch.
 
    ```json
    {
@@ -231,25 +221,36 @@ This is the primary entry point.
    nothing corrects that, the dropped decision archives to `done` unrecorded
    and leaves triage forever.
 
-   Before `commit`, treat every dropped group's candidates as `watch`. This is
-   the same recipe step 4's gate-1 override already uses, with gate 2 as a
-   second trigger rather than a second recipe:
-
-   - Re-fold the `watch`-wins rule across every session those candidates
-     touch, not only the dropped ones — another candidate from the same
-     session may already be `watch`.
-   - Keep each row's original `from` untouched.
-   - Serialize the corrected `assignments`.
-   - Re-run `bun <plannerPath> --assignments <corrected assignments JSON>`.
-   - Pass the fresh `planPath` into `commit`.
-
-   Never hand-edit `moves[]` or any other field of the serialized plan — a
-   plan's `target`, `to`, and `from` fields are derived together, so patching
-   one desyncs the rest.
+   Gate 2 is the second re-plan trigger. Treat every dropped group's candidates
+   as `watch`, and re-plan by **Re-planning the archive** below.
 
 During collection, when a fresh candidate cluster matches an entry in the watched
 bucket, pull the watched entry back in and re-judge the combined evidence. Watched
 items never re-queue on their own.
+
+### Re-planning the archive
+
+Two triggers, one recipe, one planner run. Run it once, immediately before
+`commit`, folding every correction both gates made. A run whose gates corrected
+nothing keeps the reckoner's original `planPath` and never runs the planner.
+
+- Re-fold the `watch`-wins rule across every session the corrected candidates
+  touch, not only the corrected ones — another candidate from the same session
+  may already be `watch`.
+- Keep each row's original `from` untouched.
+- Serialize the corrected `assignments`.
+- Re-run `bun <plannerPath> --assignments <corrected assignments JSON>`, using
+  the `plannerPath` retained from the collect-phase inputs through both gates.
+- Pass the fresh `planPath` into `commit` — never a prose description of the
+  corrections.
+
+Re-planning after gate 1 and again after gate 2 would start the second run from
+the same corrected `assignments` and orphan the first plan file, so fold both
+into the one run.
+
+Never hand-edit `moves[]` or any other field of the serialized plan. A plan's
+`target`, `to`, and `from`/`fromBucket` fields are derived together, so patching
+one desyncs the rest.
 
 ### Promotion threshold
 
@@ -277,7 +278,8 @@ documentation.
 
 At gate 1, if no candidate is `promote`, say that approving the dispositions is
 the last decision in this run. Skip draft and gate 2. Invoke commit with only the
-approved plan; pass no `newAdrs` and no `metadataUpdate`.
+approved plan; pass no `newAdrs` and no `metadataUpdate`. This branch's "before
+`commit`" is right after gate 1, so re-plan there if gate 1 corrected anything.
 
 A promotion whose source sessions all proved live can produce a draft with an
 empty archive plan. Writing and archiving are independently optional. If the run
@@ -291,17 +293,31 @@ for material information the logs cannot establish. Apply the same promotion
 threshold and identify any existing ADR before drafting.
 
 Pass the reconstructed candidate, confirmed facts, source assignments, and
-archive plan into `draft`, as a one-entry `groups` payload. Present the complete
-draft and proposed path at gate 2 before writing. Its gate-2 reply uses the same
-`verdicts` shape, with one entry. Pass a one-entry `newAdrs`, the path, and the
-archive plan into `commit` — the same contract `triage` uses.
+archive plan into `draft`, as a one-entry `groups` payload. Build that entry the
+same way step 5 does: `groupId` is `g1`, `entryIds` is the reconstructed
+candidate's own `entryIds`, and `adrNumber` is `adrIndex.nextNumber`. `adrIndex`
+comes from the collect return, as in `triage`; retain it until `draft` is
+spawned. The codifier refuses to derive a number for itself, so a payload
+without `adrNumber` cannot draft.
+
+```json
+{ "groups": [{ "groupId": "g1", "entryIds": ["id-1"], "adrNumber": 27 }] }
+```
+
+Present the complete draft and proposed path at gate 2 before writing. Its
+gate-2 reply uses the same `verdicts` shape, with one entry. Pass a one-entry
+`newAdrs`, the path, and the archive plan into `commit` — the same contract
+`triage` uses.
 
 ## `supersede <adr-id>` — replace an accepted record
 
 Collect the existing ADR and the evidence for its replacement. Draft the
-replacement first. After gate 2, write the replacement, then update only the old
-record's successor lifecycle metadata. Never rewrite the old decision's context
-or consequences.
+replacement first, through the same one-entry `groups` payload `promote` uses:
+`groupId` `g1`, the replacement's `entryIds`, and `adrNumber`
+`adrIndex.nextNumber` retained from the collect return. The replacement takes a
+fresh number; the superseded record keeps its own. After gate 2, write the
+replacement, then update only the old record's successor lifecycle metadata.
+Never rewrite the old decision's context or consequences.
 
 This is two writes with no transaction. If the successor-link update fails after
 the replacement lands, do not roll anything back. The new record is valid alone,
@@ -364,14 +380,10 @@ After the barrowkeeper reports `validation-error`:
 Q fixes the offending record by hand, then re-runs `triage`. There is no
 archive-only entry point, and this change adds none.
 
-The re-run self-heals for three reasons:
-
-1. `adrIndex.nextNumber` has advanced past the written records, so no path
-   collides.
-2. The reckoner skips clusters that match an existing ADR, so the same
-   decisions disposition to `skip`.
-3. The run then takes the no-promotion branch, and the archive plan finally
-   applies.
+The re-run self-heals: `adrIndex.nextNumber` has advanced past the written
+records, so no path collides; the reckoner skips clusters that match an existing
+ADR, so the same decisions disposition to `skip`; and the run then takes the
+no-promotion branch, where the archive plan finally applies.
 
 ## Edge Cases
 

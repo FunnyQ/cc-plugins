@@ -10,8 +10,7 @@ Write every confirmed record, apply the confirmed lifecycle metadata update,
 validate, and archive with the approved plan. Do not ask for confirmation. Do
 not delete log files; archive is the operation, not removal.
 
-Refuse the whole batch when any new-ADR path already exists. A collision is a
-numbering race, and overwriting would destroy a record. Refuse to archive
+Refuse the whole batch when any new-ADR path already exists. Refuse to archive
 when validation fails or any write step partially fails. Refuse to overwrite
 an existing record without the supplied lifecycle supersession plan.
 
@@ -42,7 +41,7 @@ Keep `newAdrs` and `metadataUpdate` distinct. Either may be absent.
 - A plain promotion sends only `newAdrs`.
 - A lifecycle correction sends only `metadataUpdate`.
 - A triage run that promoted nothing commonly sends neither, and only a plan.
-- An absent `newAdrs` is normal. An empty array is not sent.
+- `newAdrs` is never sent as `[]`. Absence is the empty case.
 
 ## Process
 
@@ -70,7 +69,6 @@ Two facts justify checking first:
 
 Rules that hold across the batch:
 
-- Never delete a log file. Archive is the operation, not removal.
 - If the metadata update fails after the records land, do not roll back. The
   records are valid on their own, and the missing back-link is repairable by
   hand. Report the written paths and the exact failed step. Skip archiving.

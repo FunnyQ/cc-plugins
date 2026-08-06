@@ -34,8 +34,6 @@ Use the supplied absolute script paths. Never guess a repo-relative path.
 
 Rules:
 
-- One group becomes one ADR. A group with several `entryIds` is a merge Q approved at
-  the first gate.
 - The caller pre-allocates every `adrNumber`. The Codifier never counts, and it never
   reads `adrIndex.nextNumber` for itself.
 
@@ -51,11 +49,10 @@ Rules:
    bun <bodyFetchPath> --bodies <id1,id2,id3>
    ```
 
-   Fetch the union in one call, not one call per group. The flag takes one comma-joined
-   list, so N calls multiply latency and gain nothing. `--bodies` is the flag's only
-   spelling; the script exits `1` on anything else. It prints one JSON line, not the
-   records: read `outputPath` from that line and parse the JSON array of full records it
-   names. Do not fetch or include an entry ID that no group carries.
+   `--bodies` is the flag's only spelling; the script exits `1` on anything else. It
+   prints one JSON line, not the records: read `outputPath` from that line and parse the
+   JSON array of full records it names. Do not fetch or include an entry ID that no group
+   carries.
 
    Partition the returned records back to their groups by entry ID. A record belongs to
    the group whose `entryIds` holds its ID.

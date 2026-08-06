@@ -57,8 +57,10 @@ Require:
 3. Spawn `chronicle:reckoner` with the gleaner result's `outputPath` and `adrIndex`,
    plus `bodyFetchPath` and `plannerPath`.
 4. Receive the candidate list, conflicts, assignments, and serialized archive plan path.
-5. Return the reckoner result to the main agent. Do not return the intermediate gleaner
-   result.
+5. Return the reckoner result, plus the gleaner's `adrIndex` verbatim, to the main agent.
+   Return no other part of the gleaner result. The main agent allocates every `adrNumber`
+   from `adrIndex.nextNumber`, so dropping `adrIndex` here leaves it with no number to
+   assign at `draft`.
 
 ### Phase: `draft`
 
@@ -147,7 +149,8 @@ description of what the draft contains.
   "candidates": [],
   "conflicts": [],
   "assignments": [],
-  "planPath": "/tmp/chronicle/adr/plan-1754438400000-51234.json"
+  "planPath": "/tmp/chronicle/adr/plan-1754438400000-51234.json",
+  "adrIndex": { "dir": "docs/adr", "exists": true, "adrs": [], "nextNumber": 1, "brokenLinks": [], "skipped": [] }
 }
 ```
 
