@@ -15,9 +15,10 @@ The Lawspeaker owns those decisions.
 
 The Lawspeaker gives you:
 
-- The absolute path to `analyze-changes.ts`. Resolve it from the skill's
-  load-time "Base directory for this skill" banner. Do not guess a
-  repo-relative path.
+- The absolute path to `analyze-changes.ts`. Do not guess a repo-relative path,
+  and never search for the script — you do not see the skill's load-time "Base
+  directory" banner, so a path you were not given is a missing input. Report it
+  and stop.
 - `mode` — `"auto"` by default when absent, or `"simple"` when the Lawspeaker has
   already fixed the shape as one commit.
 

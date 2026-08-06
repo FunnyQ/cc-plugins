@@ -41,13 +41,33 @@ complete draft and target path, log `needs_your_call`, then use `cockpit wait`
 again. Do not put either gate inside Lorekeeper. Do not use `AskUserQuestion` for
 these gates because the cockpit wait/send bridge must hand control back to Q.
 
+## Script paths
+
+Only the main agent sees the skill's load-time "Base directory for this skill"
+banner. A subagent does not. Resolve `$SKILL_DIR` from that banner and pass every
+path each phase needs as an absolute path, in the spawn prompt. A child that has to
+find a script starts searching the plugin cache — that is the caller's bug.
+
+| Input | Path |
+| --- | --- |
+| `collectorPath`, `bodyFetchPath` | `$SKILL_DIR/scripts/collect-adr-context.ts` |
+| `indexReaderPath` | `$SKILL_DIR/scripts/adr-index.ts` |
+| `plannerPath` | `$SKILL_DIR/scripts/archive-plan.ts` |
+| `templatePath` | `$SKILL_DIR/references/adr-template.md` |
+| `validatorPath` | `$SKILL_DIR/scripts/adr-validate.ts` |
+| `archiverPath` | `$SKILL_DIR/scripts/archive-logs.ts` |
+
+`collect` takes `collectorPath`, `indexReaderPath`, `bodyFetchPath`, and
+`plannerPath`. `draft` takes `bodyFetchPath` and `templatePath`. `commit` takes
+`validatorPath` and `archiverPath`.
+
 ## `triage` — process the inbox
 
 This is the primary entry point.
 
-1. Spawn Lorekeeper in `collect` phase with `$SKILL_DIR`, `contextBrief`, the
-   requested mode, and any explicit scope. It scans unarchived logs and the
-   watched bucket. Scanning and judging are read-only.
+1. Spawn Lorekeeper in `collect` phase with the four collect paths above,
+   `contextBrief`, the requested mode, and any explicit scope. It scans unarchived
+   logs and the watched bucket. Scanning and judging are read-only.
 2. Cluster by **decision**, not by session. Assign every candidate `promote`,
    `watch`, or `skip`, and give a reason. Surface assignments from candidates to
    their source sessions.
@@ -124,9 +144,8 @@ to finish the repair.
 Codex loads the same three-phase Lorekeeper boundary through one of two paths:
 
 1. **Named-role selector available**: spawn exactly one registered
-   `chronicle_lorekeeper` per phase. Pass `$SKILL_DIR` from the skill's load-time
-   "Base directory" banner, `contextBrief`, and the phase-specific carry-over
-   state.
+   `chronicle_lorekeeper` per phase. Pass the resolved absolute paths from
+   **Script paths**, `contextBrief`, and the phase-specific carry-over state.
 2. **Generic sub-agent API only**: verify stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
    exactly one non-fork generic agent per phase with task name

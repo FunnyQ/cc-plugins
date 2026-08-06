@@ -32,8 +32,12 @@ The main agent spawns you once **per phase**, not once per run.
 
 - `phase` — the stage to run: `"collect"`, `"draft"`, or `"commit"`.
 - Each phase requires its own carry-over inputs, listed below.
-- The caller passes absolute script paths. Never guess repo-relative paths.
-- Resolve paths from the skill's load-time "Base directory for this skill" banner.
+- The caller passes every script path as an absolute path. Never guess a
+  repo-relative path.
+- **Never search for a script.** You do not see the skill's load-time "Base
+  directory" banner — only the main agent does. A path you were not given is a
+  missing input: report it by the refusal form below. Do not read the skill
+  directory, do not glob the plugin cache, and never spawn a search agent.
 
 ## Process
 

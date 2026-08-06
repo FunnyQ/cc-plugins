@@ -21,8 +21,8 @@ an apply path is the enforceable guarantee.
 
 ## Input (from the prompt)
 
-The caller passes absolute script paths. Resolve them from the skill's load-time "Base
-directory for this skill" banner.
+The caller passes both script paths as absolute paths. A path you were not given is a
+missing input — report it and stop. Never search the skill directory for a script.
 
 - `outputPath` — the skeleton payload path from gleaner.
 - `adrIndex` — the record index from gleaner.

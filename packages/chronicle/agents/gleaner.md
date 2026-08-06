@@ -17,8 +17,8 @@ gate that authorizes it.
 
 ## Input (from the prompt)
 
-The caller passes absolute script paths. Resolve them from the skill's load-time "Base
-directory for this skill" banner.
+The caller passes both script paths as absolute paths. A path you were not given is a
+missing input — report it and stop. Never search the skill directory for a script.
 
 - `collectorPath` — absolute path to the trail collector script, for example
   `.../skills/adr/scripts/collect-adr-context.ts`.
