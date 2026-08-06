@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.10.4] - 2026-08-07
+
+_tracks tag `chronicle-v0.10.4`_
+
+### Changed
+- ADR's two human review gates now render a fixed, purpose-built local page instead of markup the main agent hand-assembled each run. The main agent now supplies only the review data; the page's layout, wording, and consistency checks stay stable across runs instead of drifting between them.
+- The gate page is written to a local temp file and opened with the platform's default browser rather than hosted anywhere, since the page is fully self-contained and review data never needs to leave the machine.
+- When no browser is available, the gate falls back to the Artifact tool, then to structured markdown in the transcript. This cascade is chosen by whether a browser is present, not by which harness is running — Codex goes through the same script as Claude.
+- `cockpit wait` and the `needs_your_call` handoff were dropped from both ADR gates. The wait step only ever succeeded with the answer-here switch on and a subscribed browser tab, and a gate carrying up to twelve full decision records didn't fit a cockpit card anyway.
+
 ## [chronicle 0.10.3] - 2026-08-07
 
 _tracks tag `chronicle-v0.10.3`_
