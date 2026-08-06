@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: codex/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -153,43 +153,43 @@ loses a decision the human already approved at the first gate.
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/agents/codifier.md` contains no occurrence of `candidateIds`.
-- [ ] `adrIndex` survives in exactly one place: the sentence stating that the Codifier never
+- [x] `packages/chronicle/agents/codifier.md` contains no occurrence of `candidateIds`.
+- [x] `adrIndex` survives in exactly one place: the sentence stating that the Codifier never
       reads `adrIndex.nextNumber` for itself. It is gone from the Input list and from the
       numbering step.
-- [ ] The Input section documents `groups` with the `{ groupId, entryIds, adrNumber }`
+- [x] The Input section documents `groups` with the `{ groupId, entryIds, adrNumber }`
       shape, and states that the Codifier never counts.
-- [ ] Exactly one `bun <bodyFetchPath> --bodies` command appears in the file, described as
+- [x] Exactly one `bun <bodyFetchPath> --bodies` command appears in the file, described as
       one call over the union of every group's `entryIds`.
-- [ ] The file states that the group's given `adrNumber` is baked into both the H1 and
+- [x] The file states that the group's given `adrNumber` is baked into both the H1 and
       `proposedPath`, and names the `adr-validate.ts` rule `id-mismatch` as the failure it
       prevents.
-- [ ] The Output section shows the `drafts` array. Neither `draftText` nor `proposedPath`
+- [x] The Output section shows the `drafts` array. Neither `draftText` nor `proposedPath`
       is a top-level field of the returned JSON: inside the output shape, every occurrence
       of both sits under a `drafts[]` entry. Prose elsewhere in the file may name either
       token freely.
-- [ ] The file states the 12-group cap and tells the Codifier to refuse a larger input
+- [x] The file states the 12-group cap and tells the Codifier to refuse a larger input
       rather than truncate it.
-- [ ] The seven frontmatter lines are byte-identical to the block quoted in Implementation
+- [x] The seven frontmatter lines are byte-identical to the block quoted in Implementation
       notes.
 
 ## Verification
 
-- [ ] Run `grep -n "candidateIds" packages/chronicle/agents/codifier.md` and confirm it
+- [x] Run `grep -n "candidateIds" packages/chronicle/agents/codifier.md` and confirm it
       prints nothing.
-- [ ] Run `grep -o "adrIndex" packages/chronicle/agents/codifier.md | wc -l` and confirm the
+- [x] Run `grep -o "adrIndex" packages/chronicle/agents/codifier.md | wc -l` and confirm the
       count is `1`. Use `grep -o … | wc -l`, not `grep -c`: `grep -c` counts matching lines,
       so two mentions on one line would read as one.
-- [ ] Run `grep -n "groups\|groupId\|adrNumber\|drafts" packages/chronicle/agents/codifier.md`
+- [x] Run `grep -n "groups\|groupId\|adrNumber\|drafts" packages/chronicle/agents/codifier.md`
       and confirm every one of the four tokens is present.
-- [ ] Run `grep -c -- "--bodies" packages/chronicle/agents/codifier.md` and confirm the
+- [x] Run `grep -c -- "--bodies" packages/chronicle/agents/codifier.md` and confirm the
       count matches the mentions this file describes, with exactly one of them a runnable
       command line.
-- [ ] Run `grep -n "id-mismatch" packages/chronicle/agents/codifier.md` and confirm the
+- [x] Run `grep -n "id-mismatch" packages/chronicle/agents/codifier.md` and confirm the
       rule is named.
-- [ ] Run `head -7 packages/chronicle/agents/codifier.md` and confirm the seven lines match
+- [x] Run `head -7 packages/chronicle/agents/codifier.md` and confirm the seven lines match
       the frontmatter block quoted in Implementation notes.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. This
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. This
       task changes no script, so a failure means an edit landed out of scope.
 
 ## Eval rubric

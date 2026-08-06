@@ -64,15 +64,25 @@ Require:
 
 Require:
 
-- `candidateIds` — the entry ids of the approved candidates from the `collect` gate.
+- `groups` — the approved group list from the gate-1 confirmation. Each entry holds
+  `groupId`, `entryIds`, and `adrNumber`:
+
+  ```json
+  {
+    "groups": [
+      { "groupId": "g1", "entryIds": ["id-1", "id-2"], "adrNumber": 27 },
+      { "groupId": "g2", "entryIds": ["id-3"], "adrNumber": 28 }
+    ]
+  }
+  ```
+
+  The main agent allocated each `adrNumber`. Pass `groups` through unchanged.
 - `bodyFetchPath` — absolute path to the trail collector script, for `--bodies`.
 - `templatePath` — absolute path to `references/adr-template.md`.
-- `adrIndex` — the record index, so the draft can propose the next number.
 
-1. Spawn `chronicle:codifier` with `candidateIds`, `bodyFetchPath`, `templatePath`, and
-   `adrIndex`.
-2. Receive `draftText` and `proposedPath`.
-3. Return both values to the main agent.
+1. Spawn `chronicle:codifier` with `groups`, `bodyFetchPath`, and `templatePath`.
+2. Receive `drafts`.
+3. Return `drafts` to the main agent.
 
 ### Phase: `commit`
 
@@ -91,17 +101,29 @@ runs the validator or the archiver against an empty path.
 
 Optional, and each independently so:
 
-- `newAdr` — `{ "path": <approved target path>, "content": <approved draft text> }`.
-  Assemble it from the values the gate-2 confirmation returned. Omit it entirely when
-  the run promoted nothing.
+- `newAdrs` — an array of `{ "path": <approved target path>, "content": <approved draft
+  text> }` objects, one per approved draft. Assemble it from the values the gate-2
+  confirmation returned.
+
+  ```json
+  {
+    "newAdrs": [{ "path": "docs/adr/0027-....md", "content": "..." }],
+    "metadataUpdate": { "path": "...", "set": {} }
+  }
+  ```
+
+  Omit `newAdrs` entirely when the run promoted nothing. Never send `[]`.
+  `newAdr` is an unknown field. Refuse a caller that sends `newAdr`, and name the field
+  in the refusal. Without the refusal a stale caller writes one record out of five,
+  silently.
 - `metadataUpdate` — `{ "path": ..., "set": { ... } }` for a supersession back-link.
 
 1. Spawn `chronicle:barrowkeeper` with `planPath`, `validatorPath`, `archiverPath`, and
-   whichever of `newAdr` and `metadataUpdate` the gate approved.
+   whichever of `newAdrs` and `metadataUpdate` the gate approved.
 2. Receive what was written, what was archived, and what was refused.
 3. Return the result to the main agent.
 
-**A commit with neither `newAdr` nor `metadataUpdate` is the normal no-promotion path,
+**A commit with neither `newAdrs` nor `metadataUpdate` is the normal no-promotion path,
 not a missing input.** A triage run where every candidate was `watch` or `skip` still
 has an approved archive plan to apply, and refusing it there would strand the plan and
 leave the inbox untriageable. This exception covers the two optional inputs only. It
@@ -114,8 +136,8 @@ summary of it. The main agent presents this JSON at a human gate; a summary forc
 extra round-trip to fetch what should have been in the first return. `candidates` must
 carry every field the reckoner produced — `title`, `disposition`, `reason`, `entryIds`,
 `sessionIds`, and `matchesAdr` — for every candidate, not a title-only listing.
-`draftText` must be the complete ADR body, not a description of what the draft
-contains.
+Each entry in `drafts` must carry a complete ADR body in `draftText`, not a
+description of what the draft contains.
 
 ### Collect phase
 
@@ -134,10 +156,13 @@ contains.
 ```json
 {
   "phase": "draft",
-  "draftText": "...",
-  "proposedPath": "docs/adr/0001-title.md"
+  "drafts": [
+    { "groupId": "g1", "draftText": "...", "proposedPath": "docs/adr/0027-....md" }
+  ]
 }
 ```
+
+`drafts` holds one entry per input group, in the same order, with the same `groupId`.
 
 ### Commit phase
 

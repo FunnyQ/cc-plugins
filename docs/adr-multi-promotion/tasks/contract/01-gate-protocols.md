@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: contract/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -207,32 +207,32 @@ Do not move either block.
 
 ## Acceptance criteria
 
-- [ ] `grep -n '"group"' packages/chronicle/skills/adr/SKILL.md` prints the gate-1 schema
+- [x] `grep -n '"group"' packages/chronicle/skills/adr/SKILL.md` prints the gate-1 schema
       line carrying `"group": "g1"`.
-- [ ] `grep -n '"notes"' packages/chronicle/skills/adr/SKILL.md` prints nothing.
-- [ ] `grep -n 'mergeGroup' packages/chronicle/skills/adr/SKILL.md` prints nothing.
-- [ ] `grep -n 'verdicts' packages/chronicle/skills/adr/SKILL.md` prints the gate-2 schema.
-- [ ] `grep -n 'one proposed ADR' packages/chronicle/skills/adr/SKILL.md` prints nothing.
-- [ ] `grep -n 'multi-candidate promotion is not yet wired' packages/chronicle/skills/adr/SKILL.md`
+- [x] `grep -n '"notes"' packages/chronicle/skills/adr/SKILL.md` prints nothing.
+- [x] `grep -n 'mergeGroup' packages/chronicle/skills/adr/SKILL.md` prints nothing.
+- [x] `grep -n 'verdicts' packages/chronicle/skills/adr/SKILL.md` prints the gate-2 schema.
+- [x] `grep -n 'one proposed ADR' packages/chronicle/skills/adr/SKILL.md` prints nothing.
+- [x] `grep -n 'multi-candidate promotion is not yet wired' packages/chronicle/skills/adr/SKILL.md`
       prints nothing.
-- [ ] `grep -n 'On Claude Code\|On Codex' packages/chronicle/skills/adr/SKILL.md` prints
+- [x] `grep -n 'On Claude Code\|On Codex' packages/chronicle/skills/adr/SKILL.md` prints
       both fallback branches.
-- [ ] The gate-1 consistency check names a `group` holding a non-`promote` row, and the
+- [x] The gate-1 consistency check names a `group` holding a non-`promote` row, and the
       **A watch item that contradicts its own conflict** bullet is still present in full.
-- [ ] The `promote <candidate-or-topic>` section still describes one record, and names the
+- [x] The `promote <candidate-or-topic>` section still describes one record, and names the
       `verdicts` shape with one entry.
 
 ## Verification
 
-- [ ] Run `grep -c 'group' packages/chronicle/skills/adr/SKILL.md` and confirm the count is
+- [x] Run `grep -c 'group' packages/chronicle/skills/adr/SKILL.md` and confirm the count is
       at least 4: the schema field, the group rule, the consistency-check bullet, and the
       ledger column.
-- [ ] Run `grep -n 'draftText\|proposedPath' packages/chronicle/skills/adr/SKILL.md` and
+- [x] Run `grep -n 'draftText\|proposedPath' packages/chronicle/skills/adr/SKILL.md` and
       confirm every hit sits inside the `verdicts` schema or the `promote` mode sentence.
       No hit describes a bare top-level `draftText`/`proposedPath` pair.
-- [ ] Read the `## Topology` section end to end. Confirm gate 1 and gate 2 both read as a
+- [x] Read the `## Topology` section end to end. Confirm gate 1 and gate 2 both read as a
       batch, and that no sentence still says one draft.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. This
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. This
       task changes no script, so a failure means an edit landed outside
       `packages/chronicle/skills/adr/SKILL.md`.
 

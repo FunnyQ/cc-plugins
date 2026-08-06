@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: codex/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -121,28 +121,28 @@ The path-collision shape is the exception, and it carries no `newAdrPaths` at al
 
 ## Acceptance criteria
 
-- [ ] `packages/chronicle/agents/barrowkeeper.md` names `newAdrs` as an array of `{ path, content }` in its input block.
-- [ ] No bare `newAdr` field name survives in the file. Every occurrence is either `newAdrs` or `newAdrPaths`.
-- [ ] The Process section documents the collision pre-check as step 1, ahead of every write, and states why the check moves first.
-- [ ] The Process section documents all six steps in the frozen order, ending with `bun <archiverPath> --plan <planPath> --apply`.
-- [ ] All three output shapes are present, with the literal reason strings `path-collision` and `validation-error`.
-- [ ] `newAdrPaths` is an array on the success shape, the validation-error shape, and the metadata-update-failure shape, and the file states that those three never omit it.
-- [ ] The path-collision shape carries `collisions` and no `newAdrPaths`, and the file says why.
-- [ ] No sentence tells the Barrowkeeper to omit a record-path field when nothing was written.
-- [ ] `metadataUpdate` is still a single object with a `path` and a `set` map.
-- [ ] The rules on deletion, rollback, lifecycle-only fields, warning tolerance, and `planPath` pass-through all survive in the rewritten text.
-- [ ] The YAML frontmatter is byte-identical to the version before this task.
+- [x] `packages/chronicle/agents/barrowkeeper.md` names `newAdrs` as an array of `{ path, content }` in its input block.
+- [x] No bare `newAdr` field name survives in the file. Every occurrence is either `newAdrs` or `newAdrPaths`.
+- [x] The Process section documents the collision pre-check as step 1, ahead of every write, and states why the check moves first.
+- [x] The Process section documents all six steps in the frozen order, ending with `bun <archiverPath> --plan <planPath> --apply`.
+- [x] All three output shapes are present, with the literal reason strings `path-collision` and `validation-error`.
+- [x] `newAdrPaths` is an array on the success shape, the validation-error shape, and the metadata-update-failure shape, and the file states that those three never omit it.
+- [x] The path-collision shape carries `collisions` and no `newAdrPaths`, and the file says why.
+- [x] No sentence tells the Barrowkeeper to omit a record-path field when nothing was written.
+- [x] `metadataUpdate` is still a single object with a `path` and a `set` map.
+- [x] The rules on deletion, rollback, lifecycle-only fields, warning tolerance, and `planPath` pass-through all survive in the rewritten text.
+- [x] The YAML frontmatter is byte-identical to the version before this task.
 
 ## Verification
 
-- [ ] Run `grep -n "newAdrs" packages/chronicle/agents/barrowkeeper.md` and confirm it appears in the input block and in the Process section.
-- [ ] Run `grep -n "newAdrPaths" packages/chronicle/agents/barrowkeeper.md` and confirm three or more output shapes carry it.
-- [ ] Run `grep -nE "newAdr[^sP]|newAdr$" packages/chronicle/agents/barrowkeeper.md` and confirm it prints nothing.
-- [ ] Run `grep -n "path-collision" packages/chronicle/agents/barrowkeeper.md` and confirm the reason string is present.
-- [ ] Run `grep -n "validation-error" packages/chronicle/agents/barrowkeeper.md` and confirm the reason string is present.
-- [ ] Run `grep -n "newAdrPath\"" packages/chronicle/agents/barrowkeeper.md` and confirm it prints nothing, so no singular path field survives in a JSON shape.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm every test passes. This task changes no script, so a failure means an edit went out of scope.
-- [ ] Read the frontmatter block and confirm the `name`, `description`, `model`, `effort`, and `tools` lines are unchanged.
+- [x] Run `grep -n "newAdrs" packages/chronicle/agents/barrowkeeper.md` and confirm it appears in the input block and in the Process section.
+- [x] Run `grep -n "newAdrPaths" packages/chronicle/agents/barrowkeeper.md` and confirm three or more output shapes carry it.
+- [x] Run `grep -nE "newAdr[^sP]|newAdr$" packages/chronicle/agents/barrowkeeper.md` and confirm it prints nothing.
+- [x] Run `grep -n "path-collision" packages/chronicle/agents/barrowkeeper.md` and confirm the reason string is present.
+- [x] Run `grep -n "validation-error" packages/chronicle/agents/barrowkeeper.md` and confirm the reason string is present.
+- [x] Run `grep -n "newAdrPath\"" packages/chronicle/agents/barrowkeeper.md` and confirm it prints nothing, so no singular path field survives in a JSON shape.
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm every test passes. This task changes no script, so a failure means an edit went out of scope.
+- [x] Read the frontmatter block and confirm the `name`, `description`, `model`, `effort`, and `tools` lines are unchanged.
 
 ## Eval rubric
 

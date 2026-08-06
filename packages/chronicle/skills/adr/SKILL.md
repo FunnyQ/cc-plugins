@@ -36,8 +36,8 @@ sequential, not a team: never spawn the gleaner, the reckoner, the codifier, or
 the barrowkeeper yourself, never run two phases at once, and never put two agents
 in one message. It does not inherit
 the main conversation. At gate 1, log `needs_your_call`, then use `cockpit wait`
-in the main agent to receive Q's confirmed dispositions. At gate 2, present the
-complete draft and target path, log `needs_your_call`, then use `cockpit wait`
+in the main agent to receive Q's confirmed dispositions. At gate 2, present
+every draft and its target path, log `needs_your_call`, then use `cockpit wait`
 again. Do not put either gate inside Lorekeeper. Do not use `AskUserQuestion` for
 these gates because the cockpit wait/send bridge must hand control back to Q.
 
@@ -47,16 +47,17 @@ silently switching to `AskUserQuestion`:
 
 - **On Claude Code**, build a custom interactive HTML review page with the
   `Artifact` tool: gate 1 is a disposition ledger (one row per candidate, its
-  disposition and reason, and controls to confirm or override it) with a
-  live-updating decision summary and a "copy for chat" button; gate 2 is the
-  full draft text per proposed ADR, collapsible per record, for a verbatim
-  read-through.
+  disposition and reason, a `group` column, and controls to confirm or
+  override it) with a live-updating decision summary and a "copy for chat"
+  button; gate 2 shows every proposed draft, collapsible per record, with an
+  approve-or-drop control per record, for a verbatim read-through.
 - **On Codex**, which has no `Artifact` tool, print the same content as
   structured markdown directly in the transcript — the candidate ledger for
-  gate 1, the full draft text for gate 2 — and ask Q to reply in the same
-  terminal with the response block below. This is not `AskUserQuestion`: it is
-  the same plaintext round-trip the Artifact path uses, over the terminal
-  instead of a copy button.
+  gate 1 with its `group` column, the full draft text for every proposed
+  record at gate 2 — and ask Q to reply in the same terminal with the response
+  block below. This is not `AskUserQuestion`: it is the same plaintext
+  round-trip the Artifact path uses, over the terminal instead of a copy
+  button.
 
 Either path produces the same plaintext gate-1 response, which Q pastes or
 types back. Require the complete set, not only the changed rows — a partial
@@ -65,29 +66,49 @@ reply is ambiguous about which candidates it leaves untouched:
 ```json
 {
   "dispositions": [
-    { "entryIds": ["id-1", "id-2"], "decision": "promote" },
-    { "entryIds": ["id-3"], "decision": "skip" }
+    { "entryIds": ["id-1"], "decision": "promote", "group": "g1" },
+    { "entryIds": ["id-2"], "decision": "promote", "group": "g1" },
+    { "entryIds": ["id-3"], "decision": "promote" },
+    { "entryIds": ["id-4"], "decision": "skip" }
   ],
   "conflictResolutions": [
-    { "entryIds": ["id-4", "id-5"], "resolution": "skip" }
-  ],
-  "notes": ""
+    { "entryIds": ["id-5", "id-6"], "resolution": "skip" }
+  ]
 }
 ```
 
 `entryIds` must match a candidate's `entryIds` from the reckoner output
 exactly — it is the candidate's identity, since candidates carry no separate
 id field. `conflictResolutions` covers every entry in the reckoner's
-`conflicts`. This schema has no field for merging two candidates into one ADR;
-multi-candidate promotion is not yet wired through `draft` and `commit` (see
-the codifier/barrowkeeper single-record limit below). Until that lands, note a
-requested merge in free text under `notes` and apply it by hand — do not
-invent a `mergeGroup` field the rest of the pipeline cannot consume.
+`conflicts`.
+
+- `group` is optional.
+- Rows that share a `group` value become one ADR.
+- A `promote` row with no `group` is its own single-member group.
+- A `group` value is an opaque clustering label. Q chooses it. The main agent uses it only
+  to decide which rows share a record, and then assigns each group its own positional
+  `groupId` (`g1`, `g2`, `g3`). Q never supplies a `groupId`. A carried-through
+  label would collide with a single-member group that Q never labelled.
 
 Treat the parsed response as the gate response exactly as `cockpit wait` would
-return it, including the consistency check above. Gate 2's response follows
-the same shape: Q's reply is either an unqualified approval, or an edited
-`draftText`/`proposedPath` pair Q pastes back for the one proposed ADR.
+return it, including the consistency check below. Gate 2's response follows
+this schema:
+
+```json
+{
+  "verdicts": [
+    { "proposedPath": "docs/adr/0027-....md", "verdict": "approve" },
+    { "proposedPath": "docs/adr/0028-....md", "verdict": "drop" },
+    { "proposedPath": "docs/adr/0029-....md", "verdict": "approve", "draftText": "..." }
+  ]
+}
+```
+
+- One entry per proposed draft. `verdict` is `approve` or `drop`.
+- An optional `draftText` on an `approve` replaces the codifier's text for that record.
+- Require the complete set. A partial reply is ambiguous, so re-surface it to Q.
+- A `drop` leaves a number gap. Nothing is renumbered. `adr-index.ts` never reuses a gap,
+  because reusing a number would make an id ambiguous across git history.
 
 ## Script paths
 
@@ -124,15 +145,13 @@ This is the primary entry point.
    empty. Deliberately leave sessions written in the last ten minutes behind.
 
    Before treating Q's gate-1 response as final, check it for internal
-   contradictions the reckoner cannot see, since a merge or a conflict
+   contradictions the reckoner cannot see, since a group or a conflict
    resolution is a gate-1-only decision the reckoner never produces or
    validates:
 
-   - **A merge with a declined half.** If Q's response folds two candidates
-     into one ADR, both must still be `promote`. If Q declined one, do not
-     silently merge the declined content in and do not silently drop the
-     merge — re-surface it: ask whether the surviving candidate stands alone
-     or the merge itself is off.
+   - **A group with a non-`promote` row.** A `group` that holds any non-`promote` row is a
+     contradiction. Re-surface it to Q. Ask whether the remaining rows still form one record,
+     or whether the group itself is off. Never guess which half wins.
    - **A watch item that contradicts its own conflict.** If a candidate is
      `watch` because of an entry in `conflicts`, and Q's response also
      resolves that same conflict, the disposition and the resolution must
@@ -205,8 +224,8 @@ threshold and identify any existing ADR before drafting.
 
 Pass the reconstructed candidate, confirmed facts, source assignments, and
 archive plan into `draft`. Present the complete draft and proposed path at gate 2
-before writing. Pass only the confirmed draft, path, and archive plan into
-`commit`.
+before writing. Its gate-2 reply uses the same `verdicts` shape, with one entry.
+Pass only the confirmed draft, path, and archive plan into `commit`.
 
 ## `supersede <adr-id>` — replace an accepted record
 

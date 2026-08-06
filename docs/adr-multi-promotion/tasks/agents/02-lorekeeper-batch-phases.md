@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: codex/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -129,34 +129,37 @@ alone.
 
 ## Acceptance criteria
 
-- [ ] `grep -n "candidateIds" packages/chronicle/agents/lorekeeper.md` returns nothing.
-- [ ] The `draft` phase Require list names `groups`, `bodyFetchPath`, and `templatePath`,
+- [x] `grep -n "candidateIds" packages/chronicle/agents/lorekeeper.md` returns nothing.
+- [x] The `draft` phase Require list names `groups`, `bodyFetchPath`, and `templatePath`,
       and no longer requires `adrIndex`.
-- [ ] The `draft` phase steps spawn one Codifier with `groups` and return `drafts`.
-- [ ] The `draft` phase output block is the `drafts` array form, with `groupId`,
+- [x] The `draft` phase steps spawn one Codifier with `groups` and return `drafts`.
+- [x] The `draft` phase output block is the `drafts` array form, with `groupId`,
       `draftText`, and `proposedPath` per entry.
-- [ ] The `commit` phase optional input is `newAdrs`, an array of `{ path, content }`,
+- [x] The `commit` phase optional input is `newAdrs`, an array of `{ path, content }`,
       omitted entirely when nothing promoted and never sent as `[]`.
-- [ ] The only surviving `newAdr` mention is the unknown-field refusal, and that refusal
+- [x] The only surviving `newAdr` mention is the unknown-field refusal, and that refusal
       states the failure it prevents.
-- [ ] `planPath`, `validatorPath`, and `archiverPath` are still all required, and the
+- [x] `planPath`, `validatorPath`, and `archiverPath` are still all required, and the
       `PHASE MISSING INPUT` refusal text is unchanged.
-- [ ] `metadataUpdate` is still described as a single object.
-- [ ] The no-promotion exception paragraph survives with its meaning intact.
-- [ ] The YAML frontmatter is byte-identical to the version before this task.
+- [x] `metadataUpdate` is still described as a single object.
+- [x] The no-promotion exception paragraph survives with its meaning intact.
+- [x] The YAML frontmatter is byte-identical to the version before this task.
 
 ## Verification
 
-- [ ] Run `grep -n "candidateIds\|adrIndex" packages/chronicle/agents/lorekeeper.md` and
-      confirm it prints nothing.
-- [ ] Run `grep -n "groups\|drafts\|newAdrs" packages/chronicle/agents/lorekeeper.md` and
+- [x] Run `grep -n "candidateIds" packages/chronicle/agents/lorekeeper.md` and confirm it
+      prints nothing.
+- [x] Run `grep -n "adrIndex" packages/chronicle/agents/lorekeeper.md` and confirm every
+      hit sits inside the `collect` phase's Process steps (receiving it from the gleaner,
+      forwarding it to the reckoner). The `draft` phase Require list must not mention it.
+- [x] Run `grep -n "groups\|drafts\|newAdrs" packages/chronicle/agents/lorekeeper.md` and
       confirm hits in the `draft` Require list, the `draft` steps, the `draft` output
       block, and the `commit` optional inputs.
-- [ ] Run `grep -n "newAdr\b" packages/chronicle/agents/lorekeeper.md` and confirm the
+- [x] Run `grep -n "newAdr\b" packages/chronicle/agents/lorekeeper.md` and confirm the
       only hit is the unknown-field refusal sentence.
-- [ ] Run `grep -n "PHASE MISSING INPUT\|no-promotion path\|metadataUpdate" packages/chronicle/agents/lorekeeper.md`
+- [x] Run `grep -n "PHASE MISSING INPUT\|no-promotion path\|metadataUpdate" packages/chronicle/agents/lorekeeper.md`
       and confirm all three survive.
-- [ ] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. No
+- [x] Run `bun test packages/chronicle/skills/adr/scripts/` and confirm it passes. No
       script changed, so a failure means an edit landed outside the declared file.
 
 ## Eval rubric
