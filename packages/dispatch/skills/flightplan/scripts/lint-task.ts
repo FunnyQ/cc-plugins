@@ -312,10 +312,17 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
  *      reaches every other task, so the review can't start until all the work
  *      is done and it sees the whole deliverable.
  *
+ *   3. **location** — that task sits at `review/01`, its own reserved bucket.
+ *
  * The marker says "this is the review" (not just a task that happens to be
  * terminal); coverage proves it actually reviews all results. Plans with one
- * task are exempt (nothing to gate). Naming-agnostic — reads the marker + graph,
- * not bucket names.
+ * task are exempt (nothing to gate).
+ *
+ * Rules 1 and 2 stay naming-agnostic: they resolve the closing task from the
+ * marker and the graph, never from a bucket name. Rule 3 is the deliberate
+ * exception, and it runs LAST for that reason — a plan that put its review in
+ * the wrong bucket still gets told about a real coverage hole first, because
+ * coverage breaks the gate while location only obscures it.
  */
 export function checkFinalReview(
   tasks: ParsedTask[],
@@ -343,8 +350,21 @@ export function checkFinalReview(
       },
     ];
   }
+  const home = refToString(resolved.task);
+  if (home !== FINAL_REVIEW_HOME) {
+    return [
+      {
+        file: label,
+        rule: "final-review-location",
+        detail: `final review task is at ${home}, but the closing gate always lives at ${FINAL_REVIEW_HOME}. Move it into its own reserved \`review\` bucket — appended to a feature bucket it reads as that bucket's next task and hides the fact that every other task feeds it.`,
+      },
+    ];
+  }
   return [];
 }
+
+/** The one ref the closing gate is allowed to occupy. */
+const FINAL_REVIEW_HOME = "review/01";
 
 /**
  * The one task both final-review rules judge: the marked task whose transitive

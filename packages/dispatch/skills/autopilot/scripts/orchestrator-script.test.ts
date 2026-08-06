@@ -1359,15 +1359,66 @@ describe("orchestrator cross-vendor review lens", () => {
     expect(prompt).not.toContain("relay.ts");
   });
 
-  test("the four Claude lenses stay headless whatever the review engine does", async () => {
+  test("the three Claude lenses stay headless whatever the review engine does", async () => {
     const log = await runOrchestrator(
       { scouts: [finalWave, complete(1)] },
       { liveReviewEngine: "true", relayPath: "'/abs/relay/relay.ts'" },
     );
 
-    for (const lens of ["reuse", "simplification", "efficiency", "altitude"]) {
+    for (const lens of ["reuse", "leanness", "efficiency"]) {
       expect(promptFor(log, `review:${lens}#1`)).not.toContain("relay.ts");
     }
+  });
+
+  /**
+   * Pins the lens SET, not just each member. The loop above passes even if a
+   * removed lens is reintroduced, so it cannot protect the 4→3 consolidation
+   * that replaced `simplification` + `altitude` with `leanness`.
+   */
+  test("fans out exactly the external lens plus reuse / leanness / efficiency", async () => {
+    const log = await runOrchestrator({ scouts: [finalWave, complete(1)] });
+
+    const lenses = log.labels
+      .filter((label) => label.startsWith("review:"))
+      .map((label) => label.slice("review:".length).split("#")[0])
+      .sort();
+
+    expect(lenses).toEqual(["codex", "efficiency", "leanness", "reuse"]);
+  });
+
+  test("leanness carries the tag vocabulary and the net-lines summary", async () => {
+    const log = await runOrchestrator({ scouts: [finalWave, complete(1)] });
+    const prompt = promptFor(log, "review:leanness#1");
+
+    for (const tag of ["delete:", "stdlib:", "native:", "yagni:", "shrink:"]) {
+      expect(prompt).toContain(tag);
+    }
+    expect(prompt).toContain("net: -<N> lines possible.");
+    // Correctness/security/perf belong to other lenses; overlap wastes a pass.
+    expect(prompt).toContain("OUT of scope");
+  });
+
+  test("reuse owns the under-engineering half that altitude used to carry", async () => {
+    const log = await runOrchestrator({ scouts: [finalWave, complete(1)] });
+
+    expect(promptFor(log, "review:reuse#1")).toContain(
+      "copy-paste that wants a helper",
+    );
+  });
+
+  /**
+   * The exclusivity rule is scoped to the abstraction axis on purpose: an
+   * efficiency fix may legitimately add a cache or a batch, and a blanket
+   * "every other lens only cuts" once gave the fixer grounds to reject one.
+   */
+  test("the fixer is told not to reject an efficiency finding for adding code", async () => {
+    const log = await runOrchestrator({ scouts: [finalWave, complete(1)] });
+    const prompt = promptFor(log, "fix:integration/01#1");
+
+    expect(prompt).toContain("ABSTRACTION axis");
+    expect(prompt).toContain(
+      "never reject an efficiency finding merely because it adds code",
+    );
   });
 });
 

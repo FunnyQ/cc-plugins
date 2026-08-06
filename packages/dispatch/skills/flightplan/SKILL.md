@@ -60,11 +60,11 @@ Call `EnterPlanMode` immediately, before any text output or question. Skip if al
 - **Scope boundaries** — the explicit Non-goals list.
 - **Tech constraints** — stack, conventions, deployment target, integrations, version pins.
 - **Architecture** — how pieces fit, where new code lives, what talks to what.
-- **Bucketing** — `ui/backend/api`, by phase, by feature, or a single `work/` bucket for short plans.
+- **Bucketing** — `ui/backend/api`, by phase, by feature, or a single `work/` bucket for short plans. **`review` is reserved**: it holds the closing task and nothing else. Never put feature work there, and never name a feature bucket `review`.
 - **Cross-bucket dependencies** — which task in A unblocks which task in B.
 - **Acceptance criteria & verification** — per requirement, how it gets validated.
 - **Eval rubric** — the graded quality bar on top of the binary gate. Recommend the defaults (`Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1`, pass `> 4.0`, `Correctness < 4` veto) and adapt. A shared bar goes in `_context/rubric.md`.
-- **Final review** — every plan ends with one terminal task marked `> **Final review**: true` whose `Depends on` reaches every other task, transitively. It gates integration, consistency, regressions, and whether the PLAN goal was met — it does not re-score individual tasks. `lint-task.ts` requires it (single-task plans exempt), and requires its `## Verification` to run a test suite whenever the tree runs tests anywhere.
+- **Final review** — every plan ends with one terminal task marked `> **Final review**: true` whose `Depends on` reaches every other task, transitively. **It always lives at `review/01`** — its own bucket, never appended as the next number in a feature bucket. It gates integration, consistency, regressions, and whether the PLAN goal was met — it does not re-score individual tasks. Offer a low-weight **Leanness** axis on its rubric too (see `references/task-template.md`); only the whole diff reveals accumulated over-engineering. `lint-task.ts` requires it (single-task plans exempt), and requires its `## Verification` to run a test suite whenever the tree runs tests anywhere.
 - **Conventions worth freezing** — commit style, code style, file layout, naming. These become `_context/shared.md`.
 - **Failure modes & rollback**.
 
@@ -93,9 +93,11 @@ Either way, never leave a half-written tree.
 
 1. **Scaffold the tree** — deterministic `mkdir` only, no stub files:
    ```bash
-   bun "$SCRIPTS"/scaffold.ts <slug> <bucket1>,<bucket2>,...
+   bun "$SCRIPTS"/scaffold.ts <slug> <bucket1>,<bucket2>,...,review
    ```
    Creates `tasks/_context/` and one dir per bucket. The root is created non-recursively, so a slug created between the Step 2 check and now throws EEXIST instead of silently overwriting.
+
+   **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
 2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription). Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure.
 
@@ -129,7 +131,7 @@ Either way, never leave a half-written tree.
    ```bash
    bun "$SCRIPTS"/lint-task.ts docs/<slug>/tasks
    ```
-   Pass the **tasks directory**, not a glob; the script walks bucket dirs and auto-skips `_context/` and `README.md`. Violations include PLAN.md refs in any casing, sibling-task refs, missing sections, a missing or unparseable `## Eval rubric`, an out-of-scale pass threshold, no final-review task (or one that doesn't reach every task), broken Required reading paths, an H1-vs-path mismatch, a `git status` gate with no `--` pathspec, and a bad Status. Fix and re-run. Do not finish with violations outstanding.
+   Pass the **tasks directory**, not a glob; the script walks bucket dirs and auto-skips `_context/` and `README.md`. Violations include PLAN.md refs in any casing, sibling-task refs, missing sections, a missing or unparseable `## Eval rubric`, an out-of-scale pass threshold, no final-review task (or one that doesn't reach every task, or one outside `review/01`), broken Required reading paths, an H1-vs-path mismatch, a `git status` gate with no `--` pathspec, and a bad Status. Fix and re-run. Do not finish with violations outstanding.
 
    **Every task in this tree may run beside another one.** Autopilot dispatches all ready tasks of a wave in parallel into one shared working tree, and forbids each of them to commit. So no task's verification may assert anything about the state of the whole tree — a sibling's correct, uncommitted edits are indistinguishable from a scope violation. Assert on this task's own declared files, by name.
 
@@ -184,7 +186,7 @@ bun "$SCRIPTS"/next-ready.ts docs/<slug>/tasks
 
 1. **Task files are self-contained.** An executor needs only `_context/` + the task file. Never reference PLAN.md or another task file. → `references/task-template.md`
 2. **PLAN.md is the source of truth; `_context/` mirrors it.** When a decision changes, update those two, not the task files. → `references/context-files.md`
-3. **A bucket directory is always required.** Never write task files directly under `tasks/`; short plans use a single `tasks/work/`. This keeps every `Required reading` path identical.
+3. **A bucket directory is always required.** Never write task files directly under `tasks/`; short plans use a single `tasks/work/` plus `tasks/review/` for the closing task. This keeps every `Required reading` path identical.
 4. **Mark unknowns explicitly** as Known gaps in `tasks/README.md`, never as vague tasks. → `references/readme-template.md`
 5. **Write the artifacts in English.** A sub-agent picks them up cold, so English keeps them portable regardless of the interview language. (Exception: a writing-topic plan whose deliverable is in another language may use it for content samples.) Interview in whatever language the user prefers; hand back the Step 7 recap in theirs.
 
