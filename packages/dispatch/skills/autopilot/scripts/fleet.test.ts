@@ -195,13 +195,7 @@ describe("deriveTaskViews", () => {
   });
 
   test("keeps a task in progress until every parallel lens has ended", () => {
-    const lenses = [
-      "simplification",
-      "reuse",
-      "altitude",
-      "codex",
-      "efficiency",
-    ];
+    const lenses = ["leanness", "reuse", "codex", "efficiency"];
     const entries = [
       ...lenses.map((lens, index) =>
         note(

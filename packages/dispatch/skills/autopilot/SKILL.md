@@ -79,14 +79,14 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 - **Dev engine** (`CFG.devEngine`) — **Claude** (default; Sonnet writes, Opus on the last attempt), **Codex** (`'codex'` — the OpenAI codex CLI writes each task via `codex-run.ts`), or **OpenCode** (`'opencode'` — the opencode CLI writes each task via `opencode-run.ts`). With Codex or OpenCode, the dev step is a cheap Haiku driver, and Claude still judges. This gives a cross-vendor dev≠judge split.
 - **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
-- **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the four Claude `/simplify` lenses (reuse / simplification / efficiency / altitude) in the closing Final review. This choice affects **only** those four lenses. The fixer and rubric judge stay Opus regardless. **Fable 5 is Anthropic's most capable model and is priced above Opus** ($10/$50 per MTok vs Opus's $5/$25) — pick it for maximum lens quality on a hard review, not to save cost. Never describe it to the user as the cheaper option.
+- **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the three Claude quality lenses (reuse / leanness / efficiency) in the closing Final review. This choice affects **only** those three lenses. The fixer and rubric judge stay Opus regardless. **Fable 5 is Anthropic's most capable model and is priced above Opus** ($10/$50 per MTok vs Opus's $5/$25) — pick it for maximum lens quality on a hard review, not to save cost. Never describe it to the user as the cheaper option.
 - **Live panes** (`CFG.liveDevEngine`, `CFG.liveReviewEngine`) — only when `HERDR_ENV=1` + `relay.ts` resolved, ask this fourth question, `multiSelect`: which steps run in a visible herdr live pane via relay, defaulting to neither (headless). Offer the **dev delegate** option only when the chosen dev engine is external — a Claude dev step has no delegate to make live. Always offer the **closing cross-vendor review** option; the review lens is external on every flight. Each picked step sets its own flag.
 
 The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.reviewLensModel`, `CFG.liveDevEngine`, and `CFG.liveReviewEngine` in Step 3. Whichever external engines get chosen, their `--version` check from Step 1 becomes load-bearing. If a picked engine is unreachable, say so before flying. Offer to fall back: Claude for the dev engine, the other CLI for the reviewer.
 
 When the user picks live, leave `CFG.liveCollectRounds` at its default `3`, and lower it only when a fast fail matters more than finishing a slow task. Both live steps pass `--dangerous`; `references/orchestrator.md` carries the reasoning for that and for the collect rounds.
 
-If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, the headless wrapper path is exactly today's behavior. The four Claude `/simplify` lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
+If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, the headless wrapper path is exactly today's behavior. The three Claude quality lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
 
 Then show the user a one-screen brief. State the slug and how many tasks there are. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
@@ -151,10 +151,9 @@ The `Final review` task (`> **Final review**: true`) depends transitively on eve
 The Final review's "dev" step fans out independent record-only reviewers. Then a single Opus fixer applies the real fixes and re-runs verification:
 
 - `<reviewEngine>`: codex/opencode CLI bug and correctness review.
-- `reuse`: duplicated logic and missed existing helpers.
-- `simplification`: dead code, needless complexity, clearer equivalents.
+- `reuse`: duplicated logic, missed existing helpers, copy-paste that wants one. On the abstraction axis, the only lens that may ask for more code — `leanness` is its counterweight.
+- `leanness`: over-engineering only — what to delete. Tags each finding `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` on one line, and closes with `net: -N lines possible.`
 - `efficiency`: redundant work, N+1s, recomputation, avoidable allocation/IO.
-- `altitude`: over- or under-engineered abstraction level.
 
 The fan-out happens at the orchestrator level. See `references/orchestrator.md` for the full rationale, failure handling, and exact prompts.
 
@@ -183,7 +182,7 @@ This policy is encoded as a constant table at the top of the orchestrator, so it
 | **Rubric judge** | Opus | It decides loop-or-pass, and a weak judge either ships bad code or loops forever. |
 | **Commit (inter-wave + post-loop)** | Haiku | A wave's changes are usually one coherent set, so grouping + message-writing over the inlined `COMMIT_INSTRUCTIONS` is within Haiku's reach. |
 | **Final review — cross-vendor lens** (`CFG.reviewEngine`) | Haiku | The review intelligence lives in the external CLI, so the agent only invokes `<engine>-run.ts review` and records its output. |
-| **Final review — /simplify lenses** (`CFG.reviewLensModel`) | Opus × 4 (parallel), default — or **Fable 5** (`'fable'`) | reuse / simplification / efficiency / altitude must genuinely *understand* the code to judge quality, so they get a strong model; they record findings and never edit. See Step 2 before offering Fable 5. |
+| **Final review — quality lenses** (`CFG.reviewLensModel`) | Opus × 3 (parallel), default — or **Fable 5** (`'fable'`) | reuse / leanness / efficiency must genuinely *understand* the code to judge quality, so they get a strong model; they record findings and never edit. See Step 2 before offering Fable 5. |
 | **Final review — fixer** | Opus | It is the highest-stakes holistic gate — integration, consistency, regressions, met the PLAN goal — capped at `finalReviewMaxAttempts`. |
 
 ## Grounding the score (do not skip)
@@ -213,7 +212,7 @@ Everything lands in `docs/<slug>/.flightlog/`. It is **gitignored** via a self-i
 
 - **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label>`. Deterministic, guaranteed each cycle.
 - **Narrative** — Dev / judge / final-review agents run `flightlog.ts log <run.jsonl> --task <ref> --role <role> --attempt N --agent <label> --message "..."` to record what they did.
-- **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (`<reviewEngine>` / reuse / simplification / efficiency / altitude). These persist as the artifact behind each closing-round verdict.
+- **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (`<reviewEngine>` / reuse / leanness / efficiency). These persist as the artifact behind each closing-round verdict.
 - **Report** — `flightlog.ts report <run.jsonl>` renders `RUNLOG.md`, grouped by task in chronological order.
 
 Each entry records an `agentLabel` so a suspicious verdict can be traced back to that agent's raw `agent-<id>.jsonl` in the harness transcript.
