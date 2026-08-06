@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.10.3] - 2026-08-07
+
+_tracks tag `chronicle-v0.10.3`_
+
+### Changed
+- ADR promotion now handles a whole batch of decisions in one run instead of one at a time: the codifier drafts every record in a single pass, the lorekeeper runs its phases across the batch, and the barrowkeeper writes the full batch behind the existing two-gate confirmation.
+- The `adr` skill's collect phase gained a documented contract, including gate-1 fallback behavior and automatic re-planning when a decision's disposition changes mid-flow.
+- The reckoner's shortlist logic now accounts for batch promotion.
+- Codex's `adr` agents (codifier, lorekeeper, barrowkeeper) were brought in line with the Claude agent definitions so both harnesses share the same batch contract.
+
 ## [dispatch 3.19.0] - 2026-08-06
 
 _tracks tag `dispatch-v3.19.0`_
