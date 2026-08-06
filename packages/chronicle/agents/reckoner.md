@@ -32,6 +32,15 @@ missing input — report it and stop. Never search the skill directory for a scr
 
 ## Process
 
+### 0. Exclude live sessions before clustering
+
+Before step 1, drop any session whose `mtimeMs` is within `STALE_MS` (10 minutes)
+of now from both clustering and assignments. It stays untouched in the inbox for
+a later run. `chronicle:adr`'s SKILL.md already states this policy — nothing
+upstream enforces it structurally, so this step is where it becomes concrete.
+Skeletons from an excluded session must not feed a candidate cluster, and the
+session gets no row in `assignments` at all, not a `done` row.
+
 ### 1. Load and analyze the skeleton payload
 
 Read and parse `outputPath`. Extract its sessions and skeleton entries. Skeletons carry
@@ -137,7 +146,8 @@ This asymmetry protects triage. A session wrongly sent to `done` disappears from
 forever. A session wrongly sent to `watch` costs one extra review when matching evidence
 arrives.
 
-Build exactly one assignment for every session in the payload. For each session, gather
+Build exactly one assignment for every session in the payload except one excluded by
+step 0 for being too fresh. For each remaining session, gather
 the dispositions of every candidate containing its id. Set `target` to `watch` if any
 gathered disposition is `watch`; otherwise set it to `done`. Preserve the session's
 source bucket as `from`: use `inbox` for a fresh session and `watch` for a session pulled
@@ -176,7 +186,10 @@ of the archive flow. The archive applier is separate. Never run the applier.
 - The archiver refuses to recompute a plan after approval.
 - Planning touches nothing under `.cockpit/`. It stats files and writes JSON only to a
   temporary path.
-- Preserve `planPath` unchanged through both gates.
+- Preserve `planPath` unchanged through both gates, unless gate 1 changes a
+  disposition the plan assumed. In that case the main agent replaces it by
+  re-folding the confirmed overrides into `assignments` and re-running the
+  planner — never by editing the plan JSON itself.
 
 ## Output
 
@@ -238,7 +251,8 @@ of the archive flow. The archive applier is separate. Never run the applier.
 - Run the planner before the gate. Never run the archive applier or apply an archive
   plan.
 - Apply the watch-wins rule. A session with any `watch` candidate targets `watch`.
-- Emit assignment rows targeting `done` for sessions with no candidates.
+- Emit assignment rows targeting `done` for sessions with no candidates, except a
+  session excluded by step 0 for being within `STALE_MS` of now.
 - When no candidate clears the threshold, return the skipped candidates with reasons
   that explain why the shortlist was empty, an empty `conflicts` array when appropriate,
   assignments for every session, and the planner's `planPath`.

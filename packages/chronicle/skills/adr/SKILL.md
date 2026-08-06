@@ -41,6 +41,54 @@ complete draft and target path, log `needs_your_call`, then use `cockpit wait`
 again. Do not put either gate inside Lorekeeper. Do not use `AskUserQuestion` for
 these gates because the cockpit wait/send bridge must hand control back to Q.
 
+**If `cockpit wait --require-watcher` exits `4`** (`nobody is watching` — Q's
+`answer-here` switch is off), fall back instead of retrying the wait or
+silently switching to `AskUserQuestion`:
+
+- **On Claude Code**, build a custom interactive HTML review page with the
+  `Artifact` tool: gate 1 is a disposition ledger (one row per candidate, its
+  disposition and reason, and controls to confirm or override it) with a
+  live-updating decision summary and a "copy for chat" button; gate 2 is the
+  full draft text per proposed ADR, collapsible per record, for a verbatim
+  read-through.
+- **On Codex**, which has no `Artifact` tool, print the same content as
+  structured markdown directly in the transcript — the candidate ledger for
+  gate 1, the full draft text for gate 2 — and ask Q to reply in the same
+  terminal with the response block below. This is not `AskUserQuestion`: it is
+  the same plaintext round-trip the Artifact path uses, over the terminal
+  instead of a copy button.
+
+Either path produces the same plaintext gate-1 response, which Q pastes or
+types back. Require the complete set, not only the changed rows — a partial
+reply is ambiguous about which candidates it leaves untouched:
+
+```json
+{
+  "dispositions": [
+    { "entryIds": ["id-1", "id-2"], "decision": "promote" },
+    { "entryIds": ["id-3"], "decision": "skip" }
+  ],
+  "conflictResolutions": [
+    { "entryIds": ["id-4", "id-5"], "resolution": "skip" }
+  ],
+  "notes": ""
+}
+```
+
+`entryIds` must match a candidate's `entryIds` from the reckoner output
+exactly — it is the candidate's identity, since candidates carry no separate
+id field. `conflictResolutions` covers every entry in the reckoner's
+`conflicts`. This schema has no field for merging two candidates into one ADR;
+multi-candidate promotion is not yet wired through `draft` and `commit` (see
+the codifier/barrowkeeper single-record limit below). Until that lands, note a
+requested merge in free text under `notes` and apply it by hand — do not
+invent a `mergeGroup` field the rest of the pipeline cannot consume.
+
+Treat the parsed response as the gate response exactly as `cockpit wait` would
+return it, including the consistency check above. Gate 2's response follows
+the same shape: Q's reply is either an unqualified approval, or an edited
+`draftText`/`proposedPath` pair Q pastes back for the one proposed ADR.
+
 ## Script paths
 
 Only the main agent sees the skill's load-time "Base directory for this skill"
@@ -74,9 +122,43 @@ This is the primary entry point.
 3. Present every disposition at gate 1. A triage is done when every stale session
    was dispositioned and every retained candidate is named, not when the inbox is
    empty. Deliberately leave sessions written in the last ten minutes behind.
+
+   Before treating Q's gate-1 response as final, check it for internal
+   contradictions the reckoner cannot see, since a merge or a conflict
+   resolution is a gate-1-only decision the reckoner never produces or
+   validates:
+
+   - **A merge with a declined half.** If Q's response folds two candidates
+     into one ADR, both must still be `promote`. If Q declined one, do not
+     silently merge the declined content in and do not silently drop the
+     merge — re-surface it: ask whether the surviving candidate stands alone
+     or the merge itself is off.
+   - **A watch item that contradicts its own conflict.** If a candidate is
+     `watch` because of an entry in `conflicts`, and Q's response also
+     resolves that same conflict, the disposition and the resolution must
+     agree. If they don't, re-surface both choices for Q rather than guessing
+     which one wins.
+
+   Re-run this check after any correction Q makes in response to a flagged
+   contradiction — a fix to one contradiction can introduce another.
 4. After Q confirms, derive the archive target per session. **`watch` wins**: if
    any candidate drawn from a session is `watch`, archive that session to the
    watched bucket. Otherwise archive it to `done`.
+
+   If gate 1 changed any disposition the reckoner assumed — overriding a
+   candidate, or declining one half of a proposed `merge` — the reckoner's
+   `assignments` and its `planPath` no longer match Q's decision. Never edit
+   `moves[]` or any other field of the serialized plan by hand: a plan's
+   `target`, `to`, and `from`/`fromBucket` are derived together, and hand
+   patching one desyncs the rest. Instead: apply the confirmed overrides to
+   the candidate dispositions, re-fold the `watch`-wins rule across every
+   session those candidates touch (not just the overridden session — another
+   candidate from the same session may still be `watch`), keep each row's
+   original `from` untouched, serialize the corrected `assignments`, and
+   re-run `bun <plannerPath> --assignments <corrected assignments JSON>`
+   using the `plannerPath` retained from the collect-phase inputs. Pass the
+   fresh `planPath` this produces — never a prose description of the
+   overrides — into `commit`.
 
 During collection, when a fresh candidate cluster matches an entry in the watched
 bucket, pull the watched entry back in and re-judge the combined evidence. Watched
@@ -174,6 +256,12 @@ Codex thread. Do not replace the role boundary with an inline flow.
    enters git, so path references are guaranteed to rot.
 6. **Exclude secrets, credentials, personal data, and raw transcript text from
    evidence.** Preserve the decision without leaking its surrounding conversation.
+7. **`draft` and `commit` write exactly one ADR per invocation.** The codifier
+   returns one `draftText`/`proposedPath` pair, and the barrowkeeper writes one
+   `newAdr`. A triage with several `promote` candidates currently needs one
+   `draft`/gate-2/`commit` cycle per candidate — there is no batched or merged
+   multi-ADR path yet. Do not invent one inline; this is tracked as follow-up
+   work, not a gap to paper over with an ad hoc multi-record payload.
 
 ## Edge Cases
 

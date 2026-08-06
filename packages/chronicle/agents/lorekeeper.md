@@ -78,8 +78,9 @@ Require:
 
 Require:
 
-- `planPath` — path to the approved archive plan produced by reckoner. Preserve it
-  unchanged through both gates.
+- `planPath` — path to the approved archive plan, produced either by the reckoner
+  or by the main agent's gate-1 correction re-run (see `chronicle:adr` SKILL.md).
+  Pass it unchanged. Never accept a prose description of overrides in its place.
 - `validatorPath` — absolute path to `adr-validate.ts`.
 - `archiverPath` — absolute path to `archive-logs.ts`.
 
@@ -108,7 +109,13 @@ never softens the three required paths above.
 
 ## Output
 
-Return each phase result as JSON.
+Return each phase result as JSON, complete and verbatim — never a condensed prose
+summary of it. The main agent presents this JSON at a human gate; a summary forces an
+extra round-trip to fetch what should have been in the first return. `candidates` must
+carry every field the reckoner produced — `title`, `disposition`, `reason`, `entryIds`,
+`sessionIds`, and `matchesAdr` — for every candidate, not a title-only listing.
+`draftText` must be the complete ADR body, not a description of what the draft
+contains.
 
 ### Collect phase
 
