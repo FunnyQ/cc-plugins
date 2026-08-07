@@ -32,10 +32,13 @@ describe("codexBackend", () => {
       expect(spec.argv).not.toContain("-o");
     });
 
-    it("passes no sandbox flag when not dangerous (pane shows approvals)", () => {
+    it("drops the sandbox but keeps approvals when not dangerous", () => {
       const spec = codexBackend.invokeLive!("review", {})!;
 
-      expect(spec.argv).toEqual([]);
+      expect(spec.argv).toEqual(["-s", "danger-full-access"]);
+      expect(spec.argv).not.toContain(
+        "--dangerously-bypass-approvals-and-sandbox",
+      );
     });
   });
 
@@ -68,7 +71,7 @@ describe("codexBackend", () => {
 
   describe("invoke", () => {
     describe("delegate mode", () => {
-      it("should build argv with workspace-write sandbox", () => {
+      it("should build argv with danger-full-access sandbox", () => {
         const opts: InvokeOpts = {
           promptText: "test prompt",
           lastFile: "/tmp/last.txt",
@@ -80,7 +83,7 @@ describe("codexBackend", () => {
           "codex",
           "exec",
           "-s",
-          "workspace-write",
+          "danger-full-access",
           "-o",
           "/tmp/last.txt",
           "-",

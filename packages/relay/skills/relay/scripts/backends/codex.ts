@@ -88,6 +88,9 @@ export const codexBackend: Backend = {
       // `codex exec` is non-interactive by default; `-s` controls the sandbox.
       // (The old `-a never` approval flag was removed in codex >= 0.139 —
       // passing it makes `codex exec` error with "unexpected argument '-a'".)
+      // `danger-full-access` is the non-dangerous default because the
+      // workspace-write sandbox blocks routine delegate work (writes outside
+      // the workspace root, network fetches) far more often than it helps.
       const argv = opts.dangerous
         ? [
             CODEX_BIN,
@@ -101,7 +104,7 @@ export const codexBackend: Backend = {
             CODEX_BIN,
             "exec",
             "-s",
-            "workspace-write",
+            "danger-full-access",
             "-o",
             opts.lastFile!,
             "-",
@@ -137,9 +140,10 @@ export const codexBackend: Backend = {
     if (mode === "image") return null;
     const argv: string[] = [];
     if (opts.model) argv.push("-m", opts.model);
-    // Non-dangerous passes NO sandbox flag on purpose: the TUI's own approval
-    // prompts are visible in the pane, which is the point of live mode.
+    // Non-dangerous drops the sandbox but KEEPS approvals: the TUI's own
+    // prompts stay visible in the pane, which is the point of live mode.
     if (opts.dangerous) argv.push("--dangerously-bypass-approvals-and-sandbox");
+    else argv.push("-s", "danger-full-access");
     return { agentBin: CODEX_BIN, argv };
   },
 
