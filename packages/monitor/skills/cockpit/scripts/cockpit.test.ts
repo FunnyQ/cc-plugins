@@ -258,6 +258,34 @@ describe("cockpit log", () => {
     expect(() => readLines(logPath)).toThrow();
   });
 
+  test("--help prints usage and writes nothing", () => {
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    const res = run(["log", "--help"]);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain("cockpit log");
+    // The bug this guards: --help used to fall through as an unknown flag, so
+    // `log` ran with empty fields and appended a blank record.
+    expect(() => readLines(logPath)).toThrow();
+  });
+
+  test("an unknown flag is rejected instead of becoming content", () => {
+    const logPath = join(projectDir, ".cockpit/logs", `${SID}.jsonl`);
+    const res = run([
+      "log",
+      "--session",
+      SID,
+      "--decision",
+      "d",
+      "--reason",
+      "r",
+      "--notaflag",
+      "x",
+    ]);
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain("--notaflag");
+    expect(() => readLines(logPath)).toThrow();
+  });
+
   test("scribe --diagram is gated by the same lint", () => {
     const res = run([
       "scribe",
