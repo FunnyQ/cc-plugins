@@ -27,10 +27,13 @@ them at a config file. Do not write a config anywhere except the first-run
 - `persistConfig` — `true` only on a first run (no `.chronicle/release.json` yet).
   When `false`, the config already exists on disk. Do **nothing** config-related.
   Skip step 1 entirely. Go straight to apply.
-- `releases[]` — one or more units to bump, each `{ component, targetVersion }`.
+- `releases[]` — one or more units, each `{ component, targetVersion, prepared? }`.
   `targetVersion` is the bare version (e.g. `0.5.0`). `component` (per-component
   repos) passes through as `--component <name>`, and is null/absent for whole-repo.
-  A coordinated release hands you several entries. Bump **each**.
+  A coordinated release hands you several entries.
+  `prepared: true` means that unit's version files already carry `targetVersion`,
+  because the repo bumped on its feature branch. **Never apply a prepared unit.**
+  Verify it. A missing `prepared` is false.
 
 ## Process
 
@@ -51,11 +54,12 @@ not pass one to anything.
 
 ### 2. Apply + verify each release
 
-Loop over `releases[]`. For **each** `{ component, targetVersion }`, run apply then
-verify. Do this one component at a time (`--apply`/`--verify` scope to that
-component's version files):
+Loop over `releases[]`. Run `--apply` only for an entry **without** `prepared: true`.
+Run `--verify` for **every** entry, prepared or not. Do this one component at a time
+(`--apply`/`--verify` scope to that component's version files):
 
 ```bash
+# omit this line when the entry carries prepared: true
 bun $SKILL_DIR/scripts/analyze-release.ts --apply <targetVersion> [--component <name>]
 bun $SKILL_DIR/scripts/analyze-release.ts --verify <targetVersion> [--component <name>]
 ```

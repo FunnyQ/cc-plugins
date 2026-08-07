@@ -45,6 +45,13 @@ fields the main agent needs. Omit the raw `tags[]` list:
   commitCount }`. `commitCount` is commits since that component's last scoped tag.
   Null means the analyzer could not determine the count. The main agent must not
   treat it as "unchanged".
+- prepared state, on the whole-repo object and on every `components[]` entry:
+  `fileVersion`, `changelogEntry`, `prepared`, `halfPrepared`. `fileVersion` is the
+  version the unit's own version files carry, which is not always the version its
+  last tag carries. `prepared` means the bump and the CHANGELOG entry already
+  landed, and only the tag is missing. `halfPrepared` means the version files moved
+  but no CHANGELOG entry followed. Pass all four through as-is. The main agent
+  decides.
 
 ### 3. Return JSON
 
