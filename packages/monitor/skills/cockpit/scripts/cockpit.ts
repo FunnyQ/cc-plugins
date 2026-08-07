@@ -112,6 +112,23 @@ function logPathFor(project: string, sessionId: string): string {
 
 // ---------- Arg parsing ----------
 
+const USAGE = [
+  "usage: cockpit <log|scribe|prep|config|wait|send|restart|nudge> [args]",
+  "  cockpit log    --session <id> --decision D --reason R [--tradeoff T]",
+  '                 [--facet "LABEL: text"]... [--file p]... [--option o]...',
+  "                 [--diagram MERMAID] [--needs-call]",
+  "  cockpit scribe --type <kind> --text <body> [--title <headline>]",
+  "                 [--file <path>]... [--diagram MERMAID] [--session <id>]",
+  "  cockpit scribe --recent [N] | --prep [--provider <p>]",
+  "  cockpit prep   [--provider <p>]",
+  "  cockpit config --log-language <lang> | get-language",
+  "                 | --answer-here on|off | get-answer-here",
+  "  cockpit wait   <sessionId>",
+  "  cockpit send   <sessionId> <answer>",
+  "  cockpit restart [--port N] [--no-open]",
+  "  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]",
+].join("\n");
+
 type Args = {
   single: Record<string, string>;
   repeated: Record<string, string[]>;
@@ -122,6 +139,7 @@ const SINGLE_FLAGS = new Set([
   "provider",
   "session",
   "log-language",
+  "answer-here",
   "decision",
   "reason",
   "tradeoff",
@@ -159,8 +177,12 @@ function parseArgs(argv: string[]): Args {
     } else if (SINGLE_FLAGS.has(name)) {
       single[name] = argv[++i];
     } else {
-      // unknown flag with a value — capture it loosely
-      single[name] = argv[++i];
+      // An unknown flag used to be captured loosely, which made `log --help`
+      // append a record with every field empty. On a subcommand that writes,
+      // a typo must never become content.
+      console.error(`cockpit: unknown flag "${tok}"`);
+      console.error(USAGE);
+      process.exit(1);
     }
   }
   return { single, repeated, flags };
@@ -1069,6 +1091,11 @@ function cmdNudge(rest: string[]): void {
 
 async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
+  // Before any subcommand runs. `log --help` must print usage, never log it.
+  if (rest.includes("--help") || rest.includes("-h") || sub === "--help") {
+    console.log(USAGE);
+    return;
+  }
   switch (sub) {
     case "log":
       await cmdLog(parseArgs(rest));
