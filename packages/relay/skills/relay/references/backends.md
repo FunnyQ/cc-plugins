@@ -20,7 +20,9 @@ Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 
 `--dangerous` is a **uniform YOLO switch** across all three live backends. It lets an **unattended** run proceed without stopping on approval prompts.
 
-Without `--dangerous`, relay passes no sandbox or approval-bypass flag. The TUI's own approval prompts then surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So `--dangerous` means fire-and-forget; no flag means supervised. `image` has no live path (codex `invokeLive("image")` returns null).
+Without `--dangerous`, relay passes no approval-bypass flag. The TUI's own approval prompts then surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So `--dangerous` means fire-and-forget; no flag means supervised. `image` has no live path (codex `invokeLive("image")` returns null).
+
+codex is the exception on the sandbox axis: its live launch passes `-s danger-full-access` even when not dangerous. The approval prompts stay, only the filesystem/network sandbox goes. See the codex section below for why.
 
 **New-tab placement.** `herd.ts` has no primitive to start an agent in a fresh empty tab, so `spawn({ newTab: true })` does the dance instead. Note first: `agent start --tab` steals focus despite `--no-focus`. The dance accounts for this: capture the focused tab → `tab create --no-focus --label <name>` → `agent start --tab <new>` → close the leftover shell root pane → restore focus to the caller's tab.
 
@@ -35,13 +37,24 @@ Binary: `codex` (override via `CODEX_BIN`).
 ### Delegate (write-capable)
 
 ```bash
-codex exec -s workspace-write -o <lastfile> -
+codex exec -s danger-full-access -o <lastfile> -
 ```
 
 > `codex exec` is non-interactive by default. `-s` sets the sandbox.
 >
+> The default is `danger-full-access`, not `workspace-write`. The write sandbox
+> blocks routine delegate work — writes outside the workspace root, network
+> fetches — far more often than it catches anything. Approvals are unaffected:
+> `exec` is non-interactive either way, and the live TUI still prompts.
+>
+> `--approve-for-me` is **not** the escape hatch: it forces the workspace-write
+> sandbox by definition, so it reintroduces exactly the failure being avoided.
+>
 > codex ≥ 0.139 removed the old `-a never` approval flag. Passing it now errors
 > with `unexpected argument '-a' found`. Verified against codex-cli 0.139.0.
+>
+> `codex review` takes no `-s` flag (only `-c`), so the review path is unchanged.
+> Verified against codex-cli 0.147.0.
 
 Dangerous opt-in (only if user explicitly asks):
 ```bash
