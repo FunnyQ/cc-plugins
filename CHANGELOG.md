@@ -1,5 +1,14 @@
 # Changelog
 
+## [monitor 4.0.3] - 2026-08-08
+
+_tracks tag `monitor-v4.0.3`_
+
+### Fixed
+- `cockpit log --help` used to silently write a blank decision record instead of printing usage: the argument parser's catch-all for unrecognized flags treated `--help` as an ordinary flag and swallowed the next token as its value. Unrecognized flags on `log` and other writing subcommands now fail with an error instead of being written into the trail.
+- `--help` / `-h` now short-circuits before any subcommand runs and prints a usage block, so a mistyped invocation is caught before it can touch the decision log.
+- `cockpit config --answer-here on|off` kept working after the flag-parsing tightened; `--answer-here` is now a declared flag rather than reaching the command only through the old loose catch-all.
+
 ## [chronicle 0.10.6] - 2026-08-08
 
 _tracks tag `chronicle-v0.10.6`_
