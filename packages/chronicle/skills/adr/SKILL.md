@@ -24,9 +24,9 @@ drafts, `newAdrs`, the optional `metadataUpdate`, and the archive plan into comm
 ```
 chronicle:adr  (this skill — the main agent; owns both gates)
   ├─ lorekeeper(collect) → gleaner, reckoner   skeletons → clusters → dispositions + assignments
-  ├─ [GATE 1]  Q confirms the dispositions
+  ├─ [GATE 1]  the user confirms the dispositions
   ├─ lorekeeper(draft)   → codifier            draft the ADR from the confirmed candidates
-  ├─ [GATE 2]  Q confirms the draft and its target path
+  ├─ [GATE 2]  the user confirms the draft and its target path
   └─ lorekeeper(commit)  → barrowkeeper        write, apply any link update, validate, archive
 ```
 
@@ -39,7 +39,7 @@ the main conversation. Do not put either gate inside Lorekeeper.
 
 **Both gates are one local HTML page.** Never hand-write that page and never
 hand-design it — `gatePagePath` renders it. Build the payload, render it, end the
-turn, and let Q paste the response block back:
+turn, and let the user paste the response block back:
 
 1. Write a payload JSON to the scratchpad. Gate 1 takes `gate: 1`, `nextAdr`,
    `candidates` (each with `entryIds`, `title`, `reason`, `disposition`, and an
@@ -48,15 +48,15 @@ turn, and let Q paste the response block back:
    `groupId`, `adrNumber`, `proposedPath`, and the codifier's `draftText` verbatim.
 2. Run `bun <gatePagePath> --data <payload.json> --open`. Pass
    `--lang zh-TW` when the cockpit decision-log language is zh-TW.
-3. Report the rendered path to Q and stop. The page carries its own consistency
+3. Report the rendered path to the user and stop. The page carries its own consistency
    checks, so a reply copied from it is already internally consistent — you still
-   run the checks below, because Q may type one by hand instead.
+   run the checks below, because the user may type one by hand instead.
 
 The page is self-contained, so it needs no host. A local repo's decision trail
 and its full draft text never leave the machine to be read.
 
 **Do not call `cockpit wait` for either gate, and do not log `needs_your_call`.**
-The wait only succeeds while Q's `answer-here` switch is on and a tab is
+The wait only succeeds while the user's `answer-here` switch is on and a tab is
 subscribed, and a gate carrying twelve full records reads badly in a cockpit card
 either way. Parking on a call nobody will answer strands the run. Log a plain
 decision entry recording that the gate was reached, then end the turn. Do not use
@@ -77,7 +77,7 @@ This cascade is about the browser, not about the harness. Codex writes files and
 spawns processes like Claude Code does, so it renders and opens the same page
 through the same script.
 
-Every path produces the same plaintext gate-1 response, which Q pastes or
+Every path produces the same plaintext gate-1 response, which the user pastes or
 types back. Require the complete set, not only the changed rows — a partial
 reply is ambiguous about which candidates it leaves untouched:
 
@@ -103,7 +103,7 @@ id field. `conflictResolutions` covers every entry in the reckoner's
 - `group` is optional.
 - Rows that share a `group` value become one ADR.
 - A `promote` row with no `group` is its own single-member group.
-- A `group` value is an opaque clustering label. Q chooses it, and Q never supplies a
+- A `group` value is an opaque clustering label. The user chooses it, and the user never supplies a
   `groupId`. The main agent uses `group` only to decide which rows share a record, then
   assigns positional `groupId`s when it builds the `draft` payload (step 5).
 
@@ -122,7 +122,7 @@ back over. Gate 2's response follows this schema:
 
 - One entry per proposed draft. `verdict` is `approve` or `drop`.
 - An optional `draftText` on an `approve` replaces the codifier's text for that record.
-- Require the complete set. A partial reply is ambiguous, so re-surface it to Q.
+- Require the complete set. A partial reply is ambiguous, so re-surface it to the user.
 - A `drop` leaves a number gap. Nothing is renumbered. `adr-index.ts` never reuses a gap,
   because reusing a number would make an id ambiguous across git history.
 
@@ -164,51 +164,51 @@ This is the primary entry point.
    the reckoner produced more than 12 `promote` candidates, say so, and say that
    grouping may still bring the run under the cap.
 
-   At most 12 groups may reach `draft` in one run. Enforce the cap before Q
+   At most 12 groups may reach `draft` in one run. Enforce the cap before the user
    confirms, never after: once gate 1 is confirmed, the disposition set is
    complete and the archive plan already covers every candidate, so dropping
    groups after confirmation would archive an unrecorded decision to `done`.
-   Fold Q's reply into groups. If the folded count exceeds 12, re-surface it
-   before treating the reply as confirmed. Ask Q to group further, or to
+   Fold the user's reply into groups. If the folded count exceeds 12, re-surface it
+   before treating the reply as confirmed. Ask the user to group further, or to
    disposition the excess as `watch` in this run — a `watch` candidate archives
    to the watched bucket and re-queues on the next `triage` run, so nothing is
    lost. The main agent never picks the excess itself; which decisions wait is
-   Q's call. 12 is a judgment call, not a measured ceiling: in one 26-group run
+   the user's call. 12 is a judgment call, not a measured ceiling: in one 26-group run
    the limit was review fatigue, not failure.
 
-   Before treating Q's gate-1 response as final, check it for internal
+   Before treating the user's gate-1 response as final, check it for internal
    contradictions the reckoner cannot see, since a group or a conflict
    resolution is a gate-1-only decision the reckoner never produces or
    validates:
 
    - **A group with a non-`promote` row.** A `group` that holds any non-`promote` row is a
-     contradiction. Re-surface it to Q. Ask whether the remaining rows still form one record,
+     contradiction. Re-surface it to the user. Ask whether the remaining rows still form one record,
      or whether the group itself is off. Never guess which half wins.
    - **A watch item that contradicts its own conflict.** If a candidate is
-     `watch` because of an entry in `conflicts`, and Q's response also
+     `watch` because of an entry in `conflicts`, and the user's response also
      resolves that same conflict, the disposition and the resolution must
-     agree. If they don't, re-surface both choices for Q rather than guessing
+     agree. If they don't, re-surface both choices for the user rather than guessing
      which one wins.
 
    Re-run the contradiction check and the group-count check after any correction
-   Q makes — a fix to one contradiction can introduce another.
-4. After Q confirms, derive the archive target per session. **`watch` wins**: if
+   the user makes — a fix to one contradiction can introduce another.
+4. After the user confirms, derive the archive target per session. **`watch` wins**: if
    any candidate drawn from a session is `watch`, archive that session to the
    watched bucket. Otherwise archive it to `done`.
 
    Gate 1 is the first re-plan trigger. If it changed any disposition the
    reckoner assumed — overriding a candidate, or declining one half of a
    proposed `merge` — the reckoner's `assignments` and its `planPath` no longer
-   match Q's decision. Apply the confirmed overrides to the candidate
+   match the user's decision. Apply the confirmed overrides to the candidate
    dispositions now, and re-plan by **Re-planning the archive** below.
 5. Build the `draft` payload from the confirmed `promote` rows. Fold rows that
    share a `group` value into one entry, in the order the `promote` rows appear
-   in Q's confirmed response. A `promote` row with no `group` becomes its own
+   in the user's confirmed response. A `promote` row with no `group` becomes its own
    single-member entry.
 
    Assign each entry a `groupId` by position: `g1`, `g2`, `g3`, and so on. Never
-   carry Q's `group` value through as the `groupId` — a Q-invented label would
-   collide with a single-member group Q never labelled, and two entries would
+   carry the user's `group` value through as the `groupId` — a user-invented label would
+   collide with a single-member group the user never labelled, and two entries would
    share one `groupId`.
 
    Assign each entry a record number before spawning `draft`. Group `i` takes
@@ -230,7 +230,7 @@ This is the primary entry point.
    verdict, in the order the drafts were proposed. Drop every `drop` verdict.
    For each kept verdict, set `path` to its `proposedPath`, and set `content`
    to the verdict's own `draftText` when it carries one, otherwise to the
-   codifier's `draftText` for that draft. A verdict's `draftText` is Q's edit,
+   codifier's `draftText` for that draft. A verdict's `draftText` is the user's edit,
    and it always wins over the codifier's text.
 
    If every verdict was `drop`, the run promoted nothing. Omit `newAdrs`
@@ -306,7 +306,7 @@ produces neither, report a no-op instead of spawning commit with nothing to do.
 
 ## `promote <candidate-or-topic>` — direct promotion
 
-Use this escape hatch when Q already knows what should become a record. Collect
+Use this escape hatch when the user already knows what should become a record. Collect
 the decision across all relevant sessions, including archived sessions. Ask only
 for material information the logs cannot establish. Apply the same promotion
 threshold and identify any existing ADR before drafting.
@@ -360,7 +360,7 @@ Codex loads the same three-phase Lorekeeper boundary through one of two paths:
    `chronicle_lorekeeper` and no inherited turns. Tell it to read and obey
    `developer_instructions` in `lorekeeper.toml` before handling the same inputs.
 
-If neither path is available, tell Q to run `chronicle:install` and start a new
+If neither path is available, tell the user to run `chronicle:install` and start a new
 Codex thread. Do not replace the role boundary with an inline flow.
 
 ## Constraints
@@ -396,7 +396,7 @@ After the barrowkeeper reports `validation-error`:
 - The session logs are untouched in `.cockpit/`.
 - The plan file survives at `/tmp/chronicle/adr/`.
 
-Q fixes the offending record by hand, then re-runs `triage`. There is no
+The user fixes the offending record by hand, then re-runs `triage`. There is no
 archive-only entry point, and this change adds none.
 
 The re-run self-heals: `adrIndex.nextNumber` has advanced past the written
@@ -410,5 +410,5 @@ no-promotion branch, where the archive plan finally applies.
   to triage and stop. Do not create `docs/adr/`.
 - **A candidate matches an existing record**: disposition it `skip` and name the
   matching record instead of drafting a near-duplicate.
-- **Conflicting evidence**: surface the conflict for Q's judgment at gate 1. Never
+- **Conflicting evidence**: surface the conflict for the user's judgment at gate 1. Never
   silently treat the newest entry as the winner.

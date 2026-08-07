@@ -1,6 +1,6 @@
 # Backend Reference — CLI flags, headless output, and install
 
-> Verified on Q's machine (2026-06-15). Each backend section translates a `relay` mode into the canonical CLI invocation.
+> Verified locally (2026-06-15). Each backend section translates a `relay` mode into the canonical CLI invocation.
 
 ## Live-pane mode (herdr)
 

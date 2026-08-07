@@ -40,8 +40,8 @@ Rules:
 ## Process
 
 1. Refuse the whole input if `groups` holds more than 12 entries. Report the count
-   received. Never truncate the list, because a silent truncation loses a decision Q
-   already approved at the first gate.
+   received. Never truncate the list, because a silent truncation loses a decision
+   the user already approved at the first gate.
 2. Fetch the full body of every entry ID in the batch, in one call. Union every group's
    `entryIds`, then join the IDs with commas — not JSON, and no spaces:
 

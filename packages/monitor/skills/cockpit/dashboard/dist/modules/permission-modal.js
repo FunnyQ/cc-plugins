@@ -9,7 +9,7 @@ import { raiseAttention, clearAttention } from "./attention.js";
 
 // TTL ceiling: if neither an own-verdict success nor a `resolved` frame arrives,
 // the modal dims to a "possibly handled elsewhere" state, then auto-dismisses.
-// MANDATORY — Q runs a PreToolUse auto-approve hook that resolves many requests
+// MANDATORY — the user's PreToolUse auto-approve hook can resolve many requests
 // outside cockpit, and the protocol guarantees no cancel notification (see
 // docs/permission-relay/tasks/_context/protocol.md). 90s default, module const.
 const TTL_MS = 90_000;
