@@ -27,11 +27,8 @@ keeps all git/script output out of this conversation.
   the version gate.
 - `/chronicle:release auto` → **finish, local only**: everything prepare does, then
   commit the bump and cut the annotated tag — **no push**. How it finishes follows
-  the repo's `workflow` (`references/release-config.md`):
-  - **git-flow** — commit on `develop`, merge `develop → main`, tag that merge
-    commit, merge back, end on `develop`.
-  - **github-flow** — commit on `main`, tag that bump commit, end on `main`. One
-    long-lived branch, so there is nothing to merge.
+  the repo's `workflow` (`references/release-config.md`); the hammerbearer owns
+  those steps, not you.
 - `/chronicle:release auto push` → **finish + push**: the above, then push the
   branch(es) and the tag.
 - A version token (`0.5.0`) or component token(s) (`chronicle`, or several like
@@ -229,14 +226,9 @@ tag presence when pushing.
   `versionFiles: []` — changelog + tag only. Confirm the starting version in the gate.
 - **Nothing changed** since the last tag (`commitCount: 0` everywhere): tell the
   user there's nothing to release and stop, unless they force an explicit version.
-- **The bump already landed** on the release branch, because the repo bumps on the
-  feature branch: the seer reports `prepared`. Tag the unit at its `fileVersion`.
-  Never bump a second time — that writes a duplicate CHANGELOG heading and applies
-  a version the files already carry.
-- **The bump landed without a CHANGELOG entry**: the seer reports `halfPrepared`.
-  Stop and report. Completing either half is a guess about which half was intended.
-  A repo with no tag yet never reports this. It has never released, so a missing
-  entry there is the normal first-release state, not a half-applied bump.
+- **A repo with no tag yet** never reports `halfPrepared`. It has never released, so
+  a missing CHANGELOG entry there is the normal first-release state, not a
+  half-applied bump.
 - **A unit with no version file** (`versionFiles: []`, the changelog-and-tag-only
   shape) can never report `prepared`. There is no file to read a version from, so
   it always goes through the ordinary bump gate. The same is true when a unit's

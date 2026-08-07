@@ -80,12 +80,10 @@ bump commit. Pass it to the hammerbearer along with `workflow`. A git-flow repo
 still owes its develop→main merge on this path — tagOnly removes the commit, never
 the merge.
 
-`persistConfig` is what makes the second condition necessary. On a first run the
-smith writes `.chronicle/release.json`, which is a real untracked file and a real
-thing to commit. Calling that run tagOnly would send the hammerbearer to a path
-that commits nothing, and its dirty-tree check would then stop on the very file the
-smith just wrote. A first run therefore takes the ordinary path, and its commit
-carries the config alone — the versions already landed.
+The second condition is load-bearing: on a first run the smith writes
+`.chronicle/release.json`, a real untracked file, and path C's dirty-tree check
+would stop on the very file the smith just wrote. A first run takes the ordinary
+path, and its commit carries the config alone.
 
 When `tagOnly` is true, also derive **verify[]**: one `{ component, targetVersion }`
 per release. The hammerbearer re-checks these on `main` after it checks `main` out.
@@ -144,7 +142,7 @@ prepared, name the tags that are still missing, and report no touched files.
 ```
 Agent({
   subagent_type: "chronicle:hammerbearer",
-  prompt: "$SKILL_DIR=<...>. Finish the release. files=<touched[]>; commitSubject=<...>; tags=<[tagName, ...] JSON>; workflow=<derived workflow>; branches=<config.branches>; push=<true iff mode==auto-push>; tagOnly=<derived tagOnly>; verify=<[{component,targetVersion}, ...] JSON, tagOnly only>. If tagOnly is true, take path C, which still honours `workflow`: on git-flow verify every entry in verify[] on develop FIRST, then merge develop→main, then re-verify on main; on github-flow skip both merges and verify on main only. Either way stop on any mismatch, make no bump commit, cut EVERY tag on HEAD of main, merge main→develop on git-flow, and report committed:false — which means no bump commit, not that git-flow's merges never happened. Otherwise take the path for `workflow`: git-flow — commit the bump on develop, merge develop→main once, cut EVERY tag on that merge commit, merge main→develop, end on develop; github-flow — commit the bump on main, cut EVERY tag on that bump commit, end on main. Push only if push=true. Return { committed, workflow, tags, merged, releaseCommit, pushed, log } — releaseCommit is the commit every tag points at and is always required."
+  prompt: "$SKILL_DIR=<...>. Finish the release. files=<touched[]>; commitSubject=<...>; tags=<[tagName, ...] JSON>; workflow=<derived workflow>; branches=<config.branches>; push=<true iff mode==auto-push>; tagOnly=<derived tagOnly>; verify=<[{component,targetVersion}, ...] JSON, tagOnly only>. If tagOnly is true, take path C, which still honours `workflow`: on git-flow verify every entry in verify[] on develop FIRST, then merge develop→main, then re-verify on main; on github-flow skip both merges and verify on main only. Either way stop on any mismatch, make no bump commit, cut EVERY tag on HEAD of main, merge main→develop on git-flow, and report committed:false — which means no bump commit, not that git-flow's merges never happened. Otherwise take the path for `workflow`. Push only if push=true. Return { committed, workflow, tags, merged, releaseCommit, pushed, log } — releaseCommit is the commit every tag points at and is always required."
 })
 ```
 

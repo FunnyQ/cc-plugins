@@ -7,7 +7,7 @@ tools: ["Bash", "Read"]
 ---
 
 Finish the release with plain git. The bump and the changelog are already written
-and verified in the working tree. You commit them and cut the tag.
+and verified. Your job is the commit — when there is one to make — and the tag.
 
 The repo's `workflow` picks the path. A **git-flow** repo gets a hand-rolled gitflow
 `release finish`. `git flow release finish` cannot produce a scoped
@@ -30,12 +30,9 @@ has one long-lived branch and no merge at all.
   key, if present, is ignored).
 - `push` — always commit and tag locally. Push the branch(es) and **every** tag
   only if `push` is true.
-- `tagOnly` — optional, default false. True when the bump and the CHANGELOG entry
-  are already committed, because the repo bumps on the feature branch. Nothing is
-  left to commit. Take **path C** instead of path A or path B. Path C still honours
-  `workflow`: a git-flow repo owes the develop→main merge, and only the commit is
-  skipped. `files` is empty in this case. An empty `files` on its own never implies
-  `tagOnly`. Only this flag does.
+- `tagOnly` — optional, default false. True → take **path C**, which still honours
+  `workflow`. `files` is empty in this case, but an empty `files` on its own never
+  implies `tagOnly`. Only this flag does.
 - `verify[]` — `tagOnly` only. One `{ component, targetVersion }` per unit being
   tagged. Path C re-checks these on `main` before it tags. `component` is null or
   absent for whole-repo.
@@ -47,7 +44,15 @@ commit every tag points at is the **`releaseCommit`** you report.
 
 ## Path A — git-flow — stop at the first failure, never force
 
-1. **Commit the bump on `develop`.** First, confirm you are on `branches.develop`
+1. **Refuse to re-cut an existing tag.** Do this first, before the commit — a tag
+   collision found after the merge leaves a commit on `develop` and a merge on
+   `main` that no tag points at:
+
+   ```bash
+   git rev-parse -q --verify "refs/tags/<tagName>" && { echo "tag <tagName> already exists" >&2; exit 1; }
+   ```
+
+2. **Commit the bump on `develop`.** First, confirm you are on `branches.develop`
    (`git branch --show-current`; `git checkout <develop>` if not). Then:
 
    ```bash
@@ -62,7 +67,7 @@ commit every tag points at is the **`releaseCommit`** you report.
    nothing to release, and hand back. Only proceed past here with a real new
    commit hash.
 
-2. **Merge develop → main** (one merge, whatever the tag count):
+3. **Merge develop → main** (one merge, whatever the tag count):
 
    ```bash
    git checkout <main>
@@ -73,29 +78,29 @@ commit every tag points at is the **`releaseCommit`** you report.
    printf '%s\n' "$releaseCommit"            # the SHA every tag must point at
    ```
 
-3. **Annotated tag(s) on main.** Cut **every** tag in `tags` on this one merge
+4. **Annotated tag(s) on main.** Cut **every** tag in `tags` on this one merge
    commit:
 
    ```bash
    git tag -a <tagName> -m "<tagName>"        # repeat for each tag in `tags`
    ```
 
-4. **Merge main → develop.** This keeps branches in sync. **End on develop:**
+5. **Merge main → develop.** This keeps branches in sync. **End on develop:**
 
    ```bash
    git checkout <develop>
    git merge --no-ff <main> -m "Merge branch '<main>' back into <develop>"
    ```
 
-5. **Push, only if `push` is true.** Push every tag:
+6. **Push, only if `push` is true.** Push every tag:
 
    ```bash
    git push origin <develop> <main>
    git push origin <tag1> [<tag2> ...]        # all tags in `tags`
    ```
 
-6. Confirm `git branch --show-current` is `<develop>`. Report the SHA printed in
-   step 2, verbatim. Never re-derive or guess it.
+7. Confirm `git branch --show-current` is `<develop>`. Report the SHA printed in
+   step 3, verbatim. Never re-derive or guess it.
 
 ## Path B — github-flow — stop at the first failure, never force
 
@@ -301,19 +306,10 @@ found it. The first step that moves anything is the merge in step 5.
 ```
 
 `tags` lists every tag cut (one for a single release). **`releaseCommit` is always
-required**, on every path. The caller verifies every tag against it: path A's
-develop→main merge SHA, path B's bump SHA, and path C's `HEAD` — which is the
-develop→main merge commit on git-flow and the already-merged `main` tip on
-github-flow. Path C sets `committed: false` and still reports the SHA it tagged. On
-git-flow, path C also sets `mergeCommit` to the same SHA.
+required**, on every path — the caller verifies every tag against it. Your path's
+last step says what to put in `committed`, `merged`, and `branch`.
 
-`committed` reports whether you made the **bump** commit — nothing else. Path C
-never makes one, so it is always false there, and on git-flow it is false even
-though the two merges each created a commit. `merged` is what reports those.
-
-On git-flow, also set `mergeCommit` to the same SHA (older callers still read that
-name). On github-flow, set `merged: []` and omit `mergeCommit`, since nothing was
-merged. `branch` is `develop` on path A, `main` on path B, and on path C it follows
-the workflow: `main` on github-flow, `develop` on git-flow. Set `pushed: []` when
-`push` was false. Report honestly. Never claim a push, a merge, or a tag that
-didn't happen.
+`committed` reports whether you made the **bump** commit — nothing else. On git-flow
+set `mergeCommit` to the same SHA as `releaseCommit` (older callers still read that
+name); on github-flow omit it. Set `pushed: []` when `push` was false. Report
+honestly. Never claim a push, a merge, or a tag that didn't happen.
