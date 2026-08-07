@@ -1,5 +1,26 @@
 # Changelog
 
+## [relay 0.6.3] - 2026-08-07
+
+_tracks tag `relay-v0.6.3`_
+
+### Fixed
+- The codex backend's `workspace-write` sandbox was blocking relay's routine delegated writes and network fetches. Both the headless delegate and the live-pane invocation now request `-s danger-full-access` instead, so delegated work no longer stalls on sandbox denials. This only lifts the sandbox restriction — approval prompts are unaffected, and the live TUI still surfaces its usual approval prompts in the pane. The opt-in `--dangerous` (YOLO) switch is unchanged, and `codex review` is untouched since it accepts no `-s` flag.
+
+## [chronicle 0.10.5] - 2026-08-07
+
+_tracks tag `chronicle-v0.10.5`_
+
+### Changed
+- Depersonalized shipped plugin documentation, replacing the repo owner's name with generic "the user" phrasing in the `adr` skill guide and its codifier agent specs. No behaviour change.
+
+## [monitor 4.0.2] - 2026-08-07
+
+_tracks tag `monitor-v4.0.2`_
+
+### Changed
+- Depersonalized a code comment in the cockpit dashboard's permission modal to use generic user phrasing. No behaviour change.
+
 ## [chronicle 0.10.4] - 2026-08-07
 
 _tracks tag `chronicle-v0.10.4`_
