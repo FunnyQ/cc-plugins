@@ -1,5 +1,20 @@
 # Changelog
 
+## [chronicle 0.10.6] - 2026-08-08
+
+_tracks tag `chronicle-v0.10.6`_
+
+### Added
+- The release skill now recognizes a release already prepared on the feature branch: version bumps and CHANGELOG entries landed, only the tag is missing. It resolves the version gate at the existing bump without asking for a new one, verifies the bump instead of reapplying it, and cuts the tag directly, skipping a duplicate CHANGELOG entry.
+- A repo whose version files were bumped with no CHANGELOG entry behind them is now caught and stopped rather than guessed at, so the release doesn't silently pick the wrong half to finish. A repo with no prior tag is never treated this way, since a missing entry there is just the normal first-release state.
+
+### Fixed
+- Re-running a release at a version whose tag already exists now fails before the commit and merge happen, instead of after — matching the other release paths, which already refused to touch the repo in that case.
+- The Codex side of the release orchestrator now returns the same field names as the Claude side, fixing a mismatch that could point Codex-side callers at the wrong data.
+
+### Changed
+- Agent instructions were trimmed of about 260 restated words, so each rule now lives in exactly one place instead of being repeated across prompts.
+
 ## [relay 0.6.3] - 2026-08-07
 
 _tracks tag `relay-v0.6.3`_
