@@ -1,13 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
+  agreedVersion,
   applyVersionToContent,
   computeBumps,
   detectShape,
   detectWorkflow,
   detectWorkflowDrift,
   effectiveWorkflow,
+  hasChangelogEntry,
   lastTagFor,
   normalizeVersion,
+  preparedState,
   parseBranchNames,
   parseConfig,
   readVersionFromContent,
@@ -513,5 +516,226 @@ describe("workflow in the config", () => {
     expect(() =>
       parseConfig(JSON.stringify({ ...gitFlow, workflow: "trunk-flow" })),
     ).toThrow();
+  });
+});
+
+describe("agreedVersion", () => {
+  test("returns the version when every file agrees", () => {
+    expect(agreedVersion([{ current: "3.5.0" }, { current: "v3.5.0" }])).toBe(
+      "3.5.0",
+    );
+  });
+
+  test("returns null when the files disagree", () => {
+    expect(agreedVersion([{ current: "3.5.0" }, { current: "3.4.0" }])).toBe(
+      null,
+    );
+  });
+
+  test("returns null when a file has no readable version", () => {
+    expect(agreedVersion([{ current: "3.5.0" }, { current: null }])).toBe(null);
+  });
+
+  test("returns null for a repo with no version files", () => {
+    expect(agreedVersion([])).toBe(null);
+  });
+});
+
+describe("hasChangelogEntry", () => {
+  const changelog = [
+    "# Changelog",
+    "",
+    "## [odin 3.5.0] - 2026-08-07",
+    "",
+    "### Added",
+    "- Something.",
+    "",
+    "## [odin 3.4.0] - 2026-07-28",
+  ].join("\n");
+
+  test("finds a per-component heading", () => {
+    expect(hasChangelogEntry(changelog, "3.5.0", "odin")).toBe(true);
+  });
+
+  test("misses a version that has no heading", () => {
+    expect(hasChangelogEntry(changelog, "3.6.0", "odin")).toBe(false);
+  });
+
+  test("does not match another component at the same version", () => {
+    expect(hasChangelogEntry(changelog, "3.5.0", "odin-session")).toBe(false);
+  });
+
+  test("finds a whole-repo heading", () => {
+    expect(hasChangelogEntry("## [0.5.0] - 2026-08-07", "0.5.0")).toBe(true);
+  });
+
+  test("tolerates a v prefix on either side", () => {
+    expect(hasChangelogEntry("## [v0.5.0] - 2026-08-07", "0.5.0")).toBe(true);
+    expect(hasChangelogEntry("## [0.5.0] - 2026-08-07", "v0.5.0")).toBe(true);
+  });
+
+  test("ignores a heading that only contains the version as a substring", () => {
+    expect(hasChangelogEntry("## [0.5.01] - 2026-08-07", "0.5.0")).toBe(false);
+  });
+});
+
+describe("preparedState", () => {
+  test("reports prepared when the files lead the tag and the entry exists", () => {
+    expect(
+      preparedState({
+        fileVersion: "3.5.0",
+        taggedVersion: "3.4.0",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: true, halfPrepared: false });
+  });
+
+  test("reports halfPrepared when the entry is missing", () => {
+    expect(
+      preparedState({
+        fileVersion: "3.5.0",
+        taggedVersion: "3.4.0",
+        changelogEntry: false,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: true });
+  });
+
+  test("reports neither when the files match the last tag", () => {
+    expect(
+      preparedState({
+        fileVersion: "3.4.0",
+        taggedVersion: "3.4.0",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+
+  test("reports neither when the files trail the last tag", () => {
+    expect(
+      preparedState({
+        fileVersion: "3.3.0",
+        taggedVersion: "3.4.0",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+
+  test("treats a first release with an entry as prepared", () => {
+    expect(
+      preparedState({
+        fileVersion: "0.1.0",
+        taggedVersion: null,
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: true, halfPrepared: false });
+  });
+
+  test("reports neither when no version file could be read", () => {
+    expect(
+      preparedState({
+        fileVersion: null,
+        taggedVersion: "3.4.0",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+});
+
+describe("prepared state and prerelease versions", () => {
+  // Chronicle compares core versions only: parseSemver splits on [-+] and keeps
+  // major.minor.patch. computeBumps and lastTagFor already behave this way, so
+  // preparedState matches them rather than implementing SemVer precedence.
+  test("treats a prerelease as its core version", () => {
+    expect(
+      preparedState({
+        fileVersion: "1.2.3-rc.1",
+        taggedVersion: "1.2.3",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+
+  test("sees a core bump even when the file version carries a prerelease", () => {
+    expect(
+      preparedState({
+        fileVersion: "1.3.0-rc.1",
+        taggedVersion: "1.2.3",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: true, halfPrepared: false });
+  });
+
+  test("rejects a version that is not semver", () => {
+    expect(
+      preparedState({
+        fileVersion: "not-a-version",
+        taggedVersion: "1.2.3",
+        changelogEntry: true,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+});
+
+describe("hasChangelogEntry edge cases", () => {
+  test("escapes regex characters in a component name", () => {
+    expect(
+      hasChangelogEntry("## [odin.core 1.0.0] - 2026-01-01", "1.0.0", "odin.core"),
+    ).toBe(true);
+    expect(
+      hasChangelogEntry("## [odinXcore 1.0.0] - 2026-01-01", "1.0.0", "odin.core"),
+    ).toBe(false);
+  });
+
+  test("matches a heading in a CRLF file", () => {
+    expect(
+      hasChangelogEntry("# Changelog\r\n\r\n## [alpha 1.0.0] - 2026-01-01\r\n", "1.0.0", "alpha"),
+    ).toBe(true);
+  });
+
+  test("does not match a heading deeper than h2", () => {
+    expect(hasChangelogEntry("### [alpha 1.0.0] - 2026-01-01", "1.0.0", "alpha")).toBe(
+      false,
+    );
+  });
+
+  test("does not match the version inside body text", () => {
+    expect(
+      hasChangelogEntry("- upgraded to [alpha 1.0.0] last week", "1.0.0", "alpha"),
+    ).toBe(false);
+  });
+});
+
+describe("preparedState on a first release", () => {
+  // A repo with no tag has never released, so a missing CHANGELOG entry is the
+  // normal state, not a half-applied bump. Reporting halfPrepared here would stop
+  // the first release of every repo.
+  test("does not call a first release halfPrepared when no entry exists", () => {
+    expect(
+      preparedState({
+        fileVersion: "0.1.0",
+        taggedVersion: null,
+        changelogEntry: false,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+
+  test("does not call a 0.0.0 scaffold halfPrepared", () => {
+    expect(
+      preparedState({
+        fileVersion: "0.0.0",
+        taggedVersion: null,
+        changelogEntry: false,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: false });
+  });
+
+  test("still reports halfPrepared once a tag exists", () => {
+    expect(
+      preparedState({
+        fileVersion: "0.2.0",
+        taggedVersion: "0.1.0",
+        changelogEntry: false,
+      }),
+    ).toEqual({ prepared: false, halfPrepared: true });
   });
 });

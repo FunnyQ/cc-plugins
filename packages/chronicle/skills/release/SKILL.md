@@ -23,13 +23,12 @@ keeps all git/script output out of this conversation.
 
 - `/chronicle:release` → **prepare**: bump version files + write the CHANGELOG
   entry + verify, then STOP. You review and commit (`/chronicle:commit`) and tag.
+  A unit whose bump and CHANGELOG entry already landed has nothing to prepare — see
+  the version gate.
 - `/chronicle:release auto` → **finish, local only**: everything prepare does, then
   commit the bump and cut the annotated tag — **no push**. How it finishes follows
-  the repo's `workflow` (`references/release-config.md`):
-  - **git-flow** — commit on `develop`, merge `develop → main`, tag that merge
-    commit, merge back, end on `develop`.
-  - **github-flow** — commit on `main`, tag that bump commit, end on `main`. One
-    long-lived branch, so there is nothing to merge.
+  the repo's `workflow` (`references/release-config.md`); the hammerbearer owns
+  those steps, not you.
 - `/chronicle:release auto push` → **finish + push**: the above, then push the
   branch(es) and the tag.
 - A version token (`0.5.0`) or component token(s) (`chronicle`, or several like
@@ -99,8 +98,37 @@ If `hasConfig` is true, use `config` as-is and skip this step.
 
 ### 3. Version gate (always)
 
+#### Already-prepared units
+
+Check the seer's `prepared` and `halfPrepared` fields **before** you ask any bump.
+A repo that bumps on the feature branch arrives here with the version files and the
+CHANGELOG entry already merged. There is no bump left to make.
+
+- `prepared` is true → the unit's target version is its `fileVersion`. Do not ask
+  for a bump. Do not offer one. Resolve
+  `{ component, targetVersion: fileVersion, lastTag, prepared: true }`, and tell the
+  user which version you are about to tag. In prepare mode there is nothing to do:
+  say the unit is already prepared and name the tag command they need.
+- `halfPrepared` is true → **stop**. The version files moved and no CHANGELOG entry
+  followed. Report the unit, its `fileVersion`, and that its CHANGELOG entry is
+  missing. Do not write the entry, and do not bump on top of the moved files.
+  Either half could be the mistake, and only the user knows which.
+- Both false → the ordinary bump gate below applies.
+
+A coordinated release may mix prepared and unprepared units. Ask the bump only for
+the unprepared ones. Every unit still lands its tag on the same commit.
+
+The seer reads `prepared` from the branch you are standing on, which may be neither
+`main` nor `develop`. The hammerbearer re-checks it on the branch it actually tags,
+so a bump that never reached that branch stops the release rather than mis-tagging
+it. On a git-flow repo, tell the user to merge into `develop` first — a prepared
+unit that is still only on a feature branch cannot be tagged.
+
+#### The ordinary gate
+
 The gate resolves a **`releases[]`** list. This is one entry per unit being cut,
-each `{ component, targetVersion, lastTag }`. A whole-repo release uses a single
+each `{ component, targetVersion, lastTag }`, plus `prepared: true` on any unit that
+came in already prepared. A whole-repo release uses a single
 entry with `component: null`. `lastTag` comes from the seer facts the main agent
 already holds: per-component from `components[].lastTag`, whole-repo from
 top-level `lastTag`. It may be null on a first release. One component is just a
@@ -146,7 +174,11 @@ returns the final report.
 - **auto / auto push** → take `releaseCommit` from the Oathkeeper's report. This is
   the one commit every tag points at. For git-flow, it is the develop→main merge
   SHA, also reported as `mergeCommit`. For github-flow, it is the bump commit on
-  `main`. A finished release without one is a failed release. Stop and report it.
+  `main`. For a fully prepared release, it is `HEAD` on `main`, and the report sets
+  `committed: false` — that field means "no bump commit", not "nothing was
+  committed", and a git-flow prepared release still makes its two merge commits.
+  A finished release without a `releaseCommit` is a failed release. Stop and report
+  it.
   Then, for every tag, require non-empty `git tag --list <tag>` output and
   `git rev-list -n1 <tag>` equal to that commit. When pushing, also require
   non-empty `git ls-remote --tags origin <tag>`. Relay only verified results.
@@ -194,6 +226,14 @@ tag presence when pushing.
   `versionFiles: []` — changelog + tag only. Confirm the starting version in the gate.
 - **Nothing changed** since the last tag (`commitCount: 0` everywhere): tell the
   user there's nothing to release and stop, unless they force an explicit version.
+- **A repo with no tag yet** never reports `halfPrepared`. It has never released, so
+  a missing CHANGELOG entry there is the normal first-release state, not a
+  half-applied bump.
+- **A unit with no version file** (`versionFiles: []`, the changelog-and-tag-only
+  shape) can never report `prepared`. There is no file to read a version from, so
+  it always goes through the ordinary bump gate. The same is true when a unit's
+  version files disagree with each other, which reads as no prepared state rather
+  than as its own error.
 - **Verify fails** after the bump (a file didn't move): the smith reports it. The
   Oathkeeper stops before any finish. Never tag a half-bumped tree.
 - **A repo that migrated to GitHub Flow** after its config was committed: the config

@@ -29,7 +29,8 @@ export type Workflow = "git-flow" | "github-flow";
 
 /** A version source: either a known `kind` or a custom capture-group `pattern`. */
 export type VersionFileSpec =
-  { path: string; kind: VersionFileKind } | { path: string; pattern: string };
+  | { path: string; kind: VersionFileKind }
+  | { path: string; pattern: string };
 
 export type ComponentSpec = {
   name: string;
@@ -660,6 +661,72 @@ async function commitCountSince(
   }
 }
 
+/**
+ * The one version every version file agrees on, or null when they disagree, when
+ * one is unreadable, or when the unit has no version file at all.
+ *
+ * Null collapses all three cases into "no prepared state detected", and the unit
+ * then goes through the ordinary bump gate. Disagreeing files are not reported as
+ * their own condition. A unit configured with no version file at all — the
+ * changelog-and-tag-only shape — can therefore never read as prepared.
+ */
+export function agreedVersion(
+  files: Array<{ current: string | null }>,
+): string | null {
+  if (files.length === 0) return null;
+  const versions = files.map((f) =>
+    f.current ? normalizeVersion(f.current) : null,
+  );
+  if (versions.some((v) => v === null)) return null;
+  return versions.every((v) => v === versions[0]) ? versions[0] : null;
+}
+
+/**
+ * Whether CHANGELOG.md already heads an entry for this version. Matches the
+ * heading shape the annalist writes: `## [<component> <version>]` per-component,
+ * `## [<version>]` whole-repo.
+ */
+export function hasChangelogEntry(
+  changelog: string,
+  version: string,
+  component?: string,
+): boolean {
+  const want = escapeRegex(normalizeVersion(version));
+  const label = component
+    ? `${escapeRegex(component)}\\s+v?${want}`
+    : `v?${want}`;
+  return new RegExp(`^##\\s*\\[\\s*${label}\\s*\\]`, "m").test(changelog);
+}
+
+/**
+ * Whether the working tree already carries this release. A repo that bumps on the
+ * feature branch arrives here with the version files and the CHANGELOG entry
+ * already merged, so the only work left is the tag.
+ *
+ * `halfPrepared` is the version files leading the last tag with no CHANGELOG entry
+ * behind them. That is a partial state, and the caller must stop rather than guess
+ * which half to complete.
+ */
+export function preparedState(args: {
+  fileVersion: string | null;
+  taggedVersion: string | null;
+  changelogEntry: boolean;
+}): { prepared: boolean; halfPrepared: boolean } {
+  const { fileVersion, taggedVersion, changelogEntry } = args;
+  if (!fileVersion || !parseSemver(fileVersion)) {
+    return { prepared: false, halfPrepared: false };
+  }
+  const ahead = taggedVersion
+    ? cmpSemver(fileVersion, taggedVersion) > 0
+    : true;
+  if (!ahead) return { prepared: false, halfPrepared: false };
+  // A repo with no tag yet has no bump to be half-way through. Its version files
+  // hold whatever the scaffolder wrote, and its CHANGELOG has no entry because it
+  // has never released. Calling that halfPrepared would stop every first release.
+  if (!taggedVersion) return { prepared: changelogEntry, halfPrepared: false };
+  return { prepared: changelogEntry, halfPrepared: !changelogEntry };
+}
+
 export type ComponentFact = {
   name: string;
   path: string;
@@ -667,17 +734,45 @@ export type ComponentFact = {
   current: string | null;
   bumps: { patch: string; minor: string; major: string } | null;
   commitCount: number | null;
+  fileVersion: string | null;
+  changelogEntry: boolean;
+  prepared: boolean;
+  halfPrepared: boolean;
 };
 
+/** The version the unit's own files currently carry, independent of any tag. */
+async function fileVersionFor(
+  root: string,
+  files: VersionFileSpec[],
+): Promise<string | null> {
+  const read = await Promise.all(
+    files.map(async (spec) => {
+      const content = await readFile(resolve(root, spec.path), "utf-8").catch(
+        () => "",
+      );
+      return {
+        current: content ? readVersionFromContent(content, spec) : null,
+      };
+    }),
+  );
+  return agreedVersion(read);
+}
+
 async function perComponentFacts(
+  root: string,
   config: ReleaseConfig,
   tags: string[],
+  changelog: string,
 ): Promise<ComponentFact[]> {
   const components = config.components ?? [];
   return Promise.all(
     components.map(async (c) => {
       const last = lastTagFor(tags, config, c.name);
       const current = last?.version ?? null;
+      const fileVersion = await fileVersionFor(root, c.versionFiles);
+      const changelogEntry = fileVersion
+        ? hasChangelogEntry(changelog, fileVersion, c.name)
+        : false;
       return {
         name: c.name,
         path: c.path,
@@ -685,6 +780,13 @@ async function perComponentFacts(
         current,
         bumps: current ? computeBumps(current) : null,
         commitCount: await commitCountSince(last?.tag ?? null, c.path),
+        fileVersion,
+        changelogEntry,
+        ...preparedState({
+          fileVersion,
+          taggedVersion: current,
+          changelogEntry,
+        }),
       };
     }),
   );
@@ -752,12 +854,28 @@ async function main() {
   const last = lastTagFor(tags, effective, component);
   const current = last?.version ?? null;
 
+  const changelog = await readFile(
+    resolve(root, effective.changelog),
+    "utf-8",
+  ).catch(() => "");
+
   // per-component mode: enumerate each unit with its own version + change count
   // so the main agent's version gate can offer "which component + which bump".
   const components =
     effective.mode === "per-component"
-      ? await perComponentFacts(effective, tags)
+      ? await perComponentFacts(root, effective, tags, changelog)
       : null;
+
+  // A repo that bumps on the feature branch merges with the version files and the
+  // CHANGELOG entry already in place. Report that, so the gate can tag instead of
+  // bumping a second time. Whole-repo only — per-component reports it per unit.
+  const wholeRepoFileVersion =
+    effective.mode === "per-component"
+      ? null
+      : await fileVersionFor(root, effective.versionFiles);
+  const wholeRepoChangelogEntry = wholeRepoFileVersion
+    ? hasChangelogEntry(changelog, wholeRepoFileVersion)
+    : false;
 
   const out = {
     root,
@@ -772,6 +890,13 @@ async function main() {
     lastTag: last?.tag ?? null,
     current,
     bumps: current ? computeBumps(current) : null,
+    fileVersion: wholeRepoFileVersion,
+    changelogEntry: wholeRepoChangelogEntry,
+    ...preparedState({
+      fileVersion: wholeRepoFileVersion,
+      taggedVersion: current,
+      changelogEntry: wholeRepoChangelogEntry,
+    }),
     components,
   };
 
