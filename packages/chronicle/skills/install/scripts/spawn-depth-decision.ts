@@ -2,7 +2,7 @@
 //
 // Claude Code 2.1.217 stopped letting subagents spawn nested subagents by
 // default, which breaks every Chronicle orchestrator (lawspeaker/storykeeper/
-// oathkeeper) — they exist to spawn children. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`
+// lorekeeper) — they exist to spawn children. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`
 // re-enables it. Chronicle needs exactly two levels: main → orchestrator → child.
 
 export const ENV_KEY = "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH";

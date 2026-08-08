@@ -29,7 +29,7 @@ describe("setup-codex-agents", () => {
     const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(16);
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(12);
     for (const role of [
       "lawspeaker",
       "watcher",
@@ -37,11 +37,7 @@ describe("setup-codex-agents", () => {
       "storykeeper",
       "skald",
       "messenger",
-      "seer",
-      "oathkeeper",
-      "smith",
       "annalist",
-      "hammerbearer",
       "lorekeeper",
       "gleaner",
       "reckoner",
@@ -67,11 +63,7 @@ describe("setup-codex-agents", () => {
     expect(config).toContain("[agents.chronicle_storykeeper]");
     expect(config).toContain("[agents.chronicle_skald]");
     expect(config).toContain("[agents.chronicle_messenger]");
-    expect(config).toContain("[agents.chronicle_seer]");
-    expect(config).toContain("[agents.chronicle_oathkeeper]");
-    expect(config).toContain("[agents.chronicle_smith]");
     expect(config).toContain("[agents.chronicle_annalist]");
-    expect(config).toContain("[agents.chronicle_hammerbearer]");
 
     const installed = Object.fromEntries(
       [
@@ -81,11 +73,7 @@ describe("setup-codex-agents", () => {
         "storykeeper",
         "skald",
         "messenger",
-        "seer",
-        "oathkeeper",
-        "smith",
         "annalist",
-        "hammerbearer",
         "lorekeeper",
         "gleaner",
         "reckoner",
@@ -110,14 +98,7 @@ describe("setup-codex-agents", () => {
     expect(installed.storykeeper).toContain("chronicle_messenger");
     expect(installed.skald).toContain('model = "gpt-5.6-terra"');
     expect(installed.messenger).toContain('model = "gpt-5.6-luna"');
-    expect(installed.seer).toContain('model = "gpt-5.6-luna"');
-    expect(installed.oathkeeper).toContain('model = "gpt-5.6-terra"');
-    expect(installed.oathkeeper).toContain("chronicle_smith");
-    expect(installed.oathkeeper).toContain("chronicle_annalist");
-    expect(installed.oathkeeper).toContain("chronicle_hammerbearer");
-    expect(installed.smith).toContain('model = "gpt-5.6-luna"');
     expect(installed.annalist).toContain('model = "gpt-5.6-terra"');
-    expect(installed.hammerbearer).toContain('model = "gpt-5.6-luna"');
     expect(installed.lorekeeper).toContain('model = "gpt-5.6-terra"');
     expect(installed.gleaner).toContain('model = "gpt-5.6-luna"');
     expect(installed.reckoner).toContain('model = "gpt-5.6-terra"');
