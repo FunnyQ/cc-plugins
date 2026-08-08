@@ -4,7 +4,7 @@
  *
  * Pure core (unit-tested): version math, pattern-aware version read/write, repo
  * shape detection (interview defaults), and `.chronicle/release.json` config I/O.
- * Thin git/fs shell on top feeds the seer agent and applies/verifies bumps.
+ * Thin git/fs shell on top feeds the skill's version gate and applies bumps.
  *
  * Usage:
  *   bun analyze-release.ts                       # detect + emit JSON for the interview/gate
@@ -456,7 +456,7 @@ const MANIFEST_GLOBS: Array<{ glob: string; kind: VersionFileKind }> = [
   { glob: "*/VERSION", kind: "text" },
 ];
 
-async function git(
+export async function git(
   strings: TemplateStringsArray,
   ...v: unknown[]
 ): Promise<string> {
@@ -467,7 +467,7 @@ async function git(
   }
 }
 
-async function repoRoot(): Promise<string> {
+export async function repoRoot(): Promise<string> {
   return (await git`git rev-parse --show-toplevel`) || process.cwd();
 }
 
@@ -489,7 +489,7 @@ async function discoverManifests(root: string): Promise<ManifestFact[]> {
   return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
-async function allTags(): Promise<string[]> {
+export async function allTags(): Promise<string[]> {
   const out = await git`git tag`;
   return out ? out.split("\n").filter(Boolean) : [];
 }
@@ -520,7 +520,7 @@ async function allBranches(): Promise<string[] | undefined> {
  * The literal prefix a tag has before its version, derived from `config.tag` (the
  * source of truth) — not hard-coded. `v{version}` → `v`; `{component}-v{version}`
  * with component `chronicle` → `chronicle-v`; a custom `release-{version}` →
- * `release-`. This keeps last-tag lookup consistent with how the hammerbearer cuts the
+ * `release-`. This keeps last-tag lookup consistent with how the engine cuts the
  * tag, even when the interview set a non-default template.
  */
 export function tagPrefix(config: ReleaseConfig, component?: string): string {
@@ -626,7 +626,7 @@ async function verify(
   };
 }
 
-async function apply(
+export async function apply(
   root: string,
   version: string,
   files: VersionFileSpec[],
@@ -698,35 +698,6 @@ export function hasChangelogEntry(
   return new RegExp(`^##\\s*\\[\\s*${label}\\s*\\]`, "m").test(changelog);
 }
 
-/**
- * Whether the working tree already carries this release. A repo that bumps on the
- * feature branch arrives here with the version files and the CHANGELOG entry
- * already merged, so the only work left is the tag.
- *
- * `halfPrepared` is the version files leading the last tag with no CHANGELOG entry
- * behind them. That is a partial state, and the caller must stop rather than guess
- * which half to complete.
- */
-export function preparedState(args: {
-  fileVersion: string | null;
-  taggedVersion: string | null;
-  changelogEntry: boolean;
-}): { prepared: boolean; halfPrepared: boolean } {
-  const { fileVersion, taggedVersion, changelogEntry } = args;
-  if (!fileVersion || !parseSemver(fileVersion)) {
-    return { prepared: false, halfPrepared: false };
-  }
-  const ahead = taggedVersion
-    ? cmpSemver(fileVersion, taggedVersion) > 0
-    : true;
-  if (!ahead) return { prepared: false, halfPrepared: false };
-  // A repo with no tag yet has no bump to be half-way through. Its version files
-  // hold whatever the scaffolder wrote, and its CHANGELOG has no entry because it
-  // has never released. Calling that halfPrepared would stop every first release.
-  if (!taggedVersion) return { prepared: changelogEntry, halfPrepared: false };
-  return { prepared: changelogEntry, halfPrepared: !changelogEntry };
-}
-
 export type ComponentFact = {
   name: string;
   path: string;
@@ -736,26 +707,30 @@ export type ComponentFact = {
   commitCount: number | null;
   fileVersion: string | null;
   changelogEntry: boolean;
-  prepared: boolean;
-  halfPrepared: boolean;
 };
+
+/** Reads one repo-root-relative path, returning "" when it cannot be read. */
+type ContentReader = (path: string) => Promise<string>;
+
+const workingTreeReader =
+  (root: string): ContentReader =>
+  (path) =>
+    readFile(resolve(root, path), "utf-8").catch(() => "");
 
 /** The version the unit's own files currently carry, independent of any tag. */
 async function fileVersionFor(
-  root: string,
   files: VersionFileSpec[],
+  read: ContentReader,
 ): Promise<string | null> {
-  const read = await Promise.all(
+  const got = await Promise.all(
     files.map(async (spec) => {
-      const content = await readFile(resolve(root, spec.path), "utf-8").catch(
-        () => "",
-      );
+      const content = await read(spec.path);
       return {
         current: content ? readVersionFromContent(content, spec) : null,
       };
     }),
   );
-  return agreedVersion(read);
+  return agreedVersion(got);
 }
 
 async function perComponentFacts(
@@ -769,7 +744,10 @@ async function perComponentFacts(
     components.map(async (c) => {
       const last = lastTagFor(tags, config, c.name);
       const current = last?.version ?? null;
-      const fileVersion = await fileVersionFor(root, c.versionFiles);
+      const fileVersion = await fileVersionFor(
+        c.versionFiles,
+        workingTreeReader(root),
+      );
       const changelogEntry = fileVersion
         ? hasChangelogEntry(changelog, fileVersion, c.name)
         : false;
@@ -782,11 +760,6 @@ async function perComponentFacts(
         commitCount: await commitCountSince(last?.tag ?? null, c.path),
         fileVersion,
         changelogEntry,
-        ...preparedState({
-          fileVersion,
-          taggedVersion: current,
-          changelogEntry,
-        }),
       };
     }),
   );
@@ -872,7 +845,7 @@ async function main() {
   const wholeRepoFileVersion =
     effective.mode === "per-component"
       ? null
-      : await fileVersionFor(root, effective.versionFiles);
+      : await fileVersionFor(effective.versionFiles, workingTreeReader(root));
   const wholeRepoChangelogEntry = wholeRepoFileVersion
     ? hasChangelogEntry(changelog, wholeRepoFileVersion)
     : false;
@@ -892,11 +865,6 @@ async function main() {
     bumps: current ? computeBumps(current) : null,
     fileVersion: wholeRepoFileVersion,
     changelogEntry: wholeRepoChangelogEntry,
-    ...preparedState({
-      fileVersion: wholeRepoFileVersion,
-      taggedVersion: current,
-      changelogEntry: wholeRepoChangelogEntry,
-    }),
     components,
   };
 

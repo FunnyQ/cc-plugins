@@ -6,8 +6,8 @@ description: >-
 when_to_use: >-
   Setting up or repairing Chronicle. On Claude Code: when commit/pr/release fail
   with "Agent exists but is not enabled in this context". On Codex: registering or
-  refreshing the commit/PR/release agents (chronicle_lawspeaker,
-  chronicle_storykeeper, chronicle_oathkeeper, etc.).
+  refreshing the commit/PR/ADR agents (chronicle_lawspeaker,
+  chronicle_storykeeper, chronicle_lorekeeper, etc.).
   Not monitor:install (that wires the usage-dashboard statusline).
 ---
 
@@ -16,7 +16,7 @@ when_to_use: >-
 ## Claude Code — nested subagent spawn depth
 
 Chronicle's flows are orchestrator-shaped: `main → lawspeaker → watcher/runesmith`
-(and the same for `storykeeper` / `oathkeeper`). Claude Code **2.1.217** stopped
+(and the same for `storykeeper` / `lorekeeper`). Claude Code **2.1.217** stopped
 letting subagents spawn nested subagents by default. Those orchestrators then fail
 with `Agent exists but is not enabled in this context`. No commit lands, and
 nothing is staged.
@@ -46,8 +46,7 @@ restarts. Always say this when you report the fix.
 Register the Codex-native commit roles (`chronicle_lawspeaker`,
 `chronicle_watcher`, `chronicle_runesmith`) and PR roles
 (`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), plus the
-release roles (`chronicle_seer`, `chronicle_oathkeeper`, `chronicle_smith`,
-`chronicle_annalist`, `chronicle_hammerbearer`), plus the ADR roles
+the release role (`chronicle_annalist`), plus the ADR roles
 (`chronicle_lorekeeper`, `chronicle_gleaner`, `chronicle_reckoner`,
 `chronicle_codifier`, `chronicle_barrowkeeper`).
 

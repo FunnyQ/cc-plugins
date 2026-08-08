@@ -22,7 +22,7 @@ Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents 
 
 **relay** — `/relay <codex|opencode|claude> <delegate|review|image>`. A backend-agnostic mode layer sits over a per-harness strategy layer. The capability matrix makes `image` codex-only.
 
-**chronicle** — all five skills use one topology: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents. `adr` triages the cockpit decision trail and promotes decisions into Architecture Decision Records. `release` is config-first: it detects whole-repo versus per-component layouts, persists the shape to a committed `.chronicle/release.json`, then bumps versions, writes the CHANGELOG entry, and (in auto mode) commits, tags, and pushes.
+**chronicle** — `adr`, `commit`, and `pr` share one topology: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents. `adr` triages the cockpit decision trail and promotes decisions into Architecture Decision Records. `release` is the exception: it is a script, `scripts/release.ts`, driving an ordered list of stages that each detect whether they have already happened, so a run resumes wherever the last one stopped. Its only agent is the annalist, which writes the CHANGELOG entry. It stays config-first — the whole-repo versus per-component shape lives in a committed `.chronicle/release.json`.
 
 **monitor** — `usage-dashboard` is the rear-view: a local web dashboard for sessions, tokens, cost, model mix, and project activity. `cockpit` is the windshield: a live decision trail, transcript, and a `needs_your_call` wait/send bridge for running sessions. `install` owns every prerequisite check and config write for the whole plugin.
 
@@ -82,7 +82,7 @@ cc-plugins/
     ├── chronicle/
     │   ├── shared/scripts/               # code imported by more than one skill
     │   ├── agents/                       # lawspeaker+watcher+runesmith / storykeeper+skald+messenger /
-    │   │                                 # lorekeeper+gleaner+reckoner+codifier+barrowkeeper / oathkeeper+smith+annalist+hammerbearer / seer
+    │   │                                 # lorekeeper+gleaner+reckoner+codifier+barrowkeeper / annalist (release)
     │   ├── agents-codex/                 # Codex agent definitions (TOML format)
     │   ├── hooks/check-branch.sh         # PreToolUse, guards commits on main/master
     │   └── skills/{adr,commit,pr,release,install}/
