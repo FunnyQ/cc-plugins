@@ -60,6 +60,8 @@ export type Plan = {
   head: string;
   /** The commit every tag lands on: `main`'s HEAD. */
   releaseCommit: string;
+  /** The changelog the entry stage targets — the annalist needs it by name. */
+  changelogPath: string;
   units: Unit[];
   files: string[];
   subject: string;
@@ -267,6 +269,7 @@ export async function plan(
     branch,
     head: headSha,
     releaseCommit,
+    changelogPath: config.changelog,
     units,
     files,
     subject: releaseSubject(units),

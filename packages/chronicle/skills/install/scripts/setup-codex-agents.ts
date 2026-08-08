@@ -16,6 +16,7 @@ const ROLES = [
   "storykeeper",
   "skald",
   "messenger",
+  "skirnir",
   "annalist",
   "lorekeeper",
   "gleaner",
@@ -46,6 +47,7 @@ function managedBlock(targetDir: string): string {
     storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
     skald: "Analyze a branch and draft pull request material.",
     messenger: "Create a pull request from confirmed material.",
+    skirnir: "Run the Chronicle release scripts and report their result.",
     annalist: "Write user-facing release changelog entries.",
     lorekeeper:
       "Orchestrate Chronicle ADR triage, promotion, and supersession.",

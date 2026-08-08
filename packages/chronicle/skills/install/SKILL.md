@@ -45,8 +45,8 @@ restarts. Always say this when you report the fix.
 
 Register the Codex-native commit roles (`chronicle_lawspeaker`,
 `chronicle_watcher`, `chronicle_runesmith`) and PR roles
-(`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), plus the
-the release role (`chronicle_annalist`), plus the ADR roles
+(`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), the release
+roles (`chronicle_skirnir`, `chronicle_annalist`), plus the ADR roles
 (`chronicle_lorekeeper`, `chronicle_gleaner`, `chronicle_reckoner`,
 `chronicle_codifier`, `chronicle_barrowkeeper`).
 

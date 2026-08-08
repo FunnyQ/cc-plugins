@@ -20,6 +20,12 @@ You own the two things a script cannot do: **asking which version to cut**, and 
 on a first run — **interviewing the repo's shape**. The changelog entry needs
 judgment too, so one agent writes it.
 
+You never run the scripts yourself. **Skirnir** runs them and returns only the
+distilled result, so analyzer blobs, git output, and stack traces stay out of this
+conversation. Spawn it with `subagent_type: "chronicle:skirnir"`, one call at a
+time, no `name`, **never a fork** — a fork inherits this whole conversation, which
+is the opposite of what it is for.
+
 ## Stages
 
 ```
@@ -53,14 +59,11 @@ ask each bump. A per-component `chronicle@0.5.1` form is fine if the user writes
 
 ### 1. Facts
 
-```bash
-bun $SKILL_DIR/scripts/analyze-release.ts
-```
+Spawn Skirnir with `command: "facts"` and `$SKILL_DIR` — the skill's load-time
+"Base directory for this skill" banner. Do not hard-code a path or rely on
+`${CLAUDE_PLUGIN_ROOT}`.
 
-`$SKILL_DIR` is the skill's load-time "Base directory for this skill" banner. Do not
-hard-code a path or rely on `${CLAUDE_PLUGIN_ROOT}`.
-
-You get `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`, `branch`,
+You get back `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`, `branch`,
 and either a whole-repo `current`/`bumps`/`lastTag` or a `components[]` list with
 each unit's `current`, `lastTag`, `commitCount`, and `fileVersion`.
 
@@ -77,7 +80,8 @@ vs per-component, git-flow vs github-flow, the tag template, the version files, 
 branch names. Add a capture-group `pattern` for odd locations like a Rails
 `config/application.rb` — `suggested` will not include those.
 
-Pass `--persist-config` on the first `run`, which adds the `save-config` stage.
+Tell Skirnir to pass `--persist-config` on the first `run`, which adds the
+`save-config` stage.
 
 ### 3. Version gate
 
@@ -102,11 +106,7 @@ target instead of asking for a bump. Confirm it; do not bump on top of it.
 
 ### 4. Plan
 
-```bash
-bun $SKILL_DIR/scripts/release.ts plan --units '<units JSON>'
-```
-
-Read `stages[]`. Exit 1 means something is **blocked** — report the `note` and stop.
+Spawn Skirnir with `command: "plan"` and `units`. Read `stages[]`. Exit 1 means something is **blocked** — report the `note` and stop.
 A blocked stage is always a state the user must resolve (a tag already on another
 commit, a `main` behind its remote); never work around it.
 
@@ -118,21 +118,18 @@ If the `entry` stage is pending, spawn the annalist **once**, with
 ```
 Agent({
   subagent_type: "chronicle:annalist",
-  prompt: "$SKILL_DIR=<...>. Write a CHANGELOG entry per release. changelogPath=<config.changelog>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON>. Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
+  prompt: "$SKILL_DIR=<...>. Write a CHANGELOG entry per release. changelogPath=<the plan's changelogPath>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON>. Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
 })
 ```
 
-`headerLabel`, `tagName`, and `pathScope` are in the plan's `units[]`. Skip this
+`changelogPath` and each entry's `headerLabel`, `tagName`, `pathScope`, and
+`lastTag` all come from the plan — you never need the raw config for this. Skip this
 whenever `entry` already reads done — the entry exists, and a second one for the
 same version is a duplicate heading.
 
 ### 6. Run
 
-```bash
-bun $SKILL_DIR/scripts/release.ts run --units '<units JSON>' --through <stage>
-```
-
-The result names `executed[]`, `skipped[]`, `releaseCommit`, `tags[]`, and `branch`.
+Spawn Skirnir with `command: "run"`, `units`, and `through`. The result names `executed[]`, `skipped[]`, `releaseCommit`, `tags[]`, and `branch`.
 A stage that runs without taking effect aborts the release — the engine will not
 report a tag it did not cut.
 
@@ -155,10 +152,11 @@ host guard may still prompt. Answer it; don't work around it.
 
 ## Codex
 
-Same flow. Run the same two scripts with Bash. The only agent is the annalist:
-spawn the registered `chronicle_annalist`, or — with a generic sub-agent API only —
-a non-fork generic agent named `chronicle_annalist` told to read and obey
-`$CODEX_HOME/agents/chronicle/annalist.toml` (default `$CODEX_HOME` to `~/.codex`).
+Same flow, same two roles. Spawn the registered `chronicle_skirnir` for each script
+call and the registered `chronicle_annalist` for the entry — or — with a generic sub-agent API only —
+non-fork generic agents named `chronicle_skirnir` and `chronicle_annalist`, each
+told to read and obey its own TOML under `$CODEX_HOME/agents/chronicle/` (default
+`$CODEX_HOME` to `~/.codex`).
 Never paste or improvise the role instructions. If it is missing, tell the user to
 run `chronicle:install`.
 
