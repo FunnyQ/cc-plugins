@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.11.1] - 2026-08-09
+
+_tracks tag `chronicle-v0.11.1`_
+
+### Added
+- A new `skirnir` agent now runs the release scripts on the main agent's behalf, so their raw output — including the repo's full tag list, git logs, and stack traces — no longer floods the conversation. Skirnir decides nothing; it just runs the script and hands back the distilled result.
+
+### Changed
+- The release plan now carries the CHANGELOG path directly instead of the raw release config, an internal cleanup with no visible effect.
+
 ## [chronicle 0.11.0] - 2026-08-09
 
 _tracks tag `chronicle-v0.11.0`_
