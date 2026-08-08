@@ -3,7 +3,7 @@
 Some monorepos ship each package on its own cadence: independent versions,
 independent tags, independent changelog entries. This repo (`cc-plugins`) is the
 reference case. `git flow release finish` can't produce a scoped
-`<component>-vX.Y.Z` tag cleanly. So the hammerbearer replicates the finish with
+`<component>-vX.Y.Z` tag cleanly. So the release engine replicates the finish with
 plain git.
 
 ## What "per-component" means here
