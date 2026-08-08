@@ -1,5 +1,17 @@
 # Changelog
 
+## [chronicle 0.11.0] - 2026-08-09
+
+_tracks tag `chronicle-v0.11.0`_
+
+### Changed
+- The release skill's five-agent orchestration (seer, oathkeeper, smith, hammerbearer, annalist) is replaced by a script that drives an ordered list of stages — bump, entry, commit, merge, tag, back-merge, push. Each stage decides whether it has already happened by reading the repo, so a run resumes wherever the last one stopped, and re-running a release that already finished now does nothing instead of erroring or duplicating work. Only the annalist remains, since turning commits into user-facing prose is the one judgment a script can't make.
+- A release now blocks instead of proceeding when a tag already points at a different commit, or when local `main` is behind its remote — matching the refusal the other release paths already had.
+- One release run now loads about a quarter of the instructions it used to, and spawns at most one agent instead of four.
+
+### Fixed
+- A release stopped after prepare mode (version bumped, CHANGELOG entry written, nothing committed) had no correct way to finish: the internal "prepared" state could only ever be recorded in a way that either wrote a duplicate CHANGELOG heading on finish, or cut a tag on a commit that didn't actually contain the version it claimed. `/chronicle:release auto` now finishes a stopped prepare run correctly.
+
 ## [monitor 4.0.3] - 2026-08-08
 
 _tracks tag `monitor-v4.0.3`_
