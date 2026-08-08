@@ -18,6 +18,9 @@ has one long-lived branch and no merge at all.
 
 - `files` — the exact files to stage, by name (version files, changelog, and
   possibly `.chronicle/release.json`). **Stage only these**. Never `git add -A`.
+  Some may already sit at the target version: a previous prepare run wrote the bump
+  and the entry without committing them. Stage and commit them anyway — that commit
+  is the one the tag lands on. Never skip it because a file "already looks done".
 - `commitSubject` — e.g. `🔧 release: chronicle 0.5.0`, or coordinated
   `🔧 release: chronicle 0.5.0 + monitor 3.18.3`.
 - `tags` — the annotated tags to cut, e.g. `["chronicle-v0.5.0"]` or coordinated
@@ -31,8 +34,11 @@ has one long-lived branch and no merge at all.
 - `push` — always commit and tag locally. Push the branch(es) and **every** tag
   only if `push` is true.
 - `tagOnly` — optional, default false. True → take **path C**, which still honours
-  `workflow`. `files` is empty in this case, but an empty `files` on its own never
-  implies `tagOnly`. Only this flag does.
+  `workflow`. It asserts every unit's bump and entry are already **committed**, so
+  only the tag is missing. `files` is empty then, but an empty `files` on its own
+  never implies `tagOnly` — only this flag does. A bump that is written but
+  uncommitted is not tagOnly: it arrives here with a non-empty `files` and takes
+  path A or B.
 - `verify[]` — `tagOnly` only. One `{ component, targetVersion }` per unit being
   tagged. Path C re-checks these on `main` before it tags. `component` is null or
   absent for whole-repo.
@@ -153,7 +159,8 @@ There is one long-lived branch, so there is nothing to merge. The bump commit
 
 ## Path C — `tagOnly` — stop at the first failure, never force
 
-The bump and the CHANGELOG entry are already committed. There is no bump commit to
+The bump and the CHANGELOG entry are already committed — that is what `tagOnly`
+asserts, and step 2 is where you find out it was wrong. There is no bump commit to
 make. What is left depends on the workflow: github-flow tags what `main` already
 has, and git-flow still owes the develop→main merge that path A would have done
 after its commit.
@@ -178,6 +185,11 @@ found it. The first step that moves anything is the merge in step 5.
    A dirty tree means the commit you would tag is not the release, and a checkout
    would drag the changes onto another branch. Stop and report it. Never stage or
    commit to clean the tree.
+
+   Report **what** is dirty. If it is the release's own version files or changelog,
+   `tagOnly` was wrong — the bump was prepared but never committed, and this path
+   cannot make the commit it still owes. Say so: the fix is to re-run so the release
+   takes path A or B, not to clean the tree by hand.
 
 3. **Get on `branches.main` and make it current with its remote.** Skip the fetch
    block entirely when the repo has no `origin`:

@@ -28,7 +28,8 @@ keeps all git/script output out of this conversation.
 - `/chronicle:release auto` → **finish, local only**: everything prepare does, then
   commit the bump and cut the annotated tag — **no push**. How it finishes follows
   the repo's `workflow` (`references/release-config.md`); the hammerbearer owns
-  those steps, not you.
+  those steps, not you. Run after a prepare, this is what finishes it — committing
+  the already-written bump and entry, never writing a second of either.
 - `/chronicle:release auto push` → **finish + push**: the above, then push the
   branch(es) and the tag.
 - A version token (`0.5.0`) or component token(s) (`chronicle`, or several like
@@ -100,35 +101,47 @@ If `hasConfig` is true, use `config` as-is and skip this step.
 
 #### Already-prepared units
 
-Check the seer's `prepared` and `halfPrepared` fields **before** you ask any bump.
-A repo that bumps on the feature branch arrives here with the version files and the
-CHANGELOG entry already merged. There is no bump left to make.
+Check the seer's `prepared`, `preparedCommitted`, and `halfPrepared` fields
+**before** you ask any bump. A unit arrives prepared two ways: a repo that bumped on
+the feature branch merges with both halves in place, and chronicle's own prepare mode
+leaves both in the working tree uncommitted. Neither has a bump left to make — but
+only the first is tag-only. In both, the target version is `fileVersion`: do not ask
+for a bump, and do not offer one.
 
-- `prepared` is true → the unit's target version is its `fileVersion`. Do not ask
-  for a bump. Do not offer one. Resolve
-  `{ component, targetVersion: fileVersion, lastTag, prepared: true }`, and tell the
-  user which version you are about to tag. In prepare mode there is nothing to do:
-  say the unit is already prepared and name the tag command they need.
+- `prepared` **and** `preparedCommitted` → only the tag is missing. Resolve
+  `{ component, targetVersion: fileVersion, lastTag, prepared: true,
+  preparedCommitted: true }` and name the version you are about to tag. In prepare
+  mode there is nothing to do: say so, and give them the tag command.
+- `prepared` **and not** `preparedCommitted` → where a previous prepare run stopped.
+  The version is settled; the release commit is not — this unit still owes one.
+  Resolve the same shape with `preparedCommitted: false`. In prepare mode, say
+  there is nothing left to prepare and point at `/chronicle:release auto` (or
+  `auto push`), which commits and tags it.
 - `halfPrepared` is true → **stop**. The version files moved and no CHANGELOG entry
   followed. Report the unit, its `fileVersion`, and that its CHANGELOG entry is
   missing. Do not write the entry, and do not bump on top of the moved files.
   Either half could be the mistake, and only the user knows which.
-- Both false → the ordinary bump gate below applies.
+- All false → the ordinary bump gate below applies.
 
-A coordinated release may mix prepared and unprepared units. Ask the bump only for
-the unprepared ones. Every unit still lands its tag on the same commit.
+Always resolve `preparedCommitted` alongside `prepared`. The Oathkeeper reads the
+pair, and a missing `preparedCommitted` reads as false — the safe side, since it
+commits the bump rather than tagging a commit that lacks it.
 
-The seer reads `prepared` from the branch you are standing on, which may be neither
-`main` nor `develop`. The hammerbearer re-checks it on the branch it actually tags,
-so a bump that never reached that branch stops the release rather than mis-tagging
-it. On a git-flow repo, tell the user to merge into `develop` first — a prepared
-unit that is still only on a feature branch cannot be tagged.
+A coordinated release may mix all three states. Ask the bump only for the unprepared
+units. Every unit still lands its tag on the same commit.
+
+The seer reads the prepared state from the branch you are standing on, which may be
+neither `main` nor `develop`. For a committed-prepared unit the hammerbearer
+re-checks it on the branch it actually tags, so a bump that never reached that
+branch stops the release rather than mis-tagging it. On a git-flow repo, tell the
+user to merge into `develop` first — a prepared unit that is still only on a feature
+branch cannot be tagged.
 
 #### The ordinary gate
 
 The gate resolves a **`releases[]`** list. This is one entry per unit being cut,
-each `{ component, targetVersion, lastTag }`, plus `prepared: true` on any unit that
-came in already prepared. A whole-repo release uses a single
+each `{ component, targetVersion, lastTag }`, plus `prepared: true` and its
+`preparedCommitted` on any unit that came in already prepared. A whole-repo release uses a single
 entry with `component: null`. `lastTag` comes from the seer facts the main agent
 already holds: per-component from `components[].lastTag`, whole-repo from
 top-level `lastTag`. It may be null on a first release. One component is just a
@@ -162,7 +175,8 @@ whole-repo with per-component units.
 Distill a tight `contextBrief` — the "why" of this release, from the conversation.
 The Oathkeeper can't see the chat. Then spawn it with `$SKILL_DIR`, `mode`,
 `config`, `persistConfig`, `releases[]` (each
-`{ component, targetVersion, lastTag }`), `contextBrief`, and `branch`. The
+`{ component, targetVersion, lastTag }`, carrying `prepared` + `preparedCommitted`
+where the gate resolved them), `contextBrief`, and `branch`. The
 Oathkeeper derives each unit's tag name, changelog header, and path scope from
 `config` itself. It forwards each release's `lastTag` to the annalist, and it
 returns the final report.
@@ -174,11 +188,13 @@ returns the final report.
 - **auto / auto push** → take `releaseCommit` from the Oathkeeper's report. This is
   the one commit every tag points at. For git-flow, it is the develop→main merge
   SHA, also reported as `mergeCommit`. For github-flow, it is the bump commit on
-  `main`. For a fully prepared release, it is `HEAD` on `main`, and the report sets
-  `committed: false` — that field means "no bump commit", not "nothing was
-  committed", and a git-flow prepared release still makes its two merge commits.
-  A finished release without a `releaseCommit` is a failed release. Stop and report
-  it.
+  `main`. For a release where every unit was prepared **and committed**, it is
+  `HEAD` on `main`, and the report sets `committed: false` — that field means "no
+  bump commit", not "nothing was committed", and a git-flow prepared release still
+  makes its two merge commits. A prepared-but-uncommitted release is not that case:
+  it reports `committed: true`, because its bump commit is what carries the version
+  the tag claims. A finished release without a `releaseCommit` is a failed release.
+  Stop and report it.
   Then, for every tag, require non-empty `git tag --list <tag>` output and
   `git rev-list -n1 <tag>` equal to that commit. When pushing, also require
   non-empty `git ls-remote --tags origin <tag>`. Relay only verified results.

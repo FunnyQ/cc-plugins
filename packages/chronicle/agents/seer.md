@@ -46,12 +46,14 @@ fields the main agent needs. Omit the raw `tags[]` list:
   Null means the analyzer could not determine the count. The main agent must not
   treat it as "unchanged".
 - prepared state, on the whole-repo object and on every `components[]` entry:
-  `fileVersion`, `changelogEntry`, `prepared`, `halfPrepared`. `fileVersion` is the
-  version the unit's own version files carry, which is not always the version its
-  last tag carries. `prepared` means the bump and the CHANGELOG entry already
-  landed, and only the tag is missing. `halfPrepared` means the version files moved
-  but no CHANGELOG entry followed. Pass all four through as-is. The main agent
-  decides.
+  `fileVersion`, `changelogEntry`, `prepared`, `halfPrepared`, `preparedCommitted`.
+  `fileVersion` is the version the unit's own version files carry, which is not
+  always the version its last tag carries. `prepared` means the bump and the
+  CHANGELOG entry are both in place and only the tag is missing. `halfPrepared`
+  means the version files moved but no CHANGELOG entry followed.
+  `preparedCommitted` says whether that prepared bump is **committed**; it is false
+  when both halves sit in the working tree only, the state prepare mode leaves
+  behind. Pass all five through as-is. The main agent decides.
 
 ### 3. Return JSON
 

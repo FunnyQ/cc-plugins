@@ -68,6 +68,12 @@ _tracks tag `<tagName>`_
 Read `changelogPath`. If it is missing, create it with a standard Keep-a-Changelog
 preamble.
 
+**Then drop any entry whose `## [<headerLabel>]` heading the file already has** —
+usually a previous prepare run that stopped without committing. Skip it and name it
+in your return. Otherwise you splice a second block for a version that already has
+one, anchored on that very entry, and two headings for one version is a corrupted
+log. If every entry already exists, change nothing and say so.
+
 Build **one contiguous block** of all your new entries, in `entries[]` order,
 blank-line-separated. Splice that whole block **at the very top of the entry
 list**. Place it immediately below the `# Changelog` preamble and **above the first

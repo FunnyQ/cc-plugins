@@ -50,10 +50,12 @@ tag or push.
 - `persistConfig` — on first run, save `.chronicle/release.json` before bumping.
 - `releases[]` — one or more units to cut, each
   `{ component, targetVersion, lastTag }`; whole-repo uses `component: null`.
-  `lastTag` may be null. Multiple entries form one coordinated release. A unit may
-  also carry `prepared: true`, which means its version files and its CHANGELOG entry
-  already landed on the release branch. A prepared unit needs a tag and nothing
-  else. Treat a missing `prepared` as false.
+  `lastTag` may be null. Multiple entries form one coordinated release.
+  `prepared: true` means the unit's version files already carry `targetVersion` and
+  its CHANGELOG entry is written — nothing left to bump or write. `preparedCommitted`
+  says whether that work is **committed**: true → only the tag is missing; false → it
+  sits in the working tree, where a previous `prepare` run left it, and still owes its
+  bump commit. Both default to false when absent, which errs toward committing.
 - `contextBrief` — the distilled "why" of this release.
 - `branch` — the current branch.
 
@@ -74,16 +76,21 @@ Also derive **workflow**: `config.workflow`, or `"git-flow"` when the field is
 absent (older configs). This decides how the hammerbearer finishes. Never choose
 the workflow yourself.
 
-Also derive **tagOnly**: true when every entry in `releases[]` has `prepared: true`
-**and** `persistConfig` is false. A tagOnly release writes no file, so it has no
-bump commit. Pass it to the hammerbearer along with `workflow`. A git-flow repo
-still owes its develop→main merge on this path — tagOnly removes the commit, never
-the merge.
+Also derive **tagOnly**: true when every entry in `releases[]` has **both**
+`prepared: true` and `preparedCommitted: true`, **and** `persistConfig` is false. A
+tagOnly release writes no file and has nothing left to commit, so it has no bump
+commit. Pass it to the hammerbearer along with `workflow`. A git-flow repo still
+owes its develop→main merge on this path — tagOnly removes the commit, never the
+merge.
 
-The second condition is load-bearing: on a first run the smith writes
-`.chronicle/release.json`, a real untracked file, and path C's dirty-tree check
-would stop on the very file the smith just wrote. A first run takes the ordinary
-path, and its commit carries the config alone.
+`prepared: true` alone must never set it: an uncommitted bump tagged at `HEAD` cuts a
+tag whose commit does not carry the version it names. One such unit anywhere makes
+the whole release non-tagOnly, and the ordinary path commits before it tags.
+
+`persistConfig` earns its place separately: on a first run the smith writes
+`.chronicle/release.json`, and path C's dirty-tree check would stop on the very file
+it just wrote. A first run takes the ordinary path, its commit carrying the config
+alone.
 
 When `tagOnly` is true, also derive **verify[]**: one `{ component, targetVersion }`
 per release. The hammerbearer re-checks these on `main` after it checks `main` out.
@@ -103,6 +110,9 @@ Agent({
 })
 ```
 
+Pass `prepared`, not `preparedCommitted` — the smith reads the working tree, where
+both prepared states look identical.
+
 If `verify.allMatch` is false, report the mismatches and stop. A prepared unit
 verifies its files without touching them. That is the check that its
 already-landed bump is the version you are about to tag.
@@ -114,6 +124,10 @@ the only thing standing between a stale tree and a wrong tag.
 
 Skip this step when every release is prepared. Their entries already exist, and a
 second entry for the same version is a duplicate heading.
+
+`prepared` alone decides this, whatever `preparedCommitted` says: an uncommitted
+entry is still a written entry, and it is the very `## [` heading the annalist would
+splice above — so passing it here duplicates that version's heading.
 
 Otherwise pass only the releases **without** `prepared: true`:
 
@@ -127,15 +141,34 @@ Agent({
 ### 3. Assemble touched files
 
 Union the smith's `changed[]`, the changelog when the annalist ran, and (when
-persisted) `.chronicle/release.json`. A tagOnly release touches no file, so this
-list is empty. That is correct, and it is not a failure. An empty list and a
+persisted) `.chronicle/release.json`. This is a set: name each path once, however
+many sources contribute it.
+
+Then add, for every release with `prepared: true` and `preparedCommitted: false`,
+that unit's `versionFiles[].path` from `config` plus `config.changelog` —
+per-component, the matching `config.components[]` entry; whole-repo,
+`config.versionFiles`. A previous prepare run wrote those files, so the smith reports
+no change and the annalist never ran: nothing else names them, and the hammerbearer
+stages only what this list names. Leave them out and its commit is empty and the
+release stops.
+
+A committed-prepared unit contributes nothing, even alongside an uncommitted one. Its
+bump is in an earlier commit, so every later commit's tree still carries it — and a
+tag is verified against its commit's tree, not against what that commit changed.
+
+A tagOnly release touches no file, so this list is empty. That is correct, and it is
+not a failure. An empty list is only ever correct for tagOnly: a
+prepared-but-uncommitted release always names files here. An empty list and a
 non-empty `persistConfig` cannot both happen: persisting excludes tagOnly.
 
 ### 4a. mode = prepare → STOP and report
 
 Report touched files, versions, future tags, and next steps. Do not spawn the
-hammerbearer. When the release is tagOnly, say that every unit was already
-prepared, name the tags that are still missing, and report no touched files.
+hammerbearer. When the release is tagOnly, say that every unit was already prepared
+and committed, name the tags that are still missing, and report no touched files.
+When a unit is prepared but uncommitted, say its bump and entry were already
+written, name the files, and give `/chronicle:release auto` (or `auto push`) as the
+step that commits and tags them. Do not tell the user to re-run prepare.
 
 ### 4b. mode = auto | auto-push → spawn the hammerbearer
 
