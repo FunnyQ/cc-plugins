@@ -706,6 +706,11 @@ export function hasChangelogEntry(
  * `halfPrepared` is the version files leading the last tag with no CHANGELOG entry
  * behind them. That is a partial state, and the caller must stop rather than guess
  * which half to complete.
+ *
+ * This reads the working tree only. `prepared` therefore says nothing about whether
+ * the bump is committed — chronicle's own prepare mode leaves exactly this state
+ * uncommitted. Pair it with `preparedCommitted` before deciding a release still
+ * owes a bump commit.
  */
 export function preparedState(args: {
   fileVersion: string | null;
@@ -727,6 +732,29 @@ export function preparedState(args: {
   return { prepared: changelogEntry, halfPrepared: !changelogEntry };
 }
 
+/**
+ * Whether a prepared unit's bump is *committed*, not merely written to the working
+ * tree. `prepare` mode bumps the version files and writes the CHANGELOG entry and
+ * then stops without committing, so its tree reads as `prepared` while HEAD still
+ * carries the old version. Tagging HEAD there would produce a tag whose commit does
+ * not contain the version it claims.
+ *
+ * True only when HEAD carries the same version the working tree does *and* HEAD's
+ * changelog already heads that version's entry. HEAD is compared rather than
+ * `git status`, so unrelated dirt elsewhere in the tree does not read as an
+ * uncommitted bump.
+ */
+export function preparedCommitted(args: {
+  prepared: boolean;
+  fileVersion: string | null;
+  headFileVersion: string | null;
+  headChangelogEntry: boolean;
+}): boolean {
+  const { prepared, fileVersion, headFileVersion, headChangelogEntry } = args;
+  if (!prepared || !fileVersion) return false;
+  return headFileVersion === fileVersion && headChangelogEntry;
+}
+
 export type ComponentFact = {
   name: string;
   path: string;
@@ -738,24 +766,39 @@ export type ComponentFact = {
   changelogEntry: boolean;
   prepared: boolean;
   halfPrepared: boolean;
+  preparedCommitted: boolean;
 };
+
+/** Reads one repo-root-relative path, returning "" when it cannot be read. */
+type ContentReader = (path: string) => Promise<string>;
+
+const workingTreeReader =
+  (root: string): ContentReader =>
+  (path) =>
+    readFile(resolve(root, path), "utf-8").catch(() => "");
+
+/**
+ * The same path as of HEAD. `git show HEAD:<path>` resolves against the repo root
+ * (a `./` prefix would make it cwd-relative), so this matches the config's
+ * root-relative paths whatever directory the script runs in. An unborn HEAD, or a
+ * path that does not exist there, reads as "".
+ */
+const headReader = (): ContentReader => (path) => git`git show HEAD:${path}`;
 
 /** The version the unit's own files currently carry, independent of any tag. */
 async function fileVersionFor(
-  root: string,
   files: VersionFileSpec[],
+  read: ContentReader,
 ): Promise<string | null> {
-  const read = await Promise.all(
+  const got = await Promise.all(
     files.map(async (spec) => {
-      const content = await readFile(resolve(root, spec.path), "utf-8").catch(
-        () => "",
-      );
+      const content = await read(spec.path);
       return {
         current: content ? readVersionFromContent(content, spec) : null,
       };
     }),
   );
-  return agreedVersion(read);
+  return agreedVersion(got);
 }
 
 async function perComponentFacts(
@@ -763,16 +806,26 @@ async function perComponentFacts(
   config: ReleaseConfig,
   tags: string[],
   changelog: string,
+  headChangelog: string,
 ): Promise<ComponentFact[]> {
   const components = config.components ?? [];
+  const head = headReader();
   return Promise.all(
     components.map(async (c) => {
       const last = lastTagFor(tags, config, c.name);
       const current = last?.version ?? null;
-      const fileVersion = await fileVersionFor(root, c.versionFiles);
+      const fileVersion = await fileVersionFor(
+        c.versionFiles,
+        workingTreeReader(root),
+      );
       const changelogEntry = fileVersion
         ? hasChangelogEntry(changelog, fileVersion, c.name)
         : false;
+      const state = preparedState({
+        fileVersion,
+        taggedVersion: current,
+        changelogEntry,
+      });
       return {
         name: c.name,
         path: c.path,
@@ -782,10 +835,17 @@ async function perComponentFacts(
         commitCount: await commitCountSince(last?.tag ?? null, c.path),
         fileVersion,
         changelogEntry,
-        ...preparedState({
+        ...state,
+        preparedCommitted: preparedCommitted({
+          prepared: state.prepared,
           fileVersion,
-          taggedVersion: current,
-          changelogEntry,
+          headFileVersion: state.prepared
+            ? await fileVersionFor(c.versionFiles, head)
+            : null,
+          headChangelogEntry: Boolean(
+            fileVersion &&
+              hasChangelogEntry(headChangelog, fileVersion, c.name),
+          ),
         }),
       };
     }),
@@ -858,12 +918,15 @@ async function main() {
     resolve(root, effective.changelog),
     "utf-8",
   ).catch(() => "");
+  // The same changelog as of HEAD, so a prepared unit can be told apart from one
+  // whose entry is still only in the working tree.
+  const headChangelog = await headReader()(effective.changelog);
 
   // per-component mode: enumerate each unit with its own version + change count
   // so the main agent's version gate can offer "which component + which bump".
   const components =
     effective.mode === "per-component"
-      ? await perComponentFacts(root, effective, tags, changelog)
+      ? await perComponentFacts(root, effective, tags, changelog, headChangelog)
       : null;
 
   // A repo that bumps on the feature branch merges with the version files and the
@@ -872,10 +935,15 @@ async function main() {
   const wholeRepoFileVersion =
     effective.mode === "per-component"
       ? null
-      : await fileVersionFor(root, effective.versionFiles);
+      : await fileVersionFor(effective.versionFiles, workingTreeReader(root));
   const wholeRepoChangelogEntry = wholeRepoFileVersion
     ? hasChangelogEntry(changelog, wholeRepoFileVersion)
     : false;
+  const wholeRepoState = preparedState({
+    fileVersion: wholeRepoFileVersion,
+    taggedVersion: current,
+    changelogEntry: wholeRepoChangelogEntry,
+  });
 
   const out = {
     root,
@@ -892,10 +960,17 @@ async function main() {
     bumps: current ? computeBumps(current) : null,
     fileVersion: wholeRepoFileVersion,
     changelogEntry: wholeRepoChangelogEntry,
-    ...preparedState({
+    ...wholeRepoState,
+    preparedCommitted: preparedCommitted({
+      prepared: wholeRepoState.prepared,
       fileVersion: wholeRepoFileVersion,
-      taggedVersion: current,
-      changelogEntry: wholeRepoChangelogEntry,
+      headFileVersion: wholeRepoState.prepared
+        ? await fileVersionFor(effective.versionFiles, headReader())
+        : null,
+      headChangelogEntry: Boolean(
+        wholeRepoFileVersion &&
+          hasChangelogEntry(headChangelog, wholeRepoFileVersion),
+      ),
     }),
     components,
   };

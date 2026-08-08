@@ -10,6 +10,7 @@ import {
   hasChangelogEntry,
   lastTagFor,
   normalizeVersion,
+  preparedCommitted,
   preparedState,
   parseBranchNames,
   parseConfig,
@@ -641,6 +642,76 @@ describe("preparedState", () => {
   });
 });
 
+describe("preparedCommitted", () => {
+  test("true when HEAD carries the same version and its entry", () => {
+    expect(
+      preparedCommitted({
+        prepared: true,
+        fileVersion: "3.5.0",
+        headFileVersion: "3.5.0",
+        headChangelogEntry: true,
+      }),
+    ).toBe(true);
+  });
+
+  // The prepare-mode tree: bumped and entry written, nothing committed.
+  test("false when HEAD still carries the old version", () => {
+    expect(
+      preparedCommitted({
+        prepared: true,
+        fileVersion: "3.5.0",
+        headFileVersion: "3.4.0",
+        headChangelogEntry: false,
+      }),
+    ).toBe(false);
+  });
+
+  // The bump was committed on its own and the annalist's entry was not.
+  test("false when HEAD has the version but not the entry", () => {
+    expect(
+      preparedCommitted({
+        prepared: true,
+        fileVersion: "3.5.0",
+        headFileVersion: "3.5.0",
+        headChangelogEntry: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("false when HEAD cannot be read at all", () => {
+    expect(
+      preparedCommitted({
+        prepared: true,
+        fileVersion: "3.5.0",
+        headFileVersion: null,
+        headChangelogEntry: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("false whenever the unit is not prepared", () => {
+    expect(
+      preparedCommitted({
+        prepared: false,
+        fileVersion: "3.4.0",
+        headFileVersion: "3.4.0",
+        headChangelogEntry: true,
+      }),
+    ).toBe(false);
+  });
+
+  test("false when there is no version file to read", () => {
+    expect(
+      preparedCommitted({
+        prepared: true,
+        fileVersion: null,
+        headFileVersion: null,
+        headChangelogEntry: true,
+      }),
+    ).toBe(false);
+  });
+});
+
 describe("prepared state and prerelease versions", () => {
   // Chronicle compares core versions only: parseSemver splits on [-+] and keeps
   // major.minor.patch. computeBumps and lastTagFor already behave this way, so
@@ -679,28 +750,44 @@ describe("prepared state and prerelease versions", () => {
 describe("hasChangelogEntry edge cases", () => {
   test("escapes regex characters in a component name", () => {
     expect(
-      hasChangelogEntry("## [odin.core 1.0.0] - 2026-01-01", "1.0.0", "odin.core"),
+      hasChangelogEntry(
+        "## [odin.core 1.0.0] - 2026-01-01",
+        "1.0.0",
+        "odin.core",
+      ),
     ).toBe(true);
     expect(
-      hasChangelogEntry("## [odinXcore 1.0.0] - 2026-01-01", "1.0.0", "odin.core"),
+      hasChangelogEntry(
+        "## [odinXcore 1.0.0] - 2026-01-01",
+        "1.0.0",
+        "odin.core",
+      ),
     ).toBe(false);
   });
 
   test("matches a heading in a CRLF file", () => {
     expect(
-      hasChangelogEntry("# Changelog\r\n\r\n## [alpha 1.0.0] - 2026-01-01\r\n", "1.0.0", "alpha"),
+      hasChangelogEntry(
+        "# Changelog\r\n\r\n## [alpha 1.0.0] - 2026-01-01\r\n",
+        "1.0.0",
+        "alpha",
+      ),
     ).toBe(true);
   });
 
   test("does not match a heading deeper than h2", () => {
-    expect(hasChangelogEntry("### [alpha 1.0.0] - 2026-01-01", "1.0.0", "alpha")).toBe(
-      false,
-    );
+    expect(
+      hasChangelogEntry("### [alpha 1.0.0] - 2026-01-01", "1.0.0", "alpha"),
+    ).toBe(false);
   });
 
   test("does not match the version inside body text", () => {
     expect(
-      hasChangelogEntry("- upgraded to [alpha 1.0.0] last week", "1.0.0", "alpha"),
+      hasChangelogEntry(
+        "- upgraded to [alpha 1.0.0] last week",
+        "1.0.0",
+        "alpha",
+      ),
     ).toBe(false);
   });
 });
