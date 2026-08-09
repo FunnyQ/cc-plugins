@@ -6,15 +6,16 @@
  * styling — a gate rendered from scratch each run drifts in layout, in wording,
  * and in which consistency checks it actually enforces.
  *
- * Being self-contained, the page needs no host: a local repo's decision trail
- * and its full draft text never leave the machine to be read.
+ * By default the page is self-contained. `--serve` gives it a one-shot
+ * loopback endpoint so the response can return without leaving the machine.
  *
- *   bun gate-page.ts --data <payload.json> --open [--out <file.html>] [--lang zh-TW]
+ *   bun gate-page.ts --data <payload.json> --open [--serve] [--timeout <seconds>]
+ *     [--out <file.html>] [--lang zh-TW]
  *
  * The payload's own `gate` field picks the gate; `--gate` overrides it. Prints
- * the written path on stdout. `--open` hands that path to the platform browser
- * and exits `3` when there is none — the signal to fall back to the Artifact
- * tool, or to structured markdown in the transcript.
+ * the written path on stdout. In serve mode, the response follows it on stdout.
+ * Exit `0` means submitted, `2` means bad usage, `3` means no browser, and `4`
+ * means the one-shot server timed out.
  */
 
 export type Disposition = "promote" | "watch" | "skip";
@@ -67,6 +68,103 @@ export type GatePayload = Gate1Payload | Gate2Payload;
 /** At most this many records may reach `draft` in one run. */
 export const GROUP_CAP = 12;
 
+export type GateServer = {
+  url: string;
+  port: number;
+  submitUrl: string;
+  response: Promise<unknown | null>;
+  stop: () => void;
+};
+
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+export function serveGatePage(opts: {
+  render: (submitUrl: string) => string;
+  nonce?: string;
+  timeoutMs?: number;
+}): GateServer {
+  const nonce = opts.nonce ?? crypto.randomUUID();
+  let settle!: (value: unknown | null) => void;
+  let settled = false;
+  let submitting = false;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const response = new Promise<unknown | null>((resolve) => {
+    settle = resolve;
+  });
+  const finish = (value: unknown | null) => {
+    if (settled) return;
+    settled = true;
+    if (timeout) clearTimeout(timeout);
+    settle(value);
+  };
+
+  let html = "";
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch(request) {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === `/${nonce}`) {
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+      if (request.method !== "POST" || url.pathname !== `/${nonce}/submit`) {
+        return new Response(null, { status: 404 });
+      }
+      if (settled || submitting) return new Response(null, { status: 404 });
+
+      const declaredSize = Number(request.headers.get("content-length"));
+      if (declaredSize > MAX_BODY_BYTES)
+        return new Response(null, { status: 413 });
+
+      submitting = true;
+      const bytes = await request.arrayBuffer();
+      if (bytes.byteLength > MAX_BODY_BYTES) {
+        submitting = false;
+        return new Response(null, { status: 413 });
+      }
+
+      let body: unknown;
+      try {
+        body = JSON.parse(new TextDecoder().decode(bytes));
+      } catch {
+        submitting = false;
+        return new Response(null, { status: 400 });
+      }
+
+      finish(body);
+      void server.stop();
+      return Response.json({ ok: true });
+    },
+  });
+  const port = server.port;
+  const url = `http://127.0.0.1:${port}/${nonce}`;
+  const submitUrl = `${url}/submit`;
+  html = opts.render(submitUrl);
+  timeout = setTimeout(
+    () => {
+      finish(null);
+      void server.stop();
+    },
+    opts.timeoutMs ?? 30 * 60_000,
+  );
+
+  return {
+    url,
+    port,
+    submitUrl,
+    response,
+    stop: () => {
+      finish(null);
+      void server.stop();
+    },
+  };
+}
+
 /**
  * Both locales share one shape. Without the annotation `as const` would give
  * each table its own literal types, and the zh-TW table would stop being
@@ -100,6 +198,9 @@ type Strings = {
   responseSect: string;
   copy: string;
   copied: string;
+  send: string;
+  sent: string;
+  sendFailed: string;
   completeNote: string;
   alertGroupTitle: string;
   alertGroupBody: string;
@@ -144,6 +245,9 @@ const STRINGS: Record<Lang, Strings> = {
     responseSect: "Response block",
     copy: "Copy for chat",
     copied: "Copied",
+    send: "Send to the agent",
+    sent: "Sent — you can close this tab",
+    sendFailed: "Send failed — use the copy button",
     completeNote:
       "This carries the complete set, not only the rows you changed. A partial reply cannot say which rows it leaves untouched.",
     alertGroupTitle: "A group holds a non-promote row.",
@@ -191,6 +295,9 @@ const STRINGS: Record<Lang, Strings> = {
     responseSect: "回應區塊",
     copy: "複製給對話",
     copied: "已複製",
+    send: "送回代理",
+    sent: "已送出，可以關掉這個分頁",
+    sendFailed: "送出失敗，請改用複製按鈕",
     completeNote:
       "這份回應帶著完整的清單，不只你改過的那幾列。只回傳一部分，會讓「其餘維持原判」變成無法確認的事。",
     alertGroupTitle: "group 裡混進了非 promote 的列。",
@@ -218,14 +325,17 @@ const esc = (s: string): string =>
 
 const pad4 = (n: number): string => String(n).padStart(4, "0");
 
-export function renderGatePage(payload: GatePayload): string {
+export function renderGatePage(
+  payload: GatePayload,
+  opts?: { submitUrl?: string },
+): string {
   const lang: Lang = payload.lang === "zh-TW" ? "zh-TW" : "en";
   const t = STRINGS[lang];
 
   if (payload.gate === 1)
-    return shell(t.gate1Title, t, payload, gate1Body(payload, t));
+    return shell(t.gate1Title, t, payload, gate1Body(payload, t), opts);
   if (payload.gate === 2)
-    return shell(t.gate2Title, t, payload, gate2Body(payload, t));
+    return shell(t.gate2Title, t, payload, gate2Body(payload, t), opts);
   throw new Error(
     `gate-page: unsupported gate ${(payload as { gate: unknown }).gate}`,
   );
@@ -236,6 +346,7 @@ function shell(
   t: Strings,
   payload: GatePayload,
   body: string,
+  opts?: { submitUrl?: string },
 ): string {
   // "<" is escaped so a "</script>" inside any title or draft body cannot close
   // this block early and blank the page.
@@ -254,12 +365,12 @@ ${body}
       <div class="sect">${esc(t.responseSect)}</div>
       <button class="btn" id="copy" type="button">${esc(t.copy)}</button>
       <span class="copied" id="copied" hidden>${esc(t.copied)}</span>
-    </div>
+${opts?.submitUrl ? `      <button class="btn" id="send" type="button">${esc(t.send)}</button>\n      <span class="copied" id="sent" hidden>${esc(t.sent)}</span>\n` : ""}    </div>
     <p class="quiet-panel">${esc(t.completeNote)}</p>
     <pre id="out"></pre>
   </section>
 </div>
-<script>${payload.gate === 1 ? GATE1_JS : GATE2_JS}</script>`;
+<script>${clientScript(payload.gate, opts?.submitUrl)}</script>`;
 }
 
 /* ------------------------------ gate 1 ------------------------------ */
@@ -426,13 +537,13 @@ ${cards}
 
 const SHARED_JS = `
   const P = JSON.parse(document.getElementById("payload").textContent);
-  const T = ${JSON.stringify({ en: pickClientStrings("en"), "zh-TW": pickClientStrings("zh-TW") })}[P.lang === "zh-TW" ? "zh-TW" : "en"];
+  const T = __CLIENT_STRINGS__[P.lang === "zh-TW" ? "zh-TW" : "en"];
   const pad4 = n => String(n).padStart(4, "0");
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
   const out = document.getElementById("out");
   const copyBtn = document.getElementById("copy");
 
-  copyBtn.addEventListener("click", async () => {
+__SEND_BUTTON_REF__  copyBtn.addEventListener("click", async () => {
     const text = out.textContent;
     try {
       await navigator.clipboard.writeText(text);
@@ -449,13 +560,69 @@ const SHARED_JS = `
     setTimeout(() => { flag.hidden = true; }, 1800);
   });
 
-  document.getElementById("ledger").addEventListener("click", e => {
+__SUBMIT_HANDLER__  document.getElementById("ledger").addEventListener("click", e => {
     const btn = e.target.closest("[data-more]");
     if (!btn) return;
     btn.parentElement.querySelectorAll(".id[hidden]").forEach(el => { el.hidden = false; });
     btn.remove();
   });
 `;
+
+function clientScript(gate: 1 | 2, submitUrl?: string): string {
+  const submitHandler = submitUrl
+    ? `  const submitUrl = ${JSON.stringify(submitUrl).replace(/</g, "\\u003c")};
+  sendBtn.addEventListener("click", async () => {
+    const flag = document.getElementById("sent");
+    try {
+      const response = await fetch(submitUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: out.textContent,
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      flag.textContent = T.sent;
+      flag.hidden = false;
+      sendBtn.disabled = true;
+    } catch {
+      flag.textContent = T.sendFailed;
+      flag.hidden = false;
+      sendBtn.disabled = false;
+    }
+  });
+
+`
+    : "";
+  // Every replacement goes through a function, never a string. A string
+  // replacement re-reads `$&` and friends as substitution patterns, and
+  // `submitUrl` is caller-supplied — one carrying `$&` would splice the
+  // placeholder's own text back into the emitted script.
+  const fill = (source: string, token: string, value: string): string =>
+    source.replace(token, () => value);
+
+  return [
+    [
+      "__CLIENT_STRINGS__",
+      JSON.stringify({
+        en: pickClientStrings("en", Boolean(submitUrl)),
+        "zh-TW": pickClientStrings("zh-TW", Boolean(submitUrl)),
+      }),
+    ],
+    [
+      "__SEND_BUTTON_REF__",
+      submitUrl ? '  const sendBtn = document.getElementById("send");\n\n' : "",
+    ],
+    ["__SUBMIT_HANDLER__", submitHandler],
+    [
+      "__DISABLE_BUTTONS__",
+      submitUrl
+        ? "    const disabled = bad.length > 0 || groups.length > CAP;\n    copyBtn.disabled = disabled;\n    if (sendBtn) sendBtn.disabled = disabled;"
+        : "    copyBtn.disabled = bad.length > 0 || groups.length > CAP;",
+    ],
+  ].reduce(
+    (script, [token, value]) => fill(script, token, value),
+    gate === 1 ? GATE1_JS : GATE2_JS,
+  );
+}
 
 const GATE1_JS = `(() => {
 ${SHARED_JS}
@@ -554,7 +721,7 @@ ${SHARED_JS}
       conflictResolutions: (P.conflicts || []).map(c => ({ entryIds: c.entryIds, resolution: "skip" })),
     }, null, 2);
 
-    copyBtn.disabled = bad.length > 0 || groups.length > CAP;
+__DISABLE_BUTTONS__
   }
 
   render();
@@ -604,7 +771,7 @@ ${SHARED_JS}
   render();
 })();`;
 
-function pickClientStrings(lang: Lang) {
+function pickClientStrings(lang: Lang, withSubmit = false) {
   const t = STRINGS[lang];
   return {
     cap: t.cap,
@@ -616,6 +783,9 @@ function pickClientStrings(lang: Lang) {
     alertCapTitle: t.alertCapTitle(0).replace(/^0/, "{n}"),
     alertCapBody: t.alertCapBody,
     allDropped: t.allDropped,
+    ...(withSubmit
+      ? { send: t.send, sent: t.sent, sendFailed: t.sendFailed }
+      : {}),
   };
 }
 
@@ -770,13 +940,42 @@ if (import.meta.main) {
   const langFlag = flag("lang");
   if (langFlag) payload.lang = langFlag as Lang;
 
+  const serve = argv.includes("--serve");
+  const timeoutFlag = flag("timeout");
+  const timeoutSeconds =
+    timeoutFlag === undefined ? 30 * 60 : Number(timeoutFlag);
+  if (
+    (argv.includes("--timeout") && timeoutFlag === undefined) ||
+    !Number.isFinite(timeoutSeconds) ||
+    timeoutSeconds <= 0
+  ) {
+    console.error("gate-page: --timeout <seconds> must be a positive number");
+    process.exit(2);
+  }
+
   const outPath =
     flag("out") ?? `/tmp/chronicle/adr/gate${payload.gate}-${Date.now()}.html`;
-  await Bun.write(outPath, renderGatePage(payload));
+  let pageUrl = outPath;
+  let gateServer: GateServer | undefined;
+  let html = "";
+  if (serve) {
+    gateServer = serveGatePage({
+      render: (submitUrl) => {
+        html = renderGatePage(payload, { submitUrl });
+        return html;
+      },
+      timeoutMs: timeoutSeconds * 1_000,
+    });
+    pageUrl = gateServer.url;
+  } else {
+    html = renderGatePage(payload);
+  }
+  await Bun.write(outPath, html);
   console.log(outPath);
+  if (gateServer) console.error(`gate-page: serving ${gateServer.url}`);
 
-  // The page is self-contained, so the review surface is a local file. Nothing
-  // about a local repo's decision trail needs to leave the machine to be read.
+  // The review surface stays local whether the browser reads the file or the
+  // one-shot loopback page.
   if (argv.includes("--open")) {
     const opener =
       process.platform === "darwin"
@@ -784,15 +983,27 @@ if (import.meta.main) {
         : process.platform === "win32"
           ? "start"
           : "xdg-open";
-    const proc = Bun.spawn([opener, outPath], {
+    const proc = Bun.spawn([opener, pageUrl], {
       stdout: "ignore",
       stderr: "ignore",
     });
     if ((await proc.exited) !== 0) {
+      gateServer?.stop();
       console.error(
-        `gate-page: could not open a browser with "${opener}" — open ${outPath} by hand`,
+        `gate-page: could not open a browser with "${opener}" — open ${pageUrl} by hand`,
       );
       process.exit(3);
     }
+  }
+
+  if (gateServer) {
+    const body = await gateServer.response;
+    if (body === null) {
+      console.error("gate-page: timed out waiting for a response");
+      process.exit(4);
+    }
+    const responseText = JSON.stringify(body, null, 2);
+    await Bun.write(`${outPath}.response.json`, responseText);
+    console.log(responseText);
   }
 }

@@ -38,22 +38,42 @@ in one message. It does not inherit
 the main conversation. Do not put either gate inside Lorekeeper.
 
 **Both gates are one local HTML page.** Never hand-write that page and never
-hand-design it — `gatePagePath` renders it. Build the payload, render it, end the
-turn, and let the user paste the response block back:
+hand-design it — `gatePagePath` renders it. Build the payload, serve it, and end
+the turn:
 
 1. Write a payload JSON to the scratchpad. Gate 1 takes `gate: 1`, `nextAdr`,
    `candidates` (each with `entryIds`, `title`, `reason`, `disposition`, and an
    optional `matchesAdr` and `hint`), an optional `conflicts`, and an optional
    `scan` for the header facts. Gate 2 takes `gate: 2` and `drafts`, each with
    `groupId`, `adrNumber`, `proposedPath`, and the codifier's `draftText` verbatim.
-2. Run `bun <gatePagePath> --data <payload.json> --open`. Pass
-   `--lang zh-TW` when the cockpit decision-log language is zh-TW.
-3. Report the rendered path to the user and stop. The page carries its own consistency
-   checks, so a reply copied from it is already internally consistent — you still
-   run the checks below, because the user may type one by hand instead.
+2. Run `bun <gatePagePath> --data <payload.json> --serve --open` **as a background
+   command**. Pass `--lang zh-TW` when the cockpit decision-log language is zh-TW.
+3. Report the served URL to the user and end the turn. Do not poll the command and
+   do not re-run it.
 
-The page is self-contained, so it needs no host. A local repo's decision trail
-and its full draft text never leave the machine to be read.
+The command holds a one-shot loopback server open until the user presses the page's
+send button, then prints the response JSON and exits. Ending the command is what
+returns control: the harness wakes this session on that exit, and the response is
+the command's output. Read it from there. Nothing is copied by hand on this path.
+
+Run it in the background. A foreground call would be killed at the shell timeout
+long before a user finishes reading twelve records, and the server would die with it.
+
+The server binds `127.0.0.1` on a random port under a random path. Nothing about a
+local repo's decision trail or its draft text leaves the machine.
+
+The page carries its own consistency checks, so a submitted reply is already
+internally consistent. Still run the checks below — a reply may also arrive typed
+by hand over a fallback surface.
+
+Read the command's exit code:
+
+| Exit | Meaning | What to do |
+| --- | --- | --- |
+| `0` | The user submitted. | Parse the response JSON from stdout after the first line, which is the written HTML path. |
+| `2` | Bad arguments. | Fix the call. Never report a usage error as a user decision. |
+| `3` | No browser. | Take the fallback cascade below. |
+| `4` | Timed out after 30 minutes. | Tell the user the gate expired and re-run the same command. The payload file is unchanged. |
 
 **Do not call `cockpit wait` for either gate, and do not log `needs_your_call`.**
 The wait only succeeds while the user's `answer-here` switch is on and a tab is
@@ -62,12 +82,15 @@ either way. Parking on a call nobody will answer strands the run. Log a plain
 decision entry recording that the gate was reached, then end the turn. Do not use
 `AskUserQuestion` either — it would skip the decision trail entirely.
 
-**When `--open` exits `3`**, the platform opener failed and there is no local
-browser: a headless run, a remote environment, or Claude Code on the web. Fall
-back in this order:
+**When the command exits `3`**, the platform opener failed and there is no local
+browser: a headless run, a remote environment, or Claude Code on the web. The
+server is already stopped, so every fallback below is the plaintext round-trip the
+send button replaced — the user copies or types the response back. Fall back in
+this order:
 
 - **`Artifact`**, when the tool is available. Publish the file `gate-page.ts`
-  already rendered. Do not rebuild its markup.
+  already rendered. Do not rebuild its markup. Its send button is dead on this
+  path; the copy button beside it is the one that works.
 - **Structured markdown in the transcript**, when it is not — the candidate
   ledger with its `group` column at gate 1, the full draft text for every
   proposed record at gate 2. This is not `AskUserQuestion`: it is the same
@@ -77,9 +100,9 @@ This cascade is about the browser, not about the harness. Codex writes files and
 spawns processes like Claude Code does, so it renders and opens the same page
 through the same script.
 
-Every path produces the same plaintext gate-1 response, which the user pastes or
-types back. Require the complete set, not only the changed rows — a partial
-reply is ambiguous about which candidates it leaves untouched:
+Every path produces the same gate-1 response, whether it was submitted, pasted, or
+typed. Require the complete set, not only the changed rows — a partial reply is
+ambiguous about which candidates it leaves untouched:
 
 ```json
 {
