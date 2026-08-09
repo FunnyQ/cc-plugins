@@ -15,7 +15,7 @@
 
 import { $, Glob } from "bun";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 // ---------------------------------------------------------------------------
@@ -67,6 +67,13 @@ export type ManifestFact = {
   path: string;
   version: string | null;
   kind: VersionFileKind;
+  /**
+   * Extra version files that ride with this manifest — today only the Cargo.lock
+   * block for its crate. They are never discovered on their own: a lock is not a
+   * manifest, and counting it as one would break the "exactly one manifest"
+   * whole-repo heuristic and leave a workspace-root lock outside every component.
+   */
+  companions?: VersionFileSpec[];
 };
 
 export type ShapeFacts = {
@@ -228,6 +235,42 @@ export function applyVersionToContent(
 }
 
 // ---------------------------------------------------------------------------
+// Cargo.lock (a version file no `kind` can describe)
+// ---------------------------------------------------------------------------
+
+/** The `[package]` name of a Cargo.toml — never a `[workspace]` or dependency key. */
+export function cargoPackageName(toml: string): string | null {
+  const header = /^\[package\]\s*$/m.exec(toml);
+  if (!header) return null; // a virtual workspace manifest carries no version either
+  const rest = toml.slice(header.index + header[0].length);
+  const next = /^\[/m.exec(rest);
+  const body = next ? rest.slice(0, next.index) : rest;
+  return /^name\s*=\s*["']([^"']+)["']/m.exec(body)?.[1] ?? null;
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * A Cargo.lock spec for one crate, or null when the lock holds no block for it.
+ *
+ * `kind: "toml"` must never point at a lock: it has one `version = "..."` per
+ * package — hundreds of them — and would move whichever sorts first. So the spec
+ * is a pattern anchored on the preceding `name = "<crate>"`, which is the only
+ * thing that identifies the block. Returning null rather than an unmatched
+ * pattern keeps a spec we cannot prove out of the committed config.
+ */
+export function cargoLockSpec(
+  path: string,
+  crate: string,
+  lock: string,
+): VersionFileSpec | null {
+  const pattern = `name = "${escapeRe(crate)}"\\nversion = "([^"]+)"`;
+  return new RegExp(pattern).test(lock) ? { path, pattern } : null;
+}
+
+// ---------------------------------------------------------------------------
 // Shape detection (produces interview defaults, not gospel)
 // ---------------------------------------------------------------------------
 
@@ -253,8 +296,8 @@ function componentPath(manifestPath: string, name: string): string {
   return idx >= 0 ? segs.slice(0, idx + 1).join("/") : name;
 }
 
-function specOf(m: ManifestFact): VersionFileSpec {
-  return { path: m.path, kind: m.kind };
+function specsOf(m: ManifestFact): VersionFileSpec[] {
+  return [{ path: m.path, kind: m.kind }, ...(m.companions ?? [])];
 }
 
 const DEFAULT_BRANCHES = { develop: "develop", main: "main" } as const;
@@ -330,7 +373,7 @@ export function detectShape(facts: ShapeFacts): ReleaseConfig {
         ([name, manifests]) => ({
           name,
           path: componentPath(manifests[0].path, name),
-          versionFiles: manifests.map(specOf),
+          versionFiles: manifests.flatMap(specsOf),
         }),
       );
       return {
@@ -348,7 +391,7 @@ export function detectShape(facts: ShapeFacts): ReleaseConfig {
   // whole-repo: only auto-fill a version file when exactly one manifest exists;
   // anything ambiguous is left for the interview to resolve.
   const versionFiles =
-    facts.manifests.length === 1 ? [specOf(facts.manifests[0])] : [];
+    facts.manifests.length === 1 ? specsOf(facts.manifests[0]) : [];
   return {
     mode: "whole-repo",
     workflow,
@@ -471,6 +514,29 @@ export async function repoRoot(): Promise<string> {
   return (await git`git rev-parse --show-toplevel`) || process.cwd();
 }
 
+/**
+ * The Cargo.lock that governs a manifest: the crate's own dir first, then the
+ * workspace root. The lock carries the crate's version too, so leaving it out
+ * tags a tree whose manifest and lockfile disagree.
+ */
+async function cargoLockCompanion(
+  root: string,
+  manifestRel: string,
+  toml: string,
+): Promise<VersionFileSpec | null> {
+  const crate = cargoPackageName(toml);
+  if (!crate) return null;
+  const dir = dirname(manifestRel);
+  const candidates =
+    dir === "." ? ["Cargo.lock"] : [join(dir, "Cargo.lock"), "Cargo.lock"];
+  for (const rel of candidates) {
+    const lock = await readFile(resolve(root, rel), "utf-8").catch(() => "");
+    const spec = lock ? cargoLockSpec(rel, crate, lock) : null;
+    if (spec) return spec;
+  }
+  return null;
+}
+
 async function discoverManifests(root: string): Promise<ManifestFact[]> {
   const byPath = new Map<string, ManifestFact>();
   for (const { glob, kind } of MANIFEST_GLOBS) {
@@ -483,7 +549,16 @@ async function discoverManifests(root: string): Promise<ManifestFact[]> {
       const version = content
         ? readVersionFromContent(content, { path: rel, kind })
         : null;
-      byPath.set(rel, { path: rel, version, kind });
+      const lock =
+        content && rel.endsWith("Cargo.toml")
+          ? await cargoLockCompanion(root, rel, content)
+          : null;
+      byPath.set(rel, {
+        path: rel,
+        version,
+        kind,
+        ...(lock ? { companions: [lock] } : {}),
+      });
     }
   }
   return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));

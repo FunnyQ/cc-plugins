@@ -88,6 +88,25 @@ Each entry is one of:
   `__version__` in Python, a version baked into a shell script. Chronicle rewrites
   only the captured span. Surrounding formatting stays untouched.
 
+#### Cargo.lock
+
+A Rust crate's version lives in **two** files: `Cargo.toml` and its `Cargo.lock`
+package block. Detection writes both, the lock as a name-anchored pattern:
+
+```jsonc
+{ "path": "Cargo.lock", "pattern": "name = \"my-crate\"\\nversion = \"([^\"]+)\"" }
+```
+
+Never point `kind: "toml"` at a lockfile. A lock carries one `version = "..."` per
+package — hundreds of them — and the plain `toml` rule would move whichever sorts
+first, corrupting the lock. Only the block under `name = "<crate>"` may move.
+
+Workspaces share one root lock: every member component lists the same
+`Cargo.lock` path with its own crate name in the pattern.
+
+Detection runs once, so a config committed before this existed lists only
+`Cargo.toml`. Add the lock entry by hand; the release commit then stages it.
+
 ### per-component mode
 
 ```jsonc
