@@ -10,7 +10,6 @@ import {
 import { dirname, join, resolve } from "node:path";
 
 const ROLES = [
-  "lawspeaker",
   "watcher",
   "runesmith",
   "storykeeper",
@@ -41,9 +40,8 @@ function withoutManagedBlock(config: string): string {
 
 function managedBlock(targetDir: string): string {
   const descriptions = {
-    lawspeaker: "Orchestrate Chronicle commit analysis and execution.",
-    watcher: "Analyze the current changeset without committing.",
-    runesmith: "Stage explicit files and write Chronicle commits.",
+    watcher: "Group the current changeset without committing.",
+    runesmith: "Run the Chronicle commit script and report its result.",
     storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
     skald: "Analyze a branch and draft pull request material.",
     messenger: "Create a pull request from confirmed material.",
