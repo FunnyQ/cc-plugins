@@ -407,7 +407,12 @@ function summarizeFile(file: AnalyzedFile): FileSummary {
 }
 
 async function analyzeChanges(): Promise<AnalysisResult> {
-  const statusOutput = (await gitText`git status --porcelain -uall`).trimEnd();
+  // core.quotePath=false: git otherwise octal-escapes every non-ASCII path, and
+  // those escapes are not JSON, so unquoteGitPath hands back the escaped string
+  // and the path never matches the file it names.
+  const statusOutput = (
+    await gitText`git -c core.quotePath=false status --porcelain -uall`
+  ).trimEnd();
   const statusLines = statusOutput ? statusOutput.split("\n") : [];
   const entries = statusLines.flatMap(parseStatusLine);
   const [analyzed, logOutput] = await Promise.all([
@@ -463,7 +468,7 @@ export function verifyPlanLanded(
   };
 }
 
-async function committedPathsSince(base: string): Promise<string[]> {
+export async function committedPathsSince(base: string): Promise<string[]> {
   // --no-renames keeps a rename's old path in the list, matching the plan's
   // habit of carrying both oldPath and path for one commit.
   const output = (
@@ -473,7 +478,7 @@ async function committedPathsSince(base: string): Promise<string[]> {
   return output ? output.split("\n") : [];
 }
 
-async function remainingPaths(): Promise<string[]> {
+export async function remainingPaths(): Promise<string[]> {
   const output = (
     await gitText`git -c core.quotePath=false status --porcelain -uall`
   ).trimEnd();
