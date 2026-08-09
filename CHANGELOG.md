@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.11.2] - 2026-08-09
+
+_tracks tag `chronicle-v0.11.2`_
+
+### Fixed
+- Releasing a Rust crate left `Cargo.lock` behind: the commit bumped `Cargo.toml` alone, so the tag pointed at a tree whose manifest and lockfile disagreed. Both now move together, including in Cargo workspaces where one lockfile tracks several crates. The lock update is anchored to the crate's own package name, so a bump can never rewrite another dependency's version.
+- A config written before this fix lists only `Cargo.toml`. Detection runs once, so add the `Cargo.lock` entry to `.chronicle/release.json` by hand — the format is in `references/release-config.md`.
+
 ## [chronicle 0.11.1] - 2026-08-09
 
 _tracks tag `chronicle-v0.11.1`_
