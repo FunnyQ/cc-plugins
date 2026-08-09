@@ -22,7 +22,7 @@ Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents 
 
 **relay** — `/relay <codex|opencode|claude> <delegate|review|image>`. A backend-agnostic mode layer sits over a per-harness strategy layer. The capability matrix makes `image` codex-only.
 
-**chronicle** — `adr`, `commit`, and `pr` share one topology: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents. `adr` triages the cockpit decision trail and promotes decisions into Architecture Decision Records. `release` is the exception: it is a script, `scripts/release.ts`, driving an ordered list of stages that each detect whether they have already happened, so a run resumes wherever the last one stopped. Its agents are the skirnir, which runs the scripts so their output stays out of the conversation, and the annalist, which writes the CHANGELOG entry. It stays config-first — the whole-repo versus per-component shape lives in a committed `.chronicle/release.json`.
+**chronicle** — `adr` and `pr` share one topology: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents. `adr` triages the cockpit decision trail and promotes decisions into Architecture Decision Records. `commit` and `release` are script-centric instead: a deterministic engine owns every mechanical step, the main agent keeps the judgment, and cheap leaf agents run the scripts so their output never reaches the conversation. `commit` is `scripts/commit.ts` — `shape` settles simple-vs-atomic, `apply` stages, commits, and verifies off one plan file, re-reading how much already landed from the log so an interrupted run resumes. Its agents are the watcher, the only party that reads the diff, and the runesmith, which runs `apply`. The commit bodies are written by the main agent, because it is the only one holding the "why". `release` is a script, `scripts/release.ts`, driving an ordered list of stages that each detect whether they have already happened, so a run resumes wherever the last one stopped. Its agents are the skirnir, which runs the scripts so their output stays out of the conversation, and the annalist, which writes the CHANGELOG entry. It stays config-first — the whole-repo versus per-component shape lives in a committed `.chronicle/release.json`.
 
 **monitor** — `usage-dashboard` is the rear-view: a local web dashboard for sessions, tokens, cost, model mix, and project activity. `cockpit` is the windshield: a live decision trail, transcript, and a `needs_your_call` wait/send bridge for running sessions. `install` owns every prerequisite check and config write for the whole plugin.
 
@@ -81,7 +81,7 @@ cc-plugins/
     │       # next-ready / score-task (--log) / flightlog
     ├── chronicle/
     │   ├── shared/scripts/               # code imported by more than one skill
-    │   ├── agents/                       # lawspeaker+watcher+runesmith / storykeeper+skald+messenger /
+    │   ├── agents/                       # watcher+runesmith (commit) / storykeeper+skald+messenger /
     │   │                                 # lorekeeper+gleaner+reckoner+codifier+barrowkeeper / skirnir+annalist (release)
     │   ├── agents-codex/                 # Codex agent definitions (TOML format)
     │   ├── hooks/check-branch.sh         # PreToolUse, guards commits on main/master
