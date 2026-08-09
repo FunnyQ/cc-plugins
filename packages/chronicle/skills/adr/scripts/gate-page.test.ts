@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { renderGatePage } from "./gate-page";
+import { renderGatePage, serveGatePage } from "./gate-page";
 
 const GATE1 = {
   gate: 1 as const,
@@ -37,6 +37,39 @@ const GATE2 = {
 };
 
 describe("renderGatePage", () => {
+  test("omits the send control without a submit endpoint", () => {
+    expect(renderGatePage(GATE1)).not.toContain('id="send"');
+    expect(renderGatePage(GATE2)).not.toContain('id="send"');
+  });
+
+  test("adds the send control for both gates and locales", () => {
+    for (const payload of [GATE1, GATE2]) {
+      for (const lang of ["en", "zh-TW"] as const) {
+        const submitUrl = "http://127.0.0.1:3210/nonce/submit";
+        const html = renderGatePage({ ...payload, lang } as any, { submitUrl });
+        expect(html).toContain('id="send"');
+        expect(html).toContain(submitUrl);
+      }
+    }
+  });
+
+  test("a closing script tag in the submit URL cannot break out", () => {
+    const html = renderGatePage(GATE1, {
+      submitUrl: "http://127.0.0.1/</script><svg onload=1>",
+    });
+    expect(html).not.toContain("</script><svg");
+  });
+
+  // The client script is assembled by substituting placeholders. A string
+  // replacement would re-read "$&" as a substitution pattern and splice the
+  // placeholder's own name into the URL.
+  test("a substitution pattern in the submit URL survives verbatim", () => {
+    const submitUrl = "http://127.0.0.1/x$&$'y/submit";
+    const html = renderGatePage(GATE1, { submitUrl });
+    expect(html).toContain(JSON.stringify(submitUrl));
+    expect(html).not.toContain("__SUBMIT_HANDLER__");
+  });
+
   test("gate 1 embeds every candidate in the payload", () => {
     const html = renderGatePage(GATE1);
     const payload = extractPayload(html);
@@ -97,6 +130,77 @@ describe("renderGatePage", () => {
   test("an unknown gate is rejected rather than rendered empty", () => {
     // @ts-expect-error deliberately out of contract
     expect(() => renderGatePage({ gate: 3, lang: "en" })).toThrow();
+  });
+});
+
+describe("serveGatePage", () => {
+  test("serves one nonce-scoped page and accepts one JSON response", async () => {
+    const gate = serveGatePage({
+      nonce: "test-nonce",
+      render: (submitUrl) => `page:${submitUrl}`,
+    });
+    try {
+      const page = await fetch(gate.url);
+      expect(page.status).toBe(200);
+      expect(page.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(page.headers.get("cache-control")).toBe("no-store");
+      expect(await page.text()).toBe(`page:${gate.submitUrl}`);
+      expect((await fetch(`${gate.url}/unknown`)).status).toBe(404);
+
+      const submitted = { verdicts: [{ verdict: "approve" }] };
+      const reply = await fetch(gate.submitUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(submitted),
+      });
+      expect(reply.status).toBe(200);
+      expect(await reply.json()).toEqual({ ok: true });
+      expect(await gate.response).toEqual(submitted);
+    } finally {
+      gate.stop();
+    }
+  });
+
+  test("rejects invalid and oversized bodies without resolving", async () => {
+    const gate = serveGatePage({
+      nonce: "body-test",
+      render: () => "page",
+      timeoutMs: 10_000,
+    });
+    try {
+      expect(
+        (
+          await fetch(gate.submitUrl, {
+            method: "POST",
+            body: "{broken",
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await fetch(gate.submitUrl, {
+            method: "POST",
+            body: "x".repeat(2 * 1024 * 1024 + 1),
+          })
+        ).status,
+      ).toBe(413);
+
+      const marker = Symbol("pending");
+      expect(await Promise.race([gate.response, Promise.resolve(marker)])).toBe(
+        marker,
+      );
+    } finally {
+      gate.stop();
+    }
+  });
+
+  test("resolves null after the timeout", async () => {
+    const gate = serveGatePage({ render: () => "page", timeoutMs: 5 });
+    try {
+      expect(await gate.response).toBeNull();
+    } finally {
+      gate.stop();
+    }
   });
 });
 
