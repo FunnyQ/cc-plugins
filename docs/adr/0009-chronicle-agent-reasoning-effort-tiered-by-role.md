@@ -33,6 +33,28 @@ Claude Code side uses `effort` in each agent's `.md` frontmatter
 (`packages/chronicle/agents/*.md`); Codex side maps the same tiers onto
 `model_reasoning_effort` in each `$CODEX_HOME/agents/chronicle/*.toml`.
 
+### Amendment, 2026-08-09
+
+Tier-by-role stands. The roster above does not: it names four agents that no
+longer exist (`seer`, `smith`, `hammerbearer`, `oathkeeper`), predates the five
+ADR agents, and predates a fourth tier. Current assignment, 13 agents:
+
+- `low` — watcher, runesmith, messenger, skirnir, gleaner, barrowkeeper.
+- `medium` — lawspeaker, storykeeper, lorekeeper.
+- `default` (full) — annalist, skald.
+- `high` — reckoner, codifier: long-horizon synthesis over a whole decision
+  trail, where a shallow pass produces a plausible-looking wrong clustering.
+
+**`lawspeaker` moved from `default` to `medium`** when chronicle 0.12.0 put a
+deterministic engine (`commit.ts`) under the commit flow. It no longer classifies
+simple-vs-atomic — `decideShape()` does — so what remains is ordering commits and
+writing their prose. Revisit if commit bodies go vague: the two candidates are
+this tier and the `contextBrief` hop, in that order of cheapness to test.
+
+Codex has no `default` literal, so both `default` and `medium` map to
+`model_reasoning_effort = "medium"` there. The two tiers are distinguishable only
+on Claude Code.
+
 ## Consequences
 
 The tiering is cross-harness and independent of which model backs an agent,
