@@ -71,6 +71,16 @@ it. When a group's ordering looks wrong and the watcher's note does not settle i
 `Read` the specific file to confirm before you move it. Reorder freely — the
 grouping is the watcher's, the sequence is yours.
 
+**When no order works, the grouping is wrong, not the order.** Two files that
+import from each other — a module and its only caller, a type and its user — cannot
+both build in either sequence. Merge those groups into one commit rather than
+picking the less-bad order. Merging is the one grouping change you may make, and
+only for this reason.
+
+Ignore any claim in `contextBrief` that the ordering is free. The main agent is
+describing the change it made, not the groups the watcher returned, and the watcher
+may have split one of its "independent" changes across two commits.
+
 ### 3. Write the plan file
 
 Read `promptPath` — the commit template, which the user may have overridden.

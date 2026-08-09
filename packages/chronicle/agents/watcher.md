@@ -63,6 +63,13 @@ Groups are **whole-file**. Every path appears in exactly one group; a file with
 mixed concerns goes entirely into one. Deduplicate a path that appears both staged
 and unstaged.
 
+**Two files that cannot be ordered belong in one group.** Before you split, ask
+which order would make both halves build. When the answer is neither — a module
+and the caller that imports the symbol it just renamed, a type and the file that
+uses it, a fixture and its test — there is no ordering to find, and splitting them
+leaves a commit that does not build no matter where it lands. Merge them. Ordering
+is the next step's job; this one is yours alone.
+
 A rename **must** carry both `oldPath` and `path`, in the same group. Committing
 the new path alone leaves the old path's deletion behind, so the tree ends up with
 both files. The script refuses a plan that splits or drops one half.
