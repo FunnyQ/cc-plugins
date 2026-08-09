@@ -43,7 +43,7 @@
 
 ## Length guardrail
 
-The Lawspeaker hands the runesmith a distilled `whyBrief`. It holds far more
+The body is written by the agent holding the conversation, which knows far more
 "why" than belongs in a commit. Be terse on purpose: the commit records the
 change, not the whole investigation.
 
