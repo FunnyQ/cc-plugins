@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.13.0] - 2026-08-10
+
+_tracks tag `chronicle-v0.13.0`_
+
+### Added
+- The ADR gate page can now run as a background command with `--serve --open`: the browser page posts its answer straight back to a one-shot local loopback server, so submitting no longer needs a manual copy-paste. The command exits on submission (or on usage error, missing browser, or a 30-minute timeout by default), and `SKILL.md` documents the exit codes so the agent resumes correctly. The copy-button fallback still works when `--serve` isn't used or the published page's send button is unreachable.
+
+### Fixed
+- A placeholder-substitution bug in the gate page's client script could leak the placeholder name into a submit URL that happened to contain `$&`; substitution now uses a function replacer instead of a plain string replace.
+
 ## [chronicle 0.12.1] - 2026-08-09
 
 _tracks tag `chronicle-v0.12.1`_
