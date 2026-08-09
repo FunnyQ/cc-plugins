@@ -202,6 +202,29 @@ describe("composeMessage", () => {
     ).toBe("🔧 chore: bump to 0.2.0\n");
   });
 
+  test("derives a missing emoji from the type", () => {
+    expect(
+      composeMessage({ type: "remove", subject: "drop the shim", files: [] }),
+    ).toBe("🔥 remove: drop the shim\n");
+  });
+
+  test("an unknown type still produces a usable subject", () => {
+    expect(
+      composeMessage({ type: "wip", subject: "something", files: [] }),
+    ).toBe("🔧 wip: something\n");
+  });
+
+  test("an explicit emoji wins over the table", () => {
+    expect(
+      composeMessage({
+        emoji: "🚑",
+        type: "fix",
+        subject: "patch prod",
+        files: [],
+      }),
+    ).toBe("🚑 fix: patch prod\n");
+  });
+
   test("a body without a summary carries no separator", () => {
     expect(
       composeMessage({

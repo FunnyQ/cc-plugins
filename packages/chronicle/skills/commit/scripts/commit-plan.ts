@@ -15,14 +15,15 @@ import type { ParsedStatus } from "./analyze-changes";
 
 /** One cohesive group of files, as proposed by the watcher. */
 export type CommitGroup = {
-  emoji: string;
+  /** Optional: derived from `type` when absent. See `emojiFor`. */
+  emoji?: string;
   type: string;
   subject: string;
   /** Repo-root-relative. A rename carries both its old and its new path. */
   files: string[];
 };
 
-/** A group once the main agent has written its prose. */
+/** A group once the Lawspeaker has written its prose. */
 export type PlannedCommit = CommitGroup & {
   /** English markdown body. Omitted for a trivial one-liner. */
   body?: string;
@@ -159,9 +160,36 @@ export function validatePlan(
   };
 }
 
+/**
+ * The template's type → emoji table, as code.
+ *
+ * An agent asked for an emoji alongside a type will sometimes return the type
+ * alone — observed on the first live run of this flow. The mapping is fixed, so
+ * deriving it here means no agent can drop it.
+ */
+const EMOJI_FOR_TYPE: Record<string, string> = {
+  feat: "✨",
+  fix: "🐛",
+  docs: "📖",
+  style: "🎨",
+  refactor: "📦",
+  test: "✅",
+  chore: "🔧",
+  remove: "🔥",
+  hotfix: "🚑",
+  security: "🔒",
+  perf: "⚡️",
+};
+
+/** The commit's emoji: what the plan asked for, or the type's own. */
+export function emojiFor(commit: Pick<CommitGroup, "emoji" | "type">): string {
+  return commit.emoji?.trim() || (EMOJI_FOR_TYPE[commit.type] ?? "🔧");
+}
+
 /** The commit message, per `references/commit-template.md`. */
 export function composeMessage(commit: PlannedCommit): string {
-  const subject = `${commit.emoji} ${commit.type}: ${commit.subject}`.trim();
+  const subject =
+    `${emojiFor(commit)} ${commit.type}: ${commit.subject}`.trim();
   const body = commit.body?.trim();
   const summary = commit.summary?.trim();
 
