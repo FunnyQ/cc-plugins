@@ -6,7 +6,7 @@ description: >-
 when_to_use: >-
   Setting up or repairing Chronicle. On Claude Code: when commit/pr/release fail
   with "Agent exists but is not enabled in this context". On Codex: registering or
-  refreshing the commit/PR/ADR agents (chronicle_watcher,
+  refreshing the commit/PR/ADR agents (chronicle_lawspeaker,
   chronicle_storykeeper, chronicle_lorekeeper, etc.).
   Not monitor:install (that wires the usage-dashboard statusline).
 ---
@@ -15,12 +15,12 @@ when_to_use: >-
 
 ## Claude Code — nested subagent spawn depth
 
-Chronicle's PR and ADR flows are orchestrator-shaped: `main → storykeeper →
-skald/messenger`, and the same for `lorekeeper`. Claude Code **2.1.217** stopped
-letting subagents spawn nested subagents by default. Those orchestrators then fail
-with `Agent exists but is not enabled in this context`, and no request or record
-is written. (`commit` and `release` are flat — they spawn leaf agents directly and
-do not need this.)
+Chronicle's commit, PR, and ADR flows are orchestrator-shaped: `main → lawspeaker →
+watcher/runesmith`, and the same for `storykeeper` and `lorekeeper`. Claude Code
+**2.1.217** stopped letting subagents spawn nested subagents by default. Those
+orchestrators then fail with `Agent exists but is not enabled in this context`. No
+commit lands, and nothing is staged. (`release` is flat — it spawns leaf agents
+directly and does not need this.)
 
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` re-enables it. Chronicle needs `2`.
 
@@ -44,8 +44,8 @@ restarts. Always say this when you report the fix.
 
 ## Codex — named agent roles
 
-Register the Codex-native commit roles (`chronicle_watcher`,
-`chronicle_runesmith`) and PR roles
+Register the Codex-native commit roles (`chronicle_lawspeaker`,
+`chronicle_watcher`, `chronicle_runesmith`) and PR roles
 (`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), the release
 roles (`chronicle_skirnir`, `chronicle_annalist`), plus the ADR roles
 (`chronicle_lorekeeper`, `chronicle_gleaner`, `chronicle_reckoner`,

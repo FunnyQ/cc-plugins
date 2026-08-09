@@ -43,9 +43,9 @@
 
 ## Length guardrail
 
-The body is written by the agent holding the conversation, which knows far more
-"why" than belongs in a commit. Be terse on purpose: the commit records the
-change, not the whole investigation.
+The Lawspeaker writes the body from the main agent's `contextBrief`, which holds
+far more "why" than belongs in a commit. Be terse on purpose: the commit records
+the change, not the whole investigation.
 
 - **Body**: Write one line per bullet where possible. Use about 3–4 bullets
   for a normal change. Say *why*; do not restate the diff or narrate the
