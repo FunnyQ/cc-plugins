@@ -9,62 +9,106 @@ import {
   capDiff,
   isBinaryFile,
   parseNumstat,
-  parseStatusLine,
+  parseStatus,
+  parseStatusRecords,
   shouldSkipDiff,
   unquoteGitPath,
   verifyPlanLanded,
 } from "./analyze-changes";
 
-describe("parseStatusLine", () => {
+// `-z` terminates every field, so a fixture must too.
+const z = (...fields: string[]) => `${fields.join("\0")}\0`;
+
+describe("parseStatus", () => {
   test("parses untracked files as unstaged additions", () => {
-    expect(parseStatusLine("?? f")).toEqual([
-      { path: "f", staged: false, status: "added" },
+    expect(parseStatus(z("?? f"))).toEqual([
+      { path: "f", oldPath: undefined, staged: false, status: "added" },
     ]);
   });
 
   test("parses staged additions", () => {
-    expect(parseStatusLine("A  f")).toEqual([
-      { path: "f", staged: true, status: "added" },
+    expect(parseStatus(z("A  f"))).toEqual([
+      { path: "f", oldPath: undefined, staged: true, status: "added" },
     ]);
   });
 
   test("parses combined staged and unstaged modifications", () => {
-    expect(parseStatusLine("MM f")).toEqual([
-      { path: "f", staged: true, status: "modified" },
-      { path: "f", staged: false, status: "modified" },
+    expect(parseStatus(z("MM f"))).toEqual([
+      { path: "f", oldPath: undefined, staged: true, status: "modified" },
+      { path: "f", oldPath: undefined, staged: false, status: "modified" },
     ]);
   });
 
-  test("parses renames with oldPath", () => {
-    expect(parseStatusLine("R  old -> new")).toEqual([
+  test("parses renames, whose source is its own field", () => {
+    expect(parseStatus(z("R  new", "old"))).toEqual([
       { path: "new", oldPath: "old", staged: true, status: "renamed" },
     ]);
   });
 
   test("parses deletions", () => {
-    expect(parseStatusLine(" D f")).toEqual([
-      { path: "f", staged: false, status: "deleted" },
+    expect(parseStatus(z(" D f"))).toEqual([
+      { path: "f", oldPath: undefined, staged: false, status: "deleted" },
     ]);
   });
 
-  test("parses intent-to-add files as unstaged additions", () => {
-    // `git add -N f` reports " A f": nothing in the index, an addition in the
-    // worktree. Dropping it hides a brand-new file from the whole analysis.
-    expect(parseStatusLine(" A f")).toEqual([
-      { path: "f", staged: false, status: "added" },
+  test("parses an intent-to-add file as a brand-new unstaged addition", () => {
+    expect(parseStatus(z(" A f"))).toEqual([
+      { path: "f", oldPath: undefined, staged: false, status: "added" },
     ]);
   });
 
-  test("does not double-report an add-add conflict", () => {
-    // "AA" is an unmerged both-added conflict, not an intent-to-add. It keeps
-    // its single staged entry.
-    expect(parseStatusLine("AA f")).toEqual([
-      { path: "f", staged: true, status: "added" },
+  test("reports an unmerged AA conflict once", () => {
+    expect(parseStatus(z("AA f"))).toEqual([
+      { path: "f", oldPath: undefined, staged: true, status: "added" },
     ]);
   });
 
-  test("ignores short lines", () => {
-    expect(parseStatusLine("M")).toEqual([]);
+  test("ignores a truncated record", () => {
+    expect(parseStatus(z("M"))).toEqual([]);
+  });
+
+  test("parses several records in one stream", () => {
+    expect(parseStatus(z("A  a", "R  new", "old", " M b"))).toHaveLength(3);
+  });
+});
+
+describe("parseStatusRecords", () => {
+  test("keeps a literal ' -> ' inside a filename", () => {
+    expect(parseStatusRecords(z("?? a -> b.txt"))).toEqual([
+      { index: "?", worktree: "?", path: "a -> b.txt" },
+    ]);
+  });
+
+  test("keeps a newline inside a filename as one record", () => {
+    expect(parseStatusRecords(z("?? two\nlines.txt"))).toEqual([
+      { index: "?", worktree: "?", path: "two\nlines.txt" },
+    ]);
+  });
+
+  test("keeps a non-ASCII path verbatim", () => {
+    expect(parseStatusRecords(z(" M 筆記.md"))).toEqual([
+      { index: " ", worktree: "M", path: "筆記.md" },
+    ]);
+  });
+
+  test("consumes a rename's source so the next record is not shifted", () => {
+    expect(parseStatusRecords(z("R  new", "old", "A  after"))).toEqual([
+      { index: "R", worktree: " ", path: "new", oldPath: "old" },
+      { index: "A", worktree: " ", path: "after" },
+    ]);
+  });
+
+  test("consumes the source of a worktree-side rename too", () => {
+    expect(parseStatusRecords(z(" R new", "old", "A  after"))).toEqual([
+      { index: " ", worktree: "R", path: "new", oldPath: "old" },
+      { index: "A", worktree: " ", path: "after" },
+    ]);
+  });
+
+  test("keeps an unmapped status code rather than dropping the path", () => {
+    expect(parseStatusRecords(z("T  typechange.txt"))).toEqual([
+      { index: "T", worktree: " ", path: "typechange.txt" },
+    ]);
   });
 });
 
@@ -299,8 +343,9 @@ describe("analyzeFile", () => {
     await writeFile(join(dir, "newmod.ts"), "export const b = 3;\n");
     await $`git add -N newmod.ts`.quiet();
 
-    const status = (await $`git status --porcelain -uall`.text()).trimEnd();
-    const entries = status.split("\n").flatMap(parseStatusLine);
+    const entries = parseStatus(
+      await $`git status --porcelain -uall -z`.text(),
+    );
 
     expect(entries).toContainEqual({
       path: "newmod.ts",

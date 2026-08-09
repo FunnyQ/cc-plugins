@@ -58,16 +58,61 @@ function statusFromCode(code: string): FileStatus | undefined {
   }
 }
 
-export function parseStatusLine(line: string): ParsedStatus[] {
-  if (line.length < 4) return [];
+/** One `--porcelain -z` record, before the staged/unstaged split. */
+export type StatusRecord = {
+  index: string;
+  worktree: string;
+  path: string;
+  oldPath?: string;
+};
 
-  const index = line[0];
-  const worktree = line[1];
-  const rawPath = line.slice(3);
-  const [rawOldPath, rawNewPath] = rawPath.split(" -> ");
-  const path = unquoteGitPath(rawNewPath ?? rawOldPath);
-  const oldPath = rawNewPath ? unquoteGitPath(rawOldPath) : undefined;
+/**
+ * Split `git status --porcelain -uall -z` into records.
+ *
+ * `-z` is not an optimization. Porcelain v1's human-readable form separates a
+ * rename's two paths with a literal ` -> ` and its entries with newlines, and
+ * both are legal inside a filename — `a -> b.txt` parses as a rename of `a` to
+ * `b.txt`. Under `-z` every field is NUL-terminated, a rename's source arrives
+ * as its own following field, and nothing is ever quoted or escaped.
+ */
+export function parseStatusRecords(output: string): StatusRecord[] {
+  const fields = output.split("\0");
+  const records: StatusRecord[] = [];
 
+  for (let i = 0; i < fields.length; i += 1) {
+    const field = fields[i];
+    // The stream ends with a terminator, so the final split element is empty.
+    if (field == null || field.length < 4) continue;
+
+    const index = field[0] ?? " ";
+    const worktree = field[1] ?? " ";
+    const record: StatusRecord = { index, worktree, path: field.slice(3) };
+
+    // A rename or copy on either side is followed by its source path. Consume
+    // that field here, or the next iteration reads it as a bogus entry.
+    if ("RC".includes(index) || "RC".includes(worktree)) {
+      i += 1;
+      const source = fields[i];
+      if (source) record.oldPath = source;
+    }
+
+    records.push(record);
+  }
+
+  return records;
+}
+
+/** Every changed path, one entry per staged/unstaged side. */
+export function parseStatus(output: string): ParsedStatus[] {
+  return parseStatusRecords(output).flatMap(toParsedStatus);
+}
+
+function toParsedStatus({
+  index,
+  worktree,
+  path,
+  oldPath,
+}: StatusRecord): ParsedStatus[] {
   if (index === "?") {
     return [{ path, oldPath, staged: false, status: "added" }];
   }
@@ -407,14 +452,9 @@ function summarizeFile(file: AnalyzedFile): FileSummary {
 }
 
 async function analyzeChanges(): Promise<AnalysisResult> {
-  // core.quotePath=false: git otherwise octal-escapes every non-ASCII path, and
-  // those escapes are not JSON, so unquoteGitPath hands back the escaped string
-  // and the path never matches the file it names.
-  const statusOutput = (
-    await gitText`git -c core.quotePath=false status --porcelain -uall`
-  ).trimEnd();
-  const statusLines = statusOutput ? statusOutput.split("\n") : [];
-  const entries = statusLines.flatMap(parseStatusLine);
+  const entries = parseStatus(
+    await gitText`git status --porcelain -uall -z`,
+  );
   const [analyzed, logOutput] = await Promise.all([
     Promise.all(entries.map(analyzeFile)),
     gitText`git log --oneline -10`.catch(() => ""),
@@ -471,27 +511,19 @@ export function verifyPlanLanded(
 export async function committedPathsSince(base: string): Promise<string[]> {
   // --no-renames keeps a rename's old path in the list, matching the plan's
   // habit of carrying both oldPath and path for one commit.
-  const output = (
-    await gitText`git -c core.quotePath=false diff --name-only --no-renames ${base} HEAD`
-  ).trimEnd();
+  const output =
+    await gitText`git diff --name-only --no-renames -z ${base} HEAD`;
 
-  return output ? output.split("\n") : [];
+  return output.split("\0").filter(Boolean);
 }
 
 export async function remainingPaths(): Promise<string[]> {
-  const output = (
-    await gitText`git -c core.quotePath=false status --porcelain -uall`
-  ).trimEnd();
-  if (!output) return [];
-
-  // Read the raw status lines instead of parseStatusLine: a status code the
-  // parser does not map would drop out here too, and that silent drop is
-  // exactly what this check exists to expose.
-  return output.split("\n").map((line) => {
-    const rawPath = line.slice(3);
-    const [rawOldPath, rawNewPath] = rawPath.split(" -> ");
-    return rawNewPath ?? rawOldPath;
-  });
+  // Take every record's path whatever its code, rather than going through
+  // parseStatus: a status code the mapping does not know would drop out here
+  // too, and that silent drop is exactly what this check exists to expose.
+  return parseStatusRecords(
+    await gitText`git status --porcelain -uall -z`,
+  ).map((record) => record.path);
 }
 
 async function verifyMain(argv: string[]) {

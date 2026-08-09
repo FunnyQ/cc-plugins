@@ -273,6 +273,64 @@ describe("apply", () => {
     expect(json.ok).toBe(true);
   });
 
+  test("carries a filename containing git's rename separator", async () => {
+    await baseCommit();
+    await seed("a -> b.txt", "hi\n");
+    const planPath = await writePlan({
+      shape: "simple",
+      commits: [
+        { type: "docs", subject: "add the odd name", files: ["a -> b.txt"] },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.ok).toBe(true);
+    expect(json.verify.plannedFiles).toBe(1);
+  });
+
+  test("carries a filename containing a newline", async () => {
+    await baseCommit();
+    await seed("two\nlines.txt", "hi\n");
+    const planPath = await writePlan({
+      shape: "simple",
+      commits: [
+        {
+          type: "docs",
+          subject: "add the odd name",
+          files: ["two\nlines.txt"],
+        },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.ok).toBe(true);
+  });
+
+  test("renames a file whose name holds the rename separator", async () => {
+    await baseCommit();
+    await seed("a -> b.txt", "stable content here\n");
+    await $`git add -A`.cwd(repo).quiet();
+    await $`git commit -q -m ${"✨ feat: add it"}`.cwd(repo).quiet();
+    await $`git mv ${"a -> b.txt"} ${"c -> d.txt"}`.cwd(repo).quiet();
+
+    const planPath = await writePlan({
+      shape: "simple",
+      commits: [
+        {
+          type: "refactor",
+          subject: "rename it",
+          files: ["a -> b.txt", "c -> d.txt"],
+        },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.ok).toBe(true);
+  });
+
   test("refuses a rename that dropped its old path, before staging anything", async () => {
     await baseCommit();
     await seed("old.ts", "same content here\n");

@@ -28,7 +28,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import {
   committedPathsSince,
-  parseStatusLine,
+  parseStatus,
   remainingPaths,
   verifyPlanLanded,
   type ParsedStatus,
@@ -98,12 +98,9 @@ async function readPlanFile(path: string): Promise<PlanFile> {
 }
 
 async function readChangeset(): Promise<ParsedStatus[]> {
-  // See analyzeChanges: without core.quotePath=false a non-ASCII path comes back
-  // octal-escaped, and the coverage check then rejects a plan that is correct.
-  const status = (
-    await git("-c", "core.quotePath=false", "status", "--porcelain", "-uall")
-  ).trimEnd();
-  return status ? status.split("\n").flatMap(parseStatusLine) : [];
+  // -z, because ` -> ` and newlines are both legal in a filename. See
+  // parseStatusRecords.
+  return parseStatus(await git("status", "--porcelain", "-uall", "-z"));
 }
 
 /**
@@ -129,17 +126,15 @@ async function readLog(limit: number): Promise<LogEntry[]> {
       // --no-renames keeps both halves of a rename, matching how a plan carries them.
       paths: (
         await gitOrEmpty(
-          "-c",
-          "core.quotePath=false",
           "show",
           "--name-only",
           "--no-renames",
           "--format=",
+          "-z",
           sha,
         )
       )
-        .trimEnd()
-        .split("\n")
+        .split("\0")
         .filter(Boolean),
     })),
   );
@@ -168,9 +163,8 @@ async function mergeInProgress(): Promise<boolean> {
  */
 async function stageable(files: string[]): Promise<string[]> {
   const cached = new Set(
-    (await gitOrEmpty("ls-files", "--cached", "--", ...files))
-      .trimEnd()
-      .split("\n")
+    (await gitOrEmpty("ls-files", "--cached", "-z", "--", ...files))
+      .split("\0")
       .filter(Boolean),
   );
   const present = await Promise.all(
