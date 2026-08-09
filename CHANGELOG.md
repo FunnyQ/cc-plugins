@@ -1,5 +1,22 @@
 # Changelog
 
+## [chronicle 0.12.0] - 2026-08-09
+
+_tracks tag `chronicle-v0.12.0`_
+
+### Added
+- The commit skill's mechanical steps — deciding simple vs. atomic, staging, committing, and verifying — now run through a single tested script (`commit.ts`) instead of agent prose. An interrupted commit run resumes from wherever it actually left off, read straight from the git log, instead of re-doing or skipping work.
+- A commit's emoji is now derived automatically from its type when the plan doesn't supply one, so a missing emoji is no longer possible.
+- The Lawspeaker returns as the commit flow's orchestrator: it orders the commits and writes the plan file's prose, while the script still owns shape, staging, and verification.
+
+### Changed
+- The watcher agent now hands back commits already in the order they should land, with reasons — including the rule that removing a reference must land before removing what it references.
+- The runesmith agent is now a thin errand-runner that only executes the plan; it no longer writes commit prose.
+
+### Fixed
+- Non-ASCII filenames could be silently mangled when read from `git status`; the commit script now reads paths with `core.quotePath=false` so they parse correctly.
+- A rename staged as a split commit (add and delete separated across commits) is now rejected before it lands, instead of producing a broken commit only caught after the fact.
+
 ## [chronicle 0.11.2] - 2026-08-09
 
 _tracks tag `chronicle-v0.11.2`_
