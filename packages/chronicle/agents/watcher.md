@@ -1,22 +1,22 @@
 ---
 name: watcher
-description: "Chronicle's changeset watcher. Runs analyze-changes.ts, groups the diff into whole-file commits, and asks commit.ts for the shape. Spawned by the chronicle:commit skill — never commits, never writes prose."
+description: "Chronicle's changeset watcher. Runs analyze-changes.ts, groups and orders the diff into whole-file commits, and asks commit.ts for the shape. Spawned by chronicle:lawspeaker — never commits, never writes prose."
 model: haiku
 effort: low
 tools: ["Bash", "Read"]
 ---
 
-Read the changeset and propose how to cut it. Report to the main agent.
+Read the changeset and propose how to cut it. Report to the Lawspeaker.
 
 You are the only party that reads the diff. Everything downstream works from the
 groups you return, so the diff must not leave this subtree.
 
 You do **not** commit, and you do **not** write commit bodies or the 繁中 summary —
-the main agent holds the conversation and writes those.
+the Lawspeaker writes those from the conversation's rationale.
 
 ## Input (from the prompt)
 
-- `$SKILL_DIR` — absolute path to `.../skills/commit`. Resolve
+- `$SKILL_DIR` — absolute path to `.../skills/commit`, given by the Lawspeaker. Resolve
   `$SKILL_DIR/scripts/analyze-changes.ts` and `$SKILL_DIR/scripts/commit.ts` under
   it. Never search for a script: you do not see the skill's load-time banner, so a
   path you were not given is a missing input. Report it and stop.
@@ -67,10 +67,22 @@ A rename **must** carry both `oldPath` and `path`, in the same group. Committing
 the new path alone leaves the old path's deletion behind, so the tree ends up with
 both files. The script refuses a plan that splits or drops one half.
 
-Write subjects only: imperative mood, ≤ ~50 characters, no trailing period.
+Write subjects only: imperative mood, ≤ ~50 characters, no trailing period. Give
+each group a `type`; the emoji is derived from it downstream, so do not pick one.
 
 Propose the split you would make even when you suspect it will collapse — the
 shape is not yours to decide, and a collapsed split costs nothing.
+
+### 2a. Order them
+
+Return the groups in the order they should be committed, and say why in `notes`.
+You are the only party that has read the diff, so you are the only one who can see
+that one group's file still references what another group deletes.
+
+**Every commit must build on its own.** A group that deletes a file lands *after*
+the group that removes the last reference to it. The same holds for a renamed
+export, a dropped config key, or a removed registry entry. Order the removal of the
+reference before the removal of the target, every time.
 
 ### 3. Ask for the shape
 
@@ -99,19 +111,19 @@ Report what it prints. Never override it, and never decide the shape yourself.
   "moduleSpread": ["packages/chronicle"],
   "promptPath": "<from script stdout>",
   "groups": [
-    { "emoji": "✨", "type": "feat", "subject": "...", "files": ["..."] }
+    { "type": "feat", "subject": "...", "files": ["..."] }
   ],
-  "notes": ["lockfile folded into chore"]
+  "notes": ["groups ordered so the install roster drops the role before its file goes"]
 }
 ```
 
-Return the groups whatever the shape says. On `"shape": "simple"` the main agent
-merges them into one commit and writes its own subject — that is cheaper and
-better-informed than a second proposal from you.
+Return the groups whatever the shape says. On `"shape": "simple"` the Lawspeaker
+merges them into one commit and writes its own subject — that is cheaper than a
+second proposal from you.
 
 ## Guidelines
 
-- Report facts and groups. The script decides the shape; the main agent writes prose.
+- Report facts, groups, and their order. The script decides the shape; the Lawspeaker writes the prose.
 - `status: "added"` with `staged: false` covers both an untracked file and a
   `git add -N` file. Both are brand-new. Dropping one produces a commit that
   cannot build.

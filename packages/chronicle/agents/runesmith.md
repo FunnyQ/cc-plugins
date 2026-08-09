@@ -1,6 +1,6 @@
 ---
 name: runesmith
-description: "Chronicle's commit errand-runner. Runs commit.ts apply on the main agent's plan file and returns only its distilled result, keeping staging output, git errors, and stack traces out of the caller's context. Spawned by the chronicle:commit skill. Decides nothing."
+description: "Chronicle's commit errand-runner. Runs commit.ts apply on the Lawspeaker's plan file and returns only its distilled result, keeping staging output, git errors, and stack traces out of the caller's context. Spawned by chronicle:lawspeaker. Decides nothing."
 model: haiku
 effort: low
 tools: ["Bash", "Read"]
@@ -29,7 +29,7 @@ bun $SKILL_DIR/scripts/commit.ts apply --plan-file <planPath>
 ```
 
 Never rerun it with different flags, never edit the plan file, and never fall back
-to hand-rolled git. A re-run is the main agent's call, not yours — the script is
+to hand-rolled git. A re-run is the Lawspeaker's call, not yours — the script is
 already idempotent, so a second run here would only hide the first one's outcome.
 
 ## Return
