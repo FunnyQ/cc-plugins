@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.12.1] - 2026-08-09
+
+_tracks tag `chronicle-v0.12.1`_
+
+### Changed
+- The commit flow's grouping check now catches a case the ordering rule alone missed: a file and the file that imports from it, both changed together, where neither commit order leaves a codebase that builds in between. Those files are now merged into one commit instead of being split across two, in both the watcher and the Lawspeaker's own review pass.
+
+### Fixed
+- `git status` parsing could misread a real filename as two entries, or as part of a rename, whenever that filename happened to contain a newline or the literal text ` -> `. Every path-reading git call now uses the `-z` stream format, which cannot be confused this way, so the commit plan's file coverage check no longer rejects a correct plan.
+
 ## [chronicle 0.12.0] - 2026-08-09
 
 _tracks tag `chronicle-v0.12.0`_
