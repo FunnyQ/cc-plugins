@@ -69,7 +69,12 @@ Rules:
    evidence.
 7. Exclude secrets, credentials, personal data, and raw transcript text. Records are
    permanent and shared; the trail they came from was neither.
-8. Bake the group's given `adrNumber` into the H1, as `# ADR-0027:` for `adrNumber` 27.
+8. Keep every record readable on its own. When the body relies on another decision, state
+   the fact in the sentence and cite the record in parentheses. `ADR-NNNN` names where a
+   fact is recorded; it never carries the fact. Records get rewritten and deleted, so a
+   sentence that only points at another file loses its meaning when that file moves. The
+   `Cross-references` section of the template holds the full rule and its test.
+9. Bake the group's given `adrNumber` into the H1, as `# ADR-0027:` for `adrNumber` 27.
    Bake the same number into `proposedPath`, as `docs/adr/<NNNN>-<kebab-title>.md`, with
    `<NNNN>` zero-padded to four digits. Propose the path without creating it. Return the
    drafts only.

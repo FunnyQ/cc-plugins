@@ -84,6 +84,7 @@ Text.
       path: "0002-status.md",
       sections: ["Context", "Evidence", "Decision"],
       evidenceEntries: 3,
+      proseRefs: [],
     });
   });
 
@@ -101,7 +102,25 @@ Text.
       path: "a.md",
       sections: [],
       evidenceEntries: 0,
+      proseRefs: [],
     });
+  });
+
+  test("collects body ADR mentions, deduped and without its own id", () => {
+    const adr = parseAdr(
+      `# ADR-0002: Example
+
+- Status: Accepted
+- Supersedes: ADR-0001
+
+## Context
+
+ADR-0007 ruled this out, and ADR-0002 is the replacement. ADR-0007 again.
+`,
+      "0002-example.md",
+    );
+
+    expect(adr?.proseRefs).toEqual(["ADR-0007"]);
   });
 
   test("rejects missing and malformed H1 headings", () => {

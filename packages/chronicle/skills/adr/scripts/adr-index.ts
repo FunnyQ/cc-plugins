@@ -15,6 +15,11 @@ export type AdrMeta = {
   sections: string[];
   /** Top-level list items under `## Evidence`. 0 when the section is absent or empty. */
   evidenceEntries: number;
+  /**
+   * Other records this one names in its body, excluding the H1, the lifecycle
+   * metadata lines, and its own id. Deduped, in first-appearance order.
+   */
+  proseRefs: string[];
 };
 
 export type BrokenLink = {
@@ -77,6 +82,19 @@ function adrIds(value: string | null): string[] {
     .filter(Boolean);
 }
 
+// Lifecycle links are excluded because brokenLinks already checks them both ways.
+// Reporting the same dead id twice would make one typo look like two problems.
+function proseRefIds(lines: string[], h1: string, selfId: string): string[] {
+  const ids = new Set<string>();
+  for (const line of lines) {
+    if (line === h1 || /^- Supersed(?:es|ed by):/.test(line)) continue;
+    for (const match of line.matchAll(/ADR-\d{4}/g)) {
+      if (match[0] !== selfId) ids.add(match[0]);
+    }
+  }
+  return [...ids];
+}
+
 function parseAdrResult(content: string, path: string): ParseResult {
   const lines = content.split(/\r?\n/);
   const h1 = lines.find((line) => /^# ADR-/.test(line));
@@ -105,10 +123,11 @@ function parseAdrResult(content: string, path: string): ParseResult {
     ? (statusValue as AdrStatus)
     : null;
   const number = Number.parseInt(heading[1], 10);
+  const id = formatAdrId(number);
 
   return {
     adr: {
-      id: formatAdrId(number),
+      id,
       number,
       title: heading[2],
       status,
@@ -118,6 +137,7 @@ function parseAdrResult(content: string, path: string): ParseResult {
       path,
       sections,
       evidenceEntries,
+      proseRefs: proseRefIds(lines, h1, id),
     },
     reason: null,
   };

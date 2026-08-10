@@ -30,9 +30,10 @@ The review lens stays headless unconditionally.
 
 Live mode trades unattended safety for visibility: `--dangerous` is a
 deliberate, explicit cost of running without a human to approve prompts, not
-an oversight. This decision underlies later `relay pending`/`collect`
-timeout work (ADR-0015) and the wait-cap decision (ADR-0014), both of which
-build on the same live-pane path.
+an oversight. This decision underlies two later ones that build on the same
+live-pane path: capping the live-mode wait at a single 9-minute foreground call
+(ADR-0014), and letting a timed-out pane keep waiting through a `relay collect`
+reattach rather than failing at the cap (ADR-0015).
 
 ## Evidence
 
