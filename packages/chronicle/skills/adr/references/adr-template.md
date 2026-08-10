@@ -116,6 +116,32 @@ When an ADR's lifecycle metadata changes, never rewrite its body. The `## Contex
 `## Decision`, and `## Consequences` sections describe what was true when the
 decision was made. Editing them destroys the only record of that historical state.
 
+## Cross-references
+
+A record must read completely on its own. Records are updated and deleted over
+time, so a sentence whose meaning depends on opening another file loses its
+meaning the moment that file changes.
+
+When the body relies on another decision, state the fact you rely on in the
+sentence, then cite the record in parentheses. `ADR-NNNN` names where the fact is
+recorded. It never carries the fact.
+
+- Good: `Following ADR-0019's fix (parallel-wave commits had been fully stopped
+  after one escalation), the old guard was not a safe baseline.`
+- Bad: `ADR-0019 already fixed the guard, so the old baseline was unsafe.`
+
+Apply one test before saving: delete every referenced record, and read the draft
+again. A body that still argues its case passes. A body that now names something
+the reader cannot resolve fails.
+
+This rule governs the body only. The `Supersedes` and `Superseded by` metadata
+lines are the exception, because they are the lifecycle relationship itself
+rather than a shortcut around restating a fact.
+
+A body reference to a record that no longer exists raises the `stale-prose-ref`
+**warning**, not an error. A body written under this rule survives its citation,
+so the repair is to drop the dead pointer, never to rewrite the argument.
+
 ## Evidence format
 
 The Evidence section must hold at least one entry. An empty section triggers the
@@ -154,7 +180,8 @@ both the finding and the measurement without opening anything.
 | `bad-date` | The Date line is present and names a real calendar date in `YYYY-MM-DD`. `2026-99-99` and `2025-02-30` match the shape and are rejected. | Error |
 | `superseded-no-link` | A `Superseded` record carries a `Superseded by:` line. | Error |
 | `deprecated-linked` | A `Deprecated` record carries no successor link. | Error |
-| `link-missing` | Every referenced `ADR-NNNN` names a record that exists. | Error |
+| `link-missing` | Every `ADR-NNNN` on a `Supersedes` or `Superseded by` line names a record that exists. | Error |
 | `link-not-mutual` | Supersession is declared in both directions. | Error |
 | `self-link` | A record never references its own ID. | Error |
+| `stale-prose-ref` | Every `ADR-NNNN` in the body names a record that exists. | Warning |
 | `empty-evidence` | The Evidence section holds at least one entry. | Warning |
