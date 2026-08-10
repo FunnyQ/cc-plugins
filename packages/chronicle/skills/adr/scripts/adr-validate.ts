@@ -23,6 +23,7 @@ export type Violation = {
     | "link-missing"
     | "link-not-mutual"
     | "self-link"
+    | "stale-prose-ref"
     | "empty-evidence"
     | "unreadable";
   severity: Severity;
@@ -209,6 +210,24 @@ export async function validateDir(dir: string): Promise<ValidateResult> {
   }
 
   const pathById = new Map(index.adrs.map((adr) => [adr.id, adr.path]));
+
+  // A warning, not an error: a record that restates the fact it cites still reads
+  // correctly once the cited record is gone. What rots is the pointer, so this
+  // reports where to drop a dead citation without blocking an unrelated batch.
+  for (const adr of index.adrs) {
+    for (const ref of adr.proseRefs) {
+      if (pathById.has(ref)) continue;
+      violations.push(
+        violation(
+          "stale-prose-ref",
+          adr.path,
+          `${adr.id} mentions ${ref}, which does not exist.`,
+          "warning",
+        ),
+      );
+    }
+  }
+
   for (const link of index.brokenLinks) {
     if (link.reason === "self") continue;
     const rule = link.reason === "missing" ? "link-missing" : "link-not-mutual";

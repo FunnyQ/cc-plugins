@@ -15,6 +15,7 @@ function adr(
     links?: string;
     sections?: string[];
     evidence?: string;
+    prose?: string;
   } = {},
 ): string {
   const sections = overrides.sections ?? [
@@ -44,7 +45,11 @@ ${sections
   .map(
     (section) =>
       `## ${section}\n\n${
-        section === "Evidence" ? (overrides.evidence ?? "- Verified") : "Text."
+        section === "Evidence"
+          ? (overrides.evidence ?? "- Verified")
+          : section === "Context"
+            ? (overrides.prose ?? "Text.")
+            : "Text."
       }`,
   )
   .join("\n\n")}
@@ -255,6 +260,70 @@ describe("validateDir", () => {
 
     expect((await validateDir(dir)).violations).toContainEqual(
       expect.objectContaining({ rule: "link-not-mutual" }),
+    );
+  });
+
+  test("reports stale-prose-ref as a warning naming the dead id", async () => {
+    const dir = await tempDir();
+    await writeAdr(
+      dir,
+      "0001-example.md",
+      adr({ prose: "The wait cap (ADR-0099) already ruled this out." }),
+    );
+
+    const result = await validateDir(dir);
+
+    expect(result.ok).toBe(true);
+    expect(result.violations).toContainEqual(
+      expect.objectContaining({
+        rule: "stale-prose-ref",
+        severity: "warning",
+        detail: "ADR-0001 mentions ADR-0099, which does not exist.",
+      }),
+    );
+  });
+
+  test("stays silent on a prose reference to a record that exists", async () => {
+    const dir = await tempDir();
+    await writeAdr(
+      dir,
+      "0001-first.md",
+      adr({
+        id: "ADR-0001",
+        prose: "Plugins never import each other (ADR-0002).",
+      }),
+    );
+    await writeAdr(dir, "0002-second.md", adr({ id: "ADR-0002" }));
+
+    expect((await validateDir(dir)).violations).not.toContainEqual(
+      expect.objectContaining({ rule: "stale-prose-ref" }),
+    );
+  });
+
+  test("leaves a dead lifecycle link to link-missing alone", async () => {
+    const dir = await tempDir();
+    await writeAdr(
+      dir,
+      "0001-example.md",
+      adr({ links: "- Supersedes: ADR-0099" }),
+    );
+
+    const rules = (await validateDir(dir)).violations.map((item) => item.rule);
+
+    expect(rules).toContain("link-missing");
+    expect(rules).not.toContain("stale-prose-ref");
+  });
+
+  test("ignores a record's own id in prose", async () => {
+    const dir = await tempDir();
+    await writeAdr(
+      dir,
+      "0001-example.md",
+      adr({ prose: "ADR-0001 replaces the hand-built page." }),
+    );
+
+    expect((await validateDir(dir)).violations).not.toContainEqual(
+      expect.objectContaining({ rule: "stale-prose-ref" }),
     );
   });
 
