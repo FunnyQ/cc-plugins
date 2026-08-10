@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.13.1] - 2026-08-10
+
+_tracks tag `chronicle-v0.13.1`_
+
+### Added
+- The ADR validator now catches a body's `ADR-NNNN` citations in ordinary prose, not just its `Supersedes:` / `Superseded by:` lines. Deleting a referenced record now surfaces a warning on every draft still citing it, instead of leaving a dangling pointer with no signal.
+
+### Changed
+- ADR drafting now follows a restate-then-cite rule: a citation should point to a source, not carry the fact itself, so a draft's argument still stands even if the cited record is later removed. The template, the codifier's drafting guidance, and ADR-0003 were all updated to this pattern.
+
 ## [chronicle 0.13.0] - 2026-08-10
 
 _tracks tag `chronicle-v0.13.0`_
