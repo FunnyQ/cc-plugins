@@ -68,51 +68,128 @@ beforeEach(async () => {
   repo = await initRepo();
 });
 
-describe("shape", () => {
-  async function shape(...args: string[]) {
-    const result = await $`bun ${SCRIPT} shape ${args}`
+describe("propose", () => {
+  // Whatever analyze-changes resolved; propose only checks it is filled in.
+  const TEMPLATE = "/home/q/.claude/chronicle/commit-template.md";
+
+  // Outside the repo, for the same reason the plan file is.
+  async function writeProposal(draft: unknown): Promise<string> {
+    const path = join(
+      await mkdtemp(join(tmpdir(), "chronicle-proposal-")),
+      "groups.json",
+    );
+    await writeFile(path, JSON.stringify(draft, null, 2));
+    return path;
+  }
+
+  async function propose(draft: unknown) {
+    const path = await writeProposal(draft);
+    const result = await $`bun ${SCRIPT} propose --file ${path}`
       .cwd(repo)
       .quiet()
       .nothrow();
     return {
       exitCode: result.exitCode,
       json: JSON.parse(result.stdout.toString().trim() || "null"),
+      settled: async () => JSON.parse(await Bun.file(path).text()),
     };
   }
 
-  test("returns the decision without touching the repo", async () => {
+  test("settles the shape in the file, not just on stdout", async () => {
     await baseCommit();
     await seed("a.ts", "a\n");
+    await seed("b.md", "b\n");
 
-    const { exitCode, json } = await shape(
-      "--types",
-      "feat,docs",
-      "--total-files",
-      "2",
-      "--modules",
-      ".",
-    );
+    const { exitCode, json, settled } = await propose({
+      groups: [
+        { type: "feat", subject: "add a", files: ["a.ts"] },
+        { type: "docs", subject: "add b", files: ["b.md"] },
+      ],
+      totalFiles: 2,
+      moduleSpread: ["."],
+      promptPath: TEMPLATE,
+      notes: ["docs last"],
+    });
+
     expect(exitCode).toBe(0);
     expect(json.shape).toBe("atomic");
+    expect(await settled()).toEqual(json);
+    // The groups keep the watcher's order, and nothing was committed.
+    expect(json.groups.map((group: any) => group.type)).toEqual([
+      "feat",
+      "docs",
+    ]);
+    expect(json.notes).toEqual(["docs last"]);
     expect(await subjects()).toEqual(["🔧 chore: init"]);
   });
 
   test("simple mode overrides every signal", async () => {
     await baseCommit();
-    const { json } = await shape(
-      "--types",
-      "feat,fix,docs",
-      "--total-files",
-      "20",
-      "--mode",
-      "simple",
-    );
-    expect(json).toEqual({ shape: "simple", reasons: [] });
+    await seed("a.ts", "a\n");
+    await seed("b.md", "b\n");
+
+    const { json } = await propose({
+      mode: "simple",
+      groups: [
+        { type: "feat", subject: "add a", files: ["a.ts"] },
+        { type: "docs", subject: "add b", files: ["b.md"] },
+      ],
+      totalFiles: 20,
+      promptPath: TEMPLATE,
+    });
+    expect(json.shape).toBe("simple");
+    expect(json.reasons).toEqual([]);
   });
 
-  test("refuses with no types", async () => {
+  test("refuses a draft that dropped a changed file", async () => {
     await baseCommit();
-    const result = await $`bun ${SCRIPT} shape`.cwd(repo).quiet().nothrow();
+    await seed("a.ts", "a\n");
+    await seed("b.md", "b\n");
+
+    const { exitCode, json } = await propose({
+      groups: [{ type: "feat", subject: "add a", files: ["a.ts"] }],
+      promptPath: TEMPLATE,
+    });
+    expect(exitCode).toBe(2);
+    expect(json.missing).toEqual(["b.md"]);
+  });
+
+  test("refuses a structurally broken draft with per-field errors", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+
+    const { exitCode, json } = await propose({
+      shape: "atomic",
+      groups: [{ type: "feat", files: ["a.ts"] }],
+      promptPath: TEMPLATE,
+    });
+    expect(exitCode).toBe(2);
+    expect(json.errors).toHaveLength(2);
+  });
+
+  test("refuses a proposal file inside the repo", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed(
+      "groups.json",
+      JSON.stringify({
+        groups: [{ type: "feat", subject: "add a", files: ["a.ts"] }],
+        promptPath: TEMPLATE,
+      }),
+    );
+
+    const result =
+      await $`bun ${SCRIPT} propose --file ${join(repo, "groups.json")}`
+        .cwd(repo)
+        .quiet()
+        .nothrow();
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout.toString()).toContain("outside the repo");
+  });
+
+  test("refuses with no file", async () => {
+    await baseCommit();
+    const result = await $`bun ${SCRIPT} propose`.cwd(repo).quiet().nothrow();
     expect(result.exitCode).toBe(2);
   });
 });

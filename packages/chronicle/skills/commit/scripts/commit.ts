@@ -3,17 +3,21 @@
 /**
  * The commit executor.
  *
- * Everything a commit run does mechanically — decide the shape, check the plan
- * covers the changeset, stage, commit, verify — happens here, in one process,
- * from one file on disk. Only two judgements are left outside it: grouping the
- * diff (the watcher) and writing the prose (the main agent, which is the only
- * party that holds the "why").
+ * Everything a commit run does mechanically — check the groups, decide the shape,
+ * check the plan covers the changeset, stage, commit, verify — happens here, in
+ * one process, from one file on disk. Only two judgements are left outside it:
+ * grouping the diff (the watcher) and writing the prose (the main agent, which
+ * is the only party that holds the "why").
+ *
+ * Both agents hand off through a file, never through their final message:
+ * `propose` takes the watcher's draft and writes the settled proposal back over
+ * it, and `apply` takes the plan the Lawspeaker built from that proposal.
  *
  * Usage:
- *   bun commit.ts shape --types feat,fix --total-files 7 --modules a,b [--mode simple]
+ *   bun commit.ts propose --file <path>      # → { ok, shape, reasons, groups, … }
  *   bun commit.ts apply --plan-file <path>   # → { ok, executed, skipped, verify }
  *
- * Exit codes: 0 done · 2 refused (bad plan, or a shape git will not accept)
+ * Exit codes: 0 done · 2 refused (bad proposal or plan, or a shape git will not accept)
  *             3 committed but the changeset did not land intact
  *
  * `apply` re-runs cleanly. It reads how much of the plan is already at HEAD off
@@ -22,10 +26,10 @@
  */
 
 import { $ } from "bun";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import {
   committedPathsSince,
   parseStatus,
@@ -38,9 +42,11 @@ import {
   decideShape,
   resolveResumption,
   validatePlan,
+  validateProposalDraft,
   type CommitPlan,
   type LogEntry,
   type PlannedCommit,
+  type ProposalDraft,
 } from "./commit-plan";
 
 /** The one artifact `apply` reads: the shaped plan, prose and all. */
@@ -72,25 +78,52 @@ async function gitOrEmpty(...args: string[]): Promise<string> {
   return await git(...args).catch(() => "");
 }
 
-async function readPlanFile(path: string): Promise<PlanFile> {
-  // A plan file inside the repo is itself an unassigned change, and the coverage
-  // check would then reject the plan for not planning its own plan.
+/**
+ * Whether a path lands inside the repo, symlinked prefixes and all.
+ *
+ * Both sides are resolved: `main` chdir'd to the git root, which the OS may
+ * report through its real path (`/private/var/…`) while the caller passes the
+ * symlinked one (`/var/…`). Comparing the raw strings would call an in-repo file
+ * external and let it through the guard below.
+ */
+function insideRepo(absolute: string): boolean {
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  };
+  const root = real(process.cwd());
+  const holder = real(dirname(absolute));
+  return holder === root || holder.startsWith(`${root}${sep}`);
+}
+
+/**
+ * Reads a hand-off file, refusing one written inside the repo.
+ *
+ * Both hand-off files — the watcher's proposal and the Lawspeaker's plan — are
+ * themselves unassigned changes when they live in the tree, and the coverage
+ * check would then reject the plan for not planning its own plan.
+ */
+async function readHandoff(path: string, kind: string): Promise<unknown> {
   const absolute = resolve(path);
-  if (absolute.startsWith(`${process.cwd()}${sep}`)) {
-    refuse(`the plan file must live outside the repo, not at ${absolute}`);
+  if (insideRepo(absolute)) {
+    refuse(`the ${kind} file must live outside the repo, not at ${absolute}`);
   }
 
   const file = Bun.file(absolute);
-  if (!(await file.exists())) refuse(`no plan file at ${path}`);
+  if (!(await file.exists())) refuse(`no ${kind} file at ${path}`);
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(await file.text());
+    return JSON.parse(await file.text());
   } catch (error) {
-    refuse(`plan file is not JSON — ${(error as Error).message}`);
+    refuse(`${kind} file is not JSON — ${(error as Error).message}`);
   }
+}
 
-  const plan = parsed as PlanFile;
+async function readPlanFile(path: string): Promise<PlanFile> {
+  const plan = (await readHandoff(path, "plan")) as PlanFile;
   if (!Array.isArray(plan?.commits) || plan.commits.length === 0) {
     refuse("plan file holds no commits");
   }
@@ -197,42 +230,58 @@ async function writeCommit(
 }
 
 /**
- * Scalars, not a file: the shape is settled before any prose exists, and the
- * decision needs only the group types, the file count, and the module spread.
- * That lets the watcher answer it in the same turn it proposes the groups.
+ * Validates the watcher's proposal and settles the shape, in place.
+ *
+ * The groups are a file rather than a return value because an agent's final
+ * message is not a reliable channel — the watcher is a Haiku agent, and a run
+ * that answered in prose used to strand the whole flow. The file is the
+ * hand-off; this command is what makes it trustworthy, and the Lawspeaker reads
+ * the same path whatever the watcher said.
+ *
+ * Refusing rather than repairing is deliberate: the watcher is the only party
+ * that read the diff, so a draft that drops a file has to go back to it.
  */
-function shapeMain(argv: string[]): void {
-  const flag = (name: string): string => {
-    const index = argv.indexOf(`--${name}`);
-    return index === -1 ? "" : (argv[index + 1] ?? "");
-  };
-  const list = (name: string): string[] =>
-    flag(name)
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+async function proposeMain(proposalPath: string): Promise<void> {
+  const draft = (await readHandoff(proposalPath, "proposal")) as ProposalDraft;
 
-  const types = list("types");
-  if (types.length === 0) {
-    console.error(
-      "usage: commit.ts shape --types <a,b> [--total-files <n>] [--modules <a,b>] [--mode auto|simple]",
-    );
-    process.exit(2);
+  const errors = validateProposalDraft(draft);
+  if (errors.length > 0) {
+    refuse("the proposal is not usable — fix the file and re-run", { errors });
   }
 
-  emit(
-    decideShape(types, {
-      mode: flag("mode") === "simple" ? "simple" : "auto",
-      totalFiles: Number(flag("total-files")) || types.length,
-      moduleSpread: list("modules"),
-    }),
+  const groups = draft.groups;
+  const coverage = validatePlan(
+    { shape: "atomic", commits: groups },
+    await readChangeset(),
   );
+  if (!coverage.ok) {
+    refuse("the groups do not cover the changeset exactly once", coverage);
+  }
+
+  const mode = draft.mode === "simple" ? "simple" : "auto";
+  const decision = decideShape(
+    groups.map((group) => group.type),
+    {
+      mode,
+      totalFiles:
+        Number(draft.totalFiles) ||
+        new Set(groups.flatMap((g) => g.files)).size,
+      moduleSpread: draft.moduleSpread ?? [],
+    },
+  );
+
+  const proposal = { ok: true, ...decision, ...draft, mode };
+  await Bun.write(
+    resolve(proposalPath),
+    `${JSON.stringify(proposal, null, 2)}\n`,
+  );
+  emit(proposal);
 }
 
 async function applyMain(planPath: string): Promise<void> {
   const plan = await readPlanFile(planPath);
   if (plan.shape !== "simple" && plan.shape !== "atomic") {
-    refuse("plan file has no shape — run `commit.ts shape` first");
+    refuse("plan file has no shape — copy it from the settled proposal");
   }
   if (plan.shape === "simple" && plan.commits.length > 1) {
     refuse(`shape is simple but the plan holds ${plan.commits.length} commits`);
@@ -311,16 +360,26 @@ async function main(): Promise<void> {
   if (repoRoot) process.chdir(repoRoot);
 
   const command = process.argv[2];
-  if (command === "shape") return shapeMain(process.argv);
+  const flagged = (name: string): string => {
+    const index = process.argv.indexOf(`--${name}`);
+    return index === -1 ? "" : (process.argv[index + 1] ?? "");
+  };
 
-  const flagIndex = process.argv.indexOf("--plan-file");
-  const planPath = flagIndex === -1 ? "" : (process.argv[flagIndex + 1] ?? "");
-  if (command !== "apply" || !planPath) {
+  const usage = (): never => {
     console.error(
-      "usage: commit.ts shape --types <a,b> [...]\n       commit.ts apply --plan-file <path>",
+      "usage: commit.ts propose --file <path>\n       commit.ts apply --plan-file <path>",
     );
     process.exit(2);
+  };
+
+  if (command === "propose") {
+    const proposalPath = flagged("file");
+    if (!proposalPath) usage();
+    return await proposeMain(proposalPath);
   }
+
+  const planPath = flagged("plan-file");
+  if (command !== "apply" || !planPath) usage();
 
   return await applyMain(planPath);
 }

@@ -161,6 +161,131 @@ export function validatePlan(
 }
 
 /**
+ * What the watcher writes to disk: the groups, in commit order, plus the scalars
+ * the shape decision needs. `shape` and `ok` are absent on purpose — the script
+ * adds them, and a draft that already carries them was copied from the schema
+ * rather than derived from the diff.
+ */
+export type ProposalDraft = {
+  groups: CommitGroup[];
+  /** The commit template, which the Lawspeaker reads. From analyze-changes stdout. */
+  promptPath: string;
+  mode?: "auto" | "simple";
+  totalFiles?: number;
+  elidedFiles?: number;
+  /** Top-level modules the changeset spans — repo-shaped, so the watcher judges it. */
+  moduleSpread?: string[];
+  /** Why the groups are in this order. */
+  notes?: string[];
+  /** Set alone, with no groups, when there is nothing to commit. */
+  nothingToCommit?: boolean;
+};
+
+function isFilledString(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Whether a proposal draft is structurally usable, as a list of complaints.
+ *
+ * The watcher is a Haiku agent writing JSON by hand, so every field here has a
+ * plausible way of arriving wrong: a group without files, an absolute path, the
+ * shape it was told not to decide. Saying exactly what is wrong lets it fix the
+ * file and re-run instead of handing the Lawspeaker something half-formed.
+ *
+ * Coverage of the changeset is `validatePlan`'s job — it needs git, this does not.
+ */
+export function validateProposalDraft(raw: unknown): string[] {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return ["the proposal must be a JSON object"];
+  }
+
+  const draft = raw as Record<string, unknown>;
+  const errors: string[] = [];
+
+  for (const key of ["shape", "reasons", "ok"]) {
+    if (key in draft) {
+      errors.push(`remove \`${key}\` — the script decides it, not you`);
+    }
+  }
+
+  if (
+    draft.mode !== undefined &&
+    draft.mode !== "auto" &&
+    draft.mode !== "simple"
+  ) {
+    errors.push('`mode` must be "auto" or "simple"');
+  }
+
+  // Required: the Lawspeaker reads the commit template from it, and it fails
+  // there — past the point where re-running the watcher is still an option.
+  if (!isFilledString(draft.promptPath)) {
+    errors.push(
+      "`promptPath` is missing — copy it from analyze-changes stdout",
+    );
+  }
+
+  for (const key of ["moduleSpread", "notes"]) {
+    const value = draft[key];
+    if (value === undefined) continue;
+    if (
+      !Array.isArray(value) ||
+      value.some((item) => typeof item !== "string")
+    ) {
+      // A bare string survives `.length` and then throws inside decideShape's
+      // join, which reaches the watcher as a JS error it cannot act on.
+      errors.push(`\`${key}\` must be an array of strings`);
+    }
+  }
+
+  for (const key of ["totalFiles", "elidedFiles"]) {
+    const value = draft[key];
+    if (value === undefined) continue;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      errors.push(`\`${key}\` must be a count, not ${JSON.stringify(value)}`);
+    }
+  }
+
+  if (!Array.isArray(draft.groups) || draft.groups.length === 0) {
+    errors.push("`groups` must be a non-empty array, in commit order");
+    return errors;
+  }
+
+  for (const [index, entry] of draft.groups.entries()) {
+    const at = `groups[${index}]`;
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      errors.push(`${at} must be an object`);
+      continue;
+    }
+
+    const candidate = entry as Record<string, unknown>;
+    if (!isFilledString(candidate.type)) {
+      errors.push(`${at}.type is missing — feat / fix / docs / chore / …`);
+    }
+    if (!isFilledString(candidate.subject)) {
+      errors.push(`${at}.subject is missing — imperative, no trailing period`);
+    }
+
+    const files = candidate.files;
+    if (!Array.isArray(files) || files.length === 0) {
+      errors.push(
+        `${at}.files must be a non-empty array of repo-relative paths`,
+      );
+      continue;
+    }
+    for (const path of files) {
+      if (!isFilledString(path)) {
+        errors.push(`${at}.files holds a non-string path`);
+      } else if ((path as string).startsWith("/")) {
+        errors.push(`${at}.files holds an absolute path: ${path}`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
  * The template's type → emoji table, as code.
  *
  * An agent asked for an emoji alongside a type will sometimes return the type

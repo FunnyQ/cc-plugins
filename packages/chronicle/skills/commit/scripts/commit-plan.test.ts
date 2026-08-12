@@ -4,6 +4,7 @@ import {
   decideShape,
   resolveResumption,
   validatePlan,
+  validateProposalDraft,
   type CommitGroup,
   type CommitPlan,
 } from "./commit-plan";
@@ -172,6 +173,103 @@ describe("validatePlan", () => {
       { path: "a.ts", staged: false, status: "modified" },
     ]);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("validateProposalDraft", () => {
+  const draft = {
+    groups: [{ type: "feat", subject: "add a", files: ["a.ts"] }],
+    mode: "auto",
+    totalFiles: 1,
+    elidedFiles: 0,
+    moduleSpread: ["pkg"],
+    promptPath: "/home/q/.claude/commit-template.md",
+    notes: ["only one group"],
+  };
+
+  test("accepts a well-formed draft", () => {
+    expect(validateProposalDraft(draft)).toEqual([]);
+  });
+
+  test("requires promptPath — the Lawspeaker cannot write prose without it", () => {
+    const { promptPath, ...without } = draft;
+    expect(validateProposalDraft(without)).toHaveLength(1);
+    expect(validateProposalDraft({ ...draft, promptPath: "" })).toHaveLength(1);
+  });
+
+  test("rejects a moduleSpread that is not a list of strings", () => {
+    // A bare string passes `.length` and then throws inside decideShape's join.
+    expect(
+      validateProposalDraft({ ...draft, moduleSpread: "pkg" }),
+    ).toHaveLength(1);
+    expect(validateProposalDraft({ ...draft, notes: "one note" })).toHaveLength(
+      1,
+    );
+    expect(validateProposalDraft({ ...draft, moduleSpread: [1] })).toHaveLength(
+      1,
+    );
+  });
+
+  test("rejects a count that is not a non-negative number", () => {
+    expect(
+      validateProposalDraft({ ...draft, totalFiles: "seven" }),
+    ).toHaveLength(1);
+    expect(validateProposalDraft({ ...draft, elidedFiles: -1 })).toHaveLength(
+      1,
+    );
+  });
+
+  test("keeps the optional fields optional", () => {
+    expect(
+      validateProposalDraft({
+        groups: draft.groups,
+        promptPath: draft.promptPath,
+      }),
+    ).toEqual([]);
+  });
+
+  test("rejects anything that is not an object", () => {
+    expect(validateProposalDraft([draft])).toHaveLength(1);
+    expect(validateProposalDraft("groups")).toHaveLength(1);
+  });
+
+  test("rejects a draft that decided the shape itself", () => {
+    const errors = validateProposalDraft({ ...draft, shape: "atomic" });
+    expect(errors).toEqual(["remove `shape` — the script decides it, not you"]);
+  });
+
+  test("rejects a draft that pre-declared success", () => {
+    expect(validateProposalDraft({ ...draft, ok: true })).toHaveLength(1);
+  });
+
+  test("rejects empty or missing groups", () => {
+    expect(validateProposalDraft({ ...draft, groups: [] })).toHaveLength(1);
+    const { groups, ...without } = draft;
+    expect(validateProposalDraft(without)).toHaveLength(1);
+  });
+
+  test("names the group and field that are wrong", () => {
+    const errors = validateProposalDraft({
+      ...draft,
+      groups: [
+        { type: "feat", subject: "add a", files: ["a.ts"] },
+        { type: " ", files: [] },
+      ],
+    });
+    expect(errors).toHaveLength(3);
+    expect(errors.every((error) => error.startsWith("groups[1]"))).toBe(true);
+  });
+
+  test("rejects an absolute path", () => {
+    const errors = validateProposalDraft({
+      ...draft,
+      groups: [{ type: "feat", subject: "add a", files: ["/tmp/a.ts"] }],
+    });
+    expect(errors[0]).toContain("absolute path");
+  });
+
+  test("rejects an unknown mode", () => {
+    expect(validateProposalDraft({ ...draft, mode: "atomic" })).toHaveLength(1);
   });
 });
 
