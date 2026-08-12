@@ -75,7 +75,7 @@ describe("setup-codex-agents", () => {
         "skald",
         "messenger",
         "skirnir",
-      "annalist",
+        "annalist",
         "lorekeeper",
         "gleaner",
         "reckoner",
@@ -95,7 +95,7 @@ describe("setup-codex-agents", () => {
     expect(installed.watcher).toContain('model = "gpt-5.6-luna"');
     expect(installed.runesmith).toContain('model = "gpt-5.6-luna"');
     expect(installed.runesmith).toContain("commit.ts apply");
-    expect(installed.watcher).toContain("commit.ts shape");
+    expect(installed.watcher).toContain("commit.ts propose");
     expect(installed.storykeeper).toContain('model = "gpt-5.6-terra"');
     expect(installed.storykeeper).toContain("chronicle_skald");
     expect(installed.storykeeper).toContain("chronicle_messenger");
