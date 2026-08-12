@@ -1,5 +1,18 @@
 # Changelog
 
+## [chronicle 0.13.2] - 2026-08-12
+
+_tracks tag `chronicle-v0.13.2`_
+
+### Added
+- `commit.ts` gained a `propose --file <path>` command: the watcher now writes its proposed commit groups straight to a file the Lawspeaker names, instead of relying on its final chat reply. A watcher that answers in prose no longer strands the commit flow.
+
+### Fixed
+- Fixed a macOS-only bug where the outside-repo guard could be fooled by the `/var` ↔ `/private/var` symlink, letting a hand-off file *inside* the repo pass as if it were outside.
+
+### Changed
+- The old `shape` subcommand is gone, replaced end to end by the file-backed `propose` hand-off; the Lawspeaker and watcher agents (both Claude and Codex configs) and the commit skill docs now describe this protocol instead.
+
 ## [chronicle 0.13.1] - 2026-08-10
 
 _tracks tag `chronicle-v0.13.1`_
