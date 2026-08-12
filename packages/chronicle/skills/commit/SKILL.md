@@ -12,10 +12,11 @@ argument-hint: "[simple]"
 
 # Chronicle Commit
 
-A commit run is a plan file and one script. `scripts/commit.ts` decides the shape,
-checks the plan covers the changeset, stages, commits, and verifies — in one
-process, off one artifact on disk. Re-running it finishes an interrupted run
-instead of duplicating it.
+A commit run is two files and one script. `scripts/commit.ts` checks the watcher's
+proposal file and decides the shape, then checks the plan file covers the
+changeset, stages, commits, and verifies. Both hand-offs are files on disk rather
+than agent replies, so a child that answers in prose costs nothing. Re-running
+`apply` finishes an interrupted run instead of duplicating it.
 
 Spawn ONE **Lawspeaker**. It owns the flow: it spawns a cheap Haiku watcher to read
 the diff, orders the commits, writes the plan file, then spawns a cheap Haiku
@@ -27,7 +28,7 @@ of the main conversation.
 ```
 main agent  (holds the conversation = the "why")
   └─ chronicle:lawspeaker   (subagent_type — a nested custom agent, NOT a fork)
-       ├─ chronicle:watcher  (Haiku) — reads the diff, returns ordered groups + the script's shape
+       ├─ chronicle:watcher  (Haiku) — reads the diff, writes the ordered groups to the proposal file
        ├─ Lawspeaker orders the commits and writes the plan file's prose
        └─ chronicle:runesmith (Haiku) — runs commit.ts apply, returns the distilled result
 ```

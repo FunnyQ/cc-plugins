@@ -26,8 +26,8 @@ runesmith runs the script.
 
 ## Child protocol
 
-Spawn exactly one watcher, then one runesmith, in that order. Never spawn helpers,
-replacements, or both children together. Never pass a child a `name` — these are
+Spawn one watcher, then one runesmith, in that order — a second of either only on
+the one failure its own step allows. Never spawn helpers or both children together. Never pass a child a `name` — these are
 nested subagents, not a team. Do not inspect scripts.
 
 After each `Agent()` call:
@@ -42,16 +42,26 @@ Never treat a receipt as a result. Never report unverified success.
 
 ### 1. Watcher
 
+Pick the proposal path first — an absolute path **outside the repo**, at
+`/tmp/chronicle/commit/groups-<something distinctive>.json` — and hand it over:
+
 ```
 Agent({
   subagent_type: "chronicle:watcher",
-  prompt: "$SKILL_DIR=<...>. mode=<auto|simple>. Follow your agent instructions fully."
+  prompt: "$SKILL_DIR=<...>. $PROPOSAL_PATH=<the path you just picked>. mode=<auto|simple>. Follow your agent instructions fully."
 })
 ```
 
-You get back `shape`, `reasons`, `groups`, `totalFiles`, `elidedFiles`,
-`moduleSpread`, `promptPath`, and `notes`. `nothingToCommit` — or `totalFiles: 0` —
-means report `nothing to commit` and stop.
+**`Read` that path. It is the hand-off, not the watcher's message.** A watcher that
+answered in prose still did the work, and its reply is at most a hint about where to
+look. Never rebuild the groups from what it said.
+
+The file holds `ok`, `shape`, `reasons`, `groups`, `totalFiles`, `elidedFiles`,
+`moduleSpread`, `promptPath`, and `notes`.
+
+- `nothingToCommit` — or `totalFiles: 0` — → report `nothing to commit` and stop.
+- Anything but `ok: true` → the script never accepted these groups. Spawn the
+  watcher once more with the same path. Fail if the second file is no better.
 
 **The shape came from `commit.ts`. Do not second-guess it**, and do not re-derive it
 from the signals yourself.
@@ -66,8 +76,8 @@ The trap is a reference outliving its target. A group that deletes a file must l
 *after* the group that removes the last reference to it, never before. The same
 holds for a renamed export, a dropped config key, or a registry entry.
 
-The watcher orders its groups and says why. Check that ordering rather than trusting
-it. When a group's ordering looks wrong and the watcher's note does not settle it,
+The watcher orders its groups in the proposal file and says why in `notes`. Check
+that ordering rather than trusting it. When a group's ordering looks wrong and the watcher's note does not settle it,
 `Read` the specific file to confirm before you move it. Reorder freely — the
 grouping is the watcher's, the sequence is yours.
 
@@ -86,8 +96,11 @@ may have split one of its "independent" changes across two commits.
 Read `promptPath` — the commit template, which the user may have overridden.
 
 Write the plan to an absolute path **outside the repo**, at
-`/tmp/chronicle/commit/plan-<something distinctive>.json`. A plan file inside the
-repo is itself an unassigned change, and `apply` refuses it.
+`/tmp/chronicle/commit/plan-<something distinctive>.json` — a new file, never the
+proposal path. A plan file inside the repo is itself an unassigned change, and
+`apply` refuses it.
+
+Carry `shape` over from the proposal verbatim.
 
 ```ts
 type PlanFile = {
