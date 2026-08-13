@@ -1,6 +1,6 @@
 ---
 name: flightplan
-version: 0.8.0
+version: 0.9.0
 description: >-
   Heavyweight interviewer that writes a multi-file spec artifact to disk —
   docs/<topic>/PLAN.md plus a tasks/ tree for sub-agents to execute later.
@@ -41,7 +41,29 @@ The output is three layers:
 
 Call `EnterPlanMode` immediately, before any text output or question. Skip if already in plan mode.
 
-### Step 2 — Interview until shared understanding
+### Step 2 — Confirm the run options
+
+Ask these **before the interview**, in one `AskUserQuestion` call. A question asked an hour later lands on a user who has stopped tracking the details, so every choice the run needs gets settled while attention is highest. After the plan is approved in Step 6, the rest of the run is unattended.
+
+**Review engine** — who critiques the written tree in Step 7. All three share one source of criteria; only the reviewer changes.
+
+1. **Codex (Recommended)** — cross-vendor critique an all-Claude author can't produce.
+2. **OpenCode** — also cross-vendor; pick it to use opencode's models.
+3. **Opus** — a fresh context-less Claude reviewer; needs no external CLI.
+
+**Review depth** — how many review→fix cycles Step 7 runs.
+
+| Tier | Fits | Floor | Checkpoint |
+|---|---|---|---|
+| **Light** | ≤ 5 tasks, one bucket | 2 | 3 |
+| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 |
+| **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 |
+
+**Neither number caps the loop.** The floor is the minimum before a clean pass may end it. The checkpoint is where the loop *changes tactics* if blocking findings are still arriving — not where it quits. Step 7 owns that rule; a blocking defect is never shipped because a counter expired. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
+
+Carry both answers to Step 7 and do not re-ask them there. The tier is a guess about a tree that doesn't exist yet — Step 5 restates it beside the finished task index, which is the user's one chance to correct it. After that, honor the pick and note any tier mismatch in the Step 8 recap.
+
+### Step 3 — Interview until shared understanding
 
 **Mission**: don't stop until both sides understand every part of the plan. Treat the design as a tree of decisions and walk one branch at a time. There is no round cap — stop when the tree is fully walked, not when a counter expires.
 
@@ -70,15 +92,17 @@ Call `EnterPlanMode` immediately, before any text output or question. Skip if al
 
 **For writing topics**, translate: Architecture → outline/section structure, Tech constraints → style decisions, Failure modes → revision and review strategy. Drop what doesn't apply.
 
-### Step 3 — Draft PLAN.md inside plan mode
+### Step 4 — Draft PLAN.md inside plan mode
 
 Follow `references/plan-template.md`. PLAN.md carries all decisions, requirements, constraints, bucketing rationale, and the task index. Show its full content via the plan so the user can review it.
 
-### Step 4 — Exit plan mode
+### Step 5 — Exit plan mode
 
 Call `ExitPlanMode` once PLAN.md is drafted. Always exit, even with open questions — record those in PLAN.md's "Open Questions".
 
-### Step 5 — On approval, write the files
+Restate the Step 2 options — engine and depth tier — in one line as part of the plan, right beside the task index. The tier was picked before the task count existed, so this is where a wrong guess gets caught. This is the last decision point: Steps 6–8 ask nothing.
+
+### Step 6 — On approval, write the files
 
 **Approval** is explicit acceptance: clicks approve, types "yes/approved/go ahead", or equivalent. Silence, "looks ok-ish", and "but can you also…" are **not** approval — keep revising, and write no files until the user accepts.
 
@@ -95,7 +119,7 @@ Either way, never leave a half-written tree.
    ```bash
    bun "$SCRIPTS"/scaffold.ts <slug> <bucket1>,<bucket2>,...,review
    ```
-   Creates `tasks/_context/` and one dir per bucket. The root is created non-recursively, so a slug created between the Step 2 check and now throws EEXIST instead of silently overwriting.
+   Creates `tasks/_context/` and one dir per bucket. The root is created non-recursively, so a slug created between the Step 3 check and now throws EEXIST instead of silently overwriting.
 
    **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
@@ -139,13 +163,13 @@ Either way, never leave a half-written tree.
    ```bash
    bun "$SCRIPTS"/build-readme.ts docs/<slug>/tasks
    ```
-   It fails loudly on malformed or duplicate-ref tasks rather than dropping them, and preserves the human-authored prologue/epilogue between the generated markers. Two of those sections are yours to fill, and the template ships them as placeholder comments that will otherwise be delivered as-is: **`## Where to start`** (name the first task file) and **`## Known gaps`**. `tasks/README.md` is what an executor opens, so a gap recorded only in PLAN.md never reaches them. Revisit both after Step 6 — most gaps surface during the review loop, not the interview.
+   It fails loudly on malformed or duplicate-ref tasks rather than dropping them, and preserves the human-authored prologue/epilogue between the generated markers. Two of those sections are yours to fill, and the template ships them as placeholder comments that will otherwise be delivered as-is: **`## Where to start`** (name the first task file) and **`## Known gaps`**. `tasks/README.md` is what an executor opens, so a gap recorded only in PLAN.md never reaches them. Revisit both after Step 7 — most gaps surface during the review loop, not the interview.
 
-### Step 6 — Review the written artifact (engine-selectable; iterate to convergence)
+### Step 7 — Review the written artifact (engine and depth chosen in Step 2; iterate to convergence)
 
 Once lint passes, run an independent review over the whole tree, then **loop**: review → fix → re-review. This is a mandatory content-quality gate, a different lens from `lint-task.ts`'s structural checks. Cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects here, not nitpicks.
 
-**Pick the engine first** via `AskUserQuestion`. All three share one source of criteria — the 7-point checklist baked into `review-plan.ts`. Only *who critiques* changes.
+**Run the engine the user picked in Step 2 — do not ask again.** Ask here only when Step 2 never happened (a resumed or handed-over session). All three share one source of criteria — the 7-point checklist baked into `review-plan.ts`. Only *who critiques* changes.
 
 - **Codex** (default) — the cross-vendor signal an all-Claude author can't produce:
   ```bash
@@ -155,26 +179,34 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
   ```bash
   bun "$SCRIPTS"/review-plan.ts docs/<slug> --engine opencode   # optional: --model <provider/model>
   ```
-  Both bundle the plan files, so the scope is exactly the tree regardless of other uncommitted changes. If the CLI isn't installed the script exits 0 with a warning — skip the gate, note it as a Known gap in `tasks/README.md`, and go to Step 7.
+  Both bundle the plan files, so the scope is exactly the tree regardless of other uncommitted changes. If the CLI isn't installed the script exits 0 with a warning — skip the gate, note it as a Known gap in `tasks/README.md`, and go to Step 8.
 - **Opus** — a strong Claude reviewer, but **you wrote this plan, so you must not review it yourself**; author bias defeats the gate. Each pass:
   1. Capture the same bundle the CLIs get: `bun "$SCRIPTS"/review-plan.ts docs/<slug> --print`
-  2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."* **Omit `subagent_type`** — the reviewer must start context-less. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 5's fan-out).
+  2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."* **Omit `subagent_type`** — the reviewer must start context-less. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out).
   3. Take the findings back to the loop. A fresh subagent each pass keeps reviewer ≠ author — the same anti-bias split autopilot uses.
 
 **Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings; the loop is where most of the quality comes from, because the first pass catches the loud problems and the *revised* plan then exposes what they were masking. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap in `tasks/README.md` with the reason, and don't re-fix it when a later pass raises it again.
 
-**How many passes, within bounds:**
+**Sort every finding into two buckets before deciding anything:**
 
-- **At least 2** full review→fix cycles. The second, on the improved plan, is the high-value one.
-- **Keep going** while a pass still surfaces *material* findings.
-- **Stop when a pass comes back clean** — only nitpicks or already-recorded intent. That's the "plan is complete" signal.
-- **Ceiling ~4–5.** Past that it's usually over-polishing. Bank remaining real items as Known gaps in `tasks/README.md` and move on.
+- **P1 — blocks execution.** A missing or contradicted decision, two files that disagree, an acceptance criterion nobody can verify, a dependency edge the executor cannot satisfy, a task that can't be done from `_context/` plus its own file. An executor hits a P1 and stalls or guesses.
+- **P2 — quality.** Wording, ordering, a criterion that could be sharper, a task that could split more cleanly. An executor ships anyway.
 
-### Step 7 — Stop. Do not execute.
+**The loop is gated on P1, not on a round number.** A pass at round 12 that finds a real P1 has just paid for itself; the round count is evidence the plan was harder than the tier guessed, not a reason to stop.
+
+- **Never fewer than floor passes.** The second cycle, on the improved plan, is the high-value one — the first catches the loud problems, and only the revision exposes what they were masking.
+- **Never stop with an open P1.** No counter overrides this.
+- **Stop at the first P1-clean pass at or past the floor.** P2-only findings — or already-recorded intent — mean the plan is done. Apply the cheap ones, bank the rest as Known gaps, and move on. This is the normal exit.
+- **At the checkpoint, if P1s are still arriving, stop patching files and re-cut.** Repeated P1s that far in are symptoms, not defects: the decomposition, a bucket boundary, or a PLAN-level decision is wrong. Fix it at PLAN.md / `_context/` / bucket level, re-run `lint-task.ts` and `build-readme.ts`, then resume the loop. Fixing symptoms one file at a time is what makes a review run to round 12 without converging.
+- **Declare non-convergence only when the loop stops making ground**: two consecutive passes past the checkpoint whose P1s repeat fixes already attempted, with nothing new. Then stop, list every open P1 in `tasks/README.md`'s Known gaps, and **lead the Step 8 recap with it** — "review did not converge: N P1s open after M passes". A tree handed over with known-open P1s is a real result the user must see, not a silent truncation.
+
+### Step 8 — Stop. Do not execute.
 
 Tell the user where the files live and which task to start from. Do not start implementing — the whole point is that execution happens elsewhere with fresh context.
 
 **Hand back a short recap in the user's reply language** (the files stay English; only this recap is localized). Glanceable: the goal in one line, the buckets and task counts, the suggested first task, and any Known gaps. It lets the user sanity-check the plan's shape without opening every file — it is not a re-paste of the plan.
+
+**If Step 7 ended on non-convergence, that goes first**, before the goal line: how many P1s stayed open, after how many passes, and what they are. Everything else in the recap is secondary to a tree the review could not clear.
 
 The next executor can ask "what should I work on?" — this lists tasks whose dependencies are all `done`:
 
@@ -188,21 +220,21 @@ bun "$SCRIPTS"/next-ready.ts docs/<slug>/tasks
 2. **PLAN.md is the source of truth; `_context/` mirrors it.** When a decision changes, update those two, not the task files. → `references/context-files.md`
 3. **A bucket directory is always required.** Never write task files directly under `tasks/`; short plans use a single `tasks/work/` plus `tasks/review/` for the closing task. This keeps every `Required reading` path identical.
 4. **Mark unknowns explicitly** as Known gaps in `tasks/README.md`, never as vague tasks. → `references/readme-template.md`
-5. **Write the artifacts in English.** A sub-agent picks them up cold, so English keeps them portable regardless of the interview language. (Exception: a writing-topic plan whose deliverable is in another language may use it for content samples.) Interview in whatever language the user prefers; hand back the Step 7 recap in theirs.
+5. **Write the artifacts in English.** A sub-agent picks them up cold, so English keeps them portable regardless of the interview language. (Exception: a writing-topic plan whose deliverable is in another language may use it for content samples.) Interview in whatever language the user prefers; hand back the Step 8 recap in theirs.
 
 ## File-writing rules
 
 - All paths are relative to the current working directory unless the user says otherwise.
 - Kebab-case for `<topic>` and `<slug>`. Zero-pad `NN` to two digits.
-- Never overwrite an existing `docs/<topic>/` without explicit confirmation (collision check happens in Step 2).
+- Never overwrite an existing `docs/<topic>/` without explicit confirmation (collision check happens in Step 3).
 
 ## Automatic lint hook
 
 The dispatch plugin registers `hooks/flightplan-lint.sh` as a PostToolUse hook on `Edit|Write`. It lints any file that lives at `docs/<slug>/tasks/<bucket>/NN-*.md` **and** carries a Required-reading header (`> **Required reading**:` or `> **Required reading** (read before starting; do not need to open other files):`). The signature is narrow on purpose — a near miss like `> **Required reading later**:` is a silent no-op, as is anything else.
 
-On a violation it exits 2 with stderr feedback, so the problem surfaces immediately instead of at the Step 5 whole-tree lint. Writing `_context/` before task files keeps it quiet during normal flow.
+On a violation it exits 2 with stderr feedback, so the problem surfaces immediately instead of at the Step 6 whole-tree lint. Writing `_context/` before task files keeps it quiet during normal flow.
 
-**It observes harness `Edit|Write` calls only** — it cannot see a file written by an external CLI, by relay, or by Bash. Treat it as early per-file feedback for flightplan authors, not as the gate. Step 5's whole-tree lint is the gate here; `autopilot`'s binary and rubric gates own the execution boundary.
+**It observes harness `Edit|Write` calls only** — it cannot see a file written by an external CLI, by relay, or by Bash. Treat it as early per-file feedback for flightplan authors, not as the gate. Step 6's whole-tree lint is the gate here; `autopilot`'s binary and rubric gates own the execution boundary.
 
 ## Additional resources
 
@@ -221,7 +253,7 @@ Reach for these instead of doing the mechanical work by hand. Each exports a tes
 - `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
 - `scripts/lint-task.ts` — validates task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
-- `scripts/review-plan.ts` — Step 6's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--print` emits the instructions + bundle for the Opus reviewer subagent. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.
+- `scripts/review-plan.ts` — Step 7's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--print` emits the instructions + bundle for the Opus reviewer subagent. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.
 - `scripts/next-ready.ts` — lists tasks whose dependencies are all `done` (executor-session helper)
 - `scripts/score-task.ts` — executor side: feed it `{ dimension: score }` JSON for a deterministic weighted average + hard-fail verdict against the task's own rubric (`scoreTask(rubric, scores)`). `--log <file>` appends to an audit trail.
 - `scripts/mark-done.ts` — the done-transition: sets `> **Status**: done` and ticks every `## Acceptance criteria` / `## Verification` box (`markDone(content)`). Used by `autopilot`.

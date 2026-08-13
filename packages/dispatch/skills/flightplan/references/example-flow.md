@@ -8,7 +8,13 @@ flow has more rounds, with variations per topic.
 User: /flightplan want to add a course player to the site, will hand off to sub-agents
 
 Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion: topic slug + scope — what does "course player"
+        [calls AskUserQuestion: run options — which review engine for the
+         written tree (Codex (Recommended) / OpenCode / Opus), and which
+         review depth (Light / Standard (Recommended) / Deep)?]
+
+User: codex, standard
+
+Claude: [calls AskUserQuestion: topic slug + scope — what does "course player"
          cover here, and what's out of scope for v1?]
 
 User: slug "course-player", in: video playback + progress tracking. Out: admin tools.
@@ -40,7 +46,9 @@ Claude: [writes docs/course-player/PLAN.md]
 
 ## What to notice
 
-- **The slug collision check happens in Step 2**, immediately after the
+- **The run options are settled in Step 2**, before the interview starts.
+  Nothing after the approval asks the user anything.
+- **The slug collision check happens in Step 3**, immediately after the
   slug is agreed. It does not happen after approval.
 - **Approval must be explicit.** "yes, ship it" works. Silence does not
   count as approval.

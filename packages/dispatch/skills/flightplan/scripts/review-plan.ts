@@ -95,6 +95,14 @@ Focus on:
 
 Treat every vague acceptance criterion and every cross-file inconsistency as a real defect, not a minor note.
 
+Label every finding P1 or P2 as the first token of its line, because the caller
+loops until no P1 remains:
+
+- P1 — an executor hits this and stalls or guesses: a missing or contradicted decision, two files that disagree, an unverifiable acceptance criterion, a dependency edge that cannot be satisfied, a task that cannot be done from _context/ plus its own file.
+- P2 — an executor ships anyway: wording, ordering, a criterion that could be sharper, a task that could split more cleanly.
+
+Do not inflate P2 into P1 to seem thorough, and do not soften a P1 to seem agreeable. If the plan is clean, say so and return no findings.
+
 ---
 `.trim();
 
