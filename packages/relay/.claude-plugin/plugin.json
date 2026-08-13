@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Delegate a task to another harness — relay work to the codex, opencode, or claude CLI (delegate / review / image), capture the result, and report back.",
   "author": { "name": "Q" },
   "license": "MIT",

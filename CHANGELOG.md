@@ -1,5 +1,19 @@
 # Changelog
 
+## [relay 0.6.4] - 2026-08-14
+
+_tracks tag `relay-v0.6.4`_
+
+### Added
+- The opencode backend now supports opencode 1.18.18, both live and headless.
+
+### Fixed
+- Headless opencode runs (`opencode run`) no longer silently drop approval-gated operations. `--dangerous` now maps to opencode's `--auto` flag on the headless path too, not just the live TUI, so unattended runs don't auto-reject prompts that need approval.
+- A task prompt containing flag-like text (leading `-`/`--`) no longer gets misparsed as a CLI option; the prompt is now appended after a `--` separator so opencode's own parser stops treating it as flags.
+
+### Changed
+- Corrected the relay docs' description of opencode's `--auto`: it is not a full permission bypass like Codex's equivalent flag, since explicit deny rules still apply. Also documented that `-m/--model` is optional and that the hidden `--yolo`/`--dangerously-skip-permissions` aliases collapse to the same boolean, and replaced the stale "`--agent` deferred" note with the real reason it stays unwired — the referenced profile would need to exist in every machine's opencode config.
+
 ## [dispatch 3.20.0] - 2026-08-14
 
 _tracks tag `dispatch-v3.20.0`_
