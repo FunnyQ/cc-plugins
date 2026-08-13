@@ -7,9 +7,18 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
  * Model defaults: delegate → opencode-go/kimi-k2.7-code, review → opencode-go/qwen3.7-max.
  * --model flag overrides the defaults.
  *
+ * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
+ * and live TUI). Headless `run` auto-REJECTS approval prompts when `--auto` is
+ * absent — no pane means no human can answer — so a non-dangerous headless
+ * delegate silently loses approval-gated operations. `--auto` auto-approves
+ * only what is not explicitly denied: explicit deny rules still block, so it is
+ * not a full bypass like codex's --dangerously-bypass-approvals-and-sandbox.
+ *
  * Limitations:
  * - Review is prompt-based only: "Analyze only — do not modify files" is in the prompt text.
- *   Hard read-only via --agent is deferred.
+ *   Hard read-only via a `--agent` profile with edit/bash denied is possible
+ *   but not wired in — the profile would have to exist in every machine's
+ *   opencode config.
  * - Output parsing tolerates bug #26855 (--format json can exit before emitting step_finish).
  *
  * Output: `--format json` streams JSONL (one event per line) — `step_start`,
@@ -41,9 +50,19 @@ export const opencodeBackend: Backend = {
     // (parseOutput → parseJsonl); --format default interleaves TUI/progress noise.
     argv.push("--format", "json");
 
-    // Append prompt text (opencode has no --prompt-file flag)
+    // Headless run auto-REJECTS permission requests (no pane, no human to ask),
+    // so --auto is the only way an unattended delegate gets past approval
+    // prompts. Same mapping as the live path, keeping --dangerous uniform
+    // across headless/live (matches codex/claude headless behavior).
+    if (opts.dangerous) {
+      argv.push("--auto");
+    }
+
+    // Append prompt text (opencode has no --prompt-file flag). The `--` stops
+    // yargs from parsing flag-like tokens inside the task (e.g. "add --help
+    // flag") as options — run.ts merges args["--"] back into the message.
     if (opts.promptText !== undefined) {
-      argv.push(opts.promptText);
+      argv.push("--", opts.promptText);
     }
 
     return { argv };
@@ -52,10 +71,14 @@ export const opencodeBackend: Backend = {
   invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
     const argv: string[] = [];
     if (opts.model) argv.push("-m", opts.model);
-    // opencode has no --dangerously-* flag; its YOLO equivalent is `--auto`
-    // ("auto-approve permissions that are not explicitly denied"), accepted by
-    // the interactive TUI too. Gate it on --dangerous so it matches codex/claude:
-    // --dangerous = unattended, no --dangerous = prompts surface in the pane.
+    // opencode's approval-bypass flag is `--auto` ("auto-approve permissions
+    // that are not explicitly denied (dangerous!)"), accepted by the interactive
+    // TUI too. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist
+    // on `run` and currently collapse to the same boolean (1.18.18) — not a
+    // separate, stronger mode. Gate --auto on --dangerous so it matches
+    // codex/claude: --dangerous = unattended, no --dangerous = prompts surface
+    // in the pane. Note --auto still respects explicit deny rules — it is not a
+    // full bypass like codex's flag.
     if (opts.dangerous) argv.push("--auto");
     return { agentBin: "opencode", argv };
   },

@@ -17,7 +17,7 @@ Flags:
 - `--headless` — force today's headless flow even inside herdr. **Use this for nested delegation.** An agent that was itself live-delegated inherits `HERDR_ENV=1`. A second layer of panes is rarely what anyone wants.
 - `--keep-pane` — after a verified success, keep the live pane open for follow-up conversation. Without this flag, relay closes the pane after it has collected a settled, marker-terminated result.
 - `--wait-timeout <ms>` — how long relay polls for the result (default 600000 = 10 min).
-- `--dangerous` — **YOLO / unattended** live run. The delegate proceeds without stopping on approval prompts (codex `--dangerously-bypass-approvals-and-sandbox`, claude `--dangerously-skip-permissions`, opencode `--auto`). Without it, approval prompts surface **in the pane** for a human to answer. When nobody is watching the pane to press "allow", pass `--dangerous`. Leave it off for supervised runs.
+- `--dangerous` — **YOLO / unattended** live run. The delegate proceeds without stopping on approval prompts (codex `--dangerously-bypass-approvals-and-sandbox`, claude `--dangerously-skip-permissions`, opencode `--auto`). Without it, approval prompts surface **in the pane** for a human to answer. When nobody is watching the pane to press "allow", pass `--dangerous`. Leave it off for supervised runs. opencode nuance: `--auto` auto-approves only what is **not explicitly denied** — config `deny` rules still block, unlike codex's full bypass.
 
 Output contract:
 

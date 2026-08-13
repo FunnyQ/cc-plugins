@@ -22,6 +22,10 @@ Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 
 Without `--dangerous`, relay passes no approval-bypass flag. The TUI's own approval prompts then surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So `--dangerous` means fire-and-forget; no flag means supervised. `image` has no live path (codex `invokeLive("image")` returns null).
 
+Caveats on the uniformity (see the opencode section below for details):
+- opencode's `--auto` is **not a full bypass**: it auto-approves only what is *not explicitly denied* — config `deny` rules (and built-in deny patterns) still block. codex's flag bypasses everything.
+- **Headless `run` has no human to prompt.** Without `--auto`, opencode auto-rejects approval requests instead of asking. So on the headless path `--dangerous` → `--auto` too, and a non-dangerous headless run silently loses approval-gated operations (it does not abort).
+
 codex is the exception on the sandbox axis: its live launch passes `-s danger-full-access` even when not dangerous. The approval prompts stay, only the filesystem/network sandbox goes. See the codex section below for why.
 
 **New-tab placement.** `herd.ts` has no primitive to start an agent in a fresh empty tab, so `spawn({ newTab: true })` does the dance instead. Note first: `agent start --tab` steals focus despite `--no-focus`. The dance accounts for this: capture the focused tab → `tab create --no-focus --label <name>` → `agent start --tab <new>` → close the leftover shell root pane → restore focus to the caller's tab.
@@ -86,31 +90,44 @@ Unset. codex uses its own configured or last-used model. Do not pass `-m`.
 
 ---
 
-## opencode (1.17.6)
+## opencode (1.18.18)
 
 Binary: `opencode`. Headless subcommand: `opencode run [message..]`.
 
 ### Delegate
 
 ```bash
-opencode run -m opencode-go/kimi-k2.7-code "<prompt>"
+opencode run -m opencode-go/kimi-k2.7-code --format json -- "<prompt>"
 ```
 
-Write-capable by default.
+Write-capable by default. `--dangerous` maps to `--auto` on the headless path
+too (same flag as the live TUI). Without it, headless `run` **auto-rejects**
+approval prompts — there is no pane and no human to answer — so a non-dangerous
+headless delegate silently loses approval-gated operations instead of failing
+loudly. Use `--dangerous` for unattended headless runs that may need approvals.
 
 ### Review (emulated, read-only prompt)
 
 ```bash
-opencode run -m opencode-go/qwen3.7-max "<read-only review prompt>"
+opencode run -m opencode-go/qwen3.7-max --format json -- "<read-only review prompt>"
 ```
 
-There is no native review. The prompt must instruct "analyze only, do not modify files." (Hard read-only via a `--agent` with `edit/bash: deny` is deferred.)
+There is no native review. The prompt must instruct "analyze only, do not modify files."
+
+Read-only is prompt-level only, and opencode's default permissions allow `edit`
+— a headless review *could* write files if the model ignores the instruction.
+Hard read-only is possible via an agent profile that denies `edit`/`bash`
+(`--agent <name>` with `permission` deny rules) but relay does not wire one in:
+the profile would have to exist in every machine's opencode config. Create a
+local `readonly` agent (e.g. via `opencode agent create --mode primary --permissions read,glob,grep,webfetch`) and pass `--agent readonly` manually if you need it.
 
 ### Relevant flags
 
-- `-m, --model <provider/model>` — model specification (required)
+- `-m, --model <provider/model>` — model specification (optional; falls back to the configured default model — relay always resolves one per mode)
 - `--agent <name>` — agent profile (optional)
 - `--format <default|json>` — output format
+- `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous`. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist on `run` and currently collapse to the same boolean (1.18.18) — they are not a stronger bypass. `--auto` still respects explicit deny rules, unlike codex's full bypass.
+- `--` — relay appends this separator before the message so flag-like task text (e.g. "add --help flag") is passed through as the message, not parsed as options.
 
 ### Output parsing
 

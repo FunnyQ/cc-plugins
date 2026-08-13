@@ -15,7 +15,7 @@ describe("opencodeBackend", () => {
       });
     });
 
-    it("maps --dangerous to --auto (opencode's YOLO), never headless flags", () => {
+    it("maps --dangerous to --auto (opencode's approval bypass), never headless flags", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {
         dangerous: true,
       })!;
@@ -69,6 +69,7 @@ describe("opencodeBackend", () => {
         "opencode-go/kimi-k2.7-code",
         "--format",
         "json",
+        "--",
         "test prompt",
       ]);
     });
@@ -87,6 +88,7 @@ describe("opencodeBackend", () => {
         "opencode-go/qwen3.7-max",
         "--format",
         "json",
+        "--",
         "review prompt",
       ]);
     });
@@ -100,6 +102,7 @@ describe("opencodeBackend", () => {
         "run",
         "--format",
         "json",
+        "--",
         "test prompt",
       ]);
     });
@@ -138,6 +141,38 @@ describe("opencodeBackend", () => {
         "--format",
         "json",
       ]);
+    });
+
+    it("maps --dangerous to --auto headless, matching the live path", () => {
+      const opts: InvokeOpts = {
+        promptText: "test prompt",
+        dangerous: true,
+      };
+      const result = opencodeBackend.invoke("delegate", opts);
+
+      expect(result.argv).toContain("--auto");
+    });
+
+    it("omits --auto headless without --dangerous (run auto-rejects approvals)", () => {
+      const opts: InvokeOpts = { promptText: "test prompt" };
+      const result = opencodeBackend.invoke("delegate", opts);
+
+      expect(result.argv).not.toContain("--auto");
+    });
+
+    it("does not emit --auto for review without --dangerous", () => {
+      const opts: InvokeOpts = { promptText: "review prompt" };
+      const result = opencodeBackend.invoke("review", opts);
+
+      expect(result.argv).not.toContain("--auto");
+    });
+
+    it("separates the prompt with -- so flag-like task text is not parsed", () => {
+      const opts: InvokeOpts = { promptText: "add --help flag to the CLI" };
+      const result = opencodeBackend.invoke("delegate", opts);
+
+      expect(result.argv.at(-2)).toBe("--");
+      expect(result.argv.at(-1)).toBe("add --help flag to the CLI");
     });
   });
 
