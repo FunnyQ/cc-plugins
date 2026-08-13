@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 3.20.0] - 2026-08-14
+
+_tracks tag `dispatch-v3.20.0`_
+
+### Added
+- Flightplan now asks for the review engine and review depth up front, in one question alongside the interview's other run options, instead of leaving them buried later in the flow.
+
+### Changed
+- Flightplan's approval step (ExitPlanMode) now restates the chosen review options next to the finished task index, so approving the plan also confirms those choices and nothing asks about them again afterward.
+- The review loop's stopping rule no longer relies on a fixed round limit. Findings are now labelled by severity, and the loop keeps going as long as a P1 issue is open; the previous round cap becomes a checkpoint that escalates fix tactics instead of cutting the review short.
+- The reviewer only declares a plan unable to converge after two consecutive checkpoint passes repeat fixes it already tried, and that verdict is now surfaced in the run's closing recap.
+
 ## [chronicle 0.13.2] - 2026-08-12
 
 _tracks tag `chronicle-v0.13.2`_
