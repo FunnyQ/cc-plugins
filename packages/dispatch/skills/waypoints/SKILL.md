@@ -37,6 +37,10 @@ If a `docs/<slug>/tasks/` tree already exists and the user wants execution, use 
 
 Resolve the scripts path once. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Instead, take the skill's load-time *"Base directory for this skill"* banner. Set `SCRIPTS="<base-dir>/scripts"`. Use `bun "$SCRIPTS"/...` in every command below.
 
+#### Under OpenCode
+
+OpenCode prints no *"Base directory for this skill"* banner (runtime fact **S16**), so there is no value to read one from. Under OpenCode, skills are installed at `~/.config/opencode/skills/waypoints/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `SCRIPTS=~/.config/opencode/skills/waypoints/scripts`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+
 1. Interview for the roadmap using `references/interview-guide.md`. Elicit milestone legs and each leg's done-state. Do **not** break legs into tasks.
 2. After the user approves, write `docs/<proj>/WAYPOINTS.md` using `references/waypoints-template.md`. This skill authors the roadmap. There is no CLI verb for creating it. Mark leg 1 `[~]` and every later leg `[ ]`.
 3. To plan a leg, hand off to `flightplan`. It detects the project's `WAYPOINTS.md`, reads the active leg, and runs in waypoint mode.

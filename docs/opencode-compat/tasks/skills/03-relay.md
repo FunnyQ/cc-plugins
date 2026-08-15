@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -116,23 +116,23 @@ This task needs no unresolved runtime fact — the install target and the root r
 
 ## Acceptance criteria
 
-- [ ] `packages/relay/skills/relay/SKILL.md` carries an OpenCode script-root branch giving the concrete path `~/.config/opencode/skills/relay/scripts/relay.ts`.
-- [ ] No OpenCode-facing instruction in either file references `CLAUDE_PLUGIN_ROOT` as a resolution method.
-- [ ] The `~/.claude/skills/relay` symlink is labelled legacy, with the two-skills-named-relay collision reason stated inline, and a removal command given.
-- [ ] The recommended install path is the repo's OpenCode installer.
-- [ ] The `## Additional Resources` bullet no longer describes `backends.md` as covering "the OpenCode symlink integration".
-- [ ] `image` is still documented as codex-only in both the `### Image (codex-only)` section and the `## Known Caveats` bullet, unchanged.
-- [ ] Every pre-existing Claude Code and Codex instruction is still present and unreordered, including the intact `<BANNER_PATH>` block.
-- [ ] Only `.md` files changed under `packages/relay`.
+- [x] `packages/relay/skills/relay/SKILL.md` carries an OpenCode script-root branch giving the concrete path `~/.config/opencode/skills/relay/scripts/relay.ts`.
+- [x] No OpenCode-facing instruction in either file references `CLAUDE_PLUGIN_ROOT` as a resolution method.
+- [x] The `~/.claude/skills/relay` symlink is labelled legacy, with the two-skills-named-relay collision reason stated inline, and a removal command given.
+- [x] The recommended install path is the repo's OpenCode installer.
+- [x] The `## Additional Resources` bullet no longer describes `backends.md` as covering "the OpenCode symlink integration".
+- [x] `image` is still documented as codex-only in both the `### Image (codex-only)` section and the `## Known Caveats` bullet, unchanged.
+- [x] Every pre-existing Claude Code and Codex instruction is still present and unreordered, including the intact `<BANNER_PATH>` block.
+- [x] Only `.md` files changed under `packages/relay`.
 
 ## Verification
 
-- [ ] Run `git diff --name-only -- packages/relay` and confirm every path ends in `.md`.
-- [ ] Run `git diff --quiet -- packages/relay/skills/relay/scripts` and confirm it exits 0 (backend sources untouched).
-- [ ] Run `grep -n 'CLAUDE_PLUGIN_ROOT' packages/relay/skills/relay/SKILL.md packages/relay/skills/relay/references/backends.md` and confirm every remaining hit is inside Claude-Code-specific prose, not an OpenCode instruction.
-- [ ] Run `grep -n 'legacy' packages/relay/skills/relay/references/backends.md` and confirm the `~/.claude/skills/relay` line is covered.
-- [ ] Run `git diff -- packages/relay/skills/relay/SKILL.md` and read it end to end, confirming the banner block and the `${CLAUDE_PLUGIN_ROOT}` warning survive as additions-only.
-- [ ] Run `git status --short -- packages/relay docs/opencode-compat/tasks/skills/03-relay.md` and confirm both paths are dirty.
+- [x] Run `git diff --name-only -- packages/relay` and confirm every path ends in `.md`.
+- [x] Run `git diff --quiet -- packages/relay/skills/relay/scripts` and confirm it exits 0 (backend sources untouched).
+- [x] Run `grep -n 'CLAUDE_PLUGIN_ROOT' packages/relay/skills/relay/SKILL.md packages/relay/skills/relay/references/backends.md` and confirm every remaining hit is inside Claude-Code-specific prose, not an OpenCode instruction.
+- [x] Run `grep -n 'legacy' packages/relay/skills/relay/references/backends.md` and confirm the `~/.claude/skills/relay` line is covered.
+- [x] Run `git diff -- packages/relay/skills/relay/SKILL.md` and read it end to end, confirming the banner block and the `${CLAUDE_PLUGIN_ROOT}` warning survive as additions-only.
+- [x] Run `git status --short -- packages/relay docs/opencode-compat/tasks/skills/03-relay.md` and confirm both paths are dirty.
 
 ## Eval rubric
 

@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -78,20 +78,20 @@ This task needs no entry from `../_context/runtime-facts.md`. If the executor fi
 
 ## Acceptance criteria
 
-- [ ] Both skill files carry a self-contained, clearly fenced OpenCode block giving the literal `~/.config/opencode/skills/<name>/` path.
-- [ ] No OpenCode-facing instruction in either file uses `CLAUDE_PLUGIN_ROOT`, except to say it is empty and must not be used.
-- [ ] Every pre-existing Claude and Codex instruction in both files survives unmodified — same wording, same order.
-- [ ] The OpenCode pane note is either backed by a real pane spawn, or carries an explicit "unverified" marker.
-- [ ] Neither file instructs a reader to cross-check the agent kind against a type union.
-- [ ] `git diff --name-only -- packages/herdr` lists only `.md` paths.
+- [x] Both skill files carry a self-contained, clearly fenced OpenCode block giving the literal `~/.config/opencode/skills/<name>/` path.
+- [x] No OpenCode-facing instruction in either file uses `CLAUDE_PLUGIN_ROOT`, except to say it is empty and must not be used.
+- [x] Every pre-existing Claude and Codex instruction in both files survives unmodified — same wording, same order.
+- [x] The OpenCode pane note is either backed by a real pane spawn, or carries an explicit "unverified" marker.
+- [x] Neither file instructs a reader to cross-check the agent kind against a type union.
+- [x] `git diff --name-only -- packages/herdr` lists only `.md` paths.
 
 ## Verification
 
-- [ ] Run `grep -n 'CLAUDE_PLUGIN_ROOT' packages/herdr/skills/herdr/SKILL.md packages/herdr/skills/herdr-protocol-upgrade/SKILL.md` and confirm every hit is either a pre-existing Claude warning or the new "empty under OpenCode" statement.
-- [ ] Run `git diff -- packages/herdr/skills/herdr/SKILL.md packages/herdr/skills/herdr-protocol-upgrade/SKILL.md` and confirm the diff is additions only — no deleted or reworded pre-existing lines.
-- [ ] Run `git diff --name-only -- packages/herdr | grep -v '\.md$'` and confirm it prints nothing.
-- [ ] Spawn a pane with `--agent opencode` per the commands above, confirm it comes up, then close it. If no herdr terminal is available, record the claim as unverified instead.
-- [ ] Run `git status --short -- packages/herdr/skills/herdr/SKILL.md packages/herdr/skills/herdr-protocol-upgrade/SKILL.md docs/opencode-compat/tasks/skills/05-herdr.md` and confirm the two skill files are dirty.
+- [x] Run `grep -n 'CLAUDE_PLUGIN_ROOT' packages/herdr/skills/herdr/SKILL.md packages/herdr/skills/herdr-protocol-upgrade/SKILL.md` and confirm every hit is either a pre-existing Claude warning or the new "empty under OpenCode" statement.
+- [x] Run `git diff -- packages/herdr/skills/herdr/SKILL.md packages/herdr/skills/herdr-protocol-upgrade/SKILL.md` and confirm the diff is additions only — no deleted or reworded pre-existing lines.
+- [x] Run `git diff --name-only -- packages/herdr | grep -v '\.md$'` and confirm it prints nothing.
+- [x] Spawn a pane with `--agent opencode` per the commands above, confirm it comes up, then close it. If no herdr terminal is available, record the claim as unverified instead.
+- [x] Run `git status --short -- packages/herdr/skills/herdr/SKILL.md packages/herdr/skills/herdr-protocol-upgrade/SKILL.md docs/opencode-compat/tasks/skills/05-herdr.md` and confirm the two skill files are dirty.
 
 ## Eval rubric
 

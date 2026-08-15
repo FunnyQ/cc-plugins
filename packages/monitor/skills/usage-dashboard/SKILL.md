@@ -63,6 +63,13 @@ reader at `packages/monitor/skills/shared/scripts/opencode.ts`. Nothing has to
 be installed for OpenCode sessions, tokens, and cost to show up — if they are
 missing, the cause is the database, not a missing integration.
 
+**Background launch.** OpenCode's bash tool has no background-run parameter —
+none exists to pass. Launch the server with shell-level detachment instead:
+`bun ~/.config/opencode/skills/usage-dashboard/scripts/atlas-server.ts … &`.
+This is the same `… &` fallback the "Run" section above already gives for any
+harness with no background flag; OpenCode is that harness. A foreground call
+blocks the session for as long as the server runs.
+
 The precheck (`install.ts`, owned by the sibling `install` skill) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps do **not** block the dashboard. A typical optional gap is a missing `history.jsonl`, because the user has not used Claude Code chat yet. The affected sections simply show empty.
 
 If the precheck exits non-zero, surface the failed `✗` lines and their `→ hint` to the user verbatim. Then stop. Do **not** attempt to auto-fix: no `bun install`, no file fetches. The hints are actionable steps the user takes themselves, for example installing bun or running `/stats` once in Claude Code to seed `stats-cache.json`.

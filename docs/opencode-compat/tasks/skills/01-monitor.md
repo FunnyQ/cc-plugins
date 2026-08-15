@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -106,23 +106,23 @@ Attempt 3 delivered every cockpit / install / reference edit and stopped one sen
 
 ## Acceptance criteria
 
-- [ ] No OpenCode-facing instruction anywhere in the seven modified files uses `CLAUDE_PLUGIN_ROOT`; each instead resolves scripts from `~/.config/opencode/skills/<name>/scripts/…`
-- [ ] `packages/monitor/skills/cockpit/SKILL.md` states that reads and sends both work under OpenCode, and names the TUI port precondition
-- [ ] No file under `packages/monitor/` claims that cockpit sends are unsupported, unavailable, or not implemented under OpenCode
-- [ ] `packages/monitor/skills/cockpit/references/claude-cli.md` carries the one-line note that OpenCode sends use the TUI HTTP path, not the channel MCP server
-- [ ] `packages/monitor/skills/install/SKILL.md` marks the statusline Claude-only and points at the OpenCode installer for the OpenCode layer
-- [ ] `packages/monitor/skills/usage-dashboard/SKILL.md` records both the native-read fact and the S5 background-launch fact
-- [ ] Every changed path under `packages/monitor/` ends in `.md`
-- [ ] Every Claude Code and Codex instruction present before this task is present after it, unmodified — the diff is additions only
+- [x] No OpenCode-facing instruction anywhere in the seven modified files uses `CLAUDE_PLUGIN_ROOT`; each instead resolves scripts from `~/.config/opencode/skills/<name>/scripts/…`
+- [x] `packages/monitor/skills/cockpit/SKILL.md` states that reads and sends both work under OpenCode, and names the TUI port precondition
+- [x] No file under `packages/monitor/` claims that cockpit sends are unsupported, unavailable, or not implemented under OpenCode
+- [x] `packages/monitor/skills/cockpit/references/claude-cli.md` carries the one-line note that OpenCode sends use the TUI HTTP path, not the channel MCP server
+- [x] `packages/monitor/skills/install/SKILL.md` marks the statusline Claude-only and points at the OpenCode installer for the OpenCode layer
+- [x] `packages/monitor/skills/usage-dashboard/SKILL.md` records both the native-read fact and the S5 background-launch fact
+- [x] Every changed path under `packages/monitor/` ends in `.md`
+- [x] Every Claude Code and Codex instruction present before this task is present after it, unmodified — the diff is additions only
 
 ## Verification
 
-- [ ] Run `git diff --name-only -- packages/monitor` and confirm every listed path ends in `.md`
-- [ ] Run `git diff --numstat -- packages/monitor` and confirm the deleted-lines column is `0` for every file, proving the diff is additive
-- [ ] Run `grep -rn 'CLAUDE_PLUGIN_ROOT' packages/monitor/skills/` and confirm every remaining hit sits in a Claude Code or Codex clause, never in an OpenCode one
-- [ ] Run `grep -rniE 'opencode.{0,40}(send|sends).{0,40}(not|unsupported|unavailable)' packages/monitor/skills/` and confirm it returns nothing
-- [ ] Run `grep -rn 'config/opencode/skills' packages/monitor/skills/` and confirm the root rule reached `usage-dashboard/SKILL.md`, `install/SKILL.md`, and the four cockpit reference files that previously used `CLAUDE_PLUGIN_ROOT`
-- [ ] Run `git status --short -- packages/monitor docs/opencode-compat/tasks/skills/01-monitor.md` and confirm the expected `.md` paths are dirty
+- [x] Run `git diff --name-only -- packages/monitor` and confirm every listed path ends in `.md`
+- [x] Run `git diff --numstat -- packages/monitor` and confirm the deleted-lines column is `0` for every file, proving the diff is additive
+- [x] Run `grep -rn 'CLAUDE_PLUGIN_ROOT' packages/monitor/skills/` and confirm every remaining hit sits in a Claude Code or Codex clause, never in an OpenCode one
+- [x] Run `grep -rniE 'opencode.{0,40}(send|sends).{0,40}(not|unsupported|unavailable)' packages/monitor/skills/` and confirm it returns nothing
+- [x] Run `grep -rn 'config/opencode/skills' packages/monitor/skills/` and confirm the root rule reached `usage-dashboard/SKILL.md`, `install/SKILL.md`, and the four cockpit reference files that previously used `CLAUDE_PLUGIN_ROOT`
+- [x] Run `git status --short -- packages/monitor docs/opencode-compat/tasks/skills/01-monitor.md` and confirm the expected `.md` paths are dirty
 
 ## Eval rubric
 

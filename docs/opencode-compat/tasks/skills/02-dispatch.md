@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -64,20 +64,20 @@ If a fact you decide you need is still marked `UNRESOLVED`, set this file's head
 
 ## Acceptance criteria
 
-- [ ] No OpenCode-facing instruction added by this task uses `CLAUDE_PLUGIN_ROOT`.
-- [ ] Both the flightplan and waypoints skills carry an OpenCode block naming the concrete install root and how to resolve `scripts/` from it.
-- [ ] The preflight audit is recorded — either "no change needed, confirmed by grep" or the change applied.
-- [ ] Nothing under `packages/dispatch/skills/autopilot/` is modified by this task.
-- [ ] Every file changed under `packages/dispatch` is a `.md` file.
-- [ ] Every pre-existing Claude and Codex instruction survives unmodified; the diff contains additions only, no rewritten or reordered lines.
+- [x] No OpenCode-facing instruction added by this task uses `CLAUDE_PLUGIN_ROOT`.
+- [x] Both the flightplan and waypoints skills carry an OpenCode block naming the concrete install root and how to resolve `scripts/` from it.
+- [x] The preflight audit is recorded — either "no change needed, confirmed by grep" or the change applied.
+- [x] Nothing under `packages/dispatch/skills/autopilot/` is modified by this task.
+- [x] Every file changed under `packages/dispatch` is a `.md` file.
+- [x] Every pre-existing Claude and Codex instruction survives unmodified; the diff contains additions only, no rewritten or reordered lines.
 
 ## Verification
 
-- [ ] Run `grep -rn "CLAUDE_PLUGIN_ROOT" packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints packages/dispatch/skills/preflight` and confirm every hit is a pre-existing Claude-facing warning, none of them inside a block added by this task.
-- [ ] Run `grep -c "opencode" packages/dispatch/skills/preflight/SKILL.md` and confirm the audit outcome matches what the task reported.
-- [ ] Run `git diff --name-only -- packages/dispatch/skills/preflight packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints` and confirm every listed path ends in `.md`. Scope it to those three directories — the autopilot skill is another task's territory and may be dirty in the same working tree.
-- [ ] Run `git diff --stat -- packages/dispatch/skills/preflight packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints` and confirm the deleted-line count is zero.
-- [ ] Run `git status --short -- packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints docs/opencode-compat/tasks/skills/02-dispatch.md` and confirm the paths this task edited are dirty.
+- [x] Run `grep -rn "CLAUDE_PLUGIN_ROOT" packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints packages/dispatch/skills/preflight` and confirm every hit is a pre-existing Claude-facing warning, none of them inside a block added by this task.
+- [x] Run `grep -c "opencode" packages/dispatch/skills/preflight/SKILL.md` and confirm the audit outcome matches what the task reported.
+- [x] Run `git diff --name-only -- packages/dispatch/skills/preflight packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints` and confirm every listed path ends in `.md`. Scope it to those three directories — the autopilot skill is another task's territory and may be dirty in the same working tree.
+- [x] Run `git diff --stat -- packages/dispatch/skills/preflight packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints` and confirm the deleted-line count is zero.
+- [x] Run `git status --short -- packages/dispatch/skills/flightplan packages/dispatch/skills/waypoints docs/opencode-compat/tasks/skills/02-dispatch.md` and confirm the paths this task edited are dirty.
 
 ## Eval rubric
 

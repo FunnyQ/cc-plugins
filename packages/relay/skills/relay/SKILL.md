@@ -38,7 +38,7 @@ If the user says "生圖", "畫圖", "Generate image" → use `image` (codex onl
 
 Every command below runs the bundled `scripts/relay.ts`.
 
-`${CLAUDE_PLUGIN_ROOT}` is Claude Code's official plugin-root variable. Inside an agent Bash call it is **not reliably set**. Under Codex it is empty. Do not depend on it.
+`${CLAUDE_PLUGIN_ROOT}` is Claude Code's official plugin-root variable. Inside an agent Bash call it is **not reliably set**. Under Codex it is empty. Under OpenCode it is also empty. Do not depend on it.
 
 Do not use a repo-relative path such as `packages/relay/...`. That path exists only inside the source repo.
 
@@ -50,6 +50,15 @@ SKILL_DIR="<BANNER_PATH>"            # e.g. ~/.claude/plugins/cache/.../skills/r
 RELAY="$SKILL_DIR/scripts/relay.ts"
 test -f "$RELAY" || { echo "relay.ts not found at $RELAY" >&2; exit 1; }
 ```
+
+> **Under OpenCode**: there is no "Base directory for this skill" banner. Skills install to `~/.config/opencode/skills/<name>/`, so resolve the script directly:
+>
+> ```bash
+> RELAY=~/.config/opencode/skills/relay/scripts/relay.ts
+> test -f "$RELAY" || { echo "relay.ts not found at $RELAY" >&2; exit 1; }
+> ```
+>
+> `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
 
 For brevity, the examples below write `relay.ts <backend> <mode> …` as shorthand for `bun "$RELAY" <backend> <mode> …`. Run it from the user's current project directory. `relay.ts` invokes the backend CLIs against that working tree's git context.
 
@@ -256,5 +265,5 @@ If `relay.ts` cannot run, report that and stop.
 
 ## Additional Resources
 
-- **`references/backends.md`** — read this only when installing the OpenCode symlink integration or debugging a backend CLI failure. `relay.ts` already encodes all CLI invocations. Normal runs never need it.
+- **`references/backends.md`** — read this only when installing under OpenCode or debugging a backend CLI failure. `relay.ts` already encodes all CLI invocations. Normal runs never need it.
 - **`references/live.md`** — read this only when `HERDR_ENV=1`. It covers live-pane flags, output contract, pane lifecycle, and pending-report semantics.
