@@ -73,3 +73,16 @@ The script is idempotent. It preserves unrelated config, and it backs up an
 existing config as `config.toml.bak-chronicle` before a changed write. Tell the
 user to start a new Codex thread after applying. This lets the role registry
 reload.
+
+## OpenCode — installer and nested subagent depth
+
+Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+
+The OpenCode installer is `opencode/install.ts`. It supports `--check`,
+`--dry-run`, `--apply`, and `--unlink`. On `--apply`, it raises
+`subagent_depth` to `2` in `~/.config/opencode/opencode.json`.
+
+This depth setting is mandatory for Chronicle's nested commit, PR, and ADR skills
+to work. Below the required depth the orchestrator simply stops with no error
+naming the config. Release is flat, spawns only one level, and does not need the
+depth setting.

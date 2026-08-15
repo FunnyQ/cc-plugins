@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: runtime/02, assets/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -99,25 +99,25 @@ The branch guard exempts a commit whose subject contains `🔧 release:` on the 
 
 ## Acceptance criteria
 
-- [ ] All five chronicle `SKILL.md` files carry an OpenCode branch.
-- [ ] No OpenCode-facing instruction in any of the five files uses `CLAUDE_PLUGIN_ROOT`.
-- [ ] Every `subagent_type` name written into an OpenCode line is a bare name that resolves to an existing converted OpenCode agent file.
-- [ ] The install skill states the `subagent_depth ≥ 2` prerequisite and its silent failure signature — it does not claim the step is unnecessary under OpenCode.
-- [ ] The install skill's OpenCode section preserves the existing nuance that `release` is flat and does not need the raised depth.
-- [ ] Every edit is additive: no existing Claude Code or Codex sentence is reworded, reordered, or removed.
-- [ ] Only `.md` files changed under `packages/chronicle/`.
-- [ ] `git diff --quiet -- packages/chronicle/agents packages/chronicle/hooks` exits 0.
-- [ ] `git diff --quiet -- packages/chronicle/.claude-plugin packages/chronicle/.codex-plugin` exits 0.
+- [x] All five chronicle `SKILL.md` files carry an OpenCode branch.
+- [x] No OpenCode-facing instruction in any of the five files uses `CLAUDE_PLUGIN_ROOT`.
+- [x] Every `subagent_type` name written into an OpenCode line is a bare name that resolves to an existing converted OpenCode agent file.
+- [x] The install skill states the `subagent_depth ≥ 2` prerequisite and its silent failure signature — it does not claim the step is unnecessary under OpenCode.
+- [x] The install skill's OpenCode section preserves the existing nuance that `release` is flat and does not need the raised depth.
+- [x] Every edit is additive: no existing Claude Code or Codex sentence is reworded, reordered, or removed.
+- [x] Only `.md` files changed under `packages/chronicle/`.
+- [x] `git diff --quiet -- packages/chronicle/agents packages/chronicle/hooks` exits 0.
+- [x] `git diff --quiet -- packages/chronicle/.claude-plugin packages/chronicle/.codex-plugin` exits 0.
 
 ## Verification
 
-- [ ] `git diff --name-only -- packages/chronicle` lists only `skills/*/SKILL.md` paths.
-- [ ] `git diff --quiet -- packages/chronicle/agents packages/chronicle/hooks packages/chronicle/.claude-plugin packages/chronicle/.codex-plugin && echo CLEAN` prints `CLEAN`.
-- [ ] `grep -rn 'CLAUDE_PLUGIN_ROOT' packages/chronicle/skills/*/SKILL.md` — every remaining hit sits in a Claude Code paragraph, none in an OpenCode block.
-- [ ] `grep -rn 'subagent_type' packages/chronicle/skills/*/SKILL.md` — every OpenCode-block name is bare, and each one has a matching file in `opencode/agents/`.
-- [ ] `git diff -- packages/chronicle` read end to end: confirm every hunk is an addition, with no modified or deleted line outside the added blocks.
-- [ ] `git status --short -- packages/chronicle docs/opencode-compat/tasks/skills/04-chronicle.md` shows the five skill files and this task file as dirty.
-- [ ] `bun test packages/` passes.
+- [x] `git diff --name-only -- packages/chronicle` lists only `skills/*/SKILL.md` paths.
+- [x] `git diff --quiet -- packages/chronicle/agents packages/chronicle/hooks packages/chronicle/.claude-plugin packages/chronicle/.codex-plugin && echo CLEAN` prints `CLEAN`.
+- [x] `grep -rn 'CLAUDE_PLUGIN_ROOT' packages/chronicle/skills/*/SKILL.md` — every remaining hit sits in a Claude Code paragraph, none in an OpenCode block.
+- [x] `grep -rn 'subagent_type' packages/chronicle/skills/*/SKILL.md` — every OpenCode-block name is bare, and each one has a matching file in `opencode/agents/`.
+- [x] `git diff -- packages/chronicle` read end to end: confirm every hunk is an addition, with no modified or deleted line outside the added blocks.
+- [x] `git status --short -- packages/chronicle docs/opencode-compat/tasks/skills/04-chronicle.md` shows the five skill files and this task file as dirty.
+- [x] `bun test packages/` passes.
 
 ## Eval rubric
 

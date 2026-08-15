@@ -142,6 +142,25 @@ Apply the same verification after Codex returns. Check with `gh pr view <url>` o
 `glab mr view <id-or-url>`. On a no or failed URL, run the `--head`/`--source-branch`
 lookup above before reporting failure. Never trust an unverified URL.
 
+## OpenCode
+
+Under OpenCode, use the same nested topology. Spawn ONE Storykeeper; the
+Storykeeper spawns the skald and messenger children. This skill is NOT flat and
+requires `subagent_depth >= 2`. Below the required depth the orchestrator simply
+stops with no error naming the config.
+
+Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+
+Spawn the orchestrator with the bare OpenCode agent name:
+
+```text
+subagent_type: "storykeeper"
+```
+
+The Storykeeper uses the bare child agent names `skald` and `messenger`. OpenCode
+task-tool subagents do NOT inherit parent context. Pass every input explicitly:
+the literal OpenCode skill path, `contextBrief`, `base`, `branch`, and `draft`.
+
 ## Edge Cases
 
 - **No commits**: skald reports it. The Storykeeper returns `nothing to propose` and

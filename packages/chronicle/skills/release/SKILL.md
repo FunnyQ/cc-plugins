@@ -160,6 +160,26 @@ told to read and obey its own TOML under `$CODEX_HOME/agents/chronicle/` (defaul
 Never paste or improvise the role instructions. If it is missing, tell the user to
 run `chronicle:install`.
 
+## OpenCode
+
+Under OpenCode, release is FLAT: the main skill spawns the leaf agents Skirnir and
+Annalist directly. It only spawns one level, so release itself does NOT need
+`subagent_depth >= 2`.
+
+Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+
+Spawn the leaf agents with their bare OpenCode names:
+
+```text
+subagent_type: "skirnir"
+subagent_type: "annalist"
+```
+
+OpenCode task-tool subagents do NOT inherit parent context. Pass the literal
+OpenCode skill path and every command-specific parameter explicitly on each spawn.
+The release-subject exemption in the branch guard applies under OpenCode in the
+same way.
+
 ## Edge cases
 
 - **No config + can't detect**: whole-repo, `versionFiles: []` — changelog + tag

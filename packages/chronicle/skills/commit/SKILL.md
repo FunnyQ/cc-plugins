@@ -93,6 +93,26 @@ are missing, tell the user to invoke `chronicle:install` and start a new Codex
 thread. The main agent may run `analyze-changes.ts` and `commit.ts` inline only when
 the user explicitly asks to continue without agents.
 
+## OpenCode
+
+Under OpenCode, use the same nested topology. Spawn ONE Lawspeaker; the Lawspeaker
+spawns the watcher and runesmith children. This skill is NOT flat and requires
+`subagent_depth >= 2`. Below the required depth the orchestrator simply stops with
+no error naming the config.
+
+Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+
+Spawn the orchestrator with the bare OpenCode agent name:
+
+```text
+subagent_type: "lawspeaker"
+```
+
+The Lawspeaker uses the bare child agent names `watcher` and `runesmith`. OpenCode
+task-tool subagents do NOT inherit parent context. Pass `contextBrief`, `branch`,
+and `mode` explicitly, just as in the Claude Code flow, together with the literal
+OpenCode skill path needed to resolve scripts.
+
 ## Edge cases
 
 - **Nothing to commit**: the watcher returns `nothingToCommit`; the Lawspeaker
