@@ -1,0 +1,284 @@
+import { describe, expect, test } from "bun:test";
+import { join, relative, resolve } from "node:path";
+
+import {
+  REQUIRED_SUBAGENT_DEPTH,
+  buildApplyPlan,
+  buildTargets,
+  classifyLink,
+  decideSubagentDepth,
+  findSkillDirs,
+  resolveSkillNames,
+  type LinkState,
+} from "./install";
+
+// Enumeration reads the repo it ships with; `home` stays fictional so no test ever
+// touches a real HOME.
+const repoRoot = resolve(import.meta.dir, "..");
+const home = "/tmp/opencode-installer-home";
+
+describe("findSkillDirs", () => {
+  const dirs = findSkillDirs(repoRoot);
+
+  test("finds the 15 skills that carry a SKILL.md", () => {
+    expect(dirs).toHaveLength(15);
+  });
+
+  test("excludes monitor's shared support directory", () => {
+    expect(
+      dirs.some(
+        (entry) => entry.plugin === "monitor" && entry.dir === "shared",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("resolveSkillNames", () => {
+  test("leaves unique skill names alone", () => {
+    const named = resolveSkillNames([
+      { plugin: "relay", dir: "relay" },
+      { plugin: "herdr", dir: "herdr" },
+    ]);
+
+    expect(named.map((entry) => entry.name)).toEqual(["relay", "herdr"]);
+  });
+
+  test("plugin-prefixes both sides of a name collision", () => {
+    const named = resolveSkillNames([
+      { plugin: "monitor", dir: "install" },
+      { plugin: "chronicle", dir: "install" },
+      { plugin: "relay", dir: "relay" },
+    ]);
+
+    expect(named.map((entry) => entry.name)).toEqual([
+      "monitor-install",
+      "chronicle-install",
+      "relay",
+    ]);
+  });
+});
+
+describe("buildTargets", () => {
+  const targets = buildTargets(repoRoot, home);
+
+  test("builds the exact target composition", () => {
+    expect(targets).toHaveLength(32);
+    expect(
+      targets
+        .filter((target) => target.group === "skill")
+        .map((target) => target.name)
+        .sort(),
+    ).toEqual([
+      "adr",
+      "autopilot",
+      "chronicle-install",
+      "cockpit",
+      "commit",
+      "flightplan",
+      "herdr",
+      "herdr-protocol-upgrade",
+      "monitor-install",
+      "pr",
+      "preflight",
+      "relay",
+      "release",
+      "usage-dashboard",
+      "waypoints",
+    ]);
+    expect(targets.filter((target) => target.group === "plugin")).toHaveLength(
+      1,
+    );
+    expect(targets.filter((target) => target.group === "agent")).toHaveLength(
+      13,
+    );
+    expect(targets.filter((target) => target.group === "command")).toHaveLength(
+      2,
+    );
+    expect(targets.filter((target) => target.kind === "config")).toHaveLength(
+      1,
+    );
+  });
+
+  test("excludes monitor's shared support directory", () => {
+    expect(
+      targets.some((target) =>
+        target.source?.endsWith("packages/monitor/skills/shared"),
+      ),
+    ).toBe(false);
+    expect(targets.some((target) => target.name === "shared")).toBe(false);
+  });
+
+  test("installs both colliding install skills at distinct paths", () => {
+    const byName = new Map(targets.map((target) => [target.name, target]));
+
+    expect(byName.get("monitor-install")?.source).toBe(
+      join(repoRoot, "packages/monitor/skills/install"),
+    );
+    expect(byName.get("chronicle-install")?.source).toBe(
+      join(repoRoot, "packages/chronicle/skills/install"),
+    );
+  });
+
+  test("gives every target its own installed path", () => {
+    const paths = targets.map((target) => target.installed);
+
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  test("keeps every installed path within the OpenCode config directory", () => {
+    const root = join(home, ".config", "opencode");
+
+    for (const target of targets) {
+      const child = relative(root, target.installed);
+      expect(child).not.toBe("");
+      expect(child.startsWith("..") || child.startsWith("/")).toBe(false);
+    }
+  });
+});
+
+describe("classifyLink", () => {
+  const expected = join(repoRoot, "opencode", "plugin.ts");
+
+  test.each([
+    ["ok", { exists: true, isSymlink: true, resolved: expected }],
+    ["missing", { exists: false, isSymlink: false, resolved: null }],
+    [
+      "stale",
+      {
+        exists: true,
+        isSymlink: true,
+        resolved: join(repoRoot, "old", "plugin.ts"),
+      },
+    ],
+    [
+      "broken",
+      {
+        exists: false,
+        isSymlink: true,
+        resolved: join(repoRoot, "gone", "plugin.ts"),
+      },
+    ],
+    ["foreign", { exists: true, isSymlink: false, resolved: null }],
+    [
+      "foreign",
+      { exists: true, isSymlink: true, resolved: "/another/repo/plugin.ts" },
+    ],
+  ] satisfies Array<
+    [
+      LinkState,
+      { exists: boolean; isSymlink: boolean; resolved: string | null },
+    ]
+  >)("classifies %s links", (state, probe) =>
+    expect(classifyLink(probe, expected, repoRoot)).toBe(state),
+  );
+});
+
+describe("decideSubagentDepth", () => {
+  test.each([
+    [{}, "write", 2],
+    [{ subagent_depth: 1 }, "write", 2],
+    [{ subagent_depth: 2 }, "ok", 2],
+    [{ subagent_depth: 5 }, "ok", 5],
+    [{ subagent_depth: "2" }, "write", 2],
+    [[], "unparsable", 2],
+  ] as const)("decides %#", (config, action, value) => {
+    expect(decideSubagentDepth(config)).toMatchObject({ action, value });
+  });
+
+  test("does not mutate input objects", () => {
+    const sufficient = { subagent_depth: 5, theme: "q" };
+    const insufficient = { subagent_depth: 1, theme: "q" };
+
+    decideSubagentDepth(sufficient);
+    decideSubagentDepth(insufficient);
+
+    expect(sufficient).toEqual({ subagent_depth: 5, theme: "q" });
+    expect(insufficient).toEqual({ subagent_depth: 1, theme: "q" });
+    expect(REQUIRED_SUBAGENT_DEPTH).toBe(2);
+  });
+});
+
+describe("buildApplyPlan", () => {
+  const targets = buildTargets(repoRoot, home);
+  const symlinks = targets.filter((target) => target.kind === "symlink");
+
+  test("creates all 32 targets on a clean home", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "missing" as const]),
+    );
+    const plan = buildApplyPlan(targets, states, decideSubagentDepth({}));
+
+    expect(
+      plan.operations.filter(
+        (operation) =>
+          operation.action === "create" || operation.action === "write",
+      ),
+    ).toHaveLength(32);
+    expect(plan.success).toBe(true);
+  });
+
+  test("creates nothing on an already-correct home", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "ok" as const]),
+    );
+    const plan = buildApplyPlan(
+      targets,
+      states,
+      decideSubagentDepth({ subagent_depth: 2 }),
+    );
+
+    expect(
+      plan.operations.every((operation) => operation.action === "keep"),
+    ).toBe(true);
+    expect(plan.success).toBe(true);
+  });
+
+  test("replaces stale and broken links", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "ok" as LinkState]),
+    );
+    states.set(symlinks[0].installed, "stale");
+    states.set(symlinks[1].installed, "broken");
+    const plan = buildApplyPlan(
+      targets,
+      states,
+      decideSubagentDepth({ subagent_depth: 2 }),
+    );
+
+    expect(plan.operations[0].action).toBe("replace");
+    expect(plan.operations[1].action).toBe("replace");
+    expect(plan.success).toBe(true);
+  });
+
+  test("skips foreign entries and fails the plan", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "ok" as LinkState]),
+    );
+    states.set(symlinks[0].installed, "foreign");
+    const plan = buildApplyPlan(
+      targets,
+      states,
+      decideSubagentDepth({ subagent_depth: 2 }),
+    );
+
+    expect(
+      plan.operations.find((operation) => operation.target === symlinks[0])
+        ?.action,
+    ).toBe("skip");
+    expect(plan.success).toBe(false);
+  });
+
+  test("skips the config write when the file is unparsable", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "ok" as LinkState]),
+    );
+    const plan = buildApplyPlan(
+      targets,
+      states,
+      decideSubagentDepth("not json"),
+    );
+
+    expect(plan.operations.at(-1)?.action).toBe("skip");
+    expect(plan.success).toBe(false);
+  });
+});

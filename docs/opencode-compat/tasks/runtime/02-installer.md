@@ -8,7 +8,7 @@
 >
 > **Depends on**: runtime/01, assets/01, assets/02
 > **Blocks**: skills/01, skills/02, skills/03, skills/04, skills/05, skills/06
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -170,25 +170,25 @@ The installer writes **only** inside `<home>/.config/opencode/`. Never `~/.claud
 
 ## Acceptance criteria
 
-- [ ] `opencode/install.ts` exists, runs under `bun`, and supports `--check`, `--dry-run`, `--apply`, `--unlink`.
-- [ ] `buildTargets` is pure, takes `(repoRoot, home)`, and returns exactly 32 targets — 31 symlinks (15 skills + 1 plugin + 13 agents + 2 commands) plus 1 config edit.
-- [ ] Skill enumeration filters on `SKILL.md`; `packages/monitor/skills/shared` is not installed.
-- [ ] `--apply` never overwrites a foreign file or a symlink pointing outside this repo — it reports, skips, and exits non-zero.
-- [ ] `subagent_depth` is raised to 2 only when below it, every other key in the config survives, and an unparseable config prints the manual edit instead of writing.
-- [ ] `--unlink` removes only repo-owned symlinks and explicitly leaves `subagent_depth` in place.
-- [ ] `--check` warns when a legacy `~/.claude/skills/relay` symlink is present.
-- [ ] No path outside `~/.config/opencode/` is written, and no file under `packages/` is modified.
+- [x] `opencode/install.ts` exists, runs under `bun`, and supports `--check`, `--dry-run`, `--apply`, `--unlink`.
+- [x] `buildTargets` is pure, takes `(repoRoot, home)`, and returns exactly 32 targets — 31 symlinks (15 skills + 1 plugin + 13 agents + 2 commands) plus 1 config edit.
+- [x] Skill enumeration filters on `SKILL.md`; `packages/monitor/skills/shared` is not installed.
+- [x] `--apply` never overwrites a foreign file or a symlink pointing outside this repo — it reports, skips, and exits non-zero.
+- [x] `subagent_depth` is raised to 2 only when below it, every other key in the config survives, and an unparseable config prints the manual edit instead of writing.
+- [x] `--unlink` removes only repo-owned symlinks and explicitly leaves `subagent_depth` in place.
+- [x] `--check` warns when a legacy `~/.claude/skills/relay` symlink is present.
+- [x] No path outside `~/.config/opencode/` is written, and no file under `packages/` is modified.
 
 ## Verification
 
-- [ ] `bun test opencode/install.test.ts` passes.
-- [ ] `bun opencode/install.ts --check` runs against a sandbox home and prints a per-target report.
-- [ ] Sandboxed full cycle: `HOME=/tmp/install-home bun opencode/install.ts --check` (expect non-zero, all missing) → `--apply` (expect exit 0) → `--check` (expect exit 0) → `--apply` again (expect exit 0, no writes) → `--unlink` → `--check` (expect non-zero again).
-- [ ] Foreign-file run: create a real file at `/tmp/install-home/.config/opencode/agents/watcher.md`, run `--apply`, confirm the file is byte-identical afterwards and the command exited non-zero.
-- [ ] Legacy-symlink run: create `/tmp/install-home/.claude/skills/relay`, run `--check`, confirm the warning names that path.
-- [ ] Depth runs: with `{"subagent_depth": 5, "permission": "allow"}` confirm `--apply` leaves the file byte-identical; with `{"theme": "x"}` confirm `subagent_depth: 2` is added and `theme` survives; with `not json` confirm nothing is written and the manual-edit hint prints.
-- [ ] `bun test packages/` still passes — the existing Claude Code and Codex suites are unaffected.
-- [ ] Run `git status --short -- opencode/install.ts opencode/install.test.ts docs/opencode-compat/tasks/runtime/02-installer.md` and confirm those paths are dirty.
+- [x] `bun test opencode/install.test.ts` passes.
+- [x] `bun opencode/install.ts --check` runs against a sandbox home and prints a per-target report.
+- [x] Sandboxed full cycle: `HOME=/tmp/install-home bun opencode/install.ts --check` (expect non-zero, all missing) → `--apply` (expect exit 0) → `--check` (expect exit 0) → `--apply` again (expect exit 0, no writes) → `--unlink` → `--check` (expect non-zero again).
+- [x] Foreign-file run: create a real file at `/tmp/install-home/.config/opencode/agents/watcher.md`, run `--apply`, confirm the file is byte-identical afterwards and the command exited non-zero.
+- [x] Legacy-symlink run: create `/tmp/install-home/.claude/skills/relay`, run `--check`, confirm the warning names that path.
+- [x] Depth runs: with `{"subagent_depth": 5, "permission": "allow"}` confirm `--apply` leaves the file byte-identical; with `{"theme": "x"}` confirm `subagent_depth: 2` is added and `theme` survives; with `not json` confirm nothing is written and the manual-edit hint prints.
+- [x] `bun test packages/` still passes — the existing Claude Code and Codex suites are unaffected.
+- [x] Run `git status --short -- opencode/install.ts opencode/install.test.ts docs/opencode-compat/tasks/runtime/02-installer.md` and confirm those paths are dirty.
 
 ## Eval rubric
 
