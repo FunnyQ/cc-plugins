@@ -51,3 +51,9 @@ plainly. Do not imply that the update fully landed.
 - Restart from the install whose code you want to serve. The repo's
   `cockpit.ts` serves the repo. The plugin cache's `cockpit.ts` serves the
   cache.
+
+**Under OpenCode** (skip this paragraph otherwise): skills are installed at
+`~/.config/opencode/skills/cockpit/` (symlinked by `opencode/install.ts`).
+Resolve scripts from there: `bun ~/.config/opencode/skills/cockpit/scripts/…`.
+`CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it, and OpenCode
+prints no "Base directory for this skill" banner to read one from.
