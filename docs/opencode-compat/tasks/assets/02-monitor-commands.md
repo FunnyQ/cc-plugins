@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -106,23 +106,23 @@ The `nudge` conversion never had a runtime-fact dependency. Complete both halves
 
 ## Acceptance criteria
 
-- [ ] `opencode/commands/nudge.md` and `opencode/commands/thoughtful.md` both exist.
-- [ ] Neither new file contains the string `CLAUDE_PLUGIN_ROOT`.
-- [ ] `opencode/commands/nudge.md` invokes `bun ~/.config/opencode/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS` and uses the `$ARGUMENTS` token.
-- [ ] `opencode/commands/nudge.md` frontmatter carries `description` and does **not** carry `argument-hint`.
-- [ ] `opencode/commands/thoughtful.md` frontmatter parses and carries `description`.
-- [ ] `opencode/commands/thoughtful.md` still contains its Claude Code section and its Codex section, plus a new OpenCode section.
-- [ ] The OpenCode section of `opencode/commands/thoughtful.md` states that OpenCode has no SessionStart hook, so the command is the only way to enable the behavior.
-- [ ] `git diff --quiet -- packages/monitor/commands/` exits 0 — the two source commands are unchanged.
+- [x] `opencode/commands/nudge.md` and `opencode/commands/thoughtful.md` both exist.
+- [x] Neither new file contains the string `CLAUDE_PLUGIN_ROOT`.
+- [x] `opencode/commands/nudge.md` invokes `bun ~/.config/opencode/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS` and uses the `$ARGUMENTS` token.
+- [x] `opencode/commands/nudge.md` frontmatter carries `description` and does **not** carry `argument-hint`.
+- [x] `opencode/commands/thoughtful.md` frontmatter parses and carries `description`.
+- [x] `opencode/commands/thoughtful.md` still contains its Claude Code section and its Codex section, plus a new OpenCode section.
+- [x] The OpenCode section of `opencode/commands/thoughtful.md` states that OpenCode has no SessionStart hook, so the command is the only way to enable the behavior.
+- [x] `git diff --quiet -- packages/monitor/commands/` exits 0 — the two source commands are unchanged.
 
 ## Verification
 
-- [ ] Parse the frontmatter of both new files (for example `bun -e` with a YAML-block split, or `head -6` on each) and confirm each yields a non-empty `description`.
-- [ ] `grep -c CLAUDE_PLUGIN_ROOT opencode/commands/nudge.md opencode/commands/thoughtful.md` reports 0 for both.
-- [ ] `git diff --quiet -- packages/monitor/commands/ && echo UNCHANGED` prints `UNCHANGED`.
-- [ ] Sandbox round-trip: with the commands symlinked into a sandboxed `~/.config/opencode/commands/`, run `/nudge status` in an OpenCode session and confirm it prints the effective scope breakdown rather than an error about an unresolved path.
-- [ ] Best-effort `/thoughtful` smoke run in an OpenCode session — confirm the agent reads the OpenCode section and attempts a task-subagent spawn. Requires a running cockpit daemon; record it as not-run if the daemon is unavailable rather than claiming a pass.
-- [ ] `git status --short -- opencode/commands docs/opencode-compat/tasks/assets/02-monitor-commands.md` shows both paths dirty.
+- [x] Parse the frontmatter of both new files (for example `bun -e` with a YAML-block split, or `head -6` on each) and confirm each yields a non-empty `description`.
+- [x] `grep -c CLAUDE_PLUGIN_ROOT opencode/commands/nudge.md opencode/commands/thoughtful.md` reports 0 for both.
+- [x] `git diff --quiet -- packages/monitor/commands/ && echo UNCHANGED` prints `UNCHANGED`.
+- [x] Sandbox round-trip: with the commands symlinked into a sandboxed `~/.config/opencode/commands/`, run `/nudge status` in an OpenCode session and confirm it prints the effective scope breakdown rather than an error about an unresolved path.
+- [x] Best-effort `/thoughtful` smoke run in an OpenCode session — confirm the agent reads the OpenCode section and attempts a task-subagent spawn. Requires a running cockpit daemon; record it as not-run if the daemon is unavailable rather than claiming a pass.
+- [x] `git status --short -- opencode/commands docs/opencode-compat/tasks/assets/02-monitor-commands.md` shows both paths dirty.
 
 ## Eval rubric
 

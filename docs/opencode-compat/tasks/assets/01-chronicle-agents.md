@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: runtime/02, skills/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -127,25 +127,25 @@ Both live in `../_context/runtime-facts.md`. If either is still `UNRESOLVED` whe
 
 ## Acceptance criteria
 
-- [ ] Exactly 13 files exist under `opencode/agents/`, named for the 13 chronicle agents.
-- [ ] Every file's YAML frontmatter parses.
-- [ ] No file contains a `model` field or an `effort` field.
-- [ ] Every file carries `mode: subagent` and `hidden: true`.
-- [ ] `steps: 15` appears on exactly three files: `lawspeaker.md`, `lorekeeper.md`, `storykeeper.md`.
-- [ ] `task: allow` appears on exactly those same three files, and on no other.
-- [ ] Each file's `permission` map matches its source `tools` array under the mapping table above, with `Edit`/`Write` collapsed to one `edit` key.
-- [ ] Each `description` is byte-identical to its source.
-- [ ] All 13 names a chronicle skill spawns are present: `lawspeaker`, `watcher`, `runesmith`, `storykeeper`, `skald`, `messenger`, `lorekeeper`, `gleaner`, `reckoner`, `codifier`, `barrowkeeper`, `skirnir`, `annalist`.
-- [ ] No body contains `subagent_type: "chronicle:<name>"` — the prefix is dropped.
-- [ ] `git diff --quiet -- packages/chronicle/agents/` exits 0, proving the Claude definitions are unchanged.
+- [x] Exactly 13 files exist under `opencode/agents/`, named for the 13 chronicle agents.
+- [x] Every file's YAML frontmatter parses.
+- [x] No file contains a `model` field or an `effort` field.
+- [x] Every file carries `mode: subagent` and `hidden: true`.
+- [x] `steps: 15` appears on exactly three files: `lawspeaker.md`, `lorekeeper.md`, `storykeeper.md`.
+- [x] `task: allow` appears on exactly those same three files, and on no other.
+- [x] Each file's `permission` map matches its source `tools` array under the mapping table above, with `Edit`/`Write` collapsed to one `edit` key.
+- [x] Each `description` is byte-identical to its source.
+- [x] All 13 names a chronicle skill spawns are present: `lawspeaker`, `watcher`, `runesmith`, `storykeeper`, `skald`, `messenger`, `lorekeeper`, `gleaner`, `reckoner`, `codifier`, `barrowkeeper`, `skirnir`, `annalist`.
+- [x] No body contains `subagent_type: "chronicle:<name>"` — the prefix is dropped.
+- [x] `git diff --quiet -- packages/chronicle/agents/` exits 0, proving the Claude definitions are unchanged.
 
 ## Verification
 
-- [ ] Parse the frontmatter of all 13 files and print `name → keys present`; confirm no `model`/`effort` anywhere and `steps`/`task` on exactly the three orchestrators.
-- [ ] Diff each new body against its source and read the differences; confirm every one is a listed adjustment and nothing else drifted.
-- [ ] `grep -rn 'chronicle:' opencode/agents/` returns no `subagent_type` hit.
-- [ ] Run `git diff --quiet -- packages/chronicle/agents/ && echo UNCHANGED` and confirm it prints `UNCHANGED`.
-- [ ] Run `git status --short -- opencode/agents docs/opencode-compat/tasks/assets/01-chronicle-agents.md` and confirm both paths are dirty. Other paths in the working tree belong to work running alongside this task; make no claim about them.
+- [x] Parse the frontmatter of all 13 files and print `name → keys present`; confirm no `model`/`effort` anywhere and `steps`/`task` on exactly the three orchestrators.
+- [x] Diff each new body against its source and read the differences; confirm every one is a listed adjustment and nothing else drifted.
+- [x] `grep -rn 'chronicle:' opencode/agents/` returns no `subagent_type` hit.
+- [x] Run `git diff --quiet -- packages/chronicle/agents/ && echo UNCHANGED` and confirm it prints `UNCHANGED`.
+- [x] Run `git status --short -- opencode/agents docs/opencode-compat/tasks/assets/01-chronicle-agents.md` and confirm both paths are dirty. Other paths in the working tree belong to work running alongside this task; make no claim about them.
 
 ## Eval rubric
 

@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -144,24 +144,24 @@ Never spawn a real shell, a real script, or a real OpenCode process in a unit te
 
 ## Acceptance criteria
 
-- [ ] `opencode/plugin.ts` exists and contains no import of any file inside this repository.
-- [ ] **`opencode/plugin.ts` has exactly one `export`, and its value is a function.** No `id`, no version, no constant, no re-exported type. Anything else silently disables every hook (S18).
-- [ ] The module was loaded by a real OpenCode session and observed to initialize — not merely evaluated. A module-level side effect proves evaluation; only a log line from inside the plugin function proves initialization.
-- [ ] The module reads no configuration file and no harness environment variable; the repo root derives from `import.meta.dir`.
-- [ ] `hookPayload`, `guardVerdict`, and `lintVerdict` are exported and pure — no spawning, no file I/O, no clock, no environment access.
-- [ ] A protected-branch commit raises the branch guard's own `systemMessage` verbatim, with no wording added or removed.
-- [ ] A missing script, an unparseable hook output, and a non-`2` non-zero exit each produce a silent no-op rather than an error.
-- [ ] `packages/chronicle/hooks/check-branch.sh` and `packages/dispatch/hooks/flightplan-lint.sh` are unmodified.
-- [ ] Every claim in this file that rests on a runtime fact cites which one, and no such fact was still `UNRESOLVED` when the code was written.
+- [x] `opencode/plugin.ts` exists and contains no import of any file inside this repository.
+- [x] **`opencode/plugin.ts` has exactly one `export`, and its value is a function.** No `id`, no version, no constant, no re-exported type. Anything else silently disables every hook (S18).
+- [x] The module was loaded by a real OpenCode session and observed to initialize — not merely evaluated. A module-level side effect proves evaluation; only a log line from inside the plugin function proves initialization.
+- [x] The module reads no configuration file and no harness environment variable; the repo root derives from `import.meta.dir`.
+- [x] `hookPayload`, `guardVerdict`, and `lintVerdict` are exported and pure — no spawning, no file I/O, no clock, no environment access.
+- [x] A protected-branch commit raises the branch guard's own `systemMessage` verbatim, with no wording added or removed.
+- [x] A missing script, an unparseable hook output, and a non-`2` non-zero exit each produce a silent no-op rather than an error.
+- [x] `packages/chronicle/hooks/check-branch.sh` and `packages/dispatch/hooks/flightplan-lint.sh` are unmodified.
+- [x] Every claim in this file that rests on a runtime fact cites which one, and no such fact was still `UNRESOLVED` when the code was written.
 
 ## Verification
 
-- [ ] Run `grep -c '^export' opencode/plugin.ts` and confirm it prints `1`.
-- [ ] Run `bun test opencode/plugin.test.ts` — all tests pass.
-- [ ] Run `bun test packages/` — the existing suites still pass, confirming nothing under `packages/` shifted.
-- [ ] Run `git status --short -- opencode/plugin.ts opencode/plugin.test.ts docs/opencode-compat/tasks/runtime/01-plugin-module.md` and confirm those paths are dirty. Make no claim about any other path; sibling work shares this working tree.
-- [ ] Run `git diff --stat -- packages/chronicle/hooks/check-branch.sh packages/dispatch/hooks/flightplan-lint.sh` and confirm it prints nothing.
-- [ ] Run `grep -nE "^\s*import .* from ['\"][./]" opencode/plugin.ts` and confirm it prints nothing.
+- [x] Run `grep -c '^export' opencode/plugin.ts` and confirm it prints `1`.
+- [x] Run `bun test opencode/plugin.test.ts` — all tests pass.
+- [x] Run `bun test packages/` — the existing suites still pass, confirming nothing under `packages/` shifted.
+- [x] Run `git status --short -- opencode/plugin.ts opencode/plugin.test.ts docs/opencode-compat/tasks/runtime/01-plugin-module.md` and confirm those paths are dirty. Make no claim about any other path; sibling work shares this working tree.
+- [x] Run `git diff --stat -- packages/chronicle/hooks/check-branch.sh packages/dispatch/hooks/flightplan-lint.sh` and confirm it prints nothing.
+- [x] Run `grep -nE "^\s*import .* from ['\"][./]" opencode/plugin.ts` and confirm it prints nothing.
 
 ## Eval rubric
 
