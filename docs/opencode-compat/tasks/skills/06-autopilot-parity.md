@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: runtime/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -88,21 +88,21 @@ If a blocking fact is still marked `UNRESOLVED`, set this file's header to `> **
 
 ## Acceptance criteria
 
-- [ ] No OpenCode-facing instruction added by this task uses `CLAUDE_PLUGIN_ROOT`.
-- [ ] The OpenCode block names all eight steps of the manual wave loop, in order, and states the "behaviorally close, not identical — no automatic parallel-wave scheduling" caveat in the skill text itself.
-- [ ] Neither spawn step names a `subagent_type` value that has no corresponding agent definition or confirmed built-in type.
-- [ ] The OpenCode block cannot be confused with the pre-existing external-engine text; the distinction between running under OpenCode and delegating out to it is unambiguous.
-- [ ] `packages/dispatch/skills/autopilot/references/orchestrator.md` carries a note that it describes the Claude Code Workflow path, and the script body itself is otherwise unchanged.
-- [ ] Every file changed under `packages/dispatch` is a `.md` file.
-- [ ] Every pre-existing Claude and Codex instruction survives unmodified; the diff contains additions only, no rewritten or reordered lines.
+- [x] No OpenCode-facing instruction added by this task uses `CLAUDE_PLUGIN_ROOT`.
+- [x] The OpenCode block names all eight steps of the manual wave loop, in order, and states the "behaviorally close, not identical — no automatic parallel-wave scheduling" caveat in the skill text itself.
+- [x] Neither spawn step names a `subagent_type` value that has no corresponding agent definition or confirmed built-in type.
+- [x] The OpenCode block cannot be confused with the pre-existing external-engine text; the distinction between running under OpenCode and delegating out to it is unambiguous.
+- [x] `packages/dispatch/skills/autopilot/references/orchestrator.md` carries a note that it describes the Claude Code Workflow path, and the script body itself is otherwise unchanged.
+- [x] Every file changed under `packages/dispatch` is a `.md` file.
+- [x] Every pre-existing Claude and Codex instruction survives unmodified; the diff contains additions only, no rewritten or reordered lines.
 
 ## Verification
 
-- [ ] Run `grep -n "CLAUDE_PLUGIN_ROOT" packages/dispatch/skills/autopilot/SKILL.md` and confirm every hit is a pre-existing Claude-facing warning, none inside a block added by this task.
-- [ ] Run `grep -n "Workflow" packages/dispatch/skills/autopilot/SKILL.md` and confirm the new OpenCode block states the tool is absent there, without contradicting the existing Claude Code statements.
-- [ ] Run `git diff --name-only -- packages/dispatch` and confirm every listed path ends in `.md`.
-- [ ] Run `git diff --stat -- packages/dispatch/skills/autopilot/references/orchestrator.md` and confirm the change is an insertion only, with zero deleted lines.
-- [ ] Run `git status --short -- packages/dispatch/skills/autopilot docs/opencode-compat/tasks/skills/06-autopilot-parity.md` and confirm both paths are dirty.
+- [x] Run `grep -n "CLAUDE_PLUGIN_ROOT" packages/dispatch/skills/autopilot/SKILL.md` and confirm every hit is a pre-existing Claude-facing warning, none inside a block added by this task.
+- [x] Run `grep -n "Workflow" packages/dispatch/skills/autopilot/SKILL.md` and confirm the new OpenCode block states the tool is absent there, without contradicting the existing Claude Code statements.
+- [x] Run `git diff --name-only -- packages/dispatch` and confirm every listed path ends in `.md`.
+- [x] Run `git diff --stat -- packages/dispatch/skills/autopilot/references/orchestrator.md` and confirm the change is an insertion only, with zero deleted lines.
+- [x] Run `git status --short -- packages/dispatch/skills/autopilot docs/opencode-compat/tasks/skills/06-autopilot-parity.md` and confirm both paths are dirty.
 
 ## Eval rubric
 
