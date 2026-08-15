@@ -112,7 +112,11 @@ The loader iterates the module's exported values and calls each one. A string ex
 
 **Question**: what is the bash command's argument path in the `tool.execute.before` input — `input.args.command`? And can a bash invocation run a long-lived background process (needed for launching the usage dashboard server)?
 
-**Status**: **RESOLVED — the args live on the SECOND parameter, not the first.** The handler signature is `(input, output)`. `input` carries only `{ tool, sessionID, callID }`. The arguments are `output.args`:
+**Status**: **RESOLVED — both halves.** They were observed in separate runs, so read the two sub-entries below rather than this header alone. An earlier revision marked the whole entry `RESOLVED` while only S5a held, and a gate keyed on the header string let a task through that S5b should have blocked.
+
+### S5a — argument path
+
+**RESOLVED — the args live on the SECOND parameter, not the first.** The handler signature is `(input, output)`. `input` carries only `{ tool, sessionID, callID }`. The arguments are `output.args`:
 
 ```
 bash  → output.args = { command: "echo hello-from-bash" }
@@ -121,7 +125,21 @@ write → output.args = { filePath: "/abs/path/done.txt", content: "DONE" }
 
 **Decision**: the branch guard reads `output.args.command`; the lint gate reads `output.args.filePath`. Writing `input.args.command` — the shape this plan originally guessed — yields `undefined` and silently disables both hooks.
 
-Background process support is still untested.
+### S5b — background process support
+
+**RESOLVED — there is no background parameter; shell detachment works.**
+
+The bash tool takes exactly one argument, `command`. Observed through a probe plugin's `tool.execute.before` on opencode 1.18.18, in a run that explicitly instructed the model to pass a background parameter if one existed:
+
+```
+{"at":"before","tool":"bash","args":{"command":"nohup bash -c \"sleep 200; …\" … & echo \"launched pid $!\""}}
+```
+
+No `run_in_background`, `runInBackground`, or `background_run` string exists anywhere in `opencode.exe`; every `background` hit in the binary is CSS.
+
+Shell-level detachment does survive. `nohup bash -c "sleep 200; …" … &` returned pid `61709`; that process was confirmed still running at 49s elapsed, well after the `opencode run` invocation had returned and the session had ended. It was killed during cleanup, so completion past that point was not observed — survival past session exit was, and that is the property a long-lived server needs.
+
+**Decision**: instruct OpenCode sessions to detach with `… &`. Do not tell them to pass a background flag — there is none. This is the same wording the existing harness-agnostic paragraph already uses, so the OpenCode section states the fact explicitly rather than leaving the reader to infer it.
 
 ---
 
