@@ -24,6 +24,51 @@ const FLIGHTPLAN_TASK =
 const OPENCODE_SPAWN_NOTE =
   'OPENCODE: ignore any Agent(subagent_type: "fork") instruction above — that tool does not exist here. Spawn with the task tool as `general`, and pass the parent session id literally in the prompt, because an OpenCode subagent inherits no context.';
 
+// S19: the session scripts write guidance Claude consumes as hook context, but
+// OpenCode feeds the model from the system prompt, not from plugin output — a
+// console write would be red TUI noise the model never reads. The event hooks
+// stash guidance here, and experimental.chat.system.transform injects it into
+// the next request and consumes it, so each message reaches the model exactly
+// once, the way Claude's additionalContext does.
+//
+// Lifecycle: a stash that no request ever consumes (a session that ends right
+// after its last nudge, or a created-stash for a session the user never sends
+// a message to) would otherwise accumulate one entry per session while the
+// server lives. Guidance is time-sensitive, so the cap keeps the map bounded
+// by evicting the least-recently-stashed entries — an unconsumed stash is
+// garbage, never a delivery promise. TUI runs die with the server; the cap
+// covers `serve`.
+const PENDING_GUIDANCE = new Map<string, string[]>();
+const GUIDANCE_CAP = 32;
+
+/** Append a message to a session's pending guidance and enforce the cap.
+ *  Map iteration order is insertion order, so the oldest key comes first —
+ *  but `set` on an existing key keeps its original position, which would make
+ *  a long-lived session the first one evicted. Delete before re-inserting so
+ *  the freshest stash moves to the back and the eviction is genuinely LRU. */
+function stashPending(
+  pending: Map<string, string[]>,
+  sessionID: string,
+  message: string,
+  cap = GUIDANCE_CAP,
+): void {
+  const messages = [...(pending.get(sessionID) ?? []), message];
+  pending.delete(sessionID);
+  pending.set(sessionID, messages);
+  while (pending.size > cap) pending.delete(pending.keys().next().value!);
+}
+
+/** Take a session's pending guidance, if any, and clear it. */
+function consumePending(
+  pending: Map<string, string[]>,
+  sessionID: string,
+): string[] | null {
+  const messages = pending.get(sessionID);
+  if (!messages?.length) return null;
+  pending.delete(sessionID);
+  return messages;
+}
+
 function hookPayload(kind: HookKind, value: string): string {
   return JSON.stringify({ tool_input: { [kind]: value } });
 }
@@ -98,15 +143,41 @@ function withOpenCodeNote(message: string | null): string | null {
   return trimmed ? `${trimmed}\n\n${OPENCODE_SPAWN_NOTE}` : null;
 }
 
+// client.app.log is the structured logging surface — plugin stderr would be
+// rendered red in the TUI, so genuine failures go here instead of the console.
+type PluginClient = {
+  app: {
+    log: (options: {
+      body: {
+        service: string;
+        level: "debug" | "info" | "error" | "warn";
+        message: string;
+      };
+    }) => Promise<unknown> | unknown;
+  };
+};
+
+async function logFailure(client: PluginClient | undefined, message: string) {
+  try {
+    await client?.app.log({
+      body: { service: "q-lab", level: "error", message },
+    });
+  } catch {
+    // The log endpoint is best-effort; never let it break a hook.
+  }
+}
+
 const QLabPlugin = Object.assign(
   async function QLabPlugin(context?: {
     directory?: string;
     worktree?: string;
+    client?: PluginClient;
   }) {
     // S8: symlink-loaded modules expose the checkout's real directory here.
     const root = dirname(import.meta.dir);
     // S11: the plugin context carries the session's worktree and directory.
     const cwd = context?.worktree ?? context?.directory ?? process.cwd();
+    const client = context?.client;
 
     return {
       // S1/S2: created is session-scoped and idle is turn-scoped.
@@ -124,8 +195,12 @@ const QLabPlugin = Object.assign(
               "{}",
             );
             const message = withOpenCodeNote(result?.stdout ?? null);
-            if (message) console.error(message);
-            if (result?.stderr) console.error(result.stderr.trimEnd());
+            if (message && sessionID) {
+              stashPending(PENDING_GUIDANCE, sessionID, message);
+            }
+            if (result?.stderr) {
+              await logFailure(client, result.stderr.trimEnd());
+            }
           }
 
           if (event.type === "session.idle") {
@@ -140,13 +215,34 @@ const QLabPlugin = Object.assign(
             const message = withOpenCodeNote(
               result ? sessionMessage(result.stdout) : null,
             );
-            if (message) console.error(message);
-            if (result?.stderr) console.error(result.stderr.trimEnd());
+            if (message && sessionID) {
+              // Append to anything still pending (a created-guidance never
+              // consumed, for instance) so both reach the model in order.
+              stashPending(PENDING_GUIDANCE, sessionID, message);
+            }
+            if (result?.stderr) {
+              await logFailure(client, result.stderr.trimEnd());
+            }
           }
         } catch {
-          // Session handlers log to stderr and never throw.
-          console.error("q-lab session hook failed");
+          // Session handlers log and never throw.
+          await logFailure(client, "q-lab session hook failed");
         }
+      },
+
+      // S19: the model reads guidance from the system prompt. Consume-on-first-
+      // request mirrors Claude's additionalContext, which also lands once. The
+      // idle stash is spawned asynchronously, so a message sent immediately
+      // after an idle turn may beat the stash and defer the nudge one turn.
+      "experimental.chat.system.transform": async (
+        input: { sessionID?: string },
+        output: { system: string[] },
+      ) => {
+        const pending = input.sessionID
+          ? consumePending(PENDING_GUIDANCE, input.sessionID)
+          : null;
+        if (!pending) return;
+        output.system.push(...pending);
       },
 
       "tool.execute.before": async (
@@ -202,6 +298,9 @@ const QLabPlugin = Object.assign(
     hookPayload,
     lintVerdict,
     withOpenCodeNote,
+    stashPending,
+    consumePending,
+    GUIDANCE_CAP,
     COMMIT_COMMAND,
     FLIGHTPLAN_TASK,
   },

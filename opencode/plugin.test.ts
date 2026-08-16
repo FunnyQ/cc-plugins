@@ -10,6 +10,9 @@ const {
   hookPayload,
   lintVerdict,
   withOpenCodeNote,
+  stashPending,
+  consumePending,
+  GUIDANCE_CAP,
   COMMIT_COMMAND,
   FLIGHTPLAN_TASK,
 } = QLabPlugin;
@@ -167,12 +170,15 @@ describe("tool.execute.after handler", () => {
     const hooks = await QLabPlugin({ directory: root });
     const output = { output: "" };
     try {
-      await hooks["tool.execute.after"]({
-        tool,
-        sessionID: "ses_test",
-        callID: "call_test",
-        args: { filePath },
-      }, output);
+      await hooks["tool.execute.after"](
+        {
+          tool,
+          sessionID: "ses_test",
+          callID: "call_test",
+          args: { filePath },
+        },
+        output,
+      );
       return output;
     } catch (thrown) {
       return { output: output.output, thrown };
@@ -223,4 +229,130 @@ describe("withOpenCodeNote", () => {
   test.each([null, "", "   \n"])("stays null for %p", (message) =>
     expect(withOpenCodeNote(message)).toBeNull(),
   );
+});
+
+// S19: guidance must reach the model via the system prompt, not the TUI. A
+// session.created run stashes the decision-log guidance; the transform hook
+// pushes it into the system prompt exactly once.
+describe("experimental.chat.system.transform", () => {
+  const root = dirname(import.meta.dir);
+
+  async function createdAndTransform(
+    sessionID = "ses_guidance",
+  ): Promise<{ system: string[] }> {
+    const hooks = await QLabPlugin({ directory: root });
+    await hooks.event({
+      event: { type: "session.created", properties: { sessionID } },
+    });
+    const output = { system: ["base system prompt"] };
+    await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+    return output;
+  }
+
+  test("injects the decision-log guidance into the system prompt", async () => {
+    const { system } = await createdAndTransform();
+
+    expect(system[0]).toBe("base system prompt");
+    expect(system[1]).toContain("DECISION LOG ACTIVE");
+    expect(system[1]).toContain("task tool");
+  });
+
+  test("consumes the guidance after the first request", async () => {
+    const hooks = await QLabPlugin({ directory: root });
+    const sessionID = "ses_once";
+    await hooks.event({
+      event: { type: "session.created", properties: { sessionID } },
+    });
+    const first = { system: ["base"] };
+    await hooks["experimental.chat.system.transform"]({ sessionID }, first);
+    const second = { system: ["base"] };
+    await hooks["experimental.chat.system.transform"]({ sessionID }, second);
+
+    expect(first.system).toHaveLength(2);
+    expect(second.system).toHaveLength(1);
+  });
+
+  test("no-ops without a session id or without pending guidance", async () => {
+    const hooks = await QLabPlugin({ directory: root });
+    const output = { system: ["base"] };
+
+    await hooks["experimental.chat.system.transform"]({}, output);
+    expect(output.system).toHaveLength(1);
+
+    await hooks["experimental.chat.system.transform"](
+      { sessionID: "ses_unknown" },
+      output,
+    );
+    expect(output.system).toHaveLength(1);
+  });
+});
+
+// The stash/consume pair is the append-order branch the event handlers share —
+// unit-testing the pure helpers covers the ordering the idle handler promises
+// without forcing scribe-nudge to actually fire (git repo, code change,
+// throttle, marker file).
+describe("stashPending / consumePending", () => {
+  test("appends in order and consumes them all at once", () => {
+    const pending = new Map<string, string[]>();
+
+    stashPending(pending, "ses_x", "created-guidance");
+    stashPending(pending, "ses_x", "idle-nudge");
+
+    expect(consumePending(pending, "ses_x")).toEqual([
+      "created-guidance",
+      "idle-nudge",
+    ]);
+    // Consumed: a second take finds nothing.
+    expect(consumePending(pending, "ses_x")).toBeNull();
+  });
+
+  test("keeps sessions independent", () => {
+    const pending = new Map<string, string[]>();
+
+    stashPending(pending, "ses_a", "a");
+    stashPending(pending, "ses_b", "b");
+    expect(consumePending(pending, "ses_a")).toEqual(["a"]);
+    expect(consumePending(pending, "ses_b")).toEqual(["b"]);
+  });
+
+  test("returns null when nothing is pending", () => {
+    expect(consumePending(new Map(), "ses_missing")).toBeNull();
+  });
+
+  test("caps the map by evicting the oldest session", () => {
+    const pending = new Map<string, string[]>();
+
+    for (let i = 0; i < GUIDANCE_CAP + 5; i++) {
+      stashPending(pending, `ses_${i}`, `guidance-${i}`);
+    }
+
+    expect(pending.size).toBe(GUIDANCE_CAP);
+    // The five oldest sessions were evicted; the newest still resolve.
+    expect(consumePending(pending, "ses_0")).toBeNull();
+    expect(pending.has("ses_4")).toBe(false);
+    expect(consumePending(pending, `ses_${GUIDANCE_CAP + 4}`)).toEqual([
+      `guidance-${GUIDANCE_CAP + 4}`,
+    ]);
+  });
+
+  test("re-stashing keeps a session alive past the cap", () => {
+    const pending = new Map<string, string[]>();
+
+    // The oldest key by first insertion, but the most recently active session.
+    stashPending(pending, "ses_live", "created-guidance");
+    for (let i = 0; i < GUIDANCE_CAP - 1; i++) {
+      stashPending(pending, `ses_dead_${i}`, `guidance-${i}`);
+    }
+    stashPending(pending, "ses_live", "idle-nudge");
+    // One more session pushes the map over the cap.
+    stashPending(pending, "ses_new", "new-guidance");
+
+    expect(pending.size).toBe(GUIDANCE_CAP);
+    expect(consumePending(pending, "ses_live")).toEqual([
+      "created-guidance",
+      "idle-nudge",
+    ]);
+    // The genuinely-stalest session took the eviction instead.
+    expect(pending.has("ses_dead_0")).toBe(false);
+  });
 });

@@ -109,6 +109,7 @@ Full write-ups, each with its observation and the decision it drove, live in `do
 - **S13** — all three legs of the cockpit send bridge respond, but `/tui/append-prompt` returns `200 true` **with no TUI attached**, and `opencode serve` is excluded from the bridge's `ps` discovery.
 - **S1 / S2** — full event list captured; `session.idle` is turn-scoped, not tool-scoped. Resume behavior and multi-turn idle cadence remain untested.
 - **S12** — still open, and never a gate.
+- **S19** — plugin stderr renders **red in the TUI and never reaches the model**; the model reads only the system prompt. Verified live: `experimental.chat.system.transform` (`{ sessionID?, model }` → `output.system: string[]`) appends strings the model demonstrably reads, so the session guidance stashed by `session.created`/`session.idle` is injected there, consume-on-first-request, mirroring Claude's `additionalContext`. Failures go to `client.app.log` instead — the TUI shows nothing, so debug with `opencode run --print-logs`. The stash map is capped (least-recently-stashed evicted) because guidance is time-sensitive and a session ending right after its last nudge would otherwise leave one never-consumed entry per session while a `serve` process lives.
 
 ## Method note
 
