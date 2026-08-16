@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 import { QLabPlugin } from "./plugin";
 
@@ -116,6 +119,95 @@ describe("FLIGHTPLAN_TASK", () => {
   ])("gates %p", (path, expected) =>
     expect(FLIGHTPLAN_TASK.test(path)).toBe(expected),
   );
+});
+
+const VALID_TASK_WITH_PLAN_REF = `# RUNTIME-01: Lint fixture
+
+> **Required reading**:
+> - \`../_context/shared.md\`
+>
+> **Depends on**: none
+> **Status**: todo
+
+## Goal
+One sentence.
+
+## Files to create / modify
+- a.ts (new)
+
+## Acceptance criteria
+- [ ] One
+
+## Verification
+- [ ] Run \`bun test\`
+
+## Eval rubric
+
+> Each dimension 0\u20135; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
+
+| Dimension | Weight | 4\u20135 (pass) |
+|---|---|---|
+| Correctness | \u00d73 | correct |
+| Test coverage | \u00d71 | covers edges |
+
+See PLAN.md for the broader plan.
+`;
+
+// End-to-end through the real handler. The hook contract is the regression
+// under test: after-hooks receive the arguments on the FIRST parameter
+// (`input.args`) and the tool result on the second — the before-hook shape
+// (`output.args`) throws on write/edit and fails the tool call.
+describe("tool.execute.after handler", () => {
+  const root = dirname(import.meta.dir);
+
+  async function lintHook(
+    filePath: string,
+    tool = "write",
+  ): Promise<{ output: string; thrown?: unknown }> {
+    const hooks = await QLabPlugin({ directory: root });
+    const output = { output: "" };
+    try {
+      await hooks["tool.execute.after"]({
+        tool,
+        sessionID: "ses_test",
+        callID: "call_test",
+        args: { filePath },
+      }, output);
+      return output;
+    } catch (thrown) {
+      return { output: output.output, thrown };
+    }
+  }
+
+  test("a write outside the task tree is a silent no-op", async () => {
+    const { output, thrown } = await lintHook("packages/foo/src/bar.ts");
+    expect(thrown).toBeUndefined();
+    expect(output).toBe("");
+  });
+
+  test("a non-write tool is a silent no-op even with a task path", async () => {
+    const { output, thrown } = await lintHook(
+      "docs/x/tasks/runtime/01-x.md",
+      "bash",
+    );
+    expect(thrown).toBeUndefined();
+    expect(output).toBe("");
+  });
+
+  test("appends lint feedback to the result for a violating task file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "qlab-lint-"));
+    try {
+      const filePath = join(dir, "docs", "x", "tasks", "runtime", "01-x.md");
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, VALID_TASK_WITH_PLAN_REF);
+
+      const { output, thrown } = await lintHook(filePath);
+      expect(thrown).toBeUndefined();
+      expect(output).toContain("flightplan lint violations");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("withOpenCodeNote", () => {

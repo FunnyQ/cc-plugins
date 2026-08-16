@@ -171,21 +171,23 @@ const QLabPlugin = Object.assign(
       },
 
       "tool.execute.after": async (
-        input: { tool: string },
-        output: { args: { filePath?: unknown }; output: string },
+        input: { tool: string; args: { filePath?: unknown } },
+        output: { output: string },
       ) => {
-        // S5: tool arguments live on the second handler parameter.
+        // S5a is before-hook-specific: after-hooks carry the arguments on the
+        // FIRST parameter (`input.args`) and the tool result on the second —
+        // reading output.args.filePath here throws and fails the write.
         if (
           (input.tool !== "write" && input.tool !== "edit") ||
-          typeof output.args.filePath !== "string"
+          typeof input.args.filePath !== "string"
         ) {
           return;
         }
-        if (!FLIGHTPLAN_TASK.test(output.args.filePath)) return;
+        if (!FLIGHTPLAN_TASK.test(input.args.filePath)) return;
 
         const result = await run(
           [join(root, FLIGHTPLAN_LINT)],
-          hookPayload("file_path", output.args.filePath),
+          hookPayload("file_path", input.args.filePath),
         );
         if (!result) return;
 

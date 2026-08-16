@@ -104,6 +104,8 @@ The loader iterates the module's exported values and calls each one. A string ex
 
 **Status**: **RESOLVED — mutate `output.output`.** The hook fires for both `write` and `bash`. `output` carries `{ title, metadata, output, attachments }`. Appending to `output.output` surfaces the text to the user's transcript **and** to the agent's view of the tool result; the write still lands. Observed: the agent quoted back *"Wrote file successfully. / [PROBE LINT] violation surfaced via output mutation"*.
 
+**Correction (post-spike, from a live failure)**: the **after-hook argument path differs from the before-hook**. `tool.execute.after` receives the arguments on the **first** parameter — `input.args = { filePath, content }` — and the tool result on the second. The S5a shape (`output.args`) is before-hook-only; reading `output.args.filePath` in the after-hook throws `undefined is not an object`, which fails the write/edit call after the file has already landed. The flightplan lint gate must read `input.args.filePath`.
+
 **Decision**: the lint appends the script's stderr to `output.output`. No throw — this matches the Claude `PostToolUse` exit-2 semantics, where the write has already landed and the feedback is advisory.
 
 ---
@@ -122,6 +124,8 @@ The loader iterates the module's exported values and calls each one. A string ex
 bash  → output.args = { command: "echo hello-from-bash" }
 write → output.args = { filePath: "/abs/path/done.txt", content: "DONE" }
 ```
+
+**Scope**: this holds for `tool.execute.before` **only**. `tool.execute.after` inverts the shape — args on `input.args`, result on `output` (see S4's correction). Generalizing S5a to the after-hook produced a real bug: the flightplan lint gate read `output.args.filePath`, threw `undefined is not an object`, and failed every write/edit call.
 
 **Decision**: the branch guard reads `output.args.command`; the lint gate reads `output.args.filePath`. Writing `input.args.command` — the shape this plan originally guessed — yields `undefined` and silently disables both hooks.
 

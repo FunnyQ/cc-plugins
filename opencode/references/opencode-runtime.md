@@ -96,7 +96,7 @@ Isolate some other way for the remaining items — a scratch project directory w
 Full write-ups, each with its observation and the decision it drove, live in `docs/opencode-compat/tasks/_context/runtime-facts.md`. Headlines:
 
 - **S18 (new, critical)** — `export const id` **prevents the plugin from loading**. The loader calls each exported value; a string export poisons the loop, the module evaluates, nothing errors, and every hook silently does nothing. Export the plugin function and nothing else.
-- **S5a** — tool arguments are on the **second** handler parameter: `output.args.command`, `output.args.filePath`. `input` carries only `{ tool, sessionID, callID }`. The shape this plan first guessed returns `undefined`.
+- **S5a** — `tool.execute.before` carries tool arguments on the **second** handler parameter: `output.args.command`, `output.args.filePath`. `input` carries only `{ tool, sessionID, callID }`. `tool.execute.after` inverts this — args on `input.args`, result on `output` — and a post-spike live failure confirmed that reading the before-hook shape in the after-hook throws and fails the write after it has landed.
 - **S5b** — the bash tool takes **only** `command`; there is no background parameter (no `run_in_background`/`runInBackground`/`background_run` string exists in the binary). Shell detachment works instead: `nohup … &` returned a pid that outlived the `opencode run` invocation. So a long-lived server launches with `… &`, never with a flag.
 - **S3** — throwing in `tool.execute.before` blocks the command and surfaces the message verbatim. Exactly what the branch guard needs.
 - **S4** — a lint violation is surfaced by appending to `output.output`; the write has already landed.
