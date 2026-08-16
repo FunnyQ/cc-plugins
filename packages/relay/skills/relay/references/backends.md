@@ -184,26 +184,12 @@ Install through the repo's OpenCode installer, run from the checkout — it syml
 bun opencode/install.ts --apply
 ```
 
-**Legacy — this is the old manual install method:**
-
-```bash
-ln -s <repo>/packages/relay/skills/relay ~/.claude/skills/relay
-```
-
-Replace `<repo>` with the absolute path to the cc-plugins repository. Example:
-
-```bash
-ln -s /Users/funnyq/Projects/q-lab/cc-plugins/packages/relay/skills/relay ~/.claude/skills/relay
-```
-
-**The `~/.claude/skills/relay` symlink above is legacy. Remove it.** This reverses what these docs previously told users to do: OpenCode scans both `~/.claude/skills/` and `~/.config/opencode/skills/`, so keeping the old symlink alongside a fresh installer run surfaces **two skills named `relay`**.
+**Remove the legacy `~/.claude/skills/relay` symlink.** These docs used to tell users to create it by hand. OpenCode scans both `~/.claude/skills/` and `~/.config/opencode/skills/`, so keeping it alongside a fresh installer run surfaces **two skills named `relay`**:
 
 ```bash
 # legacy — remove if present
 [ -L ~/.claude/skills/relay ] && rm ~/.claude/skills/relay
 ```
-
-That command only ever removed a symlink, so it is safe to run.
 
 The skill's frontmatter (`name`, `description`) is portable across all three harnesses. OpenCode's skill frontmatter recognizes only `name`, `description`, `license`, `compatibility`, and `metadata`, and ignores every other key — including `user-invocable` and `argument-hint` — which is why no existing skill needs a frontmatter change for OpenCode.
 

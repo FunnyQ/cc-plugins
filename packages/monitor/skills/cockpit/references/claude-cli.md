@@ -27,12 +27,6 @@ A bare `${CLAUDE_PLUGIN_ROOT}/skills/...` in the shell collapses to a broken
 `/skills/...`. In a development checkout of this repository, use
 `packages/monitor` from the repo root instead.
 
-**Under OpenCode** (skip this paragraph otherwise): skills are installed at
-`~/.config/opencode/skills/cockpit/` (symlinked by `opencode/install.ts`).
-Resolve scripts from there: `bun ~/.config/opencode/skills/cockpit/scripts/…`.
-`CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it, and OpenCode
-prints no "Base directory for this skill" banner to read one from.
-
 ## Session id (Step 1)
 
 ```bash
