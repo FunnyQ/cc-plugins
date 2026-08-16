@@ -44,14 +44,11 @@ The trade-off is real and worth stating to the user rather than deciding for the
 
 Two things tend to be missed when switching to a floor. The error message and notification usually read backwards afterwards, since only a *too-old* Herdr can trigger them now. And tests that hardcode the old protocol number fail one at a time across several runs; derive them from the constant instead.
 
-## Under OpenCode
+## OpenCode only — skip on Claude Code and Codex
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve `$SKILL_DIR` from there — there is no "Base directory for this skill" banner to read the path from:
+There is no banner and `CLAUDE_PLUGIN_ROOT` is empty. Set the path directly:
 
 ```bash
-# Under OpenCode
 SKILL_DIR=~/.config/opencode/skills/herdr-protocol-upgrade
 bun "$SKILL_DIR/scripts/protocol-check.ts" --repo /path/to/plugin
 ```
-
-`CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.

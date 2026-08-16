@@ -25,11 +25,9 @@ The fork **must** substitute the real banner path. It cannot fall back to
 an env var. If the file guard fails, stop. Surface the error. Do not
 continue.
 
-**Under OpenCode** (skip this paragraph otherwise): skills are installed at
-`~/.config/opencode/skills/cockpit/` (symlinked by `opencode/install.ts`).
-Resolve scripts from there — set `CLI="$HOME/.config/opencode/skills/cockpit/scripts/cockpit.ts"`
-and keep the same `test -f` guard. OpenCode prints no "Base directory for this
-skill" banner, and `CLAUDE_PLUGIN_ROOT` is empty there — never use it.
+**OpenCode only**: there is no banner and `CLAUDE_PLUGIN_ROOT` is empty. Set
+`CLI="$HOME/.config/opencode/skills/cockpit/scripts/cockpit.ts"` and keep the
+same `test -f` guard.
 
 ### Session — honor the parent handoff
 
@@ -67,7 +65,7 @@ Decide which surface you are on from the inherited context. The spawn
 prompt notes the surface. Use `$PROVIDER_FLAG` consistently in every call
 below.
 
-**Under OpenCode** (skip this paragraph otherwise): the same rule applies with
+**OpenCode only**: the same rule applies with
 its own value — every `cockpit scribe` call passes `--provider opencode`, so
 set `PROVIDER_FLAG="--provider opencode"`. The default stays `claude`, so
 omitting the flag resolves against the wrong vendor's sessions exactly as it

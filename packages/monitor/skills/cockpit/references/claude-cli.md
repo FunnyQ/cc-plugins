@@ -52,6 +52,6 @@ The background task's exit code carries the outcome. On exit `4` nobody is
 watching the cockpit — ask the same question with `AskUserQuestion`, then
 record the answer with `cockpit send`. See "Nobody is watching" in `pilot.md`.
 
-**Under OpenCode** (skip this line otherwise): a send goes over the TUI HTTP
+**OpenCode only**: a send goes over the TUI HTTP
 path — `scripts/opencode-send.ts`, served at `/api/send-opencode-message` —
 rather than the cockpit channel MCP server, which OpenCode never registers.

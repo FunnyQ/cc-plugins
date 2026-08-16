@@ -386,7 +386,7 @@ Codex loads the same three-phase Lorekeeper boundary through one of two paths:
 If neither path is available, tell the user to run `chronicle:install` and start a new
 Codex thread. Do not replace the role boundary with an inline flow.
 
-## OpenCode
+## OpenCode only — skip on Claude Code and Codex
 
 Under OpenCode, use the same three-phase nested topology. Spawn ONE Lorekeeper per
 phase. The Lorekeeper spawns `gleaner` and `reckoner` for `collect`, `codifier` for
@@ -394,7 +394,7 @@ phase. The Lorekeeper spawns `gleaner` and `reckoner` for `collect`, `codifier` 
 `subagent_depth >= 2`. Below the required depth the orchestrator simply stops with
 no error naming the config.
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+**OpenCode only**: scripts are at `~/.config/opencode/skills/adr/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
 
 Spawn each phase orchestrator with the bare OpenCode agent name:
 

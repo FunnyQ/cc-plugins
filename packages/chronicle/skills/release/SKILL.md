@@ -160,13 +160,13 @@ told to read and obey its own TOML under `$CODEX_HOME/agents/chronicle/` (defaul
 Never paste or improvise the role instructions. If it is missing, tell the user to
 run `chronicle:install`.
 
-## OpenCode
+## OpenCode only — skip on Claude Code and Codex
 
 Under OpenCode, release is FLAT: the main skill spawns the leaf agents Skirnir and
 Annalist directly. It only spawns one level, so release itself does NOT need
 `subagent_depth >= 2`.
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+**OpenCode only**: scripts are at `~/.config/opencode/skills/release/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
 
 Spawn the leaf agents with their bare OpenCode names:
 

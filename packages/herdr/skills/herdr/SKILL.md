@@ -71,16 +71,13 @@ This skill's detail lives in `references/`. Read only the file(s) relevant to th
 
 Most CLI commands output JSON for scripting. `herdr --default-config` prints the full default config as a starting point.
 
-## Under OpenCode
+## OpenCode only — skip on Claude Code and Codex
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there — there is no "Base directory for this skill" banner to read the path from:
+There is no banner and `CLAUDE_PLUGIN_ROOT` is empty. Set the path directly:
 
 ```bash
-# Under OpenCode
 SKILL_DIR=~/.config/opencode/skills/herdr
 bun "$SKILL_DIR/scripts/herd.ts" list
 ```
-
-`CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
 
 Herdr panes support an OpenCode agent kind, spawnable as `--agent opencode` (`bun "$SKILL_DIR/scripts/herd.ts" spawn <name> --agent opencode --cwd "$PWD"`) — verified by spawning a pane, confirming `list` reported it with `type: "opencode"`, and closing it. There is no type union to cross-check the agent kind against: `scripts/herd.ts` types it as plain `string`, and `claude|codex|opencode` appears only in comments.

@@ -49,13 +49,11 @@ prints the URL as usual.
 that contains this skill. In a development checkout of this repository,
 `${CLAUDE_PLUGIN_ROOT}` is empty. Substitute `packages/monitor` from the repo
 root instead, for example `bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
-Under OpenCode, skills are installed at
-`~/.config/opencode/skills/usage-dashboard/` (symlinked by
-`opencode/install.ts`). Resolve scripts from there:
-`bun ~/.config/opencode/skills/usage-dashboard/scripts/…`.
-`CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+**OpenCode only**: scripts are at
+`~/.config/opencode/skills/usage-dashboard/scripts/`; `CLAUDE_PLUGIN_ROOT` is
+empty there.
 
-### OpenCode — skip this section on Claude Code and Codex
+### OpenCode only — skip on Claude Code and Codex
 
 OpenCode usage data is already read **natively**. The dashboard reads
 `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` through the shared

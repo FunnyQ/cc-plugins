@@ -33,9 +33,7 @@ The output is three layers:
 
 `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time *"Base directory for this skill"* banner and set `SCRIPTS="<base-dir>/scripts"`. Every command below uses `bun "$SCRIPTS"/...`.
 
-#### Under OpenCode
-
-OpenCode prints no *"Base directory for this skill"* banner (runtime fact **S16**), so there is no value to read one from. Under OpenCode, skills are installed at `~/.config/opencode/skills/flightplan/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `SCRIPTS=~/.config/opencode/skills/flightplan/scripts`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+**OpenCode only**: there is no banner. Set `SCRIPTS=~/.config/opencode/skills/flightplan/scripts`; `CLAUDE_PLUGIN_ROOT` is empty there.
 
 **Waypoint mode**: if the request targets a specific waypointed project (`docs/<proj>/WAYPOINTS.md`, a named leg, or a roadmap), read `references/waypoint-mode.md` and follow it instead of the steps below. An ordinary "spec this out" stays in normal mode even when a roadmap exists elsewhere.
 

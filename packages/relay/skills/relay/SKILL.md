@@ -51,14 +51,8 @@ RELAY="$SKILL_DIR/scripts/relay.ts"
 test -f "$RELAY" || { echo "relay.ts not found at $RELAY" >&2; exit 1; }
 ```
 
-> **Under OpenCode**: there is no "Base directory for this skill" banner. Skills install to `~/.config/opencode/skills/<name>/`, so resolve the script directly:
->
-> ```bash
-> RELAY=~/.config/opencode/skills/relay/scripts/relay.ts
-> test -f "$RELAY" || { echo "relay.ts not found at $RELAY" >&2; exit 1; }
-> ```
->
-> `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+> **OpenCode only**: there is no banner and `CLAUDE_PLUGIN_ROOT` is empty. Use
+> `RELAY=~/.config/opencode/skills/relay/scripts/relay.ts` instead.
 
 For brevity, the examples below write `relay.ts <backend> <mode> …` as shorthand for `bun "$RELAY" <backend> <mode> …`. Run it from the user's current project directory. `relay.ts` invokes the backend CLIs against that working tree's git context.
 

@@ -46,7 +46,7 @@ The dashboard precheck (`install.ts`) and the statusline wiring
 (`setup-statusline.ts`) live in this skill. usage-dashboard imports both, so
 there is one source of truth for setup logic.
 
-## OpenCode — skip this section on Claude Code and Codex
+## OpenCode only — skip on Claude Code and Codex
 
 **The statusline is Claude Code-only.** OpenCode has no statusline equivalent,
 and none is planned. Every `${CLAUDE_PLUGIN_ROOT}` statusline instruction below

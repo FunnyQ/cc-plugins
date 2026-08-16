@@ -142,14 +142,14 @@ Apply the same verification after Codex returns. Check with `gh pr view <url>` o
 `glab mr view <id-or-url>`. On a no or failed URL, run the `--head`/`--source-branch`
 lookup above before reporting failure. Never trust an unverified URL.
 
-## OpenCode
+## OpenCode only — skip on Claude Code and Codex
 
 Under OpenCode, use the same nested topology. Spawn ONE Storykeeper; the
 Storykeeper spawns the skald and messenger children. This skill is NOT flat and
 requires `subagent_depth >= 2`. Below the required depth the orchestrator simply
 stops with no error naming the config.
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
+**OpenCode only**: scripts are at `~/.config/opencode/skills/pr/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
 
 Spawn the orchestrator with the bare OpenCode agent name:
 

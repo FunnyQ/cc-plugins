@@ -74,11 +74,10 @@ existing config as `config.toml.bak-chronicle` before a changed write. Tell the
 user to start a new Codex thread after applying. This lets the role registry
 reload.
 
-## OpenCode — installer and nested subagent depth
+## OpenCode installer — skip on Claude Code and Codex
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
-
-The OpenCode installer is `opencode/install.ts`. It supports `--check`,
+The OpenCode installer is `opencode/install.ts`, run from a checkout of this
+repository — not from the installed skill. It supports `--check`,
 `--dry-run`, `--apply`, and `--unlink`. On `--apply`, it raises
 `subagent_depth` to `2` in `~/.config/opencode/opencode.json`.
 

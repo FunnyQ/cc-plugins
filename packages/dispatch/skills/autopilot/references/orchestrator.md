@@ -3,7 +3,7 @@
 This is the script the `autopilot` skill adapts and passes to the **Workflow** tool.
 Read the three hard constraints in `SKILL.md` first. They explain every awkward-looking choice in this file.
 
-> **Under OpenCode**: this script describes the **Claude Code Workflow path only**. Every spawn path it asserts — the orchestrator JS layer, `agent()`, the parallel wave dispatch — exists only under the Workflow tool, and OpenCode has no Workflow tool and no equivalent orchestrator process (runtime fact S10). Under OpenCode, the person or agent invoking the `/autopilot` skill performs the orchestrator's role **by hand**, following the eight-step manual wave loop in the `#### Under OpenCode` section of `SKILL.md`. Read that section for the steps and the runtime prerequisites. Nothing in this file is ported to OpenCode.
+> **OpenCode only**: this script describes the **Claude Code Workflow path only**. Every spawn path it asserts — the orchestrator JS layer, `agent()`, the parallel wave dispatch — exists only under the Workflow tool, and OpenCode has no Workflow tool and no equivalent orchestrator process. Under OpenCode, the person or agent invoking the `/autopilot` skill performs the orchestrator's role **by hand**, following the eight-step manual wave loop in the `#### OpenCode only` section of `SKILL.md`. Read that section for the steps and the runtime prerequisites. Nothing in this file is ported to OpenCode.
 
 The main agent scouts inline. It then calls `Workflow({ script: <this> })`. **Bake the
 scouted values into the `CFG` block at the top of the script as literals.**

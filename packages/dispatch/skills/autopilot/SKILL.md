@@ -32,7 +32,7 @@ autopilot  → execute the tree with a quality loop   ← you are here
 
 Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent to call Workflow is a *sanctioned opt-in*. Invoking `/autopilot` lets you call Workflow directly, **without the user typing "workflow"**.
 
-> **Under OpenCode**: there is no Workflow tool. Skip the rest of this section and read `#### Under OpenCode` at the end of it instead.
+> **OpenCode only**: there is no Workflow tool. Skip the rest of this section and read `#### OpenCode only` at the end of it instead.
 
 Use the **hybrid shape**. Scout inline first to discover the work-list. Then hand the fan-out to a Workflow script.
 
@@ -42,22 +42,20 @@ Three hard constraints shape the design. Internalize them:
 2. **There is exactly one scoring implementation.** The rubric judge runs `score-task.ts --json --log`. The orchestrator gates on that printed verdict object. Do not duplicate the weighted-average or hard-fail arithmetic in the Workflow script.
 3. **The orchestrator can't pause for input.** On a task that can't pass, it parks the task and keeps going. Escalation to the user happens *after* the workflow returns. See Escalation below.
 
-#### Under OpenCode
+#### OpenCode only — skip on Claude Code and Codex
 
 **Two different things share the name "OpenCode" in this skill. This section is only the first one.** Running autopilot **under** the OpenCode harness — the OpenCode agent is the one invoking `/autopilot` — is what this section documents. Delegating **out to** the `opencode` CLI (`CFG.devEngine: 'opencode'`, `CFG.reviewEngine: 'opencode'`, `opencode-run.ts`, Step 2 and the Model policy table) is a Claude Code flight that shells out to an external engine. This section changes none of that, and none of that applies here.
 
-OpenCode exposes no Workflow tool and no equivalent (runtime fact **S10**: the primary agent's full tool list is `bash, edit, glob, grep, read, skill, task, todowrite, webfetch, write`; `task` is the only spawn mechanism). Autopilot therefore runs there as a **hand-driven wave loop over the task tool**.
+OpenCode exposes no Workflow tool and no equivalent — the primary agent's full tool list is `bash, edit, glob, grep, read, skill, task, todowrite, webfetch, write`, and `task` is the only spawn mechanism. Autopilot therefore runs there as a **hand-driven wave loop over the task tool**.
 
 **Read this before the steps.** The loop below is behaviorally close to the Claude Code flight but **not identical**: there is **no automatic parallel-wave scheduling** and **no orchestrator process**. The waves are driven **by hand, one at a time, by whoever invoked the skill**, who must stay at the keyboard between waves. Autopilot under OpenCode is not the same unattended flight — do not report it to the user as one.
 
-**Script root.** OpenCode prints no *"Base directory for this skill"* banner (runtime fact **S16** — invoking a skill returns `# Skill: <name>` followed by the SKILL.md body and nothing else), so the paths are stated literally rather than read from a banner. Skills install at `~/.config/opencode/skills/<name>/`, symlinked by `opencode/install.ts`:
+**Script root.** There is no banner; `CLAUDE_PLUGIN_ROOT` is empty there. Two paths:
 
 - `$SCRIPTS` = `~/.config/opencode/skills/flightplan/scripts` — the shared tools autopilot borrows: `next-ready.ts`, `lint-task.ts`, `score-task.ts`, `mark-done.ts`, `flightlog.ts`.
 - `$OWN` = `~/.config/opencode/skills/autopilot/scripts` — autopilot's own, `flightdeck.ts`.
 
-`CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it, for either path.
-
-The sibling-relative form `<base>/../flightplan/scripts` survives this install layout too: each skill is symlinked separately into the OpenCode skills root, so `<base>/../flightplan/scripts` resolves to the flightplan skill either way — through the symlink root, where both siblings are installed side by side, or through the realpath, where both siblings live beside each other in the repo.
+The sibling-relative form `<base>/../flightplan/scripts` also resolves, because each skill is symlinked separately and the two siblings sit beside each other under both the symlink root and the realpath.
 
 **The wave loop.** Repeat these steps by hand, one wave at a time:
 
@@ -70,11 +68,11 @@ The sibling-relative form `<base>/../flightplan/scripts` survives this install l
 7. Make one atomic commit **between** waves, never inside one — the tasks of a wave share a working tree, so a mid-wave commit sweeps a sibling's half-finished edits into it.
 8. Run the closing `Final review` task last, after every other task is done.
 
-**Both spawns use `subagent_type: general`**, with the dev and judge roles carried entirely by the inline prompt (runtime fact **S17**: `opencode agent list` reports `explore` and `general` as the built-in subagents). There is no `dev` agent and no `judge` agent in this build, and none is needed — both roles are leaves that never spawn anything themselves.
+**Both spawns use `subagent_type: general`**, with the dev and judge roles carried entirely by the inline prompt — `explore` and `general` are the only built-in subagents. There is no `dev` agent and no `judge` agent in this build, and none is needed — both roles are leaves that never spawn anything themselves.
 
-**`general` has no `task` tool and cannot spawn further**, at any `subagent_depth` (also **S17** — raising the depth does not grant it). That is harmless for the dev and judge roles, but it means the wave loop's driver must stay the one doing the spawning. There is no way to delegate the loop itself to a `general` subagent.
+**`general` has no `task` tool and cannot spawn further**, at any `subagent_depth` — raising the depth does not grant it. That is harmless for the dev and judge roles, but it means the wave loop's driver must stay the one doing the spawning. There is no way to delegate the loop itself to a `general` subagent.
 
-**Spawn depth.** Because the loop spawns through the task tool, the driver needs `subagent_depth` at or above the installed value of `2` in `~/.config/opencode/opencode.json`; a fresh install defaults to `1` (runtime fact **S14**), which `opencode/install.ts --apply` raises. Below the required depth a spawn fails with no error naming the config, so it reads as a plugin bug. This is the OpenCode counterpart of Claude Code's `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`.
+**Spawn depth.** Because the loop spawns through the task tool, the driver needs `subagent_depth` at or above the installed value of `2` in `~/.config/opencode/opencode.json`; a fresh install defaults to `1`, which `opencode/install.ts --apply` raises. Below the required depth a spawn fails with no error naming the config, so it reads as a plugin bug. This is the OpenCode counterpart of Claude Code's `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`.
 
 ## Step 1 — Scout inline
 

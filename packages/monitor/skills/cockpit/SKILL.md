@@ -41,7 +41,7 @@ Use the provider reference exactly as the selected mode reference requires.
 - Otherwise, for plain `/cockpit`, read
   [references/pilot.md](references/pilot.md). Follow it.
 
-## OpenCode — skip this section on Claude Code and Codex
+## OpenCode only — skip on Claude Code and Codex
 
 Running in **OpenCode** → provider is `opencode`; the CLI accepts
 `--provider opencode`. There is no OpenCode provider reference file: take the
@@ -67,7 +67,5 @@ Two preconditions, both observed on opencode 1.18.18:
   returns `200 true` even with no TUI attached, so treat delivery as
   best-effort and confirm through the session itself.
 
-Under OpenCode, skills are installed at `~/.config/opencode/skills/cockpit/`
-(symlinked by `opencode/install.ts`). Resolve scripts from there:
-`bun ~/.config/opencode/skills/cockpit/scripts/…`. `CLAUDE_PLUGIN_ROOT` is
-empty under OpenCode — never use it.
+Scripts are at `~/.config/opencode/skills/cockpit/scripts/`;
+`CLAUDE_PLUGIN_ROOT` is empty there.
