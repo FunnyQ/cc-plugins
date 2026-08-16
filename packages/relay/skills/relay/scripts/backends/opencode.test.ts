@@ -6,12 +6,17 @@ describe("opencodeBackend", () => {
   describe("invokeLive", () => {
     it("launches the bare TUI with the resolved model", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {
-        model: "opencode-go/kimi-k2.7-code",
+        model: "opencode-go/deepseek-v4-light",
       });
 
       expect(spec).toEqual({
         agentBin: "opencode",
-        argv: ["-m", "opencode-go/kimi-k2.7-code"],
+        argv: [
+          "-m",
+          "opencode-go/deepseek-v4-light",
+          "--variant",
+          "max",
+        ],
       });
     });
 
@@ -20,7 +25,7 @@ describe("opencodeBackend", () => {
         dangerous: true,
       })!;
 
-      expect(spec.argv).toEqual(["--auto"]);
+      expect(spec.argv).toEqual(["--variant", "max", "--auto"]);
       expect(spec.argv).not.toContain("run");
       expect(spec.argv).not.toContain("--format");
     });
@@ -28,7 +33,7 @@ describe("opencodeBackend", () => {
     it("omits --auto without --dangerous (prompts surface in the pane)", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {})!;
 
-      expect(spec.argv).toEqual([]);
+      expect(spec.argv).toEqual(["--variant", "max"]);
     });
   });
 
@@ -58,7 +63,7 @@ describe("opencodeBackend", () => {
     it("builds delegate argv with the resolved model", () => {
       const opts: InvokeOpts = {
         promptText: "test prompt",
-        model: "opencode-go/kimi-k2.7-code",
+        model: "opencode-go/deepseek-v4-light",
       };
       const result = opencodeBackend.invoke("delegate", opts);
 
@@ -66,7 +71,9 @@ describe("opencodeBackend", () => {
         "opencode",
         "run",
         "-m",
-        "opencode-go/kimi-k2.7-code",
+        "opencode-go/deepseek-v4-light",
+        "--variant",
+        "max",
         "--format",
         "json",
         "--",
@@ -77,7 +84,7 @@ describe("opencodeBackend", () => {
     it("builds review argv with the resolved model", () => {
       const opts: InvokeOpts = {
         promptText: "review prompt",
-        model: "opencode-go/qwen3.7-max",
+        model: "opencode-go/deepseek-v4-pro",
       };
       const result = opencodeBackend.invoke("review", opts);
 
@@ -85,7 +92,7 @@ describe("opencodeBackend", () => {
         "opencode",
         "run",
         "-m",
-        "opencode-go/qwen3.7-max",
+        "opencode-go/deepseek-v4-pro",
         "--format",
         "json",
         "--",
@@ -100,6 +107,8 @@ describe("opencodeBackend", () => {
       expect(result.argv).toEqual([
         "opencode",
         "run",
+        "--variant",
+        "max",
         "--format",
         "json",
         "--",
@@ -129,7 +138,7 @@ describe("opencodeBackend", () => {
     });
 
     it("handles missing prompt text", () => {
-      const opts: InvokeOpts = { model: "opencode-go/kimi-k2.7-code" };
+      const opts: InvokeOpts = { model: "opencode-go/deepseek-v4-light" };
       const result = opencodeBackend.invoke("delegate", opts);
 
       // Should build argv without appending undefined
@@ -137,7 +146,9 @@ describe("opencodeBackend", () => {
         "opencode",
         "run",
         "-m",
-        "opencode-go/kimi-k2.7-code",
+        "opencode-go/deepseek-v4-light",
+        "--variant",
+        "max",
         "--format",
         "json",
       ]);

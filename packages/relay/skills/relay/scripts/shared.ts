@@ -12,8 +12,8 @@ export const DEFAULT_MODELS: Record<string, Partial<Record<Mode, string>>> = {
   codex: {}, // unset → CLI default
   claude: {}, // unset → CLI default
   opencode: {
-    delegate: "opencode-go/kimi-k2.7-code",
-    review: "opencode-go/qwen3.7-max",
+    delegate: "opencode-go/deepseek-v4-light",
+    review: "opencode-go/deepseek-v4-pro",
   },
 };
 

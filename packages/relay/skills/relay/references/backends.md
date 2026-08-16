@@ -97,7 +97,7 @@ Binary: `opencode`. Headless subcommand: `opencode run [message..]`.
 ### Delegate
 
 ```bash
-opencode run -m opencode-go/kimi-k2.7-code --format json -- "<prompt>"
+opencode run -m opencode-go/deepseek-v4-light --variant max --format json -- "<prompt>"
 ```
 
 Write-capable by default. `--dangerous` maps to `--auto` on the headless path
@@ -109,7 +109,7 @@ loudly. Use `--dangerous` for unattended headless runs that may need approvals.
 ### Review (emulated, read-only prompt)
 
 ```bash
-opencode run -m opencode-go/qwen3.7-max --format json -- "<read-only review prompt>"
+opencode run -m opencode-go/deepseek-v4-pro --format json -- "<read-only review prompt>"
 ```
 
 There is no native review. The prompt must instruct "analyze only, do not modify files."
@@ -140,7 +140,7 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Model
 
-Resolved per mode (opencode-go/kimi-k2.7-code for delegate; opencode-go/qwen3.7-max for review). The `--model` flag overrides this. Format is `provider/model`.
+Delegate resolves to opencode-go/deepseek-v4-light with `--variant max`. Review resolves to opencode-go/deepseek-v4-pro. The `--model` flag overrides the model. Format is `provider/model`.
 
 ---
 

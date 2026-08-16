@@ -4,7 +4,8 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
  * opencode Backend: delegate + emulated (prompt-based) review.
  *
  * Both modes use strategy = "prompt" (no native review).
- * Model defaults: delegate → opencode-go/kimi-k2.7-code, review → opencode-go/qwen3.7-max.
+ * Model defaults: delegate → opencode-go/deepseek-v4-light; review → opencode-go/deepseek-v4-pro.
+ * Delegate uses the max reasoning variant.
  * --model flag overrides the defaults.
  *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
@@ -35,7 +36,7 @@ export const opencodeBackend: Backend = {
     return "prompt";
   },
 
-  invoke(_mode: Mode, opts: InvokeOpts) {
+  invoke(mode: Mode, opts: InvokeOpts) {
     // Model is already resolved in relay.ts (flag > config > per-mode default);
     // opts.model is the final value — do not re-resolve here.
     const model = opts.model;
@@ -44,6 +45,9 @@ export const opencodeBackend: Backend = {
     // Add resolved model (or default)
     if (model) {
       argv.push("-m", model);
+    }
+    if (mode === "delegate") {
+      argv.push("--variant", "max");
     }
 
     // JSON gives a clean, structured stream we can extract the final answer from
@@ -68,9 +72,10 @@ export const opencodeBackend: Backend = {
     return { argv };
   },
 
-  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
+  invokeLive(mode: Mode, opts: InvokeOpts): LiveSpec {
     const argv: string[] = [];
     if (opts.model) argv.push("-m", opts.model);
+    if (mode === "delegate") argv.push("--variant", "max");
     // opencode's approval-bypass flag is `--auto` ("auto-approve permissions
     // that are not explicitly denied (dangerous!)"), accepted by the interactive
     // TUI too. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist

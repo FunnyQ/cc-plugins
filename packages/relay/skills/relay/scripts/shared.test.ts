@@ -26,7 +26,7 @@ describe("resolveModel", () => {
 
   it("returns DEFAULT_MODELS[backend][mode] when flag and config absent", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({}));
-    expect(result).toBe("opencode-go/kimi-k2.7-code");
+    expect(result).toBe("opencode-go/deepseek-v4-light");
   });
 
   it("returns undefined for codex delegate when flag, config, and constant absent", () => {
@@ -44,7 +44,7 @@ describe("resolveModel", () => {
       throw new Error("file not found");
     });
     // Should fall back to DEFAULT_MODELS
-    expect(result).toBe("opencode-go/qwen3.7-max");
+    expect(result).toBe("opencode-go/deepseek-v4-pro");
   });
 
   it("handles malformed JSON gracefully (no throw)", () => {
@@ -52,26 +52,26 @@ describe("resolveModel", () => {
       // Simulate a readConfig that encounters invalid JSON
       return undefined;
     });
-    expect(result).toBe("opencode-go/kimi-k2.7-code");
+    expect(result).toBe("opencode-go/deepseek-v4-light");
   });
 
   it("falls back to constant when config is invalid shape", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: { someBackend: { someMode: "model" } }, // wrong backend
     }));
-    expect(result).toBe("opencode-go/kimi-k2.7-code");
+    expect(result).toBe("opencode-go/deepseek-v4-light");
   });
 
   it("falls back to constant when config.models is missing", () => {
     const result = resolveModel("opencode", "review", undefined, () => ({}));
-    expect(result).toBe("opencode-go/qwen3.7-max");
+    expect(result).toBe("opencode-go/deepseek-v4-pro");
   });
 
   it("falls back to constant when config.models[backend] is missing", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: {},
     }));
-    expect(result).toBe("opencode-go/kimi-k2.7-code");
+    expect(result).toBe("opencode-go/deepseek-v4-light");
   });
 
   it("falls back to constant when config.models[backend][mode] is missing", () => {
@@ -157,7 +157,7 @@ describe("DEFAULT_MODELS", () => {
   });
 
   it("has delegate and review for opencode", () => {
-    expect(DEFAULT_MODELS.opencode.delegate).toBe("opencode-go/kimi-k2.7-code");
-    expect(DEFAULT_MODELS.opencode.review).toBe("opencode-go/qwen3.7-max");
+    expect(DEFAULT_MODELS.opencode.delegate).toBe("opencode-go/deepseek-v4-light");
+    expect(DEFAULT_MODELS.opencode.review).toBe("opencode-go/deepseek-v4-pro");
   });
 });
