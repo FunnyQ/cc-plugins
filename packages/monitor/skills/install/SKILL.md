@@ -48,23 +48,10 @@ there is one source of truth for setup logic.
 
 ## OpenCode only — skip on Claude Code and Codex
 
-**The statusline is Claude Code-only.** OpenCode has no statusline equivalent,
-and none is planned. Every `${CLAUDE_PLUGIN_ROOT}` statusline instruction below
-is a Claude Code instruction — an OpenCode user is not missing a step by
-skipping all of them.
-
-**The OpenCode layer is installed by the repo's own installer, not by this
-skill.** From a checkout of this repository:
-
-```bash
-bun opencode/install.ts --check
-bun opencode/install.ts --apply
-```
-
-That symlinks the skills into `~/.config/opencode/skills/<name>/` and wires the
-rest of the OpenCode layer. This skill keeps owning the Claude Code and Codex
-prerequisites exactly as it does today, and writes nothing under
-`~/.config/opencode/`.
+This skill does not apply. The statusline is Claude Code-only, and the OpenCode
+layer is installed by the repo's own installer — run `bun opencode/install.ts
+--check`, then `--apply`, from a checkout of this repository. This skill writes
+nothing under `~/.config/opencode/`.
 
 ## Workflow
 

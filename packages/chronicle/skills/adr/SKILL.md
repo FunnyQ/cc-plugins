@@ -388,23 +388,10 @@ Codex thread. Do not replace the role boundary with an inline flow.
 
 ## OpenCode only — skip on Claude Code and Codex
 
-Under OpenCode, use the same three-phase nested topology. Spawn ONE Lorekeeper per
-phase. The Lorekeeper spawns `gleaner` and `reckoner` for `collect`, `codifier` for
-`draft`, and `barrowkeeper` for `commit`. This skill is NOT flat and requires
-`subagent_depth >= 2`. Below the required depth the orchestrator simply stops with
-no error naming the config.
-
-**OpenCode only**: scripts are at `~/.config/opencode/skills/adr/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
-
-Spawn each phase orchestrator with the bare OpenCode agent name:
-
-```text
-subagent_type: "lorekeeper"
-```
-
-OpenCode task-tool subagents do NOT inherit parent context. Pass all resolved
-literal script paths, `contextBrief`, and the phase-specific carry-over state
-explicitly on every Lorekeeper spawn.
+Follow `~/.config/opencode/skills/adr/references/opencode.md` instead of the
+spawn instructions above — bare agent names, no context inheritance, literal
+`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+base-directory banner.
 
 ## Constraints
 

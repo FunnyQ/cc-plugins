@@ -162,23 +162,10 @@ run `chronicle:install`.
 
 ## OpenCode only — skip on Claude Code and Codex
 
-Under OpenCode, release is FLAT: the main skill spawns the leaf agents Skirnir and
-Annalist directly. It only spawns one level, so release itself does NOT need
-`subagent_depth >= 2`.
-
-**OpenCode only**: scripts are at `~/.config/opencode/skills/release/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
-
-Spawn the leaf agents with their bare OpenCode names:
-
-```text
-subagent_type: "skirnir"
-subagent_type: "annalist"
-```
-
-OpenCode task-tool subagents do NOT inherit parent context. Pass the literal
-OpenCode skill path and every command-specific parameter explicitly on each spawn.
-The release-subject exemption in the branch guard applies under OpenCode in the
-same way.
+Follow `~/.config/opencode/skills/release/references/opencode.md` instead of the
+spawn instructions above — bare agent names, no context inheritance, literal
+`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+base-directory banner.
 
 ## Edge cases
 

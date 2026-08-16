@@ -95,23 +95,10 @@ the user explicitly asks to continue without agents.
 
 ## OpenCode only — skip on Claude Code and Codex
 
-Under OpenCode, use the same nested topology. Spawn ONE Lawspeaker; the Lawspeaker
-spawns the watcher and runesmith children. This skill is NOT flat and requires
-`subagent_depth >= 2`. Below the required depth the orchestrator simply stops with
-no error naming the config.
-
-**OpenCode only**: scripts are at `~/.config/opencode/skills/commit/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
-
-Spawn the orchestrator with the bare OpenCode agent name:
-
-```text
-subagent_type: "lawspeaker"
-```
-
-The Lawspeaker uses the bare child agent names `watcher` and `runesmith`. OpenCode
-task-tool subagents do NOT inherit parent context. Pass `contextBrief`, `branch`,
-and `mode` explicitly, just as in the Claude Code flow, together with the literal
-OpenCode skill path needed to resolve scripts.
+Follow `~/.config/opencode/skills/commit/references/opencode.md` instead of the
+spawn instructions above — bare agent names, no context inheritance, literal
+`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+base-directory banner.
 
 ## Edge cases
 

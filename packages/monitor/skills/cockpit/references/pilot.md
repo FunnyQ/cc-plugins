@@ -18,9 +18,6 @@ If it exits non-zero because the session id cannot be resolved, generate one
 with `crypto.randomUUID()`. Note which id you used. Check your provider
 reference — it notes any provider-specific retry to try first.
 
-**OpenCode only**: there is no banner. Scripts are at
-`~/.config/opencode/skills/cockpit/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
-
 This only resolves the id for use. It does not register the session. The
 session auto-registers on the first `log` or `scribe` write.
 

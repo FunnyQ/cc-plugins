@@ -25,10 +25,6 @@ The fork **must** substitute the real banner path. It cannot fall back to
 an env var. If the file guard fails, stop. Surface the error. Do not
 continue.
 
-**OpenCode only**: there is no banner and `CLAUDE_PLUGIN_ROOT` is empty. Set
-`CLI="$HOME/.config/opencode/skills/cockpit/scripts/cockpit.ts"` and keep the
-same `test -f` guard.
-
 ### Session — honor the parent handoff
 
 A `/thoughtful` background-fork prompt includes the **initiating parent
@@ -64,12 +60,6 @@ PROVIDER_FLAG="--provider codex"
 Decide which surface you are on from the inherited context. The spawn
 prompt notes the surface. Use `$PROVIDER_FLAG` consistently in every call
 below.
-
-**OpenCode only**: the same rule applies with
-its own value — every `cockpit scribe` call passes `--provider opencode`, so
-set `PROVIDER_FLAG="--provider opencode"`. The default stays `claude`, so
-omitting the flag resolves against the wrong vendor's sessions exactly as it
-does under Codex.
 
 ### Run the prep bundle — BEFORE you write anything
 

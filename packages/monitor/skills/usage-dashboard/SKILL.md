@@ -49,24 +49,10 @@ prints the URL as usual.
 that contains this skill. In a development checkout of this repository,
 `${CLAUDE_PLUGIN_ROOT}` is empty. Substitute `packages/monitor` from the repo
 root instead, for example `bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
-**OpenCode only**: scripts are at
-`~/.config/opencode/skills/usage-dashboard/scripts/`; `CLAUDE_PLUGIN_ROOT` is
-empty there.
 
-### OpenCode only — skip on Claude Code and Codex
-
-OpenCode usage data is already read **natively**. The dashboard reads
-`${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` through the shared
-reader at `packages/monitor/skills/shared/scripts/opencode.ts`. Nothing has to
-be installed for OpenCode sessions, tokens, and cost to show up — if they are
-missing, the cause is the database, not a missing integration.
-
-**Background launch.** OpenCode's bash tool has no background-run parameter —
-none exists to pass. Launch the server with shell-level detachment instead:
-`bun ~/.config/opencode/skills/usage-dashboard/scripts/atlas-server.ts … &`.
-This is the same `… &` fallback the "Run" section above already gives for any
-harness with no background flag; OpenCode is that harness. A foreground call
-blocks the session for as long as the server runs.
+**OpenCode only** — skip on Claude Code and Codex: follow
+`~/.config/opencode/skills/usage-dashboard/references/opencode.md`. The path is
+absolute because OpenCode prints no skill base-directory banner.
 
 The precheck (`install.ts`, owned by the sibling `install` skill) verifies `bun`, vendor files, and Claude data sources. It distinguishes **required** failures (`✗`, exit 1) from **optional** ones (`○`, exit 0 with a notice). Optional gaps do **not** block the dashboard. A typical optional gap is a missing `history.jsonl`, because the user has not used Claude Code chat yet. The affected sections simply show empty.
 

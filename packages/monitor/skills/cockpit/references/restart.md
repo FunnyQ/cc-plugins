@@ -51,6 +51,3 @@ plainly. Do not imply that the update fully landed.
 - Restart from the install whose code you want to serve. The repo's
   `cockpit.ts` serves the repo. The plugin cache's `cockpit.ts` serves the
   cache.
-
-**OpenCode only**: there is no banner. Scripts are at
-`~/.config/opencode/skills/cockpit/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.

@@ -144,22 +144,10 @@ lookup above before reporting failure. Never trust an unverified URL.
 
 ## OpenCode only — skip on Claude Code and Codex
 
-Under OpenCode, use the same nested topology. Spawn ONE Storykeeper; the
-Storykeeper spawns the skald and messenger children. This skill is NOT flat and
-requires `subagent_depth >= 2`. Below the required depth the orchestrator simply
-stops with no error naming the config.
-
-**OpenCode only**: scripts are at `~/.config/opencode/skills/pr/scripts/`; `CLAUDE_PLUGIN_ROOT` is empty there.
-
-Spawn the orchestrator with the bare OpenCode agent name:
-
-```text
-subagent_type: "storykeeper"
-```
-
-The Storykeeper uses the bare child agent names `skald` and `messenger`. OpenCode
-task-tool subagents do NOT inherit parent context. Pass every input explicitly:
-the literal OpenCode skill path, `contextBrief`, `base`, `branch`, and `draft`.
+Follow `~/.config/opencode/skills/pr/references/opencode.md` instead of the
+spawn instructions above — bare agent names, no context inheritance, literal
+`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+base-directory banner.
 
 ## Edge Cases
 
