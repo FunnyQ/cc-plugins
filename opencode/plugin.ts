@@ -3,6 +3,27 @@ import { dirname, join } from "node:path";
 type HookKind = "command" | "file_path";
 type HookResult = { exitCode: number; stdout: string; stderr: string };
 
+const CHECK_BRANCH = "packages/chronicle/hooks/check-branch.sh";
+const FLIGHTPLAN_LINT = "packages/dispatch/hooks/flightplan-lint.sh";
+const DECISION_LOG_START =
+  "packages/monitor/skills/cockpit/scripts/decision-log-start.ts";
+const SCRIBE_NUDGE = "packages/monitor/skills/cockpit/scripts/scribe-nudge.ts";
+
+// Each shell hook opens with a gate that discards almost every call it receives.
+// Mirroring that gate here keeps the common tool call from paying a bash + jq
+// spawn; the script stays the verdict authority for everything that passes.
+const COMMIT_COMMAND = /git\s+commit/; // check-branch.sh:13
+const FLIGHTPLAN_TASK =
+  /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/; // flightplan-lint.sh:28
+
+// S9/S10/S17: OpenCode has no Agent tool, no "fork" subagent, and a spawned
+// subagent inherits no context. The cockpit scripts are shared with Claude Code
+// and emit Claude's spawn wording, so the OpenCode reading is *appended* rather
+// than substituted — an upstream reword can never silently defeat a note that
+// only adds a sentence, the way a text substitution would.
+const OPENCODE_SPAWN_NOTE =
+  'OPENCODE: ignore any Agent(subagent_type: "fork") instruction above — that tool does not exist here. Spawn with the task tool as `general`, and pass the parent session id literally in the prompt, because an OpenCode subagent inherits no context.';
+
 function hookPayload(kind: HookKind, value: string): string {
   return JSON.stringify({ tool_input: { [kind]: value } });
 }
@@ -30,59 +51,28 @@ function lintVerdict(exitCode: number, stderr: string): string | null {
   return exitCode === 2 && stderr ? stderr : null;
 }
 
-async function runHook(
-  root: string,
-  relScript: string,
-  payload: string,
+/** Spawn and collect. Every failure mode — a missing script after a partial
+ *  checkout, a bad interpreter, a refused spawn — collapses to `null`, which
+ *  every caller treats as "no verdict". The branch guard's thrown message is
+ *  the module's only intentional failure path. */
+async function run(
+  command: string[],
+  stdin: string,
 ): Promise<HookResult | null> {
-  const script = join(root, relScript);
-
-  // A missing script is a silent no-op so a partial checkout cannot break tools.
-  if (!(await Bun.file(script).exists())) return null;
-
   try {
-    const process = Bun.spawn([script], {
-      stdin: new Blob([payload]),
+    const child = Bun.spawn(command, {
+      stdin: new Blob([stdin]),
       stdout: "pipe",
       stderr: "pipe",
     });
     const [exitCode, stdout, stderr] = await Promise.all([
-      process.exited,
-      process.stdout.text(),
-      process.stderr.text(),
+      child.exited,
+      child.stdout.text(),
+      child.stderr.text(),
     ]);
 
     return { exitCode, stdout, stderr };
   } catch {
-    // Spawn failures fail open; the branch-guard verdict is the only intentional failure.
-    return null;
-  }
-}
-
-async function runScript(
-  root: string,
-  relScript: string,
-  args: string[],
-): Promise<HookResult | null> {
-  const script = join(root, relScript);
-
-  // A missing session script is a silent no-op.
-  if (!(await Bun.file(script).exists())) return null;
-
-  try {
-    const process = Bun.spawn(["bun", script, ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [exitCode, stdout, stderr] = await Promise.all([
-      process.exited,
-      process.stdout.text(),
-      process.stderr.text(),
-    ]);
-
-    return { exitCode, stdout, stderr };
-  } catch {
-    // Session hooks only report; a broken decision log must never kill a session.
     return null;
   }
 }
@@ -103,34 +93,54 @@ function sessionMessage(stdout: string): string | null {
   }
 }
 
+function withOpenCodeNote(message: string | null): string | null {
+  const trimmed = message?.trimEnd();
+  return trimmed ? `${trimmed}\n\n${OPENCODE_SPAWN_NOTE}` : null;
+}
+
 const QLabPlugin = Object.assign(
-  async function QLabPlugin() {
+  async function QLabPlugin(context?: {
+    directory?: string;
+    worktree?: string;
+  }) {
     // S8: symlink-loaded modules expose the checkout's real directory here.
     const root = dirname(import.meta.dir);
+    // S11: the plugin context carries the session's worktree and directory.
+    const cwd = context?.worktree ?? context?.directory ?? process.cwd();
 
     return {
       // S1/S2: created is session-scoped and idle is turn-scoped.
-      event: async ({ event }: { event: { type: string } }) => {
+      event: async ({
+        event,
+      }: {
+        event: { type: string; properties?: { sessionID?: string } };
+      }) => {
         try {
+          const sessionID = event.properties?.sessionID;
+
           if (event.type === "session.created") {
-            const result = await runScript(
-              root,
-              "packages/monitor/skills/cockpit/scripts/decision-log-start.ts",
-              [],
+            const result = await run(
+              ["bun", join(root, DECISION_LOG_START)],
+              "{}",
             );
-            if (result?.stdout) console.error(result.stdout.trimEnd());
+            const message = withOpenCodeNote(result?.stdout ?? null);
+            if (message) console.error(message);
             if (result?.stderr) console.error(result.stderr.trimEnd());
           }
 
           if (event.type === "session.idle") {
-            const result = await runScript(
-              root,
-              "packages/monitor/skills/cockpit/scripts/scribe-nudge.ts",
-              [],
+            // scribe-nudge reads its session id and cwd from stdin and returns
+            // immediately when that parse fails, so an empty stdin silently
+            // disables the nudge entirely. The payload is the behavior.
+            const result = await run(
+              ["bun", join(root, SCRIBE_NUDGE)],
+              JSON.stringify({ session_id: sessionID, cwd }),
             );
             // S15: OpenCode receives the Claude hook wrapper, not plain reminder text.
-            const message = result && sessionMessage(result.stdout);
-            if (message) console.error(message.trimEnd());
+            const message = withOpenCodeNote(
+              result ? sessionMessage(result.stdout) : null,
+            );
+            if (message) console.error(message);
             if (result?.stderr) console.error(result.stderr.trimEnd());
           }
         } catch {
@@ -144,11 +154,12 @@ const QLabPlugin = Object.assign(
         output: { args: { command?: unknown } },
       ) => {
         // S5: tool arguments live on the second handler parameter.
-        if (input.tool !== "bash" || typeof output.args.command !== "string") return;
+        if (input.tool !== "bash" || typeof output.args.command !== "string")
+          return;
+        if (!COMMIT_COMMAND.test(output.args.command)) return;
 
-        const result = await runHook(
-          root,
-          "packages/chronicle/hooks/check-branch.sh",
+        const result = await run(
+          [join(root, CHECK_BRANCH)],
           hookPayload("command", output.args.command),
         );
         if (!result) return;
@@ -170,10 +181,10 @@ const QLabPlugin = Object.assign(
         ) {
           return;
         }
+        if (!FLIGHTPLAN_TASK.test(output.args.filePath)) return;
 
-        const result = await runHook(
-          root,
-          "packages/dispatch/hooks/flightplan-lint.sh",
+        const result = await run(
+          [join(root, FLIGHTPLAN_LINT)],
           hookPayload("file_path", output.args.filePath),
         );
         if (!result) return;
@@ -184,7 +195,14 @@ const QLabPlugin = Object.assign(
       },
     };
   },
-  { guardVerdict, hookPayload, lintVerdict },
+  {
+    guardVerdict,
+    hookPayload,
+    lintVerdict,
+    withOpenCodeNote,
+    COMMIT_COMMAND,
+    FLIGHTPLAN_TASK,
+  },
 );
 
 export { QLabPlugin };

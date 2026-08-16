@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { join, relative, resolve } from "node:path";
 
 import {
-  REQUIRED_SUBAGENT_DEPTH,
+  GLOBAL_CONFIG_NAMES,
   buildApplyPlan,
   buildTargets,
   classifyLink,
   decideSubagentDepth,
   findSkillDirs,
+  parseJsonc,
+  resolveGlobalConfig,
   resolveSkillNames,
   type LinkState,
 } from "./install";
@@ -94,7 +96,7 @@ describe("buildTargets", () => {
     expect(targets.filter((target) => target.group === "command")).toHaveLength(
       2,
     );
-    expect(targets.filter((target) => target.kind === "config")).toHaveLength(
+    expect(targets.filter((target) => target.group === "config")).toHaveLength(
       1,
     );
   });
@@ -194,13 +196,107 @@ describe("decideSubagentDepth", () => {
 
     expect(sufficient).toEqual({ subagent_depth: 5, theme: "q" });
     expect(insufficient).toEqual({ subagent_depth: 1, theme: "q" });
-    expect(REQUIRED_SUBAGENT_DEPTH).toBe(2);
+  });
+
+  test("downgrades a needed write to manual when the config carries comments", () => {
+    expect(decideSubagentDepth({}, true)).toMatchObject({ action: "manual" });
+    expect(decideSubagentDepth({ subagent_depth: 1 }, true)).toMatchObject({
+      action: "manual",
+    });
+  });
+
+  test("leaves a sufficient commented config alone", () => {
+    expect(decideSubagentDepth({ subagent_depth: 3 }, true)).toMatchObject({
+      action: "ok",
+      value: 3,
+    });
+  });
+});
+
+describe("parseJsonc", () => {
+  test("accepts plain JSON without reporting loss", () => {
+    expect(parseJsonc('{"subagent_depth": 2}')).toEqual({
+      value: { subagent_depth: 2 },
+      ok: true,
+      lossy: false,
+    });
+  });
+
+  test("strips line and block comments and reports the loss", () => {
+    const text = `{
+      // the depth chronicle needs
+      "subagent_depth": 2, /* raise-only */
+      "theme": "q"
+    }`;
+
+    expect(parseJsonc(text)).toEqual({
+      value: { subagent_depth: 2, theme: "q" },
+      ok: true,
+      lossy: true,
+    });
+  });
+
+  test("strips trailing commas without calling the file lossy", () => {
+    expect(parseJsonc('{"a": [1, 2,], "b": 3,}')).toEqual({
+      value: { a: [1, 2], b: 3 },
+      ok: true,
+      lossy: false,
+    });
+  });
+
+  test("never mistakes string content for syntax", () => {
+    // `$schema` is in every generated OpenCode config, and a naive stripper
+    // truncates it at the `//`.
+    const text = '{"$schema": "https://opencode.ai/config.json", "a": "x,}"}';
+
+    expect(parseJsonc(text)).toEqual({
+      value: { $schema: "https://opencode.ai/config.json", a: "x,}" },
+      ok: true,
+      lossy: false,
+    });
+  });
+
+  test("reports genuinely broken JSON", () => {
+    expect(parseJsonc("{ nope")).toMatchObject({ ok: false });
+  });
+});
+
+describe("resolveGlobalConfig", () => {
+  const configRoot = join(home, ".config", "opencode");
+  const only =
+    (...present: string[]) =>
+    (path: string) =>
+      present.includes(path);
+
+  test.each(GLOBAL_CONFIG_NAMES)("resolves an existing %s", (name) => {
+    expect(resolveGlobalConfig(configRoot, only(join(configRoot, name)))).toBe(
+      join(configRoot, name),
+    );
+  });
+
+  test("prefers the file OpenCode merges last when several exist", () => {
+    expect(
+      resolveGlobalConfig(
+        configRoot,
+        only(
+          join(configRoot, "config.json"),
+          join(configRoot, "opencode.json"),
+          join(configRoot, "opencode.jsonc"),
+        ),
+      ),
+    ).toBe(join(configRoot, "opencode.jsonc"));
+  });
+
+  test("creates opencode.json when nothing exists", () => {
+    expect(resolveGlobalConfig(configRoot, () => false)).toBe(
+      join(configRoot, "opencode.json"),
+    );
   });
 });
 
 describe("buildApplyPlan", () => {
   const targets = buildTargets(repoRoot, home);
-  const symlinks = targets.filter((target) => target.kind === "symlink");
+  const symlinks = targets.filter((target) => target.group !== "config");
 
   test("creates all 32 targets on a clean home", () => {
     const states = new Map(
