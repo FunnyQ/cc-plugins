@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: skills/01, skills/02, skills/03, skills/04, skills/05, skills/06
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -116,30 +116,30 @@ The **Route sends by provider** paragraph under `## Cockpit constraints` (line 1
 
 ## Acceptance criteria
 
-- [ ] `README.md` has an "OpenCode Installation" section positioned after the Codex one, and every command in it runs as documented against the installer as built.
-- [ ] The section states the `subagent_depth` requirement, naming the key, the file, and the value `2`.
-- [ ] The works / does not work lists match the resolved entries in `../_context/runtime-facts.md`; nothing on either list is asserted from an entry still marked `UNRESOLVED`.
-- [ ] The README states that cockpit sends work for OpenCode sessions, with the TUI port precondition; no file claims OpenCode sends are unsupported.
-- [ ] Chronicle's spawn-depth prerequisite appears as a satisfied requirement, not in the "does not work" list.
-- [ ] The relay install block's `~/.claude/skills/relay` symlink instruction is gone, replaced by the installer, with the name-collision reason stated inline.
-- [ ] Every per-plugin `### Installation` block carries an OpenCode line.
-- [ ] No "Claude Code and Codex only" style phrasing survives in either file — checked by grep, including the overview paragraph, the cockpit provider-support list, and the send-box list.
-- [ ] `CLAUDE.md` carries an "opencode runtime layer" entry under Harness constraints containing the parity table, the no-hook-level-ask caveat, and the four module constraints.
-- [ ] The nested-subagent-spawning constraint names both harnesses in one entry.
-- [ ] The send-routing paragraph names all three harnesses.
-- [ ] `CLAUDE.md` records the no-version-bump, no-tag, no-CHANGELOG policy for `opencode/`.
-- [ ] No `plugin.json` is modified and no file under `packages/` appears in the diff.
+- [x] `README.md` has an "OpenCode Installation" section positioned after the Codex one, and every command in it runs as documented against the installer as built.
+- [x] The section states the `subagent_depth` requirement, naming the key, the file, and the value `2`.
+- [x] The works / does not work lists match the resolved entries in `../_context/runtime-facts.md`; nothing on either list is asserted from an entry still marked `UNRESOLVED`.
+- [x] The README states that cockpit sends work for OpenCode sessions, with the TUI port precondition; no file claims OpenCode sends are unsupported.
+- [x] Chronicle's spawn-depth prerequisite appears as a satisfied requirement, not in the "does not work" list.
+- [x] The relay install block's `~/.claude/skills/relay` symlink instruction is gone, replaced by the installer, with the name-collision reason stated inline.
+- [x] Every per-plugin `### Installation` block carries an OpenCode line.
+- [x] No "Claude Code and Codex only" style phrasing survives in either file — checked by grep, including the overview paragraph, the cockpit provider-support list, and the send-box list.
+- [x] `CLAUDE.md` carries an "opencode runtime layer" entry under Harness constraints containing the parity table, the no-hook-level-ask caveat, and the four module constraints.
+- [x] The nested-subagent-spawning constraint names both harnesses in one entry.
+- [x] The send-routing paragraph names all three harnesses.
+- [x] `CLAUDE.md` records the no-version-bump, no-tag, no-CHANGELOG policy for `opencode/`.
+- [x] No `plugin.json` is modified and no file under `packages/` appears in the diff.
 
 ## Verification
 
-- [ ] Run each command documented in the new README section and confirm its behavior matches the surrounding prose, including the flag names.
-- [ ] `rg -n 'Claude Code and Codex|Claude and Codex' README.md CLAUDE.md` — every remaining hit is a deliberate statement about those two harnesses specifically, not a stale exclusion of OpenCode.
-- [ ] `rg -n 'sends do not|send.*not support' README.md CLAUDE.md packages/monitor/skills/cockpit` returns no claim that OpenCode sends are unsupported.
-- [ ] `rg -n 'subagent_depth' README.md CLAUDE.md` shows the value `2` in both files.
-- [ ] `git diff --name-only -- README.md CLAUDE.md` lists exactly those two paths.
-- [ ] `git diff --name-only -- packages/` prints nothing for this task's own edits.
-- [ ] `git status --short -- README.md CLAUDE.md docs/opencode-compat/tasks/docs/01-readme-and-claude-md.md` shows those paths dirty. Other paths in the working tree belong to work running beside this task; make no claim about them.
-- [ ] `bun test packages/` still passes.
+- [x] Run each command documented in the new README section and confirm its behavior matches the surrounding prose, including the flag names.
+- [x] `rg -n 'Claude Code and Codex|Claude and Codex' README.md CLAUDE.md` — every remaining hit is a deliberate statement about those two harnesses specifically, not a stale exclusion of OpenCode.
+- [x] `rg -n 'sends do not|send.*not support' README.md CLAUDE.md packages/monitor/skills/cockpit` returns no claim that OpenCode sends are unsupported.
+- [x] `rg -n 'subagent_depth' README.md CLAUDE.md` shows the value `2` in both files.
+- [x] `git diff --name-only -- README.md CLAUDE.md` lists exactly those two paths.
+- [x] `git diff --name-only -- packages/` prints nothing for this task's own edits.
+- [x] `git status --short -- README.md CLAUDE.md docs/opencode-compat/tasks/docs/01-readme-and-claude-md.md` shows those paths dirty. Other paths in the working tree belong to work running beside this task; make no claim about them.
+- [x] `bun test packages/` still passes.
 
 ## Eval rubric
 

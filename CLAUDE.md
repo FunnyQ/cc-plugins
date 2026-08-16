@@ -4,7 +4,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 
 ## What This Is
 
-`q-lab-marketplace` — a plugin marketplace for Claude Code and Codex. It holds five plugins. Each plugin ships to both harnesses and versions independently.
+`q-lab-marketplace` — a plugin marketplace for Claude Code, Codex, and OpenCode. It holds five plugins. Each plugin ships to Claude Code and Codex and versions independently; OpenCode is a third runtime layered on top of the same skills (see `opencode/` below), versioned with none of them.
 
 | Plugin | Purpose | Skills |
 | --- | --- | --- |
@@ -36,71 +36,79 @@ cc-plugins/
 ├── .agents/plugins/marketplace.json  # Codex registry (all five plugins; no version field)
 ├── .chronicle/release.json           # release shape: per-component versions + version-file patterns
 ├── CHANGELOG.md                      # Keep a Changelog format, per-plugin headings
-└── packages/
-    ├── monitor/
-    │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks + cockpit channel
-    │   ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hooks
-    │   ├── commands/                     # thoughtful.md, nudge.md
-    │   └── skills/
-    │       ├── usage-dashboard/
-    │       │   ├── PRODUCT.md            # design direction — Sunrise Atlas
-    │       │   ├── scripts/
-    │       │   │   ├── api.ts            # data engine → buildStats()
-    │       │   │   ├── rollup-db.ts      # bun:sqlite schema + accessors
-    │       │   │   ├── rollup-update.ts  # incremental transcript ingest
-    │       │   │   ├── live.ts           # active sessions, both providers
-    │       │   │   ├── atlas-server.ts   # Bun HTTP server, port 5938
-    │       │   │   └── statusline-collector.ts
-    │       │   ├── dashboard/dist/       # committed SPA, no build step
-    │       │   └── references/pricing-defaults.json
-    │       ├── cockpit/
-    │       │   ├── SKILL.md              # router only
-    │       │   ├── PRODUCT.md / DESIGN.md  # brand + Night Flight design system
-    │       │   ├── references/           # pilot / scribe / restart / claude-cli / codex
-    │       │   ├── scripts/
-    │       │   │   ├── cockpit-server.ts # Bun daemon, port 5858
-    │       │   │   ├── cockpit.ts        # CLI: log / scribe / prep / wait / send / config / nudge / restart
-    │       │   │   ├── cockpit-channel.ts    # channel MCP server (stdio)
-    │       │   │   ├── codex-control-probe.ts
-    │       │   │   ├── log-root.ts       # per-repo trail anchoring
-    │       │   │   └── config.ts
-    │       │   └── dashboard/dist/
-    │       ├── install/scripts/
-    │       │   ├── setup.ts              # plugin-wide check + wire (--check/--dry-run/--apply/--session-check)
-    │       │   ├── install.ts            # dashboard precheck
-    │       │   ├── setup-statusline.ts
-    │       │   └── statusline-decision.ts    # pure decision, unit-tested
-    │       └── shared/scripts/           # imported by BOTH dashboards — extend, never duplicate
-    │           ├── opencode.ts           # OpenCode DB reader
-    │           ├── path-inside.ts
-    │           └── static-server.ts
-    ├── dispatch/
-    │   ├── hooks/flightplan-lint.sh      # PostToolUse, path + content gated
-    │   └── skills/{preflight,flightplan,autopilot,waypoints}/
-    │       # flightplan/scripts/ also hosts autopilot's shared tools:
-    │       # next-ready / score-task (--log) / flightlog
-    ├── chronicle/
-    │   ├── shared/scripts/               # code imported by more than one skill
-    │   ├── agents/                       # lawspeaker+watcher+runesmith (commit) / storykeeper+skald+messenger /
-    │   │                                 # lorekeeper+gleaner+reckoner+codifier+barrowkeeper / skirnir+annalist (release)
-    │   ├── agents-codex/                 # Codex agent definitions (TOML format)
-    │   ├── hooks/check-branch.sh         # PreToolUse, guards commits on main/master
-    │   └── skills/{adr,commit,pr,release,install}/
-    ├── relay/
-    │   ├── commands/                     # backend-fixed aliases: codex / opencode / claude-cli
-    │   └── skills/relay/
-    │       ├── references/backends.md
-    │       └── scripts/
-    │           ├── relay.ts              # entry: relay <backend> <mode> [flags]
-    │           ├── relay-prompt.ts       # pure formatPrompt + file-contract helpers
-    │           ├── live.ts               # herdr live-pane layer (dynamic import)
-    │           ├── context-collector.ts / shared.ts / types.ts
-    │           └── backends/             # gate.ts (pure) + index.ts + codex/opencode/claude
-    └── herdr/skills/
-        ├── herdr/
-        │   ├── references/               # config / cli / plugin-development / agent-orchestration
-        │   └── scripts/herd.ts           # typed Bun wrapper: spawn/send/keys/wait/read/list/close
-        └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
+├── packages/
+│   ├── monitor/
+│   │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks + cockpit channel
+│   │   ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hooks
+│   │   ├── commands/                     # thoughtful.md, nudge.md
+│   │   └── skills/
+│   │       ├── usage-dashboard/
+│   │       │   ├── PRODUCT.md            # design direction — Sunrise Atlas
+│   │       │   ├── scripts/
+│   │       │   │   ├── api.ts            # data engine → buildStats()
+│   │       │   │   ├── rollup-db.ts      # bun:sqlite schema + accessors
+│   │       │   │   ├── rollup-update.ts  # incremental transcript ingest
+│   │       │   │   ├── live.ts           # active sessions, both providers
+│   │       │   │   ├── atlas-server.ts   # Bun HTTP server, port 5938
+│   │       │   │   └── statusline-collector.ts
+│   │       │   ├── dashboard/dist/       # committed SPA, no build step
+│   │       │   └── references/pricing-defaults.json
+│   │       ├── cockpit/
+│   │       │   ├── SKILL.md              # router only
+│   │       │   ├── PRODUCT.md / DESIGN.md  # brand + Night Flight design system
+│   │       │   ├── references/           # pilot / scribe / restart / claude-cli / codex
+│   │       │   ├── scripts/
+│   │       │   │   ├── cockpit-server.ts # Bun daemon, port 5858
+│   │       │   │   ├── cockpit.ts        # CLI: log / scribe / prep / wait / send / config / nudge / restart
+│   │       │   │   ├── cockpit-channel.ts    # channel MCP server (stdio)
+│   │       │   │   ├── codex-control-probe.ts
+│   │       │   │   ├── log-root.ts       # per-repo trail anchoring
+│   │       │   │   └── config.ts
+│   │       │   └── dashboard/dist/
+│   │       ├── install/scripts/
+│   │       │   ├── setup.ts              # plugin-wide check + wire (--check/--dry-run/--apply/--session-check)
+│   │       │   ├── install.ts            # dashboard precheck
+│   │       │   ├── setup-statusline.ts
+│   │       │   └── statusline-decision.ts    # pure decision, unit-tested
+│   │       └── shared/scripts/           # imported by BOTH dashboards — extend, never duplicate
+│   │           ├── opencode.ts           # OpenCode DB reader
+│   │           ├── path-inside.ts
+│   │           └── static-server.ts
+│   ├── dispatch/
+│   │   ├── hooks/flightplan-lint.sh      # PostToolUse, path + content gated
+│   │   └── skills/{preflight,flightplan,autopilot,waypoints}/
+│   │       # flightplan/scripts/ also hosts autopilot's shared tools:
+│   │       # next-ready / score-task (--log) / flightlog
+│   ├── chronicle/
+│   │   ├── shared/scripts/               # code imported by more than one skill
+│   │   ├── agents/                       # lawspeaker+watcher+runesmith (commit) / storykeeper+skald+messenger /
+│   │   │                                 # lorekeeper+gleaner+reckoner+codifier+barrowkeeper / skirnir+annalist (release)
+│   │   ├── agents-codex/                 # Codex agent definitions (TOML format)
+│   │   ├── hooks/check-branch.sh         # PreToolUse, guards commits on main/master
+│   │   └── skills/{adr,commit,pr,release,install}/
+│   ├── relay/
+│   │   ├── commands/                     # backend-fixed aliases: codex / opencode / claude-cli
+│   │   └── skills/relay/
+│   │       ├── references/backends.md
+│   │       └── scripts/
+│   │           ├── relay.ts              # entry: relay <backend> <mode> [flags]
+│   │           ├── relay-prompt.ts       # pure formatPrompt + file-contract helpers
+│   │           ├── live.ts               # herdr live-pane layer (dynamic import)
+│   │           ├── context-collector.ts / shared.ts / types.ts
+│   │           └── backends/             # gate.ts (pure) + index.ts + codex/opencode/claude
+│   └── herdr/skills/
+│       ├── herdr/
+│       │   ├── references/               # config / cli / plugin-development / agent-orchestration
+│       │   └── scripts/herd.ts           # typed Bun wrapper: spawn/send/keys/wait/read/list/close
+│       └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
+└── opencode/                          # OpenCode runtime layer — repo infra, outside packages/, owns no version
+    ├── plugin.ts                          # the OpenCode plugin module (single file, no repo imports)
+    ├── plugin.test.ts
+    ├── install.ts                         # --check | --dry-run | --apply | --unlink
+    ├── install.test.ts
+    ├── agents/                            # 13 chronicle agents in OpenCode frontmatter (committed)
+    ├── commands/                          # nudge.md + thoughtful.md in OpenCode format (committed)
+    └── references/opencode-runtime.md     # the runtime spike log, written by hand before the tree ran
 ```
 
 Every `packages/<plugin>/` holds both a `.claude-plugin/plugin.json` and a `.codex-plugin/plugin.json`.
@@ -163,11 +171,30 @@ Do not infer intent from visibility. `document.hidden` stays false when another 
 
 **Leave the permission relay ungated.** Its protocol is notification-based and the terminal prompt stays live beside the cockpit card, so it already defaults to the TUI.
 
-**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. The channel is UI→agent only; the agent's answers ride the transcript.
+**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends use the TUI HTTP bridge (`opencode-send.ts`): the running TUI is discovered from `OPENCODE_TUI_SERVER_URL` or a `ps` scan for `opencode --port <n>` (a `serve` process is excluded from that scan), then delivered through `/tui/append-prompt` followed by `/tui/submit-prompt`. The channel is UI→agent only; the agent's answers ride the transcript.
 
 ## Harness constraints
 
-**Chronicle needs nested subagent spawning.** Claude Code 2.1.217 disabled it by default. Without `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (chronicle needs `2`), every orchestrator fails with `Agent exists but is not enabled in this context`. The `chronicle:install` skill owns this: a `SessionStart` hook runs `setup-spawn-depth.ts --session-check`, writes the value into `~/.claude/settings.json` when missing or too low (it only ever raises), and asks the user to restart. The env var is read at session start, so the writing session still runs without it.
+**Chronicle needs nested subagent spawning.** Claude Code 2.1.217 disabled it by default. Without `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (chronicle needs `2`), every orchestrator fails with `Agent exists but is not enabled in this context`. The `chronicle:install` skill owns this: a `SessionStart` hook runs `setup-spawn-depth.ts --session-check`, writes the value into `~/.claude/settings.json` when missing or too low (it only ever raises), and asks the user to restart. The env var is read at session start, so the writing session still runs without it. OpenCode carries the identical requirement under a different name: `subagent_depth` in `~/.config/opencode/opencode.json`, also needing at least `2` — it ships defaulting to `1`, which blocks nesting outright. There is no session hook to write it; `opencode/install.ts --apply` raises it instead, same raise-only rule, same silent-stop failure mode if it's skipped.
+
+**opencode runtime layer.** All OpenCode-facing code lives in `opencode/` at the repo root, deliberately outside `packages/`, so the two-manifests-per-package invariant and the release config stay untouched — `opencode/` versions nothing and ships in no plugin. Install is symlinks, not copies: `opencode/install.ts --apply` links the 15 skills, the plugin module, the 13 chronicle agents, and the 2 monitor commands into `~/.config/opencode/`, with the checkout as the single source of truth — an edit lands live, no reinstall — plus the one `subagent_depth` config edit above.
+
+Hook parity — which Claude hooks port to which OpenCode events:
+
+| Plugin | Hook | Command | Ported to OpenCode? |
+|---|---|---|---|
+| monitor | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup.ts --session-check` | **No** — dead code outside Claude Code: it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work (statusline-path migration, reaping orphaned Claude processes) is Claude-only |
+| monitor | `SessionStart` (same matcher) | `skills/cockpit/scripts/decision-log-start.ts` | Yes → `session.created` |
+| monitor | `Stop` | `skills/cockpit/scripts/scribe-nudge.ts` | Yes → `session.idle` |
+| chronicle | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup-spawn-depth.ts --session-check` | **Moved** — becomes the installer's `subagent_depth` write |
+| chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.execute.before` |
+| dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
+
+OpenCode has no hook-level "ask" — a plugin's `tool.execute.before` handler can only let a call through or throw. The branch guard degrades accordingly: instead of returning an `ask` permission decision, it throws `check-branch.sh`'s own `systemMessage` verbatim, turning what is a prompt on Claude Code into a hard block on OpenCode.
+
+The module itself carries four constraints, each a trap if broken: it is a single file; it imports nothing from anywhere else in this repo, even a helper worth sharing stays module-local; it derives the repo root from `dirname(import.meta.dir)`, never a config file; and it never reads a harness environment variable — Claude's and Codex's own vars must stay meaningless to it.
+
+**Version policy.** `opencode/` is repo infrastructure, not a release component. This work bumps no `plugin.json`, cuts no `<plugin>-vX.Y.Z` tag, and adds no `CHANGELOG.md` entry — it belongs to no plugin, so none of them owns a version bump for it.
 
 **Codex freezes hook environments.** Codex runs plugin hooks under a long-lived `codex app-server daemon` whose environment is fixed at daemon start. A delegation env var such as relay's `RELAY_DELEGATED=1` reaches the Codex frontend but not the hook, if the daemon predates it. Restart the app-server to refresh the environment. The same suppression works cleanly on Claude Code.
 
@@ -207,10 +234,14 @@ bun packages/monitor/skills/cockpit/scripts/cockpit.ts nudge status   # on|off|t
 # Cockpit dev: isolate from the cached daemon entirely
 COCKPIT_HOME=/tmp/cockpit-dev bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts --port 5999
 
+# OpenCode installer — symlinks skills/plugin/agents/commands into ~/.config/opencode/, raises subagent_depth
+bun opencode/install.ts                                                # --check | --dry-run | --apply | --unlink
+
 # Tests
 bun test packages/monitor/skills/cockpit/scripts/
 bun test packages/monitor/skills/install/scripts/
 bun test packages/monitor/skills/usage-dashboard/scripts/rollup-update.test.ts
+bun test opencode/
 ```
 
 ## Code Conventions

@@ -1,6 +1,6 @@
 # cc-plugins
 
-A local Claude Code and Codex plugin marketplace for a personal coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, and cut the tag; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
+A local Claude Code, Codex, and OpenCode plugin marketplace for a personal coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the *usage-dashboard* skill is the rear-view mirror for usage history, and the *cockpit* skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task *out* to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, and cut the tag; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
 
 ## Development Workflow
 
@@ -12,8 +12,8 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 
 | Skill | Description |
 |-------|-------------|
-| [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code and Codex: sessions, tokens, cost, model mix, project activity, and live sessions |
-| [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code and Codex: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
+| [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code, Codex, and OpenCode: sessions, tokens, cost, model mix, and project activity, plus live sessions for Claude Code and Codex |
+| [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code, Codex, and OpenCode: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
 | [install](./packages/monitor/skills/install) | One-stop prerequisite check and statusline wiring for the whole plugin, command-triggered |
 
 **dispatch** bundles four skills:
@@ -102,6 +102,47 @@ codex plugin list | rg 'q-lab-marketplace|monitor'
 
 After installing a Codex plugin, start a new Codex session so the skill list is refreshed.
 
+## OpenCode Installation
+
+There is no plugin registry step. The repo is the single source of truth: `opencode/install.ts` symlinks skills, agents, commands, and the plugin module straight into `~/.config/opencode/`, so an update to the checkout is live immediately — no reinstall, no rebuild.
+
+```bash
+bun opencode/install.ts --check     # report what is and is not wired
+bun opencode/install.ts --apply     # symlink everything, raise subagent_depth
+bun opencode/install.ts --unlink    # remove only what --apply created
+```
+
+`--dry-run` also exists — it prints the same plan as `--apply` without writing anything.
+
+`--apply` installs:
+
+| Installs | Count | Target |
+|---|---|---|
+| Skills | 15 | `~/.config/opencode/skills/<name>/` |
+| Plugin module | 1 | `~/.config/opencode/plugin/q-lab.ts` |
+| Chronicle agents | 13 | `~/.config/opencode/agents/<name>.md` |
+| Commands | 2 | `~/.config/opencode/commands/<name>.md` |
+| `subagent_depth` | 1 edit | `~/.config/opencode/opencode.json` |
+
+**The `subagent_depth` prerequisite.** `--apply` raises `subagent_depth` to **at least 2** in `~/.config/opencode/opencode.json`, the one config file it touches outside symlinks. The edit is raise-only — every other key in that file is preserved, and a value already `≥ 2` is left alone. OpenCode ships defaulting `subagent_depth` to `1`, which blocks nesting outright, so this isn't a hypothetical edge case — it's the shipped default. Below the required depth, one of chronicle's orchestrators simply stops mid-run with no error naming the config: the failure reads exactly like a plugin bug. Anyone hand-editing `opencode.json` instead of running `--apply` needs to set this key to `2` themselves.
+
+**Works under OpenCode:**
+
+- All 15 skills, discovered from `~/.config/opencode/skills/`.
+- usage-dashboard reads OpenCode data natively — the shared reader already handles `~/.local/share/opencode/opencode.db`.
+- cockpit **reads and sends** for OpenCode sessions. Precondition: the OpenCode TUI must have been started with a port (`opencode --port <n>`), or `OPENCODE_TUI_SERVER_URL` must be set before cockpit starts.
+- relay `delegate` and `review`.
+- The four ported hook behaviors: decision-log start, the scribe nudge, the chronicle branch guard, and the dispatch flightplan lint.
+- Both monitor commands.
+- Chronicle's subagents, spawned through the task tool, with `subagent_depth` satisfied as above.
+
+**Does not work under OpenCode:**
+
+- The statusline. It is a Claude-only concept with no OpenCode equivalent, and there is no plan for one.
+- relay `image` — codex-only, and it fails at the capability gate before any CLI runs.
+- Workflow-driven autopilot. There is no Workflow tool, so [autopilot](./packages/dispatch/skills/autopilot) runs as a manual task-tool wave loop instead: behaviorally close, but with no automatic parallel-wave scheduling.
+- monitor's `setup.ts --session-check`. It is deliberately not ported because it is inert outside Claude Code — it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work is statusline-path migration and reaping orphaned Claude processes.
+
 ## usage-dashboard
 
 A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and visualizes usage in a browser. No telemetry, no cloud; everything stays on your machine.
@@ -179,6 +220,7 @@ Opens `http://localhost:5858` in your default browser.
 
 - Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
 - Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and rollout files under `~/.codex/sessions`.
+- OpenCode transcripts resolve via the `opencode` provider in `transcript-stream.ts`, reading the same `~/.local/share/opencode/opencode.db` the usage-dashboard uses.
 - Decision logs live per-project under `.cockpit/`; the registry and wait/send bridge are shared through `~/.local/share/q-lab/cockpit/`.
 
 ### Channel (send box)
@@ -187,6 +229,7 @@ The send box at the bottom of the Decision Log column can send text into a runni
 
 - **Claude Code** uses the cockpit channel MCP server. The agent's answer comes back through the live transcript.
 - **Codex** uses the managed Codex remote-control daemon. Cockpit connects to the local app-server control socket, resumes the selected thread, and submits or steers a turn. Direct app-server is only a fallback when remote-control is unavailable.
+- **OpenCode** uses the TUI HTTP bridge, not an MCP channel: it discovers the running TUI from `OPENCODE_TUI_SERVER_URL` (or a `ps` scan for `opencode --port <n>`) and delivers through `/tui/append-prompt` + `/tui/submit-prompt`. Same port precondition as the OpenCode Installation section above — the TUI must have been started with `--port`; a `serve` process is not discovered, and a successful send is not a delivery receipt.
 
 Channels require Claude Code 2.1.80 or later and are still behind the research-preview development flag. The channel MCP server is packaged in the plugin manifest (`mcpServers` + `channels` in `.claude-plugin/plugin.json`), so installing the plugin registers it — no hand-written `~/.claude.json` entry. (If you set one up for an older version, `/monitor:install` removes it; leaving it in place double-registers the channel.)
 
@@ -226,6 +269,9 @@ claude plugins install dispatch@q-lab-marketplace
 
 # Codex
 codex plugin add dispatch@q-lab-marketplace
+
+# OpenCode
+bun opencode/install.ts --apply
 ```
 
 (Add the marketplace first if you haven't — see the monitor install steps above.)
@@ -257,9 +303,11 @@ claude plugins install relay@q-lab-marketplace
 # Codex
 codex plugin add relay@q-lab-marketplace
 
-# OpenCode (reads ~/.claude/skills/) — one-time symlink
-ln -s "$(pwd)/packages/relay/skills/relay" ~/.claude/skills/relay
+# OpenCode
+bun opencode/install.ts --apply
 ```
+
+If you previously ran the old manual symlink (`ln -s .../packages/relay/skills/relay ~/.claude/skills/relay`), remove it. `opencode/install.ts --apply` installs `relay` under `~/.config/opencode/skills/`, and OpenCode scans `~/.claude/skills/` as well — leaving the old symlink in place surfaces two skills both named `relay`. `--check` warns about it.
 
 ## chronicle
 
@@ -278,6 +326,9 @@ claude plugins install chronicle@q-lab-marketplace
 
 # Codex
 codex plugin add chronicle@q-lab-marketplace
+
+# OpenCode
+bun opencode/install.ts --apply
 ```
 
 ## herdr
@@ -308,6 +359,9 @@ claude plugins install herdr@q-lab-marketplace
 
 # Codex
 codex plugin add herdr@q-lab-marketplace
+
+# OpenCode
+bun opencode/install.ts --apply
 ```
 
 ## Adding a New Plugin
