@@ -109,7 +109,39 @@ Full write-ups, each with its observation and the decision it drove, live in `do
 - **S13** — all three legs of the cockpit send bridge respond, but `/tui/append-prompt` returns `200 true` **with no TUI attached**, and `opencode serve` is excluded from the bridge's `ps` discovery.
 - **S1 / S2** — full event list captured; `session.idle` is turn-scoped, not tool-scoped. Resume behavior and multi-turn idle cadence remain untested.
 - **S12** — still open, and never a gate.
-- **S19** — plugin stderr renders **red in the TUI and never reaches the model**; the model reads only the system prompt. Verified live: `experimental.chat.system.transform` (`{ sessionID?, model }` → `output.system: string[]`) appends strings the model demonstrably reads, so the session guidance stashed by `session.created`/`session.idle` is injected there, consume-on-first-request, mirroring Claude's `additionalContext`. Failures go to `client.app.log` instead — the TUI shows nothing, so debug with `opencode run --print-logs`. The stash map is capped (least-recently-stashed evicted) because guidance is time-sensitive and a session ending right after its last nudge would otherwise leave one never-consumed entry per session while a `serve` process lives.
+- **S19** — plugin stderr renders **red in the TUI and never reaches the model**; the model reads only the system prompt. `experimental.chat.system.transform` (`{ sessionID?, model }` → `output.system: string[]`) appends strings the model demonstrably reads, so the session guidance seeded by `session.created`/`session.idle` is injected there, mirroring Claude's `additionalContext`. Failures go to `client.app.log` instead — the TUI shows nothing, so debug with `opencode run --print-logs`. The seed map is capped (least-recently-stashed evicted) because guidance is time-sensitive and a session ending right after its last nudge would otherwise leave one never-consumed entry per session while a `serve` process lives. Delivery is not consume-once — see S21 for why.
+
+## S20 — The `event` dispatch is fire-and-forget; the transform is awaited ⚠️ TRAP
+
+**Observation**, opencode 1.18.18, source + timed probe. The plugin index awaits the transform trigger (`yield* Effect.promise(() => fn(input, output))`) but dispatches events without awaiting: `void hook["event"]?.({...})`. A probe that logged every step with `Date.now()` showed the first request's transform firing **before** an async event-handler stash completed:
+
+```
+620  session.created received — async stash starts (bun spawn)
+931  transform → pending empty
+557+ transform (2nd) → still empty
+155+ stash lands — after both transforms
+```
+
+So stashing guidance by spawning the script in the `session.created` handler is a coin flip: on a fast request the model's system prompt is already built, the stash lands too late, and the guidance is never read — with no error anywhere.
+
+**Decision**: the event handlers seed sentinels **synchronously** (`\u0000created-guidance`, `\u0000idle-nudge`) — no spawns — and the awaited transform materializes them by running the scripts itself. One spawn, exactly when a request makes the guidance worth reading; the seed is visible to the transform from the instant the event lands.
+
+## S21 — The first request is the title generator — consume-once loses the guidance ⚠️ TRAP
+
+**Observation**, opencode 1.18.18, diag probe logging every transform call. The runtime triggers the transform for **every** LLM request in the session; the first call carries the throwaway session-title prompt (`agent/prompt/title.txt`, 2120 bytes — observed as a 2096-char system header) and the second carries the real ~27KB system prompt. A consume-on-first-request design hands the guidance to the title request and the real one never sees it:
+
+```
+transform #1:  hdrLen 2096, found:true  → materialized, pushed (title request)
+transform #2:  hdrLen 27040, found:false → nothing (real request)
+```
+
+**The earlier "verified end-to-end" probe was a false positive.** Its transform pushed the marker unconditionally on every call (so the title request carried it too) and its yes/no oracle had no negative control — a control run with **no plugin at all** answered READ 3/6 times. A verbatim-quote oracle (output the exact phrase, or NOTHING) answered NOTHING 4/4 with no plugin and, against the consume-once implementation, still NOTHING 4/4 — the guidance was never reaching the real request.
+
+**Decision**: a seed rides up to `PUSH_CAP = 3` requests (title + real request + a retry; the title request is harmless noise) and `session.idle` retires the entry at the turn boundary — the created guidance rides turn 1, the per-turn nudge rides turn 2. Re-verified live with the verbatim oracle: `DECISION LOG ACTIVE` surfaced 4/4 runs. The no-plugin control still answers NOTHING, so the oracle is trustworthy.
+
+**Riding N requests must not mean running the script N times.** The two seeds differ: `decision-log-start.ts` is stateless (three runs, 944 bytes each), while `scribe-nudge.ts` writes a marker and throttles for 8 minutes — back-to-back runs return 336 / 0 / 0 bytes. A materialize-per-push design would hand the nudge to whichever request transformed first, the title one, and push an empty message to the rest — the same trap, one layer down, and invisible because it lives in the nudge's marker file rather than in the plugin. The transform therefore writes the resolved strings back into the entry and later pushes replay them, so `PUSH_CAP` counts requests and not subprocess spawns.
+
+**Method note for this spike**: a positive-only model probe proves nothing. Every "does the model see X" claim needs (a) a negative control and (b) an oracle that requires quoting exact text, not a yes/no answer — this model answers yes/no trivia probes randomly (3/6 on a false premise).
 
 ## Method note
 

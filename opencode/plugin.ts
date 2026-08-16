@@ -27,46 +27,65 @@ const OPENCODE_SPAWN_NOTE =
 // S19: the session scripts write guidance Claude consumes as hook context, but
 // OpenCode feeds the model from the system prompt, not from plugin output — a
 // console write would be red TUI noise the model never reads. The event hooks
-// stash guidance here, and experimental.chat.system.transform injects it into
-// the next request and consumes it, so each message reaches the model exactly
-// once, the way Claude's additionalContext does.
+// seed this map synchronously, and experimental.chat.system.transform
+// materializes the seeds and injects the result into the requests of the turn,
+// so each message reaches the model the way Claude's additionalContext does.
 //
-// Lifecycle: a stash that no request ever consumes (a session that ends right
-// after its last nudge, or a created-stash for a session the user never sends
+// Seeds, not messages (S20): opencode dispatches the `event` hook
+// fire-and-forget — `void hook["event"]?.(...)` is never awaited — but awaits
+// the transform. An async stash (spawn the script, then set the entry) could
+// lose the race to the first request, leaving the model with no guidance and
+// no error. A seed lands synchronously the instant the event is dispatched,
+// so the awaited transform always sees it; the transform runs the script
+// itself, exactly when a request makes the guidance worth materializing.
+//
+// No consume-once (S21): the runtime triggers the transform for EVERY LLM
+// request in the session, and the first one is the throwaway title generator
+// (~2KB prompt; its output never surfaces). A consume-on-first-request design
+// hands the guidance to that request and the real one never sees it. A seed
+// therefore rides up to PUSH_CAP requests (the title request is harmless
+// noise), and the session.idle handler retires the entry at the turn
+// boundary — the guidance rides the first turn only, the per-turn nudge rides
+// the next turn.
+//
+// Lifecycle: an entry that no request ever rides (a session that ends right
+// after its last nudge, or a created-seed for a session the user never sends
 // a message to) would otherwise accumulate one entry per session while the
 // server lives. Guidance is time-sensitive, so the cap keeps the map bounded
-// by evicting the least-recently-stashed entries — an unconsumed stash is
-// garbage, never a delivery promise. TUI runs die with the server; the cap
-// covers `serve`.
-const PENDING_GUIDANCE = new Map<string, string[]>();
+// by evicting the least-recently-stashed entries — an entry no request ever
+// rides is garbage, never a delivery promise. TUI runs die with the server;
+// the cap covers `serve`.
+type PendingGuidance = {
+  /** Seeds until the first request materializes them, resolved strings after
+   *  — the scripts run once per turn, never once per request. */
+  items: string[];
+  /** How many requests of this turn already received the push. */
+  pushes: number;
+};
+const PENDING_GUIDANCE = new Map<string, PendingGuidance>();
 const GUIDANCE_CAP = 32;
+// Title + real request (+ a retry) must all ride before the push stops.
+const PUSH_CAP = 3;
 
-/** Append a message to a session's pending guidance and enforce the cap.
+// Placeholders the transform materializes by running the matching script.
+// \u0000 keeps them disjoint from any script output, which is plain text.
+const CREATED_SEED = "\u0000created-guidance";
+const IDLE_SEED = "\u0000idle-nudge";
+
+/** Store a session's guidance entry and enforce the cap.
  *  Map iteration order is insertion order, so the oldest key comes first —
  *  but `set` on an existing key keeps its original position, which would make
  *  a long-lived session the first one evicted. Delete before re-inserting so
  *  the freshest stash moves to the back and the eviction is genuinely LRU. */
 function stashPending(
-  pending: Map<string, string[]>,
+  pending: Map<string, PendingGuidance>,
   sessionID: string,
-  message: string,
+  entry: PendingGuidance,
   cap = GUIDANCE_CAP,
 ): void {
-  const messages = [...(pending.get(sessionID) ?? []), message];
   pending.delete(sessionID);
-  pending.set(sessionID, messages);
+  pending.set(sessionID, entry);
   while (pending.size > cap) pending.delete(pending.keys().next().value!);
-}
-
-/** Take a session's pending guidance, if any, and clear it. */
-function consumePending(
-  pending: Map<string, string[]>,
-  sessionID: string,
-): string[] | null {
-  const messages = pending.get(sessionID);
-  if (!messages?.length) return null;
-  pending.delete(sessionID);
-  return messages;
 }
 
 function hookPayload(kind: HookKind, value: string): string {
@@ -186,63 +205,91 @@ const QLabPlugin = Object.assign(
       }: {
         event: { type: string; properties?: { sessionID?: string } };
       }) => {
-        try {
-          const sessionID = event.properties?.sessionID;
+        const sessionID = event.properties?.sessionID;
+        if (!sessionID) return;
 
-          if (event.type === "session.created") {
-            const result = await run(
-              ["bun", join(root, DECISION_LOG_START)],
-              "{}",
-            );
-            const message = withOpenCodeNote(result?.stdout ?? null);
-            if (message && sessionID) {
-              stashPending(PENDING_GUIDANCE, sessionID, message);
-            }
-            if (result?.stderr) {
-              await logFailure(client, result.stderr.trimEnd());
-            }
-          }
+        // S20: seed synchronously — never spawn here. The event dispatch is
+        // fire-and-forget, so anything async could land after the first
+        // request's transform has already read an empty stash. The transform
+        // materializes the seed by running the script (it is awaited). Map
+        // writes cannot throw, so this handler needs no failure path.
+        if (event.type === "session.created") {
+          stashPending(PENDING_GUIDANCE, sessionID, {
+            items: [CREATED_SEED],
+            pushes: 0,
+          });
+        }
 
-          if (event.type === "session.idle") {
-            // scribe-nudge reads its session id and cwd from stdin and returns
-            // immediately when that parse fails, so an empty stdin silently
-            // disables the nudge entirely. The payload is the behavior.
-            const result = await run(
-              ["bun", join(root, SCRIBE_NUDGE)],
-              JSON.stringify({ session_id: sessionID, cwd }),
-            );
-            // S15: OpenCode receives the Claude hook wrapper, not plain reminder text.
-            const message = withOpenCodeNote(
-              result ? sessionMessage(result.stdout) : null,
-            );
-            if (message && sessionID) {
-              // Append to anything still pending (a created-guidance never
-              // consumed, for instance) so both reach the model in order.
-              stashPending(PENDING_GUIDANCE, sessionID, message);
-            }
-            if (result?.stderr) {
-              await logFailure(client, result.stderr.trimEnd());
-            }
-          }
-        } catch {
-          // Session handlers log and never throw.
-          await logFailure(client, "q-lab session hook failed");
+        if (event.type === "session.idle") {
+          // S21: turn boundary — anything the turn already rode retires, and
+          // a fresh entry seeds the nudge for the next turn's requests.
+          PENDING_GUIDANCE.delete(sessionID);
+          stashPending(PENDING_GUIDANCE, sessionID, {
+            items: [IDLE_SEED],
+            pushes: 0,
+          });
         }
       },
 
-      // S19: the model reads guidance from the system prompt. Consume-on-first-
-      // request mirrors Claude's additionalContext, which also lands once. The
-      // idle stash is spawned asynchronously, so a message sent immediately
-      // after an idle turn may beat the stash and defer the nudge one turn.
+      // S19/S20/S21: the model reads guidance from the system prompt. The
+      // transform is triggered for EVERY LLM request in the session — the
+      // first is the throwaway title generator, so consume-once would hand
+      // the guidance to a request whose output never surfaces. A seed rides
+      // up to PUSH_CAP requests (the title request is harmless noise) and the
+      // turn-ending idle retires it. agent.generate triggers without a
+      // sessionID and no-ops here.
       "experimental.chat.system.transform": async (
         input: { sessionID?: string },
         output: { system: string[] },
       ) => {
         const pending = input.sessionID
-          ? consumePending(PENDING_GUIDANCE, input.sessionID)
-          : null;
-        if (!pending) return;
-        output.system.push(...pending);
+          ? PENDING_GUIDANCE.get(input.sessionID)
+          : undefined;
+        if (!pending || pending.pushes >= PUSH_CAP) return;
+
+        const messages: string[] = [];
+        for (const item of pending.items) {
+          if (item === CREATED_SEED) {
+            const result = await run(
+              ["bun", join(root, DECISION_LOG_START)],
+              "{}",
+            );
+            if (result?.stderr) {
+              await logFailure(client, result.stderr.trimEnd());
+            }
+            const message = withOpenCodeNote(result?.stdout ?? null);
+            if (message) messages.push(message);
+          } else if (item === IDLE_SEED) {
+            // scribe-nudge reads its session id and cwd from stdin and returns
+            // immediately when that parse fails, so an empty stdin silently
+            // disables the nudge entirely. The payload is the behavior.
+            const result = await run(
+              ["bun", join(root, SCRIBE_NUDGE)],
+              JSON.stringify({ session_id: input.sessionID, cwd }),
+            );
+            if (result?.stderr) {
+              await logFailure(client, result.stderr.trimEnd());
+            }
+            // S15: OpenCode receives the Claude hook wrapper, not plain
+            // reminder text.
+            const message = withOpenCodeNote(
+              result ? sessionMessage(result.stdout) : null,
+            );
+            if (message) messages.push(message);
+          } else {
+            // Already materialized by an earlier request of this turn.
+            messages.push(item);
+          }
+        }
+        // Materialize once, then replay. Re-running a script per push would
+        // assume it is a pure function of its input; scribe-nudge is not —
+        // it writes a marker and throttles for 8 minutes, so a re-run inside
+        // the turn returns nothing and every request after the first would
+        // push an empty message. Caching the resolved strings is also what
+        // makes PUSH_CAP count requests instead of subprocess spawns.
+        pending.items = messages;
+        pending.pushes += 1;
+        if (messages.length) output.system.push(...messages);
       },
 
       "tool.execute.before": async (
@@ -299,8 +346,8 @@ const QLabPlugin = Object.assign(
     lintVerdict,
     withOpenCodeNote,
     stashPending,
-    consumePending,
     GUIDANCE_CAP,
+    PUSH_CAP,
     COMMIT_COMMAND,
     FLIGHTPLAN_TASK,
   },

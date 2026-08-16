@@ -289,3 +289,35 @@ Still UNRESOLVED: read timing (startup vs live), which config file supplied the 
 - **Custom agents are discovered from `.opencode/agents/`** (plural), confirmed by listing with only that directory present.
 
 Still UNRESOLVED: whether a spawn prompts for permission in an interactive session, as opposed to the `"permission": "allow"` config used in the probe.
+
+---
+
+## S20 — Can the `session.created` handler pass guidance to the model?
+
+**Question**: the `experimental.chat.system.transform` hook injects strings into the model's system prompt — but can a `session.created` handler reliably feed it?
+
+**Why it matters**: the decision-log guidance must ride the first real request of a session; losing it silently means the model never learns the cockpit contract.
+
+**Status**: **RESOLVED — only via a synchronous seed.** The `event` hook is dispatched fire-and-forget (`void hook["event"]?.(...)` — never awaited, observed in the plugin index source) while the transform is awaited. An async stash (spawn the script, then set the map) loses the race to the first request's transform — a timed probe measured the transform firing ~300ms after `session.created` while a spawn-based stash landed ~1.5s later. The model never saw the guidance.
+
+**Decision**: the event handlers seed sentinels **synchronously** and the awaited transform materializes them by running the scripts itself. No spawn in the event handler at all.
+
+---
+
+## S21 — The first request eats consume-once guidance ⚠️ TRAP
+
+**Question**: does the guidance actually reach the request the user sees, once per session?
+
+**Status**: **RESOLVED — consume-once is broken; the first transform call is the title generator.** The runtime triggers `experimental.chat.system.transform` for **every** LLM request in the session, and the first one is the throwaway session-title request (`agent/prompt/title.txt`, ~2.1KB system prompt; its output never surfaces). A consume-on-first-request design hands the guidance to that request and the real one (~27KB system) never gets it. Observed with a diag probe logging both calls: `hdrLen 2096, found:true` (title) then `hdrLen 27040, found:false` (main). The first `opencode run` probe that "verified" the transform reached the model was a false positive — it had no negative control, and the yes/no oracle is unreliable (a control run answered READ 3/6 with no plugin at all; a verbatim-quote oracle answered NOTHING 4/4).
+
+**Decision**: a seed rides up to `PUSH_CAP` requests (title + real request + a retry; the title one is harmless noise) and the `session.idle` handler retires the entry at the turn boundary. Verified live with the verbatim oracle: the guidance phrase surfaced 4/4 runs.
+
+**Materialize once, then replay.** Riding N requests must not mean running the script N times. `decision-log-start.ts` is stateless (three runs, 944 bytes each), but `scribe-nudge.ts` is a one-shot: it writes a marker and throttles for 8 minutes, so back-to-back runs return 336 / 0 / 0 bytes. Re-running per push would hand the nudge to whichever request transformed first — the title request — and push an empty message to the rest, reintroducing this very trap one layer down. The transform therefore writes the resolved strings back into the entry and later pushes replay them, so `PUSH_CAP` counts requests rather than subprocess spawns.
+
+---
+
+## S22 — Can a plugin send a user-visible notification?
+
+**Question**: the docs' "Send notifications" example uses `$` (Bun shell) with `osascript` for macOS system notifications, and there is a `tui.toast.show` event. What can a plugin actually reach?
+
+**Status**: **RESOLVED — user-facing only.** Those channels reach the user's screen/desktop, never the model; the model reads only the system prompt (S19). The `experimental.chat.system.transform` hook is the only documented channel from a hook into the model's context.
