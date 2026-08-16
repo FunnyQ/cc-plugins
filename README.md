@@ -126,6 +126,8 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 
 **The `subagent_depth` prerequisite.** `--apply` raises `subagent_depth` to **at least 2** in `~/.config/opencode/opencode.json`, the one config file it touches outside symlinks. The edit is raise-only — every other key in that file is preserved, and a value already `≥ 2` is left alone. OpenCode ships defaulting `subagent_depth` to `1`, which blocks nesting outright, so this isn't a hypothetical edge case — it's the shipped default. Below the required depth, one of chronicle's orchestrators simply stops mid-run with no error naming the config: the failure reads exactly like a plugin bug. Anyone hand-editing `opencode.json` instead of running `--apply` needs to set this key to `2` themselves.
 
+**Which config file gets the edit.** OpenCode merges three global config names in order — `config.json`, then `opencode.json`, then `opencode.jsonc` — so the last one present wins. The installer patches whichever of those already exists, highest precedence first, and creates `opencode.json` only when none does. Two consequences: an existing `opencode.jsonc` is the file that gets raised, and a config carrying **comments** is read but never rewritten, because re-serializing it would delete them — `--check` and `--apply` report `manual` and print the line to add by hand.
+
 **Works under OpenCode:**
 
 - All 15 skills, discovered from `~/.config/opencode/skills/`.

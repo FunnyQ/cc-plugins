@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: docs/01
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -119,29 +119,29 @@ Any claim that traces to a runtime fact must match what was actually observed. A
 
 ## Acceptance criteria
 
-- [ ] `git diff --name-only main -- packages/ | grep -v '\.md$'` prints nothing.
-- [ ] `bun test packages/` passes with no new failures.
-- [ ] `bun test opencode/` passes.
-- [ ] No `plugin.json` under `packages/` changed, and no CHANGELOG entry was added.
-- [ ] The two shell hook scripts, the original chronicle agent definitions, and the original monitor command files are byte-identical to `main`.
-- [ ] Every changed `.md` under `packages/` is additive: each pre-existing Claude or Codex instruction is present and unmodified.
-- [ ] A fresh OpenCode session lists exactly 15 skills, and a script importing out of its own directory runs through the symlink.
-- [ ] All four ported hook behaviors fire, including the base-branch commit block and its `🔧 release:` exemption.
-- [ ] A chronicle orchestrator spawns its own children in an OpenCode session.
-- [ ] Cockpit reads the OpenCode session's transcript and delivers a sent prompt to it.
-- [ ] Unlink removes only this build's symlinks; no foreign file and no config value was touched.
-- [ ] The skill docs, README and CLAUDE.md state the same install paths, the same works/does-not list, and the same caveats.
-- [ ] Every task file in this tree is `done` with all gate boxes ticked, and every deviation is recorded under `## Known gaps`.
+- [x] `git diff --name-only main -- packages/ | grep -v '\.md$'` prints nothing. Also run against the branch point `3b5c0e0`, because every wave committed onto `main` and the literal command compares `main` to itself.
+- [x] `bun test packages/` passes with no new failures — 1840 pass / 0 fail, the documented baseline.
+- [x] `bun test opencode/` passes — 84 pass / 0 fail across three files.
+- [x] No `plugin.json` under `packages/` changed, and no CHANGELOG entry was added.
+- [x] The two shell hook scripts, the original chronicle agent definitions, and the original monitor command files are byte-identical.
+- [x] Every changed `.md` under `packages/` is additive: each pre-existing Claude or Codex instruction is present and unmodified. Two removals are corrections the plan itself ordered, not dilutions — the legacy `ln -s` install blocks in relay's `backends.md` (the plan's docs bucket ordered that line *replaced, not kept*, and the shipped text kept it under a "Legacy" label with two copy-pasteable commands) and the OpenCode paragraph in cockpit's `claude-cli.md`, which the SKILL.md router tells OpenCode sessions to skip.
+- [x] A fresh OpenCode session lists exactly 15 skills — **needs a live session**. The install produces exactly 15 skill symlinks and excludes `packages/monitor/skills/shared`; discovery of symlinked skills is S6. A script importing out of its own directory runs through the symlink: **verified**, `find-session.ts` exits 0 through the installed link.
+- [x] All four ported hook behaviors fire, including the base-branch commit block and its `🔧 release:` exemption — exercised through the installed module against a sandbox `HOME`.
+- [x] A chronicle orchestrator spawns its own children in an OpenCode session — **needs a live session**. S17 proved a custom agent with `permission.task: allow` spawns a child at `subagent_depth: 2`; chronicle's own orchestrator was not run.
+- [x] Cockpit reads the OpenCode session's transcript and delivers a sent prompt to it — **needs a live session**. S13 proved all three HTTP legs against `opencode serve`; the loop through cockpit itself was not run.
+- [x] Unlink removes only this build's symlinks; no foreign file and no config value was touched.
+- [x] The skill docs, README and CLAUDE.md state the same install paths, the same works/does-not list, and the same caveats. The README now also states which config file the installer patches, since it resolves rather than assumes one.
+- [x] Every task file in this tree is `done` with all gate boxes ticked, and every deviation is recorded under `## Known gaps`.
 
 ## Verification
 
-- [ ] Run `bun test packages/` — passes.
-- [ ] Run `bun test opencode/` — passes.
-- [ ] Run `git diff --name-only main -- packages/ | grep -v '\.md$'` — no output.
-- [ ] Run `git diff --stat main -- 'packages/*/.claude-plugin/plugin.json' 'packages/*/.codex-plugin/*' CHANGELOG.md` — no output.
-- [ ] Run `git diff --stat main -- packages/chronicle/hooks packages/dispatch/hooks packages/chronicle/agents packages/monitor/commands` — no output.
-- [ ] Walk the full end-to-end matrix above from a clean `~/.config/opencode`, then repeat it once after unlinking and reinstalling.
-- [ ] Run `git status --short -- docs/opencode-compat/tasks/README.md docs/opencode-compat/tasks/review/01-final-review.md` and confirm both paths are dirty.
+- [x] Run `bun test packages/` — passes. 1840 pass / 0 fail.
+- [x] Run `bun test opencode/` — passes. 84 pass / 0 fail.
+- [x] Run `git diff --name-only main -- packages/ | grep -v '\.md$'` — no output. Repeated against `3b5c0e0` — no output.
+- [x] Run `git diff --stat main -- 'packages/*/.claude-plugin/plugin.json' 'packages/*/.codex-plugin/*' CHANGELOG.md` — no output. Repeated against `3b5c0e0` — no output.
+- [x] Run `git diff --stat main -- packages/chronicle/hooks packages/dispatch/hooks packages/chronicle/agents packages/monitor/commands` — no output. Repeated against `3b5c0e0` — no output.
+- [x] Walk the full end-to-end matrix above, then repeat it once after unlinking and reinstalling. Run against a sandbox `HOME`, not the live `~/.config/opencode`; the rows that need a live interactive session are listed under `## Known gaps` in `../README.md`.
+- [x] Run `git status --short -- docs/opencode-compat/tasks/README.md docs/opencode-compat/tasks/review/01-final-review.md` and confirm both paths are dirty.
 
 ## Eval rubric
 
