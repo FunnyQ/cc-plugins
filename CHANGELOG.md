@@ -1,5 +1,58 @@
 # Changelog
 
+## [chronicle 0.13.3] - 2026-08-16
+
+_tracks tag `chronicle-v0.13.3`_
+
+### Added
+- adr, commit, install, pr, and release gained OpenCode compatibility documentation, so an OpenCode session can resolve chronicle's own scripts and agents.
+
+### Changed
+- OpenCode-only instructions for commit, pr, release, and adr moved out of each skill's main SKILL.md into a dedicated `references/opencode.md`, so Claude Code and Codex sessions no longer load OpenCode-specific behavior they never use.
+- Normalized OpenCode-only section wording and headings, replacing several copy-pasted phrasings with one canonical line.
+
+## [dispatch 3.20.1] - 2026-08-16
+
+_tracks tag `dispatch-v3.20.1`_
+
+### Added
+- autopilot gained OpenCode compatibility documentation, so an OpenCode session can drive the same dev/verify/judge loop.
+
+### Changed
+- autopilot's OpenCode-only instructions moved out of SKILL.md into a dedicated `references/opencode.md`.
+- Normalized OpenCode-only section wording and headings across the skill's docs.
+
+## [herdr 0.2.5] - 2026-08-16
+
+_tracks tag `herdr-v0.2.5`_
+
+### Added
+- herdr and herdr-protocol-upgrade gained OpenCode-facing documentation, clarifying how scripts resolve under OpenCode.
+
+### Changed
+- Normalized OpenCode-only section wording and headings across the skill's docs.
+
+## [monitor 4.0.4] - 2026-08-16
+
+_tracks tag `monitor-v4.0.4`_
+
+### Added
+- cockpit, install, and usage-dashboard gained OpenCode compatibility documentation, so an OpenCode session can resolve monitor's scripts and agents.
+- cockpit gained a `references/opencode.md`, filling the missing third provider reference alongside `claude-cli.md` and `codex.md`.
+
+### Changed
+- cockpit's OpenCode-only behavioral sections moved out of SKILL.md into `references/opencode.md`, and the OpenCode notes scattered through `claude-cli.md`, `pilot.md`, `restart.md`, and `scribe.md` were folded into it — cockpit's SKILL.md is a thin router and is now half its former size.
+- Normalized OpenCode-only section wording and headings across the skill's docs.
+
+## [relay 0.6.5] - 2026-08-16
+
+_tracks tag `relay-v0.6.5`_
+
+### Changed
+- OpenCode's default models moved to the Deepseek v4 family: delegate now defaults to `opencode-go/deepseek-v4-light` and review to `opencode-go/deepseek-v4-pro`; delegate also now passes `--variant max` on both headless and live-pane invocations, running the lighter default model at its maximum reasoning setting to offset the change.
+- `relay/backends.md` was shortened, consolidating outdated manual-install instructions now that `opencode/install.ts` is the install method.
+- Normalized OpenCode-only section wording and headings across the skill's docs.
+
 ## [relay 0.6.4] - 2026-08-14
 
 _tracks tag `relay-v0.6.4`_
