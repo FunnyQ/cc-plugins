@@ -1,7 +1,7 @@
 {
   "name": "herdr",
   "version": "0.2.5",
-  "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, and controlling sibling panes/agents when running inside a herdr pane.",
+  "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, controlling sibling panes/agents, and driving web pages in a Herdr browser pane over CDP.",
   "author": { "name": "Q" },
   "license": "MIT",
   "keywords": [
@@ -11,20 +11,24 @@
     "panes",
     "agent-orchestration",
     "tmux",
-    "multiplexer"
+    "multiplexer",
+    "browser",
+    "cdp",
+    "playwright"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Herdr",
     "shortDescription": "Herdr terminal workspace manager reference + agent orchestration.",
-    "longDescription": "Reference and in-session orchestration for the Herdr terminal workspace manager — config.toml, CLI, plugin development, and controlling sibling panes/agents when running inside a herdr pane.",
+    "longDescription": "Reference and in-session orchestration for the Herdr terminal workspace manager — config.toml, CLI, plugin development, controlling sibling panes/agents when running inside a herdr pane, and opening, reading, and driving web pages in a Herdr browser pane over CDP.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive"],
     "defaultPrompt": [
       "How do I configure herdr keybindings?",
       "Spawn a reviewer agent in a new pane.",
-      "Write a herdr plugin."
+      "Write a herdr plugin.",
+      "Open localhost:3000 in a browser pane and show me the console errors."
     ],
     "brandColor": "#8B6BB1"
   }

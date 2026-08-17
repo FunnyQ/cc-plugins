@@ -12,7 +12,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | **dispatch** | Interview-driven planning and execution | `preflight`, `flightplan`, `autopilot`, `waypoints` |
 | **relay** | Delegate a task to another harness CLI | `relay` |
 | **chronicle** | ADR curation, commit, PR/MR, and release automation | `adr`, `commit`, `pr`, `release`, `install` |
-| **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `herdr-protocol-upgrade` |
+| **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `herdr-browser`, `herdr-protocol-upgrade` |
 
 Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: the repo layout, monitor's dashboard internals, and the release rules.
 
@@ -100,6 +100,7 @@ cc-plugins/
 │       ├── herdr/
 │       │   ├── references/               # config / cli / plugin-development / agent-orchestration
 │       │   └── scripts/herd.ts           # typed Bun wrapper: spawn/send/keys/wait/read/list/close
+│       ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/text/snapshot/watch/endpoint
 │       └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
 └── opencode/                          # OpenCode runtime layer — repo infra, outside packages/, owns no version
     ├── plugin.ts                          # the OpenCode plugin module (single file, no repo imports)
@@ -177,7 +178,7 @@ Do not infer intent from visibility. `document.hidden` stays false when another 
 
 **Chronicle needs nested subagent spawning.** Claude Code 2.1.217 disabled it by default. Without `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (chronicle needs `2`), every orchestrator fails with `Agent exists but is not enabled in this context`. The `chronicle:install` skill owns this: a `SessionStart` hook runs `setup-spawn-depth.ts --session-check`, writes the value into `~/.claude/settings.json` when missing or too low (it only ever raises), and asks the user to restart. The env var is read at session start, so the writing session still runs without it. OpenCode carries the identical requirement under a different name: `subagent_depth` in `~/.config/opencode/opencode.json`, also needing at least `2` — it ships defaulting to `1`, which blocks nesting outright. There is no session hook to write it; `opencode/install.ts --apply` raises it instead, same raise-only rule, same silent-stop failure mode if it's skipped.
 
-**opencode runtime layer.** All OpenCode-facing code lives in `opencode/` at the repo root, deliberately outside `packages/`, so the two-manifests-per-package invariant and the release config stay untouched — `opencode/` versions nothing and ships in no plugin. Install is symlinks, not copies: `opencode/install.ts --apply` links the 15 skills, the plugin module, the 13 chronicle agents, and the 2 monitor commands into `~/.config/opencode/`, with the checkout as the single source of truth — an edit lands live, no reinstall — plus the one `subagent_depth` config edit above.
+**opencode runtime layer.** All OpenCode-facing code lives in `opencode/` at the repo root, deliberately outside `packages/`, so the two-manifests-per-package invariant and the release config stay untouched — `opencode/` versions nothing and ships in no plugin. Install is symlinks, not copies: `opencode/install.ts --apply` links the 16 skills, the plugin module, the 13 chronicle agents, and the 2 monitor commands into `~/.config/opencode/`, with the checkout as the single source of truth — an edit lands live, no reinstall — plus the one `subagent_depth` config edit above.
 
 Hook parity — which Claude hooks port to which OpenCode events:
 

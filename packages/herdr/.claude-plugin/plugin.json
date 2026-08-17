@@ -1,7 +1,7 @@
 {
   "name": "herdr",
   "version": "0.2.5",
-  "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, and controlling sibling panes/agents when running inside a herdr pane.",
+  "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, controlling sibling panes/agents, and driving web pages in a Herdr browser pane over CDP.",
   "author": { "name": "Q" },
   "license": "MIT",
   "keywords": [
@@ -11,6 +11,9 @@
     "panes",
     "agent-orchestration",
     "tmux",
-    "multiplexer"
+    "multiplexer",
+    "browser",
+    "cdp",
+    "playwright"
   ]
 }
