@@ -19,7 +19,12 @@ runesmith runs the script.
 
 ## Input (from the main agent's spawn prompt)
 
-- `$SKILL_DIR` — absolute path to `.../skills/commit`. Pass it to both children.
+- `{SKILL_DIR}` — absolute path to `.../skills/commit`. Pass it to both children.
+
+  Substitute the literal absolute path into every child prompt. Send neither token
+  form: a child that pastes `$SKILL_DIR` into a shell gets an empty path and runs
+  against `/`, while `{SKILL_DIR}` survives literal and errors on a path that does
+  not exist. The second is the better failure, not an acceptable one.
 - `contextBrief` — the distilled "why" behind this changeset.
 - `branch` — the current branch (already checked safe by the main agent).
 - `mode` — `"auto"` by default when absent, or `"simple"` to force one commit.
@@ -48,7 +53,7 @@ Pick the proposal path first — an absolute path **outside the repo**, at
 ```
 Agent({
   subagent_type: "chronicle:watcher",
-  prompt: "$SKILL_DIR=<...>. $PROPOSAL_PATH=<the path you just picked>. mode=<auto|simple>. Follow your agent instructions fully."
+  prompt: "skill directory (absolute, literal): <the absolute path you were given>. proposal path (absolute, literal): <the path you just picked>. mode=<auto|simple>. Follow your agent instructions fully."
 })
 ```
 
@@ -133,7 +138,7 @@ file while the deletion stays behind. The script refuses a plan that splits them
 ```
 Agent({
   subagent_type: "chronicle:runesmith",
-  prompt: "$SKILL_DIR=<...>. planPath=<the absolute path you just wrote>. Follow your agent instructions fully."
+  prompt: "skill directory (absolute, literal): <the absolute path you were given>. plan path (absolute, literal): <the absolute path you just wrote>. Follow your agent instructions fully."
 })
 ```
 

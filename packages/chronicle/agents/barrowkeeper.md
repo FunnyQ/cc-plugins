@@ -60,12 +60,12 @@ Two facts justify checking first:
    shape with every colliding path.
 2. Write all records.
 3. Apply `metadataUpdate` if present.
-4. Run the validator as `bun <validatorPath> <docs/adr directory>`.
+4. Run the validator as `bun "{validatorPath}" "{docs/adr directory}"`.
 5. If validation reports errors, return the `validation-error` shape with
    the violations and `newAdrPaths`. Skip archive. Delete nothing and repair
    nothing. `validateDir` already names the offending path in each
    violation, so the Barrowkeeper adds no attribution step of its own.
-6. If validation passes, run `bun <archiverPath> --plan <planPath> --apply`.
+6. If validation passes, run `bun "{archiverPath}" --plan "{planPath}" --apply`.
 
 Rules that hold across the batch:
 

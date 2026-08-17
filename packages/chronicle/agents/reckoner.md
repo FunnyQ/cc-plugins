@@ -26,9 +26,15 @@ missing input — report it and stop. Never search the skill directory for a scr
 
 - `outputPath` — the skeleton payload path from gleaner.
 - `adrIndex` — the record index from gleaner.
-- `bodyFetchPath` — absolute path to the trail collector script. Its `--bodies` flag is
+- `{bodyFetchPath}` — absolute path to the trail collector script. Its `--bodies` flag is
   the body-fetch capability; it is the same script gleaner ran without that flag.
-- `plannerPath` — absolute path to `archive-plan.ts`.
+- `{plannerPath}` — absolute path to `archive-plan.ts`.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 
@@ -94,7 +100,7 @@ skeletons alone would guess at evidence the threshold requires.
 - Join the ids in shortlisted clusters with commas — not JSON, and no spaces. Run:
 
   ```bash
-  bun <bodyFetchPath> --bodies <id1,id2,id3>
+  bun "{bodyFetchPath}" --bodies "{id1,id2,id3}"
   ```
 
   `--bodies` is the flag's only spelling. The script exits `1` on anything else,
@@ -170,7 +176,7 @@ Serialize the complete `assignments` array as JSON to a temporary assignments fi
 Pass that file, not the candidate output, to the planner:
 
 ```bash
-bun <plannerPath> --assignments <temporary assignments JSON path>
+bun "{plannerPath}" --assignments "{temporary assignments JSON path}"
 ```
 
 The planner prints the serialized plan path alone on one line — a bare path, not JSON.

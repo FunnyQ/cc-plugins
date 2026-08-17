@@ -12,8 +12,8 @@ tag.
 
 ## Input (from the prompt)
 
-- `$SKILL_DIR` — absolute path to `.../skills/release` (read
-  `references/changelog-template.md` for the format).
+- `{SKILL_DIR}` — absolute path to `.../skills/release` (read
+  `{SKILL_DIR}/references/changelog-template.md` for the format).
 - `changelogPath` — the changelog file (e.g. `CHANGELOG.md`), relative to repo root.
 - `entries[]` — one per release, in the order they should appear (each becomes one
   `## [...]` block). Each entry has:
@@ -28,6 +28,12 @@ tag.
 A single-unit release is just `entries[]` of length 1. A coordinated release hands
 you several. Write them all.
 
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
+
 ## Process
 
 ### 1. Gather commits — per entry
@@ -35,7 +41,7 @@ you several. Write them all.
 For **each** entry, scoped to its own `lastTag` + `pathScope`:
 
 ```bash
-git log <lastTag>..HEAD [-- <pathScope>]      # omit <lastTag>.. entirely if lastTag is null
+git log {lastTag}..HEAD [-- {pathScope}]      # omit {lastTag}.. entirely if lastTag is null
 ```
 
 Read subjects and bodies. When `pathScope` is given, scope to it. This keeps a

@@ -15,7 +15,7 @@ You are the only party that reads the diff. Everything downstream works from the
 groups you propose, so the diff must not leave this subtree.
 
 **The file is the hand-off, not your reply.** Write the proposal to
-`$PROPOSAL_PATH` and let `commit.ts propose` accept it. The Lawspeaker reads that
+`{PROPOSAL_PATH}` and let `commit.ts propose` accept it. The Lawspeaker reads that
 path whatever your final message says, so a proposal you only described in prose
 is a proposal that never arrived.
 
@@ -24,25 +24,32 @@ the Lawspeaker writes those from the conversation's rationale.
 
 ## Input (from the prompt)
 
-- `$SKILL_DIR` — absolute path to `.../skills/commit`, given by the Lawspeaker. Resolve
-  `$SKILL_DIR/scripts/analyze-changes.ts` and `$SKILL_DIR/scripts/commit.ts` under
+- `{SKILL_DIR}` — absolute path to `.../skills/commit`, given by the Lawspeaker. Resolve
+  `{SKILL_DIR}/scripts/analyze-changes.ts` and `{SKILL_DIR}/scripts/commit.ts` under
   it. Never search for a script: you do not see the skill's load-time banner, so a
   path you were not given is a missing input. Report it and stop.
-- `$PROPOSAL_PATH` — absolute path, outside the repo, where your proposal goes.
+- `{PROPOSAL_PATH}` — absolute path, outside the repo, where your proposal goes.
   Write exactly this path. Both are missing inputs when absent: report and stop.
 - `mode` — `"auto"` by default when absent, or `"simple"` when the invocation
   forced one commit.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 
 ### 1. Analyze
 
 ```bash
-bun $SKILL_DIR/scripts/analyze-changes.ts
+test -f "{SKILL_DIR}/scripts/analyze-changes.ts" || { echo "analyzer missing" >&2; exit 1; }
+bun "{SKILL_DIR}/scripts/analyze-changes.ts"
 ```
 
 If it prints `totalFiles === 0`, `Write` `{ "nothingToCommit": true }` to
-`$PROPOSAL_PATH`, say so in one line, and stop. Do not run `propose`.
+`{PROPOSAL_PATH}`, say so in one line, and stop. Do not run `propose`.
 
 Read the `outputPath` JSON. It is summary-first: `summary[]` lists every file's
 path, status, staging state, and stats before the full `files[]` payload with diff
@@ -54,7 +61,7 @@ Treat the JSON as the source of truth. Do not repeat its git commands. If git is
 unavoidable, keep paths repo-root-relative:
 
 ```bash
-git -C "$(git rev-parse --show-toplevel)" diff -- <root-relative-path>
+git -C "$(git rev-parse --show-toplevel)" diff -- {root-relative-path}
 ```
 
 Classify elided diffs from path and stats — never fetch their content. Lock files
@@ -104,7 +111,7 @@ reference before the removal of the target, every time.
 
 ### 3. Write the proposal
 
-`Write` this to `$PROPOSAL_PATH`, groups in commit order:
+`Write` this to `{PROPOSAL_PATH}`, groups in commit order:
 
 ```json
 {
@@ -136,7 +143,8 @@ carries them is refused. Paths are repo-root-relative, never absolute.
 ### 4. Let the script settle it
 
 ```bash
-bun $SKILL_DIR/scripts/commit.ts propose --file $PROPOSAL_PATH
+test -f "{SKILL_DIR}/scripts/commit.ts" || { echo "commit script missing" >&2; exit 1; }
+bun "{SKILL_DIR}/scripts/commit.ts" propose --file "{PROPOSAL_PATH}"
 ```
 
 It checks your groups cover the changeset exactly once, decides the shape, and
@@ -156,7 +164,7 @@ decide it yourself.
 ## Guidelines
 
 - Report facts, groups, and their order. The script decides the shape; the Lawspeaker writes the prose.
-- `Write` only to `$PROPOSAL_PATH`. Never write inside the repo — the script refuses a proposal that lives there, because the file would be part of the changeset it describes.
+- `Write` only to `{PROPOSAL_PATH}`. Never write inside the repo — the script refuses a proposal that lives there, because the file would be part of the changeset it describes.
 - `status: "added"` with `staged: false` covers both an untracked file and a
   `git add -N` file. Both are brand-new. Dropping one produces a commit that
   cannot build.

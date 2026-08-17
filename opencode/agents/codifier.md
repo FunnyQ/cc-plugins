@@ -27,8 +27,8 @@ The caller gives you:
   }
   ```
 
-- `templatePath` — the absolute path to the ADR template.
-- `bodyFetchPath` — the absolute path to the trail collector script, whose `--bodies`
+- `{templatePath}` — the absolute path to the ADR template.
+- `{bodyFetchPath}` — the absolute path to the trail collector script, whose `--bodies`
   flag is the body-fetch capability.
 
 Use the supplied absolute script paths. Never guess a repo-relative path.
@@ -37,6 +37,12 @@ Rules:
 
 - The caller pre-allocates every `adrNumber`. The Codifier never counts, and it never
   reads `adrIndex.nextNumber` for itself.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 
@@ -47,7 +53,7 @@ Rules:
    `entryIds`, then join the IDs with commas — not JSON, and no spaces:
 
    ```bash
-   bun <bodyFetchPath> --bodies <id1,id2,id3>
+   bun "{bodyFetchPath}" --bodies "{id1,id2,id3}"
    ```
 
    `--bodies` is the flag's only spelling; the script exits `1` on anything else. It

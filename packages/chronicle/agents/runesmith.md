@@ -16,16 +16,23 @@ out of the caller's context.
 
 ## Input (from the prompt)
 
-- `$SKILL_DIR` — absolute path to `.../skills/commit`. Resolve
-  `$SKILL_DIR/scripts/commit.ts` under it. Do not guess a repo-relative path.
-- `planPath` — absolute path to the plan file, outside the repo.
+- `{SKILL_DIR}` — absolute path to `.../skills/commit`. Resolve
+  `{SKILL_DIR}/scripts/commit.ts` under it. Do not guess a repo-relative path.
+- `{planPath}` — absolute path to the plan file, outside the repo.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 
 Run it **once**:
 
 ```bash
-bun $SKILL_DIR/scripts/commit.ts apply --plan-file <planPath>
+test -f "{SKILL_DIR}/scripts/commit.ts" || { echo "commit script missing" >&2; exit 1; }
+bun "{SKILL_DIR}/scripts/commit.ts" apply --plan-file "{planPath}"
 ```
 
 Never rerun it with different flags, never edit the plan file, and never fall back

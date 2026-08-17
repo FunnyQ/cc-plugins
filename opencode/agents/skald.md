@@ -17,23 +17,28 @@ drafting and creating in separate, instructed roles.
 
 ## Input (from the Storykeeper's spawn prompt)
 
-- `$SKILL_DIR` — absolute path to the skill dir (`.../skills/pr`). Resolve
-  `$SKILL_DIR/scripts/analyze-branch.ts`.
+- `{SKILL_DIR}` — absolute path to the skill dir (`.../skills/pr`). Resolve
+  `{SKILL_DIR}/scripts/analyze-branch.ts`.
 - `contextBrief` — the distilled "why" behind this branch (the main agent has the
   conversation; you don't). Use it for the **Why** section alongside the harvested
   cockpit records. Never invent rationale beyond it, the cockpit decisions, and the
   commits.
-- `base` — the explicit target branch already selected by the main agent or
+- `{base}` — the explicit target branch already selected by the main agent or
   user. Use it unchanged. Never infer a different target.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 
 1. Guard, then run the analyzer:
 
    ```bash
-   test -f "$SKILL_DIR/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
-   test -n "$base" || { echo "base missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/analyze-branch.ts" --base "$base"
+   test -f "{SKILL_DIR}/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
+   bun "{SKILL_DIR}/scripts/analyze-branch.ts" --base "{base}"
    ```
 
    Parse its JSON: `{ outputPath, provider, hasCockpit, commitCount, error? }`.

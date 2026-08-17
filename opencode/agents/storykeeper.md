@@ -47,8 +47,13 @@ Do not emit waiting prose.
 
 ## Input (from the main agent's spawn prompt)
 
-- `$SKILL_DIR` — absolute path to the skill dir (`.../skills/pr`). Pass it to both
+- `{SKILL_DIR}` — absolute path to the skill dir (`.../skills/pr`). Pass it to both
   children.
+
+  Substitute the literal absolute path into every child prompt. Send neither token
+  form: a child that pastes `$SKILL_DIR` into a shell gets an empty path and runs
+  against `/`, while `{SKILL_DIR}` survives literal and errors on a path that does
+  not exist. The second is the better failure, not an acceptable one.
 - `contextBrief` — the distilled "why" behind this branch. Pass it to the skald.
 - `base` — the explicit target branch, already resolved with the user. Pass it to the
   skald unchanged. Never infer or replace it.
@@ -62,7 +67,7 @@ Do not emit waiting prose.
 ```
 task({
   subagent_type: "skald",
-  prompt: "$SKILL_DIR=<...>; contextBrief=<...>; base=<...>. Follow your agent instructions: run analyze-branch.ts with the explicit base, harvest cockpit, synthesize the title + four-section body (+ optional overview diagram). Return { title, body, base, head, repo, provider } — or 'no commits to propose', or the material with provider:'unknown', or a plain analyzer error."
+  prompt: "skill directory (absolute, literal): <the absolute path you were given>; contextBrief=<...>; base=<...>. Follow your agent instructions: run analyze-branch.ts with the explicit base, harvest cockpit, synthesize the title + four-section body (+ optional overview diagram). Return { title, body, base, head, repo, provider } — or 'no commits to propose', or the material with provider:'unknown', or a plain analyzer error."
 })
 ```
 
@@ -74,7 +79,7 @@ provider, report no recognizable remote. In all three cases, stop before the mes
 ```
 task({
   subagent_type: "messenger",
-  prompt: "$SKILL_DIR=<...>. Create the request from this CreateInput JSON: { provider, title, body, base, head, draft, repo }. Return the CreateResult."
+  prompt: "skill directory (absolute, literal): <the absolute path you were given>. Create the request from this CreateInput JSON: { provider, title, body, base, head, draft, repo }. Return the CreateResult."
 })
 ```
 

@@ -12,13 +12,19 @@ in the script. Your one job is to keep its output out of the caller's context.
 
 ## Input (from the prompt)
 
-- `$SKILL_DIR` — absolute path to `.../skills/release`. Resolve the scripts under
-  `$SKILL_DIR/scripts/`. Do not guess a repo-relative path.
+- `{SKILL_DIR}` — absolute path to `.../skills/release`. Resolve the scripts under
+  `{SKILL_DIR}/scripts/`. Do not guess a repo-relative path.
 - `command` — exactly one of:
-  - `facts` → `bun $SKILL_DIR/scripts/analyze-release.ts`
-  - `plan` → `bun $SKILL_DIR/scripts/release.ts plan --units '<units>'`
-  - `run` → `bun $SKILL_DIR/scripts/release.ts run --units '<units>' --through <stage>`
+  - `facts` → `bun "{SKILL_DIR}/scripts/analyze-release.ts"`
+  - `plan` → `bun "{SKILL_DIR}/scripts/release.ts" plan --units '{units}'`
+  - `run` → `bun "{SKILL_DIR}/scripts/release.ts" run --units '{units}' --through "{stage}"`
 - `units` / `through` / `--persist-config` — pass through verbatim when given.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 

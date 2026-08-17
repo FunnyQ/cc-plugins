@@ -21,12 +21,18 @@ gate that authorizes it.
 The caller passes both script paths as absolute paths. A path you were not given is a
 missing input — report it and stop. Never search the skill directory for a script.
 
-- `collectorPath` — absolute path to the trail collector script, for example
+- `{collectorPath}` — absolute path to the trail collector script, for example
   `.../skills/adr/scripts/collect-adr-context.ts`.
-- `indexReaderPath` — absolute path to the record index reader script, for example
+- `{indexReaderPath}` — absolute path to the record index reader script, for example
   `.../skills/adr/scripts/adr-index.ts`.
 - `includeDone` — optional boolean. Default to `false`. True pulls the `done` archive
   bucket into the skeleton pass as well.
+
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
 
 ## Process
 
@@ -35,7 +41,7 @@ missing input — report it and stop. Never search the skill directory for a scr
 Always run the collector first.
 
 ```bash
-bun <collectorPath> [--include-done]
+bun "{collectorPath}" [--include-done]
 ```
 
 These are the collector's only two flags, and it exits `1` on any other. Pass
@@ -59,7 +65,7 @@ nothing on its own. The caller resolves the script paths. You wire the collector
 Pass the `adrDir` from step 2 exactly.
 
 ```bash
-bun <indexReaderPath> <adrDir>
+bun "{indexReaderPath}" "{adrDir}"
 ```
 
 Parse its stdout JSON. It contains `dir`, `exists`, `adrs`, `nextNumber`,

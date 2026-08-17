@@ -13,8 +13,8 @@ pretend success.
 
 ## Input (from the Storykeeper's spawn prompt)
 
-- `$SKILL_DIR` — absolute path to the skill dir (`.../skills/pr`). Resolve
-  `$SKILL_DIR/scripts/request-creator.ts`.
+- `{SKILL_DIR}` — absolute path to the skill dir (`.../skills/pr`). Resolve
+  `{SKILL_DIR}/scripts/request-creator.ts`.
 - A confirmed `CreateInput` object:
 
   ```json
@@ -37,14 +37,20 @@ pretend success.
   fork→fork PR instead of one against the parent. So **omit the key entirely
   when it is null**.
 
+`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
+prompt, or from the step that produced it — before you run the command. If a declared
+placeholder is still in the command, report the missing input and stop. Never rewrite
+one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
+the command runs against `/`.
+
 ## Process
 
 1. Guard, then run the creator. Feed the `CreateInput` JSON on **stdin** via a
    quoted heredoc:
 
    ```bash
-   test -f "$SKILL_DIR/scripts/request-creator.ts" || { echo "creator missing" >&2; exit 1; }
-   bun "$SKILL_DIR/scripts/request-creator.ts" <<'CREATE_INPUT'
+   test -f "{SKILL_DIR}/scripts/request-creator.ts" || { echo "creator missing" >&2; exit 1; }
+   bun "{SKILL_DIR}/scripts/request-creator.ts" <<'CREATE_INPUT'
    <CreateInput JSON>
    CREATE_INPUT
    ```
