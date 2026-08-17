@@ -28,10 +28,15 @@ A `SessionStart` hook runs this automatically and writes the setting when it is
 missing or too low. A fresh install self-heals this way. Run it by hand to check
 or repair:
 
+`{SKILL_DIR}` is a **placeholder** for the skill's load-time "Base directory for
+this skill" banner value. Substitute the literal absolute path before running.
+Never write it as `$SKILL_DIR` — nothing sets that variable, so the path silently
+becomes empty and the command runs against `/`.
+
 ```bash
-bun "$SKILL_DIR/scripts/setup-spawn-depth.ts"            # report only (default)
-bun "$SKILL_DIR/scripts/setup-spawn-depth.ts" --dry-run  # show the resulting file
-bun "$SKILL_DIR/scripts/setup-spawn-depth.ts" --apply    # write it
+bun "{SKILL_DIR}/scripts/setup-spawn-depth.ts"            # report only (default)
+bun "{SKILL_DIR}/scripts/setup-spawn-depth.ts" --dry-run  # show the resulting file
+bun "{SKILL_DIR}/scripts/setup-spawn-depth.ts" --apply    # write it
 ```
 
 It only ever **raises** the value. A larger depth set by the user or another
@@ -60,13 +65,13 @@ at the versioned plugin cache. The setup script copies role TOMLs into the stabl
 Preview first:
 
 ```bash
-bun "$SKILL_DIR/scripts/setup-codex-agents.ts" --plugin-root "$PLUGIN_ROOT" --dry-run
+bun "{SKILL_DIR}/scripts/setup-codex-agents.ts" --plugin-root "$PLUGIN_ROOT" --dry-run
 ```
 
 After explicit user approval, apply:
 
 ```bash
-bun "$SKILL_DIR/scripts/setup-codex-agents.ts" --plugin-root "$PLUGIN_ROOT" --apply
+bun "{SKILL_DIR}/scripts/setup-codex-agents.ts" --plugin-root "$PLUGIN_ROOT" --apply
 ```
 
 The script is idempotent. It preserves unrelated config, and it backs up an

@@ -46,7 +46,7 @@ the turn:
    optional `matchesAdr` and `hint`), an optional `conflicts`, and an optional
    `scan` for the header facts. Gate 2 takes `gate: 2` and `drafts`, each with
    `groupId`, `adrNumber`, `proposedPath`, and the codifier's `draftText` verbatim.
-2. Run `bun <gatePagePath> --data <payload.json> --serve --open` **as a background
+2. Run `bun "{gatePagePath}" --data "{payload.json}" --serve --open` **as a background
    command**. Pass `--lang zh-TW` when the cockpit decision-log language is zh-TW.
 3. Report the served URL to the user and end the turn. Do not poll the command and
    do not re-run it.
@@ -152,19 +152,21 @@ back over. Gate 2's response follows this schema:
 ## Script paths
 
 Only the main agent sees the skill's load-time "Base directory for this skill"
-banner. A subagent does not. Resolve `$SKILL_DIR` from that banner and pass every
-path each phase needs as an absolute path, in the spawn prompt. A child that has to
-find a script starts searching the plugin cache — that is the caller's bug.
+banner. A subagent does not. Resolve the skill directory from that banner and pass
+every path each phase needs as a **literal absolute path**, in the spawn prompt. A
+child that has to find a script starts searching the plugin cache — that is the
+caller's bug. Never pass a `$`-prefixed token: nothing sets that variable in the
+child's shell, so its command silently runs against `/`.
 
 | Input | Path |
 | --- | --- |
-| `collectorPath`, `bodyFetchPath` | `$SKILL_DIR/scripts/collect-adr-context.ts` |
-| `indexReaderPath` | `$SKILL_DIR/scripts/adr-index.ts` |
-| `plannerPath` | `$SKILL_DIR/scripts/archive-plan.ts` |
-| `templatePath` | `$SKILL_DIR/references/adr-template.md` |
-| `validatorPath` | `$SKILL_DIR/scripts/adr-validate.ts` |
-| `archiverPath` | `$SKILL_DIR/scripts/archive-logs.ts` |
-| `gatePagePath` | `$SKILL_DIR/scripts/gate-page.ts` |
+| `collectorPath`, `bodyFetchPath` | `<skill dir>/scripts/collect-adr-context.ts` |
+| `indexReaderPath` | `<skill dir>/scripts/adr-index.ts` |
+| `plannerPath` | `<skill dir>/scripts/archive-plan.ts` |
+| `templatePath` | `<skill dir>/references/adr-template.md` |
+| `validatorPath` | `<skill dir>/scripts/adr-validate.ts` |
+| `archiverPath` | `<skill dir>/scripts/archive-logs.ts` |
+| `gatePagePath` | `<skill dir>/scripts/gate-page.ts` |
 
 `collect` takes `collectorPath`, `indexReaderPath`, `bodyFetchPath`, and
 `plannerPath`. `draft` takes `bodyFetchPath` and `templatePath`. `commit` takes
@@ -281,7 +283,7 @@ nothing keeps the reckoner's original `planPath` and never runs the planner.
   may already be `watch`.
 - Keep each row's original `from` untouched.
 - Serialize the corrected `assignments`.
-- Re-run `bun <plannerPath> --assignments <corrected assignments JSON>`, using
+- Re-run `bun "{plannerPath}" --assignments "{corrected assignments JSON}"`, using
   the `plannerPath` retained from the collect-phase inputs through both gates.
 - Pass the fresh `planPath` into `commit` — never a prose description of the
   corrections.
@@ -389,8 +391,8 @@ Codex thread. Do not replace the role boundary with an inline flow.
 ## OpenCode only — skip on Claude Code and Codex
 
 Follow `~/.config/opencode/skills/adr/references/opencode.md` instead of the
-spawn instructions above — bare agent names, no context inheritance, literal
-`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+spawn instructions above — bare agent names, no context inheritance, a literal
+skill directory. The path is absolute because OpenCode prints no skill
 base-directory banner.
 
 ## Constraints

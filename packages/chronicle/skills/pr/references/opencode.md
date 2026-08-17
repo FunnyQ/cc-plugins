@@ -18,14 +18,16 @@ The Storykeeper uses the bare child names `skald` and `messenger`.
 
 OpenCode task-tool subagents do **not** inherit parent context. Pass every
 input explicitly on the spawn — `contextBrief`, `base`, `branch`, and `draft` —
-plus `$SKILL_DIR` as a literal:
+plus the **skill directory** as a literal:
 
 ```text
-$SKILL_DIR = ~/.config/opencode/skills/pr
+skill directory = /Users/<you>/.config/opencode/skills/pr
 ```
 
 `CLAUDE_PLUGIN_ROOT` is empty and there is no skill base-directory banner, so
-that path has to be stated rather than resolved.
+that path has to be stated rather than resolved. State it **tilde-free** — the
+children quote it, and `~` does not expand inside quotes. Expand `$HOME` yourself
+and pass the result.
 
 ## Spawn depth
 

@@ -54,17 +54,20 @@ and auto-register as `chronicle:lawspeaker` / `chronicle:watcher` / `chronicle:r
    for every commit body it writes. Everything the reader of a commit would need to
    know, and nothing else.
 4. **Spawn the Lawspeaker** (`subagent_type: "chronicle:lawspeaker"`), passing:
-   - `$SKILL_DIR` — the skill's load-time "Base directory for this skill" banner
-     value, so it can resolve `$SKILL_DIR/scripts/` and hand the path to its
-     children. Do not hard-code a repo-relative path or rely on
+   - the **skill directory** — the skill's load-time "Base directory for this
+     skill" banner value, so it can resolve `<skill dir>/scripts/` and hand the
+     path to its children. Do not hard-code a repo-relative path or rely on
      `${CLAUDE_PLUGIN_ROOT}`.
+     Pass it as a **literal absolute path**, never as a `$`-prefixed token —
+     nothing sets that variable in a child's shell, so its command silently
+     runs against `/`.
    - `contextBrief` (from step 3).
    - `branch` — the current branch. If it is protected, defer to the user's existing
      branch guard before spawning; do not re-implement branch protection.
    - `mode` (from step 2).
 5. **Verify**. Run `git rev-parse HEAD 2>/dev/null || true` and compare with the
    baseline.
-   - Changed → report `git log --oneline <baseline>..HEAD` (or `git log --oneline`
+   - Changed → report `git log --oneline {baseline}..HEAD` (or `git log --oneline`
      for an empty baseline).
    - Unchanged → report no commit plus the Lawspeaker's reason. Do not respawn.
 
@@ -76,7 +79,8 @@ when commits exist.
 Codex uses the same topology through one of two role-loading paths:
 
 1. **Named-role selector available**: spawn exactly one registered
-   `chronicle_lawspeaker` and pass `$SKILL_DIR`, `contextBrief`, `branch`, and `mode`.
+   `chronicle_lawspeaker` and pass the literal skill directory, `contextBrief`,
+   `branch`, and `mode`.
 2. **Generic sub-agent API only**: first verify the stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
    exactly one non-fork generic agent with task name `chronicle_lawspeaker` and no
@@ -96,8 +100,8 @@ the user explicitly asks to continue without agents.
 ## OpenCode only — skip on Claude Code and Codex
 
 Follow `~/.config/opencode/skills/commit/references/opencode.md` instead of the
-spawn instructions above — bare agent names, no context inheritance, literal
-`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+spawn instructions above — bare agent names, no context inheritance, a literal
+skill directory. The path is absolute because OpenCode prints no skill
 base-directory banner.
 
 ## Edge cases

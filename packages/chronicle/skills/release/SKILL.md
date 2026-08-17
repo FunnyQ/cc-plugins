@@ -59,9 +59,11 @@ ask each bump. A per-component `chronicle@0.5.1` form is fine if the user writes
 
 ### 1. Facts
 
-Spawn Skirnir with `command: "facts"` and `$SKILL_DIR` — the skill's load-time
-"Base directory for this skill" banner. Do not hard-code a path or rely on
-`${CLAUDE_PLUGIN_ROOT}`.
+Spawn Skirnir with `command: "facts"` and the **skill directory** — the skill's
+load-time "Base directory for this skill" banner. Do not hard-code a path or rely
+on `${CLAUDE_PLUGIN_ROOT}`. Pass it as a literal absolute path, never as a
+`$`-prefixed token — nothing sets that variable in a child's shell, so its
+command silently runs against `/`.
 
 You get back `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`, `branch`,
 and either a whole-repo `current`/`bumps`/`lastTag` or a `components[]` list with
@@ -118,7 +120,7 @@ If the `entry` stage is pending, spawn the annalist **once**, with
 ```
 Agent({
   subagent_type: "chronicle:annalist",
-  prompt: "$SKILL_DIR=<...>. Write a CHANGELOG entry per release. changelogPath=<the plan's changelogPath>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON>. Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
+  prompt: "skill directory (absolute, literal): <the base-directory banner value>. Write a CHANGELOG entry per release. changelogPath=<the plan's changelogPath>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON>. Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
 })
 ```
 
@@ -137,9 +139,9 @@ report a tag it did not cut.
 
 - **prepare** → confirm the version files read `targetVersion` and the changelog
   holds the entry.
-- **auto / auto push** → for every tag, require non-empty `git tag --list <tag>` and
-  `git rev-list -n1 <tag>` equal to `releaseCommit`. When pushing, also require
-  non-empty `git ls-remote --tags origin <tag>`.
+- **auto / auto push** → for every tag, require non-empty `git tag --list "{tag}"` and
+  `git rev-list -n1 "{tag}"` equal to `releaseCommit`. When pushing, also require
+  non-empty `git ls-remote --tags origin "{tag}"`.
 - Relay only verified results. Never announce an unverified tag or push.
 
 ## Protected branches
@@ -163,8 +165,8 @@ run `chronicle:install`.
 ## OpenCode only — skip on Claude Code and Codex
 
 Follow `~/.config/opencode/skills/release/references/opencode.md` instead of the
-spawn instructions above — bare agent names, no context inheritance, literal
-`$SKILL_DIR`. The path is absolute because OpenCode prints no skill
+spawn instructions above — bare agent names, no context inheritance, a literal
+skill directory. The path is absolute because OpenCode prints no skill
 base-directory banner.
 
 ## Edge cases

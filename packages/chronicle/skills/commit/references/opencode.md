@@ -18,14 +18,16 @@ The Lawspeaker uses the bare child names `watcher` and `runesmith`.
 
 OpenCode task-tool subagents do **not** inherit parent context. Pass
 `contextBrief`, `branch`, and `mode` explicitly on the spawn, exactly as in the
-Claude Code flow, plus `$SKILL_DIR` as a literal:
+Claude Code flow, plus the **skill directory** as a literal:
 
 ```text
-$SKILL_DIR = ~/.config/opencode/skills/commit
+skill directory = /Users/<you>/.config/opencode/skills/commit
 ```
 
 `CLAUDE_PLUGIN_ROOT` is empty and there is no skill base-directory banner, so
-that path has to be stated rather than resolved.
+that path has to be stated rather than resolved. State it **tilde-free** — the
+children quote it, and `~` does not expand inside quotes. Expand `$HOME` yourself
+and pass the result.
 
 ## Spawn depth
 

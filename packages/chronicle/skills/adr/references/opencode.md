@@ -20,10 +20,10 @@ The child names are likewise bare: `gleaner`, `reckoner`, `codifier`,
 
 OpenCode task-tool subagents do **not** inherit parent context. On **every**
 Lorekeeper spawn, pass all resolved literal script paths, `contextBrief`, and
-the phase-specific carry-over state explicitly, plus `$SKILL_DIR` as a literal:
+the phase-specific carry-over state explicitly, plus the **skill directory** as a literal:
 
 ```text
-$SKILL_DIR = ~/.config/opencode/skills/adr
+skill directory = /Users/<you>/.config/opencode/skills/adr
 ```
 
 `CLAUDE_PLUGIN_ROOT` is empty and there is no skill base-directory banner, so

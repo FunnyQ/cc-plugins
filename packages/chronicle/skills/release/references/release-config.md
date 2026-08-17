@@ -128,7 +128,7 @@ Detection runs once, so a config committed before this existed lists only
 }
 ```
 
-`path` scopes a component's changelog diff (`git log <tag>..HEAD -- <path>`) and its
+`path` scopes a component's changelog diff (`git log {tag}..HEAD -- {path}`) and its
 "did it change?" commit count. Each component lists **all** of its version files. In
 this repo, that's the paired Claude + Codex `plugin.json`. Marketplace registries
 carry no version and are never listed. The changelog header is per-component (e.g.
