@@ -1,5 +1,20 @@
 # Changelog
 
+## [herdr 0.3.0] - 2026-08-17
+
+_tracks tag `herdr-v0.3.0`_
+
+### Added
+- New `herdr:herdr-browser` skill drives Herdr's browser/CDP plugin from inside a live Herdr session — open pages, read text/snapshots, click by reference, watch, and emulate — migrated in from a personal skill so it ships with the plugin instead of living outside it.
+- Both plugin manifests and the marketplace registry now advertise the browser/CDP capability, so Claude Code and Codex can discover and load `herdr-browser`.
+
+## [chronicle 0.13.4] - 2026-08-17
+
+_tracks tag `chronicle-v0.13.4`_
+
+### Fixed
+- Subagent prompts that referenced skill paths with `$VAR`-style tokens could silently expand to an empty string in a child's shell — a child pasting `$SKILL_DIR` into Bash would run against an unintended path, which had already caused `/chronicle:commit` runs to complete with zero commits staged. All agent and skill docs now hand children literal absolute paths through `{VAR}`-style placeholders instead, so a missed substitution fails loudly with the token name intact rather than silently expanding to nothing.
+
 ## [chronicle 0.13.3] - 2026-08-16
 
 _tracks tag `chronicle-v0.13.3`_

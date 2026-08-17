@@ -1,6 +1,6 @@
 {
   "name": "herdr",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, controlling sibling panes/agents, and driving web pages in a Herdr browser pane over CDP.",
   "author": { "name": "Q" },
   "license": "MIT",
