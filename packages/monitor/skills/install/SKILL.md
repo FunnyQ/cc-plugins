@@ -116,31 +116,52 @@ bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts" --apply-statusline
 
 The plugin ships a `SessionStart` hook, declared in
 `.claude-plugin/plugin.json` with matcher `startup`. The hook runs
-`setup.ts --session-check`. It is **marker-gated** via
-`$CLAUDE_PLUGIN_DATA/.wired-version`, so it acts at most once per plugin
-version:
+`setup.ts --session-check`, which has two halves with different rules.
+
+### Repair — marker-gated, at most once per version
+
+Gated on `$CLAUDE_PLUGIN_DATA/.wired-version`. An upgrade is the only drift
+this hook repairs on its own, because the upgrade is what caused it.
 
 - **Statusline drift** — if an *already-wired* statusline points at an older
   plugin-cache version (for example `.../monitor/3.1.0/...` after an
-  update), the hook silently **re-points** it to the current path (backed up
-  first). Installed plugins keep old cache dirs, so a path can resolve yet
-  still be stale. The check compares the exact current path, not mere
-  existence.
-- **Stale channel entry** — the hook silently **removes** a leftover
-  hand-wired `cockpit-channel` in `~/.claude.json` (backed up first). This
-  entry is left over from versions before the channel was plugin-packaged.
-  Removing it keeps the packaged channel from being registered twice.
-- **Fresh install** — if the statusline isn't wired yet, the hook prints a
-  single write-free nudge to run `/monitor:install`. The marker keeps the
-  nudge from repeating.
+  update), the hook **re-points** it to the current path (backed up first).
+  Installed plugins keep old cache dirs, so a path can resolve yet still be
+  stale. The check compares the exact current path, not mere existence.
+- **Stale channel entry** — the hook **removes** a leftover hand-wired
+  `cockpit-channel` in `~/.claude.json` (backed up first). This entry is left
+  over from versions before the channel was plugin-packaged. Removing it keeps
+  the packaged channel from being registered twice.
 - **Never fresh-wires** — initial statusline opt-in, the first `--apply`,
   always stays manual. The hook only re-points or cleans up state the user
   already has.
 
+### Drift watch — every session, read-only
+
+Config also drifts *within* a version: a hand-edited `settings.json`, a
+restored backup, a reinstall under a different cache root. The repair half
+never sees any of it, so a second half runs on every session, writes nothing,
+and asks the user to fix what it finds. It reports:
+
+- a statusline collector belonging to another install;
+- a stale hand-wired `cockpit-channel` in `~/.claude.json`;
+- the `q-lab` script patterns missing from `permissions.allow`;
+- a `settings.json` that no longer parses (reported alone — nothing past it
+  can be read);
+- nothing wired at all, as the one fresh-install nudge (it subsumes the rest).
+
+The notice goes out as a `systemMessage` in a **single JSON object on stdout**
+— that field is what reaches the user; bare stdout only reaches the model. So
+nothing else in `--session-check` may print, and `migrate()`'s own output is
+captured rather than echoed.
+
+Repetition is keyed on **which** pieces are off, recorded in
+`$CLAUDE_PLUGIN_DATA/.drift-notice`. The same complaint is made once; a drift
+that is fixed and later returns is reported again.
+
 Manual equivalents: `setup.ts --migrate` re-points drift and cleans up the
-stale channel now, with no version gate. `setup.ts --session-check` is
-marker-gated; it is a no-op when `$CLAUDE_PLUGIN_DATA` is unset, so it's safe
-to run by hand.
+stale channel now, with no version gate. `setup.ts --session-check` is a no-op
+when `$CLAUDE_PLUGIN_DATA` is unset, so it's safe to run by hand.
 
 ## Notes
 
