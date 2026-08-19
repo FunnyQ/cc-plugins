@@ -29,13 +29,14 @@ is the opposite of what it is for.
 ## Stages
 
 ```
-save-config?  bump  entry  commit  [merge]  tag  [back-merge]  push
-                            ▲                                   ▲
-                            └─ prepare stops here      auto push ┘
-                                        auto stops at tag
+save-config?  bump  [artifacts]  entry  commit  [merge]  tag  [back-merge]  push
+                                         ▲                                   ▲
+                                         └─ prepare stops here     auto push ┘
+                                                     auto stops at tag
 ```
 
 `merge` / `back-merge` exist only on git-flow. `save-config` only on a first run.
+`artifacts` only when the config declares a committed build output.
 
 ## Modes → `--through`
 
@@ -65,14 +66,22 @@ on `${CLAUDE_PLUGIN_ROOT}`. Pass it as a literal absolute path, never as a
 `$`-prefixed token — nothing sets that variable in a child's shell, so its
 command silently runs against `/`.
 
-You get back `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`, `branch`,
-and either a whole-repo `current`/`bumps`/`lastTag` or a `components[]` list with
-each unit's `current`, `lastTag`, `commitCount`, and `fileVersion`.
+You get back `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`,
+`versionFileDrift`, `branch`, and either a whole-repo `current`/`bumps`/`lastTag` or a
+`components[]` list with each unit's `current`, `lastTag`, `commitCount`, and
+`fileVersion`.
 
 If `workflowDrift` is set, the committed config still says git-flow but its
 `missingBranch` is gone. Say so **before** the gate and offer the one-time edit
 (`"workflow": "github-flow"`, drop `branches.develop`). Never apply it silently, and
 never run `auto` against the drifted config.
+
+If `versionFileDrift` is non-empty, the config bumps a `manifest` but not the
+companion file carrying the same version — a `Cargo.toml` without its `Cargo.lock`
+block. Say so **before** the gate and offer to add each `missing` entry to that unit's
+`versionFiles`. Never add it silently. Release without it and the lock keeps the old
+version, so the next unrelated `cargo build` rewrites it and drags the version change
+into a foreign commit.
 
 ### 2. First run only — interview the shape
 
@@ -144,6 +153,18 @@ report a tag it did not cut.
   non-empty `git ls-remote --tags origin "{tag}"`.
 - Relay only verified results. Never announce an unverified tag or push.
 
+## Committed build outputs
+
+A repo that commits a build output — a compiled binary, a bundled script — carries a
+version no bump can rewrite. Declare those as `artifacts` and the `artifacts` stage
+asks each one for its version after the bump, and stops the release while one still
+reports the old number. It sits before `tag` because everything after a pushed tag is
+a force-push.
+
+When the run aborts there, the note names the artifact and what it reported. Rebuild
+it and re-run. Give the artifact a `build` command and the stage rebuilds it itself.
+Either way the rebuilt file is staged with the release commit.
+
 ## Protected branches
 
 Release operates on the branches the config names. Defer to the user's existing
@@ -183,3 +204,6 @@ base-directory banner.
   run aborts there. Never tag a half-bumped tree.
 - **A repo that migrated to GitHub Flow** after its config was committed: see
   `workflowDrift` above. A missing field is never re-detected on its own.
+- **An artifact whose version command cannot run** — missing file, wrong flag — reads
+  as stale, never as current. Fix the `command`; never drop the artifact to get past
+  the stage.

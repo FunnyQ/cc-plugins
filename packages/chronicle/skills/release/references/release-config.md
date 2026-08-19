@@ -28,7 +28,10 @@ Commit the file (it's shared team/session state, not a personal dotfile).
   "versionFiles": [
     { "path": "frontend/package.json", "kind": "json" },
     { "path": "config/application.rb", "pattern": "VERSION\\s*=\\s*[\"']([^\"']+)[\"']" }
-  ]
+  ],
+
+  // Optional. Committed build outputs — checked, never rewritten. See below.
+  "artifacts": [{ "path": "bin/workbench", "build": "cargo build --release" }]
 
   // per-component instead uses "components" (see below); omit "versionFiles".
 }
@@ -105,7 +108,35 @@ Workspaces share one root lock: every member component lists the same
 `Cargo.lock` path with its own crate name in the pattern.
 
 Detection runs once, so a config committed before this existed lists only
-`Cargo.toml`. Add the lock entry by hand; the release commit then stages it.
+`Cargo.toml`. The analyzer reports that as `versionFileDrift` — one entry per
+`manifest` whose companion is `missing` — and `/chronicle:release` offers the edit at
+the gate. It never applies it silently, for the same reason it never re-shapes the
+workflow: the committed config is the source of truth.
+
+### `artifacts`
+
+A committed build output carries the version the manifest had **when it was built**.
+No bump can rewrite it, so the release checks it instead:
+
+```jsonc
+"artifacts": [
+  {
+    "path": "bin/workbench",        // repo-relative; staged with the release commit
+    "command": "./bin/workbench --version",  // optional; this is the default
+    "build": "cargo build --release && cp target/release/workbench bin/"  // optional
+  }
+]
+```
+
+The `artifacts` stage runs each `command` after the bump and requires the target
+version in its output. A stale artifact stops the release **before `tag`** — after a
+pushed tag the only fix is a force-push. With `build` set, the stage runs it and
+re-checks; without it, the release stops and asks for a rebuild.
+
+Per-component configs put `artifacts` on the component, next to its `versionFiles`.
+
+Declare only an artifact the repo actually commits. `git add` refuses a gitignored
+path, which would break the release commit.
 
 ### per-component mode
 
