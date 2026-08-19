@@ -1,5 +1,15 @@
 # Changelog
 
+## [monitor 4.0.5] - 2026-08-19
+
+_tracks tag `monitor-v4.0.5`_
+
+### Added
+- monitor now watches for configuration drift on every session start: another install claiming the statusline, a stale hand-wired cockpit channel entry, missing q-lab permission patterns, or an unparseable `settings.json`. It reports what it finds instead of silently staying broken.
+
+### Changed
+- The `SessionStart` hook now runs in two clearly separated phases: a repair phase (still marker-gated, still auto-fixes on a version bump) and a read-only drift watch that always runs afterward. Drift caused by an upgrade is fixed automatically; drift you caused yourself is only reported, never silently changed for you. Repeated notices for the same unresolved drift are throttled so you aren't nagged every session.
+
 ## [herdr 0.3.0] - 2026-08-17
 
 _tracks tag `herdr-v0.3.0`_
