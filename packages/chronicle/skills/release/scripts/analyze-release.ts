@@ -32,10 +32,27 @@ export type VersionFileSpec =
   | { path: string; kind: VersionFileKind }
   | { path: string; pattern: string };
 
+/**
+ * A committed build output that carries its version from the manifest at build
+ * time — a compiled binary, a bundled script. Nothing can rewrite it, so the
+ * release checks it instead of bumping it. It is the one release mistake git
+ * cannot see: the manifest moves, the artifact keeps the old version, and the
+ * tag ships the mismatch.
+ */
+export type ArtifactSpec = {
+  /** Repo-relative path. Staged with the release commit. */
+  path: string;
+  /** How to ask it for its version. Default: `./<path> --version`. */
+  command?: string;
+  /** How to rebuild it. Absent means the release stops and asks for a build. */
+  build?: string;
+};
+
 export type ComponentSpec = {
   name: string;
   path: string;
   versionFiles: VersionFileSpec[];
+  artifacts?: ArtifactSpec[];
 };
 
 export type ReleaseConfig = {
@@ -52,9 +69,27 @@ export type ReleaseConfig = {
   branches: { main: string; develop?: string };
   /** whole-repo bump targets. Empty = changelog + tag only. */
   versionFiles: VersionFileSpec[];
+  /** whole-repo committed build outputs. Per-component ones live on the component. */
+  artifacts?: ArtifactSpec[];
   /** per-component bump targets, one entry per releasable unit. */
   components?: ComponentSpec[];
 };
+
+export function artifactCommand(spec: ArtifactSpec): string {
+  return spec.command ?? `./${spec.path} --version`;
+}
+
+/**
+ * Whether a `--version` output carries exactly this version.
+ *
+ * Bounded on both sides by digit-or-dot, so `0.8.0` never matches inside
+ * `0.8.01` or `10.8.0` — a substring test would call a wrong build current,
+ * which is the failure this whole check exists to catch.
+ */
+export function versionInOutput(output: string, version: string): boolean {
+  const want = escapeRegex(normalizeVersion(version));
+  return new RegExp(`(?<![\\d.])${want}(?![\\d.])`).test(output);
+}
 
 /** A missing `workflow` is git-flow — never silently a new default. */
 export function effectiveWorkflow(
@@ -355,6 +390,56 @@ export function detectWorkflowDrift(
   };
 }
 
+export type VersionFileDrift = {
+  /** null for a whole-repo config. */
+  component: string | null;
+  /** The manifest already in the config whose companion is missing. */
+  manifest: string;
+  missing: VersionFileSpec;
+};
+
+/**
+ * A committed config that bumps a manifest but not the companion file that
+ * carries the same version — today, a `Cargo.toml` without its `Cargo.lock`.
+ *
+ * Detection runs once, at the first-run interview, so a config written before
+ * companions existed never learns about them. Reported, never applied: the
+ * config is the source of truth, and re-shaping it silently is exactly what the
+ * workflow drift rule already refuses.
+ *
+ * Only a manifest the config *already* lists can drift. A repo that deliberately
+ * releases something else is never nagged about a crate it never named.
+ */
+export function detectVersionFileDrift(
+  config: ReleaseConfig,
+  manifests: ManifestFact[],
+): VersionFileDrift[] {
+  const units =
+    config.mode === "per-component"
+      ? (config.components ?? []).map((c) => ({
+          component: c.name as string | null,
+          files: c.versionFiles,
+        }))
+      : [{ component: null, files: config.versionFiles }];
+
+  const out: VersionFileDrift[] = [];
+  for (const unit of units) {
+    const paths = new Set(unit.files.map((f) => f.path));
+    for (const m of manifests) {
+      if (!paths.has(m.path)) continue;
+      for (const companion of m.companions ?? []) {
+        if (paths.has(companion.path)) continue;
+        out.push({
+          component: unit.component,
+          manifest: m.path,
+          missing: companion,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export function detectShape(facts: ShapeFacts): ReleaseConfig {
   const scoped = scopedTagComponents(facts.tags);
   const { workflow, branches } = detectWorkflow(facts);
@@ -432,6 +517,19 @@ export function parseConfig(text: string): ReleaseConfig {
     typeof raw.branches?.develop !== "string"
   ) {
     bad(`git-flow branches must name develop`);
+  }
+  const checkArtifacts = (list: unknown, where: string) => {
+    if (list === undefined) return;
+    if (!Array.isArray(list)) bad(`${where} artifacts must be an array`);
+    for (const a of list as Array<{ path?: unknown }>) {
+      if (typeof a?.path !== "string") {
+        bad(`${where} artifacts entries need a string path`);
+      }
+    }
+  };
+  checkArtifacts(raw.artifacts, "top-level");
+  for (const c of (raw.components ?? []) as ComponentSpec[]) {
+    checkArtifacts(c.artifacts, `component ${c.name}`);
   }
   if (raw.mode === "per-component") {
     if (!Array.isArray(raw.components) || raw.components.length === 0) {
@@ -931,6 +1029,7 @@ async function main() {
     component,
     workflow: effectiveWorkflow(effective),
     workflowDrift: config ? detectWorkflowDrift(config, branches) : null,
+    versionFileDrift: config ? detectVersionFileDrift(config, manifests) : [],
     hasConfig: Boolean(config),
     config,
     suggested,

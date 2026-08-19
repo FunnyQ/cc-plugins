@@ -2,10 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   agreedVersion,
   applyVersionToContent,
+  artifactCommand,
   cargoLockSpec,
   cargoPackageName,
   computeBumps,
   detectShape,
+  detectVersionFileDrift,
   detectWorkflow,
   detectWorkflowDrift,
   effectiveWorkflow,
@@ -18,6 +20,7 @@ import {
   scopedTagComponents,
   serializeConfig,
   tagPrefix,
+  versionInOutput,
   type ReleaseConfig,
 } from "./analyze-release";
 
@@ -726,5 +729,157 @@ describe("hasChangelogEntry edge cases", () => {
         "alpha",
       ),
     ).toBe(false);
+  });
+});
+
+describe("versionInOutput", () => {
+  test("finds the version anywhere in a --version banner", () => {
+    expect(versionInOutput("workbench 0.8.0", "0.8.0")).toBe(true);
+    expect(versionInOutput("workbench v0.8.0\n", "v0.8.0")).toBe(true);
+  });
+
+  test("rejects the version it does not carry", () => {
+    expect(versionInOutput("workbench 0.7.0", "0.8.0")).toBe(false);
+    expect(versionInOutput("", "0.8.0")).toBe(false);
+  });
+
+  // A substring match would call a 0.8.01 build current for 0.8.0, which is the
+  // exact failure this stage exists to catch.
+  test("does not match inside a longer version", () => {
+    expect(versionInOutput("workbench 0.8.01", "0.8.0")).toBe(false);
+    expect(versionInOutput("workbench 10.8.0", "0.8.0")).toBe(false);
+    expect(versionInOutput("workbench 0.8.0-rc1", "0.8.0")).toBe(true);
+  });
+});
+
+describe("artifactCommand", () => {
+  test("defaults to running the artifact itself", () => {
+    expect(artifactCommand({ path: "bin/workbench" })).toBe(
+      "./bin/workbench --version",
+    );
+  });
+
+  test("uses the configured command when given", () => {
+    expect(
+      artifactCommand({ path: "dist/cli.js", command: "bun dist/cli.js -V" }),
+    ).toBe("bun dist/cli.js -V");
+  });
+});
+
+describe("detectVersionFileDrift", () => {
+  const lock = {
+    path: "Cargo.lock",
+    pattern: 'name = "workbench"\\nversion = "([^"]+)"',
+  };
+  const manifests = [
+    {
+      path: "Cargo.toml",
+      version: "0.8.0",
+      kind: "toml" as const,
+      companions: [lock],
+    },
+  ];
+
+  test("reports a companion the committed config never listed", () => {
+    const config: ReleaseConfig = {
+      mode: "whole-repo",
+      workflow: "github-flow",
+      tag: "v{version}",
+      changelog: "CHANGELOG.md",
+      branches: { main: "main" },
+      versionFiles: [{ path: "Cargo.toml", pattern: 'version = "([^"]+)"' }],
+    };
+    expect(detectVersionFileDrift(config, manifests)).toEqual([
+      { component: null, manifest: "Cargo.toml", missing: lock },
+    ]);
+  });
+
+  test("stays quiet once the companion is listed", () => {
+    const config: ReleaseConfig = {
+      mode: "whole-repo",
+      workflow: "github-flow",
+      tag: "v{version}",
+      changelog: "CHANGELOG.md",
+      branches: { main: "main" },
+      versionFiles: [{ path: "Cargo.toml", kind: "toml" }, lock],
+    };
+    expect(detectVersionFileDrift(config, manifests)).toEqual([]);
+  });
+
+  // Only a manifest the config already bumps can be missing a companion. A repo
+  // that deliberately releases something else must not be nagged about a crate
+  // it never listed.
+  test("ignores a manifest the config does not bump at all", () => {
+    const config: ReleaseConfig = {
+      mode: "whole-repo",
+      workflow: "github-flow",
+      tag: "v{version}",
+      changelog: "CHANGELOG.md",
+      branches: { main: "main" },
+      versionFiles: [{ path: "package.json", kind: "json" }],
+    };
+    expect(detectVersionFileDrift(config, manifests)).toEqual([]);
+  });
+
+  test("names the component whose version files are short", () => {
+    const crateLock = {
+      path: "Cargo.lock",
+      pattern: 'name = "cli"\\nversion = "([^"]+)"',
+    };
+    const config: ReleaseConfig = {
+      mode: "per-component",
+      workflow: "github-flow",
+      tag: "{component}-v{version}",
+      changelog: "CHANGELOG.md",
+      branches: { main: "main" },
+      versionFiles: [],
+      components: [
+        {
+          name: "cli",
+          path: "crates/cli",
+          versionFiles: [{ path: "crates/cli/Cargo.toml", kind: "toml" }],
+        },
+      ],
+    };
+    expect(
+      detectVersionFileDrift(config, [
+        {
+          path: "crates/cli/Cargo.toml",
+          version: "0.4.0",
+          kind: "toml",
+          companions: [crateLock],
+        },
+      ]),
+    ).toEqual([
+      {
+        component: "cli",
+        manifest: "crates/cli/Cargo.toml",
+        missing: crateLock,
+      },
+    ]);
+  });
+});
+
+describe("parseConfig artifacts", () => {
+  const base = {
+    mode: "whole-repo",
+    workflow: "github-flow",
+    tag: "v{version}",
+    changelog: "CHANGELOG.md",
+    branches: { main: "main" },
+    versionFiles: [],
+  };
+
+  test("accepts an artifacts list", () => {
+    const config = parseConfig(
+      JSON.stringify({ ...base, artifacts: [{ path: "bin/workbench" }] }),
+    );
+    expect(config.artifacts).toEqual([{ path: "bin/workbench" }]);
+  });
+
+  test("rejects an artifact with no path", () => {
+    expect(() =>
+      parseConfig(JSON.stringify({ ...base, artifacts: [{ build: "make" }] })),
+    ).toThrow(/artifacts/);
   });
 });

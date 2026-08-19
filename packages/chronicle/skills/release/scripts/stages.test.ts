@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  artifactsDone,
   bumpDone,
   commitDone,
   deriveUnits,
   entryDone,
+  hasArtifacts,
   stagesFor,
   tagState,
   touchedFiles,
@@ -68,6 +70,7 @@ describe("deriveUnits", () => {
       headerLabel: "chronicle 0.11.0",
       pathScope: "packages/chronicle",
       versionFiles: perComponent.components![0].versionFiles,
+      artifacts: [],
     });
   });
 
@@ -303,5 +306,107 @@ describe("stagesFor", () => {
     expect(stagesFor(perComponent, { persistConfig: true })[0]).toBe(
       "save-config",
     );
+  });
+});
+
+describe("artifacts", () => {
+  const withArtifact: ReleaseConfig = {
+    ...wholeRepo,
+    workflow: "github-flow",
+    branches: { main: "main" },
+    versionFiles: [{ path: "Cargo.toml", kind: "toml" }],
+    artifacts: [{ path: "bin/workbench" }],
+  };
+
+  const unitOf = (config: ReleaseConfig, targetVersion = "0.8.0") =>
+    deriveUnits(config, [
+      { component: null, targetVersion, lastTag: "v0.7.0" },
+    ])[0];
+
+  test("the stage only exists when the config declares one", () => {
+    expect(stagesFor(wholeRepo, { persistConfig: false })).not.toContain(
+      "artifacts",
+    );
+    expect(stagesFor(withArtifact, { persistConfig: false })).toEqual([
+      "bump",
+      "artifacts",
+      "entry",
+      "commit",
+      "tag",
+      "push",
+    ]);
+  });
+
+  // After bump, before entry: the earliest point the check can pass, and far
+  // enough ahead of tag that nothing has to be force-pushed to undo.
+  test("it sits between bump and entry", () => {
+    const order = stagesFor(withArtifact, { persistConfig: false });
+    expect(order.indexOf("artifacts")).toBe(order.indexOf("bump") + 1);
+    expect(order.indexOf("artifacts")).toBeLessThan(order.indexOf("tag"));
+  });
+
+  test("a component's artifacts reach its unit", () => {
+    const config: ReleaseConfig = {
+      ...perComponent,
+      components: [
+        {
+          ...perComponent.components![0],
+          artifacts: [{ path: "packages/chronicle/bin/cli" }],
+        },
+        perComponent.components![1],
+      ],
+    };
+    const [a, b] = deriveUnits(config, [
+      { component: "chronicle", targetVersion: "0.11.0", lastTag: null },
+      { component: "monitor", targetVersion: "3.0.0", lastTag: null },
+    ]);
+    expect(a.artifacts).toEqual([{ path: "packages/chronicle/bin/cli" }]);
+    expect(b.artifacts).toEqual([]);
+  });
+
+  test("done when the artifact reports the target version", () => {
+    const unit = unitOf(withArtifact);
+    expect(artifactsDone(unit, { "bin/workbench": "workbench 0.8.0\n" })).toBe(
+      true,
+    );
+    expect(artifactsDone(unit, { "bin/workbench": "workbench 0.7.0\n" })).toBe(
+      false,
+    );
+  });
+
+  test("an artifact whose command could not run is never done", () => {
+    expect(artifactsDone(unitOf(withArtifact), { "bin/workbench": null })).toBe(
+      false,
+    );
+    expect(artifactsDone(unitOf(withArtifact), {})).toBe(false);
+  });
+
+  test("a unit with no artifact is vacuously done", () => {
+    expect(artifactsDone(unitOf(wholeRepo), {})).toBe(true);
+  });
+
+  // The rebuilt binary is part of the release commit. Leaving it out would commit
+  // a manifest at 0.8.0 next to a checked-in binary still reporting 0.7.0.
+  test("the artifact is staged with the release commit", () => {
+    const units = deriveUnits(withArtifact, [
+      { component: null, targetVersion: "0.8.0", lastTag: null },
+    ]);
+    expect(touchedFiles(units, withArtifact, { persistConfig: false })).toEqual(
+      ["Cargo.toml", "bin/workbench", "CHANGELOG.md"],
+    );
+  });
+});
+
+describe("hasArtifacts", () => {
+  test("sees a component-level declaration", () => {
+    expect(hasArtifacts(perComponent)).toBe(false);
+    expect(
+      hasArtifacts({
+        ...perComponent,
+        components: [
+          { ...perComponent.components![0], artifacts: [{ path: "bin/x" }] },
+        ],
+      }),
+    ).toBe(true);
   });
 });

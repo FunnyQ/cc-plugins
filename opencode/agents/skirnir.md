@@ -40,7 +40,8 @@ Return JSON and nothing else.
 **`facts`** — read the printed blob and return only:
 
 ```json
-{ "hasConfig": true, "workflow": "...", "workflowDrift": null, "branch": "...",
+{ "hasConfig": true, "workflow": "...", "workflowDrift": null,
+  "versionFileDrift": [], "branch": "...",
   "outputPath": "...",
   "components": [ { "name": "...", "lastTag": "...", "current": "...",
                     "fileVersion": "...", "commitCount": 0,

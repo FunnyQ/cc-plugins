@@ -18,6 +18,8 @@ import {
   hasChangelogEntry,
   normalizeVersion,
   readVersionFromContent,
+  versionInOutput,
+  type ArtifactSpec,
   type ReleaseConfig,
   type VersionFileSpec,
 } from "./analyze-release";
@@ -25,6 +27,7 @@ import {
 export type StageId =
   | "save-config"
   | "bump"
+  | "artifacts"
   | "entry"
   | "commit"
   | "merge"
@@ -44,6 +47,7 @@ export type Unit = {
   /** The component dir that scopes its changelog diff; null for whole-repo. */
   pathScope: string | null;
   versionFiles: VersionFileSpec[];
+  artifacts: ArtifactSpec[];
 };
 
 /** What the human settled at the version gate. Everything else is derived. */
@@ -55,6 +59,9 @@ export type VersionChoice = {
 
 /** Path → content, as read from the working tree or from HEAD. Null = unreadable. */
 export type FileContents = Record<string, string | null>;
+
+/** Artifact path → what its version command printed. Null = it could not run. */
+export type ArtifactOutputs = Record<string, string | null>;
 
 /**
  * Turn the config plus the human's choices into units. This is the whole of the
@@ -70,6 +77,7 @@ export function deriveUnits(
     const component = choice.component;
 
     let versionFiles = config.versionFiles;
+    let artifacts = config.artifacts ?? [];
     let pathScope: string | null = null;
 
     if (component !== null) {
@@ -82,6 +90,7 @@ export function deriveUnits(
         );
       }
       versionFiles = spec.versionFiles;
+      artifacts = spec.artifacts ?? [];
       pathScope = spec.path;
     }
 
@@ -97,6 +106,7 @@ export function deriveUnits(
       headerLabel: component ? `${component} ${version}` : version,
       pathScope,
       versionFiles,
+      artifacts,
     };
   });
 }
@@ -108,7 +118,9 @@ export function stagesFor(
 ): StageId[] {
   const stages: StageId[] = [];
   if (opts.persistConfig) stages.push("save-config");
-  stages.push("bump", "entry", "commit");
+  stages.push("bump");
+  if (hasArtifacts(config)) stages.push("artifacts");
+  stages.push("entry", "commit");
   // A missing workflow means git-flow, which owes the develop→main merge before
   // the tag and the main→develop merge after it.
   const gitFlow = (config.workflow ?? "git-flow") === "git-flow";
@@ -133,6 +145,31 @@ export function bumpDone(unit: Unit, contents: FileContents): boolean {
     if (content == null) return false;
     const current = readVersionFromContent(content, spec);
     return current != null && normalizeVersion(current) === want;
+  });
+}
+
+/** Whether any releasable unit of this config declares a committed build output. */
+export function hasArtifacts(config: ReleaseConfig): boolean {
+  return (
+    (config.artifacts?.length ?? 0) > 0 ||
+    (config.components ?? []).some((c) => (c.artifacts?.length ?? 0) > 0)
+  );
+}
+
+/**
+ * Whether every declared artifact already reports the target version.
+ *
+ * A unit with no artifact is vacuously done, the same way `bumpDone` treats a
+ * unit with no version file. An artifact whose command could not run is never
+ * done: an unanswerable check is a failed check, never a passed one.
+ */
+export function artifactsDone(
+  unit: Unit,
+  outputs: ArtifactOutputs,
+): boolean {
+  return unit.artifacts.every((a) => {
+    const out = outputs[a.path];
+    return out != null && versionInOutput(out, unit.targetVersion);
   });
 }
 
@@ -199,8 +236,10 @@ export function touchedFiles(
       out.push(p);
     }
   };
-  for (const unit of units)
+  for (const unit of units) {
     for (const spec of unit.versionFiles) add(spec.path);
+    for (const artifact of unit.artifacts) add(artifact.path);
+  }
   add(config.changelog);
   if (opts.persistConfig) add(configPath(""));
   return out;

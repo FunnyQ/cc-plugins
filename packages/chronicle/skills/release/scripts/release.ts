@@ -13,7 +13,9 @@
  * which is what lets a stopped prepare run be finished by a later `run`.
  *
  * The units come from the caller (the skill's main agent, after the human picks
- * versions). This engine never prompts and never spawns anything.
+ * versions). This engine never prompts and never spawns anything. `plan` changes
+ * nothing, but it does run each declared artifact's version command — asking a
+ * committed binary what it is, is the only way to know.
  */
 
 import { readFile } from "node:fs/promises";
@@ -25,13 +27,17 @@ import { $ } from "bun";
 import {
   allTags,
   apply as applyVersion,
+  artifactCommand,
   git,
   loadConfig,
   repoRoot,
   saveConfig,
+  versionInOutput,
+  type ArtifactSpec,
   type ReleaseConfig,
 } from "./analyze-release";
 import {
+  artifactsDone,
   bumpDone,
   commitDone,
   deriveUnits,
@@ -39,6 +45,7 @@ import {
   stagesFor,
   tagState,
   touchedFiles,
+  type ArtifactOutputs,
   type FileContents,
   type StageId,
   type Unit,
@@ -120,6 +127,51 @@ async function readTagTargets(
   return out;
 }
 
+/**
+ * What every declared artifact says its version is.
+ *
+ * Runs each artifact's version command in the repo root and keeps stdout and
+ * stderr together — plenty of tools print `--version` to stderr. A command that
+ * exits non-zero, or prints nothing, reads as null: unanswerable, never passed.
+ */
+async function readArtifactOutputs(
+  root: string,
+  units: Unit[],
+): Promise<ArtifactOutputs> {
+  const specs = new Map<string, ArtifactSpec>();
+  for (const unit of units) {
+    for (const artifact of unit.artifacts) specs.set(artifact.path, artifact);
+  }
+  const out: ArtifactOutputs = {};
+  await Promise.all(
+    [...specs.values()].map(async (artifact) => {
+      const command = artifactCommand(artifact);
+      const result = await $`sh -c ${command}`.cwd(root).quiet().nothrow();
+      const text = (result.stdout.toString() + result.stderr.toString()).trim();
+      out[artifact.path] = result.exitCode === 0 && text ? text : null;
+    }),
+  );
+  return out;
+}
+
+/** One line naming every artifact that is not at its unit's target version. */
+function artifactNote(units: Unit[], outputs: ArtifactOutputs): string {
+  const stale: string[] = [];
+  for (const unit of units) {
+    for (const artifact of unit.artifacts) {
+      const out = outputs[artifact.path];
+      if (out == null) {
+        stale.push(`${artifact.path}: \`${artifactCommand(artifact)}\` failed`);
+      } else if (!versionInOutput(out, unit.targetVersion)) {
+        stale.push(
+          `${artifact.path}: reports "${out.split("\n")[0].slice(0, 60)}", expected ${unit.targetVersion}`,
+        );
+      }
+    }
+  }
+  return `stale committed build output — ${stale.join("; ")}`;
+}
+
 /** Whether `branch` already contains everything `other` has. */
 async function contains(branch: string, other: string): Promise<boolean> {
   const a = await git`git rev-parse --verify -q ${branch}`;
@@ -193,6 +245,7 @@ export async function plan(
     )) || "";
   const headChangelog = (await git`git show HEAD:${config.changelog}`) || "";
   const configOnDisk = (await loadConfig(root)) != null;
+  const artifactOutputs = await readArtifactOutputs(root, units);
 
   const workflow = config.workflow ?? "git-flow";
   const every = (fn: (u: Unit) => boolean) => units.every(fn);
@@ -221,6 +274,16 @@ export async function plan(
           id,
           every((u) => bumpDone(u, tree)),
         );
+      case "artifacts": {
+        const done = every((u) => artifactsDone(u, artifactOutputs));
+        return done
+          ? report(id, true)
+          : {
+              id,
+              state: "pending",
+              note: artifactNote(units, artifactOutputs),
+            };
+      }
       case "entry":
         return report(
           id,
@@ -390,6 +453,24 @@ async function execute(
         await applyVersion(ctx.root, unit.targetVersion, unit.versionFiles);
       }
       return;
+
+    // A stale artifact has one honest fix — rebuild it. The engine runs the
+    // configured build when there is one; without it the release stops here,
+    // which is the whole point: every later stage would bake the mismatch into a
+    // tag, and everything after a pushed tag is a force-push.
+    case "artifacts": {
+      const note = p.stages.find((s) => s.id === "artifacts")?.note ?? "";
+      const builds = new Set(
+        p.units
+          .flatMap((u) => u.artifacts)
+          .flatMap((a) => (a.build ? [a.build] : [])),
+      );
+      if (builds.size === 0) {
+        throw new Error(`${note} — rebuild it, then re-run`);
+      }
+      for (const build of builds) await sh`sh -c ${build}`;
+      return;
+    }
 
     // The one stage this engine cannot do: turning commits into user-facing
     // prose is the annalist's job. Refusing here rather than committing keeps a
