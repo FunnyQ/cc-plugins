@@ -1,5 +1,16 @@
 # Changelog
 
+## [chronicle 0.14.0] - 2026-08-19
+
+_tracks tag `chronicle-v0.14.0`_
+
+### Added
+- `chronicle:release` gained an optional `artifacts` stage that runs between the version bump and the changelog entry. It checks each configured artifact's `--version` output against the target version and rebuilds it when a `build` command is configured, so a committed binary (or similar build output) can no longer drift out of sync with the version you just bumped.
+- The version gate now surfaces version-file drift up front: if a unit's bumped manifest has a companion file (like a lockfile) missing from its `versionFiles`, the release reports it at the version gate and offers the edit, instead of leaving it for you to notice later — the kind of gap that once forced a commit amend and a force-pushed tag on a peer repo.
+
+### Changed
+- `versionInOutput()` now matches on digit/dot boundaries, so checking for `0.8.0` in an artifact's version output no longer false-matches inside `0.8.01` or `10.8.0`.
+
 ## [monitor 4.0.5] - 2026-08-19
 
 _tracks tag `monitor-v4.0.5`_
