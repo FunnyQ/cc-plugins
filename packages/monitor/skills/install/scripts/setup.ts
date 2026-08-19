@@ -349,15 +349,101 @@ function migrate(): string[] {
   return changed;
 }
 
-// --- session-check: marker-gated migrate for the SessionStart hook ----------
-// Runs at most once per plugin version: compares the current version against a
-// marker in $CLAUDE_PLUGIN_DATA and only migrates when it changed (or on first
-// run). Keeps per-session cost to a fast string compare after the first launch.
+// --- drift watch: read-only, runs every session -----------------------------
+// migrate() is gated on a version change, so wiring that drifts WITHIN a version
+// — a hand-edited settings.json, a restored backup, a reinstall under another
+// cache root — would go unseen until the next upgrade. This half never writes:
+// it only names what no longer matches this install, and the user decides.
+type DriftItem = { key: string; message: string };
+
+function driftReport(): DriftItem[] {
+  const { readable } = readJson(SETTINGS_JSON);
+  if (!readable) {
+    return [
+      {
+        key: "settings-unparseable",
+        message: `${SETTINGS_JSON} is not valid JSON, so the statusline and permission wiring can't be read. Fix the file, then run the /monitor:install skill.`,
+      },
+    ];
+  }
+
+  const collector = statuslineReferencedCollector();
+  if (!collector) {
+    // Nothing wired at all — the installer never ran, or was undone. That one
+    // line already covers every other item, so don't pile them on.
+    return [
+      {
+        key: "statusline-missing",
+        message:
+          "not set up yet — run the /monitor:install skill to enable the cockpit send box and live usage limits.",
+      },
+    ];
+  }
+
+  const items: DriftItem[] = [];
+  if (collector !== COLLECTOR_SCRIPT) {
+    items.push({
+      key: "statusline-drift",
+      message: `the statusline runs the collector from another install (${collector}). Run the /monitor:install skill to re-point it here.`,
+    });
+  }
+  if (channelConfiguredPath() !== null) {
+    items.push({
+      key: "stale-channel",
+      message: `${CLAUDE_JSON} still hand-wires cockpit-channel, so the plugin-packaged channel registers twice. Run the /monitor:install skill to remove the stale entry.`,
+    });
+  }
+  if (missingScriptPermissions().length > 0) {
+    items.push({
+      key: "missing-permissions",
+      message:
+        "the q-lab plugin scripts are missing from permissions.allow, so a nested sub-agent's `bun` call is silently denied. Run the /monitor:install skill to add them.",
+    });
+  }
+  return items;
+}
+
+// A SessionStart hook reaches the USER only through the systemMessage field of a
+// JSON stdout payload; bare stdout lands in the model's context instead. So the
+// whole hook speaks exactly once, and nothing may print before this.
+function emitHookNotice(lines: string[]): void {
+  const systemMessage =
+    lines.length === 1
+      ? `monitor: ${lines[0]}`
+      : `monitor:\n${lines.map((l) => `• ${l}`).join("\n")}`;
+  process.stdout.write(`${JSON.stringify({ systemMessage })}\n`);
+}
+
+// migrate() reports through console.log, which would break the single-JSON rule
+// above. Collect its lines instead of letting them out.
+function captureLogs(fn: () => string[]): {
+  changed: string[];
+  logs: string[];
+} {
+  const logs: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    return { changed: fn(), logs };
+  } finally {
+    console.log = original;
+  }
+}
+
+// --- session-check: the SessionStart hook entry -----------------------------
+// Two halves with different rules. The repair half is marker-gated: it runs at
+// most once per plugin version, because the drift an upgrade causes is the only
+// drift this script is allowed to fix on its own. The drift watch runs every
+// session, reads only, and reports once per distinct set of problems.
 function sessionCheck(): void {
   const dataDir = process.env.CLAUDE_PLUGIN_DATA;
   const version = pluginVersion();
   // No data dir or unknown version → can't gate safely; do nothing.
   if (!dataDir || !version) return;
+
+  const notices: string[] = [];
 
   const marker = join(dataDir, ".wired-version");
   let last: string | null = null;
@@ -369,35 +455,58 @@ function sessionCheck(): void {
   const markerOrder = last ? compareMonitorVersions(last, version) : null;
   // The marker is shared across sessions. An older session can keep running after an
   // upgrade and fire this hook on resume/compact; it must never roll newer config back.
-  if (markerOrder !== null && markerOrder >= 0) return;
+  if (markerOrder === null || markerOrder < 0) {
+    // The version just changed (or this is a first run) — exactly when daemons from the
+    // previous version are still running. Before 3.19.0 the channel had no exit path, so
+    // those are immortal; retire them now. Only true orphans (PPID 1) are touched.
+    const reaped = reapStaleMonitorProcesses(version);
+    if (reaped) {
+      notices.push(
+        `retired ${reaped} leftover process${reaped === 1 ? "" : "es"} from a previous version.`,
+      );
+    }
 
-  // The version just changed (or this is a first run) — exactly when daemons from the
-  // previous version are still running. Before 3.19.0 the channel had no exit path, so
-  // those are immortal; retire them now. Only true orphans (PPID 1) are touched.
-  const reaped = reapStaleMonitorProcesses(version);
-  if (reaped) {
-    console.log(
-      `monitor: retired ${reaped} leftover process${reaped === 1 ? "" : "es"} from a previous version.`,
-    );
+    const { changed, logs } = captureLogs(migrate);
+    if (changed.length) {
+      notices.push(...logs.filter(Boolean));
+      notices.push(
+        `updated ${changed.join(" + ")} to v${version} after a plugin update.`,
+      );
+    }
+    try {
+      writeFileSync(marker, `${version}\n`);
+    } catch {
+      // Best-effort marker; if the data dir isn't writable we just retry next session.
+    }
   }
 
-  const changed = migrate();
-  if (changed.length) {
-    console.log(
-      `monitor: updated ${changed.join(" + ")} to v${version} after a plugin update.`,
-    );
-  } else if (!statuslineReferencedCollector()) {
-    // Nothing wired yet (fresh install). One gentle, write-free nudge per
-    // version — the marker below keeps it from repeating every session.
-    console.log(
-      "monitor: not set up yet — run the /monitor:install skill to enable the cockpit send box and live usage limits.",
-    );
-  }
+  // Drift watch. Keyed on WHICH pieces are off, not on the version, so the same
+  // complaint isn't repeated every session — and a drift that returns after being
+  // fixed is reported again.
+  const drift = driftReport();
+  const signature = drift
+    .map((d) => d.key)
+    .sort()
+    .join(",");
+  const sigPath = join(dataDir, ".drift-notice");
+  let lastSignature = "";
   try {
-    writeFileSync(marker, `${version}\n`);
+    if (existsSync(sigPath)) {
+      lastSignature = readFileSync(sigPath, "utf-8").trim();
+    }
   } catch {
-    // Best-effort marker; if the data dir isn't writable we just retry next session.
+    lastSignature = "";
   }
+  if (signature !== lastSignature) {
+    notices.push(...drift.map((d) => d.message));
+    try {
+      writeFileSync(sigPath, `${signature}\n`);
+    } catch {
+      // Best-effort; an unwritable data dir just means the notice repeats.
+    }
+  }
+
+  if (notices.length) emitHookNotice(notices);
 }
 
 // --- main -------------------------------------------------------------------
@@ -405,7 +514,7 @@ function main() {
   const flags = new Set(process.argv.slice(2));
   const dryRun = flags.has("--dry-run");
 
-  // SessionStart hook entry — quiet, marker-gated, never fresh-wires.
+  // SessionStart hook entry — quiet, never fresh-wires, notice-only off-version.
   if (flags.has("--session-check")) {
     sessionCheck();
     process.exit(0);

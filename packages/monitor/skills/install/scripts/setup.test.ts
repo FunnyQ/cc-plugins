@@ -36,13 +36,19 @@ let dataDir: string;
 // Run setup.ts as a subprocess with a controlled HOME (and CLAUDE_PLUGIN_DATA)
 // so reads/writes land in a tmpdir, never the real ~/.claude. This exercises
 // the actual CLI entrypoint.
-function run(args: string[] = []): { code: number; stdout: string } {
+function run(args: string[] = []): {
+  code: number;
+  stdout: string;
+  out: string;
+} {
   const proc = Bun.spawnSync(["bun", SCRIPT, ...args], {
     env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir },
   });
   return {
     code: proc.exitCode ?? 0,
     stdout: proc.stdout.toString() + proc.stderr.toString(),
+    // stdout alone — the hook payload must parse as JSON on its own.
+    out: proc.stdout.toString(),
   };
 }
 
@@ -455,5 +461,117 @@ describe("malformed config", () => {
     expect(readFileSync(join(home, ".claude.json"), "utf-8")).toBe(
       "{ not json",
     );
+  });
+});
+
+describe("--session-check drift watch (every session, read-only)", () => {
+  const OLD_COLLECTOR =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+
+  function wireCurrent() {
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: { type: "command", command: `bun ${COLLECTOR_SCRIPT}` },
+        permissions: {
+          allow: [
+            "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
+            "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+          ],
+        },
+      }),
+    );
+  }
+
+  test("a notice is a single JSON object with a systemMessage", () => {
+    const { out } = run(["--session-check"]);
+    const payload = JSON.parse(out.trim());
+    expect(payload.systemMessage).toContain("/monitor:install");
+  });
+
+  test("says nothing when the wiring matches this install", () => {
+    wireCurrent();
+    const { out } = run(["--session-check"]);
+    expect(out.trim()).toBe("");
+  });
+
+  test("notices drift that appears within the same version, and writes nothing", () => {
+    wireCurrent();
+    run(["--session-check"]); // stamps the version marker + a clean drift signature
+    // Same version, so the migrate gate is closed — the drift watch must still see this.
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
+      }),
+    );
+    const before = readFileSync(join(home, ".claude", "settings.json"), "utf-8");
+
+    const { stdout } = run(["--session-check"]);
+
+    expect(stdout).toContain("another install");
+    expect(stdout).toContain("/monitor:install");
+    // Notice only — the same-version path never repairs.
+    expect(readFileSync(join(home, ".claude", "settings.json"), "utf-8")).toBe(
+      before,
+    );
+  });
+
+  test("reports every drifted piece in one notice", () => {
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
+      }),
+    );
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: "bun", args: [CHANNEL_SCRIPT] },
+        },
+      }),
+    );
+    // Marker already current, so only the drift watch runs.
+    writeFileSync(join(dataDir, ".wired-version"), "999.0.0\n");
+
+    const { out } = run(["--session-check"]);
+    const message = JSON.parse(out.trim()).systemMessage as string;
+    expect(message).toContain("another install");
+    expect(message).toContain("cockpit-channel");
+    expect(message).toContain("permissions.allow");
+  });
+
+  test("repeats nothing while the same drift persists", () => {
+    wireCurrent();
+    run(["--session-check"]);
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
+      }),
+    );
+    expect(run(["--session-check"]).stdout).toContain("another install");
+    expect(run(["--session-check"]).out.trim()).toBe("");
+  });
+
+  test("notices again after the drift is fixed and returns", () => {
+    wireCurrent();
+    run(["--session-check"]);
+    const drifted = JSON.stringify({
+      statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
+    });
+    writeFileSync(join(home, ".claude", "settings.json"), drifted);
+    run(["--session-check"]);
+    wireCurrent();
+    run(["--session-check"]); // clean again — clears the signature
+    writeFileSync(join(home, ".claude", "settings.json"), drifted);
+    expect(run(["--session-check"]).stdout).toContain("another install");
+  });
+
+  test("names an unparseable settings.json instead of guessing past it", () => {
+    writeFileSync(join(home, ".claude", "settings.json"), "{ not json");
+    const { stdout } = run(["--session-check"]);
+    expect(stdout).toContain("not valid JSON");
   });
 });
