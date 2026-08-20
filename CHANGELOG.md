@@ -1,5 +1,25 @@
 # Changelog
 
+## [herdr 0.3.1] - 2026-08-21
+
+_tracks tag `herdr-v0.3.1`_
+
+### Added
+- `herd.ts`'s `send()` gained an optional third argument (`{wait, status, timeoutMs}`) that confirms a prompt actually landed, driven by Herdr 0.8.2's `agent prompt --wait`. A prompt that was accepted but never acted on now surfaces as its own stalled state instead of looking identical to an agent that's simply still idle.
+
+### Fixed
+- `spawn --task` and `agent start` could both strand a pane the caller had no handle to close: `spawn --task` threw after already creating the pane if a blocked screen was detected on the initial send, and `agent start` rethrew on a not-ready signal even when the agent was actually live. Both paths now always hand the pane's name back to the caller, even when a downstream step errors.
+
+### Changed
+- All five `herdr` reference docs and the skill's own guidance are refreshed for Herdr 0.8.2: the updated socket protocol (19 to 20) and its new `pane.input.set` method, new CLI surface (`pane input --right-click`, `api snapshot`, `server reload-agent-manifests`, the renamed `antigravity-cli` agent kind), the full current config surface, and corrected agent-orchestration guidance now that 0.8.2 waits internally after `agent start` instead of needing a manual settle wait.
+
+## [relay 0.6.6] - 2026-08-21
+
+_tracks tag `relay-v0.6.6`_
+
+### Changed
+- relay's initial bootstrap send now confirms the prompt actually landed before proceeding, using Herdr's new wait/confirm support — a stalled send is caught immediately at submit time instead of surfacing later through a delayed poll. A failed confirmation is logged and passed over rather than treated as fatal, so the existing nudge/self-heal retry still catches a genuine miss; only a fully blocked send (nothing delivered) stops the bootstrap outright.
+
 ## [chronicle 0.14.0] - 2026-08-19
 
 _tracks tag `chronicle-v0.14.0`_
