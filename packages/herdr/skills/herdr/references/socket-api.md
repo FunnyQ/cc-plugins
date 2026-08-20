@@ -1,6 +1,6 @@
 # Herdr Socket API
 
-This document is verified against herdr 0.8.0, protocol 19. If live output disagrees with this doc, trust `herdr api schema --json`.
+This document is verified against herdr 0.8.2, protocol 20. If live output disagrees with this doc, trust `herdr api schema --json`.
 
 Herdr's control surface is a Unix domain socket. The `herdr` CLI is a thin client over it. Every subcommand opens the socket, sends one request, prints the response, and exits.
 
@@ -60,7 +60,7 @@ Send `id`, `method`, and `params`. All three are required — omitting `params` 
 Success returns the request's `id` and a `result` whose `type` names the variant:
 
 ```json
-{"id":"1","result":{"type":"pong","version":"0.8.0","protocol":19,
+{"id":"1","result":{"type":"pong","version":"0.8.2","protocol":20,
   "capabilities":{"live_handoff":true,"detached_server_daemon":true}}}
 ```
 
@@ -70,15 +70,17 @@ Errors return `code` and `message`, both required:
 {"id":"1","error":{"code":"agent_not_found","message":"agent target nope not found"}}
 ```
 
-CLI socket commands use `server_not_running` when no compatible server is available. Alternate-screen history reads can use `agent_not_idle` when the target is not safe to scroll.
+CLI socket commands use `server_not_running` when no compatible server is available. Alternate-screen history reads can use `agent_not_idle` when the target is not safe to scroll. `agent.prompt` returns `agent_blocked` when the target already waits at an approval or question dialog; it sends no text and starts no wait. A prompt that herdr accepted but that produced no lifecycle change within five seconds returns `agent_prompt_stalled`.
 
 **Do not key error handling on `id`.** A request that fails to deserialise comes back with `id: ""`, because the server never read the id.
 
-Gate on `ping` before assuming a shape. Protocol 19 is current here. Treat a supported protocol as a minimum floor unless your client has a verified reason to reject additive future protocols.
+Gate on `ping` before assuming a shape. Protocol 20 is current here. Treat a supported protocol as a minimum floor unless your client has a verified reason to reject additive future protocols.
+
+**Upgrading the binary does not upgrade the socket.** The server keeps running the version it started with, so `ping` reports the old protocol until it restarts or hands off. Compare `herdr status` client and server versions before you trust a new method. `agent.explain` is the usual casualty: it classifies against the *server's* manifest cache, so a stale server explains with stale rules.
 
 ## Methods
 
-There are 90 methods: `agent.*` (12), `client.*` (2), `events.*` (2), `integration.*` (2), `layout.*` (3), `notification.show`, `pane.*` (29), `ping`, `plugin.*` (11), `popup.close`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). Protocol 19 adds `workspace.move_block` with `{workspace_ids, before_workspace_id}` for atomic worktree-group ordering.
+There are 91 methods: `agent.*` (12), `client.*` (2), `events.*` (2), `integration.*` (2), `layout.*` (3), `notification.show`, `pane.*` (30), `ping`, `plugin.*` (11), `popup.close`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). Protocol 20 adds `pane.input.set` with `{pane_id, right_click}` for right-click routing.
 
 Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. The mapping for the calls `scripts/herd.ts` makes:
 
@@ -91,7 +93,7 @@ Each CLI subcommand maps to the dotted method of the same name, with flags becom
 | `agent wait <t> --until S --timeout MS` | `agent.wait` | `{target, until:[…], timeout_ms}` |
 | `agent read <t> --source S --lines N` | `agent.read` | `{target, source, lines, format, strip_ansi}` |
 | `agent send-keys <t> K…` | `agent.send_keys` | `{target, keys}` |
-| `pane split --direction D` | `pane.split` | `{direction, target_pane_id, workspace_id, cwd, env, ratio, focus}` |
+| `pane split --direction D` | `pane.split` | `{direction, target_pane_id, workspace_id, cwd, env, ratio, right_click, focus}` |
 | `pane read <id> --source S` | `pane.read` | `{pane_id, source, lines, format, strip_ansi}` |
 | `pane send-keys <id> K…` | `pane.send_keys` | `{pane_id, keys}` |
 | `pane run <id> <cmd>` | `pane.send_input` | `{pane_id, text, keys}` |
@@ -100,7 +102,9 @@ Each CLI subcommand maps to the dotted method of the same name, with flags becom
 | `tab create` | `tab.create` | `{workspace_id, label, cwd, env, focus}` |
 | `tab list` / `focus` | `tab.list` / `tab.focus` | `{workspace_id}` / `{tab_id}` |
 
-Note the shape changes, not just the names. `--env K=V` repeated becomes an `env` **object**. `--until` repeated becomes an `until` **array**. `-- ARGS` becomes `args`. `--no-focus` becomes `focus: false`, which is already the default.
+Note the shape changes, not just the names. `--env K=V` repeated becomes an `env` **object**. `--until` repeated becomes an `until` **array**. `-- ARGS` becomes `args`. `--no-focus` becomes `focus: false`, which is already the default. On `agent.prompt` the wait flags **nest**: `--wait --until S --timeout MS` becomes one `wait: {until:[…], timeout_ms}` object, and `--wait` alone becomes `wait: {}`. Passing `until` or `timeout_ms` at the top level is a deserialisation error, not a wait.
+
+`pane.input.set` takes `{pane_id, right_click}` and routes one pane's right-click gestures. Send `right_click: "pane"` to forward unmodified hold and drag gestures to a mouse-reporting application. Send `right_click: "herdr"` to restore Herdr's pane menu. Right-clicking the pane frame always opens Herdr's menu. `pane.split` takes the same `right_click` for the pane it creates, defaulting to `herdr`.
 
 Result variants you will unwrap: `agent_list.agents`, `agent_info.agent`, `agent_started.agent`, `pane_list.panes`, `pane_info.pane`, `pane_read.read`, `tab_created.{tab,root_pane}`, `workspace_created.{workspace,tab,root_pane}`, `wait_matched.event`. `PaneReadResult.truncated` is required and reports when older rows were omitted. Simple mutations return `{"type":"ok"}`.
 
@@ -114,6 +118,7 @@ This is the trap. The CLI accepts hyphens; the socket accepts only the underscor
 | `AgentStatus` | `idle`, `working`, `blocked`, `done`, `unknown` | same |
 | `SplitDirection` | `right`, `down` | same |
 | `ReadFormat` | `text`, `ansi` | same |
+| `PaneRightClickTarget` | `herdr`, `pane` | same |
 
 Passing the CLI spelling returns a deserialisation error, not a friendlier one:
 

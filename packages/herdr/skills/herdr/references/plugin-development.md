@@ -1,6 +1,6 @@
 # Herdr Plugin Development
 
-This document is verified against herdr 0.8.0. If live CLI output disagrees with this doc, trust `herdr --help`.
+This document is verified against herdr 0.8.2. If live CLI output disagrees with this doc, trust `herdr --help`.
 
 Plugins are shareable executable workflow packages. You can write a plugin in any language, for example Bash, JS, Rust, Go, Lua, or Python. Herdr owns the host surface. The plugin owns its implementation.
 
@@ -25,6 +25,9 @@ command = ["npm", "ci"]
 command = ["npm", "run", "build"]
 platforms = ["linux", "macos"]
 
+[[startup]]
+command = ["node", "dist/restore.js"]
+
 [[actions]]
 id = "apply"
 title = "Apply layout"
@@ -38,7 +41,7 @@ command = ["herdr", "workspace", "list"]
 [[panes]]
 id = "board"
 title = "Project board"
-placement = "popup"      # "overlay" | "popup" | "split" | "tab" | "zoomed"
+placement = "overlay"    # default; also "popup" | "split" | "tab" | "zoomed"
 command = ["herdr-board"]
 
 [[link_handlers]]
@@ -48,21 +51,29 @@ pattern = "^https://github\\.com/[^/]+/[^/]+/(issues|pull)/[0-9]+$"
 action = "apply"
 ```
 
-**Required fields:** `id`, `name`, `version`, `min_herdr_version`.
-**ID rules:** A plugin id uses ASCII letters, digits, dot, colon, underscore, and hyphen. An action, pane, or link-handler id uses the same characters, but no dots.
-**Platforms:** The top-level field applies to all platforms. An item-level field overrides it.
-**Commands:** Commands are argv arrays. Herdr does NOT shell-expand them.
+**Required fields:** `id`, `name`, `version`, `min_herdr_version`. `description` is optional.
+**Minimum version:** Set `min_herdr_version` to the oldest herdr that supports the APIs, event names, and manifest fields you use. Herdr refuses to link or install a plugin whose minimum is newer than the running binary. Do not raise it to match the herdr you happen to build on.
+**ID rules:** A plugin id uses ASCII letters, digits, dot, colon, underscore, and hyphen. An action, pane, or link-handler id uses the same characters, but no dots. Each id type must be unique inside a plugin.
+**Platforms:** The top-level field applies to all platforms. An item-level field overrides it. A local plugin with no top-level `platforms` links with a warning.
+**Commands:** Commands are argv arrays. Herdr does NOT shell-expand them. They run with the plugin directory as their working directory.
+
+## Startup Hooks
+
+`[[startup]]` commands run once per enabled plugin after herdr restores the session and its API socket is ready. They run again when a new server takes over during live handoff. They do not run when a client attaches, when config reloads, or when a plugin is linked or enabled.
+
+Write a startup hook as one-shot initialization, not a supervised daemon. Restore plugin-owned state, call the APIs you need, then exit. A startup failure does not stop the server.
 
 ## Runtime Environment Variables
 
 Injected into all runtime commands:
 - `HERDR_SOCKET_PATH`, `HERDR_BIN_PATH`, `HERDR_ENV=1`
 - `HERDR_PLUGIN_ID`, `HERDR_PLUGIN_ROOT`, `HERDR_PLUGIN_CONFIG_DIR`, `HERDR_PLUGIN_STATE_DIR`
-- `HERDR_PLUGIN_CONTEXT_JSON` (workspace, tab, pane, agent, selected text, clicked URL, link handler fields when available)
+- `HERDR_PLUGIN_CONTEXT_JSON` (workspace, tab, focused pane, worktree, agent, selected text, clicked URL, link handler fields when available)
 - `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, `HERDR_PANE_ID` (when available)
 
 Action-specific: `HERDR_PLUGIN_ACTION_ID`
-Event-specific: `HERDR_PLUGIN_EVENT`, `HERDR_PLUGIN_EVENT_JSON`
+Startup and event: `HERDR_PLUGIN_EVENT` (`startup` for a startup hook)
+Event-specific: `HERDR_PLUGIN_EVENT_JSON`
 Pane-specific: `HERDR_PLUGIN_ENTRYPOINT_ID`
 Link handler: `HERDR_PLUGIN_CLICKED_URL`, `HERDR_PLUGIN_LINK_HANDLER_ID`, `invocation_source = "link_click"`
 
@@ -148,14 +159,17 @@ description = "apply layout"
 
 ## Install & Distribute
 ```bash
-# Install from GitHub
-herdr plugin install owner/repo[/subdir] [--ref REF] [--yes]
+# Install from GitHub (shorthand only, no URLs)
+herdr plugin install owner/repo[/subdir...] [--ref REF] [--yes]
 
-# Marketplace: add GitHub topic "herdr-plugin" to public repo
-# Index refreshes every 30 minutes
+# Remove a GitHub install, managed checkout included
+herdr plugin uninstall <plugin-id|owner/repo[/subdir...]>
 ```
 
+**Marketplace listing:** Add the GitHub topic `herdr-plugin` to a public repository. Put one or more `herdr-plugin.toml` manifests on its default branch, at the root or in subdirectories. The index shows one card per repository and lists each valid manifest as a separately installable plugin, recording its `name`, `version`, `platforms`, `min_herdr_version`, and the exact default-branch commit. It refreshes every 30 minutes and rescans a repository when its default-branch head changes. It excludes forks, archived repositories, and manifests whose required metadata does not parse.
+
 ## Pitfalls
+- A plugin's build, startup, and runtime commands run as your user with your environment. Read the manifest before you install or link one.
 - `command` is argv, not shell. It supports no `$VAR` expansion, no pipes, and no `&&`.
 - Relative command paths resolve from the plugin root.
 - Build commands do not receive the runtime env or socket.
