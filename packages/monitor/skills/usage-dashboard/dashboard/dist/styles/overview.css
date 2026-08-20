@@ -477,9 +477,11 @@
   color: color-mix(in oklch, var(--rose) 52%, var(--text));
 }
 
+/* auto-fit, not a fixed 2: a provider can report a single window (Codex lost
+   its 5-hour limit), and a hard second column strands that ring at 25% width. */
 .usage-limit-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
   gap: var(--s-12);
 }
 

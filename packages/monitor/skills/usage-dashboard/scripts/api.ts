@@ -58,6 +58,8 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
 const RATE_LIMITS_STALE_AFTER_MS = 5 * 60 * 1000;
 const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
 const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
+// Anything longer than a day is a weekly Codex window; see buildCodexUsageLimits.
+const CODEX_WEEKLY_MIN_MS = 24 * 60 * 60 * 1000;
 
 // ---------- Types ----------
 
@@ -646,22 +648,44 @@ function codexUsageBase(error: string | null = null): UsageLimits {
   };
 }
 
-function buildCodexUsageLimits(
+export function buildCodexUsageLimits(
   usage: CodexApiUsage | null | undefined,
   capturedAt: string | null,
   capturedAtMs: number,
   error: string | null,
+  nowMs: number,
 ): UsageLimits {
-  const nowMs = Date.now();
   const rateLimit = usage?.rate_limit;
   const primary = rateLimit?.primary_window ?? null;
   const secondary = rateLimit?.secondary_window ?? null;
   const nextError =
     error ?? (!primary && !secondary ? "missing-rate-limits" : null);
-  const primaryDurationMs =
-    (coerceNumber(primary?.limit_window_seconds) ?? 5 * 60 * 60) * 1000;
-  const secondaryDurationMs =
-    (coerceNumber(secondary?.limit_window_seconds) ?? 7 * 24 * 60 * 60) * 1000;
+
+  // Slot each bucket by the window length the API reports, not by the field it
+  // arrived in: OpenAI dropped Codex's 5-hour limit, so primary_window now
+  // carries the weekly window on its own.
+  let fiveHour: UsageLimitWindow | null = null;
+  let weekly: UsageLimitWindow | null = null;
+  const buckets: Array<[CodexApiRateLimitBucket | null, number]> = [
+    [primary, FIVE_HOUR_MS],
+    [secondary, SEVEN_DAY_MS],
+  ];
+  for (const [bucket, fallbackDurationMs] of buckets) {
+    if (!bucket) continue;
+    const windowSeconds = coerceNumber(bucket.limit_window_seconds);
+    const durationMs =
+      windowSeconds === null ? fallbackDurationMs : windowSeconds * 1000;
+    const window = buildUsageLimitWindow(
+      { used_percentage: bucket.used_percent, resets_at: bucket.reset_at },
+      durationMs,
+      nowMs,
+    );
+    if (durationMs >= CODEX_WEEKLY_MIN_MS) {
+      weekly = weekly ?? window;
+    } else {
+      fiveHour = fiveHour ?? window;
+    }
+  }
 
   return {
     ...codexUsageBase(nextError),
@@ -670,26 +694,8 @@ function buildCodexUsageLimits(
       !Number.isFinite(capturedAtMs) ||
       nowMs - capturedAtMs > RATE_LIMITS_STALE_AFTER_MS,
     plan: usage?.plan_type ?? null,
-    fiveHour: primary
-      ? buildUsageLimitWindow(
-          {
-            used_percentage: primary.used_percent,
-            resets_at: primary.reset_at,
-          },
-          primaryDurationMs,
-          nowMs,
-        )
-      : null,
-    weekly: secondary
-      ? buildUsageLimitWindow(
-          {
-            used_percentage: secondary.used_percent,
-            resets_at: secondary.reset_at,
-          },
-          secondaryDurationMs,
-          nowMs,
-        )
-      : null,
+    fiveHour,
+    weekly,
   };
 }
 
@@ -789,6 +795,7 @@ function readCodexUsageCache(): UsageLimits {
     cache.data.capturedAt ?? null,
     capturedAtMs,
     null,
+    Date.now(),
   );
 }
 
@@ -811,6 +818,7 @@ export async function readCodexUsageLimits(): Promise<UsageLimits> {
       cache.capturedAt ?? null,
       capturedAtEpochMs,
       null,
+      capturedAtEpochMs,
     );
   } catch (err) {
     if (cached.capturedAt) {

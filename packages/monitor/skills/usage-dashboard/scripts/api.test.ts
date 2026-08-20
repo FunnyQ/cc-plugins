@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   addModelUsage,
   addUsage,
+  buildCodexUsageLimits,
   buildUsageLimitWindow,
   calcCost,
   coerceNumber,
@@ -284,6 +285,88 @@ describe("buildUsageLimitWindow", () => {
       elapsedPercent: null,
       remainingMs: null,
     });
+  });
+});
+
+describe("buildCodexUsageLimits window slotting", () => {
+  // A fixed clock: buildCodexUsageLimits takes nowMs, so nothing here depends
+  // on how long the test takes to run.
+  const NOW_MS = 1_787_254_275_000; // 2026-08-20T19:31:15Z, on a whole second
+  const bucket = (
+    windowSeconds: number | null,
+    usedPercent: number,
+    resetsInSeconds: number,
+  ) => ({
+    used_percent: usedPercent,
+    reset_at: Math.floor(NOW_MS / 1000) + resetsInSeconds,
+    ...(windowSeconds === null ? {} : { limit_window_seconds: windowSeconds }),
+  });
+  const build = (usage: Parameters<typeof buildCodexUsageLimits>[0]) =>
+    buildCodexUsageLimits(usage, null, NOW_MS, null, NOW_MS);
+
+  test("a weekly-length primary_window lands in weekly, not fiveHour", () => {
+    // OpenAI dropped Codex's 5-hour limit, so the one bucket it still returns
+    // arrives as primary_window while describing a 7-day window. This is the
+    // live payload shape, secondary_window explicitly null and all.
+    const limits = build({
+      plan_type: "prolite",
+      rate_limit: {
+        primary_window: bucket(604800, 1, 561600),
+        secondary_window: null,
+      },
+    });
+    expect(limits.fiveHour).toBeNull();
+    expect(limits.weekly?.usedPercent).toBe(1);
+    expect(limits.error).toBeNull();
+    // Elapsed math must use the 7-day length, not a 5-hour one.
+    expect(limits.weekly?.remainingMs).toBe(561_600_000);
+    expect(limits.weekly?.elapsedPercent).toBeCloseTo(7.14, 2);
+  });
+
+  test("both windows are kept when the API reports both lengths", () => {
+    const limits = build({
+      rate_limit: {
+        primary_window: bucket(18000, 40, 3600),
+        secondary_window: bucket(604800, 12, 432000),
+      },
+    });
+    expect(limits.fiveHour?.usedPercent).toBe(40);
+    expect(limits.weekly?.usedPercent).toBe(12);
+  });
+
+  test("slots by length even when the API swaps the two fields", () => {
+    const limits = build({
+      rate_limit: {
+        primary_window: bucket(604800, 12, 432000),
+        secondary_window: bucket(18000, 40, 3600),
+      },
+    });
+    expect(limits.fiveHour?.usedPercent).toBe(40);
+    expect(limits.weekly?.usedPercent).toBe(12);
+  });
+
+  test("falls back to slot position when limit_window_seconds is absent", () => {
+    const limits = build({
+      rate_limit: {
+        primary_window: bucket(null, 7, 3600),
+        secondary_window: bucket(null, 3, 432000),
+      },
+    });
+    expect(limits.fiveHour?.usedPercent).toBe(7);
+    expect(limits.weekly?.usedPercent).toBe(3);
+  });
+
+  test("keeps the first bucket and drops the second when both share a slot", () => {
+    // Unreachable today — the API returns at most one weekly window. Locked so
+    // the collision stays deterministic rather than accidental.
+    const limits = build({
+      rate_limit: {
+        primary_window: bucket(604800, 12, 432000),
+        secondary_window: bucket(2592000, 88, 2000000),
+      },
+    });
+    expect(limits.weekly?.usedPercent).toBe(12);
+    expect(limits.fiveHour).toBeNull();
   });
 });
 
