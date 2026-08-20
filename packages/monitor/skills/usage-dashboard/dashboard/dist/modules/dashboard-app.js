@@ -2245,8 +2245,8 @@ export function App() {
 
     usageLimitProviderView(key, label, limits, waitingLabel, fallbackPath) {
       const windows = [
-        this.usageLimitWindowView("fiveHour", "5hr", limits?.fiveHour),
-        this.usageLimitWindowView("weekly", "Weekly", limits?.weekly),
+        this.usageLimitWindowView("fiveHour", limits?.fiveHour),
+        this.usageLimitWindowView("weekly", limits?.weekly),
       ].filter(Boolean);
       const error = limits?.error ?? null;
       const stale = limits?.stale === true;
@@ -2276,8 +2276,10 @@ export function App() {
       };
     },
 
-    usageLimitWindowView(key, label, window) {
+    usageLimitWindowView(key, window) {
       if (!window) return null;
+
+      const label = this.usageLimitWindowLabel(window.durationMs);
 
       const usedPercent =
         typeof window.usedPercent === "number" &&
@@ -2384,6 +2386,26 @@ export function App() {
         hour: "2-digit",
         minute: "2-digit",
       });
+    },
+
+    // Names a window by its length, never by the slot it arrived in: Codex's
+    // sole remaining window reports 7 days through the field that used to carry
+    // the 5-hour one. The two canonical lengths keep their established wording.
+    usageLimitWindowLabel(durationMs) {
+      if (
+        typeof durationMs !== "number" ||
+        !Number.isFinite(durationMs) ||
+        durationMs <= 0
+      ) {
+        return "Window";
+      }
+      if (durationMs === 5 * 60 * 60 * 1000) return "5hr";
+      if (durationMs === 7 * 24 * 60 * 60 * 1000) return "Weekly";
+
+      const minutes = Math.round(durationMs / 60000);
+      if (minutes % 1440 === 0) return `${minutes / 1440}d`;
+      if (minutes % 60 === 0) return `${minutes / 60}hr`;
+      return `${minutes}m`;
     },
 
     formatUsageLimitDuration(value) {

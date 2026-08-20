@@ -125,6 +125,9 @@ type UsageLimitWindow = {
   resetAt: string | null;
   elapsedPercent: number | null;
   remainingMs: number | null;
+  // The window's own length. Without it the UI has to name a window from the
+  // slot it arrived in, which is how weekly Codex usage got labelled "5hr".
+  durationMs: number;
 };
 type UsageLimits = {
   source: string;
@@ -564,6 +567,7 @@ export function buildUsageLimitWindow(
       resetAt: null,
       elapsedPercent: null,
       remainingMs: null,
+      durationMs,
     };
   }
 
@@ -578,6 +582,7 @@ export function buildUsageLimitWindow(
     resetAt,
     elapsedPercent: (elapsedMs / durationMs) * 100,
     remainingMs,
+    durationMs,
   };
 }
 

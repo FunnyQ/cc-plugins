@@ -275,6 +275,7 @@ describe("buildUsageLimitWindow", () => {
       resetAt: new Date(1_000_000).toISOString(),
       elapsedPercent: 50,
       remainingMs: 500,
+      durationMs: 1000,
     });
   });
   test("null resets_at yields a partial window", () => {
@@ -284,6 +285,8 @@ describe("buildUsageLimitWindow", () => {
       resetAt: null,
       elapsedPercent: null,
       remainingMs: null,
+      // Known even without resets_at: the caller supplied it.
+      durationMs: 1000,
     });
   });
 });
@@ -321,6 +324,8 @@ describe("buildCodexUsageLimits window slotting", () => {
     // Elapsed math must use the 7-day length, not a 5-hour one.
     expect(limits.weekly?.remainingMs).toBe(561_600_000);
     expect(limits.weekly?.elapsedPercent).toBeCloseTo(7.14, 2);
+    // The window reports its own length, so the label need not trust the slot.
+    expect(limits.weekly?.durationMs).toBe(604_800_000);
   });
 
   test("both windows are kept when the API reports both lengths", () => {
@@ -367,6 +372,14 @@ describe("buildCodexUsageLimits window slotting", () => {
     });
     expect(limits.weekly?.usedPercent).toBe(12);
     expect(limits.fiveHour).toBeNull();
+  });
+
+  test("carries a duration no slot name describes", () => {
+    // A 30-day window lands in the weekly slot but must not claim to be weekly.
+    const limits = build({
+      rate_limit: { primary_window: bucket(2592000, 4, 2000000) },
+    });
+    expect(limits.weekly?.durationMs).toBe(2_592_000_000);
   });
 });
 
