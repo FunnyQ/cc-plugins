@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { join } from "path";
 import {
+  BOOTSTRAP_ACTIVITY_WAIT_MS,
   collectLive,
   compareVersionsDesc,
   DEFAULT_WAIT_TIMEOUT_MS,
@@ -413,8 +414,8 @@ function fakeHerd(options: {
       }
       return namedAgents;
     },
-    async send(target, text) {
-      calls.push({ verb: "send", args: [target, text] });
+    async send(target, text, opts) {
+      calls.push({ verb: "send", args: [target, text, opts] });
       if (options.sendError) throw options.sendError;
       return {};
     },
@@ -918,6 +919,83 @@ describe("runLive", () => {
     expect(result.agentName).toBe("relay-codex-delegate-ab12");
     expect(result.error).toContain("pane gone");
   });
+
+  it("asks herdr to confirm the bootstrap landed, on any lifecycle state", async () => {
+    const { run, calls } = runLiveHarness({ statuses: ["idle"] });
+
+    await run();
+
+    const sends = calls.filter((c) => c.verb === "send");
+    expect(sends[0].args[2]).toEqual({
+      status: ["working", "done", "idle", "blocked", "unknown"],
+      timeoutMs: BOOTSTRAP_ACTIVITY_WAIT_MS,
+    });
+    // Above herdr's five-second stall window, or the stall collapses into a
+    // plain timeout and the signal is lost.
+    expect(BOOTSTRAP_ACTIVITY_WAIT_MS).toBeGreaterThan(5_000);
+  });
+
+  it("accepts unknown as proof the bootstrap landed", async () => {
+    const { run, calls } = runLiveHarness({ statuses: ["idle"] });
+
+    await run();
+
+    // herdr excludes `unknown` from its own defaults, so it must be listed here
+    // explicitly. Omit it and a detection wobble on a delivered bootstrap burns
+    // the budget and surfaces as a plain `timeout`.
+    const sends = calls.filter((c) => c.verb === "send");
+    expect(sends[0].args[2].status).toContain("unknown");
+  });
+
+  it("treats a timeout on the confirmation as a warning, not a failed run", async () => {
+    const timedOut = Object.assign(new Error("timed out"), { code: "timeout" });
+    const { run, errors } = runLiveHarness({
+      statuses: [],
+      sendError: timedOut,
+    });
+
+    const result = await run();
+
+    // Confirming is a diagnostic, not a gate — it must never fail a run that
+    // would have proceeded before the confirmation existed.
+    expect(String(result.error ?? "")).not.toContain(
+      "failed to send bootstrap",
+    );
+    expect(errors.some((e) => e.includes("could not confirm activity"))).toBe(
+      true,
+    );
+  });
+
+  it("still fails the run when the send itself is rejected", async () => {
+    const blocked = Object.assign(new Error("agent is blocked"), {
+      code: "agent_blocked",
+    });
+    const { run } = runLiveHarness({ statuses: [], sendError: blocked });
+
+    const result = await run();
+
+    // Nothing was sent and the pane needs a human — do not pretend otherwise.
+    expect(result.ok).toBe(false);
+    expect(String(result.error ?? "")).toContain("failed to send bootstrap");
+  });
+
+  it("treats agent_prompt_stalled as a warning, not a failed run", async () => {
+    const stalled = Object.assign(new Error("no lifecycle change"), {
+      code: "agent_prompt_stalled",
+    });
+    const { run, errors } = runLiveHarness({
+      statuses: [],
+      sendError: stalled,
+    });
+
+    const result = await run();
+
+    // A cold start can exceed herdr's window; the nudge loop heals a real miss.
+    expect(String(result.error ?? "")).not.toContain(
+      "failed to send bootstrap",
+    );
+    expect(errors.some((e) => e.includes("agent_prompt_stalled"))).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1095,9 +1173,9 @@ describe("collectLive", () => {
 
 describe("shellArg", () => {
   it("leaves ordinary paths bare", () => {
-    expect(shellArg("/Users/q/.claude/plugins/cache/relay/0.5.9/relay.ts")).toBe(
-      "/Users/q/.claude/plugins/cache/relay/0.5.9/relay.ts",
-    );
+    expect(
+      shellArg("/Users/q/.claude/plugins/cache/relay/0.5.9/relay.ts"),
+    ).toBe("/Users/q/.claude/plugins/cache/relay/0.5.9/relay.ts");
   });
 
   it("quotes a path containing a space", () => {

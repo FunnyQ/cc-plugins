@@ -25,6 +25,10 @@ import { RESULT_END_MARKER } from "./relay-prompt";
 export const DEFAULT_WAIT_TIMEOUT_MS = 600_000; // 10 min
 export const POLL_INTERVAL_MS = 5_000;
 export const SPAWN_IDLE_WAIT_MS = 20_000;
+// Budget for herdr to observe the bootstrap land. Must stay ABOVE 5000: at or
+// below it herdr reports a plain `timeout` instead of `agent_prompt_stalled`,
+// merging "took the text and did nothing" into "still thinking".
+export const BOOTSTRAP_ACTIVITY_WAIT_MS = 8_000;
 
 // relay.ts is this file's sibling by construction, so the pending report can
 // print a runnable `relay collect` line without relay.ts plumbing its own path
@@ -187,7 +191,13 @@ export type HerdClient = {
     argv?: string[];
     env?: string[];
   }): Promise<{ name: string }>;
-  send(target: string, text: string): Promise<unknown>;
+  // The third argument is herd.ts 0.4.0+. An older herd.ts ignores it, which is
+  // why the bootstrap send below must stay correct without it.
+  send(
+    target: string,
+    text: string,
+    opts?: { wait?: boolean; status?: string[]; timeoutMs?: number },
+  ): Promise<unknown>;
   keys(target: string, ...keys: string[]): Promise<unknown>;
   wait(
     target: string,
@@ -544,7 +554,37 @@ export async function runLive(
     } catch {
       /* proceed to send regardless */
     }
-    await herd.send(agentName, opts.bootstrapText);
+    // Ask herdr to confirm the bootstrap actually landed. Every lifecycle state
+    // satisfies the wait, so this returns the moment the agent reacts — and when
+    // the agent takes the text but never acts, herdr says so outright rather than
+    // leaving the nudge loop below to infer it from the pane's visible text one
+    // poll window later.
+    //
+    // The list must be the WHOLE enum. herdr excludes `unknown` from its own
+    // defaults, so omitting it here would let a detection wobble — agent reacted,
+    // screen momentarily unclassifiable — burn the budget and surface as a plain
+    // `timeout` on a bootstrap that demonstrably landed.
+    //
+    // Failing to CONFIRM is never fatal either. This call is a diagnostic, not a
+    // gate: before it existed relay sent and moved on unconditionally, and the
+    // nudge loop below still heals a genuine miss. A cold start can exceed
+    // herdr's five-second window, so both "no activity" and "did not settle"
+    // report and continue. Only a rejected send (e.g. `agent_blocked`, which
+    // sends nothing and needs a human at the pane) still fails the run.
+    try {
+      await herd.send(agentName, opts.bootstrapText, {
+        status: ["working", "done", "idle", "blocked", "unknown"],
+        timeoutMs: BOOTSTRAP_ACTIVITY_WAIT_MS,
+      });
+    } catch (error) {
+      // Duck-typed: relay never statically imports herd.ts, so HerdrError is not
+      // in scope here.
+      const code = (error as { code?: string })?.code;
+      if (code !== "agent_prompt_stalled" && code !== "timeout") throw error;
+      deps.stderr(
+        `[relay live] ${agentName}: bootstrap submitted but herdr could not confirm activity (${code}) — continuing; the nudge loop will retry\n`,
+      );
+    }
   } catch (error) {
     return {
       ok: false,
