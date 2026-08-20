@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 4.0.6] - 2026-08-21
+
+_tracks tag `monitor-v4.0.6`_
+
+### Fixed
+- Codex's rate-limit windows now slot by their actual duration instead of position, so a dropped 5-hour window no longer causes the weekly window to be mislabeled as "5hr." The usage-limit grid also switches to `auto-fit` columns so a single remaining window no longer gets stranded at 25% width.
+- Rate-limit window labels are now derived from each window's real duration rather than a hardcoded slot name, fixing mislabeled windows and giving non-canonical lengths (like 30d, 4hr, 15m) a sensible display name.
+
 ## [herdr 0.3.1] - 2026-08-21
 
 _tracks tag `herdr-v0.3.1`_
