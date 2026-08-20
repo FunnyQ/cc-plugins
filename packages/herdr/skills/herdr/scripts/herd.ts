@@ -89,12 +89,23 @@ export type SpawnOpts = {
 
 export type SpawnResult = AgentInfo & {
   name: string;
-  task?: { sent: boolean };
+  /** Set when `agent start` saw a blocked screen during startup. The agent is
+   *  live and the name resolves; clear the dialog before prompting it. */
+  startBlocked?: true;
+  task?: { sent: boolean; reason?: string };
 };
+export type SendOpts = {
+  wait?: boolean; // settle after submitting instead of returning immediately
+  status?: AgentStatus | AgentStatus[]; // narrows the settle set; implies wait
+  timeoutMs?: number; // settle budget; implies wait
+};
+
 export type SendResult = {
   target: string;
   paneId: string | null;
   submitted: boolean;
+  waited: boolean;
+  status?: string; // the agent's status once herdr returned
 };
 export type KeysResult = { target: string; paneId: string; keys: string[] };
 export type CloseResult = { target: string; paneId: string; closed: true };
@@ -271,7 +282,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     target: string,
     opts: {
       lines?: number;
-      source?: "recent-unwrapped" | "recent" | "visible";
+      source?: "recent-unwrapped" | "recent" | "visible" | "detection";
     } = {},
   ): Promise<string> {
     const lines = opts.lines ?? 40;
@@ -289,10 +300,49 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     ]);
   }
 
-  /** Submit through herdr's paste-aware, timing-safe agent prompt path. */
-  async function send(target: string, text: string): Promise<SendResult> {
-    await callJson(["agent", "prompt", target, text]);
-    return { target, paneId: null, submitted: true };
+  /**
+   * Submit through herdr's paste-aware, timing-safe agent prompt path.
+   *
+   * With `wait`, herdr settles the agent in the same call, so a send-then-wait
+   * pair collapses into one round trip. It also gains a signal a separate wait
+   * cannot give: a prompt accepted from a non-working state must produce a
+   * lifecycle change within five seconds, or herdr returns `agent_prompt_stalled`
+   * — the agent took the text but never acted on it. Keep `timeoutMs` above 5000;
+   * at or below it herdr reports a plain `timeout` and that distinction is lost.
+   */
+  async function send(
+    target: string,
+    text: string,
+    opts: SendOpts = {},
+  ): Promise<SendResult> {
+    const statuses =
+      opts.status === undefined
+        ? []
+        : Array.isArray(opts.status)
+          ? opts.status
+          : [opts.status];
+    // herdr rejects `--until` without `--wait`, and a caller passing either a
+    // status set or a budget has already asked to settle. Imply it.
+    const waited =
+      opts.wait === true || statuses.length > 0 || opts.timeoutMs !== undefined;
+
+    const args = ["agent", "prompt", target, text];
+    if (waited) {
+      args.push("--wait");
+      args.push(...statuses.flatMap((s) => ["--until", s]));
+      if (opts.timeoutMs !== undefined) {
+        args.push("--timeout", String(opts.timeoutMs));
+      }
+    }
+    const r = await callJson(args);
+    const agent = r.agent ?? {};
+    return {
+      target,
+      paneId: agent.pane_id ?? null,
+      submitted: true,
+      waited,
+      status: agent.agent_status,
+    };
   }
 
   /** Send bare key chords to a target's pane (no text) — e.g. keys(name, "enter")
@@ -346,6 +396,26 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
    * exists — its shell is typically a beat behind. Starting immediately loses
    * that race and fails with `agent_pane_busy`, so poll until the shell shows
    * up. Every other error fails fast: only readiness is transient.
+   *
+   * Still required on herdr 0.8.2, despite its "agent start now waits for new
+   * pane shells" note — measured, not assumed. That internal wait covers agent
+   * readiness AFTER the pane check, not the check itself: an occupied pane is
+   * waited out (verified to both a 3s and a 20s timeout), but a pane whose
+   * shell has not spawned yet is still rejected outright.
+   *
+   * Measured with real `--kind codex` agents under THIS function's exact
+   * conditions — in-process JSON parse, no subprocess between split and start,
+   * `Q_NO_BANNER=1` on the new pane. `agent_pane_busy` hit 13 of 20 spawns.
+   * The loop is not a rare-edge guard; it carries the majority case.
+   *
+   * The constants below are measured, not picked. Rejection comes back in
+   * ~115ms — it is an immediate refusal, not a wait — and a single 150ms
+   * backoff clears it: 7 of 8 busy spawns succeeded on attempt 2, none needed
+   * a third, none failed. A clean start then takes ~4.4s to reach `idle`,
+   * which is herdr's own readiness wait doing its job once the pane check has
+   * passed. Note ~100ms of slack anywhere between the two calls hides all of
+   * this: an early probe that shelled out to `python3` in that gap measured
+   * 2 of 18 and nearly retired the loop.
    */
   async function startAgentInPane(
     name: string,
@@ -369,6 +439,16 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       try {
         return await callJson(args);
       } catch (error) {
+        // herdr 0.8.2 returns `agent_not_ready` when detection sees a blocked
+        // screen during startup. The agent is live and the name still resolves,
+        // so recover its record rather than stranding a pane the caller was
+        // never handed a handle to.
+        if (error instanceof HerdrError && error.code === "agent_not_ready") {
+          return {
+            ...(await callJson(["agent", "get", name])),
+            startBlocked: true,
+          };
+        }
         if (!isPaneNotReady(error) || now() >= deadline) throw error;
         await sleep(backoff);
         backoff = Math.min(backoff * 2, SHELL_RETRY_MAX_MS);
@@ -473,8 +553,14 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     }
     const info = normAgent(started.agent ?? started);
 
-    let task: { sent: boolean } | undefined;
-    if (opts.task) {
+    const startBlocked: true | undefined = started.startBlocked || undefined;
+
+    let task: { sent: boolean; reason?: string } | undefined;
+    if (opts.task && startBlocked) {
+      // Prompting a blocked agent can only fail. Skip the settle wait too — it
+      // would burn its full timeout waiting for an idle that needs a human.
+      task = { sent: false, reason: "agent_not_ready" };
+    } else if (opts.task) {
       // Best-effort: wait for the agent to settle, then submit the task.
       try {
         await wait(name, {
@@ -484,12 +570,22 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       } catch {
         /* proceed to send regardless */
       }
-      await send(name, opts.task);
-      task = { sent: true };
+      // herdr 0.8.2 rejects a prompt to a blocked agent with `agent_blocked` and
+      // sends nothing. Throwing here would strand a pane the caller cannot name,
+      // so report the block in the result and let them read + clear the dialog.
+      try {
+        await send(name, opts.task);
+        task = { sent: true };
+      } catch (error) {
+        if (!(error instanceof HerdrError) || error.code !== "agent_blocked") {
+          throw error;
+        }
+        task = { sent: false, reason: "agent_blocked" };
+      }
     }
     // Generated name is authoritative — spread info first so a null name from the
     // envelope can't clobber it.
-    return { ...info, name, task };
+    return { ...info, name, startBlocked, task };
   }
 
   async function close(target: string): Promise<CloseResult> {
@@ -585,10 +681,11 @@ Usage:
   herd list
   herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--tab-label TEXT]
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
-  herd send <target> <text>
-  herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k
+  herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
+              # flags go BEFORE <target> so prompt text containing \`--\` survives
+  herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab
   herd wait <target> [--status idle|working|blocked|done|unknown]... [--timeout MS]
-  herd read <target> [--lines N] [--source recent-unwrapped|recent|visible]
+  herd read <target> [--lines N] [--source recent-unwrapped|recent|visible|detection]
   herd close <target>
 
 Targets are agent NAMES (as returned by spawn/list), not pane ids.
@@ -637,11 +734,32 @@ async function main() {
       case "send": {
         // Parse from raw argv (not the generic flag parser) so prompt text that
         // starts with or contains `--` (e.g. "--please fix this") survives intact.
-        const target = rest[0];
-        const text = rest.slice(1).join(" ");
+        // Flags are therefore only recognised BEFORE <target>; everything from
+        // <target> onward is positional.
+        const sendOpts: SendOpts = {};
+        const statuses: AgentStatus[] = [];
+        let i = 0;
+        while (i < rest.length && rest[i]!.startsWith("--")) {
+          const flag = rest[i]!;
+          if (flag === "--wait") {
+            sendOpts.wait = true;
+            i += 1;
+          } else if (flag === "--status") {
+            statuses.push(rest[++i] as AgentStatus);
+            i += 1;
+          } else if (flag === "--timeout") {
+            sendOpts.timeoutMs = Number(rest[++i]);
+            i += 1;
+          } else {
+            throw new HerdrError(`send: unknown flag ${flag}`);
+          }
+        }
+        if (statuses.length) sendOpts.status = statuses;
+        const target = rest[i];
+        const text = rest.slice(i + 1).join(" ");
         if (!target || !text)
           throw new HerdrError("send requires <target> and <text>");
-        const res = await herd.send(target, text);
+        const res = await herd.send(target, text, sendOpts);
         console.log(JSON.stringify(res, null, 2));
         break;
       }

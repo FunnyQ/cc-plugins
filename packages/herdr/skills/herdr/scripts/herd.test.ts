@@ -79,9 +79,78 @@ describe("send", () => {
     const herd = createHerd(run);
     const res = await herd.send("rev-1", "do the thing");
 
-    expect(res).toEqual({ target: "rev-1", paneId: null, submitted: true });
+    expect(res).toEqual({
+      target: "rev-1",
+      paneId: null,
+      submitted: true,
+      waited: false,
+      status: undefined,
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual(["agent", "prompt", "rev-1", "do the thing"]);
+  });
+
+  test("--wait settles in the same call and reports the status", async () => {
+    const { run, calls } = mockRunner((a) =>
+      a[0] === "agent" && a[1] === "prompt"
+        ? {
+            stdout: agentEnvelope({
+              name: "rev-1",
+              pane_id: "w9:pB",
+              agent_status: "done",
+            }),
+          }
+        : undefined,
+    );
+    const herd = createHerd(run);
+    const res = await herd.send("rev-1", "go", {
+      status: ["idle", "done"],
+      timeoutMs: 120000,
+    });
+
+    expect(res).toEqual({
+      target: "rev-1",
+      paneId: "w9:pB",
+      submitted: true,
+      waited: true,
+      status: "done",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual([
+      "agent",
+      "prompt",
+      "rev-1",
+      "go",
+      "--wait",
+      "--until",
+      "idle",
+      "--until",
+      "done",
+      "--timeout",
+      "120000",
+    ]);
+  });
+
+  test("a bare timeout implies --wait, since herdr rejects --until without it", async () => {
+    const { run, calls } = mockRunner(() => ({
+      stdout: agentEnvelope({ pane_id: "w1:p1", agent_status: "idle" }),
+    }));
+    const res = await createHerd(run).send("rev-1", "go", { timeoutMs: 30000 });
+    expect(res.waited).toBe(true);
+    expect(calls[0]).toContain("--wait");
+  });
+
+  test("surfaces agent_prompt_stalled with its code", async () => {
+    const { run } = mockRunner(() => ({
+      code: 1,
+      stderr: JSON.stringify({
+        error: { code: "agent_prompt_stalled", message: "no lifecycle change" },
+      }),
+    }));
+    const herd = createHerd(run);
+    await expect(
+      herd.send("rev-1", "go", { wait: true }),
+    ).rejects.toMatchObject({ code: "agent_prompt_stalled" });
   });
 });
 
@@ -738,6 +807,91 @@ describe("spawn", () => {
     });
     expect(res.task).toEqual({ sent: true });
   });
+
+  test("with --task: reports agent_blocked instead of stranding the pane", async () => {
+    const { run } = mockRunner((a) => {
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({
+            result: { pane: { pane_id: "w2:p3" } },
+          }),
+        };
+      if (a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w2:p3",
+            tab_id: "w2:t1",
+            workspace_id: "w2",
+            terminal_id: "t",
+            cwd: "/",
+            agent_status: "blocked",
+          }),
+        };
+      if (a[1] === "wait") return { code: 1, stderr: "timeout" };
+      if (a[0] === "agent" && a[1] === "prompt")
+        return {
+          code: 1,
+          stderr: JSON.stringify({
+            error: { code: "agent_blocked", message: "agent is blocked" },
+          }),
+        };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    const res = await herd.spawn({
+      role: "worker",
+      agent: "codex",
+      task: "echo hi",
+    });
+    expect(res.task).toEqual({ sent: false, reason: "agent_blocked" });
+    expect(res.name).toStartWith("worker-");
+  });
+
+  test("agent_not_ready returns the live agent instead of stranding the pane", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({
+            result: { pane: { pane_id: "w2:p3" } },
+          }),
+        };
+      if (a[1] === "start")
+        return {
+          code: 1,
+          stderr: JSON.stringify({
+            error: { code: "agent_not_ready", message: "agent is blocked" },
+          }),
+        };
+      if (a[1] === "get")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "w2:p3",
+            tab_id: "w2:t1",
+            workspace_id: "w2",
+            terminal_id: "t",
+            cwd: "/",
+            agent_status: "blocked",
+          }),
+        };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    const res = await herd.spawn({
+      role: "worker",
+      agent: "codex",
+      task: "echo hi",
+    });
+    expect(res.startBlocked).toBe(true);
+    expect(res.paneId).toBe("w2:p3");
+    expect(res.name).toStartWith("worker-");
+    expect(res.task).toEqual({ sent: false, reason: "agent_not_ready" });
+    // No settle wait and no prompt: both can only fail while the dialog is up.
+    expect(calls.some((c) => c[1] === "wait" || c[1] === "prompt")).toBe(false);
+  });
 });
 
 describe("errors", () => {
@@ -823,6 +977,23 @@ describe("keys", () => {
       "w9:pB",
       "ctrl+a",
       "ctrl+k",
+    ]);
+  });
+
+  test("passes shift+tab through unmodified", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[1] === "get")
+        return { stdout: agentEnvelope({ name: "rev-1", pane_id: "w9:pB" }) };
+      if (a[0] === "pane" && a[1] === "send-keys") return { stdout: "" };
+      return undefined;
+    });
+    const herd = createHerd(run);
+    await herd.keys("rev-1", "shift+tab");
+    expect(calls.find((c) => c[0] === "pane" && c[1] === "send-keys")).toEqual([
+      "pane",
+      "send-keys",
+      "w9:pB",
+      "shift+tab",
     ]);
   });
 
