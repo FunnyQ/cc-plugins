@@ -1,18 +1,15 @@
 #!/usr/bin/env bun
 
-// One entry point for the whole skill, over two backends: terminal-browser and
-// the official herdr-browser plugin. Each backend only has to answer "where is
-// the CDP endpoint" — every page operation then runs over CDP, identically for
-// both. Output is lines, not pretty JSON, to stay cheap to read.
+// One entry point for the whole skill. terminal-browser answers "where is the
+// CDP endpoint"; every page operation then runs over CDP. Output is lines, not
+// pretty JSON, to stay cheap to read.
 
 import {
-  chooseBackend,
-  openBackend,
+  INSTALL_HINT,
   newcomer,
   parseTerminalBrowsers,
   selectTarget,
   terminalOpenArgs,
-  type BackendName,
   type Tab,
   type Target,
 } from "./backends";
@@ -36,21 +33,6 @@ import {
   type CdpSession,
 } from "./ops";
 
-export type ViewInfo = {
-  view_id: string;
-  pane_id: string | null;
-  url: string;
-  title: string;
-};
-
-export type Automation = {
-  view_id: string;
-  cdp_http_url: string;
-  browser_ws_url: string;
-  active_target_id: string;
-  active_page_ws_url: string | null;
-};
-
 export type WatchEvent =
   | {
       kind: "net";
@@ -69,22 +51,15 @@ export type TargetDescriptor = {
   url: string;
 };
 
-export const PLACEMENTS = ["tab", "split", "overlay", "zoomed"] as const;
-
-export type Placement = (typeof PLACEMENTS)[number];
-
 export type Invocation = {
   command: string | null;
   args: string[];
   view: string | null;
-  // null until a backend resolves it: herdr places in a tab, terminal splits.
-  placement: Placement | null;
   all: boolean;
   body: string | null;
   device: string | null;
   size: string | null;
   fresh: boolean;
-  backend: BackendName | null;
   split: string | null;
   ratio: string | null;
   output: string | null;
@@ -96,7 +71,7 @@ export type ConsoleEntry = {
   timestamp: number;
 };
 
-export const USAGE = `browser.ts <command> [args] [--view ID] [--backend terminal|herdr]
+export const USAGE = `browser.ts <command> [args] [--view ID]
 
   open <url> [--new] [--split right|left|down|up] [--ratio 0.4]
                               loads the url in the live browser; --new, or no
@@ -116,20 +91,16 @@ export const USAGE = `browser.ts <command> [args] [--view ID] [--backend termina
   screenshot --output <path>
   emulate --device iphone|ipad|laptop|desktop | --size 1440x900
                               sticky: the way back is another size
-  endpoint                    CDP urls for Playwright, Browser Use, and friends
-
-  --placement tab|split|overlay|zoomed  herdr backend only`;
+  endpoint                    CDP urls for Playwright, Browser Use, and friends`;
 
 export function parseArgv(argv: string[]): Invocation {
   const positionals: string[] = [];
   let view: string | null = null;
-  let placement: Placement | null = null;
   let all = false;
   let body: string | null = null;
   let device: string | null = null;
   let size: string | null = null;
   let fresh = false;
-  let backend: BackendName | null = null;
   let split: string | null = null;
   let ratio: string | null = null;
   let output: string | null = null;
@@ -138,11 +109,9 @@ export function parseArgv(argv: string[]): Invocation {
     const token = argv[index];
     if (
       token === "--view" ||
-      token === "--placement" ||
       token === "--body" ||
       token === "--device" ||
       token === "--size" ||
-      token === "--backend" ||
       token === "--split" ||
       token === "--ratio" ||
       token === "--output"
@@ -163,20 +132,8 @@ export function parseArgv(argv: string[]): Invocation {
         split = value;
       } else if (token === "--ratio") {
         ratio = value;
-      } else if (token === "--output") {
-        output = value;
-      } else if (token === "--backend") {
-        if (value !== "terminal" && value !== "herdr") {
-          throw new Error(`invalid backend: ${value} (terminal, herdr)`);
-        }
-        backend = value;
       } else {
-        if (!PLACEMENTS.includes(value as Placement)) {
-          throw new Error(
-            `invalid placement: ${value} (${PLACEMENTS.join(", ")})`,
-          );
-        }
-        placement = value as Placement;
+        output = value;
       }
       index += 1;
       continue;
@@ -196,54 +153,14 @@ export function parseArgv(argv: string[]): Invocation {
     command: positionals[0] ?? null,
     args: positionals.slice(1),
     view,
-    placement,
     all,
     body,
     device,
     size,
     fresh,
-    backend,
     split,
     ratio,
     output,
-  };
-}
-
-// A view outlives the pane that owned it by some seconds, and a view whose pane
-// is gone renders nowhere. Only panes Herdr still lists count.
-export function renderedViews(
-  views: ViewInfo[],
-  livePaneIds: Set<string>,
-): ViewInfo[] {
-  return views.filter((view) => view.pane_id && livePaneIds.has(view.pane_id));
-}
-
-export async function waitForView(
-  load: () => Promise<ViewInfo[]>,
-  match: (views: ViewInfo[]) => ViewInfo | undefined,
-  attempts = 40,
-  delayMs = 250,
-): Promise<ViewInfo> {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const found = match(await load());
-    if (found) {
-      return found;
-    }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-  throw new Error("opened the browser pane but its view never appeared");
-}
-
-export function toTab(
-  descriptor: TargetDescriptor,
-  activeTargetId: string,
-): Tab {
-  return {
-    id: null,
-    targetId: descriptor.id,
-    title: descriptor.title,
-    url: descriptor.url,
-    active: descriptor.id === activeTargetId,
   };
 }
 
@@ -465,8 +382,8 @@ export const DEVICES: Record<
   desktop: { width: 1920, height: 1080, scale: 1, mobile: false },
 };
 
-// The daemon keeps one console buffer per view, so entries from pages visited
-// earlier sit in front of this page's. performance.timeOrigin is the cut.
+// Runtime.enable replays the whole buffer, so entries from pages visited earlier
+// sit in front of this page's. performance.timeOrigin is the cut.
 export function sincePageLoad(
   entries: ConsoleEntry[],
   timeOrigin: number | null,
@@ -505,51 +422,22 @@ export async function cdp<T>(url: string, method: "GET" | "PUT"): Promise<T> {
   }
 }
 
-export async function listTabs(
-  base: string,
-  activeTargetId: string,
-): Promise<Tab[]> {
-  const descriptors = await cdp<TargetDescriptor[]>(`${base}/json/list`, "GET");
-  return descriptors.map((descriptor) => toTab(descriptor, activeTargetId));
-}
-
-export async function newTab(
-  base: string,
-  url: string,
-): Promise<TargetDescriptor> {
-  return await cdp<TargetDescriptor>(
-    `${base}/json/new?url=${encodeURIComponent(url)}`,
-    "PUT",
-  );
-}
-
-export async function activateTab(
-  base: string,
-  targetId: string,
-): Promise<void> {
-  await cdp(`${base}/json/activate/${encodeURIComponent(targetId)}`, "GET");
-}
-
 export async function closeTab(base: string, targetId: string): Promise<void> {
   await cdp(`${base}/json/close/${encodeURIComponent(targetId)}`, "GET");
 }
 
-// A wedged herdr plugin daemon does not fail — its CLI hangs, and without a
-// deadline that hang becomes every command's latency. The child has to be
-// killed too, or the pipes keep this process alive past the throw. The signal
-// reaches the child alone, deliberately: the plugin's own daemon is detached
-// and meant to outlive the CLI, so killing the group would take it down.
+// A hung child would otherwise become every command's latency. The child has to
+// be killed too, or the pipes keep this process alive past the throw. The signal
+// reaches the child alone, never the group: terminal-browser's own Electron
+// process is detached and meant to outlive the CLI call.
 export async function run(
   command: string[],
-  viewId?: string,
   timeoutMs?: number,
 ): Promise<string> {
   const child = Bun.spawn(command, {
     stdout: "pipe",
     stderr: "pipe",
-    env: viewId
-      ? { ...process.env, HERDR_BROWSER_VIEW_ID: viewId }
-      : process.env,
+    env: process.env,
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline =
@@ -580,76 +468,6 @@ export async function run(
     );
   }
   return stdout;
-}
-
-// Every command needs the plugin, so the failure has to carry the way out of it.
-export function resolvePluginRoot(raw: string): string {
-  const plugin = JSON.parse(raw)?.result?.plugins?.[0];
-  if (!plugin?.plugin_root) {
-    throw new Error(
-      "herdr plugin official.browser is not installed\n" +
-        "install it: herdr plugin install ogulcancelik/herdr-browser",
-    );
-  }
-  if (plugin.enabled === false) {
-    throw new Error(
-      "herdr plugin official.browser is disabled\n" +
-        "enable it: herdr plugin enable official.browser",
-    );
-  }
-  return plugin.plugin_root;
-}
-
-async function pluginCli(timeoutMs?: number): Promise<string[]> {
-  const raw = await run(
-    ["herdr", "plugin", "list", "--plugin", "official.browser", "--json"],
-    undefined,
-    timeoutMs,
-  );
-  return ["bun", "run", `${resolvePluginRoot(raw)}/src/cli.ts`];
-}
-
-async function livePaneIds(timeoutMs?: number): Promise<Set<string>> {
-  const raw = await run(["herdr", "pane", "list"], undefined, timeoutMs);
-  const panes = JSON.parse(raw)?.result?.panes ?? [];
-  return new Set(
-    panes.map((pane: { pane_id: string }) => pane.pane_id).filter(Boolean),
-  );
-}
-
-async function loadViews(
-  cli: string[],
-  timeoutMs?: number,
-): Promise<ViewInfo[]> {
-  const views: ViewInfo[] =
-    JSON.parse(await run([...cli, "views"], undefined, timeoutMs)).views ?? [];
-  return renderedViews(views, await livePaneIds(timeoutMs));
-}
-
-// The pane creates its own first tab, so hand it the url and let it land there.
-async function openPane(url: string, placement: Placement): Promise<string> {
-  if (!process.env.HERDR_ENV) {
-    throw new Error("not inside a Herdr session; start Herdr, then retry");
-  }
-  const raw = await run([
-    "herdr",
-    "plugin",
-    "pane",
-    "open",
-    "--plugin",
-    "official.browser",
-    "--entrypoint",
-    "browser",
-    "--placement",
-    placement,
-    "--env",
-    `HERDR_BROWSER_INITIAL_URL=${url}`,
-  ]);
-  const paneId = JSON.parse(raw)?.result?.plugin_pane?.pane?.pane_id;
-  if (!paneId) {
-    throw new Error("herdr did not report the opened pane id");
-  }
-  return paneId;
 }
 
 async function attach(pageWsUrl: string): Promise<CdpSession> {
@@ -855,63 +673,19 @@ function requireArg(value: string | null | undefined, message: string): string {
   return value;
 }
 
-// Long enough for a healthy plugin daemon to answer, short enough that a dead
-// one costs a pause rather than a hang.
+// Long enough for a healthy terminal-browser to answer, short enough that a
+// wedged one costs a pause rather than a hang.
 const PROBE_TIMEOUT_MS = 3_000;
 
-async function terminalTargets(forced: BackendName | null): Promise<Target[]> {
-  if (forced === "herdr" || !Bun.which("terminal-browser")) {
-    return [];
+async function terminalTargets(): Promise<Target[]> {
+  if (!Bun.which("terminal-browser")) {
+    throw new Error(INSTALL_HINT);
   }
   return parseTerminalBrowsers(
-    await run(
-      ["terminal-browser", "ls", "--all", "--json"],
-      undefined,
-      PROBE_TIMEOUT_MS,
-    ),
+    await run(["terminal-browser", "ls", "--all", "--json"], PROBE_TIMEOUT_MS),
   );
 }
 
-// Costs a plugin lookup, a view list, a pane list, and a connect per view, so
-// it only runs when terminal-browser did not already answer.
-async function herdrTargets(forced: BackendName | null): Promise<Target[]> {
-  try {
-    const cli = await pluginCli(PROBE_TIMEOUT_MS);
-    const views = await loadViews(cli, PROBE_TIMEOUT_MS);
-    return await Promise.all(
-      views.map(async (view) => {
-        const automation: Automation = JSON.parse(
-          await run(
-            [...cli, "connect", "--view", view.view_id],
-            undefined,
-            PROBE_TIMEOUT_MS,
-          ),
-        );
-        return {
-          backend: "herdr" as const,
-          id: view.view_id,
-          cdpHttp: automation.cdp_http_url,
-          activeTargetId: automation.active_target_id,
-          pane: view.pane_id,
-          url: view.url,
-          title: view.title,
-          // The plugin's CDP gateway is already view-scoped, so /json/list is
-          // the pane's own tab list here and needs no strip of its own.
-          tabs: [],
-        };
-      }),
-    );
-  } catch (error) {
-    // An explicit --backend herdr deserves the plugin's own way out of this.
-    if (forced === "herdr") {
-      throw error;
-    }
-    return [];
-  }
-}
-
-// Both backends expose the same browser-level endpoint, so the page socket is
-// looked up the same way rather than from a backend-specific field.
 async function pageSocket(base: string, targetId: string): Promise<string> {
   const descriptors = await cdp<TargetDescriptor[]>(`${base}/json/list`, "GET");
   // Every terminal-browser pane shares one Electron process and one CDP port,
@@ -925,24 +699,15 @@ async function pageSocket(base: string, targetId: string): Promise<string> {
   return socket;
 }
 
-// The backend's own strip is the only pane-scoped tab list; CDP's is not.
-async function paneTabs(target: Target): Promise<Tab[]> {
-  return target.tabs.length > 0
-    ? target.tabs
-    : await listTabs(target.cdpHttp, target.activeTargetId);
-}
-
 async function openTerminal(
   url: string,
-  placement: Placement,
   split: string | null,
   ratio: string | null,
   before: Target[],
 ): Promise<Target> {
-  const args = terminalOpenArgs(url, placement, split, ratio);
-  await run(["terminal-browser", ...args]);
+  await run(["terminal-browser", ...terminalOpenArgs(url, split, ratio)]);
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    const found = newcomer(before, await terminalTargets("terminal"));
+    const found = newcomer(before, await terminalTargets());
     if (found) {
       return found;
     }
@@ -951,40 +716,16 @@ async function openTerminal(
   throw new Error("opened the browser but it never reported the page");
 }
 
-async function openHerdr(url: string, placement: Placement): Promise<Target> {
-  const paneId = await openPane(url, placement);
-  const cli = await pluginCli();
-  const opened = await waitForView(
-    () => loadViews(cli),
-    (views) => views.find((candidate) => candidate.pane_id === paneId),
-  );
-  const automation: Automation = JSON.parse(
-    await run([...cli, "connect", "--view", opened.view_id]),
-  );
-  return {
-    backend: "herdr",
-    id: opened.view_id,
-    cdpHttp: automation.cdp_http_url,
-    activeTargetId: automation.active_target_id,
-    pane: paneId,
-    url: opened.url,
-    title: opened.title,
-    tabs: [],
-  };
-}
-
 async function main(argv: string[]): Promise<void> {
   const {
     command,
     args,
     view,
-    placement,
     all,
     body,
     device,
     size,
     fresh,
-    backend,
     split,
     ratio,
     output,
@@ -1000,49 +741,33 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  const terminal = await terminalTargets(backend);
-  const herdr =
-    backend === "herdr" || (backend === null && terminal.length === 0)
-      ? await herdrTargets(backend)
-      : [];
+  const terminal = await terminalTargets();
 
   let target: Target;
 
   if (command === "open") {
     const url = requireArg(args[0], "missing URL");
-    const chosen = openBackend(
-      terminal,
-      herdr,
-      backend,
-      Boolean(Bun.which("terminal-browser")),
-    );
-    const live = chosen === "terminal" ? terminal : herdr;
-    if (!fresh && live.length > 0) {
-      target = selectTarget(live, view);
+    if (!fresh && terminal.length > 0) {
+      target = selectTarget(terminal, view);
       const socket = await attach(await pageSocket(target.cdpHttp, target.activeTargetId));
       try {
         console.log(await navigate(socket, url));
       } finally {
         socket.close();
       }
-      console.log(formatTabs(await paneTabs(target)));
+      console.log(formatTabs(target.tabs));
       return;
     }
-    target =
-      chosen === "terminal"
-        ? await openTerminal(url, placement ?? "split", split, ratio, terminal)
-        : await openHerdr(url, placement ?? "tab");
+    target = await openTerminal(url, split, ratio, terminal);
     console.log(`view ${target.id} pane ${target.pane ?? "-"}`);
-    console.log(formatTabs(await paneTabs(target)));
+    console.log(formatTabs(target.tabs));
     return;
   }
 
-  const chosen = chooseBackend(terminal, herdr, backend);
-  target = selectTarget(chosen === "terminal" ? terminal : herdr, view);
+  target = selectTarget(terminal, view);
   const base = target.cdpHttp;
 
   if (command === "endpoint") {
-    console.log(`backend     ${target.backend}`);
     console.log(`view        ${target.id}`);
     console.log(`cdp_http    ${base}`);
     console.log(
@@ -1052,8 +777,8 @@ async function main(argv: string[]): Promise<void> {
   }
 
   // CDP /json/list orders by recency, the tab strip by creation, so the row
-  // numbers only match what the user sees if the backend's own list wins.
-  const tabs = await paneTabs(target);
+  // numbers only match what the user sees if terminal-browser's own list wins.
+  const tabs = target.tabs;
 
   if (command === "tabs") {
     console.log(formatTabs(tabs));
@@ -1062,29 +787,24 @@ async function main(argv: string[]): Promise<void> {
 
   if (command === "new-tab") {
     const url = requireArg(args[0], "missing URL");
-    // Electron answers /json/new with a 500; its own command is what keeps the
-    // new tab in terminal-browser's tab strip anyway.
-    if (target.backend === "terminal") {
-      await run(["terminal-browser", "new-tab", "--browser", target.id, url]);
-      const refreshed = selectTarget(await terminalTargets("terminal"), target.id);
-      console.log(formatTabs(refreshed.tabs));
-      return;
-    }
-    const created = await newTab(base, url);
-    console.log(formatTabs(await listTabs(base, created.id)));
+    // Electron answers /json/new with a 500; terminal-browser's own command is
+    // what keeps the new tab in its tab strip anyway.
+    await run(["terminal-browser", "new-tab", "--browser", target.id, url]);
+    console.log(formatTabs(selectTarget(await terminalTargets(), target.id).tabs));
     return;
   }
 
   if (command === "activate" || command === "close") {
     const row = requireArg(args[0], "missing tab");
     const targetId = resolveTargetId(tabs, row);
-    // CDP /json/activate leaves terminal-browser's tab strip untouched — the
-    // tab never comes forward and the command reads as a success.
-    const strip =
-      target.backend === "terminal" && command === "activate"
-        ? tabs.find((tab) => tab.targetId === targetId)?.id
-        : undefined;
-    if (strip !== undefined && strip !== null) {
+    if (command === "activate") {
+      // CDP /json/activate leaves terminal-browser's tab strip untouched — the
+      // tab never comes forward and the command reads as a success. Only the
+      // strip's own id can bring it to the front.
+      const strip = tabs.find((tab) => tab.targetId === targetId)?.id;
+      if (strip === null || strip === undefined) {
+        throw new Error(`tab ${row} carries no terminal-browser id to activate`);
+      }
       await run([
         "terminal-browser", "action",
         "--browser", target.id,
@@ -1092,27 +812,14 @@ async function main(argv: string[]): Promise<void> {
         "--follow", "--", "get", "url",
       ]);
     } else {
-      await (command === "activate"
-        ? activateTab(base, targetId)
-        : closeTab(base, targetId));
+      await closeTab(base, targetId);
     }
-    if (target.backend === "terminal") {
-      // Closing the last tab closes the pane, so the browser itself is gone and
-      // there is no strip left to print — that is success, not a lookup error.
-      const refreshed = (await terminalTargets("terminal")).find(
-        (candidate) => candidate.id === target.id,
-      );
-      console.log(refreshed ? formatTabs(refreshed.tabs) : `closed ${target.id}`);
-      return;
-    }
-    console.log(
-      formatTabs(
-        await listTabs(
-          base,
-          command === "activate" ? targetId : target.activeTargetId,
-        ),
-      ),
+    // Closing the last tab closes the pane, so the browser itself is gone and
+    // there is no strip left to print — that is success, not a lookup error.
+    const refreshed = (await terminalTargets()).find(
+      (candidate) => candidate.id === target.id,
     );
+    console.log(refreshed ? formatTabs(refreshed.tabs) : `closed ${target.id}`);
     return;
   }
 

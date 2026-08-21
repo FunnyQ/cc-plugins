@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 
 import {
-  activateTab,
   applyWatchMessage,
   cdp,
   DEVICES,
@@ -10,21 +9,14 @@ import {
   formatSnapshot,
   formatWatch,
   formatTabs,
-  listTabs,
-  newTab,
   parseArgv,
   renderCallArguments,
-  renderedViews,
   resolveMetrics,
-  resolvePluginRoot,
   resolveTargetId,
   run,
   settleEvents,
   sincePageLoad,
-  toTab,
-  waitForView,
   type Tab,
-  type ViewInfo,
 } from "./browser";
 
 describe("parseArgv", () => {
@@ -33,22 +25,15 @@ describe("parseArgv", () => {
       command: "open",
       args: ["https://example.com"],
       view: null,
-      placement: null,
       all: false,
       device: null,
       size: null,
       body: null,
       fresh: false,
-      backend: null,
       split: null,
       ratio: null,
       output: null,
     });
-  });
-
-  test("reads --backend, and rejects one that is neither", () => {
-    expect(parseArgv(["text", "--backend", "herdr"]).backend).toBe("herdr");
-    expect(() => parseArgv(["text", "--backend", "firefox"])).toThrow(/firefox/);
   });
 
   test("takes --split and --ratio off the positionals", () => {
@@ -102,19 +87,6 @@ describe("parseArgv", () => {
 
   test("keeps the first positional when no flag is given", () => {
     expect(parseArgv(["tabs"]).command).toBe("tabs");
-  });
-
-  test("reads a placement", () => {
-    expect(
-      parseArgv(["open", "https://example.com", "--placement", "split"])
-        .placement,
-    ).toBe("split");
-  });
-
-  test("rejects an unknown placement", () => {
-    expect(() => parseArgv(["open", "u", "--placement", "window"])).toThrow(
-      /invalid placement: window/,
-    );
   });
 
   test("reports a flag without a value", () => {
@@ -377,33 +349,6 @@ const tab = (id: string, active = false): Tab => ({
   active,
 });
 
-describe("resolvePluginRoot", () => {
-  test("takes the root of the first listed plugin", () => {
-    const raw = JSON.stringify({
-      result: { plugins: [{ plugin_root: "/plugins/official.browser" }] },
-    });
-    expect(resolvePluginRoot(raw)).toBe("/plugins/official.browser");
-  });
-
-  test("tells an empty list how to install the plugin", () => {
-    const raw = JSON.stringify({ result: { plugins: [] } });
-    expect(() => resolvePluginRoot(raw)).toThrow(
-      "herdr plugin install ogulcancelik/herdr-browser",
-    );
-  });
-
-  test("tells a disabled plugin how to enable it", () => {
-    const raw = JSON.stringify({
-      result: {
-        plugins: [{ plugin_root: "/plugins/official.browser", enabled: false }],
-      },
-    });
-    expect(() => resolvePluginRoot(raw)).toThrow(
-      "herdr plugin enable official.browser",
-    );
-  });
-});
-
 describe("resolveTargetId", () => {
   const tabs = [tab("AAAA", true), tab("BBBB")];
 
@@ -443,93 +388,6 @@ describe("formatTabs", () => {
   });
 });
 
-const view = (id: string, paneId: string | null = null): ViewInfo => ({
-  view_id: id,
-  pane_id: paneId,
-  url: "https://example.com/",
-  title: "Example Domain",
-});
-
-describe("renderedViews", () => {
-  test("keeps views whose pane is still live", () => {
-    const views = [view("v1", "w1:p1"), view("v2", "w1:p2")];
-    expect(renderedViews(views, new Set(["w1:p2"]))).toEqual([views[1]]);
-  });
-
-  test("drops a view that outlived its closed pane", () => {
-    expect(renderedViews([view("v1", "w1:p9")], new Set(["w1:p1"]))).toEqual(
-      [],
-    );
-  });
-
-  test("drops a headless view that no pane renders", () => {
-    expect(renderedViews([view("v1", null)], new Set(["w1:p1"]))).toEqual([]);
-  });
-});
-
-describe("waitForView", () => {
-  const byPane =
-    (paneId: string) =>
-    (views: ViewInfo[]): ViewInfo | undefined =>
-      views.find((candidate) => candidate.pane_id === paneId);
-
-  test("returns the view belonging to the pane it opened", async () => {
-    const answers: ViewInfo[][] = [
-      [],
-      [view("old", "w1:p1")],
-      [view("old", "w1:p1"), view("fresh", "w1:p2")],
-    ];
-    let calls = 0;
-    const found = await waitForView(
-      async () => answers[calls++],
-      byPane("w1:p2"),
-      5,
-      0,
-    );
-    expect(found.view_id).toBe("fresh");
-    expect(calls).toBe(3);
-  });
-
-  test("gives up after the last attempt", async () => {
-    let calls = 0;
-    const wait = waitForView(
-      async () => {
-        calls += 1;
-        return [];
-      },
-      byPane("w1:p2"),
-      3,
-      0,
-    );
-    await expect(wait).rejects.toThrow(/never appeared/);
-    expect(calls).toBe(3);
-  });
-});
-
-describe("toTab", () => {
-  const descriptor = {
-    id: "T1",
-    title: "Hacker News",
-    url: "https://news.ycombinator.com/",
-    webSocketDebuggerUrl: "ws://127.0.0.1:1/devtools/page/T1",
-  };
-
-  test("marks the active target", () => {
-    expect(toTab(descriptor, "T1").active).toBe(true);
-    expect(toTab(descriptor, "T2").active).toBe(false);
-  });
-
-  test("drops the websocket url", () => {
-    expect(toTab(descriptor, "T1")).toEqual({
-      id: null,
-      targetId: "T1",
-      title: "Hacker News",
-      url: "https://news.ycombinator.com/",
-      active: true,
-    });
-  });
-});
-
 describe("gateway calls", () => {
   const requests: Array<{ method: string; path: string; search: string }> = [];
 
@@ -558,17 +416,6 @@ describe("gateway calls", () => {
           },
         ]);
       }
-      if (url.pathname === "/json/new") {
-        return Response.json({
-          id: "T2",
-          title: "",
-          url: url.searchParams.get("url"),
-          webSocketDebuggerUrl: "ws://x/devtools/page/T2",
-        });
-      }
-      if (url.pathname.startsWith("/json/activate/")) {
-        return new Response("Target activated");
-      }
       if (url.pathname.startsWith("/json/close/")) {
         return new Response("Target is closing");
       }
@@ -579,44 +426,10 @@ describe("gateway calls", () => {
 
   afterAll(() => server.stop(true));
 
-  test("listTabs maps descriptors and flags the active tab", async () => {
-    expect(await listTabs(base, "T2")).toEqual([
-      {
-        id: null,
-        targetId: "T1",
-        title: "Example Domain",
-        url: "https://example.com/",
-        active: false,
-      },
-      {
-        id: null,
-        targetId: "T2",
-        title: "Hacker News",
-        url: "https://news.ycombinator.com/",
-        active: true,
-      },
-    ]);
-  });
-
-  test("newTab PUTs the url intact through the query string", async () => {
+  test("closeTab tolerates a plain-text answer", async () => {
     requests.length = 0;
-    const created = await newTab(base, "https://example.com/a?b=c&d=e#f");
-    expect(created.url).toBe("https://example.com/a?b=c&d=e#f");
-    expect(requests[0]).toEqual({
-      method: "PUT",
-      path: "/json/new",
-      search: `?url=${encodeURIComponent("https://example.com/a?b=c&d=e#f")}`,
-    });
-  });
-
-  test("activateTab and closeTab tolerate plain-text answers", async () => {
-    requests.length = 0;
-    await activateTab(base, "T1");
     await closeTab(base, "T2");
-    expect(requests.map((request) => request.path)).toEqual([
-      "/json/activate/T1",
-      "/json/close/T2",
-    ]);
+    expect(requests.map((request) => request.path)).toEqual(["/json/close/T2"]);
   });
 
   test("a failed call reports status and body", async () => {
@@ -629,17 +442,17 @@ describe("gateway calls", () => {
 describe("run timeout", () => {
   test("kills a command that hangs, instead of waiting on it forever", async () => {
     const startedAt = Date.now();
-    expect(run(["sleep", "10"], undefined, 200)).rejects.toThrow(/timed out/);
+    expect(run(["sleep", "10"], 200)).rejects.toThrow(/timed out/);
     await new Promise((resolve) => setTimeout(resolve, 600));
     expect(Date.now() - startedAt).toBeLessThan(2_000);
   });
 
   test("names the command it gave up on", async () => {
-    expect(run(["sleep", "10"], undefined, 100)).rejects.toThrow(/sleep 10/);
+    expect(run(["sleep", "10"], 100)).rejects.toThrow(/sleep 10/);
   });
 
   test("leaves a command that answers in time alone", async () => {
-    expect((await run(["echo", "hi"], undefined, 5_000)).trim()).toBe("hi");
+    expect((await run(["echo", "hi"], 5_000)).trim()).toBe("hi");
   });
 
   test("waits indefinitely when no timeout is given", async () => {
