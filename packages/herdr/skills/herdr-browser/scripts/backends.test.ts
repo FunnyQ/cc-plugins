@@ -6,6 +6,9 @@ import {
   parseTerminalBrowsers,
   selectTarget,
   terminalOpenArgs,
+  herdrTabLabel,
+  herdrTabCreateArgs,
+  parseHerdrTab,
   type Target,
 } from "./backends";
 
@@ -39,6 +42,7 @@ describe("parseTerminalBrowsers", () => {
         cdpHttp: "http://127.0.0.1:57768",
         activeTargetId: "AAA",
         pane: "w5G:p2E",
+        hostTab: "w5G:t1",
         url: "http://localhost:8899/",
         title: "probe",
         tabs: [
@@ -95,6 +99,7 @@ const target = (id: string): Target => ({
   cdpHttp: "http://127.0.0.1:57768",
   activeTargetId: "AAA",
   pane: "w5G:p2E",
+  hostTab: "w5G:t1",
   url: "http://localhost:8899/",
   title: "probe",
   tabs: [],
@@ -126,12 +131,10 @@ describe("selectTarget", () => {
 });
 
 describe("terminalOpenArgs", () => {
-  test("splits right by default", () => {
+  test("takes over the pane it is pointed at when no split is asked for", () => {
     expect(terminalOpenArgs("http://a/", null, null)).toEqual([
       "open",
       "http://a/",
-      "--split",
-      "right",
     ]);
   });
 
@@ -153,8 +156,48 @@ describe("terminalOpenArgs", () => {
   });
 
   test("rejects a ratio outside what terminal-browser accepts", () => {
-    expect(() => terminalOpenArgs("http://a/", null, "0.05")).toThrow(/0.2/);
-    expect(() => terminalOpenArgs("http://a/", null, "abc")).toThrow(/0.2/);
+    expect(() => terminalOpenArgs("http://a/", "right", "0.05")).toThrow(/0.2/);
+    expect(() => terminalOpenArgs("http://a/", "right", "abc")).toThrow(/0.2/);
+  });
+
+  test("rejects a ratio with nothing to divide", () => {
+    expect(() => terminalOpenArgs("http://a/", null, "0.4")).toThrow(/--split/);
+  });
+});
+
+describe("herdrTabCreateArgs", () => {
+  test("pins the tab to this workspace and cwd", () => {
+    expect(herdrTabCreateArgs("w5X", "/repo")).toEqual([
+      "tab",
+      "create",
+      "--workspace",
+      "w5X",
+      "--cwd",
+      "/repo",
+      "--label",
+      "browser",
+      "--no-focus",
+    ]);
+  });
+});
+
+describe("parseHerdrTab", () => {
+  const raw = JSON.stringify({
+    id: "cli:tab:create",
+    result: {
+      root_pane: { pane_id: "w5X:p5", tab_id: "w5X:t2" },
+      tab: { tab_id: "w5X:t2", label: "browser" },
+      type: "tab_created",
+    },
+  });
+
+  test("reads the new tab's root pane", () => {
+    expect(parseHerdrTab(raw)).toEqual({ pane: "w5X:p5", tab: "w5X:t2" });
+  });
+
+  test("fails loudly rather than opening in the caller's pane", () => {
+    expect(() => parseHerdrTab("{}")).toThrow(/pane/);
+    expect(() => parseHerdrTab("not json")).toThrow();
   });
 });
 
@@ -191,5 +234,20 @@ describe("newcomer", () => {
   test("reports nothing while the new browser has not registered yet", () => {
     const before = [target("64777-1")];
     expect(newcomer(before, before)).toBeUndefined();
+  });
+});
+
+describe("herdrTabLabel", () => {
+  const raw = (label: unknown) =>
+    JSON.stringify({ result: { tab: { tab_id: "w5X:t4", label } } });
+
+  test("reads the label a tab was created with", () => {
+    expect(herdrTabLabel(raw("browser"))).toBe("browser");
+  });
+
+  test("is null when there is nothing to read, so nothing gets closed", () => {
+    expect(herdrTabLabel(raw(undefined))).toBeNull();
+    expect(herdrTabLabel("{}")).toBeNull();
+    expect(herdrTabLabel("not json")).toBeNull();
   });
 });

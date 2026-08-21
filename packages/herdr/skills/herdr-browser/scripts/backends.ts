@@ -16,6 +16,9 @@ export type Target = {
   cdpHttp: string;
   activeTargetId: string;
   pane: string | null;
+  // The herdr tab holding that pane. `open` makes a tab per browser, so this is
+  // what has to be cleaned up when the last page tab closes the browser.
+  hostTab: string | null;
   url: string;
   title: string;
   // terminal-browser's own tab strip, in the order the user sees it. CDP
@@ -55,6 +58,7 @@ export function parseTerminalBrowsers(raw: string): Target[] {
         cdpHttp: cdpBase(browser.cdpPort),
         activeTargetId: active?.targetId ?? "",
         pane: browser.pane?.pane ?? null,
+        hostTab: browser.pane?.tab ?? null,
         url: active?.url ?? "",
         title: active?.title ?? "",
         tabs,
@@ -86,13 +90,23 @@ export function terminalOpenArgs(
   direction: string | null,
   ratio: string | null,
 ): string[] {
-  const where = direction ?? "right";
-  if (!SPLIT_DIRECTIONS.includes(where as (typeof SPLIT_DIRECTIONS)[number])) {
+  // No direction means the caller already picked the pane — it points
+  // HERDR_PANE_ID at a fresh tab's root pane, and terminal-browser's herdr
+  // adapter reads that one env var to decide where the browser lands. Passing
+  // --split here instead would carve up whichever pane the agent was invoked
+  // from, which is the human's.
+  if (direction === null) {
+    if (ratio !== null) {
+      throw new Error("--ratio needs --split: a full tab has nothing to divide");
+    }
+    return ["open", url];
+  }
+  if (!SPLIT_DIRECTIONS.includes(direction as (typeof SPLIT_DIRECTIONS)[number])) {
     throw new Error(
-      `invalid --split ${where} (${SPLIT_DIRECTIONS.join(", ")})`,
+      `invalid --split ${direction} (${SPLIT_DIRECTIONS.join(", ")})`,
     );
   }
-  const args = ["open", url, "--split", where];
+  const args = ["open", url, "--split", direction];
   if (ratio !== null) {
     const value = Number(ratio);
     if (!Number.isFinite(value) || value < 0.2 || value > 0.95) {
@@ -103,9 +117,49 @@ export function terminalOpenArgs(
   return args;
 }
 
+export type HerdrTab = { pane: string; tab: string };
+
+// `herdr tab create` without --workspace lands the tab in whatever workspace
+// herdr considers default, which is not necessarily ours — verified: it opened
+// in another repo's workspace with that repo's cwd.
+export function herdrTabCreateArgs(workspace: string, cwd: string): string[] {
+  return [
+    "tab",
+    "create",
+    "--workspace",
+    workspace,
+    "--cwd",
+    cwd,
+    "--label",
+    "browser",
+    "--no-focus",
+  ];
+}
+
+export function parseHerdrTab(raw: string): HerdrTab {
+  const root = JSON.parse(raw)?.result?.root_pane;
+  const pane = root?.pane_id;
+  const tab = root?.tab_id;
+  if (typeof pane !== "string" || typeof tab !== "string") {
+    throw new Error(`herdr tab create reported no pane: ${raw.slice(0, 200)}`);
+  }
+  return { pane, tab };
+}
+
 // Two browsers can hold the same url, so a fresh one is only identifiable by
 // the key that was not there before it opened.
 export function newcomer(before: Target[], after: Target[]): Target | undefined {
   const known = new Set(before.map((target) => target.id));
   return after.find((target) => !known.has(target.id));
+}
+
+// Only a tab this skill made carries the label, and closing a tab the human
+// made would take their work with it. A label we cannot read means no close.
+export function herdrTabLabel(raw: string): string | null {
+  try {
+    const label = JSON.parse(raw)?.result?.tab?.label;
+    return typeof label === "string" ? label : null;
+  } catch {
+    return null;
+  }
 }
