@@ -13,14 +13,12 @@ import {
   listTabs,
   newTab,
   parseArgv,
-  PASSTHROUGH,
   renderCallArguments,
   renderedViews,
-  reuseViewId,
   resolveMetrics,
   resolvePluginRoot,
   resolveTargetId,
-  selectViewId,
+  run,
   settleEvents,
   sincePageLoad,
   toTab,
@@ -30,18 +28,36 @@ import {
 } from "./browser";
 
 describe("parseArgv", () => {
-  test("reads command and args, and places in a Herdr tab by default", () => {
+  test("reads command and args, defaulting every flag", () => {
     expect(parseArgv(["open", "https://example.com"])).toEqual({
       command: "open",
       args: ["https://example.com"],
       view: null,
-      placement: "tab",
+      placement: null,
       all: false,
       device: null,
       size: null,
       body: null,
       fresh: false,
+      backend: null,
+      split: null,
+      ratio: null,
+      output: null,
     });
+  });
+
+  test("reads --backend, and rejects one that is neither", () => {
+    expect(parseArgv(["text", "--backend", "herdr"]).backend).toBe("herdr");
+    expect(() => parseArgv(["text", "--backend", "firefox"])).toThrow(/firefox/);
+  });
+
+  test("takes --split and --ratio off the positionals", () => {
+    const parsed = parseArgv([
+      "open", "https://example.com", "--split", "down", "--ratio", "0.4",
+    ]);
+    expect(parsed.args).toEqual(["https://example.com"]);
+    expect(parsed.split).toBe("down");
+    expect(parsed.ratio).toBe("0.4");
   });
 
   test("reads --new as a switch", () => {
@@ -79,10 +95,9 @@ describe("parseArgv", () => {
       "#q",
       "hello world",
     ]);
-    expect(parseArgv(["screenshot", "--output", "/tmp/a.png"]).args).toEqual([
-      "--output",
-      "/tmp/a.png",
-    ]);
+    const shot = parseArgv(["screenshot", "--output", "/tmp/a.png"]);
+    expect(shot.args).toEqual([]);
+    expect(shot.output).toBe("/tmp/a.png");
   });
 
   test("keeps the first positional when no flag is given", () => {
@@ -232,6 +247,40 @@ describe("renderCallArguments", () => {
   });
 });
 
+describe("formatSnapshot document order", () => {
+  // getFullAXTree returns a flat array whose order is Chromium's serialization,
+  // not the document's. The tree only exists in childIds.
+  const scrambled = [
+    { nodeId: "9", role: { value: "link" }, name: { value: "Legal" }, backendDOMNodeId: 91 },
+    { nodeId: "1", role: { value: "RootWebArea" }, name: { value: "x" }, childIds: ["2", "3"] },
+    { nodeId: "3", role: { value: "contentinfo" }, childIds: ["9"] },
+    { nodeId: "2", role: { value: "navigation" }, childIds: ["4"] },
+    { nodeId: "4", role: { value: "link" }, name: { value: "Home" }, backendDOMNodeId: 12 },
+  ];
+
+  test("walks childIds from the root instead of trusting the array", () => {
+    expect(formatSnapshot(scrambled)).toBe(
+      '12 link "Home"\n91 link "Legal"',
+    );
+  });
+
+  test("still reports nodes the root cannot reach, rather than dropping them", () => {
+    const orphaned = [
+      ...scrambled,
+      { nodeId: "77", role: { value: "button" }, name: { value: "Orphan" }, backendDOMNodeId: 77 },
+    ];
+    expect(formatSnapshot(orphaned)).toContain('77 button "Orphan"');
+  });
+
+  test("survives a childIds cycle without hanging", () => {
+    const cyclic = [
+      { nodeId: "1", role: { value: "RootWebArea" }, childIds: ["2"] },
+      { nodeId: "2", role: { value: "link" }, name: { value: "A" }, backendDOMNodeId: 5, childIds: ["1"] },
+    ];
+    expect(formatSnapshot(cyclic)).toBe('5 link "A"');
+  });
+});
+
 describe("formatSnapshot", () => {
   const node = (id: number, role: string, name: string) => ({
     backendDOMNodeId: id,
@@ -320,24 +369,8 @@ describe("formatEntries", () => {
   });
 });
 
-describe("PASSTHROUGH", () => {
-  test("does not forward console, which needs filtering first", () => {
-    expect(PASSTHROUGH.console).toBeUndefined();
-  });
-
-  test("renames goto so it cannot collide with pane open", () => {
-    expect(PASSTHROUGH.goto).toBe("open");
-    expect(PASSTHROUGH.open).toBeUndefined();
-  });
-
-  test("does not shadow a command this script implements itself", () => {
-    for (const own of ["tabs", "new-tab", "activate", "close", "endpoint"]) {
-      expect(PASSTHROUGH[own]).toBeUndefined();
-    }
-  });
-});
-
 const tab = (id: string, active = false): Tab => ({
+  id: null,
   targetId: id,
   title: "Hacker News",
   url: "https://news.ycombinator.com/",
@@ -473,56 +506,6 @@ describe("waitForView", () => {
   });
 });
 
-describe("selectViewId", () => {
-  test("picks the only live view", () => {
-    expect(selectViewId([view("v1")], null)).toBe("v1");
-  });
-
-  test("refuses to guess between several views", () => {
-    expect(() => selectViewId([view("v1"), view("v2")], null)).toThrow(
-      /several browser panes are live/,
-    );
-  });
-
-  test("honours the requested view", () => {
-    expect(selectViewId([view("v1"), view("v2")], "v2")).toBe("v2");
-  });
-
-  test("rejects a view that is not live", () => {
-    expect(() => selectViewId([view("v1")], "v9")).toThrow("unknown view: v9");
-  });
-
-  test("points at `open` when no pane is rendering", () => {
-    expect(() => selectViewId([], null)).toThrow(
-      /no browser pane is rendering/,
-    );
-  });
-});
-
-describe("reuseViewId", () => {
-  test("reuses the only live pane", () => {
-    expect(reuseViewId([view("v1")], null, false)).toBe("v1");
-  });
-
-  test("opens a pane when none is rendering", () => {
-    expect(reuseViewId([], null, false)).toBeNull();
-  });
-
-  test("opens a pane when --new is set", () => {
-    expect(reuseViewId([view("v1")], null, true)).toBeNull();
-  });
-
-  test("honours the requested view", () => {
-    expect(reuseViewId([view("v1"), view("v2")], "v2", false)).toBe("v2");
-  });
-
-  test("refuses to guess between several panes", () => {
-    expect(() => reuseViewId([view("v1"), view("v2")], null, false)).toThrow(
-      /several browser panes are live/,
-    );
-  });
-});
-
 describe("toTab", () => {
   const descriptor = {
     id: "T1",
@@ -538,6 +521,7 @@ describe("toTab", () => {
 
   test("drops the websocket url", () => {
     expect(toTab(descriptor, "T1")).toEqual({
+      id: null,
       targetId: "T1",
       title: "Hacker News",
       url: "https://news.ycombinator.com/",
@@ -598,12 +582,14 @@ describe("gateway calls", () => {
   test("listTabs maps descriptors and flags the active tab", async () => {
     expect(await listTabs(base, "T2")).toEqual([
       {
+        id: null,
         targetId: "T1",
         title: "Example Domain",
         url: "https://example.com/",
         active: false,
       },
       {
+        id: null,
         targetId: "T2",
         title: "Hacker News",
         url: "https://news.ycombinator.com/",
@@ -637,5 +623,26 @@ describe("gateway calls", () => {
     await expect(cdp(`${base}/json/nope`, "GET")).rejects.toThrow(
       /404 not found/,
     );
+  });
+});
+
+describe("run timeout", () => {
+  test("kills a command that hangs, instead of waiting on it forever", async () => {
+    const startedAt = Date.now();
+    expect(run(["sleep", "10"], undefined, 200)).rejects.toThrow(/timed out/);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+  });
+
+  test("names the command it gave up on", async () => {
+    expect(run(["sleep", "10"], undefined, 100)).rejects.toThrow(/sleep 10/);
+  });
+
+  test("leaves a command that answers in time alone", async () => {
+    expect((await run(["echo", "hi"], undefined, 5_000)).trim()).toBe("hi");
+  });
+
+  test("waits indefinitely when no timeout is given", async () => {
+    expect((await run(["echo", "hi"])).trim()).toBe("hi");
   });
 });

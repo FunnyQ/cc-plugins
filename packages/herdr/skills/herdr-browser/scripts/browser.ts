@@ -1,9 +1,40 @@
 #!/usr/bin/env bun
 
-// One entry point for the whole skill. `open` reuses the live browser pane, or
-// places one in a Herdr tab; the tab commands drive Chromium through the
-// view-scoped CDP gateway the plugin CLI does not expose; everything else
-// forwards to the plugin CLI with the view pinned. Output is lines, not pretty JSON, to stay cheap to read.
+// One entry point for the whole skill, over two backends: terminal-browser and
+// the official herdr-browser plugin. Each backend only has to answer "where is
+// the CDP endpoint" — every page operation then runs over CDP, identically for
+// both. Output is lines, not pretty JSON, to stay cheap to read.
+
+import {
+  chooseBackend,
+  openBackend,
+  newcomer,
+  parseTerminalBrowsers,
+  selectTarget,
+  terminalOpenArgs,
+  type BackendName,
+  type Tab,
+  type Target,
+} from "./backends";
+
+export type { Tab, Target } from "./backends";
+import {
+  clickPoint,
+  evaluate,
+  formatEvalResult,
+  history,
+  landed,
+  navigate,
+  pageText,
+  reload,
+  screenshot,
+  selectorClick,
+  selectorPress,
+  selectorType,
+  waitFor,
+  wheel,
+  type CdpSession,
+} from "./ops";
 
 export type ViewInfo = {
   view_id: string;
@@ -38,13 +69,6 @@ export type TargetDescriptor = {
   url: string;
 };
 
-export type Tab = {
-  targetId: string;
-  title: string;
-  url: string;
-  active: boolean;
-};
-
 export const PLACEMENTS = ["tab", "split", "overlay", "zoomed"] as const;
 
 export type Placement = (typeof PLACEMENTS)[number];
@@ -53,12 +77,17 @@ export type Invocation = {
   command: string | null;
   args: string[];
   view: string | null;
-  placement: Placement;
+  // null until a backend resolves it: herdr places in a tab, terminal splits.
+  placement: Placement | null;
   all: boolean;
   body: string | null;
   device: string | null;
   size: string | null;
   fresh: boolean;
+  backend: BackendName | null;
+  split: string | null;
+  ratio: string | null;
+  output: string | null;
 };
 
 export type ConsoleEntry = {
@@ -67,58 +96,43 @@ export type ConsoleEntry = {
   timestamp: number;
 };
 
-// Commands the plugin CLI already implements against the active Chromium tab.
-// The value is its name there; arguments pass through untouched.
-export const PASSTHROUGH: Record<string, string> = {
-  goto: "open",
-  eval: "eval",
-  screenshot: "screenshot",
-  "selector-click": "selector-click",
-  type: "type",
-  press: "press",
-  wait: "wait",
-  click: "click",
-  wheel: "wheel",
-  back: "back",
-  forward: "forward",
-  reload: "reload",
-  status: "status",
-};
+export const USAGE = `browser.ts <command> [args] [--view ID] [--backend terminal|herdr]
 
-export const USAGE = `browser.ts <command> [args] [--view VIEW_ID]
-
-  open <url> [--new] [--placement tab|split|overlay|zoomed]
-                              loads the url in the live browser pane; --new, or
-                              no live pane, puts one in a Herdr tab (default tab)
-  tabs                        list Chromium tabs
-  new-tab <url>               Chromium tab in the open pane
-  activate <n|targetId>       bring a tab to front
-  close <n|targetId>          close a tab
-  text                        active tab's page text
-  goto <url>                  navigate the active tab
-  eval <expression>           evaluate in the active tab
-  screenshot --output <path>
-  selector-click <selector> | type <selector> <text> | press [selector] <key>
-  wait <expression> [timeoutMs] | click <x> <y> | wheel <x> <y> <deltaY>
+  open <url> [--new] [--split right|left|down|up] [--ratio 0.4]
+                              loads the url in the live browser; --new, or no
+                              live browser, opens one in a pane beside you
+  status                      url, title, then the tab list
+  tabs | new-tab <url> | activate <n> | close <n>
+  text                        page text
+  goto <url> | back | forward | reload
+  snapshot                    actionable elements as "ref role name"
+  click-ref <ref>             click one of them
+  selector-click <sel> | type <sel> <text> | press [sel] <key>
+  click <x> <y> | wheel <x> <y> <deltaY>
+  eval <expression> | wait <expression> [timeoutMs]
   console [--all]             this page load's entries; --all keeps older ones
-  back | forward | reload | status
   watch [url] [--body <url-fragment>]  reload or navigate, then report every
                               request, console line, and uncaught exception
-  snapshot                    interactive elements as "ref role name"
-  click-ref <ref>             click an element from the latest snapshot
+  screenshot --output <path>
   emulate --device iphone|ipad|laptop|desktop | --size 1440x900
                               sticky: the way back is another size
-  endpoint                    CDP urls for Playwright, Browser Use, and friends`;
+  endpoint                    CDP urls for Playwright, Browser Use, and friends
+
+  --placement tab|split|overlay|zoomed  herdr backend only`;
 
 export function parseArgv(argv: string[]): Invocation {
   const positionals: string[] = [];
   let view: string | null = null;
-  let placement: Placement = "tab";
+  let placement: Placement | null = null;
   let all = false;
   let body: string | null = null;
   let device: string | null = null;
   let size: string | null = null;
   let fresh = false;
+  let backend: BackendName | null = null;
+  let split: string | null = null;
+  let ratio: string | null = null;
+  let output: string | null = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -127,7 +141,11 @@ export function parseArgv(argv: string[]): Invocation {
       token === "--placement" ||
       token === "--body" ||
       token === "--device" ||
-      token === "--size"
+      token === "--size" ||
+      token === "--backend" ||
+      token === "--split" ||
+      token === "--ratio" ||
+      token === "--output"
     ) {
       const value = argv[index + 1];
       if (value === undefined) {
@@ -141,6 +159,17 @@ export function parseArgv(argv: string[]): Invocation {
         device = value;
       } else if (token === "--size") {
         size = value;
+      } else if (token === "--split") {
+        split = value;
+      } else if (token === "--ratio") {
+        ratio = value;
+      } else if (token === "--output") {
+        output = value;
+      } else if (token === "--backend") {
+        if (value !== "terminal" && value !== "herdr") {
+          throw new Error(`invalid backend: ${value} (terminal, herdr)`);
+        }
+        backend = value;
       } else {
         if (!PLACEMENTS.includes(value as Placement)) {
           throw new Error(
@@ -173,6 +202,10 @@ export function parseArgv(argv: string[]): Invocation {
     device,
     size,
     fresh,
+    backend,
+    split,
+    ratio,
+    output,
   };
 }
 
@@ -201,46 +234,12 @@ export async function waitForView(
   throw new Error("opened the browser pane but its view never appeared");
 }
 
-export function selectViewId(
-  views: ViewInfo[],
-  requested: string | null,
-): string {
-  if (views.length === 0) {
-    throw new Error("no browser pane is rendering; run `open <url>` first");
-  }
-  if (!requested && views.length > 1) {
-    const listing = views
-      .map((view) => `  ${view.view_id} ${view.pane_id} ${view.url}`)
-      .join("\n");
-    throw new Error(
-      `several browser panes are live; pass --view VIEW_ID\n${listing}`,
-    );
-  }
-  const viewId = requested ?? views[0].view_id;
-  if (!views.some((view) => view.view_id === viewId)) {
-    throw new Error(`unknown view: ${viewId}`);
-  }
-  return viewId;
-}
-
-// A second pane costs a Herdr tab and leaves `--view` mandatory for every later
-// command, so `open` lands in the pane already on screen unless told otherwise.
-export function reuseViewId(
-  views: ViewInfo[],
-  requested: string | null,
-  fresh: boolean,
-): string | null {
-  if (fresh || views.length === 0) {
-    return null;
-  }
-  return selectViewId(views, requested);
-}
-
 export function toTab(
   descriptor: TargetDescriptor,
   activeTargetId: string,
 ): Tab {
   return {
+    id: null,
     targetId: descriptor.id,
     title: descriptor.title,
     url: descriptor.url,
@@ -415,8 +414,34 @@ export const INTERACTIVE_ROLES = [
   "switch",
 ];
 
+// getFullAXTree answers with a flat array whose order is Chromium's own
+// serialization, not the document's — on Hacker News that puts the footer links
+// ahead of the stories. Document order lives in childIds, so the tree has to be
+// walked. Anything the root cannot reach still gets reported, at the end.
+export function documentOrder(nodes: any[]): any[] {
+  const byId = new Map(
+    nodes.filter((node) => node.nodeId !== undefined).map((node) => [node.nodeId, node]),
+  );
+  // Identity, not nodeId: a node carrying no nodeId must not collapse into
+  // every other one that also carries none.
+  const seen = new Set<any>();
+  const ordered: any[] = [];
+  const walk = (node: any): void => {
+    if (!node || seen.has(node)) {
+      return;
+    }
+    seen.add(node);
+    ordered.push(node);
+    for (const child of node.childIds ?? []) {
+      walk(byId.get(child));
+    }
+  };
+  walk(nodes.find((node) => node.role?.value === "RootWebArea") ?? nodes[0]);
+  return [...ordered, ...nodes.filter((node) => !seen.has(node))];
+}
+
 export function formatSnapshot(nodes: any[]): string {
-  return nodes
+  return documentOrder(nodes)
     .filter(
       (node) =>
         INTERACTIVE_ROLES.includes(node.role?.value) &&
@@ -509,7 +534,16 @@ export async function closeTab(base: string, targetId: string): Promise<void> {
   await cdp(`${base}/json/close/${encodeURIComponent(targetId)}`, "GET");
 }
 
-async function run(command: string[], viewId?: string): Promise<string> {
+// A wedged herdr plugin daemon does not fail — its CLI hangs, and without a
+// deadline that hang becomes every command's latency. The child has to be
+// killed too, or the pipes keep this process alive past the throw. The signal
+// reaches the child alone, deliberately: the plugin's own daemon is detached
+// and meant to outlive the CLI, so killing the group would take it down.
+export async function run(
+  command: string[],
+  viewId?: string,
+  timeoutMs?: number,
+): Promise<string> {
   const child = Bun.spawn(command, {
     stdout: "pipe",
     stderr: "pipe",
@@ -517,11 +551,29 @@ async function run(command: string[], viewId?: string): Promise<string> {
       ? { ...process.env, HERDR_BROWSER_VIEW_ID: viewId }
       : process.env,
   });
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline =
+    timeoutMs === undefined
+      ? []
+      : [
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              child.kill();
+              reject(
+                new Error(`${command.join(" ")} timed out after ${timeoutMs}ms`),
+              );
+            }, timeoutMs);
+          }),
+        ];
+  const [stdout, stderr, code] = await Promise.race([
+    Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]),
+    ...deadline,
   ]);
+  clearTimeout(timer);
   if (code !== 0) {
     throw new Error(
       `${command.join(" ")} failed: ${stderr.trim() || `exit ${code}`}`,
@@ -548,30 +600,30 @@ export function resolvePluginRoot(raw: string): string {
   return plugin.plugin_root;
 }
 
-async function pluginCli(): Promise<string[]> {
-  const raw = await run([
-    "herdr",
-    "plugin",
-    "list",
-    "--plugin",
-    "official.browser",
-    "--json",
-  ]);
+async function pluginCli(timeoutMs?: number): Promise<string[]> {
+  const raw = await run(
+    ["herdr", "plugin", "list", "--plugin", "official.browser", "--json"],
+    undefined,
+    timeoutMs,
+  );
   return ["bun", "run", `${resolvePluginRoot(raw)}/src/cli.ts`];
 }
 
-async function livePaneIds(): Promise<Set<string>> {
-  const raw = await run(["herdr", "pane", "list"]);
+async function livePaneIds(timeoutMs?: number): Promise<Set<string>> {
+  const raw = await run(["herdr", "pane", "list"], undefined, timeoutMs);
   const panes = JSON.parse(raw)?.result?.panes ?? [];
   return new Set(
     panes.map((pane: { pane_id: string }) => pane.pane_id).filter(Boolean),
   );
 }
 
-async function loadViews(cli: string[]): Promise<ViewInfo[]> {
+async function loadViews(
+  cli: string[],
+  timeoutMs?: number,
+): Promise<ViewInfo[]> {
   const views: ViewInfo[] =
-    JSON.parse(await run([...cli, "views"])).views ?? [];
-  return renderedViews(views, await livePaneIds());
+    JSON.parse(await run([...cli, "views"], undefined, timeoutMs)).views ?? [];
+  return renderedViews(views, await livePaneIds(timeoutMs));
 }
 
 // The pane creates its own first tab, so hand it the url and let it land there.
@@ -599,12 +651,6 @@ async function openPane(url: string, placement: Placement): Promise<string> {
   }
   return paneId;
 }
-
-type CdpSession = {
-  send: (method: string, params?: unknown) => Promise<any>;
-  onEvent: (handler: (message: any) => void) => void;
-  close: () => void;
-};
 
 async function attach(pageWsUrl: string): Promise<CdpSession> {
   const socket = new WebSocket(pageWsUrl);
@@ -762,30 +808,187 @@ async function emulate(
 }
 
 // about:blank and error pages can refuse to evaluate; then every entry stands.
-async function pageTimeOrigin(
-  cli: string[],
-  viewId: string,
-): Promise<number | null> {
+async function pageTimeOrigin(session: CdpSession): Promise<number | null> {
   try {
-    const value = JSON.parse(
-      await run([...cli, "eval", "performance.timeOrigin"], viewId),
-    ).value;
-    return typeof value === "number" ? value : Number(value) || null;
+    const value = (await evaluate(session, "performance.timeOrigin"))?.value;
+    return typeof value === "number" ? value : null;
   } catch {
     return null;
   }
 }
 
-function requireArg(value: string | undefined, message: string): string {
+// Runtime.enable replays the console the page collected before we attached, so
+// a short-lived CLI reads the same buffer a resident daemon would have kept.
+async function collectConsole(session: CdpSession): Promise<ConsoleEntry[]> {
+  const entries: ConsoleEntry[] = [];
+  session.onEvent((message) => {
+    if (message.method === "Runtime.consoleAPICalled") {
+      entries.push({
+        level: message.params.type,
+        text: renderCallArguments(message.params.args),
+        timestamp: message.params.timestamp,
+      });
+    }
+    if (message.method === "Runtime.exceptionThrown") {
+      const details = message.params.exceptionDetails;
+      entries.push({
+        level: "exception",
+        text: (
+          details?.exception?.description ??
+          details?.text ??
+          "uncaught exception"
+        ).split("\n")[0],
+        timestamp: message.params.timestamp,
+      });
+    }
+  });
+  await session.send("Runtime.enable");
+  // The replay arrives as events after the reply, so it needs a moment to land.
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  return entries;
+}
+
+function requireArg(value: string | null | undefined, message: string): string {
   if (!value) {
     throw new Error(message);
   }
   return value;
 }
 
+// Long enough for a healthy plugin daemon to answer, short enough that a dead
+// one costs a pause rather than a hang.
+const PROBE_TIMEOUT_MS = 3_000;
+
+async function terminalTargets(forced: BackendName | null): Promise<Target[]> {
+  if (forced === "herdr" || !Bun.which("terminal-browser")) {
+    return [];
+  }
+  return parseTerminalBrowsers(
+    await run(
+      ["terminal-browser", "ls", "--all", "--json"],
+      undefined,
+      PROBE_TIMEOUT_MS,
+    ),
+  );
+}
+
+// Costs a plugin lookup, a view list, a pane list, and a connect per view, so
+// it only runs when terminal-browser did not already answer.
+async function herdrTargets(forced: BackendName | null): Promise<Target[]> {
+  try {
+    const cli = await pluginCli(PROBE_TIMEOUT_MS);
+    const views = await loadViews(cli, PROBE_TIMEOUT_MS);
+    return await Promise.all(
+      views.map(async (view) => {
+        const automation: Automation = JSON.parse(
+          await run(
+            [...cli, "connect", "--view", view.view_id],
+            undefined,
+            PROBE_TIMEOUT_MS,
+          ),
+        );
+        return {
+          backend: "herdr" as const,
+          id: view.view_id,
+          cdpHttp: automation.cdp_http_url,
+          activeTargetId: automation.active_target_id,
+          pane: view.pane_id,
+          url: view.url,
+          title: view.title,
+          // The plugin's CDP gateway is already view-scoped, so /json/list is
+          // the pane's own tab list here and needs no strip of its own.
+          tabs: [],
+        };
+      }),
+    );
+  } catch (error) {
+    // An explicit --backend herdr deserves the plugin's own way out of this.
+    if (forced === "herdr") {
+      throw error;
+    }
+    return [];
+  }
+}
+
+// Both backends expose the same browser-level endpoint, so the page socket is
+// looked up the same way rather than from a backend-specific field.
+async function pageSocket(base: string, targetId: string): Promise<string> {
+  const descriptors = await cdp<TargetDescriptor[]>(`${base}/json/list`, "GET");
+  // Every terminal-browser pane shares one Electron process and one CDP port,
+  // so /json/list carries other panes' pages too. Falling back to "the first
+  // page" would silently drive somebody else's pane.
+  const match = descriptors.find((descriptor) => descriptor.id === targetId);
+  const socket = (match as any)?.webSocketDebuggerUrl;
+  if (!socket) {
+    throw new Error(`tab ${targetId} exposes no CDP page socket`);
+  }
+  return socket;
+}
+
+// The backend's own strip is the only pane-scoped tab list; CDP's is not.
+async function paneTabs(target: Target): Promise<Tab[]> {
+  return target.tabs.length > 0
+    ? target.tabs
+    : await listTabs(target.cdpHttp, target.activeTargetId);
+}
+
+async function openTerminal(
+  url: string,
+  placement: Placement,
+  split: string | null,
+  ratio: string | null,
+  before: Target[],
+): Promise<Target> {
+  const args = terminalOpenArgs(url, placement, split, ratio);
+  await run(["terminal-browser", ...args]);
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const found = newcomer(before, await terminalTargets("terminal"));
+    if (found) {
+      return found;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("opened the browser but it never reported the page");
+}
+
+async function openHerdr(url: string, placement: Placement): Promise<Target> {
+  const paneId = await openPane(url, placement);
+  const cli = await pluginCli();
+  const opened = await waitForView(
+    () => loadViews(cli),
+    (views) => views.find((candidate) => candidate.pane_id === paneId),
+  );
+  const automation: Automation = JSON.parse(
+    await run([...cli, "connect", "--view", opened.view_id]),
+  );
+  return {
+    backend: "herdr",
+    id: opened.view_id,
+    cdpHttp: automation.cdp_http_url,
+    activeTargetId: automation.active_target_id,
+    pane: paneId,
+    url: opened.url,
+    title: opened.title,
+    tabs: [],
+  };
+}
+
 async function main(argv: string[]): Promise<void> {
-  const { command, args, view, placement, all, body, device, size, fresh } =
-    parseArgv(argv);
+  const {
+    command,
+    args,
+    view,
+    placement,
+    all,
+    body,
+    device,
+    size,
+    fresh,
+    backend,
+    split,
+    ratio,
+    output,
+  } = parseArgv(argv);
 
   if (
     !command ||
@@ -797,112 +1000,60 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  const cli = await pluginCli();
+  const terminal = await terminalTargets(backend);
+  const herdr =
+    backend === "herdr" || (backend === null && terminal.length === 0)
+      ? await herdrTargets(backend)
+      : [];
+
+  let target: Target;
 
   if (command === "open") {
     const url = requireArg(args[0], "missing URL");
-    const reused = reuseViewId(await loadViews(cli), view, fresh);
-    if (reused) {
-      await run([...cli, PASSTHROUGH.goto, url], reused);
-      const automation: Automation = JSON.parse(
-        await run([...cli, "connect", "--view", reused]),
-      );
-      console.log(`view ${reused} reused`);
-      console.log(
-        formatTabs(
-          await listTabs(automation.cdp_http_url, automation.active_target_id),
-        ),
-      );
+    const chosen = openBackend(
+      terminal,
+      herdr,
+      backend,
+      Boolean(Bun.which("terminal-browser")),
+    );
+    const live = chosen === "terminal" ? terminal : herdr;
+    if (!fresh && live.length > 0) {
+      target = selectTarget(live, view);
+      const socket = await attach(await pageSocket(target.cdpHttp, target.activeTargetId));
+      try {
+        console.log(await navigate(socket, url));
+      } finally {
+        socket.close();
+      }
+      console.log(formatTabs(await paneTabs(target)));
       return;
     }
-    const paneId = await openPane(url, placement);
-    const opened = await waitForView(
-      () => loadViews(cli),
-      (views) => views.find((candidate) => candidate.pane_id === paneId),
-    );
-    const automation: Automation = JSON.parse(
-      await run([...cli, "connect", "--view", opened.view_id]),
-    );
-    console.log(`view ${automation.view_id} pane ${paneId}`);
-    console.log(
-      formatTabs(
-        await listTabs(automation.cdp_http_url, automation.active_target_id),
-      ),
-    );
+    target =
+      chosen === "terminal"
+        ? await openTerminal(url, placement ?? "split", split, ratio, terminal)
+        : await openHerdr(url, placement ?? "tab");
+    console.log(`view ${target.id} pane ${target.pane ?? "-"}`);
+    console.log(formatTabs(await paneTabs(target)));
     return;
   }
 
-  const viewId = selectViewId(await loadViews(cli), view);
-
-  if (command === "text") {
-    console.log(JSON.parse(await run([...cli, "text"], viewId)).text ?? "");
-    return;
-  }
-
-  if (command === "console") {
-    const entries: ConsoleEntry[] =
-      JSON.parse(await run([...cli, "console"], viewId)).entries ?? [];
-    const timeOrigin = all ? null : await pageTimeOrigin(cli, viewId);
-    console.log(formatEntries(sincePageLoad(entries, timeOrigin)));
-    return;
-  }
-
-  const proxied = PASSTHROUGH[command];
-  if (proxied) {
-    process.stdout.write(await run([...cli, proxied, ...args], viewId));
-    return;
-  }
-
-  const automation: Automation = JSON.parse(
-    await run([...cli, "connect", "--view", viewId]),
-  );
-  const base = automation.cdp_http_url;
-
-  if (
-    command === "watch" ||
-    command === "snapshot" ||
-    command === "click-ref" ||
-    command === "emulate"
-  ) {
-    if (!automation.active_page_ws_url) {
-      throw new Error("the active tab exposes no CDP page socket");
-    }
-    const session = await attach(automation.active_page_ws_url);
-    try {
-      if (command === "watch") {
-        const recorded = await watchPage(session, args[0] ?? null, body);
-        console.log(formatWatch(recorded.events));
-        if (recorded.body !== null) {
-          console.log(`\n--- body ---\n${recorded.body}`);
-        }
-      } else if (command === "snapshot") {
-        await session.send("Accessibility.enable");
-        const tree = await session.send("Accessibility.getFullAXTree");
-        console.log(formatSnapshot(tree?.nodes ?? []));
-      } else if (command === "click-ref") {
-        const label = await clickRef(
-          session,
-          requireArg(args[0], "missing ref from `snapshot`"),
-        );
-        console.log(label);
-      } else {
-        console.log(await emulate(session, device, size));
-      }
-    } finally {
-      session.close();
-    }
-    return;
-  }
+  const chosen = chooseBackend(terminal, herdr, backend);
+  target = selectTarget(chosen === "terminal" ? terminal : herdr, view);
+  const base = target.cdpHttp;
 
   if (command === "endpoint") {
-    console.log(`view        ${automation.view_id}`);
-    console.log(`cdp_http    ${automation.cdp_http_url}`);
-    console.log(`browser_ws  ${automation.browser_ws_url}`);
-    console.log(`plugin_cli  ${cli.join(" ")}`);
+    console.log(`backend     ${target.backend}`);
+    console.log(`view        ${target.id}`);
+    console.log(`cdp_http    ${base}`);
+    console.log(
+      `browser_ws  ${(await cdp<any>(`${base}/json/version`, "GET"))?.webSocketDebuggerUrl ?? "-"}`,
+    );
     return;
   }
 
-  const tabs = await listTabs(base, automation.active_target_id);
+  // CDP /json/list orders by recency, the tab strip by creation, so the row
+  // numbers only match what the user sees if the backend's own list wins.
+  const tabs = await paneTabs(target);
 
   if (command === "tabs") {
     console.log(formatTabs(tabs));
@@ -910,28 +1061,189 @@ async function main(argv: string[]): Promise<void> {
   }
 
   if (command === "new-tab") {
-    const created = await newTab(base, requireArg(args[0], "missing URL"));
+    const url = requireArg(args[0], "missing URL");
+    // Electron answers /json/new with a 500; its own command is what keeps the
+    // new tab in terminal-browser's tab strip anyway.
+    if (target.backend === "terminal") {
+      await run(["terminal-browser", "new-tab", "--browser", target.id, url]);
+      const refreshed = selectTarget(await terminalTargets("terminal"), target.id);
+      console.log(formatTabs(refreshed.tabs));
+      return;
+    }
+    const created = await newTab(base, url);
     console.log(formatTabs(await listTabs(base, created.id)));
     return;
   }
 
-  if (command === "activate") {
-    const targetId = resolveTargetId(tabs, requireArg(args[0], "missing tab"));
-    await activateTab(base, targetId);
-    console.log(formatTabs(await listTabs(base, targetId)));
-    return;
-  }
-
-  if (command === "close") {
-    await closeTab(
-      base,
-      resolveTargetId(tabs, requireArg(args[0], "missing tab")),
+  if (command === "activate" || command === "close") {
+    const row = requireArg(args[0], "missing tab");
+    const targetId = resolveTargetId(tabs, row);
+    // CDP /json/activate leaves terminal-browser's tab strip untouched — the
+    // tab never comes forward and the command reads as a success.
+    const strip =
+      target.backend === "terminal" && command === "activate"
+        ? tabs.find((tab) => tab.targetId === targetId)?.id
+        : undefined;
+    if (strip !== undefined && strip !== null) {
+      await run([
+        "terminal-browser", "action",
+        "--browser", target.id,
+        "--tab", String(strip),
+        "--follow", "--", "get", "url",
+      ]);
+    } else {
+      await (command === "activate"
+        ? activateTab(base, targetId)
+        : closeTab(base, targetId));
+    }
+    if (target.backend === "terminal") {
+      // Closing the last tab closes the pane, so the browser itself is gone and
+      // there is no strip left to print — that is success, not a lookup error.
+      const refreshed = (await terminalTargets("terminal")).find(
+        (candidate) => candidate.id === target.id,
+      );
+      console.log(refreshed ? formatTabs(refreshed.tabs) : `closed ${target.id}`);
+      return;
+    }
+    console.log(
+      formatTabs(
+        await listTabs(
+          base,
+          command === "activate" ? targetId : target.activeTargetId,
+        ),
+      ),
     );
-    console.log(formatTabs(await listTabs(base, automation.active_target_id)));
     return;
   }
 
-  throw new Error(`unknown command: ${command}`);
+  const session = await attach(await pageSocket(base, target.activeTargetId));
+  try {
+    if (command === "watch") {
+      const recorded = await watchPage(session, args[0] ?? null, body);
+      console.log(formatWatch(recorded.events));
+      if (recorded.body !== null) {
+        console.log(`\n--- body ---\n${recorded.body}`);
+      }
+      return;
+    }
+    if (command === "console") {
+      const entries = await collectConsole(session);
+      const timeOrigin = all ? null : await pageTimeOrigin(session);
+      console.log(formatEntries(sincePageLoad(entries, timeOrigin)));
+      return;
+    }
+    if (command === "snapshot") {
+      await session.send("Accessibility.enable");
+      const tree = await session.send("Accessibility.getFullAXTree");
+      console.log(formatSnapshot(tree?.nodes ?? []));
+      return;
+    }
+    if (command === "click-ref") {
+      console.log(
+        await clickRef(session, requireArg(args[0], "missing ref from `snapshot`")),
+      );
+      return;
+    }
+    if (command === "emulate") {
+      console.log(await emulate(session, device, size));
+      return;
+    }
+    if (command === "text") {
+      console.log(await pageText(session));
+      return;
+    }
+    if (command === "status") {
+      console.log(await landed(session));
+      console.log(formatTabs(tabs));
+      return;
+    }
+    if (command === "goto") {
+      console.log(await navigate(session, requireArg(args[0], "missing URL")));
+      return;
+    }
+    if (command === "back" || command === "forward") {
+      console.log(await history(session, command));
+      return;
+    }
+    if (command === "reload") {
+      console.log(await reload(session));
+      return;
+    }
+    if (command === "eval") {
+      console.log(
+        formatEvalResult(
+          await evaluate(session, requireArg(args[0], "missing expression"), true),
+        ),
+      );
+      return;
+    }
+    if (command === "wait") {
+      const timeoutMs = args[1] === undefined ? 5_000 : Number(args[1]);
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        throw new Error(`invalid timeout: ${args[1]}`);
+      }
+      console.log(
+        await waitFor(session, requireArg(args[0], "missing expression"), timeoutMs),
+      );
+      return;
+    }
+    if (command === "selector-click") {
+      console.log(
+        await selectorClick(session, requireArg(args[0], "missing selector")),
+      );
+      return;
+    }
+    if (command === "type") {
+      console.log(
+        await selectorType(
+          session,
+          requireArg(args[0], "missing selector"),
+          requireArg(args.slice(1).join(" "), "missing text"),
+        ),
+      );
+      return;
+    }
+    if (command === "press") {
+      const [first, second] = args;
+      requireArg(first, "missing key or selector");
+      console.log(
+        await selectorPress(session, second ? first : null, second ?? first),
+      );
+      return;
+    }
+    if (command === "click") {
+      await clickPoint(session, coordinate(args[0], "x"), coordinate(args[1], "y"));
+      console.log("ok");
+      return;
+    }
+    if (command === "wheel") {
+      await wheel(
+        session,
+        coordinate(args[0], "x"),
+        coordinate(args[1], "y"),
+        coordinate(args[2], "deltaY"),
+      );
+      console.log("ok");
+      return;
+    }
+    if (command === "screenshot") {
+      console.log(
+        await screenshot(session, requireArg(output, "missing --output PATH")),
+      );
+      return;
+    }
+    throw new Error(`unknown command: ${command}`);
+  } finally {
+    session.close();
+  }
+}
+
+export function coordinate(raw: string | undefined, name: string): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(`missing or invalid ${name}: ${raw ?? ""}`);
+  }
+  return value;
 }
 
 if (import.meta.main) {
