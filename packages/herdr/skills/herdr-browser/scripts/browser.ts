@@ -10,6 +10,10 @@ import {
   parseTerminalBrowsers,
   selectTarget,
   terminalOpenArgs,
+  herdrTabCreateArgs,
+  parseHerdrTab,
+  herdrTabLabel,
+  type HerdrTab,
   type Tab,
   type Target,
 } from "./backends";
@@ -17,6 +21,10 @@ import {
 export type { Tab, Target } from "./backends";
 import {
   clickPoint,
+  cookieSetParams,
+  cookiesClear,
+  cookiesGet,
+  cookiesSet,
   evaluate,
   formatEvalResult,
   history,
@@ -25,6 +33,7 @@ import {
   pageText,
   reload,
   screenshot,
+  setHeaders,
   selectorClick,
   selectorPress,
   selectorType,
@@ -63,6 +72,9 @@ export type Invocation = {
   split: string | null;
   ratio: string | null;
   output: string | null;
+  // Everything after a bare `--`, verbatim. Our own flag parser must not touch
+  // it: `raw -- snapshot --json` is agent-browser's --json, not ours.
+  passthrough: string[] | null;
 };
 
 export type ConsoleEntry = {
@@ -89,9 +101,15 @@ export const USAGE = `browser.ts <command> [args] [--view ID]
   watch [url] [--body <url-fragment>]  reload or navigate, then report every
                               request, console line, and uncaught exception
   screenshot --output <path>
+  cookies [get] | cookies set <name> <value> [--url U] [--domain D] [--path P]
+                              [--http-only] [--secure] [--same-site Lax] [--expires N]
+  headers '{"Authorization":"Bearer ..."}'   sent with every request from now on
   emulate --device iphone|ipad|laptop|desktop | --size 1440x900
                               sticky: the way back is another size
-  endpoint                    CDP urls for Playwright, Browser Use, and friends`;
+  endpoint                    CDP urls for Playwright, Browser Use, and friends
+  raw -- <agent-browser cmd>  anything not native yet: cookies, har, route, pdf,
+                              trace, record, diff, vitals, a11y. Verbose --
+                              prefer the native command when there is one`;
 
 export function parseArgv(argv: string[]): Invocation {
   const positionals: string[] = [];
@@ -104,9 +122,14 @@ export function parseArgv(argv: string[]): Invocation {
   let split: string | null = null;
   let ratio: string | null = null;
   let output: string | null = null;
+  let passthrough: string[] | null = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
+    if (token === "--") {
+      passthrough = argv.slice(index + 1);
+      break;
+    }
     if (
       token === "--view" ||
       token === "--body" ||
@@ -161,6 +184,7 @@ export function parseArgv(argv: string[]): Invocation {
     split,
     ratio,
     output,
+    passthrough,
   };
 }
 
@@ -433,11 +457,13 @@ export async function closeTab(base: string, targetId: string): Promise<void> {
 export async function run(
   command: string[],
   timeoutMs?: number,
+  overlay?: Record<string, string>,
+  label?: string,
 ): Promise<string> {
   const child = Bun.spawn(command, {
     stdout: "pipe",
     stderr: "pipe",
-    env: process.env,
+    env: overlay ? { ...process.env, ...overlay } : process.env,
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline =
@@ -464,7 +490,7 @@ export async function run(
   clearTimeout(timer);
   if (code !== 0) {
     throw new Error(
-      `${command.join(" ")} failed: ${stderr.trim() || `exit ${code}`}`,
+      `${label ?? command.join(" ")} failed: ${stderr.trim() || `exit ${code}`}`,
     );
   }
   return stdout;
@@ -707,21 +733,72 @@ async function refreshStrip(id: string): Promise<Tab[] | null> {
   return (await terminalTargets()).find((live) => live.id === id)?.tabs ?? null;
 }
 
+const HERDR_BIN = process.env.HERDR_BIN_PATH || "herdr";
+
+// terminal-browser's herdr adapter picks the browser's home from HERDR_PANE_ID
+// and nothing else — its getCurrentPane() returns {id: env.HERDR_PANE_ID}. So
+// "open in a new tab" is: make the tab, then point that one variable at its
+// root pane. Returns null outside herdr, where terminal-browser does its own
+// placement.
+async function herdrTab(): Promise<HerdrTab | null> {
+  const workspace = process.env.HERDR_WORKSPACE_ID;
+  if (!process.env.HERDR_PANE_ID || !workspace) {
+    return null;
+  }
+  return parseHerdrTab(
+    await run([HERDR_BIN, ...herdrTabCreateArgs(workspace, process.cwd())]),
+  );
+}
+
+// terminal-browser hands the pane back to a shell rather than closing it, so
+// the tab `open` made outlives its browser as an idle shell in the strip.
+async function closeHostTab(tab: string | null): Promise<void> {
+  if (!tab) {
+    return;
+  }
+  const label = herdrTabLabel(
+    await run([HERDR_BIN, "tab", "get", tab]).catch(() => ""),
+  );
+  if (label !== "browser") {
+    return;
+  }
+  await run([HERDR_BIN, "tab", "close", tab]).catch(() => {});
+}
+
 async function openTerminal(
   url: string,
   split: string | null,
   ratio: string | null,
   before: Target[],
 ): Promise<Target> {
-  await run(["terminal-browser", ...terminalOpenArgs(url, split, ratio)]);
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const found = newcomer(before, await terminalTargets());
-    if (found) {
-      return found;
+  const tab = split === null ? await herdrTab() : null;
+  try {
+    await run(
+      ["terminal-browser", ...terminalOpenArgs(url, split, ratio)],
+      undefined,
+      tab ? { HERDR_PANE_ID: tab.pane, HERDR_TAB_ID: tab.tab } : undefined,
+    );
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const found = newcomer(before, await terminalTargets());
+      if (found) {
+        // terminal-browser splits rather than takes over, so the tab we made
+        // still holds the shell pane it was born with. Left alone it sits
+        // beside the browser as dead space for the rest of the session.
+        if (tab && found.pane && found.pane !== tab.pane) {
+          await run([HERDR_BIN, "pane", "close", tab.pane]).catch(() => {});
+        }
+        return found;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    throw new Error("opened the browser but it never reported the page");
+  } catch (error) {
+    // An empty labelled tab left in the strip reads as a browser that opened.
+    if (tab) {
+      await run([HERDR_BIN, "tab", "close", tab.tab]).catch(() => {});
+    }
+    throw error;
   }
-  throw new Error("opened the browser but it never reported the page");
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -737,6 +814,7 @@ async function main(argv: string[]): Promise<void> {
     split,
     ratio,
     output,
+    passthrough,
   } = parseArgv(argv);
 
   if (
@@ -775,6 +853,30 @@ async function main(argv: string[]): Promise<void> {
 
   target = selectTarget(terminal, view);
   const base = target.cdpHttp;
+
+  // The escape hatch to agent-browser's full surface. Anything this skill has
+  // not made native yet still runs, at agent-browser's own output size — its
+  // snapshot is ~5x ours on a real page, so prefer the native command when one
+  // exists.
+  if (command === "raw") {
+    if (!passthrough || passthrough.length === 0) {
+      throw new Error("raw needs a command after --, e.g. raw -- get title");
+    }
+    const out = await run(
+      ["terminal-browser", "action", "--browser", target.id, "--", ...passthrough],
+      undefined,
+      undefined,
+      // The default error echoes the whole command line back, which here is the
+      // agent's own words plus plumbing it never typed. Errors are the common
+      // case with a guessed selector, so that echo is the expensive one.
+      `raw ${passthrough[0]}`,
+    );
+    const trimmed = out.trimEnd();
+    if (trimmed) {
+      console.log(trimmed);
+    }
+    return;
+  }
 
   if (command === "endpoint") {
     console.log(`view        ${target.id}`);
@@ -825,7 +927,12 @@ async function main(argv: string[]): Promise<void> {
       await closeTab(base, targetId);
     }
     const refreshed = await refreshStrip(target.id);
-    console.log(refreshed ? formatTabs(refreshed) : `closed ${target.id}`);
+    if (!refreshed) {
+      await closeHostTab(target.hostTab);
+      console.log(`closed ${target.id}`);
+      return;
+    }
+    console.log(formatTabs(refreshed));
     return;
   }
 
@@ -937,6 +1044,25 @@ async function main(argv: string[]): Promise<void> {
         coordinate(args[2], "deltaY"),
       );
       console.log("ok");
+      return;
+    }
+    if (command === "cookies") {
+      const operation = args[0] ?? "get";
+      if (operation === "get") {
+        console.log(await cookiesGet(session));
+      } else if (operation === "clear") {
+        console.log(await cookiesClear(session));
+      } else if (operation === "set") {
+        console.log(await cookiesSet(session, cookieSetParams(args.slice(1))));
+      } else {
+        throw new Error(`unknown cookies operation ${operation} (get, set, clear)`);
+      }
+      return;
+    }
+    if (command === "headers") {
+      console.log(
+        await setHeaders(session, requireArg(args[0], "missing JSON object")),
+      );
       return;
     }
     if (command === "screenshot") {

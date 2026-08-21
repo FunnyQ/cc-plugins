@@ -26,20 +26,25 @@ Written `B <command>` below — expand it to `bun "$B" <command>` every time.
 
 ## Requirements
 
-The browser is [terminal-browser](https://terminal-browser.sh); every operation
-runs over CDP rather than through its CLI. When the binary is missing the error
-names the install command. Never install it for the user without asking.
+The browser is [terminal-browser](https://terminal-browser.sh). Every operation
+below runs over CDP; only `open`, `new-tab`, `activate`, and `raw` go through its
+CLI. When the binary is missing the error names the install command. Never
+install it for the user without asking.
 
 ## Open a page
 
 ```bash
 B open https://news.ycombinator.com
+B open <url> --new
 B open <url> --new --split right|left|down|up --ratio 0.4
 ```
 
 Loads the URL in the browser that is already open. Opens a new one only when
-none is live, or when you pass `--new`. A new browser splits the focused pane —
-`--split` picks the side, `--ratio` its share (0.2 to 0.95).
+none is live, or when you pass `--new`.
+
+A new browser gets **its own Herdr tab**, so the pane the human is working in
+stays whole. Pass `--split` to carve up the focused pane instead — `--ratio`
+sets its share (0.2 to 0.95) and is only valid alongside `--split`.
 
 With several browsers live, every command refuses to guess — pass `--view ID`,
 and the error lists the candidates.
@@ -102,6 +107,19 @@ B click-ref 8
 `ref role name`, and `click-ref` clicks one. Refs survive a detach, so the two
 commands may be separate calls, but they die on navigation or re-render.
 
+**When you already know what the thing is called, skip the snapshot entirely:**
+
+```bash
+B raw -- find role button click --name "Sign in"
+B raw -- find text "Add to cart" click
+B raw -- find label Email fill you@example.com
+```
+
+`find` locates and acts in one call, and answers `✓ Done`. A snapshot on a real
+page costs 5,340 chars before you have clicked anything — this costs seven.
+Reach for `snapshot` when you need to discover what is on the page, not when you
+already know.
+
 ## Viewport
 
 ```bash
@@ -122,7 +140,8 @@ B close <n>
 ```
 
 Row numbers come from the pane's own tab strip, so they match what the user
-sees. Closing the last tab closes the pane; that prints `closed <view>`.
+sees. Closing the last tab closes the browser, and the Herdr tab `open` made
+goes with it; that prints `closed <view>`.
 
 ## Gotchas
 
@@ -130,11 +149,68 @@ sees. Closing the last tab closes the pane; that prints `closed <view>`.
 `/json/list` on that port therefore carries other panes' pages too. This script
 scopes every command to the pane behind `--view`, but a raw CDP client will not.
 
-`open --new` makes another browser pane; `new-tab` makes a tab inside the one
-you have.
+`open --new` makes another browser in its own Herdr tab; `new-tab` makes a page
+tab inside the browser you already have.
+
+**There is no PDF.** terminal-browser's Chromium is Electron's, and it does not
+expose `Page.printToPDF` — CDP answers `'Page.printToPDF' wasn't found`. `B raw
+-- pdf` fails the same way, so this is a limit of the browser, not of the skill.
 
 **terminal-browser rewrites `~/.config/herdr/config.toml` on first open**, with
 no prompt: it sets `[experimental] kitty_graphics = true` and reloads the config.
+
+## Cookies and headers
+
+```bash
+B cookies                                   # name=value domain/path flags
+B cookies set <name> <value> [--url U] [--domain D] [--path P]
+                            [--http-only] [--secure] [--same-site Lax] [--expires N]
+B cookies clear
+B headers '{"Authorization":"Bearer ..."}'  # on every request from now on
+```
+
+`eval 'document.cookie'` reaches only what JS may read: it never sees an
+httpOnly cookie and cannot write one. These go over CDP and do. Use `eval` for
+`localStorage` and `sessionStorage` — JS owns those outright.
+
+**Chrome answers a cookie it rejects with success, not an error.** A wrong
+domain, or `--secure` on an http page, is a silent no-op at the protocol level.
+`cookies set` turns that into a failure.
+
+`headers` replaces the whole set — pass `{}` to clear.
+
+## Everything else — the raw escape hatch
+
+```bash
+B raw -- cookies set session abc123 --url https://example.com --httpOnly
+B raw -- cookies get
+B raw -- route '**/api/**' --abort
+B raw -- har start /tmp/run.har
+B raw -- vitals
+```
+
+`raw` hands everything after `--` to agent-browser, the CLI terminal-browser
+bundles. It reaches what JS through `eval` cannot: httpOnly cookies, request
+mocking, HAR, traces, video, Core Web Vitals, axe-core audits.
+
+Read its surface with `B raw -- <command> --help` rather than guessing flags —
+`cookies set` takes `<name> <value>`, not `name=value`, and the wrong shape
+fails as a CDP error, not a usage error.
+
+**Prefer a native command whenever one exists** — but the gap is narrower than
+it looks, and it is worth knowing where it actually is. agent-browser is verbose
+in exactly one place: `snapshot`, where it prints the whole accessibility tree
+and this skill prints only what you can act on (27,363 chars to our 5,340 on
+Hacker News). Everywhere else it is already terse — measured on the same page,
+`get value` and `is visible` answer in 0 and 4 chars, `get box` in 61, and
+`fill` and `scroll` in 7. Reimplementing those natively would save nothing, so
+they are deliberately left on `raw`.
+
+agent-browser keeps session state across separate `raw` calls — a `network
+route`, a `storage local set`, or a set of `headers` outlives the command that
+made it, because a daemon holds it. That is also why `route` cannot be native
+here: this skill attaches and detaches per command, and a CDP interception
+handler needs a connection that stays open.
 
 ## External CDP clients
 

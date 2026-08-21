@@ -33,7 +33,23 @@ describe("parseArgv", () => {
       split: null,
       ratio: null,
       output: null,
+      passthrough: null,
     });
+  });
+
+  test("hands everything after -- to the passthrough, flags included", () => {
+    const parsed = parseArgv(["raw", "--", "snapshot", "--json", "--view", "x"]);
+    expect(parsed.command).toBe("raw");
+    expect(parsed.passthrough).toEqual(["snapshot", "--json", "--view", "x"]);
+    // our own parser must not have eaten the agent-browser flags
+    expect(parsed.view).toBeNull();
+    expect(parsed.args).toEqual([]);
+  });
+
+  test("still reads our flags before the --", () => {
+    const parsed = parseArgv(["raw", "--view", "abc", "--", "get", "url"]);
+    expect(parsed.view).toBe("abc");
+    expect(parsed.passthrough).toEqual(["get", "url"]);
   });
 
   test("takes --split and --ratio off the positionals", () => {
