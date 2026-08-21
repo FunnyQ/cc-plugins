@@ -70,10 +70,22 @@ not exist, and a URL that fails to resolve all fail loudly — none of them
 reports success.
 
 `screenshot` captures the viewport at the device pixel ratio, so the file comes
-out twice the CSS size on a retina display. `--full` captures the whole scroll
-height instead, without touching the viewport — a long page runs to tens of
-thousands of pixels and several megabytes, so ask for it only when you need what
-is below the fold.
+out twice the CSS size on a retina display.
+
+`--full` captures the whole scroll height into that one file, without touching
+the viewport. **Trust it only on a static page.** On a page with scroll-triggered
+reveals it fails silently, and in two different ways: run it bare and it returns
+wide blank bands, because the composite never scrolls and the reveals never fire;
+scroll the page first and it returns the content composited twice, even though
+the DOM holds one copy and nothing on the page is `fixed` or `sticky`. Neither
+reports an error, and a long page also costs tens of thousands of pixels and
+several megabytes.
+
+Such a page has no one height to capture — `scrollHeight` read 12315, then 14247,
+then 27295 on the same site as the viewport and the animations changed. Scroll it
+and take a viewport shot per screen instead. Enlarging the viewport with `emulate
+--size` is not the way around this: Chromium clamps that capture at 16384px, and
+the override is sticky.
 
 `console` reads the buffer the page itself kept, so it covers lines printed
 before this command ran, **including uncaught exceptions**. Use `watch` when you

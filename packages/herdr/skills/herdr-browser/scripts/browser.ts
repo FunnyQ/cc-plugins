@@ -101,8 +101,8 @@ export const USAGE = `browser.ts <command> [args] [--view ID]
   console [--all]             this page load's entries; --all keeps older ones
   watch [url] [--body <url-fragment>]  reload or navigate, then report every
                               request, console line, and uncaught exception
-  screenshot --output <path> [--full]  --full captures the whole page,
-                              not just the viewport
+  screenshot --output <path> [--full]  --full captures the whole page; it is
+                              reliable on a static page only, see SKILL.md
   cookies [get] | cookies set <name> <value> [--url U] [--domain D] [--path P]
                               [--http-only] [--secure] [--same-site Lax] [--expires N]
   headers '{"Authorization":"Bearer ..."}'   sent with every request from now on
