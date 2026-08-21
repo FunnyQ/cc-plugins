@@ -179,6 +179,21 @@ domain, or `--secure` on an http page, is a silent no-op at the protocol level.
 
 `headers` replaces the whole set — pass `{}` to clear.
 
+**`cookies clear` empties the whole browser, not the current site.** `cookies`
+reads only the current page's cookies, so the pair reads as if both were scoped
+to it — they are not. `clear` is `Network.clearBrowserCookies`, and the profile
+behind it is shared and on disk, so one call logs every pane out of every site,
+permanently. To drop one cookie, overwrite it with `cookies set <name> ""
+--expires 1` instead.
+
+## Logging in
+
+A login persists on its own — terminal-browser keeps one Chromium profile on
+disk, and it survives a browser close. There is only that one, and every pane
+shares it, so a login is global and outlives the session that made it. Read
+`references/auth.md` before logging in anywhere, and for what an agent can read
+off a logged-in page.
+
 ## Everything else — the raw escape hatch
 
 ```bash
