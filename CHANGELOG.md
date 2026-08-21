@@ -1,5 +1,15 @@
 # Changelog
 
+## [herdr 0.5.1] - 2026-08-21
+
+_tracks tag `herdr-v0.5.1`_
+
+### Added
+- New `references/auth.md` guide for herdr-browser: how login persistence works through terminal-browser's shared Chromium profile, and how to snapshot and restore authenticated state.
+
+### Changed
+- SKILL.md now warns that `cookies clear` wipes cookies for every open pane, not just the site you're working on — the browser profile is shared, not per-site.
+
 ## [herdr 0.5.0] - 2026-08-21
 
 _tracks tag `herdr-v0.5.0`_
