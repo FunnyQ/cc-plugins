@@ -6,9 +6,8 @@ description: >-
 when_to_use: >-
   Use whenever a page needs opening, reading, or driving — screenshots, clicks,
   form input, console or network debugging, viewport emulation — and Herdr is
-  running. Works over terminal-browser or Herdr's official browser plugin,
-  whichever is installed. Also use to hand a CDP endpoint to Playwright, Chrome
-  DevTools MCP, or Browser Use.
+  running. Drives terminal-browser. Also use to hand a CDP endpoint to
+  Playwright, Chrome DevTools MCP, or Browser Use.
 version: 2
 ---
 
@@ -25,31 +24,22 @@ bun "$B" open https://news.ycombinator.com
 
 Written `B <command>` below — expand it to `bun "$B" <command>` every time.
 
-## Backends
+## Requirements
 
-Two things can own a browser in a Herdr pane. Both are driven identically,
-because every operation here runs over CDP rather than through either CLI.
-
-| | detected by | placement |
-| --- | --- | --- |
-| **terminal-browser** | the `terminal-browser` binary | `--split right\|left\|down\|up --ratio 0.4` |
-| **herdr plugin** | `herdr plugin list official.browser` | `--placement tab\|split\|overlay\|zoomed` |
-
-Detection is automatic and needs no flag. terminal-browser is probed first and
-wins when both are live, because probing the plugin costs three more processes.
-Pass `--backend terminal|herdr` to override.
-
-When neither is installed the error names both install commands. Never install
-either for the user without asking.
+The browser is [terminal-browser](https://terminal-browser.sh); every operation
+runs over CDP rather than through its CLI. When the binary is missing the error
+names the install command. Never install it for the user without asking.
 
 ## Open a page
 
 ```bash
 B open https://news.ycombinator.com
+B open <url> --new --split right|left|down|up --ratio 0.4
 ```
 
 Loads the URL in the browser that is already open. Opens a new one only when
-none is live, or when you pass `--new`.
+none is live, or when you pass `--new`. A new browser splits the focused pane —
+`--split` picks the side, `--ratio` its share (0.2 to 0.95).
 
 With several browsers live, every command refuses to guess — pass `--view ID`,
 and the error lists the candidates.
@@ -136,19 +126,20 @@ sees. Closing the last tab closes the pane; that prints `closed <view>`.
 
 ## Gotchas
 
-**Every terminal-browser pane shares one Chromium process and one CDP port.**
+**Every pane shares one Chromium process and one CDP port.**
 `/json/list` on that port therefore carries other panes' pages too. This script
 scopes every command to the pane behind `--view`, but a raw CDP client will not.
 
 `open --new` makes another browser pane; `new-tab` makes a tab inside the one
 you have.
 
-A view whose pane just closed is ignored — it renders nowhere.
+**terminal-browser rewrites `~/.config/herdr/config.toml` on first open**, with
+no prompt: it sets `[experimental] kitty_graphics = true` and reloads the config.
 
 ## External CDP clients
 
 ```bash
-B endpoint    # backend, view, cdp_http, browser_ws
+B endpoint    # view, cdp_http, browser_ws
 ```
 
 Use the browser-level endpoint so the client can drive multiple tabs.
@@ -158,15 +149,10 @@ Use the browser-level endpoint so the client can drive multiple tabs.
 - Chrome DevTools MCP: `--browser-url=<cdp_http>`.
 - Browser Use: `BU_CDP_URL=<cdp_http>` or `BU_CDP_WS=<browser_ws>`.
 
-On terminal-browser the client sees every pane's pages, per the gotcha above.
+The client sees every pane's pages, per the gotcha above.
 
-On the herdr plugin, `Target.createTarget`, `Target.activateTarget`,
-`Page.bringToFront`, and `Target.closeTarget` sync with the Herdr tab strip. A
-client that changes only its own selected-page state must also bring that page
-to front.
-
-Herdr owns Chromium: disconnecting a client leaves it running, closing the pane
-closes the view.
+terminal-browser owns Chromium: disconnecting a client leaves it running,
+closing the pane closes the browser.
 
 ## OpenCode only — skip on Claude Code and Codex
 
