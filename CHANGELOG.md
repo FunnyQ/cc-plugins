@@ -1,5 +1,29 @@
 # Changelog
 
+## [herdr 0.4.0] - 2026-08-21
+
+_tracks tag `herdr-v0.4.0`_
+
+### Added
+- New `--split right|left|down|up` and `--ratio` flags for `open`, plus `--output` for `screenshot`.
+
+### Changed
+- Every page operation (`snapshot`, `goto`, `click`, `eval`, `console`, and the rest) now runs over the Chrome DevTools Protocol directly instead of forwarding to a CLI. Output shrinks sharply as a result — a page snapshot now runs 5-18x smaller than the equivalent `agent-browser snapshot` on the same page.
+- `console` now reports uncaught exceptions, which it previously could not: a fresh CDP attach replays the page's whole console buffer, including `Runtime.exceptionThrown`.
+- `snapshot` now lists elements in document order instead of Chromium's internal serialization order, so a link-dense page no longer buries the first real item under the footer.
+- Tab row numbers now come from terminal-browser's own tab strip instead of CDP, which ordered by recency and could make `close 1` close the wrong tab.
+- Any command that changes a tab (`open`, `new-tab`, `activate`, `close`) now re-reads the tab strip after acting, instead of printing a snapshot taken before the change — `open` on an already-live browser no longer reports the new page while still showing the old URL in the active row.
+
+### Removed
+- **Breaking:** the herdr-browser plugin backend is gone; terminal-browser is now the only backend. It was kept on the belief that it spawned the *system* Chrome and so carried real profiles, extensions, and logged-in sessions — its own source in fact launches Chrome with `--headless=new`, a throwaway per-session `--user-data-dir`, and `--disable-extensions`, borrowing only the Chrome binary, never its state.
+- **Breaking:** the `--placement tab|split|overlay|zoomed` flag (added in 0.3.1) is gone with the plugin backend. Use `--split right|left|down|up` and `--ratio` instead.
+
+### Fixed
+- A `goto` to an unresolvable host used to report success while loading an error page; it now fails loudly.
+- `activate` was a silent no-op, `new-tab` returned a 500 on Electron, and `open --new` could report the wrong browser when two panes held the same URL. All three are fixed.
+- Closing the last tab closes its pane, which used to surface as an error; it now reports `closed <view>`.
+- Selector and `eval` failures now report one line instead of a full JS stack from the injected wrapper.
+
 ## [monitor 4.0.6] - 2026-08-21
 
 _tracks tag `monitor-v4.0.6`_
