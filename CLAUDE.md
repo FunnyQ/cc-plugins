@@ -245,14 +245,30 @@ bun test packages/monitor/skills/cockpit/scripts/
 bun test packages/monitor/skills/install/scripts/
 bun test packages/monitor/skills/usage-dashboard/scripts/rollup-update.test.ts
 bun test opencode/
+
+# Typecheck. Run it before calling a refactor done — `bun build` bundles
+# without typechecking, and `bun test` only reaches the paths a test drives.
+bunx --bun tsc --noEmit                              # whole repo
+bunx --bun tsc --noEmit | grep <path-you-touched>    # must print nothing
 ```
+
+**Typecheck against the root `tsconfig.json`, never against a file list.** Naming
+files on the command line drops the config, so `strict` runs without
+`types: ["bun"]` and every `Bun`, `process`, and `Buffer` reports as an undefined
+name. Real errors then hide among a dozen fake ones — this is how a `Target`
+literal missing a required field once shipped and failed at runtime on every
+command.
+
+The repo-wide run is **not** green: 86 pre-existing errors sit outside herdr, so
+a change is clean when `grep <path-you-touched>` prints nothing, not when the
+count is zero.
 
 ## Code Conventions
 
 - Runtime is Bun with TypeScript. There is no transpile step.
 - Use `type` over `interface`.
 - Frontend uses petite-vue, not full Vue. Charts use Chart.js.
-- Take no external npm dependencies. Vendor libraries are committed in `dashboard/dist/vendor/`.
+- Take no external npm dependencies at runtime. Vendor libraries are committed in `dashboard/dist/vendor/`. `devDependencies` may carry types-only packages — `@types/bun` is there so the typecheck above resolves Bun's globals.
 - Vendor mermaid as the UMD bundle (`mermaid.min.js`, ~3.3MB, sets `globalThis.mermaid`). The ESM build is code-split and cannot ship as one file. `modules/diagram.js` lazy-loads it on the first diagram render, themes it with concrete hex (mermaid's khroma engine cannot parse `oklch()`), and sanitizes the SVG through DOMPurify's SVG profile.
 - Price per 1M tokens in USD.
 
