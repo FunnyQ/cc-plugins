@@ -1,12 +1,9 @@
-// Two things can own a Chromium in a Herdr pane: the official herdr-browser
-// plugin, and terminal-browser. Both hand out a plain CDP endpoint, so the rest
-// of the skill only needs whichever one is live reduced to a Target.
-
-export type BackendName = "terminal" | "herdr";
+// terminal-browser owns the Chromium behind a Herdr pane and hands out a plain
+// CDP endpoint, so the rest of the skill only needs it reduced to a Target.
 
 export type Tab = {
-  // The backend's own id for this tab, when it keeps one. terminal-browser
-  // needs it to bring a tab to the front; CDP alone cannot.
+  // The backend's own id for this tab. terminal-browser needs it to bring a tab
+  // to the front; CDP alone cannot.
   id: number | null;
   targetId: string;
   title: string;
@@ -15,19 +12,23 @@ export type Tab = {
 };
 
 export type Target = {
-  backend: BackendName;
   id: string;
   cdpHttp: string;
   activeTargetId: string;
   pane: string | null;
   url: string;
   title: string;
-  // The backend's own tab strip, in the order the user sees it. Empty means the
-  // backend does not keep one, and CDP /json/list is the fallback.
+  // terminal-browser's own tab strip, in the order the user sees it. CDP
+  // /json/list is not a substitute: it orders by recency, and every pane shares
+  // one Electron process and one port, so it carries other panes' pages too.
   tabs: Tab[];
 };
 
 export const SPLIT_DIRECTIONS = ["right", "left", "down", "up"] as const;
+
+export const INSTALL_HINT =
+  "terminal-browser is not installed\n" +
+  "  install it: curl -fsSL https://terminal-browser.sh/install | bash";
 
 export function cdpBase(port: number): string {
   return `http://127.0.0.1:${port}`;
@@ -50,7 +51,6 @@ export function parseTerminalBrowsers(raw: string): Target[] {
         active: Boolean(tab.active),
       }));
       return {
-        backend: "terminal" as const,
         id: String(browser.key),
         cdpHttp: cdpBase(browser.cdpPort),
         activeTargetId: active?.targetId ?? "",
@@ -80,44 +80,12 @@ export function selectTarget(targets: Target[], requested: string | null): Targe
   return found;
 }
 
-// Auto-detect is what keeps the command surface identical across backends, so
-// it may only pick when the answer is not a guess.
-export function chooseBackend(
-  terminal: Target[],
-  herdr: Target[],
-  requested: BackendName | null,
-): BackendName {
-  if (requested) {
-    return requested;
-  }
-  // terminal-browser costs one process to probe, the herdr plugin costs three,
-  // so it is probed first and wins a tie. --backend herdr is the way past that.
-  if (terminal.length > 0) {
-    return "terminal";
-  }
-  if (herdr.length > 0) {
-    return "herdr";
-  }
-  throw new Error(
-    "no browser is live, and neither backend reports one\n" +
-      "  terminal-browser: curl -fsSL https://terminal-browser.sh/install | bash\n" +
-      "  herdr plugin:     herdr plugin install ogulcancelik/herdr-browser",
-  );
-}
-
-// terminal-browser places by splitting the focused pane and nothing else, so a
-// Herdr-only placement has to say which backend can honour it.
+// terminal-browser places by splitting the focused pane and nothing else.
 export function terminalOpenArgs(
   url: string,
-  placement: string,
   direction: string | null,
   ratio: string | null,
 ): string[] {
-  if (placement !== "split") {
-    throw new Error(
-      `terminal-browser only splits; drop --placement ${placement} or pass --backend herdr`,
-    );
-  }
   const where = direction ?? "right";
   if (!SPLIT_DIRECTIONS.includes(where as (typeof SPLIT_DIRECTIONS)[number])) {
     throw new Error(
@@ -133,26 +101,6 @@ export function terminalOpenArgs(
     args.push("--size", ratio);
   }
   return args;
-}
-
-// `open` is the one command that runs with nothing live, so it cannot ask
-// chooseBackend — it has to fall back to whichever backend is installed.
-export function openBackend(
-  terminal: Target[],
-  herdr: Target[],
-  requested: BackendName | null,
-  terminalInstalled: boolean,
-): BackendName {
-  if (requested) {
-    return requested;
-  }
-  if (terminal.length > 0) {
-    return "terminal";
-  }
-  if (herdr.length > 0) {
-    return "herdr";
-  }
-  return terminalInstalled ? "terminal" : "herdr";
 }
 
 // Two browsers can hold the same url, so a fresh one is only identifiable by

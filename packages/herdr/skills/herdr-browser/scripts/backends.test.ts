@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  chooseBackend,
   newcomer,
-  openBackend,
   cdpBase,
   parseTerminalBrowsers,
   selectTarget,
@@ -37,7 +35,6 @@ describe("parseTerminalBrowsers", () => {
     ]);
     expect(parseTerminalBrowsers(raw)).toEqual([
       {
-        backend: "terminal",
         id: "64777-1",
         cdpHttp: "http://127.0.0.1:57768",
         activeTargetId: "AAA",
@@ -93,8 +90,7 @@ describe("cdpBase", () => {
   });
 });
 
-const target = (backend: "terminal" | "herdr", id: string): Target => ({
-  backend,
+const target = (id: string): Target => ({
   id,
   cdpHttp: "http://127.0.0.1:57768",
   activeTargetId: "AAA",
@@ -106,22 +102,22 @@ const target = (backend: "terminal" | "herdr", id: string): Target => ({
 
 describe("selectTarget", () => {
   test("takes the only live target without being asked", () => {
-    expect(selectTarget([target("terminal", "64777-1")], null).id).toBe("64777-1");
+    expect(selectTarget([target("64777-1")], null).id).toBe("64777-1");
   });
 
   test("refuses to guess between two, and names both", () => {
     expect(() =>
-      selectTarget([target("terminal", "a"), target("terminal", "b")], null),
+      selectTarget([target("a"), target("b")], null),
     ).toThrow(/--view/);
   });
 
   test("honours an explicit id", () => {
-    const targets = [target("terminal", "a"), target("terminal", "b")];
+    const targets = [target("a"), target("b")];
     expect(selectTarget(targets, "b").id).toBe("b");
   });
 
   test("names the unknown id rather than falling back", () => {
-    expect(() => selectTarget([target("terminal", "a")], "zz")).toThrow(/zz/);
+    expect(() => selectTarget([target("a")], "zz")).toThrow(/zz/);
   });
 
   test("says how to open one when nothing is live", () => {
@@ -129,37 +125,9 @@ describe("selectTarget", () => {
   });
 });
 
-describe("chooseBackend", () => {
-  test("picks the backend that has a live target", () => {
-    expect(chooseBackend([target("terminal", "a")], [], null)).toBe("terminal");
-    expect(chooseBackend([], [target("herdr", "v1")], null)).toBe("herdr");
-  });
-
-  test("prefers terminal when both are live; probing herdr costs 3 processes", () => {
-    expect(chooseBackend([target("terminal", "a")], [target("herdr", "v1")], null)).toBe(
-      "terminal",
-    );
-  });
-
-  test("an explicit backend wins even when both are live", () => {
-    expect(
-      chooseBackend([target("terminal", "a")], [target("herdr", "v1")], "herdr"),
-    ).toBe("herdr");
-  });
-
-  test("an explicit backend wins even when nothing is live there", () => {
-    expect(chooseBackend([], [], "terminal")).toBe("terminal");
-  });
-
-  test("names both install paths when neither is live", () => {
-    expect(() => chooseBackend([], [], null)).toThrow(/terminal-browser/);
-    expect(() => chooseBackend([], [], null)).toThrow(/herdr plugin install/);
-  });
-});
-
 describe("terminalOpenArgs", () => {
   test("splits right by default", () => {
-    expect(terminalOpenArgs("http://a/", "split", null, null)).toEqual([
+    expect(terminalOpenArgs("http://a/", null, null)).toEqual([
       "open",
       "http://a/",
       "--split",
@@ -168,7 +136,7 @@ describe("terminalOpenArgs", () => {
   });
 
   test("carries the direction and the ratio", () => {
-    expect(terminalOpenArgs("http://a/", "split", "down", "0.4")).toEqual([
+    expect(terminalOpenArgs("http://a/", "down", "0.4")).toEqual([
       "open",
       "http://a/",
       "--split",
@@ -178,43 +146,15 @@ describe("terminalOpenArgs", () => {
     ]);
   });
 
-  test("rejects a placement terminal-browser cannot do, naming the way out", () => {
-    for (const placement of ["overlay", "zoomed", "tab"] as const) {
-      expect(() => terminalOpenArgs("http://a/", placement, null, null)).toThrow(
-        /--backend herdr/,
-      );
-    }
-  });
-
   test("rejects a direction that is not one of the four", () => {
-    expect(() => terminalOpenArgs("http://a/", "split", "sideways", null)).toThrow(
+    expect(() => terminalOpenArgs("http://a/", "sideways", null)).toThrow(
       /right, left, down, up/,
     );
   });
 
   test("rejects a ratio outside what terminal-browser accepts", () => {
-    expect(() => terminalOpenArgs("http://a/", "split", null, "0.05")).toThrow(
-      /0.2/,
-    );
-    expect(() => terminalOpenArgs("http://a/", "split", null, "abc")).toThrow(
-      /0.2/,
-    );
-  });
-});
-
-describe("openBackend", () => {
-  test("reuses the backend that already has a browser", () => {
-    expect(openBackend([target("terminal", "a")], [], null, false)).toBe("terminal");
-    expect(openBackend([], [target("herdr", "v1")], null, true)).toBe("herdr");
-  });
-
-  test("with nothing live, opens wherever terminal-browser is installed", () => {
-    expect(openBackend([], [], null, true)).toBe("terminal");
-    expect(openBackend([], [], null, false)).toBe("herdr");
-  });
-
-  test("an explicit backend still wins", () => {
-    expect(openBackend([target("terminal", "a")], [], "herdr", true)).toBe("herdr");
+    expect(() => terminalOpenArgs("http://a/", null, "0.05")).toThrow(/0.2/);
+    expect(() => terminalOpenArgs("http://a/", null, "abc")).toThrow(/0.2/);
   });
 });
 
@@ -243,13 +183,13 @@ describe("parseTerminalBrowsers tab strip", () => {
 
 describe("newcomer", () => {
   test("finds the key that was not there before, not the matching url", () => {
-    const before = [target("terminal", "64777-1")];
-    const after = [target("terminal", "64777-1"), target("terminal", "64777-2")];
+    const before = [target("64777-1")];
+    const after = [target("64777-1"), target("64777-2")];
     expect(newcomer(before, after)?.id).toBe("64777-2");
   });
 
   test("reports nothing while the new browser has not registered yet", () => {
-    const before = [target("terminal", "64777-1")];
+    const before = [target("64777-1")];
     expect(newcomer(before, before)).toBeUndefined();
   });
 });
