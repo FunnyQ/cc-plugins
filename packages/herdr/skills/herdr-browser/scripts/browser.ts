@@ -72,6 +72,7 @@ export type Invocation = {
   split: string | null;
   ratio: string | null;
   output: string | null;
+  full: boolean;
   // Everything after a bare `--`, verbatim. Our own flag parser must not touch
   // it: `raw -- snapshot --json` is agent-browser's --json, not ours.
   passthrough: string[] | null;
@@ -100,7 +101,8 @@ export const USAGE = `browser.ts <command> [args] [--view ID]
   console [--all]             this page load's entries; --all keeps older ones
   watch [url] [--body <url-fragment>]  reload or navigate, then report every
                               request, console line, and uncaught exception
-  screenshot --output <path>
+  screenshot --output <path> [--full]  --full captures the whole page,
+                              not just the viewport
   cookies [get] | cookies set <name> <value> [--url U] [--domain D] [--path P]
                               [--http-only] [--secure] [--same-site Lax] [--expires N]
   headers '{"Authorization":"Bearer ..."}'   sent with every request from now on
@@ -122,6 +124,7 @@ export function parseArgv(argv: string[]): Invocation {
   let split: string | null = null;
   let ratio: string | null = null;
   let output: string | null = null;
+  let full = false;
   let passthrough: string[] | null = null;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -169,6 +172,10 @@ export function parseArgv(argv: string[]): Invocation {
       fresh = true;
       continue;
     }
+    if (token === "--full") {
+      full = true;
+      continue;
+    }
     positionals.push(token);
   }
 
@@ -184,6 +191,7 @@ export function parseArgv(argv: string[]): Invocation {
     split,
     ratio,
     output,
+    full,
     passthrough,
   };
 }
@@ -814,6 +822,7 @@ async function main(argv: string[]): Promise<void> {
     split,
     ratio,
     output,
+    full,
     passthrough,
   } = parseArgv(argv);
 
@@ -1067,7 +1076,7 @@ async function main(argv: string[]): Promise<void> {
     }
     if (command === "screenshot") {
       console.log(
-        await screenshot(session, requireArg(output, "missing --output PATH")),
+        await screenshot(session, requireArg(output, "missing --output PATH"), full),
       );
       return;
     }

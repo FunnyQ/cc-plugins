@@ -33,6 +33,7 @@ describe("parseArgv", () => {
       split: null,
       ratio: null,
       output: null,
+      full: false,
       passthrough: null,
     });
   });
@@ -66,6 +67,15 @@ describe("parseArgv", () => {
       command: "open",
       args: ["https://example.com"],
       fresh: true,
+    });
+  });
+
+  test("reads --full as a switch", () => {
+    expect(parseArgv(["screenshot", "--output", "/tmp/a.png", "--full"])).toMatchObject({
+      command: "screenshot",
+      args: [],
+      output: "/tmp/a.png",
+      full: true,
     });
   });
 

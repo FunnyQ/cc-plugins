@@ -309,8 +309,12 @@ async function settled(session: CdpSession, timeoutMs = 10_000): Promise<void> {
 export async function screenshot(
   session: CdpSession,
   path: string,
+  full = false,
 ): Promise<string> {
-  const shot = await session.send("Page.captureScreenshot", { format: "png" });
+  const shot = await session.send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: full,
+  });
   if (!shot?.data) {
     throw new Error("the page returned no screenshot data");
   }

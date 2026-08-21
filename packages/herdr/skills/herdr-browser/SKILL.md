@@ -61,13 +61,19 @@ B type <selector> <text>
 B press [selector] <key>      # Enter, Tab, ArrowDown, Control+a, a
 B wait <expression> [timeoutMs]
 B click <x> <y> | wheel <x> <y> <deltaY>
-B screenshot --output <path>
+B screenshot --output <path> [--full]
 B console                     # this page load only; --all keeps older entries
 ```
 
 Every one answers in one line. A selector that matches nothing, a key that does
 not exist, and a URL that fails to resolve all fail loudly — none of them
 reports success.
+
+`screenshot` captures the viewport at the device pixel ratio, so the file comes
+out twice the CSS size on a retina display. `--full` captures the whole scroll
+height instead, without touching the viewport — a long page runs to tens of
+thousands of pixels and several megabytes, so ask for it only when you need what
+is below the fold.
 
 `console` reads the buffer the page itself kept, so it covers lines printed
 before this command ran, **including uncaught exceptions**. Use `watch` when you
