@@ -1,15 +1,15 @@
 ---
 name: herdr-browser
 description: >-
-  Open web pages in a Herdr browser pane, read and drive them, and attach
+  Open web pages in a terminal browser pane, read and drive them, and attach
   Playwright or other CDP clients.
 when_to_use: >-
   Use whenever a page needs opening, reading, or driving — screenshots, clicks,
   form input, console or network debugging, viewport emulation — and Herdr is
-  running. Also use to hand a CDP endpoint to Playwright, Chrome DevTools MCP,
-  or Browser Use. Needs a live Herdr session; outside one, reach for another
-  browser tool.
-version: 1
+  running. Works over terminal-browser or Herdr's official browser plugin,
+  whichever is installed. Also use to hand a CDP endpoint to Playwright, Chrome
+  DevTools MCP, or Browser Use.
+version: 2
 ---
 
 # Herdr Browser
@@ -25,17 +25,22 @@ bun "$B" open https://news.ycombinator.com
 
 Written `B <command>` below — expand it to `bun "$B" <command>` every time.
 
-## Prerequisite
+## Backends
 
-Every command needs Herdr's official browser plugin. When one reports the plugin
-is missing, tell the user to install it:
+Two things can own a browser in a Herdr pane. Both are driven identically,
+because every operation here runs over CDP rather than through either CLI.
 
-```bash
-herdr plugin install ogulcancelik/herdr-browser
-```
+| | detected by | placement |
+| --- | --- | --- |
+| **terminal-browser** | the `terminal-browser` binary | `--split right\|left\|down\|up --ratio 0.4` |
+| **herdr plugin** | `herdr plugin list official.browser` | `--placement tab\|split\|overlay\|zoomed` |
 
-Installed but disabled reports `herdr plugin enable official.browser` instead.
-Never install it for the user without asking.
+Detection is automatic and needs no flag. terminal-browser is probed first and
+wins when both are live, because probing the plugin costs three more processes.
+Pass `--backend terminal|herdr` to override.
+
+When neither is installed the error names both install commands. Never install
+either for the user without asking.
 
 ## Open a page
 
@@ -43,32 +48,35 @@ Never install it for the user without asking.
 B open https://news.ycombinator.com
 ```
 
-Loads the URL in the browser pane that is already open. Opens a pane in a **new
-Herdr tab** only when none is live, or when you pass `--new`. Add `--placement
-split|overlay|zoomed` for other layouts of a new pane. Needs a running Herdr
-session.
+Loads the URL in the browser that is already open. Opens a new one only when
+none is live, or when you pass `--new`.
 
-With several panes live, `open` refuses to guess — pass `--view <view_id>` or
-`--new`.
+With several browsers live, every command refuses to guess — pass `--view ID`,
+and the error lists the candidates.
 
 ## Read and drive the page
 
 ```bash
-B text                        # page text, raw
-B goto <url>                  # navigate the active tab
+B status                      # url, title, then the tab list
+B text                        # page text
+B goto <url> | back | forward | reload
 B eval <expression>
 B selector-click <selector>
 B type <selector> <text>
-B press [selector] <key>
+B press [selector] <key>      # Enter, Tab, ArrowDown, Control+a, a
 B wait <expression> [timeoutMs]
 B click <x> <y> | wheel <x> <y> <deltaY>
 B screenshot --output <path>
 B console                     # this page load only; --all keeps older entries
-B back | forward | reload | status
 ```
 
-`console` reads the buffer the pane already keeps. It misses uncaught
-exceptions — use `watch` when a page might be throwing.
+Every one answers in one line. A selector that matches nothing, a key that does
+not exist, and a URL that fails to resolve all fail loudly — none of them
+reports success.
+
+`console` reads the buffer the page itself kept, so it covers lines printed
+before this command ran, **including uncaught exceptions**. Use `watch` when you
+need the network alongside them, or the order between them.
 
 ## Debug a page load
 
@@ -77,8 +85,8 @@ B watch [url]                    # navigate there, or reload, and record
 B watch <url> --body <fragment>  # also print that response's body
 ```
 
-One pass over the load: every request, every console line, and the uncaught
-exceptions `console` never sees, in the order they happened.
+One pass over the load: every request, every console line, and every uncaught
+exception, in the order they happened.
 
 ```
 200 Document http://localhost:8899/
@@ -101,8 +109,8 @@ B click-ref 8
 ```
 
 `snapshot` lists only elements worth acting on — links, buttons, fields — as
-`ref role name`, and `click-ref` clicks one. Refs die on navigation or re-render,
-so snapshot again after the page changes.
+`ref role name`, and `click-ref` clicks one. Refs survive a detach, so the two
+commands may be separate calls, but they die on navigation or re-render.
 
 ## Viewport
 
@@ -112,11 +120,9 @@ B emulate --size 1440x900
 ```
 
 The override is **sticky and has no clear** — it outlives the command, and
-another size is the only way back. Dark mode and offline are not offered here:
-those overrides die with the session, so they need a persistent client via
-`endpoint`.
+another size is the only way back.
 
-## Chromium tabs inside the pane
+## Tabs inside the pane
 
 ```bash
 B tabs                        # 1* https://... Title   — the star is the active tab
@@ -125,19 +131,24 @@ B activate <n>                # n is the row number from `tabs`
 B close <n>
 ```
 
-`open --new` makes a Herdr tab; `new-tab` makes a Chromium tab. Both print the
-tab list.
+Row numbers come from the pane's own tab strip, so they match what the user
+sees. Closing the last tab closes the pane; that prints `closed <view>`.
 
 ## Gotchas
 
-Several browser panes live at once: every command takes `--view <view_id>`, and
-the script lists the candidates rather than guessing. A view whose pane just
-closed is ignored — it renders nowhere.
+**Every terminal-browser pane shares one Chromium process and one CDP port.**
+`/json/list` on that port therefore carries other panes' pages too. This script
+scopes every command to the pane behind `--view`, but a raw CDP client will not.
+
+`open --new` makes another browser pane; `new-tab` makes a tab inside the one
+you have.
+
+A view whose pane just closed is ignored — it renders nowhere.
 
 ## External CDP clients
 
 ```bash
-B endpoint    # view, cdp_http, browser_ws, plugin_cli
+B endpoint    # backend, view, cdp_http, browser_ws
 ```
 
 Use the browser-level endpoint so the client can drive multiple tabs.
@@ -146,14 +157,16 @@ Use the browser-level endpoint so the client can drive multiple tabs.
   `--cdp-endpoint=<cdp_http>`.
 - Chrome DevTools MCP: `--browser-url=<cdp_http>`.
 - Browser Use: `BU_CDP_URL=<cdp_http>` or `BU_CDP_WS=<browser_ws>`.
-- PinchTab: enable external attach, bridge to either URL.
 
-`Target.createTarget`, `Target.activateTarget`, `Page.bringToFront`, and
-`Target.closeTarget` sync with the Herdr tab strip. A client that changes only
-its own selected-page state must also bring that page to front.
+On terminal-browser the client sees every pane's pages, per the gotcha above.
+
+On the herdr plugin, `Target.createTarget`, `Target.activateTarget`,
+`Page.bringToFront`, and `Target.closeTarget` sync with the Herdr tab strip. A
+client that changes only its own selected-page state must also bring that page
+to front.
 
 Herdr owns Chromium: disconnecting a client leaves it running, closing the pane
-closes the view. Do not install `herdr-browser` globally.
+closes the view.
 
 ## OpenCode only — skip on Claude Code and Codex
 
