@@ -1,5 +1,18 @@
 # Changelog
 
+## [herdr 0.5.0] - 2026-08-21
+
+_tracks tag `herdr-v0.5.0`_
+
+### Added
+- `open` now gives a new browser its own Herdr tab instead of splitting the pane you are working in. `--split` becomes an opt-in flag for the old behaviour, and closing the browser removes only a tab the skill created itself.
+- New `raw -- <agent-browser command>` escape hatch, forwarding straight to terminal-browser's full surface: network route, HAR, traces, video, Core Web Vitals, and axe-core accessibility checks. Anything this skill does not expose natively is still one command away. PDF is the one exception neither path can reach — Electron's Chromium does not implement `Page.printToPDF`.
+- Native `cookies` (get/set/clear) and `headers` commands over CDP, closing a gap `eval` couldn't reach — `document.cookie` never sees an httpOnly cookie and can't write one either. A cookie rejected for the wrong domain now throws instead of silently doing nothing.
+
+### Changed
+- `raw` errors no longer echo the whole forwarded command line back, which on a wrong selector was most of the message.
+- `--ratio` without `--split` now fails instead of being silently ignored.
+
 ## [herdr 0.4.0] - 2026-08-21
 
 _tracks tag `herdr-v0.4.0`_
