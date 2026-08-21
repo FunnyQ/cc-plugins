@@ -699,6 +699,14 @@ async function pageSocket(base: string, targetId: string): Promise<string> {
   return socket;
 }
 
+// The tab strip is a snapshot taken before the command ran, so anything that
+// navigates, opens, or closes a tab has to re-read it — printing the stale one
+// describes the page as it was, which reads exactly like success. null means
+// the browser itself is gone: closing the last tab closes the pane.
+async function refreshStrip(id: string): Promise<Tab[] | null> {
+  return (await terminalTargets()).find((live) => live.id === id)?.tabs ?? null;
+}
+
 async function openTerminal(
   url: string,
   split: string | null,
@@ -755,7 +763,8 @@ async function main(argv: string[]): Promise<void> {
       } finally {
         socket.close();
       }
-      console.log(formatTabs(target.tabs));
+      const refreshed = await refreshStrip(target.id);
+      console.log(refreshed ? formatTabs(refreshed) : `closed ${target.id}`);
       return;
     }
     target = await openTerminal(url, split, ratio, terminal);
@@ -790,7 +799,8 @@ async function main(argv: string[]): Promise<void> {
     // Electron answers /json/new with a 500; terminal-browser's own command is
     // what keeps the new tab in its tab strip anyway.
     await run(["terminal-browser", "new-tab", "--browser", target.id, url]);
-    console.log(formatTabs(selectTarget(await terminalTargets(), target.id).tabs));
+    const refreshed = await refreshStrip(target.id);
+    console.log(refreshed ? formatTabs(refreshed) : `closed ${target.id}`);
     return;
   }
 
@@ -814,12 +824,8 @@ async function main(argv: string[]): Promise<void> {
     } else {
       await closeTab(base, targetId);
     }
-    // Closing the last tab closes the pane, so the browser itself is gone and
-    // there is no strip left to print — that is success, not a lookup error.
-    const refreshed = (await terminalTargets()).find(
-      (candidate) => candidate.id === target.id,
-    );
-    console.log(refreshed ? formatTabs(refreshed.tabs) : `closed ${target.id}`);
+    const refreshed = await refreshStrip(target.id);
+    console.log(refreshed ? formatTabs(refreshed) : `closed ${target.id}`);
     return;
   }
 
