@@ -1,5 +1,15 @@
 # Changelog
 
+## [herdr 0.5.2] - 2026-08-21
+
+_tracks tag `herdr-v0.5.2`_
+
+### Added
+- `screenshot --full` captures the entire page height instead of just the visible viewport, using Chrome DevTools Protocol's `captureBeyondViewport`.
+
+### Changed
+- SKILL.md now warns that `--full` can fail silently on pages with scroll-triggered content, returning blank bands or double-composited output, and recommends viewport-by-viewport shots instead. It also notes Chromium's 16384px cap on full-page captures and that an emulated viewport override stays sticky afterward.
+
 ## [herdr 0.5.1] - 2026-08-21
 
 _tracks tag `herdr-v0.5.1`_
