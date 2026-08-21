@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { formatEvalResult, keyDescriptor, MODIFIERS } from "./ops";
+import {
+  cookieSetParams,
+  formatCookies,
+  formatEvalResult,
+  keyDescriptor,
+  MODIFIERS,
+} from "./ops";
 
 describe("formatEvalResult", () => {
   test("prints a string bare, so the agent reads a value not a quote", () => {
@@ -81,5 +87,60 @@ describe("keyDescriptor", () => {
 
   test("rejects an unknown key name rather than sending a no-op", () => {
     expect(() => keyDescriptor("Wingding")).toThrow(/Wingding/);
+  });
+});
+
+describe("cookieSetParams", () => {
+  test("takes the bare name and value", () => {
+    expect(cookieSetParams(["session", "abc123"])).toEqual({
+      name: "session",
+      value: "abc123",
+    });
+  });
+
+  test("carries the attributes CDP needs and JS cannot set", () => {
+    expect(
+      cookieSetParams([
+        "session", "abc", "--url", "https://x/", "--http-only", "--secure",
+        "--same-site", "Lax", "--path", "/api", "--expires", "1750000000",
+      ]),
+    ).toEqual({
+      name: "session",
+      value: "abc",
+      url: "https://x/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+      path: "/api",
+      expires: 1750000000,
+    });
+  });
+
+  test("refuses a value it would otherwise drop on the floor", () => {
+    expect(() => cookieSetParams(["session"])).toThrow(/value/);
+    expect(() => cookieSetParams([])).toThrow(/name/);
+    expect(() => cookieSetParams(["a", "b", "--url"])).toThrow(/--url/);
+    expect(() => cookieSetParams(["a", "b", "--httpOnly"])).toThrow(/--httpOnly/);
+    expect(() => cookieSetParams(["a", "b", "--same-site", "Nope"])).toThrow(
+      /Strict, Lax, None/,
+    );
+    expect(() => cookieSetParams(["a", "b", "--expires", "soon"])).toThrow(
+      /--expires/,
+    );
+  });
+});
+
+describe("formatCookies", () => {
+  test("one line each, flags only when set", () => {
+    expect(
+      formatCookies([
+        { name: "a", value: "1", domain: "x.com", path: "/", httpOnly: true, secure: false },
+        { name: "b", value: "2", domain: "x.com", path: "/api", httpOnly: false, secure: true },
+      ]),
+    ).toBe("a=1 x.com/ httpOnly\nb=2 x.com/api secure");
+  });
+
+  test("says so rather than printing nothing", () => {
+    expect(formatCookies([])).toBe("no cookies");
   });
 });

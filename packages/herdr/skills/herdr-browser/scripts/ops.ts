@@ -318,3 +318,130 @@ export async function screenshot(
   await Bun.write(path, bytes);
   return `${path} ${bytes.length}`;
 }
+
+export type CookieParams = {
+  name: string;
+  value: string;
+  url?: string;
+  domain?: string;
+  path?: string;
+  httpOnly?: true;
+  secure?: true;
+  sameSite?: string;
+  expires?: number;
+};
+
+const SAME_SITE = ["Strict", "Lax", "None"];
+
+// Network.setCookie is the only way in for the attributes document.cookie
+// cannot express: httpOnly is unreadable and unwritable from JS, and a cookie
+// for a domain the page is not on cannot be written from that page at all.
+export function cookieSetParams(args: string[]): CookieParams {
+  const name = args[0];
+  if (name === undefined || name.startsWith("--")) {
+    throw new Error("missing cookie name");
+  }
+  const value = args[1];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(`missing value for cookie ${name}`);
+  }
+  const params: CookieParams = { name, value };
+  for (let index = 2; index < args.length; index += 1) {
+    const flag = args[index];
+    if (flag === "--http-only") {
+      params.httpOnly = true;
+      continue;
+    }
+    if (flag === "--secure") {
+      params.secure = true;
+      continue;
+    }
+    const next = args[index + 1];
+    if (next === undefined) {
+      throw new Error(`missing ${flag} value`);
+    }
+    index += 1;
+    if (flag === "--url") {
+      params.url = next;
+    } else if (flag === "--domain") {
+      params.domain = next;
+    } else if (flag === "--path") {
+      params.path = next;
+    } else if (flag === "--same-site") {
+      if (!SAME_SITE.includes(next)) {
+        throw new Error(`invalid --same-site ${next} (${SAME_SITE.join(", ")})`);
+      }
+      params.sameSite = next;
+    } else if (flag === "--expires") {
+      const seconds = Number(next);
+      if (!Number.isFinite(seconds)) {
+        throw new Error(`invalid --expires ${next} (unix seconds)`);
+      }
+      params.expires = seconds;
+    } else {
+      throw new Error(`unknown cookies flag ${flag}`);
+    }
+  }
+  return params;
+}
+
+export function formatCookies(cookies: any[]): string {
+  if (cookies.length === 0) {
+    return "no cookies";
+  }
+  return cookies
+    .map((cookie) => {
+      const flags = [
+        cookie.httpOnly ? "httpOnly" : null,
+        cookie.secure ? "secure" : null,
+        cookie.sameSite ? String(cookie.sameSite) : null,
+      ].filter(Boolean);
+      const where = `${cookie.domain ?? ""}${cookie.path ?? ""}`;
+      return [`${cookie.name}=${cookie.value}`, where, ...flags]
+        .filter(Boolean)
+        .join(" ");
+    })
+    .join("\n");
+}
+
+export async function cookiesGet(session: CdpSession): Promise<string> {
+  const { cookies } = await session.send("Network.getCookies", {});
+  return formatCookies(cookies ?? []);
+}
+
+export async function cookiesSet(
+  session: CdpSession,
+  params: CookieParams,
+): Promise<string> {
+  const result = await session.send("Network.setCookie", params);
+  // Chrome answers a rejected cookie with success:false, not an error — a
+  // silent no-op is exactly what a wrong domain or a missing secure looks like.
+  if (result?.success === false) {
+    throw new Error(`the browser rejected cookie ${params.name}`);
+  }
+  return `${params.name}=${params.value}`;
+}
+
+export async function cookiesClear(session: CdpSession): Promise<string> {
+  await session.send("Network.clearBrowserCookies", {});
+  return "cleared";
+}
+
+export async function setHeaders(
+  session: CdpSession,
+  json: string,
+): Promise<string> {
+  let headers: Record<string, string>;
+  try {
+    headers = JSON.parse(json);
+  } catch {
+    throw new Error(`headers needs JSON, got: ${json.slice(0, 60)}`);
+  }
+  if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+    throw new Error("headers needs a JSON object of name to value");
+  }
+  await session.send("Network.enable", {});
+  await session.send("Network.setExtraHTTPHeaders", { headers });
+  const names = Object.keys(headers);
+  return names.length === 0 ? "cleared" : names.join(" ");
+}
