@@ -1,8 +1,37 @@
 // Transcript primitives shared by api.ts (the live walk) and rollup-update.ts
-// (the incremental ingest). This module imports nothing, so both sides can pull
-// from it without the cycle that a direct api.ts import would create — the
-// reason it exists. Anything whose two copies must agree byte-for-byte belongs
-// here rather than duplicated with a "keep in lockstep" comment.
+// (the incremental ingest). This module imports nothing from the codebase (only
+// node builtins), so both sides can pull from it without the cycle that a direct
+// api.ts import would create — the reason it exists. Anything whose two copies
+// must agree byte-for-byte belongs here rather than duplicated with a "keep in
+// lockstep" comment.
+import { readdirSync, type Dirent } from "node:fs";
+import { join } from "node:path";
+
+// Recursive file walk, filtered by extension. `withFileTypes` gives one syscall
+// per directory instead of one stat per file. Shared so the rollup ingest and
+// the live walk agree by construction on what counts as a file — they compare
+// their results, and a drift here would look like missing tokens.
+export function walkFiles(
+  dir: string,
+  ext: string,
+  out: string[] = [],
+): string[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(path, ext, out);
+    } else if (entry.isFile() && entry.name.endsWith(ext)) {
+      out.push(path);
+    }
+  }
+  return out;
+}
 
 export type DedupEntry = {
   requestId?: string;

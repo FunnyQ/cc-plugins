@@ -14,7 +14,7 @@ import {
 } from "./live-sessions";
 import { readSessionFiles } from "./session-files";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
-import { isAlive } from "../../cockpit/scripts/cockpit-channel";
+import { isAlive } from "../../shared/scripts/process-alive";
 import { CODEX_STATE_DB, OPENCODE_DB, PROJECTS_DIR } from "./paths";
 
 export type { LiveSession } from "./live-sessions";

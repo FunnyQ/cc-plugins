@@ -2,7 +2,6 @@
 import {
   accessSync,
   constants,
-  type Dirent,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -12,7 +11,7 @@ import {
 } from "node:fs";
 import { Database } from "bun:sqlite";
 import { dirname, join } from "node:path";
-import { dedupKey, hourStartMs, usageTokenTotal } from "./dedup";
+import { dedupKey, hourStartMs, usageTokenTotal, walkFiles } from "./dedup";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
 import { allHourlyRows, openRollupDb } from "./rollup-db";
@@ -702,18 +701,12 @@ export function buildCodexUsageLimits(
   };
 }
 
-export async function fetchWithTimeout(
+export function fetchWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
 ): Promise<Response> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 async function refreshCodexAccessToken(auth: CodexAuth): Promise<string> {
@@ -860,10 +853,8 @@ async function fetchOpenRouterPricing(
 ): Promise<OpenRouterPricing> {
   const models: Record<string, ModelPrice> = {};
   let error: string | null = null;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(OPENROUTER_URL, { signal: ctrl.signal });
+    const res = await fetchWithTimeout(OPENROUTER_URL, {}, timeoutMs);
     if (res.ok) {
       const json = (await res.json()) as {
         data?: Array<{
@@ -898,8 +889,6 @@ async function fetchOpenRouterPricing(
   } catch (err) {
     error =
       err instanceof Error ? err.name || err.message : "OpenRouter failed";
-  } finally {
-    clearTimeout(timer);
   }
   return { models, error };
 }
@@ -1417,26 +1406,6 @@ function usageCost(
 }
 
 // withFileTypes gets the kind from the directory entry itself, so the walk costs
-// one syscall per directory instead of one stat per file. rollup-update.ts's
-// walkJsonlFiles already walks the same trees this way; matching it also means
-// the rollup and the live walk agree on what counts as a file.
-function walkFiles(dir: string, ext: string, out: string[] = []): string[] {
-  let entries: Dirent[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkFiles(path, ext, out);
-    } else if (entry.isFile() && entry.name.endsWith(ext)) {
-      out.push(path);
-    }
-  }
-  return out;
-}
 
 function openCodeStorageRoots(): string[] {
   const roots = new Set<string>();
@@ -1679,7 +1648,9 @@ function parseTranscriptUsage(): {
   try {
     const db = openRollupDb();
     try {
-      updateRollup(db);
+      // Reuse the walk above — the ingest traverses the same tree, and one walk
+      // of ~10k transcripts is ~100ms of pure directory syscalls per request.
+      updateRollup(db, { files: transcriptFiles });
       aggregates = readRollupAggregates(db);
     } finally {
       db.close();
@@ -1870,7 +1841,6 @@ function parseCodexUsage(): {
     string,
     { threadCount: number; interactionCount: number; toolCallCount: number }
   >;
-  hourCounts: Record<string, number>;
   weekHourMatrix: number[][];
   dailyHourCounts: Map<string, number[]>;
   totalThreads: number;
@@ -1900,7 +1870,6 @@ function parseCodexUsage(): {
     string,
     { threadCount: number; interactionCount: number; toolCallCount: number }
   >();
-  const hourCounts: Record<string, number> = {};
   const dailyHourCounts = new Map<string, number[]>();
   const ledger: InternalLedgerRow[] = [];
   const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
@@ -2009,8 +1978,6 @@ function parseCodexUsage(): {
     daily.interactionCount += interactionCount;
     daily.toolCallCount += toolCallCount;
     dailyActivity.set(date, daily);
-    hourCounts[String(d.getHours())] =
-      (hourCounts[String(d.getHours())] || 0) + interactionCount;
     weekHourMatrix[d.getDay()][d.getHours()] += interactionCount;
     const hourBuckets = dailyHourCounts.get(date) ?? new Array(24).fill(0);
     hourBuckets[d.getHours()] += interactionCount;
@@ -2084,7 +2051,6 @@ function parseCodexUsage(): {
     projectModelUsage,
     projectActivity,
     dailyActivity,
-    hourCounts,
     weekHourMatrix,
     dailyHourCounts,
     totalThreads: sessionFiles.size,
@@ -2550,6 +2516,62 @@ function serializeHourlyUsage(
       };
     })
     .sort((a, b) => a.timestampMs - b.timestampMs);
+}
+
+/**
+ * A cheap exact fingerprint of everything buildStats() reads.
+ *
+ * Measured on a 1.6GB / 11,978-file corpus: ~125ms (94ms readdir + 30ms stat)
+ * against a ~10s build, so callers can cache the build and revalidate per
+ * request without ever serving stale data.
+ *
+ * It lives here, beside the readers, because a source added to buildStats() and
+ * forgotten here would silently pin the cache to the old value. Same failure
+ * mode the RATE_LIMITS_CACHE note in paths.ts warns about: a drifted literal
+ * fails quietly.
+ */
+export function statsFingerprint(): string {
+  let newest = 0;
+  let count = 0;
+  const note = (path: string) => {
+    try {
+      const m = statSync(path).mtimeMs;
+      if (m > newest) newest = m;
+      count++;
+    } catch {
+      // absent source — its disappearance still moves `count`
+    }
+  };
+
+  const trees: Array<[string, string]> = [
+    [PROJECTS_DIR, ".jsonl"],
+    [CODEX_SESSIONS_DIR, ".jsonl"],
+    ...openCodeStorageRoots().flatMap(
+      (root): Array<[string, string]> => [
+        [join(root, "session"), ".json"],
+        [join(root, "message"), ".json"],
+      ],
+    ),
+  ];
+  for (const [dir, ext] of trees) {
+    for (const file of walkFiles(dir, ext)) note(file);
+  }
+  for (const file of [
+    STATS_CACHE,
+    HISTORY,
+    CODEX_STATE_DB,
+    CODEX_AUTH,
+    OPENCODE_DB,
+    RATE_LIMITS_CACHE,
+    CODEX_USAGE_CACHE,
+    // Not transcripts, but they change the numbers: a pricing refresh or a
+    // budget edit must invalidate a cached build even though no session ran.
+    USER_PRICING_OVERRIDE,
+    USER_BUDGET_CONFIG,
+  ]) {
+    note(file);
+  }
+  return `${count}:${newest}`;
 }
 
 export async function buildStats() {

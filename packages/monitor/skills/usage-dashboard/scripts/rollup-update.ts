@@ -7,21 +7,19 @@
 // so any truncation triggers a full rebuild.
 //
 // Kept free of any api.ts import so api.ts can call updateRollup() without a
-// cycle. The parse helpers both sides need live in dedup.ts, which imports
-// nothing — sharing them there keeps the hour buckets identical by construction
-// instead of by hand.
+// cycle. The parse helpers and the transcript walk both sides need live in
+// dedup.ts, which imports nothing from the codebase — sharing them there keeps
+// the hour buckets identical by construction instead of by hand.
 
 import { Database } from "bun:sqlite";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
 import {
-  type Dirent,
-  closeSync,
-  openSync,
-  readSync,
-  readdirSync,
-  statSync,
-} from "node:fs";
-import { join } from "node:path";
-import { dedupKey, hourStartMs, usageTokenTotal } from "./dedup";
+  dedupKey,
+  hourStartMs,
+  usageTokenTotal,
+  walkFiles,
+  type DedupUsage,
+} from "./dedup";
 import { PROJECTS_DIR } from "./paths";
 import {
   addHourlyRow,
@@ -36,35 +34,14 @@ import {
   type HourlyRow,
 } from "./rollup-db";
 
-type TranscriptUsage = {
-  input_tokens?: number;
-  output_tokens?: number;
-  cache_read_input_tokens?: number;
-  cache_creation_input_tokens?: number;
-};
 type TranscriptEntry = {
   timestamp?: string;
   requestId?: string;
   uuid?: string;
   type?: string;
   cwd?: string;
-  message?: { id?: string; model?: string; usage?: TranscriptUsage };
+  message?: { id?: string; model?: string; usage?: DedupUsage };
 };
-
-function walkJsonlFiles(dir: string, out: string[] = []): string[] {
-  let entries: Dirent[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) walkJsonlFiles(full, out);
-    else if (entry.isFile() && entry.name.endsWith(".jsonl")) out.push(full);
-  }
-  return out;
-}
 
 type ParsedSlice = {
   rows: Map<string, HourlyRow>;
@@ -213,10 +190,17 @@ export type UpdateResult = {
 // clears all rollup state and re-ingests every file from byte 0.
 export function updateRollup(
   db: Database,
-  opts: { rebuild?: boolean; nowMs?: number; projectsDir?: string } = {},
+  opts: {
+    rebuild?: boolean;
+    nowMs?: number;
+    projectsDir?: string;
+    /** Transcript paths the caller already walked, to skip a second traversal. */
+    files?: string[];
+  } = {},
 ): UpdateResult {
   const nowMs = opts.nowMs ?? Date.now();
-  const files = walkJsonlFiles(opts.projectsDir ?? PROJECTS_DIR);
+  const files =
+    opts.files ?? walkFiles(opts.projectsDir ?? PROJECTS_DIR, ".jsonl");
 
   let rebuilt = false;
   if (opts.rebuild) {
