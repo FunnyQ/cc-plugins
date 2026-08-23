@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
-import { readLog } from "../../flightplan/scripts/lib/flightlog";
+import { readLog, runLogPath } from "../../flightplan/scripts/lib/flightlog";
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
-import { deriveTaskViews, type TaskView } from "./fleet";
+import { deriveTaskViews, type TaskState, type TaskView } from "./fleet";
 
 export type Loaded = {
   byRef: Record<string, ParsedTask>;
@@ -76,7 +76,7 @@ export async function loadPlan(planDir: string): Promise<{
 
   const [taskResult, entries] = await Promise.all([
     loadAllTasks(tasksDir),
-    readLog(join(planDir, ".flightlog", "run.jsonl")),
+    readLog(runLogPath(planDir)),
   ]);
 
   return {
@@ -95,6 +95,15 @@ export async function loadPlan(planDir: string): Promise<{
     entries,
   };
 }
+
+/** Which counter each task state increments. Exhaustive over `TaskState`. */
+const COUNT_KEY = {
+  done: "done",
+  "in-progress": "inProgress",
+  ready: "ready",
+  blocked: "blocked",
+  invalid: "invalid",
+} as const satisfies Record<TaskState, string>;
 
 /** Pure: shapes the response. */
 export function buildTreePayload(input: {
@@ -115,13 +124,7 @@ export function buildTreePayload(input: {
     invalid: 0,
   };
 
-  for (const task of tasks) {
-    if (task.state === "done") counts.done += 1;
-    if (task.state === "in-progress") counts.inProgress += 1;
-    if (task.state === "ready") counts.ready += 1;
-    if (task.state === "blocked") counts.blocked += 1;
-    if (task.state === "invalid") counts.invalid += 1;
-  }
+  for (const task of tasks) counts[COUNT_KEY[task.state]] += 1;
 
   return {
     slug: input.slug,

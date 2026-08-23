@@ -1,5 +1,6 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { removeRecord, writeRecord } from "./daemon-record";
+import { runLogPath } from "../../flightplan/scripts/lib/flightlog";
 import { eventsHandler } from "./events-api";
 import {
   main as launchMain,
@@ -68,7 +69,7 @@ export async function createServer(
         }
 
         if (url.pathname === "/api/events") {
-          return eventsHandler(request, join(plan, ".flightlog", "run.jsonl"));
+          return eventsHandler(request, runLogPath(plan));
         }
 
         return serveStatic(distRoot, url.pathname);
