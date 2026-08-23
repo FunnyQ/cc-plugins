@@ -23,6 +23,7 @@
  * Exits 0 if passed, 1 if not, 2 on usage / unparseable-rubric errors.
  */
 import { readFile } from "node:fs/promises";
+import { flagValue } from "./lib/args";
 import { parseTask, refToString, type Rubric } from "./lib/parse-task";
 import { appendEntry, type ScoreEntry } from "./lib/flightlog";
 
@@ -140,11 +141,6 @@ export function buildScoreEntry(
       score: d.score,
     })),
   };
-}
-
-function flagValue(argv: string[], name: string): string | undefined {
-  const i = argv.indexOf(name);
-  return i !== -1 ? argv[i + 1] : undefined;
 }
 
 async function main() {

@@ -18,7 +18,9 @@
  */
 import { writeFile } from "node:fs/promises";
 import { dirname, join, basename } from "node:path";
+import { flagValue } from "./lib/args";
 import {
+  FLIGHTLOG_DIRNAME,
   appendEntry,
   readLog,
   renderRunlog,
@@ -53,15 +55,10 @@ export function buildNoteEntry(meta: {
  */
 export function slugFromLogPath(logFile: string): string {
   const dir = dirname(logFile);
-  if (basename(dir) === ".flightlog") {
+  if (basename(dir) === FLIGHTLOG_DIRNAME) {
     return basename(dirname(dir)) || "run";
   }
   return basename(dir) || "run";
-}
-
-function flagValue(argv: string[], name: string): string | undefined {
-  const i = argv.indexOf(name);
-  return i !== -1 ? argv[i + 1] : undefined;
 }
 
 async function main() {
@@ -71,7 +68,8 @@ async function main() {
     if (!logFile) usage();
     const task = flagValue(rest, "--task");
     const role = flagValue(rest, "--role");
-    const message = flagValue(rest, "--message");
+    // Free text — a note may legitimately open with `--`.
+    const message = flagValue(rest, "--message", { allowDashValue: true });
     const phase = flagValue(rest, "--phase");
     if (phase !== undefined && phase !== "start" && phase !== "end") {
       console.error("flightlog --phase must be start or end");
