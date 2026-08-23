@@ -1,5 +1,14 @@
 # Changelog
 
+## [herdr 0.5.3] - 2026-08-24
+
+_tracks tag `herdr-v0.5.3`_
+
+### Fixed
+- The CDP transport no longer mistakes a protocol error for a result: a failed `eval` used to print an empty line as if it had succeeded, and `screenshot` / `click-ref` blamed the wrong cause when the browser itself reported the failure. These now surface as real errors.
+- A socket that dropped mid-command no longer hangs the CLI forever — a pending call now fails instead of waiting on a connection that's already gone.
+- Commands now carry a send deadline: 30s normally, 120s for calls whose cost scales with page size (full-page screenshot, whole accessibility tree, large response bodies). A renderer stuck behind a modal dialog now times out instead of hanging. `eval` with an awaited promise is exempt, since its duration is the caller's own expression to decide.
+
 ## [monitor 4.0.7] - 2026-08-24
 
 _tracks tag `monitor-v4.0.7`_
