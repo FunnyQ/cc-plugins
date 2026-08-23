@@ -180,13 +180,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return parsed?.result ?? parsed;
   }
 
-  /** Run a herdr command that prints nothing on success (send-text/send-keys/run). */
-  async function callVoid(args: string[]): Promise<void> {
-    const result = await run(args);
-    // No envelope is parsed, so these errors never carry herdr's error code.
-    if (result.code !== 0) throw failure(args, result, null);
-  }
-
   /** Run a read command whose successful stdout is terminal text, not JSON. */
   async function callText(args: string[]): Promise<string> {
     const result = await run(args);
@@ -197,6 +190,14 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       result,
       envelope(result.stderr.trim() || result.stdout.trim()),
     );
+  }
+
+  /** Run a herdr command that prints nothing on success (send-text/send-keys/run).
+   *  Shares callText's failure path so these errors carry herdr's error code —
+   *  an `error.code === "agent_pane_busy"` check cannot fire without it, and
+   *  keys() reaches herdr only through here. */
+  async function callVoid(args: string[]): Promise<void> {
+    await callText(args);
   }
 
   async function list(): Promise<AgentInfo[]> {
