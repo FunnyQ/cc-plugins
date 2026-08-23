@@ -10,7 +10,7 @@ import {
   sortLiveSessions,
   statusRank,
   STALE_CUTOFF_MS,
-  CODEX_BUSY_CUTOFF_MS,
+  BUSY_CUTOFF_MS,
   type CodexRowInput,
   type LiveSession,
   type OpenCodeRowInput,
@@ -171,7 +171,7 @@ describe("buildCodexLiveSessions", () => {
 
   test("marks older-but-fresh sessions as recent", () => {
     const out = buildCodexLiveSessions(
-      [row({ updated_at_ms: NOW - CODEX_BUSY_CUTOFF_MS - 1000 })],
+      [row({ updated_at_ms: NOW - BUSY_CUTOFF_MS - 1000 })],
       new Set(),
       NOW,
       () => true,
@@ -224,7 +224,7 @@ describe("buildOpenCodeLiveSessions", () => {
 
   test("marks older-but-fresh sessions as recent", () => {
     const out = buildOpenCodeLiveSessions(
-      [row({ time_updated: NOW - CODEX_BUSY_CUTOFF_MS - 1000 })],
+      [row({ time_updated: NOW - BUSY_CUTOFF_MS - 1000 })],
       new Set(),
       NOW,
     );

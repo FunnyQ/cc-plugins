@@ -4,13 +4,12 @@
 // by wrapping it via TOKEN_ATLAS_STATUSLINE_COMMAND. Reused by setup.ts and run
 // directly by the dashboard skill after the user approves (see SKILL.md).
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
 import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
+// One source for the collector path and the settings file: "wired" is decided
+// by string equality against COLLECTOR_COMMAND, so a second literal here could
+// drift and make the check disagree with what this file writes.
+import { COLLECTOR_COMMAND, SETTINGS_JSON as SETTINGS } from "./install";
 
-const SETTINGS = join(homedir(), ".claude", "settings.json");
-// The collector lives in the usage-dashboard skill, one over from here.
-const COLLECTOR_COMMAND = `bun ${resolve(import.meta.dir, "..", "..", "usage-dashboard", "scripts", "statusline-collector.ts")}`;
 
 export type ApplyResult =
   | {

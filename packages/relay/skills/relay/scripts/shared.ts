@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { join, parse } from "path";
 import { homedir } from "os";
 import type { Mode, RunResult } from "./types";
 
@@ -26,6 +26,10 @@ export const CONFIG_PATH = join(
   "relay",
   "config.json",
 );
+
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
 // Parse a comma-separated flag value into a trimmed, empty-free list.
 export function parseCsv(value: string): string[] {
@@ -57,14 +61,22 @@ export function run(
   };
 }
 
-// Timestamp in YYYYMMDD-HHMMSS-milliseconds format (for paths)
-export function timestampForPath(now = new Date()): string {
-  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
+const pad = (n: number, len = 2) => String(n).padStart(len, "0");
+
+// Timestamp in YYYYMMDD-HHMM format (minute resolution)
+function timestampToMinute(now: Date): string {
   return [
     `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`,
-    `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`,
-    pad(now.getMilliseconds(), 3),
+    `${pad(now.getHours())}${pad(now.getMinutes())}`,
   ].join("-");
+}
+
+// Timestamp in YYYYMMDD-HHMMSS-milliseconds format (for paths)
+export function timestampForPath(now = new Date()): string {
+  return `${timestampToMinute(now)}${pad(now.getSeconds())}-${pad(
+    now.getMilliseconds(),
+    3,
+  )}`;
 }
 
 // Create a tmp run directory and return its path
@@ -79,13 +91,8 @@ export function createTmpRunDir(): string {
 
 // Add timestamp suffix to file path (foo.png → foo_YYYYMMDD-HHMM.png)
 export function addTimestampSuffix(filePath: string): string {
-  const { dir, name, ext } = require("path").parse(filePath);
-  const now = new Date();
-  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
-  const ts = `${now.getFullYear()}${pad(
-    now.getMonth() + 1,
-  )}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
-  const newName = `${name}_${ts}${ext}`;
+  const { dir, name, ext } = parse(filePath);
+  const newName = `${name}_${timestampToMinute(new Date())}${ext}`;
   // Preserve empty dir as "." (current directory)
   if (!dir) return newName;
   return join(dir, newName);
@@ -122,18 +129,11 @@ export function resolveModel(
   } catch {
     config = undefined;
   }
-  if (
-    config &&
-    typeof config === "object" &&
-    "models" in config &&
-    typeof config.models === "object" &&
-    config.models !== null &&
-    backend in config.models &&
-    typeof config.models[backend] === "object" &&
-    config.models[backend] !== null &&
-    mode in config.models[backend]
-  ) {
-    return config.models[backend][mode];
+  if (isObject(config) && isObject(config.models)) {
+    const backendModels = config.models[backend];
+    if (isObject(backendModels) && typeof backendModels[mode] === "string") {
+      return backendModels[mode];
+    }
   }
 
   // Precedence 3: built-in constant

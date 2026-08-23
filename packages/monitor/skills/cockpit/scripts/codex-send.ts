@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { jsonResponse as json } from "./http";
-import { cockpitHome } from "./cockpit-home";
+import { daemonToken } from "./cockpit-home";
 import {
   runProbe,
   type ProbeOptions,
@@ -11,17 +9,6 @@ import {
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
 type SendCodexTurn = (opts: ProbeOptions) => Promise<ProbeReport>;
-
-function daemonToken(): string | null {
-  try {
-    const raw = JSON.parse(
-      readFileSync(join(cockpitHome(), "daemon.json"), "utf8"),
-    );
-    return typeof raw?.token === "string" ? raw.token : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function handleSendCodexMessage(
   req: Request,

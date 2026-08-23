@@ -6,9 +6,10 @@ import {
 } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { createConnection, type Socket } from "node:net";
+import { errorMessage } from "./http";
+import { codexDir } from "./codex-db";
 
 type JsonRpcMessage =
   | {
@@ -62,10 +63,6 @@ export type ProbeDeps = {
   createProxyTransport: () => Promise<JsonRpcTransport>;
   createDirectTransport: () => Promise<JsonRpcTransport>;
 };
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 export function parseArgs(argv: string[]): ProbeOptions {
   const out: ProbeOptions = { help: false };
@@ -457,8 +454,7 @@ function defaultStartRemoteControl(): unknown {
 
 async function defaultCreateTransport(): Promise<JsonRpcTransport> {
   const socketPath = join(
-    homedir(),
-    ".codex",
+    codexDir(),
     "app-server-control",
     "app-server-control.sock",
   );
@@ -726,56 +722,6 @@ export async function runProbe(
   } finally {
     transport?.close();
   }
-}
-
-export function runDirectProbe(opts: ProbeOptions): Promise<ProbeReport> {
-  const report: ProbeReport = {
-    ok: false,
-    daemonReady: false,
-    controlMode: "direct-app-server",
-    rpcReady: false,
-    threadId: opts.threadId,
-    threadResolved: false,
-    warnings: [],
-    errors: [],
-  };
-
-  if (opts.sendText && !opts.threadId) {
-    report.errors.push("--send requires --thread");
-    return Promise.resolve(report);
-  }
-
-  try {
-    report.codexCliVersion = defaultCliVersion();
-  } catch (err) {
-    report.errors.push(`codex --version failed: ${errorMessage(err)}`);
-  }
-
-  return defaultCreateDirectTransport()
-    .then(async (transport) => {
-      let shouldClose = true;
-      try {
-        const result = await executeProbeRequests(transport, opts, report);
-        shouldClose = !result.keepTransportOpen;
-        return report;
-      } catch (err) {
-        if (turnSubmitted(report)) {
-          report.ok = false;
-          report.errors.push(
-            `direct app-server failed after Codex turn was submitted: ${errorMessage(err)}`,
-          );
-          return report;
-        }
-        report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
-        return report;
-      } finally {
-        if (shouldClose) transport.close();
-      }
-    })
-    .catch((err) => {
-      report.errors.push(`direct app-server failed: ${errorMessage(err)}`);
-      return report;
-    });
 }
 
 export function formatHumanReport(report: ProbeReport): string {

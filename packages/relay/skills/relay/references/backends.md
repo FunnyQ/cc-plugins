@@ -80,7 +80,7 @@ codex review -                # task provided; prompt arrives on stdin
 codex exec -o <lastfile> "<image prompt>"
 ```
 
-Generated PNGs land under `~/.codex/generated_images/`. After the run, locate the newest PNG, or parse a `*.png` path from output, then `cp` it to `--out` (timestamp-suffixed).
+Generated PNGs land under `~/.codex/generated_images/`. After the run, locate the newest PNG written since the run started, falling back to a `*.png` path parsed out of the output, then copy it to `--out` (timestamp-suffixed). That order matters: the fallback matches any path-shaped token that exists on disk, so a model merely referring to an older image would otherwise copy the wrong file.
 
 ### Model
 

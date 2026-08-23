@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { buildRateLimitsRecord } from "./rate-limits-cache";
+import { RATE_LIMITS_CACHE, TOKEN_ATLAS_CACHE_DIR } from "./paths";
 
-const CACHE_DIR = join(homedir(), ".cache", "token-atlas");
-const RATE_LIMITS_CACHE = join(CACHE_DIR, "rate-limits.json");
+const CACHE_DIR = TOKEN_ATLAS_CACHE_DIR;
 const ROLLUP_NUDGE_MARKER = join(CACHE_DIR, ".rollup-nudge");
 const ROLLUP_NUDGE_THROTTLE_MS = 5 * 60 * 1000;
 const PUSH_NUDGE_MARKER = join(CACHE_DIR, ".push-nudge");
@@ -37,63 +36,30 @@ function cacheRateLimits(payload: string): void {
   }
 }
 
-// Secondary rollup trigger: keep the usage rollup fresh even when the dashboard
-// is never opened. Throttled via a marker-file mtime and run fully detached so it
-// can never slow down or break statusline rendering. The primary trigger is still
-// the dashboard's own update-then-read in api.ts.
-function nudgeRollup(): void {
+// Fire a background script, at most once per throttle window. The marker file's
+// mtime is the clock. Everything here is best-effort and fully detached:
+// statusline rendering must never wait on, or fail because of, a nudge.
+function nudge(marker: string, throttleMs: number, script: string): void {
   try {
     const last = (() => {
       try {
-        return statSync(ROLLUP_NUDGE_MARKER).mtimeMs;
+        return statSync(marker).mtimeMs;
       } catch {
         return 0;
       }
     })();
-    if (Date.now() - last < ROLLUP_NUDGE_THROTTLE_MS) return;
+    if (Date.now() - last < throttleMs) return;
 
     mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(ROLLUP_NUDGE_MARKER, "");
+    writeFileSync(marker, "");
 
-    const child = spawn(
-      process.execPath,
-      [join(import.meta.dir, "rollup-update.ts")],
-      { detached: true, stdio: "ignore" },
-    );
+    const child = spawn(process.execPath, [join(import.meta.dir, script)], {
+      detached: true,
+      stdio: "ignore",
+    });
     child.unref();
   } catch {
-    // Best-effort only — never let a rollup nudge disrupt the statusline.
-  }
-}
-
-// Tertiary trigger: push the latest Claude + Codex usage snapshot to a remote
-// relay (n8n) so an external dashboard (e.g. TRMNL) can read it. Opt-in via
-// LLM_QUOTA_INGEST_URL. Throttled + fully detached for the same reason as the
-// rollup nudge: statusline rendering must never wait on (or fail because of) the
-// network push or the Codex usage API call that push-usage.ts makes.
-function nudgePush(): void {
-  if (!process.env.LLM_QUOTA_INGEST_URL?.trim()) return;
-  try {
-    const last = (() => {
-      try {
-        return statSync(PUSH_NUDGE_MARKER).mtimeMs;
-      } catch {
-        return 0;
-      }
-    })();
-    if (Date.now() - last < PUSH_NUDGE_THROTTLE_MS) return;
-
-    mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(PUSH_NUDGE_MARKER, "");
-
-    const child = spawn(
-      process.execPath,
-      [join(import.meta.dir, "push-usage.ts")],
-      { detached: true, stdio: "ignore" },
-    );
-    child.unref();
-  } catch {
-    // Best-effort only — never let a usage push disrupt the statusline.
+    // Best-effort only — never let a nudge disrupt the statusline.
   }
 }
 
@@ -118,6 +84,16 @@ function runStatusline(payload: string): number {
 
 const payload = await readStdin();
 cacheRateLimits(payload);
-nudgeRollup();
-nudgePush();
+
+// Secondary rollup trigger: keep the usage rollup fresh even when the dashboard
+// is never opened. The primary trigger is the dashboard's own update-then-read
+// in api.ts.
+nudge(ROLLUP_NUDGE_MARKER, ROLLUP_NUDGE_THROTTLE_MS, "rollup-update.ts");
+
+// Tertiary trigger: push the latest Claude + Codex usage snapshot to a remote
+// relay (n8n) so an external dashboard (e.g. TRMNL) can read it. Opt-in.
+if (process.env.LLM_QUOTA_INGEST_URL?.trim()) {
+  nudge(PUSH_NUDGE_MARKER, PUSH_NUDGE_THROTTLE_MS, "push-usage.ts");
+}
+
 process.exit(runStatusline(payload));

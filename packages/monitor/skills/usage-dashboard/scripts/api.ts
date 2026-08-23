@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { Database } from "bun:sqlite";
 import { dirname, join } from "node:path";
-import { dedupKey } from "./dedup";
+import { dedupKey, hourStartMs, usageTokenTotal, walkFiles } from "./dedup";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
 import { allHourlyRows, openRollupDb } from "./rollup-db";
@@ -23,14 +23,17 @@ import {
   CODEX_AUTH,
   CODEX_SESSIONS_DIR,
   CODEX_STATE_DB,
+  CODEX_USAGE_CACHE,
   HISTORY,
   HOME,
   OPENCODE_DB,
   OPENCODE_PROJECT_DIR,
   OPENCODE_STORAGE_DIR,
   PROJECTS_DIR,
+  RATE_LIMITS_CACHE,
   SESSIONS_DIR,
   STATS_CACHE,
+  TOKEN_ATLAS_CACHE_DIR,
 } from "./paths";
 const PRICING_DEFAULTS = join(
   import.meta.dir,
@@ -45,12 +48,6 @@ const USER_PRICING_OVERRIDE = join(
   "pricing.json",
 );
 const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
-const TOKEN_ATLAS_CACHE_DIR = join(HOME, ".cache", "token-atlas");
-const RATE_LIMITS_CACHE = join(TOKEN_ATLAS_CACHE_DIR, "rate-limits.json");
-const CODEX_USAGE_CACHE = join(
-  TOKEN_ATLAS_CACHE_DIR,
-  "codex-usage-limits.json",
-);
 const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/codex/usage";
 const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
 const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -704,18 +701,12 @@ export function buildCodexUsageLimits(
   };
 }
 
-async function fetchWithTimeout(
+export function fetchWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
 ): Promise<Response> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 async function refreshCodexAccessToken(auth: CodexAuth): Promise<string> {
@@ -862,10 +853,8 @@ async function fetchOpenRouterPricing(
 ): Promise<OpenRouterPricing> {
   const models: Record<string, ModelPrice> = {};
   let error: string | null = null;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(OPENROUTER_URL, { signal: ctrl.signal });
+    const res = await fetchWithTimeout(OPENROUTER_URL, {}, timeoutMs);
     if (res.ok) {
       const json = (await res.json()) as {
         data?: Array<{
@@ -900,8 +889,6 @@ async function fetchOpenRouterPricing(
   } catch (err) {
     error =
       err instanceof Error ? err.name || err.message : "OpenRouter failed";
-  } finally {
-    clearTimeout(timer);
   }
   return { models, error };
 }
@@ -1264,18 +1251,6 @@ function parseHistory(): {
   return { byProject, weekHourMatrix, dailyHistory, dailyHourCounts };
 }
 
-function parseSessions(): Array<{
-  pid: number;
-  sessionId: string;
-  cwd: string;
-  startedAt: number;
-  status: string;
-  updatedAt?: number;
-  version?: string;
-}> {
-  return readSessionFiles();
-}
-
 export function emptyModelUsage(): ModelUsage {
   return {
     inputTokens: 0,
@@ -1293,14 +1268,7 @@ export function addUsage(target: ModelUsage, usage: TranscriptUsage): void {
   target.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
 }
 
-export function usageTokenTotal(usage: TranscriptUsage): number {
-  return (
-    (usage.input_tokens ?? 0) +
-    (usage.output_tokens ?? 0) +
-    (usage.cache_read_input_tokens ?? 0) +
-    (usage.cache_creation_input_tokens ?? 0)
-  );
-}
+export { usageTokenTotal };
 
 export function modelKey(provider: Provider, model: string): string {
   return `${provider}:${model}`;
@@ -1328,12 +1296,6 @@ export function addModelUsage(target: ModelUsage, source: ModelUsage): void {
   }
 }
 
-function hourStartMs(timestampMs: number): number {
-  const d = new Date(timestampMs);
-  d.setMinutes(0, 0, 0);
-  return d.getTime();
-}
-
 function addHourlyUsage(
   buckets: Map<number, HourlyUsageBucket>,
   timestampMs: number,
@@ -1352,6 +1314,38 @@ function addHourlyUsage(
   addModelUsage(current, usage);
   bucket.usageByModel.set(model, current);
   buckets.set(hourMs, bucket);
+}
+
+// Accumulate into a two-level Map<outerKey, Map<model, ModelUsage>> — the shape
+// projectModelUsage and dailyModelUsage both use. Ten call sites across the three
+// providers open-coded the get-or-create, and the two variants differ only in
+// which adder they need: addUsage takes a raw transcript usage, addModelUsage an
+// already-aggregated one. Picking the wrong one undercounts without erroring, so
+// the choice is a function name here rather than a line in each caller.
+function addNestedModelUsage(
+  outer: Map<string, Map<string, ModelUsage>>,
+  key: string,
+  model: string,
+  usage: ModelUsage,
+): void {
+  const byModel = outer.get(key) ?? new Map<string, ModelUsage>();
+  const target = byModel.get(model) ?? emptyModelUsage();
+  addModelUsage(target, usage);
+  byModel.set(model, target);
+  outer.set(key, byModel);
+}
+
+function addNestedTranscriptUsage(
+  outer: Map<string, Map<string, ModelUsage>>,
+  key: string,
+  model: string,
+  usage: TranscriptUsage,
+): void {
+  const byModel = outer.get(key) ?? new Map<string, ModelUsage>();
+  const target = byModel.get(model) ?? emptyModelUsage();
+  addUsage(target, usage);
+  byModel.set(model, target);
+  outer.set(key, byModel);
 }
 
 export function modelUsageTotal(usage: ModelUsage): number {
@@ -1411,24 +1405,7 @@ function usageCost(
     : calcCost(usage, model, pricing);
 }
 
-function walkFiles(dir: string, ext: string, out: string[] = []): string[] {
-  if (!existsSync(dir)) return out;
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    let stat;
-    try {
-      stat = statSync(path);
-    } catch {
-      continue;
-    }
-    if (stat.isDirectory()) {
-      walkFiles(path, ext, out);
-    } else if (stat.isFile() && path.endsWith(ext)) {
-      out.push(path);
-    }
-  }
-  return out;
-}
+// withFileTypes gets the kind from the directory entry itself, so the walk costs
 
 function openCodeStorageRoots(): string[] {
   const roots = new Set<string>();
@@ -1491,14 +1468,7 @@ function readRollupAggregates(db: Database): ClaudeAggregates {
     // projectModelUsage + projectTokens — only rows with a cwd, matching the live
     // parser which writes these solely when entry.cwd is truthy.
     if (r.project) {
-      let byModel = projectModelUsage.get(r.project);
-      if (!byModel) {
-        byModel = new Map();
-        projectModelUsage.set(r.project, byModel);
-      }
-      const pu = byModel.get(r.model) ?? emptyModelUsage();
-      addModelUsage(pu, usage);
-      byModel.set(r.model, pu);
+      addNestedModelUsage(projectModelUsage, r.project, r.model, usage);
       projectTokens.set(
         r.project,
         (projectTokens.get(r.project) ?? 0) + modelUsageTotal(usage),
@@ -1515,14 +1485,7 @@ function readRollupAggregates(db: Database): ClaudeAggregates {
         usage,
       );
       const date = fmtDate(r.hour_ms);
-      let byModel = dailyModelUsage.get(date);
-      if (!byModel) {
-        byModel = new Map();
-        dailyModelUsage.set(date, byModel);
-      }
-      const du = byModel.get(r.model) ?? emptyModelUsage();
-      addModelUsage(du, usage);
-      byModel.set(r.model, du);
+      addNestedModelUsage(dailyModelUsage, date, r.model, usage);
     }
   }
 
@@ -1653,26 +1616,12 @@ function parseTranscriptUsage(): {
           entry.cwd,
           (projectTokens.get(entry.cwd) ?? 0) + tokenTotal,
         );
-        let byModel = projectModelUsage.get(entry.cwd);
-        if (!byModel) {
-          byModel = new Map();
-          projectModelUsage.set(entry.cwd, byModel);
-        }
-        const projectUsage = byModel.get(model) ?? emptyModelUsage();
-        addUsage(projectUsage, usage);
-        byModel.set(model, projectUsage);
+        addNestedTranscriptUsage(projectModelUsage, entry.cwd, model, usage);
       }
 
-      const date = entry.timestamp ? fmtDate(Date.parse(entry.timestamp)) : "";
+      const date = entry.timestamp ? fmtDate(parsedTimestamp) : "";
       if (!date) continue;
-      let byModel = dailyModelUsage.get(date);
-      if (!byModel) {
-        byModel = new Map();
-        dailyModelUsage.set(date, byModel);
-      }
-      const dayUsage = byModel.get(model) ?? emptyModelUsage();
-      addUsage(dayUsage, usage);
-      byModel.set(model, dayUsage);
+      addNestedTranscriptUsage(dailyModelUsage, date, model, usage);
     }
   }
 
@@ -1699,7 +1648,9 @@ function parseTranscriptUsage(): {
   try {
     const db = openRollupDb();
     try {
-      updateRollup(db);
+      // Reuse the walk above — the ingest traverses the same tree, and one walk
+      // of ~10k transcripts is ~100ms of pure directory syscalls per request.
+      updateRollup(db, { files: transcriptFiles });
       aggregates = readRollupAggregates(db);
     } finally {
       db.close();
@@ -1890,7 +1841,6 @@ function parseCodexUsage(): {
     string,
     { threadCount: number; interactionCount: number; toolCallCount: number }
   >;
-  hourCounts: Record<string, number>;
   weekHourMatrix: number[][];
   dailyHourCounts: Map<string, number[]>;
   totalThreads: number;
@@ -1920,7 +1870,6 @@ function parseCodexUsage(): {
     string,
     { threadCount: number; interactionCount: number; toolCallCount: number }
   >();
-  const hourCounts: Record<string, number> = {};
   const dailyHourCounts = new Map<string, number[]>();
   const ledger: InternalLedgerRow[] = [];
   const weekHourMatrix: number[][] = Array.from({ length: 7 }, () =>
@@ -1995,25 +1944,11 @@ function parseCodexUsage(): {
       addHourlyUsage(hourlyUsage, updatedMs || createdMs, key, usage);
     }
 
-    let byModel = dailyModelUsage.get(date);
-    if (!byModel) {
-      byModel = new Map();
-      dailyModelUsage.set(date, byModel);
-    }
-    const dayUsage = byModel.get(key) ?? emptyModelUsage();
-    addModelUsage(dayUsage, usage);
-    byModel.set(key, dayUsage);
+    addNestedModelUsage(dailyModelUsage, date, key, usage);
 
     if (cwd) {
       projectTokens.set(cwd, (projectTokens.get(cwd) ?? 0) + tokenTotal);
-      let projectByModel = projectModelUsage.get(cwd);
-      if (!projectByModel) {
-        projectByModel = new Map();
-        projectModelUsage.set(cwd, projectByModel);
-      }
-      const projectUsage = projectByModel.get(key) ?? emptyModelUsage();
-      addModelUsage(projectUsage, usage);
-      projectByModel.set(key, projectUsage);
+      addNestedModelUsage(projectModelUsage, cwd, key, usage);
 
       const current = projectActivity.get(cwd);
       if (current) {
@@ -2043,8 +1978,6 @@ function parseCodexUsage(): {
     daily.interactionCount += interactionCount;
     daily.toolCallCount += toolCallCount;
     dailyActivity.set(date, daily);
-    hourCounts[String(d.getHours())] =
-      (hourCounts[String(d.getHours())] || 0) + interactionCount;
     weekHourMatrix[d.getDay()][d.getHours()] += interactionCount;
     const hourBuckets = dailyHourCounts.get(date) ?? new Array(24).fill(0);
     hourBuckets[d.getHours()] += interactionCount;
@@ -2083,14 +2016,7 @@ function parseCodexUsage(): {
     addModelUsage(modelUsage[key], usage);
 
     const date = fmtDate(timestampMs);
-    let byModel = dailyModelUsage.get(date);
-    if (!byModel) {
-      byModel = new Map();
-      dailyModelUsage.set(date, byModel);
-    }
-    const dayUsage = byModel.get(key) ?? emptyModelUsage();
-    addModelUsage(dayUsage, usage);
-    byModel.set(key, dayUsage);
+    addNestedModelUsage(dailyModelUsage, date, key, usage);
 
     if (row.cwd) {
       const tokenTotal = row.tokens_used || modelUsageTotal(usage);
@@ -2098,14 +2024,7 @@ function parseCodexUsage(): {
         row.cwd,
         (projectTokens.get(row.cwd) ?? 0) + tokenTotal,
       );
-      let projectByModel = projectModelUsage.get(row.cwd);
-      if (!projectByModel) {
-        projectByModel = new Map();
-        projectModelUsage.set(row.cwd, projectByModel);
-      }
-      const projectUsage = projectByModel.get(key) ?? emptyModelUsage();
-      addModelUsage(projectUsage, usage);
-      projectByModel.set(key, projectUsage);
+      addNestedModelUsage(projectModelUsage, row.cwd, key, usage);
     }
 
     ledger.push({
@@ -2132,7 +2051,6 @@ function parseCodexUsage(): {
     projectModelUsage,
     projectActivity,
     dailyActivity,
-    hourCounts,
     weekHourMatrix,
     dailyHourCounts,
     totalThreads: sessionFiles.size,
@@ -2142,10 +2060,6 @@ function parseCodexUsage(): {
     codexSessionFileCount: codexSessionFiles.length,
     codexThreadRowCount: rows.length,
   };
-}
-
-function openCodeMessageInfo(stored: OpenCodeStoredMessage): OpenCodeMessage {
-  return stored.info ?? stored;
 }
 
 export function openCodeUsageFromTokens(
@@ -2322,7 +2236,6 @@ function parseOpenCodeUsage(): {
     session: OpenCodeSession | undefined;
     fallbackTimestampMs: number;
     toolCalls: number;
-    fallbackMessageId?: string;
   }) {
     const createdMs =
       openCodeTimestampMs(info.time?.created ?? 0) ||
@@ -2367,8 +2280,7 @@ function parseOpenCodeUsage(): {
     }
 
     if (info.role === "user") {
-      const messageId =
-        info.id ?? fallbackMessageId ?? `${sessionId}:${timestampMs}`;
+      const messageId = info.id ?? `${sessionId}:${timestampMs}`;
       if (!ledger.userMessageIds.has(messageId)) {
         ledger.userMessageIds.add(messageId);
         ledger.interactions += 1;
@@ -2399,25 +2311,11 @@ function parseOpenCodeUsage(): {
     addHourlyUsage(hourlyUsage, timestampMs, key, usage);
 
     const date = fmtDate(timestampMs);
-    let dayByModel = dailyModelUsage.get(date);
-    if (!dayByModel) {
-      dayByModel = new Map();
-      dailyModelUsage.set(date, dayByModel);
-    }
-    const dayUsage = dayByModel.get(key) ?? emptyModelUsage();
-    addModelUsage(dayUsage, usage);
-    dayByModel.set(key, dayUsage);
+    addNestedModelUsage(dailyModelUsage, date, key, usage);
 
     if (cwd) {
       projectTokens.set(cwd, (projectTokens.get(cwd) ?? 0) + tokenTotal);
-      let projectByModel = projectModelUsage.get(cwd);
-      if (!projectByModel) {
-        projectByModel = new Map();
-        projectModelUsage.set(cwd, projectByModel);
-      }
-      const projectUsage = projectByModel.get(key) ?? emptyModelUsage();
-      addModelUsage(projectUsage, usage);
-      projectByModel.set(key, projectUsage);
+      addNestedModelUsage(projectModelUsage, cwd, key, usage);
     }
   }
 
@@ -2425,7 +2323,7 @@ function parseOpenCodeUsage(): {
     for (const file of messageFiles) {
       const stored = safeReadJSON<OpenCodeStoredMessage>(file);
       if (!stored) continue;
-      const info = openCodeMessageInfo(stored);
+      const info = stored.info ?? stored;
       const sessionId =
         info.sessionID ?? stored.sessionID ?? file.split("/").at(-2) ?? file;
       ingestOpenCodeMessage({
@@ -2434,7 +2332,6 @@ function parseOpenCodeUsage(): {
         session: sessionsById.get(sessionId),
         fallbackTimestampMs: 0,
         toolCalls: countOpenCodeToolCalls(stored.parts),
-        fallbackMessageId: file,
       });
     }
   }
@@ -2606,9 +2503,6 @@ function serializeHourlyUsage(
       return {
         timestampMs: bucket.timestampMs,
         date: fmtDate(bucket.timestampMs),
-        messages: 0,
-        sessions: 0,
-        toolCalls: 0,
         tokens: Object.values(tokensByModel).reduce(
           (sum, value) => sum + value,
           0,
@@ -2624,6 +2518,62 @@ function serializeHourlyUsage(
     .sort((a, b) => a.timestampMs - b.timestampMs);
 }
 
+/**
+ * A cheap exact fingerprint of everything buildStats() reads.
+ *
+ * Measured on a 1.6GB / 11,978-file corpus: ~125ms (94ms readdir + 30ms stat)
+ * against a ~10s build, so callers can cache the build and revalidate per
+ * request without ever serving stale data.
+ *
+ * It lives here, beside the readers, because a source added to buildStats() and
+ * forgotten here would silently pin the cache to the old value. Same failure
+ * mode the RATE_LIMITS_CACHE note in paths.ts warns about: a drifted literal
+ * fails quietly.
+ */
+export function statsFingerprint(): string {
+  let newest = 0;
+  let count = 0;
+  const note = (path: string) => {
+    try {
+      const m = statSync(path).mtimeMs;
+      if (m > newest) newest = m;
+      count++;
+    } catch {
+      // absent source — its disappearance still moves `count`
+    }
+  };
+
+  const trees: Array<[string, string]> = [
+    [PROJECTS_DIR, ".jsonl"],
+    [CODEX_SESSIONS_DIR, ".jsonl"],
+    ...openCodeStorageRoots().flatMap(
+      (root): Array<[string, string]> => [
+        [join(root, "session"), ".json"],
+        [join(root, "message"), ".json"],
+      ],
+    ),
+  ];
+  for (const [dir, ext] of trees) {
+    for (const file of walkFiles(dir, ext)) note(file);
+  }
+  for (const file of [
+    STATS_CACHE,
+    HISTORY,
+    CODEX_STATE_DB,
+    CODEX_AUTH,
+    OPENCODE_DB,
+    RATE_LIMITS_CACHE,
+    CODEX_USAGE_CACHE,
+    // Not transcripts, but they change the numbers: a pricing refresh or a
+    // budget edit must invalidate a cached build even though no session ran.
+    USER_PRICING_OVERRIDE,
+    USER_BUDGET_CONFIG,
+  ]) {
+    note(file);
+  }
+  return `${count}:${newest}`;
+}
+
 export async function buildStats() {
   const cache = parseStatsCache();
   const {
@@ -2632,7 +2582,7 @@ export async function buildStats() {
     dailyHistory,
     dailyHourCounts: historyDailyHourCounts,
   } = parseHistory();
-  const sessions = parseSessions();
+  const sessions = readSessionFiles();
   const [pricingLoad, codexUsageLimits] = await Promise.all([
     loadPricingWithMeta(),
     readCodexUsageLimits(),
@@ -2717,31 +2667,26 @@ export async function buildStats() {
       ),
     );
   }
-  for (const [date, usageByModel] of codexUsage.dailyModelUsage.entries()) {
-    let combined = combinedDailyModelUsage.get(date);
-    if (!combined) {
-      combined = new Map();
-      combinedDailyModelUsage.set(date, combined);
+  // Codex and OpenCode already carry namespaced model keys, so both merge the
+  // same way. Claude above needs its own loop only because its keys are still
+  // raw and have to be re-keyed on the way in.
+  for (const source of [
+    codexUsage.dailyModelUsage,
+    openCodeUsage.dailyModelUsage,
+  ]) {
+    for (const [date, usageByModel] of source.entries()) {
+      let combined = combinedDailyModelUsage.get(date);
+      if (!combined) {
+        combined = new Map();
+        combinedDailyModelUsage.set(date, combined);
+      }
+      const dayTokens = tokensByDate.get(date) ?? {};
+      for (const [model, usage] of usageByModel.entries()) {
+        combined.set(model, usage);
+        dayTokens[model] = (dayTokens[model] ?? 0) + modelUsageTotal(usage);
+      }
+      tokensByDate.set(date, dayTokens);
     }
-    const dayTokens = tokensByDate.get(date) ?? {};
-    for (const [model, usage] of usageByModel.entries()) {
-      combined.set(model, usage);
-      dayTokens[model] = (dayTokens[model] ?? 0) + modelUsageTotal(usage);
-    }
-    tokensByDate.set(date, dayTokens);
-  }
-  for (const [date, usageByModel] of openCodeUsage.dailyModelUsage.entries()) {
-    let combined = combinedDailyModelUsage.get(date);
-    if (!combined) {
-      combined = new Map();
-      combinedDailyModelUsage.set(date, combined);
-    }
-    const dayTokens = tokensByDate.get(date) ?? {};
-    for (const [model, usage] of usageByModel.entries()) {
-      combined.set(model, usage);
-      dayTokens[model] = (dayTokens[model] ?? 0) + modelUsageTotal(usage);
-    }
-    tokensByDate.set(date, dayTokens);
   }
   for (const [source, sessionField] of [
     [codexUsage.dailyActivity, "threadCount"],

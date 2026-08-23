@@ -2,11 +2,11 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
-import { buildStats, refreshPricingOverride } from "./api.ts";
+import { buildStats, refreshPricingOverride, statsFingerprint } from "./api.ts";
 import { getLiveSessions, cockpitDaemonPort } from "./live.ts";
 import { decideStartup, type AtlasInfo } from "./atlas-lifecycle";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
-import { isAlive } from "../../cockpit/scripts/cockpit-channel";
+import { isAlive } from "../../shared/scripts/process-alive";
 import { jsonResponse, jsonError } from "../../cockpit/scripts/http";
 import { serveStaticFile } from "../../shared/scripts/static-server";
 
@@ -121,9 +121,30 @@ function startupGuard(): void {
 
 // ---------- handlers ----------
 
+// A full stats build re-reads the whole corpus — seconds of *synchronous* work,
+// and Bun.serve runs one event loop, so every one of them also stalls /api/live
+// (polled every 3s) and the static assets behind it. Revalidating against a
+// ~125ms exact fingerprint makes a reload, a second tab, and a background poll
+// free without ever serving stale data.
+//
+// The in-flight promise is shared, not just the settled value: two tabs opening
+// together would otherwise both miss and run two full builds back to back.
+let statsCache: { fingerprint: string; payload: Promise<unknown> } | null =
+  null;
+
 async function handleStats(): Promise<Response> {
   try {
-    return jsonResponse(await buildStats());
+    const fingerprint = statsFingerprint();
+    if (!statsCache || statsCache.fingerprint !== fingerprint) {
+      statsCache = { fingerprint, payload: buildStats() };
+    }
+    try {
+      return jsonResponse((await statsCache.payload) as object);
+    } catch (err) {
+      // Never cache a rejection — the next request must retry.
+      statsCache = null;
+      throw err;
+    }
   } catch (err) {
     return jsonError(err);
   }

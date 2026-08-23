@@ -134,14 +134,6 @@ export function buildPromptFile(options: {
 
 // Optional CLI entry for manual/debug use
 if (import.meta.main) {
-  async function readStdin(): Promise<string> {
-    let input = "";
-    for await (const chunk of Bun.stdin.stream()) {
-      input += new TextDecoder().decode(chunk);
-    }
-    return input.trim();
-  }
-
   async function main() {
     const args = process.argv.slice(2);
 
@@ -190,9 +182,8 @@ if (import.meta.main) {
     }
 
     // Read stdin as the task fallback for both modes.
-    const stdinData = await readStdin();
     if (!opts.task) {
-      opts.task = stdinData;
+      opts.task = (await Bun.stdin.text()).trim();
     }
 
     // Build the prompt file

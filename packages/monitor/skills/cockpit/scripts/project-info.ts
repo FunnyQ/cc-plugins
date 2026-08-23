@@ -11,7 +11,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { readRegistry } from "./registry";
 import { resolveKnownProject } from "./log-root";
-import { jsonResponse as json } from "./http";
+import { errorMessage, jsonResponse as json } from "./http";
 
 export type ProjectTokens = {
   colorBg?: string;
@@ -246,7 +246,7 @@ export function handleProjectInfo(req: Request): Response {
     return json(buildProjectInfo(project));
   } catch (err) {
     return json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: errorMessage(err) },
       500,
     );
   }

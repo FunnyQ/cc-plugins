@@ -4,6 +4,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { readRegistry } from "./registry";
 import { resolveKnownProject } from "./log-root";
+import { errorMessage } from "./http";
 
 export type DesignToken = {
   key: string;
@@ -194,7 +195,7 @@ export function handleDesignSystem(projectDir?: string | null): Response {
   try {
     return json(readProjectDesignSystem(project));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errorMessage(err);
     return json({ error: msg }, /not found/.test(msg) ? 404 : 500);
   }
 }

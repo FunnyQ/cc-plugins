@@ -2,7 +2,7 @@
 
 import { readFileSync, existsSync, statSync } from "fs";
 import { resolve, extname } from "path";
-import { parseCsv } from "./shared";
+import { parseCsv, run } from "./shared";
 
 type Options = {
   files: string[];
@@ -36,17 +36,16 @@ function parseArgs(argv: string[]): Options {
 }
 
 function shell(args: string[], maxLength = MAX_OUTPUT_LENGTH): string {
-  const proc = Bun.spawnSync(args);
-  if (proc.exitCode !== 0) return "";
-  let out = proc.stdout.toString().trim();
+  const result = run(args);
+  if (!result.ok) return "";
+  const out = result.stdout.trim();
   if (out.length > maxLength) {
-    out = out.substring(0, maxLength) + "\n... (truncated)";
+    return out.substring(0, maxLength) + "\n... (truncated)";
   }
   return out;
 }
 
 function safeReadFile(path: string): string | null {
-  if (!existsSync(path)) return null;
   try {
     return readFileSync(path, "utf-8");
   } catch {
@@ -119,12 +118,14 @@ export function collectFileContents(files: string[]): string {
 
   for (const filePath of files) {
     const resolved = resolve(filePath);
-    if (!existsSync(resolved)) {
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(resolved);
+    } catch {
       sections.push(`## ${filePath}\n> File not found\n`);
       continue;
     }
 
-    const stat = statSync(resolved);
     if (stat.size > 100_000) {
       sections.push(
         `## ${filePath}\n> File too large (${(stat.size / 1024).toFixed(0)} KB), skipped\n`,

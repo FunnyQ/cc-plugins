@@ -55,7 +55,7 @@ export type OpenCodeRowInput = {
 };
 
 export const STALE_CUTOFF_MS = 10 * 60 * 1000;
-export const CODEX_BUSY_CUTOFF_MS = 60 * 1000;
+export const BUSY_CUTOFF_MS = 60 * 1000;
 
 export function projectNameFor(cwd: string): string {
   return cwd.split("/").filter(Boolean).at(-1) ?? cwd;
@@ -153,7 +153,7 @@ export function buildCodexLiveSessions(
         id: row.id,
         projectName: projectNameFor(row.cwd),
         cwd: row.cwd,
-        status: ageMs <= CODEX_BUSY_CUTOFF_MS ? "active-inferred" : "recent",
+        status: ageMs <= BUSY_CUTOFF_MS ? "active-inferred" : "recent",
         statusSource: "codex-sqlite-rollout",
         updatedAt: new Date(updatedAtMs).toISOString(),
         ageMs,
@@ -187,7 +187,7 @@ export function buildOpenCodeLiveSessions(
         id: row.id,
         projectName: projectNameFor(row.directory),
         cwd: row.directory,
-        status: ageMs <= CODEX_BUSY_CUTOFF_MS ? "active-inferred" : "recent",
+        status: ageMs <= BUSY_CUTOFF_MS ? "active-inferred" : "recent",
         statusSource: "opencode-sqlite-session",
         updatedAt: new Date(updatedAtMs).toISOString(),
         ageMs,

@@ -1,5 +1,4 @@
 export type Mode = "delegate" | "review" | "image";
-export type Strategy = "native" | "prompt";
 
 export type RunResult = {
   ok: boolean;
@@ -11,10 +10,9 @@ export type RunResult = {
 // What relay.ts hands a backend after parsing argv + (maybe) building a prompt.
 // This is the single shared seam — backends must not invent their own extensions.
 export type InvokeOpts = {
-  promptFile?: string; // path to the built prompt (strategy === "prompt"); codex feeds it on stdin
-  promptText?: string; // prompt body already read from promptFile, for CLIs with no --prompt-file flag (opencode/claude)
+  promptText?: string; // the built prompt body — every CLI takes it inline (codex on stdin, opencode after --, claude via -p)
   task?: string; // raw delegate, review, or image task
-  out?: string; // image output path
+  out?: string; // image output path (--out; the backend owns the default)
   model?: string; // resolved model (may be undefined → CLI default)
   lastFile?: string; // pre-created output-capture path (codex `-o <lastFile>`); relay creates the tmp dir first
   dangerous?: boolean; // delegate sandbox opt-out
@@ -36,7 +34,6 @@ export type LiveSpec = {
 export type Backend = {
   name: string; // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
   supports: Set<Mode>;
-  strategy(mode: Mode, opts: InvokeOpts): Strategy;
   // Build the argv (and optional stdin) for this mode. Pure — no spawning here.
   invoke(mode: Mode, opts: InvokeOpts): { argv: string[]; stdin?: string };
   // Extract clean final text from a completed run (file content or stdout).

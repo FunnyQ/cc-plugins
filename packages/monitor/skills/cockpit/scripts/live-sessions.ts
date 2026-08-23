@@ -5,11 +5,11 @@
 // uses. This is only the lightweight session LIST; the transcript renderer is
 // not duplicated (transcript-stream.ts remains the single source).
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
 import { openCodeDb, openCodeTimestampMs } from "../../shared/scripts/opencode";
+import { claudeSessionsDir } from "./claude-paths";
 
 export type Provider = "claude" | "codex" | "opencode";
 
@@ -35,12 +35,6 @@ const CODEX_BUSY_MS = 60 * 1000;
 
 // Dirs/DB are env-overridable so tests can point at fixtures (mirrors the
 // overrides transcript-stream.ts already honours).
-function claudeSessionsDir(): string {
-  return (
-    process.env.COCKPIT_CLAUDE_SESSIONS_DIR ||
-    join(homedir(), ".claude", "sessions")
-  );
-}
 
 type ClaudeSessionFile = {
   sessionId: string;

@@ -6,13 +6,20 @@
 // its recorded bytes_parsed (truncated/rewritten) can't be reconciled additively,
 // so any truncation triggers a full rebuild.
 //
-// Kept free of any api.ts import so api.ts can call updateRollup() without a cycle
-// — the small parse helpers below are deliberately duplicated rather than shared.
+// Kept free of any api.ts import so api.ts can call updateRollup() without a
+// cycle. The parse helpers and the transcript walk both sides need live in
+// dedup.ts, which imports nothing from the codebase — sharing them there keeps
+// the hour buckets identical by construction instead of by hand.
 
 import { Database } from "bun:sqlite";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { dedupKey } from "./dedup";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
+import {
+  dedupKey,
+  hourStartMs,
+  usageTokenTotal,
+  walkFiles,
+  type DedupUsage,
+} from "./dedup";
 import { PROJECTS_DIR } from "./paths";
 import {
   addHourlyRow,
@@ -27,55 +34,14 @@ import {
   type HourlyRow,
 } from "./rollup-db";
 
-type TranscriptUsage = {
-  input_tokens?: number;
-  output_tokens?: number;
-  cache_read_input_tokens?: number;
-  cache_creation_input_tokens?: number;
-};
 type TranscriptEntry = {
   timestamp?: string;
   requestId?: string;
   uuid?: string;
   type?: string;
   cwd?: string;
-  message?: { id?: string; model?: string; usage?: TranscriptUsage };
+  message?: { id?: string; model?: string; usage?: DedupUsage };
 };
-
-// --- helpers duplicated from api.ts (kept in lockstep; see note above) ---
-
-function usageTokenTotal(usage: TranscriptUsage): number {
-  return (
-    (usage.input_tokens ?? 0) +
-    (usage.output_tokens ?? 0) +
-    (usage.cache_read_input_tokens ?? 0) +
-    (usage.cache_creation_input_tokens ?? 0)
-  );
-}
-
-// Local hour-start in epoch ms — must match api.ts's hourStartMs() exactly so the
-// reconstructed hourly/daily maps line up bucket-for-bucket.
-function hourStartMs(timestampMs: number): number {
-  if (!timestampMs) return 0;
-  const d = new Date(timestampMs);
-  d.setMinutes(0, 0, 0);
-  return d.getTime();
-}
-
-function walkJsonlFiles(dir: string, out: string[] = []): string[] {
-  let entries: ReturnType<typeof readdirSync>;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) walkJsonlFiles(full, out);
-    else if (entry.isFile() && entry.name.endsWith(".jsonl")) out.push(full);
-  }
-  return out;
-}
 
 type ParsedSlice = {
   rows: Map<string, HourlyRow>;
@@ -165,9 +131,18 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
   // Nothing new since last complete-line boundary.
   if (size <= startByte) return true;
 
-  let buf: Buffer;
+  // Read only the appended bytes. A live session transcript grows to tens of MB
+  // while each run ingests a few KB, so reading the whole file to slice off the
+  // tail is the single most wasteful thing this function could do.
+  let tail: Buffer;
   try {
-    buf = readFileSync(file);
+    const fd = openSync(file, "r");
+    try {
+      tail = Buffer.allocUnsafe(size - startByte);
+      readSync(fd, tail, 0, tail.length, startByte);
+    } finally {
+      closeSync(fd);
+    }
   } catch {
     return true;
   }
@@ -175,8 +150,8 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
   // Only consume up to the last newline; a trailing partial line (file still
   // being written) waits for the next run. Slicing the Buffer at \n bytes is
   // UTF-8 safe — 0x0a never occurs inside a multibyte sequence.
-  const lastNl = buf.lastIndexOf(0x0a);
-  const boundary = lastNl + 1;
+  const lastNl = tail.lastIndexOf(0x0a);
+  const boundary = lastNl < 0 ? startByte : startByte + lastNl + 1;
   if (boundary <= startByte) {
     // Grew, but no new *complete* line yet — leave bytes_parsed where it is.
     upsertIngestedFile(
@@ -187,7 +162,7 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
     return true;
   }
 
-  const text = buf.subarray(startByte, boundary).toString("utf-8");
+  const text = tail.subarray(0, boundary - startByte).toString("utf-8");
   const seenRun = new Set<string>();
   const { rows, requestKeys } = parseSlice(text, file, seenRun, (k) =>
     hasSeenRequest(db, k),
@@ -215,10 +190,17 @@ export type UpdateResult = {
 // clears all rollup state and re-ingests every file from byte 0.
 export function updateRollup(
   db: Database,
-  opts: { rebuild?: boolean; nowMs?: number; projectsDir?: string } = {},
+  opts: {
+    rebuild?: boolean;
+    nowMs?: number;
+    projectsDir?: string;
+    /** Transcript paths the caller already walked, to skip a second traversal. */
+    files?: string[];
+  } = {},
 ): UpdateResult {
   const nowMs = opts.nowMs ?? Date.now();
-  const files = walkJsonlFiles(opts.projectsDir ?? PROJECTS_DIR);
+  const files =
+    opts.files ?? walkFiles(opts.projectsDir ?? PROJECTS_DIR, ".jsonl");
 
   let rebuilt = false;
   if (opts.rebuild) {

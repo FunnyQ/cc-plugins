@@ -196,7 +196,7 @@ export type HerdClient = {
   send(
     target: string,
     text: string,
-    opts?: { wait?: boolean; status?: string[]; timeoutMs?: number },
+    opts?: { status?: string[]; timeoutMs?: number },
   ): Promise<unknown>;
   keys(target: string, ...keys: string[]): Promise<unknown>;
   wait(
@@ -204,10 +204,7 @@ export type HerdClient = {
     opts?: { status?: string; timeoutMs?: number },
   ): Promise<unknown>;
   get(target: string): Promise<{ status: string }>;
-  read(
-    target: string,
-    opts?: { lines?: number; source?: string },
-  ): Promise<string>;
+  read(target: string, opts?: { source?: string }): Promise<string>;
   list(): Promise<HerdAgent[]>;
   close(target: string): Promise<unknown>;
 };
@@ -239,12 +236,26 @@ function callerAgentType(
   return null;
 }
 
-function hasLocation(agent: HerdAgent): agent is HerdAgent & {
+type LocatedAgent = HerdAgent & {
   paneId: string;
   tabId: string;
   workspaceId: string;
-} {
+};
+
+function hasLocation(agent: HerdAgent): agent is LocatedAgent {
   return !!(agent.paneId && agent.tabId && agent.workspaceId);
+}
+
+function locationOf(
+  agent: LocatedAgent,
+  source: CallerLocation["source"],
+): CallerLocation {
+  return {
+    workspaceId: agent.workspaceId,
+    tabId: agent.tabId,
+    paneId: agent.paneId,
+    source,
+  };
 }
 
 /** True when `base` is `target` or one of its ancestor directories. Compared on
@@ -302,14 +313,7 @@ export function resolveCallerLocation(
     );
     if (exactIdentity.length > 1) return null;
     const exact = exactIdentity[0];
-    if (exact && hasLocation(exact)) {
-      return {
-        workspaceId: exact.workspaceId,
-        tabId: exact.tabId,
-        paneId: exact.paneId,
-        source: "env",
-      };
-    }
+    if (exact && hasLocation(exact)) return locationOf(exact, "env");
   }
 
   const inherited = agents.find(
@@ -319,14 +323,7 @@ export function resolveCallerLocation(
       matchesType(agent) &&
       cwdMatchDepth(agent, input.cwd) !== null,
   );
-  if (inherited && hasLocation(inherited)) {
-    return {
-      workspaceId: inherited.workspaceId,
-      tabId: inherited.tabId,
-      paneId: inherited.paneId,
-      source: "env",
-    };
-  }
+  if (inherited && hasLocation(inherited)) return locationOf(inherited, "env");
 
   const candidates = agents
     .filter(
@@ -345,12 +342,7 @@ export function resolveCallerLocation(
 
   const resolved = best[0]?.agent;
   if (!resolved || !hasLocation(resolved)) return null;
-  return {
-    workspaceId: resolved.workspaceId,
-    tabId: resolved.tabId,
-    paneId: resolved.paneId,
-    source: "runtime",
-  };
+  return locationOf(resolved, "runtime");
 }
 
 export type LiveRunResult =
@@ -414,7 +406,7 @@ export function defaultRunLiveDeps(): RunLiveDeps {
     readFile: (path) => readFileSync(path, "utf-8"),
     stderr: (text) => process.stderr.write(text),
     now: () => Date.now(),
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    sleep: (ms) => Bun.sleep(ms),
   };
 }
 
@@ -662,18 +654,7 @@ export async function collectLive(
     };
   }
 
-  return pollForResult(
-    herd,
-    {
-      agentName: opts.agentName,
-      herdScriptPath: opts.herdScriptPath,
-      resultPath: opts.resultPath,
-      waitTimeoutMs: opts.waitTimeoutMs,
-      keepPane: opts.keepPane,
-      label: "collect",
-    },
-    deps,
-  );
+  return pollForResult(herd, { ...opts, label: "collect" }, deps);
 }
 
 // Poll a live pane until it settles with a verified result, or the budget runs

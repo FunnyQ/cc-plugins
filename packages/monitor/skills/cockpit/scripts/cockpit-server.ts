@@ -34,6 +34,7 @@ import { jsonResponse, jsonError } from "./http";
 import { decideStartup, type DaemonInfo } from "./daemon-lifecycle";
 import { cockpitHome } from "./cockpit-home";
 import { serveStaticFile } from "../../shared/scripts/static-server";
+import { isAlive } from "../../shared/scripts/process-alive";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
 const DEFAULT_PORT = 5858;
@@ -94,16 +95,6 @@ function readDaemonInfo(): DaemonInfo | null {
     // missing or corrupt — treat as no daemon
   }
   return null;
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    // ESRCH → no such process (dead); EPERM → exists but not ours (alive).
-    return (err as NodeJS.ErrnoException)?.code === "EPERM";
-  }
 }
 
 function writeDaemonInfo(info: DaemonInfo): void {

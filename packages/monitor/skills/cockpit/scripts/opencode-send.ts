@@ -1,8 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { jsonResponse as json } from "./http";
-import { cockpitHome } from "./cockpit-home";
+import { errorMessage, jsonResponse as json } from "./http";
+import { daemonToken } from "./cockpit-home";
 
 const OPENCODE_SESSION_RE = /^ses_[A-Za-z0-9_-]{8,160}$/;
 
@@ -18,7 +16,6 @@ export type OpenCodeSendReport = {
   sessionFound: boolean;
   delivered: boolean;
   sessionDirectory?: string;
-  inputId?: string;
   delivery?: "tui";
   warnings: string[];
   errors: string[];
@@ -30,23 +27,8 @@ type SendOpenCodePrompt = (
 
 type CheckOpenCodeSession = (sessionId: string) => Promise<OpenCodeSendReport>;
 
-function daemonToken(): string | null {
-  try {
-    const raw = JSON.parse(
-      readFileSync(join(cockpitHome(), "daemon.json"), "utf8"),
-    );
-    return typeof raw?.token === "string" ? raw.token : null;
-  } catch {
-    return null;
-  }
-}
-
 function normalizeServerUrl(value: string): string {
   return value.replace(/\/+$/, "");
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 function openCodeHeaders(
@@ -114,16 +96,12 @@ async function discoverOpenCodeServer(): Promise<string | null> {
   return null;
 }
 
-async function ensureOpenCodeServer(): Promise<string | null> {
-  return await discoverOpenCodeServer();
-}
-
 async function checkOpenCodeSession(
   sessionId: string,
 ): Promise<OpenCodeSendReport> {
   const warnings: string[] = [];
   const errors: string[] = [];
-  const serverUrl = await ensureOpenCodeServer();
+  const serverUrl = await discoverOpenCodeServer();
   if (!serverUrl) {
     return {
       ok: false,
@@ -287,7 +265,6 @@ export async function handleSendOpenCodeMessage(
   return json({
     delivered: true,
     delivery: report.delivery,
-    inputId: report.inputId,
     serverUrl: report.serverUrl,
     warnings: report.warnings,
   });

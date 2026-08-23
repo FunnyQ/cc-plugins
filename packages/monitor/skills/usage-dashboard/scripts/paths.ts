@@ -17,3 +17,17 @@ export const HISTORY = join(CLAUDE_DIR, "history.jsonl");
 export const SESSIONS_DIR = join(CLAUDE_DIR, "sessions");
 export const PROJECTS_DIR =
   process.env.TOKEN_ATLAS_PROJECTS_DIR || join(CLAUDE_DIR, "projects");
+
+// Cross-process cache contract: statusline-collector.ts writes RATE_LIMITS_CACHE
+// on every statusline render, api.ts reads it. A drifted literal fails silently
+// — the dashboard's usage-limits panel just stays empty — so both sides resolve
+// the paths here.
+export const TOKEN_ATLAS_CACHE_DIR = join(HOME, ".cache", "token-atlas");
+export const RATE_LIMITS_CACHE = join(
+  TOKEN_ATLAS_CACHE_DIR,
+  "rate-limits.json",
+);
+export const CODEX_USAGE_CACHE = join(
+  TOKEN_ATLAS_CACHE_DIR,
+  "codex-usage-limits.json",
+);

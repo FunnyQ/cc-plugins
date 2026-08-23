@@ -6,7 +6,6 @@ function fakeBackend(name: string, supports: Mode[]): Backend {
   return {
     name,
     supports: new Set(supports),
-    strategy: () => "prompt",
     invoke: () => ({ argv: [] }),
     parseOutput: (raw) => raw,
   };

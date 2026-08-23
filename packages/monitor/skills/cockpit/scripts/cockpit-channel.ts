@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   execFileSync,
@@ -17,6 +16,9 @@ import {
 import { z } from "zod";
 import { findSession } from "./find-session";
 import { cockpitHome } from "./cockpit-home";
+import { isAlive } from "../../shared/scripts/process-alive";
+export { claudeSessionsDir } from "./claude-paths";
+import { claudeSessionsDir } from "./claude-paths";
 
 export type DaemonCoords = { port: number; token: string };
 export type ProcessInfo = { pid: number; port: number; root?: string };
@@ -101,15 +103,6 @@ export function shouldSupersedeDaemon(
   const theirs = versionFromRoot(daemonRoot);
   if (!mine || !theirs) return false;
   return compareVersions(mine, theirs) > 0;
-}
-
-export function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException)?.code === "EPERM";
-  }
 }
 
 export function isUp(
@@ -348,13 +341,6 @@ function sessionIdFromAncestors(startPid = process.ppid): string | null {
     const command = processField(pid, "command");
     return command ? sessionIdFromCommand(command) : null;
   });
-}
-
-export function claudeSessionsDir(): string {
-  return (
-    process.env.COCKPIT_CLAUDE_SESSIONS_DIR ||
-    join(homedir(), ".claude", "sessions")
-  );
 }
 
 // Claude writes ~/.claude/sessions/<pid>.json per running session, keyed by the

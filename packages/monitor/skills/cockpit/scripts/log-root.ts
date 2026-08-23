@@ -22,12 +22,8 @@
  */
 import { spawnSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-
-function isInside(root: string, child: string): boolean {
-  const rel = relative(root, child);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-}
+import { dirname, join, resolve } from "node:path";
+import { isPathInside } from "../../shared/scripts/path-inside";
 
 export type LogRootDeps = {
   /** Injectable for tests; defaults to the real `git rev-parse`. */
@@ -84,7 +80,7 @@ export function resolveKnownProject(
   for (const candidate of known) {
     if (!candidate) continue;
     const root = resolve(candidate);
-    if (root !== target && !isInside(root, target)) continue;
+    if (root !== target && !isPathInside(root, target)) continue;
     if (!best || root.length > best.length) best = root;
   }
   return best;
@@ -106,7 +102,7 @@ export function logRoot(cwd: string, deps: LogRootDeps = {}): string {
   // root. If cwd isn't under the reported root (a stale/renamed checkout, or an
   // injected resolver), walking cwd's own branch could adopt a `.cockpit` that
   // lives outside the repo entirely — exactly what the bound exists to prevent.
-  if (start !== top && !isInside(top, start)) return top;
+  if (start !== top && !isPathInside(top, start)) return top;
 
   let dir = start;
   for (;;) {
