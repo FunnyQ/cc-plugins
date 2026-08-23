@@ -10,7 +10,7 @@ import {
   herdrTabCreateArgs,
   parseHerdrTab,
   type Target,
-} from "./backends";
+} from "./terminal-browser";
 
 const browsersJson = (browsers: unknown[]) =>
   JSON.stringify({ self: { tab: "w5G:t1", pane: "w5G:p1" }, browsers });
@@ -34,7 +34,9 @@ const tab = (id: number, url: string, active: boolean, targetId: string) => ({
 describe("parseTerminalBrowsers", () => {
   test("reads one browser into a target keyed by its browser key", () => {
     const raw = browsersJson([
-      browser("64777-1", 57768, [tab(1, "http://localhost:8899/", true, "AAA")]),
+      browser("64777-1", 57768, [
+        tab(1, "http://localhost:8899/", true, "AAA"),
+      ]),
     ]);
     expect(parseTerminalBrowsers(raw)).toEqual([
       {
@@ -111,9 +113,9 @@ describe("selectTarget", () => {
   });
 
   test("refuses to guess between two, and names both", () => {
-    expect(() =>
-      selectTarget([target("a"), target("b")], null),
-    ).toThrow(/--view/);
+    expect(() => selectTarget([target("a"), target("b")], null)).toThrow(
+      /--view/,
+    );
   });
 
   test("honours an explicit id", () => {

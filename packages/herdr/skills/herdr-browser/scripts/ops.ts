@@ -3,10 +3,22 @@
 // ten lines; going to CDP directly is what lets one line be the answer.
 
 export type CdpSession = {
-  send: (method: string, params?: unknown) => Promise<any>;
+  // A rejected send means the call did not happen. timeoutMs 0 waives the
+  // transport deadline for a call the caller's own expression bounds.
+  send: (method: string, params?: unknown, timeoutMs?: number) => Promise<any>;
   onEvent: (handler: (message: any) => void) => void;
   close: () => void;
 };
+
+// The default deadline catches a wedged renderer — one that took the command
+// and will never answer, the way a page parked on a modal dialog does.
+export const CDP_TIMEOUT_MS = 30_000;
+
+// Some calls are slow because the page is big, not because the renderer is
+// sick: a full-page screenshot, a whole AX tree, a multi-megabyte response
+// body. CDP promises them no bound, so they get a looser one rather than the
+// default — still bounded, because a wedged renderer looks the same from here.
+export const CDP_BULK_TIMEOUT_MS = 120_000;
 
 export function formatEvalResult(remote: any): string {
   if (remote?.subtype === "null") {
@@ -111,11 +123,13 @@ export async function evaluate(
   expression: string,
   awaitPromise = false,
 ): Promise<any> {
-  const response = await session.send("Runtime.evaluate", {
-    expression,
-    returnByValue: true,
-    awaitPromise,
-  });
+  const response = await session.send(
+    "Runtime.evaluate",
+    { expression, returnByValue: true, awaitPromise },
+    // Awaiting the caller's promise is unbounded by definition — `eval` on an
+    // expression that sleeps a minute is a legitimate use, not a wedged page.
+    awaitPromise ? 0 : undefined,
+  );
   if (response?.exceptionDetails) {
     const details = response.exceptionDetails;
     // The stack belongs to the injected wrapper, never to the caller, so it
@@ -319,10 +333,11 @@ export async function screenshot(
   path: string,
   full = false,
 ): Promise<string> {
-  const shot = await session.send("Page.captureScreenshot", {
-    format: "png",
-    captureBeyondViewport: full,
-  });
+  const shot = await session.send(
+    "Page.captureScreenshot",
+    { format: "png", captureBeyondViewport: full },
+    CDP_BULK_TIMEOUT_MS,
+  );
   if (!shot?.data) {
     throw new Error("the page returned no screenshot data");
   }

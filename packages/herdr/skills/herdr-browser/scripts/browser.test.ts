@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 
 import {
   applyWatchMessage,
+  attach,
   cdp,
   DEVICES,
   closeTab,
@@ -498,6 +499,104 @@ describe("gateway calls", () => {
 
   test("a failed call reports status and body", async () => {
     await expect(cdp(`${base}/json/nope`)).rejects.toThrow(/404 not found/);
+  });
+});
+
+describe("attach", () => {
+  // Each method drives one transport outcome; "Silent.hang" answers nothing.
+  const server = Bun.serve({
+    port: 0,
+    fetch(request, server) {
+      return server.upgrade(request)
+        ? undefined
+        : new Response("expected a websocket", { status: 400 });
+    },
+    websocket: {
+      message(socket, raw) {
+        const { id, method } = JSON.parse(String(raw));
+        if (method === "Ok.echo") {
+          socket.send(JSON.stringify({ id, result: { ok: true } }));
+        } else if (method === "Fail.protocol") {
+          socket.send(
+            JSON.stringify({
+              id,
+              error: { code: -32000, message: "Cannot find context" },
+            }),
+          );
+        } else if (method === "Drop.socket") {
+          socket.close();
+        } else if (method === "Emit.event") {
+          socket.send(
+            JSON.stringify({ method: "Runtime.consoleAPICalled", params: {} }),
+          );
+          socket.send(JSON.stringify({ id, result: {} }));
+        }
+      },
+    },
+  });
+  const wsUrl = `ws://127.0.0.1:${server.port}`;
+
+  afterAll(() => server.stop(true));
+
+  test("resolves with the reply's result", async () => {
+    const session = await attach(wsUrl);
+    expect(await session.send("Ok.echo")).toEqual({ ok: true });
+    session.close();
+  });
+
+  test("rejects a protocol error instead of answering with it", async () => {
+    const session = await attach(wsUrl);
+    // Resolving here is what let a failed eval print an empty line as success.
+    await expect(session.send("Fail.protocol")).rejects.toThrow(
+      /Fail\.protocol failed: Cannot find context/,
+    );
+    session.close();
+  });
+
+  test("fails every call in flight when the socket closes", async () => {
+    const session = await attach(wsUrl);
+    const hung = session.send("Silent.hang");
+    await session.send("Drop.socket").catch(() => {});
+    await expect(hung).rejects.toThrow(/closed the CDP connection/);
+  });
+
+  test("fails a call made after the socket already closed", async () => {
+    const session = await attach(wsUrl);
+    await session.send("Drop.socket").catch(() => {});
+    await Bun.sleep(50);
+    // timeoutMs 0 on purpose: with no deadline to rescue it, a call the drain
+    // does not catch stays pending forever.
+    await expect(session.send("Ok.echo", {}, 0)).rejects.toThrow(
+      /closed the CDP connection/,
+    );
+  });
+
+  test("gives up on a command the browser never answers", async () => {
+    const session = await attach(wsUrl);
+    await expect(session.send("Silent.hang", {}, 100)).rejects.toThrow(
+      /Silent\.hang got no answer in 100ms/,
+    );
+    session.close();
+  });
+
+  test("waits without a deadline when the timeout is disabled", async () => {
+    const session = await attach(wsUrl);
+    const hung = session.send("Silent.hang", {}, 0);
+    const outcome = await Promise.race([
+      hung.then(() => "settled").catch(() => "settled"),
+      Bun.sleep(200).then(() => "pending"),
+    ]);
+    expect(outcome).toBe("pending");
+    session.close();
+  });
+
+  test("routes a reply-less message to the event handler", async () => {
+    const session = await attach(wsUrl);
+    const seen: string[] = [];
+    session.onEvent((message) => seen.push(message.method));
+    await session.send("Emit.event");
+    expect(seen).toEqual(["Runtime.consoleAPICalled"]);
+    session.close();
   });
 });
 

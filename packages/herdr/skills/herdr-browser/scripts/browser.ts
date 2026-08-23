@@ -16,9 +16,9 @@ import {
   type HerdrTab,
   type Tab,
   type Target,
-} from "./backends";
+} from "./terminal-browser";
 
-export type { Tab, Target } from "./backends";
+export type { Tab, Target } from "./terminal-browser";
 import {
   clickPoint,
   cookieSetParams,
@@ -39,6 +39,8 @@ import {
   selectorType,
   waitFor,
   wheel,
+  CDP_BULK_TIMEOUT_MS,
+  CDP_TIMEOUT_MS,
   type CdpSession,
 } from "./ops";
 
@@ -495,21 +497,69 @@ export async function run(
   return stdout;
 }
 
-async function attach(pageWsUrl: string): Promise<CdpSession> {
+type PendingCall = {
+  resolve: (result: any) => void;
+  reject: (error: Error) => void;
+  method: string;
+  timer?: ReturnType<typeof setTimeout>;
+};
+
+// The transport decides only whether the call happened. Whether it did what the
+// caller meant stays with the ops, which is why their own sentinel checks —
+// exceptionDetails, errorText, success:false — remain on top of this.
+export async function attach(pageWsUrl: string): Promise<CdpSession> {
   const socket = new WebSocket(pageWsUrl);
-  const pending = new Map<number, (result: any) => void>();
+  const pending = new Map<number, PendingCall>();
   let handler: ((message: any) => void) | null = null;
   let messageId = 0;
 
+  const settle = (id: number): PendingCall | undefined => {
+    const call = pending.get(id);
+    if (call) {
+      clearTimeout(call.timer);
+      pending.delete(id);
+    }
+    return call;
+  };
+
+  // A socket that dies mid-command leaves every call in flight unsettled, and
+  // an unsettled call is a CLI that never exits — the hang run()'s timeout
+  // exists to prevent on the subprocess path. The reason is remembered because
+  // draining what is pending right now is not enough: a send issued after the
+  // close would join an empty map that nothing will ever drain again, and a
+  // send that waived its deadline would then wait forever.
+  let closedReason: string | null = null;
+  const drain = (reason: string): void => {
+    closedReason = reason;
+    for (const id of [...pending.keys()]) {
+      settle(id)?.reject(new Error(reason));
+    }
+  };
+
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(String(event.data));
-    if (message.id && pending.has(message.id)) {
-      pending.get(message.id)?.(message.result ?? message.error);
-      pending.delete(message.id);
+    const call = message.id === undefined ? undefined : settle(message.id);
+    if (!call) {
+      handler?.(message);
       return;
     }
-    handler?.(message);
+    // Handing message.error back as the result is a silent wrong answer: every
+    // op then reads it as data and blames its own sentinel for the failure.
+    if (message.error) {
+      call.reject(
+        new Error(
+          `${call.method} failed: ${
+            message.error.message ?? JSON.stringify(message.error)
+          }`,
+        ),
+      );
+      return;
+    }
+    call.resolve(message.result);
   });
+  socket.addEventListener("close", () =>
+    drain("the browser closed the CDP connection"),
+  );
 
   await new Promise<void>((resolve, reject) => {
     socket.addEventListener("open", () => resolve());
@@ -519,11 +569,32 @@ async function attach(pageWsUrl: string): Promise<CdpSession> {
   });
 
   return {
-    send: (method, params = {}) => {
-      messageId += 1;
-      socket.send(JSON.stringify({ id: messageId, method, params }));
-      return new Promise((resolve) => pending.set(messageId, resolve));
-    },
+    // timeoutMs 0 disables the deadline, for a call whose duration is the
+    // caller's own expression to decide.
+    send: (method, params = {}, timeoutMs = CDP_TIMEOUT_MS) =>
+      new Promise((resolve, reject) => {
+        if (closedReason) {
+          reject(new Error(`${method} failed: ${closedReason}`));
+          return;
+        }
+        messageId += 1;
+        const id = messageId;
+        const timer = timeoutMs
+          ? setTimeout(() => {
+              settle(id);
+              reject(new Error(`${method} got no answer in ${timeoutMs}ms`));
+            }, timeoutMs)
+          : undefined;
+        pending.set(id, { resolve, reject, method, timer });
+        try {
+          socket.send(JSON.stringify({ id, method, params }));
+        } catch (error) {
+          // A synchronous send failure would otherwise leave the entry and its
+          // timer behind with nothing left to answer them.
+          settle(id);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      }),
     onEvent: (next) => {
       handler = next;
     },
@@ -578,9 +649,11 @@ async function watchPage(
     }
     body =
       (
-        await session.send("Network.getResponseBody", {
-          requestId: match.requestId,
-        })
+        await session.send(
+          "Network.getResponseBody",
+          { requestId: match.requestId },
+          CDP_BULK_TIMEOUT_MS,
+        )
       )?.body ?? null;
   }
   return { events: settled, body };
@@ -965,7 +1038,11 @@ async function main(argv: string[]): Promise<void> {
     }
     if (command === "snapshot") {
       await session.send("Accessibility.enable");
-      const tree = await session.send("Accessibility.getFullAXTree");
+      const tree = await session.send(
+        "Accessibility.getFullAXTree",
+        {},
+        CDP_BULK_TIMEOUT_MS,
+      );
       console.log(formatSnapshot(tree?.nodes ?? []));
       return;
     }
