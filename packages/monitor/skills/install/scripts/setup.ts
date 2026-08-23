@@ -26,9 +26,12 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type Check,
+  COLLECTOR_COMMAND,
+  COLLECTOR_SCRIPT,
   dashboardChecks,
   pluginVersion,
   printReport,
+  SETTINGS_JSON,
 } from "./install";
 import {
   compareMonitorVersions,
@@ -54,17 +57,7 @@ const COCKPIT_SCRIPTS = resolve(
   "cockpit",
   "scripts",
 );
-const COLLECTOR_SCRIPT = resolve(
-  import.meta.dir,
-  "..",
-  "..",
-  "usage-dashboard",
-  "scripts",
-  "statusline-collector.ts",
-);
-const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
 const CLAUDE_JSON = join(HOME, ".claude.json");
-const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 const MIN_CLAUDE_VERSION = "2.1.80"; // channels research-preview floor
 
 // Pre-approve `bun <q-lab-marketplace plugin script>.ts` in permissions.allow.
@@ -189,14 +182,6 @@ function channelChecks(): Check[] {
 export function cockpitChecks(
   resolveDep: ResolveDependency = defaultResolve,
 ): Check[] {
-  const checks: Check[] = [];
-  const add = (
-    label: string,
-    ok: boolean,
-    level: Check["level"],
-    hint?: string,
-  ) => checks.push({ label, ok, level, hint });
-
   let happyDomResolves = false;
   try {
     resolveDep("happy-dom", COCKPIT_SCRIPTS);
@@ -205,14 +190,14 @@ export function cockpitChecks(
     happyDomResolves = false;
   }
 
-  add(
-    "mermaid diagram lint (happy-dom)",
-    happyDomResolves,
-    "optional",
-    "Mermaid --diagram lint falls back to weaker heuristics that can pass source the dashboard cannot render.\n   Run bun install in the plugin directory, or let Bun auto-install it from ~/.bun/install/cache on first use (needs network once).",
-  );
-
-  return checks;
+  return [
+    {
+      label: "mermaid diagram lint (happy-dom)",
+      ok: happyDomResolves,
+      level: "optional",
+      hint: "Mermaid --diagram lint falls back to weaker heuristics that can pass source the dashboard cannot render.\n   Run bun install in the plugin directory, or let Bun auto-install it from ~/.bun/install/cache on first use (needs network once).",
+    },
+  ];
 }
 
 // --- cleanup: remove a stale hand-wired cockpit-channel from ~/.claude.json --
@@ -532,8 +517,6 @@ function main() {
   }
 
   if (flags.has("--apply") || flags.has("--apply-statusline") || dryRun) {
-    const wantStatusline =
-      flags.has("--apply") || flags.has("--apply-statusline") || dryRun;
     let ok = true;
     // --apply / --dry-run also clean up a stale hand-wired channel entry and
     // pre-approve the q-lab plugin scripts.
@@ -541,9 +524,9 @@ function main() {
       ok = unwireChannel(dryRun) !== "error" && ok;
       ok = applyScriptPermissions(dryRun) && ok;
     }
-    if (wantStatusline) ok = applyStatuslinePiece(dryRun) && ok;
+    ok = applyStatuslinePiece(dryRun) && ok;
     console.log();
-    if (!dryRun && ok && wantStatusline) {
+    if (!dryRun && ok) {
       console.log("Done. Launch an opted-in session with:");
       console.log(
         `   bun ${resolve(import.meta.dir, "..", "..", "cockpit", "scripts", "monitor-up.ts")}`,

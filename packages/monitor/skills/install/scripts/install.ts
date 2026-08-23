@@ -14,8 +14,18 @@ export type Check = { label: string; ok: boolean; level: Level; hint?: string };
 const HOME = homedir();
 // usage-dashboard assets live one skill over; resolve cross-skill from here.
 const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
-const COLLECTOR_SCRIPT = join(DASH, "scripts", "statusline-collector.ts");
-const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
+
+// Exported because "is the statusline wired?" is decided by STRING EQUALITY
+// against the command below. When setup.ts and setup-statusline.ts each built
+// their own copy of this path, any drift between the literals made the drift
+// watch report "unwired" forever while --apply wrote a different value.
+export const COLLECTOR_SCRIPT = join(
+  DASH,
+  "scripts",
+  "statusline-collector.ts",
+);
+export const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
+export const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 // The plugin manifest sits three levels up from skills/install/scripts/.
 const PLUGIN_JSON = resolve(
   import.meta.dir,
@@ -89,7 +99,7 @@ export function dashboardChecks(): Check[] {
 
   // Live usage limits — optional: dashboard works without it, the usage-window
   // panel just stays empty until Claude Code's statusline feeds rate_limits in.
-  const settingsPath = join(HOME, ".claude", "settings.json");
+  const settingsPath = SETTINGS_JSON;
   let statuslineCommand: string | null = null;
   let settingsReadable = true;
   try {
