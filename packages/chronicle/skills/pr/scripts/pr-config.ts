@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
-import { $ } from "bun";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { errorMessage } from "../../../shared/scripts/errors";
+import { gitText, tryGitText } from "../../../shared/scripts/git";
 
 export type PrConfig =
   | { workflow: "github-flow"; base: string }
@@ -104,18 +105,6 @@ export function buildFirstRunState(facts: FirstRunFacts): FirstRunState {
     defaultBranch: facts.defaultBranch,
     suggestions,
   };
-}
-
-async function gitText(args: string[]): Promise<string> {
-  return await $`git ${args}`.text();
-}
-
-async function tryGitText(args: string[]): Promise<string | null> {
-  try {
-    return await gitText(args);
-  } catch {
-    return null;
-  }
 }
 
 async function branchExists(name: string): Promise<boolean> {
@@ -242,7 +231,7 @@ async function main(): Promise<void> {
     console.log(
       JSON.stringify({
         status: "error",
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       }),
     );
     process.exitCode = 1;

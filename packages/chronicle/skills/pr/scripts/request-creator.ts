@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-
-type Provider = "github" | "gitlab";
+import { errorMessage } from "../../../shared/scripts/errors";
+import type { Provider } from "./analyze-branch";
 
 export type CreateInput = {
   provider: Provider;
@@ -117,7 +117,7 @@ function extractLastUrl(stdout: string): string | undefined {
   return matches?.at(-1)?.replace(/[),.;]+$/, "");
 }
 
-function errorMessage(stderr: string, fallback: string): string {
+function stderrMessage(stderr: string, fallback: string): string {
   return stderr.trim() || fallback;
 }
 
@@ -125,25 +125,21 @@ export async function createRequest(
   input: CreateInput,
   run: Runner,
 ): Promise<CreateResult> {
-  const binary = binaryForProvider(input.provider);
-
-  try {
-    const preflight = await run(["sh", "-lc", `command -v ${binary}`]);
-    if (preflight.exitCode !== 0) {
-      return missingCliResult(binary);
-    }
-  } catch (error) {
-    if (isMissingExecutable(error)) {
-      return missingCliResult(binary);
-    }
-
+  // analyze-branch emits "unknown" for any remote that is neither host; there is no
+  // CLI to reach for, so refuse here rather than let buildArgs guess a binary.
+  if (input.provider === "unknown") {
     return {
       ok: false,
       reason: "cli-error",
-      message: error instanceof Error ? error.message : String(error),
+      message:
+        "Unknown provider: the remote is neither GitHub nor GitLab, so no request CLI applies.",
     };
   }
 
+  const binary = binaryForProvider(input.provider);
+
+  // No `command -v` preflight: a missing binary makes the spawn below throw ENOENT,
+  // which isMissingExecutable already maps to the same missing-cli result.
   let result: Awaited<ReturnType<Runner>>;
   try {
     result = await run(buildArgs(input));
@@ -155,7 +151,7 @@ export async function createRequest(
     return {
       ok: false,
       reason: "cli-error",
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage(error),
     };
   }
 
@@ -177,14 +173,14 @@ export async function createRequest(
     return {
       ok: false,
       reason: "no-remote",
-      message: errorMessage(result.stderr, "No repository remote was found."),
+      message: stderrMessage(result.stderr, "No repository remote was found."),
     };
   }
 
   return {
     ok: false,
     reason: "cli-error",
-    message: errorMessage(result.stderr, "Request CLI failed."),
+    message: stderrMessage(result.stderr, "Request CLI failed."),
   };
 }
 
@@ -225,7 +221,7 @@ if (import.meta.main) {
     const result: CreateResult = {
       ok: false,
       reason: "cli-error",
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage(error),
     };
     console.log(JSON.stringify(result));
   }

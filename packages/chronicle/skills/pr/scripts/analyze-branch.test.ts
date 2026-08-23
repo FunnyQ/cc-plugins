@@ -282,19 +282,11 @@ describe("remotePushUrlArgs", () => {
 });
 
 describe("selectBaseRef", () => {
-  test("prefers the remote ref when local and remote both exist", () => {
-    expect(selectBaseRef("target", true, true)).toBe("origin/target");
+  test("prefers the remote ref when it exists", () => {
+    expect(selectBaseRef("develop", true)).toBe("origin/develop");
   });
 
-  test("uses the remote ref in a fresh clone", () => {
-    expect(selectBaseRef("develop", false, true)).toBe("origin/develop");
-  });
-
-  test("falls back to the local ref when no remote ref exists", () => {
-    expect(selectBaseRef("local-only", true, false)).toBe("local-only");
-  });
-
-  test("leaves an unknown base unchanged so git reports the error", () => {
-    expect(selectBaseRef("missing", false, false)).toBe("missing");
+  test("falls back to the bare base so git resolves or reports it", () => {
+    expect(selectBaseRef("local-only", false)).toBe("local-only");
   });
 });

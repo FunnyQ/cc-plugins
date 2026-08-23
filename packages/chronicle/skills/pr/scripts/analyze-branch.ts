@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import { $ } from "bun";
 import { existsSync } from "node:fs";
 import {
   collectDecisions,
@@ -9,6 +8,8 @@ import {
   type DecisionRecord,
   type RegistryEntry,
 } from "../../../shared/scripts/cockpit-trail";
+import { errorMessage } from "../../../shared/scripts/errors";
+import { gitText, tryGitText } from "../../../shared/scripts/git";
 import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 
 export type Provider = "github" | "gitlab" | "unknown";
@@ -149,18 +150,6 @@ function remoteHost(remoteUrl: string): string | null {
   }
 }
 
-async function gitText(args: string[]): Promise<string> {
-  return await $`git ${args}`.text();
-}
-
-async function tryGitText(args: string[]): Promise<string | null> {
-  try {
-    return await gitText(args);
-  } catch {
-    return null;
-  }
-}
-
 function lines(text: string): string[] {
   return text
     .split("\n")
@@ -186,24 +175,19 @@ async function resolveBase(override: string | null): Promise<string> {
   return "main";
 }
 
-export function selectBaseRef(
-  base: string,
-  localExists: boolean,
-  remoteExists: boolean,
-): string {
+export function selectBaseRef(base: string, remoteExists: boolean): string {
   if (remoteExists) return `origin/${base}`;
   return base;
 }
 
 async function baseRef(base: string): Promise<string> {
-  const local = await tryGitText(["rev-parse", "--verify", "--quiet", base]);
   const remote = await tryGitText([
     "rev-parse",
     "--verify",
     "--quiet",
     `origin/${base}`,
   ]);
-  return selectBaseRef(base, !!local, !!remote);
+  return selectBaseRef(base, !!remote);
 }
 
 function parseArgs(argv: string[]): { base: string | null } {
@@ -262,11 +246,13 @@ async function gatherGit(baseOverride: string | null) {
   const changedFiles = lines(changedFilesText);
   const commitTimes = lines(commitTimesText);
   const branch = head.trim();
+  const provider = detectProvider(remoteUrl);
+  // resolveCrossFork ignores the head remote off GitHub, so don't go ask git for it.
   const crossFork = resolveCrossFork(
     branch,
-    await headRemoteUrl(branch),
+    provider === "github" ? await headRemoteUrl(branch) : null,
     remoteUrl,
-    detectProvider(remoteUrl),
+    provider,
   );
 
   return {
@@ -286,19 +272,12 @@ async function gatherGit(baseOverride: string | null) {
 // The remote this branch actually pushes to — which is NOT always `origin`, and not
 // always the tracking remote either (see pickPushRemote for the resolution chain).
 async function headRemoteUrl(branch: string): Promise<string | null> {
-  const name = pickPushRemote({
-    pushRemote: await tryGitText([
-      "config",
-      "--get",
-      `branch.${branch}.pushRemote`,
-    ]),
-    pushDefault: await tryGitText(["config", "--get", "remote.pushDefault"]),
-    trackingRemote: await tryGitText([
-      "config",
-      "--get",
-      `branch.${branch}.remote`,
-    ]),
-  });
+  const [pushRemote, pushDefault, trackingRemote] = await Promise.all([
+    tryGitText(["config", "--get", `branch.${branch}.pushRemote`]),
+    tryGitText(["config", "--get", "remote.pushDefault"]),
+    tryGitText(["config", "--get", `branch.${branch}.remote`]),
+  ]);
+  const name = pickPushRemote({ pushRemote, pushDefault, trackingRemote });
   if (!name) return null;
   // A branch can be configured to push to a URL rather than a named remote.
   if (name.includes(":") || name.includes("/")) return name;
@@ -350,10 +329,6 @@ async function harvestCockpit(
 
 async function writePayload(payload: BranchMaterial): Promise<string> {
   return writeTempPayload("pr", "branch-material", payload);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function fallbackPayloadForError(error: unknown): BranchMaterial {

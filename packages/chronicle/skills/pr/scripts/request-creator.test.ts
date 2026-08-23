@@ -97,21 +97,15 @@ describe("buildArgs", () => {
 
 describe("createRequest", () => {
   test("returns the last URL from successful CLI output", async () => {
-    const run: Runner = async (cmd) => {
-      if (cmd[0] === "sh") {
-        return { exitCode: 0, stdout: "/usr/bin/gh\n", stderr: "" };
-      }
-
-      return {
-        exitCode: 0,
-        stdout: [
-          "Creating pull request",
-          "https://github.com/acme/repo/pull/1",
-          "View: https://github.com/acme/repo/pull/2",
-        ].join("\n"),
-        stderr: "",
-      };
-    };
+    const run: Runner = async () => ({
+      exitCode: 0,
+      stdout: [
+        "Creating pull request",
+        "https://github.com/acme/repo/pull/1",
+        "View: https://github.com/acme/repo/pull/2",
+      ].join("\n"),
+      stderr: "",
+    });
 
     await expect(createRequest(githubInput, run)).resolves.toEqual({
       ok: true,
@@ -119,12 +113,14 @@ describe("createRequest", () => {
     });
   });
 
-  test("maps missing binary preflight to missing-cli", async () => {
-    const run: Runner = async () => ({
-      exitCode: 1,
-      stdout: "",
-      stderr: "",
-    });
+  // Bun.spawn throws ENOENT for a binary that is not on PATH, which is the only
+  // signal createRequest gets — there is no `command -v` preflight.
+  test("maps a spawn ENOENT to missing-cli", async () => {
+    const run: Runner = async () => {
+      throw Object.assign(new Error('Executable not found in $PATH: "gh"'), {
+        code: "ENOENT",
+      });
+    };
 
     await expect(createRequest(githubInput, run)).resolves.toMatchObject({
       ok: false,
@@ -132,18 +128,25 @@ describe("createRequest", () => {
     });
   });
 
-  test("maps repository or remote errors to no-remote", async () => {
-    const run: Runner = async (cmd) => {
-      if (cmd[0] === "sh") {
-        return { exitCode: 0, stdout: "/usr/bin/gh\n", stderr: "" };
-      }
-
-      return {
-        exitCode: 1,
-        stdout: "",
-        stderr: "fatal: not a git repository (or any parent up to mount point)",
-      };
+  test("reports an unknown provider without running anything", async () => {
+    const run: Runner = async () => {
+      throw new Error("must not spawn");
     };
+
+    await expect(
+      createRequest({ ...githubInput, provider: "unknown" }, run),
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: "cli-error",
+    });
+  });
+
+  test("maps repository or remote errors to no-remote", async () => {
+    const run: Runner = async () => ({
+      exitCode: 1,
+      stdout: "",
+      stderr: "fatal: not a git repository (or any parent up to mount point)",
+    });
 
     await expect(createRequest(githubInput, run)).resolves.toMatchObject({
       ok: false,
@@ -152,17 +155,11 @@ describe("createRequest", () => {
   });
 
   test("maps other non-zero exits to cli-error", async () => {
-    const run: Runner = async (cmd) => {
-      if (cmd[0] === "sh") {
-        return { exitCode: 0, stdout: "/usr/bin/gh\n", stderr: "" };
-      }
-
-      return {
-        exitCode: 1,
-        stdout: "",
-        stderr: "GraphQL: title is too short",
-      };
-    };
+    const run: Runner = async () => ({
+      exitCode: 1,
+      stdout: "",
+      stderr: "GraphQL: title is too short",
+    });
 
     await expect(createRequest(githubInput, run)).resolves.toEqual({
       ok: false,
