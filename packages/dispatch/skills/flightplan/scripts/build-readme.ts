@@ -16,57 +16,13 @@
  * Usage:
  *   bun build-readme.ts <tasks-dir>
  */
-import { readdir, readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, access } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { parseTask, refToString, type ParsedTask } from "./lib/parse-task";
+import { refToString, type ParsedTask } from "./lib/parse-task";
+import { loadAllTasks } from "./next-ready";
 
 export const GEN_START = "<!-- flightplan:generated:start -->";
 export const GEN_END = "<!-- flightplan:generated:end -->";
-
-export type LoadError = { file: string; reason: string };
-
-export type LoadResult = {
-  /** Tasks indexed by `bucket/NN`. */
-  tasks: Record<string, ParsedTask>;
-  /** Files that failed to parse or duplicate an existing ref. */
-  errors: LoadError[];
-};
-
-export async function loadTasks(tasksDir: string): Promise<LoadResult> {
-  const tasks: Record<string, ParsedTask> = {};
-  const refToFile = new Map<string, string>();
-  const errors: LoadError[] = [];
-  const buckets = await readdir(tasksDir, { withFileTypes: true });
-  for (const bucket of buckets) {
-    if (!bucket.isDirectory()) continue;
-    if (bucket.name === "_context") continue;
-    const bucketDir = join(tasksDir, bucket.name);
-    const files = await readdir(bucketDir);
-    for (const file of files) {
-      if (!file.endsWith(".md")) continue;
-      if (file === "README.md") continue;
-      const path = join(bucketDir, file);
-      const content = await readFile(path, "utf-8");
-      const parsed = parseTask(content);
-      if (!parsed.ok) {
-        errors.push({ file: path, reason: parsed.reason });
-        continue;
-      }
-      const ref = refToString(parsed.task);
-      const existing = refToFile.get(ref);
-      if (existing) {
-        errors.push({
-          file: path,
-          reason: `duplicate ref ${ref} (already claimed by ${existing})`,
-        });
-        continue;
-      }
-      refToFile.set(ref, path);
-      tasks[ref] = parsed.task;
-    }
-  }
-  return { tasks, errors };
-}
 
 export function renderGenerated(input: {
   tasks: Record<string, ParsedTask>;
@@ -177,7 +133,6 @@ export function renderGlobalGraph(allTasks: ParsedTask[]): {
     a.bucket.localeCompare(b.bucket) || a.nn.localeCompare(b.nn);
 
   const refs = new Set(allTasks.map(refToString));
-  const byRef = new Map(allTasks.map((t) => [refToString(t), t] as const));
 
   // Primary parent = first dep that exists in this task set.
   const primaryParent = new Map<string, string>();
@@ -240,10 +195,6 @@ export function renderGlobalGraph(allTasks: ParsedTask[]): {
     lines.push(`${refToString(root)}${rootHasExtra ? " *" : ""}`);
     renderSubtree(root, "", new Set());
   }
-
-  // Silence unused-variable warning if byRef ever becomes unreferenced
-  // during future edits. (No-op at runtime.)
-  void byRef;
 
   return { graph: lines.join("\n"), hasMultiParent };
 }
@@ -340,7 +291,9 @@ async function main() {
   }
 
   const readmePath = join(tasksDir, "README.md");
-  const { tasks, errors } = await loadTasks(tasksDir);
+  // `invalid` is ignored on purpose: the README indexes whatever parsed, and a
+  // task with a malformed execution state still belongs in the index.
+  const { byRef: tasks, errors } = await loadAllTasks(tasksDir);
 
   if (errors.length > 0) {
     console.error(

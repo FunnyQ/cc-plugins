@@ -3,7 +3,6 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  loadTasks,
   renderGenerated,
   renderGlobalGraph,
   spliceGenerated,
@@ -11,6 +10,7 @@ import {
   GEN_START,
   GEN_END,
 } from "./build-readme";
+import { loadAllTasks } from "./next-ready";
 import { parseTask, type ParsedTask } from "./lib/parse-task";
 
 function parseAll(headers: string[]): ParsedTask[] {
@@ -84,10 +84,10 @@ async function writeTasks(): Promise<string> {
   return root;
 }
 
-describe("loadTasks", () => {
+describe("loadAllTasks", () => {
   test("loads all task files under tasks/<bucket>/", async () => {
     const root = await writeTasks();
-    const { tasks, errors } = await loadTasks(join(root, "tasks"));
+    const { byRef: tasks, errors } = await loadAllTasks(join(root, "tasks"));
     expect(errors).toEqual([]);
     expect(Object.keys(tasks).sort()).toEqual([
       "backend/01",
@@ -104,7 +104,7 @@ describe("loadTasks", () => {
       join(root, "tasks/_context/99-fake.md"),
       HEADER("ui", "99", "fake", "none"),
     );
-    const { tasks } = await loadTasks(join(root, "tasks"));
+    const { byRef: tasks } = await loadAllTasks(join(root, "tasks"));
     expect(tasks["ui/99"]).toBeUndefined();
     await rm(root, { recursive: true });
   });
@@ -112,7 +112,7 @@ describe("loadTasks", () => {
   test("skips README.md in bucket dirs", async () => {
     const root = await writeTasks();
     await writeFile(join(root, "tasks/ui/README.md"), "# Local notes\n");
-    const { errors } = await loadTasks(join(root, "tasks"));
+    const { errors } = await loadAllTasks(join(root, "tasks"));
     expect(errors).toEqual([]);
     await rm(root, { recursive: true });
   });
@@ -123,7 +123,7 @@ describe("loadTasks", () => {
       join(root, "tasks/ui/99-broken.md"),
       "just text, no h1, no quote\n",
     );
-    const { tasks, errors } = await loadTasks(join(root, "tasks"));
+    const { byRef: tasks, errors } = await loadAllTasks(join(root, "tasks"));
     expect(tasks["ui/99"]).toBeUndefined();
     expect(errors).toHaveLength(1);
     expect(errors[0].file).toContain("99-broken.md");
@@ -137,7 +137,7 @@ describe("loadTasks", () => {
       join(root, "tasks/ui/01-dup.md"),
       HEADER("ui", "01", "Dup", "none"),
     );
-    const { errors } = await loadTasks(join(root, "tasks"));
+    const { errors } = await loadAllTasks(join(root, "tasks"));
     expect(errors.some((e) => /duplicate ref ui\/01/.test(e.reason))).toBe(
       true,
     );
@@ -148,8 +148,8 @@ describe("loadTasks", () => {
 describe("renderGenerated", () => {
   test("emits status conventions, task index, global graph, and cross-bucket table", async () => {
     const root = await writeTasks();
-    const input = await loadTasks(join(root, "tasks"));
-    const out = renderGenerated(input);
+    const input = await loadAllTasks(join(root, "tasks"));
+    const out = renderGenerated({ tasks: input.byRef });
 
     expect(out).toContain("## Status conventions");
     expect(out).toContain("## Task index");
@@ -172,8 +172,8 @@ describe("renderGenerated", () => {
       join(root, "tasks/work/01-only.md"),
       HEADER("work", "01", "Only", "none"),
     );
-    const input = await loadTasks(join(root, "tasks"));
-    const out = renderGenerated(input);
+    const input = await loadAllTasks(join(root, "tasks"));
+    const out = renderGenerated({ tasks: input.byRef });
     expect(out).not.toContain("## Cross-bucket dependencies");
     await rm(root, { recursive: true });
   });
@@ -185,8 +185,8 @@ describe("renderGenerated", () => {
       join(root, "tasks/work/01-pipe.md"),
       HEADER("work", "01", "Title | with pipe", "none"),
     );
-    const input = await loadTasks(join(root, "tasks"));
-    const out = renderGenerated(input);
+    const input = await loadAllTasks(join(root, "tasks"));
+    const out = renderGenerated({ tasks: input.byRef });
     expect(out).toContain("Title \\| with pipe");
     await rm(root, { recursive: true });
   });
