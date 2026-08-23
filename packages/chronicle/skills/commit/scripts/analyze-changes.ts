@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 import { $ } from "bun";
-import { mkdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, resolve } from "node:path";
+import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 
 const SCRIPT_DIR = import.meta.dir;
 const DEFAULT_PROMPT_PATH = resolve(
   SCRIPT_DIR,
   "../references/commit-template.md",
 );
-const TEMP_OUTPUT_DIR = "/tmp/chronicle/commit";
 const MAX_DIFF_LINES = 400;
 const MAX_TOTAL_DIFF_LINES = 3000;
 const MAX_UNTRACKED_INLINE_BYTES = 256 * 1024;
@@ -219,28 +219,11 @@ function expandHome(path: string): string {
   return path;
 }
 
-function readChronicleTemplateOverride(settings: unknown): string | undefined {
-  if (!settings || typeof settings !== "object") return undefined;
-  if (!("skills" in settings)) return undefined;
-
-  const skills = settings.skills;
-  if (!skills || typeof skills !== "object" || !("chronicle" in skills)) {
-    return undefined;
-  }
-
-  const chronicle = skills.chronicle;
-  if (!chronicle || typeof chronicle !== "object" || !("commit" in chronicle)) {
-    return undefined;
-  }
-
-  const commit = chronicle.commit;
-  if (!commit || typeof commit !== "object" || !("templatePath" in commit)) {
-    return undefined;
-  }
-
-  return typeof commit.templatePath === "string"
-    ? commit.templatePath
-    : undefined;
+// `any` because the argument is a JSON.parse result and the caller already
+// catches — only the string check below is load-bearing.
+function readChronicleTemplateOverride(settings: any): string | undefined {
+  const path = settings?.skills?.chronicle?.commit?.templatePath;
+  return typeof path === "string" ? path : undefined;
 }
 
 export async function resolvePromptPath(): Promise<string> {
@@ -418,12 +401,11 @@ export async function analyzeFile(entry: ParsedStatus): Promise<AnalyzedFile> {
       return binaryResult(entry);
     }
 
-    const cached = entry.staged ? "--cached" : "";
     const [numstatText, diff] = await Promise.all([
-      cached
+      entry.staged
         ? gitText`git diff --cached --numstat -- ${entry.path}`
         : gitText`git diff --numstat -- ${entry.path}`,
-      cached
+      entry.staged
         ? gitText`git diff --cached -- ${entry.path}`
         : gitText`git diff -- ${entry.path}`,
     ]);
@@ -452,9 +434,7 @@ function summarizeFile(file: AnalyzedFile): FileSummary {
 }
 
 async function analyzeChanges(): Promise<AnalysisResult> {
-  const entries = parseStatus(
-    await gitText`git status --porcelain -uall -z`,
-  );
+  const entries = parseStatus(await gitText`git status --porcelain -uall -z`);
   const [analyzed, logOutput] = await Promise.all([
     Promise.all(entries.map(analyzeFile)),
     gitText`git log --oneline -10`.catch(() => ""),
@@ -521,9 +501,9 @@ export async function remainingPaths(): Promise<string[]> {
   // Take every record's path whatever its code, rather than going through
   // parseStatus: a status code the mapping does not know would drop out here
   // too, and that silent drop is exactly what this check exists to expose.
-  return parseStatusRecords(
-    await gitText`git status --porcelain -uall -z`,
-  ).map((record) => record.path);
+  return parseStatusRecords(await gitText`git status --porcelain -uall -z`).map(
+    (record) => record.path,
+  );
 }
 
 async function verifyMain(argv: string[]) {
@@ -570,9 +550,7 @@ async function main() {
     analyzeChanges(),
     resolvePromptPath(),
   ]);
-  await mkdir(TEMP_OUTPUT_DIR, { recursive: true });
-  const outputPath = resolve(TEMP_OUTPUT_DIR, `${Date.now()}.json`);
-  await Bun.write(outputPath, JSON.stringify(analysis, null, 2));
+  const outputPath = await writeTempPayload("commit", "analysis", analysis);
 
   console.log(
     JSON.stringify({

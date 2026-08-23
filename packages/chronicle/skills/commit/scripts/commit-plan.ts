@@ -325,6 +325,11 @@ export function composeMessage(commit: PlannedCommit): string {
   return `${message}\n`;
 }
 
+/** The commit's subject: the first line of its message. */
+export function subjectOf(commit: PlannedCommit): string {
+  return composeMessage(commit).split("\n")[0] ?? "";
+}
+
 export type LogEntry = {
   sha: string;
   subject: string;
@@ -369,9 +374,7 @@ export function resolveResumption(
   plan: CommitPlan,
   emptyTree: string,
 ): Resumption {
-  const subjects = plan.commits.map(
-    (commit) => composeMessage(commit).split("\n")[0] ?? "",
-  );
+  const subjects = plan.commits.map(subjectOf);
   const most = Math.min(log.length, subjects.length);
 
   for (let landed = most; landed > 0; landed--) {

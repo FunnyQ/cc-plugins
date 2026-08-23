@@ -41,6 +41,7 @@ import {
   composeMessage,
   decideShape,
   resolveResumption,
+  subjectOf,
   validatePlan,
   validateProposalDraft,
   type CommitPlan,
@@ -193,23 +194,28 @@ async function mergeInProgress(): Promise<boolean> {
  * nor the index, and `git add` fails the whole invocation on one unmatched
  * pathspec. The old path still belongs in the *commit* pathspec — that is what
  * keeps the deletion in the same commit — so it is dropped here and only here.
+ *
+ * `cached` is read once for the whole run: the plan assigns every path to exactly
+ * one commit, so staging can only ever take paths out of the index, never add one
+ * that a later commit still needs to match.
  */
-async function stageable(files: string[]): Promise<string[]> {
-  const cached = new Set(
-    (await gitOrEmpty("ls-files", "--cached", "-z", "--", ...files))
+function stageable(files: string[], cached: Set<string>): string[] {
+  return files.filter((path) => existsSync(path) || cached.has(path));
+}
+
+async function cachedPaths(): Promise<Set<string>> {
+  return new Set(
+    (await gitOrEmpty("ls-files", "--cached", "-z"))
       .split("\0")
       .filter(Boolean),
   );
-  const present = await Promise.all(
-    files.map(async (path) => existsSync(path) || cached.has(path)),
-  );
-  return files.filter((_, index) => present[index]);
 }
 
 async function writeCommit(
   commit: PlannedCommit,
   index: number,
   duringMerge: boolean,
+  cached: Set<string>,
 ): Promise<void> {
   // Kept on failure on purpose: the message is the part of a broken run that is
   // expensive to reproduce, and the reported path is how the user recovers it.
@@ -219,7 +225,7 @@ async function writeCommit(
   );
   await Bun.write(messagePath, composeMessage(commit));
 
-  const toStage = await stageable(commit.files);
+  const toStage = stageable(commit.files, cached);
   if (toStage.length > 0) await git("add", "--", ...toStage);
   if (duringMerge) {
     await git("commit", "-F", messagePath);
@@ -314,9 +320,10 @@ async function applyMain(planPath: string): Promise<void> {
       );
     }
 
+    const cached = await cachedPaths();
     for (const [offset, commit] of pending.entries()) {
       try {
-        await writeCommit(commit, landed + offset, duringMerge);
+        await writeCommit(commit, landed + offset, duringMerge, cached);
       } catch (error) {
         refuse((error as Error).message, {
           executed: offset,
@@ -337,10 +344,8 @@ async function applyMain(planPath: string): Promise<void> {
     ok: verification.ok,
     shape: plan.shape,
     base,
-    executed: pending.map((commit) => composeMessage(commit).split("\n")[0]),
-    skipped: plan.commits
-      .slice(0, landed)
-      .map((commit) => composeMessage(commit).split("\n")[0]),
+    executed: pending.map(subjectOf),
+    skipped: plan.commits.slice(0, landed).map(subjectOf),
     log: (await gitOrEmpty("log", "--oneline", `${base}..HEAD`))
       .trimEnd()
       .split("\n"),
