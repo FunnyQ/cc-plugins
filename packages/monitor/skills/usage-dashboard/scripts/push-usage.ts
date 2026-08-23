@@ -4,7 +4,7 @@
 // throttled by statusline-collector.ts so the statusline never waits on the
 // Codex usage API call or the network push. Opt-in: does nothing unless
 // LLM_QUOTA_INGEST_URL is set.
-import { readCodexUsageLimits, readUsageLimits } from "./api";
+import { fetchWithTimeout, readCodexUsageLimits, readUsageLimits } from "./api";
 
 const INGEST_URL = process.env.LLM_QUOTA_INGEST_URL?.trim();
 const INGEST_SECRET = process.env.LLM_QUOTA_INGEST_SECRET?.trim() ?? "";
@@ -25,22 +25,21 @@ async function main(): Promise<void> {
     codex,
   };
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), PUSH_TIMEOUT_MS);
   try {
-    await fetch(INGEST_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Auth-Token": INGEST_SECRET,
+    await fetchWithTimeout(
+      INGEST_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": INGEST_SECRET,
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal,
-    });
+      PUSH_TIMEOUT_MS,
+    );
   } catch {
     // Best-effort telemetry push — never surface errors.
-  } finally {
-    clearTimeout(timer);
   }
 }
 
