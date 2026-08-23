@@ -438,7 +438,6 @@ describe("planLegScaffold", () => {
       proj: "demo",
       nnSlug: "01-auth",
       buckets: ["work", "review"],
-      docsRoot: "docs",
     });
 
     expect(result.legDir).toBe(join("docs", "demo/legs/01-auth"));
@@ -457,8 +456,7 @@ describe("planLegScaffold", () => {
         proj: "demo",
         nnSlug: "01-auth",
         buckets: ["bad-bucket"],
-        docsRoot: "docs",
-      }),
+        }),
     ).toThrow(/bucket/);
   });
 });

@@ -9,6 +9,7 @@
  */
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { FLIGHTLOG_DIRNAME } from "../../flightplan/scripts/lib/flightlog";
 
 export type LegStatus = "done" | "active" | "pending";
 
@@ -29,7 +30,6 @@ export type LegScaffoldPlanInput = {
   proj: string;
   nnSlug: string;
   buckets: string[];
-  docsRoot: string;
 };
 
 export type LegScaffoldPlan = {
@@ -294,7 +294,7 @@ export function planLegScaffold(input: LegScaffoldPlanInput): LegScaffoldPlan {
   }
   for (const bucket of input.buckets) validateBucket(bucket);
 
-  const legsDir = join(input.docsRoot, input.proj, "legs");
+  const legsDir = join("docs", input.proj, "legs");
   const legDir = join(legsDir, input.nnSlug);
   const tasksDir = join(legDir, "tasks");
   const createdDirs = [legDir, tasksDir, join(tasksDir, "_context")];
@@ -412,7 +412,6 @@ async function main() {
           proj,
           nnSlug,
           buckets: parseBuckets(rawBuckets),
-          docsRoot: "docs",
         });
         await mkdir(plan.legsDir, { recursive: true });
         for (const dir of plan.createdDirs) {
@@ -467,7 +466,7 @@ async function main() {
           proj,
           "legs",
           activeLeg.slug,
-          ".flightlog",
+          FLIGHTLOG_DIRNAME,
           "RUNLOG.md",
         );
         const planPath = join("docs", proj, "legs", activeLeg.slug, "PLAN.md");
