@@ -1,8 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 
 import {
-  applyWatchMessage,
-  attach,
   cdp,
   DEVICES,
   closeTab,
@@ -11,14 +9,21 @@ import {
   formatWatch,
   formatTabs,
   parseArgv,
-  renderCallArguments,
   resolveMetrics,
   resolveTargetId,
   run,
-  settleEvents,
-  sincePageLoad,
   type Tab,
 } from "./browser";
+// The watch/console data model moved to the driver; these tests span both
+// layers on purpose — they check that what ops produces is what browser prints.
+import {
+  applyWatchMessage,
+  attach,
+  renderCallArguments,
+  settleEvents,
+  sincePageLoad,
+  type ConsoleEntry,
+} from "./ops";
 
 describe("parseArgv", () => {
   test("reads command and args, defaulting every flag", () => {
@@ -377,7 +382,7 @@ describe("resolveMetrics", () => {
 });
 
 describe("sincePageLoad", () => {
-  const entries = [
+  const entries: ConsoleEntry[] = [
     { level: "log", text: "previous page", timestamp: 100 },
     { level: "error", text: "this page", timestamp: 200 },
     { level: "warning", text: "later still", timestamp: 300 },

@@ -1,6 +1,9 @@
-// Every page operation, driven straight over CDP. The herdr plugin CLI answers
-// each of these with pretty-printed JSON, which is the same fact spread over
-// ten lines; going to CDP directly is what lets one line be the answer.
+// The CDP driver: the transport, every page operation, and the data those
+// operations produce. Nothing here formats for a human or reads argv — that is
+// browser.ts's half, and the split is the rule, not a habit. The herdr plugin
+// CLI answers each of these with pretty-printed JSON, which is the same fact
+// spread over ten lines; going to CDP directly is what lets one line be the
+// answer.
 
 export type CdpSession = {
   // A rejected send means the call did not happen. timeoutMs 0 waives the
@@ -477,4 +480,419 @@ export async function setHeaders(
   await session.send("Network.setExtraHTTPHeaders", { headers });
   const names = Object.keys(headers);
   return names.length === 0 ? "cleared" : names.join(" ");
+}
+
+// --- watch ------------------------------------------------------------------
+// CDP only reports while a client is attached, so recording means driving the
+// navigation ourselves. A request that never gets a response still matters — a
+// blocked or refused fetch is usually the bug — and an uncaught exception never
+// reaches the console buffer at all.
+
+export type WatchEvent =
+  | {
+      kind: "net";
+      requestId: string;
+      type: string;
+      url: string;
+      status: number | null;
+      failure: string | null;
+    }
+  | { kind: "console"; level: string; text: string }
+  | { kind: "exception"; text: string };
+
+export function renderCallArguments(args: any[] = []): string {
+  return args
+    .map((arg) =>
+      arg?.value !== undefined
+        ? String(arg.value)
+        : (arg?.description ?? arg?.type ?? ""),
+    )
+    .join(" ");
+}
+
+// Whichever field of exceptionDetails carries the description this time.
+export function exceptionText(details: any): string {
+  return (
+    details?.exception?.description ?? details?.text ?? "uncaught exception"
+  );
+}
+
+// One CDP message yields at most one event; null means we do not report it.
+function watchEvent(message: {
+  method?: string;
+  params?: any;
+}): WatchEvent | null {
+  if (message.method === "Network.responseReceived") {
+    const { requestId, type, response } = message.params;
+    return {
+      kind: "net",
+      requestId,
+      type,
+      url: response.url,
+      status: response.status,
+      failure: null,
+    };
+  }
+  if (message.method === "Network.loadingFailed") {
+    const { requestId, type, errorText, blockedReason } = message.params;
+    return {
+      kind: "net",
+      requestId,
+      type: type ?? "Other",
+      url: "",
+      status: null,
+      failure: blockedReason ? `${errorText} (${blockedReason})` : errorText,
+    };
+  }
+  if (message.method === "Network.requestWillBeSent") {
+    // Only used to give a failed exchange its url once the failure arrives.
+    const { requestId, request } = message.params;
+    return {
+      kind: "net",
+      requestId,
+      type: "pending",
+      url: request.url,
+      status: null,
+      failure: null,
+    };
+  }
+  if (message.method === "Runtime.consoleAPICalled") {
+    return {
+      kind: "console",
+      level: message.params.type,
+      text: renderCallArguments(message.params.args),
+    };
+  }
+  if (message.method === "Runtime.exceptionThrown") {
+    return {
+      kind: "exception",
+      text: exceptionText(message.params.exceptionDetails),
+    };
+  }
+  return null;
+}
+
+export function applyWatchMessage(
+  events: WatchEvent[],
+  message: { method?: string; params?: any },
+): WatchEvent[] {
+  const event = watchEvent(message);
+  return event ? [...events, event] : events;
+}
+
+// requestWillBeSent rows exist to name the failures; drop the ones that landed.
+export function settleEvents(events: WatchEvent[]): WatchEvent[] {
+  const urls = new Map<string, string>();
+  for (const event of events) {
+    if (event.kind === "net" && event.url) {
+      urls.set(event.requestId, event.url);
+    }
+  }
+  const settled = new Set(
+    events
+      .filter((event) => event.kind === "net" && event.type !== "pending")
+      .map(
+        (event) => (event as Extract<WatchEvent, { kind: "net" }>).requestId,
+      ),
+  );
+  return events
+    .filter(
+      (event) =>
+        event.kind !== "net" ||
+        event.type !== "pending" ||
+        !settled.has(event.requestId),
+    )
+    .map((event) =>
+      event.kind === "net"
+        ? {
+            ...event,
+            url: event.url || urls.get(event.requestId) || "",
+            type: event.type === "pending" ? "Other" : event.type,
+          }
+        : event,
+    );
+}
+
+export async function watchPage(
+  session: CdpSession,
+  url: string | null,
+  bodyNeedle: string | null,
+  idleMs = 1_500,
+  capMs = 15_000,
+): Promise<{ events: WatchEvent[]; body: string | null }> {
+  let events: WatchEvent[] = [];
+  let lastEventAt = Date.now();
+
+  session.onEvent((message) => {
+    const before = events.length;
+    events = applyWatchMessage(events, message);
+    if (events.length !== before) {
+      lastEventAt = Date.now();
+    }
+  });
+
+  // Three independent domains — enabling them concurrently saves two round trips.
+  await Promise.all([
+    session.send("Network.enable"),
+    session.send("Runtime.enable"),
+    session.send("Page.enable"),
+  ]);
+  // Runtime.enable replays the console messages the page already collected;
+  // those belong to the load we are about to replace.
+  await session.send("Runtime.discardConsoleEntries");
+  events = [];
+  lastEventAt = Date.now();
+  await session.send(url ? "Page.navigate" : "Page.reload", url ? { url } : {});
+
+  const startedAt = Date.now();
+  while (Date.now() - lastEventAt < idleMs && Date.now() - startedAt < capMs) {
+    await Bun.sleep(100);
+  }
+
+  const settled = settleEvents(events);
+  let body: string | null = null;
+  if (bodyNeedle) {
+    const match = settled.find(
+      (event) => event.kind === "net" && event.url.includes(bodyNeedle),
+    ) as Extract<WatchEvent, { kind: "net" }> | undefined;
+    if (!match) {
+      throw new Error(`no request url contains ${bodyNeedle}`);
+    }
+    body =
+      (
+        await session.send(
+          "Network.getResponseBody",
+          { requestId: match.requestId },
+          CDP_BULK_TIMEOUT_MS,
+        )
+      )?.body ?? null;
+  }
+  return { events: settled, body };
+}
+
+// --- console ----------------------------------------------------------------
+
+export type ConsoleEntry = {
+  level: string;
+  text: string;
+  timestamp: number;
+};
+
+// Runtime.enable replays the whole buffer, so entries from pages visited earlier
+// sit in front of this page's. performance.timeOrigin is the cut.
+export function sincePageLoad(
+  entries: ConsoleEntry[],
+  timeOrigin: number | null,
+): ConsoleEntry[] {
+  if (timeOrigin === null) {
+    return entries;
+  }
+  return entries.filter((entry) => entry.timestamp >= timeOrigin);
+}
+
+// about:blank and error pages can refuse to evaluate; then every entry stands.
+export async function pageTimeOrigin(
+  session: CdpSession,
+): Promise<number | null> {
+  try {
+    const value = (await evaluate(session, "performance.timeOrigin"))?.value;
+    return typeof value === "number" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+// Runtime.enable replays the console the page collected before we attached, so
+// a short-lived CLI reads the same buffer a resident daemon would have kept.
+export async function collectConsole(
+  session: CdpSession,
+): Promise<ConsoleEntry[]> {
+  const entries: ConsoleEntry[] = [];
+  session.onEvent((message) => {
+    if (message.method === "Runtime.consoleAPICalled") {
+      entries.push({
+        level: message.params.type,
+        text: renderCallArguments(message.params.args),
+        timestamp: message.params.timestamp,
+      });
+    }
+    if (message.method === "Runtime.exceptionThrown") {
+      entries.push({
+        level: "exception",
+        text: exceptionText(message.params.exceptionDetails).split("\n")[0],
+        timestamp: message.params.timestamp,
+      });
+    }
+  });
+  await session.send("Runtime.enable");
+  // The replay arrives as events after the reply, so it needs a moment to land.
+  await Bun.sleep(400);
+  return entries;
+}
+
+// --- accessibility and emulation --------------------------------------------
+
+// The flat array is Chromium's own serialization order, not the document's.
+// Putting it back in document order is the caller's job.
+export async function axTree(session: CdpSession): Promise<any[]> {
+  await session.send("Accessibility.enable");
+  const tree = await session.send(
+    "Accessibility.getFullAXTree",
+    {},
+    CDP_BULK_TIMEOUT_MS,
+  );
+  return tree?.nodes ?? [];
+}
+
+// backendDOMNodeId survives a detach but not a navigation or a re-render, so
+// snapshot and click-ref belong next to each other in time.
+export async function clickRef(
+  session: CdpSession,
+  ref: string,
+): Promise<string> {
+  const resolved = await session.send("DOM.resolveNode", {
+    backendNodeId: Number.parseInt(ref, 10),
+  });
+  const objectId = resolved?.object?.objectId;
+  if (!objectId) {
+    throw new Error(`ref ${ref} is no longer on the page; snapshot again`);
+  }
+  const clicked = await session.send("Runtime.callFunctionOn", {
+    objectId,
+    functionDeclaration:
+      "function(){this.scrollIntoView({block:'center'});this.click();return this.textContent?.trim().slice(0,80)??''}",
+    returnByValue: true,
+  });
+  return clicked?.result?.value ?? "";
+}
+
+export type DeviceMetrics = {
+  width: number;
+  height: number;
+  scale: number;
+  mobile: boolean;
+};
+
+// Device metrics are the one override that outlives the session that set it —
+// emulated media and network conditions die on detach, so this does not offer
+// them. There is no clear either: the way back is another size. Which size the
+// flags meant is the CLI's question, so the answer arrives already resolved.
+export async function emulate(
+  session: CdpSession,
+  metrics: DeviceMetrics,
+): Promise<string> {
+  await session.send("Emulation.setDeviceMetricsOverride", {
+    width: metrics.width,
+    height: metrics.height,
+    deviceScaleFactor: metrics.scale,
+    mobile: metrics.mobile,
+  });
+  return `${metrics.width}x${metrics.height}`;
+}
+
+// --- transport ---------------------------------------------------------------
+
+type PendingCall = {
+  resolve: (result: any) => void;
+  reject: (error: Error) => void;
+  method: string;
+  timer?: ReturnType<typeof setTimeout>;
+};
+
+// The transport decides only whether the call happened. Whether it did what the
+// caller meant stays with the ops, which is why their own sentinel checks —
+// exceptionDetails, errorText, success:false — remain on top of this.
+export async function attach(pageWsUrl: string): Promise<CdpSession> {
+  const socket = new WebSocket(pageWsUrl);
+  const pending = new Map<number, PendingCall>();
+  let handler: ((message: any) => void) | null = null;
+  let messageId = 0;
+
+  const settle = (id: number): PendingCall | undefined => {
+    const call = pending.get(id);
+    if (call) {
+      clearTimeout(call.timer);
+      pending.delete(id);
+    }
+    return call;
+  };
+
+  // A socket that dies mid-command leaves every call in flight unsettled, and
+  // an unsettled call is a CLI that never exits — the hang run()'s timeout
+  // exists to prevent on the subprocess path. The reason is remembered because
+  // draining what is pending right now is not enough: a send issued after the
+  // close would join an empty map that nothing will ever drain again, and a
+  // send that waived its deadline would then wait forever.
+  let closedReason: string | null = null;
+  const drain = (reason: string): void => {
+    closedReason = reason;
+    for (const id of [...pending.keys()]) {
+      settle(id)?.reject(new Error(reason));
+    }
+  };
+
+  socket.addEventListener("message", (event) => {
+    const message = JSON.parse(String(event.data));
+    const call = message.id === undefined ? undefined : settle(message.id);
+    if (!call) {
+      handler?.(message);
+      return;
+    }
+    // Handing message.error back as the result is a silent wrong answer: every
+    // op then reads it as data and blames its own sentinel for the failure.
+    if (message.error) {
+      call.reject(
+        new Error(
+          `${call.method} failed: ${
+            message.error.message ?? JSON.stringify(message.error)
+          }`,
+        ),
+      );
+      return;
+    }
+    call.resolve(message.result);
+  });
+  socket.addEventListener("close", () =>
+    drain("the browser closed the CDP connection"),
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    socket.addEventListener("open", () => resolve());
+    socket.addEventListener("error", () =>
+      reject(new Error(`cannot attach to ${pageWsUrl}`)),
+    );
+  });
+
+  return {
+    // timeoutMs 0 disables the deadline, for a call whose duration is the
+    // caller's own expression to decide.
+    send: (method, params = {}, timeoutMs = CDP_TIMEOUT_MS) =>
+      new Promise((resolve, reject) => {
+        if (closedReason) {
+          reject(new Error(`${method} failed: ${closedReason}`));
+          return;
+        }
+        messageId += 1;
+        const id = messageId;
+        const timer = timeoutMs
+          ? setTimeout(() => {
+              settle(id);
+              reject(new Error(`${method} got no answer in ${timeoutMs}ms`));
+            }, timeoutMs)
+          : undefined;
+        pending.set(id, { resolve, reject, method, timer });
+        try {
+          socket.send(JSON.stringify({ id, method, params }));
+        } catch (error) {
+          // A synchronous send failure would otherwise leave the entry and its
+          // timer behind with nothing left to answer them.
+          settle(id);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      }),
+    onEvent: (next) => {
+      handler = next;
+    },
+    close: () => socket.close(),
+  };
 }
