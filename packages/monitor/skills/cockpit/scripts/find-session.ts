@@ -17,10 +17,10 @@
 // Defaults: provider=claude, projectPath=cwd.
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import { Database } from "bun:sqlite";
 import { codexStateDb, excludeCodexSpawnedChildrenSql } from "./codex-db";
 import { openCodeDb } from "../../shared/scripts/opencode";
+import { claudeProjectsDir } from "./claude-paths";
 
 type Provider = "claude" | "codex" | "opencode";
 
@@ -60,7 +60,7 @@ function findClaude(project: string): string | null {
   if (fromEnv && UUID_RE.test(fromEnv)) return fromEnv;
 
   const encoded = project.replace(/[/.]/g, "-");
-  const dir = join(homedir(), ".claude", "projects", encoded);
+  const dir = join(claudeProjectsDir(), encoded);
 
   if (!existsSync(dir)) {
     console.error(

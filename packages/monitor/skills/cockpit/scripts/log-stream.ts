@@ -9,8 +9,9 @@ import {
   readSync,
   realpathSync,
 } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import { readRegistry } from "./registry";
+import { isPathInside } from "../../shared/scripts/path-inside";
 import {
   createTailStream,
   jsonError,
@@ -20,17 +21,12 @@ import {
 
 const SESSION_RE = /^[0-9a-f-]{36}$/;
 
-function isInside(root: string, child: string): boolean {
-  const rel = relative(root, child);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-}
-
 // Same path, or one contains the other. Segment-wise (via relative()), so
 // "/repo" and "/repo-other" are unrelated.
 function arePathsRelated(a: string, b: string): boolean {
   const x = resolve(a);
   const y = resolve(b);
-  return x === y || isInside(x, y) || isInside(y, x);
+  return x === y || isPathInside(x, y) || isPathInside(y, x);
 }
 
 // Resolve + confine the log path for a (project, session) pair. Returns the
@@ -65,14 +61,14 @@ export function resolveLogPath(
     : resolve(logsDir, `${session}.jsonl`);
 
   // lexical confinement
-  if (!isInside(logsDir, logPath)) return null;
+  if (!isPathInside(logsDir, logPath)) return null;
 
   // realpath confinement when the target (or its dir) exists
   try {
     if (existsSync(logPath)) {
       const realLogs = realpathSync(logsDir);
       const realFile = realpathSync(logPath);
-      if (!isInside(realLogs, realFile)) return null;
+      if (!isPathInside(realLogs, realFile)) return null;
     }
   } catch {
     return null;

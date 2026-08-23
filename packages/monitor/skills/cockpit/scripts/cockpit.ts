@@ -31,6 +31,7 @@ import {
 } from "./config";
 import { classifyDaemon } from "./restart-lifecycle";
 import { cockpitHome } from "./cockpit-home";
+import { envInt } from "./tunables";
 import { logRoot } from "./log-root";
 import {
   readScopes,
@@ -39,6 +40,7 @@ import {
   type NudgeScope,
   type ToggleAction,
 } from "./nudge-toggle";
+import { isAlive } from "../../shared/scripts/process-alive";
 
 // ---------- Types ----------
 
@@ -689,15 +691,6 @@ function readDaemon(): DaemonInfo | null {
   return null;
 }
 
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException)?.code === "EPERM";
-  }
-}
-
 function requireDaemon(): DaemonInfo {
   const d = readDaemon();
   if (!d || (typeof d.pid === "number" && !isAlive(d.pid))) {
@@ -757,10 +750,7 @@ async function cmdWait(rest: string[]): Promise<void> {
   // Bind this park to a specific call so an answer to a different (stale) card
   // can't wake it. Resolved from the log when --call isn't given explicitly.
   const callId = resolveCallId(sessionId, flagValue(rest, "call"));
-  const maxMs = (() => {
-    const v = parseInt(process.env.COCKPIT_WAIT_MAX_MS || "", 10);
-    return Number.isFinite(v) && v > 0 ? v : 6 * 60 * 60 * 1000; // 6h ceiling
-  })();
+  const maxMs = envInt("COCKPIT_WAIT_MAX_MS", 6 * 60 * 60 * 1000); // 6h ceiling
   // require_watcher=1 opts this park into the daemon's presence gate: park only
   // while a cockpit tab is actually watching this session. An older daemon
   // ignores the param and parks as before.
@@ -912,23 +902,21 @@ async function cmdSend(rest: string[]): Promise<void> {
 const COCKPIT_SERVER = join(import.meta.dir, "cockpit-server.ts");
 const MY_ROOT = import.meta.dir;
 
-// daemon.json carries the launcher's root (see daemon-lifecycle.ts); readDaemon()
-// only surfaces port/token, so read the root separately for the ownership check.
-function readDaemonRoot(): string | undefined {
-  try {
-    const raw = JSON.parse(readFileSync(DAEMON_PATH, "utf8"));
-    return typeof raw?.root === "string" ? raw.root : undefined;
-  } catch {
-    return undefined;
-  }
-}
+// daemon.json carries the launcher's root and pid (see daemon-lifecycle.ts);
+// readDaemon() only surfaces port/token, which it validates. One reader for the
+// rest, so the restart loop below can take a single consistent snapshot per tick
+// instead of parsing the same file once per field.
+type DaemonFile = { pid?: number; root?: string };
 
-function daemonPid(): number | undefined {
+function readDaemonFile(): DaemonFile {
   try {
     const raw = JSON.parse(readFileSync(DAEMON_PATH, "utf8"));
-    return typeof raw?.pid === "number" ? raw.pid : undefined;
+    return {
+      pid: typeof raw?.pid === "number" ? raw.pid : undefined,
+      root: typeof raw?.root === "string" ? raw.root : undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -970,7 +958,7 @@ async function cmdRestart(rest: string[]): Promise<void> {
   const portFlag = flagValue(rest, "port");
   const noOpen = rest.includes("--no-open");
 
-  const oldPid = daemonPid();
+  const oldPid = readDaemonFile().pid;
   if (oldPid && isAlive(oldPid)) stopPid(oldPid);
 
   const ATTEMPTS = 4;
@@ -984,16 +972,15 @@ async function cmdRestart(rest: string[]): Promise<void> {
 
     const deadline = Date.now() + 4000;
     while (Date.now() < deadline) {
-      const kind = classifyDaemon(
-        { pid: daemonPid(), root: readDaemonRoot() },
-        MY_ROOT,
-        isAlive,
-      );
+      // One snapshot per tick: reading pid and root separately could observe two
+      // generations of the file mid-rewrite and misjudge ownership.
+      const info = readDaemonFile();
+      const kind = classifyDaemon(info, MY_ROOT, isAlive);
       if (kind === "ours") {
         const d = readDaemon();
         if (d && (await portAnswers(d.port))) {
           console.log(
-            `cockpit: daemon restarted → http://localhost:${d.port} (pid ${daemonPid()})`,
+            `cockpit: daemon restarted → http://localhost:${d.port} (pid ${info.pid})`,
           );
           console.log(`  serving: ${MY_ROOT}`);
           return;
@@ -1001,8 +988,7 @@ async function cmdRestart(rest: string[]): Promise<void> {
       } else if (kind === "foreign") {
         // Another install (e.g. an MCP respawn from the old plugin cache) grabbed
         // the port — supersede it and spawn ours again.
-        const p = daemonPid();
-        if (p) stopPid(p);
+        if (info.pid) stopPid(info.pid);
         break;
       }
       await Bun.sleep(100);

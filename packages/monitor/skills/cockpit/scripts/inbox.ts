@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { jsonResponse as json } from "./http";
-import { cockpitHome } from "./cockpit-home";
+import { daemonToken } from "./cockpit-home";
+import { envInt, stashTtlMs, waitTimeoutMs } from "./tunables";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -14,30 +13,8 @@ const stashed = new Map<string, { text: string; expires: number }>();
 // `hasChannel` must not flicker false in that gap.
 const channelSeen = new Map<string, number>();
 
-function daemonToken(): string | null {
-  try {
-    const raw = JSON.parse(
-      readFileSync(join(cockpitHome(), "daemon.json"), "utf8"),
-    );
-    return typeof raw?.token === "string" ? raw.token : null;
-  } catch {
-    return null;
-  }
-}
-
-function waitTimeoutMs(): number {
-  const v = parseInt(process.env.COCKPIT_WAIT_TIMEOUT_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 240_000;
-}
-
-function stashTtlMs(): number {
-  const v = parseInt(process.env.COCKPIT_STASH_TTL_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 60_000;
-}
-
 function channelTtlMs(): number {
-  const v = parseInt(process.env.COCKPIT_CHANNEL_TTL_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 5_000;
+  return envInt("COCKPIT_CHANNEL_TTL_MS", 5_000);
 }
 
 function takeStashed(session: string): string | null {

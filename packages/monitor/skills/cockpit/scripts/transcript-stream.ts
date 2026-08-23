@@ -11,19 +11,23 @@ import {
   realpathSync,
   statSync,
 } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
-import { homedir } from "node:os";
+import { join } from "node:path";
+import { isPathInside } from "../../shared/scripts/path-inside";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 import { codexDir, codexStateDb, resolveCodexPath } from "./codex-db";
 import { openCodeDb, openCodeTimestampMs } from "../../shared/scripts/opencode";
 import {
   createTailStream,
+  HEARTBEAT_MS,
   jsonError,
   splitCompleteLines,
+  sseResponse,
+  tailPollMs,
   type ResolveResult,
 } from "./sse-tailer";
 import { jsonResponse } from "./http";
+import { claudeProjectsDir } from "./claude-paths";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const OPENCODE_ID_RE = /^[A-Za-z0-9_.:-]+$/;
@@ -64,12 +68,6 @@ const DISPLAY_ENTRY_TYPES = new Set([
 // Claude transcripts live under ~/.claude/projects/**/<id>.jsonl. The base dir
 // is overridable via COCKPIT_CLAUDE_PROJECTS_DIR so tests can point at a temp
 // fixture tree (mirrors the COCKPIT_HOME override the rest of the daemon uses).
-function claudeProjectsDir(): string {
-  return (
-    process.env.COCKPIT_CLAUDE_PROJECTS_DIR ||
-    join(homedir(), ".claude", "projects")
-  );
-}
 
 function codexSessionsDir(): string {
   return process.env.COCKPIT_CODEX_SESSIONS_DIR || join(codexDir(), "sessions");
@@ -129,13 +127,11 @@ export function resolveCodexRolloutPath(id: string): string | undefined {
 }
 
 export function isInsideProjects(filePath: string): boolean {
-  const rel = relative(projectsReal(), filePath);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  return isPathInside(projectsReal(), filePath);
 }
 
 export function isInsideCodexSessions(filePath: string): boolean {
-  const rel = relative(codexSessionsReal(), filePath);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  return isPathInside(codexSessionsReal(), filePath);
 }
 
 function normalizeProvider(provider: string | null): Provider | null {
@@ -434,26 +430,17 @@ function createOpenCodeTranscriptStream(session: string): Response {
       emitRows(backlog);
       enqueue(`event: backlog-done\ndata: ${JSON.stringify({})}\n\n`);
 
-      poll = setInterval(
-        () => {
-          emitRows(readOpenCodeRows(session, cursor, BACKLOG_LINES));
-        },
-        Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000,
-      );
-      heartbeat = setInterval(() => enqueue(": ping\n\n"), 25_000);
+      poll = setInterval(() => {
+        emitRows(readOpenCodeRows(session, cursor, BACKLOG_LINES));
+      }, tailPollMs());
+      heartbeat = setInterval(() => enqueue(": ping\n\n"), HEARTBEAT_MS);
     },
     cancel() {
       cleanup();
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  return sseResponse(stream);
 }
 
 // True when an entry is a displayable conversation line (not metadata noise).

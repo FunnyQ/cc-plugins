@@ -195,18 +195,23 @@ async function main() {
   if (shouldSkipDecisionLogReminder(process.env, input)) return;
 
   const cwd = input.cwd || process.cwd();
+  const key = input.session_id || cwd;
+  const now = Date.now();
+
+  // Throttle first. This runs on every turn end, and the time gate needs neither
+  // git nor the config — checking it last meant ~15 of every 16 invocations paid
+  // four `git` spawns and four file reads to reach a guaranteed no-op, straight
+  // on the agent's turn-end latency.
+  const marker = readMarker();
+  const prev = marker[key] ?? null;
+  if (prev?.lastNudgeMs != null && now - prev.lastNudgeMs < THROTTLE_MS) return;
 
   // Multi-scope opt-out, flipped via `cockpit nudge` (session / project / user).
   // Most-specific defined scope wins; all-unset stays enabled.
-  if (!nudgeEnabledFor(input.session_id, cwd, Date.now())) return;
+  if (!nudgeEnabledFor(input.session_id, cwd, now)) return;
 
   const probe = codeSignature(cwd);
   if (!probe) return; // not a git repo, or no detectable change basis
-
-  const key = input.session_id || cwd;
-  const now = Date.now();
-  const marker = readMarker();
-  const prev = marker[key] ?? null;
 
   const shouldNudge = decideNudge({
     now,

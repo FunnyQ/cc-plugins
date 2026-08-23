@@ -12,10 +12,14 @@ export function jsonResponse(payload: object, status = 200): Response {
   });
 }
 
+/** A human-readable message from any thrown value. */
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 // Generic API error: extracts a message from any thrown value. Defaults to 500
 // (an unexpected server fault). Param-validation helpers that want a 400 default
 // build their own thin wrapper on top of jsonResponse (see sse-tailer).
 export function jsonError(err: unknown, status = 500): Response {
-  const message = err instanceof Error ? err.message : String(err);
-  return jsonResponse({ error: message }, status);
+  return jsonResponse({ error: errorMessage(err) }, status);
 }

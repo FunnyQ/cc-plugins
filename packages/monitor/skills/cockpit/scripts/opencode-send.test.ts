@@ -29,7 +29,6 @@ function report(
     serverUrl: "http://127.0.0.1:9123",
     sessionFound: true,
     delivered: true,
-    inputId: "msg_test",
     delivery: "tui",
     warnings: [],
     errors: [],
@@ -66,7 +65,6 @@ describe("handleSendOpenCodeMessage", () => {
     expect(await r.json()).toEqual({
       delivered: true,
       delivery: "tui",
-      inputId: "msg_test",
       serverUrl: "http://127.0.0.1:9123",
       warnings: [],
     });
@@ -105,7 +103,6 @@ describe("handleSendOpenCodeMessage", () => {
           ok: false,
           ready: false,
           delivered: false,
-          inputId: undefined,
           errors: ["OpenCode session not found"],
         }),
     );
@@ -237,7 +234,7 @@ describe("handleOpenCodeControlStatus", () => {
       ),
       async (sessionId) => {
         calls.push(sessionId);
-        return report({ delivered: false, inputId: undefined });
+        return report({ delivered: false });
       },
     );
 
@@ -262,7 +259,6 @@ describe("handleOpenCodeControlStatus", () => {
           ready: false,
           sessionFound: false,
           delivered: false,
-          inputId: undefined,
           errors: ["OpenCode session not found"],
         }),
     );

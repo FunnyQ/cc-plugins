@@ -14,12 +14,12 @@
 //     if Claude Code ever tells it the request was answered elsewhere (terminal /
 //     hook / timeout — undocumented), so the UI's modal closes promptly.
 // A restarted daemon simply has no pending requests; clients re-poll. Same
-// cockpitHome()/daemonToken()/UUID_RE/env-override helpers as broker.ts/inbox.ts.
-import { readFileSync, statSync, watch, type FSWatcher } from "node:fs";
-import { join } from "node:path";
+import { statSync, watch, type FSWatcher } from "node:fs";
 import { jsonResponse as json } from "./http";
 import { resolveClaudeTranscriptPath } from "./transcript-stream";
-import { cockpitHome } from "./cockpit-home";
+import { daemonToken } from "./cockpit-home";
+import { envInt, stashTtlMs, waitTimeoutMs } from "./tunables";
+import { HEARTBEAT_MS, sseResponse } from "./sse-tailer";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
@@ -32,7 +32,8 @@ type Behavior = "allow" | "deny";
 // treats {abandoned:true} like an abort — it stops pulling without echoing a
 // verdict.
 type PullResult =
-  { requestId: string; behavior: Behavior } | { abandoned: true };
+  | { requestId: string; behavior: Behavior }
+  | { abandoned: true };
 
 type PendingRequest = {
   requestId: string;
@@ -83,41 +84,11 @@ function abandonParkedPull(session: string): void {
   }
 }
 
-// ---------- central dir + token (overridable for tests) ----------
-
-// The shared secret the daemon wrote on bind. Read fresh per request so a daemon
-// restart (new token) is picked up without caching staleness.
-function daemonToken(): string | null {
-  try {
-    const raw = JSON.parse(
-      readFileSync(join(cockpitHome(), "daemon.json"), "utf8"),
-    );
-    return typeof raw?.token === "string" ? raw.token : null;
-  } catch {
-    return null;
-  }
-}
-
-// Single-hop long-poll budget. Kept under the daemon's 255s idleTimeout so the
-// pull resolves with a re-pollable sentinel before Bun drops the idle socket.
-function waitTimeoutMs(): number {
-  const v = parseInt(process.env.COCKPIT_WAIT_TIMEOUT_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 240_000;
-}
-
-function stashTtlMs(): number {
-  const v = parseInt(process.env.COCKPIT_STASH_TTL_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 60_000;
-}
-
-const HEARTBEAT_MS = 25_000;
-
 // Ignore transcript events for this long after registration: the tool_use line
 // that TRIGGERED the permission prompt is written ~simultaneously, so an event
 // inside this window is the request's own line, not the resolution that follows.
 function transcriptGuardMs(): number {
-  const v = parseInt(process.env.COCKPIT_TRANSCRIPT_GUARD_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 1000;
+  return envInt("COCKPIT_TRANSCRIPT_GUARD_MS", 1000);
 }
 
 // ---------- pure helpers (unit-tested) ----------
@@ -436,13 +407,7 @@ export function handlePermissionStream(req: Request): Response {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  return sseResponse(stream);
 }
 
 // ---------- POST /api/permission-verdict ----------

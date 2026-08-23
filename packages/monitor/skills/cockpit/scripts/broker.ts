@@ -4,11 +4,11 @@
 // Routing is keyed by sessionId (a Map, not a flat queue) so concurrent
 // sessions never steal each other's events.
 import { appendFileSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { readRegistry } from "./registry";
 import { jsonResponse as json } from "./http";
 import { callMatches, latestOpenCallId } from "./call-log";
-import { cockpitHome } from "./cockpit-home";
+import { daemonToken } from "./cockpit-home";
+import { stashTtlMs, waitTimeoutMs } from "./tunables";
 import { hasVisibleSubscriber } from "./permission";
 import { getAnswerHere, setAnswerHere } from "./config";
 
@@ -38,11 +38,6 @@ const stashedAnswers = new Map<
   { answer: string; callId: string | null; expires: number }
 >();
 
-function stashTtlMs(): number {
-  const v = parseInt(process.env.COCKPIT_STASH_TTL_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 60_000;
-}
-
 function stashAnswer(
   session: string,
   answer: string,
@@ -67,30 +62,6 @@ function takeStashedAnswer(
   if (!callMatches(e.callId, expectedCall)) return null;
   stashedAnswers.delete(session);
   return e.expires > Date.now() ? e.answer : null;
-}
-
-// ---------- central dir (overridable for tests) ----------
-
-// The shared secret the daemon wrote on bind. Read fresh per request so a
-// daemon restart (new token) is picked up without caching staleness.
-function daemonToken(): string | null {
-  try {
-    const raw = JSON.parse(
-      readFileSync(join(cockpitHome(), "daemon.json"), "utf8"),
-    );
-    return typeof raw?.token === "string" ? raw.token : null;
-  } catch {
-    return null;
-  }
-}
-
-// Single-hop long-poll budget. Kept under the daemon's 255s idleTimeout (see
-// cockpit-server.ts) so the hop resolves with a re-pollable sentinel before
-// Bun can drop the idle socket; cockpit wait simply re-polls. Overridable so
-// tests don't wait minutes.
-function waitTimeoutMs(): number {
-  const v = parseInt(process.env.COCKPIT_WAIT_TIMEOUT_MS || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : 240_000;
 }
 
 function logPathFor(sessionId: string): string | null {

@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 import { codexStateDb } from "./codex-db";
 import { openCodeDb } from "../../shared/scripts/opencode";
+import { claudeProjectsDir } from "./claude-paths";
 
 type Provider = "claude" | "codex" | "opencode";
 
@@ -25,13 +25,6 @@ function databaseTitle(path: string, sql: string, sessionId: string): string {
   } catch {
     return "";
   }
-}
-
-function claudeProjectsDir(): string {
-  return (
-    process.env.COCKPIT_CLAUDE_PROJECTS_DIR ||
-    join(homedir(), ".claude", "projects")
-  );
 }
 
 function claudeTranscriptTitle(sessionId: string): string {

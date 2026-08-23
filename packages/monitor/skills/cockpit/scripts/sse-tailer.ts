@@ -27,11 +27,23 @@ import { dirname } from "node:path";
 import { jsonResponse } from "./http";
 
 const WATCH_DEBOUNCE_MS = 80;
-const HEARTBEAT_MS = 25_000;
+export const HEARTBEAT_MS = 25_000;
+
+/** The SSE envelope every cockpit stream returns. One copy so the headers,
+ *  the heartbeat cadence, and the poll cadence stay tunable together. */
+export function sseResponse(stream: ReadableStream): Response {
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
 // Poll cadences are env-tunable and read per request: ops can trade latency for
 // cost, and tests lower them to stay within their timeouts.
 const resolvePollMs = () => Number(process.env.COCKPIT_RESOLVE_POLL_MS) || 500;
-const tailPollMs = () => Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000;
+export const tailPollMs = () => Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000;
 
 export type WatchFn = (path: string, cb: () => void) => FSWatcher;
 
@@ -263,11 +275,5 @@ export function createTailStream(source: TailSource): Response {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  return sseResponse(stream);
 }
