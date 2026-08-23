@@ -1,5 +1,32 @@
 # Changelog
 
+## [monitor 4.0.7] - 2026-08-24
+
+_tracks tag `monitor-v4.0.7`_
+
+### Changed
+- `/api/stats` now caches its result and reuses one file walk across the stats build and the rollup update, cutting a warm dashboard load from about 6 seconds to 0.14-0.19 seconds. Two tabs opening at once share the same in-flight rebuild instead of each triggering their own.
+- `rollup-update.ts` now reads only the bytes appended to a transcript since the last ingest instead of re-reading the whole file, which matters most for long-running sessions whose transcripts reach tens of MB.
+- The Codex live-sessions query gained a time floor that cuts its per-call cost roughly 20x, with no change to which sessions show up in the live panel.
+- Consolidated duplicated logic across cockpit and the dashboard onto shared helpers (env-int parsing, path containment, cache paths, error messages, liveness checks), closing a few drift risks where three copies of the same literal could silently disagree — including one where the install drift watch could report "not wired" forever.
+- The install script's statusline collector path is now defined in one place, so `--apply` and the drift check can no longer point at different values.
+- `scribe-nudge.ts` checks its throttle before doing any work, removing four `git` calls and four file reads from the common no-op path on every turn end.
+
+### Fixed
+- Hourly usage payloads no longer carry three always-zero fields (`messages`, `sessions`, `toolCalls`) that the frontend never read and that were always overwritten anyway.
+
+## [relay 0.6.7] - 2026-08-24
+
+_tracks tag `relay-v0.6.7`_
+
+### Fixed
+- Image generation now prefers the PNG actually produced by the current run over a path merely mentioned in the tool's output, so a stale or unrelated image can no longer get copied out by mistake. Falls back to the parsed path only when no freshly generated file is found.
+
+### Changed
+- Removed a dead decision point (`Backend.strategy()`) that always returned the same value per mode across all three backends; call sites now branch directly on mode.
+- The Codex backend now uses standard library calls (`mkdirSync`, `copyFileSync`, `readdirSync({recursive: true})`) instead of subprocess calls and a hand-rolled recursive directory walk.
+- A live-pane pre-spawn failure that falls back to the headless path now reuses the already-built prompt instead of re-running git and file reads a second time.
+
 ## [herdr 0.5.2] - 2026-08-21
 
 _tracks tag `herdr-v0.5.2`_
