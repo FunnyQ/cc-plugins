@@ -18,7 +18,18 @@
 set -e
 
 input=$(cat)
-file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo "")
+
+# 0. Cheap bash prefilter before spawning jq. This hook runs on EVERY Edit/Write,
+# and the path filter below rejects almost all of them — so the ~5ms jq spawn is
+# pure waste on that majority. Match the bare word `tasks`, not `/tasks/`: JSON
+# may escape the slash as `\/`, and matching the escaped form would silently
+# skip the lint on such a payload.
+case "$input" in
+  *tasks*) ;;
+  *) exit 0 ;;
+esac
+
+file_path=$(jq -r '.tool_input.file_path // empty' <<<"$input" 2>/dev/null || echo "")
 
 if [ -z "$file_path" ] || [ ! -f "$file_path" ]; then
   exit 0
