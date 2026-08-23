@@ -18,6 +18,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { writeTempPayload } from "../../../shared/scripts/temp-payload";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -283,8 +285,8 @@ export function cargoPackageName(toml: string): string | null {
   return /^name\s*=\s*["']([^"']+)["']/m.exec(body)?.[1] ?? null;
 }
 
-function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(s: string): string {
+  return s.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 }
 
 /**
@@ -301,7 +303,7 @@ export function cargoLockSpec(
   crate: string,
   lock: string,
 ): VersionFileSpec | null {
-  const pattern = `name = "${escapeRe(crate)}"\\nversion = "([^"]+)"`;
+  const pattern = `name = "${escapeRegex(crate)}"\\nversion = "([^"]+)"`;
   return new RegExp(pattern).test(lock) ? { path, pattern } : null;
 }
 
@@ -689,25 +691,6 @@ async function allBranches(): Promise<string[] | undefined> {
   return names.length > 0 ? names : undefined;
 }
 
-/**
- * The literal prefix a tag has before its version, derived from `config.tag` (the
- * source of truth) — not hard-coded. `v{version}` → `v`; `{component}-v{version}`
- * with component `chronicle` → `chronicle-v`; a custom `release-{version}` →
- * `release-`. This keeps last-tag lookup consistent with how the engine cuts the
- * tag, even when the interview set a non-default template.
- */
-export function tagPrefix(config: ReleaseConfig, component?: string): string {
-  const filled = component
-    ? config.tag.replaceAll("{component}", component)
-    : config.tag;
-  const i = filled.indexOf("{version}");
-  return i >= 0 ? filled.slice(0, i) : filled;
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
-}
-
 function tagRegex(config: ReleaseConfig, component?: string): RegExp {
   const semver = "(?<version>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?)";
   let pattern = "";
@@ -980,10 +963,12 @@ async function main() {
   }
 
   // default: detection facts for the interview / version gate
-  const tags = await allTags();
-  const manifests = await discoverManifests(root);
-  const branch = await git`git branch --show-current`;
-  const branches = await allBranches();
+  const [tags, manifests, branch, branches] = await Promise.all([
+    allTags(),
+    discoverManifests(root),
+    git`git branch --show-current`,
+    allBranches(),
+  ]);
   const suggested = detectShape({
     manifests,
     tags,
@@ -1042,10 +1027,7 @@ async function main() {
     components,
   };
 
-  const dir = "/tmp/chronicle/release";
-  await mkdir(dir, { recursive: true });
-  const outputPath = resolve(dir, `${Date.now()}.json`);
-  await writeFile(outputPath, JSON.stringify(out, null, 2));
+  const outputPath = await writeTempPayload("release", "analysis", out);
   console.log(JSON.stringify({ outputPath, ...out }, null, 2));
 }
 

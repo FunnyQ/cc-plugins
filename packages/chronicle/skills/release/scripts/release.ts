@@ -28,6 +28,7 @@ import {
   allTags,
   apply as applyVersion,
   artifactCommand,
+  effectiveWorkflow,
   git,
   loadConfig,
   repoRoot,
@@ -35,6 +36,7 @@ import {
   versionInOutput,
   type ArtifactSpec,
   type ReleaseConfig,
+  type Workflow,
 } from "./analyze-release";
 import {
   artifactsDone,
@@ -62,7 +64,7 @@ export type StageReport = {
 };
 
 export type Plan = {
-  workflow: "git-flow" | "github-flow";
+  workflow: Workflow;
   branch: string;
   head: string;
   /** The commit every tag lands on: `main`'s HEAD. */
@@ -183,8 +185,11 @@ async function contains(branch: string, other: string): Promise<boolean> {
   );
 }
 
-async function hasRemote(): Promise<boolean> {
-  return Boolean(await git`git remote get-url origin`);
+// Memoized: `plan()` re-runs after every stage, and each run asked twice.
+let remote: Promise<boolean> | null = null;
+
+function hasRemote(): Promise<boolean> {
+  return (remote ??= git`git remote get-url origin`.then(Boolean));
 }
 
 /**
@@ -207,10 +212,17 @@ async function behindRemote(main: string): Promise<number | null> {
 /** True only when every tag is already on the remote. No remote → nothing pushed. */
 async function tagsOnRemote(names: string[]): Promise<boolean> {
   if (!(await hasRemote())) return false;
-  for (const n of names) {
-    if (!(await git`git ls-remote --tags origin ${n}`)) return false;
-  }
-  return true;
+  // One query for every name — a per-name loop paid the ~3s round-trip N times.
+  // Never spawn with an empty list: bare `--tags` would match every tag.
+  if (names.length === 0) return true;
+  const listed = await git`git ls-remote --tags origin ${names}`;
+  const found = new Set(
+    listed
+      .split("\n")
+      .map((line) => line.split("\t")[1] ?? "")
+      .map((ref) => ref.replace(/^refs\/tags\//, "").replace(/\^\{\}$/, "")),
+  );
+  return names.every((n) => found.has(n));
 }
 
 // ---------------------------------------------------------------------------
@@ -239,27 +251,28 @@ export async function plan(
     readTagTargets(units.map((u) => u.tagName)),
   ]);
 
-  const changelog =
-    (await readFile(resolve(root, config.changelog), "utf-8").catch(
-      () => "",
-    )) || "";
-  const headChangelog = (await git`git show HEAD:${config.changelog}`) || "";
-  const configOnDisk = (await loadConfig(root)) != null;
-  const artifactOutputs = await readArtifactOutputs(root, units);
+  const [changelog, headChangelog, savedConfig, artifactOutputs] =
+    await Promise.all([
+      readFile(resolve(root, config.changelog), "utf-8").catch(() => ""),
+      git`git show HEAD:${config.changelog}`,
+      loadConfig(root),
+      readArtifactOutputs(root, units),
+    ]);
+  const configOnDisk = savedConfig != null;
 
-  const workflow = config.workflow ?? "git-flow";
+  const workflow = effectiveWorkflow(config);
   const every = (fn: (u: Unit) => boolean) => units.every(fn);
 
   const main = config.branches.main;
   const develop = config.branches.develop;
-  const [mainContainsDevelop, developContainsMain, pushed, mainHead] =
+  const [mainContainsDevelop, developContainsMain, pushed, mainHead, behind] =
     await Promise.all([
       workflow === "git-flow" && develop ? contains(main, develop) : true,
       workflow === "git-flow" && develop ? contains(develop, main) : true,
       tagsOnRemote(units.map((u) => u.tagName)),
       git`git rev-parse ${main}`,
+      behindRemote(main),
     ]);
-  const behind = await behindRemote(main);
 
   // Every tag lands on `main` — the bump commit on github-flow, the develop→main
   // merge on git-flow — never on whatever branch this happens to run from.
@@ -354,7 +367,7 @@ export type RunResult = {
   releaseCommit: string;
   tags: string[];
   branch: string;
-  workflow: "git-flow" | "github-flow";
+  workflow: Workflow;
   log: string;
 };
 
@@ -389,7 +402,7 @@ export async function run(
   const root = await repoRoot();
   const main = config.branches.main;
   const develop = config.branches.develop;
-  const workflow = config.workflow ?? "git-flow";
+  const workflow = effectiveWorkflow(config);
   const commitBranch = workflow === "git-flow" ? (develop ?? main) : main;
 
   const order = stagesFor(config, opts);

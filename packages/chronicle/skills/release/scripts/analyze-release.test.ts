@@ -19,7 +19,6 @@ import {
   readVersionFromContent,
   scopedTagComponents,
   serializeConfig,
-  tagPrefix,
   versionInOutput,
   type ReleaseConfig,
 } from "./analyze-release";
@@ -476,29 +475,6 @@ describe("detectShape workflow", () => {
     });
     expect(shape.workflow).toBe("git-flow");
     expect(shape.branches).toEqual({ develop: "develop", main: "main" });
-  });
-});
-
-describe("tagPrefix", () => {
-  const whole: ReleaseConfig = {
-    mode: "whole-repo",
-    tag: "v{version}",
-    changelog: "CHANGELOG.md",
-    branches: { develop: "develop", main: "main" },
-    versionFiles: [],
-  };
-
-  test("whole-repo default", () => {
-    expect(tagPrefix(whole)).toBe("v");
-  });
-
-  test("per-component fills {component}", () => {
-    const cfg: ReleaseConfig = { ...whole, tag: "{component}-v{version}" };
-    expect(tagPrefix(cfg, "chronicle")).toBe("chronicle-v");
-  });
-
-  test("honors a custom template (source of truth, not hard-coded 'v')", () => {
-    expect(tagPrefix({ ...whole, tag: "release-{version}" })).toBe("release-");
   });
 });
 

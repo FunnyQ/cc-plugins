@@ -15,6 +15,7 @@
 
 import {
   configPath,
+  effectiveWorkflow,
   hasChangelogEntry,
   normalizeVersion,
   readVersionFromContent,
@@ -123,7 +124,7 @@ export function stagesFor(
   stages.push("entry", "commit");
   // A missing workflow means git-flow, which owes the develop→main merge before
   // the tag and the main→develop merge after it.
-  const gitFlow = (config.workflow ?? "git-flow") === "git-flow";
+  const gitFlow = effectiveWorkflow(config) === "git-flow";
   if (gitFlow) stages.push("merge");
   stages.push("tag");
   if (gitFlow) stages.push("back-merge");
@@ -163,10 +164,7 @@ export function hasArtifacts(config: ReleaseConfig): boolean {
  * unit with no version file. An artifact whose command could not run is never
  * done: an unanswerable check is a failed check, never a passed one.
  */
-export function artifactsDone(
-  unit: Unit,
-  outputs: ArtifactOutputs,
-): boolean {
+export function artifactsDone(unit: Unit, outputs: ArtifactOutputs): boolean {
   return unit.artifacts.every((a) => {
     const out = outputs[a.path];
     return out != null && versionInOutput(out, unit.targetVersion);
