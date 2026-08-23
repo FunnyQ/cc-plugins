@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { dirname, join } from "path";
 import { homedir } from "os";
 import type {
@@ -8,7 +8,7 @@ import type {
   LiveSpec,
   PostRunResult,
 } from "../types";
-import { addTimestampSuffix, run } from "../shared";
+import { addTimestampSuffix } from "../shared";
 
 // Codex binary from environment or default
 const CODEX_BIN = process.env.CODEX_BIN ?? "codex";
@@ -53,34 +53,25 @@ export function findNewestPng(after: Date, baseDir?: string): string | null {
 
   let newest: { path: string; mtime: Date } | null = null;
 
-  const scan = (currentDir: string) => {
-    for (const entry of readdirSync(currentDir, { withFileTypes: true })) {
-      const full = join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        scan(full);
-      } else if (entry.isFile() && entry.name.endsWith(".png")) {
-        const stat = statSync(full);
-        if (stat.mtime > after && (!newest || stat.mtime > newest.mtime)) {
-          newest = { path: full, mtime: stat.mtime };
-        }
-      }
+  for (const entry of readdirSync(dir, {
+    recursive: true,
+    encoding: "utf-8",
+  })) {
+    if (!entry.endsWith(".png")) continue;
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (!stat.isFile()) continue;
+    if (stat.mtime > after && (!newest || stat.mtime > newest.mtime)) {
+      newest = { path: full, mtime: stat.mtime };
     }
-  };
+  }
 
-  scan(dir);
-  return newest ? newest.path : null;
+  return newest?.path ?? null;
 }
 
 export const codexBackend: Backend = {
   name: "codex",
   supports: new Set(["delegate", "review", "image"]),
-
-  strategy(mode: Mode, _opts: InvokeOpts) {
-    if (mode === "review") return "native";
-    if (mode === "delegate") return "prompt";
-    // image mode is native
-    return "native";
-  },
 
   invoke(mode: Mode, opts: InvokeOpts) {
     if (mode === "delegate") {
@@ -91,25 +82,13 @@ export const codexBackend: Backend = {
       // `danger-full-access` is the non-dangerous default because the
       // workspace-write sandbox blocks routine delegate work (writes outside
       // the workspace root, network fetches) far more often than it helps.
-      const argv = opts.dangerous
-        ? [
-            CODEX_BIN,
-            "exec",
-            "--dangerously-bypass-approvals-and-sandbox",
-            "-o",
-            opts.lastFile!,
-            "-",
-          ]
-        : [
-            CODEX_BIN,
-            "exec",
-            "-s",
-            "danger-full-access",
-            "-o",
-            opts.lastFile!,
-            "-",
-          ];
-      return { argv, stdin: opts.promptText };
+      const sandbox = opts.dangerous
+        ? ["--dangerously-bypass-approvals-and-sandbox"]
+        : ["-s", "danger-full-access"];
+      return {
+        argv: [CODEX_BIN, "exec", ...sandbox, "-o", opts.lastFile!, "-"],
+        stdin: opts.promptText,
+      };
     }
 
     if (mode === "review") {
@@ -119,15 +98,9 @@ export const codexBackend: Backend = {
       return { argv, stdin: opts.promptText };
     }
 
-    if (mode === "image") {
-      // image: codex exec with image prompt (no stdin)
-      const prompt = buildImagePrompt(opts.task || "an image");
-      const argv = [CODEX_BIN, "exec", "-o", opts.lastFile!, prompt];
-      return { argv };
-    }
-
-    // Should not reach here if mode is validated upstream
-    throw new Error(`Unsupported mode for codex: ${mode}`);
+    // image: codex exec with image prompt (no stdin)
+    const prompt = buildImagePrompt(opts.task || "an image");
+    return { argv: [CODEX_BIN, "exec", "-o", opts.lastFile!, prompt] };
   },
 
   parseOutput(raw: string): string {
@@ -171,26 +144,17 @@ export const codexBackend: Backend = {
     }
 
     // Copy PNG to output path with timestamp suffix
-    const finalPath = addTimestampSuffix(opts.out!);
-    const outDir = dirname(finalPath);
+    const finalPath = addTimestampSuffix(opts.out ?? "relay-image.png");
 
-    // Ensure output directory exists
-    if (!existsSync(outDir)) {
-      const mkdirResult = run(["mkdir", "-p", outDir]);
-      if (!mkdirResult.ok) {
-        return {
-          ok: false,
-          text: `Error: Failed to create output directory ${outDir}\n`,
-        };
-      }
-    }
-
-    // Copy the PNG file
-    const cpResult = run(["cp", sourcePng, finalPath]);
-    if (!cpResult.ok) {
+    try {
+      mkdirSync(dirname(finalPath), { recursive: true });
+      copyFileSync(sourcePng, finalPath);
+    } catch (error) {
       return {
         ok: false,
-        text: `Error: Failed to copy image from ${sourcePng} to ${finalPath}: ${cpResult.stderr}\n`,
+        text: `Error: Failed to copy image from ${sourcePng} to ${finalPath}: ${
+          error instanceof Error ? error.message : String(error)
+        }\n`,
       };
     }
 

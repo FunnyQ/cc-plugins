@@ -3,7 +3,7 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 /**
  * opencode Backend: delegate + emulated (prompt-based) review.
  *
- * Both modes use strategy = "prompt" (no native review).
+ * Both modes run off relay's built prompt (no native review).
  * Model defaults: delegate → opencode-go/deepseek-v4-light; review → opencode-go/deepseek-v4-pro.
  * Delegate uses the max reasoning variant.
  * --model flag overrides the defaults.
@@ -31,10 +31,6 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 export const opencodeBackend: Backend = {
   name: "opencode",
   supports: new Set(["delegate", "review"]),
-
-  strategy() {
-    return "prompt";
-  },
 
   invoke(mode: Mode, opts: InvokeOpts) {
     // Model is already resolved in relay.ts (flag > config > per-mode default);

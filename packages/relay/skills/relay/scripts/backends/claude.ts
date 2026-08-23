@@ -4,27 +4,12 @@ export const claudeBackend: Backend = {
   name: "claude",
   supports: new Set(["delegate", "review"]),
 
-  strategy(_mode: Mode) {
-    return "prompt";
-  },
-
-  invoke(mode: Mode, opts: InvokeOpts) {
-    if (mode === "delegate" || mode === "review") {
-      // Both modes use the prompt text that relay.ts has already built.
-      // Always use --output-format json to get a structured envelope.
-      return {
-        argv: [
-          "claude",
-          "-p",
-          opts.promptText || "",
-          "--output-format",
-          "json",
-        ],
-      };
-    }
-
-    // Should not reach here (gate prevents unsupported modes), but be defensive
-    return { argv: [] };
+  invoke(_mode: Mode, opts: InvokeOpts) {
+    // Both supported modes use the prompt text that relay.ts has already built.
+    // Always use --output-format json to get a structured envelope.
+    return {
+      argv: ["claude", "-p", opts.promptText || "", "--output-format", "json"],
+    };
   },
 
   invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
