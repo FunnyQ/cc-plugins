@@ -2,6 +2,7 @@
 import { lstatSync, mkdirSync, realpathSync, renameSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { logRoot, STALE_MS } from "../../../shared/scripts/cockpit-trail";
+import { bucketDirectory } from "./archive-plan";
 import type {
   ArchivePlan,
   ArchiveTarget,
@@ -26,11 +27,7 @@ function sessionIdOf(move: Move): string {
 }
 
 function sourceDirectory(trustedRoot: string, bucket: SourceBucket): string {
-  const path =
-    bucket === "inbox"
-      ? join(trustedRoot, ".cockpit", "logs")
-      : join(trustedRoot, ".cockpit", "archive", "watch");
-  return realpathSync(path);
+  return realpathSync(bucketDirectory(trustedRoot, bucket));
 }
 
 function validateDestinationAncestors(
@@ -41,7 +38,7 @@ function validateDestinationAncestors(
   const components = [
     join(trustedRoot, ".cockpit"),
     join(trustedRoot, ".cockpit", "archive"),
-    join(trustedRoot, ".cockpit", "archive", target),
+    bucketDirectory(trustedRoot, target),
   ];
 
   for (const component of components) {
@@ -115,11 +112,10 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
     }
 
     if (targetValid) {
+      // Layout comes from the shared helper; the filename stays derived from the
+      // move's own source, so a destination renamed away from its source still fails.
       const expectedDestination = join(
-        realTrustedRoot,
-        ".cockpit",
-        "archive",
-        move.target,
+        bucketDirectory(realTrustedRoot, move.target),
         basename(move.from),
       );
       if (resolve(move.to) !== expectedDestination) {

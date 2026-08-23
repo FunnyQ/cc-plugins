@@ -40,21 +40,26 @@ export type PlanDeps = {
   exists: (path: string) => boolean;
 };
 
-function archivePath(
+/** Every bucket a session log can sit in. `inbox` is Cockpit's live log directory. */
+export type TrailBucket = SourceBucket | ArchiveTarget;
+
+// The one place the on-disk trail layout is written down. The collector, the planner
+// and the applier's validator all route through it, so no two of them can drift apart.
+export function bucketDirectory(
   trailRoot: string,
-  sessionId: string,
-  bucket: ArchiveTarget,
+  bucket: TrailBucket,
 ): string {
-  return join(trailRoot, ".cockpit", "archive", bucket, `${sessionId}.jsonl`);
+  return bucket === "inbox"
+    ? join(trailRoot, ".cockpit", "logs")
+    : join(trailRoot, ".cockpit", "archive", bucket);
 }
 
-function sourcePath(
+export function sessionPath(
   trailRoot: string,
   sessionId: string,
-  bucket: SourceBucket,
+  bucket: TrailBucket,
 ): string {
-  if (bucket === "watch") return archivePath(trailRoot, sessionId, "watch");
-  return join(trailRoot, ".cockpit", "logs", `${sessionId}.jsonl`);
+  return join(bucketDirectory(trailRoot, bucket), `${sessionId}.jsonl`);
 }
 
 /** Pure. No filesystem access — everything comes through deps. */
@@ -68,8 +73,8 @@ export function planArchive(
 
   for (const assignment of assignments) {
     const fromBucket = assignment.from ?? "inbox";
-    const from = sourcePath(trailRoot, assignment.sessionId, fromBucket);
-    const to = archivePath(trailRoot, assignment.sessionId, assignment.target);
+    const from = sessionPath(trailRoot, assignment.sessionId, fromBucket);
+    const to = sessionPath(trailRoot, assignment.sessionId, assignment.target);
     const mtimeMs = deps.mtimeOf(from);
 
     // The shared reader owns STALE_MS so the planner cannot drift from Cockpit's
@@ -85,8 +90,8 @@ export function planArchive(
     }
 
     if (mtimeMs === null) {
-      const done = archivePath(trailRoot, assignment.sessionId, "done");
-      const watch = archivePath(trailRoot, assignment.sessionId, "watch");
+      const done = sessionPath(trailRoot, assignment.sessionId, "done");
+      const watch = sessionPath(trailRoot, assignment.sessionId, "watch");
       if (fromBucket === "inbox" && deps.exists(done) && !deps.exists(watch)) {
         refused.push({
           sessionId: assignment.sessionId,

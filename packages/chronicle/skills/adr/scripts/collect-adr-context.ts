@@ -9,6 +9,7 @@ import {
   readDecisionLog,
   type DecisionRecord,
 } from "../../../shared/scripts/cockpit-trail";
+import { bucketDirectory } from "./archive-plan";
 
 export type Bucket = "inbox" | "watch" | "done";
 
@@ -114,10 +115,9 @@ async function readSession(
 
 async function readBucket(
   trailRoot: string,
-  relativeDirectory: string,
   bucket: Bucket,
 ): Promise<SessionRecords[]> {
-  const paths = await globPaths(join(trailRoot, ".cockpit", relativeDirectory));
+  const paths = await globPaths(bucketDirectory(trailRoot, bucket));
   const sessions = await Promise.all(
     paths.map((path) => readSession(path, bucket)),
   );
@@ -137,11 +137,11 @@ async function readBuckets(
   includeDone: boolean,
 ): Promise<SessionRecords[]> {
   const buckets = [
-    readBucket(trailRoot, "logs", "inbox"),
-    readBucket(trailRoot, "archive/watch", "watch"),
+    readBucket(trailRoot, "inbox"),
+    readBucket(trailRoot, "watch"),
   ];
   if (includeDone) {
-    buckets.push(readBucket(trailRoot, "archive/done", "done"));
+    buckets.push(readBucket(trailRoot, "done"));
   }
   return (await Promise.all(buckets)).flat();
 }
@@ -174,13 +174,13 @@ export async function collectContext(
   };
 }
 
+/** Takes an already-resolved trail root, so a bodies run spawns git exactly once. */
 export async function fetchBodies(
-  cwd: string,
+  trailRoot: string,
   ids: string[],
 ): Promise<EntryBody[]> {
   if (ids.length === 0) return [];
 
-  const { trailRoot } = resolveRoots(cwd);
   if (!existsSync(join(trailRoot, ".cockpit"))) return [];
 
   const requested = new Set(ids);
@@ -232,15 +232,27 @@ function usage(): string {
 async function main(): Promise<void> {
   const cwd = process.cwd();
   const { includeDone, bodyIds } = parseCliArgs(process.argv.slice(2));
-  const { trailRoot, adrDir } = resolveRoots(cwd);
-  const hasTrail = existsSync(join(trailRoot, ".cockpit"));
 
   // Bodies mode skips the skeleton pass entirely: running both read every session
   // log twice per invocation for two fields main already has.
-  const payload =
-    bodyIds === null
-      ? await collectContext(cwd, { includeDone })
-      : await fetchBodies(cwd, bodyIds);
+  let payload: AdrContext | EntryBody[];
+  let hasTrail: boolean;
+  let adrDir: string;
+
+  if (bodyIds === null) {
+    // The context already carries both summary fields — recomputing them here spawned
+    // a second `git rev-parse` for answers collectContext had just resolved.
+    const context = await collectContext(cwd, { includeDone });
+    ({ hasTrail, adrDir } = context);
+    payload = context;
+  } else {
+    // A bodies payload is a bare array, so the summary fields are resolved here — once.
+    const roots = resolveRoots(cwd);
+    adrDir = roots.adrDir;
+    hasTrail = existsSync(join(roots.trailRoot, ".cockpit"));
+    payload = await fetchBodies(roots.trailRoot, bodyIds);
+  }
+
   const outputPath = await writeTempPayload("adr", "context", payload);
 
   const sessionCount = Array.isArray(payload)
