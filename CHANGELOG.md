@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 3.20.2] - 2026-08-24
+
+_tracks tag `dispatch-v3.20.2`_
+
+### Fixed
+- The flightplan CLIs that take flag values (`score-task`, `flightlog`, `codex-run`, `opencode-run`) now reject a malformed invocation like `--log --attempt 3` instead of silently treating the next flag as the value.
+
+### Changed
+- The lint hook that runs on every Edit/Write now filters non-task-file calls in bash before spawning `jq`, cutting its overhead on those calls.
+
 ## [chronicle 0.14.1] - 2026-08-24
 
 _tracks tag `chronicle-v0.14.1`_
