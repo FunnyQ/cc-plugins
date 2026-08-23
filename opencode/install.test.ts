@@ -19,11 +19,39 @@ import {
 const repoRoot = resolve(import.meta.dir, "..");
 const home = "/tmp/opencode-installer-home";
 
+// The golden list — the ONE place a skill count is written down. Every other
+// expectation here derives from it or from the built target set, so adding a
+// skill reds exactly this constant instead of three unrelated magic numbers.
+const EXPECTED_SKILL_NAMES = [
+  "adr",
+  "autopilot",
+  "chronicle-install",
+  "cockpit",
+  "commit",
+  "flightplan",
+  "herdr",
+  "herdr-browser",
+  "herdr-protocol-upgrade",
+  "monitor-install",
+  "pr",
+  "preflight",
+  "relay",
+  "release",
+  "usage-dashboard",
+  "waypoints",
+];
+
+// Non-skill targets, each fixed by a directory this installer owns.
+const PLUGIN_TARGETS = 1;
+const AGENT_TARGETS = 13;
+const COMMAND_TARGETS = 2;
+const CONFIG_TARGETS = 1;
+
 describe("findSkillDirs", () => {
   const dirs = findSkillDirs(repoRoot);
 
-  test("finds the 15 skills that carry a SKILL.md", () => {
-    expect(dirs).toHaveLength(15);
+  test("finds every skill that carries a SKILL.md", () => {
+    expect(dirs).toHaveLength(EXPECTED_SKILL_NAMES.length);
   });
 
   test("excludes monitor's shared support directory", () => {
@@ -64,40 +92,32 @@ describe("buildTargets", () => {
   const targets = buildTargets(repoRoot, home);
 
   test("builds the exact target composition", () => {
-    expect(targets).toHaveLength(32);
     expect(
       targets
         .filter((target) => target.group === "skill")
         .map((target) => target.name)
         .sort(),
-    ).toEqual([
-      "adr",
-      "autopilot",
-      "chronicle-install",
-      "cockpit",
-      "commit",
-      "flightplan",
-      "herdr",
-      "herdr-protocol-upgrade",
-      "monitor-install",
-      "pr",
-      "preflight",
-      "relay",
-      "release",
-      "usage-dashboard",
-      "waypoints",
-    ]);
+    ).toEqual(EXPECTED_SKILL_NAMES);
     expect(targets.filter((target) => target.group === "plugin")).toHaveLength(
-      1,
+      PLUGIN_TARGETS,
     );
     expect(targets.filter((target) => target.group === "agent")).toHaveLength(
-      13,
+      AGENT_TARGETS,
     );
     expect(targets.filter((target) => target.group === "command")).toHaveLength(
-      2,
+      COMMAND_TARGETS,
     );
     expect(targets.filter((target) => target.group === "config")).toHaveLength(
-      1,
+      CONFIG_TARGETS,
+    );
+    // The total is the sum of the parts above — asserted so a target in no
+    // known group cannot slip in uncounted.
+    expect(targets).toHaveLength(
+      EXPECTED_SKILL_NAMES.length +
+        PLUGIN_TARGETS +
+        AGENT_TARGETS +
+        COMMAND_TARGETS +
+        CONFIG_TARGETS,
     );
   });
 
@@ -298,18 +318,19 @@ describe("buildApplyPlan", () => {
   const targets = buildTargets(repoRoot, home);
   const symlinks = targets.filter((target) => target.group !== "config");
 
-  test("creates all 32 targets on a clean home", () => {
+  test("creates every target on a clean home", () => {
     const states = new Map(
       symlinks.map((target) => [target.installed, "missing" as const]),
     );
     const plan = buildApplyPlan(targets, states, decideSubagentDepth({}));
 
+    // One create per symlink, plus the single config write.
     expect(
       plan.operations.filter(
         (operation) =>
           operation.action === "create" || operation.action === "write",
       ),
-    ).toHaveLength(32);
+    ).toHaveLength(symlinks.length + CONFIG_TARGETS);
     expect(plan.success).toBe(true);
   });
 
