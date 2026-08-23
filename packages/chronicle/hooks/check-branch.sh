@@ -5,6 +5,12 @@
 set -euo pipefail
 
 input=$(cat)
+# This hook runs before every Bash call, so skip the jq spawn on the raw payload
+# first. A superset of line 13's test: no "commit" substring, no git commit.
+if [[ "$input" != *commit* ]]; then
+  exit 0
+fi
+
 # Fail open if jq is missing or the payload isn't parseable — a branch guard must
 # never break every Bash command just because jq isn't installed.
 command=$(echo "$input" | jq -r '.tool_input.command // empty' 2>/dev/null || echo "")
