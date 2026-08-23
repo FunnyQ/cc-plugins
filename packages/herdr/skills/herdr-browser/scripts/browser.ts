@@ -58,6 +58,7 @@ export type TargetDescriptor = {
   id: string;
   title: string;
   url: string;
+  webSocketDebuggerUrl?: string;
 };
 
 export type Invocation = {
@@ -113,87 +114,71 @@ export const USAGE = `browser.ts <command> [args] [--view ID]
                               trace, record, diff, vitals, a11y. Verbose --
                               prefer the native command when there is one`;
 
+// Maps rather than object literals: `token in obj` would match `__proto__`.
+const VALUE_FLAGS = new Map<
+  string,
+  "view" | "body" | "device" | "size" | "split" | "ratio" | "output"
+>([
+  ["--view", "view"],
+  ["--body", "body"],
+  ["--device", "device"],
+  ["--size", "size"],
+  ["--split", "split"],
+  ["--ratio", "ratio"],
+  ["--output", "output"],
+]);
+
+const BOOLEAN_FLAGS = new Map<string, "all" | "fresh" | "full">([
+  ["--all", "all"],
+  ["--new", "fresh"],
+  ["--full", "full"],
+]);
+
 export function parseArgv(argv: string[]): Invocation {
   const positionals: string[] = [];
-  let view: string | null = null;
-  let all = false;
-  let body: string | null = null;
-  let device: string | null = null;
-  let size: string | null = null;
-  let fresh = false;
-  let split: string | null = null;
-  let ratio: string | null = null;
-  let output: string | null = null;
-  let full = false;
-  let passthrough: string[] | null = null;
+  const parsed: Invocation = {
+    command: null,
+    args: [],
+    view: null,
+    all: false,
+    body: null,
+    device: null,
+    size: null,
+    fresh: false,
+    split: null,
+    ratio: null,
+    output: null,
+    full: false,
+    passthrough: null,
+  };
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--") {
-      passthrough = argv.slice(index + 1);
+      parsed.passthrough = argv.slice(index + 1);
       break;
     }
-    if (
-      token === "--view" ||
-      token === "--body" ||
-      token === "--device" ||
-      token === "--size" ||
-      token === "--split" ||
-      token === "--ratio" ||
-      token === "--output"
-    ) {
+    const valued = VALUE_FLAGS.get(token);
+    if (valued) {
       const value = argv[index + 1];
       if (value === undefined) {
         throw new Error(`missing ${token} value`);
       }
-      if (token === "--view") {
-        view = value;
-      } else if (token === "--body") {
-        body = value;
-      } else if (token === "--device") {
-        device = value;
-      } else if (token === "--size") {
-        size = value;
-      } else if (token === "--split") {
-        split = value;
-      } else if (token === "--ratio") {
-        ratio = value;
-      } else {
-        output = value;
-      }
+      parsed[valued] = value;
       index += 1;
       continue;
     }
-    if (token === "--all") {
-      all = true;
-      continue;
-    }
-    if (token === "--new") {
-      fresh = true;
-      continue;
-    }
-    if (token === "--full") {
-      full = true;
+    const flagged = BOOLEAN_FLAGS.get(token);
+    if (flagged) {
+      parsed[flagged] = true;
       continue;
     }
     positionals.push(token);
   }
 
-  return {
-    command: positionals[0] ?? null,
-    args: positionals.slice(1),
-    view,
-    all,
-    body,
-    device,
-    size,
-    fresh,
-    split,
-    ratio,
-    output,
-    full,
-    passthrough,
-  };
+  parsed.command = positionals[0] ?? null;
+  parsed.args = positionals.slice(1);
+  return parsed;
 }
 
 // Target ids are 32 hex characters. Let the printed row number stand in.
@@ -225,77 +210,74 @@ export function renderCallArguments(args: any[] = []): string {
     .join(" ");
 }
 
-export function applyWatchMessage(
-  events: WatchEvent[],
-  message: { method?: string; params?: any },
-): WatchEvent[] {
+// Whichever field of exceptionDetails carries the description this time.
+export function exceptionText(details: any): string {
+  return (
+    details?.exception?.description ?? details?.text ?? "uncaught exception"
+  );
+}
+
+// One CDP message yields at most one event; null means we do not report it.
+function watchEvent(message: {
+  method?: string;
+  params?: any;
+}): WatchEvent | null {
   if (message.method === "Network.responseReceived") {
     const { requestId, type, response } = message.params;
-    return [
-      ...events,
-      {
-        kind: "net",
-        requestId,
-        type,
-        url: response.url,
-        status: response.status,
-        failure: null,
-      },
-    ];
+    return {
+      kind: "net",
+      requestId,
+      type,
+      url: response.url,
+      status: response.status,
+      failure: null,
+    };
   }
   if (message.method === "Network.loadingFailed") {
     const { requestId, type, errorText, blockedReason } = message.params;
-    return [
-      ...events,
-      {
-        kind: "net",
-        requestId,
-        type: type ?? "Other",
-        url: "",
-        status: null,
-        failure: blockedReason ? `${errorText} (${blockedReason})` : errorText,
-      },
-    ];
+    return {
+      kind: "net",
+      requestId,
+      type: type ?? "Other",
+      url: "",
+      status: null,
+      failure: blockedReason ? `${errorText} (${blockedReason})` : errorText,
+    };
   }
   if (message.method === "Network.requestWillBeSent") {
     // Only used to give a failed exchange its url once the failure arrives.
     const { requestId, request } = message.params;
-    return [
-      ...events,
-      {
-        kind: "net",
-        requestId,
-        type: "pending",
-        url: request.url,
-        status: null,
-        failure: null,
-      },
-    ];
+    return {
+      kind: "net",
+      requestId,
+      type: "pending",
+      url: request.url,
+      status: null,
+      failure: null,
+    };
   }
   if (message.method === "Runtime.consoleAPICalled") {
-    return [
-      ...events,
-      {
-        kind: "console",
-        level: message.params.type,
-        text: renderCallArguments(message.params.args),
-      },
-    ];
+    return {
+      kind: "console",
+      level: message.params.type,
+      text: renderCallArguments(message.params.args),
+    };
   }
   if (message.method === "Runtime.exceptionThrown") {
-    const { exceptionDetails } = message.params;
-    return [
-      ...events,
-      {
-        kind: "exception",
-        text:
-          exceptionDetails?.exception?.description ??
-          exceptionDetails?.text ??
-          "uncaught exception",
-      },
-    ];
+    return {
+      kind: "exception",
+      text: exceptionText(message.params.exceptionDetails),
+    };
   }
-  return events;
+  return null;
+}
+
+export function applyWatchMessage(
+  events: WatchEvent[],
+  message: { method?: string; params?: any },
+): WatchEvent[] {
+  const event = watchEvent(message);
+  return event ? [...events, event] : events;
 }
 
 // requestWillBeSent rows exist to name the failures; drop the ones that landed.
@@ -369,7 +351,9 @@ export const INTERACTIVE_ROLES = [
 // walked. Anything the root cannot reach still gets reported, at the end.
 export function documentOrder(nodes: any[]): any[] {
   const byId = new Map(
-    nodes.filter((node) => node.nodeId !== undefined).map((node) => [node.nodeId, node]),
+    nodes
+      .filter((node) => node.nodeId !== undefined)
+      .map((node) => [node.nodeId, node]),
   );
   // Identity, not nodeId: a node carrying no nodeId must not collapse into
   // every other one that also carries none.
@@ -438,14 +422,12 @@ export function formatTabs(tabs: Tab[]): string {
     .join("\n");
 }
 
-// activate and close answer with plain text, not JSON.
-export async function cdp<T>(url: string, method: "GET" | "PUT"): Promise<T> {
-  const response = await fetch(url, { method });
+// /json/close answers with plain text, not JSON, and its body is never read.
+export async function cdp<T>(url: string): Promise<T> {
+  const response = await fetch(url);
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(
-      `${method} ${url} failed: ${response.status} ${body.trim()}`,
-    );
+    throw new Error(`GET ${url} failed: ${response.status} ${body.trim()}`);
   }
   try {
     return JSON.parse(body) as T;
@@ -455,23 +437,30 @@ export async function cdp<T>(url: string, method: "GET" | "PUT"): Promise<T> {
 }
 
 export async function closeTab(base: string, targetId: string): Promise<void> {
-  await cdp(`${base}/json/close/${encodeURIComponent(targetId)}`, "GET");
+  await cdp(`${base}/json/close/${encodeURIComponent(targetId)}`);
 }
 
 // A hung child would otherwise become every command's latency. The child has to
 // be killed too, or the pipes keep this process alive past the throw. The signal
 // reaches the child alone, never the group: terminal-browser's own Electron
 // process is detached and meant to outlive the CLI call.
+export type RunOpts = {
+  timeoutMs?: number;
+  // Overlaid on this process's environment, for the child alone.
+  env?: Record<string, string>;
+  // Names the command in the failure message when the real one is mostly
+  // plumbing the caller never typed.
+  label?: string;
+};
+
 export async function run(
   command: string[],
-  timeoutMs?: number,
-  overlay?: Record<string, string>,
-  label?: string,
+  { timeoutMs, env, label }: RunOpts = {},
 ): Promise<string> {
   const child = Bun.spawn(command, {
     stdout: "pipe",
     stderr: "pipe",
-    env: overlay ? { ...process.env, ...overlay } : process.env,
+    env: env ? { ...process.env, ...env } : process.env,
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline =
@@ -482,7 +471,9 @@ export async function run(
             timer = setTimeout(() => {
               child.kill();
               reject(
-                new Error(`${command.join(" ")} timed out after ${timeoutMs}ms`),
+                new Error(
+                  `${command.join(" ")} timed out after ${timeoutMs}ms`,
+                ),
               );
             }, timeoutMs);
           }),
@@ -558,9 +549,12 @@ async function watchPage(
     }
   });
 
-  await session.send("Network.enable");
-  await session.send("Runtime.enable");
-  await session.send("Page.enable");
+  // Three independent domains — enabling them concurrently saves two round trips.
+  await Promise.all([
+    session.send("Network.enable"),
+    session.send("Runtime.enable"),
+    session.send("Page.enable"),
+  ]);
   // Runtime.enable replays the console messages the page already collected;
   // those belong to the load we are about to replace.
   await session.send("Runtime.discardConsoleEntries");
@@ -570,13 +564,11 @@ async function watchPage(
 
   const startedAt = Date.now();
   while (Date.now() - lastEventAt < idleMs && Date.now() - startedAt < capMs) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await Bun.sleep(100);
   }
 
   const settled = settleEvents(events);
   let body: string | null = null;
-  let device: string | null = null;
-  let size: string | null = null;
   if (bodyNeedle) {
     const match = settled.find(
       (event) => event.kind === "net" && event.url.includes(bodyNeedle),
@@ -682,21 +674,16 @@ async function collectConsole(session: CdpSession): Promise<ConsoleEntry[]> {
       });
     }
     if (message.method === "Runtime.exceptionThrown") {
-      const details = message.params.exceptionDetails;
       entries.push({
         level: "exception",
-        text: (
-          details?.exception?.description ??
-          details?.text ??
-          "uncaught exception"
-        ).split("\n")[0],
+        text: exceptionText(message.params.exceptionDetails).split("\n")[0],
         timestamp: message.params.timestamp,
       });
     }
   });
   await session.send("Runtime.enable");
   // The replay arrives as events after the reply, so it needs a moment to land.
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await Bun.sleep(400);
   return entries;
 }
 
@@ -716,17 +703,19 @@ async function terminalTargets(): Promise<Target[]> {
     throw new Error(INSTALL_HINT);
   }
   return parseTerminalBrowsers(
-    await run(["terminal-browser", "ls", "--all", "--json"], PROBE_TIMEOUT_MS),
+    await run(["terminal-browser", "ls", "--all", "--json"], {
+      timeoutMs: PROBE_TIMEOUT_MS,
+    }),
   );
 }
 
 async function pageSocket(base: string, targetId: string): Promise<string> {
-  const descriptors = await cdp<TargetDescriptor[]>(`${base}/json/list`, "GET");
+  const descriptors = await cdp<TargetDescriptor[]>(`${base}/json/list`);
   // Every terminal-browser pane shares one Electron process and one CDP port,
   // so /json/list carries other panes' pages too. Falling back to "the first
   // page" would silently drive somebody else's pane.
   const match = descriptors.find((descriptor) => descriptor.id === targetId);
-  const socket = (match as any)?.webSocketDebuggerUrl;
+  const socket = match?.webSocketDebuggerUrl;
   if (!socket) {
     throw new Error(`tab ${targetId} exposes no CDP page socket`);
   }
@@ -781,11 +770,9 @@ async function openTerminal(
 ): Promise<Target> {
   const tab = split === null ? await herdrTab() : null;
   try {
-    await run(
-      ["terminal-browser", ...terminalOpenArgs(url, split, ratio)],
-      undefined,
-      tab ? { HERDR_PANE_ID: tab.pane, HERDR_TAB_ID: tab.tab } : undefined,
-    );
+    await run(["terminal-browser", ...terminalOpenArgs(url, split, ratio)], {
+      env: tab ? { HERDR_PANE_ID: tab.pane, HERDR_TAB_ID: tab.tab } : undefined,
+    });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const found = newcomer(before, await terminalTargets());
       if (found) {
@@ -797,7 +784,7 @@ async function openTerminal(
         }
         return found;
       }
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await Bun.sleep(250);
     }
     throw new Error("opened the browser but it never reported the page");
   } catch (error) {
@@ -844,7 +831,9 @@ async function main(argv: string[]): Promise<void> {
     const url = requireArg(args[0], "missing URL");
     if (!fresh && terminal.length > 0) {
       target = selectTarget(terminal, view);
-      const socket = await attach(await pageSocket(target.cdpHttp, target.activeTargetId));
+      const socket = await attach(
+        await pageSocket(target.cdpHttp, target.activeTargetId),
+      );
       try {
         console.log(await navigate(socket, url));
       } finally {
@@ -872,13 +861,18 @@ async function main(argv: string[]): Promise<void> {
       throw new Error("raw needs a command after --, e.g. raw -- get title");
     }
     const out = await run(
-      ["terminal-browser", "action", "--browser", target.id, "--", ...passthrough],
-      undefined,
-      undefined,
+      [
+        "terminal-browser",
+        "action",
+        "--browser",
+        target.id,
+        "--",
+        ...passthrough,
+      ],
       // The default error echoes the whole command line back, which here is the
       // agent's own words plus plumbing it never typed. Errors are the common
       // case with a guessed selector, so that echo is the expensive one.
-      `raw ${passthrough[0]}`,
+      { label: `raw ${passthrough[0]}` },
     );
     const trimmed = out.trimEnd();
     if (trimmed) {
@@ -891,7 +885,7 @@ async function main(argv: string[]): Promise<void> {
     console.log(`view        ${target.id}`);
     console.log(`cdp_http    ${base}`);
     console.log(
-      `browser_ws  ${(await cdp<any>(`${base}/json/version`, "GET"))?.webSocketDebuggerUrl ?? "-"}`,
+      `browser_ws  ${(await cdp<any>(`${base}/json/version`))?.webSocketDebuggerUrl ?? "-"}`,
     );
     return;
   }
@@ -924,13 +918,21 @@ async function main(argv: string[]): Promise<void> {
       // strip's own id can bring it to the front.
       const strip = tabs.find((tab) => tab.targetId === targetId)?.id;
       if (strip === null || strip === undefined) {
-        throw new Error(`tab ${row} carries no terminal-browser id to activate`);
+        throw new Error(
+          `tab ${row} carries no terminal-browser id to activate`,
+        );
       }
       await run([
-        "terminal-browser", "action",
-        "--browser", target.id,
-        "--tab", String(strip),
-        "--follow", "--", "get", "url",
+        "terminal-browser",
+        "action",
+        "--browser",
+        target.id,
+        "--tab",
+        String(strip),
+        "--follow",
+        "--",
+        "get",
+        "url",
       ]);
     } else {
       await closeTab(base, targetId);
@@ -969,7 +971,10 @@ async function main(argv: string[]): Promise<void> {
     }
     if (command === "click-ref") {
       console.log(
-        await clickRef(session, requireArg(args[0], "missing ref from `snapshot`")),
+        await clickRef(
+          session,
+          requireArg(args[0], "missing ref from `snapshot`"),
+        ),
       );
       return;
     }
@@ -1001,7 +1006,11 @@ async function main(argv: string[]): Promise<void> {
     if (command === "eval") {
       console.log(
         formatEvalResult(
-          await evaluate(session, requireArg(args[0], "missing expression"), true),
+          await evaluate(
+            session,
+            requireArg(args[0], "missing expression"),
+            true,
+          ),
         ),
       );
       return;
@@ -1012,7 +1021,11 @@ async function main(argv: string[]): Promise<void> {
         throw new Error(`invalid timeout: ${args[1]}`);
       }
       console.log(
-        await waitFor(session, requireArg(args[0], "missing expression"), timeoutMs),
+        await waitFor(
+          session,
+          requireArg(args[0], "missing expression"),
+          timeoutMs,
+        ),
       );
       return;
     }
@@ -1041,7 +1054,11 @@ async function main(argv: string[]): Promise<void> {
       return;
     }
     if (command === "click") {
-      await clickPoint(session, coordinate(args[0], "x"), coordinate(args[1], "y"));
+      await clickPoint(
+        session,
+        coordinate(args[0], "x"),
+        coordinate(args[1], "y"),
+      );
       console.log("ok");
       return;
     }
@@ -1064,7 +1081,9 @@ async function main(argv: string[]): Promise<void> {
       } else if (operation === "set") {
         console.log(await cookiesSet(session, cookieSetParams(args.slice(1))));
       } else {
-        throw new Error(`unknown cookies operation ${operation} (get, set, clear)`);
+        throw new Error(
+          `unknown cookies operation ${operation} (get, set, clear)`,
+        );
       }
       return;
     }
@@ -1076,7 +1095,11 @@ async function main(argv: string[]): Promise<void> {
     }
     if (command === "screenshot") {
       console.log(
-        await screenshot(session, requireArg(output, "missing --output PATH"), full),
+        await screenshot(
+          session,
+          requireArg(output, "missing --output PATH"),
+          full,
+        ),
       );
       return;
     }

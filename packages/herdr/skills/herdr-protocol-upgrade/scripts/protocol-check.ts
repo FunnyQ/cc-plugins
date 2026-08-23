@@ -10,6 +10,7 @@
 // subprocesses, so the interesting behaviour is testable without a live server.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { relative } from "node:path";
 import { execFileSync } from "node:child_process";
 
 type JsonSchema = Record<string, unknown>;
@@ -45,7 +46,10 @@ function normalizedSchema(
       result[key] = Object.fromEntries(
         Object.entries(value ?? {})
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, schema]) => [name, normalizedSchema(schema, defs, resolving)]),
+          .map(([name, schema]) => [
+            name,
+            normalizedSchema(schema, defs, resolving),
+          ]),
       );
     } else if (key === "items") {
       result[key] = normalizedSchema(value, defs, resolving);
@@ -67,10 +71,7 @@ function normalizedSchema(
 }
 
 /** Sorted and dereferenced so reordering and $ref placement do not hide changes. */
-export const shapeOf = (
-  node: any,
-  defs: Record<string, any> = {},
-): Shape => {
+export const shapeOf = (node: any, defs: Record<string, any> = {}): Shape => {
   const props = Object.keys(node?.properties ?? {}).sort();
   return {
     required: [...(node?.required ?? [])].sort(),
@@ -218,13 +219,7 @@ function schemaBreaks(
     const was = before[key];
     const now = after[key];
     if (key === "items" && was && now) {
-      if (
-        schemaBreaks(
-          was as JsonSchema,
-          now as JsonSchema,
-          requestDirection,
-        )
-      )
+      if (schemaBreaks(was as JsonSchema, now as JsonSchema, requestDirection))
         return true;
       continue;
     }
@@ -237,10 +232,18 @@ function schemaBreaks(
         : [...newValues].every((value) => oldValues.has(value));
       if (safe) continue;
     }
-    if (key === "minimum" && typeof was === "number" && typeof now === "number") {
+    if (
+      key === "minimum" &&
+      typeof was === "number" &&
+      typeof now === "number"
+    ) {
       if (requestDirection ? now <= was : now >= was) continue;
     }
-    if (key === "maximum" && typeof was === "number" && typeof now === "number") {
+    if (
+      key === "maximum" &&
+      typeof was === "number" &&
+      typeof now === "number"
+    ) {
       if (requestDirection ? now >= was : now <= was) continue;
     }
     if (
@@ -294,16 +297,32 @@ export function summary(
   ];
 }
 
+/** One pattern, fed to both `git grep -E` and RegExp. Kept to the dialects'
+ *  common subset: POSIX ERE has no `(?:`, so the group stays capturing and
+ *  extractLiterals reads group 1. Two copies would drift, and a narrowed
+ *  pattern silently stops detecting methods — which is this script's whole job. */
+const METHOD_LITERAL = "[\"'`]([a-z_]+(\\.[a-z_]+)*)[\"'`]";
+
 /** Quoted identifiers in tracked source, including single and multi-part methods. */
 export function extractLiterals(source: string): Set<string> {
   return new Set(
-    [...source.matchAll(/["'`]([a-z_]+(?:\.[a-z_]+)*)["'`]/g)].map(
+    [...source.matchAll(new RegExp(METHOD_LITERAL, "g"))].map(
       (match) => match[1],
     ),
   );
 }
 
-export function sourceLiterals(repo: string): Set<string> {
+export function sourceLiterals(
+  repo: string,
+  baselinePath?: string,
+): Set<string> {
+  // The baseline names every method it tracks, so grepping it would feed those
+  // names back in and widen the check to methods the plugin never sends. The
+  // path is the caller's to decide (--baseline), hence not hardcoded here.
+  const baseline = relative(
+    repo,
+    baselinePath ?? `${repo}/.herdr-protocol.json`,
+  );
   let matches = "";
   try {
     // Prose is excluded deliberately: a plugin's docs tend to describe Herdr's
@@ -315,12 +334,14 @@ export function sourceLiterals(repo: string): Set<string> {
         repo,
         "grep",
         "-hoE",
-        '["\'`][a-z_]+(\\.[a-z_]+)*["\'`]',
+        METHOD_LITERAL,
         "--",
         ":!*.md",
         ":!*.txt",
         ":!docs/",
-        ":!.herdr-protocol.json",
+        // A baseline outside the repo is not tracked, so it needs no exclusion —
+        // and `:!../x` is not a pathspec git accepts.
+        ...(baseline.startsWith("..") ? [] : [`:!${baseline}`]),
       ],
       { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     );
@@ -345,7 +366,7 @@ function main(argv: string[]): number {
       maxBuffer: 64 * 1024 * 1024,
     }),
   );
-  const literals = sourceLiterals(repo);
+  const literals = sourceLiterals(repo, baselinePath);
   const used = usedMethods(schema, literals);
   if (used.length === 0) {
     throw new Error(`No Herdr methods found in tracked source under ${repo}`);

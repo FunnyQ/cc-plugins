@@ -39,7 +39,14 @@ describe("parseArgv", () => {
   });
 
   test("hands everything after -- to the passthrough, flags included", () => {
-    const parsed = parseArgv(["raw", "--", "snapshot", "--json", "--view", "x"]);
+    const parsed = parseArgv([
+      "raw",
+      "--",
+      "snapshot",
+      "--json",
+      "--view",
+      "x",
+    ]);
     expect(parsed.command).toBe("raw");
     expect(parsed.passthrough).toEqual(["snapshot", "--json", "--view", "x"]);
     // our own parser must not have eaten the agent-browser flags
@@ -55,7 +62,12 @@ describe("parseArgv", () => {
 
   test("takes --split and --ratio off the positionals", () => {
     const parsed = parseArgv([
-      "open", "https://example.com", "--split", "down", "--ratio", "0.4",
+      "open",
+      "https://example.com",
+      "--split",
+      "down",
+      "--ratio",
+      "0.4",
     ]);
     expect(parsed.args).toEqual(["https://example.com"]);
     expect(parsed.split).toBe("down");
@@ -71,7 +83,9 @@ describe("parseArgv", () => {
   });
 
   test("reads --full as a switch", () => {
-    expect(parseArgv(["screenshot", "--output", "/tmp/a.png", "--full"])).toMatchObject({
+    expect(
+      parseArgv(["screenshot", "--output", "/tmp/a.png", "--full"]),
+    ).toMatchObject({
       command: "screenshot",
       args: [],
       output: "/tmp/a.png",
@@ -249,23 +263,41 @@ describe("formatSnapshot document order", () => {
   // getFullAXTree returns a flat array whose order is Chromium's serialization,
   // not the document's. The tree only exists in childIds.
   const scrambled = [
-    { nodeId: "9", role: { value: "link" }, name: { value: "Legal" }, backendDOMNodeId: 91 },
-    { nodeId: "1", role: { value: "RootWebArea" }, name: { value: "x" }, childIds: ["2", "3"] },
+    {
+      nodeId: "9",
+      role: { value: "link" },
+      name: { value: "Legal" },
+      backendDOMNodeId: 91,
+    },
+    {
+      nodeId: "1",
+      role: { value: "RootWebArea" },
+      name: { value: "x" },
+      childIds: ["2", "3"],
+    },
     { nodeId: "3", role: { value: "contentinfo" }, childIds: ["9"] },
     { nodeId: "2", role: { value: "navigation" }, childIds: ["4"] },
-    { nodeId: "4", role: { value: "link" }, name: { value: "Home" }, backendDOMNodeId: 12 },
+    {
+      nodeId: "4",
+      role: { value: "link" },
+      name: { value: "Home" },
+      backendDOMNodeId: 12,
+    },
   ];
 
   test("walks childIds from the root instead of trusting the array", () => {
-    expect(formatSnapshot(scrambled)).toBe(
-      '12 link "Home"\n91 link "Legal"',
-    );
+    expect(formatSnapshot(scrambled)).toBe('12 link "Home"\n91 link "Legal"');
   });
 
   test("still reports nodes the root cannot reach, rather than dropping them", () => {
     const orphaned = [
       ...scrambled,
-      { nodeId: "77", role: { value: "button" }, name: { value: "Orphan" }, backendDOMNodeId: 77 },
+      {
+        nodeId: "77",
+        role: { value: "button" },
+        name: { value: "Orphan" },
+        backendDOMNodeId: 77,
+      },
     ];
     expect(formatSnapshot(orphaned)).toContain('77 button "Orphan"');
   });
@@ -273,7 +305,13 @@ describe("formatSnapshot document order", () => {
   test("survives a childIds cycle without hanging", () => {
     const cyclic = [
       { nodeId: "1", role: { value: "RootWebArea" }, childIds: ["2"] },
-      { nodeId: "2", role: { value: "link" }, name: { value: "A" }, backendDOMNodeId: 5, childIds: ["1"] },
+      {
+        nodeId: "2",
+        role: { value: "link" },
+        name: { value: "A" },
+        backendDOMNodeId: 5,
+        childIds: ["1"],
+      },
     ];
     expect(formatSnapshot(cyclic)).toBe('5 link "A"');
   });
@@ -459,26 +497,28 @@ describe("gateway calls", () => {
   });
 
   test("a failed call reports status and body", async () => {
-    await expect(cdp(`${base}/json/nope`, "GET")).rejects.toThrow(
-      /404 not found/,
-    );
+    await expect(cdp(`${base}/json/nope`)).rejects.toThrow(/404 not found/);
   });
 });
 
 describe("run timeout", () => {
   test("kills a command that hangs, instead of waiting on it forever", async () => {
     const startedAt = Date.now();
-    expect(run(["sleep", "10"], 200)).rejects.toThrow(/timed out/);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(run(["sleep", "10"], { timeoutMs: 200 })).rejects.toThrow(
+      /timed out/,
+    );
+    await Bun.sleep(600);
     expect(Date.now() - startedAt).toBeLessThan(2_000);
   });
 
   test("names the command it gave up on", async () => {
-    expect(run(["sleep", "10"], 100)).rejects.toThrow(/sleep 10/);
+    expect(run(["sleep", "10"], { timeoutMs: 100 })).rejects.toThrow(
+      /sleep 10/,
+    );
   });
 
   test("leaves a command that answers in time alone", async () => {
-    expect((await run(["echo", "hi"], 5_000)).trim()).toBe("hi");
+    expect((await run(["echo", "hi"], { timeoutMs: 5_000 })).trim()).toBe("hi");
   });
 
   test("waits indefinitely when no timeout is given", async () => {

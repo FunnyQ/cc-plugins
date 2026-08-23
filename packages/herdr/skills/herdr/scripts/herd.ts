@@ -53,6 +53,26 @@ export class HerdrError extends Error {
   }
 }
 
+/** herdr's JSON envelope, or null when the output is not JSON. */
+function envelope(raw: string): any {
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The one error ladder: herdr's own message, then whichever stream spoke. */
+function failure(args: string[], result: RunResult, parsed: any): HerdrError {
+  return new HerdrError(
+    parsed?.error?.message ||
+      result.stderr.trim() ||
+      result.stdout.trim() ||
+      `herdr ${args.join(" ")} exited ${result.code}`,
+    parsed?.error?.code,
+  );
+}
+
 /** herdr's agent_status enum, in full. `done` means the agent finished but its
  *  pane has not been looked at — codex parks there instead of returning to `idle`. */
 export type AgentStatus = "idle" | "working" | "blocked" | "done" | "unknown";
@@ -113,9 +133,15 @@ export type CloseResult = { target: string; paneId: string; closed: true };
 function randHex(n: number): string {
   const bytes = new Uint8Array(Math.ceil(n / 2));
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, n);
+  return Buffer.from(bytes).toString("hex").slice(0, n);
+}
+
+/** herdr takes a repeated `--until`, so every status option accepts one or many. */
+function asStatuses(
+  status: AgentStatus | AgentStatus[] | undefined,
+): AgentStatus[] {
+  if (status === undefined) return [];
+  return Array.isArray(status) ? status : [status];
 }
 
 function normAgent(a: any): AgentInfo {
@@ -146,53 +172,30 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
   /** Run a herdr command that returns a JSON envelope; unwrap `.result`, throw on error. */
   async function callJson(args: string[]): Promise<any> {
-    const { stdout, stderr, code } = await run(args);
-    let parsed: any = null;
-    const raw = stdout.trim() || stderr.trim();
-    try {
-      parsed = raw ? JSON.parse(raw) : null;
-    } catch {
-      parsed = null;
-    }
-    if (code !== 0 || parsed?.error) {
-      const msg =
-        parsed?.error?.message ||
-        stderr.trim() ||
-        stdout.trim() ||
-        `herdr ${args.join(" ")} exited ${code}`;
-      throw new HerdrError(msg, parsed?.error?.code);
+    const result = await run(args);
+    const parsed = envelope(result.stdout.trim() || result.stderr.trim());
+    if (result.code !== 0 || parsed?.error) {
+      throw failure(args, result, parsed);
     }
     return parsed?.result ?? parsed;
   }
 
   /** Run a herdr command that prints nothing on success (send-text/send-keys/run). */
   async function callVoid(args: string[]): Promise<void> {
-    const { stderr, stdout, code } = await run(args);
-    if (code !== 0) {
-      throw new HerdrError(
-        stderr.trim() ||
-          stdout.trim() ||
-          `herdr ${args.join(" ")} exited ${code}`,
-      );
-    }
+    const result = await run(args);
+    // No envelope is parsed, so these errors never carry herdr's error code.
+    if (result.code !== 0) throw failure(args, result, null);
   }
 
   /** Run a read command whose successful stdout is terminal text, not JSON. */
   async function callText(args: string[]): Promise<string> {
-    const { stdout, stderr, code } = await run(args);
-    if (code === 0) return stdout;
-    let parsed: any = null;
-    try {
-      parsed = JSON.parse(stderr.trim() || stdout.trim());
-    } catch {
-      /* preserve the plain CLI error below */
-    }
-    throw new HerdrError(
-      parsed?.error?.message ||
-        stderr.trim() ||
-        stdout.trim() ||
-        `herdr ${args.join(" ")} exited ${code}`,
-      parsed?.error?.code,
+    const result = await run(args);
+    if (result.code === 0) return result.stdout;
+    // Failure order is the reverse of callJson's: the error rides stderr here.
+    throw failure(
+      args,
+      result,
+      envelope(result.stderr.trim() || result.stdout.trim()),
     );
   }
 
@@ -257,11 +260,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     } = {},
   ): Promise<any> {
     const statuses =
-      opts.status === undefined
-        ? ["idle"]
-        : Array.isArray(opts.status)
-          ? opts.status
-          : [opts.status];
+      opts.status === undefined ? ["idle"] : asStatuses(opts.status);
     // A bare `agent wait` would silently fall back to herdr's idle|done|blocked
     // default, which is not what an empty array asked for. Fail instead.
     if (statuses.length === 0) {
@@ -315,12 +314,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     text: string,
     opts: SendOpts = {},
   ): Promise<SendResult> {
-    const statuses =
-      opts.status === undefined
-        ? []
-        : Array.isArray(opts.status)
-          ? opts.status
-          : [opts.status];
+    const statuses = asStatuses(opts.status);
     // herdr rejects `--until` without `--wait`, and a caller passing either a
     // status set or a budget has already asked to settle. Imply it.
     const waited =
@@ -470,7 +464,9 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
   /** Start the agent in a FRESH tab instead of splitting the caller's pane. */
   async function startInNewTab(name: string, opts: SpawnOpts): Promise<any> {
-    const prevTab = await focusedTabId();
+    // Only needed to restore focus at the end, and `--no-focus` cannot move it
+    // meanwhile — so this round trip runs alongside the create/start, not before.
+    const prevTabQuery = focusedTabId();
 
     const createArgs = ["tab", "create", "--no-focus"];
     // Pin the new tab to the CALLER's workspace, not whatever workspace happens
@@ -491,6 +487,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
     const started = await startAgentInPane(name, paneId, opts);
     // Give focus back to where the caller was.
+    const prevTab = await prevTabQuery;
     if (prevTab) {
       try {
         await callVoid(["tab", "focus", prevTab]);

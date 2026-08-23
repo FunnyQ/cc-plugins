@@ -1,7 +1,6 @@
 // Every page operation, driven straight over CDP. The herdr plugin CLI answers
 // each of these with pretty-printed JSON, which is the same fact spread over
-// ten lines; going to CDP directly is what lets one line be the answer, and it
-// is what makes both backends print identically.
+// ten lines; going to CDP directly is what lets one line be the answer.
 
 export type CdpSession = {
   send: (method: string, params?: unknown) => Promise<any>;
@@ -31,24 +30,26 @@ export const MODIFIERS: Record<string, number> = {
   Shift: 8,
 };
 
-const NAMED_KEYS: Record<string, { code: string; keyCode: number; text?: string }> =
-  {
-    Enter: { code: "Enter", keyCode: 13, text: "\r" },
-    Tab: { code: "Tab", keyCode: 9 },
-    Escape: { code: "Escape", keyCode: 27 },
-    Backspace: { code: "Backspace", keyCode: 8 },
-    Delete: { code: "Delete", keyCode: 46 },
-    ArrowUp: { code: "ArrowUp", keyCode: 38 },
-    ArrowDown: { code: "ArrowDown", keyCode: 40 },
-    ArrowLeft: { code: "ArrowLeft", keyCode: 37 },
-    ArrowRight: { code: "ArrowRight", keyCode: 39 },
-    Home: { code: "Home", keyCode: 36 },
-    End: { code: "End", keyCode: 35 },
-    PageUp: { code: "PageUp", keyCode: 33 },
-    PageDown: { code: "PageDown", keyCode: 34 },
-    " ": { code: "Space", keyCode: 32, text: " " },
-    Space: { code: "Space", keyCode: 32, text: " " },
-  };
+const NAMED_KEYS: Record<
+  string,
+  { code: string; keyCode: number; text?: string }
+> = {
+  Enter: { code: "Enter", keyCode: 13, text: "\r" },
+  Tab: { code: "Tab", keyCode: 9 },
+  Escape: { code: "Escape", keyCode: 27 },
+  Backspace: { code: "Backspace", keyCode: 8 },
+  Delete: { code: "Delete", keyCode: 46 },
+  ArrowUp: { code: "ArrowUp", keyCode: 38 },
+  ArrowDown: { code: "ArrowDown", keyCode: 40 },
+  ArrowLeft: { code: "ArrowLeft", keyCode: 37 },
+  ArrowRight: { code: "ArrowRight", keyCode: 39 },
+  Home: { code: "Home", keyCode: 36 },
+  End: { code: "End", keyCode: 35 },
+  PageUp: { code: "PageUp", keyCode: 33 },
+  PageDown: { code: "PageDown", keyCode: 34 },
+  " ": { code: "Space", keyCode: 32, text: " " },
+  Space: { code: "Space", keyCode: 32, text: " " },
+};
 
 export type KeyDescriptor = {
   key: string;
@@ -81,7 +82,9 @@ export function keyDescriptor(spec: string): KeyDescriptor {
       code: named.code,
       windowsVirtualKeyCode: named.keyCode,
       modifiers,
-      ...(named.text !== undefined && modifiers === 0 ? { text: named.text } : {}),
+      ...(named.text !== undefined && modifiers === 0
+        ? { text: named.text }
+        : {}),
     };
   }
   if (name.length === 1) {
@@ -188,7 +191,10 @@ export async function selectorPress(
     type: descriptor.text ? "keyDown" : "rawKeyDown",
     ...descriptor,
   });
-  await session.send("Input.dispatchKeyEvent", { type: "keyUp", ...descriptor });
+  await session.send("Input.dispatchKeyEvent", {
+    type: "keyUp",
+    ...descriptor,
+  });
   return key;
 }
 
@@ -213,13 +219,13 @@ export async function wheel(
   x: number,
   y: number,
   deltaY: number,
-  deltaX = 0,
 ): Promise<void> {
   await session.send("Input.dispatchMouseEvent", {
     type: "mouseWheel",
     x,
     y,
-    deltaX,
+    // The protocol requires the field; horizontal scrolling is not offered.
+    deltaX: 0,
     deltaY,
   });
 }
@@ -241,7 +247,7 @@ export async function waitFor(
     } catch {
       // A page mid-navigation throws on any expression; keep waiting.
     }
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await Bun.sleep(100);
   }
   throw new Error(`timed out after ${timeoutMs}ms waiting for ${expression}`);
 }
@@ -253,10 +259,10 @@ export async function pageText(session: CdpSession): Promise<string> {
 }
 
 // Navigation answers with where it landed, because a redirect makes the url the
-// caller passed the wrong thing to report.
+// caller passed the wrong thing to report. Both facts ride one round trip.
 export async function landed(session: CdpSession): Promise<string> {
-  const url = formatEvalResult(await evaluate(session, "location.href"));
-  const title = formatEvalResult(await evaluate(session, "document.title"));
+  const [url = "", title = ""] =
+    (await evaluate(session, "[location.href, document.title]"))?.value ?? [];
   return `${url} ${title}`.trimEnd();
 }
 
@@ -294,7 +300,9 @@ export async function reload(session: CdpSession): Promise<string> {
 async function settled(session: CdpSession, timeoutMs = 10_000): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Sleep first: right after Page.navigate the old document can still be
+    // there reporting "complete", and checking immediately would believe it.
+    await Bun.sleep(100);
     try {
       const state = await evaluate(session, "document.readyState");
       if (state?.value === "complete") {
@@ -373,7 +381,9 @@ export function cookieSetParams(args: string[]): CookieParams {
       params.path = next;
     } else if (flag === "--same-site") {
       if (!SAME_SITE.includes(next)) {
-        throw new Error(`invalid --same-site ${next} (${SAME_SITE.join(", ")})`);
+        throw new Error(
+          `invalid --same-site ${next} (${SAME_SITE.join(", ")})`,
+        );
       }
       params.sameSite = next;
     } else if (flag === "--expires") {
@@ -441,7 +451,11 @@ export async function setHeaders(
   } catch {
     throw new Error(`headers needs JSON, got: ${json.slice(0, 60)}`);
   }
-  if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+  if (
+    headers === null ||
+    typeof headers !== "object" ||
+    Array.isArray(headers)
+  ) {
     throw new Error("headers needs a JSON object of name to value");
   }
   await session.send("Network.enable", {});
