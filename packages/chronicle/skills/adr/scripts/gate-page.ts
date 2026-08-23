@@ -18,6 +18,11 @@
  * means the one-shot server timed out.
  */
 
+import { join } from "node:path";
+
+import { TEMP_ROOT } from "../../../shared/scripts/temp-payload";
+import { formatAdrId } from "./adr-index";
+
 export type Disposition = "promote" | "watch" | "skip";
 export type Lang = "en" | "zh-TW";
 
@@ -185,7 +190,8 @@ type Strings = {
   tallyGroups: string;
   cap: string;
   capWillWrite: string;
-  capOver: (n: number) => string;
+  /** Carries a literal `{n}` — the client substitutes the live count. */
+  capOver: string;
   capNone: string;
   ledgerSect: string;
   draftsSect: string;
@@ -204,7 +210,8 @@ type Strings = {
   completeNote: string;
   alertGroupTitle: string;
   alertGroupBody: string;
-  alertCapTitle: (n: number) => string;
+  /** Carries a literal `{n}` — the client substitutes the live count. */
+  alertCapTitle: string;
   alertCapBody: string;
   path: string;
   editToggle: string;
@@ -230,8 +237,7 @@ const STRINGS: Record<Lang, Strings> = {
     tallyGroups: "records after grouping",
     cap: "cap",
     capWillWrite: "will write",
-    capOver: (n: number) =>
-      `${n} / ${GROUP_CAP} — over cap, group further or set the excess to watch`,
+    capOver: `{n} / ${GROUP_CAP} — over cap, group further or set the excess to watch`,
     capNone: "no promotions — this run records nothing",
     ledgerSect: "Candidate ledger",
     draftsSect: "Proposed records",
@@ -253,8 +259,7 @@ const STRINGS: Record<Lang, Strings> = {
     alertGroupTitle: "A group holds a non-promote row.",
     alertGroupBody:
       "Rows only fold into one record when every one of them is promote. Either drop the label from the outlier, or set it back to promote.",
-    alertCapTitle: (n: number) =>
-      `${n} records exceeds the ${GROUP_CAP}-record cap.`,
+    alertCapTitle: `{n} records exceeds the ${GROUP_CAP}-record cap.`,
     alertCapBody:
       "Group further, or set the excess to watch — a watch candidate archives to the watched bucket and re-queues on the next triage run, so nothing is lost.",
     path: "path",
@@ -280,8 +285,7 @@ const STRINGS: Record<Lang, Strings> = {
     tallyGroups: "分群後記錄數",
     cap: "上限",
     capWillWrite: "將產生",
-    capOver: (n: number) =>
-      `${n} / ${GROUP_CAP} — 超過上限，請再分群或把多的改成 watch`,
+    capOver: `{n} / ${GROUP_CAP} — 超過上限，請再分群或把多的改成 watch`,
     capNone: "沒有任何晉升 — 這一輪不會產生記錄",
     ledgerSect: "候選帳冊",
     draftsSect: "待寫入的記錄",
@@ -303,7 +307,7 @@ const STRINGS: Record<Lang, Strings> = {
     alertGroupTitle: "group 裡混進了非 promote 的列。",
     alertGroupBody:
       "只有全部都是 promote 的列才能折成同一筆記錄。要嘛把標籤從那個例外身上拿掉，要嘛把它改回 promote。",
-    alertCapTitle: (n: number) => `${n} 筆記錄超過 ${GROUP_CAP} 筆上限。`,
+    alertCapTitle: `{n} 筆記錄超過 ${GROUP_CAP} 筆上限。`,
     alertCapBody:
       "請再分群，或把多出來的改成 watch——watch 候選會歸檔到 watched bucket，下一次分流會重新排隊，不會遺失。",
     path: "路徑",
@@ -322,8 +326,6 @@ const esc = (s: string): string =>
         ch
       ]!,
   );
-
-const pad4 = (n: number): string => String(n).padStart(4, "0");
 
 export function renderGatePage(
   payload: GatePayload,
@@ -390,7 +392,7 @@ function gate1Body(p: Gate1Payload, t: Strings): string {
     s.conflicts !== undefined
       ? `<span><b>${s.conflicts}</b> ${esc(t.conflictsCount)}</span>`
       : "",
-    `<span>${esc(t.nextAdr)} <b>ADR-${pad4(p.nextAdr)}</b></span>`,
+    `<span>${esc(t.nextAdr)} <b>${formatAdrId(p.nextAdr)}</b></span>`,
     s.tooFresh !== undefined
       ? `<span><b>${s.tooFresh}</b> ${esc(t.tooFresh)}</span>`
       : "",
@@ -497,10 +499,10 @@ function gate2Body(p: Gate2Payload, t: Strings): string {
       return `      <article class="row draft" data-v="approve" data-i="${i}">
         <div class="draft-head">
           <div class="draft-id">
-            <span class="record-no">ADR-${pad4(d.adrNumber)}</span>
+            <span class="record-no">${formatAdrId(d.adrNumber)}</span>
             <span class="group-no">${esc(d.groupId)}</span>
           </div>
-          <div class="stamps" role="radiogroup" aria-label="ADR-${pad4(d.adrNumber)}">${stamps}</div>
+          <div class="stamps" role="radiogroup" aria-label="${formatAdrId(d.adrNumber)}">${stamps}</div>
         </div>
         <div class="path"><span>${esc(t.path)}</span><code>${esc(d.proposedPath)}</code></div>
         <pre class="draft-text">${esc(d.draftText)}</pre>
@@ -776,11 +778,11 @@ function pickClientStrings(lang: Lang, withSubmit = false) {
   return {
     cap: t.cap,
     capWillWrite: t.capWillWrite,
-    capOver: t.capOver(0).replace("0 /", "{n} /"),
+    capOver: t.capOver,
     capNone: t.capNone,
     alertGroupTitle: t.alertGroupTitle,
     alertGroupBody: t.alertGroupBody,
-    alertCapTitle: t.alertCapTitle(0).replace(/^0/, "{n}"),
+    alertCapTitle: t.alertCapTitle,
     alertCapBody: t.alertCapBody,
     allDropped: t.allDropped,
     ...(withSubmit
@@ -814,24 +816,6 @@ const CSS = `
     --accent: #7f9de0; --warn: #e08a76; --warn-bg: #3a201a;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 16px -10px rgba(0,0,0,.7);
   }
-}
-:root[data-theme="light"] {
-  --paper: #eceef1; --card: #fff; --ink: #171a20; --ink-2: #4a5262; --ink-3: #7c8496;
-  --line: #d6dae1; --line-strong: #b9c0cb;
-  --promote: #1c6b57; --promote-bg: #e2efea;
-  --watch: #8f5c0d; --watch-bg: #f6ecda;
-  --skip: #6b7280; --skip-bg: #e9ebef;
-  --accent: #2a4a8c; --warn: #a3341f; --warn-bg: #f8e6e1;
-  --shadow: 0 1px 2px rgba(23,26,32,.06), 0 6px 16px -10px rgba(23,26,32,.18);
-}
-:root[data-theme="dark"] {
-  --paper: #101319; --card: #171b22; --ink: #e6e9ef; --ink-2: #a5adbd; --ink-3: #767f92;
-  --line: #272d38; --line-strong: #3a4250;
-  --promote: #5fc0a3; --promote-bg: #16302a;
-  --watch: #d9a441; --watch-bg: #332715;
-  --skip: #8b93a3; --skip-bg: #222731;
-  --accent: #7f9de0; --warn: #e08a76; --warn-bg: #3a201a;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 16px -10px rgba(0,0,0,.7);
 }
 body { background: var(--paper); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.75; -webkit-font-smoothing: antialiased; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 96px; display: flex; flex-direction: column; gap: 28px; }
@@ -954,7 +938,8 @@ if (import.meta.main) {
   }
 
   const outPath =
-    flag("out") ?? `/tmp/chronicle/adr/gate${payload.gate}-${Date.now()}.html`;
+    flag("out") ??
+    join(TEMP_ROOT, "adr", `gate${payload.gate}-${Date.now()}.html`);
   let pageUrl = outPath;
   let gateServer: GateServer | undefined;
   let html = "";
