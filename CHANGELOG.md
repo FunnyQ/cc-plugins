@@ -1,5 +1,13 @@
 # Changelog
 
+## [chronicle 0.14.1] - 2026-08-24
+
+_tracks tag `chronicle-v0.14.1`_
+
+### Changed
+- The branch-check hook that runs before every Bash call now skips its JSON parsing for commands other than `git commit`, cutting its per-call overhead from about 18ms to about 14ms.
+- Release remote checks (tag-on-remote lookups and the behind-remote fetch) are now batched and run concurrently, cutting a 5-component coordinated release's remote-checking time from about 14s to about 3s.
+
 ## [herdr 0.5.3] - 2026-08-24
 
 _tracks tag `herdr-v0.5.3`_
