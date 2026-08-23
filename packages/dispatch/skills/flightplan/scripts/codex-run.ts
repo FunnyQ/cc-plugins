@@ -31,6 +31,7 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { printChangedFiles, readPrompt } from "./lib/harness-run";
 
 const CODEX_BIN = process.env.CODEX_BIN ?? "codex";
 
@@ -43,19 +44,6 @@ const MODE_ARGS: Record<Mode, string[]> = {
   // read-only: the review lens records findings, it must not touch source.
   review: ["-s", "read-only"],
 };
-
-function readPrompt(args: string[]): string {
-  const i = args.indexOf("--prompt-file");
-  if (i !== -1) {
-    const path = args[i + 1];
-    if (!path) {
-      process.stderr.write("Missing path after --prompt-file\n");
-      process.exit(2);
-    }
-    return readFileSync(path, "utf-8");
-  }
-  return readFileSync(0, "utf-8"); // stdin
-}
 
 // Returns the process exit code. Never calls process.exit itself — so the
 // caller's `finally` cleanup always runs (process.exit would skip it, leaking
@@ -93,17 +81,7 @@ function run(mode: Mode, prompt: string, lastFile: string): number {
   })();
   process.stdout.write(output.trimEnd() + "\n");
 
-  if (mode === "delegate") {
-    // Show what landed in the working tree, so the driver never needs to read
-    // codex's transcript to learn what it changed. `git status --short` (not
-    // `git diff`) so NEWLY-created files show up too — `git diff` ignores
-    // untracked paths, which would hide the common "codex created a file" case.
-    const st = Bun.spawnSync(["git", "status", "--short"], { stdout: "pipe" });
-    const changed = st.stdout.toString().trim();
-    process.stdout.write(
-      `\n--- changed files (git status --short) ---\n${changed || "(no working-tree changes detected)"}\n`,
-    );
-  }
+  if (mode === "delegate") printChangedFiles();
   return 0;
 }
 
@@ -126,5 +104,3 @@ if (import.meta.main) {
   }
   process.exit(code);
 }
-
-export { MODE_ARGS, type Mode };

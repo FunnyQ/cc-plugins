@@ -36,7 +36,8 @@
  * starts with `OPENCODE UNREACHABLE` so the caller can surface it verbatim — a
  * missing cross-vendor pass must fail the task, never pass quietly).
  */
-import { readFileSync } from "node:fs";
+import { flagValue } from "./lib/args";
+import { printChangedFiles, readPrompt } from "./lib/harness-run";
 
 const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode";
 
@@ -53,23 +54,6 @@ const DEFAULT_MODEL: Record<Mode, string> = {
 const REVIEW_GUARD =
   "READ-ONLY REVIEW. Analyze only — do NOT modify, create, or delete any file, " +
   "and do not run any command that writes to disk. Report findings only.\n\n";
-
-function flagValue(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  if (i === -1) return undefined;
-  const v = args[i + 1];
-  if (!v) {
-    process.stderr.write(`Missing value after ${name}\n`);
-    process.exit(2);
-  }
-  return v;
-}
-
-function readPrompt(args: string[]): string {
-  const path = flagValue(args, "--prompt-file");
-  if (path) return readFileSync(path, "utf-8");
-  return readFileSync(0, "utf-8"); // stdin
-}
 
 function resolveModel(mode: Mode, args: string[]): string {
   return (
@@ -136,16 +120,7 @@ function run(mode: Mode, prompt: string, model: string): number {
   const output = parseJsonl(proc.stdout.toString());
   process.stdout.write(output.trimEnd() + "\n");
 
-  if (mode === "delegate") {
-    // Show what landed in the working tree, so the driver never needs to read
-    // opencode's transcript. `git status --short` (not `git diff`) so NEWLY-
-    // created files show up too — `git diff` ignores untracked paths.
-    const st = Bun.spawnSync(["git", "status", "--short"], { stdout: "pipe" });
-    const changed = st.stdout.toString().trim();
-    process.stdout.write(
-      `\n--- changed files (git status --short) ---\n${changed || "(no working-tree changes detected)"}\n`,
-    );
-  }
+  if (mode === "delegate") printChangedFiles();
   return 0;
 }
 
