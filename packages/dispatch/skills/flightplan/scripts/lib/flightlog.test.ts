@@ -6,7 +6,6 @@ import {
   formatEntry,
   parseLog,
   renderRunlog,
-  ensureFlightlogDir,
   appendEntry,
   type FlightlogEntry,
   type ScoreEntry,
@@ -70,7 +69,9 @@ describe("formatEntry / parseLog", () => {
 
   test("parseLog accepts phase entries and legacy notes without phase", () => {
     const start: NoteEntry = { ...NOTE, phase: "start", message: "" };
-    const entries = parseLog([formatEntry(start), formatEntry(NOTE)].join("\n"));
+    const entries = parseLog(
+      [formatEntry(start), formatEntry(NOTE)].join("\n"),
+    );
     expect(entries).toEqual([start, NOTE]);
     expect(entries[1]).not.toHaveProperty("phase");
   });
@@ -136,26 +137,6 @@ describe("renderRunlog", () => {
       expect(renderRunlog(entries, { slug })).toBe(expected);
     });
   }
-});
-
-describe("ensureFlightlogDir", () => {
-  test("creates .flightlog/ with a self-ignoring .gitignore", async () => {
-    const root = await newDir();
-    const dir = await ensureFlightlogDir(root);
-    expect(dir).toBe(join(root, ".flightlog"));
-    const gi = await readFile(join(dir, ".gitignore"), "utf-8");
-    expect(gi.trim()).toBe("*");
-    await rm(root, { recursive: true });
-  });
-
-  test("is idempotent — does not clobber an existing .gitignore", async () => {
-    const root = await newDir();
-    await ensureFlightlogDir(root);
-    const dir = await ensureFlightlogDir(root);
-    const gi = await readFile(join(dir, ".gitignore"), "utf-8");
-    expect(gi.trim()).toBe("*");
-    await rm(root, { recursive: true });
-  });
 });
 
 describe("appendEntry", () => {

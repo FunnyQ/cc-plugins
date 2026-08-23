@@ -65,7 +65,15 @@ export type NoteEntry = {
 
 export type FlightlogEntry = ScoreEntry | NoteEntry;
 
-const FLIGHTLOG_DIRNAME = ".flightlog";
+export const FLIGHTLOG_DIRNAME = ".flightlog";
+
+/**
+ * The JSONL trail for a plan dir. Exported so consumers never re-spell the
+ * layout — this module owns the schema, so it owns where the schema lives.
+ */
+export function runLogPath(planDir: string): string {
+  return join(planDir, FLIGHTLOG_DIRNAME, "run.jsonl");
+}
 
 /** Serialize one entry to a single newline-free JSONL line. */
 export function formatEntry(entry: FlightlogEntry): string {
@@ -144,21 +152,6 @@ function renderLine(e: FlightlogEntry): string {
   const veto = e.hardFailed ? " · hard-fail veto" : "";
   const miss = e.missing.length ? ` · missing: ${e.missing.join(", ")}` : "";
   return `- ${attempt}judge — score ${e.weighted.toFixed(2)} ${e.passOp} ${e.threshold} → ${verdict}${veto}${miss}${agent}`;
-}
-
-/**
- * Ensure `<dir>/.flightlog/` exists with a self-ignoring `.gitignore` (`*`).
- * Idempotent — never clobbers an existing `.gitignore`. Returns the flightlog
- * dir path.
- */
-export async function ensureFlightlogDir(planDir: string): Promise<string> {
-  const dir = join(planDir, FLIGHTLOG_DIRNAME);
-  await mkdir(dir, { recursive: true });
-  const gitignore = join(dir, ".gitignore");
-  if (!(await exists(gitignore))) {
-    await writeFile(gitignore, "*\n");
-  }
-  return dir;
 }
 
 /**
