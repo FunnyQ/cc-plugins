@@ -146,6 +146,8 @@ export function parseTask(
     quoteEnd++;
   }
   const quote = lines.slice(quoteStart, quoteEnd).join("\n");
+  const bodyLines = lines.slice(quoteEnd);
+  const body = bodyLines.join("\n");
 
   return {
     ok: true,
@@ -159,9 +161,9 @@ export function parseTask(
       blocks: extractRefs(quote, "Blocks"),
       status: extractStatus(quote),
       finalReview: extractFinalReview(quote),
-      sections: extractSections(lines.slice(quoteEnd)),
-      body: lines.slice(quoteEnd).join("\n"),
-      rubric: parseRubric(lines.slice(quoteEnd).join("\n")),
+      sections: extractSections(bodyLines),
+      body,
+      rubric: parseRubric(body),
     },
   };
 }
