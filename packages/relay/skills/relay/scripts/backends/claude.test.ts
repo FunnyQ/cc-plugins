@@ -35,16 +35,6 @@ describe("claudeBackend", () => {
     });
   });
 
-  describe("strategy", () => {
-    it("returns 'prompt' for delegate", () => {
-      expect(claudeBackend.strategy("delegate")).toBe("prompt");
-    });
-
-    it("returns 'prompt' for review", () => {
-      expect(claudeBackend.strategy("review", {})).toBe("prompt");
-    });
-  });
-
   describe("invoke", () => {
     describe("delegate mode", () => {
       it("builds argv with prompt text and json output format", () => {

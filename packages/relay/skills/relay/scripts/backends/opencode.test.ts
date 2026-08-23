@@ -45,17 +45,6 @@ describe("opencodeBackend", () => {
     });
   });
 
-  describe("strategy", () => {
-    it("always returns 'prompt'", () => {
-      expect(opencodeBackend.strategy("delegate", {} as InvokeOpts)).toBe(
-        "prompt",
-      );
-      expect(opencodeBackend.strategy("review", {} as InvokeOpts)).toBe(
-        "prompt",
-      );
-    });
-  });
-
   describe("invoke", () => {
     // relay.ts resolves the model (flag > config > per-mode default) and passes
     // it as opts.model; invoke trusts that value. These pass the resolved model

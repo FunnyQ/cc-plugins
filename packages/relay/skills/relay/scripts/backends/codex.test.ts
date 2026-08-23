@@ -50,25 +50,6 @@ describe("codexBackend", () => {
     });
   });
 
-  describe("strategy", () => {
-    it("should return native for every headless review", () => {
-      expect(codexBackend.strategy("review", {})).toBe("native");
-      expect(
-        codexBackend.strategy("review", { task: "review the auth flow" }),
-      ).toBe("native");
-    });
-
-    it("should return prompt for delegate", () => {
-      const opts: InvokeOpts = {};
-      expect(codexBackend.strategy("delegate", opts)).toBe("prompt");
-    });
-
-    it("should return native for image", () => {
-      const opts: InvokeOpts = {};
-      expect(codexBackend.strategy("image", opts)).toBe("native");
-    });
-  });
-
   describe("invoke", () => {
     describe("delegate mode", () => {
       it("should build argv with danger-full-access sandbox", () => {

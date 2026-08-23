@@ -379,7 +379,7 @@ describe("executeRelay", () => {
     expect(promptArg).toBe("manual prompt");
   });
 
-  it("uses native strategy without building a prompt", async () => {
+  it("skips the prompt build for a native-review backend", async () => {
     let built = false;
 
     const result = await executeRelay(
@@ -830,21 +830,6 @@ describe("executeRelay live routing", () => {
     expect(result.code).toBe(1);
     expect(ranHeadless).toBe(false);
     expect(errors.join("")).toContain("Live run failed");
-  });
-});
-
-describe("real backend strategy matrix", () => {
-  it("selects strategy through backend objects", () => {
-    expect(BACKENDS.codex.strategy("delegate", {})).toBe("prompt");
-    expect(BACKENDS.codex.strategy("review", {})).toBe("native");
-    expect(BACKENDS.codex.strategy("review", { task: "review auth" })).toBe(
-      "native",
-    );
-    expect(BACKENDS.codex.strategy("image", {})).toBe("native");
-    expect(BACKENDS.opencode.strategy("delegate", {})).toBe("prompt");
-    expect(BACKENDS.opencode.strategy("review", {})).toBe("prompt");
-    expect(BACKENDS.claude.strategy("delegate", {})).toBe("prompt");
-    expect(BACKENDS.claude.strategy("review", {})).toBe("prompt");
   });
 });
 
