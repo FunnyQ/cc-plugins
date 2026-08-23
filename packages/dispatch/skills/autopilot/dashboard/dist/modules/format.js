@@ -33,11 +33,6 @@ export function formatScore(score) {
   return Number(score).toFixed(2);
 }
 
-/** A dimension bar is as wide as its weight against the heaviest dimension. */
-export function weightWidth(weight, breakdown) {
-  return percent(weight, largestWeight(breakdown));
-}
-
 function largestWeight(breakdown) {
   return Math.max(
     ...breakdown.map((dimension) => Number(dimension.weight) || 0),

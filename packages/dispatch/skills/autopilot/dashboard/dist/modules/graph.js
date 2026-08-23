@@ -257,7 +257,8 @@ export function layoutGraph(nodes, opts = {}) {
   const positions = new Map();
   const lanePositions = new Map();
   for (const [depth, layerNodes] of layerGroups) {
-    const x = options.padding + depth * (options.nodeWidth + options.horizontalGap);
+    const x =
+      options.padding + depth * (options.nodeWidth + options.horizontalGap);
     let y = options.padding + (tallest - heightOf(layerNodes)) / 2;
     for (const node of layerNodes) {
       if (node.lane) {
@@ -464,7 +465,8 @@ function assignTurns(segments, options) {
  */
 function edgeVertices({ x1, y1, x2, y2, lanes = [], fan = 0 }) {
   const runs = [[x1, y1]];
-  for (const lane of lanes) runs.push([lane.left, lane.y], [lane.right, lane.y]);
+  for (const lane of lanes)
+    runs.push([lane.left, lane.y], [lane.right, lane.y]);
   runs.push([x2, y2]);
 
   const vertices = [runs[0]];
@@ -546,20 +548,20 @@ function spreadAttachments(segments, options) {
 export function renderGraph(nodes, layout, opts = {}) {
   const options = resolve(opts);
   const graphNodes = Array.isArray(nodes) ? nodes : [];
-  const positions = layout?.positions ?? new Map();
-  const cyclic = new Set(layout?.cyclic ?? []);
+  const positions = layout.positions;
+  const cyclic = new Set(layout.cyclic);
   const nodeByRef = new Map(graphNodes.map((node) => [node.ref, node]));
   const positioned = [...positions.values()];
-  // `layout.extent` already covers the reserved rows; the node sweep is the
-  // fallback for a layout built before extents existed.
+  // `layout.extent` covers the reserved rows; the node sweep covers the nodes
+  // themselves, and the larger of the two wins.
   const width = Math.max(
     options.nodeWidth + options.padding * 2,
-    layout?.extent?.width ?? 0,
+    layout.extent.width,
     ...positioned.map(({ x }) => x + options.nodeWidth + options.padding),
   );
   const graphHeight = Math.max(
     options.nodeHeight + options.padding * 2,
-    layout?.extent?.height ?? 0,
+    layout.extent.height,
     ...positioned.map(({ y }) => y + options.nodeHeight + options.padding),
   );
   const cycleNoteHeight = cyclic.size ? options.nodeHeight / 2 : 0;
@@ -567,8 +569,8 @@ export function renderGraph(nodes, layout, opts = {}) {
 
   // Reuse the layout's own reduction and lane plan: recomputing them here could
   // disagree with the rows it already reserved.
-  const drawable = layout?.drawn ?? drawableEdges(graphNodes, cyclic);
-  const waypoints = layout?.waypoints ?? new Map();
+  const drawable = layout.drawn;
+  const waypoints = layout.waypoints;
   const segments = graphNodes.flatMap((node) => {
     const target = positions.get(node.ref);
     if (!target) return [];
