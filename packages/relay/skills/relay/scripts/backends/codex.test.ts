@@ -6,6 +6,7 @@ import {
   buildImagePrompt,
   extractGeneratedPngPath,
   findNewestPng,
+  selectSourcePng,
   codexBackend,
 } from "./codex";
 import type { InvokeOpts } from "../types";
@@ -310,6 +311,61 @@ describe("codexBackend", () => {
     });
   });
 
+  describe("selectSourcePng", () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = join(os.tmpdir(), `test-select-${Date.now()}`);
+      mkdirSync(join(tempDir, "generated"), { recursive: true });
+    });
+
+    afterEach(() => {
+      try {
+        const fs = require("fs");
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {}
+    });
+
+    it("prefers the PNG generated during this run over an older one named in the output", () => {
+      // An older image that still exists on disk, of the kind a model routinely
+      // refers to ("similar to ~/reference.png").
+      const olderPng = join(tempDir, "reference.png");
+      writeFileSync(olderPng, "old");
+      const longAgo = new Date(Date.now() - 86_400_000);
+      utimesSync(olderPng, longAgo, longAgo);
+
+      // The image this run actually produced.
+      const freshPng = join(tempDir, "generated", "fresh.png");
+      writeFileSync(freshPng, "new");
+
+      const runStartedAt = new Date(Date.now() - 5_000);
+      const parsed = `Generated something similar to ${olderPng}`;
+
+      expect(
+        selectSourcePng(parsed, runStartedAt, join(tempDir, "generated")),
+      ).toBe(freshPng);
+    });
+
+    it("falls back to the output path when this run generated nothing", () => {
+      // Covers a codex that saved outside ~/.codex/generated_images.
+      const elsewhere = join(tempDir, "elsewhere.png");
+      writeFileSync(elsewhere, "png");
+
+      const runStartedAt = new Date(Date.now() - 5_000);
+      const parsed = `Image written to ${elsewhere}`;
+
+      expect(
+        selectSourcePng(parsed, runStartedAt, join(tempDir, "generated")),
+      ).toBe(elsewhere);
+    });
+
+    it("returns null when neither source has anything", () => {
+      expect(
+        selectSourcePng("no path here", new Date(), join(tempDir, "generated")),
+      ).toBeNull();
+    });
+  });
+
   describe("postRun", () => {
     let tempDir: string;
 
@@ -351,12 +407,14 @@ describe("codexBackend", () => {
       mkdirSync(outDir);
       const outPath = join(outDir, "result.png");
 
-      // Mock extractGeneratedPngPath to return our source PNG
-      const opts: InvokeOpts = { out: outPath };
+      // Far-future cutoff so the mtime search finds nothing in the real
+      // ~/.codex/generated_images and the output-path fallback is what runs.
+      const opts: InvokeOpts = {
+        out: outPath,
+        runStartedAt: new Date(Date.now() + 60_000),
+      };
       const parsed = `Image at ${sourcePng}`;
 
-      // We can't easily mock extractGeneratedPngPath, so we'll test with a real path
-      // For this test to work, we need to use the PNG path directly in the output
       const result = codexBackend.postRun!("image", parsed, opts);
 
       // Result should indicate success

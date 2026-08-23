@@ -69,6 +69,25 @@ export function findNewestPng(after: Date, baseDir?: string): string | null {
   return newest?.path ?? null;
 }
 
+/**
+ * Pick the PNG this image run produced.
+ *
+ * The mtime search runs FIRST because it carries actual semantics: it only ever
+ * matches a file written after this run started. The prose scrape is the
+ * fallback, for a codex that saved outside ~/.codex/generated_images — it
+ * matches any path-shaped token that happens to exist on disk, so a model
+ * merely REFERRING to an older image ("similar to ~/reference.png") would
+ * otherwise silently copy the wrong file.
+ * baseDir is injectable for testing.
+ */
+export function selectSourcePng(
+  parsed: string,
+  after: Date,
+  baseDir?: string,
+): string | null {
+  return findNewestPng(after, baseDir) ?? extractGeneratedPngPath(parsed);
+}
+
 export const codexBackend: Backend = {
   name: "codex",
   supports: new Set(["delegate", "review", "image"]),
@@ -123,18 +142,12 @@ export const codexBackend: Backend = {
   postRun(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult {
     if (mode !== "image") return { ok: true, text: parsed };
 
-    // Image mode: locate PNG and copy to opts.out with timestamp suffix
-    // Try to extract PNG path from output first
-    let sourcePng = extractGeneratedPngPath(parsed);
-
-    // Fallback: find the newest PNG created since the run started. relay.ts
-    // captures runStartedAt just before the spawn; using it (instead of a fixed
-    // 1s window measured after the run finished) avoids false "No image found"
-    // for generations that take longer than a second.
-    if (!sourcePng) {
-      const after = opts.runStartedAt ?? new Date(Date.now() - 1000);
-      sourcePng = findNewestPng(after);
-    }
+    // Image mode: locate PNG and copy to opts.out with timestamp suffix.
+    // relay.ts captures runStartedAt just before the spawn; using it (instead of
+    // a fixed 1s window measured after the run finished) avoids false "No image
+    // found" for generations that take longer than a second.
+    const after = opts.runStartedAt ?? new Date(Date.now() - 1000);
+    const sourcePng = selectSourcePng(parsed, after);
 
     if (!sourcePng) {
       return {
