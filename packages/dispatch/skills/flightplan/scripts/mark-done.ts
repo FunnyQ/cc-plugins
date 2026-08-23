@@ -22,13 +22,18 @@
  */
 import { readFile, writeFile } from "node:fs/promises";
 import {
+  GATE_SECTIONS,
   TASK_STATUSES,
   matchStatusLine,
   parseStatusValue,
 } from "./lib/parse-task";
 
-/** Sections whose checkboxes represent the pass/fail gate. Lowercased. */
-const GATE_SECTIONS = new Set(["acceptance criteria", "verification"]);
+// Lowercased from the same list `uncheckedGateItems` reads, so the writer here
+// and the `taskValidity` check downstream can never disagree about which
+// sections are the gate.
+const GATE_HEADINGS = new Set<string>(
+  GATE_SECTIONS.map((s) => s.toLowerCase()),
+);
 
 /**
  * Set Status to `done` and tick the gate-section checkboxes. Pure — returns the
@@ -79,7 +84,7 @@ export function markDone(content: string): string {
   for (let i = headerEnd; i < out.length; i++) {
     const heading = /^##\s+(.+?)\s*$/.exec(out[i]);
     if (heading) {
-      inGateSection = GATE_SECTIONS.has(heading[1].trim().toLowerCase());
+      inGateSection = GATE_HEADINGS.has(heading[1].trim().toLowerCase());
       continue;
     }
     if (inGateSection) {

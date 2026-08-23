@@ -26,9 +26,10 @@
  *
  * Exits 0 if all files pass; 1 if any violation is found.
  */
-import { readFile, access, stat, readdir } from "node:fs/promises";
+import { readFile, stat, readdir } from "node:fs/promises";
 import { basename, dirname, resolve, relative, sep } from "node:path";
 import {
+  GATE_SECTIONS,
   parseTask,
   refToString,
   taskValidity,
@@ -58,10 +59,6 @@ const REQUIRED_READING_REGEX = /^\.\.\/_context\/[a-z0-9_-]+\.md$/;
 const TEST_RUNNER_REGEX =
   /^(bun test|(?:npm|pnpm|yarn) (?:run )?test|cargo test|pytest|go test|rspec|make test)\b/;
 
-/**
- * Backticked commands in a task's `## Verification` section that invoke a known
- * test runner. Returns the command strings as written, in document order.
- */
 /** Checklist items of one section, each including its indented continuation lines. */
 function checklistItems(section: string): string[] {
   const lines = section.split("\n");
@@ -84,6 +81,10 @@ function checklistItems(section: string): string[] {
   return items;
 }
 
+/**
+ * Backticked commands in a task's `## Verification` section that invoke a known
+ * test runner. Returns the command strings as written, in document order.
+ */
 export function testCommandsIn(task: ParsedTask): string[] {
   const section = extractSection(task.body, "Verification");
   if (section === "") return [];
@@ -142,7 +143,7 @@ export type ScopeGitStatusHit = {
  */
 export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
   const hits: ScopeGitStatusHit[] = [];
-  for (const heading of ["Acceptance criteria", "Verification"]) {
+  for (const heading of GATE_SECTIONS) {
     const section = extractSection(task.body, heading);
     if (section === "") continue;
     for (const item of checklistItems(section)) {
@@ -598,10 +599,14 @@ async function main() {
     total += violations.length;
   };
 
+  // Tree-level checks only run when a tasks/ directory was given (whole-tree
+  // mode) — a cherry-picked file list is too partial to judge the final gate.
+  // Cherry-pick mode never reads the tasks back, so it skips the second parse.
+  const treeRoot = treeRoots[0] ?? null;
   const parsed: ParsedTask[] = [];
   for (const file of files) {
     reportAll(await lintFile(file));
-    // Collect parsed tasks for the tree-level pass below.
+    if (!treeRoot) continue;
     try {
       const p = parseTask(await readFile(file, "utf-8"));
       if (p.ok) parsed.push(p.task);
@@ -610,11 +615,9 @@ async function main() {
     }
   }
 
-  // Tree-level checks only run when a tasks/ directory was given (whole-tree
-  // mode) — a cherry-picked file list is too partial to judge the final gate.
-  if (treeRoots.length > 0) {
-    reportAll(checkFinalReview(parsed, treeRoots[0]));
-    reportAll(checkFinalReviewTestNet(parsed, treeRoots[0]));
+  if (treeRoot) {
+    reportAll(checkFinalReview(parsed, treeRoot));
+    reportAll(checkFinalReviewTestNet(parsed, treeRoot));
     const rows = testNetReport(parsed);
     // Keep this on stdout and before exit: it cannot affect total or disappear on failure.
     if (rows.length > 0) console.log(formatTestNetReport(rows));
