@@ -23,6 +23,7 @@ import {
 import {
   CONFIG_PATH,
   createTmpRunDir,
+  isObject,
   parseCsv,
   resolveModel,
   run,
@@ -105,6 +106,16 @@ function requireValue(argv: string[], index: number, flag: string): string {
   return value;
 }
 
+function requireTimeout(argv: string[], index: number, flag: string): number {
+  const value = Number(requireValue(argv, index, flag));
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new UsageError(
+      "--wait-timeout must be a positive number of milliseconds",
+    );
+  }
+  return value;
+}
+
 export function parseFlags(argv: string[]): ParsedFlags {
   const [backend, mode, ...rest] = argv;
   const flags: RelayFlags = {
@@ -143,13 +154,7 @@ export function parseFlags(argv: string[]): ParsedFlags {
       flags.promptFile = requireValue(rest, i, arg);
       i++;
     } else if (arg === "--wait-timeout") {
-      const value = Number(requireValue(rest, i, arg));
-      if (!Number.isFinite(value) || value <= 0) {
-        throw new UsageError(
-          "--wait-timeout must be a positive number of milliseconds",
-        );
-      }
-      flags.waitTimeoutMs = value;
+      flags.waitTimeoutMs = requireTimeout(rest, i, arg);
       i++;
     } else if (arg === "--no-project") {
       flags.noProject = true;
@@ -171,10 +176,6 @@ export function parseFlags(argv: string[]): ParsedFlags {
 
 function isMode(mode: string | undefined): mode is Mode {
   return mode !== undefined && MODES.has(mode as Mode);
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function readJsonObject(
@@ -257,10 +258,6 @@ async function executeConfigCommand(
   return { code: 0 };
 }
 
-function promptTextForMode(flags: RelayFlags, positional: string): string {
-  return flags.task ?? positional;
-}
-
 const COLLECT_USAGE =
   "Usage: relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]\n";
 
@@ -296,13 +293,7 @@ async function executeCollectCommand(
         resultPath = requireValue(rest, i, arg);
         i++;
       } else if (arg === "--wait-timeout") {
-        const value = Number(requireValue(rest, i, arg));
-        if (!Number.isFinite(value) || value <= 0) {
-          throw new UsageError(
-            "--wait-timeout must be a positive number of milliseconds",
-          );
-        }
-        waitTimeoutMs = value;
+        waitTimeoutMs = requireTimeout(rest, i, arg);
         i++;
       } else if (arg === "--keep-pane") {
         keepPane = true;
@@ -443,7 +434,7 @@ export async function executeRelay(
     return { code: 1 };
   }
 
-  const task = promptTextForMode(parsed.flags, parsed.positional);
+  const task = parsed.flags.task ?? parsed.positional;
 
   if (parsed.mode === "image" && !task.trim()) {
     deps.stderr(
@@ -461,18 +452,41 @@ export async function executeRelay(
     task: effectiveTask,
     promptText:
       parsed.mode === "review" ? buildReviewPrompt(effectiveTask) : undefined,
-    out: parsed.flags.out ?? "relay-image.png",
+    out: parsed.flags.out,
     model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
     lastFile: join(dir, "raw.txt"),
     dangerous: parsed.flags.dangerous,
+  };
+
+  // The delegate prompt is built at most once per run. A live pre-spawn failure
+  // falls through to the headless path below, and rebuilding there would re-run
+  // the whole context collection (every git subprocess, every --files read) for
+  // a provably identical result — no pane ran, so the tree did not change.
+  let delegatePromptText: string | undefined;
+  const delegatePromptOnce = () => {
+    if (delegatePromptText === undefined) {
+      const path =
+        parsed.flags.promptFile ??
+        deps.buildPromptFile({
+          kind: "delegate",
+          files: parsed.flags.files,
+          task,
+          gitScope: parsed.flags.gitScope,
+          noProject: parsed.flags.noProject,
+        });
+      delegatePromptText = deps.readFile(path);
+    }
+    return delegatePromptText;
   };
 
   // Live-pane routing: inside herdr (HERDR_ENV=1), delegate/review runs in a
   // visible sibling pane instead of a blocking headless spawn. Everything here
   // is optional — any denial (or a pre-spawn runner error) falls through to
   // the unchanged headless flow below.
-  const insideHerdr = deps.env.HERDR_ENV === "1";
-  const herdScriptPath = insideHerdr ? deps.resolveHerdScript() : null;
+  // Gated on HERDR_ENV so a non-herdr run never pays for the locator's
+  // plugin-cache directory scan; liveGate re-checks it to stay pure.
+  const herdScriptPath =
+    deps.env.HERDR_ENV === "1" ? deps.resolveHerdScript() : null;
   const gate = liveGate({
     env: deps.env,
     headless: parsed.flags.headless,
@@ -499,19 +513,7 @@ export async function executeRelay(
 
   if (gate.live && liveSpec) {
     const promptText =
-      parsed.mode === "review"
-        ? opts.promptText!
-        : parsed.flags.promptFile
-          ? deps.readFile(parsed.flags.promptFile)
-          : deps.readFile(
-              deps.buildPromptFile({
-                kind: "delegate",
-                files: parsed.flags.files,
-                task,
-                gitScope: parsed.flags.gitScope,
-                noProject: parsed.flags.noProject,
-              }),
-            );
+      parsed.mode === "review" ? opts.promptText! : delegatePromptOnce();
     const resultPath = join(dir, "result.md");
     const livePrompt = appendFileContract(promptText, resultPath);
     // The full prompt rides a file — a multi-line herd.send submits prematurely
@@ -529,7 +531,7 @@ export async function executeRelay(
       resultPath,
       cwd: process.cwd(),
       waitTimeoutMs: parsed.flags.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
-      keepPane: parsed.flags.keepPane ?? false,
+      keepPane: parsed.flags.keepPane,
       env: ["RELAY_DELEGATED=1"],
       callerEnv: deps.env,
     });
@@ -546,15 +548,13 @@ export async function executeRelay(
       // stdout carries ONLY the answer; live metadata rides stderr so piping
       // the result stays clean.
       deps.stdout(liveResult.text);
-      if (parsed.flags.keepPane) {
-        deps.stderr(
-          `\n[relay live] agent ${liveResult.agentName} — pane left open (\`herd close ${liveResult.agentName}\` to close)\n`,
-        );
-      } else {
-        deps.stderr(
-          `\n[relay live] agent ${liveResult.agentName} — pane closed after verified result\n`,
-        );
-      }
+      deps.stderr(
+        `\n[relay live] agent ${liveResult.agentName} — ${
+          parsed.flags.keepPane
+            ? `pane left open (\`herd close ${liveResult.agentName}\` to close)`
+            : "pane closed after verified result"
+        }\n`,
+      );
       return { code: 0, dir, lastMd, agentName: liveResult.agentName };
     }
 
@@ -578,25 +578,10 @@ export async function executeRelay(
     );
   }
 
-  const strategy = backend.strategy(parsed.mode, opts);
-  if (strategy === "prompt") {
-    if (parsed.mode === "image") {
-      deps.stderr("image mode does not support prompt strategy\n");
-      return { code: 1, dir, lastFile: opts.lastFile };
-    }
-
-    if (parsed.mode !== "review") {
-      opts.promptFile =
-        parsed.flags.promptFile ??
-        deps.buildPromptFile({
-          kind: "delegate",
-          files: parsed.flags.files,
-          task,
-          gitScope: parsed.flags.gitScope,
-          noProject: parsed.flags.noProject,
-        });
-      opts.promptText = deps.readFile(opts.promptFile);
-    }
+  // Only delegate needs a context-collected prompt: review builds its own from
+  // buildReviewPrompt above, and image feeds the raw task straight to the CLI.
+  if (parsed.mode === "delegate") {
+    opts.promptText = delegatePromptOnce();
   }
 
   const invocation = backend.invoke(parsed.mode, opts);
