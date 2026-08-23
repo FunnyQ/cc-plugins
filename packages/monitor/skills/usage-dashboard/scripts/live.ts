@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 import {
@@ -9,38 +9,16 @@ import {
   buildOpenCodeLiveSessions,
   parseCockpitKeys,
   sortLiveSessions,
+  STALE_CUTOFF_MS,
   type LiveSession,
 } from "./live-sessions";
 import { readSessionFiles } from "./session-files";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
 import { isAlive } from "../../cockpit/scripts/cockpit-channel";
-import { isPathInside } from "../../shared/scripts/path-inside";
-import {
-  CODEX_DIR,
-  CODEX_SESSIONS_DIR,
-  CODEX_STATE_DB,
-  OPENCODE_DB,
-  PROJECTS_DIR,
-} from "./paths";
+import { CODEX_STATE_DB, OPENCODE_DB, PROJECTS_DIR } from "./paths";
 
 export type { LiveSession } from "./live-sessions";
 
-// Resolve the projects root once: relative() needs the canonical base to
-// compare against the realpath'd transcript paths, and the dir is stable.
-const PROJECTS_REAL = (() => {
-  try {
-    return realpathSync(PROJECTS_DIR);
-  } catch {
-    return PROJECTS_DIR;
-  }
-})();
-const CODEX_SESSIONS_REAL = (() => {
-  try {
-    return realpathSync(CODEX_SESSIONS_DIR);
-  } catch {
-    return CODEX_SESSIONS_DIR;
-  }
-})();
 const TRANSCRIPT_INDEX_TTL_MS = 5_000;
 const COCKPIT_FILE_TTL_MS = 5_000;
 
@@ -63,17 +41,10 @@ type OpenCodeSessionRow = {
   time_updated: number;
 };
 
-export function resolveClaudeTranscriptPath(id: string): string | undefined {
-  if (!existsSync(PROJECTS_DIR)) return undefined;
-  const glob = new Glob(`**/${id}.jsonl`);
-  for (const rel of glob.scanSync({ cwd: PROJECTS_DIR, onlyFiles: true })) {
-    return join(PROJECTS_DIR, rel);
-  }
-  return undefined;
-}
-
-export const resolveTranscriptPath = resolveClaudeTranscriptPath;
-
+// The time floor is not an optimisation of the result — buildCodexLiveSessions
+// drops everything older than STALE_CUTOFF_MS anyway. It is an optimisation of
+// the sort: without it SQLite orders the entire threads table on every poll, and
+// this runs every 3s.
 function readCodexThreadRows(limit = 24): CodexThreadRow[] {
   if (!existsSync(CODEX_STATE_DB)) return [];
   try {
@@ -84,47 +55,17 @@ function readCodexThreadRows(limit = 24): CodexThreadRow[] {
           `select id, rollout_path, created_at, updated_at, created_at_ms, updated_at_ms, cwd, title, model
            from threads
            where archived = 0 and rollout_path != ''
+             and coalesce(updated_at_ms, updated_at * 1000, created_at_ms, created_at * 1000) >= ?
            order by coalesce(updated_at_ms, updated_at * 1000, created_at_ms, created_at * 1000) desc
            limit ?`,
         )
-        .all(limit) as CodexThreadRow[];
+        .all(Date.now() - STALE_CUTOFF_MS, limit) as CodexThreadRow[];
     } finally {
       db.close();
     }
   } catch {
     return [];
   }
-}
-
-function readCodexThreadRow(id: string): CodexThreadRow | null {
-  if (!existsSync(CODEX_STATE_DB)) return null;
-  try {
-    const db = new Database(CODEX_STATE_DB, { readonly: true });
-    try {
-      return (
-        (db
-          .query(
-            `select id, rollout_path, created_at, updated_at, created_at_ms, updated_at_ms, cwd, title, model
-             from threads
-             where id = ? and archived = 0 and rollout_path != ''
-             limit 1`,
-          )
-          .get(id) as CodexThreadRow | null) ?? null
-      );
-    } finally {
-      db.close();
-    }
-  } catch {
-    return null;
-  }
-}
-
-function resolveCodexRolloutPath(id: string): string | undefined {
-  const row = readCodexThreadRow(id);
-  if (!row?.rollout_path) return undefined;
-  return isAbsolute(row.rollout_path)
-    ? row.rollout_path
-    : resolve(CODEX_DIR, row.rollout_path);
 }
 
 function readOpenCodeSessionRows(limit = 24): OpenCodeSessionRow[] {
@@ -173,14 +114,6 @@ function getTranscriptIndex(): Map<string, string> {
   transcriptIndex = index;
   transcriptIndexAt = now;
   return index;
-}
-
-export function isInsideProjects(filePath: string): boolean {
-  return isPathInside(PROJECTS_REAL, filePath);
-}
-
-export function isInsideCodexSessions(filePath: string): boolean {
-  return isPathInside(CODEX_SESSIONS_REAL, filePath);
 }
 
 // Companion read of cockpit's registry (same machine, same author) so we can
