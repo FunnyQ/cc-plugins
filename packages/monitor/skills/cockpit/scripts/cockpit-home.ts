@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -31,4 +31,20 @@ export function cockpitHome(): string {
   const home = defaultCockpitHome();
   migrateLegacyHome(home);
   return home;
+}
+
+/** The daemon's PID/port/token record. Written at bind, read by every client. */
+export function daemonInfoPath(): string {
+  return join(cockpitHome(), "daemon.json");
+}
+
+// Read fresh on every call so a daemon restart (new token) is picked up without
+// restarting the readers. Missing/corrupt file means "no daemon" — callers 401.
+export function daemonToken(): string | null {
+  try {
+    const raw = JSON.parse(readFileSync(daemonInfoPath(), "utf8"));
+    return typeof raw?.token === "string" ? raw.token : null;
+  } catch {
+    return null;
+  }
 }
