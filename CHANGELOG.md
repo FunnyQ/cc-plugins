@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.14.2] - 2026-08-24
+
+_tracks tag `chronicle-v0.14.2`_
+
+### Fixed
+- Codex setup no longer leaves obsolete Chronicle release-role files installed, eliminating malformed-role warnings while preserving unrelated custom roles.
+
 ## [dispatch 3.20.2] - 2026-08-24
 
 _tracks tag `dispatch-v3.20.2`_
