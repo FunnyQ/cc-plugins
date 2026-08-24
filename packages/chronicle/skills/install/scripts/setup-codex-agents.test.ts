@@ -120,4 +120,22 @@ describe("setup-codex-agents", () => {
     expect(config.match(/# BEGIN chronicle codex agents/g)).toHaveLength(1);
     expect(config.match(/\[agents\.chronicle_lawspeaker\]/g)).toHaveLength(1);
   });
+
+  it("removes retired role files and preserves unrelated files", () => {
+    const targetDir = join(codexHome, "agents", "chronicle");
+    Bun.spawnSync(["mkdir", "-p", targetDir]);
+    for (const role of ["hammerbearer", "oathkeeper", "seer", "smith"]) {
+      writeFileSync(join(targetDir, `${role}.toml`), `legacy = "${role}"\n`);
+    }
+    writeFileSync(join(targetDir, "personal.toml"), 'name = "personal"\n');
+
+    expect(run("--apply").exitCode).toBe(0);
+
+    for (const role of ["hammerbearer", "oathkeeper", "seer", "smith"]) {
+      expect(existsSync(join(targetDir, `${role}.toml`))).toBe(false);
+    }
+    expect(readFileSync(join(targetDir, "personal.toml"), "utf8")).toBe(
+      'name = "personal"\n',
+    );
+  });
 });

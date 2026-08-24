@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -24,6 +25,7 @@ const ROLES = [
   "codifier",
   "barrowkeeper",
 ] as const;
+const RETIRED_ROLES = ["hammerbearer", "oathkeeper", "seer", "smith"] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
 
@@ -110,6 +112,10 @@ function main() {
       join(sourceDir, `${role}.toml`),
       join(targetDir, `${role}.toml`),
     );
+  }
+  for (const role of RETIRED_ROLES) {
+    const retiredPath = join(targetDir, `${role}.toml`);
+    if (existsSync(retiredPath)) unlinkSync(retiredPath);
   }
   mkdirSync(dirname(configPath), { recursive: true });
   if (current !== next && existsSync(configPath)) {
