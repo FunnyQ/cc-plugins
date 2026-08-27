@@ -55,13 +55,13 @@ Ask these **before the interview**, in one `AskUserQuestion` call. A question as
 
 **Review depth** — how many review→fix cycles Step 7 runs.
 
-| Tier | Fits | Floor | Checkpoint |
-|---|---|---|---|
-| **Light** | ≤ 5 tasks, one bucket | 2 | 3 |
-| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 |
-| **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 |
+| Tier | Fits | Floor | Checkpoint | Cap |
+|---|---|---|---|---|
+| **Light** | ≤ 5 tasks, one bucket | 2 | 3 | 4 |
+| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 | 8 |
+| **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 | 12 |
 
-**Neither number caps the loop.** The floor is the minimum before a clean pass may end it. The checkpoint is where the loop *changes tactics* if blocking findings are still arriving — not where it quits. Step 7 owns that rule; a blocking defect is never shipped because a counter expired. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
+**The floor is a minimum, the cap a maximum.** The floor is the fewest passes before a clean pass may end the loop. The checkpoint is where the loop *changes tactics* if blocking findings are still arriving — not where it quits. The cap is where it quits regardless. A blocking defect open at the cap is never shipped silently: the loop stops, every open P1 goes into Known gaps, and the Step 8 recap leads with the non-convergence. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
 
 Carry both answers to Step 7 and do not re-ask them there. The tier is a guess about a tree that doesn't exist yet — Step 5 restates it beside the finished task index, which is the user's one chance to correct it. After that, honor the pick and note any tier mismatch in the Step 8 recap.
 
@@ -187,6 +187,8 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
   2. Spawn an `Agent` (model `opus`) whose prompt is that bundle plus: *"You are an independent reviewer of this flightplan. Apply the review described at the top. Return findings — each with the file, the section/field, and the concrete fix. Edit nothing."* **Omit `subagent_type`** — the reviewer must start context-less. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out).
   3. Take the findings back to the loop. A fresh subagent each pass keeps reviewer ≠ author — the same anti-bias split autopilot uses.
 
+**From pass 2 on, hand the reviewer what the last pass found.** Save each pass's raw findings to `/tmp/flightplan-review-<slug>/pass-N.md` (outside the tree — these are scratch, not artifacts), then add `--prior-findings /tmp/flightplan-review-<slug>/pass-<N-1>.md` to the next pass's command. It works on all three engines, `--print` included. Every reviewer starts context-less by design, so without this each pass re-files findings you already fixed or already dispositioned — and since the loop exits only on a P1-clean pass, that is what makes a Light review run past 15 rounds. The bundle also carries `tasks/README.md`, so a gap banked there is visible to the reviewer as a decision.
+
 **Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings; the loop is where most of the quality comes from, because the first pass catches the loud problems and the *revised* plan then exposes what they were masking. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap in `tasks/README.md` with the reason, and don't re-fix it when a later pass raises it again.
 
 **Sort every finding into two buckets before deciding anything:**
@@ -194,13 +196,14 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
 - **P1 — blocks execution.** A missing or contradicted decision, two files that disagree, an acceptance criterion nobody can verify, a dependency edge the executor cannot satisfy, a task that can't be done from `_context/` plus its own file. An executor hits a P1 and stalls or guesses.
 - **P2 — quality.** Wording, ordering, a criterion that could be sharper, a task that could split more cleanly. An executor ships anyway.
 
-**The loop is gated on P1, not on a round number.** A pass at round 12 that finds a real P1 has just paid for itself; the round count is evidence the plan was harder than the tier guessed, not a reason to stop.
+**Between the floor and the cap the loop is gated on P1, not on a round number.** A pass at round 6 that finds a real P1 has just paid for itself; the round count is evidence the plan was harder than the tier guessed, not a reason to stop early.
 
 - **Never fewer than floor passes.** The second cycle, on the improved plan, is the high-value one — the first catches the loud problems, and only the revision exposes what they were masking.
-- **Never stop with an open P1.** No counter overrides this.
 - **Stop at the first P1-clean pass at or past the floor.** P2-only findings — or already-recorded intent — mean the plan is done. Apply the cheap ones, bank the rest as Known gaps, and move on. This is the normal exit.
-- **At the checkpoint, if P1s are still arriving, stop patching files and re-cut.** Repeated P1s that far in are symptoms, not defects: the decomposition, a bucket boundary, or a PLAN-level decision is wrong. Fix it at PLAN.md / `_context/` / bucket level, re-run `lint-task.ts` and `build-readme.ts`, then resume the loop. Fixing symptoms one file at a time is what makes a review run to round 12 without converging.
-- **Declare non-convergence only when the loop stops making ground**: two consecutive passes past the checkpoint whose P1s repeat fixes already attempted, with nothing new. Then stop, list every open P1 in `tasks/README.md`'s Known gaps, and **lead the Step 8 recap with it** — "review did not converge: N P1s open after M passes". A tree handed over with known-open P1s is a real result the user must see, not a silent truncation.
+- **At the checkpoint, if P1s are still arriving, stop patching files and re-cut.** Repeated P1s that far in are symptoms, not defects: the decomposition, a bucket boundary, or a PLAN-level decision is wrong. Fix it at PLAN.md / `_context/` / bucket level, re-run `lint-task.ts` and `build-readme.ts`, then resume the loop. Fixing symptoms one file at a time is what makes a review run long without converging.
+- **Count the open P1s after every pass.** That count is the only convergence signal. Do not compare findings by wording: the files change every pass, so a re-raised defect is never phrased the same way twice and a wording test never fires.
+- **Declare non-convergence at whichever comes first:** the cap is reached with P1s still open, or two consecutive passes past the checkpoint fail to lower the open-P1 count. Then stop.
+- **A non-converged tree is handed over, not hidden.** List every open P1 in `tasks/README.md`'s Known gaps and **lead the Step 8 recap with it** — "review did not converge: N P1s open after M passes". The user must see the open defects and decide; that decision is theirs, and it is cheaper for them at round 4 than at round 19.
 
 ### Step 8 — Stop. Do not execute.
 
@@ -255,7 +258,7 @@ Reach for these instead of doing the mechanical work by hand. Each exports a tes
 - `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
 - `scripts/lint-task.ts` — validates task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
-- `scripts/review-plan.ts` — Step 7's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--print` emits the instructions + bundle for the Opus reviewer subagent. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.
+- `scripts/review-plan.ts` — Step 7's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--prior-findings <file>` folds the previous pass's findings into the bundle so a context-less reviewer stops re-filing them, `--print` emits the instructions + bundle for the Opus reviewer subagent. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.
 - `scripts/next-ready.ts` — lists tasks whose dependencies are all `done` (executor-session helper)
 - `scripts/score-task.ts` — executor side: feed it `{ dimension: score }` JSON for a deterministic weighted average + hard-fail verdict against the task's own rubric (`scoreTask(rubric, scores)`). `--log <file>` appends to an audit trail.
 - `scripts/mark-done.ts` — the done-transition: sets `> **Status**: done` and ticks every `## Acceptance criteria` / `## Verification` box (`markDone(content)`). Used by `autopilot`.

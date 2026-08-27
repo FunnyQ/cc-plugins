@@ -19,6 +19,7 @@
  *
  * Usage:
  *   bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>]
+ *   bun review-plan.ts docs/<slug> --prior-findings <file>   # round 2+
  *   bun review-plan.ts docs/<slug> --print     # emit the instructions+bundle, no CLI
  *
  * Exits with the reviewer's exit code so callers can gate on failure; a missing
@@ -26,8 +27,9 @@
  *
  * Export surface (for tests):
  *   collectPlanFiles(planDir) — returns ordered list of plan file paths
- *   buildReviewPrompt(files)  — returns the bundle: instructions + file contents
- *   parseArgs(argv)           — pure parse of planDir/engine/model/print
+ *   buildReviewPrompt(files, prior?) — the bundle: instructions + prior findings
+ *                                      + file contents
+ *   parseArgs(argv)           — pure parse of planDir/engine/model/print/prior
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -42,6 +44,7 @@ export type ReviewArgs = {
   engine: ReviewEngine;
   model?: string;
   print: boolean;
+  priorFindings?: string;
 };
 
 /**
@@ -64,6 +67,10 @@ export function parseArgs(argv: string[]): ReviewArgs {
       const v = argv[++i];
       if (!v) throw new Error("Missing value after --model");
       out.model = v;
+    } else if (a === "--prior-findings") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value after --prior-findings");
+      out.priorFindings = v;
     } else if (a === "--print") {
       out.print = true;
     } else if (!a.startsWith("--") && out.planDir === undefined) {
@@ -93,6 +100,11 @@ Focus on:
 6. Eval rubric quality — are rubric dimensions specific to the task, or generic filler? Does the pass threshold make sense for what's being built?
 7. Final review completeness — does the final-review task's "Depends on:" field reach every other task in the tree?
 
+Two things in the bundle are NOT under review:
+
+- The task index in \`tasks/README.md\` sits between generated markers and is rewritten by a script from the task headers. Report nothing inside it.
+- A "## Known gaps" entry — in \`tasks/README.md\` or in PLAN.md — is the author's dispositioned decision: a defect they already saw and chose to accept. Never report one as P1. Raise it as P2 only when you can name a consequence the author's own note does not cover.
+
 Treat every vague acceptance criterion and every cross-file inconsistency as a real defect, not a minor note.
 
 Label every finding P1 or P2 as the first token of its line, because the caller
@@ -104,6 +116,22 @@ loops until no P1 remains:
 Do not inflate P2 into P1 to seem thorough, and do not soften a P1 to seem agreeable. If the plan is clean, say so and return no findings.
 
 ---
+`.trim();
+
+// Every finding the author dispositioned instead of fixing is banked in
+// tasks/README.md's "Known gaps". A reviewer that cannot see it re-files the
+// same finding as P1 every pass, and the loop — which exits only on a P1-clean
+// pass — never converges. So the file ships in the bundle, right after PLAN.md,
+// where the reviewer reads the intent before the tree. Bucket-level READMEs
+// stay excluded: they are not task content.
+const PRIOR_FINDINGS_RULE = `
+# Findings already reported
+
+An earlier pass over a previous revision of this plan reported the findings
+below, and the author has since acted on them. Report one of them again ONLY
+when the current files still show that defect — and then say what the fix
+missed. Anything the author banked as a Known gap is a decision, not an
+unfixed defect. Rank findings NEW to this pass above repeats.
 `.trim();
 
 export async function collectPlanFiles(planDir: string): Promise<string[]> {
@@ -118,6 +146,14 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
   }
 
   const tasksDir = join(planDir, "tasks");
+
+  // tasks/README.md — carries the Known gaps the reviewer must not re-raise
+  try {
+    await stat(join(tasksDir, "README.md"));
+    files.push(join(tasksDir, "README.md"));
+  } catch {
+    // skip if missing
+  }
 
   // _context files
   try {
@@ -149,8 +185,15 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
   return files;
 }
 
-export async function buildReviewPrompt(files: string[]): Promise<string> {
-  const sections: string[] = [REVIEW_INSTRUCTIONS, "\n\n# Plan Files\n"];
+export async function buildReviewPrompt(
+  files: string[],
+  priorFindings?: string,
+): Promise<string> {
+  const sections: string[] = [REVIEW_INSTRUCTIONS];
+  if (priorFindings && priorFindings.trim().length > 0) {
+    sections.push(`\n\n${PRIOR_FINDINGS_RULE}\n\n${priorFindings.trim()}\n`);
+  }
+  sections.push("\n\n# Plan Files\n");
   for (const f of files) {
     const content = await readFile(f, "utf-8");
     const label = relative(process.cwd(), f);
@@ -265,14 +308,14 @@ async function main() {
   } catch (err) {
     console.error((err as Error).message);
     console.error(
-      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--print]",
+      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--print]",
     );
     process.exit(2);
   }
 
   if (!args.planDir) {
     console.error(
-      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--print]",
+      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--print]",
     );
     process.exit(2);
   }
@@ -285,7 +328,22 @@ async function main() {
     process.exit(1);
   }
 
-  const prompt = await buildReviewPrompt(files);
+  // A prior-findings path that cannot be read is a hard error, never a silent
+  // fall-back to a first-round bundle: the reviewer would re-file every already
+  // dispositioned finding as P1 and the caller would loop on it again.
+  let prior: string | undefined;
+  if (args.priorFindings) {
+    try {
+      prior = await readFile(args.priorFindings, "utf-8");
+    } catch (err) {
+      console.error(
+        `Cannot read --prior-findings ${args.priorFindings}: ${(err as Error).message}`,
+      );
+      process.exit(2);
+    }
+  }
+
+  const prompt = await buildReviewPrompt(files, prior);
 
   // --print: emit the exact instructions+bundle and stop. The Opus reviewer
   // subagent consumes this, so it must be clean (no file-list header on stdout).

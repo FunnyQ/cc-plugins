@@ -61,6 +61,35 @@ describe("collectPlanFiles", () => {
     await rm(root, { recursive: true });
   });
 
+  test("tasks/README.md is collected right after PLAN.md", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "tasks/ui"), { recursive: true });
+    await writeFile(join(root, "PLAN.md"), "# Plan\n");
+    await writeFile(join(root, "tasks/README.md"), "## Known gaps\n- none\n");
+    await writeFile(join(root, "tasks/ui/01-build.md"), "# Build\n");
+
+    const result = await collectPlanFiles(root);
+    expect(result).toEqual([
+      join(root, "PLAN.md"),
+      join(root, "tasks/README.md"),
+      join(root, "tasks/ui/01-build.md"),
+    ]);
+
+    await rm(root, { recursive: true });
+  });
+
+  test("a missing tasks/README.md is skipped, bucket READMEs stay excluded", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "tasks/ui"), { recursive: true });
+    await writeFile(join(root, "tasks/ui/README.md"), "# bucket readme\n");
+    await writeFile(join(root, "tasks/ui/01-build.md"), "# Build\n");
+
+    const result = await collectPlanFiles(root);
+    expect(result).toEqual([join(root, "tasks/ui/01-build.md")]);
+
+    await rm(root, { recursive: true });
+  });
+
   test("missing dirs are gracefully skipped", async () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n");
@@ -119,6 +148,52 @@ describe("buildReviewPrompt", () => {
     expect(result).toContain(
       `## ${relative(process.cwd(), file)}\n\`\`\`markdown\n# Plan\n\nAcceptance criteria\n\n\`\`\``,
     );
+
+    await rm(root, { recursive: true });
+  });
+
+  test("no prior-findings section when none is passed", async () => {
+    const root = await newRoot();
+    const file = join(root, "PLAN.md");
+    await writeFile(file, "# Plan\n");
+
+    const result = await buildReviewPrompt([file]);
+    expect(result).not.toContain("Findings already reported");
+
+    await rm(root, { recursive: true });
+  });
+
+  test("prior findings land between the instructions and the plan files", async () => {
+    const root = await newRoot();
+    const file = join(root, "PLAN.md");
+    await writeFile(file, "# Plan\n");
+
+    const result = await buildReviewPrompt(
+      [file],
+      "P1 ui/01: acceptance criterion is unverifiable",
+    );
+    expect(result.startsWith("You are reviewing a flightplan artifact")).toBe(
+      true,
+    );
+    const priorIndex = result.indexOf("Findings already reported");
+    const verbatimIndex = result.indexOf(
+      "P1 ui/01: acceptance criterion is unverifiable",
+    );
+    const filesIndex = result.indexOf("# Plan Files");
+    expect(priorIndex).toBeGreaterThan(-1);
+    expect(verbatimIndex).toBeGreaterThan(priorIndex);
+    expect(filesIndex).toBeGreaterThan(verbatimIndex);
+
+    await rm(root, { recursive: true });
+  });
+
+  test("blank prior findings are treated as absent", async () => {
+    const root = await newRoot();
+    const file = join(root, "PLAN.md");
+    await writeFile(file, "# Plan\n");
+
+    const result = await buildReviewPrompt([file], "   \n  ");
+    expect(result).not.toContain("Findings already reported");
 
     await rm(root, { recursive: true });
   });
@@ -202,6 +277,19 @@ describe("parseArgs", () => {
   test("flag order is irrelevant; planDir can come after flags", () => {
     expect(parseArgs(["--engine", "opencode", "docs/p"]).planDir).toBe(
       "docs/p",
+    );
+  });
+
+  test("--prior-findings captures the path", () => {
+    expect(
+      parseArgs(["docs/p", "--prior-findings", "/tmp/round-2.md"])
+        .priorFindings,
+    ).toBe("/tmp/round-2.md");
+  });
+
+  test("rejects --prior-findings with no value", () => {
+    expect(() => parseArgs(["docs/p", "--prior-findings"])).toThrow(
+      /Missing value after --prior-findings/,
     );
   });
 
