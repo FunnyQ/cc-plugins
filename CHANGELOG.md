@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 3.21.1] - 2026-08-27
+
+_tracks tag `dispatch-v3.21.1`_
+
+### Changed
+- Autopilot's external dev-driver instructions can no longer paste ready-to-run code for a task, wave away a failed acceptance check by adding staging steps around it, or assert a prior attempt was already correct without re-checking it. Retry feedback may now only add requirements — it can no longer drop a verification command or excuse a rejected attempt.
+
 ## [chronicle 0.14.3] - 2026-08-27
 
 _tracks tag `chronicle-v0.14.3`_
