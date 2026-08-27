@@ -337,13 +337,23 @@ function progressOf(row: IndexedRow): number | undefined {
 }
 
 /**
+ * Roles the orchestrator awaits one at a time and never places inside
+ * `parallel()`: the wave scout, and the per-wave and post-loop commit agents.
+ * They share one ref and carry no attempt, so `progressOf` cannot rank them —
+ * but because they never overlap, a later `start` of the same role is itself
+ * proof that every earlier open row of that role is over.
+ */
+const SEQUENTIAL_ROLES: ReadonlySet<AgentRole> = new Set(["commit", "scout"]);
+
+/**
  * Close rows the run has moved past. A row still open at the end of the log is
  * only genuinely running if nothing for its ref got further — the newest agent
  * of a live run must keep ticking.
  *
- * Roles outside `ROLE_PROGRESS` (commit, scout) are left alone: successive
- * commit agents share one ref and one undefined attempt, so there is no
- * ordering here to reap them by. A hung commit agent still reads in-flight.
+ * Two passes, because the roles order themselves two different ways: everything
+ * in `ROLE_PROGRESS` reaps on (attempt, role) within one ref, and everything in
+ * `SEQUENTIAL_ROLES` reaps on start order within one role. A role in neither is
+ * left alone.
  */
 function reapAbandoned(rows: IndexedRow[], open: IndexedRow[]): void {
   if (open.length === 0) return;
@@ -366,6 +376,23 @@ function reapAbandoned(rows: IndexedRow[], open: IndexedRow[]): void {
     const progress = progressOf(row);
     if (progress === undefined) continue;
     if (progress < (furthest.get(row.ref) ?? progress))
+      row.status = "abandoned";
+  }
+
+  // Scanned over every row for the same reason as above: the commit agent that
+  // proves an earlier one is over has almost always closed itself already.
+  const newestStart = new Map<AgentRole, number>();
+  for (const row of rows) {
+    if (!SEQUENTIAL_ROLES.has(row.role)) continue;
+    newestStart.set(
+      row.role,
+      Math.max(newestStart.get(row.role) ?? row.order, row.order),
+    );
+  }
+
+  for (const row of open) {
+    if (!SEQUENTIAL_ROLES.has(row.role)) continue;
+    if (row.order < (newestStart.get(row.role) ?? row.order))
       row.status = "abandoned";
   }
 }

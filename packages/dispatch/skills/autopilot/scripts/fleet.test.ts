@@ -449,6 +449,140 @@ describe("aggregateFleet", () => {
     });
   });
 
+  test("abandons a commit agent once the next commit agent starts", () => {
+    // Live case, member-email-export run.jsonl: commit-wave-2 logged start at
+    // 08:15:22 and threw. `settled()` swallowed it and the run continued by
+    // design, so no end was ever logged and the row read in-flight for 118
+    // minutes, pinned to the top of the fleet panel. Commit agents share one
+    // ref and carry no attempt, so only start order can reap them.
+    const rows = aggregateFleet([
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "commit-wave-2",
+      ),
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:18:00Z",
+        "start",
+        "commit-wave-3",
+      ),
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:19:00Z",
+        "end",
+        "commit-wave-3",
+      ),
+    ]);
+    expect(rows.find((row) => row.key === "commit-wave-2")).toMatchObject({
+      status: "abandoned",
+    });
+    // Nothing invented for the row that never closed.
+    expect(
+      rows.find((row) => row.key === "commit-wave-2")?.elapsedMs,
+    ).toBeUndefined();
+    expect(rows.find((row) => row.key === "commit-wave-3")).toMatchObject({
+      status: "finished",
+    });
+  });
+
+  test("leaves the newest commit agent in flight", () => {
+    // The commit agent currently running has nothing after it. Reaping it would
+    // blank the elapsed ticker on a live commit.
+    const rows = aggregateFleet([
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "commit-wave-2",
+      ),
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:01:00Z",
+        "end",
+        "commit-wave-2",
+      ),
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:18:00Z",
+        "start",
+        "commit-wave-3",
+      ),
+    ]);
+    expect(rows.find((row) => row.key === "commit-wave-3")).toMatchObject({
+      status: "in-flight",
+    });
+  });
+
+  test("abandons a hung scout once the next wave's scout starts", () => {
+    const rows = aggregateFleet([
+      note(
+        "scout",
+        "scout",
+        undefined,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "scout-wave-1",
+      ),
+      note(
+        "scout",
+        "scout",
+        undefined,
+        "2026-01-01T00:05:00Z",
+        "start",
+        "scout-wave-2",
+      ),
+    ]);
+    expect(rows.find((row) => row.key === "scout-wave-1")).toMatchObject({
+      status: "abandoned",
+    });
+    expect(rows.find((row) => row.key === "scout-wave-2")).toMatchObject({
+      status: "in-flight",
+    });
+  });
+
+  test("a commit agent never reaps a scout, or vice versa", () => {
+    // Both are sequential, but they are separate sequences — the run interleaves
+    // them, so ordering one against the other would close a live agent.
+    const rows = aggregateFleet([
+      note(
+        "scout",
+        "scout",
+        undefined,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "scout-wave-2",
+      ),
+      note(
+        "commit",
+        "commit",
+        undefined,
+        "2026-01-01T00:05:00Z",
+        "start",
+        "commit-wave-2",
+      ),
+    ]);
+    expect(rows.find((row) => row.key === "scout-wave-2")).toMatchObject({
+      status: "in-flight",
+    });
+    expect(rows.find((row) => row.key === "commit-wave-2")).toMatchObject({
+      status: "in-flight",
+    });
+  });
+
   test("leaves a genuinely running row in flight", () => {
     // The newest agent of a live run has nothing after it. Reaping this would
     // blank the elapsed ticker on every currently-working agent.
