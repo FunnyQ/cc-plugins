@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 3.21.2] - 2026-08-27
+
+_tracks tag `dispatch-v3.21.2`_
+
+### Fixed
+- An abandoned `commit` or `scout` agent that died before finishing stayed pinned atop the Agent Fleet panel forever, its timer still running. These two roles share one reference with no attempt count, so the existing stale-row cleanup silently skipped them; a second pass now closes them out based on start order.
+
 ## [dispatch 3.21.1] - 2026-08-27
 
 _tracks tag `dispatch-v3.21.1`_
