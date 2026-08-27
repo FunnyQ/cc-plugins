@@ -67,7 +67,29 @@ git -C "$(git rev-parse --show-toplevel)" diff -- {root-relative-path}
 Classify elided diffs from path and stats — never fetch their content. Lock files
 are `chore`. Treat `elidedFiles > 0` as an incomplete diff, not a reason to read more.
 
+### 1a. On `mode=simple`, stop grouping here
+
+Everything in §2 and §2a is dead work in simple mode: the Lawspeaker merges your
+groups into one commit, and `decideShape` returns `simple` before it reads a
+single signal. Skip both steps. Do not classify per file, do not weigh cohesion,
+do not compute `moduleSpread`, do not reason about order.
+
+Write **one** group holding every path in `summary[]`, then go to §3:
+
+- `type` and `subject` — the dominant change only, as a candidate the Lawspeaker
+  may replace. Do not compare alternatives.
+- `changeSummary` — 2–4 lines of fact about what the diff does. You are the only
+  party that reads the diff, and in simple mode the Lawspeaker has no groups to
+  infer from; omit this and the commit message is written blind.
+- Omit `moduleSpread` and `notes`. Both feed decisions that no longer happen.
+
+Two rules from §2 still bind, because coverage is checked either way:
+deduplicate a path that appears both staged and unstaged, and carry both
+`oldPath` and `path` for a rename.
+
 ### 2. Group
+
+Auto mode only — §1a already sent simple mode to §3.
 
 Classify each file's change type (feat/fix/docs/style/refactor/test/chore/…) from
 its diff, then group by functional cohesion:
@@ -100,6 +122,8 @@ shape is not yours to decide, and a collapsed split costs nothing.
 
 ### 2a. Order them
 
+Auto mode only — §1a already sent simple mode to §3.
+
 Return the groups in the order they should be committed, and say why in `notes`.
 You are the only party that has read the diff, so you are the only one who can see
 that one group's file still references what another group deletes.
@@ -124,6 +148,22 @@ reference before the removal of the target, every time.
     { "type": "feat", "subject": "...", "files": ["..."] }
   ],
   "notes": ["groups ordered so the install roster drops the role before its file goes"]
+}
+```
+
+In simple mode it is the same object with one group, no `moduleSpread`, no
+`notes`, and a `changeSummary` instead:
+
+```json
+{
+  "mode": "simple",
+  "totalFiles": 7,
+  "elidedFiles": 0,
+  "promptPath": "<from analyze-changes stdout>",
+  "groups": [
+    { "type": "feat", "subject": "...", "files": ["...", "..."] }
+  ],
+  "changeSummary": "what the diff does, 2-4 lines of fact"
 }
 ```
 
@@ -155,6 +195,10 @@ writes the settled proposal back over the file.
   `missing` / `duplicated` / `unknown` / `splitRenames` for groups that do not
   cover the changeset. Fix the file and run it again, at most three times. Then
   report the last payload verbatim and stop.
+
+In simple mode the only failure left is a path you dropped or duplicated —
+`missing` / `duplicated` / `unknown`. Add or remove the path and re-run. Never
+answer it by splitting the group.
 
 Propose the groups whatever the shape turns out to be. On `"shape": "simple"` the
 Lawspeaker merges them into one commit and writes its own subject — that is

@@ -62,7 +62,9 @@ answered in prose still did the work, and its reply is at most a hint about wher
 look. Never rebuild the groups from what it said.
 
 The file holds `ok`, `shape`, `reasons`, `groups`, `totalFiles`, `elidedFiles`,
-`moduleSpread`, `promptPath`, and `notes`.
+`moduleSpread`, `promptPath`, and `notes`. A simple-mode proposal carries one
+group, no `moduleSpread`, no `notes`, and a `changeSummary` — the watcher's
+factual read of the diff, which you use in §3.
 
 - `nothingToCommit` — or `totalFiles: 0` — → report `nothing to commit` and stop.
 - Anything but `ok: true` → the script never accepted these groups. Spawn the
@@ -72,6 +74,10 @@ The file holds `ok`, `shape`, `reasons`, `groups`, `totalFiles`, `elidedFiles`,
 from the signals yourself.
 
 ### 2. Order the commits
+
+**Skip this whole step when `shape` is `"simple"`.** One commit has no order to
+get wrong, nothing to reorder, and no grouping to merge. Go straight to §3. This
+holds whether `mode` forced the shape or `commit.ts` collapsed to it.
 
 This is the judgment the script cannot make, and the one that has been wrong in
 practice. **Every commit must build on its own.** Walk the groups and ask, for each:
@@ -123,7 +129,10 @@ type PlanFile = {
 
 - **atomic** → one entry per watcher group, in your order, its `files` verbatim.
 - **simple** → one entry holding every file from every group, with a subject you
-  write yourself.
+  write yourself. Take the type and the *what* from `changeSummary` and the *why*
+  from `contextBrief`. Keep the watcher's `type` and `subject` when they already
+  fit — rewriting a subject that is already right is the work you just skipped
+  §2 to avoid.
 
 Then write each `body` and `summary` from `contextBrief`. Be terse on purpose:
 about 3–4 one-line bullets saying *why*, and a 繁中摘要 of 1–3 sentences that

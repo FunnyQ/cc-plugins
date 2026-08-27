@@ -39,6 +39,12 @@ spawn the watcher or the runesmith yourself, and never put two agents in one
 message. The Lawspeaker must be able to spawn its children, so this flow needs
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` — see `chronicle:install`.
 
+`simple` takes a fast path through the same three agents. The watcher skips
+classification, cohesion grouping, `moduleSpread`, and ordering, and writes one
+group holding every file plus a `changeSummary`; the Lawspeaker skips its
+ordering step. All of that work was already discarded — `decideShape` returns
+`simple` on the first line and the Lawspeaker merged the groups anyway.
+
 The three agents live at `packages/chronicle/agents/{lawspeaker,watcher,runesmith}.md`
 and auto-register as `chronicle:lawspeaker` / `chronicle:watcher` / `chronicle:runesmith`.
 
