@@ -1,5 +1,16 @@
 # Changelog
 
+## [dispatch 3.21.0] - 2026-08-27
+
+_tracks tag `dispatch-v3.21.0`_
+
+### Fixed
+- The flightplan review loop could spin past 19 rounds without converging. Findings already banked as "Known gaps" in `tasks/README.md` were excluded from the review bundle, so the reviewer kept re-reporting them as new P1s every pass; non-convergence detection also compared P1 wording, which never matched across rounds because the plan text changes each pass.
+
+### Added
+- A `--prior-findings <file>` flag lets a review pass carry forward the previous round's findings, so a reviewer only re-reports something if the current files still show the defect.
+- Review depth tiers (Light/Standard/Deep) now cap at 4/8/12 rounds; any P1 still open when the cap is hit is banked into Known gaps and called out in the closing recap, instead of the loop running unbounded.
+
 ## [chronicle 0.14.2] - 2026-08-24
 
 _tracks tag `chronicle-v0.14.2`_
