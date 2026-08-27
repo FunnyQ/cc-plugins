@@ -1470,6 +1470,46 @@ describe("orchestrator commit ownership", () => {
     expect(prompt).toContain("Include the no-commit rule in that instruction");
   });
 
+  test("the driver may not author the implementation it delegates", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+    const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+    expect(prompt).toContain("INSTRUCTION SHAPE");
+    expect(prompt).toContain("no ready-to-paste source");
+  });
+
+  test("the driver may not soften a gate on the way to the CLI", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+    const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+    expect(prompt).toContain("never tell codex to skip one");
+    expect(prompt).toContain("A gate you believe is wrong is a plan defect");
+  });
+
+  // Rejection feedback names what failed, and a driver left to "fold it in"
+  // freely reads that as permission to route around it — dropping the failing
+  // command and telling the delegate the previous code was already correct.
+  test("retry feedback may only add requirements, never subtract a gate", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0)],
+        gate: { "ui/01": [{ passed: false, summary: "swagger not staged" }] },
+      },
+      { devEngine: "'codex'" },
+    );
+    const retryPrompt = promptFor(log, "dev-codex:ui/01#2");
+
+    expect(retryPrompt).toContain("swagger not staged");
+    expect(retryPrompt).toContain("Feedback may only ADD requirements");
+    expect(retryPrompt).toContain("may never subtract a verification command");
+  });
+
   test("the final-review fixer is told never to commit", async () => {
     const log = await runOrchestrator({ scouts: [finalWave, complete(2)] });
 
