@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.14.3] - 2026-08-27
+
+_tracks tag `chronicle-v0.14.3`_
+
+### Changed
+- `chronicle:commit`'s simple-mode path no longer runs a full atomic-split analysis just to throw it away. The watcher now stops right after reading the diff, writing one group covering every path plus a `changeSummary`, so the commit message is written from that summary instead of blind.
+
 ## [dispatch 3.21.0] - 2026-08-27
 
 _tracks tag `dispatch-v3.21.0`_
