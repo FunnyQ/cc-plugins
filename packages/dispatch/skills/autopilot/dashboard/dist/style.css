@@ -36,6 +36,13 @@
      state, so these can never be mistaken for done / ready / blocked / alert. */
   --graph-edge-parent: #d8a657;
   --graph-edge-child: #a48ce0;
+  /* Token budget tiers, thresholds in modules/format.js. Warning and danger
+     reuse the state palette so one amber and one red mean one thing across the
+     whole deck. Normal is deliberately brighter than --muted: the count is a
+     figure to read, not a caption. */
+  --token-normal: var(--text);
+  --token-warn: var(--state-flight);
+  --token-danger: var(--state-alert);
   --header-min-height: 64px;
   --ring-size: 32px;
   --ring-stroke: 2px;
@@ -46,6 +53,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -114,7 +122,7 @@ button {
   text-transform: uppercase;
 }
 
-.plan-identity > h1 {
+.plan-identity>h1 {
   font-size: var(--text-lg);
   line-height: 1;
   margin: 0;
@@ -147,14 +155,14 @@ button {
   gap: var(--space-1);
   justify-items: end;
 
-  > .label {
+  >.label {
     color: var(--muted);
     font-size: var(--text-xs);
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
 
-  > .value {
+  >.value {
     align-items: center;
     display: grid;
     font-size: var(--text-lg);
@@ -163,7 +171,7 @@ button {
     grid-auto-flow: column;
   }
 
-  &.-live > .value {
+  &.-live>.value {
     color: var(--state-flight);
   }
 }
@@ -173,14 +181,14 @@ button {
   gap: var(--space-1);
   justify-items: end;
 
-  > .label {
+  >.label {
     color: var(--muted);
     font-size: var(--text-xs);
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
 
-  > .value {
+  >.value {
     font-size: var(--text-lg);
     font-variant-numeric: tabular-nums;
   }
@@ -201,16 +209,16 @@ button {
   width: var(--ring-size);
 }
 
-.progress-ring > circle {
+.progress-ring>circle {
   fill: none;
   stroke-width: var(--ring-stroke);
 }
 
-.progress-ring > .track {
+.progress-ring>.track {
   stroke: var(--rule);
 }
 
-.progress-ring > .value {
+.progress-ring>.value {
   stroke: var(--state-done);
   stroke-linecap: butt;
   transition: stroke var(--motion-duration);
@@ -223,7 +231,7 @@ button {
   margin: 0;
 }
 
-.plan-counts > div {
+.plan-counts>div {
   display: grid;
   gap: var(--space-1);
 }
@@ -276,7 +284,7 @@ button {
   overflow: hidden;
 }
 
-.view-toggle > button {
+.view-toggle>button {
   background: var(--surface);
   border: 0;
   cursor: pointer;
@@ -285,20 +293,20 @@ button {
   transition: color var(--motion-duration);
 }
 
-.view-toggle > button + button {
+.view-toggle>button+button {
   border-inline-start: var(--border-width) solid var(--rule);
 }
 
-.view-toggle > button[aria-pressed="true"] {
+.view-toggle>button[aria-pressed="true"] {
   background: var(--surface-2);
   color: var(--text);
 }
 
-.view-toggle > button[aria-pressed="false"] {
+.view-toggle>button[aria-pressed="false"] {
   color: var(--muted);
 }
 
-.view-toggle > button:focus-visible {
+.view-toggle>button:focus-visible {
   outline: var(--focus-width) solid var(--state-flight);
   outline-offset: calc(var(--focus-offset) * -1);
 }
@@ -319,7 +327,7 @@ button {
   color: var(--state-alert);
 }
 
-.header-state > ul {
+.header-state>ul {
   display: grid;
   gap: var(--space-1);
   margin: 0;
@@ -350,134 +358,113 @@ button {
 }
 
 .dependency-graph {
-  /* Natural size from the width/height attributes — the container scrolls.
-     Scaling a wide tree down to fit is what made the refs unreadable. */
+  /* Lit, base, unlit — one hue, three values. A signalling panel does not fill
+     a segment, it lights one, and the approved comps light at #4dc74c / #0fa804
+     against the pinned #5fa249. Value alone carries it, so this needs no
+     gradient and no glow, both of which Hangar's anti-goals forbid. */
+  --lit-done: color-mix(in oklab, var(--state-done) 78%, white);
+  --lit-flight: color-mix(in oklab, var(--state-flight) 78%, white);
+  --lit-ready: color-mix(in oklab, var(--state-ready) 70%, white);
+  --lit-alert: color-mix(in oklab, var(--state-alert) 72%, white);
+  --unlit: color-mix(in oklab, var(--state-blocked) 45%, var(--ground));
 
-  .graph-edge {
+  display: block;
+  min-inline-size: 100%;
+
+  /* The road exists whether or not the plan reaches the end of it. */
+  .graph-road > .rail {
+    stroke: var(--unlit);
+    stroke-linecap: butt;
+  }
+
+  .graph-road-name {
+    fill: var(--muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .graph-road-name.-left {
+    text-anchor: end;
+  }
+
+  .graph-road-name.-right {
+    text-anchor: start;
+  }
+
+  /* A berth is a lit block of track, so it takes the road's weight and its own
+     state's lit value. Only the four states that mean something get a colour;
+     an unset berth stays the road's own dark. */
+  .graph-berth > .segment {
+    fill: var(--unlit);
+    transition: fill var(--motion-duration);
+  }
+
+  .graph-berth.-done > .segment {
+    fill: var(--lit-done);
+  }
+  .graph-berth.-in-progress > .segment {
+    fill: var(--lit-flight);
+  }
+  .graph-berth.-ready > .segment {
+    fill: var(--lit-ready);
+  }
+  .graph-berth.-blocked > .segment {
+    fill: var(--unlit);
+  }
+  .graph-berth.-alert > .segment,
+  .graph-berth.-invalid > .segment,
+  .graph-berth.-cyclic > .segment {
+    fill: var(--lit-alert);
+  }
+
+  .graph-berth.-in-progress > .segment {
+    animation: flight-pulse var(--flight-duration) ease-in-out infinite;
+  }
+
+  /* Crossovers are track too, at the road's weight, so a dependency that leaves
+     its bucket reads as a physical connection and not as an annotation. */
+  .graph-crossover {
     fill: none;
-    stroke: var(--text);
-    stroke-width: var(--graph-edge-width);
-    vector-effect: non-scaling-stroke;
+    stroke: var(--unlit);
+    stroke-linejoin: miter;
+    transition:
+      stroke var(--motion-duration),
+      opacity var(--motion-duration);
   }
 
-  .graph-edge.-dimmed {
-    opacity: 0.55;
+  .graph-crossover.-cleared {
+    stroke: color-mix(in oklab, var(--state-done) 50%, var(--ground));
   }
 
-  /* The marker inherits the referencing edge's opacity, so a dimmed edge gets a
-     dimmed head for free. `context-stroke` makes the head follow the edge's
-     colour too — without it one shared marker would leave every highlighted
-     edge with a grey head. The plain fill stays first as the fallback. */
   .graph-arrow > path {
-    fill: var(--text);
+    fill: var(--unlit);
     fill: context-stroke;
   }
 
-  .graph-node > rect {
+  /* Signal heads: the post is chrome, the lamp carries the aspect. */
+  .graph-signal > .post {
+    fill: var(--surface-2);
+    stroke: var(--rule);
     stroke-width: var(--border-width);
-    transition:
-      fill var(--motion-duration),
-      stroke var(--motion-duration);
-    vector-effect: non-scaling-stroke;
   }
 
-  .graph-node.-done > rect {
-    fill: var(--state-done);
-    stroke: var(--state-done);
-  }
-  .graph-node.-in-progress > rect {
-    fill: var(--state-flight);
-    stroke: var(--state-flight);
-  }
-  .graph-node.-ready > rect {
-    fill: var(--state-ready);
-    stroke: var(--state-ready);
-  }
-  .graph-node.-blocked > rect {
+  .graph-signal > .lamp {
     fill: var(--state-blocked);
-    stroke: var(--state-blocked);
-  }
-  .graph-node.-alert > rect,
-  .graph-node.-invalid > rect,
-  .graph-node.-cyclic > rect {
-    fill: var(--state-alert);
-    stroke: var(--state-alert);
   }
 
-  /* Hover lineage: everything on the hovered node's ancestry or descent stays
-     lit, the rest recedes. Opacity, not colour, so a state colour never turns
-     into a different state's colour. */
-  &.-focus .graph-node:not(.-lit),
-  &.-focus .graph-edge:not(.-lit) {
-    opacity: 0.16;
+  .graph-signal.-clear > .lamp {
+    fill: var(--lit-done);
   }
-
-  &.-focus .graph-edge.-lit {
-    opacity: 1;
-    stroke-width: calc(var(--graph-edge-width) * 1.6);
+  .graph-signal.-caution > .lamp {
+    fill: var(--lit-flight);
   }
-
-  /* The rest of the lineage sits between the two hops and everything outside it:
-     present enough to trace, quiet enough that the one-hop pair stays the
-     subject. Stated after the `.-lit` rules so it wins over their opacity. */
-  &.-focus .graph-edge.-lit:not(.-parent):not(.-child),
-  &.-focus .graph-node.-lit:not(.-parent):not(.-child):not(.-self) {
-    opacity: 0.8;
-  }
-
-  /* Three tiers inside the lit lineage, so the eye lands on the subject first,
-     then its immediate neighbours, then the rest of the ancestry. Brightness and
-     stroke only — the fill stays the state colour it earned. */
-  &.-focus .graph-node.-lit > rect {
-    filter: brightness(1.12);
-  }
-
-  &.-focus .graph-node.-parent > rect,
-  &.-focus .graph-node.-child > rect {
-    filter: brightness(1.35);
-    stroke-width: calc(var(--border-width) * 2);
-  }
-
-  /* The ring repeats its edge's colour, which is what ties a neighbour to the
-     line reaching it when several are lit at once. */
-  &.-focus .graph-node.-parent > rect {
-    stroke: var(--graph-edge-parent);
-  }
-
-  &.-focus .graph-node.-child > rect {
-    stroke: var(--graph-edge-child);
-  }
-
-  /* Without this the hovered node would be the dimmest of its own cluster. */
-  &.-focus .graph-node.-self > rect {
-    filter: brightness(1.5);
-    stroke: var(--text);
-    stroke-width: calc(var(--border-width) * 2);
-  }
-
-  /* One hop from the hovered node, coloured by direction. Listed after `.-lit`
-     so the colour wins over its neutral stroke, and both keep its weight. */
-  &.-focus .graph-edge.-parent {
-    stroke: var(--graph-edge-parent);
-  }
-
-  &.-focus .graph-edge.-child {
-    stroke: var(--graph-edge-child);
-  }
-
-  .graph-node,
-  .graph-edge {
-    transition:
-      opacity var(--motion-duration) ease,
-      stroke-width var(--motion-duration) ease;
-  }
-
-  .graph-node.-in-progress > .graph-status {
-    animation: flight-pulse var(--flight-duration) ease-in-out infinite;
-    fill: var(--ground);
+  .graph-signal.-danger > .lamp {
+    fill: var(--lit-alert);
   }
 
   .graph-ref,
+  .graph-tokens,
   .graph-cycle-label,
   .graph-cycle-note,
   .graph-empty {
@@ -486,28 +473,28 @@ button {
     text-anchor: middle;
   }
 
-  /* Each node is a saturated fill, so the label takes the ink that actually
-     contrasts with it: near-black on the four light states, and the light text
-     only on -blocked, which is the one dark fill. */
-  .graph-node.-done > .graph-ref,
-  .graph-node.-in-progress > .graph-ref,
-  .graph-node.-ready > .graph-ref,
-  .graph-node.-alert > .graph-ref,
-  .graph-node.-invalid > .graph-ref,
-  .graph-node.-cyclic > .graph-ref,
-  .graph-node.-cyclic > .graph-cycle-label {
-    fill: var(--ground);
-  }
-
-  /* Size comes from the font-size attribute graph.js stamps on each label —
-     the same number its box geometry is derived from, so type and boxes can
-     never drift apart. Only weight and tracking live here. */
   .graph-ref {
     font-weight: 600;
   }
 
+  .graph-tokens {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .graph-tokens.-normal {
+    fill: var(--muted);
+  }
+  .graph-tokens.-warn {
+    fill: var(--token-warn);
+  }
+  .graph-tokens.-danger {
+    fill: var(--token-danger);
+  }
+
   .graph-cycle-label {
-    letter-spacing: 0.02em;
+    fill: var(--state-alert);
+    letter-spacing: 0.08em;
   }
 
   .graph-cycle-note {
@@ -517,6 +504,36 @@ button {
 
   .graph-empty {
     font-size: var(--text-md);
+    fill: var(--muted);
+  }
+
+  /* THE SET ROUTE. Hovering a berth darkens the whole panel and lights one
+     lineage end to end — the approved hover comp. Everything off the route
+     drops to the panel's own dark rather than fading out, because an unlit
+     segment is a real state on this instrument, not an absence. */
+  &.-focus .graph-berth:not(.-lit) > .segment,
+  &.-focus .graph-crossover:not(.-lit) {
+    opacity: 0.18;
+  }
+
+  &.-focus .graph-berth:not(.-lit) :is(.graph-ref, .graph-tokens),
+  &.-focus .graph-berth:not(.-lit) .graph-signal {
+    opacity: 0.22;
+  }
+
+  &.-focus .graph-crossover.-lit {
+    stroke: var(--lit-done);
+  }
+
+  &.-focus .graph-berth.-self > .segment {
+    stroke: var(--text);
+    stroke-width: calc(var(--border-width) * 2);
+  }
+
+  .graph-berth,
+  .graph-crossover,
+  .graph-signal {
+    transition: opacity var(--motion-duration) ease;
   }
 }
 
@@ -530,7 +547,7 @@ button {
   container-type: inline-size;
   min-inline-size: 0;
 
-  > .empty {
+  >.empty {
     color: var(--muted);
     display: grid;
     margin: 0;
@@ -539,15 +556,13 @@ button {
     padding: var(--space-6);
   }
 
-  > .strip {
+  >.strip {
     align-items: start;
     block-size: 100%;
     display: grid;
     gap: var(--space-3);
-    grid-auto-columns: minmax(
-      var(--task-lanes-lane-min),
-      var(--task-lanes-lane-max)
-    );
+    grid-auto-columns: minmax(var(--task-lanes-lane-min),
+        var(--task-lanes-lane-max));
     grid-auto-flow: column;
     justify-content: start;
     min-inline-size: 0;
@@ -566,7 +581,7 @@ button {
     min-inline-size: 0;
     overflow: hidden;
 
-    > .heading {
+    >.heading {
       align-items: center;
       background: var(--surface-2);
       border-block-end: var(--border-width) solid var(--rule);
@@ -576,7 +591,7 @@ button {
       padding: var(--space-2) var(--space-3);
     }
 
-    > .heading > h2 {
+    >.heading>h2 {
       font-size: var(--text-sm);
       letter-spacing: 0.02em;
       margin: 0;
@@ -586,12 +601,12 @@ button {
       white-space: nowrap;
     }
 
-    > .heading > span {
+    >.heading>span {
       color: var(--muted);
       font-size: var(--text-xs);
     }
 
-    > .stack {
+    >.stack {
       display: grid;
       gap: var(--space-2);
       overflow-y: auto;
@@ -614,7 +629,7 @@ button {
     display: grid;
     overflow: hidden;
 
-    > .summary {
+    >.summary {
       background: transparent;
       border: 0;
       cursor: default;
@@ -625,42 +640,42 @@ button {
       text-align: start;
     }
 
-    > .summary.-expandable {
+    >.summary.-expandable {
       cursor: pointer;
     }
 
-    > .summary.-expandable:hover {
+    >.summary.-expandable:hover {
       background: var(--surface-2);
     }
 
-    > .summary:disabled {
+    >.summary:disabled {
       color: inherit;
     }
 
-    > .summary:focus-visible {
+    >.summary:focus-visible {
       outline: var(--focus-width) solid var(--state-flight);
       outline-offset: calc(var(--focus-offset) * -1);
     }
 
-    > .summary > .identity {
+    >.summary>.identity {
       align-items: center;
       display: grid;
       gap: var(--space-2);
       grid-template-columns: auto minmax(0, 1fr);
     }
 
-    > .summary .status {
+    >.summary .status {
       border-radius: var(--radius-sm);
       block-size: var(--task-lanes-status-size);
       inline-size: var(--task-lanes-status-size);
     }
 
-    > .summary .ref {
+    >.summary .ref {
       color: var(--muted);
       font-size: var(--text-xs);
     }
 
-    > .summary .state-label {
+    >.summary .state-label {
       block-size: var(--border-width);
       clip-path: inset(50%);
       inline-size: var(--border-width);
@@ -669,20 +684,20 @@ button {
       white-space: nowrap;
     }
 
-    > .summary > .title {
+    >.summary>.title {
       color: var(--text);
       font-family: var(--font-sans);
       font-size: var(--text-md);
       line-height: 1.4;
     }
 
-    > .summary > .badges {
+    >.summary>.badges {
       display: grid;
       gap: var(--space-1);
       grid-template-columns: repeat(auto-fit, minmax(min-content, max-content));
     }
 
-    > .summary .badge {
+    >.summary .badge {
       border: var(--border-width) solid currentColor;
       border-radius: var(--radius-sm);
       color: var(--muted);
@@ -692,41 +707,49 @@ button {
       text-transform: uppercase;
     }
 
-    > .summary > .token-figure {
-      color: var(--muted);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
+    /* Placement only. The type and the tier ink live with the fleet's figure,
+       so the same count reads the same way in both views. */
+    >.summary>.token-figure {
       justify-self: end;
     }
 
-    &.-done > .summary .status {
+    &.-done>.summary .status {
       background: var(--state-done);
     }
-    &.-done > .summary .badge {
+
+    &.-done>.summary .badge {
       color: var(--state-done);
     }
-    &.-in-progress > .summary .status {
+
+    &.-in-progress>.summary .status {
       background: var(--state-flight);
     }
-    &.-in-progress > .summary .badge {
+
+    &.-in-progress>.summary .badge {
       color: var(--state-flight);
     }
-    &.-ready > .summary .status {
+
+    &.-ready>.summary .status {
       background: var(--state-ready);
     }
-    &.-ready > .summary .badge {
+
+    &.-ready>.summary .badge {
       color: var(--state-ready);
     }
-    &.-blocked > .summary .status {
+
+    &.-blocked>.summary .status {
       background: var(--state-blocked);
     }
-    &.-blocked > .summary .badge {
+
+    &.-blocked>.summary .badge {
       color: var(--state-blocked);
     }
-    &.-invalid > .summary .status {
+
+    &.-invalid>.summary .status {
       background: var(--state-alert);
     }
-    &.-invalid > .summary .badge {
+
+    &.-invalid>.summary .badge {
       color: var(--state-alert);
     }
   }
@@ -737,28 +760,30 @@ button {
     gap: var(--space-2);
     grid-template-columns: minmax(0, 1fr) auto;
 
-    > .track {
+    >.track {
       background: var(--surface-2);
       block-size: var(--task-lanes-meter-height);
       position: relative;
     }
 
-    > .track > .fill {
+    >.track>.fill {
       block-size: 100%;
       display: block;
     }
 
-    > .track > .fill.-passed {
+    >.track>.fill.-passed {
       background: var(--state-done);
     }
-    > .track > .fill.-failed {
+
+    >.track>.fill.-failed {
       background: var(--state-alert);
     }
-    > .track > .fill.-pending {
+
+    >.track>.fill.-pending {
       background: var(--state-flight);
     }
 
-    > .track > .threshold {
+    >.track>.threshold {
       background: var(--text);
       block-size: 100%;
       inline-size: var(--border-width);
@@ -766,7 +791,7 @@ button {
       inset-block-start: 0;
     }
 
-    > .value {
+    >.value {
       color: var(--text);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -780,17 +805,15 @@ button {
     gap: var(--space-2);
     padding: var(--space-3);
 
-    > .dimension {
+    >.dimension {
       align-items: center;
       display: grid;
       gap: var(--space-2);
-      grid-template-columns: minmax(calc(var(--space-8) * 3), 1fr) minmax(
-          0,
-          2fr
-        ) auto;
+      grid-template-columns: minmax(calc(var(--space-8) * 3), 1fr) minmax(0,
+          2fr) auto;
     }
 
-    > .dimension > .label {
+    >.dimension>.label {
       color: var(--muted);
       font-size: var(--text-xs);
       overflow: hidden;
@@ -798,30 +821,28 @@ button {
       white-space: nowrap;
     }
 
-    > .dimension > .bar {
+    >.dimension>.bar {
       background: var(--rule);
       block-size: var(--task-lanes-meter-height);
       display: block;
     }
 
-    > .dimension > .bar > .fill {
+    >.dimension>.bar>.fill {
       background: var(--state-ready);
       block-size: 100%;
       display: block;
     }
 
-    > .dimension > .score {
+    >.dimension>.score {
       color: var(--muted);
       font-size: var(--text-xs);
     }
   }
 
   @container (inline-size < 600px) {
-    > .strip {
-      grid-auto-columns: minmax(
-        var(--task-lanes-lane-min),
-        calc(100cqi - var(--space-6))
-      );
+    >.strip {
+      grid-auto-columns: minmax(var(--task-lanes-lane-min),
+          calc(100cqi - var(--space-6)));
     }
   }
 }
@@ -831,8 +852,7 @@ button {
 }
 
 .c-fleet {
-  --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px
-    minmax(160px, 1fr) 76px minmax(160px, 2fr);
+  --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px minmax(160px, 1fr) minmax(160px, 2fr);
   --fleet-meter-height: var(--space-1);
   /* The heading is pinned to this height and the column header sticks exactly
      below it. One declaration for both, because the two used to be a rendered
@@ -859,7 +879,7 @@ button {
   z-index: 2;
 }
 
-.fleet-heading > h2 {
+.fleet-heading>h2 {
   font-family: var(--font-sans);
   font-size: var(--text-md);
   margin: 0;
@@ -876,7 +896,7 @@ button {
   justify-content: start;
   padding: 0;
 
-  > .chevron {
+  >.chevron {
     border-inline-start: 5px solid currentColor;
     border-block: 4px solid transparent;
     block-size: 0;
@@ -886,7 +906,7 @@ button {
     transition: rotate var(--motion-duration);
   }
 
-  &[aria-expanded="false"] > .chevron {
+  &[aria-expanded="false"]>.chevron {
     rotate: 0deg;
   }
 
@@ -922,15 +942,17 @@ button {
 .connection.-live {
   color: var(--state-done);
 }
+
 .connection.-waiting {
   color: var(--state-ready);
 }
+
 .connection.-reconnecting {
   color: var(--state-flight);
 }
 
 .fleet-table {
-  min-inline-size: 760px;
+  min-inline-size: 690px;
 }
 
 .fleet-row,
@@ -990,9 +1012,11 @@ button {
 .fleet-row.-failed .fleet-status {
   background: var(--state-alert);
 }
+
 .fleet-row.-rejected .fleet-status {
   background: var(--state-alert);
 }
+
 /* Muted, not alarming: an abandoned agent reported no verdict either way, and
    the default dot is the green of a clean finish. */
 .fleet-row.-abandoned .fleet-status {
@@ -1019,25 +1043,54 @@ button {
 .fleet-row.-flight .role-badge {
   color: var(--state-flight);
 }
+
 .fleet-row.-failed .role-badge {
   color: var(--state-alert);
 }
+
 .fleet-row.-rejected .role-badge {
   color: var(--state-alert);
 }
+
 .fleet-row.-abandoned .role-badge {
   color: var(--state-blocked);
 }
+
 /* The message is where a rejected gate says WHY, so it stops being secondary. */
 .fleet-row.-rejected .fleet-cell.-message {
   color: var(--text);
 }
 
-.fleet-cell.-tokens {
-  color: var(--muted);
+/* One rule for every token figure on the deck: the fleet's under-chip count and
+   the lane card's. Tabular figures so a stack of them lines up on the decimal,
+   and --text-sm rather than --text-xs — this stopped being a caption the moment
+   it started carrying a warning.
+
+   The lane selector has to spell out its nesting to reach the rule it replaces
+   inside .c-task-lanes. That makes it four classes deep, which would then
+   outrank the tier variants below — so the ink travels as a custom property,
+   which each variant sets on the element itself and specificity never touches. */
+.role-tokens,
+.c-task-lanes .c-task-card>.summary>.token-figure {
+  color: var(--token-ink, var(--token-normal));
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  text-align: end;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+:is(.role-tokens, .token-figure).-warn {
+  --token-ink: var(--token-warn);
+}
+
+:is(.role-tokens, .token-figure).-danger {
+  --token-ink: var(--token-danger);
+}
+
+/* No measurement, no reading: N/A carries no tier class and stays caption grey. */
+:is(.role-tokens, .token-figure):not(.-normal, .-warn, .-danger) {
+  --token-ink: var(--muted);
 }
 
 .raw-label,
@@ -1060,26 +1113,27 @@ button {
   grid-template-columns: minmax(64px, 1fr) auto auto;
 }
 
-.c-fleet-score > .track {
+.c-fleet-score>.track {
   background: var(--surface-2);
   block-size: var(--fleet-meter-height);
   position: relative;
 }
 
-.c-fleet-score > .track > .fill {
+.c-fleet-score>.track>.fill {
   background: var(--state-flight);
   block-size: 100%;
   display: block;
 }
 
-.c-fleet-score.-passed > .track > .fill {
+.c-fleet-score.-passed>.track>.fill {
   background: var(--state-done);
 }
-.c-fleet-score.-failed > .track > .fill {
+
+.c-fleet-score.-failed>.track>.fill {
   background: var(--state-alert);
 }
 
-.c-fleet-score > .track > .threshold {
+.c-fleet-score>.track>.threshold {
   background: var(--text);
   block-size: 100%;
   inline-size: var(--border-width);
@@ -1087,12 +1141,12 @@ button {
   inset-block-start: 0;
 }
 
-.c-fleet-score > .value,
-.c-fleet-score > .failure {
+.c-fleet-score>.value,
+.c-fleet-score>.failure {
   font-size: var(--text-xs);
 }
 
-.c-fleet-score > .failure {
+.c-fleet-score>.failure {
   color: var(--state-alert);
 }
 
@@ -1104,7 +1158,7 @@ button {
   padding: var(--space-3) var(--space-4) var(--space-3) var(--space-8);
 }
 
-.c-fleet-rubric > .dimension {
+.c-fleet-rubric>.dimension {
   align-items: center;
   display: grid;
   gap: var(--space-2);
@@ -1144,17 +1198,19 @@ button {
   white-space: nowrap;
 }
 
-@container (inline-size < 760px) {
+@container (inline-size < 690px) {
   .fleet-table {
     overflow-x: auto;
   }
 }
 
 @keyframes flight-pulse {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.45;
   }

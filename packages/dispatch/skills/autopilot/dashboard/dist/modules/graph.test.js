@@ -18,247 +18,14 @@ function makeNode(ref, bucket, nn, dependsOn = []) {
 
 function compare(nodes) {
   return [...nodes]
-    .sort((left, right) => left.bucket.localeCompare(right.bucket)
-      || left.nn.localeCompare(right.nn, undefined, { numeric: true })
-      || left.ref.localeCompare(right.ref))
+    .sort(
+      (left, right) =>
+        left.bucket.localeCompare(right.bucket) ||
+        left.nn.localeCompare(right.nn, undefined, { numeric: true }) ||
+        left.ref.localeCompare(right.ref),
+    )
     .map(({ ref }) => ref);
 }
-
-describe("layoutGraph", () => {
-  test("lays out a linear chain left to right", () => {
-    const nodes = [
-      makeNode("A", "chain", "01"),
-      makeNode("B", "chain", "02", ["A"]),
-      makeNode("C", "chain", "03", ["B"]),
-    ];
-    const layout = layoutGraph(nodes);
-    const secondLayout = layoutGraph(nodes);
-
-    expect(layout.positions.get("A")).toEqual({ x: 7, y: 7 });
-    expect(layout.positions.get("B")).toEqual({ x: 245, y: 7 });
-    expect(layout.positions.get("C")).toEqual({ x: 483, y: 7 });
-    expect(layout.positions.get("A").x).toBeLessThan(layout.positions.get("B").x);
-    expect(layout.positions.get("B").x).toBeLessThan(layout.positions.get("C").x);
-    expect([...secondLayout.positions]).toEqual([...layout.positions]);
-    expect(secondLayout.cyclic).toEqual([]);
-  });
-
-  test("lays out a diamond with convergence at the deepest layer", () => {
-    const nodes = [
-      makeNode("D", "work", "04", ["B", "C"]),
-      makeNode("C", "work", "03", ["A"]),
-      makeNode("B", "work", "02", ["A"]),
-      makeNode("A", "work", "01"),
-    ];
-    const layout = layoutGraph(nodes);
-    const positionA = layout.positions.get("A");
-    const positionB = layout.positions.get("B");
-    const positionC = layout.positions.get("C");
-    const positionD = layout.positions.get("D");
-
-    expect(positionA.x).toBe(7);
-    expect(positionB.x).toBe(245);
-    expect(positionC.x).toBe(245);
-    expect(positionD.x).toBe(483);
-    expect(positionB.y).toBeLessThan(positionC.y);
-    expect(compare(nodes.filter(({ ref }) => ref === "B" || ref === "C"))).toEqual(["B", "C"]);
-  });
-
-  test("places disconnected roots at the same depth in order", () => {
-    const nodes = [
-      makeNode("Y", "root", "02"),
-      makeNode("X", "root", "01"),
-    ];
-    const layout = layoutGraph(nodes);
-
-    expect(layout.positions.get("X").x).toBe(7);
-    expect(layout.positions.get("Y").x).toBe(7);
-    expect(layout.positions.get("X").y).toBeLessThan(layout.positions.get("Y").y);
-    expect(compare(nodes)).toEqual(["X", "Y"]);
-  });
-
-  test("detects a two-node cycle without hanging", () => {
-    const nodes = [
-      makeNode("A", "cycle", "01", ["B"]),
-      makeNode("B", "cycle", "02", ["A"]),
-    ];
-    const startedAt = performance.now();
-    const layout = layoutGraph(nodes);
-    const elapsedMs = performance.now() - startedAt;
-
-    expect(elapsedMs).toBeLessThan(50);
-    expect(layout.cyclic).toEqual(["A", "B"]);
-    expect(layout.positions.get("A").x).toBe(layout.positions.get("B").x);
-    expect(layout.positions.get("A").y).toBeLessThan(layout.positions.get("B").y);
-  });
-
-  test("orders a layer top to bottom by bucket then numeric sequence", () => {
-    const nodes = [
-      makeNode("ui/10", "ui", "10"),
-      makeNode("api/02", "api", "02"),
-      makeNode("ui/02", "ui", "02"),
-      makeNode("api/01", "api", "01"),
-    ];
-    const layout = layoutGraph(nodes);
-    const positionedOrder = [...layout.positions]
-      .sort(([, left], [, right]) => left.y - right.y)
-      .map(([ref]) => ref);
-
-    expect(positionedOrder).toEqual(compare(nodes));
-    expect(positionedOrder).toEqual(["api/01", "api/02", "ui/02", "ui/10"]);
-  });
-});
-
-describe("renderGraph", () => {
-  test("renders positioned nodes and a dimmed dependency edge", () => {
-    const nodes = [
-      makeNode("A", "chain", "01"),
-      makeNode("B", "chain", "02", ["A"]),
-    ];
-    const svg = renderGraph(nodes, layoutGraph(nodes));
-
-    expect(svg).toContain('<svg class="dependency-graph"');
-    expect(svg).toContain('data-ref="A"');
-    expect(svg).toContain('data-ref="B"');
-    expect(svg.match(/<g class="graph-node/g)?.length).toBe(2);
-    expect(svg.match(/<path class="graph-edge/g)?.length).toBe(1);
-    expect(svg).toContain('class="graph-edge -dimmed"');
-  });
-
-  test("draws a dependency edge from the right edge into the left edge", () => {
-    const nodes = [
-      makeNode("A", "chain", "01"),
-      makeNode("B", "chain", "02", ["A"]),
-    ];
-    const layout = layoutGraph(nodes);
-    const svg = renderGraph(nodes, layout);
-    const d = svg.match(/<path class="graph-edge[^>]* d="([^"]+)"/)[1];
-    const coords = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(
-      ([, x, y]) => [Number(x), Number(y)],
-    );
-    const [startX, startY] = coords[0];
-    const [endX, endY] = coords[coords.length - 1];
-    const source = layout.positions.get("A");
-    const target = layout.positions.get("B");
-
-    expect(startX).toBeGreaterThan(source.x);
-    expect(startY).toBeGreaterThan(source.y);
-    expect(startY).toBeLessThan(source.y + 42);
-    expect(endX).toBe(target.x);
-    expect(endY).toBe(startY);
-  });
-
-  test("marks cyclic nodes and lists their refs", () => {
-    const nodes = [
-      makeNode("A", "cycle", "01", ["B"]),
-      makeNode("B", "cycle", "02", ["A"]),
-    ];
-    const svg = renderGraph(nodes, layoutGraph(nodes));
-
-    expect(svg.match(/>CYCLE<\/text>/g)?.length).toBe(2);
-    expect(svg.match(/class="graph-node -cyclic"/g)?.length).toBe(2);
-    expect(svg).toContain('class="graph-cycle-note"');
-    expect(svg).toContain("Cycle: A, B");
-  });
-});
-
-describe("renderGraph sizing", () => {
-  test("carries its natural pixel size so a wide tree scrolls instead of shrinking", () => {
-    const nodes = [
-      makeNode("A", "chain", "01"),
-      makeNode("B", "chain", "02", ["A"]),
-      makeNode("C", "chain", "03", ["B"]),
-    ];
-    const svg = renderGraph(nodes, layoutGraph(nodes));
-    const viewBox = svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/);
-
-    expect(svg).toContain(`width="${viewBox[1]}"`);
-    expect(svg).toContain(`height="${viewBox[2]}"`);
-    expect(Number(viewBox[1])).toBeGreaterThan(Number(viewBox[2]));
-  });
-});
-
-describe("graph typography", () => {
-  test("stamps a fixed font size on every label", () => {
-    const nodes = [makeNode("chain/01", "chain", "01")];
-    const svg = renderGraph(nodes, layoutGraph(nodes));
-
-    expect(svg).toContain('class="graph-ref" font-size="14"');
-  });
-
-  test("derives node geometry from that font size", () => {
-    const nodes = [
-      makeNode("A", "chain", "01"),
-      makeNode("B", "chain", "02", ["A"]),
-    ];
-    const wide = layoutGraph(nodes, { fontSize: 28 });
-    const normal = layoutGraph(nodes);
-
-    // Double the type, double the box and the gaps that separate the boxes.
-    expect(wide.positions.get("B").x - wide.positions.get("A").x).toBe(
-      (normal.positions.get("B").x - normal.positions.get("A").x) * 2,
-    );
-  });
-
-  test("a node is wide enough for a full bucket/NN ref", () => {
-    const nodes = [makeNode("integration/01", "integration", "01")];
-    const svg = renderGraph(nodes, layoutGraph(nodes));
-    const width = Number(svg.match(/width="(\d+(?:\.\d+)?)"/)[1]);
-
-    // 14 chars of 14px mono ≈ 118px, plus padding on both sides.
-    expect(width).toBeGreaterThan(134);
-  });
-});
-
-describe("edge arrows", () => {
-  const chain = [
-    makeNode("A", "chain", "01"),
-    makeNode("B", "chain", "02", ["A"]),
-  ];
-
-  test("points every edge at its dependent", () => {
-    const svg = renderGraph(chain, layoutGraph(chain));
-    const markerId = svg.match(/<marker id="([^"]+)"/)[1];
-
-    expect(svg).toContain(`marker-end="url(#${markerId})"`);
-    expect(svg).toContain('orient="auto"');
-  });
-
-  test("sizes the arrow from the same font size as everything else", () => {
-    const svg = renderGraph(chain, layoutGraph(chain), { fontSize: 28 });
-    const normal = renderGraph(chain, layoutGraph(chain));
-    const size = (markup) =>
-      Number(markup.match(/<marker[^>]*markerWidth="(\d+(?:\.\d+)?)"/)[1]);
-
-    expect(size(svg)).toBe(size(normal) * 2);
-  });
-
-  test("omits the marker definition when nothing connects", () => {
-    const lone = [makeNode("A", "chain", "01")];
-    const svg = renderGraph(lone, layoutGraph(lone));
-
-    expect(svg).not.toContain("<marker");
-    expect(svg).not.toContain("marker-end");
-  });
-});
-
-describe("graph geometry overrides", () => {
-  const chain = [
-    makeNode("A", "chain", "01"),
-    makeNode("B", "chain", "02", ["A"]),
-  ];
-
-  test("takes an explicit arrow size without touching the rest", () => {
-    const svg = renderGraph(chain, layoutGraph(chain), {
-      arrowLength: 40,
-      arrowHeight: 24,
-    });
-
-    expect(svg).toContain('markerWidth="40"');
-    expect(svg).toContain('markerHeight="24"');
-    expect(svg).toContain('class="graph-ref" font-size="14"');
-  });
-});
 
 describe("relatedRefs", () => {
   //  A ──→ B ──→ D        E is unrelated to the A/B/C/D lineage.
@@ -276,21 +43,11 @@ describe("relatedRefs", () => {
   });
 
   test("a root reaches every descendant", () => {
-    expect([...relatedRefs(diamond, "A")].sort()).toEqual([
-      "A",
-      "B",
-      "C",
-      "D",
-    ]);
+    expect([...relatedRefs(diamond, "A")].sort()).toEqual(["A", "B", "C", "D"]);
   });
 
   test("a leaf reaches every ancestor", () => {
-    expect([...relatedRefs(diamond, "D")].sort()).toEqual([
-      "A",
-      "B",
-      "C",
-      "D",
-    ]);
+    expect([...relatedRefs(diamond, "D")].sort()).toEqual(["A", "B", "C", "D"]);
   });
 
   test("an isolated node is related only to itself", () => {
@@ -318,10 +75,12 @@ describe("relatedRefs", () => {
 });
 
 describe("edge identity", () => {
-  test("each edge names the pair it connects", () => {
+  // Cross-bucket, because only a dependency that leaves its own road is drawn
+  // as a crossover; one inside a bucket is the running road itself.
+  test("each crossover names the pair it connects", () => {
     const nodes = [
-      makeNode("A", "chain", "01"),
-      makeNode("B", "chain", "02", ["A"]),
+      makeNode("A", "one", "01"),
+      makeNode("B", "two", "01", ["A"]),
     ];
     const svg = renderGraph(nodes, layoutGraph(nodes));
 
@@ -371,11 +130,13 @@ describe("drawable edges", () => {
     expect(drawn.has("B->A")).toBe(true);
   });
 
+  // C sits on its own road so both surviving dependencies become crossovers and
+  // the reduction is visible in the markup.
   test("renderGraph omits the redundant edge", () => {
     const nodes = [
       makeNode("A", "core", "01"),
       makeNode("B", "core", "02", ["A"]),
-      makeNode("C", "core", "03", ["A", "B"]),
+      makeNode("C", "tail", "01", ["A", "B"]),
     ];
     const svg = renderGraph(nodes, layoutGraph(nodes));
 
@@ -384,67 +145,205 @@ describe("drawable edges", () => {
   });
 });
 
-describe("svg extent", () => {
-  test("declares a height that covers the reserved lane rows", () => {
-    // A long edge reserves a row in each layer it crosses. Measuring only the
-    // real nodes declared an SVG shorter than its own content, and the panel
-    // scrolls to the declared size — everything past it was unreachable.
-    // `X` is unreachable from the chain, so `X -> D` survives the reduction and
-    // is the long edge that has to reserve rows.
+describe("roads and berths", () => {
+  test("one road per bucket, in the order the tasks arrive", () => {
     const nodes = [
-      makeNode("A", "core", "01"),
-      makeNode("B", "core", "02", ["A"]),
-      makeNode("C", "core", "03", ["B"]),
-      makeNode("D", "core", "04", ["C", "X"]),
-      makeNode("X", "extra", "01"),
+      makeNode("api/01", "api", "01"),
+      makeNode("ui/01", "ui", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
     ];
     const layout = layoutGraph(nodes);
-    const svg = renderGraph(nodes, layout);
-    const declared = Number(svg.match(/height="([\d.]+)"/)[1]);
 
-    const lanes = [...layout.waypoints.values()].flat();
-    expect(lanes.length).toBeGreaterThan(0);
-    for (const lane of lanes) expect(declared).toBeGreaterThan(lane.y);
-    for (const point of layout.positions.values()) {
-      expect(declared).toBeGreaterThanOrEqual(point.y + 42);
-    }
+    expect(layout.roads.map(({ name }) => name)).toEqual(["api", "ui"]);
+    expect(layout.positions.get("api/01").road).toBe(
+      layout.positions.get("api/02").road,
+    );
+    expect(layout.positions.get("ui/01").road).not.toBe(
+      layout.positions.get("api/01").road,
+    );
+  });
+
+  test("a task never leaves its bucket's line", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("ui/01", "ui", "01", ["api/01"]),
+      makeNode("ui/02", "ui", "02", ["ui/01"]),
+    ];
+    const layout = layoutGraph(nodes);
+
+    expect(layout.positions.get("ui/01").y).toBe(
+      layout.positions.get("ui/02").y,
+    );
+  });
+
+  test("two tasks of one bucket at the same depth take different slots", () => {
+    // Both are roots, so both sit at depth 0; on one road that would be two
+    // berths in one block, and the second would hide the first.
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02"),
+    ];
+    const layout = layoutGraph(nodes);
+
+    expect(layout.positions.get("api/01").slot).toBe(0);
+    expect(layout.positions.get("api/02").slot).toBe(1);
+  });
+
+  test("a road runs strictly left to right", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02"),
+      makeNode("api/03", "api", "03", ["api/01"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const slots = ["api/01", "api/02", "api/03"].map(
+      (ref) => layout.positions.get(ref).slot,
+    );
+
+    expect(slots).toEqual([...slots].sort((a, b) => a - b));
+    expect(new Set(slots).size).toBe(slots.length);
+  });
+
+  test("renders the road name in both gutters", () => {
+    const nodes = [makeNode("api/01", "api", "01")];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain('class="graph-road-name -left"');
+    expect(svg).toContain('class="graph-road-name -right"');
+    expect((svg.match(/>api<\/text>/g) ?? []).length).toBe(2);
+  });
+
+  test("a dependency inside one bucket draws no crossover", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).not.toContain("graph-crossover");
   });
 });
 
-describe("lane placement", () => {
-  test("a chain longer than the sweep count still settles beside its edge", () => {
-    // The barycentre sweep reindexes per layer, not per pass. Per pass, a
-    // position advances only one layer per pass, so a placeholder chain longer
-    // than ORDER_PASSES never hears where its edge starts and strands itself at
-    // the bottom of every layer it crosses — placeholders are appended last.
-    //
-    // `X` sorts above the chain and is unreachable from it, so `X -> Z` survives
-    // the reduction and every one of its eight placeholders belongs at the TOP
-    // of its layer. Reaching that from the bottom is exactly the propagation the
-    // per-layer reindex buys.
-    const chain = Array.from({ length: 9 }, (_, index) =>
-      makeNode(
-        `A${index}`,
-        "chain",
-        String(index + 1).padStart(2, "0"),
-        index === 0 ? [] : [`A${index - 1}`],
-      ),
-    );
-    const nodes = [
-      ...chain,
-      makeNode("X", "aaa", "01"),
-      makeNode("Z", "tail", "01", ["A8", "X"]),
-    ];
-    const layout = layoutGraph(nodes);
-    const lanes = [...layout.waypoints.values()].flat();
-    expect(lanes.length).toBe(8);
+describe("crossover routing", () => {
+  // The regression this suite exists for: contract/02 -> server/04 drove its
+  // diagonal straight through server/03's segment on the first render.
+  // b/03 sits two slots along, so the span is wide enough to hold the drop at
+  // 45 degrees. A crossover with no room falls back to a straight line by
+  // design — the connection matters more than the angle.
+  const nodes = [
+    makeNode("a/01", "a", "01"),
+    makeNode("b/01", "b", "01"),
+    makeNode("b/02", "b", "02", ["b/01"]),
+    makeNode("b/03", "b", "03", ["a/01"]),
+  ];
 
-    // Every placeholder sits above the chain node sharing its column.
-    const nodeAtColumn = new Map(
-      [...layout.positions.values()].map(({ x, y }) => [x, y]),
-    );
-    for (const lane of lanes) {
-      expect(lane.y).toBeLessThan(nodeAtColumn.get(lane.left));
+  test("changes road inside a gap, never over another berth", () => {
+    const layout = layoutGraph(nodes);
+    const turnX = layout.turns.get("a/01->b/03");
+    const options = { berthWidth: 14 * 7, slotGap: 14 * 4 };
+
+    expect(turnX).toBeGreaterThan(0);
+    for (const [ref, p] of layout.positions) {
+      if (ref === "a/01" || ref === "b/03") continue;
+      const covers = turnX > p.x && turnX < p.x + options.berthWidth;
+      expect(covers).toBe(false);
     }
+  });
+
+  test("holds 45 degrees: the diagonal's run equals its drop", () => {
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+    const d = svg.match(/data-from="a\/01" data-to="b\/03"[^>]*d="([^"]+)"/)[1];
+    const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(([, x, y]) => [
+      Number(x),
+      Number(y),
+    ]);
+
+    expect(pts.length).toBe(4);
+    const [, [x2, y2], [x3, y3]] = pts;
+    expect(Math.abs(x3 - x2)).toBeCloseTo(Math.abs(y3 - y2), 5);
+  });
+});
+
+describe("signals", () => {
+  test("a berth with a dependency carries a signal head", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect((svg.match(/class="graph-signal/g) ?? []).length).toBe(1);
+  });
+
+  test("the aspect follows the task's state", () => {
+    const done = {
+      ...makeNode("api/02", "api", "02", ["api/01"]),
+      state: "done",
+    };
+    const blocked = {
+      ...makeNode("api/02", "api", "02", ["api/01"]),
+      state: "blocked",
+    };
+    const root = makeNode("api/01", "api", "01");
+
+    expect(renderGraph([root, done], layoutGraph([root, done]))).toContain(
+      "graph-signal -clear",
+    );
+    expect(
+      renderGraph([root, blocked], layoutGraph([root, blocked])),
+    ).toContain("graph-signal -danger");
+  });
+});
+
+describe("panel tokens", () => {
+  const nodes = [
+    makeNode("api/01", "api", "01"),
+    makeNode("api/02", "api", "02"),
+  ];
+
+  test("tiers the count under the berth", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes), {
+      usage: { byTask: { "api/01": { output: 92_400 } } },
+    });
+
+    expect(svg).toContain('class="graph-tokens -warn"');
+    expect(svg).toContain(">92.4K</text>");
+  });
+
+  test("omits the line where nothing was measured, and draws no pill", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes), {
+      usage: { byTask: {} },
+    });
+
+    expect(svg).not.toContain("graph-tokens");
+    expect(svg).not.toContain("graph-token-pill");
+    expect(svg).not.toContain("N/A");
+  });
+});
+
+describe("panel extent", () => {
+  test("the road runs the full declared width", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+    const width = Number(svg.match(/width="([\d.]+)"/)[1]);
+    const railEnd = Number(svg.match(/class="rail"[^>]*x2="([\d.]+)"/)[1]);
+
+    expect(railEnd).toBeLessThan(width);
+    expect(railEnd).toBeGreaterThan(width * 0.7);
+  });
+
+  test("height grows one pitch per road", () => {
+    const one = layoutGraph([makeNode("a/01", "a", "01")]);
+    const three = layoutGraph([
+      makeNode("a/01", "a", "01"),
+      makeNode("b/01", "b", "01"),
+      makeNode("c/01", "c", "01"),
+    ]);
+
+    expect(three.extent.height - one.extent.height).toBe(2 * 14 * 5);
   });
 });
