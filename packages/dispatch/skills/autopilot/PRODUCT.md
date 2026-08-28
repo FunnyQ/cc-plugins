@@ -8,9 +8,11 @@ Dispatch runs are monitored for long stretches, often beside terminals and edito
 
 ## Palette
 
-Semantics lead; colour follows. Ground is the work area (`#0E1114`). Surface and raised surface separate operational regions (`#171B20`, `#1E242B`). Rule draws structure without depth effects (`#262C33`). Text, muted text, and faint metadata form the reading hierarchy (`#D6DCE2`, `#7C8794`, `#4C555F`).
+Semantics lead; colour follows. Ground is the work area (`#0E1114`). Surface and raised surface separate operational regions (`#171B20`, `#1E242B`). Rule draws structure without depth effects (`#262C33`). Text, muted text, and faint metadata form the reading hierarchy (`#D2D8DF`, `#7C8794`, `#4C555F`).
 
-Flight is the only warm active signal (`#F0A830`). Done is cool and conclusive (`#4FB6C4`). Ready stays quiet but available (`#6E8CA0`). Blocked recedes without disappearing (`#414A55`). Alert is ember, reserved for failures that need attention (`#E05B4A`). Colour always appears with a label, count, or shape.
+Done is green and conclusive (`#5FA249`). Flight is the only warm active signal (`#C3843F`). Ready is a cool teal, quiet but available (`#4E97A1`). Blocked recedes into slate without disappearing (`#4F5B69`). Alert is coral, reserved for failures that need attention (`#FA6B66`). Colour always appears with a label, count, or shape.
+
+These are the shipped values, read from `dashboard/dist/style.css`. The record previously carried an earlier, cooler set — done as `#4FB6C4` cyan against the green the deck actually renders — and the code was confirmed authoritative on 2026-08-29. Read the stylesheet, not this paragraph, when the two disagree again.
 
 ## Type
 
