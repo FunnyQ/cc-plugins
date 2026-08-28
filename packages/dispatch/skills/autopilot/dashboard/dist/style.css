@@ -92,7 +92,7 @@ button {
   box-shadow: 0 var(--border-width) 0 var(--rule);
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
   min-height: var(--header-min-height);
   padding: var(--space-2) var(--space-4);
   position: sticky;
@@ -165,6 +165,24 @@ button {
 
   &.-live > .value {
     color: var(--state-flight);
+  }
+}
+
+.plan-tokens {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+
+  > .label {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  > .value {
+    font-size: var(--text-lg);
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -674,6 +692,13 @@ button {
       text-transform: uppercase;
     }
 
+    > .summary > .token-figure {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      justify-self: end;
+    }
+
     &.-done > .summary .status {
       background: var(--state-done);
     }
@@ -807,7 +832,7 @@ button {
 
 .c-fleet {
   --fleet-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) 48px 76px
-    minmax(160px, 1fr) minmax(160px, 2fr);
+    minmax(160px, 1fr) 76px minmax(160px, 2fr);
   --fleet-meter-height: var(--space-1);
   /* The heading is pinned to this height and the column header sticks exactly
      below it. One declaration for both, because the two used to be a rendered
@@ -1006,6 +1031,13 @@ button {
 /* The message is where a rejected gate says WHY, so it stops being secondary. */
 .fleet-row.-rejected .fleet-cell.-message {
   color: var(--text);
+}
+
+.fleet-cell.-tokens {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: end;
 }
 
 .raw-label,

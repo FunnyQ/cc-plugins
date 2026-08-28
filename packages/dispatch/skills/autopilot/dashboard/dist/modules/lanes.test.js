@@ -65,4 +65,19 @@ describe("Lanes", () => {
 
     expect(component.lanes()).toBe(component.lanes());
   });
+
+  test("renders N/A for a task absent from the rollup, and the figure for one present", () => {
+    const usage = {
+      byTask: {
+        "api/01": { input: 100, output: 500, cacheRead: 0, cacheWrite: 0 },
+      },
+      unattributed: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      totals: { input: 100, output: 500, cacheRead: 0, cacheWrite: 0 },
+      agentCount: 1,
+    };
+    const component = Lanes({ tree, usage });
+
+    expect(component.formatTokens(usage.byTask["ui/02"]?.output)).toBe("N/A");
+    expect(component.formatTokens(usage.byTask["api/01"]?.output)).toBe("500");
+  });
 });

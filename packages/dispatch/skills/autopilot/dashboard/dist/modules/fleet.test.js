@@ -351,3 +351,59 @@ describe("gate outcome colouring", () => {
     expect(html).not.toContain("-rejected");
   });
 });
+
+describe("Tokens column", () => {
+  const rowHtml = (row) => {
+    const originalDocument = globalThis.document;
+    globalThis.document = {
+      createElement() {
+        return { addEventListener() {}, className: "", innerHTML: "" };
+      },
+    };
+    try {
+      return renderFleet([row], 1, true, "connected").innerHTML;
+    } finally {
+      globalThis.document = originalDocument;
+    }
+  };
+
+  test("reads N/A, never 0, for a row with no matched transcript", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+    });
+
+    expect(html).toContain(
+      '<span class="fleet-cell -tokens" role="cell" title="no transcript matched this agent">N/A</span>',
+    );
+  });
+
+  test("renders the formatted output count and both counts in the title", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      usage: { input: 352, output: 3465, cacheRead: 0, cacheWrite: 0 },
+    });
+
+    expect(html).toContain(
+      '<span class="fleet-cell -tokens" role="cell" title="input 352 · output 3465">3.5K</span>',
+    );
+  });
+
+  test("keeps the column header count in step with the row cell count", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+    });
+    const headerCount = (html.match(/role="columnheader"/g) ?? []).length;
+    const cellCount = (html.match(/class="fleet-cell/g) ?? []).length;
+
+    expect(headerCount).toBe(cellCount);
+  });
+});

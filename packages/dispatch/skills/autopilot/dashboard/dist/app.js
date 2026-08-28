@@ -11,8 +11,23 @@ import {
   toggleRubric,
 } from "./modules/fleet.js";
 import { layoutGraph, relatedRefs, renderGraph } from "./modules/graph.js";
+import { formatTokens } from "./modules/format.js";
 
 const POLL_INTERVAL_MS = 3_000;
+
+const emptyCounts = () => ({
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+});
+
+const emptyUsage = () => ({
+  byTask: {},
+  unattributed: emptyCounts(),
+  totals: emptyCounts(),
+  agentCount: 0,
+});
 
 const emptyTree = () => ({
   planTitle: "",
@@ -37,10 +52,13 @@ const store = reactive({
   loadError: null,
   tree: emptyTree(),
   Lanes,
+  formatTokens,
   graphSvg: "",
   // Total flight time, from the first agent start. Empty until one starts.
   elapsed: "",
   elapsedLive: false,
+  // Plan-wide token rollup, updated in place from the fleet stream — see onFleet.
+  usage: emptyUsage(),
 });
 
 let graphLayout;
@@ -171,6 +189,13 @@ function syncElapsed(nowMs = Date.now()) {
   store.elapsedLive = total?.live === true;
 }
 
+// Mutates store.usage's own fields rather than reassigning the object: the
+// lanes view destructured this exact object at mount time, and swapping it
+// out would freeze that view's card totals at their first-frame values.
+function syncUsage(usage) {
+  Object.assign(store.usage, usage ?? emptyUsage());
+}
+
 function drawFleet() {
   const mount = document.querySelector(".deck-fleet");
   if (!mount) return;
@@ -234,7 +259,7 @@ document.addEventListener("visibilitychange", refreshWhenVisible);
 
 document.querySelector(".deck-top")?.insertAdjacentHTML(
   "beforeend",
-  `<div v-if="view === 'lanes'" v-scope="Lanes({ tree })"></div>
+  `<div v-if="view === 'lanes'" v-scope="Lanes({ tree, usage })"></div>
    <div v-if="view === 'graph'" class="c-dependency-graph" v-html="graphSvg"></div>`,
 );
 createApp(store).mount("#app");
@@ -249,6 +274,7 @@ connectEvents({
     fleetState.rows = Array.isArray(payload.rows) ? payload.rows : [];
     fleetState.entryCount = payload.entryCount ?? 0;
     fleetState.logPresent = payload.logPresent === true;
+    syncUsage(payload.usage);
     syncElapsed();
     drawFleet();
     syncFleetTicker();

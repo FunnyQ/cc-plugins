@@ -18,6 +18,19 @@ export function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+// Absent must never render as zero: a row with no matched transcript burned an
+// unknown amount, not a measured zero, and collapsing the two would look like a
+// real reading to anyone glancing at the panel.
+export function formatTokens(value) {
+  if (value === undefined || value === null) return "N/A";
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return "N/A";
+  if (number === 0) return "0";
+  if (number < 1_000) return String(Math.trunc(number));
+  if (number < 1_000_000) return `${(number / 1_000).toFixed(1)}K`;
+  return `${(number / 1_000_000).toFixed(1)}M`;
+}
+
 export function percent(value, maximum = SCORE_MAX) {
   const number = Math.min(Math.max(Number(value) || 0, 0), maximum);
   return `${(number / maximum) * 100}%`;

@@ -1,6 +1,7 @@
 import {
   compareTaskOrder,
   formatScore,
+  formatTokens,
   percent,
   renderDimensions,
   scoreClass,
@@ -28,7 +29,7 @@ export function buildLanes(tree) {
   });
 }
 
-export function Lanes({ tree }) {
+export function Lanes({ tree, usage }) {
   // Held in the closure, not on the scope: a cache written during a render must
   // not be reactive, or storing it would schedule the very render that filled it.
   let cachedFrom = null;
@@ -76,6 +77,7 @@ export function Lanes({ tree }) {
                     </span>
                     <span class="value">{{ formatScore(task.latestScore.weighted) }}</span>
                   </span>
+                  <span class="token-figure">{{ formatTokens(usage.byTask[task.ref]?.output) }}</span>
                 </button>
                 <div
                   v-if="hasBreakdown(task)"
@@ -117,5 +119,6 @@ export function Lanes({ tree }) {
     percent,
     renderDimensions,
     formatScore,
+    formatTokens,
   };
 }

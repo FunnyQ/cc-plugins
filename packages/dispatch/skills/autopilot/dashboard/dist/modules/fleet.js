@@ -1,6 +1,7 @@
 import {
   escapeHtml,
   formatScore,
+  formatTokens,
   percent,
   renderDimensions,
   scoreClass,
@@ -34,6 +35,13 @@ function renderScore(score) {
       <span class="value">${formatScore(score.weighted)}</span>
       ${failure}
     </span>`;
+}
+
+// Local to this module: it has one caller, renderRow.
+function tokenTitle(usage) {
+  return usage
+    ? `input ${usage.input} · output ${usage.output}`
+    : "no transcript matched this agent";
 }
 
 function renderBreakdown(row) {
@@ -83,6 +91,7 @@ function renderRow(row, nowMs) {
       <span class="fleet-cell -attempt" role="cell">${row.attempt === undefined ? "" : escapeHtml(row.attempt)}</span>
       <span class="fleet-cell -elapsed" role="cell">${elapsed}</span>
       <span class="fleet-cell -verdict" role="cell">${renderScore(row.score)}</span>
+      <span class="fleet-cell -tokens" role="cell" title="${escapeHtml(tokenTitle(row.usage))}">${escapeHtml(formatTokens(row.usage?.output))}</span>
       <span class="fleet-cell -message" role="cell" title="${escapeHtml(row.message)}">${escapeHtml(row.message)}</span>
     </div>
     ${renderBreakdown(row)}`;
@@ -202,7 +211,8 @@ export function renderFleet(
         <span role="columnheader"><span class="visually-hidden">Status</span></span>
         <span role="columnheader">Role</span><span role="columnheader">Task</span>
         <span role="columnheader">Try</span><span role="columnheader">Elapsed</span>
-        <span role="columnheader">Verdict</span><span role="columnheader">Message</span>
+        <span role="columnheader">Verdict</span><span role="columnheader">Tokens</span>
+        <span role="columnheader">Message</span>
       </div>
       <div class="fleet-body" role="rowgroup">
         ${visibleRows.map((row) => renderRow(row, nowMs)).join("") || '<p class="fleet-empty">No agents seen yet.</p>'}

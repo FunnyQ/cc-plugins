@@ -34,6 +34,11 @@
           <span class="value"><span v-if="elapsedLive" class="status-dot" aria-hidden="true"></span>{{ elapsed }}</span>
         </div>
 
+        <div class="plan-tokens" v-if="usage.agentCount">
+          <span class="label">Tokens</span>
+          <span class="value">{{ formatTokens(usage.totals.output) }}</span>
+        </div>
+
         <dl class="plan-counts" aria-label="Flight plan counts">
           <div>
             <dt>Total</dt>
