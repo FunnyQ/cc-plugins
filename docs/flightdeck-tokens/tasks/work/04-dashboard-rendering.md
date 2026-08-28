@@ -6,7 +6,7 @@
 >
 > **Depends on**: work/03
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -148,22 +148,22 @@ The value is the plan-wide output total, through the same formatter. petite-vue 
 
 ## Acceptance criteria
 
-- [ ] `formatTokens` is exported from the shared format module and returns `"N/A"` for `undefined`, `null`, `NaN`, `Infinity`, and negatives; `"0"` for `0`; and the `K` / `M` forms for the worked examples above.
-- [ ] A fleet row whose `usage` is absent renders a Tokens cell reading `N/A`; a row with usage renders its output through the formatter.
-- [ ] The fleet column header and the row cells stay in the same order, and the grid track count in the stylesheet matches the number of columns rendered.
-- [ ] A lanes card for a task absent from the rollup's per-task map renders `N/A`, and one present renders that task's output figure.
-- [ ] The rollup object held on the reactive store is **mutated in place** on every frame and never reassigned, so a lanes card's figure updates on the second and later frames rather than freezing at its first value. Grep the frame handler for an assignment to the store's rollup field: there must not be one.
-- [ ] The header figure is absent from the DOM when the rollup reports zero agents, and shows the plan-wide output total otherwise.
-- [ ] Every value interpolated into an HTML string in the fleet module passes through the existing escaping helper.
-- [ ] No new colour, font, or animation is introduced in the stylesheet.
+- [x] `formatTokens` is exported from the shared format module and returns `"N/A"` for `undefined`, `null`, `NaN`, `Infinity`, and negatives; `"0"` for `0`; and the `K` / `M` forms for the worked examples above.
+- [x] A fleet row whose `usage` is absent renders a Tokens cell reading `N/A`; a row with usage renders its output through the formatter.
+- [x] The fleet column header and the row cells stay in the same order, and the grid track count in the stylesheet matches the number of columns rendered.
+- [x] A lanes card for a task absent from the rollup's per-task map renders `N/A`, and one present renders that task's output figure.
+- [x] The rollup object held on the reactive store is **mutated in place** on every frame and never reassigned, so a lanes card's figure updates on the second and later frames rather than freezing at its first value. Grep the frame handler for an assignment to the store's rollup field: there must not be one.
+- [x] The header figure is absent from the DOM when the rollup reports zero agents, and shows the plan-wide output total otherwise.
+- [x] Every value interpolated into an HTML string in the fleet module passes through the existing escaping helper.
+- [x] No new colour, font, or animation is introduced in the stylesheet.
 
 ## Verification
 
-- [ ] Run `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` — every test passes, including the existing fleet and lanes suites.
-- [ ] Generate the scenario rather than hunting for one. Run the fixture generator described in `../_context/shared.md`, capture the `planDir`, `projectsRoot`, and `expected` it prints, and start the flightdeck server against that plan directory with `--projects-root` pointing at that projects tree. Read the port from the server's own startup output rather than assuming one, open that URL in a browser, and confirm three things: the fleet panel shows a Tokens column with figures, at least one lanes card shows a task total, and the header shows a plan total matching the token formatter applied to `expected.totals.output`.
-- [ ] In that same session, confirm the row the fixture deliberately left without a transcript reads `N/A` and not `0`. The fixture guarantees exactly one such row, which is why this check does not depend on finding an external-engine agent in whatever data happens to be lying around.
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/` — the server-side suite still passes, proving nothing outside the dashboard bundle was touched.
-- [ ] Run `git status --short -- packages/dispatch/skills/autopilot/dashboard/dist/modules/format.js packages/dispatch/skills/autopilot/dashboard/dist/modules/format.test.js packages/dispatch/skills/autopilot/dashboard/dist/modules/fleet.js packages/dispatch/skills/autopilot/dashboard/dist/modules/lanes.js packages/dispatch/skills/autopilot/dashboard/dist/app.js packages/dispatch/skills/autopilot/dashboard/dist/index.html packages/dispatch/skills/autopilot/dashboard/dist/style.css` and confirm every one of those paths is dirty.
+- [x] Run `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` — every test passes, including the existing fleet and lanes suites.
+- [x] Generate the scenario rather than hunting for one. Run the fixture generator described in `../_context/shared.md`, capture the `planDir`, `projectsRoot`, and `expected` it prints, and start the flightdeck server against that plan directory with `--projects-root` pointing at that projects tree. Read the port from the server's own startup output rather than assuming one, open that URL in a browser, and confirm three things: the fleet panel shows a Tokens column with figures, at least one lanes card shows a task total, and the header shows a plan total matching the token formatter applied to `expected.totals.output`.
+- [x] In that same session, confirm the row the fixture deliberately left without a transcript reads `N/A` and not `0`. The fixture guarantees exactly one such row, which is why this check does not depend on finding an external-engine agent in whatever data happens to be lying around.
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/` — the server-side suite still passes, proving nothing outside the dashboard bundle was touched.
+- [x] Run `git status --short -- packages/dispatch/skills/autopilot/dashboard/dist/modules/format.js packages/dispatch/skills/autopilot/dashboard/dist/modules/format.test.js packages/dispatch/skills/autopilot/dashboard/dist/modules/fleet.js packages/dispatch/skills/autopilot/dashboard/dist/modules/lanes.js packages/dispatch/skills/autopilot/dashboard/dist/app.js packages/dispatch/skills/autopilot/dashboard/dist/index.html packages/dispatch/skills/autopilot/dashboard/dist/style.css` and confirm every one of those paths is dirty.
 
 ## Eval rubric
 
