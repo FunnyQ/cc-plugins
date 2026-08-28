@@ -29,7 +29,7 @@ import {
   compareTaskOrder,
   escapeHtml,
   formatTokens,
-  tokenTier,
+  hasTokenReading,
 } from "./format.js";
 
 // Left-to-right layout: a dependency chain reads along the reading direction,
@@ -631,10 +631,11 @@ export function renderGraph(nodes, layout, opts = {}) {
       const centreX = position.x + options.berthWidth / 2;
       const midY = position.y + options.berthHeight / 2;
       const tokens = tokensByRef[node.ref]?.output;
-      const tokenLine =
-        tokenTier(tokens) === ""
-          ? ""
-          : `<text class="graph-tokens ${tokenTier(tokens)}" font-size="${options.fontSize * 0.75}" x="${trim(centreX)}" y="${trim(position.y + options.berthHeight + options.fontSize * 2.5)}">${escapeHtml(formatTokens(tokens))}</text>`;
+      // Untiered: a berth's figure is the whole task, several agents deep, so the
+      // per-agent thresholds would paint every berth on any real run.
+      const tokenLine = !hasTokenReading(tokens)
+        ? ""
+        : `<text class="graph-tokens" font-size="${options.fontSize * 0.75}" x="${trim(centreX)}" y="${trim(position.y + options.berthHeight + options.fontSize * 2.5)}">${escapeHtml(formatTokens(tokens))}</text>`;
       // A gate stands at the entry of any berth something has to clear first.
       const aspect = isCyclic
         ? "danger"

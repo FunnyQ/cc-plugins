@@ -411,13 +411,17 @@ describe("panel tokens", () => {
     makeNode("api/02", "api", "02"),
   ];
 
-  test("tiers the count under the berth", () => {
+  // A berth totals every agent on the task, so the per-agent tiers stay in the
+  // fleet — the count here is drawn in one ink no matter how large.
+  test("draws the count under the berth, untiered", () => {
     const svg = renderGraph(nodes, layoutGraph(nodes), {
       usage: { byTask: { "api/01": { output: 92_400 } } },
     });
 
-    expect(svg).toContain('class="graph-tokens -warn"');
+    expect(svg).toContain('class="graph-tokens"');
     expect(svg).toContain(">92.4K</text>");
+    expect(svg).not.toContain("-warn");
+    expect(svg).not.toContain("-danger");
   });
 
   test("omits the line where nothing was measured, and draws no pill", () => {

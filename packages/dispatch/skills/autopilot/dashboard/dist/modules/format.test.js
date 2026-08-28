@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { TOKEN_DANGER, TOKEN_WARN, formatTokens, tokenTier } from "./format.js";
+import {
+  TOKEN_DANGER,
+  TOKEN_WARN,
+  formatTokens,
+  hasTokenReading,
+  tokenTier,
+} from "./format.js";
 
 describe("formatTokens", () => {
   test("reports missing measurements as unavailable, never zero", () => {
@@ -52,6 +58,18 @@ describe("tokenTier", () => {
     for (const absent of [undefined, null, NaN, Infinity, -Infinity, -1]) {
       expect(formatTokens(absent)).toBe("N/A");
       expect(tokenTier(absent)).toBe("");
+      expect(hasTokenReading(absent)).toBe(false);
+    }
+  });
+});
+
+// The panels that carry no thresholds still have to tell a measured 0 from an
+// unknown, so the presence test is shared rather than re-derived per panel.
+describe("hasTokenReading", () => {
+  test("accepts every count formatTokens prints a number for", () => {
+    for (const present of [0, 1, 999, 92_400, 7_183_857]) {
+      expect(hasTokenReading(present)).toBe(true);
+      expect(formatTokens(present)).not.toBe("N/A");
     }
   });
 });

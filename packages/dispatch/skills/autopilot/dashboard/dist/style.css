@@ -526,19 +526,12 @@ button {
     font-weight: 600;
   }
 
+  /* Untiered — a berth totals several agents, so the fleet's per-agent
+     thresholds would light every berth on a real run. */
   .graph-tokens {
+    fill: var(--muted);
     font-weight: 700;
     letter-spacing: 0.03em;
-  }
-
-  .graph-tokens.-normal {
-    fill: var(--muted);
-  }
-  .graph-tokens.-warn {
-    fill: var(--token-warn);
-  }
-  .graph-tokens.-danger {
-    fill: var(--token-danger);
   }
 
   .graph-cycle-label {
@@ -1137,16 +1130,20 @@ button {
   letter-spacing: 0.02em;
 }
 
-:is(.role-tokens, .token-figure).-warn {
+/* Tiers are the fleet's alone. A lane card and a graph berth both total several
+   agents, so per-agent thresholds would light them up on every real run. */
+.role-tokens.-warn {
   --token-ink: var(--token-warn);
 }
 
-:is(.role-tokens, .token-figure).-danger {
+.role-tokens.-danger {
   --token-ink: var(--token-danger);
 }
 
-/* No measurement, no reading: N/A carries no tier class and stays caption grey. */
-:is(.role-tokens, .token-figure):not(.-normal, .-warn, .-danger) {
+/* No measurement, no reading: N/A stays caption grey wherever it prints. Absence is
+   not a tier — the lane card carries no thresholds but still has to say "unknown". */
+.role-tokens:not(.-normal, .-warn, .-danger),
+.token-figure.-absent {
   --token-ink: var(--muted);
 }
 
