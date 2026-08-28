@@ -1,5 +1,22 @@
 # Changelog
 
+## [dispatch 3.22.0] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.0`_
+
+### Added
+- Autopilot's flightdeck dashboard now tracks token usage: per-agent counts in the fleet panel, per-task and plan-wide totals on the lane, graph, and header panels, and warn/danger coloring in the fleet once one agent crosses a budget threshold. Task and plan totals stay uncolored — they sum several agents, so per-agent thresholds would light them on any real run.
+
+### Changed
+- The dependency graph is now flightdeck's default view, redesigned as a railway-signalling interlocking panel: buckets read as tracks, tasks as berth segments, cross-bucket dependencies as diagonal crossovers, and gates as signal heads, replacing the previous flat node-graph look.
+- In the fleet view, each agent's token count now sits under its role chip instead of occupying its own column.
+
+### Fixed
+- The graph panel no longer overflows or clips content at wide viewports — it now sizes itself to the pane's actual space instead of a fixed band.
+- A lit route on the graph now stays lit end to end instead of breaking at every berth boundary, and a blocked berth is now visually distinct from open track.
+- Streamed token usage is no longer double-counted across incremental transcript reads, and aggregate multi-agent token totals no longer get colored as if a single agent had used them.
+- `flightplan-lint` now reports a missing task or plan path as its own error instead of folding it into a generic lint failure, with clearer path and working-directory diagnostics.
+
 ## [dispatch 3.21.2] - 2026-08-27
 
 _tracks tag `dispatch-v3.21.2`_
