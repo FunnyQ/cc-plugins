@@ -1,8 +1,5 @@
 import {
-  closeSync,
   existsSync,
-  openSync,
-  readSync,
   statSync,
   watch as fsWatch,
   type FSWatcher,
@@ -11,7 +8,7 @@ import { dirname } from "node:path";
 import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
-import { nextCursor, splitCompleteLines } from "./tail";
+import { nextCursor, readRange, splitCompleteLines } from "./tail";
 
 const SNAPSHOT_DEBOUNCE_MS = 250;
 const POLL_MS = 2_000;
@@ -144,28 +141,6 @@ export function eventsHandler(request: Request, logPath: string): Response {
         decoder.decode();
       }
 
-      function readRange(from: number, size: number): Uint8Array {
-        const bytes = Buffer.allocUnsafe(size - from);
-        const descriptor = openSync(logPath, "r");
-        let offset = 0;
-        try {
-          while (offset < bytes.length) {
-            const count = readSync(
-              descriptor,
-              bytes,
-              offset,
-              bytes.length - offset,
-              from + offset,
-            );
-            if (count === 0) break;
-            offset += count;
-          }
-        } finally {
-          closeSync(descriptor);
-        }
-        return bytes.subarray(0, offset);
-      }
-
       function checkFile(): void {
         if (closed) return;
         attachDirectoryWatcher();
@@ -198,7 +173,7 @@ export function eventsHandler(request: Request, logPath: string): Response {
           const from = reset ? 0 : next.from;
           const grew = stat.size > from;
           if (grew) {
-            const bytes = readRange(from, stat.size);
+            const bytes = readRange(logPath, from, stat.size);
             const decoded = decodeLogChunk(decoder, bytes, heldPartial);
             entries.push(...decoded.entries);
             heldPartial = decoded.partial;

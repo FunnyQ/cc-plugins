@@ -1,3 +1,32 @@
+import { closeSync, openSync, readSync } from "node:fs";
+
+/** Read a byte range out of a file. Returns fewer bytes than asked when the file shrank mid-read. */
+export function readRange(
+  path: string,
+  from: number,
+  size: number,
+): Uint8Array {
+  const bytes = Buffer.allocUnsafe(size - from);
+  const descriptor = openSync(path, "r");
+  let offset = 0;
+  try {
+    while (offset < bytes.length) {
+      const count = readSync(
+        descriptor,
+        bytes,
+        offset,
+        bytes.length - offset,
+        from + offset,
+      );
+      if (count === 0) break;
+      offset += count;
+    }
+  } finally {
+    closeSync(descriptor);
+  }
+  return bytes.subarray(0, offset);
+}
+
 /** Split a chunk into complete lines and the trailing partial remainder. */
 export function splitCompleteLines(text: string): {
   complete: string[];
