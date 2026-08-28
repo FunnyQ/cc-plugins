@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: work/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -194,30 +194,30 @@ dashboard and nothing in the runtime imports it.
 
 ## Acceptance criteria
 
-- [ ] `usage-types.ts` declares `TokenCounts`, `AgentUsage`, and `UsageRollup` exactly as frozen in `../_context/types.md`, with no imports and no runtime code.
-- [ ] `readRange(path, from, size)` is exported from `tail.ts`, and `events-api.ts` uses it with no local copy remaining.
-- [ ] `projectSlug` returns `-Users-funnyq-Projects-q-lab-cc-plugins` for `/Users/funnyq/Projects/q-lab/cc-plugins` and `-Users-funnyq--claude` for `/Users/funnyq/.claude`.
-- [ ] `repoRootOf` finds a root whose `.git` is a plain file, and returns `null` when no `.git` exists above the input.
-- [ ] `parseAgentPrompt` extracts task and role from the announce shape, task with role `"mark-done"` from the finalize shape, an attempt when present, `undefined` when absent, and all-null when neither shape matches.
-- [ ] `addUsage` maps the four wire keys to the four camelCase fields, skips non-integer and unknown keys, and is a no-op on a non-object.
-- [ ] A second `read()` over unchanged files reads no new bytes and returns counts identical to the first.
-- [ ] A file truncated below its cursor is re-read from zero and its counts equal a fresh read of the new content, not the sum of both reads.
-- [ ] A transcript whose first line does not mention the plan directory is excluded from the results and is not reopened on later passes.
-- [ ] A zero-byte transcript, and one holding only a partial first line, are both omitted from the result rather than returned with unknown membership — and a later `read()` includes the first once its opening line arrives and names the plan.
-- [ ] A `started` line carrying no `message` key does not throw, and a malformed JSON line is skipped without losing the valid lines around it.
-- [ ] A file deleted after a successful `read()` is absent from the next result and its tokens are gone from the totals; a file that still exists but whose read throws keeps its previous counts and returns them unchanged.
-- [ ] `usage-fixture.ts` prints one JSON object on stdout, and feeding its `planDir` and `projectsRoot` back into `createTranscriptSource` reproduces its declared `expected.totals` and `expected.agentCount` exactly. The generator is only useful if it is self-consistent, so this round trip is its own test.
-- [ ] The fixture's flightlog names three agents while only two transcripts exist, so a consumer can observe one row that will never pair.
-- [ ] Every failure path degrades instead of throwing: missing projects directory, missing repo root, empty file, malformed line. A file that exists but throws on read is the documented exception — it keeps its state rather than reducing the result.
+- [x] `usage-types.ts` declares `TokenCounts`, `AgentUsage`, and `UsageRollup` exactly as frozen in `../_context/types.md`, with no imports and no runtime code.
+- [x] `readRange(path, from, size)` is exported from `tail.ts`, and `events-api.ts` uses it with no local copy remaining.
+- [x] `projectSlug` returns `-Users-funnyq-Projects-q-lab-cc-plugins` for `/Users/funnyq/Projects/q-lab/cc-plugins` and `-Users-funnyq--claude` for `/Users/funnyq/.claude`.
+- [x] `repoRootOf` finds a root whose `.git` is a plain file, and returns `null` when no `.git` exists above the input.
+- [x] `parseAgentPrompt` extracts task and role from the announce shape, task with role `"mark-done"` from the finalize shape, an attempt when present, `undefined` when absent, and all-null when neither shape matches.
+- [x] `addUsage` maps the four wire keys to the four camelCase fields, skips non-integer and unknown keys, and is a no-op on a non-object.
+- [x] A second `read()` over unchanged files reads no new bytes and returns counts identical to the first.
+- [x] A file truncated below its cursor is re-read from zero and its counts equal a fresh read of the new content, not the sum of both reads.
+- [x] A transcript whose first line does not mention the plan directory is excluded from the results and is not reopened on later passes.
+- [x] A zero-byte transcript, and one holding only a partial first line, are both omitted from the result rather than returned with unknown membership — and a later `read()` includes the first once its opening line arrives and names the plan.
+- [x] A `started` line carrying no `message` key does not throw, and a malformed JSON line is skipped without losing the valid lines around it.
+- [x] A file deleted after a successful `read()` is absent from the next result and its tokens are gone from the totals; a file that still exists but whose read throws keeps its previous counts and returns them unchanged.
+- [x] `usage-fixture.ts` prints one JSON object on stdout, and feeding its `planDir` and `projectsRoot` back into `createTranscriptSource` reproduces its declared `expected.totals` and `expected.agentCount` exactly. The generator is only useful if it is self-consistent, so this round trip is its own test.
+- [x] The fixture's flightlog names three agents while only two transcripts exist, so a consumer can observe one row that will never pair.
+- [x] Every failure path degrades instead of throwing: missing projects directory, missing repo root, empty file, malformed line. A file that exists but throws on read is the documented exception — it keeps its state rather than reducing the result.
 
 ## Verification
 
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/usage-source.test.ts packages/dispatch/skills/autopilot/scripts/tail.test.ts` — all tests pass.
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/` — the pre-existing suite still passes, proving the `readRange` lift did not break the live event feed.
-- [ ] Run `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — prints nothing. Run it exactly like that, against the root `tsconfig.json`: naming files on the `tsc` command line drops the config, so `strict` runs without Bun's types and every `Bun`, `process`, and `Buffer` reports as an undefined name, burying real errors under fake ones. Do not chase a zero total; the repo-wide run is not green.
-- [ ] Run `git status --short -- packages/dispatch/skills/autopilot/scripts/usage-types.ts packages/dispatch/skills/autopilot/scripts/usage-source.ts packages/dispatch/skills/autopilot/scripts/usage-source.test.ts packages/dispatch/skills/autopilot/scripts/tail.ts packages/dispatch/skills/autopilot/scripts/tail.test.ts packages/dispatch/skills/autopilot/scripts/events-api.ts` and confirm all six paths are dirty.
-- [ ] Build fixture transcript trees with `mkdtempSync(join(tmpdir(), "usage-source-"))`, writing real JSONL files that mirror the line shapes in `../_context/data-model.md`, and pass that temp directory as `projectsRoot`. Never read a real `~/.claude/projects/` directory from a test.
-- [ ] A source built against a `projectsRoot` whose slug directory does not exist yet returns `[]`, and then returns real results on a later `read()` once that directory and its files are created — proving the negative verdict was not cached.
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/usage-source.test.ts packages/dispatch/skills/autopilot/scripts/tail.test.ts` — all tests pass.
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/` — the pre-existing suite still passes, proving the `readRange` lift did not break the live event feed.
+- [x] Run `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — prints nothing. Run it exactly like that, against the root `tsconfig.json`: naming files on the `tsc` command line drops the config, so `strict` runs without Bun's types and every `Bun`, `process`, and `Buffer` reports as an undefined name, burying real errors under fake ones. Do not chase a zero total; the repo-wide run is not green.
+- [x] Run `git status --short -- packages/dispatch/skills/autopilot/scripts/usage-types.ts packages/dispatch/skills/autopilot/scripts/usage-source.ts packages/dispatch/skills/autopilot/scripts/usage-source.test.ts packages/dispatch/skills/autopilot/scripts/tail.ts packages/dispatch/skills/autopilot/scripts/tail.test.ts packages/dispatch/skills/autopilot/scripts/events-api.ts` and confirm all six paths are dirty.
+- [x] Build fixture transcript trees with `mkdtempSync(join(tmpdir(), "usage-source-"))`, writing real JSONL files that mirror the line shapes in `../_context/data-model.md`, and pass that temp directory as `projectsRoot`. Never read a real `~/.claude/projects/` directory from a test.
+- [x] A source built against a `projectsRoot` whose slug directory does not exist yet returns `[]`, and then returns real results on a later `read()` once that directory and its files are created — proving the negative verdict was not cached.
 
 ## Eval rubric
 
