@@ -8,6 +8,7 @@ import type {
   FlightlogEntry,
   ScoreEntry,
 } from "../../flightplan/scripts/lib/flightlog";
+import type { TokenCounts } from "./usage-types";
 
 /** Every role the orchestrator logs. The type is derived so the two never drift. */
 const KNOWN_ROLES = [
@@ -91,6 +92,12 @@ export type FleetRow = {
   message?: string;
   score?: ScoreEntry;
   outcome?: GateOutcome;
+  /**
+   * Tokens this agent burned. Absent when no transcript paired to the row —
+   * an external-engine agent, or a run whose transcripts are gone. Absent must
+   * render as unavailable, never as zero.
+   */
+  usage?: TokenCounts;
 };
 
 /** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */
@@ -143,7 +150,7 @@ export function parseAgentLabel(label: string): ParsedLabel {
 }
 
 /** The one place the fleet identity string is built. */
-function fleetIdentity(
+export function fleetIdentity(
   task: string,
   role: string,
   attempt: number | undefined,
