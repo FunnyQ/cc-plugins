@@ -7,7 +7,7 @@
 >
 > **Depends on**: work/01
 > **Blocks**: work/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -174,22 +174,22 @@ export function addCounts(into: TokenCounts, from: TokenCounts): void;
 
 ## Acceptance criteria
 
-- [ ] `attributeUsage(rows, agents)` returns `{ rows, rollup }` matching the frozen signature, importing its types rather than redeclaring them.
-- [ ] `fleetIdentity` is exported from the fleet module and imported here; no second copy of the identity format exists in the codebase.
-- [ ] The `FleetRow` type carries the optional `usage` field, and those two edits are the only changes made to the fleet module.
-- [ ] A group holding five agents and five rows pairs by nearest start time, not by array order — a case where the two orders differ proves it.
-- [ ] A group with more agents than rows, and a group with more rows than agents, both leave the surplus unpaired without throwing and without inventing a partner.
-- [ ] An unpaired row's `usage` is `undefined`, never a zeroed object.
-- [ ] Repeated calls on an input containing a timestamp tie return byte-identical output.
-- [ ] `sum(values(byTask)) + unattributed === totals` holds for all four counters on a mixed input containing paired agents, unpaired agents, and agents with a null task.
-- [ ] Input rows and agents are unmodified after the call, verified against deep-frozen inputs.
+- [x] `attributeUsage(rows, agents)` returns `{ rows, rollup }` matching the frozen signature, importing its types rather than redeclaring them.
+- [x] `fleetIdentity` is exported from the fleet module and imported here; no second copy of the identity format exists in the codebase.
+- [x] The `FleetRow` type carries the optional `usage` field, and those two edits are the only changes made to the fleet module.
+- [x] A group holding five agents and five rows pairs by nearest start time, not by array order — a case where the two orders differ proves it.
+- [x] A group with more agents than rows, and a group with more rows than agents, both leave the surplus unpaired without throwing and without inventing a partner.
+- [x] An unpaired row's `usage` is `undefined`, never a zeroed object.
+- [x] Repeated calls on an input containing a timestamp tie return byte-identical output.
+- [x] `sum(values(byTask)) + unattributed === totals` holds for all four counters on a mixed input containing paired agents, unpaired agents, and agents with a null task.
+- [x] Input rows and agents are unmodified after the call, verified against deep-frozen inputs.
 
 ## Verification
 
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/usage-attribute.test.ts` — every test passes.
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` — every test still passes, proving the two edits to the fleet module broke nothing.
-- [ ] Run `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — it prints nothing. Do **not** pass file paths to `tsc`: naming files on the command line drops the root `tsconfig.json`, so `strict` runs without Bun's global types and every `Bun`, `process`, and `Buffer` reports as an undefined name, hiding the real errors among a dozen fake ones. Do not chase a zero repo-wide total either; the repo has pre-existing errors elsewhere and is not green.
-- [ ] Run `git status --short -- packages/dispatch/skills/autopilot/scripts/usage-attribute.ts packages/dispatch/skills/autopilot/scripts/usage-attribute.test.ts packages/dispatch/skills/autopilot/scripts/fleet.ts` and confirm all three paths are dirty. This gate claims nothing about any path outside that list.
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/usage-attribute.test.ts` — every test passes.
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` — every test still passes, proving the two edits to the fleet module broke nothing.
+- [x] Run `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — it prints nothing. Do **not** pass file paths to `tsc`: naming files on the command line drops the root `tsconfig.json`, so `strict` runs without Bun's global types and every `Bun`, `process`, and `Buffer` reports as an undefined name, hiding the real errors among a dozen fake ones. Do not chase a zero repo-wide total either; the repo has pre-existing errors elsewhere and is not green.
+- [x] Run `git status --short -- packages/dispatch/skills/autopilot/scripts/usage-attribute.ts packages/dispatch/skills/autopilot/scripts/usage-attribute.test.ts packages/dispatch/skills/autopilot/scripts/fleet.ts` and confirm all three paths are dirty. This gate claims nothing about any path outside that list.
 
 ## Eval rubric
 
