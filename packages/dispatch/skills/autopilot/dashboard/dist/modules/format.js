@@ -31,6 +31,30 @@ export function formatTokens(value) {
   return `${(number / 1_000_000).toFixed(1)}M`;
 }
 
+// Per-agent and per-task budget thresholds. They are read against one agent's
+// spend or one task's, never against a plan-wide total: the header's rollup
+// clears both on any real run, and a figure that is permanently red teaches the
+// eye to stop reading the colour. That total stays untiered on purpose.
+export const TOKEN_WARN = 80_000;
+export const TOKEN_DANGER = 200_000;
+
+/**
+ * The tier class for a token count, or "" when there is no measurement.
+ *
+ * Absent is not a tier. A row with no matched transcript prints N/A, and
+ * painting that the normal colour would claim a reading nobody took.
+ */
+export function tokenTier(value) {
+  // The same rejects formatTokens prints N/A for, so a tier class and a real
+  // number always arrive together — a count the eye cannot read must not be
+  // painted as if it had been measured.
+  const number = Number(value);
+  if (value === null || !Number.isFinite(number) || number < 0) return "";
+  if (number >= TOKEN_DANGER) return "-danger";
+  if (number >= TOKEN_WARN) return "-warn";
+  return "-normal";
+}
+
 export function percent(value, maximum = SCORE_MAX) {
   const number = Math.min(Math.max(Number(value) || 0, 0), maximum);
   return `${(number / maximum) * 100}%`;

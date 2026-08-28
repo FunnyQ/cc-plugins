@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatTokens } from "./format.js";
+import { TOKEN_DANGER, TOKEN_WARN, formatTokens, tokenTier } from "./format.js";
 
 describe("formatTokens", () => {
   test("reports missing measurements as unavailable, never zero", () => {
@@ -30,5 +30,28 @@ describe("formatTokens", () => {
     expect(formatTokens(8545)).toBe("8.5K");
     expect(formatTokens(278146)).toBe("278.1K");
     expect(formatTokens(7183857)).toBe("7.2M");
+  });
+});
+
+describe("tokenTier", () => {
+  test("tiers on the documented thresholds, inclusive at each step", () => {
+    expect(tokenTier(0)).toBe("-normal");
+    expect(tokenTier(TOKEN_WARN - 1)).toBe("-normal");
+    expect(tokenTier(TOKEN_WARN)).toBe("-warn");
+    expect(tokenTier(TOKEN_DANGER - 1)).toBe("-warn");
+    expect(tokenTier(TOKEN_DANGER)).toBe("-danger");
+    expect(tokenTier(7_183_857)).toBe("-danger");
+  });
+
+  test("keeps the thresholds at 80K and 200K", () => {
+    expect(TOKEN_WARN).toBe(80_000);
+    expect(TOKEN_DANGER).toBe(200_000);
+  });
+
+  test("gives no tier to everything formatTokens calls N/A", () => {
+    for (const absent of [undefined, null, NaN, Infinity, -Infinity, -1]) {
+      expect(formatTokens(absent)).toBe("N/A");
+      expect(tokenTier(absent)).toBe("");
+    }
   });
 });
