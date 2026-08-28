@@ -47,7 +47,7 @@ const emptyTree = () => ({
 });
 
 const store = reactive({
-  view: "lanes",
+  view: "graph",
   loading: true,
   loadError: null,
   tree: emptyTree(),
@@ -81,7 +81,9 @@ function updateGraph(tasks) {
     graphLayout = layoutGraph(graphTasks);
     graphStructure = structure;
   }
-  store.graphSvg = renderGraph(graphTasks, graphLayout);
+  // Usage rides along rather than living in the layout: it changes on every
+  // fleet frame, and the coordinates must not move when a token count does.
+  store.graphSvg = renderGraph(graphTasks, graphLayout, { usage: store.usage });
   graphNodes = graphTasks;
 }
 
@@ -92,7 +94,7 @@ function updateGraph(tasks) {
  * dimmed node looks, and a redraw mid-hover simply clears them.
  */
 function litRefs(target) {
-  const node = target?.closest?.(".graph-node");
+  const node = target?.closest?.(".graph-berth");
   if (!node) return null;
   const ref = node.dataset.ref;
   return { ref, lit: relatedRefs(graphNodes, ref) };
@@ -111,7 +113,7 @@ function paintLineage(container, focus) {
   // as a direct one would light a neighbour with nothing connecting it.
   const parents = new Set();
   const children = new Set();
-  for (const edge of svg.querySelectorAll(".graph-edge")) {
+  for (const edge of svg.querySelectorAll(".graph-crossover")) {
     const { from, to } = edge.dataset;
     edge.classList.toggle("-lit", lit?.has(from) === true && lit.has(to));
     // One hop, in each direction. The rest of the lineage stays neutral, so the
@@ -125,7 +127,7 @@ function paintLineage(container, focus) {
     if (isChild) children.add(to);
   }
 
-  for (const node of svg.querySelectorAll(".graph-node")) {
+  for (const node of svg.querySelectorAll(".graph-berth")) {
     const ref = node.dataset.ref;
     node.classList.toggle("-lit", lit?.has(ref) === true);
     node.classList.toggle("-self", ref === focus?.ref);
@@ -194,6 +196,10 @@ function syncElapsed(nowMs = Date.now()) {
 // out would freeze that view's card totals at their first-frame values.
 function syncUsage(usage) {
   Object.assign(store.usage, usage ?? emptyUsage());
+  // The graph is an HTML string, not a reactive template, so a new token count
+  // only reaches a node when the SVG is rebuilt. The layout is cached, so this
+  // redraws the same coordinates with fresh numbers.
+  updateGraph(store.tree.tasks);
 }
 
 function drawFleet() {
