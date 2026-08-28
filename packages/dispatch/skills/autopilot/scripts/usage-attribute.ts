@@ -1,36 +1,29 @@
-import type { AgentUsage, TokenCounts, UsageRollup } from "./usage-types";
-import type { FleetRow } from "./fleet";
-import { fleetIdentity } from "./fleet";
-import { emptyCounts } from "./usage-source";
+import {
+  addCounts,
+  emptyCounts,
+  type AgentUsage,
+  type TokenCounts,
+  type UsageRollup,
+} from "./usage-types";
+import { fleetIdentity, type FleetRow } from "./fleet";
 
-/** Add `from` into `into`, in place. `into` is always a fresh accumulator. */
-export function addCounts(into: TokenCounts, from: TokenCounts): void {
-  into.input += from.input;
-  into.output += from.output;
-  into.cacheRead += from.cacheRead;
-  into.cacheWrite += from.cacheWrite;
-}
-
-/** Epoch ms, or `null` for a missing/unparseable timestamp — never `NaN`, never `0`. A
- * zero would read as 1970 and win every comparison it entered. */
+/** Epoch ms, or null when unparseable — never NaN/0, which would read as 1970 and win
+ * every comparison it entered. */
 function toEpochMs(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? null : ms;
 }
 
-// A FleetRow carries no identity string of its own, so rebuild it the same way the
-// fleet module does. `row.ref` falls back to the logged task even for the review-lens
-// label shape, which parses a lens instead of a ref.
+// `row.identity` is the string aggregateFleet already grouped on. Re-deriving it from
+// `row.ref`/`row.attempt` would key on the label-parsed display values instead, and
+// any agent whose free-text label parses would stop pairing.
 const groupRowsByIdentity = (rows: FleetRow[]): Map<string, FleetRow[]> =>
-  Map.groupBy(rows, (row) =>
-    fleetIdentity(row.ref ?? "", row.role, row.attempt),
-  );
+  Map.groupBy(rows, (row) => row.identity);
 
-// A null task or role belongs to no group — it can never be paired, but it still
-// counts toward the rollup below. The two role vocabularies are the same strings
-// already (see ../_context/data-model.md), so no translation layer sits between an
-// agent's parsed role and a row's role.
+// A null task or role belongs to no group — never paired, but still counted in the
+// rollup. The two role vocabularies are already the same strings, so no translation
+// layer sits between an agent's parsed role and a row's role.
 const groupAgentsByIdentity = (
   agents: AgentUsage[],
 ): Map<string, AgentUsage[]> =>
@@ -46,11 +39,9 @@ type Candidate = {
 };
 
 /**
- * Pair one identity group's rows to its agents one-to-one by nearest start
- * time. This is greedy nearest-neighbour, not a global optimum — a full
- * assignment solver would be a solver nobody asked for. Agents in one fan-out
- * start seconds apart, so the greedy and optimal assignments agree in every
- * observed case.
+ * Pair one identity group's rows to its agents one-to-one by nearest start time.
+ * Greedy nearest-neighbour, not a global optimum: agents in one fan-out start seconds
+ * apart, so greedy and optimal agree in every observed case.
  */
 function pairGroup(
   rows: FleetRow[],
@@ -60,12 +51,13 @@ function pairGroup(
   const pairedRows = new Set<number>();
   const pairedAgents = new Set<number>();
 
+  const agentMsByIndex = agents.map((agent) => toEpochMs(agent.startedAt));
   const candidates: Candidate[] = [];
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
     const rowMs = toEpochMs(rows[rowIndex]!.startedAt);
     if (rowMs === null) continue;
     for (let agentIndex = 0; agentIndex < agents.length; agentIndex++) {
-      const agentMs = toEpochMs(agents[agentIndex]!.startedAt);
+      const agentMs = agentMsByIndex[agentIndex]!;
       if (agentMs === null) continue;
       candidates.push({
         rowIndex,
@@ -117,11 +109,9 @@ function pairGroup(
 }
 
 function buildRollup(agents: AgentUsage[]): UsageRollup {
-  // Prototype-free: task refs are parsed out of a transcript, so `__proto__` or
-  // `constructor` can reach this lookup. On a plain `{}` they resolve to an
-  // inherited value instead of `undefined`, and the accumulate below would then
-  // write counts onto `Object.prototype` — NaN totals, a task silently missing
-  // from the panel, and every other object in the process polluted.
+  // Prototype-free: task refs come out of a transcript, so `__proto__` can reach this
+  // lookup — on a plain `{}` it resolves to an inherited value instead of `undefined`
+  // and the accumulate below writes counts onto `Object.prototype`.
   const byTask: Record<string, TokenCounts> = Object.create(null);
   const unattributed = emptyCounts();
   const totals = emptyCounts();

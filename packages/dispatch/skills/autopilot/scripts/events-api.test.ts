@@ -7,7 +7,7 @@ import {
   formatFleetFrame,
 } from "./events-api";
 import type { TranscriptSource } from "./usage-source";
-import type { AgentUsage, TokenCounts } from "./usage-types";
+import { emptyCounts, type AgentUsage, type TokenCounts } from "./usage-types";
 
 const entry: FlightlogEntry = {
   kind: "note",
@@ -20,10 +20,6 @@ const entry: FlightlogEntry = {
 
 function counts(input: number): TokenCounts {
   return { input, output: 0, cacheRead: 0, cacheWrite: 0 };
-}
-
-function emptyCounts(): TokenCounts {
-  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 }
 
 function agent(overrides: Partial<AgentUsage> = {}): AgentUsage {
@@ -54,6 +50,7 @@ describe("formatFleetFrame", () => {
       rows: [
         {
           key: "server/05|dev|-",
+          identity: "server/05|dev|-",
           label: "server/05|dev|-",
           role: "dev",
           ref: "server/05",

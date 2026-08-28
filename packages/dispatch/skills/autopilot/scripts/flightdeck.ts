@@ -30,13 +30,9 @@ export function parseArgs(argv: string[]): FlightdeckOptions {
     return { ok: false, message: validation.message };
   }
 
-  // Not part of the launcher's own flag set: it exists so a manual gate can point
-  // at a generated fixture instead of whatever transcripts survive on this machine.
-  //
-  // The missing-value case errors rather than swallowing the next token, which is
-  // the bug `lib/args.ts` was written to kill. That helper is not reused here
-  // because it reports by exiting the process, and this function is a pure parser
-  // its own unit tests call — an exit would take the test runner down with it.
+  // Not a launcher flag — it points a manual gate at a fixture transcript dir.
+  // `lib/args.ts` is not reused: it reports by exiting the process, and this is a pure
+  // parser its own unit tests call, so an exit would take the test runner down with it.
   const projectsRootIndex = argv.indexOf("--projects-root");
   const projectsRoot =
     projectsRootIndex === -1 ? undefined : argv[projectsRootIndex + 1];

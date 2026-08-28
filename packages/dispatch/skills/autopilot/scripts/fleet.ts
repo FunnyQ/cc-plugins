@@ -79,6 +79,13 @@ export type FleetStatus = "in-flight" | "abandoned" | "finished";
 export type GateOutcome = "passed" | "failed";
 
 export type FleetRow = {
+  /**
+   * `fleetIdentity` over the raw logged `task`/`role`/`attempt`. Exported because the
+   * transcript reader parses those same three flags off an agent's announce prompt and
+   * pairs on this string — `ref`/`attempt` below are label-parse-preferred display
+   * fields and diverge from it whenever an agent's free-text label parses.
+   */
+  identity: string;
   key: string;
   label: string;
   role: AgentRole;
@@ -92,11 +99,7 @@ export type FleetRow = {
   message?: string;
   score?: ScoreEntry;
   outcome?: GateOutcome;
-  /**
-   * Tokens this agent burned. Absent when no transcript paired to the row —
-   * an external-engine agent, or a run whose transcripts are gone. Absent must
-   * render as unavailable, never as zero.
-   */
+  /** Tokens burned. Absent (never 0) when no transcript paired — render as unavailable. */
   usage?: TokenCounts;
 };
 
@@ -274,7 +277,6 @@ export function deriveTaskViews(
 
 type IndexedRow = FleetRow & {
   order: number;
-  identity: string;
   agentLabel?: string;
 };
 
@@ -549,8 +551,5 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
     return a.order - b.order;
   });
 
-  return rows.map(
-    ({ order: _order, identity: _identity, agentLabel: _agentLabel, ...row }) =>
-      row,
-  );
+  return rows.map(({ order: _order, agentLabel: _agentLabel, ...row }) => row);
 }

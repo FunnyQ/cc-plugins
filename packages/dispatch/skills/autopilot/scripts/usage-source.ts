@@ -2,7 +2,12 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { nextCursor, readRange, splitCompleteLines } from "./tail";
-import type { AgentUsage, TokenCounts } from "./usage-types";
+import {
+  emptyCounts,
+  replaceCounts,
+  type AgentUsage,
+  type TokenCounts,
+} from "./usage-types";
 
 export type TranscriptSource = {
   /**
@@ -14,9 +19,8 @@ export type TranscriptSource = {
 
 /**
  * Claude Code names a project directory after the session's absolute cwd with every
- * non-alphanumeric character replaced by `-`. Uppercase survives, and a leading `/`
+ * non-alphanumeric character replaced by `-`. Uppercase survives and a leading `/`
  * produces a leading `-`; a rule that trims or collapses dashes finds nothing on disk.
- * Verified by hand against real directory names — see `../_context/data-model.md`.
  */
 export function projectSlug(absPath: string): string {
   return absPath.replace(/[^A-Za-z0-9]/g, "-");
@@ -72,14 +76,8 @@ export function parseAgentPrompt(content: unknown): {
   return { task: null, role: null, attempt: undefined };
 }
 
-export function emptyCounts(): TokenCounts {
-  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-}
-
-// Wire names (Claude Code's snake_case) -> the repo's camelCase `TokenCounts` fields.
 // A literal array, not a record walked with `Object.entries`: `addUsage` runs once per
-// assistant line and a cursor reset re-ingests whole files, so the entries array would
-// be allocated on every line of every transcript.
+// assistant line, so the entries array would be rebuilt on every line of every transcript.
 const WIRE_KEYS: [string, keyof TokenCounts][] = [
   ["input_tokens", "input"],
   ["output_tokens", "output"],
@@ -88,12 +86,9 @@ const WIRE_KEYS: [string, keyof TokenCounts][] = [
 ];
 
 /**
- * Sum only the four named counters and ignore everything else — future versions may
- * add nested or non-numeric fields, and a blind reduce would crash or invent tokens.
- *
- * A counter must be a non-negative *safe* integer. A negative drives a total below
- * zero, which the display formatter renders as `N/A` — corruption disguised as
- * "no data". Beyond 2^53 the arithmetic silently loses precision instead.
+ * Sum only the four named counters: a blind reduce would crash or invent tokens on a
+ * field a future version adds. A negative drives a total below zero, which the display
+ * formatter renders as `N/A` — corruption disguised as "no data".
  */
 export function addUsage(into: TokenCounts, raw: unknown): void {
   if (typeof raw !== "object" || raw === null) return;
@@ -117,6 +112,8 @@ type FileState = {
   partial: string;
   decoder: TextDecoder;
   counts: TokenCounts;
+  /** Last-seen usage per billed request, the subtrahend `applyUsage` swaps out. */
+  byRequest: Map<string, TokenCounts>;
   models: string[];
   task: string | null;
   role: string | null;
@@ -131,6 +128,7 @@ function freshState(): FileState {
     partial: "",
     decoder: new TextDecoder(),
     counts: emptyCounts(),
+    byRequest: new Map(),
     models: [],
     task: null,
     role: null,
@@ -161,17 +159,13 @@ function listNames(dir: string): string[] {
 }
 
 /**
- * Workflow agents live under `<slug>/<sessionId>/subagents/workflows/wf_<runId>/`,
+ * Workflow agents live at `<slug>/<sessionId>/subagents/workflows/wf_<runId>/agent-*.jsonl`,
  * never directly under `subagents/` — that path holds plain Agent() subagents and returns
- * zero files for a Workflow run, which reads as "Workflow agents leave no transcript"
- * (the trap this whole feature exists past; see ../_context/data-model.md).
- * `journal.jsonl` and `.meta.json` sidecars are skipped: neither carries usage or a
- * label, and the `agent-*.jsonl` name filter excludes both for free.
+ * zero files for a Workflow run (see ../_context/data-model.md).
  *
- * The enumeration is its own existence check: `readdir` on a missing path, or on a
- * plain file (the project dir holds `<sessionId>.jsonl` files beside its session
- * directories), throws and `listNames` returns `[]`. A preceding `stat` would only
- * ask the kernel the same question twice, once per session the project ever produced.
+ * The enumeration is its own existence check: `readdir` on a missing path, or on one of
+ * the `<sessionId>.jsonl` files sitting beside the session directories, throws and
+ * `listNames` returns `[]`. A preceding `stat` would ask the kernel the same question twice.
  */
 function discoverAgentFiles(slugDir: string): string[] {
   const found: string[] = [];
@@ -190,21 +184,18 @@ function discoverAgentFiles(slugDir: string): string[] {
 }
 
 /**
- * Whether `text` names a path at or under `planDir`.
- *
- * A bare `includes` is not enough: sibling plans share a parent, so `docs/foo` would
- * claim every transcript of `docs/foo-bar` and silently absorb another plan's tokens.
- * The character after the match must therefore end the path or separate the next
- * segment. Every real mention is a path *inside* the plan dir (the flightlog, a task
- * file), so requiring the separator costs nothing.
+ * Whether `text` names a path at or under `planDir`. A bare `includes` is not enough:
+ * `docs/foo` would claim every transcript of the sibling `docs/foo-bar` and absorb its
+ * tokens, so the character after the match must end the path or separate the next segment.
  */
 function mentionsPlanDir(text: string, planDir: string): boolean {
-  for (let from = 0; ; from += 1) {
+  let from = 0;
+  for (;;) {
     const at = text.indexOf(planDir, from);
     if (at === -1) return false;
     const next = text[at + planDir.length];
     if (next === undefined || next === sep || next === "/") return true;
-    from = at;
+    from = at + 1;
   }
 }
 
@@ -238,6 +229,50 @@ function decideMembership(
     typeof record.timestamp === "string" ? record.timestamp : null;
 }
 
+/**
+ * Identify the billed request a line belongs to. `requestId:message.id` names it;
+ * the entry uuid, then a per-line counter, keep unkeyed lines from collapsing onto
+ * one another — that would drop every line but the last.
+ */
+function requestKey(
+  record: Record<string, unknown>,
+  message: Record<string, unknown>,
+  state: FileState,
+): string {
+  const requestId = record.requestId;
+  const messageId = message.id;
+  if (typeof requestId === "string" && typeof messageId === "string") {
+    return `${requestId}:${messageId}`;
+  }
+  return typeof record.uuid === "string"
+    ? record.uuid
+    : `#${state.byRequest.size}`;
+}
+
+/**
+ * Fold one assistant line's usage into the running total.
+ *
+ * Claude Code writes a line per streamed block (thinking, text, tool_use), each
+ * carrying a progressively completed copy of the SAME request's usage — summing them
+ * double-bills. Measured over 842 real workflow transcripts: 88% of requests repeat
+ * and a plain sum overcounts cache reads 2.05x. `output_tokens` never decreased across
+ * a request's snapshots, so the last snapshot is the complete one and replaces its
+ * predecessor rather than adding to it.
+ */
+function applyUsage(
+  state: FileState,
+  record: Record<string, unknown>,
+  message: Record<string, unknown>,
+): void {
+  const next = emptyCounts();
+  addUsage(next, message.usage);
+
+  const key = requestKey(record, message, state);
+  const previous = state.byRequest.get(key);
+  replaceCounts(state.counts, previous ?? emptyCounts(), next);
+  state.byRequest.set(key, next);
+}
+
 function ingestLine(planDir: string, state: FileState, rawLine: string): void {
   const line = rawLine.trim();
   if (!line) return;
@@ -264,7 +299,7 @@ function ingestLine(planDir: string, state: FileState, rawLine: string): void {
     record.message !== null
   ) {
     const message = record.message as Record<string, unknown>;
-    addUsage(state.counts, message.usage);
+    applyUsage(state, record, message);
     if (
       typeof message.model === "string" &&
       !state.models.includes(message.model)
@@ -291,36 +326,26 @@ function processFile(
 
   const bytes = readRange(file, from, size);
 
-  let counts = state.counts;
-  let models = state.models;
-  let partial = state.partial;
   if (next.reset) {
-    // A reset re-reads the whole file, so the old counts must not survive it —
-    // keeping them would double-count everything already tallied before the shrink.
-    counts = emptyCounts();
-    models = [];
-    partial = "";
-    state.decoder.decode(); // Flush any pending multi-byte state from the old content.
-  }
-
-  const text = state.decoder.decode(bytes, { stream: true });
-  const { complete, partial: heldPartial } = splitCompleteLines(partial + text);
-
-  state.counts = counts;
-  state.models = models;
-  state.partial = heldPartial;
-  state.cursor = size;
-  if (next.reset) {
-    // Identity is derived from the first line, so re-reading from byte 0 must
-    // re-derive it too. New content at a reused path is a different agent — keeping
-    // the old task, role, or plan membership would file its tokens under whatever
-    // used to live here.
+    // A reset re-reads from byte 0, so nothing derived from the old content may
+    // survive it: the counts would double, and identity — read off the first line —
+    // would file a reused path's tokens under whatever agent used to live there.
+    state.counts = emptyCounts();
+    state.byRequest.clear();
+    state.models = [];
+    state.partial = "";
+    state.decoder.decode(); // Flush pending multi-byte state from the old content.
     state.task = null;
     state.role = null;
     state.attempt = undefined;
     state.startedAt = null;
     state.membership = "pending";
   }
+
+  const text = state.decoder.decode(bytes, { stream: true });
+  const { complete, partial } = splitCompleteLines(state.partial + text);
+  state.partial = partial;
+  state.cursor = size;
 
   for (const line of complete) {
     ingestLine(planDir, state, line);
@@ -329,10 +354,8 @@ function processFile(
 
 /**
  * Bind a source to one plan directory. Does no I/O until `read()` is called.
- *
- * `projectsRoot` defaults to `join(homedir(), ".claude", "projects")`. It is the
- * seam that makes this layer testable: every filesystem test points it at a
- * `mkdtempSync` directory instead of the developer's real Claude Code state.
+ * `projectsRoot` is the seam that makes this layer testable: a test points it at a
+ * temp directory instead of the developer's real Claude Code state.
  */
 export function createTranscriptSource(
   planDir: string,
@@ -340,10 +363,8 @@ export function createTranscriptSource(
 ): TranscriptSource {
   const root = projectsRoot ?? join(homedir(), ".claude", "projects");
   const files = new Map<string, FileState>();
-  // The repo root and slug depend only on constructor arguments and immutable
-  // filesystem structure, so they are cached once resolution succeeds. A failure to
-  // resolve is NOT cached — the plan dir is routinely opened before the run starts,
-  // so `<projectsRoot>/<slug>/` frequently does not exist yet and must be re-checked.
+  // A failure to resolve is deliberately NOT cached: the plan dir is routinely opened
+  // before the run starts, so `<projectsRoot>/<slug>/` often does not exist yet.
   let cachedSlugDir: string | null = null;
 
   function resolveSlugDir(): string | null {
@@ -382,16 +403,15 @@ export function createTranscriptSource(
             const size = statSync(file).size;
             processFile(planDir, file, state, size);
           } catch (error) {
-            // The two cases are told apart by the errno, not by a preceding
-            // `existsSync` — that would stat every file twice, on every pass, to
-            // learn what this stat already reports.
+            // Told apart by errno, not a preceding `existsSync` — that would stat
+            // every file twice on every pass to learn what this stat already reports.
             if ((error as NodeJS.ErrnoException).code === "ENOENT") {
               // Vanished between enumeration and here: drop it, do not report it.
               files.delete(file);
               continue;
             }
-            // Exists but unreadable this pass (a lock, a permission blip). Keep the
-            // last-known state and try again next pass rather than zeroing it.
+            // Unreadable this pass (a lock, a permission blip): keep the last-known
+            // state and retry next pass rather than zeroing it.
           }
         }
 

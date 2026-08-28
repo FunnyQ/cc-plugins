@@ -2,9 +2,8 @@
 // file must depend on nothing or that edge becomes a cycle. Do not "fix" this back in.
 
 /**
- * The four counters Claude Code writes on every billed assistant turn.
- * All four are collected even though only `input` and `output` are rendered —
- * they arrive in one object, so dropping two would cost more code than keeping them.
+ * The four counters Claude Code writes on every billed assistant turn. All four are
+ * kept though only `input` and `output` render — they arrive in one object anyway.
  */
 export type TokenCounts = {
   input: number;
@@ -12,6 +11,30 @@ export type TokenCounts = {
   cacheRead: number;
   cacheWrite: number;
 };
+
+export function emptyCounts(): TokenCounts {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+}
+
+/** Add `from` into `into`, in place. `into` is always a fresh accumulator. */
+export function addCounts(into: TokenCounts, from: TokenCounts): void {
+  into.input += from.input;
+  into.output += from.output;
+  into.cacheRead += from.cacheRead;
+  into.cacheWrite += from.cacheWrite;
+}
+
+/** Swap `previous` for `next` inside the running total `into`, in place. */
+export function replaceCounts(
+  into: TokenCounts,
+  previous: TokenCounts,
+  next: TokenCounts,
+): void {
+  into.input += next.input - previous.input;
+  into.output += next.output - previous.output;
+  into.cacheRead += next.cacheRead - previous.cacheRead;
+  into.cacheWrite += next.cacheWrite - previous.cacheWrite;
+}
 
 /** One Workflow-spawned agent's whole run, distilled from its transcript. */
 export type AgentUsage = {

@@ -12,12 +12,11 @@ import { buildFixture } from "./usage-fixture";
 import {
   addUsage,
   createTranscriptSource,
-  emptyCounts,
   parseAgentPrompt,
   projectSlug,
   repoRootOf,
 } from "./usage-source";
-import type { TokenCounts } from "./usage-types";
+import { emptyCounts, type TokenCounts } from "./usage-types";
 
 function withTempDir(run: (dir: string) => void): void {
   const dir = mkdtempSync(join(tmpdir(), "usage-source-"));
@@ -81,6 +80,21 @@ function assistant(model: string | undefined, usage: Record<string, unknown>) {
   const message: Record<string, unknown> = { usage };
   if (model !== undefined) message.model = model;
   return { type: "assistant", message };
+}
+
+/** One snapshot of a billed request: several share a `requestId`/`message.id` pair. */
+function snapshot(
+  requestId: string,
+  messageId: string,
+  usage: Record<string, unknown>,
+  uuid?: string,
+) {
+  return {
+    type: "assistant",
+    requestId,
+    uuid,
+    message: { id: messageId, model: "claude-opus-5", usage },
+  };
 }
 
 describe("projectSlug", () => {
@@ -594,6 +608,134 @@ describe("createTranscriptSource", () => {
       const agents = source.read();
       expect(agents[0]!.models).toEqual(["model-a", "model-b"]);
       expect(agents[0]!.counts.input).toBe(4);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// Claude Code writes one assistant line per streamed block, each carrying a
+// progressively completed copy of the SAME request's usage. Measured over 842 real
+// workflow transcripts: 88% of requests repeat, summing them overcounts cache reads
+// 2.05x, and output_tokens never decreased across a request's snapshots.
+describe("createTranscriptSource — billing dedup", () => {
+  function setup(): {
+    root: string;
+    planDir: string;
+    projectsRoot: string;
+    slug: string;
+  } {
+    const root = mkdtempSync(join(tmpdir(), "usage-source-dedup-"));
+    const repoRoot = join(root, "repo");
+    const planDir = join(repoRoot, "docs", "myplan");
+    mkdirSync(planDir, { recursive: true });
+    writeFileSync(join(repoRoot, ".git"), "gitdir: x\n");
+    return {
+      root,
+      planDir,
+      projectsRoot: join(root, "projects"),
+      slug: projectSlug(repoRoot),
+    };
+  }
+
+  test("counts one request once, keeping its last (complete) snapshot", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      jsonl(agentPath(projectsRoot, slug, "a"), [
+        announceUser(planDir, "work/01", "dev", 1),
+        snapshot("req_1", "msg_1", {
+          input_tokens: 10,
+          output_tokens: 1,
+          cache_creation_input_tokens: 23331,
+        }),
+        snapshot("req_1", "msg_1", {
+          input_tokens: 10,
+          output_tokens: 1,
+          cache_creation_input_tokens: 23331,
+        }),
+        snapshot("req_1", "msg_1", {
+          input_tokens: 10,
+          output_tokens: 341,
+          cache_creation_input_tokens: 23331,
+        }),
+      ]);
+
+      const agents = createTranscriptSource(planDir, projectsRoot).read();
+      expect(agents[0]!.counts).toEqual({
+        input: 10,
+        output: 341,
+        cacheRead: 0,
+        cacheWrite: 23331,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps distinct requests separate", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      jsonl(agentPath(projectsRoot, slug, "a"), [
+        announceUser(planDir, "work/01", "dev", 1),
+        snapshot("req_1", "msg_1", { input_tokens: 10, output_tokens: 5 }),
+        snapshot("req_2", "msg_2", { input_tokens: 20, output_tokens: 7 }),
+      ]);
+
+      const agents = createTranscriptSource(planDir, projectsRoot).read();
+      expect(agents[0]!.counts).toMatchObject({ input: 30, output: 12 });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // The snapshots of one request routinely straddle a tail boundary, so the
+  // dedup state has to outlive a single read() or the second half double-bills.
+  test("dedups across an incremental read", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      const file = agentPath(projectsRoot, slug, "a");
+      jsonl(file, [
+        announceUser(planDir, "work/01", "dev", 1),
+        snapshot("req_1", "msg_1", { input_tokens: 10, output_tokens: 1 }),
+      ]);
+      const source = createTranscriptSource(planDir, projectsRoot);
+      expect(source.read()[0]!.counts).toMatchObject({ input: 10, output: 1 });
+
+      appendJsonl(file, [
+        snapshot("req_1", "msg_1", { input_tokens: 10, output_tokens: 341 }),
+      ]);
+      expect(source.read()[0]!.counts).toMatchObject({
+        input: 10,
+        output: 341,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Without a per-line fallback key every unkeyed line collapses onto one entry
+  // and only the last would count.
+  test("falls back to the uuid, then to a per-line key, when unkeyed", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      jsonl(agentPath(projectsRoot, slug, "a"), [
+        announceUser(planDir, "work/01", "dev", 1),
+        {
+          type: "assistant",
+          uuid: "u1",
+          message: { usage: { input_tokens: 3 } },
+        },
+        {
+          type: "assistant",
+          uuid: "u1",
+          message: { usage: { input_tokens: 3 } },
+        },
+        { type: "assistant", message: { usage: { input_tokens: 4 } } },
+        { type: "assistant", message: { usage: { input_tokens: 5 } } },
+      ]);
+
+      const agents = createTranscriptSource(planDir, projectsRoot).read();
+      expect(agents[0]!.counts).toMatchObject({ input: 12 });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

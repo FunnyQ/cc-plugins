@@ -21,10 +21,7 @@ export type FleetSnapshot = {
   rows: ReturnType<typeof aggregateFleet>;
   entryCount: number;
   logPresent: boolean;
-  /**
-   * Plan-wide token rollup. Always present; every counter is 0 and
-   * `agentCount` is 0 when no transcript was found.
-   */
+  /** Plan-wide token rollup. Always present; all-zero when no transcript was found. */
   usage: UsageRollup;
 };
 
@@ -123,9 +120,7 @@ export function eventsHandler(
       };
       const emitSnapshot = (): void => {
         // Affordable only because `read()` is incremental: an unchanged transcript
-        // costs one `stat` and zero bytes read. A source that re-parsed a whole
-        // file per call would turn this 250ms debounce into a repeated full scan
-        // of every transcript the plan ever produced.
+        // costs one `stat` and zero bytes read.
         enqueue(formatFleetFrame(entries, logPresent, readAgents()));
       };
       const debounce = createDebouncer(emitSnapshot, SNAPSHOT_DEBOUNCE_MS);
@@ -227,10 +222,9 @@ export function eventsHandler(
       checkFile();
       emitSnapshot();
       initializing = false;
-      // The same timer, doing both jobs — not a second one. A transcript grows
-      // while its agent runs but the flightlog does not move until that agent
-      // ends, so a snapshot scheduled only by flightlog activity would leave
-      // every in-flight row's token cell frozen at its opening value for minutes.
+      // One timer doing both jobs. A transcript grows while its agent runs but the
+      // flightlog does not move until that agent ends, so scheduling snapshots off
+      // flightlog activity alone freezes every in-flight token cell for minutes.
       poll = setInterval(() => {
         checkFile();
         debounce.schedule();

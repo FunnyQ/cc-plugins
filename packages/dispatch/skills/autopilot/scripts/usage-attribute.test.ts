@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { FleetRow } from "./fleet";
-import type { AgentUsage, TokenCounts } from "./usage-types";
-import { addCounts, attributeUsage } from "./usage-attribute";
+import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
+import { aggregateFleet, fleetIdentity, type FleetRow } from "./fleet";
+import { addCounts, type AgentUsage, type TokenCounts } from "./usage-types";
+import { attributeUsage } from "./usage-attribute";
 
 function counts(
   input: number,
@@ -13,11 +14,15 @@ function counts(
 }
 
 function row(overrides: Partial<FleetRow> & { key: string }): FleetRow {
-  return {
+  const base = {
     label: overrides.key,
-    role: "dev",
-    status: "finished",
+    role: "dev" as const,
+    status: "finished" as const,
     ...overrides,
+  };
+  return {
+    identity: fleetIdentity(base.ref ?? "", base.role, base.attempt),
+    ...base,
   };
 }
 
@@ -450,5 +455,72 @@ describe("attributeUsage — purity", () => {
     // The returned rows are new objects, not the frozen originals.
     expect(outRows[0]).not.toBe(rows[0]);
     expect("usage" in rows[0]!).toBe(false);
+  });
+});
+
+// The identity the pairing keys on must be the one aggregateFleet actually grouped
+// by — built from the raw --task/--role/--attempt flags an agent announces with, not
+// re-derived from the label-parse-preferred display fields. A free-text agent label
+// that parses as one of the known shapes overrides `ref`/`attempt` for display, and a
+// second derivation would then silently fail to pair that agent's tokens.
+describe("attributeUsage — identity comes from aggregateFleet", () => {
+  test("pairs when the label's parsed attempt overrides the logged attempt", () => {
+    const entries: FlightlogEntry[] = [
+      {
+        kind: "note",
+        ts: "2026-08-28T00:00:00.000Z",
+        task: "review/01",
+        role: "review",
+        attempt: 1,
+        agentLabel: "review:security#2",
+        phase: "start",
+        message: "start",
+      },
+    ];
+    const rows = aggregateFleet(entries);
+    expect(rows[0]!.attempt).toBe(2); // display attempt diverges from the log
+
+    const { rows: attributed } = attributeUsage(rows, [
+      agent({
+        file: "a.jsonl",
+        task: "review/01",
+        role: "review",
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+        counts: counts(5, 7),
+      }),
+    ]);
+
+    expect(attributed[0]!.usage).toEqual(counts(5, 7));
+  });
+
+  test("pairs when the label's parsed ref overrides the logged task", () => {
+    const entries: FlightlogEntry[] = [
+      {
+        kind: "note",
+        ts: "2026-08-28T00:00:00.000Z",
+        task: "work/01",
+        role: "dev",
+        attempt: 1,
+        agentLabel: "dev:other/99#1",
+        phase: "start",
+        message: "start",
+      },
+    ];
+    const rows = aggregateFleet(entries);
+    expect(rows[0]!.ref).toBe("other/99");
+
+    const { rows: attributed } = attributeUsage(rows, [
+      agent({
+        file: "a.jsonl",
+        task: "work/01",
+        role: "dev",
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+        counts: counts(3, 4),
+      }),
+    ]);
+
+    expect(attributed[0]!.usage).toEqual(counts(3, 4));
   });
 });
