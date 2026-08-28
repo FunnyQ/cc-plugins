@@ -63,7 +63,7 @@ Ask these **before the interview**, in one `AskUserQuestion` call. A question as
 
 **The floor is a minimum, the cap a maximum.** The floor is the fewest passes before a clean pass may end the loop. The checkpoint is where the loop *changes tactics* if blocking findings are still arriving — not where it quits. The cap is where it quits regardless. A blocking defect open at the cap is never shipped silently: the loop stops, every open P1 goes into Known gaps, and the Step 8 recap leads with the non-convergence. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
 
-Carry both answers to Step 7 and do not re-ask them there. The tier is a guess about a tree that doesn't exist yet — Step 5 restates it beside the finished task index, which is the user's one chance to correct it. After that, honor the pick and note any tier mismatch in the Step 8 recap.
+Carry both answers to Step 7 and do not re-ask them there. The tier is a guess about a tree that doesn't exist yet — Step 5 restates it beside the finished task index, which is the user's one chance to correct it. After that, honor the pick, with one exception: Step 7 may re-cut the tier **once**, on evidence, when the written tree plainly contradicts the band it was placed in. Note any remaining mismatch in the Step 8 recap.
 
 ### Step 3 — Interview until shared understanding
 
@@ -203,6 +203,10 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
 - **At the checkpoint, if P1s are still arriving, stop patching files and re-cut.** Repeated P1s that far in are symptoms, not defects: the decomposition, a bucket boundary, or a PLAN-level decision is wrong. Fix it at PLAN.md / `_context/` / bucket level, re-run `lint-task.ts` and `build-readme.ts`, then resume the loop. Fixing symptoms one file at a time is what makes a review run long without converging.
 - **Count the open P1s after every pass.** That count is the only convergence signal. Do not compare findings by wording: the files change every pass, so a re-raised defect is never phrased the same way twice and a wording test never fires.
 - **Declare non-convergence at whichever comes first:** the cap is reached with P1s still open, or two consecutive passes past the checkpoint fail to lower the open-P1 count. Then stop.
+- **Bank the capping pass's findings. Do not fix them.** A fix applied after the last pass is unverified, and an unverified fix inside a tree that reads as reviewed is worse than a recorded gap — the gap gets the executor's attention and the fix does not. If one is trivially safe and you fix it anyway, say plainly in the recap that it was fixed with no confirming pass.
+- **The cap hands the decision back to the user. It is not the end of the conversation.** Give them numbers, not a question they cannot answer. Show the open-P1 count for every pass as a trend, name the P1s still open, and offer the three real options: ship with the gaps banked, extend the loop, or re-cut at PLAN level. *"Should I review again?"* is not a decision anyone can make. *"P1s went 5 → 4 → 4 → 1, one is open, here it is"* is.
+- **Extending past the cap needs a named reason and a new bound.** The user may spend more of their budget — but only against a hypothesis for why the next pass would differ: a root-cause fix that should collapse a whole class of findings, or a tier that was visibly wrong. "One more look" is not a reason. State the new bound before starting and stop there. Every rule above still applies inside the extension, so two consecutive passes that fail to lower the count end it early no matter what the new bound said.
+- **Re-cut the tier once, mid-loop, when the written tree contradicts it.** The Step 2 bands are stated in task counts, and task count predicts review cost badly: five 200-line task files are a far larger consistency surface than fifteen 40-line ones. Measure the tree you actually wrote — `wc -l docs/<slug>/PLAN.md docs/<slug>/tasks/_context/*.md docs/<slug>/tasks/*/*.md` — and if it is much larger than its band implies, say so and re-pick the tier once, before the cap fires. Doing that at pass 3 costs one sentence. Discovering it at the cap hands the user a decision they should never have had to make.
 - **A non-converged tree is handed over, not hidden.** List every open P1 in `tasks/README.md`'s Known gaps and **lead the Step 8 recap with it** — "review did not converge: N P1s open after M passes". The user must see the open defects and decide; that decision is theirs, and it is cheaper for them at round 4 than at round 19.
 
 ### Step 8 — Stop. Do not execute.
@@ -230,6 +234,9 @@ bun "$SCRIPTS"/next-ready.ts docs/<slug>/tasks
 ## File-writing rules
 
 - All paths are relative to the current working directory unless the user says otherwise.
+- **Every script in this skill trusts your cwd. Run them from the repo root.** They resolve `docs/<slug>/` against wherever the shell happens to be, and a compound command containing `cd` moves that shell for the rest of the session. The tree then scaffolds somewhere real but wrong, and every later step points at a path that does not exist.
+- **Read the absolute path `scaffold.ts` prints.** It reports where the tree actually landed, not the argument you passed. If that is not the repo root, stop and fix it before writing any content — a misplaced tree is `trash` and re-scaffold, which is cheap now and expensive after five task files.
+- A script that cannot find its target says so and exits `2`. Exit `2` never means "your tree is bad", it means "that path is not there" — check the printed working directory before you go looking at task files. `review-plan.ts` in particular reserves exit `1` for the reviewer's own verdict.
 - Kebab-case for `<topic>` and `<slug>`. Zero-pad `NN` to two digits.
 - Never overwrite an existing `docs/<topic>/` without explicit confirmation (collision check happens in Step 3).
 

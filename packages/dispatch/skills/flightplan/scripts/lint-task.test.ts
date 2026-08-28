@@ -712,6 +712,21 @@ describe("CLI test-net report", () => {
     expect(result.stdout).not.toContain("Test net report:");
     await rm(root, { recursive: true });
   });
+
+  test("nonexistent path is an invocation error, not a violation tally", async () => {
+    const result = await runCli(join(import.meta.dir, "no-such-tree/tasks"));
+    // Exit 2 separates "that path is not there" from exit 1's "your tree is
+    // bad". Reporting a missing path as "1 violation(s) in 1 file(s)" sent a
+    // caller whose cwd had drifted looking at task files instead of at cwd.
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("Not a lint failure");
+    expect(result.stderr).not.toContain("violation(s) in");
+    // The absolute path and the cwd are what make the drift diagnosable.
+    expect(result.stderr).toContain(
+      join(import.meta.dir, "no-such-tree/tasks"),
+    );
+    expect(result.stderr).toContain("Working directory:");
+  });
 });
 
 describe("checkFinalReview", () => {

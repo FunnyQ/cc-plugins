@@ -35,7 +35,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export type ReviewEngine = "codex" | "opencode";
@@ -322,10 +322,15 @@ async function main() {
 
   const files = await collectPlanFiles(args.planDir);
   if (files.length === 0) {
+    // Exit 2, not 1. This script's exit code mirrors the reviewer's verdict, so
+    // a 1 here is indistinguishable from "the reviewer found blocking issues" —
+    // a caller looping on the exit code reads a wrong cwd as a failed review and
+    // starts fixing a tree that was never opened.
     console.error(
-      `No plan files found in ${args.planDir} — run scaffold.ts first`,
+      `No plan files found in ${resolve(args.planDir)} — run scaffold.ts first.` +
+        `\nWorking directory: ${process.cwd()}`,
     );
-    process.exit(1);
+    process.exit(2);
   }
 
   // A prior-findings path that cannot be read is a hard error, never a silent

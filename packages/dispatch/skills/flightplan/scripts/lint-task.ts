@@ -555,16 +555,22 @@ export async function collectTaskFiles(tasksDir: string): Promise<string[]> {
 
 async function resolveInputs(
   args: string[],
-): Promise<{ files: string[]; treeRoots: string[] }> {
+): Promise<{ files: string[]; treeRoots: string[]; missing: string[] }> {
   const files: string[] = [];
   const treeRoots: string[] = [];
+  const missing: string[] = [];
   for (const arg of args) {
     let info;
     try {
       info = await stat(arg);
     } catch {
-      // Treat as a missing path — main() will surface read errors per-file.
-      files.push(arg);
+      // A path named on the command line that does not exist is a bad
+      // invocation, not a content defect. Feeding it through lintFile turned it
+      // into a `read` violation counted in the same tally as a broken rubric,
+      // so "you are in the wrong directory" printed as "1 violation(s) in 1
+      // file(s)" — which reads as a damaged tree and sends the caller looking
+      // at task files instead of at their cwd.
+      missing.push(arg);
       continue;
     }
     if (info.isDirectory()) {
@@ -574,7 +580,7 @@ async function resolveInputs(
       files.push(arg);
     }
   }
-  return { files, treeRoots };
+  return { files, treeRoots, missing };
 }
 
 async function main() {
@@ -584,9 +590,17 @@ async function main() {
     process.exit(2);
   }
 
-  const { files, treeRoots } = await resolveInputs(args);
+  const { files, treeRoots, missing } = await resolveInputs(args);
+  if (missing.length > 0) {
+    for (const m of missing) console.error(`cannot open: ${resolve(m)}`);
+    console.error(
+      `\nNot a lint failure — ${missing.length} path(s) named on the command line do not exist.` +
+        `\nWorking directory: ${process.cwd()}`,
+    );
+    process.exit(2);
+  }
   if (files.length === 0) {
-    console.error("No task files found.");
+    console.error(`No task files found under ${resolve(args[0] ?? ".")}.`);
     process.exit(2);
   }
 

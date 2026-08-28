@@ -20,7 +20,7 @@
  *   bun scaffold.ts [--check] <slug> [<bucket>[,<bucket>...]] [--docs-root <path>]
  */
 import { mkdir, access } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export type CollisionResult = {
   exists: boolean;
@@ -179,7 +179,11 @@ async function main() {
       buckets: args.buckets,
       docsRoot: args.docsRoot,
     });
-    console.log(`Scaffolded ${result.rootDir}`);
+    // Absolute, always. `docsRoot` defaults to the bare relative "docs", so
+    // echoing it back proves nothing about where the tree actually landed — a
+    // caller whose cwd drifted gets an identical success line for a tree built
+    // in the wrong repo subdirectory, and finds out several steps later.
+    console.log(`Scaffolded ${resolve(result.rootDir)}`);
     for (const d of result.bucketDirs) console.log(`  + ${d}/`);
   } catch (err) {
     console.error((err as Error).message);
