@@ -64,6 +64,33 @@ const store = reactive({
 let graphLayout;
 let graphStructure = "";
 let graphNodes = [];
+let graphPane = "";
+
+/**
+ * The pane's content box. The panel spreads its roads into the height and
+ * compresses its gaps into the width, so both axes are layout inputs.
+ *
+ * Read off the DOM rather than guessed from the viewport: the pane is one row of
+ * an outer grid, so its height is set by that grid and not by the panel, and
+ * measuring it cannot feed back into what it measures. `clientWidth` and
+ * `clientHeight` already exclude the scrollbar, which is what we want — the
+ * panel must not fit itself into space a scrollbar is standing in.
+ */
+function paneBox() {
+  const pane = document.querySelector(".c-dependency-graph");
+  if (!pane) return {};
+  const style = getComputedStyle(pane);
+  return {
+    availableHeight:
+      pane.clientHeight -
+      parseFloat(style.paddingBlockStart) -
+      parseFloat(style.paddingBlockEnd),
+    availableWidth:
+      pane.clientWidth -
+      parseFloat(style.paddingInlineStart) -
+      parseFloat(style.paddingInlineEnd),
+  };
+}
 
 function taskStructure(tasks) {
   return [...tasks]
@@ -76,10 +103,16 @@ function taskStructure(tasks) {
 function updateGraph(tasks) {
   const graphTasks = Array.isArray(tasks) ? tasks : [];
   const structure = taskStructure(graphTasks);
-  // Keep coordinates frozen while polling changes only live task state.
-  if (!graphLayout || structure !== graphStructure) {
-    graphLayout = layoutGraph(graphTasks);
+  const box = paneBox();
+  const pane = `${box.availableWidth}x${box.availableHeight}`;
+  // Keep coordinates frozen while polling changes only live task state. The pane
+  // box joins the structure in that key because the roads spread to fill its
+  // height and the gaps compress to fit its width, so a resize is the one other
+  // thing that has to move them.
+  if (!graphLayout || structure !== graphStructure || pane !== graphPane) {
+    graphLayout = layoutGraph(graphTasks, box);
     graphStructure = structure;
+    graphPane = pane;
   }
   // Usage rides along rather than living in the layout: it changes on every
   // fleet frame, and the coordinates must not move when a token count does.
@@ -107,32 +140,22 @@ function paintLineage(container, focus) {
   const lit = focus?.lit ?? null;
   svg.classList.toggle("-focus", focus !== null);
 
-  // Edges first: the one-hop node sets are collected from the edges that were
-  // actually drawn, not from `dependsOn`. The graph draws its transitive
-  // reduction, so a declared-but-implied parent has no edge — marking that node
-  // as a direct one would light a neighbour with nothing connecting it.
-  const parents = new Set();
-  const children = new Set();
-  for (const edge of svg.querySelectorAll(".graph-crossover")) {
+  // Links as well as crossovers: a route the panel sets has to light through the
+  // running line inside a bucket, not just across the diagonals between them.
+  //
+  // One class, not three. An earlier pass also marked the one-hop parents and
+  // children, but the whole lineage lights at one value on this instrument —
+  // a route is set or it is not — so the extra grades had no rule behind them
+  // and rendered nothing for the two versions they sat in the file.
+  for (const edge of svg.querySelectorAll(".graph-crossover, .graph-link")) {
     const { from, to } = edge.dataset;
     edge.classList.toggle("-lit", lit?.has(from) === true && lit.has(to));
-    // One hop, in each direction. The rest of the lineage stays neutral, so the
-    // two questions the graph gets asked — what is holding this up, and what
-    // moves when it lands — are answered at a glance instead of by tracing.
-    const isParent = to === focus?.ref;
-    const isChild = from === focus?.ref;
-    edge.classList.toggle("-parent", isParent);
-    edge.classList.toggle("-child", isChild);
-    if (isParent) parents.add(from);
-    if (isChild) children.add(to);
   }
 
   for (const node of svg.querySelectorAll(".graph-berth")) {
     const ref = node.dataset.ref;
     node.classList.toggle("-lit", lit?.has(ref) === true);
     node.classList.toggle("-self", ref === focus?.ref);
-    node.classList.toggle("-parent", parents.has(ref));
-    node.classList.toggle("-child", children.has(ref));
   }
 }
 
@@ -273,6 +296,8 @@ createApp(store).mount("#app");
 // is created once by the insertAdjacentHTML above and never replaced.
 const graphMount = document.querySelector(".deck-top");
 if (graphMount) bindGraphHover(graphMount);
+// The roads spread to the pane, so the pane changing size is a relayout.
+window.addEventListener("resize", () => updateGraph(graphNodes));
 window.__flightdeck = store;
 
 connectEvents({

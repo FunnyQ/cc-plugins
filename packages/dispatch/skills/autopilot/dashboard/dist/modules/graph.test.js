@@ -276,6 +276,31 @@ describe("signals", () => {
     expect((svg.match(/class="graph-signal/g) ?? []).length).toBe(1);
   });
 
+  test("the head stacks three lamps and stands clear of the rail", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+
+    // All three aspects are drawn; the CSS lights the one the group names.
+    for (const aspect of ["clear", "caution", "danger"]) {
+      expect(svg).toContain(`class="lamp -${aspect}"`);
+    }
+
+    // A head no taller than the track it sits on is invisible against it.
+    const housing = Number(
+      svg.match(/class="housing"[^>]*height="([\d.]+)"/)[1],
+    );
+    const rail = Number(svg.match(/class="rail" stroke-width="([\d.]+)"/)[1]);
+    expect(housing).toBeGreaterThan(rail * 2);
+
+    // And it must fit above the topmost road rather than clip off the panel.
+    const top = Number(svg.match(/class="housing" x="[\d.]+" y="([\d.]+)"/)[1]);
+    expect(top).toBeGreaterThanOrEqual(0);
+  });
+
   test("the aspect follows the task's state", () => {
     const done = {
       ...makeNode("api/02", "api", "02", ["api/01"]),
@@ -293,6 +318,90 @@ describe("signals", () => {
     expect(
       renderGraph([root, blocked], layoutGraph([root, blocked])),
     ).toContain("graph-signal -danger");
+  });
+});
+
+describe("the running line inside a bucket", () => {
+  test("links consecutive berths so a set route lights end to end", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+
+    expect(svg).toContain('data-from="api/01" data-to="api/02"');
+    const link = svg.match(/class="graph-link"[^>]*>/)[0];
+    // Berth edge to berth edge, so the lit route has no break in it.
+    expect(Number(link.match(/x1="([\d.]+)"/)[1])).toBe(
+      layout.positions.get("api/01").x + 14 * 7,
+    );
+    expect(Number(link.match(/x2="([\d.]+)"/)[1])).toBe(
+      layout.positions.get("api/02").x,
+    );
+  });
+
+  test("breaks at a berth the dependency reaches past", () => {
+    // The real shape from docs/flightdeck: ui/04 depends on ui/02 and ui/03,
+    // and ui/03 does not depend on ui/02 — so the reduction keeps ui/02 -> ui/04
+    // and that edge spans ui/03's slot. Lighting straight through would put a
+    // berth on the route that is on neither end of the lineage.
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("web/01", "web", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+      makeNode("api/03", "api", "03", ["web/01"]),
+      makeNode("api/04", "api", "04", ["api/02", "api/03"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+
+    const spanning = [
+      ...svg.matchAll(
+        /<line class="graph-link"[^>]*data-from="api\/02" data-to="api\/04"[^>]*>/g,
+      ),
+    ].map((match) => match[0]);
+    expect(spanning.length).toBe(2);
+
+    const blocker = layout.positions.get("api/03");
+    const edges = spanning.map((line) => [
+      Number(line.match(/x1="([\d.]+)"/)[1]),
+      Number(line.match(/x2="([\d.]+)"/)[1]),
+    ]);
+    // Stops at the intervening berth, resumes past it, covers neither of it.
+    expect(edges[0][1]).toBe(blocker.x);
+    expect(edges[1][0]).toBe(blocker.x + 14 * 7);
+    for (const [x1, x2] of edges) {
+      expect(x2).toBeGreaterThan(x1);
+    }
+  });
+
+  test("a dependency that leaves the bucket is a crossover, not a link", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("ui/01", "ui", "01", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).not.toContain("graph-link");
+    expect(svg).toContain("graph-crossover");
+  });
+});
+
+describe("berth seams", () => {
+  test("each berth is closed at both ends so a lit run stays countable", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout);
+
+    expect((svg.match(/class="graph-seam"/g) ?? []).length).toBe(4);
+    for (const { x } of layout.positions.values()) {
+      expect(svg).toContain(`class="graph-seam" x1="${x}"`);
+      expect(svg).toContain(`class="graph-seam" x1="${x + 14 * 7}"`);
+    }
   });
 });
 
@@ -345,5 +454,120 @@ describe("panel extent", () => {
     ]);
 
     expect(three.extent.height - one.extent.height).toBe(2 * 14 * 5);
+  });
+
+  describe("spreading into the pane", () => {
+    const threeRoads = [
+      makeNode("a/01", "a", "01"),
+      makeNode("b/01", "b", "01"),
+      makeNode("c/01", "c", "01"),
+    ];
+    const natural = layoutGraph(threeRoads).extent.height;
+
+    test("roads spread to fill a taller pane", () => {
+      const filled = layoutGraph(threeRoads, { availableHeight: 600 });
+
+      expect(filled.extent.height).toBeGreaterThan(natural);
+      // The gap between roads is what stretched, not the margins.
+      expect(filled.roads[1].y - filled.roads[0].y).toBeGreaterThan(14 * 5);
+      expect(filled.roads[0].y).toBe(layoutGraph(threeRoads).roads[0].y);
+    });
+
+    test("the spread stops at the cap rather than drifting apart", () => {
+      const huge = layoutGraph(threeRoads, { availableHeight: 5_000 });
+
+      expect(huge.roads[1].y - huge.roads[0].y).toBe(14 * 9);
+    });
+
+    test("a pane shorter than the panel never squeezes it", () => {
+      const cramped = layoutGraph(threeRoads, { availableHeight: 40 });
+
+      expect(cramped.extent.height).toBe(natural);
+    });
+
+    test("one road has nothing to spread", () => {
+      const single = [makeNode("a/01", "a", "01")];
+
+      expect(
+        layoutGraph(single, { availableHeight: 5_000 }).extent.height,
+      ).toBe(layoutGraph(single).extent.height);
+    });
+  });
+
+  describe("fitting the pane's width", () => {
+    // Six slots on one road: wide enough that the flat gutter and the natural
+    // gap together overran a 1440 pane, which clipped the last berth's token.
+    const oneRoad = [
+      makeNode("contract/01", "contract", "01"),
+      makeNode("contract/02", "contract", "02", ["contract/01"]),
+      makeNode("contract/03", "contract", "03", ["contract/02"]),
+      makeNode("contract/04", "contract", "04", ["contract/03"]),
+      makeNode("contract/05", "contract", "05", ["contract/04"]),
+      makeNode("contract/06", "contract", "06", ["contract/05"]),
+    ];
+
+    test("the gutter is the road name's own width, not a flat allowance", () => {
+      const long = layoutGraph(oneRoad).geometry.gutter;
+      const short = layoutGraph([makeNode("ui/01", "ui", "01")]).geometry
+        .gutter;
+
+      expect(long).toBeLessThan(14 * 9);
+      expect(short).toBeLessThan(long);
+      // Whole pixels: every berth's x is the gutter plus a multiple of the
+      // stride, so a fractional gutter spreads float error across the panel.
+      expect(Number.isInteger(long)).toBe(true);
+    });
+
+    test("gaps compress so the panel fits the pane", () => {
+      const natural = layoutGraph(oneRoad);
+      const fitted = layoutGraph(oneRoad, { availableWidth: 1_100 });
+
+      expect(natural.extent.width).toBeGreaterThan(1_100);
+      expect(fitted.extent.width).toBeLessThanOrEqual(1_100);
+      expect(fitted.geometry.slotGap).toBeLessThan(natural.geometry.slotGap);
+      // The berth itself never shrinks — it has to hold a full `bucket/NN`.
+      const [first, second] = [...fitted.positions.values()];
+      expect(second.x - first.x - 14 * 7).toBe(fitted.geometry.slotGap);
+    });
+
+    test("compression stops at the floor rather than crushing the gap", () => {
+      const crushed = layoutGraph(oneRoad, { availableWidth: 120 });
+
+      expect(crushed.geometry.slotGap).toBe(14 * 2.5);
+      // Past the floor the panel simply overruns and the pane scrolls.
+      expect(crushed.extent.width).toBeGreaterThan(120);
+    });
+
+    test("a pane wider than the panel never stretches it", () => {
+      const roomy = layoutGraph(oneRoad, { availableWidth: 5_000 });
+
+      expect(roomy.geometry.slotGap).toBe(14 * 4);
+      expect(roomy.extent.width).toBe(layoutGraph(oneRoad).extent.width);
+    });
+
+    test("the render lands on the geometry the layout fitted", () => {
+      const layout = layoutGraph(oneRoad, { availableWidth: 1_100 });
+      const svg = renderGraph(oneRoad, layout);
+      const railStart = Number(svg.match(/class="rail"[^>]*x1="([\d.]+)"/)[1]);
+      const housing = Number(svg.match(/class="housing" x="([\d.]+)"/)[1]);
+      const gated = [...layout.positions.values()][1];
+
+      expect(railStart).toBe(14 + layout.geometry.gutter);
+      // The head stands in the compressed gap, clear of the berth it gates.
+      expect(housing).toBeGreaterThan(gated.x - layout.geometry.slotGap);
+      expect(housing).toBeLessThan(gated.x);
+    });
+  });
+
+  test("no arrowhead ships: a signalling panel has no arrows", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("ui/01", "ui", "01", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain("graph-crossover");
+    expect(svg).not.toContain("marker");
+    expect(svg).not.toContain("<defs>");
   });
 });

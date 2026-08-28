@@ -41,7 +41,6 @@ import {
 // multiple of it. Change FONT_SIZE and the whole diagram rescales in
 // proportion; nothing has to be re-tuned by hand.
 const FONT_SIZE = 14;
-const ARROW_ID = "graph-arrowhead";
 
 const geometry = (fontSize) => ({
   fontSize,
@@ -51,12 +50,51 @@ const geometry = (fontSize) => ({
   berthHeight: fontSize * 0.85,
   slotGap: fontSize * 4, // between berths along one road (x) — crossovers land here
   roadPitch: fontSize * 5, // between roads (y) — holds the two label lines
-  gutter: fontSize * 9, // road name, both ends, mirrored as on the comp
+  // A road band never grows past about twice the ink it carries: a signal head
+  // above the line, the berth, its ref and its token. Past that the roads drift
+  // apart and the panel is dead space again, only moved inside itself.
+  maxRoadPitch: fontSize * 9,
+  labelTail: fontSize * 3, // ref and token, hanging under the berth
+  gutter: fontSize * 9, // road name, both ends, mirrored as on the comp — a cap
+  minGutter: fontSize * 2,
+  // A gap never closes past what a signal head needs to stand in it without
+  // touching either berth: the housing plus a berth's own height of clearance.
+  minSlotGap: fontSize * 2.5,
   padding: fontSize,
-  arrowLength: fontSize * 1.1,
-  arrowHeight: fontSize * 0.75,
-  signalSize: fontSize * 0.85,
+  // A three-aspect head standing on the running line. Tall enough to break the
+  // rail's own silhouette — a lamp the size of the track it sits on is a speck.
+  signalWidth: fontSize * 1.05,
+  signalHeight: fontSize * 2.55,
+  signalLamp: fontSize * 0.3,
 });
+
+/*
+ * The gutter holds the road name and nothing else.
+ *
+ * A flat allowance spends the same width on `ui` as on `contract`, and at four
+ * roads that overspend — 126px a side against 54px of ink — is most of what
+ * pushed the last berth and its token off the pane. The label renders at 0.8 of
+ * the type size in the monospace stack, whose advance is ~0.6em, so the name's
+ * own length plus one character of air is the honest width. The flat value
+ * stays as the cap, so no road name can push the panel wider than it used to.
+ *
+ * Rounded to a whole pixel: every berth's x is this plus a multiple of the
+ * stride, so a gutter carrying float error spreads it across the whole panel,
+ * where the render's own two-decimal trim then rounds it back out and the
+ * coordinates stop matching the layout that produced them.
+ */
+const gutterFor = (roadNames, options) => {
+  const longest = Math.max(0, ...roadNames.map((name) => name.length));
+  return Math.round(
+    Math.min(
+      options.gutter,
+      Math.max(
+        options.minGutter,
+        longest * options.fontSize * 0.8 * 0.6 + options.fontSize,
+      ),
+    ),
+  );
+};
 
 const DEFAULTS = geometry(FONT_SIZE);
 
@@ -149,26 +187,75 @@ export function layoutGraph(nodes, opts = {}) {
     }
   }
 
-  const stride = options.berthWidth + options.slotGap;
+  /*
+   * Vertical composition.
+   *
+   * The panel is the instrument, not a picture hung inside one, so the roads
+   * spread into the height the pane actually offers instead of floating as a
+   * short band in the middle of it. `availableHeight` is the pane's content box;
+   * without it the panel keeps its natural pitch, which is what every test and
+   * every one-road plan gets.
+   *
+   * `headroom` is what a signal head needs above the first running line, and
+   * `footroom` what a berth's ref and token need below the last one. Both are
+   * fixed, so only the space between roads stretches — and only up to
+   * `maxRoadPitch`.
+   */
+  const roadCount = Math.max(roadNames.length, 1);
+  const headroom =
+    options.padding +
+    Math.max(0, options.signalHeight - options.berthHeight) / 2;
+  const footroom = options.berthHeight + options.labelTail + options.padding;
+  const spread =
+    (options.availableHeight - headroom - footroom) / (roadCount - 1);
+  const roadPitch =
+    roadCount > 1 && Number.isFinite(spread)
+      ? Math.min(options.maxRoadPitch, Math.max(options.roadPitch, spread))
+      : options.roadPitch;
+
+  /*
+   * Horizontal composition — the same rule as the vertical, in the other axis.
+   *
+   * The panel fits the pane it is given. `availableWidth` is the pane's content
+   * box; without it the panel keeps its natural gap, which is what every test
+   * gets. Only the gaps between berths compress: a berth holds a full
+   * `bucket/NN` at a legible size and never shrinks, and the gutters are already
+   * sized to their own ink. Below `minSlotGap` the panel scrolls instead, which
+   * is the honest answer — `.c-dependency-graph` themes its scrollbar so that
+   * affordance is visible rather than inferred.
+   *
+   * The gaps are one per slot plus the trailing one the road runs out on.
+   */
+  const lastSlot = slots.size ? Math.max(...slots.values()) : 0;
+  const gutter = opts.gutter ?? gutterFor(roadNames, options);
+  const gapCount = lastSlot + 2;
+  const room =
+    (options.availableWidth -
+      options.padding * 2 -
+      gutter * 2 -
+      (lastSlot + 1) * options.berthWidth) /
+    gapCount;
+  // Floored for the same reason the gutter is rounded, and floored rather than
+  // rounded so the fitted panel never comes out a pixel wider than it measured.
+  const slotGap = Number.isFinite(room)
+    ? Math.min(options.slotGap, Math.max(options.minSlotGap, Math.floor(room)))
+    : options.slotGap;
+
+  const stride = options.berthWidth + slotGap;
   const positions = new Map();
   for (const node of orderedNodes) {
     positions.set(node.ref, {
-      x: options.padding + options.gutter + (slots.get(node.ref) ?? 0) * stride,
-      y:
-        options.padding +
-        (roadOf.get(node.bucket ?? "") ?? 0) * options.roadPitch,
+      x: options.padding + gutter + (slots.get(node.ref) ?? 0) * stride,
+      y: headroom + (roadOf.get(node.bucket ?? "") ?? 0) * roadPitch,
       road: roadOf.get(node.bucket ?? "") ?? 0,
       slot: slots.get(node.ref) ?? 0,
     });
   }
 
-  const lastSlot = positions.size
-    ? Math.max(...[...positions.values()].map(({ slot }) => slot))
-    : 0;
   const roads = roadNames.map((name, index) => ({
     name,
     index,
-    y: options.padding + index * options.roadPitch + options.berthHeight / 2,
+    y: headroom + index * roadPitch + options.berthHeight / 2,
   }));
 
   /*
@@ -222,26 +309,39 @@ export function layoutGraph(nodes, opts = {}) {
     turns.set(
       key,
       options.padding +
-        options.gutter +
+        gutter +
         chosen * stride +
         options.berthWidth +
-        options.slotGap / 2,
+        slotGap / 2,
     );
   }
 
   // The road runs the full width whether or not a berth sits at the far end, so
   // the extent is the track's length, not the last berth's edge.
   const extent = {
-    width:
-      options.padding * 2 +
-      options.gutter * 2 +
-      (lastSlot + 1) * stride +
-      options.slotGap,
-    height:
-      options.padding * 2 + Math.max(roadNames.length, 1) * options.roadPitch,
+    width: options.padding * 2 + gutter * 2 + (lastSlot + 1) * stride + slotGap,
+    height: headroom + (roadCount - 1) * roadPitch + footroom,
   };
 
-  return { positions, roads, roadOf, slots, turns, cyclic, drawn, extent };
+  // The two quantities that answer to the pane rather than to the type size.
+  // The render reads them back instead of re-deriving from the defaults, which
+  // is how the signal heads and the road ends would otherwise land on a gutter
+  // and a gap the layout never used. Named `fitted`, not `geometry`: the module
+  // already has a `geometry()` builder, and a local of that name here shadows it
+  // for the rest of this function.
+  const fitted = { gutter, slotGap };
+
+  return {
+    positions,
+    roads,
+    roadOf,
+    slots,
+    turns,
+    cyclic,
+    drawn,
+    extent,
+    geometry: fitted,
+  };
 }
 
 /**
@@ -381,18 +481,41 @@ function crossoverPath(x1, y1, x2, y2, turnX) {
   ].join(" ");
 }
 
-/** A signal head: the post, and the lamp that carries the aspect. */
+/**
+ * A signal head: a three-aspect housing standing on the running line, with the
+ * aspect it shows lit and the other two dark.
+ *
+ * Three lamps rather than one, in the real top-to-bottom order — green, yellow,
+ * red — because the stacked silhouette is what makes it a signal at a glance,
+ * and where in the stack the light sits is readable before its colour is. The
+ * first build drew one lamp in a box the same height as the rail it sat on: the
+ * box vanished into the track and the lamp read as a speck of dirt on it.
+ *
+ * The housing is opaque and centred on the line, so the rail passes behind it
+ * exactly as it does behind a real head's backplate.
+ */
+const SIGNAL_ASPECTS = ["clear", "caution", "danger"];
+
 function signalHead(x, y, options, aspect) {
-  const size = options.signalSize;
+  const { signalWidth: width, signalHeight: height } = options;
+  const lampPitch = height / 3.4;
+  const lamps = SIGNAL_ASPECTS.map(
+    (name, index) =>
+      `<circle class="lamp -${name}" cx="${trim(x)}" cy="${trim(y + (index - 1) * lampPitch)}" r="${trim(options.signalLamp)}" />`,
+  ).join("");
+
   return `<g class="graph-signal -${aspect}">
-        <rect class="post" x="${trim(x - size / 2)}" y="${trim(y - size / 2)}" width="${trim(size)}" height="${trim(size)}" rx="2" ry="2" />
-        <circle class="lamp" cx="${trim(x)}" cy="${trim(y)}" r="${trim(size / 4)}" />
+        <rect class="housing" x="${trim(x - width / 2)}" y="${trim(y - height / 2)}" width="${trim(width)}" height="${trim(height)}" rx="2" ry="2" />
+        ${lamps}
       </g>`;
 }
 
 export function renderGraph(nodes, layout, opts = {}) {
   const { usage, ...geometryOpts } = opts;
-  const options = resolve(geometryOpts);
+  // The layout's own gutter and gap win: it sized them to the road names and to
+  // the pane, and a render that re-derived them from the defaults would put the
+  // signal heads and the road ends somewhere the berths are not.
+  const options = { ...resolve(geometryOpts), ...(layout.geometry ?? {}) };
   const tokensByRef = usage?.byTask ?? {};
   const graphNodes = Array.isArray(nodes) ? nodes : [];
   const { positions, roads, drawn, turns } = layout;
@@ -420,8 +543,61 @@ export function renderGraph(nodes, layout, opts = {}) {
     )
     .join("");
 
-  // Crossovers carry only the dependencies that leave their own road. A
-  // dependency inside one bucket is already drawn — it is the road itself.
+  /*
+   * The running line between two berths of one bucket.
+   *
+   * A dependency inside a bucket is the road itself, so at rest this draws
+   * nothing new: the same unlit stroke at the same weight, laid over the rail
+   * that is already there. It exists for the set route. The approved hover comp
+   * lights a route *end to end* — track included — and without these the lit
+   * line stopped at every berth edge and resumed at the next one, which reads as
+   * a route that is not set.
+   *
+   * It is drawn in segments, one per clear gap, because a dependency can reach
+   * past a berth of its own bucket: `ui/04` depends on both `ui/02` and `ui/03`,
+   * and the reduction keeps `ui/02 -> ui/04`, which spans `ui/03`'s slot. One
+   * unbroken line there lights straight through `ui/03` — a berth on neither end
+   * of the lineage — and says `ui/02` runs clear to `ui/04` when `ui/03` is
+   * holding it up too. The berth breaks the lit run instead, which is what an
+   * unset section of a route looks like on the real instrument.
+   */
+  const berthsByRoad = new Map();
+  for (const position of positions.values()) {
+    const onRoad = berthsByRoad.get(position.road) ?? [];
+    onRoad.push(position);
+    berthsByRoad.set(position.road, onRoad);
+  }
+
+  const links = graphNodes
+    .flatMap((node) => {
+      const target = positions.get(node.ref);
+      if (!target) return [];
+      return (node.dependsOn ?? []).flatMap((dependencyRef) => {
+        if (!drawn.has(edgeKey(dependencyRef, node.ref))) return [];
+        const source = positions.get(dependencyRef);
+        if (!source || source.road !== target.road) return [];
+
+        const y = source.y + options.berthHeight / 2;
+        const blockers = (berthsByRoad.get(source.road) ?? [])
+          .filter(({ slot }) => slot > source.slot && slot < target.slot)
+          .sort((left, right) => left.x - right.x);
+
+        let from = source.x + options.berthWidth;
+        const spans = [];
+        for (const blocker of [...blockers, target]) {
+          spans.push([from, blocker.x]);
+          from = blocker.x + options.berthWidth;
+        }
+
+        return spans.map(
+          ([x1, x2]) =>
+            `<line class="graph-link" stroke-width="${trim(options.berthHeight)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" x1="${trim(x1)}" y1="${trim(y)}" x2="${trim(x2)}" y2="${trim(y)}" />`,
+        );
+      });
+    })
+    .join("");
+
+  // Crossovers carry only the dependencies that leave their own road.
   const crossovers = graphNodes
     .flatMap((node) => {
       const target = positions.get(node.ref);
@@ -432,7 +608,7 @@ export function renderGraph(nodes, layout, opts = {}) {
         if (!source || source.road === target.road) return [];
         const dependency = graphNodes.find((n) => n.ref === dependencyRef);
         return [
-          `<path class="graph-crossover${dependency?.state === "done" ? " -cleared" : ""}" stroke-width="${trim(options.berthHeight)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" marker-end="url(#${ARROW_ID})" d="${crossoverPath(
+          `<path class="graph-crossover${dependency?.state === "done" ? " -cleared" : ""}" stroke-width="${trim(options.berthHeight)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" d="${crossoverPath(
             source.x + options.berthWidth,
             source.y + options.berthHeight / 2,
             target.x,
@@ -484,9 +660,26 @@ export function renderGraph(nodes, layout, opts = {}) {
     })
     .join("");
 
-  const arrowDefs = crossovers
-    ? `<defs><marker id="${ARROW_ID}" class="graph-arrow" markerUnits="userSpaceOnUse" markerWidth="${options.arrowLength}" markerHeight="${options.arrowHeight}" refX="${options.arrowLength}" refY="${options.arrowHeight / 2}" orient="auto"><path d="M 0 0 L ${options.arrowLength} ${options.arrowHeight / 2} L 0 ${options.arrowHeight} z" /></marker></defs>`
-    : "";
+  /*
+   * The seam at each berth's ends.
+   *
+   * Both comps mark every berth boundary, and the reason shows up the moment a
+   * route is set: three neighbours lighting at once fuse into one unbroken bar
+   * and stop being countable. A ground-coloured hairline at each end keeps the
+   * berths separate whether they are lit or not — value and a seam, which is all
+   * Hangar's anti-goals leave available.
+   */
+  const seams = graphNodes
+    .flatMap((node) => {
+      const position = positions.get(node.ref);
+      if (!position) return [];
+      return [position.x, position.x + options.berthWidth].map(
+        (x) =>
+          `<line class="graph-seam" x1="${trim(x)}" y1="${trim(position.y)}" x2="${trim(x)}" y2="${trim(position.y + options.berthHeight)}" />`,
+      );
+    })
+    .join("");
+
   const empty = graphNodes.length
     ? ""
     : '<text class="graph-empty" x="50%" y="50%">No tasks in this flight tree.</text>';
@@ -494,5 +687,5 @@ export function renderGraph(nodes, layout, opts = {}) {
     ? `<text class="graph-cycle-note" x="${trim(width / 2)}" y="${trim(height - options.padding / 2)}">Cycle: ${escapeHtml([...cyclic].join(", "))}</text>`
     : "";
 
-  return `<svg class="dependency-graph" width="${trim(width)}" height="${trim(height)}" viewBox="0 0 ${trim(width)} ${trim(height)}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency panel" xmlns="http://www.w3.org/2000/svg">${arrowDefs}${roadLines}${crossovers}${berths}${cycleNote}${empty}</svg>`;
+  return `<svg class="dependency-graph" width="${trim(width)}" height="${trim(height)}" viewBox="0 0 ${trim(width)} ${trim(height)}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency panel" xmlns="http://www.w3.org/2000/svg">${roadLines}${links}${crossovers}${berths}${seams}${cycleNote}${empty}</svg>`;
 }
