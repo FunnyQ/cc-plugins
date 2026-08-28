@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: work/04
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -136,48 +136,48 @@ what has no current requirement behind it.
 
 ## Acceptance criteria
 
-- [ ] Which end-to-end path was available — historical transcripts, or a built fixture —
+- [x] Which end-to-end path was available — historical transcripts, or a built fixture —
       was established before the check was written, and is stated in the report.
-- [ ] The plan-wide output total **in the event payload** matches an independently
+- [x] The plan-wide output total **in the event payload** matches an independently
       computed ground truth exactly: summed across every workflow directory the plan
       produced when historical transcripts survive, or against hand-chosen fixture
       numbers when they do not. A zero-versus-zero agreement caused by a missing
       directory does not satisfy this criterion.
-- [ ] The header on screen shows the token formatter applied to that payload value.
-- [ ] A fleet row with no matched transcript renders as unavailable, and a row with a
+- [x] The header on screen shows the token formatter applied to that payload value.
+- [x] A fleet row with no matched transcript renders as unavailable, and a row with a
       matched transcript renders its own figure.
-- [ ] The per-task figures plus the unattributed figure equal the plan total, asserted
+- [x] The per-task figures plus the unattributed figure equal the plan total, asserted
       on the raw event-stream payload rather than on rendered text.
-- [ ] Exactly one token-formatting function exists in the codebase, and every display
+- [x] Exactly one token-formatting function exists in the codebase, and every display
       site imports it.
-- [ ] The counter field names are consistent inland, with the raw wire names confined
+- [x] The counter field names are consistent inland, with the raw wire names confined
       to the parse boundary.
-- [ ] The fleet panel still streams, reaps, and renders verdicts; the tree endpoint's
+- [x] The fleet panel still streams, reaps, and renders verdicts; the tree endpoint's
       payload is unchanged.
-- [ ] No cache, persisted cursor, extra timer, extra HTTP route, or single-caller
+- [x] No cache, persisted cursor, extra timer, extra HTTP route, or single-caller
       **indirection** was introduced. Any found is removed or justified in one line.
       Small local helpers and the two defaulted test-seam parameters are expected and
       do not count.
-- [ ] Every defect found in this review is fixed, or recorded with the reason it was
+- [x] Every defect found in this review is fixed, or recorded with the reason it was
       left.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` — every test passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` — every
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` — every test passes.
+- [x] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` — every
       test passes.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — prints
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — prints
       nothing. Run it against the root `tsconfig.json`; naming files on the command line
       drops the config and floods the output with errors that are not real. Do not chase
       a zero total, the repo-wide run is not green for unrelated reasons.
-- [ ] Start the flightdeck server against the generated fixture's plan directory, with
+- [x] Start the flightdeck server against the generated fixture's plan directory, with
       `--projects-root` pointing at its projects tree, open it in a browser, and confirm
       the fleet column, a lanes card total, and the header total all render, plus the one
       row the fixture leaves without a transcript reading `N/A`. Read the port from the
       server's own startup output. This is the same fixture-backed procedure described
       above — do not substitute an already-executed plan directory, which is the gate
       wording the shared conventions forbid.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot docs/flightdeck-tokens/tasks/review/01-final-review.md`
+- [x] `git status --short -- packages/dispatch/skills/autopilot docs/flightdeck-tokens/tasks/review/01-final-review.md`
       — confirm the paths this review actually edited appear. This is a weak signal, not
       a scope gate; other paths in the tree belong to work running beside this one.
 
