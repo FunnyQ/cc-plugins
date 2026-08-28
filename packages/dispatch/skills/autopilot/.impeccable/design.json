@@ -1,0 +1,560 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-29T00:00:00.000Z",
+  "title": "Design System: Hangar",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "canonical": "oklch(17.6% 0.008 248.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.008 248.3)",
+          "oklch(26.4% 0.008 248.3)",
+          "oklch(37.9% 0.008 248.3)",
+          "oklch(49.3% 0.008 248.3)",
+          "oklch(60.7% 0.008 248.3)",
+          "oklch(72.1% 0.008 248.3)",
+          "oklch(83.6% 0.008 248.3)",
+          "oklch(95.0% 0.008 248.3)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "oklch(22.0% 0.012 254.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.012 254.1)",
+          "oklch(26.4% 0.012 254.1)",
+          "oklch(37.9% 0.012 254.1)",
+          "oklch(49.3% 0.012 254.1)",
+          "oklch(60.7% 0.012 254.1)",
+          "oklch(72.1% 0.012 254.1)",
+          "oklch(83.6% 0.012 254.1)",
+          "oklch(95.0% 0.012 254.1)"
+        ]
+      },
+      "surface-2": {
+        "role": "neutral",
+        "displayName": "Raised Surface",
+        "canonical": "oklch(25.7% 0.016 252.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.016 252.4)",
+          "oklch(26.4% 0.016 252.4)",
+          "oklch(37.9% 0.016 252.4)",
+          "oklch(49.3% 0.016 252.4)",
+          "oklch(60.7% 0.016 252.4)",
+          "oklch(72.1% 0.016 252.4)",
+          "oklch(83.6% 0.016 252.4)",
+          "oklch(95.0% 0.016 252.4)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(29.0% 0.015 252.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.015 252.4)",
+          "oklch(26.4% 0.015 252.4)",
+          "oklch(37.9% 0.015 252.4)",
+          "oklch(49.3% 0.015 252.4)",
+          "oklch(60.7% 0.015 252.4)",
+          "oklch(72.1% 0.015 252.4)",
+          "oklch(83.6% 0.015 252.4)",
+          "oklch(95.0% 0.015 252.4)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "oklch(88.0% 0.012 252.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.012 252.1)",
+          "oklch(26.4% 0.012 252.1)",
+          "oklch(37.9% 0.012 252.1)",
+          "oklch(49.3% 0.012 252.1)",
+          "oklch(60.7% 0.012 252.1)",
+          "oklch(72.1% 0.012 252.1)",
+          "oklch(83.6% 0.012 252.1)",
+          "oklch(95.0% 0.012 252.1)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "oklch(61.9% 0.024 252.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.024 252.6)",
+          "oklch(26.4% 0.024 252.6)",
+          "oklch(37.9% 0.024 252.6)",
+          "oklch(49.3% 0.024 252.6)",
+          "oklch(60.7% 0.024 252.6)",
+          "oklch(72.1% 0.024 252.6)",
+          "oklch(83.6% 0.024 252.6)",
+          "oklch(95.0% 0.024 252.6)"
+        ]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint Metadata",
+        "canonical": "oklch(44.5% 0.020 251.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 251.1)",
+          "oklch(26.4% 0.020 251.1)",
+          "oklch(37.9% 0.020 251.1)",
+          "oklch(49.3% 0.020 251.1)",
+          "oklch(60.7% 0.020 251.1)",
+          "oklch(72.1% 0.020 251.1)",
+          "oklch(83.6% 0.020 251.1)",
+          "oklch(95.0% 0.020 251.1)"
+        ]
+      },
+      "state-done": {
+        "role": "secondary",
+        "displayName": "Done Green",
+        "canonical": "oklch(64.7% 0.141 138.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.141 138.5)",
+          "oklch(26.4% 0.141 138.5)",
+          "oklch(37.9% 0.141 138.5)",
+          "oklch(49.3% 0.141 138.5)",
+          "oklch(60.7% 0.141 138.5)",
+          "oklch(72.1% 0.141 138.5)",
+          "oklch(83.6% 0.141 138.5)",
+          "oklch(95.0% 0.141 138.5)"
+        ]
+      },
+      "state-flight": {
+        "role": "primary",
+        "displayName": "Flight Amber",
+        "canonical": "oklch(66.4% 0.115 65.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.115 65.9)",
+          "oklch(26.4% 0.115 65.9)",
+          "oklch(37.9% 0.115 65.9)",
+          "oklch(49.3% 0.115 65.9)",
+          "oklch(60.7% 0.115 65.9)",
+          "oklch(72.1% 0.115 65.9)",
+          "oklch(83.6% 0.115 65.9)",
+          "oklch(95.0% 0.115 65.9)"
+        ]
+      },
+      "state-ready": {
+        "role": "secondary",
+        "displayName": "Ready Teal",
+        "canonical": "oklch(63.3% 0.074 207.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.074 207.1)",
+          "oklch(26.4% 0.074 207.1)",
+          "oklch(37.9% 0.074 207.1)",
+          "oklch(49.3% 0.074 207.1)",
+          "oklch(60.7% 0.074 207.1)",
+          "oklch(72.1% 0.074 207.1)",
+          "oklch(83.6% 0.074 207.1)",
+          "oklch(95.0% 0.074 207.1)"
+        ]
+      },
+      "state-blocked": {
+        "role": "secondary",
+        "displayName": "Blocked Slate",
+        "canonical": "oklch(46.6% 0.027 252.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.027 252.4)",
+          "oklch(26.4% 0.027 252.4)",
+          "oklch(37.9% 0.027 252.4)",
+          "oklch(49.3% 0.027 252.4)",
+          "oklch(60.7% 0.027 252.4)",
+          "oklch(72.1% 0.027 252.4)",
+          "oklch(83.6% 0.027 252.4)",
+          "oklch(95.0% 0.027 252.4)"
+        ]
+      },
+      "state-alert": {
+        "role": "secondary",
+        "displayName": "Alert Coral",
+        "canonical": "oklch(70.3% 0.176 24.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.176 24.7)",
+          "oklch(26.4% 0.176 24.7)",
+          "oklch(37.9% 0.176 24.7)",
+          "oklch(49.3% 0.176 24.7)",
+          "oklch(60.7% 0.176 24.7)",
+          "oklch(72.1% 0.176 24.7)",
+          "oklch(83.6% 0.176 24.7)",
+          "oklch(95.0% 0.176 24.7)"
+        ]
+      },
+      "lit-done": {
+        "role": "secondary",
+        "displayName": "Lit Done",
+        "canonical": "color-mix(in oklab, #5fa249 78%, white)",
+        "tonalRamp": [
+          "oklch(15.0% 0.111 138.6)",
+          "oklch(26.4% 0.111 138.6)",
+          "oklch(37.9% 0.111 138.6)",
+          "oklch(49.3% 0.111 138.6)",
+          "oklch(60.7% 0.111 138.6)",
+          "oklch(72.1% 0.111 138.6)",
+          "oklch(83.6% 0.111 138.6)",
+          "oklch(95.0% 0.111 138.6)"
+        ]
+      },
+      "lit-flight": {
+        "role": "primary",
+        "displayName": "Lit Flight",
+        "canonical": "color-mix(in oklab, #c3843f 78%, white)",
+        "tonalRamp": [
+          "oklch(15.0% 0.090 66.2)",
+          "oklch(26.4% 0.090 66.2)",
+          "oklch(37.9% 0.090 66.2)",
+          "oklch(49.3% 0.090 66.2)",
+          "oklch(60.7% 0.090 66.2)",
+          "oklch(72.1% 0.090 66.2)",
+          "oklch(83.6% 0.090 66.2)",
+          "oklch(95.0% 0.090 66.2)"
+        ]
+      },
+      "lit-ready": {
+        "role": "secondary",
+        "displayName": "Lit Ready",
+        "canonical": "color-mix(in oklab, #4e97a1 70%, white)",
+        "tonalRamp": [
+          "oklch(15.0% 0.053 207.1)",
+          "oklch(26.4% 0.053 207.1)",
+          "oklch(37.9% 0.053 207.1)",
+          "oklch(49.3% 0.053 207.1)",
+          "oklch(60.7% 0.053 207.1)",
+          "oklch(72.1% 0.053 207.1)",
+          "oklch(83.6% 0.053 207.1)",
+          "oklch(95.0% 0.053 207.1)"
+        ]
+      },
+      "lit-alert": {
+        "role": "secondary",
+        "displayName": "Lit Alert",
+        "canonical": "color-mix(in oklab, #fa6b66 72%, white)",
+        "tonalRamp": [
+          "oklch(15.0% 0.125 25.0)",
+          "oklch(26.4% 0.125 25.0)",
+          "oklch(37.9% 0.125 25.0)",
+          "oklch(49.3% 0.125 25.0)",
+          "oklch(60.7% 0.125 25.0)",
+          "oklch(72.1% 0.125 25.0)",
+          "oklch(83.6% 0.125 25.0)",
+          "oklch(95.0% 0.125 25.0)"
+        ]
+      },
+      "unlit": {
+        "role": "neutral",
+        "displayName": "Unlit Rail",
+        "canonical": "color-mix(in oklab, #4f5b69 45%, #0e1114)",
+        "tonalRamp": [
+          "oklch(15.0% 0.017 251.9)",
+          "oklch(26.4% 0.017 251.9)",
+          "oklch(37.9% 0.017 251.9)",
+          "oklch(49.3% 0.017 251.9)",
+          "oklch(60.7% 0.017 251.9)",
+          "oklch(72.1% 0.017 251.9)",
+          "oklch(83.6% 0.017 251.9)",
+          "oklch(95.0% 0.017 251.9)"
+        ]
+      },
+      "unlit-berth": {
+        "role": "neutral",
+        "displayName": "Unlit Berth",
+        "canonical": "color-mix(in oklab, #4f5b69 75%, #0e1114)",
+        "tonalRamp": [
+          "oklch(15.0% 0.023 250.9)",
+          "oklch(26.4% 0.023 250.9)",
+          "oklch(37.9% 0.023 250.9)",
+          "oklch(49.3% 0.023 250.9)",
+          "oklch(60.7% 0.023 250.9)",
+          "oklch(72.1% 0.023 250.9)",
+          "oklch(83.6% 0.023 250.9)",
+          "oklch(95.0% 0.023 250.9)"
+        ]
+      },
+      "crossover-cleared": {
+        "role": "secondary",
+        "displayName": "Cleared Crossover",
+        "canonical": "color-mix(in oklab, #5fa249 50%, #0e1114)",
+        "tonalRamp": [
+          "oklch(15.0% 0.069 141.7)",
+          "oklch(26.4% 0.069 141.7)",
+          "oklch(37.9% 0.069 141.7)",
+          "oklch(49.3% 0.069 141.7)",
+          "oklch(60.7% 0.069 141.7)",
+          "oklch(72.1% 0.069 141.7)",
+          "oklch(83.6% 0.069 141.7)",
+          "oklch(95.0% 0.069 141.7)"
+        ]
+      },
+      "lamp-dark": {
+        "role": "neutral",
+        "displayName": "Dark Lamp",
+        "canonical": "color-mix(in oklab, #4f5b69 30%, #0e1114)",
+        "tonalRamp": [
+          "oklch(15.0% 0.013 253.1)",
+          "oklch(26.4% 0.013 253.1)",
+          "oklch(37.9% 0.013 253.1)",
+          "oklch(49.3% 0.013 253.1)",
+          "oklch(60.7% 0.013 253.1)",
+          "oklch(72.1% 0.013 253.1)",
+          "oklch(83.6% 0.013 253.1)",
+          "oklch(95.0% 0.013 253.1)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "The three header numbers the deck exists to show: plan title, elapsed clock, token rollup. Tabular figures."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "The only prose on the deck: a task card's title and the fleet heading. The sole use of the sans face."
+      },
+      "reading": {
+        "displayName": "Reading",
+        "purpose": "The document default, set on html. Monospace at 13px."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Fleet rows, lane headings, view-toggle labels, token figures (weight 600). Tabular figures."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase mono chrome: eyebrows, definition terms, badges, column headers, counts."
+      },
+      "panel-ref": {
+        "displayName": "Berth Ref",
+        "purpose": "The bucket/NN under each berth. Derived from the panel's own FONT_SIZE = 14 at 0.85, not from the CSS scale."
+      },
+      "panel-token": {
+        "displayName": "Berth Token",
+        "purpose": "The token count under the ref, coloured by tier. FONT_SIZE * 0.75."
+      },
+      "panel-road": {
+        "displayName": "Road Name",
+        "purpose": "The bucket name in both gutters, uppercase, mirrored end/start anchored. FONT_SIZE * 0.8."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sticky-edge",
+        "value": "0 1px 0 var(--rule)",
+        "purpose": "The only box-shadow on the deck, and it is not depth. Zero blur, zero spread, rule colour; it doubles the header's own bottom border so the sticky edge stays visible over a scrolling panel. Anything with a blur radius is forbidden."
+      }
+    ],
+    "motion": [
+      {
+        "name": "motion-duration",
+        "value": "150ms",
+        "purpose": "Colour and opacity transitions on berths, crossovers, running lines, signal heads, meters, and status dots. Nothing changes position."
+      },
+      {
+        "name": "flight-duration",
+        "value": "2s",
+        "purpose": "The flight-pulse period: an ease-in-out opacity cycle to 0.45 and back on the three in-flight markers (header status dot, fleet status dot, in-flight berth). Deck-wide and predates the panel redesign; the two dots have always used it. A fade is in tension with the panel's own rule that segments light rather than fade, and it is retained because an in-flight berth reading differently from an in-flight fleet row would be worse."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }",
+        "purpose": "One global rule kills every animation and transition on the deck."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "lane-strip",
+        "value": "600px",
+        "purpose": "Container query on .c-task-lanes: below this the lane strip drops to one full-width lane."
+      },
+      {
+        "name": "fleet-table",
+        "value": "690px",
+        "purpose": "Container query on .c-fleet: below this the manifest table scrolls horizontally."
+      },
+      {
+        "name": "stack",
+        "value": "899px",
+        "purpose": "Viewport max-width: the deck stops being a fixed-height grid and stacks into a scrolling page; the header collapses to two columns and the counts wrap to five."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "View Toggle",
+      "kind": "nav",
+      "refersTo": "view-toggle-button",
+      "description": "The two-state task-view switch in the header. Graph is the default.",
+      "html": "<div class=\"ds-view-toggle\"><button type=\"button\" aria-pressed=\"false\">Lanes</button><button type=\"button\" aria-pressed=\"true\">Graph</button></div>",
+      "css": ".ds-view-toggle { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--rule, #262c33); border-radius: 2px; overflow: hidden; font-family: ui-monospace, \"SF Mono\", Menlo, monospace; } .ds-view-toggle > button { background: var(--surface, #171b20); border: 0; color: var(--muted, #7c8794); cursor: pointer; font: inherit; font-size: 12px; padding: 8px 12px; transition: color 150ms; } .ds-view-toggle > button + button { border-inline-start: 1px solid var(--rule, #262c33); } .ds-view-toggle > button[aria-pressed=\"true\"] { background: var(--surface-2, #1e242b); color: var(--text, #d2d8df); } .ds-view-toggle > button:focus-visible { outline: 2px solid var(--state-flight, #c3843f); outline-offset: -2px; }"
+    },
+    {
+      "name": "Task Card",
+      "kind": "card",
+      "refersTo": "task-card",
+      "description": "One task in the lanes view. A square status swatch, a mono ref, a sans title, outlined badges, and a token figure.",
+      "html": "<div class=\"ds-task-card\"><button type=\"button\" class=\"ds-task-summary\"><span class=\"ds-identity\"><span class=\"ds-status\"></span><span class=\"ds-ref\">server/03</span></span><span class=\"ds-title\">Stream fleet rows over SSE</span><span class=\"ds-badges\"><span class=\"ds-badge\">in flight</span></span><span class=\"ds-token-figure\">42.1K</span></button></div>",
+      "css": ".ds-task-card { background: var(--surface, #171b20); border: 1px solid var(--rule, #262c33); border-radius: 4px; display: grid; overflow: hidden; font-family: ui-monospace, \"SF Mono\", Menlo, monospace; } .ds-task-summary { background: transparent; border: 0; color: var(--text, #d2d8df); cursor: pointer; display: grid; font: inherit; gap: 8px; inline-size: 100%; padding: 12px; text-align: start; } .ds-task-summary:hover { background: var(--surface-2, #1e242b); } .ds-task-summary:focus-visible { outline: 2px solid var(--state-flight, #c3843f); outline-offset: -2px; } .ds-identity { align-items: center; display: grid; gap: 8px; grid-template-columns: auto minmax(0, 1fr); } .ds-status { background: var(--state-flight, #c3843f); border-radius: 2px; block-size: 6px; inline-size: 6px; } .ds-ref { color: var(--muted, #7c8794); font-size: 11px; } .ds-title { color: var(--text, #d2d8df); font-family: system-ui, -apple-system, sans-serif; font-size: 13px; line-height: 1.4; } .ds-badges { display: grid; gap: 4px; grid-template-columns: repeat(auto-fit, minmax(min-content, max-content)); } .ds-badge { border: 1px solid currentColor; border-radius: 2px; color: var(--state-flight, #c3843f); font-size: 11px; letter-spacing: 0.02em; padding: 4px 8px; text-transform: uppercase; } .ds-token-figure { color: var(--text, #d2d8df); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; justify-self: end; letter-spacing: 0.02em; }"
+    },
+    {
+      "name": "Role Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "An outlined uppercase chip. Text and border are one colour, set by the row's state, so the chip never fills.",
+      "html": "<span class=\"ds-role-badge\">judge</span> <span class=\"ds-role-badge -done\">dev</span> <span class=\"ds-role-badge -alert\">verify</span>",
+      "css": ".ds-role-badge { border: 1px solid currentColor; border-radius: 2px; color: var(--state-flight, #c3843f); display: inline-block; font-family: ui-monospace, \"SF Mono\", Menlo, monospace; font-size: 11px; letter-spacing: 0.02em; padding: 4px 8px; text-transform: uppercase; } .ds-role-badge.-done { color: var(--state-done, #5fa249); } .ds-role-badge.-alert { color: var(--state-alert, #fa6b66); }"
+    },
+    {
+      "name": "Score Meter",
+      "kind": "custom",
+      "refersTo": "score-meter",
+      "description": "One shape for both views: a 4px raised-surface track, a flat verdict fill, and a 1px text-coloured threshold marker standing in it.",
+      "html": "<div class=\"ds-score-meter\"><span class=\"ds-track\"><span class=\"ds-fill -passed\" style=\"inline-size: 82%\"></span><span class=\"ds-threshold\" style=\"inset-inline-start: 70%\"></span></span><span class=\"ds-value\">4.10</span></div>",
+      "css": ".ds-score-meter { align-items: center; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; font-family: ui-monospace, \"SF Mono\", Menlo, monospace; } .ds-score-meter > .ds-track { background: var(--surface-2, #1e242b); block-size: 4px; display: block; position: relative; } .ds-score-meter .ds-fill { block-size: 100%; display: block; } .ds-score-meter .ds-fill.-passed { background: var(--state-done, #5fa249); } .ds-score-meter .ds-fill.-failed { background: var(--state-alert, #fa6b66); } .ds-score-meter .ds-fill.-pending { background: var(--state-flight, #c3843f); } .ds-score-meter .ds-threshold { background: var(--text, #d2d8df); block-size: 100%; inline-size: 1px; position: absolute; inset-block-start: 0; } .ds-score-meter > .ds-value { color: var(--text, #d2d8df); font-size: 11px; }"
+    },
+    {
+      "name": "Fleet Row",
+      "kind": "custom",
+      "refersTo": "fleet-row",
+      "description": "One agent in the manifest. A 6px square status dot, a role badge, a token figure, and a message cell that promotes to full text when a gate was rejected.",
+      "html": "<div class=\"ds-fleet-row\"><span class=\"ds-fleet-status\"></span><span>server/03</span><span class=\"ds-fleet-role\"><span class=\"ds-role-badge\">dev</span><span class=\"ds-role-tokens\">42.1K</span></span><span class=\"ds-fleet-message\">Stream fleet rows over SSE</span></div>",
+      "css": ".ds-fleet-row { align-items: center; border-block-end: 1px solid var(--rule, #262c33); color: var(--text, #d2d8df); display: grid; font-family: ui-monospace, \"SF Mono\", Menlo, monospace; font-size: 12px; gap: 8px; grid-template-columns: 18px minmax(96px, 0.7fr) minmax(72px, 0.6fr) minmax(160px, 2fr); line-height: 1.2; padding: 8px 12px; } .ds-fleet-row:hover { background: var(--surface-2, #1e242b); cursor: pointer; } .ds-fleet-row:focus-visible { outline: 2px solid var(--state-flight, #c3843f); outline-offset: -2px; } .ds-fleet-status { animation: ds-flight-pulse 2s ease-in-out infinite; background: var(--state-flight, #c3843f); border-radius: 2px; block-size: 6px; display: block; inline-size: 6px; } .ds-fleet-role { align-items: center; display: grid; gap: 4px; justify-items: start; } .ds-role-badge { border: 1px solid currentColor; border-radius: 2px; color: var(--state-flight, #c3843f); font-size: 11px; letter-spacing: 0.02em; padding: 4px 8px; text-transform: uppercase; } .ds-role-tokens { color: var(--text, #d2d8df); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; } .ds-fleet-message { color: var(--muted, #7c8794); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } @keyframes ds-flight-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }"
+    },
+    {
+      "name": "Interlocking Panel Berth",
+      "kind": "custom",
+      "refersTo": "graph-berth",
+      "description": "A task as a berth segment on its bucket's running road. 98 x 11.9px, 2px radius, ground-coloured seams at both ends, ref and token hanging beneath.",
+      "html": "<svg class=\"ds-panel\" width=\"420\" height=\"72\" viewBox=\"0 0 420 72\" xmlns=\"http://www.w3.org/2000/svg\"><g class=\"ds-road\"><line class=\"ds-rail\" x1=\"14\" y1=\"20\" x2=\"406\" y2=\"20\" stroke-width=\"11.9\"/><text class=\"ds-road-name -left\" x=\"8\" y=\"24\" font-size=\"11.2\">server</text></g><g class=\"ds-berth -done\"><rect class=\"ds-segment\" x=\"40\" y=\"14\" width=\"98\" height=\"11.9\" rx=\"2\" ry=\"2\"/><text class=\"ds-ref\" x=\"89\" y=\"42\" font-size=\"11.9\">server/01</text><text class=\"ds-tokens -normal\" x=\"89\" y=\"60\" font-size=\"10.5\">42.1K</text><line class=\"ds-seam\" x1=\"40\" y1=\"14\" x2=\"40\" y2=\"25.9\"/><line class=\"ds-seam\" x1=\"138\" y1=\"14\" x2=\"138\" y2=\"25.9\"/></g><g class=\"ds-berth -in-progress\"><rect class=\"ds-segment\" x=\"194\" y=\"14\" width=\"98\" height=\"11.9\" rx=\"2\" ry=\"2\"/><text class=\"ds-ref\" x=\"243\" y=\"42\" font-size=\"11.9\">server/02</text><text class=\"ds-tokens -warn\" x=\"243\" y=\"60\" font-size=\"10.5\">96.4K</text><line class=\"ds-seam\" x1=\"194\" y1=\"14\" x2=\"194\" y2=\"25.9\"/><line class=\"ds-seam\" x1=\"292\" y1=\"14\" x2=\"292\" y2=\"25.9\"/></g></svg>",
+      "css": ".ds-panel { --ds-unlit: color-mix(in oklab, var(--state-blocked, #4f5b69) 45%, var(--ground, #0e1114)); --ds-unlit-berth: color-mix(in oklab, var(--state-blocked, #4f5b69) 75%, var(--ground, #0e1114)); display: block; } .ds-panel .ds-rail { stroke: var(--ds-unlit); stroke-linecap: butt; } .ds-panel .ds-road-name { fill: var(--muted, #7c8794); font-family: ui-monospace, \"SF Mono\", Menlo, monospace; letter-spacing: 0.06em; text-anchor: end; text-transform: uppercase; } .ds-panel .ds-segment { fill: var(--ds-unlit-berth); transition: fill 150ms; } .ds-panel .ds-berth.-done .ds-segment { fill: color-mix(in oklab, var(--state-done, #5fa249) 78%, white); } .ds-panel .ds-berth.-in-progress .ds-segment { fill: color-mix(in oklab, var(--state-flight, #c3843f) 78%, white); animation: ds-flight-pulse 2s ease-in-out infinite; } .ds-panel .ds-berth.-ready .ds-segment { fill: color-mix(in oklab, var(--state-ready, #4e97a1) 70%, white); } .ds-panel .ds-berth.-alert .ds-segment { fill: color-mix(in oklab, var(--state-alert, #fa6b66) 72%, white); } .ds-panel .ds-seam { stroke: var(--ground, #0e1114); stroke-width: 1; } .ds-panel .ds-ref, .ds-panel .ds-tokens { fill: var(--text, #d2d8df); font-family: ui-monospace, \"SF Mono\", Menlo, monospace; text-anchor: middle; } .ds-panel .ds-ref { font-weight: 600; } .ds-panel .ds-tokens { font-weight: 700; letter-spacing: 0.03em; } .ds-panel .ds-tokens.-normal { fill: var(--muted, #7c8794); } .ds-panel .ds-tokens.-warn { fill: var(--state-flight, #c3843f); } .ds-panel .ds-tokens.-danger { fill: var(--state-alert, #fa6b66); } @keyframes ds-flight-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }"
+    },
+    {
+      "name": "Signal Head",
+      "kind": "custom",
+      "refersTo": "graph-signal-housing",
+      "description": "The gate at a task's entry. A ground-filled 14.7 x 35.7px housing with a 1px rule stroke, three 4.2px lamps in real top-to-bottom order, one lit and two dark.",
+      "html": "<svg class=\"ds-signals\" width=\"140\" height=\"56\" viewBox=\"0 0 140 56\" xmlns=\"http://www.w3.org/2000/svg\"><line class=\"ds-rail\" x1=\"0\" y1=\"28\" x2=\"140\" y2=\"28\" stroke-width=\"11.9\"/><g class=\"ds-signal -clear\"><rect class=\"ds-housing\" x=\"18\" y=\"10.2\" width=\"14.7\" height=\"35.7\" rx=\"2\" ry=\"2\"/><circle class=\"ds-lamp -clear\" cx=\"25.35\" cy=\"17.5\" r=\"4.2\"/><circle class=\"ds-lamp -caution\" cx=\"25.35\" cy=\"28\" r=\"4.2\"/><circle class=\"ds-lamp -danger\" cx=\"25.35\" cy=\"38.5\" r=\"4.2\"/></g><g class=\"ds-signal -caution\"><rect class=\"ds-housing\" x=\"63\" y=\"10.2\" width=\"14.7\" height=\"35.7\" rx=\"2\" ry=\"2\"/><circle class=\"ds-lamp -clear\" cx=\"70.35\" cy=\"17.5\" r=\"4.2\"/><circle class=\"ds-lamp -caution\" cx=\"70.35\" cy=\"28\" r=\"4.2\"/><circle class=\"ds-lamp -danger\" cx=\"70.35\" cy=\"38.5\" r=\"4.2\"/></g><g class=\"ds-signal -danger\"><rect class=\"ds-housing\" x=\"108\" y=\"10.2\" width=\"14.7\" height=\"35.7\" rx=\"2\" ry=\"2\"/><circle class=\"ds-lamp -clear\" cx=\"115.35\" cy=\"17.5\" r=\"4.2\"/><circle class=\"ds-lamp -caution\" cx=\"115.35\" cy=\"28\" r=\"4.2\"/><circle class=\"ds-lamp -danger\" cx=\"115.35\" cy=\"38.5\" r=\"4.2\"/></g></svg>",
+      "css": ".ds-signals { display: block; } .ds-signals .ds-rail { stroke: color-mix(in oklab, var(--state-blocked, #4f5b69) 45%, var(--ground, #0e1114)); stroke-linecap: butt; } .ds-signals .ds-housing { fill: var(--ground, #0e1114); stroke: var(--rule, #262c33); stroke-width: 1; } .ds-signals .ds-lamp { fill: color-mix(in oklab, var(--state-blocked, #4f5b69) 30%, var(--ground, #0e1114)); } .ds-signals .ds-signal.-clear .ds-lamp.-clear { fill: color-mix(in oklab, var(--state-done, #5fa249) 78%, white); } .ds-signals .ds-signal.-caution .ds-lamp.-caution { fill: color-mix(in oklab, var(--state-flight, #c3843f) 78%, white); } .ds-signals .ds-signal.-danger .ds-lamp.-danger { fill: color-mix(in oklab, var(--state-alert, #fa6b66) 72%, white); }"
+    },
+    {
+      "name": "Set Route",
+      "kind": "custom",
+      "refersTo": "graph-berth",
+      "description": "The signature interaction. Hover any berth and the panel darkens to 0.18 while that task's whole lineage stays lit end to end, its track restroked to lit-done at one value. Berths on the route keep their own state colour rather than joining the green — a deliberate divergence from c-route.png, which paints the whole route one unbroken #0fa804 and carries no amber or red at all, because a berth on a set route still has to report what it is doing. Hover the svg to see it.",
+      "html": "<svg class=\"ds-route\" width=\"420\" height=\"96\" viewBox=\"0 0 420 96\" xmlns=\"http://www.w3.org/2000/svg\"><line class=\"ds-rail\" x1=\"14\" y1=\"20\" x2=\"406\" y2=\"20\" stroke-width=\"11.9\"/><line class=\"ds-rail\" x1=\"14\" y1=\"76\" x2=\"406\" y2=\"76\" stroke-width=\"11.9\"/><path class=\"ds-crossover -lit\" d=\"M 138,20 L 156,20 L 212,76 L 250,76\" stroke-width=\"11.9\"/><path class=\"ds-crossover\" d=\"M 138,20 L 300,20\" stroke-width=\"11.9\"/><g class=\"ds-berth -done -lit\"><rect class=\"ds-segment\" x=\"40\" y=\"14\" width=\"98\" height=\"11.9\" rx=\"2\" ry=\"2\"/></g><g class=\"ds-berth -ready\"><rect class=\"ds-segment\" x=\"300\" y=\"14\" width=\"98\" height=\"11.9\" rx=\"2\" ry=\"2\"/></g><g class=\"ds-berth -in-progress -lit -self\"><rect class=\"ds-segment\" x=\"250\" y=\"70\" width=\"98\" height=\"11.9\" rx=\"2\" ry=\"2\"/></g></svg>",
+      "css": ".ds-route { --ds-unlit: color-mix(in oklab, var(--state-blocked, #4f5b69) 45%, var(--ground, #0e1114)); --ds-unlit-berth: color-mix(in oklab, var(--state-blocked, #4f5b69) 75%, var(--ground, #0e1114)); --ds-lit-done: color-mix(in oklab, var(--state-done, #5fa249) 78%, white); display: block; } .ds-route .ds-rail { stroke: var(--ds-unlit); stroke-linecap: butt; } .ds-route .ds-crossover { fill: none; stroke: var(--ds-unlit); stroke-linejoin: miter; transition: stroke 150ms, opacity 150ms; } .ds-route .ds-segment { fill: var(--ds-unlit-berth); transition: fill 150ms; } .ds-route .ds-berth.-done .ds-segment { fill: var(--ds-lit-done); } .ds-route .ds-berth.-ready .ds-segment { fill: color-mix(in oklab, var(--state-ready, #4e97a1) 70%, white); } .ds-route .ds-berth.-in-progress .ds-segment { fill: color-mix(in oklab, var(--state-flight, #c3843f) 78%, white); } .ds-route .ds-berth, .ds-route .ds-crossover { transition: opacity 150ms ease; } .ds-route:hover .ds-berth:not(.-lit) .ds-segment, .ds-route:hover .ds-crossover:not(.-lit) { opacity: 0.18; } .ds-route:hover .ds-crossover.-lit { stroke: var(--ds-lit-done); } .ds-route:hover .ds-berth.-self .ds-segment { stroke: var(--text, #d2d8df); stroke-width: 2; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Signalling Desk",
+    "overview": "Hangar is one operator's desk in a dark room. The deck opens on a railway NX entrance-exit signalling panel — roads, berths, crossovers, signal heads — with a dispatch manifest of agent rows underneath it. Both halves are instruments, not pictures of instruments: the panel spreads into the pane it is given, the manifest scrolls, and nothing on either is decoration. The reader is one engineer, usually at night, beside a terminal, asking two questions about a running plan — what is holding this task up, and what starts moving when it lands — plus a third, what has it cost.\n\nThe system is dark only, monospace by default, and dense. There is no light branch and no theme control; the deck sits beside editors and terminals for hours and must stay visually continuous with them. Depth is a three-step ground ramp and a 1px rule, never a shadow. Colour is pinned to five states and never appears without a label, a count, or a shape beside it.\n\nThe signature move is that state is lit, not filled. Each state carries three steps on one hue — lit, base, unlit — separated by value alone. A signalling panel does not fill a segment, it lights one, and holding to value means the panel needs no gradient, no glow, and no shadow to say the same thing, all three of which the world forbids anyway. The rejections are specific: not a node-graph editor (free-angle wires, arrowheads, drag handles), not theatrical space (neon, glow, purple, blur), and not card-based SaaS (roomy padding, pill chips, marketing scale).",
+    "keyCharacteristics": [
+      "One fixed dark ground (#0e1114), three surfaces, one 1px rule; no light mode, no theme toggle.",
+      "Five pinned state colours, each expanded to a lit / base / unlit ramp on its own hue by value alone.",
+      "Monospace is the body face; the sans face is reserved for two prose slots.",
+      "Corner radius stops at 4px, and the panel uses 2px. No pill shapes anywhere.",
+      "The signalling panel's geometry is a multiple of one type size (FONT_SIZE = 14), so the whole diagram rescales from a single constant.",
+      "Two quantities answer to the measured pane rather than to the type size: the pitch between roads and the gap between berths.",
+      "No arrowheads, no glow, no gradient, no drop shadow, no emoji."
+    ],
+    "rules": [
+      {
+        "name": "The Lit-Not-Filled Rule",
+        "body": "A state is expressed by lighting one hue to a brighter value, never by adding a gradient, a glow, or a shadow. If a new state needs marking and value is exhausted, use shape — a fill effect is not available.",
+        "section": "colors"
+      },
+      {
+        "name": "The Toward-Ground Rule",
+        "body": "Lit steps mix toward white; unlit steps mix toward --ground. An \"unlit\" colour that mixes toward a surface floats off the panel instead of receding into it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Recede-Without-Vanishing Rule",
+        "body": "Blocked is the quietest state and still has to be findable, because \"what is holding this up\" is the question the panel exists to answer. An unlit berth is always at least one value step above the rail it sits on.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Third-Accent Rule",
+        "body": "Five state colours, and that is the whole set. A new state reuses an existing colour or is carried by shape. Purple, violet, and neon belong to the cockpit's world and must never appear here.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour-With-A-Label Rule",
+        "body": "Colour never travels alone. Every coloured figure on the deck carries a label, a count, or a shape — a status dot beside a number, a badge with its role text, a berth with its ref beneath it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono-By-Default Rule",
+        "body": "Monospace is the deck's voice. The sans face is reserved for a human sentence — a task title, a panel heading — and switching to it anywhere a value is displayed breaks the column alignment that density depends on.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular-Figure Rule",
+        "body": "Every figure a reader compares against another figure carries tabular-nums: the elapsed clock, the token rollup, every token count in the fleet and the lanes. A proportional digit in a stacked column is a misread waiting to happen.",
+        "section": "typography"
+      },
+      {
+        "name": "The One-Constant Rule",
+        "body": "The panel's geometry and type both derive from FONT_SIZE = 14. Change that one number and the whole diagram rescales in proportion; hand-tuning any individual box, gap, or label size breaks the property.",
+        "section": "typography"
+      },
+      {
+        "name": "The Measured-Pane Rule",
+        "body": "Layout inputs that answer to the pane are measured, never guessed from the viewport. The panel is one row of an outer grid, so its height is set by that grid, and reading it off the DOM is the only way the panel can spread into the space it was actually given.",
+        "section": "layout"
+      },
+      {
+        "name": "The Scroll-Is-Honest Rule",
+        "body": "Past the compression floor the pane scrolls rather than shrinking the type. The scrollbar is then the only thing telling the reader a berth exists off the right edge, so it is themed from the palette rather than left to the browser.",
+        "section": "layout"
+      },
+      {
+        "name": "The Tonal-Lift Rule",
+        "body": "To raise a surface, step the ramp. A box-shadow with a visible blur or offset is a regression toward card SaaS.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Every separator on the deck is 1px solid var(--rule). There is no thick divider, no coloured left-border stripe, and no double rule.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Two-Angle Rule",
+        "body": "Horizontal and 45 degrees. No curve, no bezier, no free angle.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Same-Rail Rule",
+        "body": "Every track element shares one stroke weight — the berth height. A dependency drawn thinner than the road reads as an annotation about the plan rather than as part of it.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do express state by lighting one hue to a brighter value — lit, base, unlit — and keep the pinned state colour as the base step.",
+      "Do mix lit steps toward white and unlit steps toward --ground, both in oklab.",
+      "Do keep every unlit berth at least one value step above the rail it sits on.",
+      "Do give every colour a label, a count, or a shape beside it.",
+      "Do derive the panel's geometry and type from FONT_SIZE = 14; change the constant, not the individual values.",
+      "Do measure the pane off the DOM for the two quantities that answer to it, and read the fitted values back from layout.geometry rather than re-deriving them.",
+      "Do let the pane scroll past the compression floor, and theme its scrollbar from the palette.",
+      "Do hold every line in the panel to horizontal or 45 degrees, at the berth's own stroke weight.",
+      "Do keep monospace as the default voice and reserve the sans face for a human sentence.",
+      "Do convey depth by stepping ground to surface to surface-2 with 1px rule hairlines."
+    ],
+    "donts": [
+      "Don't add a gradient, a glow, a drop shadow, a bevel, glassmorphism, or a backdrop blur. The header's zero-blur 1px box-shadow is a doubled border, not an exception.",
+      "Don't exceed a 4px corner radius, and never make a pill.",
+      "Don't introduce a sixth state colour, and never use purple, violet, or neon — that register belongs to the cockpit's world.",
+      "Don't put an arrowhead on a dependency. A signalling panel has none, and left-to-right layout already carries direction; the marker that used to ship never rendered at all, because it was shorter than the stroke it sat on.",
+      "Don't grade the lineage by hop count. A route is set or it is not, at one value.",
+      "Don't wrap the token count in a pill or a chip. It is plain text under the ref.",
+      "Don't literalize the railway: berth numbers stay bucket/NN, road labels stay bucket names, and the region under the panel stays the agent fleet. The world dresses the diagram, never the data.",
+      "Don't draw track across a berth, or let a diagonal find its own angle to avoid one.",
+      "Don't light a running line straight through an intermediate berth of the same bucket.",
+      "Don't ship a light mode or a theme control.",
+      "Don't use emoji as a status indicator."
+    ]
+  }
+}
