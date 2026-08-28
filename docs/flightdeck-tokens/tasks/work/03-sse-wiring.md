@@ -7,7 +7,7 @@
 >
 > **Depends on**: work/02
 > **Blocks**: work/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -236,40 +236,40 @@ nothing else.
 
 ## Acceptance criteria
 
-- [ ] `FleetSnapshot` carries a required `usage` field typed as the shared rollup type,
+- [x] `FleetSnapshot` carries a required `usage` field typed as the shared rollup type,
       imported from the shared types module rather than redeclared.
-- [ ] `formatFleetFrame` takes three arguments, remains exported, and performs no I/O.
-- [ ] A frame built with an empty agent list carries a rollup whose four counters are
+- [x] `formatFleetFrame` takes three arguments, remains exported, and performs no I/O.
+- [x] A frame built with an empty agent list carries a rollup whose four counters are
       all `0` and whose `agentCount` is `0`.
-- [ ] A frame built with a non-empty agent list carries that rollup, and every row the
+- [x] A frame built with a non-empty agent list carries that rollup, and every row the
       attribution function paired carries its own `usage` object.
-- [ ] The emitted frame still begins with `event: fleet\n` and still ends with `\n\n`.
-- [ ] Exactly one transcript source is created per stream, inside the stream closure,
+- [x] The emitted frame still begins with `event: fleet\n` and still ends with `\n\n`.
+- [x] Exactly one transcript source is created per stream, inside the stream closure,
       and no new `setInterval`, watcher, or debouncer is introduced anywhere in the file.
-- [ ] A transcript source whose `read()` throws produces a frame with an empty rollup
+- [x] A transcript source whose `read()` throws produces a frame with an empty rollup
       instead of an error, a dropped frame, or a closed stream. This is exercised by
       passing a throwing stub through the handler's optional source parameter, with no
       filesystem involved.
-- [ ] The events route in the server module passes the plan directory to the handler,
+- [x] The events route in the server module passes the plan directory to the handler,
       and the whole directory's tests still compile and pass — a changed signature whose
       caller was not updated is an unfinished change, not a follow-up.
-- [ ] `--projects-root <dir>` is accepted by the server, reaches the transcript source's
+- [x] `--projects-root <dir>` is accepted by the server, reaches the transcript source's
       second parameter, and defaults to the real location when omitted, so every existing
       way of starting the server behaves exactly as before.
 
 ## Verification
 
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/events-api.test.ts` —
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/events-api.test.ts` —
       every test passes.
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/` — the whole directory
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/` — the whole directory
       still passes, proving the handler signature change did not break its callers.
-- [ ] Run `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — it
+- [x] Run `bunx --bun tsc --noEmit | grep packages/dispatch/skills/autopilot` — it
       prints nothing. Typecheck against the root `tsconfig.json` exactly as written:
       naming files on the command line drops the config, so `strict` runs without Bun's
       global types and every `Bun`, `process`, and `Buffer` reports as an undefined
       name. Real errors then hide among a dozen fake ones. Do not chase a zero total
       either — the repo-wide run has pre-existing errors outside this directory.
-- [ ] End-to-end, against generated data rather than whatever happens to be on this
+- [x] End-to-end, against generated data rather than whatever happens to be on this
       machine. Run the fixture generator described in `../_context/shared.md`, capture
       its `planDir`, `projectsRoot`, and `expected` from the JSON it prints, then start
       the flightdeck server against that plan directory with `--projects-root` pointing
@@ -280,7 +280,7 @@ nothing else.
       Do **not** write this gate as "open a plan that has already run": Claude Code
       deletes transcripts on a retention schedule, so that form reports a zero-versus-zero
       agreement once the data ages out and cannot run on another machine at all.
-- [ ] Run `git status --short -- packages/dispatch/skills/autopilot/scripts/events-api.ts packages/dispatch/skills/autopilot/scripts/events-api.test.ts packages/dispatch/skills/autopilot/scripts/flightdeck.ts`
+- [x] Run `git status --short -- packages/dispatch/skills/autopilot/scripts/events-api.ts packages/dispatch/skills/autopilot/scripts/events-api.test.ts packages/dispatch/skills/autopilot/scripts/flightdeck.ts`
       and confirm all three paths are dirty.
 
 ## Eval rubric

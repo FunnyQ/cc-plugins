@@ -3,8 +3,11 @@ import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import {
   createDebouncer,
   decodeLogChunk,
+  eventsHandler,
   formatFleetFrame,
 } from "./events-api";
+import type { TranscriptSource } from "./usage-source";
+import type { AgentUsage, TokenCounts } from "./usage-types";
 
 const entry: FlightlogEntry = {
   kind: "note",
@@ -15,10 +18,35 @@ const entry: FlightlogEntry = {
   message: "開始",
 };
 
+function counts(input: number): TokenCounts {
+  return { input, output: 0, cacheRead: 0, cacheWrite: 0 };
+}
+
+function emptyCounts(): TokenCounts {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+}
+
+function agent(overrides: Partial<AgentUsage> = {}): AgentUsage {
+  return {
+    file: "/tmp/agent-1.jsonl",
+    task: "server/05",
+    role: "dev",
+    attempt: undefined,
+    startedAt: "2026-08-01T00:00:00.000Z",
+    models: ["claude-haiku-4-5-20251001"],
+    counts: counts(10),
+    ...overrides,
+  };
+}
+
+function frameData(frame: string): Record<string, unknown> {
+  return JSON.parse(frame.split("\n")[1]!.slice("data: ".length));
+}
+
 describe("formatFleetFrame", () => {
-  test("formats the complete fleet payload", () => {
-    const frame = formatFleetFrame([entry], true);
-    const data = JSON.parse(frame.split("\n")[1]!.slice("data: ".length));
+  test("carries an all-zero rollup when no agents are found", () => {
+    const frame = formatFleetFrame([entry], true, []);
+    const data = frameData(frame);
 
     expect(frame.startsWith("event: fleet\n")).toBe(true);
     expect(frame.endsWith("\n\n")).toBe(true);
@@ -35,6 +63,27 @@ describe("formatFleetFrame", () => {
       ],
       entryCount: 1,
       logPresent: true,
+      usage: {
+        byTask: {},
+        unattributed: emptyCounts(),
+        totals: emptyCounts(),
+        agentCount: 0,
+      },
+    });
+  });
+
+  test("attaches per-agent usage to the paired row and rolls it up", () => {
+    const frame = formatFleetFrame([entry], true, [agent()]);
+    const data = frameData(frame);
+
+    expect((data.rows as Array<{ usage?: TokenCounts }>)[0]!.usage).toEqual(
+      counts(10),
+    );
+    expect(data.usage).toEqual({
+      byTask: { "server/05": counts(10) },
+      unattributed: emptyCounts(),
+      totals: counts(10),
+      agentCount: 1,
     });
   });
 
@@ -54,11 +103,12 @@ describe("decodeLogChunk", () => {
   test("reassembles a UTF-8 character split across reads", () => {
     const bytes = new TextEncoder().encode(`${JSON.stringify(entry)}\n`);
     const character = new TextEncoder().encode("開");
-    const splitAt = bytes.findIndex((byte, index) =>
-      bytes.slice(index, index + character.length).every(
-        (candidate, offset) => candidate === character[offset],
-      ),
-    ) + 1;
+    const splitAt =
+      bytes.findIndex((byte, index) =>
+        bytes
+          .slice(index, index + character.length)
+          .every((candidate, offset) => candidate === character[offset]),
+      ) + 1;
     const decoder = new TextDecoder();
 
     const first = decodeLogChunk(decoder, bytes.slice(0, splitAt), "");
@@ -84,5 +134,45 @@ describe("createDebouncer", () => {
 
     expect(calls).toBe(1);
     debounce.cancel();
+  });
+});
+
+describe("eventsHandler", () => {
+  test("degrades to an empty rollup, not a dropped frame, when the source throws", async () => {
+    const throwingSource: TranscriptSource = {
+      read() {
+        throw new Error("boom");
+      },
+    };
+    const controller = new AbortController();
+    const request = new Request("http://localhost/api/events", {
+      signal: controller.signal,
+    });
+
+    const response = eventsHandler(
+      request,
+      "/nonexistent/run.jsonl",
+      "/nonexistent/plan",
+      { source: throwingSource },
+    );
+    const reader = response.body!.getReader();
+
+    try {
+      const { value } = await reader.read();
+      const frame = typeof value === "string" ? value : "";
+      const data = frameData(frame);
+
+      expect(frame.startsWith("event: fleet\n")).toBe(true);
+      expect(frame.endsWith("\n\n")).toBe(true);
+      expect(data.usage).toEqual({
+        byTask: {},
+        unattributed: emptyCounts(),
+        totals: emptyCounts(),
+        agentCount: 0,
+      });
+    } finally {
+      controller.abort();
+      await reader.cancel();
+    }
   });
 });

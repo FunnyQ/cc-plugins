@@ -9,6 +9,9 @@ import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
 import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { attributeUsage } from "./usage-attribute";
+import { createTranscriptSource, type TranscriptSource } from "./usage-source";
+import type { AgentUsage, UsageRollup } from "./usage-types";
 
 const SNAPSHOT_DEBOUNCE_MS = 250;
 const POLL_MS = 2_000;
@@ -18,6 +21,11 @@ export type FleetSnapshot = {
   rows: ReturnType<typeof aggregateFleet>;
   entryCount: number;
   logPresent: boolean;
+  /**
+   * Plan-wide token rollup. Always present; every counter is 0 and
+   * `agentCount` is 0 when no transcript was found.
+   */
+  usage: UsageRollup;
 };
 
 export type Debouncer = {
@@ -28,11 +36,14 @@ export type Debouncer = {
 export function formatFleetFrame(
   entries: FlightlogEntry[],
   logPresent: boolean,
+  agents: AgentUsage[],
 ): string {
+  const attributed = attributeUsage(aggregateFleet(entries), agents);
   const payload: FleetSnapshot = {
-    rows: aggregateFleet(entries),
+    rows: attributed.rows,
     entryCount: entries.length,
     logPresent,
+    usage: attributed.rollup,
   };
   return `event: fleet\ndata: ${JSON.stringify(payload)}\n\n`;
 }
@@ -67,7 +78,12 @@ export function createDebouncer(
   };
 }
 
-export function eventsHandler(request: Request, logPath: string): Response {
+export function eventsHandler(
+  request: Request,
+  logPath: string,
+  planDir: string,
+  options?: { projectsRoot?: string; source?: TranscriptSource },
+): Response {
   let fileWatcher: FSWatcher | null = null;
   let directoryWatcher: FSWatcher | null = null;
   let poll: ReturnType<typeof setInterval> | null = null;
@@ -80,6 +96,19 @@ export function eventsHandler(request: Request, logPath: string): Response {
   let logPresent = false;
   const decoder = new TextDecoder();
   let cleanupStream = (): void => {};
+  // Created once per stream, never per snapshot: its cursors are what make each
+  // re-read incremental. Two open tabs get two sources with independent cursors.
+  const usageSource =
+    options?.source ?? createTranscriptSource(planDir, options?.projectsRoot);
+
+  function readAgents(): AgentUsage[] {
+    try {
+      return usageSource.read();
+    } catch {
+      // A broken token panel must not take the fleet panel down with it.
+      return [];
+    }
+  }
 
   const stream = new ReadableStream<string>({
     start(controller) {
@@ -93,7 +122,11 @@ export function eventsHandler(request: Request, logPath: string): Response {
         }
       };
       const emitSnapshot = (): void => {
-        enqueue(formatFleetFrame(entries, logPresent));
+        // Affordable only because `read()` is incremental: an unchanged transcript
+        // costs one `stat` and zero bytes read. A source that re-parsed a whole
+        // file per call would turn this 250ms debounce into a repeated full scan
+        // of every transcript the plan ever produced.
+        enqueue(formatFleetFrame(entries, logPresent, readAgents()));
       };
       const debounce = createDebouncer(emitSnapshot, SNAPSHOT_DEBOUNCE_MS);
 

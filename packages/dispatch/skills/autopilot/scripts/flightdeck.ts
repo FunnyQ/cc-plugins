@@ -13,7 +13,7 @@ import { buildTreePayload, loadPlan } from "./tree-api";
 const distRoot = resolve(import.meta.dir, "..", "dashboard", "dist");
 
 export type FlightdeckOptions =
-  | { ok: true; plan: string; port: number }
+  | { ok: true; plan: string; port: number; projectsRoot?: string }
   | { ok: false; message: string };
 
 /** The serving entry point shares the launcher's flag shapes and plan rules. */
@@ -30,12 +30,26 @@ export function parseArgs(argv: string[]): FlightdeckOptions {
     return { ok: false, message: validation.message };
   }
 
-  return { ok: true, plan: parsed.args.plan, port: parsed.args.port };
+  // Not part of the launcher's own flag set: it exists so a manual gate can point
+  // at a generated fixture instead of whatever transcripts survive on this machine.
+  const projectsRootIndex = argv.indexOf("--projects-root");
+  const projectsRoot =
+    projectsRootIndex === -1 ? undefined : argv[projectsRootIndex + 1];
+
+  return projectsRoot === undefined
+    ? { ok: true, plan: parsed.args.plan, port: parsed.args.port }
+    : {
+        ok: true,
+        plan: parsed.args.plan,
+        port: parsed.args.port,
+        projectsRoot,
+      };
 }
 
 export async function createServer(
   plan: string,
   port: number,
+  projectsRoot?: string,
 ): Promise<Bun.Server> {
   if (!isAbsolute(plan) || !validatePlanDir(plan).ok) {
     throw new Error("plan must be absolute and contain a tasks/ directory");
@@ -69,7 +83,9 @@ export async function createServer(
         }
 
         if (url.pathname === "/api/events") {
-          return eventsHandler(request, runLogPath(plan));
+          return eventsHandler(request, runLogPath(plan), plan, {
+            projectsRoot,
+          });
         }
 
         return serveStatic(distRoot, url.pathname);
@@ -107,7 +123,11 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  const server = await createServer(options.plan, options.port);
+  const server = await createServer(
+    options.plan,
+    options.port,
+    options.projectsRoot,
+  );
   const shutdown = async () => {
     removeRecord();
     await server.stop();
