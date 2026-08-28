@@ -5,6 +5,7 @@ import {
   percent,
   renderDimensions,
   scoreClass,
+  tokenTier,
 } from "./format.js";
 
 export function buildLanes(tree) {
@@ -77,7 +78,7 @@ export function Lanes({ tree, usage }) {
                     </span>
                     <span class="value">{{ formatScore(task.latestScore.weighted) }}</span>
                   </span>
-                  <span class="token-figure">{{ formatTokens(usage.byTask[task.ref]?.output) }}</span>
+                  <span class="token-figure" :class="tokenTier(usage.byTask[task.ref]?.output)">{{ formatTokens(usage.byTask[task.ref]?.output) }}</span>
                 </button>
                 <div
                   v-if="hasBreakdown(task)"
@@ -120,5 +121,6 @@ export function Lanes({ tree, usage }) {
     renderDimensions,
     formatScore,
     formatTokens,
+    tokenTier,
   };
 }

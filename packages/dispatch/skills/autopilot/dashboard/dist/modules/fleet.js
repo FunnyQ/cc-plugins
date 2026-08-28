@@ -5,6 +5,7 @@ import {
   percent,
   renderDimensions,
   scoreClass,
+  tokenTier,
 } from "./format.js";
 
 const MAX_ROWS = 200;
@@ -42,6 +43,16 @@ function tokenTitle(usage) {
   return usage
     ? `input ${usage.input} · output ${usage.output}`
     : "no transcript matched this agent";
+}
+
+// Under the role chip rather than in a column of its own: the count belongs to
+// the agent, and a whole column bought one number per row at the cost of the
+// width the message needs.
+function renderTokens(usage) {
+  // An unmeasured count carries no tier, so it gets no class rather than an
+  // empty one — the CSS reads the absence, and the markup stays legible.
+  const tier = tokenTier(usage?.output);
+  return `<span class="role-tokens${tier ? ` ${tier}` : ""}" title="${escapeHtml(tokenTitle(usage))}">${escapeHtml(formatTokens(usage?.output))}</span>`;
 }
 
 function renderBreakdown(row) {
@@ -86,12 +97,11 @@ function renderRow(row, nowMs) {
       data-row-key="${escapeHtml(row.key)}"${ticking} tabindex="${expandable ? "0" : "-1"}"
       aria-expanded="${expandable ? expandedRows.has(row.key) : false}">
       <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : rejected ? "did not pass" : abandoned ? "no end reported" : "finished"}"></span></span>
-      <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${unknownLabel}</span>
+      <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${renderTokens(row.usage)}${unknownLabel}</span>
       <span class="fleet-cell -ref" role="cell">${escapeHtml(row.ref)}</span>
       <span class="fleet-cell -attempt" role="cell">${row.attempt === undefined ? "" : escapeHtml(row.attempt)}</span>
       <span class="fleet-cell -elapsed" role="cell">${elapsed}</span>
       <span class="fleet-cell -verdict" role="cell">${renderScore(row.score)}</span>
-      <span class="fleet-cell -tokens" role="cell" title="${escapeHtml(tokenTitle(row.usage))}">${escapeHtml(formatTokens(row.usage?.output))}</span>
       <span class="fleet-cell -message" role="cell" title="${escapeHtml(row.message)}">${escapeHtml(row.message)}</span>
     </div>
     ${renderBreakdown(row)}`;
@@ -211,8 +221,7 @@ export function renderFleet(
         <span role="columnheader"><span class="visually-hidden">Status</span></span>
         <span role="columnheader">Role</span><span role="columnheader">Task</span>
         <span role="columnheader">Try</span><span role="columnheader">Elapsed</span>
-        <span role="columnheader">Verdict</span><span role="columnheader">Tokens</span>
-        <span role="columnheader">Message</span>
+        <span role="columnheader">Verdict</span><span role="columnheader">Message</span>
       </div>
       <div class="fleet-body" role="rowgroup">
         ${visibleRows.map((row) => renderRow(row, nowMs)).join("") || '<p class="fleet-empty">No agents seen yet.</p>'}

@@ -341,7 +341,7 @@ describe("gate outcome colouring", () => {
   });
 });
 
-describe("Tokens column", () => {
+describe("Tokens under the role chip", () => {
   test("reads N/A, never 0, for a row with no matched transcript", () => {
     const html = rowHtml({
       key: "dev:ui/01#1",
@@ -351,7 +351,7 @@ describe("Tokens column", () => {
     });
 
     expect(html).toContain(
-      '<span class="fleet-cell -tokens" role="cell" title="no transcript matched this agent">N/A</span>',
+      '<span class="role-tokens" title="no transcript matched this agent">N/A</span>',
     );
   });
 
@@ -365,7 +365,38 @@ describe("Tokens column", () => {
     });
 
     expect(html).toContain(
-      '<span class="fleet-cell -tokens" role="cell" title="input 352 · output 3465">3.5K</span>',
+      '<span class="role-tokens -normal" title="input 352 · output 3465">3.5K</span>',
+    );
+  });
+
+  test("carries the budget tier the count falls in", () => {
+    const tierOf = (output) =>
+      rowHtml({
+        key: "dev:ui/01#1",
+        role: "dev",
+        ref: "ui/01",
+        status: "finished",
+        usage: { input: 0, output },
+      }).match(/class="role-tokens ([^"]+)"/)[1];
+
+    expect(tierOf(79_999)).toBe("-normal");
+    expect(tierOf(80_000)).toBe("-warn");
+    expect(tierOf(199_999)).toBe("-warn");
+    expect(tierOf(200_000)).toBe("-danger");
+  });
+
+  test("sits inside the role cell, not in a column of its own", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      usage: { input: 352, output: 3465, cacheRead: 0, cacheWrite: 0 },
+    });
+
+    expect(html).not.toContain("fleet-cell -tokens");
+    expect(html).toContain(
+      '<span class="role-badge">dev</span><span class="role-tokens',
     );
   });
 
