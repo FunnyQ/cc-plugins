@@ -217,6 +217,26 @@ describe("emptyCounts / addUsage", () => {
     addUsage(counts, 5);
     expect(counts).toEqual(emptyCounts());
   });
+
+  // A negative would render as `N/A` once it drove a total below zero, so corrupt
+  // data would read as "no transcript" instead of as corruption.
+  test("skips a negative counter", () => {
+    const counts = emptyCounts();
+    addUsage(counts, { input_tokens: 100 });
+    addUsage(counts, { input_tokens: -100, output_tokens: -1 });
+    expect(counts).toEqual({
+      input: 100,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+  });
+
+  test("skips an integer past the safe range", () => {
+    const counts = emptyCounts();
+    addUsage(counts, { input_tokens: Number.MAX_SAFE_INTEGER + 2 });
+    expect(counts).toEqual(emptyCounts());
+  });
 });
 
 describe("createTranscriptSource", () => {
@@ -356,6 +376,80 @@ describe("createTranscriptSource", () => {
           message: { role: "user", content: planDir },
         },
       ]);
+
+      expect(source.read()).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // `docs/foo` and `docs/foo-bar` are siblings under one repo, so a plain substring
+  // test hands every `foo-bar` transcript to `foo` and inflates its plan total.
+  test("a sibling plan whose name merely starts with this one's is excluded", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      const siblingDir = `${planDir}-extra`;
+      jsonl(agentPath(projectsRoot, slug, "sibling"), [
+        announceUser(siblingDir, "work/09", "dev", 1),
+        assistant("m", { input_tokens: 500 }),
+      ]);
+      jsonl(agentPath(projectsRoot, slug, "mine"), [
+        announceUser(planDir, "work/01", "dev", 1),
+        assistant("m", { input_tokens: 7 }),
+      ]);
+
+      const agents = createTranscriptSource(planDir, projectsRoot).read();
+
+      expect(agents.map((a) => a.task)).toEqual(["work/01"]);
+      expect(agents[0]!.counts.input).toBe(7);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a replaced file re-derives its identity instead of keeping the old one", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      const file = agentPath(projectsRoot, slug, "a");
+      jsonl(file, [
+        announceUser(planDir, "work/01", "dev", 1),
+        assistant("m", { input_tokens: 100 }),
+        assistant("m", { input_tokens: 100 }),
+      ]);
+
+      const source = createTranscriptSource(planDir, projectsRoot);
+      expect(source.read()[0]).toMatchObject({ task: "work/01", role: "dev" });
+
+      // Shorter content at the same path: a different agent, not more of the old one.
+      jsonl(file, [
+        announceUser(planDir, "ui/02", "judge", 3, "2026-01-01T00:09:00.000Z"),
+      ]);
+
+      expect(source.read()[0]).toMatchObject({
+        task: "ui/02",
+        role: "judge",
+        attempt: 3,
+        startedAt: "2026-01-01T00:09:00.000Z",
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a replaced file belonging to another plan drops out of the results", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      const file = agentPath(projectsRoot, slug, "a");
+      jsonl(file, [
+        announceUser(planDir, "work/01", "dev", 1),
+        assistant("m", { input_tokens: 100 }),
+        assistant("m", { input_tokens: 100 }),
+      ]);
+
+      const source = createTranscriptSource(planDir, projectsRoot);
+      expect(source.read()).toHaveLength(1);
+
+      jsonl(file, [announceUser(`${planDir}-other`, "work/01", "dev", 1)]);
 
       expect(source.read()).toEqual([]);
     } finally {

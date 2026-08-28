@@ -1,6 +1,7 @@
 import type { AgentUsage, TokenCounts, UsageRollup } from "./usage-types";
 import type { FleetRow } from "./fleet";
 import { fleetIdentity } from "./fleet";
+import { emptyCounts } from "./usage-source";
 
 /** Add `from` into `into`, in place. `into` is always a fresh accumulator. */
 export function addCounts(into: TokenCounts, from: TokenCounts): void {
@@ -8,10 +9,6 @@ export function addCounts(into: TokenCounts, from: TokenCounts): void {
   into.output += from.output;
   into.cacheRead += from.cacheRead;
   into.cacheWrite += from.cacheWrite;
-}
-
-function emptyCounts(): TokenCounts {
-  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 }
 
 /** Epoch ms, or `null` for a missing/unparseable timestamp — never `NaN`, never `0`. A
@@ -22,37 +19,25 @@ function toEpochMs(iso: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-function groupRowsByIdentity(rows: FleetRow[]): Map<string, FleetRow[]> {
-  const groups = new Map<string, FleetRow[]>();
-  for (const row of rows) {
-    // A FleetRow carries no identity string of its own, so rebuild it the same
-    // way the fleet module does. `row.ref` falls back to the logged task even
-    // for the review-lens label shape, which parses a lens instead of a ref.
-    const identity = fleetIdentity(row.ref ?? "", row.role, row.attempt);
-    const group = groups.get(identity);
-    if (group) group.push(row);
-    else groups.set(identity, [row]);
-  }
-  return groups;
-}
+// A FleetRow carries no identity string of its own, so rebuild it the same way the
+// fleet module does. `row.ref` falls back to the logged task even for the review-lens
+// label shape, which parses a lens instead of a ref.
+const groupRowsByIdentity = (rows: FleetRow[]): Map<string, FleetRow[]> =>
+  Map.groupBy(rows, (row) =>
+    fleetIdentity(row.ref ?? "", row.role, row.attempt),
+  );
 
-function groupAgentsByIdentity(
+// A null task or role belongs to no group — it can never be paired, but it still
+// counts toward the rollup below. The two role vocabularies are the same strings
+// already (see ../_context/data-model.md), so no translation layer sits between an
+// agent's parsed role and a row's role.
+const groupAgentsByIdentity = (
   agents: AgentUsage[],
-): Map<string, AgentUsage[]> {
-  const groups = new Map<string, AgentUsage[]>();
-  for (const agent of agents) {
-    // A null task or role belongs to no group — it can never be paired, but it
-    // still counts toward the rollup below. The two role vocabularies are the
-    // same strings already (see ../_context/data-model.md), so no translation
-    // layer sits between an agent's parsed role and a row's role.
-    if (agent.task === null || agent.role === null) continue;
-    const identity = fleetIdentity(agent.task, agent.role, agent.attempt);
-    const group = groups.get(identity);
-    if (group) group.push(agent);
-    else groups.set(identity, [agent]);
-  }
-  return groups;
-}
+): Map<string, AgentUsage[]> =>
+  Map.groupBy(
+    agents.filter((agent) => agent.task !== null && agent.role !== null),
+    (agent) => fleetIdentity(agent.task!, agent.role!, agent.attempt),
+  );
 
 type Candidate = {
   rowIndex: number;
@@ -132,7 +117,12 @@ function pairGroup(
 }
 
 function buildRollup(agents: AgentUsage[]): UsageRollup {
-  const byTask: Record<string, TokenCounts> = {};
+  // Prototype-free: task refs are parsed out of a transcript, so `__proto__` or
+  // `constructor` can reach this lookup. On a plain `{}` they resolve to an
+  // inherited value instead of `undefined`, and the accumulate below would then
+  // write counts onto `Object.prototype` — NaN totals, a task silently missing
+  // from the panel, and every other object in the process polluted.
+  const byTask: Record<string, TokenCounts> = Object.create(null);
   const unattributed = emptyCounts();
   const totals = emptyCounts();
 

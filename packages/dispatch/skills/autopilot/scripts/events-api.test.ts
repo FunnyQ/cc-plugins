@@ -175,4 +175,47 @@ describe("eventsHandler", () => {
       await reader.cancel();
     }
   });
+
+  // A transcript grows while its agent runs, but the flightlog does not move until
+  // that agent ends. Scheduling a snapshot only on flightlog activity therefore
+  // froze every in-flight row's token cell at its opening value, often for minutes.
+  // Slow on purpose: it waits out the real poll interval rather than adding a
+  // configuration seam nothing in production would ever set.
+  test("refreshes usage on the poll cadence while the flightlog is silent", async () => {
+    let reads = 0;
+    const growingSource: TranscriptSource = {
+      read() {
+        reads += 1;
+        return [agent({ counts: counts(reads * 10) })];
+      },
+    };
+    const controller = new AbortController();
+    const request = new Request("http://localhost/api/events", {
+      signal: controller.signal,
+    });
+
+    const response = eventsHandler(
+      request,
+      "/nonexistent/run.jsonl",
+      "/nonexistent/plan",
+      { source: growingSource },
+    );
+    const reader = response.body!.getReader();
+
+    try {
+      const first = await reader.read();
+      expect(frameData(String(first.value)).usage).toMatchObject({
+        totals: counts(10),
+      });
+
+      const second = await reader.read();
+      const totals = (
+        frameData(String(second.value)).usage as { totals: TokenCounts }
+      ).totals;
+      expect(totals.input).toBeGreaterThan(10);
+    } finally {
+      controller.abort();
+      await reader.cancel();
+    }
+  }, 10_000);
 });

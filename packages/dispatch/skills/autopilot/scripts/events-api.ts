@@ -227,7 +227,14 @@ export function eventsHandler(
       checkFile();
       emitSnapshot();
       initializing = false;
-      poll = setInterval(checkFile, POLL_MS);
+      // The same timer, doing both jobs — not a second one. A transcript grows
+      // while its agent runs but the flightlog does not move until that agent
+      // ends, so a snapshot scheduled only by flightlog activity would leave
+      // every in-flight row's token cell frozen at its opening value for minutes.
+      poll = setInterval(() => {
+        checkFile();
+        debounce.schedule();
+      }, POLL_MS);
       heartbeat = setInterval(() => enqueue(":heartbeat\n\n"), HEARTBEAT_MS);
     },
     cancel() {

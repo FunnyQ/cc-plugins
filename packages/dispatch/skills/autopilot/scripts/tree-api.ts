@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
@@ -6,6 +5,7 @@ import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { readLog, runLogPath } from "../../flightplan/scripts/lib/flightlog";
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import { deriveTaskViews, type TaskState, type TaskView } from "./fleet";
+import { repoRootOf } from "./usage-source";
 
 export type Loaded = {
   byRef: Record<string, ParsedTask>;
@@ -35,19 +35,14 @@ export type TreePayload = {
 };
 
 /**
- * Impure: walks up for the repo the plan belongs to. `.git` is a directory in a
- * clone and a file in a linked worktree, so presence — not type — is the test.
+ * Impure: walks up for the repo the plan belongs to, empty when there is none.
+ * The walk itself lives in `repoRootOf` — the transcript reader needs the same
+ * answer as an absolute path, and two copies could disagree about which repo a
+ * plan belongs to while both panels claim to describe it.
  */
 export function repoName(planDir: string): string {
-  let dir = planDir;
-
-  while (true) {
-    if (existsSync(join(dir, ".git"))) return basename(dir);
-
-    const parent = dirname(dir);
-    if (parent === dir) return "";
-    dir = parent;
-  }
+  const root = repoRootOf(planDir);
+  return root === null ? "" : basename(root);
 }
 
 /** Impure: reads the tasks tree and the flightlog. */

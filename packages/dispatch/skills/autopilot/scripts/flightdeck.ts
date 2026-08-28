@@ -32,30 +32,40 @@ export function parseArgs(argv: string[]): FlightdeckOptions {
 
   // Not part of the launcher's own flag set: it exists so a manual gate can point
   // at a generated fixture instead of whatever transcripts survive on this machine.
+  //
+  // The missing-value case errors rather than swallowing the next token, which is
+  // the bug `lib/args.ts` was written to kill. That helper is not reused here
+  // because it reports by exiting the process, and this function is a pure parser
+  // its own unit tests call — an exit would take the test runner down with it.
   const projectsRootIndex = argv.indexOf("--projects-root");
   const projectsRoot =
     projectsRootIndex === -1 ? undefined : argv[projectsRootIndex + 1];
 
-  return projectsRoot === undefined
-    ? { ok: true, plan: parsed.args.plan, port: parsed.args.port }
-    : {
-        ok: true,
-        plan: parsed.args.plan,
-        port: parsed.args.port,
-        projectsRoot,
-      };
+  if (
+    projectsRootIndex !== -1 &&
+    (projectsRoot === undefined || projectsRoot.startsWith("--"))
+  ) {
+    return { ok: false, message: "Missing value after --projects-root" };
+  }
+
+  return {
+    ok: true,
+    plan: parsed.args.plan,
+    port: parsed.args.port,
+    projectsRoot,
+  };
 }
 
 export async function createServer(
   plan: string,
   port: number,
   projectsRoot?: string,
-): Promise<Bun.Server> {
+): Promise<Bun.Server<unknown>> {
   if (!isAbsolute(plan) || !validatePlanDir(plan).ok) {
     throw new Error("plan must be absolute and contain a tasks/ directory");
   }
 
-  let server: Bun.Server;
+  let server: Bun.Server<unknown>;
 
   try {
     server = Bun.serve({
@@ -98,7 +108,7 @@ export async function createServer(
   try {
     writeRecord({
       pid: process.pid,
-      port: server.port,
+      port: server.port!,
       root: import.meta.dir,
       plan,
     });

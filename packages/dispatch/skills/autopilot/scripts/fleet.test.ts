@@ -5,7 +5,12 @@ import type {
   ScoreEntry,
 } from "../../flightplan/scripts/lib/flightlog";
 import { formatEntry, parseLog } from "../../flightplan/scripts/lib/flightlog";
-import { aggregateFleet, deriveTaskViews, parseAgentLabel } from "./fleet";
+import {
+  aggregateFleet,
+  deriveTaskViews,
+  parseAgentLabel,
+  type ParsedLabel,
+} from "./fleet";
 
 const note = (
   task: string,
@@ -108,8 +113,8 @@ describe("parseAgentLabel", () => {
     ["done:ui/03", { role: "done", ref: "ui/03", raw: "done:ui/03" }],
     ["block:ui/03", { role: "block", ref: "ui/03", raw: "block:ui/03" }],
     ["commit-post-loop", { role: "commit", raw: "commit-post-loop" }],
-  ])("parses %s", (label, expected) => {
-    expect(parseAgentLabel(label as string)).toEqual(expected);
+  ])("parses %s", (label: string, expected: any) => {
+    expect(parseAgentLabel(label)).toEqual(expected);
   });
 
   test.each(["codex-delegate", "my-custom-label", "", "wat:ui/03#1"])(

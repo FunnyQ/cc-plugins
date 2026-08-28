@@ -387,6 +387,33 @@ describe("attributeUsage — rollup", () => {
     expect(rollup.byTask["work/03"]).toEqual(counts(5, 5, 5, 5));
     expect(rollup.unattributed).toEqual(counts(100, 200, 300, 400));
   });
+
+  // Task refs are parsed out of a transcript prompt, so these two names can reach
+  // the rollup's key space. On a plain object they resolve to an inherited value
+  // instead of `undefined`, and the accumulator would then write onto
+  // `Object.prototype` — NaN totals here and a polluted process everywhere else.
+  test("a task ref named after a prototype key stays an ordinary task", () => {
+    const agents = [
+      agent({
+        file: "/proto.jsonl",
+        task: "__proto__",
+        counts: counts(1, 2, 3, 4),
+      }),
+      agent({
+        file: "/ctor.jsonl",
+        task: "constructor",
+        counts: counts(10, 20, 30, 40),
+      }),
+    ];
+
+    const { rollup } = attributeUsage([], agents);
+
+    expect(rollup.byTask["__proto__"]).toEqual(counts(1, 2, 3, 4));
+    expect(rollup.byTask["constructor"]).toEqual(counts(10, 20, 30, 40));
+    expect(rollup.totals).toEqual(counts(11, 22, 33, 44));
+    expect(sumRollupByTask(rollup.byTask)).toEqual(rollup.totals);
+    expect(({} as Record<string, unknown>).input).toBeUndefined();
+  });
 });
 
 describe("attributeUsage — purity", () => {

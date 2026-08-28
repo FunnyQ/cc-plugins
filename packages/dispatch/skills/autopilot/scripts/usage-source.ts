@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { nextCursor, readRange, splitCompleteLines } from "./tail";
 import type { AgentUsage, TokenCounts } from "./usage-types";
 
@@ -77,23 +77,34 @@ export function emptyCounts(): TokenCounts {
 }
 
 // Wire names (Claude Code's snake_case) -> the repo's camelCase `TokenCounts` fields.
-const WIRE_KEYS: Record<string, keyof TokenCounts> = {
-  input_tokens: "input",
-  output_tokens: "output",
-  cache_read_input_tokens: "cacheRead",
-  cache_creation_input_tokens: "cacheWrite",
-};
+// A literal array, not a record walked with `Object.entries`: `addUsage` runs once per
+// assistant line and a cursor reset re-ingests whole files, so the entries array would
+// be allocated on every line of every transcript.
+const WIRE_KEYS: [string, keyof TokenCounts][] = [
+  ["input_tokens", "input"],
+  ["output_tokens", "output"],
+  ["cache_read_input_tokens", "cacheRead"],
+  ["cache_creation_input_tokens", "cacheWrite"],
+];
 
 /**
  * Sum only the four named counters and ignore everything else — future versions may
  * add nested or non-numeric fields, and a blind reduce would crash or invent tokens.
+ *
+ * A counter must be a non-negative *safe* integer. A negative drives a total below
+ * zero, which the display formatter renders as `N/A` — corruption disguised as
+ * "no data". Beyond 2^53 the arithmetic silently loses precision instead.
  */
 export function addUsage(into: TokenCounts, raw: unknown): void {
   if (typeof raw !== "object" || raw === null) return;
   const record = raw as Record<string, unknown>;
-  for (const [wireKey, field] of Object.entries(WIRE_KEYS)) {
+  for (const [wireKey, field] of WIRE_KEYS) {
     const value = record[wireKey];
-    if (typeof value === "number" && Number.isInteger(value)) {
+    if (
+      typeof value === "number" &&
+      Number.isSafeInteger(value) &&
+      value >= 0
+    ) {
       into[field] += value;
     }
   }
@@ -149,14 +160,6 @@ function listNames(dir: string): string[] {
   }
 }
 
-function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Workflow agents live under `<slug>/<sessionId>/subagents/workflows/wf_<runId>/`,
  * never directly under `subagents/` — that path holds plain Agent() subagents and returns
@@ -164,16 +167,19 @@ function isDirectory(path: string): boolean {
  * (the trap this whole feature exists past; see ../_context/data-model.md).
  * `journal.jsonl` and `.meta.json` sidecars are skipped: neither carries usage or a
  * label, and the `agent-*.jsonl` name filter excludes both for free.
+ *
+ * The enumeration is its own existence check: `readdir` on a missing path, or on a
+ * plain file (the project dir holds `<sessionId>.jsonl` files beside its session
+ * directories), throws and `listNames` returns `[]`. A preceding `stat` would only
+ * ask the kernel the same question twice, once per session the project ever produced.
  */
 function discoverAgentFiles(slugDir: string): string[] {
   const found: string[] = [];
   for (const sessionId of listNames(slugDir)) {
     const workflowsDir = join(slugDir, sessionId, "subagents", "workflows");
-    if (!isDirectory(workflowsDir)) continue;
     for (const wf of listNames(workflowsDir)) {
       if (!wf.startsWith("wf_")) continue;
       const wfDir = join(workflowsDir, wf);
-      if (!isDirectory(wfDir)) continue;
       for (const name of listNames(wfDir)) {
         if (!name.startsWith("agent-") || !name.endsWith(".jsonl")) continue;
         found.push(join(wfDir, name));
@@ -184,9 +190,28 @@ function discoverAgentFiles(slugDir: string): string[] {
 }
 
 /**
+ * Whether `text` names a path at or under `planDir`.
+ *
+ * A bare `includes` is not enough: sibling plans share a parent, so `docs/foo` would
+ * claim every transcript of `docs/foo-bar` and silently absorb another plan's tokens.
+ * The character after the match must therefore end the path or separate the next
+ * segment. Every real mention is a path *inside* the plan dir (the flightlog, a task
+ * file), so requiring the separator costs nothing.
+ */
+function mentionsPlanDir(text: string, planDir: string): boolean {
+  for (let from = 0; ; from += 1) {
+    const at = text.indexOf(planDir, from);
+    if (at === -1) return false;
+    const next = text[at + planDir.length];
+    if (next === undefined || next === sep || next === "/") return true;
+    from = at;
+  }
+}
+
+/**
  * Decide membership from the file's first complete line. Both prompt shapes embed
  * the plan's absolute directory path, so the file belongs to this plan when the
- * stringified `message.content` contains it. Permanent once decided either way.
+ * stringified `message.content` names a path under it. Permanent once decided either way.
  */
 function decideMembership(
   planDir: string,
@@ -199,7 +224,7 @@ function decideMembership(
       : undefined;
   const content = message ? message.content : undefined;
 
-  if (!contentText(content).includes(planDir)) {
+  if (!mentionsPlanDir(contentText(content), planDir)) {
     state.membership = "excluded";
     return;
   }
@@ -285,6 +310,17 @@ function processFile(
   state.models = models;
   state.partial = heldPartial;
   state.cursor = size;
+  if (next.reset) {
+    // Identity is derived from the first line, so re-reading from byte 0 must
+    // re-derive it too. New content at a reused path is a different agent — keeping
+    // the old task, role, or plan membership would file its tokens under whatever
+    // used to live here.
+    state.task = null;
+    state.role = null;
+    state.attempt = undefined;
+    state.startedAt = null;
+    state.membership = "pending";
+  }
 
   for (const line of complete) {
     ingestLine(planDir, state, line);
@@ -335,13 +371,6 @@ export function createTranscriptSource(
 
       const results: AgentUsage[] = [];
       for (const file of discovered) {
-        // Checked before the read, not inferred from the error: a file gone between
-        // enumeration and here is "vanished" (dropped), not "exists but throws".
-        if (!existsSync(file)) {
-          files.delete(file);
-          continue;
-        }
-
         let state = files.get(file);
         if (state === undefined) {
           state = freshState();
@@ -352,7 +381,15 @@ export function createTranscriptSource(
           try {
             const size = statSync(file).size;
             processFile(planDir, file, state, size);
-          } catch {
+          } catch (error) {
+            // The two cases are told apart by the errno, not by a preceding
+            // `existsSync` — that would stat every file twice, on every pass, to
+            // learn what this stat already reports.
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+              // Vanished between enumeration and here: drop it, do not report it.
+              files.delete(file);
+              continue;
+            }
             // Exists but unreadable this pass (a lock, a permission blip). Keep the
             // last-known state and try again next pass rather than zeroing it.
           }

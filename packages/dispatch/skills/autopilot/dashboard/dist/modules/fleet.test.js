@@ -14,19 +14,31 @@ import {
 
 const expandedKeys = new Set();
 
-function isExpanded(rowKey) {
+/**
+ * Run `fn` with a minimal `document` in place. `renderFleet` builds a real element,
+ * and this file has no DOM; every render test needs the same stub, so it is written
+ * once here rather than re-declared inside each describe block.
+ */
+function withStubDocument(fn) {
   const originalDocument = globalThis.document;
   globalThis.document = {
     createElement() {
-      return {
-        addEventListener() {},
-        className: "",
-        innerHTML: "",
-      };
+      return { addEventListener() {}, className: "", innerHTML: "" };
     },
   };
-
   try {
+    return fn();
+  } finally {
+    globalThis.document = originalDocument;
+  }
+}
+
+/** The rendered markup of a single row, the shape most render tests assert on. */
+const rowHtml = (row) =>
+  withStubDocument(() => renderFleet([row], 1, true, "connected").innerHTML);
+
+function isExpanded(rowKey) {
+  return withStubDocument(() => {
     const root = renderFleet(
       [
         {
@@ -45,9 +57,7 @@ function isExpanded(rowKey) {
     // aria-expanded too, and matching the whole string would always find it.
     const body = root.innerHTML.split("</header>")[1] ?? "";
     return body.includes('aria-expanded="true"');
-  } finally {
-    globalThis.document = originalDocument;
-  }
+  });
 }
 
 function expand(rowKey) {
@@ -210,24 +220,17 @@ describe("runElapsed", () => {
 });
 
 describe("fleet collapse", () => {
-  const render = () => {
-    const originalDocument = globalThis.document;
-    globalThis.document = {
-      createElement() {
-        return { addEventListener() {}, className: "", innerHTML: "" };
-      },
-    };
-    try {
-      return renderFleet(
+  // Asserts on the root element itself (className), not on markup, so it cannot
+  // use `rowHtml`.
+  const render = () =>
+    withStubDocument(() =>
+      renderFleet(
         [{ key: "a", role: "dev", ref: "ui/01", status: "in-flight" }],
         1,
         true,
         "connected",
-      );
-    } finally {
-      globalThis.document = originalDocument;
-    }
-  };
+      ),
+    );
 
   afterEach(() => {
     if (isFleetCollapsed()) toggleFleet();
@@ -298,20 +301,6 @@ describe("fleet sticky offsets", () => {
 });
 
 describe("gate outcome colouring", () => {
-  const rowHtml = (row) => {
-    const originalDocument = globalThis.document;
-    globalThis.document = {
-      createElement() {
-        return { addEventListener() {}, className: "", innerHTML: "" };
-      },
-    };
-    try {
-      return renderFleet([row], 1, true, "connected").innerHTML;
-    } finally {
-      globalThis.document = originalDocument;
-    }
-  };
-
   test("marks a rejected verifier row", () => {
     const html = rowHtml({
       key: "verify:ui/01#1",
@@ -353,20 +342,6 @@ describe("gate outcome colouring", () => {
 });
 
 describe("Tokens column", () => {
-  const rowHtml = (row) => {
-    const originalDocument = globalThis.document;
-    globalThis.document = {
-      createElement() {
-        return { addEventListener() {}, className: "", innerHTML: "" };
-      },
-    };
-    try {
-      return renderFleet([row], 1, true, "connected").innerHTML;
-    } finally {
-      globalThis.document = originalDocument;
-    }
-  };
-
   test("reads N/A, never 0, for a row with no matched transcript", () => {
     const html = rowHtml({
       key: "dev:ui/01#1",

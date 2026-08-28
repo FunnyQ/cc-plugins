@@ -8,7 +8,7 @@ import { createServer, parseArgs } from "./flightdeck";
 let fixtureRoot: string;
 let plan: string;
 let originalDataHome: string | undefined;
-const servers: Bun.Server[] = [];
+const servers: Bun.Server<unknown>[] = [];
 
 beforeEach(() => {
   fixtureRoot = mkdtempSync(join(tmpdir(), "dispatch-flightdeck-"));
@@ -83,6 +83,35 @@ describe("parseArgs", () => {
 
     expect(messageOf(["--serve", "--plan", emptyPlan])).toContain("tasks/");
   });
+
+  test("carries --projects-root through", () => {
+    const projects = join(fixtureRoot, "projects");
+
+    expect(
+      parseArgs(["--serve", "--plan", plan, "--projects-root", projects]),
+    ).toEqual({ ok: true, plan, port: 5757, projectsRoot: projects });
+  });
+
+  // Silently falling back to the real `~/.claude/projects` here would hand a gate a
+  // dashboard full of unrelated transcripts and call it the fixture's numbers.
+  test("rejects --projects-root with nothing after it", () => {
+    expect(messageOf(["--serve", "--plan", plan, "--projects-root"])).toContain(
+      "--projects-root",
+    );
+  });
+
+  test("rejects --projects-root followed by another flag", () => {
+    expect(
+      messageOf([
+        "--serve",
+        "--plan",
+        plan,
+        "--projects-root",
+        "--port",
+        "6000",
+      ]),
+    ).toContain("--projects-root");
+  });
 });
 
 describe("createServer", () => {
@@ -94,7 +123,7 @@ describe("createServer", () => {
     });
     servers.push(occupied);
 
-    await expect(createServer(plan, occupied.port)).rejects.toThrow(
+    await expect(createServer(plan, occupied.port!)).rejects.toThrow(
       `port ${occupied.port} is already in use`,
     );
   });
@@ -114,7 +143,7 @@ describe("createServer", () => {
     expect(server.hostname).toBe("127.0.0.1");
     expect(readRecord()).toEqual({
       pid: process.pid,
-      port: server.port,
+      port: server.port!,
       root: import.meta.dir,
       plan,
     });

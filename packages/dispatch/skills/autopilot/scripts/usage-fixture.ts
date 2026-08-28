@@ -95,6 +95,24 @@ export function buildFixture(root: string): {
   mkdirSync(join(planDir, "tasks"), { recursive: true });
   const runLog = join(planDir, ".flightlog", "run.jsonl");
 
+  // A task file for the ref the agents below name. Without it `/api/tree` returns an
+  // empty tree, the lanes panel renders "No tasks in this flight tree", and the one
+  // gate that watches a per-task total render has nothing to look at.
+  mkdirSync(join(planDir, "tasks", "work"), { recursive: true });
+  writeFileSync(
+    join(planDir, "tasks", "work", "01-fixture-task.md"),
+    [
+      "# WORK-01: Fixture task",
+      "",
+      "> **Status**: done",
+      "",
+      "## Goal",
+      "",
+      "Give the lanes panel one card to hang the per-task token figure on.",
+      "",
+    ].join("\n"),
+  );
+
   const slug = projectSlug(root);
   const projectsRoot = join(root, "projects");
   const sessionDir = join(projectsRoot, slug, "session-1");
