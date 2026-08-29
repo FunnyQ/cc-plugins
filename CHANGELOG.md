@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 3.22.3] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.3`_
+
+### Fixed
+- Autopilot's external dev driver no longer runs its own verification pass alongside the independent verifier — it now only lints the task and reports which files changed, so a task's pass/fail verdict comes from one source instead of two agents potentially disagreeing.
+
 ## [dispatch 3.22.2] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.2`_
