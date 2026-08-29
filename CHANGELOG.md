@@ -1,5 +1,18 @@
 # Changelog
 
+## [dispatch 3.22.2] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.2`_
+
+### Added
+- Hovering a berth on the dependency graph now also lights a travelling pulse that runs downstream along its route, the way a real interlocking panel shows a live route rather than just the track's lineage.
+- Autopilot now folds Codex spend into its usage accounting, so dev steps that delegate to Codex no longer vanish from the plan's cost picture. Codex figures show separately from Claude token counts wherever a surface answers "which side spent what" (the fleet table, lane cards), and combine with them wherever it answers "what did this cost" (the header stat, graph berth plates).
+
+### Fixed
+- Flightdeck's headline token metric switched from raw output tokens to fresh (cache-creation) tokens, the only formula that matched a live 11-agent run to the digit on 9 of 11 panel rows; the old metric ran at 0.6-1.1% of the actual billed spend.
+- Budget-tier thresholds are recalibrated to the new metric so a plan's colour coding reflects real usage again — the old thresholds, inherited from the output-token era, flagged over 90% of agents as warn-or-worse with no real signal.
+- The fleet table's message column now renders full PASS/FAIL verdict text instead of truncating it, with commit SHAs, timestamps, and other bare identifiers tinted for readability.
+
 ## [dispatch 3.22.1] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.1`_
