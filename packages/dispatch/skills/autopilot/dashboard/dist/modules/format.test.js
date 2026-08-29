@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   TOKEN_DANGER,
   TOKEN_WARN,
+  allHarnessTokens,
   formatTokens,
+  freshTokens,
   hasTokenReading,
   tokenTier,
+  totalTokens,
 } from "./format.js";
 
 describe("formatTokens", () => {
@@ -49,9 +52,9 @@ describe("tokenTier", () => {
     expect(tokenTier(7_183_857)).toBe("-danger");
   });
 
-  test("keeps the thresholds at 80K and 200K", () => {
-    expect(TOKEN_WARN).toBe(80_000);
-    expect(TOKEN_DANGER).toBe(200_000);
+  test("keeps the thresholds at 60K and 100K", () => {
+    expect(TOKEN_WARN).toBe(60_000);
+    expect(TOKEN_DANGER).toBe(100_000);
   });
 
   test("gives no tier to everything formatTokens calls N/A", () => {
@@ -60,6 +63,84 @@ describe("tokenTier", () => {
       expect(tokenTier(absent)).toBe("");
       expect(hasTokenReading(absent)).toBe(false);
     }
+  });
+});
+
+describe("freshTokens", () => {
+  const counts = {
+    input: 305,
+    output: 4795,
+    cacheRead: 1_252_822,
+    cacheWrite: 44_920,
+  };
+
+  // The real verify:foundation/01#2 row. Claude Code's Execute panel read 44.9k for
+  // it, which is cacheWrite alone — the billed total is 1.3M and input+output+cacheWrite
+  // is 50,020, and neither renders as 44.9k.
+  test("is the cache-creation counter alone, matching the harness panel", () => {
+    expect(freshTokens(counts)).toBe(44_920);
+    expect(formatTokens(freshTokens(counts))).toBe("44.9K");
+  });
+
+  test("ignores cache reads, which carry 94-96% of the billed total", () => {
+    expect(freshTokens(counts)).not.toBe(totalTokens(counts));
+  });
+
+  test("keeps an absent counts object absent, never a measured zero", () => {
+    expect(freshTokens(undefined)).toBe(undefined);
+    expect(freshTokens(null)).toBe(undefined);
+    expect(formatTokens(freshTokens(undefined))).toBe("N/A");
+  });
+
+  test("reads a missing or unusable counter as a measured zero", () => {
+    expect(freshTokens({ output: 5 })).toBe(0);
+    expect(freshTokens({ cacheWrite: "x" })).toBe(0);
+    expect(formatTokens(freshTokens({ output: 5 }))).toBe("0");
+  });
+});
+
+describe("allHarnessTokens", () => {
+  const claude = { input: 0, output: 0, cacheRead: 9_000, cacheWrite: 788_700 };
+  const codex = { input: 0, output: 0, cacheRead: 9_000, cacheWrite: 488_500 };
+
+  // The header asks "what did this flight cost", not "which side spent what" — that
+  // question belongs to the fleet row and the lane card, which keep the two apart.
+  test("sums every harness into the one figure the header prints", () => {
+    expect(allHarnessTokens(claude, codex)).toBe(1_277_200);
+  });
+
+  test("an absent harness contributes zero rather than voiding the total", () => {
+    expect(allHarnessTokens(claude, undefined)).toBe(788_700);
+    expect(allHarnessTokens(undefined, undefined)).toBe(0);
+  });
+
+  test("counts only fresh tokens, never the cache reads beside them", () => {
+    expect(allHarnessTokens(claude)).toBe(claude.cacheWrite);
+  });
+});
+
+describe("totalTokens", () => {
+  test("sums all four billed counters", () => {
+    expect(
+      totalTokens({ input: 1, output: 20, cacheRead: 300, cacheWrite: 4000 }),
+    ).toBe(4321);
+  });
+
+  test("keeps an absent counts object absent, never a measured zero", () => {
+    expect(totalTokens(undefined)).toBe(undefined);
+    expect(totalTokens(null)).toBe(undefined);
+    expect(formatTokens(totalTokens(undefined))).toBe("N/A");
+  });
+
+  test("renders a fully zero reading as a measured zero", () => {
+    const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+    expect(totalTokens(zero)).toBe(0);
+    expect(formatTokens(totalTokens(zero))).toBe("0");
+  });
+
+  test("treats a missing or unusable counter as nothing, not as NaN", () => {
+    expect(totalTokens({ output: 5 })).toBe(5);
+    expect(totalTokens({ input: "x", output: 5 })).toBe(5);
   });
 });
 

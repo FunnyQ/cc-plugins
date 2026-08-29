@@ -37,11 +37,69 @@ export function hasTokenReading(value) {
   return value !== null && Number.isFinite(number) && number >= 0;
 }
 
+/**
+ * The figure every panel prints: fresh prompt tokens — content this agent processed
+ * for the first time, excluding re-reads of the cache.
+ *
+ * This is the metric Claude Code's own Execute panel shows. Verified against a live
+ * 11-agent run: `cache_creation_input_tokens` alone reproduces 9 of the 11 rows to
+ * the digit (16,630 -> "16.6k", 49,911 -> "49.9k"), across two models and both
+ * finished and running agents. Folding input+output in breaks the match — verify#2
+ * is 44,920 fresh against 50,020 with them added, and the panel reads 44.9k.
+ *
+ * The counter is named for how Claude bills it (new prompt content is written to the
+ * cache), but the concept is vendor-neutral, so `codex-usage.ts` maps codex's
+ * non-cached input onto the same field. Read this as "fresh", not as "a cache write".
+ *
+ * Deliberately not the billed total. Cache reads carry 94–96% of that total, which
+ * makes it a measure of how often context was re-sent rather than of work done, and
+ * it cannot be reconciled with the harness panel sitting beside it.
+ *
+ * An absent counts object stays absent rather than reading 0, so formatTokens still
+ * prints N/A for a row no transcript matched.
+ */
+export function freshTokens(counts) {
+  if (counts === undefined || counts === null) return undefined;
+  return Number(counts.cacheWrite) || 0;
+}
+
+/**
+ * Fresh tokens across every harness that worked on the plan — the header's one figure.
+ *
+ * The per-row and per-task panels keep Claude and codex apart, because there the reader
+ * is asking which side of a dev step burned what. The plan-level number is the opposite
+ * question — what did this flight cost in total — and two figures there would just be a
+ * sum the reader has to do in their head.
+ *
+ * An absent side contributes 0 rather than making the whole total unavailable: a plan
+ * with no external engine still has a real Claude total to print.
+ */
+export function allHarnessTokens(...counts) {
+  return counts.reduce((total, entry) => total + (freshTokens(entry) ?? 0), 0);
+}
+
+/**
+ * Every billed token, for the tooltip only. Kept beside `freshTokens` so a panel can
+ * explain the smaller number it prints without a second trip to the server.
+ */
+export function totalTokens(counts) {
+  if (counts === undefined || counts === null) return undefined;
+  return (
+    (Number(counts.input) || 0) +
+    (Number(counts.output) || 0) +
+    (Number(counts.cacheRead) || 0) +
+    (Number(counts.cacheWrite) || 0)
+  );
+}
+
 // Per-agent budget thresholds. Read against ONE agent's spend, never a per-task or
 // plan-wide total: those aggregate several agents, clear both thresholds on any real
 // run, and a figure that is permanently red teaches the eye to stop reading the colour.
-export const TOKEN_WARN = 80_000;
-export const TOKEN_DANGER = 200_000;
+//
+// Calibrated on fresh tokens against the 661 agents on disk here (p50 39.5K, p75 55.5K,
+// p90 75K): warn catches the top fifth, danger the top ~3%.
+export const TOKEN_WARN = 60_000;
+export const TOKEN_DANGER = 100_000;
 
 /**
  * The tier class for one agent's token count, or "" when there is no measurement.

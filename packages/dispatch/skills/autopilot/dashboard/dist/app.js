@@ -11,7 +11,7 @@ import {
   toggleRubric,
 } from "./modules/fleet.js";
 import { layoutGraph, relatedRefs, renderGraph } from "./modules/graph.js";
-import { formatTokens } from "./modules/format.js";
+import { allHarnessTokens, formatTokens } from "./modules/format.js";
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -27,6 +27,9 @@ const emptyUsage = () => ({
   unattributed: emptyCounts(),
   totals: emptyCounts(),
   agentCount: 0,
+  codexByTask: {},
+  codexTotals: emptyCounts(),
+  codexRunCount: 0,
 });
 
 const emptyTree = () => ({
@@ -53,6 +56,7 @@ const store = reactive({
   tree: emptyTree(),
   Lanes,
   formatTokens,
+  allHarnessTokens,
   graphSvg: "",
   // Total flight time, from the first agent start. Empty until one starts.
   elapsed: "",

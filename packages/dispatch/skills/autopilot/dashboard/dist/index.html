@@ -36,7 +36,7 @@
 
         <div class="plan-tokens" v-if="usage.agentCount">
           <span class="label">Tokens</span>
-          <span class="value">{{ formatTokens(usage.totals.output) }}</span>
+          <span class="value">{{ formatTokens(allHarnessTokens(usage.totals, usage.codexTotals)) }}</span>
         </div>
 
         <dl class="plan-counts" aria-label="Flight plan counts">

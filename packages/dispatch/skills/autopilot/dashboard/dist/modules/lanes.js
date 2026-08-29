@@ -2,6 +2,7 @@ import {
   compareTaskOrder,
   formatScore,
   formatTokens,
+  freshTokens,
   hasTokenReading,
   percent,
   renderDimensions,
@@ -78,7 +79,8 @@ export function Lanes({ tree, usage }) {
                     </span>
                     <span class="value">{{ formatScore(task.latestScore.weighted) }}</span>
                   </span>
-                  <span class="token-figure" :class="{ '-absent': !hasTokenReading(usage.byTask[task.ref]?.output) }">{{ formatTokens(usage.byTask[task.ref]?.output) }}</span>
+                  <span class="token-figure" :class="{ '-absent': !hasTokenReading(freshTokens(usage.byTask[task.ref])) }">{{ formatTokens(freshTokens(usage.byTask[task.ref])) }}</span>
+                  <span v-if="usage.codexByTask[task.ref]" class="token-figure -codex">cdx {{ formatTokens(freshTokens(usage.codexByTask[task.ref])) }}</span>
                 </button>
                 <div
                   v-if="hasBreakdown(task)"
@@ -121,6 +123,7 @@ export function Lanes({ tree, usage }) {
     renderDimensions,
     formatScore,
     formatTokens,
+    freshTokens,
     hasTokenReading,
   };
 }

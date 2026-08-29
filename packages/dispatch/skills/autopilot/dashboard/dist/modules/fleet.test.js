@@ -6,6 +6,7 @@ import {
   isFleetCollapsed,
   isInFlight,
   renderFleet,
+  renderMessage,
   runElapsed,
   tickElapsed,
   toggleFleet,
@@ -341,6 +342,64 @@ describe("gate outcome colouring", () => {
   });
 });
 
+describe("renderMessage", () => {
+  test("lifts a leading PASS into a chip and drops the dash after it", () => {
+    expect(renderMessage("PASS — All verification commands succeeded")).toBe(
+      '<span class="msg-verdict -pass">PASS</span>All verification commands succeeded',
+    );
+  });
+
+  test("colours a FAIL chip as a failure, not as a pass", () => {
+    expect(renderMessage("FAIL — nope")).toContain(
+      '<span class="msg-verdict -fail">FAIL</span>',
+    );
+  });
+
+  test("marks the bare identifiers agents write without backticks", () => {
+    const html = renderMessage(
+      "db:prepare fails with ActiveRecord::InvalidMigrationTimestampError because 20260901000100 is in the future",
+    );
+
+    expect(html).toContain("<code>db:prepare</code>");
+    expect(html).toContain(
+      "<code>ActiveRecord::InvalidMigrationTimestampError</code>",
+    );
+    expect(html).toContain("<code>20260901000100</code>");
+  });
+
+  test("marks snake_case but leaves ordinary prose alone", () => {
+    const html = renderMessage(
+      "the cms_kit installation is complete and green",
+    );
+
+    expect(html).toContain("<code>cms_kit</code>");
+    expect(html).toContain("installation is complete and green");
+    expect(html).not.toContain("<code>installation</code>");
+  });
+
+  test("does not match across the space in `shas: 32b4ea0`", () => {
+    const html = renderMessage("committed shas: 32b4ea0");
+    expect(html).toContain("committed shas: ");
+    expect(html).toContain("<code>32b4ea0</code>");
+  });
+
+  // The reason escaping runs per token instead of once over the whole string: an
+  // entity like `&#039;` contains a run the hex-sha branch would otherwise split.
+  test("escapes the text and never breaks an entity apart", () => {
+    const html = renderMessage("<script>alert('x')</script> & done");
+
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&amp;");
+    expect(html).not.toContain("<code>&");
+  });
+
+  test("renders an absent message as nothing at all", () => {
+    expect(renderMessage(undefined)).toBe("");
+    expect(renderMessage("")).toBe("");
+  });
+});
+
 describe("Tokens under the role chip", () => {
   test("reads N/A, never 0, for a row with no matched transcript", () => {
     const html = rowHtml({
@@ -355,34 +414,84 @@ describe("Tokens under the role chip", () => {
     );
   });
 
-  test("renders the formatted output count and both counts in the title", () => {
+  test("renders fresh tokens, with the billed total and its parts in the title", () => {
     const html = rowHtml({
       key: "dev:ui/01#1",
       role: "dev",
       ref: "ui/01",
       status: "finished",
-      usage: { input: 352, output: 3465, cacheRead: 0, cacheWrite: 0 },
+      usage: {
+        input: 352,
+        output: 3465,
+        cacheRead: 120_000,
+        cacheWrite: 8_000,
+      },
     });
 
     expect(html).toContain(
-      '<span class="role-tokens -normal" title="input 352 · output 3465">3.5K</span>',
+      '<span class="role-tokens -normal" title="fresh 8000 · billed total 131817 (cache read 120000 · input 352 · output 3465)">8.0K</span>',
     );
   });
 
-  test("carries the budget tier the count falls in", () => {
-    const tierOf = (output) =>
+  test("carries the budget tier the fresh count falls in", () => {
+    const tierOf = (cacheWrite) =>
       rowHtml({
         key: "dev:ui/01#1",
         role: "dev",
         ref: "ui/01",
         status: "finished",
-        usage: { input: 0, output },
+        // Cache reads dwarf the fresh count and must not move the tier.
+        usage: { input: 0, output: 0, cacheRead: 5_000_000, cacheWrite },
       }).match(/class="role-tokens ([^"]+)"/)[1];
 
-    expect(tierOf(79_999)).toBe("-normal");
-    expect(tierOf(80_000)).toBe("-warn");
-    expect(tierOf(199_999)).toBe("-warn");
-    expect(tierOf(200_000)).toBe("-danger");
+    expect(tierOf(59_999)).toBe("-normal");
+    expect(tierOf(60_000)).toBe("-warn");
+    expect(tierOf(99_999)).toBe("-warn");
+    expect(tierOf(100_000)).toBe("-danger");
+  });
+
+  test("prints the external engine's spend as its own figure, never merged in", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 35_100 },
+      codexUsage: { input: 0, output: 500, cacheRead: 900, cacheWrite: 54_800 },
+    });
+
+    expect(html).toContain(">35.1K</span>");
+    expect(html).toContain(">cdx 54.8K</span>");
+    // Merged it would read 89.9K, which is a Claude agent that never existed.
+    expect(html).not.toContain(">89.9K<");
+  });
+
+  test("tiers the codex figure on the same thresholds as the Claude one", () => {
+    const tierOf = (cacheWrite) =>
+      rowHtml({
+        key: "dev:ui/01#1",
+        role: "dev",
+        ref: "ui/01",
+        status: "finished",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        codexUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite },
+      }).match(/class="role-tokens -codex ([^"]+)"/)[1];
+
+    expect(tierOf(59_999)).toBe("-normal");
+    expect(tierOf(60_000)).toBe("-warn");
+    expect(tierOf(100_000)).toBe("-danger");
+  });
+
+  test("renders no codex figure for a row that drove no external engine", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 35_100 },
+    });
+
+    expect(html).not.toContain("-codex");
   });
 
   test("sits inside the role cell, not in a column of its own", () => {

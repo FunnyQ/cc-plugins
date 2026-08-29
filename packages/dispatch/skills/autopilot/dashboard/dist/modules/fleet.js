@@ -2,10 +2,12 @@ import {
   escapeHtml,
   formatScore,
   formatTokens,
+  freshTokens,
   percent,
   renderDimensions,
   scoreClass,
   tokenTier,
+  totalTokens,
 } from "./format.js";
 
 const MAX_ROWS = 200;
@@ -38,21 +40,88 @@ function renderScore(score) {
     </span>`;
 }
 
-// Local to this module: it has one caller, renderRow.
+// Local to this module: it has one caller, renderRow. The chip prints fresh tokens
+// only, so the title carries the billed total and the counters behind both.
 function tokenTitle(usage) {
   return usage
-    ? `input ${usage.input} · output ${usage.output}`
+    ? `fresh ${usage.cacheWrite} · billed total ${totalTokens(usage)} (cache read ${usage.cacheRead} · input ${usage.input} · output ${usage.output})`
     : "no transcript matched this agent";
 }
 
 // Under the role chip rather than in a column of its own: the count belongs to
 // the agent, and a whole column bought one number per row at the cost of the
 // width the message needs.
-function renderTokens(usage) {
+// The external CLI's own spend, printed beside the driver's rather than added to it.
+// A dev-codex row is a cheap Haiku driver plus an expensive external model, and one
+// merged figure would read as a single very expensive Claude agent.
+//
+// Tiered on the same thresholds as the Claude figure: the reader is scanning one
+// column for "which agent is expensive", and a second scale in that column would mean
+// two ambers stood for two different amounts. The `cdx` prefix carries the vendor, so
+// the colour is free to carry the budget.
+function renderCodexTokens(codexUsage) {
+  if (!codexUsage) return "";
+  const fresh = freshTokens(codexUsage);
+  const tier = tokenTier(fresh);
+  const title = `codex — fresh ${codexUsage.cacheWrite} · cache read ${codexUsage.cacheRead} · output ${codexUsage.output}`;
+  return `<span class="role-tokens -codex${tier ? ` ${tier}` : ""}" title="${escapeHtml(title)}">cdx ${escapeHtml(formatTokens(fresh))}</span>`;
+}
+
+function renderTokens(usage, codexUsage) {
+  const fresh = freshTokens(usage);
   // An unmeasured count carries no tier, so it gets no class rather than an
   // empty one — the CSS reads the absence, and the markup stays legible.
-  const tier = tokenTier(usage?.output);
-  return `<span class="role-tokens${tier ? ` ${tier}` : ""}" title="${escapeHtml(tokenTitle(usage))}">${escapeHtml(formatTokens(usage?.output))}</span>`;
+  const tier = tokenTier(fresh);
+  return `<span class="role-tokens${tier ? ` ${tier}` : ""}" title="${escapeHtml(tokenTitle(usage))}">${escapeHtml(formatTokens(fresh))}</span>${renderCodexTokens(codexUsage)}`;
+}
+
+// A leading PASS / FAIL is structure, not prose — agents write it on nearly every
+// verify and judge message. The dash after it is the separator the chip replaces.
+const VERDICT_PREFIX = /^(PASS|FAIL|SKIP|BLOCKED)\s*(?:[—–-]\s*)?/;
+
+/*
+ * Identifiers the agents write bare, with no backticks to mark them:
+ *   Foo::Bar          ActiveRecord::InvalidMigrationTimestampError
+ *   snake_case        cms_kit, change_reason
+ *   cmd:sub           db:prepare
+ *   long digit runs   20260901000100 (a migration timestamp)
+ *   short hex         32b4ea0 (a commit sha)
+ *
+ * Deliberately narrow. Ordinary English carries no underscores and no `::`, and the
+ * colon form needs a letter on both sides, so `shas: 32b4ea0` does not match across
+ * the space. Over-matching here would tint half the sentence and the emphasis would
+ * stop meaning anything.
+ */
+const CODEISH =
+  /([A-Za-z][\w.]*::[\w.:]+|\b\w+_\w+\b|\b[a-z][\w.-]*:[a-z][\w.:-]*\b|\b\d{6,}\b|\b[0-9a-f]{7,40}\b)/g;
+
+/**
+ * The message cell's markup.
+ *
+ * Escaping runs per token rather than once over the whole string. Escaping first
+ * would put `&amp;` and `&#039;` into the text, and the hex-sha branch of CODEISH
+ * would then match inside those entities and split them — turning a rendered `&`
+ * into visible markup. Splitting first, then escaping each piece, cannot.
+ */
+export function renderMessage(message) {
+  const text = String(message ?? "");
+  if (!text) return "";
+
+  const verdict = VERDICT_PREFIX.exec(text);
+  const chip = verdict
+    ? `<span class="msg-verdict -${verdict[1].toLowerCase() === "pass" ? "pass" : "fail"}">${verdict[1]}</span>`
+    : "";
+  const body = verdict ? text.slice(verdict[0].length) : text;
+
+  const marked = body
+    .split(CODEISH)
+    .map((piece, index) =>
+      // split() with one capturing group puts the matches at every odd index.
+      index % 2 === 1 ? `<code>${escapeHtml(piece)}</code>` : escapeHtml(piece),
+    )
+    .join("");
+
+  return `${chip}${marked}`;
 }
 
 function renderBreakdown(row) {
@@ -97,12 +166,12 @@ function renderRow(row, nowMs) {
       data-row-key="${escapeHtml(row.key)}"${ticking} tabindex="${expandable ? "0" : "-1"}"
       aria-expanded="${expandable ? expandedRows.has(row.key) : false}">
       <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : rejected ? "did not pass" : abandoned ? "no end reported" : "finished"}"></span></span>
-      <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${renderTokens(row.usage)}${unknownLabel}</span>
+      <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${renderTokens(row.usage, row.codexUsage)}${unknownLabel}</span>
       <span class="fleet-cell -ref" role="cell">${escapeHtml(row.ref)}</span>
       <span class="fleet-cell -attempt" role="cell">${row.attempt === undefined ? "" : escapeHtml(row.attempt)}</span>
       <span class="fleet-cell -elapsed" role="cell">${elapsed}</span>
       <span class="fleet-cell -verdict" role="cell">${renderScore(row.score)}</span>
-      <span class="fleet-cell -message" role="cell" title="${escapeHtml(row.message)}">${escapeHtml(row.message)}</span>
+      <span class="fleet-cell -message" role="cell">${renderMessage(row.message)}</span>
     </div>
     ${renderBreakdown(row)}`;
 }

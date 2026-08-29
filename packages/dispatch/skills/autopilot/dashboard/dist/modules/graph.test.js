@@ -514,7 +514,7 @@ describe("the berth plate", () => {
     // produces still clears the ref when it lands.
     const layout = layoutGraph(nodes);
     const svg = renderGraph(nodes, layout, {
-      usage: { byTask: { "api/01": { output: 145_000 } } },
+      usage: { byTask: { "api/01": { cacheWrite: 145_000 } } },
     });
     const refX = Number(svg.match(/class="graph-ref"[^>]*x="([\d.]+)"/)[1]);
     const tokenX = Number(
@@ -533,7 +533,7 @@ describe("the berth plate", () => {
   test("the ref and the token ride inside the plate, on its centre line", () => {
     const layout = layoutGraph(nodes);
     const svg = renderGraph(nodes, layout, {
-      usage: { byTask: { "api/01": { output: 145_000 } } },
+      usage: { byTask: { "api/01": { cacheWrite: 145_000 } } },
     });
     const plate = layout.positions.get("api/01");
     const height = Number(
@@ -586,13 +586,40 @@ describe("panel tokens", () => {
   // fleet — the count here is drawn in one ink no matter how large.
   test("draws the count under the berth, untiered", () => {
     const svg = renderGraph(nodes, layoutGraph(nodes), {
-      usage: { byTask: { "api/01": { output: 92_400 } } },
+      usage: {
+        byTask: { "api/01": { cacheWrite: 92_400, cacheRead: 900_000 } },
+        codexByTask: {},
+      },
     });
 
     expect(svg).toContain('class="graph-tokens"');
     expect(svg).toContain(">92.4K</text>");
     expect(svg).not.toContain("-warn");
     expect(svg).not.toContain("-danger");
+  });
+
+  // The berth is the task, so it sums every harness that worked on it. The fleet row
+  // is where the driver and the delegate stay apart.
+  test("sums the Claude and codex figures into the one plate figure", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes), {
+      usage: {
+        byTask: { "api/01": { cacheWrite: 92_400 } },
+        codexByTask: { "api/01": { cacheWrite: 7_600 } },
+      },
+    });
+
+    expect(svg).toContain(">100.0K</text>");
+  });
+
+  test("prints the Claude figure alone for a task no external engine touched", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes), {
+      usage: {
+        byTask: { "api/01": { cacheWrite: 92_400 } },
+        codexByTask: {},
+      },
+    });
+
+    expect(svg).toContain(">92.4K</text>");
   });
 
   test("omits the line where nothing was measured, and draws no pill", () => {

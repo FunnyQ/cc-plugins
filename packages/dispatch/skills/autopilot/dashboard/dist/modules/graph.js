@@ -29,6 +29,7 @@
  */
 
 import {
+  allHarnessTokens,
   compareTaskOrder,
   escapeHtml,
   formatTokens,
@@ -624,6 +625,7 @@ export function renderGraph(nodes, layout, opts = {}) {
   // are not.
   const options = { ...resolve(geometryOpts), ...(layout.geometry ?? {}) };
   const tokensByRef = usage?.byTask ?? {};
+  const codexByRef = usage?.codexByTask ?? {};
   const graphNodes = Array.isArray(nodes) ? nodes : [];
   const { positions, roads, drawn, turns } = layout;
   const cyclic = new Set(layout.cyclic);
@@ -742,7 +744,20 @@ export function renderGraph(nodes, layout, opts = {}) {
       // puts the x-height band on the centre line, which is where the eye reads
       // it. A raw baseline at midY hangs the whole word above the plate's waist.
       const textY = midY + options.fontSize * REF_SCALE * 0.35;
-      const tokens = tokensByRef[node.ref]?.output;
+      // One figure per plate: the whole task across every harness. The fleet row is
+      // where the driver and the delegate stay apart, because there the question is
+      // which side of one dev step spent what. A berth is the task, and a second
+      // number on every plate turned the panel into a table.
+      //
+      // Summed only when at least one side reported: `allHarnessTokens` reads an
+      // absent object as 0, so calling it blind would print a measured 0 on every
+      // berth that has not run yet.
+      const claudeCounts = tokensByRef[node.ref];
+      const codexCounts = codexByRef[node.ref];
+      const tokens =
+        claudeCounts === undefined && codexCounts === undefined
+          ? undefined
+          : allHarnessTokens(claudeCounts, codexCounts);
       // Untiered: a berth's figure is the whole task, several agents deep, so the
       // per-agent thresholds would paint every berth on any real run.
       //
