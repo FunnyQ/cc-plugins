@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 3.22.1] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.1`_
+
+### Changed
+- A task on the dependency graph now carries its ref and token count *inside* its berth, on one line, instead of hanging them beneath as two floating labels — the state colour and the task's identity no longer have to be paired up by eye before a berth can be read. Berths are taller and sized to the longest ref in the plan, and state is now lit down a berth's leading edge rather than filling it, so the text inside stays legible.
+- Cross-bucket dependencies are now drawn as curves rather than 45-degree diagonals. A curve changes road inside the single gap reserved for it, whatever the distance between the two tracks; the diagonal had to spend its own vertical drop in horizontal reach, so on a tall plan most dependencies could not fit and fell back to a straight line.
+- Berths sit further apart, which gives each crossover room to read as a curve. A dense plan therefore reaches the graph panel's horizontal scroll sooner than it used to.
+
+### Fixed
+- The fleet table's column header no longer leaves a blank band under the title bar in a narrow pane.
+
 ## [dispatch 3.22.0] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.0`_
