@@ -406,6 +406,11 @@ button {
      answer "what is holding this up", and the answer was invisible. PRODUCT.md
      has blocked recede into slate *without disappearing*. */
   --unlit-berth: color-mix(in oklab, var(--state-blocked) 75%, var(--ground));
+  /* One travelling segment per period, with a long dark gap after it, so the eye
+     follows a single light rather than a moving ladder. */
+  --graph-flow-dash: 26px;
+  --graph-flow-gap: 82px;
+  --graph-flow-duration: 1.25s;
 
   display: block;
   min-inline-size: 100%;
@@ -589,6 +594,29 @@ button {
 
   &.-focus :is(.graph-crossover, .graph-link).-lit {
     stroke: var(--lit-done);
+  }
+
+  /* Current running through a set route.
+     Drawn only while a route is set, and only on the segments in it. The base rail
+     stays solid underneath — a dashed rail would say the track is broken, which is
+     the opposite of what a lit route means — so the flow is a second, narrower
+     stroke laid inside it.
+     Discrete segments travelling, not a gradient sweeping: the panel's contract is
+     "segments light, never fade", and a dash pattern marching along the path is the
+     only way to show direction that obeys it. Negative dashoffset carries them along
+     the path's own direction, which is always source -> dependent, so the light runs
+     downstream to the end of the lineage no matter which berth is hovered.
+     The global prefers-reduced-motion rule stops the march; the route stays lit. */
+  .graph-flow {
+    fill: none;
+    stroke: transparent;
+    stroke-linecap: butt;
+  }
+
+  &.-focus .graph-flow.-lit {
+    animation: graph-flow-run var(--graph-flow-duration) linear infinite;
+    stroke: color-mix(in oklab, var(--lit-done) 22%, white);
+    stroke-dasharray: var(--graph-flow-dash) var(--graph-flow-gap);
   }
 
   &.-focus .graph-berth.-self > .segment {
@@ -1405,5 +1433,16 @@ button {
   .deck-top {
     min-block-size: 40vh;
     overflow: hidden;
+  }
+}
+
+/* The period is dash + gap, so one cycle of the offset moves each segment exactly
+   into the place the one behind it left — the loop has no seam. */
+@keyframes graph-flow-run {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: calc((var(--graph-flow-dash) + var(--graph-flow-gap)) * -1);
   }
 }

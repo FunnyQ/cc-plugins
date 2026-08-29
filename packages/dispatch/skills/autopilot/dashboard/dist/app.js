@@ -151,7 +151,9 @@ function paintLineage(container, focus) {
   // children, but the whole lineage lights at one value on this instrument —
   // a route is set or it is not — so the extra grades had no rule behind them
   // and rendered nothing for the two versions they sat in the file.
-  for (const edge of svg.querySelectorAll(".graph-crossover, .graph-link")) {
+  for (const edge of svg.querySelectorAll(
+    ".graph-crossover, .graph-link, .graph-flow",
+  )) {
     const { from, to } = edge.dataset;
     edge.classList.toggle("-lit", lit?.has(from) === true && lit.has(to));
   }

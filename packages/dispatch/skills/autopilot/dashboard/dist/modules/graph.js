@@ -115,6 +115,9 @@ const MONO_ADVANCE = 0.6;
 const ROAD_NAME_SCALE = 0.8;
 const REF_SCALE = 0.85;
 const TOKEN_SCALE = 0.75;
+// The travelling light runs inside the rail, not over it: at the rail's own weight it
+// would erase the track it is supposed to be flowing through.
+const FLOW_SCALE = 0.45;
 
 const advance = (characters, scale, fontSize) =>
   characters * fontSize * scale * MONO_ADVANCE;
@@ -698,10 +701,14 @@ export function renderGraph(nodes, layout, opts = {}) {
           from = blocker.x + options.berthWidth;
         }
 
-        return spans.map(
-          ([x1, x2]) =>
-            `<line class="graph-link" stroke-width="${trim(options.railWidth)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" x1="${trim(x1)}" y1="${trim(y)}" x2="${trim(x2)}" y2="${trim(y)}" />`,
-        );
+        return spans.map(([x1, x2]) => {
+          const geometry = `x1="${trim(x1)}" y1="${trim(y)}" x2="${trim(x2)}" y2="${trim(y)}"`;
+          const edge = `data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}"`;
+          return (
+            `<line class="graph-link" stroke-width="${trim(options.railWidth)}" ${edge} ${geometry} />` +
+            `<line class="graph-flow" stroke-width="${trim(options.railWidth * FLOW_SCALE)}" ${edge} ${geometry} />`
+          );
+        });
       });
     })
     .join("");
@@ -716,15 +723,18 @@ export function renderGraph(nodes, layout, opts = {}) {
         const source = positions.get(dependencyRef);
         if (!source || source.road === target.road) return [];
         const dependency = graphNodes.find((n) => n.ref === dependencyRef);
+        const d = crossoverPath(
+          source.x + options.berthWidth,
+          source.y + options.berthHeight / 2,
+          target.x,
+          target.y + options.berthHeight / 2,
+          turns?.get(edgeKey(dependencyRef, node.ref)),
+          { ease: options.crossoverEase, reach: options.slotGap },
+        );
+        const edge = `data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}"`;
         return [
-          `<path class="graph-crossover${dependency?.state === "done" ? " -cleared" : ""}" stroke-width="${trim(options.railWidth)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" d="${crossoverPath(
-            source.x + options.berthWidth,
-            source.y + options.berthHeight / 2,
-            target.x,
-            target.y + options.berthHeight / 2,
-            turns?.get(edgeKey(dependencyRef, node.ref)),
-            { ease: options.crossoverEase, reach: options.slotGap },
-          )}" />`,
+          `<path class="graph-crossover${dependency?.state === "done" ? " -cleared" : ""}" stroke-width="${trim(options.railWidth)}" ${edge} d="${d}" />` +
+            `<path class="graph-flow" stroke-width="${trim(options.railWidth * FLOW_SCALE)}" ${edge} d="${d}" />`,
         ];
       });
     })

@@ -74,6 +74,56 @@ describe("relatedRefs", () => {
   });
 });
 
+describe("route current", () => {
+  // The travelling light is a second stroke laid inside each connection, so the base
+  // rail can stay solid while the flow marches. It carries the same edge identity
+  // because app.js lights it from the same lineage pass that lights the rail.
+  test("lays a flow overlay inside a same-road link", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain('class="graph-flow"');
+    expect((svg.match(/class="graph-flow"/g) ?? []).length).toBe(
+      (svg.match(/class="graph-link"/g) ?? []).length,
+    );
+  });
+
+  test("lays one inside a crossover too, on the same path", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("ui/01", "ui", "01", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    const crossover = svg.match(
+      /class="graph-crossover[^"]*"[^>]*d="([^"]+)"/,
+    )[1];
+    const flow = svg.match(/class="graph-flow"[^>]*d="([^"]+)"/)[1];
+
+    expect(flow).toBe(crossover);
+  });
+
+  test("draws the flow narrower than the rail it runs inside", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+    ];
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    const rail = Number(
+      svg.match(/class="graph-link" stroke-width="([\d.]+)"/)[1],
+    );
+    const flow = Number(
+      svg.match(/class="graph-flow" stroke-width="([\d.]+)"/)[1],
+    );
+
+    expect(flow).toBeLessThan(rail);
+  });
+});
+
 describe("edge identity", () => {
   // Cross-bucket, because only a dependency that leaves its own road is drawn
   // as a crossover; one inside a bucket is the running road itself.
