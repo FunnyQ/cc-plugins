@@ -32,6 +32,7 @@ import {
   allHarnessTokens,
   compareTaskOrder,
   escapeHtml,
+  formatDuration,
   formatTokens,
   hasTokenReading,
 } from "./format.js";
@@ -46,6 +47,25 @@ import {
 // proportion; nothing has to be re-tuned by hand.
 const FONT_SIZE = 14;
 
+// The monospace stack's advance, and the three type sizes drawn against it.
+// One place, because the gutter and the berth plate both size themselves to
+// their own ink and a second copy of 0.6 drifts from the first.
+//
+// Declared above `geometry` because the plate's own height is now derived from
+// two of them rather than picked: a two-line plate is as tall as the lines it
+// holds, and a hand-tuned multiple of the type size would drift from them the
+// first time either scale moved.
+const MONO_ADVANCE = 0.6;
+const ROAD_NAME_SCALE = 0.8;
+const REF_SCALE = 0.85;
+const TOKEN_SCALE = 0.75;
+// The travelling light runs inside the rail, not over it: at the rail's own weight it
+// would erase the track it is supposed to be flowing through.
+const FLOW_SCALE = 0.45;
+
+const advance = (characters, scale, fontSize) =>
+  characters * fontSize * scale * MONO_ADVANCE;
+
 const geometry = (fontSize) => ({
   // A berth is a berth plate: the ref and the token ride *inside* it, with a
   // state bar down its leading edge, the way a terminal prints one record per
@@ -56,10 +76,23 @@ const geometry = (fontSize) => ({
   // The plate is still a block of track, not a card: it sits ON the rail, keeps
   // the panel's 2px corner, and takes no shadow and no gradient.
   fontSize,
-  berthHeight: fontSize * 2.85,
+  // Two lines: the ref, then the two figures the task cost — tokens and wall
+  // clock. The height is the ink plus its padding rather than a chosen
+  // multiple, so it follows REF_SCALE and TOKEN_SCALE instead of drifting from
+  // them. It comes out near the 2.85 the single-line plate carried, because
+  // that plate was mostly air.
+  // Rounded to a whole pixel for the reason the gutter and the plate width are:
+  // every road's y is a multiple of the pitch offset by this, so a fractional
+  // height spreads float error down the panel — and the extent then misses a
+  // round number by 3e-14, which is a real assertion this broke.
+  berthLineGap: fontSize * 0.35,
+  berthPadY: fontSize * 0.55,
+  berthHeight: Math.round(
+    fontSize * (REF_SCALE + TOKEN_SCALE) + fontSize * 0.35 + fontSize * 1.1,
+  ),
   berthPadX: fontSize * 0.55,
   statusWidth: fontSize * 0.3, // the lit leading edge
-  refGap: fontSize * 0.9, // between the ref and the token inside the plate
+  refGap: fontSize * 0.9, // between the two figures on the plate's second line
   minBerthWidth: fontSize * 7, // never narrower than the bar it replaced
   // The running line. It was the berth's own height while a berth *was* the
   // line; now that the plate stands on it, the two are separate quantities and
@@ -108,20 +141,6 @@ const geometry = (fontSize) => ({
  * where the render's own two-decimal trim then rounds it back out and the
  * coordinates stop matching the layout that produced them.
  */
-// The monospace stack's advance, and the three type sizes drawn against it.
-// One place, because the gutter and the berth plate both size themselves to
-// their own ink and a second copy of 0.6 drifts from the first.
-const MONO_ADVANCE = 0.6;
-const ROAD_NAME_SCALE = 0.8;
-const REF_SCALE = 0.85;
-const TOKEN_SCALE = 0.75;
-// The travelling light runs inside the rail, not over it: at the rail's own weight it
-// would erase the track it is supposed to be flowing through.
-const FLOW_SCALE = 0.45;
-
-const advance = (characters, scale, fontSize) =>
-  characters * fontSize * scale * MONO_ADVANCE;
-
 const gutterFor = (roadNames, options) => {
   const longest = Math.max(0, ...roadNames.map((name) => name.length));
   return Math.round(
@@ -143,31 +162,42 @@ const gutterFor = (roadNames, options) => {
  * would break the stride, which is the only reason slots read as columns across
  * roads. Rounded to a whole pixel for the same reason the gutter is.
  *
- * The token column is held at a fixed six characters (`145.0K`) whether or not
- * a reading has arrived. Sizing it to the readings actually present would
- * reflow the entire panel the first time a task reports its tokens — and this
- * panel is read while it runs, so a layout that moves under the reader costs
- * more than a plate carrying some empty column.
+ * Both figure columns are held at a fixed width whether or not a reading has
+ * arrived — six characters for the tokens (`145.0K`), seven for the elapsed
+ * (`12m 34s`). Sizing them to the readings actually present would reflow the
+ * entire panel the first time a task reports, and this panel is read while it
+ * runs — the elapsed figure ticks every second — so a layout that moves under
+ * the reader costs far more than a plate carrying some empty column.
+ *
+ * The width is the wider of the two lines, not their sum. Splitting the plate
+ * onto two lines is what pays for the elapsed column: the ref no longer shares
+ * a line with the figures, so the plate came out narrower than the single-line
+ * one it replaced even after gaining a second number.
  *
  * There is no cap. A gutter is a flat allowance spent on a road name and can be
  * capped without lying; a plate that cannot fit its own ref renders a truncated
  * task id, which is a lie about the plan. Past the pane the panel scrolls.
  */
 const TOKEN_COLUMNS = 6;
+const ELAPSED_COLUMNS = 7;
 
 const berthWidthFor = (nodes, options) => {
   const longest = Math.max(
     0,
     ...nodes.map(({ ref }) => String(ref ?? "").length),
   );
+  const refLine = advance(longest, REF_SCALE, options.fontSize);
+  const figureLine =
+    advance(TOKEN_COLUMNS, TOKEN_SCALE, options.fontSize) +
+    options.refGap +
+    advance(ELAPSED_COLUMNS, TOKEN_SCALE, options.fontSize);
+
   return Math.round(
     Math.max(
       options.minBerthWidth,
       options.statusWidth +
         options.berthPadX * 2 +
-        advance(longest, REF_SCALE, options.fontSize) +
-        options.refGap +
-        advance(TOKEN_COLUMNS, TOKEN_SCALE, options.fontSize),
+        Math.max(refLine, figureLine),
     ),
   );
 };
@@ -245,22 +275,65 @@ export function layoutGraph(nodes, opts = {}) {
    * (depth, nn) order and takes the first free slot at or after their depth.
    * Columns stay aligned across roads wherever the tree allows it, and the road
    * stays strictly left-to-right, which is the one thing a running line must be.
+   *
+   * The packing has to settle across roads, not once per road. A berth pushed
+   * right to clear its own road is now right of where its dependents' depths
+   * expected it, and a single pass leaves those dependents where they were — so
+   * the crossover between them runs right-to-left and the panel says a task is
+   * waiting on something downstream of it. On the tree that found this,
+   * `api/08` packed from depth 5 to slot 7 while `studio/02` stayed at slot 6,
+   * and the route it depends on came back up the pane. So a berth also takes a
+   * slot past every dependency's slot, and the two constraints are run to a
+   * fixed point. It settles for the same reason the depth pass does: both only
+   * ever move a berth right, and together they form a DAG once the cycles are
+   * held out — a dependency edge raises the depth, a road edge never lowers it,
+   * so no chain of the two returns to where it started.
+   *
+   * A cyclic node is exempt from the dependency floor. Inside a cycle each node
+   * demands a slot past the others, which no arrangement satisfies; they already
+   * share the one column past the settled graph.
    */
+  const roadOrder = new Map(
+    roadNames.map((road) => [
+      road,
+      orderedNodes
+        .filter((node) => (node.bucket ?? "") === road)
+        .sort(
+          (left, right) =>
+            (depths.get(left.ref) ?? 0) - (depths.get(right.ref) ?? 0) ||
+            compareTaskOrder(left, right),
+        ),
+    ]),
+  );
+  const cyclicRefs = new Set(cyclic);
   const slots = new Map();
-  for (const road of roadNames) {
-    const onRoad = orderedNodes
-      .filter((node) => (node.bucket ?? "") === road)
-      .sort(
-        (left, right) =>
-          (depths.get(left.ref) ?? 0) - (depths.get(right.ref) ?? 0) ||
-          compareTaskOrder(left, right),
-      );
-    let previous = -1;
-    for (const node of onRoad) {
-      const slot = Math.max(depths.get(node.ref) ?? 0, previous + 1);
-      slots.set(node.ref, slot);
-      previous = slot;
+
+  for (let pass = 0; pass < orderedNodes.length; pass += 1) {
+    let changed = false;
+
+    for (const road of roadNames) {
+      let previous = -1;
+      for (const node of roadOrder.get(road) ?? []) {
+        const floors = cyclicRefs.has(node.ref)
+          ? []
+          : (node.dependsOn ?? [])
+              .filter((ref) => refs.has(ref) && !cyclicRefs.has(ref))
+              .map((ref) => (slots.get(ref) ?? 0) + 1);
+        const slot = Math.max(
+          depths.get(node.ref) ?? 0,
+          previous + 1,
+          ...floors,
+        );
+
+        if (slots.get(node.ref) !== slot) {
+          slots.set(node.ref, slot);
+          changed = true;
+        }
+        previous = slot;
+      }
     }
+
+    if (!changed) break;
   }
 
   /*
@@ -621,7 +694,7 @@ function signalHead(x, y, options, aspect) {
 }
 
 export function renderGraph(nodes, layout, opts = {}) {
-  const { usage, ...geometryOpts } = opts;
+  const { usage, elapsed: elapsedByRef = {}, ...geometryOpts } = opts;
   // The layout's own gutter, gap and plate width win: it sized them to the road
   // names, the refs and the pane, and a render that re-derived them from the
   // defaults would put the signal heads and the road ends somewhere the berths
@@ -750,10 +823,27 @@ export function renderGraph(nodes, layout, opts = {}) {
       const state = isCyclic ? "cyclic" : hardFailed ? "alert" : node.state;
       const centreX = position.x + options.berthWidth / 2;
       const midY = position.y + options.berthHeight / 2;
-      // Mono text centred on the plate: half the type size back off the middle
-      // puts the x-height band on the centre line, which is where the eye reads
-      // it. A raw baseline at midY hangs the whole word above the plate's waist.
-      const textY = midY + options.fontSize * REF_SCALE * 0.35;
+      /*
+       * Two baselines, derived from the block the two lines make rather than
+       * picked. Each line sits on its own visual centre, and the pair is
+       * centred on the plate — so the block stays centred if either type scale
+       * or the line gap moves.
+       *
+       * The 0.35-of-type-size drop off a line's centre is the same trick the
+       * single-line plate used: it puts the x-height band on that centre, which
+       * is where the eye reads it. A raw baseline hangs the whole word above.
+       */
+      const refHeight = options.fontSize * REF_SCALE;
+      const figureHeight = options.fontSize * TOKEN_SCALE;
+      const blockTop =
+        midY - (refHeight + options.berthLineGap + figureHeight) / 2;
+      const refY = blockTop + refHeight / 2 + refHeight * 0.35;
+      const figureY =
+        blockTop +
+        refHeight +
+        options.berthLineGap +
+        figureHeight / 2 +
+        figureHeight * 0.35;
       // One figure per plate: the whole task across every harness. The fleet row is
       // where the driver and the delegate stay apart, because there the question is
       // which side of one dev step spent what. A berth is the task, and a second
@@ -771,11 +861,30 @@ export function renderGraph(nodes, layout, opts = {}) {
       // Untiered: a berth's figure is the whole task, several agents deep, so the
       // per-agent thresholds would paint every berth on any real run.
       //
-      // Right-aligned against the plate's inner edge, so the counts form a
-      // column down each road and can be compared without reading any of them.
+      // The two figures set against opposite edges of the plate's second line,
+      // so each forms a column down its road and can be compared by shape
+      // without reading any of them.
       const tokenLine = !hasTokenReading(tokens)
         ? ""
-        : `<text class="graph-tokens" font-size="${options.fontSize * TOKEN_SCALE}" x="${trim(position.x + options.berthWidth - options.berthPadX)}" y="${trim(textY)}">${escapeHtml(formatTokens(tokens))}</text>`;
+        : `<text class="graph-tokens" font-size="${options.fontSize * TOKEN_SCALE}" x="${trim(position.x + options.statusWidth + options.berthPadX)}" y="${trim(figureY)}">${escapeHtml(formatTokens(tokens))}</text>`;
+      /*
+       * Wall-clock span, not the sum of what every agent spent.
+       *
+       * A task runs agents in parallel — the closing review fans five lenses out
+       * at once — and summing them answers "how much agent time did this burn",
+       * which is the token column's question already. The berth's own question
+       * is how long the route was held here, and that is one clock: first start
+       * to last end. `elapsedByTask` in fleet.js owns the derivation.
+       *
+       * A running task carries `since` instead of a settled figure, so the
+       * render stamps the start and `tickGraphElapsed` advances the text in
+       * place. Redrawing the SVG once a second would rebuild every path in it to
+       * move seven characters.
+       */
+      const elapsed = elapsedByRef[node.ref];
+      const elapsedLine = !elapsed
+        ? ""
+        : `<text class="graph-elapsed"${elapsed.live ? ` data-elapsed-since="${trim(elapsed.startMs)}"` : ""} font-size="${options.fontSize * TOKEN_SCALE}" x="${trim(position.x + options.berthWidth - options.berthPadX)}" y="${trim(figureY)}">${escapeHtml(formatDuration(elapsed.ms))}</text>`;
       // A gate stands at the entry of any berth something has to clear first.
       const aspect = isCyclic
         ? "danger"
@@ -794,8 +903,9 @@ export function renderGraph(nodes, layout, opts = {}) {
         ${signal}
         <rect class="segment" x="${trim(position.x)}" y="${trim(position.y)}" width="${trim(options.berthWidth)}" height="${trim(options.berthHeight)}" rx="2" ry="2" />
         <rect class="status" x="${trim(position.x)}" y="${trim(position.y)}" width="${trim(options.statusWidth)}" height="${trim(options.berthHeight)}" rx="2" ry="2" />
-        <text class="graph-ref" font-size="${options.fontSize * REF_SCALE}" x="${trim(position.x + options.statusWidth + options.berthPadX)}" y="${trim(textY)}">${escapeHtml(node.ref)}</text>
+        <text class="graph-ref" font-size="${options.fontSize * REF_SCALE}" x="${trim(position.x + options.statusWidth + options.berthPadX)}" y="${trim(refY)}">${escapeHtml(node.ref)}</text>
         ${tokenLine}
+        ${elapsedLine}
         ${isCyclic ? `<text class="graph-cycle-label" font-size="${options.fontSize * 0.7}" x="${trim(centreX)}" y="${trim(position.y - options.fontSize * 0.4)}">CYCLE</text>` : ""}
       </g>`,
       ];

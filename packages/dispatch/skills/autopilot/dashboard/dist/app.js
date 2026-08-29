@@ -2,16 +2,21 @@ import { createApp, reactive } from "./vendor/petite-vue.es.js";
 import { Lanes } from "./modules/lanes.js";
 import {
   connectEvents,
-  formatDuration,
+  elapsedByTask,
   isInFlight,
   renderFleet,
   runElapsed,
   tickElapsed,
+  tickGraphElapsed,
   toggleFleet,
   toggleRubric,
 } from "./modules/fleet.js";
 import { layoutGraph, relatedRefs, renderGraph } from "./modules/graph.js";
-import { allHarnessTokens, formatTokens } from "./modules/format.js";
+import {
+  allHarnessTokens,
+  formatDuration,
+  formatTokens,
+} from "./modules/format.js";
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -118,9 +123,15 @@ function updateGraph(tasks) {
     graphStructure = structure;
     graphPane = pane;
   }
-  // Usage rides along rather than living in the layout: it changes on every
-  // fleet frame, and the coordinates must not move when a token count does.
-  store.graphSvg = renderGraph(graphTasks, graphLayout, { usage: store.usage });
+  // Usage and elapsed ride along rather than living in the layout: both change
+  // on every fleet frame, and the coordinates must not move when a token count
+  // or a clock does. Elapsed is derived from the fleet rows here rather than
+  // served on the task payload, so a running berth's figure ticks with the
+  // fleet row it came from instead of stepping once per tree poll.
+  store.graphSvg = renderGraph(graphTasks, graphLayout, {
+    usage: store.usage,
+    elapsed: elapsedByTask(fleetState.rows),
+  });
   graphNodes = graphTasks;
 }
 
@@ -264,9 +275,12 @@ function syncFleetTicker() {
     )
   ) {
     // Tick the elapsed cells in place. Rebuilding the table every second would
-    // drop keyboard focus and restart any selection the user is holding.
+    // drop keyboard focus and restart any selection the user is holding; the
+    // berth plates are ticked the same way, and for the same reason plus one —
+    // a rebuilt SVG loses the hover route the reader is holding open.
     fleetTimer = setInterval(() => {
       tickElapsed(document.querySelector(".deck-fleet"));
+      tickGraphElapsed(document.querySelector(".c-dependency-graph"));
       syncElapsed();
     }, 1_000);
   }

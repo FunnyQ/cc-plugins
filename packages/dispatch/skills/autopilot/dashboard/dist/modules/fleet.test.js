@@ -1,17 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+  elapsedByTask,
   elapsedText,
-  formatDuration,
   isFleetCollapsed,
   isInFlight,
   renderFleet,
   renderMessage,
   runElapsed,
   tickElapsed,
+  tickGraphElapsed,
   toggleFleet,
   toggleRubric,
 } from "./fleet.js";
+import { formatDuration } from "./format.js";
 
 const expandedKeys = new Set();
 
@@ -217,6 +219,94 @@ describe("runElapsed", () => {
     ];
 
     expect(runElapsed(rows, t0 + 11_000).ms).toBe(10_000);
+  });
+});
+
+describe("elapsedByTask", () => {
+  const t0 = Date.parse("2026-08-01T12:00:00.000Z");
+  const at = (offsetMs) => new Date(t0 + offsetMs).toISOString();
+
+  test("counts concurrent agents of one task once, not once each", () => {
+    // The closing review fans five lenses out at the same moment. Summing their
+    // elapsed would answer how much agent time the task burned — which is what
+    // the berth's token figure already says — instead of how long it took.
+    const rows = ["a", "b", "c", "d", "e"].map((key) => ({
+      key,
+      ref: "review/01",
+      status: "finished",
+      startedAt: at(0),
+      elapsedMs: 60_000,
+    }));
+
+    expect(elapsedByTask(rows, t0 + 90_000)["review/01"].ms).toBe(60_000);
+  });
+
+  test("keeps each task on its own clock", () => {
+    const rows = [
+      {
+        key: "a",
+        ref: "ui/01",
+        status: "finished",
+        startedAt: at(0),
+        elapsedMs: 5_000,
+      },
+      {
+        key: "b",
+        ref: "ui/02",
+        status: "finished",
+        startedAt: at(20_000),
+        elapsedMs: 7_000,
+      },
+    ];
+    const elapsed = elapsedByTask(rows, t0 + 90_000);
+
+    expect(elapsed["ui/01"].ms).toBe(5_000);
+    expect(elapsed["ui/02"].ms).toBe(7_000);
+  });
+
+  test("a running task stays live and reports the start to tick from", () => {
+    const rows = [
+      {
+        key: "a",
+        ref: "ui/01",
+        status: "finished",
+        startedAt: at(0),
+        elapsedMs: 5_000,
+      },
+      { key: "b", ref: "ui/01", status: "in-flight", startedAt: at(6_000) },
+    ];
+    const elapsed = elapsedByTask(rows, t0 + 30_000)["ui/01"];
+
+    expect(elapsed).toEqual({ ms: 30_000, live: true, startMs: t0 });
+  });
+
+  test("skips a row with no ref or no start", () => {
+    const rows = [
+      { key: "a", status: "in-flight", startedAt: at(0) },
+      { key: "b", ref: "ui/01", status: "finished" },
+    ];
+
+    expect(elapsedByTask(rows, t0 + 30_000)).toEqual({});
+  });
+});
+
+describe("tickGraphElapsed", () => {
+  test("rewrites only the berths that stamped a start", () => {
+    const live = { dataset: { elapsedSince: "1000" }, textContent: "0.0s" };
+    const settled = { dataset: {}, textContent: "5.0s" };
+    const root = {
+      querySelectorAll: (selector) =>
+        selector === "[data-elapsed-since]" ? [live] : [settled],
+    };
+
+    tickGraphElapsed(root, 46_000);
+
+    expect(live.textContent).toBe("45.0s");
+    expect(settled.textContent).toBe("5.0s");
+  });
+
+  test("does nothing without a root", () => {
+    expect(() => tickGraphElapsed(null, 1_000)).not.toThrow();
   });
 });
 

@@ -131,6 +131,22 @@ export function formatScore(score) {
   return Number(score).toFixed(2);
 }
 
+/**
+ * An elapsed span, held to seven characters at its widest so a berth plate can
+ * reserve the column before a reading exists. Sub-minute keeps a decimal
+ * because a fast agent's whole life is a few seconds; past a minute the decimal
+ * is noise.
+ *
+ * Lives here rather than in fleet.js, where it started, because the fleet row,
+ * the run header, and the berth plate all print it and a formatter shared three
+ * ways is a formatter, not a fleet concern.
+ */
+export function formatDuration(elapsedMs) {
+  const seconds = Math.max(0, elapsedMs) / 1_000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
+}
+
 function largestWeight(breakdown) {
   return Math.max(
     ...breakdown.map((dimension) => Number(dimension.weight) || 0),

@@ -254,6 +254,65 @@ describe("roads and berths", () => {
     expect(new Set(slots).size).toBe(slots.length);
   });
 
+  test("a berth packed right of its depth carries its dependents with it", () => {
+    // The s168 tree: api/03 forces api/09 and api/04 off their own depths, which
+    // packs api/08 to slot 7. studio/02 depends on api/08 and sat at slot 6, so
+    // its crossover ran back up the pane, right to left.
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+      makeNode("api/03", "api", "03", ["api/01"]),
+      makeNode("api/04", "api", "04", ["api/02", "api/03"]),
+      makeNode("api/08", "api", "08", ["api/03", "api/02"]),
+      makeNode("api/09", "api", "09", ["api/02"]),
+      makeNode("studio/01", "studio", "01"),
+      makeNode("studio/02", "studio", "02", ["studio/01", "api/08"]),
+    ];
+    const layout = layoutGraph(nodes);
+
+    expect(layout.positions.get("studio/02").slot).toBeGreaterThan(
+      layout.positions.get("api/08").slot,
+    );
+  });
+
+  test("every drawn edge runs left to right", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01"),
+      makeNode("api/02", "api", "02", ["api/01"]),
+      makeNode("api/03", "api", "03", ["api/01"]),
+      makeNode("api/04", "api", "04", ["api/02", "api/03"]),
+      makeNode("ui/01", "ui", "01"),
+      makeNode("ui/02", "ui", "02", ["ui/01", "api/04"]),
+      makeNode("ops/01", "ops", "01", ["ui/02"]),
+      makeNode("ops/02", "ops", "02", ["api/02"]),
+    ];
+    const layout = layoutGraph(nodes);
+
+    for (const node of nodes) {
+      for (const dependency of node.dependsOn) {
+        expect(layout.positions.get(node.ref).slot).toBeGreaterThan(
+          layout.positions.get(dependency).slot,
+        );
+      }
+    }
+  });
+
+  test("a cycle still settles instead of chasing its own slots", () => {
+    const nodes = [
+      makeNode("api/01", "api", "01", ["api/02"]),
+      makeNode("api/02", "api", "02", ["api/01"]),
+      makeNode("ui/01", "ui", "01", ["api/01"]),
+    ];
+    const layout = layoutGraph(nodes);
+
+    // Everything downstream of a cycle is left unsettled with it, by the depth
+    // pass's own rule — the slot pass must not hang on any of them.
+    expect(layout.cyclic.sort()).toEqual(["api/01", "api/02", "ui/01"]);
+    for (const ref of ["api/01", "api/02", "ui/01"]) {
+      expect(Number.isFinite(layout.positions.get(ref).slot)).toBe(true);
+    }
+  });
+
   test("renders the road name in both gutters", () => {
     const nodes = [makeNode("api/01", "api", "01")];
     const svg = renderGraph(nodes, layoutGraph(nodes));
@@ -557,33 +616,46 @@ describe("the berth plate", () => {
     );
   });
 
-  test("the token column is held open before a reading arrives", () => {
+  test("both figure columns are held open before a reading arrives", () => {
     // Sizing the plate to the readings actually present would reflow the whole
-    // panel the first time a task reports, under a reader watching the run. So
-    // the column is reserved from the start, and the widest count the formatter
-    // produces still clears the ref when it lands.
-    const layout = layoutGraph(nodes);
-    const svg = renderGraph(nodes, layout, {
+    // panel the first time a task reports, under a reader watching the run —
+    // and the elapsed figure reports every second. So both columns are reserved
+    // from the start, and the widest pair the formatters produce still fits.
+    const bare = layoutGraph(nodes);
+    const reported = layoutGraph(nodes, {
       usage: { byTask: { "api/01": { cacheWrite: 145_000 } } },
     });
-    const refX = Number(svg.match(/class="graph-ref"[^>]*x="([\d.]+)"/)[1]);
+
+    expect(reported.geometry.berthWidth).toBe(bare.geometry.berthWidth);
+
+    const svg = renderGraph(nodes, bare, {
+      usage: { byTask: { "api/01": { cacheWrite: 145_000 } } },
+      elapsed: { "api/01": { ms: 754_000, live: false } },
+    });
     const tokenX = Number(
       svg.match(/class="graph-tokens"[^>]*x="([\d.]+)"/)[1],
     );
-    const plate = layout.positions.get("api/01");
+    const elapsedX = Number(
+      svg.match(/class="graph-elapsed"[^>]*x="([\d.]+)"/)[1],
+    );
+    const plate = bare.positions.get("api/01");
 
     expect(svg).toContain(">145.0K</text>");
-    // Both inside the plate: ref set off the leading edge, token against the
-    // trailing one, with the ref's own six characters of room between them.
-    expect(refX).toBeGreaterThan(plate.x);
-    expect(tokenX).toBeLessThan(plate.x + layout.geometry.berthWidth);
-    expect(tokenX - refX).toBeGreaterThan("api/01".length * 14 * 0.85 * 0.6);
+    expect(svg).toContain(">12m 34s</text>");
+    // The figures set against opposite edges of the same line, and the widest
+    // pair still clears: six token characters plus seven elapsed ones.
+    expect(tokenX).toBeGreaterThan(plate.x);
+    expect(elapsedX).toBeLessThanOrEqual(plate.x + bare.geometry.berthWidth);
+    expect(elapsedX - tokenX).toBeGreaterThan(
+      "145.0K".length * 14 * 0.75 * 0.6,
+    );
   });
 
-  test("the ref and the token ride inside the plate, on its centre line", () => {
+  test("the ref takes the first line and the two figures the second", () => {
     const layout = layoutGraph(nodes);
     const svg = renderGraph(nodes, layout, {
       usage: { byTask: { "api/01": { cacheWrite: 145_000 } } },
+      elapsed: { "api/01": { ms: 5_400, live: false } },
     });
     const plate = layout.positions.get("api/01");
     const height = Number(
@@ -593,13 +665,55 @@ describe("the berth plate", () => {
     const tokenY = Number(
       svg.match(/class="graph-tokens"[^>]*y="([\d.]+)"/)[1],
     );
+    const elapsedY = Number(
+      svg.match(/class="graph-elapsed"[^>]*y="([\d.]+)"/)[1],
+    );
 
-    for (const y of [refY, tokenY]) {
+    for (const y of [refY, tokenY, elapsedY]) {
       expect(y).toBeGreaterThan(plate.y);
       expect(y).toBeLessThan(plate.y + height);
     }
-    // One line, so they share a baseline and read as one record.
-    expect(refY).toBe(tokenY);
+    // Two lines, and the two figures share the lower one.
+    expect(refY).toBeLessThan(tokenY);
+    expect(tokenY).toBe(elapsedY);
+    // The block is centred on the plate. Measured on the lines themselves, not
+    // their baselines: each baseline sits 0.35 of its own type size below its
+    // line's centre, and the two lines are set at different sizes, so the
+    // baselines are asymmetric even when the block they belong to is not.
+    const refHeight = 14 * 0.85;
+    const figureHeight = 14 * 0.75;
+    const blockTop = refY - refHeight * 0.35 - refHeight / 2;
+    const blockBottom = elapsedY - figureHeight * 0.35 + figureHeight / 2;
+
+    // One decimal, because the render trims its coordinates to two — the two
+    // baselines round independently, so an exact match is not on offer. A real
+    // asymmetry here is whole pixels, not hundredths.
+    expect(blockTop - plate.y).toBeCloseTo(plate.y + height - blockBottom, 1);
+  });
+
+  test("a plate with no reading yet carries neither figure", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+
+    expect(svg).toContain('class="graph-ref"');
+    expect(svg).not.toContain('class="graph-tokens"');
+    expect(svg).not.toContain('class="graph-elapsed"');
+  });
+
+  test("a running task stamps its start so the figure can tick in place", () => {
+    const layout = layoutGraph(nodes);
+    const running = renderGraph(nodes, layout, {
+      elapsed: { "api/01": { ms: 30_000, live: true, startMs: 1_700_000_000 } },
+    });
+    const settled = renderGraph(nodes, layout, {
+      elapsed: {
+        "api/01": { ms: 30_000, live: false, startMs: 1_700_000_000 },
+      },
+    });
+
+    expect(running).toContain('data-elapsed-since="1700000000"');
+    // A finished task never ticks again, so it carries no start to tick from.
+    expect(settled).not.toContain("data-elapsed-since");
+    expect(settled).toContain(">30.0s</text>");
   });
 
   test("state lights the leading edge, and leaves the plate body readable", () => {
@@ -772,13 +886,13 @@ describe("panel extent", () => {
 
     test("gaps compress so the panel fits the pane", () => {
       const natural = layoutGraph(oneRoad);
-      const fitted = layoutGraph(oneRoad, { availableWidth: 1_550 });
+      const fitted = layoutGraph(oneRoad, { availableWidth: 1_300 });
 
-      expect(natural.extent.width).toBeGreaterThan(1_550);
-      expect(fitted.extent.width).toBeLessThanOrEqual(1_550);
+      expect(natural.extent.width).toBeGreaterThan(1_300);
+      expect(fitted.extent.width).toBeLessThanOrEqual(1_300);
       expect(fitted.geometry.slotGap).toBeLessThan(natural.geometry.slotGap);
-      // The plate itself never shrinks — it has to hold a full `bucket/NN`
-      // and its token side by side.
+      // The plate itself never shrinks — its first line has to hold a full
+      // `bucket/NN` and its second the two figures.
       const [first, second] = [...fitted.positions.values()];
       expect(fitted.geometry.berthWidth).toBe(natural.geometry.berthWidth);
       expect(second.x - first.x - fitted.geometry.berthWidth).toBe(
@@ -802,7 +916,7 @@ describe("panel extent", () => {
     });
 
     test("the render lands on the geometry the layout fitted", () => {
-      const layout = layoutGraph(oneRoad, { availableWidth: 1_550 });
+      const layout = layoutGraph(oneRoad, { availableWidth: 1_300 });
       const svg = renderGraph(oneRoad, layout);
       const railStart = Number(svg.match(/class="rail"[^>]*x1="([\d.]+)"/)[1]);
       const housing = Number(svg.match(/class="housing" x="([\d.]+)"/)[1]);

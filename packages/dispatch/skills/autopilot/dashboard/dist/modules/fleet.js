@@ -1,5 +1,6 @@
 import {
   escapeHtml,
+  formatDuration,
   formatScore,
   formatTokens,
   freshTokens,
@@ -194,12 +195,6 @@ export function connectEvents({ onFleet, onState }) {
   };
 }
 
-export function formatDuration(elapsedMs) {
-  const seconds = Math.max(0, elapsedMs) / 1_000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
-}
-
 /**
  * The one derived value we own is the elapsed display.
  *
@@ -251,6 +246,51 @@ export function runElapsed(rows, nowMs = Date.now()) {
     ),
   );
   return { ms: endMs - startMs, live: false };
+}
+
+/**
+ * How long each task held the route: earliest start to now while any of its
+ * agents is in flight, else to its last finish. One clock per task, so the five
+ * concurrent review lenses count once between them rather than five times — the
+ * berth's question is how long the task took, not how much agent time it burned,
+ * which is what its token figure already answers.
+ *
+ * `runElapsed` does the derivation; this only groups by ref, so the plan-wide
+ * figure in the header and a berth's own figure can never disagree about what
+ * elapsed means. `startMs` rides along so a live berth can be ticked in place.
+ */
+export function elapsedByTask(rows, nowMs = Date.now()) {
+  const byRef = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row.ref || !row.startedAt) continue;
+    const forRef = byRef.get(row.ref);
+    if (forRef) forRef.push(row);
+    else byRef.set(row.ref, [row]);
+  }
+
+  const elapsed = {};
+  for (const [ref, rowsForRef] of byRef) {
+    const total = runElapsed(rowsForRef, nowMs);
+    if (!total) continue;
+    elapsed[ref] = { ...total, startMs: nowMs - total.ms };
+  }
+  return elapsed;
+}
+
+/**
+ * Advance every live berth's elapsed text in place.
+ *
+ * The panel is an SVG string rebuilt whole on every data frame, so ticking it
+ * that way would re-lay every path and plate once a second to move seven
+ * characters — and would fight the hover highlight, which lives in classes the
+ * render does not know about. The start time rides on the element instead.
+ */
+export function tickGraphElapsed(root, nowMs = Date.now()) {
+  for (const text of root?.querySelectorAll?.("[data-elapsed-since]") ?? []) {
+    text.textContent = formatDuration(
+      nowMs - Number(text.dataset.elapsedSince),
+    );
+  }
 }
 
 export function isFleetCollapsed() {
