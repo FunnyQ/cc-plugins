@@ -280,10 +280,18 @@ Return a one-paragraph summary of what you did.`
 // External-engine dev driver — used when CFG.devEngine is 'codex' or 'opencode'.
 // The agent does NOT hand-write the implementation; it has the external CLI write
 // it via our thin `<engine>-run.ts delegate` wrapper, or optionally via relay in a
-// visible herdr live pane, then lints the task file and reports what landed. It
-// does NOT run the task's Verification commands — the independent verify agent
-// immediately downstream is the binary gate, the driver's return value is
-// discarded, and the driver has no lever to act on red output anyway. The driver
+// visible herdr live pane, then lints the task file and reports what landed. The
+// DRIVER does NOT run the task's Verification commands — the independent verify
+// agent immediately downstream is the binary gate, the driver's return value is
+// discarded, and the driver has no lever to act on red output anyway.
+// The DELEGATE does run them, and step 3 hands it the commands to run: it holds
+// the shell and the working tree, so it is the only party that can act on red
+// output. Copying the Acceptance criteria without the Verification commands used
+// to give it the claim it is graded on but not the command that proves it —
+// measured over one 47-task flight, 13 of 23 retried tasks failed at the FIRST
+// verify, on commands the engine had never been shown. That is also why step 3
+// forbids editing a command or a test to reach green: the verifier re-runs the
+// same commands, so a weakened test would clear both gates. The driver
 // reads the command stdout only — it never mines temp/transcript files. The driver feeds the CLI the full
 // task context so it never needs to pause for clarification (it runs non-interactively).
 // If the CLI is unreachable the driver must NOT fabricate code — it reports failure
@@ -298,7 +306,7 @@ You are the ${engine.label.toUpperCase()} DEV DRIVER for flightplan task ${ref} 
 1. Read the task file at ${path} and every file in its "Required reading". Note its "Files to create / modify" list and "Implementation notes".
 2. ${STATUS_RULE} Tell the external engine to leave it in-progress too.
 ${NO_COMMIT_RULE}
-3. Build the ${engine.label} instruction from the task file — copy its Goal, "Files to create / modify", Implementation notes, and Acceptance criteria across as they are written, and tell ${engine.label} to implement the task fully and stay strictly within the listed files. Include the no-commit rule in that instruction, in your own words but with the same force: ${engine.label} writes the working tree and would otherwise commit its own work. It runs non-interactively, so give it EVERYTHING up front; it can never ask you anything.
+3. Build the ${engine.label} instruction from the task file — copy its Goal, "Files to create / modify", Implementation notes, Acceptance criteria, and ## Verification commands across as they are written, and tell ${engine.label} to implement the task fully and stay strictly within the listed files. Tell it to RUN the Verification commands itself and keep working until they pass before it reports back — it holds the shell and the working tree, so it is the only party that can act on red output. Tell it in the same instruction that those commands and the tests they run are FIXED: it fixes the code until a command passes, and never edits, weakens, or skips the command or a test to get there. Include the no-commit rule in that instruction, in your own words but with the same force: ${engine.label} writes the working tree and would otherwise commit its own work. It runs non-interactively, so give it EVERYTHING up front; it can never ask you anything.
    INSTRUCTION SHAPE — three things must never appear in that file. (a) Implementation code you wrote: no ready-to-paste source for the files ${engine.label} is meant to create. A delegate that transcribes your code delivers your solution, and the only reason an external engine writes this task is to get one Claude did not author — pass the task file's notes and let it solve. (b) A softened gate: never reword, weaken, or drop an Acceptance criteria or a Verification command, and never tell ${engine.label} to skip one because it failed or looked unrunnable before. A gate you believe is wrong is a plan defect — leave it standing and let the binary gate judge the result. (c) A claim that existing work is already correct.${attempt > 1 ? `
    RETRY — this is attempt ${attempt}. The previous attempt was rejected:
 ${feedback}

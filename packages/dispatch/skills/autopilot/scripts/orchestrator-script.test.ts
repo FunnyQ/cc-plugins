@@ -1510,6 +1510,31 @@ describe("orchestrator commit ownership", () => {
     expect(prompt).not.toContain("Verification commands YOURSELF");
   });
 
+  // The DELEGATE is the opposite case: it holds the shell and the working tree,
+  // so it is the only party that can act on red output. Copying Acceptance
+  // criteria without the Verification commands hands it the claim it is graded
+  // on but not the command that proves it — measured on one 47-task flight,
+  // 13 of 23 retried tasks failed at the first verify, on commands the engine
+  // had never been shown.
+  test("the delegate instruction carries the verification commands and runs them", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+    const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+    // Assert the COPY LIST, not a bare "## Verification" — that string already
+    // occurs in the driver's own "do NOT run" sentence and would pass either way.
+    expect(prompt).toContain(
+      'copy its Goal, "Files to create / modify", Implementation notes, Acceptance criteria, and ## Verification commands',
+    );
+    expect(prompt).toContain("RUN the Verification commands itself");
+    // Inviting the engine to chase green is what makes this guard load-bearing:
+    // the downstream verifier re-runs the SAME commands, so a weakened test
+    // passes both gates and the corruption survives the loop.
+    expect(prompt).toContain("never edits, weakens, or skips");
+  });
+
   // Rejection feedback names what failed, and a driver left to "fold it in"
   // freely reads that as permission to route around it — dropping the failing
   // command and telling the delegate the previous code was already correct.
