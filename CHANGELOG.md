@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 3.22.4] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.4`_
+
+### Added
+- Each berth on the dependency graph now shows its wall-clock elapsed time, updating live once a second while the task runs, so you can see how long a task has been going without leaving the panel.
+
+### Fixed
+- The dependency graph no longer draws backwards or zero-length crossovers — a berth now always sits past every task it depends on, so a dependency line reads left-to-right instead of doubling back on itself. The panel runs slightly wider as a result, which is the tradeoff for edges that read correctly.
+
 ## [dispatch 3.22.3] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.3`_
