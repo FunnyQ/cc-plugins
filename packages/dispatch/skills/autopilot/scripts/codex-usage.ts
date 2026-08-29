@@ -7,6 +7,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, sep } from "node:path";
+import { fleetIdentity } from "./fleet";
 import { nextCursor, readRange, splitCompleteLines } from "./tail";
 import { addCounts, emptyCounts, type AgentUsage } from "./usage-types";
 
@@ -270,6 +271,22 @@ function toEpochMs(iso: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+/**
+ * Whether the flightlog still reports this agent's row running. An agent whose opening
+ * prompt named no task or role has no fleet identity at all, so it can never be one of
+ * the open rows and keeps the ordinary window.
+ */
+function isOpen(
+  agent: AgentUsage,
+  openIdentities: ReadonlySet<string> | undefined,
+): boolean {
+  if (openIdentities === undefined) return false;
+  if (agent.task === null || agent.role === null) return false;
+  return openIdentities.has(
+    fleetIdentity(agent.task, agent.role, agent.attempt),
+  );
+}
+
 /** Whether `cwd` is at or under `root`, on a segment boundary. */
 function insideRepo(cwd: string | null, root: string): boolean {
   if (cwd === null) return false;
@@ -299,11 +316,21 @@ function insideRepo(cwd: string | null, root: string): boolean {
  * A run matching neither is dropped rather than spread across the plan: codex sessions
  * the user started by hand share the repo, and folding those in would silently inflate
  * whichever task happened to be running.
+ *
+ * `openIdentities` carries the fleet identities the flightlog still reports in flight,
+ * and it exists because a driver waiting on the codex CLI writes nothing while it
+ * waits: its `lastAt` is the moment it shelled out, which is *before* the rollout it is
+ * waiting on even opens. Closing the window there hid every live delegation until its
+ * driver returned — and with several drivers in flight, only the one still writing (a
+ * relay live pane it polls) showed a figure. For an open identity the window has no
+ * end; the moment the driver finishes, `lastAt` and the relay directory both land and
+ * the ordinary joins take over.
  */
 export function attachCodexUsage(
   agents: AgentUsage[],
   runs: CodexRun[],
   repoRoot: string,
+  options?: { openIdentities?: ReadonlySet<string> },
 ): AgentUsage[] {
   const folded = agents.map((agent) => ({
     ...agent,
@@ -359,9 +386,11 @@ export function attachCodexUsage(
       // An agent already paired by relay directory drove that run, not this one.
       if (claimed.has(agent)) continue;
       const startMs = toEpochMs(agent.startedAt);
-      const endMs = toEpochMs(agent.lastAt);
-      if (startMs === null || endMs === null) continue;
-      if (runMs < startMs || runMs > endMs) continue;
+      if (startMs === null || runMs < startMs) continue;
+      if (!isOpen(agent, options?.openIdentities)) {
+        const endMs = toEpochMs(agent.lastAt);
+        if (endMs === null || runMs > endMs) continue;
+      }
       const distance = runMs - startMs;
       // Ties break on file path so the pairing is deterministic across calls.
       if (

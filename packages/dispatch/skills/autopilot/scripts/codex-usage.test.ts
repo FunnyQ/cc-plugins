@@ -237,6 +237,58 @@ describe("attachCodexUsage", () => {
     expect(driver!.codexCounts).toBeUndefined();
   });
 
+  test("a driver still in flight claims a run that started after its last write", () => {
+    // The driver blocks on the codex CLI, so its transcript stops before the rollout
+    // it is waiting on even opens.
+    const [driver] = attachCodexUsage(
+      [agent({ file: "/a1.jsonl", externalDriver: true })],
+      [run({ startedAt: "2026-08-29T09:30:00.000Z" })],
+      "/repo",
+      { openIdentities: new Set(["work/01|dev|1"]) },
+    );
+    expect(driver!.codexCounts?.cacheWrite).toBe(5000);
+  });
+
+  test("only the identities the flightlog reports open get the endless window", () => {
+    const [driver] = attachCodexUsage(
+      [agent({ file: "/a1.jsonl", externalDriver: true })],
+      [run({ startedAt: "2026-08-29T09:30:00.000Z" })],
+      "/repo",
+      { openIdentities: new Set(["work/02|dev|1"]) },
+    );
+    expect(driver!.codexCounts).toBeUndefined();
+  });
+
+  test("two drivers in flight take one run each, nearest start first", () => {
+    const agents = [
+      agent({
+        file: "/a1.jsonl",
+        externalDriver: true,
+        startedAt: "2026-08-29T08:00:00.000Z",
+        lastAt: "2026-08-29T08:10:00.000Z",
+      }),
+      agent({
+        file: "/a2.jsonl",
+        task: "work/02",
+        externalDriver: true,
+        startedAt: "2026-08-29T08:20:00.000Z",
+        lastAt: "2026-08-29T08:25:00.000Z",
+      }),
+    ];
+    const attached = attachCodexUsage(
+      agents,
+      [
+        run({ file: "/r1.jsonl", startedAt: "2026-08-29T08:30:00.000Z" }),
+        run({ file: "/r2.jsonl", startedAt: "2026-08-29T08:31:00.000Z" }),
+      ],
+      "/repo",
+      { openIdentities: new Set(["work/01|dev|1", "work/02|dev|1"]) },
+    );
+    // Both billed, neither doubled: the later driver takes the first run it fits.
+    expect(attached[1]!.codexCounts?.cacheWrite).toBe(5000);
+    expect(attached[0]!.codexCounts?.cacheWrite).toBe(5000);
+  });
+
   test("one driver takes at most one run by window, so two cannot double-bill it", () => {
     const agents = [
       agent({ file: "/a1.jsonl", externalDriver: true }),

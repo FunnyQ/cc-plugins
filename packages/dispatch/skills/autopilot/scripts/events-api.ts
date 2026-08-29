@@ -117,6 +117,18 @@ export function eventsHandler(
     options?.codexSource ?? createCodexSource(options?.codexRoot);
   const repoRoot = repoRootOf(planDir);
 
+  // The identities the flightlog still reports running. A driver blocked on the codex
+  // CLI writes nothing while it waits, so its own last transcript line lands before the
+  // rollout it is waiting on opens and cannot bound it — see attachCodexUsage. Derived
+  // from the same aggregate the frame renders, so "in flight" means one thing here.
+  function openIdentities(): Set<string> {
+    const open = new Set<string>();
+    for (const row of aggregateFleet(entries)) {
+      if (row.status === "in-flight") open.add(row.identity);
+    }
+    return open;
+  }
+
   function readAgents(): AgentUsage[] {
     try {
       const agents = usageSource.read();
@@ -124,7 +136,9 @@ export function eventsHandler(
       // Wrapped separately: a codex tree that cannot be read must cost the Claude
       // figures nothing, so its failure falls back to the un-attached agents.
       try {
-        return attachCodexUsage(agents, codexSource.read(), repoRoot);
+        return attachCodexUsage(agents, codexSource.read(), repoRoot, {
+          openIdentities: openIdentities(),
+        });
       } catch {
         return agents;
       }
