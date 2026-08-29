@@ -74,6 +74,10 @@ let graphLayout;
 let graphStructure = "";
 let graphNodes = [];
 let graphPane = "";
+// The berth whose route is currently set, and whether a redraw was held back
+// while it was — see updateGraph.
+let hoverRef = null;
+let graphHeld = false;
 
 /**
  * The pane's content box. The panel spreads its roads into the height and
@@ -118,7 +122,23 @@ function updateGraph(tasks) {
   // box joins the structure in that key because the roads spread to fill its
   // height and the gaps compress to fit its width, so a resize is the one other
   // thing that has to move them.
-  if (!graphLayout || structure !== graphStructure || pane !== graphPane) {
+  const moved =
+    !graphLayout || structure !== graphStructure || pane !== graphPane;
+
+  // Hold the panel still while a reader holds a route. petite-vue owns the SVG
+  // through v-html, so any redraw swaps the whole tree and takes the hover
+  // classes with it — and the fleet frame (2s) and the tree poll (3s) interleave
+  // to about one wipe a second. The route is worth more than a token figure that
+  // is seconds old, so a redraw that only changes figures waits for the pointer
+  // to leave. A relayout cannot wait — the coordinates would be wrong — so it
+  // redraws and repaints the route instead.
+  if (hoverRef !== null && !moved) {
+    graphNodes = graphTasks;
+    graphHeld = true;
+    return;
+  }
+
+  if (moved) {
     graphLayout = layoutGraph(graphTasks, box);
     graphStructure = structure;
     graphPane = pane;
@@ -133,13 +153,31 @@ function updateGraph(tasks) {
     elapsed: elapsedByTask(fleetState.rows),
   });
   graphNodes = graphTasks;
+  graphHeld = false;
+  // petite-vue flushes the swap in a microtask; repainting in the frame callback
+  // therefore lands after the new SVG is in the DOM and before it is painted,
+  // so a relayout mid-hover never shows an unlit frame.
+  if (hoverRef !== null) requestAnimationFrame(repaintRoute);
+}
+
+function repaintRoute() {
+  const container = document.querySelector(".deck-top");
+  if (!container) return;
+  // The held ref can be gone after a structural redraw — a route to a berth that
+  // no longer exists would dim the whole panel and light nothing.
+  const focus =
+    hoverRef !== null && graphNodes.some(({ ref }) => ref === hoverRef)
+      ? { ref: hoverRef, lit: relatedRefs(graphNodes, hoverRef) }
+      : null;
+  paintLineage(container, focus);
 }
 
 /**
- * Hover lineage. The SVG is replaced wholesale on every poll, so the handlers
+ * Hover lineage. The SVG is replaced wholesale on every redraw, so the handlers
  * live on the container that survives — one listener pair, not one per node.
  * Classes go on the elements rather than inline styles so the CSS owns how a
- * dimmed node looks, and a redraw mid-hover simply clears them.
+ * dimmed node looks. A redraw would clear them, which is why updateGraph holds
+ * the redraw back while a route is set.
  */
 function litRefs(target) {
   const node = target?.closest?.(".graph-berth");
@@ -179,12 +217,18 @@ function paintLineage(container, focus) {
 function bindGraphHover(container) {
   container.addEventListener("pointerover", (event) => {
     const focus = litRefs(event.target);
-    if (focus) paintLineage(container, focus);
+    if (!focus) return;
+    hoverRef = focus.ref;
+    paintLineage(container, focus);
   });
   container.addEventListener("pointerout", (event) => {
     // Leaving one node for another fires out before over; only clear when the
     // pointer has actually left every node.
-    if (!litRefs(event.relatedTarget)) paintLineage(container, null);
+    if (litRefs(event.relatedTarget)) return;
+    hoverRef = null;
+    paintLineage(container, null);
+    // Whatever the panel held back while the route was set lands now.
+    if (graphHeld) updateGraph(store.tree.tasks);
   });
 }
 
