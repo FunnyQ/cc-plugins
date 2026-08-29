@@ -32,6 +32,9 @@ function agent(overrides: Partial<AgentUsage> & { file: string }): AgentUsage {
     role: "dev",
     attempt: 1,
     startedAt: "2026-08-28T00:00:00.000Z",
+    lastAt: "2026-08-28T00:00:00.000Z",
+    relayDirs: [],
+    externalDriver: false,
     models: ["claude-haiku-4-5-20251001"],
     counts: counts(1, 1),
     ...overrides,
@@ -331,6 +334,9 @@ describe("attributeUsage — rollup", () => {
       unattributed: counts(0, 0, 0, 0),
       totals: counts(0, 0, 0, 0),
       agentCount: 0,
+      codexByTask: {},
+      codexTotals: counts(0, 0, 0, 0),
+      codexRunCount: 0,
     });
   });
 

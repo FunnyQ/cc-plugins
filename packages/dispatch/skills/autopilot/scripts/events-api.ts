@@ -9,8 +9,17 @@ import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
 import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import {
+  attachCodexUsage,
+  createCodexSource,
+  type CodexSource,
+} from "./codex-usage";
 import { attributeUsage } from "./usage-attribute";
-import { createTranscriptSource, type TranscriptSource } from "./usage-source";
+import {
+  createTranscriptSource,
+  repoRootOf,
+  type TranscriptSource,
+} from "./usage-source";
 import type { AgentUsage, UsageRollup } from "./usage-types";
 
 const SNAPSHOT_DEBOUNCE_MS = 250;
@@ -79,7 +88,12 @@ export function eventsHandler(
   request: Request,
   logPath: string,
   planDir: string,
-  options?: { projectsRoot?: string; source?: TranscriptSource },
+  options?: {
+    projectsRoot?: string;
+    source?: TranscriptSource;
+    codexRoot?: string;
+    codexSource?: CodexSource;
+  },
 ): Response {
   let fileWatcher: FSWatcher | null = null;
   let directoryWatcher: FSWatcher | null = null;
@@ -97,10 +111,23 @@ export function eventsHandler(
   // re-read incremental. Two open tabs get two sources with independent cursors.
   const usageSource =
     options?.source ?? createTranscriptSource(planDir, options?.projectsRoot);
+  // The codex side is optional in the same way: a plan with no external engine gets
+  // an empty list, and the join then attaches nothing.
+  const codexSource =
+    options?.codexSource ?? createCodexSource(options?.codexRoot);
+  const repoRoot = repoRootOf(planDir);
 
   function readAgents(): AgentUsage[] {
     try {
-      return usageSource.read();
+      const agents = usageSource.read();
+      if (repoRoot === null) return agents;
+      // Wrapped separately: a codex tree that cannot be read must cost the Claude
+      // figures nothing, so its failure falls back to the un-attached agents.
+      try {
+        return attachCodexUsage(agents, codexSource.read(), repoRoot);
+      } catch {
+        return agents;
+      }
     } catch {
       // A broken token panel must not take the fleet panel down with it.
       return [];

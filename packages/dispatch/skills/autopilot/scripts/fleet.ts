@@ -101,6 +101,12 @@ export type FleetRow = {
   outcome?: GateOutcome;
   /** Tokens burned. Absent (never 0) when no transcript paired — render as unavailable. */
   usage?: TokenCounts;
+  /**
+   * Tokens the external codex CLI burned for this row, kept apart from `usage` so the
+   * cheap driver and the expensive delegate stay separately readable. Absent when the
+   * row drove no external engine.
+   */
+  codexUsage?: TokenCounts;
 };
 
 /** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */

@@ -113,11 +113,18 @@ function buildRollup(agents: AgentUsage[]): UsageRollup {
   // lookup — on a plain `{}` it resolves to an inherited value instead of `undefined`
   // and the accumulate below writes counts onto `Object.prototype`.
   const byTask: Record<string, TokenCounts> = Object.create(null);
+  const codexByTask: Record<string, TokenCounts> = Object.create(null);
   const unattributed = emptyCounts();
   const totals = emptyCounts();
+  const codexTotals = emptyCounts();
+  let codexRunCount = 0;
 
   for (const agent of agents) {
     addCounts(totals, agent.counts);
+    if (agent.codexCounts) {
+      addCounts(codexTotals, agent.codexCounts);
+      codexRunCount++;
+    }
     if (agent.task === null) {
       addCounts(unattributed, agent.counts);
       continue;
@@ -130,9 +137,28 @@ function buildRollup(agents: AgentUsage[]): UsageRollup {
       byTask[agent.task] = taskCounts;
     }
     addCounts(taskCounts, agent.counts);
+
+    // A task with no external engine gets no key at all, so the panel can tell
+    // "codex did not run here" from "codex ran and cost nothing".
+    if (agent.codexCounts) {
+      let taskCodex = codexByTask[agent.task];
+      if (taskCodex === undefined) {
+        taskCodex = emptyCounts();
+        codexByTask[agent.task] = taskCodex;
+      }
+      addCounts(taskCodex, agent.codexCounts);
+    }
   }
 
-  return { byTask, unattributed, totals, agentCount: agents.length };
+  return {
+    byTask,
+    unattributed,
+    totals,
+    agentCount: agents.length,
+    codexByTask,
+    codexTotals,
+    codexRunCount,
+  };
 }
 
 /**
@@ -150,19 +176,30 @@ export function attributeUsage(
   // on `undefined` meaning "no data" and `0` meaning "measured zero" — an
   // external-engine agent must never read as a row that burned nothing.
   const usageByRow = new Map<FleetRow, TokenCounts>();
+  // Separate map, not a field on the one above: a row can have Claude usage and no
+  // codex run, and the two absences must stay independently expressible.
+  const codexByRow = new Map<FleetRow, TokenCounts>();
 
   for (const [identity, groupRows] of rowGroups) {
     const groupAgents = agentGroups.get(identity);
     if (!groupAgents) continue;
     const pairing = pairGroup(groupRows, groupAgents);
     for (const [rowIndex, agentIndex] of pairing) {
-      usageByRow.set(groupRows[rowIndex]!, groupAgents[agentIndex]!.counts);
+      const row = groupRows[rowIndex]!;
+      const agent = groupAgents[agentIndex]!;
+      usageByRow.set(row, agent.counts);
+      if (agent.codexCounts) codexByRow.set(row, agent.codexCounts);
     }
   }
 
   const newRows = rows.map((row) => {
     const usage = usageByRow.get(row);
-    return usage === undefined ? { ...row } : { ...row, usage };
+    const codexUsage = codexByRow.get(row);
+    return {
+      ...row,
+      ...(usage === undefined ? {} : { usage }),
+      ...(codexUsage === undefined ? {} : { codexUsage }),
+    };
   });
 
   return { rows: newRows, rollup: buildRollup(agents) };

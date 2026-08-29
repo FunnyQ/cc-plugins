@@ -29,6 +29,9 @@ function agent(overrides: Partial<AgentUsage> = {}): AgentUsage {
     role: "dev",
     attempt: undefined,
     startedAt: "2026-08-01T00:00:00.000Z",
+    lastAt: "2026-08-01T00:00:00.000Z",
+    relayDirs: [],
+    externalDriver: false,
     models: ["claude-haiku-4-5-20251001"],
     counts: counts(10),
     ...overrides,
@@ -65,6 +68,9 @@ describe("formatFleetFrame", () => {
         unattributed: emptyCounts(),
         totals: emptyCounts(),
         agentCount: 0,
+        codexByTask: {},
+        codexTotals: emptyCounts(),
+        codexRunCount: 0,
       },
     });
   });
@@ -81,6 +87,9 @@ describe("formatFleetFrame", () => {
       unattributed: emptyCounts(),
       totals: counts(10),
       agentCount: 1,
+      codexByTask: {},
+      codexTotals: emptyCounts(),
+      codexRunCount: 0,
     });
   });
 
@@ -166,6 +175,9 @@ describe("eventsHandler", () => {
         unattributed: emptyCounts(),
         totals: emptyCounts(),
         agentCount: 0,
+        codexByTask: {},
+        codexTotals: emptyCounts(),
+        codexRunCount: 0,
       });
     } finally {
       controller.abort();
