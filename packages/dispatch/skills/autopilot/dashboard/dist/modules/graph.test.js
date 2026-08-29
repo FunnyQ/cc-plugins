@@ -226,10 +226,10 @@ describe("roads and berths", () => {
 
 describe("crossover routing", () => {
   // The regression this suite exists for: contract/02 -> server/04 drove its
-  // diagonal straight through server/03's segment on the first render.
-  // b/03 sits two slots along, so the span is wide enough to hold the drop at
-  // 45 degrees. A crossover with no room falls back to a straight line by
-  // design — the connection matters more than the angle.
+  // change of road straight through server/03's segment on the first render.
+  // b/03 sits two slots along, so the span is wide enough to hold the drop. A
+  // crossover with no room falls back to a straight line by design — the
+  // connection matters more than the shape.
   const nodes = [
     makeNode("a/01", "a", "01"),
     makeNode("b/01", "b", "01"),
@@ -237,31 +237,124 @@ describe("crossover routing", () => {
     makeNode("b/03", "b", "03", ["a/01"]),
   ];
 
+  // Every point in `M / L / C / L` carries a comma, so this reads the two ends,
+  // the two control points, and the two straight leads' turn points.
+  const pathPoints = (svg, from, to) => {
+    const d = svg.match(
+      new RegExp(`data-from="${from}" data-to="${to}"[^>]*d="([^"]+)"`),
+    )[1];
+    return [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(([, x, y]) => [
+      Number(x),
+      Number(y),
+    ]);
+  };
+
   test("changes road inside a gap, never over another berth", () => {
     const layout = layoutGraph(nodes);
     const turnX = layout.turns.get("a/01->b/03");
-    const options = { berthWidth: 14 * 7, slotGap: 14 * 4 };
+    const { berthWidth } = layout.geometry;
 
     expect(turnX).toBeGreaterThan(0);
     for (const [ref, p] of layout.positions) {
       if (ref === "a/01" || ref === "b/03") continue;
-      const covers = turnX > p.x && turnX < p.x + options.berthWidth;
+      const covers = turnX > p.x && turnX < p.x + berthWidth;
       expect(covers).toBe(false);
     }
   });
 
-  test("holds 45 degrees: the diagonal's run equals its drop", () => {
+  test("the change of road happens inside the reserved gap", () => {
+    /*
+     * The load-bearing invariant, and the one thing the shape change must not
+     * cost: track never crosses a berth.
+     *
+     * The 45-degree diagonal had to spend its own vertical drop in horizontal
+     * reach to hold its angle, so it routinely overflowed the gap `turns`
+     * reserved — the gap check protected the roads it crossed, and the overflow
+     * was tolerated. The curve owes nothing to that ratio, so it is held to the
+     * gap exactly. A free-angle bezier between the two berths would abandon this
+     * outright and sweep over the plates on the roads in between.
+     */
     const layout = layoutGraph(nodes);
     const svg = renderGraph(nodes, layout);
-    const d = svg.match(/data-from="a\/01" data-to="b\/03"[^>]*d="([^"]+)"/)[1];
-    const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(([, x, y]) => [
-      Number(x),
-      Number(y),
-    ]);
+    const pts = pathPoints(svg, "a\\/01", "b\\/03");
+    const { slotGap } = layout.geometry;
+    const turnX = layout.turns.get("a/01->b/03");
 
-    expect(pts.length).toBe(4);
-    const [, [x2, y2], [x3, y3]] = pts;
-    expect(Math.abs(x3 - x2)).toBeCloseTo(Math.abs(y3 - y2), 5);
+    // Ends, control points and all: the whole curve lives in the reserved gap.
+    for (const [x] of pts.slice(1, -1)) {
+      expect(x).toBeGreaterThanOrEqual(turnX - slotGap / 2);
+      expect(x).toBeLessThanOrEqual(turnX + slotGap / 2);
+    }
+    // And it starts and finishes on the two roads' own lines. Read back off the
+    // layout, not restated — the rendered path is trimmed to two decimals, so
+    // an arithmetic copy of the road's y misses it by a float's last digit.
+    const railY = (ref) => layout.roads[layout.positions.get(ref).road].y;
+    expect(pts[1][1]).toBeCloseTo(railY("a/01"), 1);
+    expect(pts.at(-2)[1]).toBeCloseTo(railY("b/03"), 1);
+  });
+
+  test("both ends leave and meet their road horizontally", () => {
+    // Track that meets track at an angle is a kink. The control points sit on
+    // their own endpoint's y, which is what pins both tangents flat.
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+    const [, [, turnInY], [, leadInY], [, leadOutY], [, turnOutY]] = pathPoints(
+      svg,
+      "a\\/01",
+      "b\\/03",
+    );
+
+    expect(leadInY).toBe(turnInY);
+    expect(leadOutY).toBe(turnOutY);
+  });
+
+  test("the curve stays inside its footprint, at any ease", () => {
+    /*
+     * A bezier is contained by the convex hull of its control points, so keeping
+     * all four x's inside the footprint keeps the whole curve inside the column
+     * the routing reserved. That is the property the ease clamp exists for — an
+     * ease past 1 would push the leading control point out of the column and the
+     * curve would bulge over whatever sits beside it.
+     *
+     * Control points crossing each other past ease 0.5 is not a reversal and is
+     * deliberately not asserted against: x stays monotonic for every ease in
+     * range, and the curve only steepens through the middle.
+     */
+    const layout = layoutGraph(nodes);
+    for (const crossoverEase of [0, 0.5, 1, 4]) {
+      const pts = pathPoints(
+        renderGraph(nodes, layout, { crossoverEase }),
+        "a\\/01",
+        "b\\/03",
+      );
+      const [, [left], , , [right]] = pts;
+
+      for (const [x] of pts.slice(1, -1)) {
+        expect(x).toBeGreaterThanOrEqual(left);
+        expect(x).toBeLessThanOrEqual(right);
+      }
+    }
+  });
+
+  test("the ease bends the curve without moving its ends", () => {
+    const layout = layoutGraph(nodes);
+    const ends = (crossoverEase) => {
+      const pts = pathPoints(
+        renderGraph(nodes, layout, { crossoverEase }),
+        "a\\/01",
+        "b\\/03",
+      );
+      return [pts.at(0), pts.at(1), pts.at(-2), pts.at(-1)];
+    };
+
+    expect(ends(0.8)).toEqual(ends(0.2));
+    // But the shape between them did change.
+    const control = (crossoverEase) =>
+      pathPoints(
+        renderGraph(nodes, layout, { crossoverEase }),
+        "a\\/01",
+        "b\\/03",
+      )[2][0];
+    expect(control(0.8)).toBeGreaterThan(control(0.2));
   });
 });
 
@@ -334,7 +427,7 @@ describe("the running line inside a bucket", () => {
     const link = svg.match(/class="graph-link"[^>]*>/)[0];
     // Berth edge to berth edge, so the lit route has no break in it.
     expect(Number(link.match(/x1="([\d.]+)"/)[1])).toBe(
-      layout.positions.get("api/01").x + 14 * 7,
+      layout.positions.get("api/01").x + layout.geometry.berthWidth,
     );
     expect(Number(link.match(/x2="([\d.]+)"/)[1])).toBe(
       layout.positions.get("api/02").x,
@@ -370,7 +463,7 @@ describe("the running line inside a bucket", () => {
     ]);
     // Stops at the intervening berth, resumes past it, covers neither of it.
     expect(edges[0][1]).toBe(blocker.x);
-    expect(edges[1][0]).toBe(blocker.x + 14 * 7);
+    expect(edges[1][0]).toBe(blocker.x + layout.geometry.berthWidth);
     for (const [x1, x2] of edges) {
       expect(x2).toBeGreaterThan(x1);
     }
@@ -388,20 +481,98 @@ describe("the running line inside a bucket", () => {
   });
 });
 
-describe("berth seams", () => {
-  test("each berth is closed at both ends so a lit run stays countable", () => {
-    const nodes = [
-      makeNode("api/01", "api", "01"),
-      makeNode("api/02", "api", "02", ["api/01"]),
-    ];
-    const layout = layoutGraph(nodes);
-    const svg = renderGraph(nodes, layout);
+describe("the berth plate", () => {
+  const nodes = [
+    makeNode("api/01", "api", "01"),
+    makeNode("api/02", "api", "02", ["api/01"]),
+  ];
 
-    expect((svg.match(/class="graph-seam"/g) ?? []).length).toBe(4);
-    for (const { x } of layout.positions.values()) {
-      expect(svg).toContain(`class="graph-seam" x1="${x}"`);
-      expect(svg).toContain(`class="graph-seam" x1="${x + 14 * 7}"`);
+  test("the plate is sized to the longest ref, and every plate shares it", () => {
+    const short = layoutGraph([makeNode("a/01", "a", "01")]).geometry
+      .berthWidth;
+    const long = layoutGraph([
+      makeNode("provisioning/01", "provisioning", "01"),
+      makeNode("a/01", "a", "01"),
+    ]).geometry.berthWidth;
+
+    expect(long).toBeGreaterThan(short);
+    // Whole pixels, and one width for the whole panel: every berth's x is the
+    // gutter plus a multiple of the stride, so a per-node width would stop
+    // slots reading as columns across roads.
+    expect(Number.isInteger(long)).toBe(true);
+    const layout = layoutGraph(nodes);
+    const [first, second] = [...layout.positions.values()];
+    expect(second.x - first.x).toBe(
+      layout.geometry.berthWidth + layout.geometry.slotGap,
+    );
+  });
+
+  test("the token column is held open before a reading arrives", () => {
+    // Sizing the plate to the readings actually present would reflow the whole
+    // panel the first time a task reports, under a reader watching the run. So
+    // the column is reserved from the start, and the widest count the formatter
+    // produces still clears the ref when it lands.
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout, {
+      usage: { byTask: { "api/01": { output: 145_000 } } },
+    });
+    const refX = Number(svg.match(/class="graph-ref"[^>]*x="([\d.]+)"/)[1]);
+    const tokenX = Number(
+      svg.match(/class="graph-tokens"[^>]*x="([\d.]+)"/)[1],
+    );
+    const plate = layout.positions.get("api/01");
+
+    expect(svg).toContain(">145.0K</text>");
+    // Both inside the plate: ref set off the leading edge, token against the
+    // trailing one, with the ref's own six characters of room between them.
+    expect(refX).toBeGreaterThan(plate.x);
+    expect(tokenX).toBeLessThan(plate.x + layout.geometry.berthWidth);
+    expect(tokenX - refX).toBeGreaterThan("api/01".length * 14 * 0.85 * 0.6);
+  });
+
+  test("the ref and the token ride inside the plate, on its centre line", () => {
+    const layout = layoutGraph(nodes);
+    const svg = renderGraph(nodes, layout, {
+      usage: { byTask: { "api/01": { output: 145_000 } } },
+    });
+    const plate = layout.positions.get("api/01");
+    const height = Number(
+      svg.match(/class="segment"[^>]*height="([\d.]+)"/)[1],
+    );
+    const refY = Number(svg.match(/class="graph-ref"[^>]*y="([\d.]+)"/)[1]);
+    const tokenY = Number(
+      svg.match(/class="graph-tokens"[^>]*y="([\d.]+)"/)[1],
+    );
+
+    for (const y of [refY, tokenY]) {
+      expect(y).toBeGreaterThan(plate.y);
+      expect(y).toBeLessThan(plate.y + height);
     }
+    // One line, so they share a baseline and read as one record.
+    expect(refY).toBe(tokenY);
+  });
+
+  test("state lights the leading edge, and leaves the plate body readable", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+    const body = Number(svg.match(/class="segment"[^>]*width="([\d.]+)"/)[1]);
+    const edge = Number(svg.match(/class="status"[^>]*width="([\d.]+)"/)[1]);
+
+    expect(edge).toBeGreaterThan(0);
+    expect(edge).toBeLessThan(body / 10);
+  });
+
+  test("the rail keeps its own weight now the plate stands on it", () => {
+    const svg = renderGraph(nodes, layoutGraph(nodes));
+    const rail = Number(svg.match(/class="rail" stroke-width="([\d.]+)"/)[1]);
+    const plate = Number(svg.match(/class="segment"[^>]*height="([\d.]+)"/)[1]);
+
+    // A rail drawn at the plate's height is a bar, not a running line.
+    expect(rail).toBeLessThan(plate);
+    // The links and crossovers are track too, and draw at the rail's weight.
+    const link = Number(
+      svg.match(/class="graph-link" stroke-width="([\d.]+)"/)[1],
+    );
+    expect(link).toBe(rail);
   });
 });
 
@@ -524,20 +695,24 @@ describe("panel extent", () => {
 
     test("gaps compress so the panel fits the pane", () => {
       const natural = layoutGraph(oneRoad);
-      const fitted = layoutGraph(oneRoad, { availableWidth: 1_100 });
+      const fitted = layoutGraph(oneRoad, { availableWidth: 1_550 });
 
-      expect(natural.extent.width).toBeGreaterThan(1_100);
-      expect(fitted.extent.width).toBeLessThanOrEqual(1_100);
+      expect(natural.extent.width).toBeGreaterThan(1_550);
+      expect(fitted.extent.width).toBeLessThanOrEqual(1_550);
       expect(fitted.geometry.slotGap).toBeLessThan(natural.geometry.slotGap);
-      // The berth itself never shrinks — it has to hold a full `bucket/NN`.
+      // The plate itself never shrinks — it has to hold a full `bucket/NN`
+      // and its token side by side.
       const [first, second] = [...fitted.positions.values()];
-      expect(second.x - first.x - 14 * 7).toBe(fitted.geometry.slotGap);
+      expect(fitted.geometry.berthWidth).toBe(natural.geometry.berthWidth);
+      expect(second.x - first.x - fitted.geometry.berthWidth).toBe(
+        fitted.geometry.slotGap,
+      );
     });
 
     test("compression stops at the floor rather than crushing the gap", () => {
       const crushed = layoutGraph(oneRoad, { availableWidth: 120 });
 
-      expect(crushed.geometry.slotGap).toBe(14 * 2.5);
+      expect(crushed.geometry.slotGap).toBe(14 * 4);
       // Past the floor the panel simply overruns and the pane scrolls.
       expect(crushed.extent.width).toBeGreaterThan(120);
     });
@@ -545,12 +720,12 @@ describe("panel extent", () => {
     test("a pane wider than the panel never stretches it", () => {
       const roomy = layoutGraph(oneRoad, { availableWidth: 5_000 });
 
-      expect(roomy.geometry.slotGap).toBe(14 * 4);
+      expect(roomy.geometry.slotGap).toBe(14 * 6);
       expect(roomy.extent.width).toBe(layoutGraph(oneRoad).extent.width);
     });
 
     test("the render lands on the geometry the layout fitted", () => {
-      const layout = layoutGraph(oneRoad, { availableWidth: 1_100 });
+      const layout = layoutGraph(oneRoad, { availableWidth: 1_550 });
       const svg = renderGraph(oneRoad, layout);
       const railStart = Number(svg.match(/class="rail"[^>]*x1="([\d.]+)"/)[1]);
       const housing = Number(svg.match(/class="housing" x="([\d.]+)"/)[1]);

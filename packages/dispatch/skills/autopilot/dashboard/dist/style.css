@@ -427,39 +427,54 @@ button {
     text-anchor: start;
   }
 
-  /* A berth is a lit block of track, so it takes the road's weight and its own
-     state's lit value. Only the four states that mean something get a colour;
-     an unset berth stays the road's own dark. */
+  /* A berth is a plate standing on the road, carrying its own ref and token.
+     State is still lit rather than filled — the leading edge takes the full lit
+     value and the plate body a held-down wash of the same hue, so a road reads
+     as a row of records whose left edges are the signal. A plate filled solid
+     at the lit value would put white-on-green text at the one contrast the
+     panel cannot afford at 2am.
+
+     `--berth-state` is the one variable each state sets. Everything downstream
+     mixes off it, so a new state is one declaration, not four. */
+  .graph-berth {
+    --berth-state: var(--unlit-berth);
+  }
+
   .graph-berth > .segment {
-    fill: var(--unlit-berth);
+    fill: color-mix(in oklab, var(--berth-state) 22%, var(--ground));
+    stroke: color-mix(in oklab, var(--berth-state) 45%, var(--ground));
+    stroke-width: var(--border-width);
+    transition:
+      fill var(--motion-duration),
+      stroke var(--motion-duration);
+  }
+
+  .graph-berth > .status {
+    fill: var(--berth-state);
     transition: fill var(--motion-duration);
   }
 
-  /* Every berth's ends, so a run of lit neighbours stays countable. */
-  .graph-seam {
-    stroke: var(--ground);
-    stroke-width: var(--border-width);
+  .graph-berth.-done {
+    --berth-state: var(--lit-done);
+  }
+  .graph-berth.-in-progress {
+    --berth-state: var(--lit-flight);
+  }
+  .graph-berth.-ready {
+    --berth-state: var(--lit-ready);
+  }
+  .graph-berth.-blocked {
+    --berth-state: var(--unlit-berth);
+  }
+  .graph-berth.-alert,
+  .graph-berth.-invalid,
+  .graph-berth.-cyclic {
+    --berth-state: var(--lit-alert);
   }
 
-  .graph-berth.-done > .segment {
-    fill: var(--lit-done);
-  }
-  .graph-berth.-in-progress > .segment {
-    fill: var(--lit-flight);
-  }
-  .graph-berth.-ready > .segment {
-    fill: var(--lit-ready);
-  }
-  .graph-berth.-blocked > .segment {
-    fill: var(--unlit-berth);
-  }
-  .graph-berth.-alert > .segment,
-  .graph-berth.-invalid > .segment,
-  .graph-berth.-cyclic > .segment {
-    fill: var(--lit-alert);
-  }
-
-  .graph-berth.-in-progress > .segment {
+  /* The pulse rides the leading edge alone. On the whole plate it dragged the
+     ref and the token in and out of legibility once a second. */
+  .graph-berth.-in-progress > .status {
     animation: flight-pulse var(--flight-duration) ease-in-out infinite;
   }
 
@@ -522,8 +537,12 @@ button {
     text-anchor: middle;
   }
 
+  /* Both live inside the plate, so they set against its edges rather than
+     centring: ref off the leading edge, token against the trailing one. The
+     tokens then form a column down each road and can be compared by shape. */
   .graph-ref {
     font-weight: 600;
+    text-anchor: start;
   }
 
   /* Untiered — a berth totals several agents, so the fleet's per-agent
@@ -532,6 +551,7 @@ button {
     fill: var(--muted);
     font-weight: 700;
     letter-spacing: 0.03em;
+    text-anchor: end;
   }
 
   .graph-cycle-label {
@@ -553,7 +573,7 @@ button {
      lineage end to end — the approved hover comp. Everything off the route
      drops to the panel's own dark rather than fading out, because an unlit
      segment is a real state on this instrument, not an absence. */
-  &.-focus .graph-berth:not(.-lit) > .segment,
+  &.-focus .graph-berth:not(.-lit) > :is(.segment, .status),
   &.-focus :is(.graph-crossover, .graph-link):not(.-lit) {
     opacity: 0.18;
   }
@@ -1255,6 +1275,21 @@ button {
 @container (inline-size < 690px) {
   .fleet-table {
     overflow-x: auto;
+  }
+
+  /* `overflow-x: auto` forces `overflow-y` to `auto` — the pair cannot be split
+     — so the table becomes a scroll container and the column header's nearest
+     scrollport stops being `.deck-fleet` and becomes the table itself. Its
+     offset was measured to clear the heading, which is outside that scrollport,
+     so it stopped clearing anything and simply pushed the header 44px down,
+     leaving a blank band under the title bar.
+
+     The header cannot stick here in any case: the table has no height of its
+     own, so its scrollport never moves vertically and there is nothing for
+     `sticky` to react to. Pinning it to 0 costs a behaviour that this width had
+     already lost, and buys back the band. */
+  .fleet-columns {
+    inset-block-start: 0;
   }
 }
 

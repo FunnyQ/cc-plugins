@@ -140,28 +140,36 @@ components:
   graph-rail:
     backgroundColor: "{colors.unlit}"
     height: "11.9px"
-    note: "SVG line at berth height, butt caps, full pane width"
+    note: "SVG line, butt caps, full pane width; links and crossovers match it"
+  graph-crossover-curve:
+    note: "cubic S changing road inside one reserved gap; control points at 0.5 of the gap width, both pinned to their endpoint's y so each end leaves horizontally"
   graph-berth:
-    backgroundColor: "{colors.unlit-berth}"
+    backgroundColor: "color-mix(in oklab, {state} 22%, {colors.ground})"
+    borderColor: "color-mix(in oklab, {state} 45%, {colors.ground})"
     rounded: "{rounded.sm}"
-    width: "98px"
-    height: "11.9px"
+    width: "content-derived, min 98px"
+    height: "26.6px"
+    note: "a plate carrying its own ref and token; one shared width per panel"
+  graph-berth-edge:
+    backgroundColor: "{state}"
+    width: "4.2px"
+    note: "the lit leading edge — the plate body is a wash of the same hue"
   graph-berth-done:
-    backgroundColor: "{colors.lit-done}"
+    state: "{colors.lit-done}"
   graph-berth-in-progress:
-    backgroundColor: "{colors.lit-flight}"
+    state: "{colors.lit-flight}"
   graph-berth-ready:
-    backgroundColor: "{colors.lit-ready}"
+    state: "{colors.lit-ready}"
   graph-berth-blocked:
-    backgroundColor: "{colors.unlit-berth}"
+    state: "{colors.unlit-berth}"
   graph-berth-alert:
-    backgroundColor: "{colors.lit-alert}"
+    state: "{colors.lit-alert}"
   graph-signal-housing:
     backgroundColor: "{colors.ground}"
     rounded: "{rounded.sm}"
-    width: "14.7px"
-    height: "35.7px"
-    note: "1px rule stroke; three 4.2px lamps, one lit, the other two at lamp-dark"
+    width: "17.5px"
+    height: "44.8px"
+    note: "1px rule stroke; three 4.76px lamps, one lit, the other two at lamp-dark"
 ---
 
 # Design System: Hangar
@@ -214,7 +222,7 @@ The panel's own tokens, defined on `.dependency-graph` and used nowhere else on 
 
 - **Lit** steps mix the pinned state toward `white` in oklab at 78% (done, flight), 70% (ready), and 72% (alert), resolving to `#82b772`, `#d19f6c`, `#85b6bd`, and `#ff9890`.
 - **Unlit** (`45%` blocked in ground → `#293038`) is the rail — every road, every unset crossover, every unset running line.
-- **Unlit berth** (`75%` blocked in ground → `#3d4752`) sits exactly one step above the rail. The two shared a value in the first build and a blocked task vanished outright, which failed the panel's whole job.
+- **Unlit berth** (`75%` blocked in ground → `#3d4752`) sits exactly one step above the rail, and is what a blocked plate lights its leading edge with. The two shared a value in the first build and a blocked task vanished outright, which failed the panel's whole job.
 - **Cleared crossover** (`50%` done in ground → `#345430`) is a fourth resting value: a diagonal whose source task is done is already tinted green at rest, before anything is hovered.
 - **Lamp dark** (`30%` blocked in ground → `#20252b`) is the two unlit lamps on every signal head. They are what makes the third one legible as an aspect rather than as a dot.
 
@@ -241,11 +249,11 @@ The shipped capture is a completed run (15 of 15 done, 0 in flight, 0 ready, 0 b
 
 **The Toward-Ground Rule.** Lit steps mix toward white; unlit steps mix toward `--ground`. An "unlit" colour that mixes toward a surface floats off the panel instead of receding into it.
 
-**The Recede-Without-Vanishing Rule.** Blocked is the quietest state and still has to be findable, because "what is holding this up" is the question the panel exists to answer. An unlit berth is always at least one value step above the rail it sits on.
+**The Recede-Without-Vanishing Rule.** Blocked is the quietest state and still has to be findable, because "what is holding this up" is the question the panel exists to answer. An unlit berth's **leading edge** is always at least one value step above the rail the plate sits on. The plate body sits below the rail — that is what lets the ref inside it stay legible — so the edge is the piece carrying the rule, and it is the piece that must never be tuned down.
 
 **The No-Third-Accent Rule.** Five state colours, and that is the whole set. A new state reuses an existing colour or is carried by shape. Purple, violet, and neon belong to the cockpit's world and must never appear here.
 
-**The Colour-With-A-Label Rule.** Colour never travels alone. Every coloured figure on the deck carries a label, a count, or a shape — a status dot beside a number, a badge with its role text, a berth with its ref beneath it.
+**The Colour-With-A-Label Rule.** Colour never travels alone. Every coloured figure on the deck carries a label, a count, or a shape — a status dot beside a number, a badge with its role text, a berth plate with its ref set inside it.
 
 ## Typography
 
@@ -278,7 +286,7 @@ The deck is a three-row viewport grid: header (auto), task view (`minmax(40vh, 1
 
 The header is a six-column grid — identity, progress ring, elapsed, tokens, counts, view toggle — sticky at the top, with an error or loading strip spanning the full width beneath it when there is one.
 
-**The panel fits the pane, in both axes.** `paneBox()` measures the graph pane's content box off the DOM and hands both numbers to `layoutGraph`. The roads spread into the measured height, capped at `fontSize * 9` so a band never grows past about twice the ink it carries; the gaps between berths compress into the measured width, floored at `fontSize * 2.5` so a signal head can still stand in one. The gutter is sized to the longest road name's own ink rather than a flat allowance, capped at `fontSize * 9`. `layoutGraph` returns the two fitted values on `layout.geometry` and `renderGraph` reads them back, so nothing re-derives them independently and lands the signal heads where the berths are not. A berth itself never shrinks — it holds a full `bucket/NN` at a legible size or the panel scrolls.
+**The panel fits the pane, in both axes.** `paneBox()` measures the graph pane's content box off the DOM and hands both numbers to `layoutGraph`. The roads spread into the measured height, capped at `fontSize * 9` so a band never grows past about twice the ink it carries; the gaps between berths compress into the measured width, floored at `fontSize * 4` — the gap is a crossover's entire horizontal reach, so below about that a change of road has no room to be a curve and reads as a kink in the rail. The gutter is sized to the longest road name's own ink rather than a flat allowance, capped at `fontSize * 9`. `layoutGraph` returns the two fitted values on `layout.geometry` and `renderGraph` reads them back, so nothing re-derives them independently and lands the signal heads where the berths are not. The plate width is the third fitted value: one shared width for the whole panel, taken from the longest ref plus a six-character token column, so the stride stays uniform and slots keep reading as columns across roads. It has no cap — a gutter is a flat allowance and can be capped without lying, but a plate that cannot fit its own ref renders a truncated task id. Past the pane the panel scrolls.
 
 Two container queries handle the density thresholds: the lane strip drops to one full-width lane below 600px, and the fleet table scrolls horizontally below 690px. At the 899px viewport breakpoint the whole deck stops being a fixed-height grid and stacks into a scrolling page, the header collapses to two columns, and the counts wrap to a five-column row.
 
@@ -306,17 +314,19 @@ One declaration, and it is not depth: the header carries `box-shadow: 0 1px 0 va
 
 ## Shapes
 
-Rectangles. The radius scale stops at 4px (`--radius-md`), used on lane and task cards, and 2px (`--radius-sm`) for everything smaller — berth segments, signal housings, badges, status dots, the view toggle. Nothing is a pill and nothing is a circle except the progress ring, which is a stroked arc rather than a filled disc.
+Rectangles. The radius scale stops at 4px (`--radius-md`), used on lane and task cards, and 2px (`--radius-sm`) for everything smaller — berth plates, signal housings, badges, status dots, the view toggle. Nothing is a pill and nothing is a circle except the progress ring, which is a stroked arc rather than a filled disc.
 
-The panel's form language is stricter still. It has **exactly two angles**: horizontal, and 45 degrees. A crossover is a horizontal run, a 45-degree diagonal, and a horizontal run, and holding to those two is what lets the eye follow one line across a field of thirty others. A free-angle line between the same two points is a wire, and a panel of wires is the node-graph editor this direction refuses. The angle gives way only when the reserved gap is too narrow to fit the drop at 45, in which case the diagonal takes the whole span — a missing crossover is a lie about the plan, a steeper one is only untidy.
+The crossover's curvature is not on that scale and is not an exception to it. The scale governs the corner of a **box**, where a large radius is what turns a panel into a deck of cards; a crossover is a **line** changing direction, which is what real track does and what no card radius can express.
 
-Strokes are `butt`-capped and `miter`-joined; every track element is drawn at exactly the berth's own height, so a road, a running line, a crossover, and a berth all read as the same physical rail.
+The panel had **exactly two angles** — horizontal and 45 degrees — through every version up to this one, on the grounds that holding to two is what lets the eye follow one line across a field of thirty others. The crossover is now a curve, and that rule is broken rather than bent. It is recorded here instead of quietly dropped because the reasoning still holds for everything else on the panel, and because what replaced it was tried the cautious way first and failed: a 45-degree diagonal with its two corners filleted is a change the eye cannot find, since any radius small enough to leave the 45 visibly straight hides inside the 11.9px stroke. What the rule still forbids is a **free-angle line between the two berths** — a bezier drawn end to end is a wire, and a panel of wires is the node-graph editor this direction refuses.
+
+Strokes are `butt`-capped; a crossover joins its roads tangentially and no other track element has a corner to join. Every track element is drawn at exactly `fontSize * 0.85` = 11.9px, so a road, a running line, and a crossover all read as the same physical rail. The berth plate stands on that rail rather than being a length of it, and is the one panel element that does not share the weight.
 
 ### Named Rules
 
-**The Two-Angle Rule.** Horizontal and 45 degrees. No curve, no bezier, no free angle.
+**The One-Curve Rule.** Every line on the panel is horizontal, except the crossover, which is a cubic S confined to one reserved gap. No free angle, and no second curved element without the same argument being made again.
 
-**The Same-Rail Rule.** Every track element shares one stroke weight — the berth height. A dependency drawn thinner than the road reads as an annotation about the plan rather than as part of it.
+**The Same-Rail Rule.** Every track element shares one stroke weight — 11.9px. A dependency drawn thinner than the road reads as an annotation about the plan rather than as part of it. The rail carried the berth's own height while a berth *was* a length of rail; the two are separate quantities now that the plate stands on it.
 
 ## Components
 
@@ -328,18 +338,18 @@ The default view, and the deck's centre. A railway NX entrance-exit signalling d
 | --- | --- |
 | running road, named in both gutters | bucket |
 | berth segment on a road | task |
-| diagonal crossover at 45° | a dependency that leaves its own bucket |
+| S-curve crossover through one gap | a dependency that leaves its own bucket |
 | the running line inside one road | a dependency that stays in its bucket |
 | three-aspect signal head | the gate at a task's entry |
 | cleared / occupied / unset / at danger | done / in-flight / ready / blocked |
 | one route lit end to end | the hovered task's lineage |
 
 - **Roads** are drawn first and run the full pane width at the berth's own weight, so a berth always sits on a line that exists whether or not the plan reaches that far along it. The bucket name is set in mono uppercase at both ends, mirrored, `text-anchor: end` on the left and `start` on the right.
-- **Berths** are 98 × 11.9px bars with a 2px radius, positioned at dependency depth along their bucket's road. Vertical position is bucket and only bucket — a task never leaves its road, which is what makes a crossover mean "this dependency left its bucket" rather than "the layout needed the room". A ground-coloured 1px seam marks both ends of every berth so a run of lit neighbours stays countable instead of fusing into one bar.
-- **The ref** hangs beneath each berth in mono 600, and the token count beneath that in mono 700, coloured by tier — muted below 80K, flight amber at 80K, alert coral at 200K, and nothing at all when there was no measurement.
-- **Signal heads** stand in the gap before any berth that has something to clear first: a 14.7 × 35.7px ground-filled housing with a 1px rule stroke, carrying three 4.2px lamps in the real top-to-bottom order (green, yellow, red), one lit and two dark. The housing is opaque and centred on the line, so the rail passes behind it as it does behind a real backplate. The aspect follows the task's own progression — clear for done, danger for blocked or cyclic, caution otherwise.
-- **Crossovers** carry only the dependencies that leave their bucket, and only the ones the transitive reduction keeps. Each changes roads inside a gap no berth occupies, chosen as early as it can, so track never crosses a berth.
-- **A cycle** paints its members alert, labels each `CYCLE` above the berth, and prints the member refs along the bottom edge.
+- **Berths** are plates 26.6px tall with a 2px radius, one shared width across the panel, positioned at dependency depth along their bucket's road. Vertical position is bucket and only bucket — a task never leaves its road, which is what makes a crossover mean "this dependency left its bucket" rather than "the layout needed the room". State is lit rather than filled: a 4.2px leading edge at the full lit value, the plate body a 22% wash of the same hue over ground, and a 45% edge stroke. A plate filled solid at the lit value would put white-on-green text at the one contrast this panel cannot afford at 2am.
+- **The ref and the token ride inside the plate**, on one baseline: the ref in mono 600 set off the leading edge, the count in mono 700 muted against the trailing one. The counts then form a column down each road and can be compared without being read. They hung beneath the berth as two free lines until the plate arrived, which split every task into a coloured bar over here and an identity over there and made the reader pair the two up before a single berth could be read. The count is drawn in one ink no matter how large — a berth totals several agents, so the fleet's per-agent tiers would paint every plate on a real run — and is omitted entirely when there was no measurement. Its column is held open from the start whether or not a reading has arrived, because sizing the plate to the readings present would reflow the whole panel the first time a task reports, under a reader watching the run.
+- **Signal heads** stand in the gap before any berth that has something to clear first: a 17.5 × 44.8px ground-filled housing with a 1px rule stroke, carrying three 4.76px lamps in the real top-to-bottom order (green, yellow, red), one lit and two dark. A head shorter than the plate reads as a fitting hanging off it rather than a signal standing beside it. The housing is opaque and centred on the line, so the rail passes behind it as it does behind a real backplate. The aspect follows the task's own progression — clear for done, danger for blocked or cyclic, caution otherwise.
+- **Crossovers** carry only the dependencies that leave their bucket, and only the ones the transitive reduction keeps. Each changes roads inside a gap no berth occupies, chosen as early as it can, so track never crosses a berth — and the curve is held to that gap **exactly**, which is a tightening of the old guarantee rather than a relaxation of it. The 45-degree diagonal had to spend its own vertical drop in horizontal reach to hold its angle, so on a panel four roads tall it routinely overflowed the reserved gap, and more often still it could not fit between the two berths at all and fell through to a straight-line fallback. That fallback is why the panel used to draw a curve on almost none of its crossovers. A curve owes nothing to that ratio: it changes road inside one gap however far apart the two roads are.
+- **A cycle** paints its members alert, labels each `CYCLE` above the plate, and prints the member refs along the bottom edge.
 
 Three pieces of `b-throat.png`'s furniture were dropped rather than built, and the shipped capture confirms none of them returned. The comp puts a **direction arrow** at both ends of every road and a **destination label** (`TO NORTH`, `TO SIDINGS`) in the right gutter; the ship has neither, because left-to-right layout already carries direction and the right gutter earns more by mirroring the bucket name. The comp also gives each road a **leading signal head before the first berth**, which would mean a gate on a task with nothing to clear — a head stands only where a dependency does.
 
@@ -373,7 +383,7 @@ One shape for both views: a 4px `surface-2` track, a flat fill in `done` / `aler
 ### Motion
 
 - `--motion-duration: 150ms` on colour and opacity transitions. Nothing moves position.
-- `--flight-duration: 2s` `flight-pulse`, an opacity cycle to 0.45 and back, on the three in-flight markers: the header status dot, the fleet status dot, and an in-flight berth. This animation is **deck-wide and predates the panel redesign** — the two dots have always used it. It is worth naming that a fade is in tension with the panel's own rule that segments light rather than fade; the pulse is retained because it is the deck's one existing "this is happening now" signal and an in-flight berth reading differently from an in-flight fleet row would be worse. It is also the reason the reduced-motion rule below is not optional.
+- `--flight-duration: 2s` `flight-pulse`, an opacity cycle to 0.45 and back, on the three in-flight markers: the header status dot, the fleet status dot, and an in-flight berth's leading edge. This animation is **deck-wide and predates the panel redesign** — the two dots have always used it. It is worth naming that a fade is in tension with the panel's own rule that segments light rather than fade; the pulse is retained because it is the deck's one existing "this is happening now" signal and an in-flight berth reading differently from an in-flight fleet row would be worse. It is also the reason the reduced-motion rule below is not optional.
 - `prefers-reduced-motion: reduce` kills every animation and transition on the deck with one global rule.
 
 ## Do's and Don'ts
@@ -381,12 +391,12 @@ One shape for both views: a 4px `surface-2` track, a flat fill in `done` / `aler
 ### Do:
 - **Do** express state by lighting one hue to a brighter value — lit, base, unlit — and keep the pinned state colour as the base step.
 - **Do** mix lit steps toward `white` and unlit steps toward `--ground`, both in oklab.
-- **Do** keep every unlit berth at least one value step above the rail it sits on.
+- **Do** keep every unlit berth's leading edge at least one value step above the rail its plate sits on.
 - **Do** give every colour a label, a count, or a shape beside it.
 - **Do** derive the panel's geometry and type from `FONT_SIZE = 14`; change the constant, not the individual values.
 - **Do** measure the pane off the DOM for the two quantities that answer to it, and read the fitted values back from `layout.geometry` rather than re-deriving them.
 - **Do** let the pane scroll past the compression floor, and theme its scrollbar from the palette.
-- **Do** hold every line in the panel to horizontal or 45 degrees, at the berth's own stroke weight.
+- **Do** keep every line in the panel horizontal, at the rail's own stroke weight, and leave the crossover as the one thing that curves.
 - **Do** keep monospace as the default voice and reserve the sans face for a human sentence.
 - **Do** convey depth by stepping `ground` → `surface` → `surface-2` with 1px `rule` hairlines.
 

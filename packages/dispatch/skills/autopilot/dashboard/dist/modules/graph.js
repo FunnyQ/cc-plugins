@@ -5,16 +5,19 @@
  * coloured boxes on a canvas. It refuses the node-graph editor this category
  * always ships — and that this file used to be.
  * OWN-WORLD: a railway NX entrance-exit desk on Hangar's near-black ground.
- * Buckets are named running roads; tasks are berth segments on them;
- * cross-bucket dependencies are diagonal crossovers; gates are signal heads.
+ * Buckets are named running roads; tasks are berth plates on them; cross-bucket
+ * dependencies are crossovers changing road; gates are signal heads.
  * State is lit, not filled: every state colour carries lit / base / unlit steps
- * on one hue, by value alone — no gradient, no shadow, no radius above 4px.
+ * on one hue, by value alone — no gradient and no shadow, and no box takes a
+ * corner above 4px. The panel held to exactly two angles — horizontal and 45 —
+ * until the crossover became a curve; that is now its one curved element, and
+ * the rule it broke is recorded rather than quietly dropped.
  * STORY: the reader asks what is holding a task up and what moves when it
  * lands, and reads the answer as one lit line instead of tracing edges.
  * FIRST VIEWPORT: roads stack down the pane with their bucket names in the left
- * and right gutters; berths sit along each road at dependency depth, ref and
- * token beneath; crossovers carry every dependency that leaves its own road;
- * the whole field is lit at rest.
+ * and right gutters; berths sit along each road at dependency depth as plates
+ * carrying their own ref and token, lit down the leading edge; crossovers carry
+ * every dependency that leaves its own road; the whole field is lit at rest.
  * FORM: Interlocking Panel, rank 1 of my grounded list, taken by the user over
  * the roll's assigned Drawing Sheet. Seed key 5e8c7193.
  * Approved comps: .impeccable/mocks/comp/b-throat.png (rest) + c-route.png
@@ -43,29 +46,50 @@ import {
 const FONT_SIZE = 14;
 
 const geometry = (fontSize) => ({
+  // A berth is a berth plate: the ref and the token ride *inside* it, with a
+  // state bar down its leading edge, the way a terminal prints one record per
+  // line. They used to hang beneath as two free-floating lines of text, which
+  // split every task into a coloured bar over here and an identity over there
+  // and made the reader pair them up before a single berth could be read.
+  //
+  // The plate is still a block of track, not a card: it sits ON the rail, keeps
+  // the panel's 2px corner, and takes no shadow and no gradient.
   fontSize,
-  // A berth is a bar, not a box: the panel reads as track, and the ref and the
-  // token hang beneath it the way a berth's identity does on a real diagram.
-  berthWidth: fontSize * 7,
-  berthHeight: fontSize * 0.85,
-  slotGap: fontSize * 4, // between berths along one road (x) — crossovers land here
-  roadPitch: fontSize * 5, // between roads (y) — holds the two label lines
+  berthHeight: fontSize * 2.85,
+  berthPadX: fontSize * 0.55,
+  statusWidth: fontSize * 0.3, // the lit leading edge
+  refGap: fontSize * 0.9, // between the ref and the token inside the plate
+  minBerthWidth: fontSize * 7, // never narrower than the bar it replaced
+  // The running line. It was the berth's own height while a berth *was* the
+  // line; now that the plate stands on it, the two are separate quantities and
+  // the rail keeps the weight it always drew at.
+  railWidth: fontSize * 0.85,
+  slotGap: fontSize * 6, // between berths along one road (x) — crossovers land here
+  roadPitch: fontSize * 5, // between roads (y)
   // A road band never grows past about twice the ink it carries: a signal head
-  // above the line, the berth, its ref and its token. Past that the roads drift
-  // apart and the panel is dead space again, only moved inside itself.
+  // above the line and the berth plate. Past that the roads drift apart and the
+  // panel is dead space again, only moved inside itself.
   maxRoadPitch: fontSize * 9,
-  labelTail: fontSize * 3, // ref and token, hanging under the berth
   gutter: fontSize * 9, // road name, both ends, mirrored as on the comp — a cap
   minGutter: fontSize * 2,
-  // A gap never closes past what a signal head needs to stand in it without
-  // touching either berth: the housing plus a berth's own height of clearance.
-  minSlotGap: fontSize * 2.5,
+  // The gap is now the crossover's entire horizontal reach, not just somewhere
+  // for a signal head to stand, so the floor answers to the curve: below about
+  // this a change of road has no room to be a curve and reads as a kink in the
+  // rail. It was fontSize * 2.5 while the diagonal spent its own drop in reach
+  // and only the head had to fit. Raising it means a long plan reaches the
+  // scroll sooner, which is the trade the panel already takes elsewhere.
+  minSlotGap: fontSize * 4,
   padding: fontSize,
   // A three-aspect head standing on the running line. Tall enough to break the
-  // rail's own silhouette — a lamp the size of the track it sits on is a speck.
-  signalWidth: fontSize * 1.05,
-  signalHeight: fontSize * 2.55,
-  signalLamp: fontSize * 0.3,
+  // plate's own silhouette — a head shorter than the berth reads as a fitting
+  // hanging off it rather than a signal standing beside it.
+  signalWidth: fontSize * 1.25,
+  signalHeight: fontSize * 4,
+  signalLamp: fontSize * 0.34,
+  // How hard a crossover's S-curve bends, as a fraction of the gap it turns in.
+  // Unitless and deliberately not derived from the type size: it shapes a curve
+  // whose footprint is already fixed by that gap, so it rescales with nothing.
+  crossoverEase: 0.5,
 });
 
 /*
@@ -83,6 +107,17 @@ const geometry = (fontSize) => ({
  * where the render's own two-decimal trim then rounds it back out and the
  * coordinates stop matching the layout that produced them.
  */
+// The monospace stack's advance, and the three type sizes drawn against it.
+// One place, because the gutter and the berth plate both size themselves to
+// their own ink and a second copy of 0.6 drifts from the first.
+const MONO_ADVANCE = 0.6;
+const ROAD_NAME_SCALE = 0.8;
+const REF_SCALE = 0.85;
+const TOKEN_SCALE = 0.75;
+
+const advance = (characters, scale, fontSize) =>
+  characters * fontSize * scale * MONO_ADVANCE;
+
 const gutterFor = (roadNames, options) => {
   const longest = Math.max(0, ...roadNames.map((name) => name.length));
   return Math.round(
@@ -90,8 +125,45 @@ const gutterFor = (roadNames, options) => {
       options.gutter,
       Math.max(
         options.minGutter,
-        longest * options.fontSize * 0.8 * 0.6 + options.fontSize,
+        advance(longest, ROAD_NAME_SCALE, options.fontSize) + options.fontSize,
       ),
+    ),
+  );
+};
+
+/*
+ * The plate holds its own text, so its width is that text's width.
+ *
+ * One shared value taken from the longest ref, not a per-node width: every
+ * berth's x is the gutter plus a multiple of the stride, and a per-node width
+ * would break the stride, which is the only reason slots read as columns across
+ * roads. Rounded to a whole pixel for the same reason the gutter is.
+ *
+ * The token column is held at a fixed six characters (`145.0K`) whether or not
+ * a reading has arrived. Sizing it to the readings actually present would
+ * reflow the entire panel the first time a task reports its tokens — and this
+ * panel is read while it runs, so a layout that moves under the reader costs
+ * more than a plate carrying some empty column.
+ *
+ * There is no cap. A gutter is a flat allowance spent on a road name and can be
+ * capped without lying; a plate that cannot fit its own ref renders a truncated
+ * task id, which is a lie about the plan. Past the pane the panel scrolls.
+ */
+const TOKEN_COLUMNS = 6;
+
+const berthWidthFor = (nodes, options) => {
+  const longest = Math.max(
+    0,
+    ...nodes.map(({ ref }) => String(ref ?? "").length),
+  );
+  return Math.round(
+    Math.max(
+      options.minBerthWidth,
+      options.statusWidth +
+        options.berthPadX * 2 +
+        advance(longest, REF_SCALE, options.fontSize) +
+        options.refGap +
+        advance(TOKEN_COLUMNS, TOKEN_SCALE, options.fontSize),
     ),
   );
 };
@@ -197,15 +269,14 @@ export function layoutGraph(nodes, opts = {}) {
    * every one-road plan gets.
    *
    * `headroom` is what a signal head needs above the first running line, and
-   * `footroom` what a berth's ref and token need below the last one. Both are
-   * fixed, so only the space between roads stretches — and only up to
-   * `maxRoadPitch`.
+   * `footroom` what the berth plate needs below the last one. Both are fixed,
+   * so only the space between roads stretches — and only up to `maxRoadPitch`.
    */
   const roadCount = Math.max(roadNames.length, 1);
   const headroom =
     options.padding +
     Math.max(0, options.signalHeight - options.berthHeight) / 2;
-  const footroom = options.berthHeight + options.labelTail + options.padding;
+  const footroom = options.berthHeight + options.padding;
   const spread =
     (options.availableHeight - headroom - footroom) / (roadCount - 1);
   const roadPitch =
@@ -218,22 +289,23 @@ export function layoutGraph(nodes, opts = {}) {
    *
    * The panel fits the pane it is given. `availableWidth` is the pane's content
    * box; without it the panel keeps its natural gap, which is what every test
-   * gets. Only the gaps between berths compress: a berth holds a full
-   * `bucket/NN` at a legible size and never shrinks, and the gutters are already
-   * sized to their own ink. Below `minSlotGap` the panel scrolls instead, which
-   * is the honest answer — `.c-dependency-graph` themes its scrollbar so that
-   * affordance is visible rather than inferred.
+   * gets. Only the gaps between berths compress: a berth plate holds a full
+   * `bucket/NN` and its token at a legible size and never shrinks, and the
+   * gutters are already sized to their own ink. Below `minSlotGap` the panel
+   * scrolls instead, which is the honest answer — `.c-dependency-graph` themes
+   * its scrollbar so that affordance is visible rather than inferred.
    *
    * The gaps are one per slot plus the trailing one the road runs out on.
    */
   const lastSlot = slots.size ? Math.max(...slots.values()) : 0;
   const gutter = opts.gutter ?? gutterFor(roadNames, options);
+  const berthWidth = opts.berthWidth ?? berthWidthFor(orderedNodes, options);
   const gapCount = lastSlot + 2;
   const room =
     (options.availableWidth -
       options.padding * 2 -
       gutter * 2 -
-      (lastSlot + 1) * options.berthWidth) /
+      (lastSlot + 1) * berthWidth) /
     gapCount;
   // Floored for the same reason the gutter is rounded, and floored rather than
   // rounded so the fitted panel never comes out a pixel wider than it measured.
@@ -241,7 +313,7 @@ export function layoutGraph(nodes, opts = {}) {
     ? Math.min(options.slotGap, Math.max(options.minSlotGap, Math.floor(room)))
     : options.slotGap;
 
-  const stride = options.berthWidth + slotGap;
+  const stride = berthWidth + slotGap;
   const positions = new Map();
   for (const node of orderedNodes) {
     positions.set(node.ref, {
@@ -308,11 +380,7 @@ export function layoutGraph(nodes, opts = {}) {
     // Centre of the gap that follows the chosen slot.
     turns.set(
       key,
-      options.padding +
-        gutter +
-        chosen * stride +
-        options.berthWidth +
-        slotGap / 2,
+      options.padding + gutter + chosen * stride + berthWidth + slotGap / 2,
     );
   }
 
@@ -323,13 +391,13 @@ export function layoutGraph(nodes, opts = {}) {
     height: headroom + (roadCount - 1) * roadPitch + footroom,
   };
 
-  // The two quantities that answer to the pane rather than to the type size.
-  // The render reads them back instead of re-deriving from the defaults, which
-  // is how the signal heads and the road ends would otherwise land on a gutter
-  // and a gap the layout never used. Named `fitted`, not `geometry`: the module
-  // already has a `geometry()` builder, and a local of that name here shadows it
-  // for the rest of this function.
-  const fitted = { gutter, slotGap };
+  // The three quantities that answer to the plan and the pane rather than to
+  // the type size. The render reads them back instead of re-deriving from the
+  // defaults, which is how the signal heads and the road ends would otherwise
+  // land on a gutter, a gap and a plate the layout never used. Named `fitted`,
+  // not `geometry`: the module already has a `geometry()` builder, and a local
+  // of that name here shadows it for the rest of this function.
+  const fitted = { gutter, slotGap, berthWidth };
 
   return {
     positions,
@@ -448,35 +516,73 @@ export function drawableEdges(graphNodes, cyclic = new Set()) {
 const trim = (value) => Math.round(value * 100) / 100;
 
 /**
- * A crossover: horizontal run, 45-degree diagonal, horizontal run.
+ * A crossover: horizontal run, an S-curve that changes road, horizontal run.
  *
- * The 45 is the whole discipline. A signalling diagram has exactly two angles,
- * and holding to them is what lets the eye follow one line across a field of
- * thirty others — a free-angle line between the same two points is a wire, and
- * a panel of wires is the node-graph editor this direction refuses.
+ * A signalling diagram has exactly two angles, and the panel held to them until
+ * this: the change of road was a straight 45-degree diagonal, latterly with its
+ * corners filleted. Rounding only the joints turned out to be a change the eye
+ * cannot find — at any radius small enough to leave the 45 visibly straight, the
+ * arc hides inside the 11.9px stroke and the corner still reads as square. So
+ * the whole diagonal becomes the curve. What that costs is real: the panel now
+ * has one shape that is neither horizontal nor 45, and a reader tracing a line
+ * no longer meets only two angles.
  *
- * The diagonal's horizontal reach equals its vertical drop, so the leads are
- * whatever is left over, split evenly. When the gap is too narrow to fit the
- * drop at 45, the diagonal takes the whole span and the angle gives way rather
- * than the connection: a missing crossover is a lie about the plan, a steeper
- * one is only untidy.
+ * The reach is the gap, not the drop. Holding 45 forced the diagonal to spend
+ * its own vertical drop in horizontal reach, and on a panel four roads tall that
+ * was routinely more than the span between the two berths — so most crossovers
+ * fell through to the straight-line fallback and the curve was drawn on almost
+ * none of them. A curve owes nothing to that ratio: it changes road inside the
+ * one gap `turns` reserved however far apart the roads are, which both makes it
+ * visible everywhere and *tightens* the old guarantee. The 45-degree diagonal
+ * overflowed its reserved gap by however much its drop exceeded the gap width;
+ * this cannot leave the gap at all.
+ *
+ * Both ends leave horizontally, because the curve meets a road there and track
+ * that meets track at an angle is a kink. That is what the control points are
+ * doing on their endpoints' own y.
+ *
+ * A free-angle bezier drawn straight between the two berths would abandon the
+ * reserved gap outright, and on a real tree it sweeps over the plates on the
+ * roads in between. That is the shape this is not.
  */
-function crossoverPath(x1, y1, x2, y2, turnX) {
+function crossoverPath(x1, y1, x2, y2, turnX, { ease = 0.5, reach = 0 } = {}) {
   const drop = Math.abs(y2 - y1);
   const span = x2 - x1;
   if (drop === 0) return `M ${trim(x1)},${trim(y1)} L ${trim(x2)},${trim(y2)}`;
 
-  // The diagonal is centred on the reserved gap, so it changes roads in a
-  // column no berth occupies. Clamped to the span so it never doubles back.
-  const centre = Number.isFinite(turnX) ? turnX : x1 + span / 2;
-  const start = Math.min(Math.max(centre - drop / 2, x1), x2 - drop);
-  if (start < x1 || start + drop > x2) {
+  // The change of road is centred on the reserved gap and no wider than it, so
+  // it happens in a column no berth occupies. Clamped to the span as well, for
+  // the crossover whose two berths sit closer together than one gap.
+  const width = Math.min(reach, span);
+  if (!(width > 0)) {
     return `M ${trim(x1)},${trim(y1)} L ${trim(x2)},${trim(y2)}`;
   }
+
+  const centre = Number.isFinite(turnX) ? turnX : x1 + span / 2;
+  const start = Math.min(Math.max(centre - width / 2, x1), x2 - width);
+
+  /*
+   * How far each control point reaches across the curve's own width.
+   *
+   * Pinning both control points to their endpoints' y is what keeps the ends
+   * horizontal, and it also means this can never straighten back into the 45:
+   * at 0 it is the gentlest S the shape allows — a smoothstep — and as it grows
+   * the ends flatten against their roads while the middle steepens.
+   *
+   * Clamped to 1 because that is what holds the footprint. A bezier is contained
+   * by the convex hull of its control points, so while all four x's stay inside
+   * `[start, start + width]` the curve cannot leave the gap the routing reserved
+   * for it; past 1 the leading control point escapes that gap and the curve
+   * bulges out over whatever is beside it. Past 0.5 the two control points do
+   * cross each other, which looks alarming and is not: x stays monotonic for
+   * every ease in range — its derivative bottoms out at `0.5 * (1 - ease)` — so
+   * the curve steepens through the middle rather than doubling back.
+   */
+  const bend = width * Math.min(Math.max(ease, 0), 1);
   return [
     `M ${trim(x1)},${trim(y1)}`,
     `L ${trim(start)},${trim(y1)}`,
-    `L ${trim(start + drop)},${trim(y2)}`,
+    `C ${trim(start + bend)},${trim(y1)} ${trim(start + width - bend)},${trim(y2)} ${trim(start + width)},${trim(y2)}`,
     `L ${trim(x2)},${trim(y2)}`,
   ].join(" ");
 }
@@ -512,9 +618,10 @@ function signalHead(x, y, options, aspect) {
 
 export function renderGraph(nodes, layout, opts = {}) {
   const { usage, ...geometryOpts } = opts;
-  // The layout's own gutter and gap win: it sized them to the road names and to
-  // the pane, and a render that re-derived them from the defaults would put the
-  // signal heads and the road ends somewhere the berths are not.
+  // The layout's own gutter, gap and plate width win: it sized them to the road
+  // names, the refs and the pane, and a render that re-derived them from the
+  // defaults would put the signal heads and the road ends somewhere the berths
+  // are not.
   const options = { ...resolve(geometryOpts), ...(layout.geometry ?? {}) };
   const tokensByRef = usage?.byTask ?? {};
   const graphNodes = Array.isArray(nodes) ? nodes : [];
@@ -536,9 +643,9 @@ export function renderGraph(nodes, layout, opts = {}) {
   const roadLines = roads
     .map(
       (road) => `<g class="graph-road" data-road="${escapeHtml(road.name)}">
-        <line class="rail" stroke-width="${trim(options.berthHeight)}" x1="${trim(trackStart)}" y1="${trim(road.y)}" x2="${trim(trackEnd)}" y2="${trim(road.y)}" />
-        <text class="graph-road-name -left" font-size="${options.fontSize * 0.8}" x="${trim(trackStart - options.fontSize * 0.75)}" y="${trim(road.y + options.fontSize * 0.3)}">${escapeHtml(road.name)}</text>
-        <text class="graph-road-name -right" font-size="${options.fontSize * 0.8}" x="${trim(trackEnd + options.fontSize * 0.75)}" y="${trim(road.y + options.fontSize * 0.3)}">${escapeHtml(road.name)}</text>
+        <line class="rail" stroke-width="${trim(options.railWidth)}" x1="${trim(trackStart)}" y1="${trim(road.y)}" x2="${trim(trackEnd)}" y2="${trim(road.y)}" />
+        <text class="graph-road-name -left" font-size="${options.fontSize * ROAD_NAME_SCALE}" x="${trim(trackStart - options.fontSize * 0.75)}" y="${trim(road.y + options.fontSize * 0.3)}">${escapeHtml(road.name)}</text>
+        <text class="graph-road-name -right" font-size="${options.fontSize * ROAD_NAME_SCALE}" x="${trim(trackEnd + options.fontSize * 0.75)}" y="${trim(road.y + options.fontSize * 0.3)}">${escapeHtml(road.name)}</text>
       </g>`,
     )
     .join("");
@@ -591,7 +698,7 @@ export function renderGraph(nodes, layout, opts = {}) {
 
         return spans.map(
           ([x1, x2]) =>
-            `<line class="graph-link" stroke-width="${trim(options.berthHeight)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" x1="${trim(x1)}" y1="${trim(y)}" x2="${trim(x2)}" y2="${trim(y)}" />`,
+            `<line class="graph-link" stroke-width="${trim(options.railWidth)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" x1="${trim(x1)}" y1="${trim(y)}" x2="${trim(x2)}" y2="${trim(y)}" />`,
         );
       });
     })
@@ -608,12 +715,13 @@ export function renderGraph(nodes, layout, opts = {}) {
         if (!source || source.road === target.road) return [];
         const dependency = graphNodes.find((n) => n.ref === dependencyRef);
         return [
-          `<path class="graph-crossover${dependency?.state === "done" ? " -cleared" : ""}" stroke-width="${trim(options.berthHeight)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" d="${crossoverPath(
+          `<path class="graph-crossover${dependency?.state === "done" ? " -cleared" : ""}" stroke-width="${trim(options.railWidth)}" data-from="${escapeHtml(dependencyRef)}" data-to="${escapeHtml(node.ref)}" d="${crossoverPath(
             source.x + options.berthWidth,
             source.y + options.berthHeight / 2,
             target.x,
             target.y + options.berthHeight / 2,
             turns?.get(edgeKey(dependencyRef, node.ref)),
+            { ease: options.crossoverEase, reach: options.slotGap },
           )}" />`,
         ];
       });
@@ -630,12 +738,19 @@ export function renderGraph(nodes, layout, opts = {}) {
       const state = isCyclic ? "cyclic" : hardFailed ? "alert" : node.state;
       const centreX = position.x + options.berthWidth / 2;
       const midY = position.y + options.berthHeight / 2;
+      // Mono text centred on the plate: half the type size back off the middle
+      // puts the x-height band on the centre line, which is where the eye reads
+      // it. A raw baseline at midY hangs the whole word above the plate's waist.
+      const textY = midY + options.fontSize * REF_SCALE * 0.35;
       const tokens = tokensByRef[node.ref]?.output;
       // Untiered: a berth's figure is the whole task, several agents deep, so the
       // per-agent thresholds would paint every berth on any real run.
+      //
+      // Right-aligned against the plate's inner edge, so the counts form a
+      // column down each road and can be compared without reading any of them.
       const tokenLine = !hasTokenReading(tokens)
         ? ""
-        : `<text class="graph-tokens" font-size="${options.fontSize * 0.75}" x="${trim(centreX)}" y="${trim(position.y + options.berthHeight + options.fontSize * 2.5)}">${escapeHtml(formatTokens(tokens))}</text>`;
+        : `<text class="graph-tokens" font-size="${options.fontSize * TOKEN_SCALE}" x="${trim(position.x + options.berthWidth - options.berthPadX)}" y="${trim(textY)}">${escapeHtml(formatTokens(tokens))}</text>`;
       // A gate stands at the entry of any berth something has to clear first.
       const aspect = isCyclic
         ? "danger"
@@ -653,31 +768,12 @@ export function renderGraph(nodes, layout, opts = {}) {
       <g class="graph-berth -${escapeHtml(state)}" data-ref="${escapeHtml(node.ref)}">
         ${signal}
         <rect class="segment" x="${trim(position.x)}" y="${trim(position.y)}" width="${trim(options.berthWidth)}" height="${trim(options.berthHeight)}" rx="2" ry="2" />
-        <text class="graph-ref" font-size="${options.fontSize * 0.85}" x="${trim(centreX)}" y="${trim(position.y + options.berthHeight + options.fontSize * 1.2)}">${escapeHtml(node.ref)}</text>
+        <rect class="status" x="${trim(position.x)}" y="${trim(position.y)}" width="${trim(options.statusWidth)}" height="${trim(options.berthHeight)}" rx="2" ry="2" />
+        <text class="graph-ref" font-size="${options.fontSize * REF_SCALE}" x="${trim(position.x + options.statusWidth + options.berthPadX)}" y="${trim(textY)}">${escapeHtml(node.ref)}</text>
         ${tokenLine}
         ${isCyclic ? `<text class="graph-cycle-label" font-size="${options.fontSize * 0.7}" x="${trim(centreX)}" y="${trim(position.y - options.fontSize * 0.4)}">CYCLE</text>` : ""}
       </g>`,
       ];
-    })
-    .join("");
-
-  /*
-   * The seam at each berth's ends.
-   *
-   * Both comps mark every berth boundary, and the reason shows up the moment a
-   * route is set: three neighbours lighting at once fuse into one unbroken bar
-   * and stop being countable. A ground-coloured hairline at each end keeps the
-   * berths separate whether they are lit or not — value and a seam, which is all
-   * Hangar's anti-goals leave available.
-   */
-  const seams = graphNodes
-    .flatMap((node) => {
-      const position = positions.get(node.ref);
-      if (!position) return [];
-      return [position.x, position.x + options.berthWidth].map(
-        (x) =>
-          `<line class="graph-seam" x1="${trim(x)}" y1="${trim(position.y)}" x2="${trim(x)}" y2="${trim(position.y + options.berthHeight)}" />`,
-      );
     })
     .join("");
 
@@ -688,5 +784,5 @@ export function renderGraph(nodes, layout, opts = {}) {
     ? `<text class="graph-cycle-note" x="${trim(width / 2)}" y="${trim(height - options.padding / 2)}">Cycle: ${escapeHtml([...cyclic].join(", "))}</text>`
     : "";
 
-  return `<svg class="dependency-graph" width="${trim(width)}" height="${trim(height)}" viewBox="0 0 ${trim(width)} ${trim(height)}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency panel" xmlns="http://www.w3.org/2000/svg">${roadLines}${links}${crossovers}${berths}${seams}${cycleNote}${empty}</svg>`;
+  return `<svg class="dependency-graph" width="${trim(width)}" height="${trim(height)}" viewBox="0 0 ${trim(width)} ${trim(height)}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Task dependency panel" xmlns="http://www.w3.org/2000/svg">${roadLines}${links}${crossovers}${berths}${cycleNote}${empty}</svg>`;
 }
