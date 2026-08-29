@@ -246,6 +246,9 @@ bun test packages/monitor/skills/install/scripts/
 bun test packages/monitor/skills/usage-dashboard/scripts/rollup-update.test.ts
 bun test opencode/
 
+# Whole-repo test run — --parallel runs test files across worker processes (Bun 1.4)
+bun test --parallel .
+
 # Typecheck. Run it before calling a refactor done — `bun build` bundles
 # without typechecking, and `bun test` only reaches the paths a test drives.
 bunx --bun tsc --noEmit                              # whole repo
