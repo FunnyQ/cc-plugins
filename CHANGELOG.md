@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 3.22.6] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.6`_
+
+### Fixed
+- Codex usage tracking no longer drops or double-counts token usage for drivers still waiting on their rollout, including when multiple drivers run concurrently.
+
 ## [dispatch 3.22.5] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.5`_
