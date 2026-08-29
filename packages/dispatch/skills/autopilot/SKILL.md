@@ -179,7 +179,7 @@ This policy is encoded as a constant table at the top of the orchestrator, so it
 | Role | Model | Why |
 |---|---|---|
 | **Dev** | Sonnet → **Opus on the last attempt** | A model that failed N times rarely clears it by retrying as itself, so the last shot gets the stronger model before we bother the user. |
-| **Dev — external engine** (`CFG.devEngine: 'codex'`/`'opencode'`) | Haiku driver → **Opus on the last attempt** | The coding intelligence is the external CLI's, so the driver only has to invoke `<engine>-run.ts delegate` and verify. |
+| **Dev — external engine** (`CFG.devEngine: 'codex'`/`'opencode'`) | Haiku driver → **Opus on the last attempt** | The coding intelligence is the external CLI's and the verdict is the verify agent's, so the driver only has to invoke `<engine>-run.ts delegate`, lint the task file, and report what landed. |
 | **Binary gate (Acceptance / Verification)** | Haiku | Its job is mechanical — re-run the `## Verification` commands and report pass/fail + raw output — and it runs first so Opus never scores code that doesn't build. |
 | **Rubric judge** | Opus | It decides loop-or-pass, and a weak judge either ships bad code or loops forever. |
 | **Commit (inter-wave + post-loop)** | Haiku | A wave's changes are usually one coherent set, so grouping + message-writing over the inlined `COMMIT_INSTRUCTIONS` is within Haiku's reach. |

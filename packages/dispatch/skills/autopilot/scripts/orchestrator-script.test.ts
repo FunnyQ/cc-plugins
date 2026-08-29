@@ -1492,6 +1492,24 @@ describe("orchestrator commit ownership", () => {
     expect(prompt).toContain("A gate you believe is wrong is a plan defect");
   });
 
+  // The independent verifier runs the same commands moments later and owns the
+  // verdict, the driver's return value is discarded, and the driver has no lever
+  // to act on red output — so a driver that verifies only doubles a full suite
+  // run and sits a cheap model in front of failures it cannot answer. The lint
+  // is NOT duplicated: the external engine writes outside the harness, so the
+  // Edit/Write lint hook never saw the task file it left behind.
+  test("the driver lints the task file but does not run its verification", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+    const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+    expect(prompt).toContain("lint-task.ts");
+    expect(prompt).toContain("Do NOT run the task's ## Verification commands");
+    expect(prompt).not.toContain("Verification commands YOURSELF");
+  });
+
   // Rejection feedback names what failed, and a driver left to "fold it in"
   // freely reads that as permission to route around it — dropping the failing
   // command and telling the delegate the previous code was already correct.
