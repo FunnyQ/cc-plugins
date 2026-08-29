@@ -48,9 +48,36 @@ export type AgentUsage = {
   attempt: number | undefined;
   /** ISO timestamp of the transcript's first line. Null when the file is empty. */
   startedAt: string | null;
+  /**
+   * ISO timestamp of the last line that carried one. With `startedAt` it bounds the
+   * window an external CLI this agent drove must have started inside.
+   */
+  lastAt: string | null;
+  /**
+   * Relay scratch directory names this transcript mentions, e.g.
+   * `20260829-164034-617-28486-7d4298ab`. When the agent drove codex through a relay
+   * live pane, the codex rollout names the same directory — an exact join key that
+   * beats any time-window guess. Empty for an agent that drove no external CLI.
+   */
+  relayDirs: string[];
+  /**
+   * Whether this transcript shows the agent driving an external CLI — a relay scratch
+   * path, or a call to one of the `<engine>-run.ts` wrappers. Only such an agent may
+   * claim a codex run by time window: a judge or a verifier running while the user has
+   * their own codex window open in the same repo must never absorb that window's spend.
+   */
+  externalDriver: boolean;
   /** Every model that produced a billed turn, in first-seen order, deduplicated. */
   models: string[];
   counts: TokenCounts;
+  /**
+   * Spend of the codex CLI run this agent drove, kept OUT of `counts` on purpose.
+   * A dev-codex row is a cheap Haiku driver plus an expensive external model, and
+   * one merged figure would hide which side burned what. Undefined for an agent
+   * that drove no external CLI — never a zeroed object, which would read as a
+   * measured "codex did nothing".
+   */
+  codexCounts?: TokenCounts;
 };
 
 /** Plan-wide usage, addressed by task and in aggregate. */
@@ -63,4 +90,10 @@ export type UsageRollup = {
   totals: TokenCounts;
   /** How many agent transcripts fed this rollup. */
   agentCount: number;
+  /** Task ref -> codex counts, for the tasks whose agents drove the codex CLI. */
+  codexByTask: Record<string, TokenCounts>;
+  /** Every codex token joined to this plan. Zero when no task used an external engine. */
+  codexTotals: TokenCounts;
+  /** How many codex runs were joined. Zero means "no codex", not "codex spent nothing". */
+  codexRunCount: number;
 };

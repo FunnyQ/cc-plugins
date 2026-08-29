@@ -119,6 +119,9 @@ type FileState = {
   role: string | null;
   attempt: number | undefined;
   startedAt: string | null;
+  lastAt: string | null;
+  relayDirs: Set<string>;
+  externalDriver: boolean;
   membership: Membership;
 };
 
@@ -134,6 +137,9 @@ function freshState(): FileState {
     role: null,
     attempt: undefined,
     startedAt: null,
+    lastAt: null,
+    relayDirs: new Set(),
+    externalDriver: false,
     membership: "pending",
   };
 }
@@ -145,6 +151,9 @@ function toAgentUsage(file: string, state: FileState): AgentUsage {
     role: state.role,
     attempt: state.attempt,
     startedAt: state.startedAt,
+    lastAt: state.lastAt,
+    relayDirs: [...state.relayDirs],
+    externalDriver: state.externalDriver,
     models: [...state.models],
     counts: { ...state.counts },
   };
@@ -273,6 +282,29 @@ function applyUsage(
   state.byRequest.set(key, next);
 }
 
+// Relay names each delegation's scratch directory `<stamp>-<ms>-<pid>-<hash>` under
+// /tmp/relay. Matched on the raw line rather than on parsed content because the path
+// can surface in a tool_use input, a tool result, or assistant prose, and scanning the
+// string once is cheaper than walking three shapes.
+const RELAY_DIR = /\/relay\/(\d{8}-\d{6}-\d+-\d+-[0-9a-f]+)/g;
+
+// The headless path leaves no relay directory — the prompt goes to `codex exec` on
+// stdin — so the wrapper's own name is what marks the agent as an external driver.
+const ENGINE_WRAPPER = /\b(?:codex|opencode)-run\.ts\b/;
+
+function collectExternalMarks(state: FileState, line: string): void {
+  // The guards are the optimisation: the regexes run on the few lines that can match,
+  // not on every line of every transcript.
+  if (line.includes("/relay/")) {
+    state.externalDriver = true;
+    RELAY_DIR.lastIndex = 0;
+    for (const match of line.matchAll(RELAY_DIR)) state.relayDirs.add(match[1]!);
+  }
+  if (!state.externalDriver && ENGINE_WRAPPER.test(line)) {
+    state.externalDriver = true;
+  }
+}
+
 function ingestLine(planDir: string, state: FileState, rawLine: string): void {
   const line = rawLine.trim();
   if (!line) return;
@@ -290,6 +322,9 @@ function ingestLine(planDir: string, state: FileState, rawLine: string): void {
     decideMembership(planDir, state, record);
   }
   if (state.membership !== "included") return;
+
+  collectExternalMarks(state, line);
+  if (typeof record.timestamp === "string") state.lastAt = record.timestamp;
 
   // A `started` or `result` line has no `message` key at all, so this guard is what
   // stops `line.message.usage` from throwing and killing the whole pass.
@@ -339,6 +374,9 @@ function processFile(
     state.role = null;
     state.attempt = undefined;
     state.startedAt = null;
+    state.lastAt = null;
+    state.relayDirs.clear();
+    state.externalDriver = false;
     state.membership = "pending";
   }
 
