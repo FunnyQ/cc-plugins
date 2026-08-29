@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 3.22.5] - 2026-08-29
+
+_tracks tag `dispatch-v3.22.5`_
+
+### Fixed
+- The flightplan graph panel no longer loses hover highlighting during polling refreshes — the hovered dependency route now stays visible and the graph no longer dims unexpectedly while a route is highlighted.
+
 ## [dispatch 3.22.4] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.4`_
