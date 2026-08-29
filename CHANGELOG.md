@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 3.23.0] - 2026-08-30
+
+_tracks tag `dispatch-v3.23.0`_
+
+### Added
+- Flightplan lint now flags oversized tasks during authoring — a task declaring more than 11 files gets an advisory, since field data shows tasks that large retry 70-89% of the time versus 43% for smaller ones. Autopilot's own lint calls stay unaffected, so existing plans keep flying as before.
+
+### Fixed
+- Autopilot's external dev delegates now receive and run the task's fixed verification commands and keep working until they pass, instead of skipping verification entirely.
+
 ## [dispatch 3.22.6] - 2026-08-29
 
 _tracks tag `dispatch-v3.22.6`_
