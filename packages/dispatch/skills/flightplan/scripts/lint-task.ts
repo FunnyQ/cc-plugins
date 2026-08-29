@@ -161,7 +161,42 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
   return hits;
 }
 
-export async function lintFile(filePath: string): Promise<Violation[]> {
+/**
+ * Bullets under `## Files to create / modify`. Counts the PLANNER's declared
+ * scope, not what an executor ends up touching — the number is only useful while
+ * the plan is still being written, which is the only moment splitting is cheap.
+ */
+export function countDeclaredFiles(body: string): number {
+  const section = extractSection(body, "Files to create / modify");
+  return (section.match(/^- /gm) ?? []).length;
+}
+
+/**
+ * Declared files a task may carry before the advisory fires. Calibrated on one
+ * 47-task flight, where the first-attempt retry rate climbed monotonically with
+ * this count: 43% at <=8 declared files, 56% at 9-11, 70% at 12-14, 89% at >=15.
+ * Set at the step where it clearly worsens rather than at task-template.md's
+ * stricter "~6" aspiration — that flight had no task below 6, so the data cannot
+ * defend the tighter line and a warning nobody trusts gets ignored.
+ */
+export const MAX_DECLARED_FILES = 11;
+
+export type LintOptions = {
+  /**
+   * Authoring mode — adds judgment checks a plan's AUTHOR can act on. Off by
+   * default because both run-time callers lint single files and neither can act:
+   * autopilot's external-dev driver lints after the engine writes and is told to
+   * repair the file until clean (size is not repairable by it), and the scout
+   * lints the whole tree before flying, where a size violation would ground a
+   * correct plan authored before this rule existed.
+   */
+  authoring?: boolean;
+};
+
+export async function lintFile(
+  filePath: string,
+  options: LintOptions = {},
+): Promise<Violation[]> {
   const violations: Violation[] = [];
   const push = (rule: string, detail: string) =>
     violations.push({ file: filePath, rule, detail });
@@ -180,6 +215,18 @@ export async function lintFile(filePath: string): Promise<Violation[]> {
     return violations;
   }
   const task = parsed.task;
+
+  // Authoring-only size judgment — see LintOptions for why it is gated.
+  if (options.authoring) {
+    const declared = countDeclaredFiles(content);
+    if (declared > MAX_DECLARED_FILES) {
+      push(
+        "task-size",
+        `declares ${declared} files, over the ${MAX_DECLARED_FILES} advised — split it into two tasks in the same bucket. ` +
+          `Tasks this size needed a retry 70-89% of the time in the field, against 43% at 8 files or fewer.`,
+      );
+    }
+  }
 
   // Path vs H1 — the H1 claim must match where the file lives.
   const pathInfo = inferRefFromPath(filePath);
@@ -584,9 +631,13 @@ async function resolveInputs(
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  const authoring = argv.includes("--authoring");
+  const args = argv.filter((a) => a !== "--authoring");
   if (args.length === 0) {
-    console.error("Usage: bun lint-task.ts <tasks-dir | file>...");
+    console.error(
+      "Usage: bun lint-task.ts [--authoring] <tasks-dir | file>...",
+    );
     process.exit(2);
   }
 
@@ -619,7 +670,7 @@ async function main() {
   const treeRoot = treeRoots[0] ?? null;
   const parsed: ParsedTask[] = [];
   for (const file of files) {
-    reportAll(await lintFile(file));
+    reportAll(await lintFile(file, { authoring }));
     if (!treeRoot) continue;
     try {
       const p = parseTask(await readFile(file, "utf-8"));

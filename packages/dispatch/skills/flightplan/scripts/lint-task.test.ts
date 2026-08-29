@@ -12,6 +12,7 @@ import {
   extractTestPaths,
   formatTestNetReport,
   testNetReport,
+  countDeclaredFiles,
 } from "./lint-task";
 import { parseTask, type ParsedTask } from "./lib/parse-task";
 
@@ -1140,5 +1141,76 @@ describe("scope-git-status rule", () => {
     );
 
     expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
+  });
+});
+
+// Declared file count is the one task-size proxy that predicted retries in the
+// field: over one 47-task flight the first-attempt retry rate rose monotonically
+// with it — 43% at <=8 declared files, 56% at 9-11, 70% at 12-14, 89% at >=15.
+// It counts what the PLANNER declared, not what the executor touched, because
+// the point is to regulate the plan while it is still cheap to split.
+describe("task-size advisory", () => {
+  const filesSection = (n: number) =>
+    Array.from({ length: n }, (_, i) => `- f${i}.ts (new) — thing ${i}`).join(
+      "\n",
+    );
+
+  const taskDeclaring = (n: number) =>
+    VALID_TASK.replace("- a.ts (new)", filesSection(n));
+
+  const lintDeclaring = async (
+    n: number,
+    opts?: Parameters<typeof lintFile>[1],
+  ) => {
+    const root = await writeTree({
+      "tasks/ui/01-fixture-state-shell.md": taskDeclaring(n),
+    });
+    const violations = await lintFile(
+      join(root, "tasks/ui/01-fixture-state-shell.md"),
+      opts,
+    );
+    await rm(root, { recursive: true, force: true });
+    return violations;
+  };
+
+  test("counts the bullets under Files to create / modify", () => {
+    expect(countDeclaredFiles(taskDeclaring(14))).toBe(14);
+    expect(countDeclaredFiles(VALID_TASK)).toBe(1);
+  });
+
+  test("counts nothing when the section is absent", () => {
+    expect(
+      countDeclaredFiles(
+        VALID_TASK.replace("## Files to create / modify", "## Other"),
+      ),
+    ).toBe(0);
+  });
+
+  test("flags an oversized task in authoring mode", async () => {
+    const violations = await lintDeclaring(12, { authoring: true });
+    const hit = violations.find((v) => v.rule === "task-size");
+
+    expect(hit).toBeDefined();
+    // The message must name the fix, not just the number — the author is the
+    // only party who can act on it, and only while still writing the plan.
+    expect(hit!.detail).toContain("12");
+    expect(hit!.detail).toContain("split");
+  });
+
+  test("stays silent just under the threshold", async () => {
+    const violations = await lintDeclaring(11, { authoring: true });
+
+    expect(violations.some((v) => v.rule === "task-size")).toBe(false);
+  });
+
+  // The two run-time callers both lint single files and must never see this:
+  // autopilot's external-dev driver lints after the engine writes (and is told
+  // to repair until clean — size is not repairable by it), and the scout lints
+  // the whole tree before flying, where a violation would ground a correct plan
+  // authored before this rule existed.
+  test("is silent by default, so autopilot's driver and scout are unaffected", async () => {
+    const violations = await lintDeclaring(20);
+
+    expect(violations.some((v) => v.rule === "task-size")).toBe(false);
   });
 });

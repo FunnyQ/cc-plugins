@@ -183,6 +183,14 @@ Aim for 1 task = 1 commit or 1 PR. Concretely:
 - A task touching more than ~6 files probably wants splitting.
 - A task that says "and also..." in the goal is two tasks.
 
+The file count is the one the linter checks. `lint-task.ts --authoring` reports a
+`task-size` violation above **11 declared files**, and the Edit/Write hook passes
+that flag, so an oversized task is flagged as you write it. The `~6` above stays
+the target; `11` is where the field data turns hard against you — over one
+47-task flight the first-attempt retry rate ran 43% at ≤8 declared files, 56% at
+9–11, 70% at 12–14, and 89% at ≥15. Autopilot's own lint calls omit the flag, so
+a plan written before this rule still flies.
+
 ## Naming
 
 `<bucket>/NN-<kebab-slug>.md`
