@@ -43,4 +43,65 @@ describe("shouldSkipDecisionLogReminder", () => {
       shouldSkipDecisionLogReminder({ CLAUDE_CODE_ENTRYPOINT: "cli" }, {}),
     ).toBe(false);
   });
+
+  describe("codex delegation marker", () => {
+    const stub = (delegated: boolean) => ({
+      isDelegated: () => delegated,
+      now: () => 1_000,
+    });
+
+    it("skips a codex session that a marker claims", () => {
+      expect(
+        shouldSkipDecisionLogReminder(
+          { PLUGIN_ROOT: "/plugins/monitor" },
+          { cwd: "/repo", session_id: "s1" },
+          stub(true),
+        ),
+      ).toBe(true);
+    });
+
+    it("keeps reminders for an unclaimed codex session", () => {
+      expect(
+        shouldSkipDecisionLogReminder(
+          { PLUGIN_ROOT: "/plugins/monitor" },
+          { cwd: "/repo", session_id: "s1" },
+          stub(false),
+        ),
+      ).toBe(false);
+    });
+
+    it("never consults the marker on Claude Code", () => {
+      let consulted = false;
+      const spy = {
+        isDelegated: () => {
+          consulted = true;
+          return true;
+        },
+        now: () => 1_000,
+      };
+      expect(
+        shouldSkipDecisionLogReminder(
+          { CLAUDE_CODE_ENTRYPOINT: "cli" },
+          { cwd: "/repo", session_id: "s1" },
+          spy,
+        ),
+      ).toBe(false);
+      expect(consulted).toBe(false);
+    });
+
+    it("keeps reminders when the marker store throws", () => {
+      expect(
+        shouldSkipDecisionLogReminder(
+          { PLUGIN_ROOT: "/plugins/monitor" },
+          { cwd: "/repo", session_id: "s1" },
+          {
+            isDelegated: () => {
+              throw new Error("boom");
+            },
+            now: () => 1_000,
+          },
+        ),
+      ).toBe(false);
+    });
+  });
 });

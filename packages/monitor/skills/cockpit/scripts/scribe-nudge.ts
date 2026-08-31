@@ -183,7 +183,7 @@ function codeSignature(
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  let input: DecisionLogHookInput & { session_id?: string; cwd?: string } = {};
+  let input: DecisionLogHookInput = {};
   try {
     input = JSON.parse(await Bun.stdin.text());
   } catch {
