@@ -1,5 +1,26 @@
 # Changelog
 
+## [monitor 4.0.8] - 2026-08-31
+
+_tracks tag `monitor-v4.0.8`_
+
+### Added
+- Decision-log hooks now recognize when a session is a Codex delegate nobody is watching and quietly skip their SessionStart guidance and Stop nudge, so an unattended delegate no longer pollutes the shared decision trail or spends tokens scribing itself.
+
+## [relay 0.6.8] - 2026-08-31
+
+_tracks tag `relay-v0.6.8`_
+
+### Added
+- Relay's live Codex pane now marks itself as a delegation for the whole time it runs, closing the gap where Codex's interactive TUI (which never sees the `RELAY_DELEGATED` env var) could still get nudged and re-prompted by monitor as if a person were watching.
+
+## [dispatch 3.23.1] - 2026-08-31
+
+_tracks tag `dispatch-v3.23.1`_
+
+### Changed
+- Autopilot's headless Codex and OpenCode dev wrappers now flag their own sessions as delegated, so monitor's session hooks correctly treat them as unattended instead of nudging them like an interactive session.
+
 ## [dispatch 3.23.0] - 2026-08-30
 
 _tracks tag `dispatch-v3.23.0`_
