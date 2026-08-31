@@ -197,7 +197,22 @@ The module itself carries four constraints, each a trap if broken: it is a singl
 
 **Version policy.** `opencode/` is repo infrastructure, not a release component. This work bumps no `plugin.json`, cuts no `<plugin>-vX.Y.Z` tag, and adds no `CHANGELOG.md` entry — it belongs to no plugin, so none of them owns a version bump for it.
 
-**Codex freezes hook environments.** Codex runs plugin hooks under a long-lived `codex app-server daemon` whose environment is fixed at daemon start. A delegation env var such as relay's `RELAY_DELEGATED=1` reaches the Codex frontend but not the hook, if the daemon predates it. Restart the app-server to refresh the environment. The same suppression works cleanly on Claude Code.
+**Codex's interactive TUI freezes hook environments; `codex exec` does not.** The TUI hands its session to a long-lived `codex app-server daemon` whose environment is fixed at daemon start, so a delegation env var such as relay's `RELAY_DELEGATED=1` reaches the Codex frontend but never the hook when the daemon predates it. `codex exec` runs the session in-process and does read the var. Verified on 0.151.0: `RELAY_DELEGATED=1 codex exec` suppresses monitor's decision-log hooks (0 `DECISION LOG ACTIVE` hits in the rollout, 1 in the control), while a herdr pane spawned with the same var running interactive `codex` still shows the Stop nudge. Restarting the app-server refreshes the daemon environment; the delegation marker below is the fix that does not require one. The same suppression works cleanly on Claude Code.
+
+To test hook behavior for free, pass a bogus `-m` model — SessionStart and UserPromptSubmit fire and the rollout persists before the 400 lands, so no tokens are spent. Do **not** try to debug this by adding a probe hook to `~/.codex/hooks.json`: codex gates every hook on a `trusted_hash` under `[hooks.state."<file>:<event>:<i>:<j>"]` in `~/.codex/config.toml`, and an entry whose hash does not match is skipped with no warning.
+
+**The delegation marker crosses that daemon boundary.** relay's live codex path drops a file that monitor's decision-log hooks read, because no environment variable can reach them. The writer is `packages/relay/skills/relay/scripts/delegation-marker.ts`, the reader is `packages/monitor/skills/cockpit/scripts/delegation-marker.ts`, and the two plugins version independently — **they share a path and a shape, never code**, so a change to one is a change to both:
+
+```
+~/.local/share/q-lab/delegation/<startedAt>-<rand>.json
+{ cwd, backend, startedAt, armUntil, expiresAt, sessionIds: [] }
+```
+
+Three rules make it safe. Matching is two-phase: a marker matches on `cwd` alone only until `armUntil` (90s, covering relay's spawn plus the 20s TUI settle), and the hook that matches writes its own `session_id` back so every later turn matches exactly — fuzzy once, precise forever, which is what keeps an interactive codex opened in the same repo from being silenced for its whole life. Only **codex live panes** get a marker (`needsDelegationMarker`): Claude and opencode run their hooks inside the process relay spawned, so `RELAY_DELEGATED` already reaches them, and a marker there could silence the parent session sharing the repo. And the reader ignores the marker store entirely unless `PLUGIN_ROOT` is set, which is codex's tell — Claude Code sets only the `CLAUDE_`-prefixed one.
+
+A `pending` live result keeps its marker: the pane is still running and still being nudged, so the marker has to outlive relay and retire on `expiresAt` instead. Every other outcome clears it.
+
+**The autopilot wrappers suppress through the env, not the marker.** `codex-run.ts` and `opencode-run.ts` spawn with `env: { ...process.env, RELAY_DELEGATED: "1" }`. They never went through relay, so before this they set nothing at all. `codex exec` and opencode both read the var, so neither needs the marker.
 
 **The statusline wiring drifts by version.** monitor's `SessionStart` hook repairs under a marker gate on `$CLAUDE_PLUGIN_DATA/.wired-version`. Once per version it re-points a version-drifted statusline path and removes any stale channel entry. The cache path encodes the version (`.../monitor/3.1.0/...`) and old directories linger, so "wired" means the exact current path, not mere existence. The hook never fresh-wires — initial opt-in stays manual.
 
