@@ -11,6 +11,12 @@ import {
   buildPromptFile,
 } from "./relay-prompt";
 import {
+  buildMarker,
+  clearDelegationMarker,
+  needsDelegationMarker,
+  writeDelegationMarker,
+} from "./delegation-marker";
+import {
   collectLive,
   DEFAULT_WAIT_TIMEOUT_MS,
   liveGate,
@@ -522,6 +528,26 @@ export async function executeRelay(
     deps.writeFile(livePromptPath, livePrompt);
     const bootstrapText = `Read the file ${livePromptPath} and follow its instructions exactly, including the result-file instructions at the end.`;
 
+    // `env` below carries RELAY_DELEGATED into the pane, and that is enough for
+    // every backend except codex's TUI: it hands the session to a shared
+    // app-server daemon whose environment froze at daemon start, so monitor's
+    // decision-log hooks run without the var and nudge a delegate nobody is
+    // watching. Leave a marker on disk for them instead — delegation-marker.ts
+    // carries the contract, and the pane's cwd is opts.cwd verbatim, which is
+    // exactly what codex reports to the hook.
+    const markerPath = needsDelegationMarker(parsed.backend, true)
+      ? writeDelegationMarker(
+          buildMarker({
+            cwd: process.cwd(),
+            backend: parsed.backend,
+            now: Date.now(),
+            waitTimeoutMs:
+              parsed.flags.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
+          }),
+          deps.env,
+        )
+      : null;
+
     const liveResult = await deps.runLive({
       backend: parsed.backend,
       mode: parsed.mode,
@@ -535,6 +561,14 @@ export async function executeRelay(
       env: ["RELAY_DELEGATED=1"],
       callerEnv: deps.env,
     });
+
+    // A pending pane is STILL RUNNING and still being nudged, so its marker has
+    // to outlive this process and retire on its TTL. Every other outcome means
+    // the delegate is done and the marker would only silence whatever opens in
+    // this repo next.
+    if (liveResult.ok || !liveResult.pending) {
+      clearDelegationMarker(markerPath);
+    }
 
     if (liveResult.ok) {
       // result.md is already the delegate's clean final markdown — no
