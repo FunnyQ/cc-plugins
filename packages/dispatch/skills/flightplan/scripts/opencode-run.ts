@@ -101,7 +101,15 @@ function run(mode: Mode, prompt: string, model: string): number {
       [OPENCODE_BIN, "run", "-m", model, "--format", "json", message],
       // stdin "ignore": opencode inherits stdin and hangs if it stays open with no
       // EOF; closing it makes `run` return normally (see relay's backends note).
-      { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+      // RELAY_DELEGATED marks this an unattended delegate, so monitor's
+      // decision-log hooks stay quiet — opencode runs them inside this process,
+      // so the var is all they need.
+      {
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, RELAY_DELEGATED: "1" },
+      },
     );
   } catch {
     // spawnSync throws (not a failed result) when the binary isn't on PATH.

@@ -58,7 +58,16 @@ function run(mode: Mode, prompt: string, lastFile: string): number {
   try {
     proc = Bun.spawnSync(
       [CODEX_BIN, "exec", ...MODE_ARGS[mode], "-o", lastFile, "-"],
-      { stdin: Buffer.from(prompt), stdout: "pipe", stderr: "pipe" },
+      // RELAY_DELEGATED marks this an unattended delegate, so monitor's
+      // decision-log hooks stay quiet. `codex exec` runs its session in-process
+      // and does read this var — only codex's interactive TUI cannot, because
+      // that path runs hooks on a daemon whose env froze at its start.
+      {
+        stdin: Buffer.from(prompt),
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, RELAY_DELEGATED: "1" },
+      },
     );
   } catch {
     // spawnSync throws (not a failed result) when the binary isn't on PATH.
