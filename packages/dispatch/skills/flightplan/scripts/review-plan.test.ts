@@ -8,6 +8,7 @@ import {
   collapseDuplicateReviewOutput,
   collectPlanFiles,
   formatCodexReviewOutput,
+  narrowInstructions,
   parseArgs,
 } from "./review-plan";
 
@@ -254,6 +255,7 @@ describe("parseArgs", () => {
       planDir: "docs/my-plan",
       engine: "codex",
       print: false,
+      narrow: false,
     });
   });
 
@@ -265,6 +267,7 @@ describe("parseArgs", () => {
       engine: "opencode",
       model: "x/y",
       print: false,
+      narrow: false,
     });
   });
 
@@ -304,6 +307,55 @@ describe("parseArgs", () => {
       /Unexpected argument/,
     );
   });
+
+  test("--narrow and --prior-passes are captured", () => {
+    const out = parseArgs(["docs/p", "--narrow", "--prior-passes", "8"]);
+    expect(out.narrow).toBe(true);
+    expect(out.priorPasses).toBe(8);
+  });
+
+  test("--narrow alone leaves the pass count unset", () => {
+    const out = parseArgs(["docs/p", "--narrow"]);
+    expect(out.narrow).toBe(true);
+    expect(out.priorPasses).toBeUndefined();
+  });
+
+  test("rejects --prior-passes without --narrow", () => {
+    expect(() => parseArgs(["docs/p", "--prior-passes", "8"])).toThrow(
+      /--prior-passes requires --narrow/,
+    );
+  });
+
+  test("rejects a non-positive-integer --prior-passes", () => {
+    expect(() => parseArgs(["docs/p", "--narrow", "--prior-passes", "0"])).toThrow(
+      /positive integer/,
+    );
+    expect(() =>
+      parseArgs(["docs/p", "--narrow", "--prior-passes", "two"]),
+    ).toThrow(/positive integer/);
+  });
+});
+
+describe("narrowInstructions", () => {
+  test("states the pass count when given", () => {
+    expect(narrowInstructions(8)).toContain(
+      "has already been through 8 review passes",
+    );
+  });
+
+  test("falls back to a countless phrasing", () => {
+    expect(narrowInstructions()).toContain(
+      "has already been through a full review cycle",
+    );
+  });
+
+  test("keeps the five-finding cap and the sanctioned clean verdict", () => {
+    const text = narrowInstructions(4);
+    expect(text).toContain("Report at most five.");
+    expect(text).toContain("No blocking findings.");
+    // The narrow phase has no P2 channel — the caller counts P1s only.
+    expect(text).not.toContain("P2");
+  });
 });
 
 describe("--print (integration)", () => {
@@ -324,6 +376,61 @@ describe("--print (integration)", () => {
     expect(out).toContain("Goal: ship it.");
     // --print must be clean: no "Flightplan review — N file(s)" header.
     expect(out).not.toContain("Flightplan review");
+
+    await rm(root, { recursive: true });
+  });
+
+  // The Opus engine reviews whatever --print emits, so it must reach the narrow
+  // phase too; without this the post-cap phase would be codex/opencode-only.
+  test("--print honors --narrow", async () => {
+    const root = await newRoot();
+    await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
+
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, root, "--print", "--narrow", "--prior-passes", "4"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(res.success).toBe(true);
+    const out = res.stdout.toString();
+    expect(out).toContain("has already been through 4 review passes");
+    expect(out).toContain("Report at most five.");
+    expect(out).not.toContain("Focus on:");
+    expect(out).toContain("Goal: ship it.");
+
+    await rm(root, { recursive: true });
+  });
+});
+
+describe("buildReviewPrompt (narrow)", () => {
+  test("--narrow swaps the instruction set, keeping the same file bundle", async () => {
+    const root = await newRoot();
+    const plan = join(root, "PLAN.md");
+    await writeFile(plan, "# Plan\n\nGoal: ship it.\n");
+
+    const broad = await buildReviewPrompt([plan]);
+    const narrow = await buildReviewPrompt([plan], undefined, { narrow: true });
+
+    expect(broad).toContain("Focus on:");
+    expect(narrow).not.toContain("Focus on:");
+    expect(narrow).toContain("Report a finding only if it meets this bar");
+    // Same tree, either way.
+    expect(narrow).toContain("Goal: ship it.");
+
+    await rm(root, { recursive: true });
+  });
+
+  test("narrow still folds in prior findings", async () => {
+    const root = await newRoot();
+    const plan = join(root, "PLAN.md");
+    await writeFile(plan, "# Plan\n");
+
+    const out = await buildReviewPrompt([plan], "- [P1] still open", {
+      narrow: true,
+      priorPasses: 8,
+    });
+    expect(out).toContain("has already been through 8 review passes");
+    expect(out).toContain("# Findings already reported");
+    expect(out).toContain("- [P1] still open");
 
     await rm(root, { recursive: true });
   });

@@ -1,6 +1,6 @@
 ---
 name: flightplan
-version: 0.9.0
+version: 0.10.0
 description: >-
   Heavyweight interviewer that writes a multi-file spec artifact to disk —
   docs/<topic>/PLAN.md plus a tasks/ tree for sub-agents to execute later.
@@ -55,13 +55,13 @@ Ask these **before the interview**, in one `AskUserQuestion` call. A question as
 
 **Review depth** — how many review→fix cycles Step 7 runs.
 
-| Tier | Fits | Floor | Checkpoint | Cap |
-|---|---|---|---|---|
-| **Light** | ≤ 5 tasks, one bucket | 2 | 3 | 4 |
-| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 | 8 |
-| **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 | 12 |
+| Tier | Fits | Floor | Checkpoint | Cap | Narrow |
+|---|---|---|---|---|---|
+| **Light** | ≤ 5 tasks, one bucket | 2 | 3 | 4 | +5 |
+| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 | 8 | +5 |
+| **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 | 12 | +5 |
 
-**The floor is a minimum, the cap a maximum.** The floor is the fewest passes before a clean pass may end the loop. The checkpoint is where the loop *changes tactics* if blocking findings are still arriving — not where it quits. The cap is where it quits regardless. A blocking defect open at the cap is never shipped silently: the loop stops, every open P1 goes into Known gaps, and the Step 8 recap leads with the non-convergence. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
+**The floor is a minimum; the cap ends the broad loop, not the review.** The floor is the fewest passes before a clean pass may end the loop. The checkpoint is where the loop *changes tactics* if blocking findings are still arriving — not where it quits. The cap is where the broad reviewer stops being useful: reaching it with P1s still open means the prompt is now manufacturing findings, so the loop switches to the **narrow phase** for up to five more passes (`--narrow`), which reports only what blocks. A blocking defect open at the end of *that* is never shipped silently: every open P1 goes into Known gaps, and the Step 8 recap leads with the non-convergence. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
 
 Carry both answers to Step 7 and do not re-ask them there. The tier is a guess about a tree that doesn't exist yet — Step 5 restates it beside the finished task index, which is the user's one chance to correct it. After that, honor the pick, with one exception: Step 7 may re-cut the tier **once**, on evidence, when the written tree plainly contradicts the band it was placed in. Note any remaining mismatch in the Step 8 recap.
 
@@ -201,13 +201,34 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
 - **Never fewer than floor passes.** The second cycle, on the improved plan, is the high-value one — the first catches the loud problems, and only the revision exposes what they were masking.
 - **Stop at the first P1-clean pass at or past the floor.** P2-only findings — or already-recorded intent — mean the plan is done. Apply the cheap ones, bank the rest as Known gaps, and move on. This is the normal exit.
 - **At the checkpoint, if P1s are still arriving, stop patching files and re-cut.** Repeated P1s that far in are symptoms, not defects: the decomposition, a bucket boundary, or a PLAN-level decision is wrong. Fix it at PLAN.md / `_context/` / bucket level, re-run `lint-task.ts` and `build-readme.ts`, then resume the loop. Fixing symptoms one file at a time is what makes a review run long without converging.
-- **Count the open P1s after every pass.** That count is the only convergence signal. Do not compare findings by wording: the files change every pass, so a re-raised defect is never phrased the same way twice and a wording test never fires.
-- **Declare non-convergence at whichever comes first:** the cap is reached with P1s still open, or two consecutive passes past the checkpoint fail to lower the open-P1 count. Then stop.
-- **Bank the capping pass's findings. Do not fix them.** A fix applied after the last pass is unverified, and an unverified fix inside a tree that reads as reviewed is worse than a recorded gap — the gap gets the executor's attention and the fix does not. If one is trivially safe and you fix it anyway, say plainly in the recap that it was fixed with no confirming pass.
-- **The cap hands the decision back to the user. It is not the end of the conversation.** Give them numbers, not a question they cannot answer. Show the open-P1 count for every pass as a trend, name the P1s still open, and offer the three real options: ship with the gaps banked, extend the loop, or re-cut at PLAN level. *"Should I review again?"* is not a decision anyone can make. *"P1s went 5 → 4 → 4 → 1, one is open, here it is"* is.
-- **Extending past the cap needs a named reason and a new bound.** The user may spend more of their budget — but only against a hypothesis for why the next pass would differ: a root-cause fix that should collapse a whole class of findings, or a tier that was visibly wrong. "One more look" is not a reason. State the new bound before starting and stop there. Every rule above still applies inside the extension, so two consecutive passes that fail to lower the count end it early no matter what the new bound said.
 - **Re-cut the tier once, mid-loop, when the written tree contradicts it.** The Step 2 bands are stated in task counts, and task count predicts review cost badly: five 200-line task files are a far larger consistency surface than fifteen 40-line ones. Measure the tree you actually wrote — `wc -l docs/<slug>/PLAN.md docs/<slug>/tasks/_context/*.md docs/<slug>/tasks/*/*.md` — and if it is much larger than its band implies, say so and re-pick the tier once, before the cap fires. Doing that at pass 3 costs one sentence. Discovering it at the cap hands the user a decision they should never have had to make.
-- **A non-converged tree is handed over, not hidden.** List every open P1 in `tasks/README.md`'s Known gaps and **lead the Step 8 recap with it** — "review did not converge: N P1s open after M passes". The user must see the open defects and decide; that decision is theirs, and it is cheaper for them at round 4 than at round 19.
+- **Count the open P1s after every pass.** That count is the only convergence signal. Do not compare findings by wording: the files change every pass, so a re-raised defect is never phrased the same way twice and a wording test never fires.
+- **End the broad loop at whichever comes first:** the cap is reached with P1s still open, or two consecutive passes past the checkpoint fail to lower the open-P1 count. Both say the same thing — the broad reviewer has stopped producing signal. Neither one ends the review: go to the narrow phase.
+
+**The narrow phase — up to five more passes, blocking findings only.**
+
+A broad prompt aimed at a plan that has already been revised a dozen times manufactures findings, and a reviewer that wants to look thorough files some of them as P1. That is what an endless review actually is; it is not evidence the plan is broken. The narrow instructions (`--narrow`) do not lower the bar — their five qualifying classes are the P1 definition above, restated. What they remove is the padding pressure: no P2 channel, at most five findings, and `No blocking findings.` sanctioned as a legitimate verdict.
+
+```bash
+bun "$SCRIPTS"/review-plan.ts docs/<slug> --narrow --prior-passes <broad passes run> \
+  --prior-findings /tmp/flightplan-review-<slug>/pass-<last>.md
+```
+
+On the Opus engine, add the same two flags to the `--print` capture (`--print --narrow --prior-passes <n>`) and spawn the reviewer exactly as before — context-less, `subagent_type` omitted.
+
+- **Carry the still-open P1s in on `--prior-findings`, always.** The narrow reviewer must *adjudicate* what the broad loop left open, not merely fail to mention it. A P1 that survives adjudication is real. One the narrow pass drops was noise — and you may only treat it as noise because a reviewer was shown it and declined it, never because the prompt changed underneath it.
+- **Reset the convergence counter at the switch.** The two-consecutive-passes rule compares open-P1 counts, and a new prompt is a new denominator. The count falling on the first narrow pass is the prompt working, not the plan improving. Do not compare across the switch; start counting again from the first narrow pass, so ending the narrow phase early needs two consecutive narrow passes that fail to lower it.
+- **Fix between narrow passes exactly as before.** A narrow P1 is by construction blocking, so it gets fixed, not banked. Re-run `lint-task.ts` and `build-readme.ts` after any structural change.
+- **The first `No blocking findings.` ends the review.** That is the narrow phase's normal exit and the plan ships. `--narrow` is only ever entered after a full broad loop, so the floor is long satisfied.
+- **Five narrow passes is the hard end.** Reaching it, or two consecutive narrow passes that fail to lower the count, is the real non-convergence — and now it means something: two different reviewers, at two different bars, both kept finding the same blocking defects. Stop.
+- **Never enter the narrow phase early.** It is a response to an observed symptom, not a cheaper default. A plan that clears the broad loop never sees it, and narrowing before the cap would drop the P2 channel during the passes where wording and task-split findings are still worth having.
+
+**At the end of the narrow phase:**
+
+- **Bank the last pass's findings. Do not fix them.** A fix applied after the final pass is unverified, and an unverified fix inside a tree that reads as reviewed is worse than a recorded gap — the gap gets the executor's attention and the fix does not. If one is trivially safe and you fix it anyway, say plainly in the recap that it was fixed with no confirming pass.
+- **Hand the decision back to the user. It is not the end of the conversation.** Give them numbers, not a question they cannot answer. Show the open-P1 count for every pass as a trend, mark where the narrow phase began, name the P1s still open, and offer the three real options: ship with the gaps banked, extend, or re-cut at PLAN level. *"Should I review again?"* is not a decision anyone can make. *"broad 5 → 4 → 4 → 3, narrow 2 → 2, two open, here they are"* is.
+- **Extending past the narrow phase needs a named reason and a new bound.** The user may spend more of their budget — but only against a hypothesis for why the next pass would differ: a root-cause fix that should collapse a whole class of findings, or a tier that was visibly wrong. "One more look" is not a reason. State the new bound before starting and stop there. Every rule above still applies inside the extension, so two consecutive passes that fail to lower the count end it early no matter what the new bound said.
+- **A non-converged tree is handed over, not hidden.** List every open P1 in `tasks/README.md`'s Known gaps and **lead the Step 8 recap with it** — "review did not converge: N P1s open after M broad passes and K narrow ones". The user must see the open defects and decide; that decision is theirs, and it is cheaper for them at the narrow cap than at round 19.
 
 ### Step 8 — Stop. Do not execute.
 
@@ -215,7 +236,7 @@ Tell the user where the files live and which task to start from. Do not start im
 
 **Hand back a short recap in the user's reply language** (the files stay English; only this recap is localized). Glanceable: the goal in one line, the buckets and task counts, the suggested first task, and any Known gaps. It lets the user sanity-check the plan's shape without opening every file — it is not a re-paste of the plan.
 
-**If Step 7 ended on non-convergence, that goes first**, before the goal line: how many P1s stayed open, after how many passes, and what they are. Everything else in the recap is secondary to a tree the review could not clear.
+**If Step 7 ended on non-convergence, that goes first**, before the goal line: how many P1s stayed open, after how many passes, and what they are. Everything else in the recap is secondary to a tree the review could not clear. **Say so too when the narrow phase is what cleared the tree** — "the broad loop capped with N P1s open; the narrow phase cleared it in K passes" — because a plan that needed the fallback is not the same as one that converged on its own, and the difference is the user's to weigh.
 
 The next executor can ask "what should I work on?" — this lists tasks whose dependencies are all `done`:
 
@@ -265,7 +286,7 @@ Reach for these instead of doing the mechanical work by hand. Each exports a tes
 - `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
 - `scripts/lint-task.ts` — validates task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
-- `scripts/review-plan.ts` — Step 7's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--prior-findings <file>` folds the previous pass's findings into the bundle so a context-less reviewer stops re-filing them, `--print` emits the instructions + bundle for the Opus reviewer subagent. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.
+- `scripts/review-plan.ts` — Step 7's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--prior-findings <file>` folds the previous pass's findings into the bundle so a context-less reviewer stops re-filing them, `--narrow` (with optional `--prior-passes <n>`) swaps in the post-cap instruction set — blocking classes only, at most five findings, `No blocking findings.` as a sanctioned verdict — and `--print` emits whichever instruction set is selected, so the Opus engine reaches the narrow phase too. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.
 - `scripts/next-ready.ts` — lists tasks whose dependencies are all `done` (executor-session helper)
 - `scripts/score-task.ts` — executor side: feed it `{ dimension: score }` JSON for a deterministic weighted average + hard-fail verdict against the task's own rubric (`scoreTask(rubric, scores)`). `--log <file>` appends to an audit trail.
 - `scripts/mark-done.ts` — the done-transition: sets `> **Status**: done` and ticks every `## Acceptance criteria` / `## Verification` box (`markDone(content)`). Used by `autopilot`.

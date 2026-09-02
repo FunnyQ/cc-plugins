@@ -20,16 +20,23 @@
  * Usage:
  *   bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>]
  *   bun review-plan.ts docs/<slug> --prior-findings <file>   # round 2+
+ *   bun review-plan.ts docs/<slug> --narrow --prior-passes 8 # the post-cap phase
  *   bun review-plan.ts docs/<slug> --print     # emit the instructions+bundle, no CLI
+ *
+ * Two instruction sets, one per phase, both baked in here so all three engines
+ * share one source of criteria: the broad one (7 checks, P1+P2) for the main
+ * loop, and the narrow one (`--narrow`, blocking classes only, at most five
+ * findings) for the phase Step 7 enters after the broad loop hits its cap.
  *
  * Exits with the reviewer's exit code so callers can gate on failure; a missing
  * CLI exits 0 with a warning (skip the gate, record a Known gap).
  *
  * Export surface (for tests):
  *   collectPlanFiles(planDir) — returns ordered list of plan file paths
- *   buildReviewPrompt(files, prior?) — the bundle: instructions + prior findings
- *                                      + file contents
- *   parseArgs(argv)           — pure parse of planDir/engine/model/print/prior
+ *   buildReviewPrompt(files, prior?, opts?) — the bundle: instructions + prior
+ *                                      findings + file contents
+ *   narrowInstructions(n?)    — the narrow-phase instruction text
+ *   parseArgs(argv)           — pure parse of planDir/engine/model/print/prior/narrow
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -45,6 +52,8 @@ export type ReviewArgs = {
   model?: string;
   print: boolean;
   priorFindings?: string;
+  narrow: boolean;
+  priorPasses?: number;
 };
 
 /**
@@ -52,10 +61,21 @@ export type ReviewArgs = {
  * emits the bundle without invoking any CLI (the Opus subagent path).
  */
 export function parseArgs(argv: string[]): ReviewArgs {
-  const out: ReviewArgs = { engine: "codex", print: false };
+  const out: ReviewArgs = { engine: "codex", print: false, narrow: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--engine") {
+    if (a === "--narrow") {
+      out.narrow = true;
+    } else if (a === "--prior-passes") {
+      const v = argv[++i];
+      const n = Number(v);
+      if (!v || !Number.isInteger(n) || n < 1) {
+        throw new Error(
+          `--prior-passes needs a positive integer, got: ${v ?? "(missing)"}`,
+        );
+      }
+      out.priorPasses = n;
+    } else if (a === "--engine") {
       const v = argv[++i];
       if (v !== "codex" && v !== "opencode") {
         throw new Error(
@@ -78,6 +98,12 @@ export function parseArgs(argv: string[]): ReviewArgs {
     } else {
       throw new Error(`Unexpected argument: ${a}`);
     }
+  }
+  // A pass count with no narrow phase is a typo, not a preference: the broad
+  // instructions have nowhere to put it, so honoring it silently would run the
+  // wrong prompt for a caller who believes they asked for the narrow one.
+  if (out.priorPasses !== undefined && !out.narrow) {
+    throw new Error("--prior-passes requires --narrow");
   }
   return out;
 }
@@ -117,6 +143,65 @@ Do not inflate P2 into P1 to seem thorough, and do not soften a P1 to seem agree
 
 ---
 `.trim();
+
+// The narrow phase (`--narrow`), which Step 7 enters when the broad loop hits
+// its cap with P1s still open. It does NOT lower the bar: its five qualifying
+// classes are the broad P1 definition restated. What it removes is the padding
+// pressure — the P2 channel, the open-ended finding count, and the absence of a
+// sanctioned clean verdict. A broad prompt run against an already-revised plan
+// manufactures findings and files some of them as P1; the broad text tries to
+// stop that with one sentence ("Do not inflate P2 into P1"), which does not
+// hold past a handful of passes. This is the same criteria, aimed only at what
+// blocks.
+export function narrowInstructions(priorPasses?: number): string {
+  const history =
+    priorPasses !== undefined
+      ? `has already been through ${priorPasses} review passes`
+      : `has already been through a full review cycle`;
+  return `
+You are reviewing a flightplan artifact — a multi-file planning blueprint written
+to disk so a sub-agent can execute each task independently in a later session,
+with no access to this conversation.
+
+This plan ${history}. The loud problems are fixed. Your job is NOT to find more
+things that could be sharper — it is to find the ones that would actually **stop
+an executor or make them produce the wrong thing**.
+
+## Report a finding only if it meets this bar
+
+A finding qualifies only when an executor, opening one task file plus the \`_context/\`
+files it lists, would either **stall** or **confidently produce something wrong**.
+Concretely, that is:
+
+1. **Two files that contradict each other** on a decision the executor must act on — a flag, a type, a path, a default, a required behavior. Name both sides.
+2. **An interface a task depends on that no task defines** — a function, struct, enum variant, or field that is used but never specified, where the executor would have to invent it and a sibling task would then collide with their invention.
+3. **A dependency that cannot be satisfied** — a task that needs an artifact produced by a task that runs after it, or not at all.
+4. **An acceptance criterion that is impossible to satisfy, or that passes while the stated goal fails** — an arithmetic impossibility, a criterion referencing something that does not exist at that point in the sequence, or a gate that a deliberately-broken implementation would still pass.
+5. **A task that cannot be done from \`_context/\` plus its own file** — genuinely missing substance, not a preference for more detail.
+
+## Do NOT report these
+
+These were considered and are out of scope for this pass. Reporting them is noise:
+
+- Wording, ordering, phrasing, or a criterion that "could be sharper" while still being checkable.
+- A missing test case, a missing golden fixture, or a fixture count — unless the count makes a stated criterion arithmetically impossible.
+- A rubric anchor you would have written differently.
+- Anything explicitly recorded as a deliberate limitation, deferral, or "out of scope" in the file itself — those are decisions. Only flag one if you can name a concrete failure the author's own stated reason does not cover.
+- A \`## Known gaps\` entry in \`tasks/README.md\` or PLAN.md — same rule: those are dispositioned decisions.
+- The task index in \`tasks/README.md\` between the generated markers — it is machine-written from task headers.
+- Suggestions to add scope, options, flags, or capabilities. The plan's surface is itself a decision; "you should also support X" is not a defect.
+
+## Output
+
+Rank findings by how badly they block, worst first. **Report at most five.** Prefix each with \`P1\`.
+
+If nothing meets the bar, say exactly: \`No blocking findings.\` — and stop. Do not pad the list to appear thorough. A clean verdict on an already-revised plan is a legitimate and expected outcome.
+
+For each finding give: the file, the section or field, what the two sides say (or what is missing), and the concrete fix in one sentence.
+
+---
+`.trim();
+}
 
 // Every finding the author dispositioned instead of fixing is banked in
 // tasks/README.md's "Known gaps". A reviewer that cannot see it re-files the
@@ -188,8 +273,11 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
 export async function buildReviewPrompt(
   files: string[],
   priorFindings?: string,
+  opts?: { narrow?: boolean; priorPasses?: number },
 ): Promise<string> {
-  const sections: string[] = [REVIEW_INSTRUCTIONS];
+  const sections: string[] = [
+    opts?.narrow ? narrowInstructions(opts.priorPasses) : REVIEW_INSTRUCTIONS,
+  ];
   if (priorFindings && priorFindings.trim().length > 0) {
     sections.push(`\n\n${PRIOR_FINDINGS_RULE}\n\n${priorFindings.trim()}\n`);
   }
@@ -308,14 +396,14 @@ async function main() {
   } catch (err) {
     console.error((err as Error).message);
     console.error(
-      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--print]",
+      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--narrow [--prior-passes <n>]] [--print]",
     );
     process.exit(2);
   }
 
   if (!args.planDir) {
     console.error(
-      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--print]",
+      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--narrow [--prior-passes <n>]] [--print]",
     );
     process.exit(2);
   }
@@ -348,7 +436,10 @@ async function main() {
     }
   }
 
-  const prompt = await buildReviewPrompt(files, prior);
+  const prompt = await buildReviewPrompt(files, prior, {
+    narrow: args.narrow,
+    priorPasses: args.priorPasses,
+  });
 
   // --print: emit the exact instructions+bundle and stop. The Opus reviewer
   // subagent consumes this, so it must be clean (no file-list header on stdout).
@@ -357,7 +448,9 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Flightplan review (${args.engine}) — ${files.length} file(s):`);
+  console.log(
+    `Flightplan review (${args.engine}${args.narrow ? ", narrow" : ""}) — ${files.length} file(s):`,
+  );
   for (const f of files) console.log(`  ${relative(process.cwd(), f)}`);
   console.log();
 
