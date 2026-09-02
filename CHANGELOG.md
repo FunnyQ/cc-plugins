@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 3.24.0] - 2026-09-02
+
+_tracks tag `dispatch-v3.24.0`_
+
+### Added
+- Flightplan's plan review no longer ends at its round cap. A review still finding blockers there switches to a narrow phase for up to five more passes, which reports only what would actually stall an executor — at most five findings, with a clean verdict treated as a legitimate result. A long review is usually the broad prompt manufacturing findings against an already-revised plan, not a broken plan, and the narrow phase is what lets one finish instead of being handed back unresolved.
+
+### Changed
+- A plan review that stops converging before the cap now enters the same narrow phase, rather than stopping and handing the open findings back.
+
 ## [monitor 4.0.8] - 2026-08-31
 
 _tracks tag `monitor-v4.0.8`_
