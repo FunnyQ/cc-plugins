@@ -1,5 +1,16 @@
 # Changelog
 
+## [dispatch 3.25.0] - 2026-09-02
+
+_tracks tag `dispatch-v3.25.0`_
+
+### Added
+- Autopilot now records the rubric judge's full reasoning for every task, not just the ones that fail. The judge's prose already fed retry feedback and the attempt-cap escalation, but a passing attempt used to leave no trace of why it passed — `RUNLOG.md` now folds that rationale into a collapsed details block under the verdict, so the audit trail is no longer thinnest exactly where an auditor looks first.
+- The flightdeck dashboard surfaces the same rationale: expanding a task card's or a fleet row's rubric now shows the judge's write-up beneath the dimension meters, in a capped, scrollable panel so a long rationale doesn't stretch the layout.
+
+### Changed
+- `score-task.ts` takes the rationale through a new `--rationale-file <path>` flag instead of an inline argument, since a rationale can run to hundreds of words of markdown. A missing or unreadable file only logs a warning — it never blocks a passing task from being recorded.
+
 ## [dispatch 3.24.0] - 2026-09-02
 
 _tracks tag `dispatch-v3.24.0`_
