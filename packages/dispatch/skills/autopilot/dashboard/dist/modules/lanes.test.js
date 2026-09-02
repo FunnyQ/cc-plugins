@@ -55,9 +55,27 @@ describe("Lanes", () => {
 
     expect(component.percent(4.1)).toBe("82%");
     expect(component.percent(4)).toBe("80%");
-    expect(component.renderDimensions(breakdown)).toContain(
+    expect(component.renderRubric({ breakdown })).toContain(
       "inline-size: 33.33333333333333%",
     );
+  });
+
+  test("folds the judge rationale into the expanded rubric, escaped", () => {
+    const component = Lanes({ tree });
+    const score = {
+      breakdown: [{ name: "Correctness", weight: 3, score: 5 }],
+      rationale: "  Deviation at `kind.rs:68` — <b>exit 2</b>.\n\nI ran it.  ",
+    };
+
+    const html = component.renderRubric(score);
+    expect(html).toContain('<p class="rationale">');
+    expect(html).toContain("&lt;b&gt;exit 2&lt;/b&gt;");
+    // Trimmed at the edges, but the judge's own paragraph break survives.
+    expect(html).toContain("exit 2&lt;/b&gt;.\n\nI ran it.</p>");
+    // A verdict logged before --rationale-file existed renders bars only.
+    expect(
+      component.renderRubric({ breakdown: score.breakdown }),
+    ).not.toContain("rationale");
   });
 
   test("reuses the built lanes until the task payload is replaced", () => {

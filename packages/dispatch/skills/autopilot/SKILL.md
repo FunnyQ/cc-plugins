@@ -212,10 +212,10 @@ How the orchestrator decides to park — the quality-vs-infrastructure split, th
 
 Everything lands in `docs/<slug>/.flightlog/`. It is **gitignored** via a self-ignore (`.flightlog/.gitignore` containing `*`). This directory is created automatically on first write; no user setup is needed.
 
-- **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label>`. Deterministic, guaranteed each cycle.
+- **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label> --rationale-file <its-rationale.md>`. Deterministic, guaranteed each cycle. The rationale file is why a *passing* verdict keeps its evidence — without it the trail records a weighted number and nothing that justifies it.
 - **Narrative** — Dev / judge / final-review agents run `flightlog.ts log <run.jsonl> --task <ref> --role <role> --attempt N --agent <label> --message "..."` to record what they did.
 - **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (`<reviewEngine>` / reuse / leanness / efficiency). These persist as the artifact behind each closing-round verdict.
-- **Report** — `flightlog.ts report <run.jsonl>` renders `RUNLOG.md`, grouped by task in chronological order.
+- **Report** — `flightlog.ts report <run.jsonl>` renders `RUNLOG.md`, grouped by task in chronological order. A verdict that carries a rationale folds it into a collapsed `<details>` block under its line.
 
 Each entry records an `agentLabel` so a suspicious verdict can be traced back to that agent's raw `agent-<id>.jsonl` in the harness transcript.
 

@@ -5,7 +5,7 @@ import {
   formatTokens,
   freshTokens,
   percent,
-  renderDimensions,
+  renderRubric,
   scoreClass,
   tokenTier,
   totalTokens,
@@ -128,7 +128,7 @@ export function renderMessage(message) {
 function renderBreakdown(row) {
   if (!expandedRows.has(row.key) || !row.score?.breakdown?.length) return "";
 
-  return `<div class="c-fleet-rubric" id="fleet-rubric-${escapeHtml(row.key)}">${renderDimensions(row.score.breakdown)}</div>`;
+  return `<div class="c-fleet-rubric" id="fleet-rubric-${escapeHtml(row.key)}">${renderRubric(row.score)}</div>`;
 }
 
 function renderRow(row, nowMs) {

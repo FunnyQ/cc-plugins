@@ -199,6 +199,21 @@ describe("deriveTaskViews", () => {
     expect(view.latestScore?.weighted).toBe(4.7);
   });
 
+  test("carries the judge rationale onto latestScore, and omits it when absent", () => {
+    const withProse = {
+      ...score("ui/03", 1, "2026-01-01T00:03:00Z"),
+      rationale: "Grounded in the gate evidence.",
+    };
+    const [view] = deriveTaskViews({ "ui/03": task("ui/03") }, [withProse]);
+    expect(view.latestScore?.rationale).toBe("Grounded in the gate evidence.");
+
+    // A trail written before `--rationale-file` leaves the key off entirely.
+    const [older] = deriveTaskViews({ "ui/03": task("ui/03") }, [
+      score("ui/03", 1, "2026-01-01T00:03:00Z"),
+    ]);
+    expect(older.latestScore).not.toHaveProperty("rationale");
+  });
+
   test("keeps a task in progress until every parallel lens has ended", () => {
     const lenses = ["leanness", "reuse", "codex", "efficiency"];
     const entries = [

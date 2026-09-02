@@ -104,6 +104,23 @@ describe("renderRunlog", () => {
     expect(md).toMatch(/veto/i);
   });
 
+  test("folds a judge rationale under the verdict line", () => {
+    const md = renderRunlog(
+      [{ ...SCORE, rationale: "Correctness 5/5.\n\n`kind.rs:68` is wrong." }],
+      { slug: "demo" },
+    );
+    expect(md).toContain("<details><summary>judge rationale</summary>");
+    // The judge's own markdown survives verbatim — no re-indentation.
+    expect(md).toContain("Correctness 5/5.\n\n`kind.rs:68` is wrong.");
+    expect(md).toContain("</details>");
+    // The verdict line still leads, so a scan of the file reads as before.
+    expect(md.indexOf("4.40")).toBeLessThan(md.indexOf("<details>"));
+  });
+
+  test("emits no details block when a score has no rationale", () => {
+    expect(renderRunlog([SCORE], { slug: "demo" })).not.toContain("<details>");
+  });
+
   test("separates multiple tasks under their own headings", () => {
     const other: NoteEntry = { ...NOTE, task: "backend/01" };
     const md = renderRunlog([NOTE, other], { slug: "demo" });

@@ -152,6 +152,29 @@ describe("buildScoreEntry", () => {
     });
     expect(entry.attempt).toBe(1);
   });
+
+  test("records a trimmed rationale, and omits the key without one", () => {
+    const result = scoreTask(RUBRIC, {
+      Correctness: 5,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+      "Assumptions & docs": 5,
+    });
+    const meta = { task: "ui/03", ts: "2026-06-01T10:00:00.000Z" };
+
+    expect(
+      buildScoreEntry(result, {
+        ...meta,
+        rationale: "\nGrounded in the gate.\n",
+      }).rationale,
+    ).toBe("Grounded in the gate.");
+    // Absent and whitespace-only both leave the key off, so an old trail and a
+    // judge that wrote an empty file render identically.
+    expect(buildScoreEntry(result, meta)).not.toHaveProperty("rationale");
+    expect(
+      buildScoreEntry(result, { ...meta, rationale: "   \n" }),
+    ).not.toHaveProperty("rationale");
+  });
 });
 
 describe("toJsonResult", () => {

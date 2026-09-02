@@ -44,6 +44,12 @@ export type ScoreEntry = {
   threshold: number;
   passOp: ">" | ">=";
   breakdown: { name: string; weight: number; score: number }[];
+  /**
+   * The judge's prose justification for the scores. Optional because every
+   * entry written before this field existed has none — an old trail stays
+   * valid and re-renders identically.
+   */
+  rationale?: string;
 };
 
 export type NoteEntry = {
@@ -151,7 +157,13 @@ function renderLine(e: FlightlogEntry): string {
   const verdict = e.passed ? "PASS ✅" : "FAIL ❌";
   const veto = e.hardFailed ? " · hard-fail veto" : "";
   const miss = e.missing.length ? ` · missing: ${e.missing.join(", ")}` : "";
-  return `- ${attempt}judge — score ${e.weighted.toFixed(2)} ${e.passOp} ${e.threshold} → ${verdict}${veto}${miss}${agent}`;
+  const line = `- ${attempt}judge — score ${e.weighted.toFixed(2)} ${e.passOp} ${e.threshold} → ${verdict}${veto}${miss}${agent}`;
+  const rationale = e.rationale?.trim();
+  if (!rationale) return line;
+  // Collapsed and unindented on purpose. A rationale runs to hundreds of words
+  // and would bury the verdict lines; nesting the block inside the list item
+  // would need every line re-indented, which rewrites the judge's own markdown.
+  return `${line}\n\n<details><summary>judge rationale</summary>\n\n${rationale}\n\n</details>\n`;
 }
 
 /**

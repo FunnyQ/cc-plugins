@@ -12,13 +12,16 @@
  * was scored.
  *
  * Usage:
- *   bun score-task.ts <task-file> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]
+ *   bun score-task.ts <task-file> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>] [--rationale-file <path>]
  *     scores.json: { "Correctness": 5, "Test coverage": 4, ... } keyed by dimension name
  *     --json: print the machine gate verdict only:
  *             {"weighted":number,"passed":boolean,"hardFailed":boolean,"missing":string[]}
  *     --log <file>: append the verdict to a flightlog JSONL trail (auto-creates
  *                   the dir + a self-ignore when logging into `.flightlog/`).
  *     --attempt / --agent: metadata stamped onto the logged entry.
+ *     --rationale-file <path>: a file holding the judge's prose justification,
+ *                   recorded on the logged entry. A file, not an argument,
+ *                   because a rationale runs to hundreds of words of markdown.
  *
  * Exits 0 if passed, 1 if not, 2 on usage / unparseable-rubric errors.
  */
@@ -121,8 +124,15 @@ export function scoreTask(
 /** Build a flightlog score entry from a verdict + run metadata (pure). */
 export function buildScoreEntry(
   result: ScoreResult,
-  meta: { task: string; ts: string; attempt?: number; agentLabel?: string },
+  meta: {
+    task: string;
+    ts: string;
+    attempt?: number;
+    agentLabel?: string;
+    rationale?: string;
+  },
 ): ScoreEntry {
+  const rationale = meta.rationale?.trim();
   return {
     kind: "score",
     ts: meta.ts,
@@ -140,7 +150,24 @@ export function buildScoreEntry(
       weight: d.weight,
       score: d.score,
     })),
+    ...(rationale ? { rationale } : {}),
   };
+}
+
+/**
+ * Read the judge's rationale, warning rather than failing when it is missing.
+ *
+ * The verdict is already computed by the time this runs, and the judge call is
+ * deliberately not retried (see the orchestrator's `resilient()` notes). Exiting
+ * here would park a task that passed its rubric over a missing narrative field.
+ */
+async function readRationale(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf-8");
+  } catch (err) {
+    console.error(`Cannot read --rationale-file: ${(err as Error).message}`);
+    return undefined;
+  }
 }
 
 async function main() {
@@ -153,9 +180,10 @@ async function main() {
   const logFile = flagValue(argv, "--log");
   const attemptRaw = flagValue(argv, "--attempt");
   const agentLabel = flagValue(argv, "--agent");
+  const rationaleFile = flagValue(argv, "--rationale-file");
   if (!taskFile || !scoresFile) {
     console.error(
-      "Usage: bun score-task.ts <task-file> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>]",
+      "Usage: bun score-task.ts <task-file> <scores.json> [--json] [--log <file>] [--attempt N] [--agent <label>] [--rationale-file <path>]",
     );
     process.exit(2);
   }
@@ -189,6 +217,7 @@ async function main() {
       ts: new Date().toISOString(),
       attempt: attemptRaw ? parseInt(attemptRaw, 10) : undefined,
       agentLabel,
+      rationale: rationaleFile ? await readRationale(rationaleFile) : undefined,
     });
     await appendEntry(logFile, entry);
   }

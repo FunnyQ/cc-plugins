@@ -951,6 +951,22 @@ button {
       color: var(--muted);
       font-size: var(--text-xs);
     }
+
+    /* The judge's prose, unparsed — `pre-wrap` is what carries its paragraphs.
+       Capped and scrolled: a rationale runs to hundreds of words, and a card
+       that grew to fit one would stretch its whole lane. */
+    > .rationale {
+      border-block-start: var(--border-width) solid var(--rule);
+      color: var(--muted);
+      font-family: var(--font-sans);
+      font-size: var(--text-xs);
+      line-height: 1.5;
+      margin: 0;
+      max-block-size: 14lh;
+      overflow-y: auto;
+      padding-block-start: var(--space-2);
+      white-space: pre-wrap;
+    }
   }
 
   @container (inline-size < 600px) {
@@ -1369,6 +1385,21 @@ button {
   background: var(--state-ready);
   block-size: 100%;
   display: block;
+}
+
+/* The judge's prose, unparsed — `pre-wrap` is what carries its paragraphs. */
+.c-fleet-rubric > .rationale {
+  border-block-start: var(--border-width) solid var(--rule);
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  margin: 0;
+  max-block-size: 18lh;
+  max-inline-size: 90ch;
+  overflow-y: auto;
+  padding-block-start: var(--space-3);
+  white-space: pre-wrap;
 }
 
 .fleet-empty,

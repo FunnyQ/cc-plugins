@@ -154,14 +154,8 @@ function largestWeight(breakdown) {
   );
 }
 
-/**
- * The dimension rows of a rubric breakdown, as markup.
- *
- * The fleet table builds HTML strings and the task lanes are a petite-vue
- * template, but the user reads the same meter in both, so the rows are written
- * once here. Each panel keeps its own wrapper element.
- */
-export function renderDimensions(breakdown) {
+/** The dimension rows of a rubric breakdown, as markup. */
+function renderDimensions(breakdown) {
   const largest = largestWeight(breakdown);
   return breakdown
     .map(
@@ -175,6 +169,32 @@ export function renderDimensions(breakdown) {
     </div>`,
     )
     .join("");
+}
+
+/**
+ * The whole expanded rubric well: the dimension meters, then the judge's prose.
+ *
+ * The fleet table builds HTML strings and the task lanes are a petite-vue
+ * template, but the user reads the same well in both, so it is written once
+ * here. Each panel keeps its own wrapper element.
+ *
+ * The rationale is escaped and laid out with `white-space: pre-wrap` rather than
+ * parsed. It is markdown the judge wrote for `RUNLOG.md` — rendering it would
+ * mean shipping a parser and a sanitizer for text that is read as evidence, not
+ * as a document, and its paragraphs and indentation already carry the structure.
+ *
+ * Takes the score, not its `breakdown`, because a verdict is now two things: an
+ * older trail has bars and no prose, and both panels must render that unchanged.
+ */
+export function renderRubric(score) {
+  const dimensions = score?.breakdown?.length
+    ? renderDimensions(score.breakdown)
+    : "";
+  const rationale = String(score?.rationale ?? "").trim();
+  if (!rationale) return dimensions;
+
+  return `${dimensions}
+    <p class="rationale">${escapeHtml(rationale)}</p>`;
 }
 
 /** Bucket, then task number read as a number, then ref. The lanes and the graph share it. */

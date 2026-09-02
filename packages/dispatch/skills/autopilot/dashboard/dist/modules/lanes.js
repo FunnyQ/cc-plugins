@@ -5,7 +5,7 @@ import {
   freshTokens,
   hasTokenReading,
   percent,
-  renderDimensions,
+  renderRubric,
   scoreClass,
 } from "./format.js";
 
@@ -87,7 +87,7 @@ export function Lanes({ tree, usage }) {
                   v-show="isExpanded(task.ref)"
                   class="c-rubric-breakdown"
                   :id="\`rubric-\${task.ref.replace('/', '-')}\`"
-                  v-html="renderDimensions(task.latestScore.breakdown)"
+                  v-html="renderRubric(task.latestScore)"
                 ></div>
               </article>
             </div>
@@ -120,7 +120,7 @@ export function Lanes({ tree, usage }) {
     },
     scoreClass,
     percent,
-    renderDimensions,
+    renderRubric,
     formatScore,
     formatTokens,
     freshTokens,

@@ -63,6 +63,8 @@ export type TaskView = {
     passed: boolean;
     hardFailed: boolean;
     breakdown: { name: string; weight: number; score: number }[];
+    /** The judge's prose. Absent on a verdict logged before `--rationale-file`. */
+    rationale?: string;
   } | null;
 };
 
@@ -275,6 +277,9 @@ export function deriveTaskViews(
             passed: latestScore.passed,
             hardFailed: latestScore.hardFailed,
             breakdown: latestScore.breakdown,
+            ...(latestScore.rationale
+              ? { rationale: latestScore.rationale }
+              : {}),
           }
         : null,
     };

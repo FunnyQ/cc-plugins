@@ -380,6 +380,8 @@ The manifest. A seven-column grid at 12px mono with 1px rule row separators, a `
 
 One shape for both views: a 4px `surface-2` track, a flat fill in `done` / `alert` / `flight` by verdict, and a 1px `text`-coloured threshold marker standing in it. Rubric dimensions use a `rule` track with a `ready` fill, the bar's own width scaled to the dimension's weight.
 
+Beneath the bars, an expanded rubric well ends with the judge's rationale when the verdict carries one: `muted` sans at `text-xs`, 1.5 line-height, above a `rule` divider, wrapped with `white-space: pre-wrap` so the judge's own paragraphs survive unparsed. It is capped and scrolled — 14 lines in a task card, 18 in a fleet row — because a rationale runs to hundreds of words and a well that grew to fit one would stretch its whole lane. A verdict logged without a rationale renders bars only, unchanged.
+
 ### Motion
 
 - `--motion-duration: 150ms` on colour and opacity transitions. Nothing moves position.

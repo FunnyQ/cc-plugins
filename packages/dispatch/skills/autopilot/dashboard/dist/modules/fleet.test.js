@@ -172,6 +172,28 @@ describe("toggleRubric", () => {
     expand("toggle-row");
     expect(isExpanded("toggle-row")).toBe(true);
   });
+
+  test("an expanded row shows the judge rationale beneath its meters", () => {
+    const row = {
+      key: "quiet-row",
+      role: "judge",
+      ref: "core/01",
+      status: "finished",
+      score: {
+        breakdown: [{ name: "Correctness", score: 5, weight: 3 }],
+        rationale: "Grounded in the gate: `kind.rs:68` <exit 2>.",
+      },
+    };
+
+    // Collapsed, the prose stays out of the DOM entirely.
+    expect(rowHtml(row)).not.toContain('<p class="rationale">');
+    expand("quiet-row");
+    const html = rowHtml(row);
+    expect(html).toContain('<p class="rationale">');
+    expect(html).toContain("&lt;exit 2&gt;");
+    // The meters still lead — the prose is the supporting evidence, not the verdict.
+    expect(html.indexOf("Correctness")).toBeLessThan(html.indexOf("rationale"));
+  });
 });
 
 describe("runElapsed", () => {

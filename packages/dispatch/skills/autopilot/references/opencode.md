@@ -54,10 +54,12 @@ Repeat these steps by hand, one wave at a time:
    `## Acceptance criteria`.
 4. Spawn a second subagent through the **task tool** in the **judge role**, to
    score the task against its `## Eval rubric`.
-5. Run `bun $SCRIPTS/score-task.ts <taskfile> <scores.json> --json --log
-   <run.jsonl> --attempt N --agent <label>` and gate on the printed verdict
-   object. Do not re-derive the weighted average or the hard-fail arithmetic by
-   hand — there is exactly one scoring implementation.
+5. Write the judge's rationale to a file, then run `bun $SCRIPTS/score-task.ts
+   <taskfile> <scores.json> --json --log <run.jsonl> --attempt N --agent <label>
+   --rationale-file <rationale.md>` and gate on the printed verdict object. Do
+   not re-derive the weighted average or the hard-fail arithmetic by hand —
+   there is exactly one scoring implementation. Skip the rationale file and a
+   passing task leaves only a number behind in the trail.
 6. Retry the task until its rubric passes or the attempt cap is reached. Park a
    capped task at `Status: blocked` and escalate it to the user; never silently
    skip it.
