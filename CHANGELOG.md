@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 3.25.2] - 2026-09-04
+
+_tracks tag `dispatch-v3.25.2`_
+
+### Changed
+- Autopilot's dashboard now renders a judge's rationale as formatted markdown instead of raw plaintext, so headings and bold text read as intended rather than showing `##`/`**` noise — worthwhile now that a rationale can run to hundreds of words. It also gets its own reading typography (larger text, looser leading, a comfortable line measure) instead of the small caption style used elsewhere.
+- Both the fleet and lanes panels now preserve your scroll position across their 2-second auto-refresh, instead of resetting to the top on every tick.
+
+### Fixed
+- Numbered step lists in a judge's rationale that started at a number other than 1 now keep that starting number, instead of always restarting at 1.
+- Continuation lines that wrapped onto a new paragraph no longer split a single numbered list into several lists that each restart from 1.
+
 ## [dispatch 3.25.1] - 2026-09-04
 
 _tracks tag `dispatch-v3.25.1`_
