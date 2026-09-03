@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 3.25.1] - 2026-09-04
+
+_tracks tag `dispatch-v3.25.1`_
+
+### Added
+- Autopilot's flightdeck dashboard now shows a "Waves left" readout in the header, so you can see at a glance how many dispatch rounds remain instead of reading the task tree by hand. The count includes the wave already in flight, and a task with a dependency cycle or a `Depends on` naming a task not in the tree paints in the alert colour rather than silently vanishing from the total.
+
+## [herdr 0.5.4] - 2026-09-04
+
+_tracks tag `herdr-v0.5.4`_
+
+### Fixed
+- Corrected `herdr-browser`'s documentation on viewport and zoom: a pane that rendered noticeably oversized was caused by the terminal's own cell-zoom scaling, not by the skill or the `emulate` override, and the fix is a terminal key command rather than anything over CDP. Also fixed a false claim that the `emulate` override was permanent — it outlives the command that set it, but any navigation drops it, and setting the pane's own size back undoes one.
+
 ## [chronicle 0.15.0] - 2026-09-03
 
 _tracks tag `chronicle-v0.15.0`_
