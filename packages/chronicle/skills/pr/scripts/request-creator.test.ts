@@ -70,6 +70,34 @@ describe("buildArgs", () => {
     expect(buildArgs(githubInput)).not.toContain("--repo");
   });
 
+  // The marker is appended here, not by the drafting agent: a script cannot
+  // forget it, reword it, or bury it mid-title.
+  test("appends the skip-review marker to the github title", () => {
+    expect(buildArgs({ ...githubInput, skipReview: true })).toContain(
+      "Ship request creator [skip-review]",
+    );
+  });
+
+  test("appends the skip-review marker to the gitlab title", () => {
+    expect(
+      buildArgs({ ...githubInput, provider: "gitlab", skipReview: true }),
+    ).toContain("Ship request creator [skip-review]");
+  });
+
+  test("does not append the marker twice", () => {
+    expect(
+      buildArgs({
+        ...githubInput,
+        title: "Ship request creator [skip-review]",
+        skipReview: true,
+      }),
+    ).toContain("Ship request creator [skip-review]");
+  });
+
+  test("leaves the title untouched without skipReview", () => {
+    expect(buildArgs(githubInput)).toContain("Ship request creator");
+  });
+
   test("builds gitlab draft args with branch flags and confirmation", () => {
     expect(
       buildArgs({

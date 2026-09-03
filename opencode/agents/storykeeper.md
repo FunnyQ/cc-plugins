@@ -59,6 +59,9 @@ Do not emit waiting prose.
   skald unchanged. Never infer or replace it.
 - `branch` — the current branch, already checked safe by the main agent.
 - `draft` — defaults to `true`.
+- `skipReview` — the user's answer at the skill's review gate. Defaults to `false`.
+  Pass it to the messenger inside `CreateInput`. Never pass it to the skald, and never
+  edit the title yourself — `request-creator.ts` stamps the ` [skip-review]` marker.
 
 ## Flow
 
@@ -79,11 +82,11 @@ provider, report no recognizable remote. In all three cases, stop before the mes
 ```
 task({
   subagent_type: "messenger",
-  prompt: "skill directory (absolute, literal): <the absolute path you were given>. Create the request from this CreateInput JSON: { provider, title, body, base, head, draft, repo }. Return the CreateResult."
+  prompt: "skill directory (absolute, literal): <the absolute path you were given>. Create the request from this CreateInput JSON: { provider, title, body, base, head, draft, skipReview, repo }. Return the CreateResult."
 })
 ```
 
-Build `CreateInput` from the skald's output plus `draft`. Pass a non-null cross-fork
+Build `CreateInput` from the skald's output plus `draft` and `skipReview`. Pass a non-null cross-fork
 `repo` and a qualified `head` unchanged. Otherwise, omit `repo`.
 
 ### 3. Report

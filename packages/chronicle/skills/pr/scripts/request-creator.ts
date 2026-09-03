@@ -15,7 +15,12 @@ export type CreateInput = {
   // workflow (origin = the fork), where gh correctly defaults to the parent repo
   // and forcing --repo would open a fork→fork PR instead.
   repo?: string;
+  // The user answered "no review needed" at the skill's review gate. The marker
+  // is stamped onto the title here so review automation reads a fixed string.
+  skipReview?: boolean;
 };
+
+export const SKIP_REVIEW_SUFFIX = "[skip-review]";
 
 export type CreateResult =
   | { ok: true; url: string }
@@ -33,7 +38,21 @@ function binaryForProvider(provider: Provider): "gh" | "glab" {
   return provider === "github" ? "gh" : "glab";
 }
 
+export function resolveTitle(input: CreateInput): string {
+  if (!input.skipReview) {
+    return input.title;
+  }
+
+  const title = input.title.trimEnd();
+
+  return title.endsWith(SKIP_REVIEW_SUFFIX)
+    ? title
+    : `${title} ${SKIP_REVIEW_SUFFIX}`;
+}
+
 export function buildArgs(input: CreateInput): string[] {
+  const title = resolveTitle(input);
+
   if (input.provider === "github") {
     const args = ["gh", "pr", "create"];
 
@@ -47,7 +66,7 @@ export function buildArgs(input: CreateInput): string[] {
       "--head",
       input.head,
       "--title",
-      input.title,
+      title,
       "--body",
       input.body,
     );
@@ -68,7 +87,7 @@ export function buildArgs(input: CreateInput): string[] {
     "--target-branch",
     input.base,
     "--title",
-    input.title,
+    title,
     "--description",
     input.body,
     "--yes",

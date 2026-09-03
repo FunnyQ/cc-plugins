@@ -17,8 +17,8 @@ The Storykeeper uses the bare child names `skald` and `messenger`.
 ## Nothing is inherited
 
 OpenCode task-tool subagents do **not** inherit parent context. Pass every
-input explicitly on the spawn — `contextBrief`, `base`, `branch`, and `draft` —
-plus the **skill directory** as a literal:
+input explicitly on the spawn — `contextBrief`, `base`, `branch`, `draft`, and
+`skipReview` — plus the **skill directory** as a literal:
 
 ```text
 skill directory = /Users/<you>/.config/opencode/skills/pr

@@ -86,10 +86,23 @@ live in those files.
    this invocation only. It does not rewrite config. See
    [references/pr-config.md](references/pr-config.md) for the schema and routing rules.
 
-2. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
+2. **Ask whether this PR needs review.** Use the harness's interactive question tool —
+   `AskUserQuestion` in Claude Code, `request_user_input` in Codex. Offer two options:
+   "Needs review" (recommended, the default) and "No review needed". Ask once, on every
+   run, before spawning. Never infer the answer from the diff size or the branch name.
+
+   - "Needs review" → `skipReview` is `false`.
+   - "No review needed" → `skipReview` is `true`. The messenger's script appends
+     ` [skip-review]` to the title. Do not write the marker into the title yourself,
+     and never ask the skald to.
+
+   If no structured question tool is available, ask in plain text and resume only after
+   the answer. If the user already stated the answer in the current request ("no review
+   needed", "skip review"), take it and skip the question.
+3. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
    drawn from this conversation (the Storykeeper and its children can't see the chat).
    This is the only "why" they get beyond the cockpit trail and commits.
-3. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
+4. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
    - the **skill directory** — the skill's load-time "Base directory for this
      skill" banner value (so the children resolve `<skill dir>/scripts/analyze-branch.ts`
      and `<skill dir>/scripts/request-creator.ts`). Do not hard-code a
@@ -97,12 +110,13 @@ live in those files.
      Pass it as a **literal absolute path**, never as a `$`-prefixed token —
      nothing sets that variable in a child's shell, so its command silently
      runs against `/`.
-   - `contextBrief` (from step 2).
+   - `contextBrief` (from step 3).
    - `base` — the explicit branch selected in step 1. Never pass `auto`.
    - `branch` — the current branch. If it is a protected branch, defer to the user's
      existing git-flow guard before spawning.
    - `draft` — optional. Default `true`. Pass `false` only if the user asked to open
      the PR ready rather than as a draft.
+   - `skipReview` — the answer from step 2. Always pass it explicitly.
 
 **Verify before reporting:**
 
@@ -128,12 +142,12 @@ Codex uses the same topology through one of two role-loading paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_storykeeper`, passing the literal skill directory, `contextBrief`,
-   `base`, `branch`, and `draft`.
+   `base`, `branch`, `draft`, and `skipReview`.
 2. **Generic sub-agent API only**: first verify the stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
    exactly one non-fork generic agent with task name `chronicle_storykeeper` and no
    inherited turns. Tell it to read and obey the `developer_instructions` in
-   `storykeeper.toml` before it handles the same five inputs. Its stable instructions
+   `storykeeper.toml` before it handles the same six inputs. Its stable instructions
    delegate sequentially to generic Skald and Messenger children that self-load their
    own TOMLs. Do not paste or improvise the role instructions in the spawn prompt.
 

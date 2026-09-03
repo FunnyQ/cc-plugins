@@ -26,9 +26,13 @@ pretend success.
     "base": "<base branch>",
     "head": "<head branch>", // "owner:branch" when repo is set
     "draft": false,          // true if the user chose "Open as draft"
+    "skipReview": false,     // true if the user chose "No review needed"
     "repo": "owner/name"     // OMIT unless the Storykeeper gave you one
   }
   ```
+
+  `skipReview` makes the script append ` [skip-review]` to the title. Pass the
+  flag through; never write the marker into `title` yourself.
 
   `repo` arrives only for a cross-fork request. The branch lives on a fork
   while `origin` is upstream, and `gh` cannot infer this. Pass it through
