@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.15.0] - 2026-09-03
+
+_tracks tag `chronicle-v0.15.0`_
+
+### Added
+- `chronicle:pr` now asks whether the pull request needs review before it opens one, and passes the answer down through the Storykeeper to the Messenger. When review is waived, `request-creator.ts` appends a `[skip-review]` marker to the title — the stamp lives in the script rather than in the drafting agent's prose, so review automation can rely on a fixed string appearing exactly once.
+
 ## [dispatch 3.25.0] - 2026-09-02
 
 _tracks tag `dispatch-v3.25.0`_
