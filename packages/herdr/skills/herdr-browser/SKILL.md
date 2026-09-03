@@ -85,7 +85,7 @@ Such a page has no one height to capture — `scrollHeight` read 12315, then 142
 then 27295 on the same site as the viewport and the animations changed. Scroll it
 and take a viewport shot per screen instead. Enlarging the viewport with `emulate
 --size` is not the way around this: Chromium clamps that capture at 16384px, and
-the override is sticky.
+the override outlives the command that set it.
 
 `console` reads the buffer the page itself kept, so it covers lines printed
 before this command ran, **including uncaught exceptions**. Use `watch` when you
@@ -145,8 +145,33 @@ B emulate --device iphone|ipad|laptop|desktop
 B emulate --size 1440x900
 ```
 
-The override is **sticky and has no clear** — it outlives the command, and
-another size is the only way back.
+The override outlives the command that set it, but **a navigation drops it** —
+`goto` anywhere and the page is back on the pane's own viewport. There is no
+clear either; set the pane's own size back to undo one.
+
+**A pane can sit at a page zoom other than 100%, and that reads as a rendering
+bug rather than as a setting.** terminal-browser scales the page zoom by the
+terminal's cell-pixel ratio, so changing the terminal font size leaves every
+browser pane zoomed, and it stays that way. The tell is an `innerWidth` far
+below `outerWidth` against an inflated `devicePixelRatio`:
+
+```bash
+B eval 'JSON.stringify([innerWidth,outerWidth,devicePixelRatio])'
+# [808,1742,4.312]  — 2.16x too big, and every responsive site in its narrow layout
+```
+
+Reset it from outside the browser, naming the pane `open` printed (`view 79456-1
+pane w7S:p7`) or one `herdr pane list` reports:
+
+```bash
+herdr pane send-keys w7S:p7 cmd+0    # cmd+= and cmd+- step it
+```
+
+`B press` cannot do this. It dispatches over CDP into the **page**, and
+terminal-browser reads its own shortcuts off the terminal input path, which CDP
+never touches. `emulate --size <outerWidth>x<outerHeight>` cancels the zoom's
+effect on layout for one document, so reach for it only when you cannot send
+keys to the pane.
 
 ## Tabs inside the pane
 
