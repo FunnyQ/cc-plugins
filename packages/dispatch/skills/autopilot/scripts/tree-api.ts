@@ -6,6 +6,7 @@ import { readLog, runLogPath } from "../../flightplan/scripts/lib/flightlog";
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import { deriveTaskViews, type TaskState, type TaskView } from "./fleet";
 import { repoRootOf } from "./usage-source";
+import { summarizeWaves, type WaveSummary } from "./waves";
 
 export type Loaded = {
   byRef: Record<string, ParsedTask>;
@@ -31,6 +32,8 @@ export type TreePayload = {
      */
     invalid: number;
   };
+  /** How the remaining work splits into wave-loop passes. */
+  waves: WaveSummary;
   errors: { file: string; bucket: string; reason: string }[];
 };
 
@@ -128,6 +131,7 @@ export function buildTreePayload(input: {
     buckets: [...input.bucketDirs].sort(),
     tasks,
     counts,
+    waves: summarizeWaves(tasks, input.entries),
     errors: input.loaded.errors,
   };
 }

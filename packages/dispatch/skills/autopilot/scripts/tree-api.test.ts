@@ -239,6 +239,37 @@ describe("buildTreePayload", () => {
     ]);
     expect(payload.tasks[1].blockedBy).toEqual(["api/01"]);
   });
+
+  test("summarizes the waves left, and which one is flying", () => {
+    const payload = buildTreePayload(
+      input(
+        {
+          "api/01": task("api/01", "done"),
+          "api/02": task("api/02", "todo", ["api/01"]),
+          "ui/01": task("ui/01", "todo", ["api/02"]),
+        },
+        ["api", "ui"],
+        [
+          {
+            kind: "note",
+            ts: "2026-01-01T00:00:00.000Z",
+            task: "-",
+            role: "scout",
+            agentLabel: "scout-wave-2",
+            phase: "start",
+            message: "scouting",
+          },
+        ],
+      ),
+    );
+
+    expect(payload.waves).toEqual({
+      current: 2,
+      remaining: 2,
+      sizes: [1, 1],
+      unschedulable: [],
+    });
+  });
 });
 
 describe("repoName", () => {
