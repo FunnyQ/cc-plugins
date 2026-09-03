@@ -98,7 +98,7 @@ button {
   box-shadow: 0 var(--border-width) 0 var(--rule);
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto auto;
   min-height: var(--header-min-height);
   padding: var(--space-2) var(--space-4);
   position: sticky;
@@ -145,6 +145,47 @@ button {
     color: var(--faint);
     content: "/";
     margin-inline: var(--space-1);
+  }
+}
+
+/* The wave figure is a countdown, so it reads in the ready hue — the colour of
+   work cleared to fly — while the wave number beside it stays an index, not a
+   status, and keeps the muted label colour. */
+.plan-waves {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+
+  > .label {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  > .value {
+    align-items: baseline;
+    color: var(--state-ready);
+    display: grid;
+    font-size: var(--text-lg);
+    font-variant-numeric: tabular-nums;
+    grid-auto-flow: column;
+  }
+
+  .current {
+    color: var(--muted);
+    font-size: var(--text-xs);
+
+    &::after {
+      color: var(--faint);
+      content: "·";
+      margin-inline: var(--space-1);
+    }
+  }
+
+  /* A task no wave can reach means the countdown is not the whole story. */
+  &.-stalled > .value {
+    color: var(--state-alert);
   }
 }
 

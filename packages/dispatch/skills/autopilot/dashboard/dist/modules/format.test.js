@@ -8,6 +8,7 @@ import {
   hasTokenReading,
   tokenTier,
   totalTokens,
+  waveHint,
 } from "./format.js";
 
 describe("formatTokens", () => {
@@ -152,5 +153,38 @@ describe("hasTokenReading", () => {
       expect(hasTokenReading(present)).toBe(true);
       expect(formatTokens(present)).not.toBe("N/A");
     }
+  });
+});
+
+describe("waveHint", () => {
+  test("says the count includes the wave in flight", () => {
+    expect(
+      waveHint({ current: 2, remaining: 2, sizes: [3, 1], unschedulable: [] }),
+    ).toBe(
+      "Wave 2 in flight · 2 waves left, counting the one in flight: 3 → 1 tasks",
+    );
+  });
+
+  test("drops the wave number before the first scout", () => {
+    expect(
+      waveHint({ current: 0, remaining: 1, sizes: [4], unschedulable: [] }),
+    ).toBe("1 wave left, counting the one in flight: 4 tasks");
+  });
+
+  test("names the tasks no wave can reach", () => {
+    expect(
+      waveHint({
+        current: 1,
+        remaining: 0,
+        sizes: [],
+        unschedulable: ["api/01", "api/02"],
+      }),
+    ).toBe(
+      "Wave 1 in flight · No waves left to fly · 2 task(s) no wave can reach: api/01, api/02",
+    );
+  });
+
+  test("survives a payload with no wave field at all", () => {
+    expect(waveHint(undefined)).toBe("No waves left to fly");
   });
 });

@@ -29,6 +29,14 @@
           <span><strong>{{ tree.counts.done }}</strong> of {{ tree.counts.total }}</span>
         </div>
 
+        <div class="plan-waves" v-if="tree.counts.total" :class="{ '-stalled': tree.waves.unschedulable.length }" :title="waveHint(tree.waves)">
+          <span class="label">Waves left</span>
+          <span class="value">
+            <span class="current" v-if="tree.waves.current">#{{ tree.waves.current }}</span>
+            <span class="left">{{ tree.waves.remaining }}</span>
+          </span>
+        </div>
+
         <div class="plan-elapsed" v-if="elapsed" :class="{ '-live': elapsedLive }">
           <span class="label">Elapsed</span>
           <span class="value"><span v-if="elapsedLive" class="status-dot" aria-hidden="true"></span>{{ elapsed }}</span>

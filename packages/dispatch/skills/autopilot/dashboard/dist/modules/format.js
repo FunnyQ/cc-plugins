@@ -147,6 +147,33 @@ export function formatDuration(elapsedMs) {
   return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
 }
 
+/**
+ * The wave readout's tooltip — what the two figures in the header mean.
+ *
+ * The count includes the wave in flight, which is the one thing about it a
+ * reader can get wrong: a run mid-wave-2 of two shows "2 left", not "1 left".
+ * The per-wave sizes come along because they are the shape of the run ahead —
+ * `4 → 1` is one broad pass then the final review, and that reads nothing like
+ * `1 → 1 → 1 → 1`.
+ */
+export function waveHint(waves) {
+  const sizes = waves?.sizes ?? [];
+  const unschedulable = waves?.unschedulable ?? [];
+  const parts = [];
+  if (waves?.current) parts.push(`Wave ${waves.current} in flight`);
+  parts.push(
+    sizes.length
+      ? `${sizes.length} ${sizes.length === 1 ? "wave" : "waves"} left, counting the one in flight: ${sizes.join(" → ")} tasks`
+      : "No waves left to fly",
+  );
+  if (unschedulable.length) {
+    parts.push(
+      `${unschedulable.length} task(s) no wave can reach: ${unschedulable.join(", ")}`,
+    );
+  }
+  return parts.join(" · ");
+}
+
 function largestWeight(breakdown) {
   return Math.max(
     ...breakdown.map((dimension) => Number(dimension.weight) || 0),

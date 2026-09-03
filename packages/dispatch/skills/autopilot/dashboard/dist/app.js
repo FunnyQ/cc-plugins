@@ -16,6 +16,7 @@ import {
   allHarnessTokens,
   formatDuration,
   formatTokens,
+  waveHint,
 } from "./modules/format.js";
 
 const POLL_INTERVAL_MS = 3_000;
@@ -37,6 +38,13 @@ const emptyUsage = () => ({
   codexRunCount: 0,
 });
 
+const emptyWaves = () => ({
+  current: 0,
+  remaining: 0,
+  sizes: [],
+  unschedulable: [],
+});
+
 const emptyTree = () => ({
   planTitle: "",
   slug: "",
@@ -51,6 +59,7 @@ const emptyTree = () => ({
     blocked: 0,
     invalid: 0,
   },
+  waves: emptyWaves(),
   errors: [],
 });
 
@@ -62,6 +71,7 @@ const store = reactive({
   Lanes,
   formatTokens,
   allHarnessTokens,
+  waveHint,
   graphSvg: "",
   // Total flight time, from the first agent start. Empty until one starts.
   elapsed: "",
@@ -248,6 +258,7 @@ async function loadTree() {
       slug: payload.slug ?? "",
       repo: payload.repo ?? "",
       counts: { ...emptyTree().counts, ...(payload.counts ?? {}) },
+      waves: { ...emptyWaves(), ...(payload.waves ?? {}) },
       errors: Array.isArray(payload.errors) ? payload.errors : [],
     });
     updateGraph(store.tree.tasks);
