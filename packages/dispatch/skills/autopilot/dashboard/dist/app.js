@@ -297,10 +297,46 @@ function syncUsage(usage) {
   updateGraph(store.tree.tasks);
 }
 
+/**
+ * How far the reader had scrolled into each open rationale, carried across the
+ * redraw that is about to throw those elements away.
+ *
+ * Every fleet frame rebuilds the panel, and a replaced element starts at
+ * scrollTop 0 — so a rationale being read jumped back to its first line once
+ * every two seconds, which is long enough to find a paragraph and not long
+ * enough to read it. The frames carry live token counts and elapsed times, so
+ * there is no version of this that stops redrawing.
+ *
+ * Only the wells. `.deck-fleet` is a scrollport too, but `replaceChildren` swaps
+ * atomically and the panel keeps its height, so the pane's own offset survives
+ * on its own — measured, not assumed. It clamps only when the panel genuinely
+ * shrinks, and no saved offset can restore height that is no longer there.
+ *
+ * Keyed by the rubric's own id, which derives from the row key: a row that moved
+ * in the ordering keeps its reading position, and a row that has gone has no key
+ * to restore.
+ */
+function captureRationaleScroll(mount) {
+  const wells = new Map();
+  for (const well of mount.querySelectorAll(".c-fleet-rubric")) {
+    const prose = well.querySelector(".rationale");
+    if (prose?.scrollTop) wells.set(well.id, prose.scrollTop);
+  }
+  return wells;
+}
+
+function restoreRationaleScroll(mount, wells) {
+  for (const [id, top] of wells) {
+    const prose = mount.querySelector(`#${CSS.escape(id)} .rationale`);
+    if (prose) prose.scrollTop = top;
+  }
+}
+
 function drawFleet() {
   const mount = document.querySelector(".deck-fleet");
   if (!mount) return;
 
+  const wells = captureRationaleScroll(mount);
   mount.replaceChildren(
     renderFleet(
       fleetState.rows,
@@ -315,6 +351,7 @@ function drawFleet() {
       },
     ),
   );
+  restoreRationaleScroll(mount, wells);
 
   mount.querySelector(".fleet-toggle")?.addEventListener("click", () => {
     toggleFleet();

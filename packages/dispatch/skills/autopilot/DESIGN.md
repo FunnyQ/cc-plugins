@@ -50,6 +50,11 @@ typography:
     fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.2
+  rationale:
+    fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.65
   label:
     fontFamily: "ui-monospace, SF Mono, JetBrains Mono, Menlo, Consolas, monospace"
     fontSize: "11px"
@@ -260,12 +265,13 @@ The shipped capture is a completed run (15 of 15 done, 0 in flight, 0 ready, 0 b
 **Body Font:** system mono (`ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace`), set on `html` at 13px.
 **Prose Font:** system sans (`system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`).
 
-No web fonts. There is no build step and the dashboard must work offline, so the type system is system mono plus system sans. Monospace is the default rather than the exception because the deck presents identifiers, counts, states, and machine-produced records; stable character widths make dense rows comparable down a column. The sans face appears in exactly two places — a task card's title and the fleet panel's heading — where the content is a human sentence rather than a value.
+No web fonts. There is no build step and the dashboard must work offline, so the type system is system mono plus system sans. Monospace is the default rather than the exception because the deck presents identifiers, counts, states, and machine-produced records; stable character widths make dense rows comparable down a column. The sans face appears only where the content is a human sentence rather than a value: a task card's title, the fleet panel's heading, and the judge's rationale — which is the one passage long enough to need a reading size of its own.
 
 ### Hierarchy
 
 - **Figure** (mono, 400, 16px, tabular figures): The three numbers the header exists to show — the plan title, the elapsed clock, the token rollup.
-- **Body** (sans, 400, 13px, line-height 1.4): Task titles and the fleet heading. The only prose on the deck.
+- **Rationale** (sans, 400, 14px, line-height 1.65): The judge's rationale, and nothing else. Deliberately off the scanning scale: every other size here is sized for a value read at a glance down a column, and this is the one place a reader spends four hundred words.
+- **Body** (sans, 400, 13px, line-height 1.4): Task titles and the fleet heading.
 - **Reading** (mono, 400, 13px): The document default, set on `html`.
 - **Data** (mono, 400, 12px, tabular figures): Fleet rows, lane headings, view-toggle labels, token figures (at weight 600).
 - **Label** (mono, 400, 11px, 0.02em, UPPERCASE): Eyebrows, definition terms, badges, column headers, connection state, counts.
@@ -380,7 +386,13 @@ The manifest. A seven-column grid at 12px mono with 1px rule row separators, a `
 
 One shape for both views: a 4px `surface-2` track, a flat fill in `done` / `alert` / `flight` by verdict, and a 1px `text`-coloured threshold marker standing in it. Rubric dimensions use a `rule` track with a `ready` fill, the bar's own width scaled to the dimension's weight.
 
-Beneath the bars, an expanded rubric well ends with the judge's rationale when the verdict carries one: `muted` sans at `text-xs`, 1.5 line-height, above a `rule` divider, wrapped with `white-space: pre-wrap` so the judge's own paragraphs survive unparsed. It is capped and scrolled — 14 lines in a task card, 18 in a fleet row — because a rationale runs to hundreds of words and a well that grew to fit one would stretch its whole lane. A verdict logged without a rationale renders bars only, unchanged.
+Beneath the bars, an expanded rubric well ends with the judge's rationale when the verdict carries one. A verdict logged without a rationale renders bars only, unchanged.
+
+The rationale is the deck's one reading surface, and it is set for reading rather than for scanning: `text` sans at `text-reading`, 1.65 line-height, held to a 78ch measure, above a `rule` divider. `renderRationale` in `modules/format.js` parses the markdown the judge wrote for `RUNLOG.md` — headings from `h3` down, paragraphs, lists, fenced code, `**bold**`, `*emphasis*`, and inline code. Headings take two grades: `h3` at `text-lg`, everything under it a `muted` uppercase section label at `text-sm`. Inline code is tinted `ready` and left unboxed, the same treatment a fleet message gives the identifiers agents write bare; a fenced block does take a box, on `ground` inside a `rule` border, because it is a quoted artefact rather than a word in a sentence.
+
+No sanitizer ships with the parser, because nothing in it can emit markup the judge did not write: every span of text passes through `escapeHtml` before placement, the tag set is fixed and closed, and the only attribute it emits is a fence language matched as `\w*`. Extending it means escaping at the leaf, never at the seam.
+
+The well is capped and scrolled — 24 lines in a task card, 32 in a fleet row — because a rationale runs to hundreds of words and a well that grew to fit one would stretch its whole lane. **Which element carries the scroll differs by panel, and it is not a free choice.** In the fleet the prose scrolls inside a still well, and `app.js` carries the reader's offset across each redraw. In the lanes the well itself is the scrollport: petite-vue owns its innerHTML and re-sets it every frame, which destroys anything scrolling inside it, so the port has to be the element petite-vue keeps. The meters scroll away with the prose there — a lane card is one column of a strip and has no room to pin them.
 
 ### Motion
 

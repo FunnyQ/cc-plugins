@@ -6,6 +6,7 @@ import {
   formatTokens,
   freshTokens,
   hasTokenReading,
+  renderRationale,
   tokenTier,
   totalTokens,
   waveHint,
@@ -186,5 +187,110 @@ describe("waveHint", () => {
 
   test("survives a payload with no wave field at all", () => {
     expect(waveHint(undefined)).toBe("No waves left to fly");
+  });
+});
+
+describe("renderRationale", () => {
+  test("promotes the judge's headings, starting at h3", () => {
+    expect(renderRationale("# Verdict\n\n## The blocking defect")).toBe(
+      "<h3>Verdict</h3><h4>The blocking defect</h4>",
+    );
+  });
+
+  test("keeps a paragraph's own line breaks and separates on a blank line", () => {
+    expect(renderRationale("one\ntwo\n\nthree")).toBe(
+      "<p>one\ntwo</p><p>three</p>",
+    );
+  });
+
+  test("marks the two inline forms judges actually write", () => {
+    expect(renderRationale("**FAIL** at `init.rs:27`")).toBe(
+      "<p><strong>FAIL</strong> at <code>init.rs:27</code></p>",
+    );
+  });
+
+  test("reads single asterisks as emphasis without breaking a bold run", () => {
+    expect(renderRationale("**bold** and *soft* alike")).toBe(
+      "<p><strong>bold</strong> and <em>soft</em> alike</p>",
+    );
+  });
+
+  test("leaves emphasis inside backticks literal", () => {
+    expect(renderRationale("`**not bold**`")).toBe(
+      "<p><code>**not bold**</code></p>",
+    );
+  });
+
+  test("fences a code block and keeps its language on the element", () => {
+    expect(renderRationale("```rust\nlet x = 1;\n```")).toBe(
+      '<pre data-lang="rust"><code>let x = 1;</code></pre>',
+    );
+  });
+
+  // The trail is tailed from a running agent, so the last block on screen is
+  // routinely half-written; dropping it would blank what the reader waits on.
+  test("renders a fence the judge has not closed yet", () => {
+    expect(renderRationale("```\nhalf a line")).toBe(
+      "<pre><code>half a line</code></pre>",
+    );
+  });
+
+  test("groups consecutive bullets into one list, ordered ones into another", () => {
+    expect(renderRationale("- a\n- b\n1. c")).toBe(
+      "<ul><li>a</li><li>b</li></ul><ol><li>c</li></ol>",
+    );
+  });
+
+  // A judge walking a seven-step pipeline numbers it 0..6. Renumbering from 1
+  // would print step 0 as step 1 and misreport every reference in the prose.
+  test("keeps the judge's own starting number", () => {
+    expect(renderRationale("0. zero\n1. one")).toBe(
+      '<ol start="0"><li>zero</li><li>one</li></ol>',
+    );
+    expect(renderRationale("1. one\n2. two")).toBe(
+      "<ol><li>one</li><li>two</li></ol>",
+    );
+  });
+
+  // Hard-wrapping split the item in two and restarted the next number at 1 —
+  // one seven-step list became four lists that all began again.
+  test("folds a hard-wrapped item back into the item it continues", () => {
+    expect(renderRationale("1. first line\nwrapped on\n2. second")).toBe(
+      "<ol><li>first line\nwrapped on</li><li>second</li></ol>",
+    );
+  });
+
+  test("a blank line still ends the list, so prose after it is prose", () => {
+    expect(renderRationale("- a\n\nafter")).toBe(
+      "<ul><li>a</li></ul><p>after</p>",
+    );
+  });
+
+  test("reads a rule as a rule, not as a bullet", () => {
+    expect(renderRationale("a\n\n---\n\nb")).toBe("<p>a</p><hr><p>b</p>");
+  });
+
+  // No sanitizer ships with this, so nothing may reach the DOM unescaped.
+  test("escapes markup the judge quoted, including inside a fence", () => {
+    expect(renderRationale("<b>x</b> & 'y'")).toBe(
+      "<p>&lt;b&gt;x&lt;/b&gt; &amp; &#039;y&#039;</p>",
+    );
+    expect(renderRationale("```\n<script>alert(1)</script>\n```")).toBe(
+      "<pre><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></pre>",
+    );
+  });
+
+  // The only attribute this emits is the fence language, and the fence pattern
+  // admits `\w*` there — anything else is not a fence, so it can carry nothing
+  // into the attribute and falls through to escaped prose.
+  test("refuses a fence whose info string could reach the attribute", () => {
+    expect(renderRationale('```js"onload=alert(1)')).toBe(
+      "<p>```js&quot;onload=alert(1)</p>",
+    );
+  });
+
+  test("renders nothing for an absent rationale", () => {
+    expect(renderRationale(undefined)).toBe("");
+    expect(renderRationale("")).toBe("");
   });
 });

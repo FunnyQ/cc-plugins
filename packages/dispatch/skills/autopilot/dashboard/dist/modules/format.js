@@ -198,17 +198,169 @@ function renderDimensions(breakdown) {
     .join("");
 }
 
+/*
+ * The judge's prose is markdown it wrote for `RUNLOG.md`, and the well below
+ * renders it rather than printing it raw.
+ *
+ * An earlier pass laid it out with `white-space: pre-wrap` on the grounds that a
+ * parser plus a sanitizer was too much machinery for evidence. The evidence is
+ * hundreds of words long and its structure is the fastest way into it — a reader
+ * hunting the blocking defect scans for the heading, and `##` in front of it and
+ * `**` around the verdict are noise standing exactly where the signal should be.
+ *
+ * No sanitizer ships with it, because nothing here can produce markup the judge
+ * did not get to write: every span of text passes through `escapeHtml` before it
+ * is placed, the tag set is fixed and closed, and there is no branch that emits
+ * an attribute from the source — no links, no images, no raw-HTML passthrough.
+ * Keep that property when extending this: escape at the leaf, never at the seam.
+ */
+
+// Order is load-bearing twice over. Inline code leads so a `**` inside backticks
+// stays literal, and `**` precedes `*` so a bold run is never read as emphasis
+// wrapping a stray asterisk — JS alternation takes the first branch that matches
+// at a position, not the longest.
+const INLINE_MARKUP = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g;
+
+function renderInline(text) {
+  return (
+    text
+      .split(INLINE_MARKUP)
+      // split() with one capturing group puts the matches at every odd index.
+      .map((piece, index) => {
+        if (index % 2 === 0) return escapeHtml(piece);
+        if (piece.startsWith("`")) {
+          return `<code>${escapeHtml(piece.slice(1, -1))}</code>`;
+        }
+        if (piece.startsWith("**")) {
+          return `<strong>${escapeHtml(piece.slice(2, -2))}</strong>`;
+        }
+        return `<em>${escapeHtml(piece.slice(1, -1))}</em>`;
+      })
+      .join("")
+  );
+}
+
+const FENCE = /^\s*```\s*(\w*)\s*$/;
+const HEADING = /^(#{1,6})\s+(.*)$/;
+const RULE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
+const BULLET = /^\s*[-*+]\s+(.*)$/;
+const ORDERED = /^\s*(\d+)[.)]\s+(.*)$/;
+
+/**
+ * The judge's rationale as markup: headings, paragraphs, lists, fenced code,
+ * and the two inline marks judges actually use.
+ *
+ * Headings start at `h3`. `h1` is the page and `h2` is the panel heading the
+ * well sits under, and a rationale that opened at `h1` would outrank both.
+ *
+ * A fence left unterminated still renders as code. The trail is tailed from a
+ * running agent, so the last block on screen is routinely half-written, and
+ * dropping it would blank the one part the reader is waiting on.
+ */
+export function renderRationale(source) {
+  const out = [];
+  let paragraph = [];
+  let list = null;
+  let fence = null;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    out.push(`<p>${renderInline(paragraph.join("\n"))}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    const items = list.items.map((item) => `<li>${renderInline(item)}</li>`);
+    // The judge's own first number, not a renumbering from 1. A rationale that
+    // walks a seven-step pipeline numbers it 0..6, and an <ol> that ignored that
+    // would print step 0 as step 1 and misreport every reference in the prose.
+    // `start` is safe unescaped: it comes from a `\d+` capture, nothing else.
+    const open =
+      list.tag === "ol" && list.start !== 1
+        ? `<ol start="${list.start}">`
+        : `<${list.tag}>`;
+    out.push(`${open}${items.join("")}</${list.tag}>`);
+    list = null;
+  };
+  const flushBlocks = () => {
+    flushParagraph();
+    flushList();
+  };
+  const flushFence = () => {
+    const lang = fence.lang ? ` data-lang="${escapeHtml(fence.lang)}"` : "";
+    out.push(
+      `<pre${lang}><code>${escapeHtml(fence.lines.join("\n"))}</code></pre>`,
+    );
+    fence = null;
+  };
+
+  for (const line of String(source ?? "").split("\n")) {
+    const fenced = FENCE.exec(line);
+    if (fence) {
+      if (fenced) flushFence();
+      else fence.lines.push(line);
+      continue;
+    }
+    if (fenced) {
+      flushBlocks();
+      fence = { lang: fenced[1], lines: [] };
+      continue;
+    }
+
+    const heading = HEADING.exec(line);
+    if (heading) {
+      flushBlocks();
+      const level = Math.min(heading[1].length + 2, 6);
+      out.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    if (RULE.test(line)) {
+      flushBlocks();
+      out.push("<hr>");
+      continue;
+    }
+
+    const bullet = BULLET.exec(line);
+    const ordered = bullet ? null : ORDERED.exec(line);
+    if (bullet || ordered) {
+      flushParagraph();
+      const tag = bullet ? "ul" : "ol";
+      if (list && list.tag !== tag) flushList();
+      if (!list)
+        list = { tag, start: ordered ? Number(ordered[1]) : 1, items: [] };
+      list.items.push(bullet ? bullet[1] : ordered[2]);
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushBlocks();
+      continue;
+    }
+
+    // Lazy continuation. A judge hard-wraps a long item across lines, and
+    // treating the second line as a new paragraph split the item in two and
+    // started the next number at 1 — on a real trail that turned one seven-step
+    // list into four lists that all began again. A non-blank line under an open
+    // item belongs to that item, which is also what markdown says.
+    if (list) {
+      list.items[list.items.length - 1] += `\n${line}`;
+      continue;
+    }
+    paragraph.push(line);
+  }
+
+  if (fence) flushFence();
+  flushBlocks();
+  return out.join("");
+}
+
 /**
  * The whole expanded rubric well: the dimension meters, then the judge's prose.
  *
  * The fleet table builds HTML strings and the task lanes are a petite-vue
  * template, but the user reads the same well in both, so it is written once
  * here. Each panel keeps its own wrapper element.
- *
- * The rationale is escaped and laid out with `white-space: pre-wrap` rather than
- * parsed. It is markdown the judge wrote for `RUNLOG.md` — rendering it would
- * mean shipping a parser and a sanitizer for text that is read as evidence, not
- * as a document, and its paragraphs and indentation already carry the structure.
  *
  * Takes the score, not its `breakdown`, because a verdict is now two things: an
  * older trail has bars and no prose, and both panels must render that unchanged.
@@ -220,8 +372,9 @@ export function renderRubric(score) {
   const rationale = String(score?.rationale ?? "").trim();
   if (!rationale) return dimensions;
 
+  // A div, not a p: the prose now carries block children of its own.
   return `${dimensions}
-    <p class="rationale">${escapeHtml(rationale)}</p>`;
+    <div class="rationale">${renderRationale(rationale)}</div>`;
 }
 
 /** Bucket, then task number read as a number, then ref. The lanes and the graph share it. */

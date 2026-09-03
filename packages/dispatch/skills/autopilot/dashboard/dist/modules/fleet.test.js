@@ -186,11 +186,12 @@ describe("toggleRubric", () => {
     };
 
     // Collapsed, the prose stays out of the DOM entirely.
-    expect(rowHtml(row)).not.toContain('<p class="rationale">');
+    expect(rowHtml(row)).not.toContain('<div class="rationale">');
     expand("quiet-row");
     const html = rowHtml(row);
-    expect(html).toContain('<p class="rationale">');
+    expect(html).toContain('<div class="rationale">');
     expect(html).toContain("&lt;exit 2&gt;");
+    expect(html).toContain("<code>kind.rs:68</code>");
     // The meters still lead — the prose is the supporting evidence, not the verdict.
     expect(html.indexOf("Correctness")).toBeLessThan(html.indexOf("rationale"));
   });

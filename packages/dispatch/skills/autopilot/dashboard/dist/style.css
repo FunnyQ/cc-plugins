@@ -20,6 +20,10 @@
   --text-md: 13px;
   --text-lg: 16px;
   --text-xl: 22px;
+  /* Off the scanning scale on purpose. Every other size on the deck is sized for
+     a value read at a glance down a column; this one is sized for the judge's
+     rationale, which is the only place a reader spends four hundred words. */
+  --text-reading: 14px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -951,11 +955,23 @@ button {
     }
   }
 
+  /* The well itself is the scrollport here, unlike the fleet's, where the prose
+     scrolls inside a still well. petite-vue owns this element's innerHTML and
+     re-sets it on every frame, which destroys anything scrolling inside it and
+     sends the reader back to line one — but the element it is setting survives,
+     and a surviving scrollport keeps its offset. So the port has to be the part
+     petite-vue does not replace. The meters scroll away with the prose, which is
+     the price: a lane card is one column of a strip and has no room to pin them.
+     Capped because a rationale runs to hundreds of words and a card that grew to
+     fit one would stretch its whole lane. */
   .c-rubric-breakdown {
     background: var(--surface-2);
     border-block-start: var(--border-width) solid var(--rule);
     display: grid;
     gap: var(--space-2);
+    max-block-size: 24lh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--space-3);
 
     > .dimension {
@@ -993,20 +1009,11 @@ button {
       font-size: var(--text-xs);
     }
 
-    /* The judge's prose, unparsed — `pre-wrap` is what carries its paragraphs.
-       Capped and scrolled: a rationale runs to hundreds of words, and a card
-       that grew to fit one would stretch its whole lane. */
+    /* The cap and the scroll live on the well above, so the prose here is a
+       plain block that grows to its full height inside it. */
     > .rationale {
-      border-block-start: var(--border-width) solid var(--rule);
-      color: var(--muted);
-      font-family: var(--font-sans);
-      font-size: var(--text-xs);
-      line-height: 1.5;
-      margin: 0;
-      max-block-size: 14lh;
-      overflow-y: auto;
-      padding-block-start: var(--space-2);
-      white-space: pre-wrap;
+      max-block-size: none;
+      overflow: visible;
     }
   }
 
@@ -1428,19 +1435,127 @@ button {
   display: block;
 }
 
-/* The judge's prose, unparsed — `pre-wrap` is what carries its paragraphs. */
+/* A fleet row spans the panel, so its well gets the taller cap of the two. */
 .c-fleet-rubric > .rationale {
+  max-block-size: 32lh;
+}
+
+/* ── The judge's rationale ──────────────────────────────────────────────────
+   The deck's one reading surface. Everything else here is set to be scanned
+   down a column; this is set to be read start to finish, so it takes the sans
+   face, the reading size, a loose leading, and full-strength ink — muted at
+   text-xs was a caption's treatment applied to four hundred words of evidence.
+   `renderRationale` in modules/format.js builds the markup it styles. */
+.rationale {
   border-block-start: var(--border-width) solid var(--rule);
-  color: var(--muted);
+  color: var(--text);
   font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-reading);
+  line-height: 1.65;
   margin: 0;
-  max-block-size: 18lh;
-  max-inline-size: 90ch;
+  /* The measure, not the well: the well spans its panel so a code block can use
+     the width, while the prose inside it stays at a readable line length. */
+  max-inline-size: 78ch;
   overflow-y: auto;
-  padding-block-start: var(--space-3);
-  white-space: pre-wrap;
+  /* The well is a scrollport inside two more; without this, reaching its end
+     hands the wheel to the fleet pane and the reader loses their place. */
+  overscroll-behavior: contain;
+  padding-block: var(--space-3) var(--space-2);
+}
+
+.rationale > :first-child {
+  margin-block-start: 0;
+}
+
+.rationale > :last-child {
+  margin-block-end: 0;
+}
+
+.rationale p,
+.rationale ul,
+.rationale ol,
+.rationale pre {
+  margin-block: 0 0.9em;
+}
+
+/* Headings start at h3 — see renderRationale. Two grades, not four: the judge
+   writes a title and its sections, so h3 takes a size step and everything under
+   it becomes a section label. A third grade would be a distinction the source
+   text does not make. */
+.rationale h3,
+.rationale h4,
+.rationale h5,
+.rationale h6 {
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  margin-block: 1.5em 0.5em;
+}
+
+.rationale h4,
+.rationale h5,
+.rationale h6 {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rationale strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The judge's own emphasis, which lands mid-sentence — italic alone, because a
+   second bold weight in a paragraph that already has one would flatten both. */
+.rationale em {
+  font-style: italic;
+}
+
+.rationale ul,
+.rationale ol {
+  padding-inline-start: var(--space-6);
+}
+
+.rationale li {
+  margin-block-end: 0.35em;
+}
+
+.rationale li::marker {
+  color: var(--faint);
+}
+
+.rationale hr {
+  border: 0;
+  border-block-start: var(--border-width) solid var(--rule);
+  margin-block: 1.4em;
+}
+
+/* Tinted rather than boxed, the same way the fleet message cell marks the
+   identifiers agents write bare — a paragraph can hold several, and a
+   background on each would turn the sentence into a row of buttons. */
+.rationale code {
+  color: var(--state-ready);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+}
+
+/* A block does get a box: it is a quoted artefact, not a word in a sentence,
+   and the reader has to be able to tell where the judge's prose stops. */
+.rationale pre {
+  background: var(--ground);
+  border: var(--border-width) solid var(--rule);
+  border-radius: var(--radius-md);
+  line-height: 1.5;
+  overflow-x: auto;
+  padding: var(--space-3);
+}
+
+.rationale pre code {
+  color: var(--text);
+  font-size: var(--text-sm);
 }
 
 .fleet-empty,

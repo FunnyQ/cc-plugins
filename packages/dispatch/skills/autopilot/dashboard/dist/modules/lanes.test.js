@@ -68,10 +68,12 @@ describe("Lanes", () => {
     };
 
     const html = component.renderRubric(score);
-    expect(html).toContain('<p class="rationale">');
+    expect(html).toContain('<div class="rationale">');
     expect(html).toContain("&lt;b&gt;exit 2&lt;/b&gt;");
-    // Trimmed at the edges, but the judge's own paragraph break survives.
-    expect(html).toContain("exit 2&lt;/b&gt;.\n\nI ran it.</p>");
+    // Trimmed at the edges, and the judge's own paragraph break becomes a break
+    // the reader can see rather than two escaped newlines in one run of text.
+    expect(html).toContain("exit 2&lt;/b&gt;.</p><p>I ran it.</p></div>");
+    expect(html).toContain("<code>kind.rs:68</code>");
     // A verdict logged before --rationale-file existed renders bars only.
     expect(
       component.renderRubric({ breakdown: score.breakdown }),
