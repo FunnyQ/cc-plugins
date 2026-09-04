@@ -18,16 +18,13 @@ version: 1
 
 Herdr runs one workspace per project, and its label *is* the project name. That makes an already-open agent addressable by the name you would say out loud.
 
-## Precondition
-
-`HERDR_ENV=1` must be set. Without it you are not inside a Herdr pane, there are no sibling agents to reach, and this skill does not apply. Say so and stop.
-
 ## Do it
+
+Run `tell` directly. Check nothing first. Do not test `HERDR_ENV`, do not run `list`, do not verify the address. `tell` resolves the fragment itself and fails with a message that tells you exactly what to do next.
 
 ```bash
 HERD="$SKILL_DIR/../herdr/scripts/herd.ts"
 
-bun "$HERD" list                                          # who is open, and at what address
 bun "$HERD" tell api-service "rebase onto main and run the suite"
 bun "$HERD" tell web-app/dashboard "restart the dev server"
 ```
@@ -38,9 +35,11 @@ Resolve `$SKILL_DIR` from the load-time **"Base directory for this skill"** bann
 
 The fragment is matched case-insensitively against the workspace label (the project name), the tab label, the agent name, the pane id, and the cwd. Split it on `/` to narrow. Every part must match, though different parts may match different fields. `web-app/dashboard` resolves on workspace plus tab; `clients/acme` resolves on path plus label.
 
-Run `list` when you are unsure. The readable address is the agent's `name` when it has one, otherwise `workspaceLabel/tabLabel`. `paneId` is the exact one. It is the only handle guaranteed unique, because two tabs in one workspace may share a label.
+The readable address is the agent's `name` when it has one, otherwise `workspaceLabel/tabLabel`. `paneId` is the exact one. It is the only handle guaranteed unique, because two tabs in one workspace may share a label. Every failure message already prints both, so pass the fullest fragment you have and let the error correct you. Run `list` only when the user asks who is open.
 
 ## Rules
+
+**No Herdr means stop.** When the script exits with `not inside a herdr-managed pane`, there are no sibling agents to reach. Say so and stop. Do not look for another way to deliver the message.
 
 **Report which agent you reached.** The user cannot see the other pane. The result carries `matched`. Name the project and tab back to them.
 
@@ -55,7 +54,7 @@ Put those candidates to the user through the harness's own question tool. On Cla
 
 **Never pick for them, and never work around a refusal.** Do not send to the first candidate, do not loop over the candidates, and do not fall back to `herdr pane send-text`. A prompt cannot be recalled, and every agent that receives one acts on it in its own repo.
 
-**A typo that matches nothing is safe; one that matches something is not.** On zero matches, read the listed agents back and ask which was meant. But a fragment is a substring, so a mistyped one can resolve uniquely to the *wrong* agent, and nothing catches that. Prefer the fullest fragment you have.
+**A typo that matches nothing is safe; one that matches something is not.** On zero matches the error already lists every reachable agent — read that list back and ask which was meant, without running `list`. But a fragment is a substring, so a mistyped one can resolve uniquely to the *wrong* agent, and nothing catches that. Prefer the fullest fragment you have.
 
 **Ask before telling anything destructive.** The receiving agent has its own permissions in its own working tree. Deleting, force-pushing, releasing, or deploying there deserves the same confirmation it would deserve here.
 
