@@ -1,5 +1,27 @@
 # Changelog
 
+## [herdr 0.6.0] - 2026-09-04
+
+_tracks tag `herdr-v0.6.0`_
+
+### Added
+- New `tell` command hands a prompt off to an agent running in a different project, fire-and-forget — address it by workspace (project name) and tab label, narrow with a `/` when needed, and it refuses to guess on an ambiguous match.
+- Ambiguous agent addresses can now be resolved precisely by pane ID: it's listed alongside every candidate in the error message and in `list` output as the guaranteed-unique fallback.
+- Agent disambiguation now shows each candidate's status and cwd, so a full match is possible without a follow-up round trip.
+
+### Fixed
+- Pane-ID matching no longer produces false positives from substring matches — addressing `w6:p1` could previously match `w6:p10` too.
+
+### Changed
+- Clarified the `herdr` and `tell` skill docs and tightened the cross-references between them.
+
+## [dispatch 3.25.3] - 2026-09-04
+
+_tracks tag `dispatch-v3.25.3`_
+
+### Changed
+- Internal test-fixture cleanup only (anonymized a sample path, clarified a code comment) — no user-facing change.
+
 ## [dispatch 3.25.2] - 2026-09-04
 
 _tracks tag `dispatch-v3.25.2`_
