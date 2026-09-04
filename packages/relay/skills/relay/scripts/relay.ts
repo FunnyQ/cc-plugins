@@ -449,6 +449,15 @@ export async function executeRelay(
     return { code: 1 };
   }
 
+  // Generation costs money, so a missing destination has to fail here rather
+  // than land the PNG in the cwd under a name the caller never chose.
+  if (parsed.mode === "image" && !parsed.flags.out) {
+    deps.stderr(
+      "image mode requires --out <path> (pass an explicit output path)\n",
+    );
+    return { code: 1 };
+  }
+
   const dir = deps.createTmpRunDir();
   const effectiveTask =
     parsed.mode === "review" && parsed.flags.promptFile

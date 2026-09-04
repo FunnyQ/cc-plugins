@@ -32,10 +32,12 @@ the command runs against `/`.
 
 ## Process
 
-1. Guard, then run the analyzer:
+1. Run the analyzer. Do not test for the file first — a wrong path makes bun
+   print `error: Module not found "<path>"` and exit 1 before anything runs, and
+   that printed path is how you see an unsubstituted `{SKILL_DIR}`. Report it
+   and stop.
 
    ```bash
-   test -f "{SKILL_DIR}/scripts/analyze-branch.ts" || { echo "analyzer missing" >&2; exit 1; }
    bun "{SKILL_DIR}/scripts/analyze-branch.ts" --base "{base}"
    ```
 

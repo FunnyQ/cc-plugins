@@ -31,9 +31,12 @@ the command runs against `/`.
 Run it **once**:
 
 ```bash
-test -f "{SKILL_DIR}/scripts/commit.ts" || { echo "commit script missing" >&2; exit 1; }
 bun "{SKILL_DIR}/scripts/commit.ts" apply --plan-file "{planPath}"
 ```
+
+Run it directly; do not test for the file first. A wrong path makes bun print
+`error: Module not found "<path>"` and exit 1 before anything runs, and that
+printed path is how you see an unsubstituted `{SKILL_DIR}`. Report it and stop.
 
 Never rerun it with different flags, never edit the plan file, and never fall back
 to hand-rolled git. A re-run is the Lawspeaker's call, not yours — the script is

@@ -157,7 +157,7 @@ export const codexBackend: Backend = {
     }
 
     // Copy PNG to output path with timestamp suffix
-    const finalPath = addTimestampSuffix(opts.out ?? "relay-image.png");
+    const finalPath = addTimestampSuffix(opts.out!);
 
     try {
       mkdirSync(dirname(finalPath), { recursive: true });

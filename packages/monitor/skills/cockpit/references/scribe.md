@@ -18,12 +18,13 @@ Code prints when the skill loads.
 # Substitute the real banner path in place of <BANNER_PATH>
 SKILL_DIR="<BANNER_PATH>"        # the cockpit skill base dir
 CLI="$SKILL_DIR/scripts/cockpit.ts"   # same skill — no ../ hop
-test -f "$CLI" || { echo "cockpit CLI not found at $CLI" >&2; exit 1; }
 ```
 
 The fork **must** substitute the real banner path. It cannot fall back to
-an env var. If the file guard fails, stop. Surface the error. Do not
-continue.
+an env var. Do not test for the file first — a wrong path makes bun print
+`error: Module not found "<path>"` and exit 1 before anything runs, and that
+printed path is how you see an unsubstituted `<BANNER_PATH>`. Surface it and
+stop. Do not guess another path.
 
 ### Session — honor the parent handoff
 

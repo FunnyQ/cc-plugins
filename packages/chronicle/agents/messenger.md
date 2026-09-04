@@ -49,11 +49,13 @@ the command runs against `/`.
 
 ## Process
 
-1. Guard, then run the creator. Feed the `CreateInput` JSON on **stdin** via a
-   quoted heredoc:
+1. Run the creator. Feed the `CreateInput` JSON on **stdin** via a quoted
+   heredoc. Do not test for the file first — a wrong path makes bun print
+   `error: Module not found "<path>"` and exit 1 before anything runs, and that
+   printed path is how you see an unsubstituted `{SKILL_DIR}`. Report it and
+   stop.
 
    ```bash
-   test -f "{SKILL_DIR}/scripts/request-creator.ts" || { echo "creator missing" >&2; exit 1; }
    bun "{SKILL_DIR}/scripts/request-creator.ts" <<'CREATE_INPUT'
    <CreateInput JSON>
    CREATE_INPUT

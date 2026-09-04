@@ -440,6 +440,26 @@ describe("executeRelay", () => {
     expect(errors.join("")).toContain("image mode requires a prompt");
   });
 
+  it("rejects codex image with no --out before spawning", async () => {
+    let spawned = false;
+    const errors: string[] = [];
+
+    const result = await executeRelay(
+      ["codex", "image", "a red bicycle"],
+      deps({
+        run: () => {
+          spawned = true;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(spawned).toBe(false);
+    expect(errors.join("")).toContain("image mode requires --out");
+  });
+
   it("reviews uncommitted changes when no review task is provided", async () => {
     let invocation: string[] = [];
     const result = await executeRelay(
@@ -506,7 +526,7 @@ describe("executeRelay", () => {
     const errors: string[] = [];
 
     const result = await executeRelay(
-      ["codex", "image", "a quiet studio"],
+      ["codex", "image", "a quiet studio", "--out", "/tmp/relay/studio.png"],
       deps({
         // No PNG will be found (future cutoff via real run), so postRun fails.
         run: () => ({ ok: true, stdout: "no png here", stderr: "", code: 0 }),

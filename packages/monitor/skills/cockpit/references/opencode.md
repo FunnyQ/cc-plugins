@@ -17,8 +17,9 @@ OpenCode prints no *"Base directory for this skill"* banner, and
 
 So every command in a mode reference becomes
 `bun ~/.config/opencode/skills/cockpit/scripts/…`. In `scribe.md`'s Step 1,
-set `CLI="$HOME/.config/opencode/skills/cockpit/scripts/cockpit.ts"` and keep
-its `test -f` guard.
+set `CLI="$HOME/.config/opencode/skills/cockpit/scripts/cockpit.ts"`. There is
+no banner to substitute here, so the path is fixed — run it directly and let
+bun's `error: Module not found "<path>"` report a broken install.
 
 The skill directory is a symlink into a checkout of this repository, so an
 edit in the checkout is live with no reinstall.

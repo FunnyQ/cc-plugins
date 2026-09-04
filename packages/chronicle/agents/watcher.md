@@ -42,9 +42,12 @@ the command runs against `/`.
 ### 1. Analyze
 
 ```bash
-test -f "{SKILL_DIR}/scripts/analyze-changes.ts" || { echo "analyzer missing" >&2; exit 1; }
 bun "{SKILL_DIR}/scripts/analyze-changes.ts"
 ```
+
+Run it directly; do not test for the file first. A wrong path makes bun print
+`error: Module not found "<path>"` and exit 1 before anything runs, and that
+printed path is how you see an unsubstituted `{SKILL_DIR}`. Report it and stop.
 
 If it prints `totalFiles === 0`, `Write` `{ "nothingToCommit": true }` to
 `{PROPOSAL_PATH}`, say so in one line, and stop. Do not run `propose`.
@@ -181,7 +184,6 @@ carries them is refused. Paths are repo-root-relative, never absolute.
 ### 4. Let the script settle it
 
 ```bash
-test -f "{SKILL_DIR}/scripts/commit.ts" || { echo "commit script missing" >&2; exit 1; }
 bun "{SKILL_DIR}/scripts/commit.ts" propose --file "{PROPOSAL_PATH}"
 ```
 
