@@ -1229,6 +1229,20 @@ describe("matchAgents", () => {
     expect(found.map((a) => a.paneId)).toEqual(["w7J:p1"]);
   });
 
+  test("a pane id resolves exactly, even against identical addresses", () => {
+    // Two tabs may carry the same label, which makes addressOf() identical for
+    // both. The pane id is the only handle that still splits them.
+    const twins = [
+      located({ paneId: "w8:p1", workspaceLabel: "twin", tabLabel: "main" }),
+      located({ paneId: "w8:p2", workspaceLabel: "twin", tabLabel: "main" }),
+    ];
+    expect(matchAgents(twins, "twin").map((a) => a.paneId)).toEqual([
+      "w8:p1",
+      "w8:p2",
+    ]);
+    expect(matchAgents(twins, "w8:p2").map((a) => a.paneId)).toEqual(["w8:p2"]);
+  });
+
   test("the calling pane is never a candidate", () => {
     expect(matchAgents(FLEET, "cc-plugins", SELF)).toEqual([]);
   });
@@ -1393,6 +1407,8 @@ describe("tell", () => {
     const p = createHerd(run).tell("web-app", "hi");
     await expect(p).rejects.toThrow(/matches 2 agents/);
     await expect(p).rejects.toThrow(/Dashboard Launcher/);
+    // The exact handle rides along, so the retry needs no second lookup.
+    await expect(p).rejects.toThrow(/\[w6E:p4\]/);
     expect(calls.some((c) => c[1] === "prompt")).toBe(false);
   });
 

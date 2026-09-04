@@ -202,9 +202,14 @@ export function addressOf(agent: AgentLocation): string {
  *
  * One rule, no tiers: split the fragment on `/`, and keep an agent when EVERY
  * part appears (case-insensitively) somewhere in its name, workspace label, tab
- * label, or either cwd. So `api-service` finds a project, `web-app/
+ * label, pane id, or either cwd. So `api-service` finds a project, `web-app/
  * dashboard` narrows two agents sharing a workspace down to one, and
  * `clients/acme` works even though one part matches a path and the other a label.
+ *
+ * The pane id is in that list as the escape hatch, because it is the only handle
+ * guaranteed unique. Two tabs in one workspace may carry the SAME label, which
+ * makes their `workspace/tab` addresses identical and leaves a caller resolving
+ * an ambiguity no fragment can split. Answering with a pane id always can.
  *
  * An exact name short-circuits: a live agent name is unique by construction, so
  * it must not be diluted by some other agent whose cwd happens to contain it.
@@ -234,6 +239,7 @@ export function matchAgents(
       agent.name,
       agent.workspaceLabel,
       agent.tabLabel,
+      agent.paneId,
       agent.cwd,
       agent.foregroundCwd,
     ]
@@ -319,7 +325,8 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
    *
    * Ambiguity is a hard failure rather than a broadcast or a best guess: an
    * unwanted prompt cannot be recalled, and the agent that receives it will act
-   * on it. The error carries the candidate addresses so the retry is one edit.
+   * on it. Each listed candidate carries its pane id beside the readable address,
+   * so the retry needs no second lookup even when two addresses read alike.
    */
   async function tell(
     fragment: string,
@@ -330,19 +337,18 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
     const matches = matchAgents(agents, fragment, { selfPaneId });
 
+    const listed = (found: AgentLocation[]) =>
+      found.map((a) => `  ${addressOf(a)}  [${a.paneId}]`).join("\n");
+
     if (matches.length === 0) {
-      const known = agents
-        .filter((a) => a.paneId !== selfPaneId)
-        .map((a) => `  ${addressOf(a)}`)
-        .join("\n");
+      const known = listed(agents.filter((a) => a.paneId !== selfPaneId));
       throw new HerdrError(
         `no agent matches "${fragment}"${known ? `\navailable:\n${known}` : ""}`,
       );
     }
     if (matches.length > 1) {
-      const candidates = matches.map((a) => `  ${addressOf(a)}`).join("\n");
       throw new HerdrError(
-        `"${fragment}" matches ${matches.length} agents — narrow it:\n${candidates}`,
+        `"${fragment}" matches ${matches.length} agents — ask which one, then retell using its pane id:\n${listed(matches)}`,
       );
     }
 
@@ -829,7 +835,7 @@ Usage:
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
   herd tell <fragment> <text>          # hand work to an existing agent, fire-and-forget
               # <fragment> matches a workspace label (the project name), a tab label,
-              # an agent name, or a cwd. Slash-separate to narrow: web-app/dashboard
+              # an agent name, a pane id, or a cwd. Slash-separate to narrow: web-app/dashboard
   herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
               # flags go BEFORE <target> so prompt text containing \`--\` survives
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab
