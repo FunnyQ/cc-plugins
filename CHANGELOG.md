@@ -1,5 +1,33 @@
 # Changelog
 
+## [chronicle 0.15.1] - 2026-09-04
+
+_tracks tag `chronicle-v0.15.1`_
+
+### Changed
+- Chronicle's agent instructions (messenger, runesmith, skald, watcher) no longer run a preflight `test -f` guard before reading a referenced file. Bun's own "Module not found" error is clearer and, unlike the guard, it surfaces an unsubstituted `{SKILL_DIR}` placeholder instead of masking it as a generic missing-file failure.
+
+## [herdr 0.6.1] - 2026-09-04
+
+_tracks tag `herdr-v0.6.1`_
+
+### Changed
+- The `tell` skill no longer requires checking for `HERDR_ENV` up front — `tell` validates itself and its own error message now guides you instead. "No Herdr means stop" guidance moved into the skill's Rules section, `list` is called out as needed only when you explicitly ask for it, and the advice on resolving address fragments is streamlined to prefer the fullest fragment and let errors correct a bad guess.
+
+## [monitor 4.0.9] - 2026-09-04
+
+_tracks tag `monitor-v4.0.9`_
+
+### Changed
+- Cockpit's opencode and scribe reference docs no longer carry a preflight file-existence guard — the same simplification applied across chronicle's agent instructions, relying on the underlying error message instead.
+
+## [relay 0.6.9] - 2026-09-04
+
+_tracks tag `relay-v0.6.9`_
+
+### Changed
+- **Breaking:** `relay codex image` now requires `--out`. A call without it used to silently write `relay-image.png` into the current directory; it now exits with an error instead. Any script or habit relying on the old default output path needs an explicit `--out <path>` added.
+
 ## [herdr 0.6.0] - 2026-09-04
 
 _tracks tag `herdr-v0.6.0`_
