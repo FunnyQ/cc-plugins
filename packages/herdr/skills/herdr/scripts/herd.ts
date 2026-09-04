@@ -2,10 +2,11 @@
 /**
  * herd.ts — a small, typed wrapper over the raw `herdr` CLI for in-session
  * agent orchestration. Collapses herdr's multi-step recipes (create pane → start →
- * prompt → wait → read) into seven verbs an agent can call without re-deriving the
+ * prompt → wait → read) into eight verbs an agent can call without re-deriving the
  * CLI's sharp edges:
  *
  *   spawn  — start an agent in a fresh pane under a collision-proof name
+ *   tell   — hand work to an ALREADY-RUNNING agent, addressed by project label
  *   send   — write a prompt to a running agent AND submit it (Enter)
  *   keys   — send bare key chords to the agent's pane
  *   wait   — block until the agent reaches a status
@@ -130,6 +131,17 @@ export type SendResult = {
 export type KeysResult = { target: string; paneId: string; keys: string[] };
 export type CloseResult = { target: string; paneId: string; closed: true };
 
+/** An agent plus the human-readable labels of the tab and workspace holding it.
+ *  `agent list` carries only ids, so the labels come from `workspace list` and
+ *  `tab list`. A workspace label is the project name — the one handle that is
+ *  both stable and meaningful across projects, which is what `tell` addresses by. */
+export type AgentLocation = AgentInfo & {
+  workspaceLabel: string | null;
+  tabLabel: string | null;
+};
+
+export type TellResult = SendResult & { matched: AgentLocation };
+
 function randHex(n: number): string {
   const bytes = new Uint8Array(Math.ceil(n / 2));
   crypto.getRandomValues(bytes);
@@ -158,6 +170,77 @@ function normAgent(a: any): AgentInfo {
     interactiveReady: a.interactive_ready,
     focused: !!a.focused,
   };
+}
+
+/** Strip herdr's leading nerd-font glyph from a tab/workspace label.
+ *  Scoped to the private-use planes on purpose: a broader "leading punctuation"
+ *  strip would eat the dot in a legitimate `.config` label. */
+export function cleanLabel(label: unknown): string | null {
+  if (typeof label !== "string") return null;
+  const trimmed = label
+    .replace(
+      /^[\u{E000}-\u{F8FF}\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}\s]+/u,
+      "",
+    )
+    .trim();
+  return trimmed || null;
+}
+
+/** How a human addresses this agent back — `workspace/tab`, else the pane id. */
+export function addressOf(agent: AgentLocation): string {
+  if (agent.name) return agent.name;
+  if (agent.workspaceLabel) {
+    return agent.tabLabel
+      ? `${agent.workspaceLabel}/${agent.tabLabel}`
+      : agent.workspaceLabel;
+  }
+  return agent.paneId;
+}
+
+/**
+ * Find the agents a human-typed fragment addresses.
+ *
+ * One rule, no tiers: split the fragment on `/`, and keep an agent when EVERY
+ * part appears (case-insensitively) somewhere in its name, workspace label, tab
+ * label, or either cwd. So `api-service` finds a project, `web-app/
+ * dashboard` narrows two agents sharing a workspace down to one, and
+ * `clients/acme` works even though one part matches a path and the other a label.
+ *
+ * An exact name short-circuits: a live agent name is unique by construction, so
+ * it must not be diluted by some other agent whose cwd happens to contain it.
+ *
+ * `selfPaneId` drops the calling pane. Prompting yourself is never the intent,
+ * and the caller's own project label is exactly the fragment most likely to be
+ * typed by an agent handing work off from inside that project.
+ */
+export function matchAgents(
+  agents: AgentLocation[],
+  fragment: string,
+  opts: { selfPaneId?: string } = {},
+): AgentLocation[] {
+  const query = fragment.trim().toLowerCase();
+  if (!query) return [];
+
+  const pool = opts.selfPaneId
+    ? agents.filter((a) => a.paneId !== opts.selfPaneId)
+    : agents;
+
+  const named = pool.filter((a) => a.name?.toLowerCase() === query);
+  if (named.length) return named;
+
+  const parts = query.split("/").filter(Boolean);
+  return pool.filter((agent) => {
+    const haystack = [
+      agent.name,
+      agent.workspaceLabel,
+      agent.tabLabel,
+      agent.cwd,
+      agent.foregroundCwd,
+    ]
+      .filter((v): v is string => typeof v === "string")
+      .map((v) => v.toLowerCase());
+    return parts.every((part) => haystack.some((v) => v.includes(part)));
+  });
 }
 
 /** Clock seam so the shell-readiness retry loop is testable without wall time. */
@@ -203,6 +286,69 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
   async function list(): Promise<AgentInfo[]> {
     const r = await callJson(["agent", "list"]);
     return (r.agents ?? []).map(normAgent);
+  }
+
+  /** Every agent, joined to the workspace and tab labels that name it. Three
+   *  round trips instead of one, so `list()` stays the cheap path relay uses. */
+  async function directory(): Promise<AgentLocation[]> {
+    const [agents, workspaces, tabs] = await Promise.all([
+      list(),
+      callJson(["workspace", "list"]),
+      callJson(["tab", "list"]),
+    ]);
+    const wsLabels = new Map<string, string | null>(
+      (workspaces.workspaces ?? []).map((w: any) => [
+        w.workspace_id,
+        cleanLabel(w.label),
+      ]),
+    );
+    const tabLabels = new Map<string, string | null>(
+      (tabs.tabs ?? []).map((t: any) => [t.tab_id, cleanLabel(t.label)]),
+    );
+    return agents.map((agent) => ({
+      ...agent,
+      workspaceLabel: wsLabels.get(agent.workspaceId) ?? null,
+      tabLabel: tabLabels.get(agent.tabId) ?? null,
+    }));
+  }
+
+  /**
+   * Fire-and-forget hand-off: resolve a human-typed fragment to exactly one
+   * agent, then submit the text. No wait — the point is to drop work on another
+   * project's agent and carry on.
+   *
+   * Ambiguity is a hard failure rather than a broadcast or a best guess: an
+   * unwanted prompt cannot be recalled, and the agent that receives it will act
+   * on it. The error carries the candidate addresses so the retry is one edit.
+   */
+  async function tell(
+    fragment: string,
+    text: string,
+    opts: { selfPaneId?: string } = {},
+  ): Promise<TellResult> {
+    const agents = await directory();
+    const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
+    const matches = matchAgents(agents, fragment, { selfPaneId });
+
+    if (matches.length === 0) {
+      const known = agents
+        .filter((a) => a.paneId !== selfPaneId)
+        .map((a) => `  ${addressOf(a)}`)
+        .join("\n");
+      throw new HerdrError(
+        `no agent matches "${fragment}"${known ? `\navailable:\n${known}` : ""}`,
+      );
+    }
+    if (matches.length > 1) {
+      const candidates = matches.map((a) => `  ${addressOf(a)}`).join("\n");
+      throw new HerdrError(
+        `"${fragment}" matches ${matches.length} agents — narrow it:\n${candidates}`,
+      );
+    }
+
+    const matched = matches[0]!;
+    const res = await send(matched.name ?? matched.paneId, text);
+    return { ...res, matched };
   }
 
   async function get(target: string): Promise<AgentInfo> {
@@ -594,11 +740,13 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
   return {
     list,
+    directory,
     get,
     resolvePane,
     genName,
     spawn,
     send,
+    tell,
     keys,
     wait,
     read,
@@ -676,9 +824,12 @@ export function parseArgs(argv: string[]): {
 const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent orchestration
 
 Usage:
-  herd list
+  herd list                            # every agent, with its workspace/tab address
   herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--tab-label TEXT]
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
+  herd tell <fragment> <text>          # hand work to an existing agent, fire-and-forget
+              # <fragment> matches a workspace label (the project name), a tab label,
+              # an agent name, or a cwd. Slash-separate to narrow: web-app/dashboard
   herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
               # flags go BEFORE <target> so prompt text containing \`--\` survives
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab
@@ -702,7 +853,19 @@ async function main() {
   try {
     switch (verb) {
       case "list": {
-        console.log(JSON.stringify(await herd.list(), null, 2));
+        // The CLI is the human/model discovery surface, so it prints the
+        // labelled directory — the addresses `tell` accepts. The module-level
+        // `list()` stays the bare, one-round-trip shape relay consumes.
+        console.log(JSON.stringify(await herd.directory(), null, 2));
+        break;
+      }
+      case "tell": {
+        // Raw argv, for the same reason send uses it: prompt text may contain `--`.
+        const [fragment, ...textParts] = rest;
+        const text = textParts.join(" ");
+        if (!fragment || !text)
+          throw new HerdrError("tell requires <fragment> and <text>");
+        console.log(JSON.stringify(await herd.tell(fragment, text), null, 2));
         break;
       }
       case "spawn": {

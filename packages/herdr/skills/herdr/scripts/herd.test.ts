@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  type AgentLocation,
   createHerd,
   HerdrError,
+  matchAgents,
   parseArgs,
   type RunResult,
   type Runner,
@@ -1128,5 +1130,277 @@ describe("parseArgs", () => {
   test("a non-repeatable flag still takes the last value", () => {
     const { flags } = parseArgs(["--agent", "codex", "--agent", "claude"]);
     expect(flags.agent).toBe("claude");
+  });
+});
+
+// --- tell -------------------------------------------------------------------
+
+const located = (o: Partial<AgentLocation>): AgentLocation => ({
+  name: null,
+  type: "claude",
+  status: "idle",
+  paneId: "w1:p1",
+  tabId: "w1:t1",
+  workspaceId: "w1",
+  terminalId: "term_1",
+  cwd: "/x",
+  focused: false,
+  workspaceLabel: null,
+  tabLabel: null,
+  ...o,
+});
+
+/** The real fleet shape this feature was designed against: two agents share the
+ *  `web-app` workspace and are told apart only by tab label. */
+const FLEET: AgentLocation[] = [
+  located({
+    paneId: "w6E:p1",
+    tabId: "w6E:t1",
+    workspaceId: "w6E",
+    workspaceLabel: "web-app",
+    tabLabel: "main",
+    cwd: "/Users/dev/Projects/web-app",
+  }),
+  located({
+    paneId: "w6E:p4",
+    tabId: "w6E:t2",
+    workspaceId: "w6E",
+    workspaceLabel: "web-app",
+    tabLabel: "Dashboard Launcher",
+    cwd: "/Users/dev/Projects/web-app",
+  }),
+  located({
+    paneId: "w7J:p1",
+    tabId: "w7J:t1",
+    workspaceId: "w7J",
+    workspaceLabel: "acme",
+    tabLabel: "main",
+    cwd: "/Users/dev/Projects/clients/acme",
+  }),
+  located({
+    paneId: "w7P:p1",
+    tabId: "w7P:t1",
+    workspaceId: "w7P",
+    workspaceLabel: "api-service",
+    tabLabel: "main",
+    cwd: "/Users/dev/Projects/api-service",
+  }),
+  located({
+    paneId: "w7S:p1",
+    tabId: "w7S:t1",
+    workspaceId: "w7S",
+    workspaceLabel: "cc-plugins",
+    tabLabel: "main",
+    cwd: "/Users/dev/Projects/cc-plugins",
+    focused: true,
+  }),
+];
+
+const SELF = { selfPaneId: "w7S:p1" };
+
+describe("matchAgents", () => {
+  test("a workspace label resolves to its agent", () => {
+    const found = matchAgents(FLEET, "api-service", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w7P:p1"]);
+  });
+
+  test("a shared workspace label returns every candidate", () => {
+    const found = matchAgents(FLEET, "web-app", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w6E:p1", "w6E:p4"]);
+  });
+
+  test("a slash narrows by tab label", () => {
+    const found = matchAgents(FLEET, "web-app/dashboard", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w6E:p4"]);
+  });
+
+  test("matching is case-insensitive", () => {
+    const found = matchAgents(FLEET, "API-Service", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w7P:p1"]);
+  });
+
+  test("every part may match a different field", () => {
+    const found = matchAgents(FLEET, "clients/acme", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w7J:p1"]);
+  });
+
+  test("a cwd fragment matches when no label does", () => {
+    const found = matchAgents(FLEET, "Projects/clients", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w7J:p1"]);
+  });
+
+  test("the calling pane is never a candidate", () => {
+    expect(matchAgents(FLEET, "cc-plugins", SELF)).toEqual([]);
+  });
+
+  test("without a self pane id nothing is excluded", () => {
+    expect(matchAgents(FLEET, "cc-plugins").map((a) => a.paneId)).toEqual([
+      "w7S:p1",
+    ]);
+  });
+
+  test("an exact name wins over a broader substring match", () => {
+    const fleet = [
+      ...FLEET,
+      located({ name: "acme", paneId: "w9:p1", cwd: "/elsewhere" }),
+    ];
+    const found = matchAgents(fleet, "acme", SELF);
+    expect(found.map((a) => a.paneId)).toEqual(["w9:p1"]);
+  });
+
+  test("an empty or unmatched fragment finds nothing", () => {
+    expect(matchAgents(FLEET, "  ", SELF)).toEqual([]);
+    expect(matchAgents(FLEET, "nope", SELF)).toEqual([]);
+  });
+});
+
+/** agent list + workspace list + tab list, the three calls directory() joins. */
+function fleetRunner() {
+  return mockRunner((a) => {
+    if (a[0] === "agent" && a[1] === "prompt") {
+      return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+    }
+    if (a[0] === "agent" && a[1] === "list") {
+      return {
+        stdout: listEnvelope([
+          {
+            agent: "claude",
+            agent_status: "idle",
+            pane_id: "w7P:p1",
+            tab_id: "w7P:t1",
+            workspace_id: "w7P",
+            terminal_id: "term_1",
+            cwd: "/Users/dev/Projects/api-service",
+            focused: false,
+          },
+          {
+            agent: "claude",
+            agent_status: "working",
+            pane_id: "w7S:p1",
+            tab_id: "w7S:t1",
+            workspace_id: "w7S",
+            terminal_id: "term_2",
+            cwd: "/Users/dev/Projects/cc-plugins",
+            focused: true,
+          },
+        ]),
+      };
+    }
+    if (a[0] === "workspace" && a[1] === "list") {
+      return {
+        stdout: JSON.stringify({
+          result: {
+            workspaces: [
+              { workspace_id: "w7P", label: "api-service" },
+              { workspace_id: "w7S", label: "cc-plugins" },
+            ],
+          },
+        }),
+      };
+    }
+    if (a[0] === "tab" && a[1] === "list") {
+      return {
+        stdout: JSON.stringify({
+          result: {
+            tabs: [
+              { tab_id: "w7P:t1", label: "\u{f09d1}  main" },
+              { tab_id: "w7S:t1", label: "\u{f09d1}  main" },
+            ],
+          },
+        }),
+      };
+    }
+    return undefined;
+  });
+}
+
+describe("directory", () => {
+  test("joins workspace and tab labels onto each agent", async () => {
+    const { run } = fleetRunner();
+    const agents = await createHerd(run).directory();
+    expect(agents[0]?.workspaceLabel).toBe("api-service");
+    // The nerd-font glyph herdr prefixes every tab label with is stripped.
+    expect(agents[0]?.tabLabel).toBe("main");
+  });
+});
+
+describe("tell", () => {
+  test("resolves a fragment and submits without waiting", async () => {
+    const { run, calls } = fleetRunner();
+    const res = await createHerd(run).tell("api-service", "reply ok", SELF);
+    const prompt = calls.find((c) => c[1] === "prompt");
+    expect(prompt).toEqual(["agent", "prompt", "w7P:p1", "reply ok"]);
+    expect(prompt).not.toContain("--wait");
+    expect(res.target).toBe("w7P:p1");
+    expect(res.matched.workspaceLabel).toBe("api-service");
+  });
+
+  test("addresses a named agent by name, not pane id", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "prompt")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([
+            {
+              name: "reviewer-a3f9",
+              agent: "codex",
+              agent_status: "idle",
+              pane_id: "w2:p1",
+              tab_id: "w2:t1",
+              workspace_id: "w2",
+              cwd: "/x",
+            },
+          ]),
+        };
+      if (a[1] === "list") return { stdout: JSON.stringify({ result: {} }) };
+      return undefined;
+    });
+    await createHerd(run).tell("reviewer-a3f9", "go");
+    expect(calls.find((c) => c[1] === "prompt")?.[2]).toBe("reviewer-a3f9");
+  });
+
+  test("an ambiguous fragment refuses to send and names the candidates", async () => {
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([
+            { pane_id: "w6E:p1", tab_id: "w6E:t1", workspace_id: "w6E" },
+            { pane_id: "w6E:p4", tab_id: "w6E:t2", workspace_id: "w6E" },
+          ]),
+        };
+      if (a[0] === "workspace")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              workspaces: [{ workspace_id: "w6E", label: "web-app" }],
+            },
+          }),
+        };
+      if (a[0] === "tab")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              tabs: [
+                { tab_id: "w6E:t1", label: "main" },
+                { tab_id: "w6E:t2", label: "Dashboard Launcher" },
+              ],
+            },
+          }),
+        };
+      return undefined;
+    });
+    const p = createHerd(run).tell("web-app", "hi");
+    await expect(p).rejects.toThrow(/matches 2 agents/);
+    await expect(p).rejects.toThrow(/Dashboard Launcher/);
+    expect(calls.some((c) => c[1] === "prompt")).toBe(false);
+  });
+
+  test("no match refuses to send", async () => {
+    const { run, calls } = fleetRunner();
+    await expect(createHerd(run).tell("nope", "hi")).rejects.toThrow(
+      /no agent matches/,
+    );
+    expect(calls.some((c) => c[1] === "prompt")).toBe(false);
   });
 });

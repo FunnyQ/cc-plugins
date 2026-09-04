@@ -37,6 +37,7 @@ const EXPECTED_SKILL_NAMES = [
   "preflight",
   "relay",
   "release",
+  "tell",
   "usage-dashboard",
   "waypoints",
 ];

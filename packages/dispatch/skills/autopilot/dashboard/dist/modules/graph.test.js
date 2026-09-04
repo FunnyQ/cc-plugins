@@ -255,7 +255,7 @@ describe("roads and berths", () => {
   });
 
   test("a berth packed right of its depth carries its dependents with it", () => {
-    // The s168 tree: api/03 forces api/09 and api/04 off their own depths, which
+    // From a real flightplan: api/03 forces api/09 and api/04 off their own depths, which
     // packs api/08 to slot 7. studio/02 depends on api/08 and sat at slot 6, so
     // its crossover ran back up the pane, right to left.
     const nodes = [

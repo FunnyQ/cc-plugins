@@ -99,13 +99,13 @@ function snapshot(
 
 describe("projectSlug", () => {
   test("replaces non-alphanumeric characters and keeps case", () => {
-    expect(projectSlug("/Users/funnyq/Projects/q-lab/cc-plugins")).toBe(
-      "-Users-funnyq-Projects-q-lab-cc-plugins",
+    expect(projectSlug("/Users/dev/Projects/q-lab/cc-plugins")).toBe(
+      "-Users-dev-Projects-q-lab-cc-plugins",
     );
   });
 
   test("doubles the dash where a dot sat", () => {
-    expect(projectSlug("/Users/funnyq/.claude")).toBe("-Users-funnyq--claude");
+    expect(projectSlug("/Users/dev/.claude")).toBe("-Users-dev--claude");
   });
 });
 
