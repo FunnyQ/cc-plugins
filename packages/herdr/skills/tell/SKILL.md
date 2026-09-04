@@ -44,7 +44,14 @@ Run `list` when you are unsure. `workspaceLabel` and `tabLabel` are the readable
 
 **Report which agent you reached.** The user cannot see the other pane. The result carries `matched` — name the project and tab back to them.
 
-**Let the user pick when it is ambiguous.** `tell` refuses to send when the fragment matches more than one agent, and prints each candidate as `web-app/dashboard  [w6E:p4]`. Put those candidates to the user through the harness's own question tool — on Claude Code that is `AskUserQuestion`, which takes up to four options; label each option with the readable address and describe it by cwd and status. When more than four survive, or the harness has no such tool, print the list and ask in plain text instead. Then retell using the chosen **pane id**, never the readable address — that is what stays unambiguous when two candidates read alike.
+**Let the user pick when it is ambiguous.** `tell` refuses to send when the fragment matches more than one agent, and prints each candidate as `address  [pane id]  status  cwd`:
+
+```
+  web-app/main               [w6E:p1]  idle     /Users/dev/Projects/web-app
+  web-app/Dashboard Launcher [w6E:p4]  working  /Users/dev/Projects/web-app
+```
+
+Put those candidates to the user through the harness's own question tool — on Claude Code that is `AskUserQuestion`, which takes up to four options; label each option with the readable address and describe it with the status and cwd from the same line. Every field the picker needs is already there, so do not re-run `list`. When more than four candidates survive, or the harness has no such tool, print the list and ask in plain text instead. Then retell using the chosen **pane id**, never the readable address — that is what stays unambiguous when two candidates read alike.
 
 **Never pick for them, and never work around a refusal.** Do not send to the first candidate, do not loop over the candidates, and do not fall back to `herdr pane send-text`. A prompt cannot be recalled, and every agent that receives one acts on it in its own repo.
 

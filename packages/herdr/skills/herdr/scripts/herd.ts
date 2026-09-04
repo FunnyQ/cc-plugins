@@ -174,7 +174,12 @@ function normAgent(a: any): AgentInfo {
 
 /** Strip herdr's leading nerd-font glyph from a tab/workspace label.
  *  Scoped to the private-use planes on purpose: a broader "leading punctuation"
- *  strip would eat the dot in a legitimate `.config` label. */
+ *  strip would eat the dot in a legitimate `.config` label.
+ *
+ *  All THREE private-use blocks are covered because herdr uses more than one —
+ *  live tab labels here carry both U+EACD (BMP) and U+F09D1, which Nerd Fonts v3
+ *  assigns in the supplementary plane. Narrowing this to the BMP would silently
+ *  stop cleaning the most common label of all. */
 export function cleanLabel(label: unknown): string | null {
   if (typeof label !== "string") return null;
   const trimmed = label
@@ -206,13 +211,15 @@ export function addressOf(agent: AgentLocation): string {
  * dashboard` narrows two agents sharing a workspace down to one, and
  * `clients/acme` works even though one part matches a path and the other a label.
  *
- * The pane id is in that list as the escape hatch, because it is the only handle
- * guaranteed unique. Two tabs in one workspace may carry the SAME label, which
- * makes their `workspace/tab` addresses identical and leaves a caller resolving
- * an ambiguity no fragment can split. Answering with a pane id always can.
- *
- * An exact name short-circuits: a live agent name is unique by construction, so
- * it must not be diluted by some other agent whose cwd happens to contain it.
+ * An exact name or pane id short-circuits. Both are unique by construction, so
+ * neither may be diluted by some other agent whose cwd happens to contain it —
+ * and for the pane id the short-circuit is what makes it the escape hatch at
+ * all. Two tabs in one workspace may carry the SAME label, which makes their
+ * `workspace/tab` addresses identical and leaves a caller resolving an ambiguity
+ * no readable fragment can split; the pane id always can. Substring matching
+ * alone would not deliver that: pane numbers are unpadded, so `w6:p1` is a
+ * substring of `w6:p10` and the escape hatch would re-fail exactly in the busy
+ * workspace that needed it.
  *
  * `selfPaneId` drops the calling pane. Prompting yourself is never the intent,
  * and the caller's own project label is exactly the fragment most likely to be
@@ -230,8 +237,10 @@ export function matchAgents(
     ? agents.filter((a) => a.paneId !== opts.selfPaneId)
     : agents;
 
-  const named = pool.filter((a) => a.name?.toLowerCase() === query);
-  if (named.length) return named;
+  const exact = pool.filter(
+    (a) => a.name?.toLowerCase() === query || a.paneId.toLowerCase() === query,
+  );
+  if (exact.length) return exact;
 
   const parts = query.split("/").filter(Boolean);
   return pool.filter((agent) => {
@@ -337,8 +346,13 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
     const matches = matchAgents(agents, fragment, { selfPaneId });
 
+    // Everything a caller needs to put these in front of a human: the readable
+    // address, the exact handle to retell with, and the two facts that tell two
+    // agents in one project apart. A picker built from this needs no second lookup.
     const listed = (found: AgentLocation[]) =>
-      found.map((a) => `  ${addressOf(a)}  [${a.paneId}]`).join("\n");
+      found
+        .map((a) => `  ${addressOf(a)}  [${a.paneId}]  ${a.status}  ${a.cwd}`)
+        .join("\n");
 
     if (matches.length === 0) {
       const known = listed(agents.filter((a) => a.paneId !== selfPaneId));

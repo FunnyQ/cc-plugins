@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  addressOf,
   type AgentLocation,
   createHerd,
   HerdrError,
@@ -1243,6 +1244,24 @@ describe("matchAgents", () => {
     expect(matchAgents(twins, "w8:p2").map((a) => a.paneId)).toEqual(["w8:p2"]);
   });
 
+  test("an exact pane id beats the pane id it is a prefix of", () => {
+    // Pane numbers are unpadded, so a substring match would return BOTH here and
+    // the escape hatch would fail in exactly the busy workspace that needs it.
+    const busy = [
+      located({ paneId: "w6:p1", workspaceLabel: "busy" }),
+      located({ paneId: "w6:p10", workspaceLabel: "busy" }),
+    ];
+    expect(matchAgents(busy, "w6:p1").map((a) => a.paneId)).toEqual(["w6:p1"]);
+    expect(matchAgents(busy, "w6:p10").map((a) => a.paneId)).toEqual([
+      "w6:p10",
+    ]);
+    // A genuine prefix that is nobody's id still matches both, as a fragment should.
+    expect(matchAgents(busy, "w6:p").map((a) => a.paneId)).toEqual([
+      "w6:p1",
+      "w6:p10",
+    ]);
+  });
+
   test("the calling pane is never a candidate", () => {
     expect(matchAgents(FLEET, "cc-plugins", SELF)).toEqual([]);
   });
@@ -1268,65 +1287,82 @@ describe("matchAgents", () => {
   });
 });
 
-/** agent list + workspace list + tab list, the three calls directory() joins. */
-function fleetRunner() {
+/** The three calls `directory()` joins, answered from raw CLI-shaped rows.
+ *  Parameterized so each test states only the fleet it cares about, and so the
+ *  workspace and tab branches stay told apart by argv[0] — `list` is argv[1] for
+ *  both commands, so matching on it alone is a coincidence, not a contract. */
+function directoryRunner(
+  agents: Record<string, unknown>[],
+  workspaces: Record<string, unknown>[] = [],
+  tabs: Record<string, unknown>[] = [],
+) {
   return mockRunner((a) => {
-    if (a[0] === "agent" && a[1] === "prompt") {
+    if (a[0] === "agent" && a[1] === "prompt")
       return { stdout: JSON.stringify({ result: { type: "ok" } }) };
-    }
-    if (a[0] === "agent" && a[1] === "list") {
-      return {
-        stdout: listEnvelope([
-          {
-            agent: "claude",
-            agent_status: "idle",
-            pane_id: "w7P:p1",
-            tab_id: "w7P:t1",
-            workspace_id: "w7P",
-            terminal_id: "term_1",
-            cwd: "/Users/dev/Projects/api-service",
-            focused: false,
-          },
-          {
-            agent: "claude",
-            agent_status: "working",
-            pane_id: "w7S:p1",
-            tab_id: "w7S:t1",
-            workspace_id: "w7S",
-            terminal_id: "term_2",
-            cwd: "/Users/dev/Projects/cc-plugins",
-            focused: true,
-          },
-        ]),
-      };
-    }
-    if (a[0] === "workspace" && a[1] === "list") {
-      return {
-        stdout: JSON.stringify({
-          result: {
-            workspaces: [
-              { workspace_id: "w7P", label: "api-service" },
-              { workspace_id: "w7S", label: "cc-plugins" },
-            ],
-          },
-        }),
-      };
-    }
-    if (a[0] === "tab" && a[1] === "list") {
-      return {
-        stdout: JSON.stringify({
-          result: {
-            tabs: [
-              { tab_id: "w7P:t1", label: "\u{f09d1}  main" },
-              { tab_id: "w7S:t1", label: "\u{f09d1}  main" },
-            ],
-          },
-        }),
-      };
-    }
+    if (a[0] === "agent" && a[1] === "list")
+      return { stdout: listEnvelope(agents) };
+    if (a[0] === "workspace" && a[1] === "list")
+      return { stdout: JSON.stringify({ result: { workspaces } }) };
+    if (a[0] === "tab" && a[1] === "list")
+      return { stdout: JSON.stringify({ result: { tabs } }) };
     return undefined;
   });
 }
+
+/** One reachable project plus the caller's own pane. */
+const fleetRunner = () =>
+  directoryRunner(
+    [
+      {
+        agent: "claude",
+        agent_status: "idle",
+        pane_id: "w7P:p1",
+        tab_id: "w7P:t1",
+        workspace_id: "w7P",
+        terminal_id: "term_1",
+        cwd: "/Users/dev/Projects/api-service",
+        focused: false,
+      },
+      {
+        agent: "claude",
+        agent_status: "working",
+        pane_id: "w7S:p1",
+        tab_id: "w7S:t1",
+        workspace_id: "w7S",
+        terminal_id: "term_2",
+        cwd: "/Users/dev/Projects/cc-plugins",
+        focused: true,
+      },
+    ],
+    [
+      { workspace_id: "w7P", label: "api-service" },
+      { workspace_id: "w7S", label: "cc-plugins" },
+    ],
+    // U+F09D1 is the glyph herdr actually prefixes tab labels with.
+    [
+      { tab_id: "w7P:t1", label: "\u{f09d1}  main" },
+      { tab_id: "w7S:t1", label: "\u{f09d1}  main" },
+    ],
+  );
+
+describe("addressOf", () => {
+  test("prefers a name, then workspace/tab, then the pane id", () => {
+    expect(addressOf(located({ name: "reviewer-a3f9" }))).toBe("reviewer-a3f9");
+    expect(
+      addressOf(located({ workspaceLabel: "web-app", tabLabel: "main" })),
+    ).toBe("web-app/main");
+    expect(addressOf(located({ workspaceLabel: "web-app" }))).toBe("web-app");
+  });
+
+  test("falls back to the pane id for an unlabelled workspace", () => {
+    // Reachable whenever `workspace list` omits a label, so it must not throw
+    // or render "null/main" into a candidate list a human has to read.
+    expect(addressOf(located({ paneId: "w4:p2" }))).toBe("w4:p2");
+    expect(addressOf(located({ paneId: "w4:p2", tabLabel: "main" }))).toBe(
+      "w4:p2",
+    );
+  });
+});
 
 describe("directory", () => {
   test("joins workspace and tab labels onto each agent", async () => {
@@ -1350,65 +1386,52 @@ describe("tell", () => {
   });
 
   test("addresses a named agent by name, not pane id", async () => {
-    const { run, calls } = mockRunner((a) => {
-      if (a[0] === "agent" && a[1] === "prompt")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
-      if (a[0] === "agent" && a[1] === "list")
-        return {
-          stdout: listEnvelope([
-            {
-              name: "reviewer-a3f9",
-              agent: "codex",
-              agent_status: "idle",
-              pane_id: "w2:p1",
-              tab_id: "w2:t1",
-              workspace_id: "w2",
-              cwd: "/x",
-            },
-          ]),
-        };
-      if (a[1] === "list") return { stdout: JSON.stringify({ result: {} }) };
-      return undefined;
-    });
+    const { run, calls } = directoryRunner([
+      {
+        name: "reviewer-a3f9",
+        agent: "codex",
+        agent_status: "idle",
+        pane_id: "w2:p1",
+        tab_id: "w2:t1",
+        workspace_id: "w2",
+        cwd: "/x",
+      },
+    ]);
     await createHerd(run).tell("reviewer-a3f9", "go");
     expect(calls.find((c) => c[1] === "prompt")?.[2]).toBe("reviewer-a3f9");
   });
 
   test("an ambiguous fragment refuses to send and names the candidates", async () => {
-    const { run, calls } = mockRunner((a) => {
-      if (a[0] === "agent" && a[1] === "list")
-        return {
-          stdout: listEnvelope([
-            { pane_id: "w6E:p1", tab_id: "w6E:t1", workspace_id: "w6E" },
-            { pane_id: "w6E:p4", tab_id: "w6E:t2", workspace_id: "w6E" },
-          ]),
-        };
-      if (a[0] === "workspace")
-        return {
-          stdout: JSON.stringify({
-            result: {
-              workspaces: [{ workspace_id: "w6E", label: "web-app" }],
-            },
-          }),
-        };
-      if (a[0] === "tab")
-        return {
-          stdout: JSON.stringify({
-            result: {
-              tabs: [
-                { tab_id: "w6E:t1", label: "main" },
-                { tab_id: "w6E:t2", label: "Dashboard Launcher" },
-              ],
-            },
-          }),
-        };
-      return undefined;
-    });
+    const { run, calls } = directoryRunner(
+      [
+        {
+          pane_id: "w6E:p1",
+          tab_id: "w6E:t1",
+          workspace_id: "w6E",
+          agent_status: "idle",
+          cwd: "/Users/dev/Projects/web-app",
+        },
+        {
+          pane_id: "w6E:p4",
+          tab_id: "w6E:t2",
+          workspace_id: "w6E",
+          agent_status: "working",
+          cwd: "/Users/dev/Projects/web-app",
+        },
+      ],
+      [{ workspace_id: "w6E", label: "web-app" }],
+      [
+        { tab_id: "w6E:t1", label: "main" },
+        { tab_id: "w6E:t2", label: "Dashboard Launcher" },
+      ],
+    );
     const p = createHerd(run).tell("web-app", "hi");
     await expect(p).rejects.toThrow(/matches 2 agents/);
     await expect(p).rejects.toThrow(/Dashboard Launcher/);
-    // The exact handle rides along, so the retry needs no second lookup.
+    // Everything a picker needs rides along, so the retry needs no second lookup.
     await expect(p).rejects.toThrow(/\[w6E:p4\]/);
+    await expect(p).rejects.toThrow(/working/);
+    await expect(p).rejects.toThrow(/Projects\/web-app/);
     expect(calls.some((c) => c[1] === "prompt")).toBe(false);
   });
 
