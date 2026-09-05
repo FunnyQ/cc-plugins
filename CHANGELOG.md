@@ -1,5 +1,17 @@
 # Changelog
 
+## [herdr 0.7.0] - 2026-09-05
+
+_tracks tag `herdr-v0.7.0`_
+
+### Added
+- New `ask`/`collect` skill lets one agent hand a question to another and get an answer back, instead of only firing one-way messages with `tell`. `ask` addresses a target the same way `tell` does, waits for the reply (default 10 minutes), and spawns a fresh pane automatically if no live agent matches. If it times out, it returns a `collect` command to redeem the answer later instead of failing outright.
+- `tell` now finds a target project even when no agent is open for it: it falls back to herdr-workbench's project registry, then to zoxide's frecency index, and can auto-spawn a new workspace with an agent already running there. A new `--new-workspace` flag opens the agent in that fresh workspace instead of the caller's.
+
+### Fixed
+- `tell` no longer silently picks the wrong agent when two live agents are open at the same resolved directory — it now refuses with the same ambiguity error used elsewhere, listing every matching pane.
+- The recovery command printed after an `ask` times out now uses an absolute path, so it actually works when run from a different project's directory instead of only resolving from herd.ts's own script location.
+
 ## [chronicle 0.15.1] - 2026-09-04
 
 _tracks tag `chronicle-v0.15.1`_
