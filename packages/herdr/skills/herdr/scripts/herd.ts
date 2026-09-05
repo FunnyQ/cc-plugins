@@ -2,17 +2,19 @@
 /**
  * herd.ts — a small, typed wrapper over the raw `herdr` CLI for in-session
  * agent orchestration. Collapses herdr's multi-step recipes (create pane → start →
- * prompt → wait → read) into eight verbs an agent can call without re-deriving the
+ * prompt → wait → read) into ten verbs an agent can call without re-deriving the
  * CLI's sharp edges:
  *
- *   spawn  — start an agent in a fresh pane under a collision-proof name
- *   tell   — hand work to an ALREADY-RUNNING agent, addressed by project label
- *   send   — write a prompt to a running agent AND submit it (Enter)
- *   keys   — send bare key chords to the agent's pane
- *   wait   — block until the agent reaches a status
- *   read   — read a pane's recent output as clean text
- *   list   — the current agents as a typed array
- *   close  — close an agent's pane
+ *   spawn   — start an agent in a fresh pane under a collision-proof name
+ *   tell    — hand work to an ALREADY-RUNNING agent, addressed by project label
+ *   ask     — like tell, but waits for and returns the answer via a result-file contract
+ *   collect — redeem a pending `ask`'s answer later, without re-asking
+ *   send    — write a prompt to a running agent AND submit it (Enter)
+ *   keys    — send bare key chords to the agent's pane
+ *   wait    — block until the agent reaches a status
+ *   read    — read a pane's recent output as clean text
+ *   list    — the current agents as a typed array
+ *   close   — close an agent's pane
  *
  * Design notes:
  * - Targets are addressed by NAME, never by pane id. Names follow an agent when
@@ -32,6 +34,13 @@ import {
   readRegistry,
   type ProjectCandidate,
 } from "./project-registry.ts";
+import {
+  appendFileContract,
+  createAskRunDir,
+  extractFinalText,
+} from "./ask-contract.ts";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; code: number };
 export type Runner = (args: string[]) => Promise<RunResult>;
@@ -155,6 +164,24 @@ export type TellResult = SendResult & {
    *  project registry or zoxide. */
   spawned?: { workspaceId: string; paneId: string; name: string; cwd: string };
 };
+
+/** `ask`'s spawned-pane bookkeeping — same shape as `TellResult.spawned`. */
+export type AskSpawned = {
+  workspaceId: string;
+  paneId: string;
+  name: string;
+  cwd: string;
+};
+
+export type AskResult = {
+  agentName: string;
+  paneId: string;
+  matched: AgentLocation;
+  spawned?: AskSpawned;
+} & (
+  | { pending: false; answer: string }
+  | { pending: true; resultPath: string; report: string }
+);
 
 function randHex(n: number): string {
   const bytes = new Uint8Array(Math.ceil(n / 2));
@@ -341,35 +368,42 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     }));
   }
 
+  /** Either an already-reachable live agent, or a project known only from the
+   *  registry/zoxide that has nothing live at its cwd — the caller decides
+   *  what to do about a `project` (spawn with a task, spawn plain and drive
+   *  it separately, etc). Shared by `tell` and `ask` so the fragment/registry/
+   *  zoxide matching — and its two ambiguity messages — exist exactly once. */
+  type Resolved =
+    | { kind: "agent"; agent: AgentLocation }
+    | { kind: "project"; path: string; name: string };
+
   /**
-   * Fire-and-forget hand-off: resolve a human-typed fragment to exactly one
-   * agent, then submit the text. No wait — the point is to drop work on another
-   * project's agent and carry on.
+   * Resolve a human-typed fragment to exactly one live agent, or — when none
+   * matches — to exactly one known-but-closed project.
    *
    * Ambiguity is a hard failure rather than a broadcast or a best guess: an
-   * unwanted prompt cannot be recalled, and the agent that receives it will act
-   * on it. Each listed candidate carries its pane id beside the readable address,
-   * so the retry needs no second lookup even when two addresses read alike.
+   * unwanted prompt cannot be recalled, and the agent that receives it will
+   * act on it. Each listed candidate carries its pane id beside the readable
+   * address, so the retry needs no second lookup even when two addresses
+   * read alike.
    *
    * When no LIVE agent matches, fall through to known-but-closed projects
    * before giving up: the project registry (`~/.local/state/herdr-projects/
    * registry.json`, written by herdr-workbench), then zoxide's frecency
    * index. A resolved path is checked against every live agent's cwd first —
-   * a renamed tab can still be reachable — and only spawns a fresh workspace
-   * when nothing already answers there. Ambiguity at the registry layer is
-   * the same hard failure as at the agent layer: spawning into the wrong
+   * a renamed tab can still be reachable — so `kind: "project"` only comes
+   * back once nothing already answers there. Ambiguity at the registry layer
+   * is the same hard failure as at the agent layer: spawning into the wrong
    * repo is worse than telling the wrong agent, never picked automatically.
    */
-  async function tell(
+  async function resolveProjectOrAgent(
     fragment: string,
-    text: string,
     opts: {
       selfPaneId?: string;
-      spawnAgent?: string;
       /** Test seam — overrides the registry path read_registry() defaults to. */
       registryPath?: string;
     } = {},
-  ): Promise<TellResult> {
+  ): Promise<Resolved> {
     const agents = await directory();
     const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
     const matches = matchAgents(agents, fragment, { selfPaneId });
@@ -384,14 +418,12 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
     if (matches.length > 1) {
       throw new HerdrError(
-        `"${fragment}" matches ${matches.length} agents — ask which one, then retell using its pane id:\n${listed(matches)}`,
+        `"${fragment}" matches ${matches.length} agents — ask which one, then retry using its pane id:\n${listed(matches)}`,
       );
     }
 
     if (matches.length === 1) {
-      const matched = matches[0]!;
-      const res = await send(matched.name ?? matched.paneId, text);
-      return { ...res, matched };
+      return { kind: "agent", agent: matches[0]! };
     }
 
     // No live agent — try known-but-closed projects.
@@ -405,7 +437,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
         .map((p) => `  ${p.name}  ${p.path}`)
         .join("\n");
       throw new HerdrError(
-        `"${fragment}" matches ${projectMatches.length} known projects — ask which one, then retell with a narrower fragment:\n${listedProjects}`,
+        `"${fragment}" matches ${projectMatches.length} known projects — ask which one, then retry with a narrower fragment:\n${listedProjects}`,
       );
     }
 
@@ -437,8 +469,39 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
         (a.cwd === resolved!.path || a.foregroundCwd === resolved!.path),
     );
     if (liveAtPath) {
-      const res = await send(liveAtPath.name ?? liveAtPath.paneId, text);
-      return { ...res, matched: liveAtPath };
+      return { kind: "agent", agent: liveAtPath };
+    }
+
+    return { kind: "project", path: resolved.path, name: resolved.name };
+  }
+
+  /**
+   * Fire-and-forget hand-off: resolve a human-typed fragment (see
+   * `resolveProjectOrAgent`) then submit the text. No wait — the point is to
+   * drop work on another project's agent and carry on.
+   *
+   * A `project` result gets spawned WITH `task: text` — spawn's own
+   * wait-for-idle-then-send-then-report-blocked handling covers exactly what
+   * a fire-and-forget hand-off needs in one atomic step.
+   */
+  async function tell(
+    fragment: string,
+    text: string,
+    opts: {
+      selfPaneId?: string;
+      spawnAgent?: string;
+      registryPath?: string;
+    } = {},
+  ): Promise<TellResult> {
+    const resolved = await resolveProjectOrAgent(fragment, {
+      selfPaneId: opts.selfPaneId,
+      registryPath: opts.registryPath,
+    });
+
+    if (resolved.kind === "agent") {
+      const matched = resolved.agent;
+      const res = await send(matched.name ?? matched.paneId, text);
+      return { ...res, matched };
     }
 
     const spawned = await spawn({
@@ -467,6 +530,217 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
         name: spawned.name,
         cwd: spawned.cwd,
       },
+    };
+  }
+
+  /** How often `ask`/`collect` poll for settlement + the result file, and how
+   *  long `ask` waits by default before reporting `pending` instead of a
+   *  failure — long enough to cover a real task, short enough that a caller
+   *  running it via a backgrounded process gets a bounded wait. */
+  const ASK_POLL_INTERVAL_MS = 5_000;
+  const ASK_DEFAULT_TIMEOUT_MS = 10 * 60_000;
+  const ASK_SPAWN_IDLE_WAIT_MS = 20_000;
+
+  /**
+   * Poll `target` until it settles (idle/done) AND `resultPath`'s last line
+   * is the sentinel — both, not either: a marker alone could be a stale file
+   * from a previous run, and settled alone could be a mid-write snapshot.
+   *
+   * Settled with no verified file, even briefly, is NOT treated as done —
+   * only the timeout distinguishes "ran out of patience while still working"
+   * (pending, worth another `collect`) from "finished without ever producing
+   * a file" (a hard failure — the target didn't follow the contract, and
+   * waiting longer will not fix that).
+   */
+  async function pollAskResult(
+    target: string,
+    resultPath: string,
+    timeoutMs: number,
+  ): Promise<{ answer: string } | { pending: true }> {
+    const deadline = now() + timeoutMs;
+    let settledWithoutFile = false;
+    while (now() < deadline) {
+      await sleep(ASK_POLL_INTERVAL_MS);
+      let status: string;
+      try {
+        status = (await get(target)).status;
+      } catch {
+        continue; // transient herdr hiccup — keep polling
+      }
+      const settled = status === "idle" || status === "done";
+      settledWithoutFile = settled;
+      if (!settled) continue;
+
+      let content: string;
+      try {
+        content = await Bun.file(resultPath).text();
+      } catch {
+        continue; // not written yet
+      }
+      const answer = extractFinalText(content);
+      if (answer === null) continue; // exists but mid-write
+      return { answer };
+    }
+    if (settledWithoutFile) {
+      throw new HerdrError(
+        `${target} settled without ever writing a valid result to ${resultPath}`,
+      );
+    }
+    return { pending: true };
+  }
+
+  function pendingReport(target: string, resultPath: string): string {
+    return (
+      `ask timed out waiting for an answer from "${target}" — it may still be working.\n` +
+      `Result file: ${resultPath}\n` +
+      `Re-check without re-asking: bun herd.ts collect ${target} --result ${resultPath}`
+    );
+  }
+
+  /**
+   * Ask another project's agent a question and wait for its answer, via the
+   * file contract in ask-contract.ts. Resolution is identical to `tell`'s
+   * (see `resolveProjectOrAgent`); the difference is entirely in what happens
+   * after the target is found.
+   *
+   * A `project` result is spawned WITHOUT a `task` — `ask` drives the
+   * question itself (file contract, then a one-line pointer, never the raw
+   * question text: a multi-line prompt can submit prematurely in a TUI input,
+   * and a long one risks ARG_MAX) — and only closes the pane it spawned
+   * itself, and only on a verified success with `keepPane` unset. An agent
+   * that was already running is never touched.
+   */
+  async function ask(
+    fragment: string,
+    question: string,
+    opts: {
+      selfPaneId?: string;
+      spawnAgent?: string;
+      registryPath?: string;
+      timeoutMs?: number;
+      keepPane?: boolean;
+      resultDir?: string;
+    } = {},
+  ): Promise<AskResult> {
+    const resolved = await resolveProjectOrAgent(fragment, {
+      selfPaneId: opts.selfPaneId,
+      registryPath: opts.registryPath,
+    });
+
+    let agent: AgentLocation;
+    let spawned: AskSpawned | undefined;
+    if (resolved.kind === "agent") {
+      agent = resolved.agent;
+    } else {
+      const started = await spawn({
+        role: resolved.name,
+        agent: opts.spawnAgent ?? "claude",
+        cwd: resolved.path,
+        newWorkspace: true,
+        tabLabel: resolved.name,
+      });
+      try {
+        await wait(started.name, {
+          status: "idle",
+          timeoutMs: ASK_SPAWN_IDLE_WAIT_MS,
+        });
+      } catch {
+        /* best-effort — proceed and let the question itself surface trouble */
+      }
+      agent = {
+        ...started,
+        workspaceLabel: resolved.name,
+        tabLabel: resolved.name,
+      };
+      spawned = {
+        workspaceId: started.workspaceId,
+        paneId: started.paneId,
+        name: started.name,
+        cwd: started.cwd,
+      };
+    }
+
+    const target = agent.name ?? agent.paneId;
+    // A test seam: given, it's used AS the run dir (deterministic path, so a
+    // test can pre-write result.md); absent, a fresh randomly-named one is
+    // created under the default base.
+    const dir = opts.resultDir
+      ? (mkdirSync(opts.resultDir, { recursive: true }), opts.resultDir)
+      : createAskRunDir();
+    const resultPath = join(dir, "result.md");
+    const questionPath = join(dir, "question.md");
+    await Bun.write(questionPath, appendFileContract(question, resultPath));
+    await send(
+      target,
+      `Read the file ${questionPath} and answer the question in it, following the result-file instructions at the end.`,
+    );
+
+    const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
+    const outcome = await pollAskResult(target, resultPath, timeoutMs);
+
+    if ("pending" in outcome) {
+      return {
+        agentName: target,
+        paneId: agent.paneId,
+        matched: agent,
+        spawned,
+        pending: true,
+        resultPath,
+        report: pendingReport(target, resultPath),
+      };
+    }
+
+    if (spawned && !opts.keepPane) {
+      try {
+        await close(target);
+      } catch {
+        /* best-effort — the answer already landed */
+      }
+    }
+    return {
+      agentName: target,
+      paneId: agent.paneId,
+      matched: agent,
+      spawned,
+      pending: false,
+      answer: outcome.answer,
+    };
+  }
+
+  /** Redeem a `pending` `ask` result later, without re-sending the question —
+   *  re-asking would collide with a target that may still be working on the
+   *  first one. Never closes the pane: `collect` doesn't know whether `ask`
+   *  spawned it, so closing here could take down someone else's session. */
+  async function collect(
+    target: string,
+    resultPath: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<AskResult> {
+    const agent = await get(target);
+    const located: AgentLocation = {
+      ...agent,
+      workspaceLabel: null,
+      tabLabel: null,
+    };
+    const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
+    const outcome = await pollAskResult(target, resultPath, timeoutMs);
+
+    if ("pending" in outcome) {
+      return {
+        agentName: target,
+        paneId: located.paneId,
+        matched: located,
+        pending: true,
+        resultPath,
+        report: pendingReport(target, resultPath),
+      };
+    }
+    return {
+      agentName: target,
+      paneId: located.paneId,
+      matched: located,
+      pending: false,
+      answer: outcome.answer,
     };
   }
 
@@ -892,6 +1166,8 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     spawn,
     send,
     tell,
+    ask,
+    collect,
     keys,
     wait,
     read,
@@ -980,6 +1256,13 @@ Usage:
               # a resolved project with no live agent gets one spawned into a fresh workspace.
   herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
               # flags go BEFORE <target> so prompt text containing \`--\` survives
+  herd ask [--agent KIND] [--timeout MS] [--keep-pane] <fragment> <question>
+              # like tell, but waits for and returns the answer via a result-file contract.
+              # Default timeout 10 min; on timeout returns {pending: true} with a "collect" command
+              # to redeem later instead of re-asking. --keep-pane keeps a pane ask itself spawned
+              # (an already-running agent is never closed either way). Flags go BEFORE <fragment>.
+  herd collect <target> --result PATH [--timeout MS]
+              # redeem a pending ask's answer later, without re-sending the question
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab
   herd wait <target> [--status idle|working|blocked|done|unknown]... [--timeout MS]
   herd read <target> [--lines N] [--source recent-unwrapped|recent|visible|detection]
@@ -1070,6 +1353,50 @@ async function main() {
         if (!target || !text)
           throw new HerdrError("send requires <target> and <text>");
         const res = await herd.send(target, text, sendOpts);
+        console.log(JSON.stringify(res, null, 2));
+        break;
+      }
+      case "ask": {
+        // Same reasoning as send: parse leading flags by hand so a question
+        // that starts with or contains `--` survives intact. Everything from
+        // <fragment> onward is positional.
+        const askOpts: {
+          spawnAgent?: string;
+          timeoutMs?: number;
+          keepPane?: boolean;
+        } = {};
+        let i = 0;
+        while (i < rest.length && rest[i]!.startsWith("--")) {
+          const flag = rest[i]!;
+          if (flag === "--agent") {
+            askOpts.spawnAgent = rest[++i];
+            i += 1;
+          } else if (flag === "--timeout") {
+            askOpts.timeoutMs = Number(rest[++i]);
+            i += 1;
+          } else if (flag === "--keep-pane") {
+            askOpts.keepPane = true;
+            i += 1;
+          } else {
+            throw new HerdrError(`ask: unknown flag ${flag}`);
+          }
+        }
+        const fragment = rest[i];
+        const question = rest.slice(i + 1).join(" ");
+        if (!fragment || !question)
+          throw new HerdrError("ask requires <fragment> and <question>");
+        const res = await herd.ask(fragment, question, askOpts);
+        console.log(JSON.stringify(res, null, 2));
+        break;
+      }
+      case "collect": {
+        const target = positionals[0];
+        const resultPath = flags.result as string | undefined;
+        if (!target || !resultPath)
+          throw new HerdrError("collect requires <target> and --result PATH");
+        const res = await herd.collect(target, resultPath, {
+          timeoutMs: flags.timeout ? Number(flags.timeout) : undefined,
+        });
         console.log(JSON.stringify(res, null, 2));
         break;
       }

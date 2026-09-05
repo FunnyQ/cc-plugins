@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ASK_RESULT_END_MARKER } from "./ask-contract.ts";
 import {
   addressOf,
   type AgentLocation,
@@ -1641,5 +1645,397 @@ describe("tell — registry/zoxide fallback", () => {
       await expect(p).rejects.toThrow(/registry and zoxide/);
     });
     expect(calls.some((c) => c[1] === "prompt")).toBe(false);
+  });
+});
+
+/** Fake clock + sleep: ask/collect's poll loop advances instantly instead of
+ *  costing 5s of wall time per iteration. */
+function fakeAskClock() {
+  let t = 0;
+  return {
+    now: () => t,
+    sleep: async (ms: number) => {
+      t += ms;
+    },
+  };
+}
+
+async function withResultDir(
+  fn: (resultDir: string) => Promise<void>,
+): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "herd-ask-result-"));
+  try {
+    await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+const writeResult = (resultDir: string, answer: string) =>
+  writeFile(
+    join(resultDir, "result.md"),
+    `${answer}\n${ASK_RESULT_END_MARKER}\n`,
+  );
+
+describe("ask", () => {
+  test("a live agent that already has the answer waiting resolves on the first poll", async () => {
+    await withResultDir(async (resultDir) => {
+      await writeResult(resultDir, "4");
+      const { run, calls } = mockRunner((a) => {
+        if (a[0] === "agent" && a[1] === "list")
+          return {
+            stdout: listEnvelope([
+              {
+                pane_id: "w7P:p1",
+                tab_id: "w7P:t1",
+                workspace_id: "w7P",
+                agent_status: "idle",
+                cwd: "/Users/dev/Projects/api-service",
+              },
+            ]),
+          };
+        if (a[0] === "workspace" && a[1] === "list")
+          return {
+            stdout: JSON.stringify({
+              result: {
+                workspaces: [{ workspace_id: "w7P", label: "api-service" }],
+              },
+            }),
+          };
+        if (a[0] === "tab" && a[1] === "list")
+          return {
+            stdout: JSON.stringify({
+              result: { tabs: [{ tab_id: "w7P:t1", label: "main" }] },
+            }),
+          };
+        if (a[0] === "agent" && a[1] === "prompt")
+          return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+        if (a[0] === "agent" && a[1] === "get")
+          return {
+            stdout: agentEnvelope({ pane_id: "w7P:p1", agent_status: "idle" }),
+          };
+        return undefined;
+      });
+
+      const res = await createHerd(run, fakeAskClock()).ask(
+        "api-service",
+        "what is 2+2?",
+        { resultDir },
+      );
+
+      expect(res.pending).toBe(false);
+      if (!res.pending) expect(res.answer).toBe("4");
+      expect(res.matched.workspaceLabel).toBe("api-service");
+      expect(res.spawned).toBeUndefined();
+
+      const prompt = calls.find((c) => c[0] === "agent" && c[1] === "prompt")!;
+      expect(prompt[2]).toBe("w7P:p1");
+      expect(prompt[3]).toContain(join(resultDir, "question.md"));
+      // Live agents are never closed, no matter what.
+      expect(calls.some((c) => c[0] === "pane" && c[1] === "close")).toBe(
+        false,
+      );
+    });
+  });
+
+  /** No live agent matches; registry fallback spawns one, mirroring tell's
+   *  own fallback runner but adding agent get/wait/pane close for ask's poll
+   *  and cleanup steps. */
+  function askFallbackRunner(cwd: string) {
+    return mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([
+            {
+              agent: "claude",
+              agent_status: "idle",
+              pane_id: "w7S:p1",
+              tab_id: "w7S:t1",
+              workspace_id: "w7S",
+              terminal_id: "term_2",
+              cwd: "/Users/dev/Projects/cc-plugins",
+              focused: true,
+            },
+          ]),
+        };
+      if (a[0] === "workspace" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              workspaces: [{ workspace_id: "w7S", label: "cc-plugins" }],
+            },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: { tabs: [{ tab_id: "w7S:t1", label: "main" }] },
+          }),
+        };
+      if (a[0] === "workspace" && a[1] === "create")
+        return {
+          stdout: JSON.stringify({
+            result: { root_pane: { pane_id: "wNEW:p1", workspace_id: "wNEW" } },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "wNEW:p1",
+            tab_id: "wNEW:t1",
+            workspace_id: "wNEW",
+            terminal_id: "term_new",
+            cwd,
+            agent_status: "unknown",
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "wait")
+        return { stdout: JSON.stringify({ result: { status: "idle" } }) };
+      if (a[0] === "agent" && a[1] === "prompt")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      if (a[0] === "agent" && a[1] === "get")
+        return {
+          stdout: agentEnvelope({ pane_id: "wNEW:p1", agent_status: "idle" }),
+        };
+      if (a[0] === "pane" && a[1] === "close")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      return undefined;
+    });
+  }
+
+  async function withRegistryFile(
+    projects: Record<string, unknown>,
+    fn: (path: string) => Promise<void>,
+  ): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), "herd-ask-registry-"));
+    const path = join(dir, "registry.json");
+    await writeFile(path, JSON.stringify({ version: 1, projects }));
+    try {
+      await fn(path);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  test("no live agent, a registry hit: spawns, waits idle, asks, then closes the pane it spawned", async () => {
+    const cwd = "/Users/dev/Projects/diqi";
+    await withResultDir(async (resultDir) => {
+      await writeResult(resultDir, "/Users/dev/Projects/diqi");
+      await withRegistryFile(
+        { [cwd]: { name: "diqi" } },
+        async (registryPath) => {
+          const { run, calls } = askFallbackRunner(cwd);
+          const res = await createHerd(run, fakeAskClock()).ask(
+            "diqi",
+            "what directory are you in?",
+            { resultDir, registryPath },
+          );
+
+          expect(res.pending).toBe(false);
+          expect(res.spawned?.cwd).toBe(cwd);
+          const closeCall = calls.find(
+            (c) => c[0] === "pane" && c[1] === "close",
+          );
+          expect(closeCall).toBeDefined();
+          expect(calls.some((c) => c[0] === "agent" && c[1] === "wait")).toBe(
+            true,
+          );
+        },
+      );
+    });
+  });
+
+  test("--keep-pane skips closing a pane ask spawned itself", async () => {
+    const cwd = "/Users/dev/Projects/diqi";
+    await withResultDir(async (resultDir) => {
+      await writeResult(resultDir, "answer");
+      await withRegistryFile(
+        { [cwd]: { name: "diqi" } },
+        async (registryPath) => {
+          const { run, calls } = askFallbackRunner(cwd);
+          await createHerd(run, fakeAskClock()).ask("diqi", "q", {
+            resultDir,
+            registryPath,
+            keepPane: true,
+          });
+          expect(calls.some((c) => c[0] === "pane" && c[1] === "close")).toBe(
+            false,
+          );
+        },
+      );
+    });
+  });
+
+  test("settled without ever producing a valid result file is a hard failure", async () => {
+    await withResultDir(async (resultDir) => {
+      const { run } = mockRunner((a) => {
+        if (a[0] === "agent" && a[1] === "list")
+          return {
+            stdout: listEnvelope([
+              {
+                pane_id: "w7P:p1",
+                tab_id: "w7P:t1",
+                workspace_id: "w7P",
+                agent_status: "idle",
+                cwd: "/Users/dev/Projects/api-service",
+              },
+            ]),
+          };
+        if (a[0] === "workspace" && a[1] === "list")
+          return {
+            stdout: JSON.stringify({
+              result: {
+                workspaces: [{ workspace_id: "w7P", label: "api-service" }],
+              },
+            }),
+          };
+        if (a[0] === "tab" && a[1] === "list")
+          return {
+            stdout: JSON.stringify({ result: { tabs: [] } }),
+          };
+        if (a[0] === "agent" && a[1] === "prompt")
+          return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+        if (a[0] === "agent" && a[1] === "get")
+          return {
+            stdout: agentEnvelope({ pane_id: "w7P:p1", agent_status: "idle" }),
+          };
+        return undefined;
+      });
+
+      await expect(
+        createHerd(run, fakeAskClock()).ask("api-service", "q", {
+          resultDir,
+          timeoutMs: 15000,
+        }),
+      ).rejects.toThrow(/settled without ever writing/);
+    });
+  });
+
+  test("still working at the timeout returns pending with a collect command, never throws", async () => {
+    await withResultDir(async (resultDir) => {
+      const { run } = mockRunner((a) => {
+        if (a[0] === "agent" && a[1] === "list")
+          return {
+            stdout: listEnvelope([
+              {
+                pane_id: "w7P:p1",
+                tab_id: "w7P:t1",
+                workspace_id: "w7P",
+                agent_status: "working",
+                cwd: "/Users/dev/Projects/api-service",
+              },
+            ]),
+          };
+        if (a[0] === "workspace" && a[1] === "list")
+          return {
+            stdout: JSON.stringify({
+              result: {
+                workspaces: [{ workspace_id: "w7P", label: "api-service" }],
+              },
+            }),
+          };
+        if (a[0] === "tab" && a[1] === "list")
+          return { stdout: JSON.stringify({ result: { tabs: [] } }) };
+        if (a[0] === "agent" && a[1] === "prompt")
+          return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+        if (a[0] === "agent" && a[1] === "get")
+          return {
+            stdout: agentEnvelope({
+              pane_id: "w7P:p1",
+              agent_status: "working",
+            }),
+          };
+        return undefined;
+      });
+
+      const res = await createHerd(run, fakeAskClock()).ask(
+        "api-service",
+        "q",
+        { resultDir, timeoutMs: 15000 },
+      );
+
+      expect(res.pending).toBe(true);
+      if (res.pending) {
+        expect(res.resultPath).toBe(join(resultDir, "result.md"));
+        expect(res.report).toContain("collect");
+        expect(res.report).toContain(res.resultPath);
+      }
+    });
+  });
+});
+
+describe("collect", () => {
+  test("redeems a pending ask's answer without re-sending anything", async () => {
+    await withResultDir(async (resultDir) => {
+      await writeResult(resultDir, "42");
+      const { run, calls } = mockRunner((a) => {
+        if (a[0] === "agent" && a[1] === "get")
+          return {
+            stdout: agentEnvelope({ pane_id: "w7P:p1", agent_status: "idle" }),
+          };
+        return undefined;
+      });
+
+      const res = await createHerd(run, fakeAskClock()).collect(
+        "diqi-90d4",
+        join(resultDir, "result.md"),
+      );
+
+      expect(res.pending).toBe(false);
+      if (!res.pending) expect(res.answer).toBe("42");
+      expect(calls.some((c) => c[0] === "agent" && c[1] === "prompt")).toBe(
+        false,
+      );
+      expect(calls.some((c) => c[0] === "pane" && c[1] === "close")).toBe(
+        false,
+      );
+    });
+  });
+
+  test("still pending stays pending and never closes the pane", async () => {
+    await withResultDir(async (resultDir) => {
+      const { run, calls } = mockRunner((a) => {
+        if (a[0] === "agent" && a[1] === "get")
+          return {
+            stdout: agentEnvelope({
+              pane_id: "w7P:p1",
+              agent_status: "working",
+            }),
+          };
+        return undefined;
+      });
+
+      const res = await createHerd(run, fakeAskClock()).collect(
+        "diqi-90d4",
+        join(resultDir, "result.md"),
+        { timeoutMs: 15000 },
+      );
+
+      expect(res.pending).toBe(true);
+      expect(calls.some((c) => c[0] === "pane" && c[1] === "close")).toBe(
+        false,
+      );
+    });
+  });
+
+  test("settled without a valid file throws, matching ask's own rule", async () => {
+    await withResultDir(async (resultDir) => {
+      const { run } = mockRunner((a) => {
+        if (a[0] === "agent" && a[1] === "get")
+          return {
+            stdout: agentEnvelope({ pane_id: "w7P:p1", agent_status: "done" }),
+          };
+        return undefined;
+      });
+
+      await expect(
+        createHerd(run, fakeAskClock()).collect(
+          "diqi-90d4",
+          join(resultDir, "result.md"),
+          { timeoutMs: 15000 },
+        ),
+      ).rejects.toThrow(/settled without ever writing/);
+    });
   });
 });
