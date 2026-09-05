@@ -1448,91 +1448,93 @@ describe("tell", () => {
   });
 });
 
+/** No live agent ever matches; `workspace create` + `agent start` stand in
+ *  for a project the registry knows about but nothing has open. Pass `extra`
+ *  to answer additional CLI calls a caller needs (e.g. `ask`'s `agent get` /
+ *  `pane close`) without duplicating this whole table. */
+function projectFallbackRunner(
+  cwd: string,
+  extra?: (a: string[]) => Partial<RunResult> | undefined,
+) {
+  return mockRunner((a) => {
+    if (a[0] === "agent" && a[1] === "list")
+      return {
+        stdout: listEnvelope([
+          {
+            agent: "claude",
+            agent_status: "idle",
+            pane_id: "w7S:p1",
+            tab_id: "w7S:t1",
+            workspace_id: "w7S",
+            terminal_id: "term_2",
+            cwd: "/Users/dev/Projects/cc-plugins",
+            focused: true,
+          },
+        ]),
+      };
+    if (a[0] === "workspace" && a[1] === "list")
+      return {
+        stdout: JSON.stringify({
+          result: {
+            workspaces: [{ workspace_id: "w7S", label: "cc-plugins" }],
+          },
+        }),
+      };
+    if (a[0] === "tab" && a[1] === "list")
+      return {
+        stdout: JSON.stringify({
+          result: { tabs: [{ tab_id: "w7S:t1", label: "main" }] },
+        }),
+      };
+    if (a[0] === "workspace" && a[1] === "create")
+      return {
+        stdout: JSON.stringify({
+          result: {
+            root_pane: { pane_id: "wNEW:p1", workspace_id: "wNEW" },
+          },
+        }),
+      };
+    if (a[0] === "agent" && a[1] === "start")
+      return {
+        stdout: agentEnvelope({
+          name: a[2],
+          pane_id: "wNEW:p1",
+          tab_id: "wNEW:t1",
+          workspace_id: "wNEW",
+          terminal_id: "term_new",
+          cwd,
+          agent_status: "unknown",
+        }),
+      };
+    if (a[0] === "agent" && a[1] === "wait")
+      return { stdout: JSON.stringify({ result: { status: "idle" } }) };
+    if (a[0] === "agent" && a[1] === "prompt")
+      return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+    return extra?.(a);
+  });
+}
+
+async function withRegistryFile(
+  projects: Record<string, unknown>,
+  fn: (path: string) => Promise<void>,
+): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "herd-registry-"));
+  const path = join(dir, "registry.json");
+  await writeFile(path, JSON.stringify({ version: 1, projects }));
+  try {
+    await fn(path);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 describe("tell — registry/zoxide fallback", () => {
-  /** No live agent ever matches; `workspace create` + `agent start` stand in
-   *  for a project the registry knows about but nothing has open. */
-  function fallbackRunner(cwd: string) {
-    return mockRunner((a) => {
-      if (a[0] === "agent" && a[1] === "list")
-        return {
-          stdout: listEnvelope([
-            {
-              agent: "claude",
-              agent_status: "idle",
-              pane_id: "w7S:p1",
-              tab_id: "w7S:t1",
-              workspace_id: "w7S",
-              terminal_id: "term_2",
-              cwd: "/Users/dev/Projects/cc-plugins",
-              focused: true,
-            },
-          ]),
-        };
-      if (a[0] === "workspace" && a[1] === "list")
-        return {
-          stdout: JSON.stringify({
-            result: {
-              workspaces: [{ workspace_id: "w7S", label: "cc-plugins" }],
-            },
-          }),
-        };
-      if (a[0] === "tab" && a[1] === "list")
-        return {
-          stdout: JSON.stringify({
-            result: { tabs: [{ tab_id: "w7S:t1", label: "main" }] },
-          }),
-        };
-      if (a[0] === "workspace" && a[1] === "create")
-        return {
-          stdout: JSON.stringify({
-            result: {
-              root_pane: { pane_id: "wNEW:p1", workspace_id: "wNEW" },
-            },
-          }),
-        };
-      if (a[0] === "agent" && a[1] === "start")
-        return {
-          stdout: agentEnvelope({
-            name: a[2],
-            pane_id: "wNEW:p1",
-            tab_id: "wNEW:t1",
-            workspace_id: "wNEW",
-            terminal_id: "term_new",
-            cwd,
-            agent_status: "unknown",
-          }),
-        };
-      if (a[0] === "agent" && a[1] === "wait")
-        return { stdout: JSON.stringify({ result: { status: "idle" } }) };
-      if (a[0] === "agent" && a[1] === "prompt")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
-      return undefined;
-    });
-  }
-
-  async function withRegistryFile(
-    projects: Record<string, unknown>,
-    fn: (path: string) => Promise<void>,
-  ): Promise<void> {
-    const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
-    const { tmpdir } = await import("node:os");
-    const { join } = await import("node:path");
-    const dir = await mkdtemp(join(tmpdir(), "herdr-tell-registry-"));
-    const path = join(dir, "registry.json");
-    await writeFile(path, JSON.stringify({ version: 1, projects }));
-    try {
-      await fn(path);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-
   test("no live agent, a single registry hit with nothing open there: spawns a fresh workspace", async () => {
     const cwd = "/Users/dev/Projects/diqi";
     await withRegistryFile(
       { [cwd]: { name: "diqi", sources: ["claude"] } },
       async (registryPath) => {
-        const { run, calls } = fallbackRunner(cwd)!;
+        const { run, calls } = projectFallbackRunner(cwd);
         const res = await createHerd(run).tell("diqi", "run tests", {
           registryPath,
         });
@@ -1738,62 +1740,10 @@ describe("ask", () => {
     });
   });
 
-  /** No live agent matches; registry fallback spawns one, mirroring tell's
-   *  own fallback runner but adding agent get/wait/pane close for ask's poll
-   *  and cleanup steps. */
+  /** `ask` needs two more CLI calls answered than `tell`'s fallback: `agent
+   *  get` for its poll loop, `pane close` for its post-success cleanup. */
   function askFallbackRunner(cwd: string) {
-    return mockRunner((a) => {
-      if (a[0] === "agent" && a[1] === "list")
-        return {
-          stdout: listEnvelope([
-            {
-              agent: "claude",
-              agent_status: "idle",
-              pane_id: "w7S:p1",
-              tab_id: "w7S:t1",
-              workspace_id: "w7S",
-              terminal_id: "term_2",
-              cwd: "/Users/dev/Projects/cc-plugins",
-              focused: true,
-            },
-          ]),
-        };
-      if (a[0] === "workspace" && a[1] === "list")
-        return {
-          stdout: JSON.stringify({
-            result: {
-              workspaces: [{ workspace_id: "w7S", label: "cc-plugins" }],
-            },
-          }),
-        };
-      if (a[0] === "tab" && a[1] === "list")
-        return {
-          stdout: JSON.stringify({
-            result: { tabs: [{ tab_id: "w7S:t1", label: "main" }] },
-          }),
-        };
-      if (a[0] === "workspace" && a[1] === "create")
-        return {
-          stdout: JSON.stringify({
-            result: { root_pane: { pane_id: "wNEW:p1", workspace_id: "wNEW" } },
-          }),
-        };
-      if (a[0] === "agent" && a[1] === "start")
-        return {
-          stdout: agentEnvelope({
-            name: a[2],
-            pane_id: "wNEW:p1",
-            tab_id: "wNEW:t1",
-            workspace_id: "wNEW",
-            terminal_id: "term_new",
-            cwd,
-            agent_status: "unknown",
-          }),
-        };
-      if (a[0] === "agent" && a[1] === "wait")
-        return { stdout: JSON.stringify({ result: { status: "idle" } }) };
-      if (a[0] === "agent" && a[1] === "prompt")
-        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+    return projectFallbackRunner(cwd, (a) => {
       if (a[0] === "agent" && a[1] === "get")
         return {
           stdout: agentEnvelope({ pane_id: "wNEW:p1", agent_status: "idle" }),
@@ -1802,20 +1752,6 @@ describe("ask", () => {
         return { stdout: JSON.stringify({ result: { type: "ok" } }) };
       return undefined;
     });
-  }
-
-  async function withRegistryFile(
-    projects: Record<string, unknown>,
-    fn: (path: string) => Promise<void>,
-  ): Promise<void> {
-    const dir = await mkdtemp(join(tmpdir(), "herd-ask-registry-"));
-    const path = join(dir, "registry.json");
-    await writeFile(path, JSON.stringify({ version: 1, projects }));
-    try {
-      await fn(path);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
   }
 
   test("no live agent, a registry hit: spawns, waits idle, asks, then closes the pane it spawned", async () => {

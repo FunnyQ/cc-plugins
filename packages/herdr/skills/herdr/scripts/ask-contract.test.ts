@@ -40,11 +40,12 @@ describe("extractFinalText", () => {
 });
 
 describe("createAskRunDir", () => {
-  test("creates a fresh directory under the given base", async () => {
+  test("creates and returns the exact directory when given one", async () => {
     const base = await mkdtemp(join(tmpdir(), "herd-ask-contract-test-"));
     try {
-      const dir = createAskRunDir(base);
-      expect(dir.startsWith(base)).toBe(true);
+      const exact = join(base, "run-dir");
+      const dir = createAskRunDir(exact);
+      expect(dir).toBe(exact);
       const stat = await Bun.file(dir).stat();
       expect(stat.isDirectory()).toBe(true);
     } finally {
@@ -52,10 +53,11 @@ describe("createAskRunDir", () => {
     }
   });
 
-  test("two calls never collide", () => {
-    const base = join(tmpdir(), "herd-ask-contract-collision-test");
-    const a = createAskRunDir(base);
-    const b = createAskRunDir(base);
+  test("two calls with no override never collide", async () => {
+    const a = createAskRunDir();
+    const b = createAskRunDir();
     expect(a).not.toBe(b);
+    await rm(a, { recursive: true, force: true });
+    await rm(b, { recursive: true, force: true });
   });
 });

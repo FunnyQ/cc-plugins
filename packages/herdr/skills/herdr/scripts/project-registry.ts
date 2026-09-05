@@ -101,12 +101,12 @@ export function compareProjects(
   a: ProjectCandidate,
   b: ProjectCandidate,
 ): number {
-  if (a.lastUsedAt !== undefined && b.lastUsedAt !== undefined) {
-    return b.lastUsedAt - a.lastUsedAt || a.name.localeCompare(b.name);
-  }
-  if (a.lastUsedAt !== undefined) return -1;
-  if (b.lastUsedAt !== undefined) return 1;
-  return a.name.localeCompare(b.name);
+  // An unstamped entry sorts as if used at the dawn of time, so it always
+  // sinks below every stamped one without a separate branch for "only one
+  // side has a timestamp".
+  const av = a.lastUsedAt ?? -Infinity;
+  const bv = b.lastUsedAt ?? -Infinity;
+  return bv - av || a.name.localeCompare(b.name);
 }
 
 /** Below this length zoxide's frecency ranking is too noisy to trust — mirrors

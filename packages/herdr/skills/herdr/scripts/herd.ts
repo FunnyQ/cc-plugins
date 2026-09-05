@@ -39,7 +39,6 @@ import {
   createAskRunDir,
   extractFinalText,
 } from "./ask-contract.ts";
-import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; code: number };
@@ -158,26 +157,25 @@ export type AgentLocation = AgentInfo & {
   tabLabel: string | null;
 };
 
-export type TellResult = SendResult & {
-  matched: AgentLocation;
-  /** Set when no live agent matched and `tell` opened one itself from the
-   *  project registry or zoxide. */
-  spawned?: { workspaceId: string; paneId: string; name: string; cwd: string };
-};
-
-/** `ask`'s spawned-pane bookkeeping — same shape as `TellResult.spawned`. */
-export type AskSpawned = {
+/** Bookkeeping for a pane `tell`/`ask` spawned themselves — set only when no
+ *  live agent matched and the project registry or zoxide resolved one instead. */
+export type SpawnedAgent = {
   workspaceId: string;
   paneId: string;
   name: string;
   cwd: string;
 };
 
+export type TellResult = SendResult & {
+  matched: AgentLocation;
+  spawned?: SpawnedAgent;
+};
+
 export type AskResult = {
   agentName: string;
   paneId: string;
   matched: AgentLocation;
-  spawned?: AskSpawned;
+  spawned?: SpawnedAgent;
 } & (
   | { pending: false; answer: string }
   | { pending: true; resultPath: string; report: string }
@@ -475,6 +473,30 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return { kind: "project", path: resolved.path, name: resolved.name };
   }
 
+  /** The two shapes every caller needs from a project-fallback spawn: an
+   *  `AgentLocation` labelled with the resolved project's name (there is no
+   *  real workspace/tab label lookup to do — it was just created), and the
+   *  bare bookkeeping ref for the `spawned` field. Shared by `tell` and `ask`
+   *  so the field list can't drift between their two spawn branches. */
+  function locateSpawned(
+    started: SpawnResult,
+    projectName: string,
+  ): { agent: AgentLocation; spawned: SpawnedAgent } {
+    return {
+      agent: {
+        ...started,
+        workspaceLabel: projectName,
+        tabLabel: projectName,
+      },
+      spawned: {
+        workspaceId: started.workspaceId,
+        paneId: started.paneId,
+        name: started.name,
+        cwd: started.cwd,
+      },
+    };
+  }
+
   /**
    * Fire-and-forget hand-off: resolve a human-typed fragment (see
    * `resolveProjectOrAgent`) then submit the text. No wait — the point is to
@@ -504,7 +526,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       return { ...res, matched };
     }
 
-    const spawned = await spawn({
+    const started = await spawn({
       role: resolved.name,
       agent: opts.spawnAgent ?? "claude",
       cwd: resolved.path,
@@ -512,24 +534,18 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       tabLabel: resolved.name,
       task: text,
     });
-    const matchedAgent: AgentLocation = {
-      ...spawned,
-      workspaceLabel: resolved.name,
-      tabLabel: resolved.name,
-    };
+    const { agent: matchedAgent, spawned } = locateSpawned(
+      started,
+      resolved.name,
+    );
     return {
-      target: spawned.name,
-      paneId: spawned.paneId,
-      submitted: spawned.task?.sent ?? false,
+      target: started.name,
+      paneId: started.paneId,
+      submitted: started.task?.sent ?? false,
       waited: true,
-      status: spawned.status,
+      status: started.status,
       matched: matchedAgent,
-      spawned: {
-        workspaceId: spawned.workspaceId,
-        paneId: spawned.paneId,
-        name: spawned.name,
-        cwd: spawned.cwd,
-      },
+      spawned,
     };
   }
 
@@ -552,11 +568,13 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
    * a file" (a hard failure — the target didn't follow the contract, and
    * waiting longer will not fix that).
    */
+  type AskOutcome = { answer: string } | { pending: true };
+
   async function pollAskResult(
     target: string,
     resultPath: string,
     timeoutMs: number,
-  ): Promise<{ answer: string } | { pending: true }> {
+  ): Promise<AskOutcome> {
     const deadline = now() + timeoutMs;
     let settledWithoutFile = false;
     while (now() < deadline) {
@@ -597,6 +615,38 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     );
   }
 
+  /** The one place that shapes an `AskOutcome` into the public `AskResult` —
+   *  shared by `ask` and `collect` so their pending/success arms can't drift
+   *  apart. `spawned` stays `undefined` for `collect`, which never knows
+   *  whether the pane it polled was one `ask` spawned. */
+  function buildAskResult(
+    target: string,
+    agent: AgentLocation,
+    outcome: AskOutcome,
+    resultPath: string,
+    spawned?: SpawnedAgent,
+  ): AskResult {
+    if ("pending" in outcome) {
+      return {
+        agentName: target,
+        paneId: agent.paneId,
+        matched: agent,
+        spawned,
+        pending: true,
+        resultPath,
+        report: pendingReport(target, resultPath),
+      };
+    }
+    return {
+      agentName: target,
+      paneId: agent.paneId,
+      matched: agent,
+      spawned,
+      pending: false,
+      answer: outcome.answer,
+    };
+  }
+
   /**
    * Ask another project's agent a question and wait for its answer, via the
    * file contract in ask-contract.ts. Resolution is identical to `tell`'s
@@ -628,7 +678,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     });
 
     let agent: AgentLocation;
-    let spawned: AskSpawned | undefined;
+    let spawned: SpawnedAgent | undefined;
     if (resolved.kind === "agent") {
       agent = resolved.agent;
     } else {
@@ -647,26 +697,14 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       } catch {
         /* best-effort — proceed and let the question itself surface trouble */
       }
-      agent = {
-        ...started,
-        workspaceLabel: resolved.name,
-        tabLabel: resolved.name,
-      };
-      spawned = {
-        workspaceId: started.workspaceId,
-        paneId: started.paneId,
-        name: started.name,
-        cwd: started.cwd,
-      };
+      ({ agent, spawned } = locateSpawned(started, resolved.name));
     }
 
     const target = agent.name ?? agent.paneId;
-    // A test seam: given, it's used AS the run dir (deterministic path, so a
-    // test can pre-write result.md); absent, a fresh randomly-named one is
-    // created under the default base.
-    const dir = opts.resultDir
-      ? (mkdirSync(opts.resultDir, { recursive: true }), opts.resultDir)
-      : createAskRunDir();
+    // opts.resultDir is a test seam: given, it's used AS the run dir
+    // (deterministic path, so a test can pre-write result.md); absent, a
+    // fresh randomly-named one is created under the default base.
+    const dir = createAskRunDir(opts.resultDir);
     const resultPath = join(dir, "result.md");
     const questionPath = join(dir, "question.md");
     await Bun.write(questionPath, appendFileContract(question, resultPath));
@@ -678,33 +716,14 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
     const outcome = await pollAskResult(target, resultPath, timeoutMs);
 
-    if ("pending" in outcome) {
-      return {
-        agentName: target,
-        paneId: agent.paneId,
-        matched: agent,
-        spawned,
-        pending: true,
-        resultPath,
-        report: pendingReport(target, resultPath),
-      };
-    }
-
-    if (spawned && !opts.keepPane) {
+    if (!("pending" in outcome) && spawned && !opts.keepPane) {
       try {
         await close(target);
       } catch {
         /* best-effort — the answer already landed */
       }
     }
-    return {
-      agentName: target,
-      paneId: agent.paneId,
-      matched: agent,
-      spawned,
-      pending: false,
-      answer: outcome.answer,
-    };
+    return buildAskResult(target, agent, outcome, resultPath, spawned);
   }
 
   /** Redeem a `pending` `ask` result later, without re-sending the question —
@@ -724,24 +743,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     };
     const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
     const outcome = await pollAskResult(target, resultPath, timeoutMs);
-
-    if ("pending" in outcome) {
-      return {
-        agentName: target,
-        paneId: located.paneId,
-        matched: located,
-        pending: true,
-        resultPath,
-        report: pendingReport(target, resultPath),
-      };
-    }
-    return {
-      agentName: target,
-      paneId: located.paneId,
-      matched: located,
-      pending: false,
-      answer: outcome.answer,
-    };
+    return buildAskResult(target, located, outcome, resultPath);
   }
 
   async function get(target: string): Promise<AgentInfo> {

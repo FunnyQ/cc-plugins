@@ -44,14 +44,20 @@ export function extractFinalText(content: string): string | null {
   return lines.slice(0, -1).join("\n").trimEnd();
 }
 
-/** A fresh scratch directory for one ask/collect run's question.md + result.md. */
-export function createAskRunDir(
-  base: string = join(tmpdir(), "herd-ask"),
-): string {
-  const dir = join(
-    base,
-    `${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`,
-  );
+/** The scratch directory for one ask/collect run's question.md + result.md.
+ *  Given `exactDir` (a test seam — a deterministic path a test can pre-write
+ *  result.md into), that directory is created and used as-is; otherwise a
+ *  fresh randomly-named one is created under the default base. Either way
+ *  this is the one place that creates the directory — never call `mkdirSync`
+ *  on a result dir anywhere else. */
+export function createAskRunDir(exactDir?: string): string {
+  const dir =
+    exactDir ??
+    join(
+      tmpdir(),
+      "herd-ask",
+      `${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`,
+    );
   mkdirSync(dir, { recursive: true });
   return dir;
 }
