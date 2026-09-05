@@ -12,6 +12,8 @@ import {
   parseArgs,
   type RunResult,
   type Runner,
+  VERB_USAGE,
+  wantsVerbHelp,
 } from "./herd.ts";
 
 /** A mock runner that records argv and replies from a scripted table. */
@@ -2040,5 +2042,45 @@ describe("collect", () => {
         ),
       ).rejects.toThrow(/settled without ever writing/);
     });
+  });
+});
+
+describe("verb help", () => {
+  test("every dispatched verb has a usage block", () => {
+    for (const verb of [
+      "list",
+      "spawn",
+      "tell",
+      "send",
+      "ask",
+      "collect",
+      "keys",
+      "wait",
+      "read",
+      "close",
+    ]) {
+      expect(VERB_USAGE[verb]).toBeTruthy();
+    }
+  });
+
+  test("ask's block names every flag its parser accepts", () => {
+    for (const flag of ["--agent", "--timeout", "--keep-pane"]) {
+      expect(VERB_USAGE.ask).toContain(flag);
+    }
+  });
+
+  test("detects --help in the leading flag run", () => {
+    expect(wantsVerbHelp(["--help"])).toBe(true);
+    expect(wantsVerbHelp(["-h"])).toBe(true);
+    expect(wantsVerbHelp(["--keep-pane", "--help"])).toBe(true);
+    expect(wantsVerbHelp(["--timeout", "5000", "--help"])).toBe(true);
+  });
+
+  test("ignores --help inside free text, so a question survives", () => {
+    expect(wantsVerbHelp(["api-service", "why does --help fail?"])).toBe(false);
+    expect(wantsVerbHelp(["--keep-pane", "api-service", "--help me"])).toBe(
+      false,
+    );
+    expect(wantsVerbHelp([])).toBe(false);
   });
 });

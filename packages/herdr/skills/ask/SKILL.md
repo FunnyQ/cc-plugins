@@ -34,6 +34,8 @@ bun "$HERD" ask --keep-pane --timeout 120000 api-service "what port does the dev
 
 Resolve `$SKILL_DIR` as the `tell` skill describes.
 
+Need a flag's exact spelling, default, or accepted values? Run `bun "$HERD" ask --help`. Never read `herd.ts` to answer that — every verb prints its own block, and `bun "$HERD" --help` lists them all.
+
 **Flag placement is not optional.** Everything from `<fragment>` onward is the question, verbatim — this is what lets a question contain a literal `--` without being misparsed as a flag. A flag placed AFTER the fragment is not an error; it is silently swallowed into the question text, `--keep-pane` included. That means a `--keep-pane` typed at the end does nothing and the spawned pane still closes on success with no warning. Put every flag before the fragment, always.
 
 ## Addressing and fallback

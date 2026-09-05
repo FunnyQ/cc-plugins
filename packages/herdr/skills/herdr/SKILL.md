@@ -24,8 +24,13 @@ Inside a herdr pane (`HERDR_ENV=1`), use the bundled `scripts/herd.ts` wrapper i
 
 `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call. Resolve the script instead from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`).
 
+Run the script instead of reading it. `bun "$HERD" --help` lists every verb; `bun "$HERD" <verb> --help` prints one verb's flags, defaults, and accepted values. Never grep `herd.ts` to learn a flag.
+
 ```bash
 HERD="$SKILL_DIR/scripts/herd.ts"
+
+bun "$HERD" --help               # all verbs
+bun "$HERD" ask --help           # one verb's flags
 
 # Spawn codex in a new pane (no focus), get back a unique name like "reviewer-a3f9"
 bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"

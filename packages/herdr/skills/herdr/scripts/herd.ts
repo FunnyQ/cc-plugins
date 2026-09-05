@@ -1262,40 +1262,92 @@ export function parseArgs(argv: string[]): {
   return { positionals, flags, env, rest };
 }
 
-const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent orchestration
+/** Agent kinds herdr can start. The full list is longer (`herdr agent start
+ *  --help`); these are the three this wrapper is used with. */
+const AGENT_KINDS = "claude|codex|opencode";
 
-Usage:
-  herd list                            # every agent, with its workspace/tab address
-  herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--new-workspace] [--tab-label TEXT]
+/** One block per verb, so `herd <verb> --help` and the full usage screen are
+ *  printed from the same text and can never drift. A caller must never have to
+ *  read this file to learn a verb's flags. */
+export const VERB_USAGE: Record<string, string> = {
+  list: `  herd list                            # every agent, with its workspace/tab address`,
+  spawn: `  herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--new-workspace] [--tab-label TEXT]
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
-              # --new-workspace opens a FRESH workspace instead of the caller's (wins over --new-tab)
-  herd tell <fragment> <text>          # hand work to an existing agent, fire-and-forget
+              # <kind> is a herdr agent kind: ${AGENT_KINDS} (no default — required)
+              # --new-workspace opens a FRESH workspace instead of the caller's (wins over --new-tab)`,
+  tell: `  herd tell <fragment> <text>          # hand work to an existing agent, fire-and-forget
               # <fragment> matches a workspace label (the project name), a tab label,
               # an agent name, a pane id, or a cwd. Slash-separate to narrow: web-app/dashboard
               # No live agent? Falls back to the herdr-workbench project registry, then zoxide;
-              # a resolved project with no live agent gets one spawned into a fresh workspace.
-  herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
-              # flags go BEFORE <target> so prompt text containing \`--\` survives
-  herd ask [--agent KIND] [--timeout MS] [--keep-pane] <fragment> <question>
+              # a resolved project with no live agent gets one spawned into a fresh workspace.`,
+  send: `  herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
+              # flags go BEFORE <target> so prompt text containing \`--\` survives`,
+  ask: `  herd ask [--agent KIND] [--timeout MS] [--keep-pane] <fragment> <question>
               # like tell, but waits for and returns the answer via a result-file contract.
-              # Default timeout 10 min; on timeout returns {pending: true} with a "collect" command
-              # to redeem later instead of re-asking. --keep-pane keeps a pane ask itself spawned
-              # (an already-running agent is never closed either way). Flags go BEFORE <fragment>.
-  herd collect <target> --result PATH [--timeout MS]
-              # redeem a pending ask's answer later, without re-sending the question
-  herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab
-  herd wait <target> [--status idle|working|blocked|done|unknown]... [--timeout MS]
-  herd read <target> [--lines N] [--source recent-unwrapped|recent|visible|detection]
-  herd close <target>
+              # <fragment> addresses the target exactly as \`tell\` does.
+              # --agent KIND   agent kind to start if none is running: ${AGENT_KINDS} (default claude)
+              # --timeout MS   how long to wait for the answer (default 600000, 10 min)
+              # --keep-pane    keep a pane ask itself spawned; an already-running agent
+              #                is never closed either way
+              # On timeout the result is {pending: true} with a "collect" command to redeem
+              # later — do NOT re-ask. Flags go BEFORE <fragment>: everything from <fragment>
+              # onward is the question verbatim, so a trailing flag is silently swallowed.`,
+  collect: `  herd collect <target> --result PATH [--timeout MS]
+              # redeem a pending ask's answer later, without re-sending the question`,
+  keys: `  herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab`,
+  wait: `  herd wait <target> [--status idle|working|blocked|done|unknown]... [--timeout MS]`,
+  read: `  herd read <target> [--lines N] [--source recent-unwrapped|recent|visible|detection]`,
+  close: `  herd close <target>`,
+};
 
-Targets are agent NAMES (as returned by spawn/list), not pane ids.
+const FOOTER = `Targets are agent NAMES (as returned by spawn/list), not pane ids.
 All verbs print JSON except \`read\`, which prints the pane's text.`;
+
+const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent orchestration
+
+Usage:
+${Object.values(VERB_USAGE).join("\n")}
+
+Run \`herd <verb> --help\` for one verb's flags.
+
+${FOOTER}`;
+
+/** True when `--help`/`-h` sits in the LEADING flag run. Verbs like `ask` and
+ *  `send` take free text from the first positional onward, so scanning the whole
+ *  argv would print usage for a question that merely mentions `--help`. */
+export function wantsVerbHelp(rest: string[]): boolean {
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i]!;
+    if (a === "--help" || a === "-h") return true;
+    if (!a.startsWith("--")) return false;
+    // A flag's value may be any token; skip it to stay inside the flag run.
+    const next = rest[i + 1];
+    if (next && !next.startsWith("--")) i++;
+  }
+  return false;
+}
 
 async function main() {
   const [verb, ...rest] = process.argv.slice(2);
   if (!verb || verb === "-h" || verb === "--help") {
     console.log(USAGE);
     process.exit(verb ? 0 : 1);
+  }
+  if (verb === "help") {
+    const topic = rest[0];
+    if (topic && VERB_USAGE[topic]) {
+      console.log(`${VERB_USAGE[topic]}\n\n${FOOTER}`);
+    } else if (topic) {
+      console.error(`herd: unknown verb "${topic}"\n\n${USAGE}`);
+      process.exit(1);
+    } else {
+      console.log(USAGE);
+    }
+    process.exit(0);
+  }
+  if (VERB_USAGE[verb] && wantsVerbHelp(rest)) {
+    console.log(`${VERB_USAGE[verb]}\n\n${FOOTER}`);
+    process.exit(0);
   }
   assertHerdrEnv();
   const herd = createHerd();

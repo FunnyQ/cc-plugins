@@ -28,6 +28,8 @@ bun "$HERD" tell api-service "rebase onto main and run the suite"
 bun "$HERD" tell web-app/dashboard "restart the dev server"
 ```
 
+Need a verb's flags? Run `bun "$HERD" <verb> --help`. Never read `herd.ts` to answer that.
+
 Resolve `$SKILL_DIR` from the load-time **"Base directory for this skill"** banner. `${CLAUDE_PLUGIN_ROOT}` is not reliable inside a Bash call. On OpenCode there is no banner. Use `~/.config/opencode/skills/herdr/scripts/herd.ts` directly.
 
 ## Addressing
