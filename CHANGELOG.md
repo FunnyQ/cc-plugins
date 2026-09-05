@@ -1,5 +1,12 @@
 # Changelog
 
+## [herdr 0.7.2] - 2026-09-05
+
+_tracks tag `herdr-v0.7.2`_
+
+### Added
+- `herd` now has built-in help: run `herd help`, `herd --help`, or `herd <verb> --help` to see usage for any command instead of having to read the source.
+
 ## [herdr 0.7.1] - 2026-09-05
 
 _tracks tag `herdr-v0.7.1`_
