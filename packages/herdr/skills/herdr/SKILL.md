@@ -20,9 +20,7 @@ Docs: <https://herdr.dev/docs/>. For an agent-readable index pinned to the insta
 
 ## Orchestrating agents — use the `herd` wrapper first
 
-Inside a herdr pane (`HERDR_ENV=1`) you may need to spawn or drive other agents. For that work, prefer the bundled `scripts/herd.ts` wrapper over hand-rolled raw `herdr` CLI chains.
-
-The wrapper collapses herdr's multi-step recipes, for example create pane → start agent → prompt → wait → read, into ten typed verbs. It also handles the sharp edges for you. It addresses agents by a **collision-proof generated name**, which follows an agent if a cross-workspace move changes its pane id. It creates the destination pane before `agent start`. It uses `agent prompt`, which handles paste mode and submission timing in one command.
+Inside a herdr pane (`HERDR_ENV=1`), use the bundled `scripts/herd.ts` wrapper instead of hand-rolled raw `herdr` CLI chains. It collapses create-pane → start → prompt → wait → read into ten typed verbs, and addresses agents by a generated name that survives a cross-workspace pane-id change.
 
 `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call. Resolve the script instead from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`).
 
@@ -39,24 +37,21 @@ bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
 
-# Hand work to an agent already running in ANOTHER project, fire-and-forget
+# Hand work to an agent already running in ANOTHER project, fire-and-forget.
+# No live agent matches? Falls back to the project registry, then zoxide, and
+# auto-spawns one. See the `tell` skill for the fallback chain and addressing rules.
 bun "$HERD" tell api-service "rebase onto main and run the suite"
-
-# No live agent matches? tell falls back to the herdr-workbench project registry
-# (~/.local/state/herdr-projects/registry.json), then zoxide. A resolved project with
-# nothing already open there gets spawned into a fresh workspace automatically.
 
 # Slash-narrow when one project runs several agents
 bun "$HERD" tell web-app/dashboard "restart the dev server"
 
-# Ask a question and get the ANSWER back instead of firing and forgetting — same
-# addressing and fallback chain as tell. Blocks up to 10 min; ALWAYS run this via
-# Bash with run_in_background: true. See the `ask` skill before using this.
+# Ask a question and get the ANSWER back — same addressing/fallback as tell, but
+# blocks up to 10 min. ALWAYS run via Bash with run_in_background: true.
+# See the `ask` skill before using this.
 bun "$HERD" ask api-service "what port does the dev server run on?"
 
-# --agent / --timeout / --keep-pane go BEFORE the fragment. Everything from the
-# fragment onward is the question, verbatim — a flag placed after it is silently
-# swallowed into the question text and does nothing (--keep-pane included).
+# Flags go BEFORE the fragment (see the `ask` skill — a trailing flag is
+# silently swallowed into the question).
 bun "$HERD" ask --keep-pane diqi "what directory are you in?"
 
 # Timed out while still working? Redeem it later without re-asking.
@@ -86,9 +81,15 @@ bun "$HERD" list                 # all current agents, each with its workspace/t
 bun "$HERD" close reviewer-a3f9  # close the agent's pane
 ```
 
-To hand off work to a DIFFERENT project, use `tell` — it addresses an already-running agent when one exists, and otherwise falls back to the project registry / zoxide and spawns one itself. Use `ask` instead when you need an ANSWER back, not just to fire off work — same addressing and fallback, but it waits on a file-contract exchange and returns the target's text (or `pending` past its timeout, with a `collect` command to redeem it later). Reach for `spawn` directly only when you want an agent in THIS session's own workspace (a helper, a reviewer, a second pane on the current repo). Before using either, read the **`tell` skill** (addressing rules, fallback chain, safety bar) and, for `ask`, the **`ask` skill** on top of it.
+To hand off work to a DIFFERENT project, use `tell`; use `ask` instead when you need an ANSWER back. Reach for `spawn` directly only when you want an agent in THIS session's own workspace (a helper, a reviewer, a second pane on the current repo). Read the **`tell` skill** before using either, and the **`ask` skill** on top of it for `ask`.
 
-All verbs print JSON. The exception is `read`, which prints the agent's terminal text. It defaults to `--source visible`, which works while an agent is active. For a longer transcript, pass `--source recent-unwrapped --lines N`. Herdr 0.8.2 can collect alternate-screen history when the agent is recognized, idle, at the transcript bottom, and `N` exceeds the visible rows; otherwise an explicit history read may return `agent_not_idle`. `send` fails with `agent_blocked` when the agent is parked on an approval or question dialog, and herdr sends nothing — not the text, not the Enter. Read the pane, then answer the dialog with `keys`. Do not retry `send` until the block clears. `spawn --task` does not fail on that block — it returns `task: {"sent": false, "reason": "agent_blocked"}` beside the generated name, so check the flag before you assume the task landed. An agent that parks on a trust dialog during startup gets the same treatment: `spawn` returns `startBlocked: true` with a live name instead of throwing, and skips the task. Never assume `spawn` succeeding means the task was delivered. `send` takes `--wait` / `--status` / `--timeout` and collapses a send-then-wait pair into one call; either of the latter two implies `--wait`. Put those flags **before** the target — everything from the target onward is positional, which is what keeps prompt text like `"--please fix this"` intact. Prefer the waiting form for its one extra signal: a prompt accepted from a non-working state that produces no lifecycle change within five seconds fails with `agent_prompt_stalled`, meaning the agent took the text and never acted on it. A separate `wait` cannot tell you that. Keep `--timeout` above 5000; at or below it herdr reports a plain `timeout` and the distinction is lost. `wait` takes the full herdr status enum, `done` included, and `--status` is repeatable — it becomes one `--until` per value. Its default stays `idle`, deliberately. `idle` is the only status meaning "the TUI will accept input", which is what a settle-before-send needs. herdr's own bare `agent wait` defaults to idle|done|blocked instead, but do not copy that set: `blocked` means the agent is parked on a human approval, so a wait returning there hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done`. Treat even that as a hint, not proof — a fresh agent reports `idle` before its first turn, so a status wait alone cannot tell a finished agent from one that never started. Pair it with your own evidence, the way relay's `collect` gates on a result-file marker. Run tests with `bun test scripts/herd.test.ts`.
+All verbs print JSON except `read`, which prints the agent's terminal text. It defaults to `--source visible`; pass `--source recent-unwrapped --lines N` for a longer transcript. Herdr 0.8.2 collects alternate-screen history only when the agent is recognized, idle, at the transcript bottom, and `N` exceeds the visible rows — otherwise an explicit history read may return `agent_not_idle`.
+
+`send` fails with `agent_blocked` when the agent is parked on an approval or question dialog — herdr sends neither the text nor the Enter. Read the pane, then answer with `keys`; do not retry `send` until the block clears. `spawn --task` reports the same block instead of throwing: check `task: {"sent": false, "reason": "agent_blocked"}` before assuming the task landed. A trust dialog during startup gets the same treatment (`startBlocked: true`, task skipped) — a live name, not a thrown error.
+
+`send` takes `--wait` / `--status` / `--timeout` to collapse a send-then-wait pair into one call; either of the latter two implies `--wait`. Put these flags **before** the target — everything from the target onward is positional, which keeps prompt text like `"--please fix this"` intact. Prefer the waiting form: a prompt accepted from a non-working state that produces no lifecycle change within five seconds fails with `agent_prompt_stalled` (the agent took the text and never acted on it) — a separate `wait` cannot tell you that. Keep `--timeout` above 5000, or herdr reports a plain `timeout` and loses that distinction.
+
+`wait` takes the full status enum and a repeatable `--status` (one `--until` per value). Its default is `idle` — the only status meaning "ready for input". Never wait on `blocked`: it hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done` — codex parks at `done`, not `idle`. Treat even that as a hint: a fresh agent also reports `idle` before its first turn. Pair it with your own evidence, such as a result-file marker.
 
 If the wrapper doesn't cover something, for example worktrees, layout, notifications, waiting on arbitrary pane output, or plugin panes, drop to the raw CLI. See `references/agent-orchestration.md` for live recipes. See `references/cli.md` for the full command surface.
 
@@ -115,4 +116,4 @@ SKILL_DIR=~/.config/opencode/skills/herdr
 bun "$SKILL_DIR/scripts/herd.ts" list
 ```
 
-Herdr panes support an OpenCode agent kind, spawnable as `--agent opencode` (`bun "$SKILL_DIR/scripts/herd.ts" spawn <name> --agent opencode --cwd "$PWD"`) — verified by spawning a pane, confirming `list` reported it with `type: "opencode"`, and closing it. There is no type union to cross-check the agent kind against: `scripts/herd.ts` types it as plain `string`, and `claude|codex|opencode` appears only in comments.
+`--agent opencode` is a valid agent kind: `bun "$SKILL_DIR/scripts/herd.ts" spawn <name> --agent opencode --cwd "$PWD"`.
