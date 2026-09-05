@@ -33,12 +33,18 @@ HERD="$SKILL_DIR/scripts/herd.ts"
 bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 
 # Add --new-tab to open the agent in its own labelled tab; --tab-label overrides the default label.
+# Add --new-workspace instead to open it in a FRESH workspace (a different project needs its own,
+# never a tab in the caller's) — wins over --new-tab.
 
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
 
 # Hand work to an agent already running in ANOTHER project, fire-and-forget
 bun "$HERD" tell api-service "rebase onto main and run the suite"
+
+# No live agent matches? tell falls back to the herdr-workbench project registry
+# (~/.local/state/herdr-projects/registry.json), then zoxide. A resolved project with
+# nothing already open there gets spawned into a fresh workspace automatically.
 
 # Slash-narrow when one project runs several agents
 bun "$HERD" tell web-app/dashboard "restart the dev server"
@@ -67,7 +73,7 @@ bun "$HERD" list                 # all current agents, each with its workspace/t
 bun "$HERD" close reviewer-a3f9  # close the agent's pane
 ```
 
-When an agent is *already running*, use `tell` to hand off the work. When no agent is there yet, use `spawn` instead. Before using `tell`, read the **`tell` skill**. It owns the addressing rules and the safety bar for prompting another project's agent.
+To hand off work to a DIFFERENT project, use `tell` — it addresses an already-running agent when one exists, and otherwise falls back to the project registry / zoxide and spawns one itself. Reach for `spawn` directly only when you want an agent in THIS session's own workspace (a helper, a reviewer, a second pane on the current repo). Before using `tell`, read the **`tell` skill**. It owns the addressing rules, the fallback chain, and the safety bar for prompting another project's agent.
 
 All verbs print JSON. The exception is `read`, which prints the agent's terminal text. It defaults to `--source visible`, which works while an agent is active. For a longer transcript, pass `--source recent-unwrapped --lines N`. Herdr 0.8.2 can collect alternate-screen history when the agent is recognized, idle, at the transcript bottom, and `N` exceeds the visible rows; otherwise an explicit history read may return `agent_not_idle`. `send` fails with `agent_blocked` when the agent is parked on an approval or question dialog, and herdr sends nothing — not the text, not the Enter. Read the pane, then answer the dialog with `keys`. Do not retry `send` until the block clears. `spawn --task` does not fail on that block — it returns `task: {"sent": false, "reason": "agent_blocked"}` beside the generated name, so check the flag before you assume the task landed. An agent that parks on a trust dialog during startup gets the same treatment: `spawn` returns `startBlocked: true` with a live name instead of throwing, and skips the task. Never assume `spawn` succeeding means the task was delivered. `send` takes `--wait` / `--status` / `--timeout` and collapses a send-then-wait pair into one call; either of the latter two implies `--wait`. Put those flags **before** the target — everything from the target onward is positional, which is what keeps prompt text like `"--please fix this"` intact. Prefer the waiting form for its one extra signal: a prompt accepted from a non-working state that produces no lifecycle change within five seconds fails with `agent_prompt_stalled`, meaning the agent took the text and never acted on it. A separate `wait` cannot tell you that. Keep `--timeout` above 5000; at or below it herdr reports a plain `timeout` and the distinction is lost. `wait` takes the full herdr status enum, `done` included, and `--status` is repeatable — it becomes one `--until` per value. Its default stays `idle`, deliberately. `idle` is the only status meaning "the TUI will accept input", which is what a settle-before-send needs. herdr's own bare `agent wait` defaults to idle|done|blocked instead, but do not copy that set: `blocked` means the agent is parked on a human approval, so a wait returning there hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done`. Treat even that as a hint, not proof — a fresh agent reports `idle` before its first turn, so a status wait alone cannot tell a finished agent from one that never started. Pair it with your own evidence, the way relay's `collect` gates on a result-file marker. Run tests with `bun test scripts/herd.test.ts`.
 

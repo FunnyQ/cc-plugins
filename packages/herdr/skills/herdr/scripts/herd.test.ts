@@ -1443,3 +1443,203 @@ describe("tell", () => {
     expect(calls.some((c) => c[1] === "prompt")).toBe(false);
   });
 });
+
+describe("tell — registry/zoxide fallback", () => {
+  /** No live agent ever matches; `workspace create` + `agent start` stand in
+   *  for a project the registry knows about but nothing has open. */
+  function fallbackRunner(cwd: string) {
+    return mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([
+            {
+              agent: "claude",
+              agent_status: "idle",
+              pane_id: "w7S:p1",
+              tab_id: "w7S:t1",
+              workspace_id: "w7S",
+              terminal_id: "term_2",
+              cwd: "/Users/dev/Projects/cc-plugins",
+              focused: true,
+            },
+          ]),
+        };
+      if (a[0] === "workspace" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              workspaces: [{ workspace_id: "w7S", label: "cc-plugins" }],
+            },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: { tabs: [{ tab_id: "w7S:t1", label: "main" }] },
+          }),
+        };
+      if (a[0] === "workspace" && a[1] === "create")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              root_pane: { pane_id: "wNEW:p1", workspace_id: "wNEW" },
+            },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "start")
+        return {
+          stdout: agentEnvelope({
+            name: a[2],
+            pane_id: "wNEW:p1",
+            tab_id: "wNEW:t1",
+            workspace_id: "wNEW",
+            terminal_id: "term_new",
+            cwd,
+            agent_status: "unknown",
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "wait")
+        return { stdout: JSON.stringify({ result: { status: "idle" } }) };
+      if (a[0] === "agent" && a[1] === "prompt")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      return undefined;
+    });
+  }
+
+  async function withRegistryFile(
+    projects: Record<string, unknown>,
+    fn: (path: string) => Promise<void>,
+  ): Promise<void> {
+    const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = await mkdtemp(join(tmpdir(), "herdr-tell-registry-"));
+    const path = join(dir, "registry.json");
+    await writeFile(path, JSON.stringify({ version: 1, projects }));
+    try {
+      await fn(path);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  test("no live agent, a single registry hit with nothing open there: spawns a fresh workspace", async () => {
+    const cwd = "/Users/dev/Projects/diqi";
+    await withRegistryFile(
+      { [cwd]: { name: "diqi", sources: ["claude"] } },
+      async (registryPath) => {
+        const { run, calls } = fallbackRunner(cwd)!;
+        const res = await createHerd(run).tell("diqi", "run tests", {
+          registryPath,
+        });
+
+        expect(res.spawned).toBeDefined();
+        expect(res.spawned?.workspaceId).toBe("wNEW");
+        expect(res.spawned?.paneId).toBe("wNEW:p1");
+        expect(res.spawned?.cwd).toBe(cwd);
+        expect(res.matched.workspaceLabel).toBe("diqi");
+
+        const createCall = calls.find(
+          (c) => c[0] === "workspace" && c[1] === "create",
+        )!;
+        expect(createCall).toContain("--no-focus");
+        expect(createCall[createCall.indexOf("--cwd") + 1]).toBe(cwd);
+        expect(calls.some((c) => c[0] === "agent" && c[1] === "start")).toBe(
+          true,
+        );
+        expect(
+          calls.some(
+            (c) =>
+              c[0] === "agent" && c[1] === "prompt" && c[3] === "run tests",
+          ),
+        ).toBe(true);
+      },
+    );
+  });
+
+  test("no live agent, a single registry hit whose cwd is already reachable: sends, does not spawn", async () => {
+    const cwd = "/Users/dev/Projects/renamed";
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([
+            {
+              pane_id: "w9:p1",
+              tab_id: "w9:t1",
+              workspace_id: "w9",
+              agent_status: "idle",
+              cwd,
+            },
+          ]),
+        };
+      if (a[0] === "workspace" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              workspaces: [{ workspace_id: "w9", label: "something-else" }],
+            },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: { tabs: [{ tab_id: "w9:t1", label: "main" }] },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "prompt")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      return undefined;
+    });
+
+    await withRegistryFile(
+      { [cwd]: { name: "diqi" } },
+      async (registryPath) => {
+        const res = await createHerd(run).tell("diqi", "run tests", {
+          registryPath,
+        });
+        expect(res.spawned).toBeUndefined();
+        expect(res.matched.paneId).toBe("w9:p1");
+        expect(
+          calls.some((c) => c[0] === "workspace" && c[1] === "create"),
+        ).toBe(false);
+        expect(
+          calls.some(
+            (c) =>
+              c[0] === "agent" && c[1] === "prompt" && c[3] === "run tests",
+          ),
+        ).toBe(true);
+      },
+    );
+  });
+
+  test("an ambiguous registry match refuses to spawn and names the candidates", async () => {
+    const { run, calls } = fleetRunner();
+    await withRegistryFile(
+      {
+        "/Users/dev/Projects/diqi-web": { name: "diqi-web" },
+        "/Users/dev/Projects/diqi-api": { name: "diqi-api" },
+      },
+      async (registryPath) => {
+        const p = createHerd(run).tell("diqi", "run tests", { registryPath });
+        await expect(p).rejects.toThrow(/matches 2 known projects/);
+        await expect(p).rejects.toThrow(/diqi-web/);
+        await expect(p).rejects.toThrow(/diqi-api/);
+      },
+    );
+    expect(calls.some((c) => c[0] === "workspace" && c[1] === "create")).toBe(
+      false,
+    );
+  });
+
+  test("no live agent, no registry hit, and a too-short fragment skips zoxide too", async () => {
+    const { run, calls } = fleetRunner();
+    await withRegistryFile({}, async (registryPath) => {
+      // "z" is below the two-character minimum, so the zoxide lookup never
+      // shells out — this stays hermetic without depending on a real zoxide.
+      const p = createHerd(run).tell("z", "hi", { registryPath });
+      await expect(p).rejects.toThrow(/no agent matches/);
+      await expect(p).rejects.toThrow(/registry and zoxide/);
+    });
+    expect(calls.some((c) => c[1] === "prompt")).toBe(false);
+  });
+});

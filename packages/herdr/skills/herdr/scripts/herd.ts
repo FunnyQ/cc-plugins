@@ -25,6 +25,14 @@
  *   layer for a future live-pane strategy.
  */
 
+import {
+  compareProjects,
+  matchProjects,
+  queryZoxide,
+  readRegistry,
+  type ProjectCandidate,
+} from "./project-registry.ts";
+
 export type RunResult = { stdout: string; stderr: string; code: number };
 export type Runner = (args: string[]) => Promise<RunResult>;
 
@@ -99,7 +107,8 @@ export type SpawnOpts = {
   cwd?: string;
   split?: "right" | "down"; // default "down"
   newTab?: boolean; // open the agent in its OWN new tab instead of splitting the caller's pane (takes precedence over split)
-  tabLabel?: string; // label for the new tab (newTab only); defaults to the generated agent name
+  newWorkspace?: boolean; // open the agent in a FRESH workspace instead of the caller's (takes precedence over newTab/split)
+  tabLabel?: string; // label for the new tab (newTab/newWorkspace only); defaults to the generated agent name
   workspace?: string;
   tab?: string;
   env?: string[]; // KEY=VALUE entries
@@ -140,7 +149,12 @@ export type AgentLocation = AgentInfo & {
   tabLabel: string | null;
 };
 
-export type TellResult = SendResult & { matched: AgentLocation };
+export type TellResult = SendResult & {
+  matched: AgentLocation;
+  /** Set when no live agent matched and `tell` opened one itself from the
+   *  project registry or zoxide. */
+  spawned?: { workspaceId: string; paneId: string; name: string; cwd: string };
+};
 
 function randHex(n: number): string {
   const bytes = new Uint8Array(Math.ceil(n / 2));
@@ -336,11 +350,25 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
    * unwanted prompt cannot be recalled, and the agent that receives it will act
    * on it. Each listed candidate carries its pane id beside the readable address,
    * so the retry needs no second lookup even when two addresses read alike.
+   *
+   * When no LIVE agent matches, fall through to known-but-closed projects
+   * before giving up: the project registry (`~/.local/state/herdr-projects/
+   * registry.json`, written by herdr-workbench), then zoxide's frecency
+   * index. A resolved path is checked against every live agent's cwd first —
+   * a renamed tab can still be reachable — and only spawns a fresh workspace
+   * when nothing already answers there. Ambiguity at the registry layer is
+   * the same hard failure as at the agent layer: spawning into the wrong
+   * repo is worse than telling the wrong agent, never picked automatically.
    */
   async function tell(
     fragment: string,
     text: string,
-    opts: { selfPaneId?: string } = {},
+    opts: {
+      selfPaneId?: string;
+      spawnAgent?: string;
+      /** Test seam — overrides the registry path read_registry() defaults to. */
+      registryPath?: string;
+    } = {},
   ): Promise<TellResult> {
     const agents = await directory();
     const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
@@ -354,21 +382,92 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
         .map((a) => `  ${addressOf(a)}  [${a.paneId}]  ${a.status}  ${a.cwd}`)
         .join("\n");
 
-    if (matches.length === 0) {
-      const known = listed(agents.filter((a) => a.paneId !== selfPaneId));
-      throw new HerdrError(
-        `no agent matches "${fragment}"${known ? `\navailable:\n${known}` : ""}`,
-      );
-    }
     if (matches.length > 1) {
       throw new HerdrError(
         `"${fragment}" matches ${matches.length} agents — ask which one, then retell using its pane id:\n${listed(matches)}`,
       );
     }
 
-    const matched = matches[0]!;
-    const res = await send(matched.name ?? matched.paneId, text);
-    return { ...res, matched };
+    if (matches.length === 1) {
+      const matched = matches[0]!;
+      const res = await send(matched.name ?? matched.paneId, text);
+      return { ...res, matched };
+    }
+
+    // No live agent — try known-but-closed projects.
+    const registry = await readRegistry(opts.registryPath);
+    const projectMatches = matchProjects(registry, fragment).sort(
+      compareProjects,
+    );
+
+    if (projectMatches.length > 1) {
+      const listedProjects = projectMatches
+        .map((p) => `  ${p.name}  ${p.path}`)
+        .join("\n");
+      throw new HerdrError(
+        `"${fragment}" matches ${projectMatches.length} known projects — ask which one, then retell with a narrower fragment:\n${listedProjects}`,
+      );
+    }
+
+    let resolved: ProjectCandidate | null = projectMatches[0] ?? null;
+    if (!resolved) {
+      const zpath = await queryZoxide(fragment);
+      if (zpath) {
+        resolved = {
+          path: zpath,
+          name: zpath.split("/").pop() || zpath,
+          aliases: [],
+        };
+      }
+    }
+
+    if (!resolved) {
+      const known = listed(agents.filter((a) => a.paneId !== selfPaneId));
+      throw new HerdrError(
+        `no agent matches "${fragment}"; checked the project registry and zoxide too${known ? `\navailable:\n${known}` : ""}`,
+      );
+    }
+
+    // A renamed tab can still be reachable at this cwd even though its label
+    // missed the fragment — never spawn a second agent onto a project that
+    // already has one.
+    const liveAtPath = agents.find(
+      (a) =>
+        a.paneId !== selfPaneId &&
+        (a.cwd === resolved!.path || a.foregroundCwd === resolved!.path),
+    );
+    if (liveAtPath) {
+      const res = await send(liveAtPath.name ?? liveAtPath.paneId, text);
+      return { ...res, matched: liveAtPath };
+    }
+
+    const spawned = await spawn({
+      role: resolved.name,
+      agent: opts.spawnAgent ?? "claude",
+      cwd: resolved.path,
+      newWorkspace: true,
+      tabLabel: resolved.name,
+      task: text,
+    });
+    const matchedAgent: AgentLocation = {
+      ...spawned,
+      workspaceLabel: resolved.name,
+      tabLabel: resolved.name,
+    };
+    return {
+      target: spawned.name,
+      paneId: spawned.paneId,
+      submitted: spawned.task?.sent ?? false,
+      waited: true,
+      status: spawned.status,
+      matched: matchedAgent,
+      spawned: {
+        workspaceId: spawned.workspaceId,
+        paneId: spawned.paneId,
+        name: spawned.name,
+        cwd: spawned.cwd,
+      },
+    };
   }
 
   async function get(target: string): Promise<AgentInfo> {
@@ -665,6 +764,30 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return started;
   }
 
+  /** Start the agent in a FRESH workspace instead of the caller's — the only
+   *  option for an agent that must land in a DIFFERENT project's workspace,
+   *  since `tell` addresses by workspace label and one workspace holds one
+   *  project. Unlike startInNewTab, focus is never claimed back: a workspace
+   *  create is the least likely of the three spawn shapes to be requested
+   *  from a pane whose focus the caller wants preserved (`tell`'s own
+   *  auto-spawn fallback runs from the CALLING project's pane while opening
+   *  a workspace for a DIFFERENT one), and workspace focus follows
+   *  `--no-focus` cleanly where tab focus does not always. */
+  async function startInNewWorkspace(
+    name: string,
+    opts: SpawnOpts,
+  ): Promise<any> {
+    const createArgs = ["workspace", "create", "--no-focus"];
+    if (opts.cwd) createArgs.push("--cwd", opts.cwd);
+    createArgs.push(...newPaneEnvArgs(opts));
+    createArgs.push("--label", opts.tabLabel ?? name);
+    const created = await callJson(createArgs);
+    const paneId: string | undefined = created.root_pane?.pane_id;
+    if (!paneId)
+      throw new HerdrError("workspace create did not return a root pane id");
+    return startAgentInPane(name, paneId, opts);
+  }
+
   /** Resolve an existing pane to split when the caller targets a tab/workspace. */
   async function splitTargetPane(opts: SpawnOpts): Promise<string | null> {
     if (!opts.tab && !opts.workspace) return null;
@@ -694,7 +817,9 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     const name = await genName(opts.role);
 
     let started: any;
-    if (opts.newTab) {
+    if (opts.newWorkspace) {
+      started = await startInNewWorkspace(name, opts);
+    } else if (opts.newTab) {
       started = await startInNewTab(name, opts);
     } else {
       const targetPaneId = await splitTargetPane(opts);
@@ -788,7 +913,7 @@ function assertHerdrEnv(): void {
 }
 
 /** Flags that never take a value (so a following token — even one starting with `--` — is not consumed). */
-const BOOLEAN_FLAGS = new Set(["new-tab"]);
+const BOOLEAN_FLAGS = new Set(["new-tab", "new-workspace"]);
 
 /** Flags that may be given more than once. The second occurrence turns the value
  *  into an array instead of overwriting the first — `herdr agent wait` takes a
@@ -845,11 +970,14 @@ const USAGE = `herd — typed wrapper over the herdr CLI for in-session agent or
 
 Usage:
   herd list                            # every agent, with its workspace/tab address
-  herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--tab-label TEXT]
+  herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--new-workspace] [--tab-label TEXT]
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
+              # --new-workspace opens a FRESH workspace instead of the caller's (wins over --new-tab)
   herd tell <fragment> <text>          # hand work to an existing agent, fire-and-forget
               # <fragment> matches a workspace label (the project name), a tab label,
               # an agent name, a pane id, or a cwd. Slash-separate to narrow: web-app/dashboard
+              # No live agent? Falls back to the herdr-workbench project registry, then zoxide;
+              # a resolved project with no live agent gets one spawned into a fresh workspace.
   herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
               # flags go BEFORE <target> so prompt text containing \`--\` survives
   herd keys <target> <key> [key ...]   # bare key chords, e.g. enter | ctrl+a ctrl+k | shift+tab
@@ -899,6 +1027,7 @@ async function main() {
           cwd: (flags.cwd as string) ?? process.cwd(),
           split: (flags.split as "right" | "down") ?? "down",
           newTab: flags["new-tab"] === true,
+          newWorkspace: flags["new-workspace"] === true,
           tabLabel: flags["tab-label"] as string | undefined,
           workspace: flags.workspace as string | undefined,
           tab: flags.tab as string | undefined,
