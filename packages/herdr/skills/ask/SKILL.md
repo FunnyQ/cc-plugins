@@ -27,9 +27,14 @@ HERD="$SKILL_DIR/../herdr/scripts/herd.ts"
 
 bun "$HERD" ask api-service "what port does the dev server run on?"
 bun "$HERD" ask web-app/dashboard "is the migration finished?"
+
+# --agent / --timeout / --keep-pane go BEFORE the fragment, never after
+bun "$HERD" ask --keep-pane --timeout 120000 api-service "what port does the dev server run on?"
 ```
 
 Resolve `$SKILL_DIR` the same way `tell` does — from the load-time **"Base directory for this skill"** banner, not `${CLAUDE_PLUGIN_ROOT}`.
+
+**Flag placement is not optional.** Everything from `<fragment>` onward is the question, verbatim — this is what lets a question contain a literal `--` without being misparsed as a flag. A flag placed AFTER the fragment is not an error; it is silently swallowed into the question text, `--keep-pane` included. That means a `--keep-pane` typed at the end does nothing and the spawned pane still closes on success with no warning. Put every flag before the fragment, always.
 
 ## Addressing and fallback
 

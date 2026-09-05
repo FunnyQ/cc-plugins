@@ -54,6 +54,11 @@ bun "$HERD" tell web-app/dashboard "restart the dev server"
 # Bash with run_in_background: true. See the `ask` skill before using this.
 bun "$HERD" ask api-service "what port does the dev server run on?"
 
+# --agent / --timeout / --keep-pane go BEFORE the fragment. Everything from the
+# fragment onward is the question, verbatim — a flag placed after it is silently
+# swallowed into the question text and does nothing (--keep-pane included).
+bun "$HERD" ask --keep-pane diqi "what directory are you in?"
+
 # Timed out while still working? Redeem it later without re-asking.
 bun "$HERD" collect diqi-90d4 --result /tmp/herd-ask/.../result.md
 
