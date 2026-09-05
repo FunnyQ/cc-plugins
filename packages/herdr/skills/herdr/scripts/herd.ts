@@ -460,14 +460,21 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
     // A renamed tab can still be reachable at this cwd even though its label
     // missed the fragment — never spawn a second agent onto a project that
-    // already has one.
-    const liveAtPath = agents.find(
+    // already has one. Collect every match, not just the first: two tabs can
+    // share a cwd, and silently picking one would be exactly the ambiguity
+    // the agent-match branch above already refuses to guess through.
+    const liveAtPath = agents.filter(
       (a) =>
         a.paneId !== selfPaneId &&
         (a.cwd === resolved!.path || a.foregroundCwd === resolved!.path),
     );
-    if (liveAtPath) {
-      return { kind: "agent", agent: liveAtPath };
+    if (liveAtPath.length > 1) {
+      throw new HerdrError(
+        `"${fragment}" resolved to ${resolved.path}, which ${liveAtPath.length} agents already have open — ask which one, then retry using its pane id:\n${listed(liveAtPath)}`,
+      );
+    }
+    if (liveAtPath.length === 1) {
+      return { kind: "agent", agent: liveAtPath[0]! };
     }
 
     return { kind: "project", path: resolved.path, name: resolved.name };
@@ -607,11 +614,22 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return { pending: true };
   }
 
+  /** Wraps a value in single quotes for safe interpolation into a shell
+   *  command, escaping any single quote it contains. */
+  function shellQuote(value: string): string {
+    return `'${value.replace(/'/g, `'\\''`)}'`;
+  }
+
   function pendingReport(target: string, resultPath: string): string {
+    // A bare `bun herd.ts collect ...` only resolves from this script's own
+    // directory. The caller's cwd is a different project entirely (that's
+    // the whole point of ask's fallback), so the report must carry this
+    // script's own absolute path, not a name that only worked by accident.
+    const script = shellQuote(import.meta.path);
     return (
       `ask timed out waiting for an answer from "${target}" — it may still be working.\n` +
       `Result file: ${resultPath}\n` +
-      `Re-check without re-asking: bun herd.ts collect ${target} --result ${resultPath}`
+      `Re-check without re-asking: bun ${script} collect ${shellQuote(target)} --result ${shellQuote(resultPath)}`
     );
   }
 

@@ -1618,6 +1618,67 @@ describe("tell — registry/zoxide fallback", () => {
     );
   });
 
+  test("a registry hit reachable by TWO live agents refuses instead of picking the first", async () => {
+    // Two tabs at the same cwd, neither matching the fragment by label — the
+    // only way this pair is found at all is the live-cwd recheck. Silently
+    // picking agents[0] here would send to the wrong one half the time.
+    const cwd = "/Users/dev/Projects/renamed";
+    const { run, calls } = mockRunner((a) => {
+      if (a[0] === "agent" && a[1] === "list")
+        return {
+          stdout: listEnvelope([
+            {
+              pane_id: "w9:p1",
+              tab_id: "w9:t1",
+              workspace_id: "w9",
+              agent_status: "idle",
+              cwd,
+            },
+            {
+              pane_id: "w9:p2",
+              tab_id: "w9:t2",
+              workspace_id: "w9",
+              agent_status: "working",
+              cwd,
+            },
+          ]),
+        };
+      if (a[0] === "workspace" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              workspaces: [{ workspace_id: "w9", label: "something-else" }],
+            },
+          }),
+        };
+      if (a[0] === "tab" && a[1] === "list")
+        return {
+          stdout: JSON.stringify({
+            result: {
+              tabs: [
+                { tab_id: "w9:t1", label: "main" },
+                { tab_id: "w9:t2", label: "second" },
+              ],
+            },
+          }),
+        };
+      if (a[0] === "agent" && a[1] === "prompt")
+        return { stdout: JSON.stringify({ result: { type: "ok" } }) };
+      return undefined;
+    });
+
+    await withRegistryFile(
+      { [cwd]: { name: "diqi" } },
+      async (registryPath) => {
+        const p = createHerd(run).tell("diqi", "run tests", { registryPath });
+        await expect(p).rejects.toThrow(/2 agents already have open/);
+        await expect(p).rejects.toThrow(/w9:p1/);
+        await expect(p).rejects.toThrow(/w9:p2/);
+      },
+    );
+    expect(calls.some((c) => c[1] === "prompt")).toBe(false);
+  });
+
   test("an ambiguous registry match refuses to spawn and names the candidates", async () => {
     const { run, calls } = fleetRunner();
     await withRegistryFile(
@@ -1896,6 +1957,12 @@ describe("ask", () => {
         expect(res.resultPath).toBe(join(resultDir, "result.md"));
         expect(res.report).toContain("collect");
         expect(res.report).toContain(res.resultPath);
+        // The report must carry herd.ts's own absolute path — a bare "bun
+        // herd.ts collect ..." only resolves from this script's own
+        // directory, never from the caller's (a different project's) cwd.
+        expect(res.report).toContain(
+          import.meta.resolve("./herd.ts").replace("file://", ""),
+        );
       }
     });
   });
