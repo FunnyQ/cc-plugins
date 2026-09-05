@@ -1,5 +1,12 @@
 # Changelog
 
+## [herdr 0.7.1] - 2026-09-05
+
+_tracks tag `herdr-v0.7.1`_
+
+### Changed
+- Simplified and de-duplicated the `herdr`, `tell`, and `ask` skill docs — cross-file repetition (like `$SKILL_DIR` resolution, the flag-before-fragment rule, and `tell`'s fallback chain) now lives in one canonical place, and the flag-placement requirement (flags must come before the fragment or they're silently swallowed) is now documented up front to prevent that failure mode. No behavior changed.
+
 ## [herdr 0.7.0] - 2026-09-05
 
 _tracks tag `herdr-v0.7.0`_
