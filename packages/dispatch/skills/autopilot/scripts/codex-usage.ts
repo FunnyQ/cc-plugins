@@ -8,7 +8,7 @@ import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, sep } from "node:path";
 import { fleetIdentity } from "./fleet";
-import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { tailFileChunks } from "./tail";
 import { addCounts, emptyCounts, type AgentUsage } from "./usage-types";
 
 /** One codex CLI run, distilled from its rollout file. */
@@ -198,32 +198,23 @@ function ingestLine(state: FileState, rawLine: string): void {
 }
 
 function processFile(file: string, state: FileState, size: number): void {
-  const next = nextCursor(state.cursor, size);
-  const from = next.reset ? 0 : next.from;
-  if (size <= from) return; // Nothing new since the last pass.
-
-  const bytes = readRange(file, from, size);
-
-  if (next.reset) {
-    // A reset re-reads from byte 0, so nothing derived from the old content may
-    // survive it — identity included, or a reused path files its tokens under
-    // whatever run used to live there.
-    state.partial = "";
-    state.decoder.decode();
-    state.cwd = null;
-    state.startedAt = null;
-    state.relayDir = null;
-    state.originator = null;
-    state.model = null;
-    state.counts = emptyCounts();
-  }
-
-  const text = state.decoder.decode(bytes, { stream: true });
-  const { complete, partial } = splitCompleteLines(state.partial + text);
-  state.partial = partial;
-  state.cursor = size;
-
-  for (const line of complete) ingestLine(state, line);
+  tailFileChunks(
+    file,
+    state,
+    size,
+    (s) => {
+      // A reset re-reads from byte 0, so nothing derived from the old content may
+      // survive it — identity included, or a reused path files its tokens under
+      // whatever run used to live there.
+      s.cwd = null;
+      s.startedAt = null;
+      s.relayDir = null;
+      s.originator = null;
+      s.model = null;
+      s.counts = emptyCounts();
+    },
+    (s, line) => ingestLine(s, line),
+  );
 }
 
 /**

@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  ftruncateSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  rmSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
@@ -62,4 +71,33 @@ describe("resolveHistoricalSessionTitle", () => {
   test("returns an empty title when the historical source has no match", () => {
     expect(resolveHistoricalSessionTitle("claude", "missing")).toBe("");
   });
+
+  // The old whole-file read failed here and the catch beneath it turned that
+  // into a silently empty title. Fixture is a tmpdir APFS sparse file.
+  test("讀到第一則 user 訊息就停，不會讀完 2.4 GB 的 transcript", () => {
+    const sessionId = "99999999-8888-7777-6666-555555555555";
+    const dir = join(process.env.COCKPIT_CLAUDE_PROJECTS_DIR!, "huge");
+    mkdirSync(dir, { recursive: true });
+    const first = JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "第一則訊息" },
+    });
+    const holeEnd = 2_400_000_000;
+
+    const fd = openSync(join(dir, `${sessionId}.jsonl`), "w");
+    try {
+      writeSync(fd, `${first}\n`);
+      const nl = Buffer.from("\n");
+      for (let at = 600_000; at < holeEnd; at += 600_000) {
+        writeSync(fd, nl, 0, 1, at);
+      }
+      ftruncateSync(fd, holeEnd);
+    } finally {
+      closeSync(fd);
+    }
+
+    expect(resolveHistoricalSessionTitle("claude", sessionId)).toBe(
+      "第一則訊息",
+    );
+  }, 600_000);
 });

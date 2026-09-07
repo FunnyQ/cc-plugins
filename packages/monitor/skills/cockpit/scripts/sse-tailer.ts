@@ -43,7 +43,8 @@ export function sseResponse(stream: ReadableStream): Response {
 // Poll cadences are env-tunable and read per request: ops can trade latency for
 // cost, and tests lower them to stay within their timeouts.
 const resolvePollMs = () => Number(process.env.COCKPIT_RESOLVE_POLL_MS) || 500;
-export const tailPollMs = () => Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000;
+export const tailPollMs = () =>
+  Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000;
 
 export type WatchFn = (path: string, cb: () => void) => FSWatcher;
 
@@ -119,6 +120,11 @@ export function createTailStream(source: TailSource): Response {
   let inode = -1;
   let offset = 0;
   let partial = "";
+  // Whether `offset` came from a successful backlog read. Attach sets `inode`
+  // before it reads, so a thrown backlog would otherwise leave a cursor of 0
+  // that the append path honours — reading the whole file. Not `offset === 0`:
+  // an empty file anchors at 0 legitimately.
+  let anchored = false;
 
   function cleanup(): void {
     closed = true;
@@ -165,13 +171,31 @@ export function createTailStream(source: TailSource): Response {
           // Atomic replace / truncate: a new inode or a shrunk file means our
           // byte cursor is stale — restart from the top of the current file and
           // re-bind the watcher (the old one may be stuck on the old inode).
-          if (st.ino !== inode || st.size < offset) {
-            offset = 0;
-            partial = "";
+          if (!anchored || st.ino !== inode || st.size < offset) {
+            // Same seam as attach: readBacklog is where a provider bounds the
+            // read. Reading it here materialised a rotated multi-GB transcript
+            // whole. Nothing is committed until it returns — a half-applied
+            // reset stops looking like one and resumes mid-file.
+            const {
+              complete,
+              partial: trailing,
+              backlogMeta,
+            } = source.readBacklog(filePath, st.size);
+
             if (st.ino !== inode) {
               inode = st.ino;
               attachFileWatcher();
             }
+            partial = trailing;
+            offset = st.size;
+            anchored = true;
+            source.emit(enqueue, complete);
+            // The window moved, so the reverse-scroll cursor has to move with
+            // it; the old one indexes a file that is no longer there.
+            enqueue(
+              `event: backlog-done\ndata: ${JSON.stringify(backlogMeta ?? {})}\n\n`,
+            );
+            return;
           }
           if (st.size <= offset) return;
           const length = st.size - offset;
@@ -221,6 +245,7 @@ export function createTailStream(source: TailSource): Response {
           source.emit(enqueue, complete);
           partial = trailing;
           offset = size;
+          anchored = true;
           if (meta) backlogMeta = meta;
         } catch {
           // vanished between resolve and read — backlog stays empty

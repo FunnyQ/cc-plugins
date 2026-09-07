@@ -10,7 +10,7 @@ import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
 import type { DeckSourceKind } from "./graph-source";
-import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { nextCursor, readRangeChunks, splitCompleteLines } from "./tail";
 import {
   attachCodexUsage,
   createCodexSource,
@@ -264,11 +264,19 @@ export function eventsHandler(
           const from = reset ? 0 : next.from;
           const grew = stat.size > from;
           if (grew) {
-            const bytes = readRange(logPath, from, stat.size);
-            const decoded = decodeLogChunk(decoder, bytes, heldPartial);
-            entries.push(...decoded.entries);
-            heldPartial = decoded.partial;
-            cursor = stat.size;
+            // A flightlog is small, but `from` is 0 on every reset and cold pass.
+            //
+            // The cursor moves per chunk, like the two usage readers: entries are
+            // appended as each chunk decodes, so leaving it until the loop ends
+            // means a read that dies partway re-ingests what already landed.
+            let consumed = from;
+            for (const chunk of readRangeChunks(logPath, from, stat.size)) {
+              const decoded = decodeLogChunk(decoder, chunk, heldPartial);
+              entries.push(...decoded.entries);
+              heldPartial = decoded.partial;
+              consumed += chunk.length;
+              cursor = consumed;
+            }
           }
           if ((grew || !wasPresent || reset) && !initializing) {
             debounce.schedule();

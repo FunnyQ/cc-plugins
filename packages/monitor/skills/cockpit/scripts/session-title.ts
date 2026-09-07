@@ -1,9 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
 import { codexStateDb } from "./codex-db";
 import { openCodeDb } from "../../shared/scripts/opencode";
+import { readJsonlLines } from "../../shared/scripts/jsonl-lines";
 import { claudeProjectsDir } from "./claude-paths";
 
 type Provider = "claude" | "codex" | "opencode";
@@ -33,8 +34,10 @@ function claudeTranscriptTitle(sessionId: string): string {
   const glob = new Glob(`**/${sessionId}.jsonl`);
   for (const relativePath of glob.scanSync({ cwd: root, onlyFiles: true })) {
     try {
-      const lines = readFileSync(join(root, relativePath), "utf8").split("\n");
-      for (const line of lines) {
+      // Returns on the first user entry. Reading the whole file to reach a line
+      // near the top failed on a 2.4 GB transcript, and the catch below turned
+      // that into a silently empty title.
+      for (const line of readJsonlLines(join(root, relativePath))) {
         if (!line.trim()) continue;
         const entry = JSON.parse(line) as {
           type?: string;

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, sep } from "node:path";
-import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { tailFileChunks } from "./tail";
 import {
   emptyCounts,
   replaceCounts,
@@ -400,11 +400,7 @@ function ingestLine(
   }
 }
 
-/**
- * Tail one file from `state.cursor` to `size`. Reads new bytes first and only
- * mutates `state` once that read succeeds, so a throw from `readRange` (a lock, a
- * permission blip) never leaves the file half-reset with its prior counts erased.
- */
+/** Tail one file from `state.cursor` to `size`. */
 function processFile(
   planDir: string,
   file: string,
@@ -412,39 +408,28 @@ function processFile(
   size: number,
   runId?: string,
 ): void {
-  const next = nextCursor(state.cursor, size);
-  const from = next.reset ? 0 : next.from;
-  if (size <= from) return; // Nothing new since the last pass.
-
-  const bytes = readRange(file, from, size);
-
-  if (next.reset) {
-    // A reset re-reads from byte 0, so nothing derived from the old content may
-    // survive it: the counts would double, and identity — read off the first line —
-    // would file a reused path's tokens under whatever agent used to live there.
-    state.counts = emptyCounts();
-    state.byRequest.clear();
-    state.models = [];
-    state.partial = "";
-    state.decoder.decode(); // Flush pending multi-byte state from the old content.
-    state.task = null;
-    state.role = null;
-    state.attempt = undefined;
-    state.startedAt = null;
-    state.lastAt = null;
-    state.relayDirs.clear();
-    state.externalDriver = false;
-    state.membership = "pending";
-  }
-
-  const text = state.decoder.decode(bytes, { stream: true });
-  const { complete, partial } = splitCompleteLines(state.partial + text);
-  state.partial = partial;
-  state.cursor = size;
-
-  for (const line of complete) {
-    ingestLine(planDir, state, line, runId);
-  }
+  tailFileChunks(
+    file,
+    state,
+    size,
+    (s) => {
+      // A reset re-reads from byte 0, so nothing derived from the old content may
+      // survive it: the counts would double, and identity — read off the first line —
+      // would file a reused path's tokens under whatever agent used to live there.
+      s.counts = emptyCounts();
+      s.byRequest.clear();
+      s.models = [];
+      s.task = null;
+      s.role = null;
+      s.attempt = undefined;
+      s.startedAt = null;
+      s.lastAt = null;
+      s.relayDirs.clear();
+      s.externalDriver = false;
+      s.membership = "pending";
+    },
+    (s, line) => ingestLine(planDir, s, line, runId),
+  );
 }
 
 /**
