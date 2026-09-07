@@ -23,11 +23,7 @@ export const ROLLUP_DIR = join(DATA_HOME, "q-lab", "token-atlas");
 export const ROLLUP_DB_PATH =
   process.env.TOKEN_ATLAS_ROLLUP_DB || join(ROLLUP_DIR, "rollup.db");
 
-// v2: seen_requests gained a `path` column so a deleted/cleaned-up transcript's
-// dedup keys are pruned alongside its ingested_files row (bounds unbounded growth
-// — cross-file request collisions don't happen, so a key is only ever needed
-// while its own file is still being appended to). A version bump triggers a clean
-// rebuild of the (fully derived) rollup, which is why `meta` carries this at all.
+// v2 adds request paths; upgrades must preserve history whose transcripts are gone.
 export const SCHEMA_VERSION = 2;
 
 // Token grain stored per (hour_ms, project, model). `hour_ms` is the LOCAL
@@ -61,8 +57,13 @@ export function openRollupDb(path: string = ROLLUP_DB_PATH): Database {
   const db = new Database(path, { create: true });
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA busy_timeout = 5000");
-  migrate(db);
-  return db;
+  try {
+    db.transaction(() => migrate(db)).immediate();
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 }
 
 function migrate(db: Database): void {
@@ -70,16 +71,12 @@ function migrate(db: Database): void {
   db.exec(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)`);
 
   const stored = getMeta(db, "schema_version");
-  if (stored !== null && Number(stored) < SCHEMA_VERSION) {
-    // Destructive upgrade: the rollup is fully derived from on-disk transcripts,
-    // so the safe way to change schema is to drop the aggregate/bookkeeping
-    // tables and let the next updateRollup() re-ingest everything from scratch.
-    // (A partial migration would corrupt usage_hourly's additive totals.)
-    db.exec(`
-      DROP TABLE IF EXISTS usage_hourly;
-      DROP TABLE IF EXISTS seen_requests;
-      DROP TABLE IF EXISTS ingested_files;
-    `);
+  if (stored !== null && stored !== "1" && stored !== String(SCHEMA_VERSION)) {
+    throw new Error(`Unsupported rollup schema version: ${stored}`);
+  }
+  if (stored === "1") {
+    // Legacy keys have no recoverable path; retain them to prevent replay billing.
+    db.exec("ALTER TABLE seen_requests ADD COLUMN path TEXT NOT NULL DEFAULT ''");
   }
 
   db.exec(`
@@ -208,14 +205,9 @@ export function allHourlyRows(db: Database): HourlyRow[] {
     .all() as HourlyRow[];
 }
 
-// Drop every ingested-state + aggregate row. Used by the truncation→rebuild path
-// and `rollup-update --rebuild`. Wrapped by the caller in a transaction.
-export function resetRollup(db: Database): void {
-  db.exec(`
-    DELETE FROM usage_hourly;
-    DELETE FROM seen_requests;
-    DELETE FROM ingested_files;
-  `);
+// Replays need existing totals and dedup keys because deleted transcripts cannot be recovered.
+export function rewindRollup(db: Database): void {
+  db.exec("UPDATE ingested_files SET bytes_parsed = 0");
 }
 
 export function clearIngestedFile(db: Database, path: string): void {

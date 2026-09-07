@@ -1,8 +1,9 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { allHourlyRows, openRollupDb } from "./rollup-db";
+import { addHourlyRow, allHourlyRows, getMeta, openRollupDb, SCHEMA_VERSION } from "./rollup-db";
 import { updateRollup } from "./rollup-update";
 
 // A minimal assistant transcript line. `ts` drives the hour bucket; `req`/`msg`
@@ -118,7 +119,7 @@ describe("updateRollup", () => {
     expect(grandTotal(db)).toBe(140);
   });
 
-  test("truncation triggers a full rebuild", () => {
+  test("truncation preserves prior usage and ingests new requests", () => {
     writeLines("session-a/x.jsonl", [
       line({ ts: "2026-06-17T10:00:00Z", req: "r1", msg: "m1", inp: 100 }),
       line({ ts: "2026-06-17T10:05:00Z", req: "r2", msg: "m2", inp: 50 }),
@@ -126,14 +127,15 @@ describe("updateRollup", () => {
     updateRollup(db, { projectsDir: dir, nowMs: NOW });
     expect(grandTotal(db)).toBe(150);
 
-    // File shrinks (rewritten with different content) — additive reconcile is
-    // impossible, so the whole rollup is rebuilt from the new on-disk state.
+    // Rewritten content must not erase already billed requests.
     writeLines("session-a/x.jsonl", [
       line({ ts: "2026-06-17T10:00:00Z", req: "r9", msg: "m9", inp: 7 }),
     ]);
     const res = updateRollup(db, { projectsDir: dir, nowMs: NOW });
     expect(res.rebuilt).toBe(true);
-    expect(grandTotal(db)).toBe(7);
+    expect(grandTotal(db)).toBe(157);
+    updateRollup(db, { projectsDir: dir, nowMs: NOW });
+    expect(grandTotal(db)).toBe(157);
   });
 
   test("dedups one request split across two ingest batches", () => {
@@ -203,7 +205,7 @@ describe("updateRollup", () => {
     expect(grandTotal(db)).toBe(150);
   });
 
-  test("--rebuild recomputes from scratch without doubling", () => {
+  test("--rebuild rescans without doubling", () => {
     writeLines("session-a/x.jsonl", [
       line({ ts: "2026-06-17T10:00:00Z", req: "r1", msg: "m1", inp: 100 }),
     ]);
@@ -215,5 +217,91 @@ describe("updateRollup", () => {
     });
     expect(res.rebuilt).toBe(true);
     expect(grandTotal(db)).toBe(100);
+  });
+});
+
+describe("historical usage protection", () => {
+  for (const trigger of ["rebuild", "truncation"] as const) {
+    test(`${trigger} preserves deleted projects and shared buckets across repeated runs`, () => {
+      const old = { hour_ms: 0, project: "/deleted", model: "old",
+        input_tokens: 100, output_tokens: 20, cache_read: 30,
+        cache_creation: 40, reasoning: 50, message_count: 6 };
+      addHourlyRow(db, old);
+      const retained = line({ ts: "2026-06-17T10:00:00Z", req: "r1", msg: "m1", inp: 10 });
+      writeLines("session-a/x.jsonl", [retained, retained]);
+      updateRollup(db, { projectsDir: dir });
+      const live = allHourlyRows(db).find(r => r.project === "/proj/a")!;
+      addHourlyRow(db, { ...live, input_tokens: 70 });
+      const before = allHourlyRows(db);
+      if (trigger === "truncation") writeLines("session-a/x.jsonl", [retained]);
+      updateRollup(db, { projectsDir: dir, rebuild: trigger === "rebuild" });
+      expect(allHourlyRows(db)).toEqual(before);
+      updateRollup(db, { projectsDir: dir, rebuild: true });
+      expect(allHourlyRows(db)).toEqual(before);
+      appendFileSync(join(dir, "session-a/x.jsonl"),
+        line({ ts: "2026-06-17T10:00:00Z", req: "new", msg: "new", inp: 3 }) + "\n");
+      updateRollup(db, { projectsDir: dir });
+      expect(grandTotal(db)).toBe(273);
+    });
+  }
+
+  test("rebuild with no surviving transcripts keeps every usage field", () => {
+    writeLines("session-a/x.jsonl", [
+      line({ ts: "2026-06-17T10:00:00Z", req: "r1", msg: "m1", inp: 100 }),
+    ]);
+    updateRollup(db, { projectsDir: dir });
+    rmSync(join(dir, "session-a/x.jsonl"));
+    updateRollup(db, { projectsDir: dir });
+    const before = allHourlyRows(db);
+    updateRollup(db, { projectsDir: dir, rebuild: true });
+    expect(allHourlyRows(db)).toEqual(before);
+  });
+
+  test("replay advances fallback keys past already seen unkeyed entries", () => {
+    const entry = (inp: number) => line({
+      ts: "2026-06-17T10:00:00Z", req: "", msg: "", inp,
+    });
+    writeLines("session-a/x.jsonl", [entry(10), entry(20)]);
+    updateRollup(db, { projectsDir: dir });
+    writeLines("session-a/x.jsonl", [entry(10), entry(20), entry(3)]);
+    updateRollup(db, { projectsDir: dir, rebuild: true });
+    expect(grandTotal(db)).toBe(33);
+    updateRollup(db, { projectsDir: dir, rebuild: true });
+    expect(grandTotal(db)).toBe(33);
+  });
+
+  test("v1 migration preserves aggregates, cursors and dedup keys", () => {
+    const path = join(dir, "legacy.db");
+    const legacy = openRollupDb(path);
+    addHourlyRow(legacy, { hour_ms: 0, project: "/deleted", model: "old",
+      input_tokens: 100, output_tokens: 20, cache_read: 30,
+      cache_creation: 40, reasoning: 50, message_count: 6 });
+    const entry = line({ ts: "2026-06-17T10:00:00Z", req: "r1", msg: "m1", inp: 10 });
+    writeLines("session-a/x.jsonl", [entry]);
+    updateRollup(legacy, { projectsDir: dir });
+    const before = allHourlyRows(legacy);
+    const cursors = legacy.query("SELECT * FROM ingested_files").all();
+    legacy.exec("DROP INDEX idx_seen_requests_path; ALTER TABLE seen_requests DROP COLUMN path;");
+    legacy.exec("UPDATE meta SET value = '1' WHERE key = 'schema_version'");
+    legacy.close();
+    const migrated = openRollupDb(path);
+    try {
+      expect(allHourlyRows(migrated)).toEqual(before);
+      expect(migrated.query("SELECT * FROM ingested_files").all()).toEqual(cursors);
+      expect(getMeta(migrated, "schema_version")).toBe(String(SCHEMA_VERSION));
+      updateRollup(migrated, { projectsDir: dir, rebuild: true });
+      expect(allHourlyRows(migrated)).toEqual(before);
+    } finally { migrated.close(); }
+  });
+
+  test("unknown schema versions fail without rewriting metadata or usage", () => {
+    const path = join(dir, "future.db");
+    const future = openRollupDb(path);
+    future.exec("UPDATE meta SET value = '999' WHERE key = 'schema_version'");
+    future.close();
+    expect(() => openRollupDb(path)).toThrow("Unsupported rollup schema version");
+    const raw = new Database(path);
+    try { expect(getMeta(raw, "schema_version")).toBe("999"); }
+    finally { raw.close(); }
   });
 });

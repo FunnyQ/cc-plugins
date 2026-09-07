@@ -2,9 +2,8 @@
 // Incremental ingest for the usage rollup DB. On each run it tail-parses only the
 // bytes appended to each transcript since last time (tracked by
 // ingested_files.bytes_parsed), dedups billing per API request via seen_requests,
-// and additively upserts token totals into usage_hourly. A file that shrank below
-// its recorded bytes_parsed (truncated/rewritten) can't be reconciled additively,
-// so any truncation triggers a full rebuild.
+// and additively upserts token totals into usage_hourly. Truncation replays
+// transcripts with existing dedup keys so already-billed history survives.
 //
 // Kept free of any api.ts import so api.ts can call updateRollup() without a
 // cycle. The parse helpers and the transcript walk both sides need live in
@@ -33,7 +32,7 @@ import {
   hasSeenRequest,
   markSeenRequest,
   openRollupDb,
-  resetRollup,
+  rewindRollup,
   upsertIngestedFile,
   type HourlyRow,
 } from "./rollup-db";
@@ -78,8 +77,9 @@ function parseSlice(
     if (model === "<synthetic>" || usageTokenTotal(usage) === 0) continue;
 
     const key = dedupKey(entry, file, seenRun.size);
-    if (seenRun.has(key) || dbSeen(key)) continue;
+    if (seenRun.has(key)) continue;
     seenRun.add(key);
+    if (dbSeen(key)) continue;
     requestKeys.push(key);
 
     const parsedTs = entry.timestamp ? Date.parse(entry.timestamp) : 0;
@@ -114,7 +114,7 @@ function parseSlice(
 }
 
 // Ingest one file's newly-appended complete lines. Returns false to signal the
-// caller that a truncation was detected and a full rebuild is required.
+// caller that a truncation was detected and a deduplicated replay is required.
 function ingestFile(db: Database, file: string, nowMs: number): boolean {
   let size: number;
   let mtimeMs: number;
@@ -129,7 +129,7 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
   const prior = getIngestedFile(db, file);
   const startByte = prior?.bytes_parsed ?? 0;
 
-  // Shrunk below what we already consumed → can't reconcile additively.
+  // Replay from byte zero when a rewrite invalidates the cursor.
   if (prior && size < prior.bytes_parsed) return false;
   // Nothing new since last complete-line boundary.
   if (size <= startByte) return true;
@@ -178,7 +178,7 @@ export type UpdateResult = {
 };
 
 // Incremental update entry point. `rebuild: true` (or a detected truncation)
-// clears all rollup state and re-ingests every file from byte 0.
+// replays every file from byte 0 while retaining totals and dedup keys.
 export function updateRollup(
   db: Database,
   opts: {
@@ -195,15 +195,15 @@ export function updateRollup(
 
   let rebuilt = false;
   if (opts.rebuild) {
-    db.transaction(() => resetRollup(db))();
+    db.transaction(() => rewindRollup(db))();
     rebuilt = true;
   }
 
   for (let i = 0; i < files.length; i++) {
     const ok = ingestFile(db, files[i], nowMs);
     if (!ok) {
-      // Truncation → blow away and restart from a clean slate, once.
-      db.transaction(() => resetRollup(db))();
+      // Keep billed history even when rewritten transcripts omit old requests.
+      db.transaction(() => rewindRollup(db))();
       rebuilt = true;
       for (const f of files) ingestFile(db, f, nowMs);
       break;
@@ -235,7 +235,7 @@ function pruneMissingFiles(db: Database, present: Set<string>): void {
   remove();
 }
 
-// CLI: `bun rollup-update.ts [--rebuild] [--db <path>]`
+// CLI: `bun rollup-update.ts [--rebuild] [--db <path>]` (--rebuild preserves history).
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const rebuild = args.includes("--rebuild");
