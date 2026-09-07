@@ -129,7 +129,6 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
   const prior = getIngestedFile(db, file);
   const startByte = prior?.bytes_parsed ?? 0;
 
-  // Replay from byte zero when a rewrite invalidates the cursor.
   if (prior && size < prior.bytes_parsed) return false;
   // Nothing new since last complete-line boundary.
   if (size <= startByte) return true;
@@ -178,7 +177,7 @@ export type UpdateResult = {
 };
 
 // Incremental update entry point. `rebuild: true` (or a detected truncation)
-// replays every file from byte 0 while retaining totals and dedup keys.
+// replays every file from byte 0.
 export function updateRollup(
   db: Database,
   opts: {
@@ -202,7 +201,6 @@ export function updateRollup(
   for (let i = 0; i < files.length; i++) {
     const ok = ingestFile(db, files[i], nowMs);
     if (!ok) {
-      // Keep billed history even when rewritten transcripts omit old requests.
       db.transaction(() => rewindRollup(db))();
       rebuilt = true;
       for (const f of files) ingestFile(db, f, nowMs);
@@ -235,7 +233,7 @@ function pruneMissingFiles(db: Database, present: Set<string>): void {
   remove();
 }
 
-// CLI: `bun rollup-update.ts [--rebuild] [--db <path>]` (--rebuild preserves history).
+// CLI: `bun rollup-update.ts [--rebuild] [--db <path>]`
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const rebuild = args.includes("--rebuild");

@@ -133,7 +133,7 @@ Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The roll
 - The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively.
 - `hour_ms` is the local hour start. It matches `hourStartMs`, so daily and heatmap reconstruction is byte-identical.
 - Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudgeRollup()` from `statusline-collector.ts` (secondary). There is no daemon.
-- A file shrinking below `bytes_parsed` forces a full rebuild. Deleted files are pruned from `ingested_files` and `seen_requests`; `usage_hourly` keeps its tokens. A `meta.schema_version` bump triggers a destructive rebuild, which is always safe because the rollup is fully derived.
+- A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, and unsupported versions are refused. The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
 - The DB lives at `~/.local/share/q-lab/token-atlas/rollup.db`, outside dotfile sync.
 
 ### Live sessions panel
@@ -229,7 +229,7 @@ bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts   # [--port 
 bun packages/monitor/skills/usage-dashboard/scripts/api.ts
 bun packages/monitor/skills/usage-dashboard/scripts/live.ts
 
-# Rollup DB (--rebuild re-ingests from scratch)
+# Rollup DB (--rebuild rescans while preserving history and dedup keys)
 bun packages/monitor/skills/usage-dashboard/scripts/rollup-update.ts  # [--rebuild]
 
 # monitor:install engine — checks both skills, wires the statusline
