@@ -1,5 +1,25 @@
 # Changelog
 
+## [monitor 4.1.0] - 2026-09-08
+
+_tracks tag `monitor-v4.1.0`_
+
+### Changed
+- `rollup-update.ts --rebuild` no longer wipes your usage rollup. The rollup is the only surviving record of token history once Claude Code deletes a transcript past `cleanupPeriodDays`, and a rebuild — or a routine schema upgrade on a plugin update — used to erase it outright (one real-world case went from 18.95B tokens across 47 projects down to 7.83B across 29). A rebuild now rewinds read cursors and replays instead of resetting, keeping everything already counted; the trade-off is that a rebuild can no longer be used to correct a prior over-count.
+- Opening a rollup database written by a newer plugin version than the one currently running now refuses instead of silently mis-migrating it, and an old (v1) database upgrades in place instead of being dropped and rebuilt.
+
+### Fixed
+- usage-dashboard no longer crashes about 30 seconds after startup when reading a multi-gigabyte session transcript; large transcripts (verified up to 2.4 GB, 6.1 GB total across projects) now stream instead of loading whole into memory.
+- Cockpit no longer shows a session with a blank title when its transcript is large — finding the first message now streams instead of silently failing and returning nothing.
+- Cockpit's live transcript view no longer loses the start of a rotated or truncated transcript, and no longer floods the client by replaying a rotated file's entire history at once.
+
+## [dispatch 3.26.2] - 2026-09-08
+
+_tracks tag `dispatch-v3.26.2`_
+
+### Fixed
+- Autopilot no longer silently loses token totals for long-running agents. Reading a large agent transcript or flightlog in one allocation could decode to an empty string, so the run counted zero lines for that agent and moved its cursor past the file with no error — the token figure just vanished. Reads are now chunked, so long-running agents keep their token totals.
+
 ## [dispatch 3.26.1] - 2026-09-06
 
 _tracks tag `dispatch-v3.26.1`_
