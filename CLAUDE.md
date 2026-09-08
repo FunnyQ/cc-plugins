@@ -165,7 +165,10 @@ Clicking a row calls `openInCockpit(session)`. The port comes from `/api/live`'s
 - **Bun-only runtime.** Uses `bun:sqlite`, `Bun.serve`, `Bun.file`.
 - **Namespaced model keys** — `provider:model`, e.g. `claude:claude-opus-4-7`.
 - **Billing dedup** by `requestId:messageId`. The shared key lives in `dedup.ts`; the rollup ingest reuses it.
-- **Theme** — light and dark through `[data-theme]` on `<html>`. Tokens are defined twice in `style.css`. The toggle cross-fades with the View Transitions API.
+- **Theme** — light and dark through `[data-theme]` on `<html>`. Tokens are defined twice in `styles/base.css` (`:root` and `[data-theme="dark"]`). The toggle cross-fades with the View Transitions API.
+- **`index.html` links all 12 sheets itself.** There is no `style.css` aggregator — a chained `@import` is discovered only after its parent sheet downloads, so the 12 loaded serially. Add a new sheet as a `<link>`, in cascade order.
+- **Serve compressed, opt in per caller.** `gzipJsonResponse` in `cockpit/scripts/http.ts` is `/api/stats` only (4.3MB → 0.58MB); every other endpoint keeps the uncompressed `jsonResponse`. `serveStaticFile` gzips the types in its `COMPRESSIBLE` set and takes the `Request` as an optional third argument, so the two-argument form stays uncompressed. Together they take a cold dashboard load from 8.6MB to 0.98MB.
+- **A `.jpg` in `assets/` must hold real JPEG data.** `static-server.ts` derives MIME from the extension alone; browsers sniff and would render a mislabelled file anyway, which is how two 1.28MB PNGs sat behind `.jpg` names unnoticed. Renaming an asset means moving the `url()` reference and the MIME table with it.
 - **Sunrise Bloom** — `.panel` / `.card` / `.budget-panel` / `.data-health-panel` / `.live-panel` carry a radial-gradient bloom. `installBloomTracker()` lerps `--bloom-x/--bloom-y` toward the cursor each frame. Register a new panel class in **both** the CSS selector list and the JS `SELECTOR` constant.
 - **Hero wave** — `.hero-band` masks with a 200%-wide SVG holding two identical wave cycles. `hero-wave-drift` slides `mask-position-x` one wavelength for a seamless loop.
 
