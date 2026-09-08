@@ -26,6 +26,12 @@ export type ToolInput = {
   content?: string;
 };
 
+/** A language's comment forms: line markers, plus open/close block pairs. */
+export type Syntax = {
+  line: readonly string[];
+  block: readonly (readonly [string, string])[];
+};
+
 /** A contiguous run of comment lines, with the ones this edit added marked. */
 export type CommentBlock = {
   start: number;
@@ -37,85 +43,177 @@ const MIN_BLOCK_LINES = 3;
 
 const SKIP_EXTS = new Set([".md", ".mdx", ".txt", ".json"]);
 
-const MARKERS: Record<string, readonly string[]> = {
-  "#": [".rb", ".py", ".sh", ".yaml", ".yml", ".toml"],
-  "//": [
-    ".js",
-    ".ts",
-    ".jsx",
-    ".tsx",
-    ".vue",
-    ".go",
-    ".rs",
-    ".c",
-    ".h",
-    ".java",
-    ".css",
-    ".scss",
+const HASH: Syntax = { line: ["#"], block: [] };
+const C: Syntax = { line: ["//"], block: [["/*", "*/"]] };
+const CSS: Syntax = { line: [], block: [["/*", "*/"]] };
+const MARKUP: Syntax = { line: [], block: [["<!--", "-->"]] };
+const PHP: Syntax = { line: ["//", "#"], block: [["/*", "*/"]] };
+const SQL: Syntax = { line: ["--"], block: [["/*", "*/"]] };
+const LUA: Syntax = { line: ["--"], block: [["--[[", "]]"]] };
+const HASKELL: Syntax = { line: ["--"], block: [["{-", "-}"]] };
+const ERB: Syntax = { line: ["<%#"], block: [["<!--", "-->"]] };
+// Haml and Slim open an HTML comment with a bare `/`, and Haml a silent one
+// with `-#`. Both are indentation-scoped, so only the opening line is seen.
+const INDENTED: Syntax = { line: ["-#", "/"], block: [] };
+// A single-file component mixes a markup template with a script and a style
+// block, so it needs every form its three sections can carry.
+const COMPONENT: Syntax = {
+  line: ["//"],
+  block: [
+    ["/*", "*/"],
+    ["<!--", "-->"],
   ],
-  "/*": [
-    ".js",
-    ".ts",
-    ".jsx",
-    ".tsx",
-    ".vue",
-    ".go",
-    ".rs",
-    ".c",
-    ".h",
-    ".java",
-    ".css",
-    ".scss",
-  ],
-  "--": [".sql", ".lua"],
-  "<!--": [".html"],
 };
 
-export function markersFor(filePath: string): string[] {
-  const dot = filePath.lastIndexOf(".");
-  const slash = filePath.lastIndexOf("/");
-  const ext = dot > slash ? filePath.slice(dot).toLowerCase() : "";
-  if (!ext || SKIP_EXTS.has(ext) || filePath.includes("/docs/")) return [];
-  return Object.keys(MARKERS).filter((m) => MARKERS[m]!.includes(ext));
+const BY_EXT: Record<string, Syntax> = {
+  ".rb": HASH,
+  ".rake": HASH,
+  ".gemspec": HASH,
+  ".py": HASH,
+  ".sh": HASH,
+  ".bash": HASH,
+  ".zsh": HASH,
+  ".fish": HASH,
+  ".yaml": HASH,
+  ".yml": HASH,
+  ".toml": HASH,
+  ".ex": HASH,
+  ".exs": HASH,
+  ".pl": HASH,
+  ".pm": HASH,
+  ".r": HASH,
+  ".env": HASH,
+  ".ini": HASH,
+  ".conf": HASH,
+  ".properties": HASH,
+  ".graphql": HASH,
+  ".gql": HASH,
+  ".tf": HASH,
+  ".hcl": HASH,
+
+  ".js": C,
+  ".mjs": C,
+  ".cjs": C,
+  ".jsx": C,
+  ".ts": C,
+  ".mts": C,
+  ".cts": C,
+  ".tsx": C,
+  ".jsonc": C,
+  ".json5": C,
+  ".go": C,
+  ".rs": C,
+  ".c": C,
+  ".h": C,
+  ".cpp": C,
+  ".cc": C,
+  ".cxx": C,
+  ".hpp": C,
+  ".hh": C,
+  ".hxx": C,
+  ".m": C,
+  ".mm": C,
+  ".cs": C,
+  ".java": C,
+  ".kt": C,
+  ".kts": C,
+  ".scala": C,
+  ".swift": C,
+  ".dart": C,
+  ".zig": C,
+  ".proto": C,
+  ".scss": C,
+  ".sass": C,
+  ".less": C,
+  ".styl": C,
+
+  ".css": CSS,
+  ".html": MARKUP,
+  ".htm": MARKUP,
+  ".xml": MARKUP,
+  ".svg": MARKUP,
+
+  ".vue": COMPONENT,
+  ".svelte": COMPONENT,
+  ".astro": COMPONENT,
+
+  ".erb": ERB,
+  ".haml": INDENTED,
+  ".slim": INDENTED,
+  ".php": PHP,
+  ".sql": SQL,
+  ".lua": LUA,
+  ".hs": HASKELL,
+};
+
+/** Build files carry no extension, so they are matched on the name instead. */
+const BY_NAME: Record<string, Syntax> = {
+  rakefile: HASH,
+  gemfile: HASH,
+  guardfile: HASH,
+  capfile: HASH,
+  brewfile: HASH,
+  procfile: HASH,
+  makefile: HASH,
+  dockerfile: HASH,
+  justfile: HASH,
+};
+
+export function syntaxFor(filePath: string): Syntax | null {
+  if (filePath.includes("/docs/")) return null;
+
+  const base = filePath.slice(filePath.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  const ext = dot > 0 ? base.slice(dot).toLowerCase() : "";
+  if (SKIP_EXTS.has(ext)) return null;
+  if (ext && BY_EXT[ext]) return BY_EXT[ext]!;
+
+  // `Dockerfile.dev` is still a Dockerfile, so the stem gets a second look.
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  return BY_NAME[base.toLowerCase()] ?? BY_NAME[stem.toLowerCase()] ?? null;
 }
 
 /**
  * Comment-or-not for each trimmed line.
  *
- * Stateful across `/* ... *\/` so a docblock counts its full height rather than
- * just the opening line. Tracking the open block is what lets `*` continuations
- * count without becoming a marker of their own — as a marker it would read
- * `*ptr = 0` and a wrapped multiplication as comments.
+ * Stateful across every open/close pair the language has, so a docblock, an
+ * HTML comment and a Lua long comment all count their full height rather than
+ * just the opening line. Tracking the open pair is also what lets a `*`
+ * continuation count without becoming a marker of its own — as a marker it
+ * would read `*ptr = 0` and a wrapped multiplication as comments.
+ *
+ * Block openers are tested before line markers because several overlap: Lua's
+ * `--[[` also starts with its line marker `--`.
  */
-export function commentFlags(lines: string[], marks: string[]): boolean[] {
-  const hasBlockMarker = marks.includes("/*");
+export function commentFlags(lines: string[], syntax: Syntax): boolean[] {
   const flags: boolean[] = [];
-  let open = false;
+  let closer: string | null = null;
 
   for (const line of lines) {
-    if (open) {
+    if (closer !== null) {
       flags.push(true);
-      if (line.includes("*/")) open = false;
+      if (line.includes(closer)) closer = null;
       continue;
     }
+
+    const pair = syntax.block.find(([open]) => line.startsWith(open));
+    if (pair) {
+      flags.push(true);
+      if (!line.slice(pair[0].length).includes(pair[1])) closer = pair[1];
+      continue;
+    }
+
     // Leading marker only. A trailing `#` or `//` is usually inside a string —
     // matching those flags every `url = "http://..."` as a comment.
-    const starts = marks.some((m) => line.startsWith(m));
-    flags.push(starts);
-    if (
-      starts &&
-      hasBlockMarker &&
-      line.startsWith("/*") &&
-      !line.includes("*/")
-    )
-      open = true;
+    flags.push(syntax.line.some((m) => line.startsWith(m)));
   }
   return flags;
 }
 
-function commentLines(text: string, marks: string[]): string[] {
+function commentLines(text: string, syntax: Syntax): string[] {
   const lines = text.split("\n").map((l) => l.trim());
-  return lines.filter((_, i) => commentFlags(lines, marks)[i]);
+  const flags = commentFlags(lines, syntax);
+  return lines.filter((_, i) => flags[i]);
 }
 
 /**
@@ -128,17 +226,17 @@ function commentLines(text: string, marks: string[]): string[] {
 export function addedCommentLines(
   toolName: string,
   input: ToolInput,
-  marks: string[],
+  syntax: Syntax,
 ): string[] {
-  if (toolName === "Write") return commentLines(input.content ?? "", marks);
+  if (toolName === "Write") return commentLines(input.content ?? "", syntax);
 
   const before = new Map<string, number>();
-  for (const line of commentLines(input.old_string ?? "", marks)) {
+  for (const line of commentLines(input.old_string ?? "", syntax)) {
     before.set(line, (before.get(line) ?? 0) + 1);
   }
 
   const added: string[] = [];
-  for (const line of commentLines(input.new_string ?? "", marks)) {
+  for (const line of commentLines(input.new_string ?? "", syntax)) {
     const seen = before.get(line) ?? 0;
     if (seen > 0) before.set(line, seen - 1);
     else added.push(line);
@@ -155,11 +253,11 @@ export function addedCommentLines(
  */
 export function flaggedBlocks(
   fileText: string,
-  marks: string[],
+  syntax: Syntax,
   added: string[],
 ): CommentBlock[] {
   const lines = fileText.split("\n").map((l) => l.trim());
-  const flags = commentFlags(lines, marks);
+  const flags = commentFlags(lines, syntax);
 
   const pending = new Map<string, number>();
   for (const line of added) pending.set(line, (pending.get(line) ?? 0) + 1);
@@ -231,10 +329,10 @@ async function main(): Promise<number> {
   const filePath = input.file_path ?? "";
   if (!filePath) return 0;
 
-  const marks = markersFor(filePath);
-  if (marks.length === 0) return 0;
+  const syntax = syntaxFor(filePath);
+  if (!syntax) return 0;
 
-  const added = addedCommentLines(toolName, input, marks);
+  const added = addedCommentLines(toolName, input, syntax);
   if (added.length === 0) return 0;
 
   // PostToolUse runs after the write landed, so the file on disk is the shape
@@ -246,7 +344,7 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const blocks = flaggedBlocks(fileText, marks, added);
+  const blocks = flaggedBlocks(fileText, syntax, added);
   if (blocks.length === 0) return 0;
 
   const fileName = filePath.slice(filePath.lastIndexOf("/") + 1);

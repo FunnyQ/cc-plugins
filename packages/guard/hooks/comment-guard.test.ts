@@ -4,36 +4,99 @@ import {
   commentFlags,
   flaggedBlocks,
   formatReason,
-  markersFor,
+  syntaxFor,
 } from "./comment-guard.ts";
+import type { Syntax } from "./comment-guard.ts";
 
-const rb = ["#"];
-const ts = ["//", "/*"];
+const rb = syntaxFor("a/user.rb")!;
+const ts = syntaxFor("a/app.ts")!;
 
-const flagsOf = (text: string, marks: string[]) =>
+const flagsOf = (text: string, syntax: Syntax) =>
   commentFlags(
     text.split("\n").map((l) => l.trim()),
-    marks,
+    syntax,
   );
 
-describe("markersFor", () => {
-  test("maps each family to its markers", () => {
-    expect(markersFor("a/user.rb")).toEqual(["#"]);
-    expect(markersFor("a/app.ts")).toEqual(["//", "/*"]);
-    expect(markersFor("a/q.sql")).toEqual(["--"]);
-    expect(markersFor("a/page.html")).toEqual(["<!--"]);
+describe("syntaxFor", () => {
+  test("maps each family to its comment forms", () => {
+    expect(syntaxFor("a/user.rb")).toEqual({ line: ["#"], block: [] });
+    expect(syntaxFor("a/app.ts")).toEqual({
+      line: ["//"],
+      block: [["/*", "*/"]],
+    });
+    expect(syntaxFor("a/q.sql")).toEqual({
+      line: ["--"],
+      block: [["/*", "*/"]],
+    });
+    expect(syntaxFor("a/page.html")).toEqual({
+      line: [],
+      block: [["<!--", "-->"]],
+    });
+    expect(syntaxFor("a/a.lua")).toEqual({
+      line: ["--"],
+      block: [["--[[", "]]"]],
+    });
+  });
+
+  test("plain CSS has no line comment", () => {
+    expect(syntaxFor("a/main.css")!.line).toEqual([]);
+    expect(syntaxFor("a/main.scss")!.line).toEqual(["//"]);
+  });
+
+  test("a single-file component carries markup and script forms", () => {
+    const vue = syntaxFor("a/App.vue")!;
+    expect(vue.line).toEqual(["//"]);
+    expect(vue.block).toEqual([
+      ["/*", "*/"],
+      ["<!--", "-->"],
+    ]);
+    expect(syntaxFor("a/App.svelte")).toEqual(vue);
+    expect(syntaxFor("a/p.astro")).toEqual(vue);
+  });
+
+  test.each([
+    "a/main.rs",
+    "a/lib.cpp",
+    "a/lib.hpp",
+    "a/A.cs",
+    "a/a.mjs",
+    "a/a.cts",
+    "a/v.erb",
+    "a/a.php",
+    "a/a.swift",
+    "a/A.kt",
+    "a/a.dart",
+    "a/a.ex",
+    "a/a.hs",
+    "a/a.zsh",
+    "a/main.tf",
+    "a/s.less",
+    "a/i.svg",
+  ])("covers %s", (path) => {
+    expect(syntaxFor(path)).not.toBeNull();
+  });
+
+  test.each([
+    "a/Rakefile",
+    "a/Gemfile",
+    "a/Makefile",
+    "a/Dockerfile",
+    "a/Dockerfile.dev",
+  ])("matches %s on its name, not an extension", (path) => {
+    expect(syntaxFor(path)).toEqual({ line: ["#"], block: [] });
   });
 
   test("skips prose, unknown extensions, and /docs/", () => {
-    expect(markersFor("a/README.md")).toEqual([]);
-    expect(markersFor("a/data.json")).toEqual([]);
-    expect(markersFor("a/notes.txt")).toEqual([]);
-    expect(markersFor("a/data.cfg")).toEqual([]);
-    expect(markersFor("repo/docs/gen.py")).toEqual([]);
+    expect(syntaxFor("a/README.md")).toBeNull();
+    expect(syntaxFor("a/data.json")).toBeNull();
+    expect(syntaxFor("a/notes.txt")).toBeNull();
+    expect(syntaxFor("a/data.cfg")).toBeNull();
+    expect(syntaxFor("repo/docs/gen.py")).toBeNull();
   });
 
   test("ignores a dot in a directory name", () => {
-    expect(markersFor("/a.b/Makefile")).toEqual([]);
+    expect(syntaxFor("/a.b/LICENSE")).toBeNull();
+    expect(syntaxFor("/a.b/Makefile")).not.toBeNull();
   });
 });
 
@@ -67,6 +130,40 @@ describe("commentFlags", () => {
     expect(flagsOf("# why\nx = a /* b\ny = 2", rb)).toEqual([
       true,
       false,
+      false,
+    ]);
+  });
+
+  test("an HTML comment counts its full height", () => {
+    const html = syntaxFor("a/page.html")!;
+    expect(
+      flagsOf("<p>x</p>\n<!--\n  one\n  two\n-->\n<p>y</p>", html),
+    ).toEqual([false, true, true, true, true, false]);
+  });
+
+  test("a Lua long comment counts its full height", () => {
+    const lua = syntaxFor("a/a.lua")!;
+    expect(
+      flagsOf("local a = 1\n--[[\n  one\n  two\n]]\nlocal b = 2", lua),
+    ).toEqual([false, true, true, true, true, false]);
+  });
+
+  test("a Lua line comment does not open a long comment", () => {
+    const lua = syntaxFor("a/a.lua")!;
+    expect(flagsOf("-- why\nlocal a = 1", lua)).toEqual([true, false]);
+  });
+
+  test("a one-line HTML comment does not open a run", () => {
+    const html = syntaxFor("a/page.html")!;
+    expect(flagsOf("<!-- why -->\n<p>x</p>", html)).toEqual([true, false]);
+  });
+
+  test("a Rust doc comment run counts every line", () => {
+    const rs = syntaxFor("a/main.rs")!;
+    expect(flagsOf("fn a() {}\n/// one\n//! two\nfn b() {}", rs)).toEqual([
+      false,
+      true,
+      true,
       false,
     ]);
   });
