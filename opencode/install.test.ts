@@ -24,14 +24,17 @@ const home = "/tmp/opencode-installer-home";
 // skill reds exactly this constant instead of three unrelated magic numbers.
 const EXPECTED_SKILL_NAMES = [
   "adr",
+  "ask",
   "autopilot",
   "chronicle-install",
   "cockpit",
   "commit",
+  "deckplan",
   "flightplan",
   "herdr",
   "herdr-browser",
   "herdr-protocol-upgrade",
+  "hop",
   "monitor-install",
   "pr",
   "preflight",
