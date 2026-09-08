@@ -254,18 +254,19 @@ describe("comment guard on tool.execute.after", () => {
     }
   }
 
-  test("appends the guard question for a newly written comment", async () => {
-    const body = "# Increment the counter\nx = 1\n";
+  test("appends the guard question for a newly written comment block", async () => {
+    const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
       guardHook({ filePath, content: body }),
     );
 
-    expect(output).toContain("這行說的是 why 還是 what");
-    expect(output).toContain("user.rb:1  # Increment the counter");
+    expect(output).toContain("does it say why, or what?");
+    expect(output).toContain("user.rb:2-4");
+    expect(output).toContain("+ 2  # one");
   });
 
   test("translates OpenCode's camelCase edit args", async () => {
-    const body = "def bump\n  # why not what\n  @n += 1\nend\n";
+    const body = "def bump\n  # one\n  # two\n  # three\n  @n += 1\nend\n";
     const output = await inTmp("user.rb", body, (filePath) =>
       guardHook(
         { filePath, oldString: "def bump\n  @n += 1\nend", newString: body },
@@ -273,7 +274,16 @@ describe("comment guard on tool.execute.after", () => {
       ),
     );
 
-    expect(output).toContain("user.rb:2  # why not what");
+    expect(output).toContain("user.rb:2-4");
+  });
+
+  test("stays silent for a comment shorter than the block threshold", async () => {
+    const body = "x = 1\n# why not what\ny = 2\n";
+    const output = await inTmp("user.rb", body, (filePath) =>
+      guardHook({ filePath, content: body }),
+    );
+
+    expect(output).toBe("");
   });
 
   test("stays silent when the edit adds no comment", async () => {
