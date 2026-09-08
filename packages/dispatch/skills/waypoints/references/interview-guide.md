@@ -12,7 +12,7 @@ Interview at milestone depth. The output is `WAYPOINTS.md`, not a task tree.
 
 ## Scope ladder
 
-- `preflight`: one small goal or early clarification.
+- `hop`: one small goal or early clarification.
 - `flightplan`: one feature or one coherent build slice that needs tasks now.
 - `waypoints`: a whole project that should be planned as several milestone legs.
 

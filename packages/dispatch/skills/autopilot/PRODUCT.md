@@ -50,7 +50,7 @@ The second half is the token join. Spend is attributed per agent and per task by
 
 ## Brand Commitments
 
-The dispatch plugin names its skills in aviation: `preflight`, `flightplan`, `autopilot`, `waypoints`, `deckplan`, and the `flightlog` trail. `flightdeck` belongs to that set and the name is binding. `Hangar` is the visual world's own name and belongs to DESIGN.md.
+The dispatch plugin names its skills in aviation: `preflight`, `hop`, `flightplan`, `autopilot`, `waypoints`, `deckplan`, and the `flightlog` trail. `flightdeck` belongs to that set and the name is binding. `Hangar` is the visual world's own name and belongs to DESIGN.md.
 
 The deck is a picture of a plan, never a picture of a railway: refs stay `bucket/NN`, road labels stay bucket names, and the manifest below stays the agent fleet.
 

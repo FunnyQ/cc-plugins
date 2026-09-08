@@ -7,7 +7,7 @@ description: >-
 when_to_use: >-
   When the user wants a multi-milestone project roadmap ("/waypoints",
   rolling-wave plan) where later legs get planned after earlier ones land. Do
-  NOT trigger for a small goal (use preflight), a single feature (use
+  NOT trigger for a small goal (use hop), a single feature (use
   flightplan), or an existing task tree ready to run (use autopilot).
 argument-hint: "[project goal]"
 ---
@@ -20,9 +20,9 @@ argument-hint: "[project goal]"
 
 This is rolling-wave planning. Do not fully decompose a large project up front. Land one leg. Record what actually shipped. Then plan the next leg from reality, not from stale assumptions.
 
-## When to use vs preflight / flightplan
+## When to use vs hop / flightplan
 
-- For a small goal with light planning that you execute now, use **preflight**.
+- For a small goal with light planning that you execute now, use **hop**.
 - For a single feature, or one coherent scope that needs a `PLAN.md` plus a `tasks/` tree, use **flightplan**.
 - For a whole project with multiple milestone legs, where later legs get planned after earlier legs land, use **waypoints**.
 
