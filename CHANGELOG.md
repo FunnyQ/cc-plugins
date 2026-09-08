@@ -1,5 +1,15 @@
 # Changelog
 
+## [guard 0.2.0] - 2026-09-08
+
+_tracks tag `guard-v0.2.0`_
+
+### Changed
+- `comment-guard` no longer flags every added comment line — too noisy to live with. It now reports a comment only when it sits inside a block of 3 or more contiguous comment lines that this edit actually touched, and the block isn't a file header, cutting flags to the cases worth a second look.
+- Detection now reads the block from the file on disk instead of the edit fragment, so a block that gets cut across the edge of an `Edit` is judged whole rather than truncated — and an unreadable file quietly reports nothing instead of showing misleading `?` line numbers.
+- `/** ... */` docblocks now count at their full height. Previously only the opening `/**` line registered as a comment, so a JSDoc block was invisible to the guard no matter how long it ran. A stateful open/close scan handles the continuation lines, which is what lets them count without treating a bare `*` as a comment marker and misreading `*ptr = 0` or a wrapped multiplication.
+- The reason shown to the model is now in English, matching the user-facing strings in the rest of these plugins.
+
 ## [guard 0.1.0] - 2026-09-08
 
 _tracks tag `guard-v0.1.0`_
