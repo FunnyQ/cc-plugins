@@ -546,16 +546,18 @@ export async function runLive(
     } catch {
       /* proceed to send regardless */
     }
-    // Ask herdr to confirm the bootstrap actually landed. Every lifecycle state
-    // satisfies the wait, so this returns the moment the agent reacts — and when
-    // the agent takes the text but never acts, herdr says so outright rather than
-    // leaving the nudge loop below to infer it from the pane's visible text one
-    // poll window later.
+    // Ask herdr to confirm the bootstrap actually landed. When the agent takes
+    // the text but never acts, herdr says so outright rather than leaving the
+    // nudge loop below to infer it from the pane's visible text one poll window
+    // later.
     //
     // The list must be the WHOLE enum. herdr excludes `unknown` from its own
     // defaults, so omitting it here would let a detection wobble — agent reacted,
     // screen momentarily unclassifiable — burn the budget and surface as a plain
-    // `timeout` on a bootstrap that demonstrably landed.
+    // `timeout` on a bootstrap that demonstrably landed. The list is a ceiling,
+    // not a floor: since 0.9.0 only observed `working` or `blocked` activity
+    // settles a prompt sent to a non-working agent, so an agent reaching `done`
+    // without a visible working phase reports stalled however wide the list is.
     //
     // Failing to CONFIRM is never fatal either. This call is a diagnostic, not a
     // gate: before it existed relay sent and moved on unconditionally, and the

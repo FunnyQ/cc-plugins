@@ -864,8 +864,9 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
    *
    * With `wait`, herdr settles the agent in the same call, so a send-then-wait
    * pair collapses into one round trip. It also gains a signal a separate wait
-   * cannot give: a prompt accepted from a non-working state must produce a
-   * lifecycle change within five seconds, or herdr returns `agent_prompt_stalled`
+   * cannot give: a prompt accepted from a non-working state must produce observed
+   * working or blocked activity within five seconds — an unrelated status change
+   * no longer settles it since 0.9.0 — or herdr returns `agent_prompt_stalled`
    * — the agent took the text but never acted on it. Keep `timeoutMs` above 5000;
    * at or below it herdr reports a plain `timeout` and that distinction is lost.
    */
