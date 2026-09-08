@@ -1,5 +1,14 @@
 # Changelog
 
+## [guard 0.1.0] - 2026-09-08
+
+_tracks tag `guard-v0.1.0`_
+
+### Added
+- New `guard` plugin, its first release. It enforces the "comment why, never what" rule automatically instead of leaving it to review: the `comment-guard` hook fires after every `Edit` or `Write`, finds the comment lines the change added, and hands each one back to the model with one question — does this say why, or does it say what? It never judges the answer itself, so it can't be gamed by rephrasing around a fixed heuristic.
+- Detection is precise about what counts as "added": it diffs comment lines as a multiset, so moving an existing comment elsewhere in the file is never flagged, while rewording one is. Only line-leading comment markers trigger it, so a marker sequence sitting inside a string (like a URL) is left alone.
+- Ships for both Claude Code and Codex with matching `PostToolUse` hook wiring.
+
 ## [dispatch 4.0.0] - 2026-09-08
 
 _tracks tag `dispatch-v4.0.0`_
