@@ -1,5 +1,17 @@
 # Changelog
 
+## [monitor 5.0.0] - 2026-09-08
+
+_tracks tag `monitor-v5.0.0`_
+
+### Changed
+- The dashboard's `/api/stats` request dropped from 17.1s to about 550ms. It used to re-read all 12,643 Claude transcripts (2.2GB) and 1.4GB of Codex rollouts on every load; a session ledger now lives in the existing rollup database, filled by the tail-parse that already runs, so the request path only lists directories. Codex rollouts get their own summary cache.
+- A cold dashboard load now transfers 996KB instead of 8,593KB, and a warm reload just 12.8KB. This comes from gzip and ETag/304 revalidation on `/api/stats` and static assets, direct CSS links instead of a 12-deep chained `@import` chain, parallel loading of dashboard partials that used to fetch one at a time, and recompressed images (3.8MB down to 184KB — two of which turned out to be PNGs wearing a `.jpg` extension).
+- Tool-call counts in the rollup are now deduplicated per session instead of per file or globally, correcting both an over-count and an under-count present in 4.1.0.
+- A session's project path now resolves to the earliest-timestamped working directory, so sessions that `cd`'d into a subdirectory now display the repo root.
+
+**Breaking:** the rollup database migrates from schema v2 to v3 on first run of this version (a one-time ~16-22s pass; the old file is backed up to `<db>.v2.bak` first) and does not support downgrade. Opening a v3 rollup with an older monitor build now refuses with `Unsupported rollup schema version` instead of risking corruption — running old and new monitor builds against the same rollup database is not supported.
+
 ## [monitor 4.1.0] - 2026-09-08
 
 _tracks tag `monitor-v4.1.0`_
