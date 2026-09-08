@@ -7,7 +7,11 @@ import { getLiveSessions, cockpitDaemonPort } from "./live.ts";
 import { decideStartup, type AtlasInfo } from "./atlas-lifecycle";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
 import { isAlive } from "../../shared/scripts/process-alive";
-import { jsonResponse, jsonError } from "../../cockpit/scripts/http";
+import {
+  jsonResponse,
+  gzipJsonResponse,
+  jsonError,
+} from "../../cockpit/scripts/http";
 import { serveStaticFile } from "../../shared/scripts/static-server";
 
 const DIST = resolve(import.meta.dir, "..", "dashboard", "dist");
@@ -132,14 +136,14 @@ function startupGuard(): void {
 let statsCache: { fingerprint: string; payload: Promise<unknown> } | null =
   null;
 
-async function handleStats(): Promise<Response> {
+async function handleStats(req: Request): Promise<Response> {
   try {
     const fingerprint = statsFingerprint();
     if (!statsCache || statsCache.fingerprint !== fingerprint) {
       statsCache = { fingerprint, payload: buildStats() };
     }
     try {
-      return jsonResponse((await statsCache.payload) as object);
+      return gzipJsonResponse((await statsCache.payload) as object, req);
     } catch (err) {
       // Never cache a rejection — the next request must retry.
       statsCache = null;
@@ -192,11 +196,11 @@ try {
     hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url);
-      if (url.pathname === "/api/stats") return handleStats();
+      if (url.pathname === "/api/stats") return handleStats(req);
       if (url.pathname === "/api/live") return handleLive();
       if (url.pathname === "/api/pricing/refresh" && req.method === "POST")
         return handlePricingRefresh(req);
-      return serveStaticFile(DIST, url.pathname);
+      return serveStaticFile(DIST, url.pathname, req);
     },
   });
 } catch (err) {

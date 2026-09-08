@@ -12,6 +12,29 @@ export function jsonResponse(payload: object, status = 200): Response {
   });
 }
 
+// Opt-in gzip, for the one endpoint whose body is measured in megabytes
+// (/api/stats builds ~4.3MB; level 6 takes it to ~0.6MB in ~30ms). Every other
+// caller keeps jsonResponse, so no cockpit endpoint pays the CPU for a payload
+// too small to benefit.
+export function gzipJsonResponse(
+  payload: object,
+  req: Request,
+  status = 200,
+): Response {
+  if (!(req.headers.get("accept-encoding") ?? "").includes("gzip")) {
+    return jsonResponse(payload, status);
+  }
+  return new Response(Bun.gzipSync(JSON.stringify(payload), { level: 6 }), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Encoding": "gzip",
+      Vary: "Accept-Encoding",
+    },
+  });
+}
+
 /** A human-readable message from any thrown value. */
 export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
