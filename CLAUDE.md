@@ -48,6 +48,7 @@ cc-plugins/
 │   │       │   │   ├── api.ts            # data engine → buildStats()
 │   │       │   │   ├── rollup-db.ts      # bun:sqlite schema + accessors
 │   │       │   │   ├── rollup-update.ts  # incremental transcript ingest
+│   │       │   │   ├── codex-cache.ts    # per-rollout summary cache (own DB)
 │   │       │   │   ├── live.ts           # active sessions, both providers
 │   │       │   │   ├── atlas-server.ts   # Bun HTTP server, port 5938
 │   │       │   │   └── statusline-collector.ts
@@ -128,13 +129,29 @@ Every `packages/<plugin>/` holds both a `.claude-plugin/plugin.json` and a `.cod
 
 Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The rollup DB makes token history outlive that deletion.
 
-- `parseTranscriptUsage()` calls `updateRollup()` then `readRollupAggregates()`. The four aggregate maps and `projectTokens` come from the rollup. The `ledger` and file count stay on the live walk. If the DB is unavailable, the live-walk maps take over.
-- `rollup-update.ts` tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`.
-- The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively.
+**Never read transcript contents on the request path.** `parseTranscriptUsage()` walks `PROJECTS_DIR` for paths only (~110ms of readdir), hands them to `updateRollup()`, and reads everything else back out of the DB. Reading the transcripts there instead cost 13.4s per request on a 2.2GB corpus.
+
+- `rollup-update.ts` tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`. The same pass fills the session ledger — one parse, both outputs.
+- The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively. The ledger follows the same rule: `date`, `projectName`, `model` and `tokens` are all derived in `readRollupLedger()`, never stored.
 - `hour_ms` is the local hour start. It matches `hourStartMs`, so daily and heatmap reconstruction is byte-identical.
 - Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudgeRollup()` from `statusline-collector.ts` (secondary). There is no daemon.
-- A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, and unsupported versions are refused. The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
+- A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, v2 → v3 rewinds every cursor to backfill the ledger, and unsupported versions are refused — including a *newer* one, so an older monitor build refuses a v3 file rather than corrupting it. `openRollupDb()` writes `<db>.v<old>.bak` via `VACUUM INTO` before any version-changing migration (a plain copy of a WAL database can read back short). The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
 - The DB lives at `~/.local/share/q-lab/token-atlas/rollup.db`, outside dotfile sync.
+
+**`usage_hourly` and `session_ledger` have opposite deletion and replay rules.** Get this backwards and the failure is silent arithmetic.
+
+| | `usage_hourly` | `session_ledger` / `session_model_usage` |
+| --- | --- | --- |
+| Transcript deleted | tokens stay — the whole point | rows pruned with the file |
+| Replay from byte 0 | untouched; `seen_requests` blocks re-billing | file's rows deleted, then rewritten |
+
+`interactions` and `tool_calls` have no `seen_requests`-style gate, so accumulating them onto surviving rows would double them on every rebuild — hence the per-file clear, and hence `parseSlice`'s `replay` flag. A replay must then ignore `seen_requests` to re-derive what it just deleted, so it dedups tokens against a run-scoped `ledgerSeen` set instead; that works only because every replay path rewinds *all* files.
+
+Ledger rows are keyed `(path, session_key)` and summed per session on read. A session spans several files — a subagent transcript carries its parent's `sessionId` (1,442 of 2,571 measured) — while a file holds exactly one session key. Per-file rows are what let the ledger prune with the file.
+
+**Tool-call dedup is scoped per session, spanning files.** Both other scopes are wrong and were caught only by diffing against a pre-change payload: per file over-counts (1,202 keys appear in more than one file of one session), and global under-counts, because a resumed or forked session legitimately replays another session's message ids. `seen_tool_calls` is cleared wholesale by `rewindRollup` — the opposite of `seen_requests`, which must never be cleared — and carries no `path` column, since pruning by `session_key NOT IN (SELECT session_key FROM session_ledger)` saves 44MB of column and index.
+
+**Codex rollouts have their own cache, `codex-sessions.db`, deliberately not in `rollup.db`.** The rollup is authoritative data that outlives its source; this is a pure cache, safe to delete. Rollouts are append-only but folded whole (last `token_count` wins), so there is no tail-parse equivalent — it keys the whole summary on path + size + mtime.
 
 ### Live sessions panel
 
@@ -229,7 +246,8 @@ bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts   # [--port 
 bun packages/monitor/skills/usage-dashboard/scripts/api.ts
 bun packages/monitor/skills/usage-dashboard/scripts/live.ts
 
-# Rollup DB (--rebuild rescans while preserving history and dedup keys)
+# Rollup DB (--rebuild rescans while preserving history and dedup keys, and
+# rewrites the session ledger, which a replay always re-derives from scratch)
 bun packages/monitor/skills/usage-dashboard/scripts/rollup-update.ts  # [--rebuild]
 
 # monitor:install engine — checks both skills, wires the statusline
