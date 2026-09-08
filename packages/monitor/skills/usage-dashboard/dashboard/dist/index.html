@@ -1,10 +1,24 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Token Atlas · Local Usage Ledger</title>
-    <link rel="stylesheet" href="/style.css" />
+    <!-- Listed individually, not @import-ed from one style.css: a chained
+         @import is discovered only after its parent sheet has downloaded, so
+         12 sheets loaded serially. Document order still sets the cascade. -->
+    <link rel="stylesheet" href="/styles/base.css">
+    <link rel="stylesheet" href="/styles/hero.css">
+    <link rel="stylesheet" href="/styles/overview.css">
+    <link rel="stylesheet" href="/styles/panels.css">
+    <link rel="stylesheet" href="/styles/live.css">
+    <link rel="stylesheet" href="/styles/controls-and-charts.css">
+    <link rel="stylesheet" href="/styles/tables-and-modal.css">
+    <link rel="stylesheet" href="/styles/activity.css">
+    <link rel="stylesheet" href="/styles/misc.css">
+    <link rel="stylesheet" href="/styles/loading.css">
+    <link rel="stylesheet" href="/styles/data-health.css">
+    <link rel="stylesheet" href="/styles/responsive.css">
   </head>
   <body>
     <div id="dashboard-root"></div>
