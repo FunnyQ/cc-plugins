@@ -16,11 +16,12 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 | [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code, Codex, and OpenCode: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
 | [install](./packages/monitor/skills/install) | One-stop prerequisite check and statusline wiring for the whole plugin, command-triggered |
 
-**dispatch** bundles four skills:
+**dispatch** bundles five skills:
 
 | Skill | Description |
 |-------|-------------|
-| [preflight](./packages/dispatch/skills/preflight) | Lightweight interviewer that gathers requirements into a single in-conversation plan to approve and execute |
+| [preflight](./packages/dispatch/skills/preflight) | Short interview that captures what you want as `docs/<slug>/INTENT.md`, before anyone decides how to build it — writes one file and stops, never executes |
+| [hop](./packages/dispatch/skills/hop) | Lightweight interviewer that gathers requirements into a single in-conversation plan to approve and execute |
 | [flightplan](./packages/dispatch/skills/flightplan) | Heavyweight interviewer that writes a multi-file blueprint to disk — `PLAN.md` + a `tasks/` tree of self-contained task files for sub-agents |
 | [autopilot](./packages/dispatch/skills/autopilot) | Executes a flightplan tree in parallel waves — a dev→verify→judge→score loop gated on each task's Eval rubric, an atomic commit between waves, then the closing final-review gate, leaving an audit trail |
 | [waypoints](./packages/dispatch/skills/waypoints) | Rolling-wave milestone-roadmap tier *above* flightplan — writes only `docs/<proj>/WAYPOINTS.md` plus a `waypoints.ts` CLI (`active` / `leg-scaffold` / `advance`) so each leg's flightplan is planned just-in-time after the previous leg lands |
@@ -254,11 +255,12 @@ Cockpit checks `/api/codex-control/status` before enabling the Codex send box, s
 
 ## dispatch
 
-Interview-driven planning you can execute. Three skills form one arc — gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop — and a fourth, `waypoints`, sits *above* it for whole-project rolling-wave planning.
+Interview-driven planning you can execute. Four skills form one arc — capture what you want, gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop — and a fifth, `waypoints`, sits *above* it for whole-project rolling-wave planning.
 
-![Dispatch flow: preflight, waypoints, flightplan, autopilot, final review, ship](./assets/dispatch-flow.svg)
+![Dispatch flow: preflight, hop, waypoints, flightplan, autopilot, final review, ship](./assets/dispatch-flow.svg)
 
-- **preflight** — a lightweight interview that produces a single in-conversation plan. Best when you'll execute now, in one session.
+- **preflight** — a short interview that captures what you want as `docs/<slug>/INTENT.md`, before anyone decides how to build it. Writes one file and stops; never executes.
+- **hop** — a lightweight interview that produces a single in-conversation plan and executes it. Best when you'll execute now, in one session. Formerly named `preflight`.
 - **flightplan** — a thorough interview that writes `docs/<slug>/PLAN.md` plus a `tasks/` tree of self-contained task files (each with its own `## Eval rubric`). Best when the work spans sessions or hands off to sub-agents.
 - **autopilot** — executes that tree in **waves**. Each wave re-scouts the ready set (`next-ready`) and runs those tasks in parallel; for each task it runs Dev → an independent binary gate (re-runs the task's Verification) → a rubric judge → a deterministic score gate, retrying until the task passes its rubric. Between waves it makes an **atomic commit** of the completed work, so the run leaves a clean per-wave history rather than one giant diff. The `Final review` task depends transitively on every other task, so the wave loop naturally schedules it last as the whole-tree gate — a closing multi-lens review round (cross-vendor `codex` + four `/simplify` lenses → an Opus fixer), followed by a final commit of its fixes. Every verdict lands in a self-gitignored `docs/<slug>/.flightlog/` audit trail (`RUNLOG.md`).
 - **waypoints** — the tier *above* flightplan for large builds. It writes only a milestone **roadmap** (`docs/<proj>/WAYPOINTS.md`, legs tracked with `[x]`/`[~]`/`[ ]`); each leg's detailed flightplan is generated **just-in-time** after the previous leg lands, so every plan starts from what actually shipped rather than one oversized up-front guess. A `waypoints.ts` CLI collapses the lifecycle into three verbs — `active` (rolling-wave digest), `leg-scaffold` (nest a leg's tree under `docs/<proj>/legs/NN-slug/`), and `advance` (land the active leg; writing requires `--outcome` as the confirmation gate). `flightplan` gains a narrow **waypoint mode** that plans one leg at a time. Human-in-loop by design — one leg lands before the next is planned.

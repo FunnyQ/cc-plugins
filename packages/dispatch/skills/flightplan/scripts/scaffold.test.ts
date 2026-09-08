@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, access, rm, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, access, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkCollision, scaffold, validateInput } from "./scaffold";
@@ -32,6 +32,46 @@ describe("checkCollision", () => {
     await mkdir(join(root, "course-player-v2"));
     const result = await checkCollision("course-player", root);
     expect(result.suggestedAlt).toBe("course-player-v3");
+    await rm(root, { recursive: true });
+  });
+
+  test("an intent-only dir is not a collision", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "course-player"));
+    await writeFile(join(root, "course-player/INTENT.md"), "# intent\n");
+    const result = await checkCollision("course-player", root);
+    expect(result.exists).toBe(false);
+    expect(result.intentOnly).toBe(true);
+    expect(result.suggestedAlt).toBeNull();
+    await rm(root, { recursive: true });
+  });
+
+  test("dotfiles do not disqualify an intent-only dir", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "course-player"));
+    await writeFile(join(root, "course-player/INTENT.md"), "# intent\n");
+    await writeFile(join(root, "course-player/.DS_Store"), "");
+    const result = await checkCollision("course-player", root);
+    expect(result.exists).toBe(false);
+    expect(result.intentOnly).toBe(true);
+    await rm(root, { recursive: true });
+  });
+
+  test("INTENT.md beside a real tree is still a collision", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "course-player/tasks"), { recursive: true });
+    await writeFile(join(root, "course-player/INTENT.md"), "# intent\n");
+    const result = await checkCollision("course-player", root);
+    expect(result.exists).toBe(true);
+    expect(result.intentOnly).toBe(false);
+    expect(result.suggestedAlt).toBe("course-player-v2");
+    await rm(root, { recursive: true });
+  });
+
+  test("an absent dir is not intent-only", async () => {
+    const root = await newRoot();
+    const result = await checkCollision("nope", root);
+    expect(result.intentOnly).toBe(false);
     await rm(root, { recursive: true });
   });
 });
@@ -146,6 +186,26 @@ describe("scaffold", () => {
     } catch (err) {
       expect((err as Error).message).toContain("course-player-v2");
     }
+    await rm(root, { recursive: true });
+  });
+
+  test("scaffolds into an intent-only dir and preserves INTENT.md", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "course-player"));
+    await writeFile(join(root, "course-player/INTENT.md"), "# intent\n");
+
+    const result = await scaffold({
+      slug: "course-player",
+      buckets: ["work", "review"],
+      docsRoot: root,
+    });
+
+    expect(result.rootDir).toBe(join(root, "course-player"));
+    const contextDir = await stat(join(root, "course-player/tasks/_context"));
+    expect(contextDir.isDirectory()).toBe(true);
+    const intent = await Bun.file(join(root, "course-player/INTENT.md")).text();
+    expect(intent).toBe("# intent\n");
+
     await rm(root, { recursive: true });
   });
 

@@ -1,13 +1,15 @@
 {
   "name": "dispatch",
   "version": "3.26.2",
-  "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint to disk; autopilot flies the tree with a dev→verify→judge→score quality loop; waypoints orchestrates the rolling-wave roadmap tier above flightplan; deckplan is a reference-only guide to authoring Workflow scripts for flightdeck.",
+  "description": "Plan before you fly — interview-driven specs you can execute. preflight captures what you want as INTENT.md before any solution is chosen; hop interviews, plans, and executes a small scope in one session; flightplan writes a multi-file blueprint to disk; autopilot flies the tree with a dev→verify→judge→score quality loop; waypoints orchestrates the rolling-wave roadmap tier above flightplan; deckplan is a reference-only guide to authoring Workflow scripts for flightdeck.",
   "author": {
     "name": "Q"
   },
   "license": "MIT",
   "keywords": [
     "preflight",
+    "intent",
+    "hop",
     "flightplan",
     "autopilot",
     "waypoints",
@@ -25,12 +27,13 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Dispatch",
-    "shortDescription": "Interview-driven planning: lightweight in-conversation specs and multi-file blueprints for sub-agents.",
-    "longDescription": "Five skills in one plugin. preflight is a lightweight interviewer that gathers requirements through systematic questioning and writes a single in-conversation plan to approve and execute. flightplan is the heavyweight sibling: it interviews thoroughly, then commits a complete blueprint to disk — PLAN.md plus a tasks/ tree with shared _context/ files and self-contained task files a different session or sub-agent can pick up and execute independently. autopilot executes that tree: for each ready task it runs a dev→verify→judge→score loop that gates on the task's own Eval rubric, retrying until it passes, then runs the closing final-review task as the whole-tree gate — leaving an audit trail of every verdict. waypoints orchestrates the rolling-wave milestone-roadmap tier above flightplan. deckplan explains how to author Workflow scripts for flightdeck; it runs no interview, scaffolds nothing, generates no artifacts, and bundles no scripts.",
+    "shortDescription": "Interview-driven planning, from captured intent to in-conversation specs to multi-file blueprints for sub-agents.",
+    "longDescription": "Six skills in one plugin, forming a ladder. preflight is the first rung: a short interview that captures what you want as docs/<slug>/INTENT.md before anyone decides how to build it — it refuses to answer 'how', writes one file, and stops, so the eventual plan has a frozen baseline to be checked against. hop is the everyday rung: it interviews through structured questions, writes a single in-conversation plan to approve, and then executes it in the same session. flightplan is the heavyweight sibling: it interviews thoroughly, then commits a complete blueprint to disk — PLAN.md plus a tasks/ tree with shared _context/ files and self-contained task files a different session or sub-agent can pick up and execute independently; it reads an existing INTENT.md as its baseline. autopilot executes that tree: for each ready task it runs a dev→verify→judge→score loop that gates on the task's own Eval rubric, retrying until it passes, then runs the closing final-review task as the whole-tree gate — leaving an audit trail of every verdict. waypoints orchestrates the rolling-wave milestone-roadmap tier above flightplan. deckplan explains how to author Workflow scripts for flightdeck; it runs no interview, scaffolds nothing, generates no artifacts, and bundles no scripts.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "defaultPrompt": [
+      "Write down what I want here — don't decide how yet.",
       "Interview me to spec this out before we build.",
       "Help me think through this idea.",
       "Fully spec this out and break it into task files.",

@@ -18,6 +18,7 @@
     <marker id="ah-indigo" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#6473D7"/></marker>
     <marker id="ah-amber" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#D9852E"/></marker>
     <marker id="ah-red" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#C9603F"/></marker>
+    <marker id="ah-slate" markerWidth="11" markerHeight="11" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#7E96A6"/></marker>
     <style>
       .ink{fill:#1B2A36}.mut{fill:#5E7686}.wt{fill:#fff}
       .h1{font-size:26px;font-weight:700}
@@ -37,53 +38,63 @@
 
   <!-- Title -->
   <text class="h1 ink" x="60" y="48">Dispatch — plan at the right altitude, then fly</text>
-  <text class="sub mut" x="61" y="74">preflight for now · waypoints for milestone roadmaps · flightplan writes the executable tree · autopilot runs waves, gates, commits, final review</text>
+  <text class="sub mut" x="61" y="74">preflight captures the want · hop plans &amp; runs it now · waypoints maps milestone legs · flightplan writes the executable tree · autopilot runs waves, gates, commits, final review</text>
 
   <!-- through-line behind top tier -->
   <rect x="60" y="166" width="1135" height="8" rx="4" fill="url(#runway)"/>
 
   <!-- ===== TOP TIER: planning tiers + execution ===== -->
   <!-- arrows between cards -->
-  <line class="ln" x1="306" y1="170" x2="326" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <line class="ln" x1="576" y1="170" x2="596" y2="170" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
-  <line class="ln" x1="846" y1="170" x2="866" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <line class="ln" x1="1116" y1="170" x2="1158" y2="170" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <line class="ln" x1="253" y1="170" x2="272" y2="170" stroke="#7E96A6" marker-end="url(#ah-slate)"/>
+  <line class="ln" x1="469" y1="170" x2="488" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <line class="ln" x1="685" y1="170" x2="704" y2="170" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
+  <line class="ln" x1="901" y1="170" x2="920" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <line class="ln" x1="1117" y1="170" x2="1158" y2="170" stroke="#2F9C70" marker-end="url(#ah-green)"/>
 
   <!-- Card P: preflight -->
-  <g filter="url(#soft)"><rect x="60" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="60" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
-  <circle cx="92" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="92" y="143" text-anchor="middle">1</text>
-  <text class="ntitle ink" x="118" y="144">preflight</text>
-  <rect x="118" y="156" width="86" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="161" y="170" text-anchor="middle">light</text>
-  <text class="role ink" x="80" y="202">Clarify work to do now</text>
-  <text class="role2 mut" x="80" y="223">→ one chat plan, approve &amp; run</text>
+  <g filter="url(#soft)"><rect x="60" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="60" y="104" width="6" height="132" rx="3" fill="#7E96A6"/>
+  <circle cx="92" cy="138" r="15" fill="#7E96A6"/><text class="wt" font-size="14" font-weight="700" x="92" y="143" text-anchor="middle">1</text>
+  <text class="ntitle ink" x="116" y="144">preflight</text>
+  <rect x="116" y="156" width="62" height="20" rx="10" fill="#EAF1F4"/><text class="tag" fill="#5E7686" x="147" y="170" text-anchor="middle">intent</text>
+  <text class="role ink" x="80" y="202">Capture the want</text>
+  <text class="role2 mut" x="80" y="223">→ INTENT.md, no how</text>
+
+  <!-- Card H: hop -->
+  <g filter="url(#soft)"><rect x="276" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="276" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
+  <circle cx="308" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="308" y="143" text-anchor="middle">2</text>
+  <text class="ntitle ink" x="332" y="144">hop</text>
+  <rect x="332" y="156" width="56" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="360" y="170" text-anchor="middle">light</text>
+  <text class="role ink" x="296" y="202">Clarify work to do now</text>
+  <text class="role2 mut" x="296" y="223">→ one chat plan, run</text>
 
   <!-- Card W: waypoints -->
-  <g filter="url(#soft)"><rect x="330" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="330" y="104" width="6" height="132" rx="3" fill="#6473D7"/>
-  <circle cx="362" cy="138" r="15" fill="#6473D7"/><text class="wt" font-size="14" font-weight="700" x="362" y="143" text-anchor="middle">2</text>
-  <text class="ntitle ink" x="388" y="144">waypoints</text>
-  <rect x="388" y="156" width="98" height="20" rx="10" fill="#EEF0FF"/><text class="tag" fill="#6473D7" x="437" y="170" text-anchor="middle">roadmap</text>
-  <text class="role ink" x="350" y="202">Plan milestone legs</text>
-  <text class="role2 mut" x="350" y="223">→ WAYPOINTS.md + active leg</text>
+  <g filter="url(#soft)"><rect x="492" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="492" y="104" width="6" height="132" rx="3" fill="#6473D7"/>
+  <circle cx="524" cy="138" r="15" fill="#6473D7"/><text class="wt" font-size="14" font-weight="700" x="524" y="143" text-anchor="middle">3</text>
+  <text class="ntitle ink" x="548" y="144">waypoints</text>
+  <rect x="548" y="156" width="74" height="20" rx="10" fill="#EEF0FF"/><text class="tag" fill="#6473D7" x="585" y="170" text-anchor="middle">roadmap</text>
+  <text class="role ink" x="512" y="202">Plan milestone legs</text>
+  <text class="role2 mut" x="512" y="223">→ WAYPOINTS.md + leg</text>
 
   <!-- Card F: flightplan -->
-  <g filter="url(#soft)"><rect x="600" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="600" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
-  <circle cx="632" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="632" y="143" text-anchor="middle">3</text>
-  <text class="ntitle ink" x="658" y="144">flightplan</text>
-  <rect x="658" y="156" width="92" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="704" y="170" text-anchor="middle">blueprint</text>
-  <text class="role ink" x="620" y="202">Write executable specs</text>
-  <text class="role2 mut" x="620" y="223">→ PLAN.md + _context + tasks</text>
+  <g filter="url(#soft)"><rect x="708" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="708" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
+  <circle cx="740" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="740" y="143" text-anchor="middle">4</text>
+  <text class="ntitle ink" x="764" y="144">flightplan</text>
+  <rect x="764" y="156" width="84" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="806" y="170" text-anchor="middle">blueprint</text>
+  <text class="role ink" x="728" y="202">Write executable specs</text>
+  <text class="role2 mut" x="728" y="223">→ PLAN.md + tasks tree</text>
 
   <!-- Card A: autopilot -->
-  <g filter="url(#soft)"><rect x="870" y="104" width="245" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="870" y="104" width="6" height="132" rx="3" fill="#34A879"/>
-  <circle cx="902" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="902" y="143" text-anchor="middle">4</text>
-  <text class="ntitle ink" x="928" y="144">autopilot</text>
-  <rect x="928" y="156" width="86" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="971" y="170" text-anchor="middle">auto</text>
-  <text class="role ink" x="890" y="202">Fly tasks in waves</text>
-  <text class="role2 mut" x="890" y="223">→ gates, commits, final review</text>
+  <g filter="url(#soft)"><rect x="924" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="924" y="104" width="6" height="132" rx="3" fill="#34A879"/>
+  <circle cx="956" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="956" y="143" text-anchor="middle">5</text>
+  <text class="ntitle ink" x="980" y="144">autopilot</text>
+  <rect x="980" y="156" width="54" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="1007" y="170" text-anchor="middle">auto</text>
+  <text class="role ink" x="944" y="202">Fly tasks in waves</text>
+  <text class="role2 mut" x="944" y="223">→ gates, commits, review</text>
 
   <!-- Ship -->
   <g filter="url(#soft)"><circle cx="1218" cy="170" r="46" fill="#fff" stroke="#34A879"/></g>
@@ -91,12 +102,12 @@
   <text class="nlbl" fill="#2F9C70" x="1218" y="200" text-anchor="middle">shipped</text>
 
   <!-- connectors from F and A down into the detail boxes -->
-  <path class="ln" d="M452,236 L452,268 L205,268 L205,298" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
-  <text class="note mut" x="230" y="262">roadmaps</text>
-  <path class="ln" d="M722,236 L722,268 L330,268 L330,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <text class="note mut" x="350" y="262">writes</text>
-  <path class="ln" d="M992,236 L992,268 L930,268 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <text class="note mut" x="948" y="262">reads &amp; runs</text>
+  <path class="ln" d="M588,236 L588,264 L205,264 L205,298" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
+  <text class="note mut" x="214" y="258">roadmaps</text>
+  <path class="ln" d="M804,236 L804,280 L330,280 L330,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <text class="note mut" x="340" y="274">writes</text>
+  <path class="ln" d="M1020,236 L1020,264 L930,264 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <text class="note mut" x="938" y="258">reads &amp; runs</text>
 
   <!-- ===== LEFT: flightplan artifact tree ===== -->
   <g filter="url(#soft)"><rect x="60" y="300" width="500" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>

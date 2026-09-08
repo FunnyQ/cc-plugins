@@ -1,23 +1,25 @@
 ---
 name: flightplan
-version: 0.10.0
+version: 0.11.0
 description: >-
   Heavyweight interviewer that writes a multi-file spec artifact to disk —
   docs/<topic>/PLAN.md plus a tasks/ tree for sub-agents to execute later.
 when_to_use: >-
   When the work should be frozen to disk for a later/different session or
   sub-agent to execute — decomposing into a task tree, "/flightplan". Do NOT
-  trigger for a lightweight in-conversation spec (use preflight instead), for
-  an existing task tree ready to run (use autopilot), or when a clear
-  instruction can just be executed directly.
+  trigger for a lightweight in-conversation spec executed now (use hop), for
+  capturing a want with no solution yet (use preflight), for an existing task
+  tree ready to run (use autopilot), or when a clear instruction can just be
+  executed directly.
 argument-hint: "[topic]"
 ---
 
 # Flightplan
 
-Interview thoroughly, then commit a complete blueprint to disk so a *different* session — possibly a sub-agent — executes each piece cold. `preflight` is the lighter sibling: it plans and executes in this conversation.
+Interview thoroughly, then commit a complete blueprint to disk so a *different* session — possibly a sub-agent — executes each piece cold. `hop` is the lighter sibling: it plans and executes in this conversation.
 
-- Executing now, single session, small scope → **`preflight`**.
+- Executing now, single session, small scope → **`hop`**.
+- Recording what you want with no solution decided yet → **`preflight`** (writes `INTENT.md`, which this skill reads later).
 - Multi-stage, multi-file, handed to a sub-agent, or decisions frozen in version-controlled docs → **`flightplan`**.
 - Unsure? Ask *"executing now, or saving for later?"* Later = `flightplan`.
 
@@ -77,9 +79,15 @@ Carry both answers to Step 7 and do not re-ask them there. The tier is a guess a
 
 `references/interview-guide.md` holds the per-topic question banks, tree-walking examples, question-design checklist, and stop criteria.
 
+**When `docs/<slug>/INTENT.md` exists, read it first.** It answers *why* and *what*, never *how*, so it pre-fills some dimensions below and none of the rest. Confirm what it already settled in **one** `AskUserQuestion` batch — an intent can be weeks old and the want may have moved — then interview only the gaps. Do not re-ask what it answers; do not treat it as answering more than it does.
+
+**Never generate the tree from INTENT.md alone.** Architecture, bucketing, cross-bucket dependencies, verification commands, and eval rubrics are absent from it by design, so skipping the interview means inventing all of them and rendering a fuzzy input as a confident tree. The intent shortens the interview; it does not replace it.
+
+Carry INTENT.md's Open questions into PLAN.md's — each is either resolved during this interview or restated there. When a decision here contradicts the intent, say so out loud and record it under PLAN.md's `## Context`. **Leave INTENT.md unmodified**: it is the baseline, and editing it to match the plan destroys the only record of the drift.
+
 **Required dimensions** — resolve each, or explicitly defer it to Open Questions:
 
-- **Topic slug** — kebab-case, for `docs/<topic>/`. The moment it's agreed, check collision: `bun "$SCRIPTS"/scaffold.ts --check <slug>` prints `OK` or `EXISTS: <suggested -vN slug>`. On collision, pause and ask: merge, version-bump, or abort.
+- **Topic slug** — kebab-case, for `docs/<topic>/`. The moment it's agreed, check collision: `bun "$SCRIPTS"/scaffold.ts --check <slug>` prints `OK`, `INTENT: <path>`, or `EXISTS: <suggested -vN slug>`. `INTENT` is not a collision — read that file per the paragraph above and keep the slug. On a real collision, pause and ask: merge, version-bump, or abort.
 - **Problem & users** — who it's for, what changes after it ships.
 - **Scope boundaries** — the explicit Non-goals list.
 - **Tech constraints** — stack, conventions, deployment target, integrations, version pins.
@@ -121,7 +129,7 @@ Either way, never leave a half-written tree.
    ```bash
    bun "$SCRIPTS"/scaffold.ts <slug> <bucket1>,<bucket2>,...,review
    ```
-   Creates `tasks/_context/` and one dir per bucket. The root is created non-recursively, so a slug created between the Step 3 check and now throws EEXIST instead of silently overwriting.
+   Creates `tasks/_context/` and one dir per bucket. The root is created non-recursively, so a slug created between the Step 3 check and now throws EEXIST instead of silently overwriting. The one root it merges into is a dir holding only `INTENT.md`, which it leaves in place.
 
    **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
@@ -283,7 +291,7 @@ On a violation it exits 2 with stderr feedback, so the problem surfaces immediat
 
 Reach for these instead of doing the mechanical work by hand. Each exports a tested pure function.
 
-- `scripts/scaffold.ts` — collision check (`--check`) and dir-tree creation
+- `scripts/scaffold.ts` — collision check (`--check`, printing `OK` / `INTENT: <path>` / `EXISTS: <alt>`) and dir-tree creation. A dir holding only `INTENT.md` is not a collision; scaffolding merges into it.
 - `scripts/lint-task.ts` — validates task files against the self-containment contract + the mandatory Eval-rubric shape
 - `scripts/build-readme.ts` — regenerates `tasks/README.md` index / dep graphs from task headers
 - `scripts/review-plan.ts` — Step 7's plan review. `--engine codex|opencode` (default codex; codex uses its native `review`, opencode delegates to `opencode-run.ts`), `--model` overrides the opencode model, `--prior-findings <file>` folds the previous pass's findings into the bundle so a context-less reviewer stops re-filing them, `--narrow` (with optional `--prior-passes <n>`) swaps in the post-cap instruction set — blocking classes only, at most five findings, `No blocking findings.` as a sanctioned verdict — and `--print` emits whichever instruction set is selected, so the Opus engine reaches the narrow phase too. Exit code mirrors the reviewer so callers can gate on it; a missing CLI exits 0 with a warning.

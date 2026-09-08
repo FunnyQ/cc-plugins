@@ -20,10 +20,11 @@ argument-hint: "<slug|path>"
 
 `autopilot` walks a `docs/<slug>/tasks/` tree, executing each task with a dev→review→score loop gated on that task's own machine-parseable `## Eval rubric`, and finishing on the one `Final review` task as the holistic closing gate. The output is working, reviewed code, plus an audit trail (`RUNLOG.md`) of every verdict.
 
-It is the third skill in the arc:
+It is the last rung of the ladder:
 
 ```
-preflight  → lightweight in-conversation spec
+preflight  → what you want, no solution            (INTENT.md)
+hop        → interview, plan, execute now           (in conversation)
 flightplan → multi-file blueprint to disk (PLAN.md + tasks/)
 autopilot  → execute the tree with a quality loop   ← you are here
 ```
