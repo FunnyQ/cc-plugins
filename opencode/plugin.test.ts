@@ -12,12 +12,14 @@ type PendingGuidance = { items: string[]; pushes: number };
 const {
   guardVerdict,
   hookPayload,
+  commentPayload,
   lintVerdict,
   withOpenCodeNote,
   stashPending,
   GUIDANCE_CAP,
   PUSH_CAP,
   COMMIT_COMMAND,
+  COMMENT_GUARDED,
   FLIGHTPLAN_TASK,
 } = QLabPlugin;
 
@@ -218,6 +220,130 @@ describe("tool.execute.after handler", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+});
+
+describe("comment guard on tool.execute.after", () => {
+  const root = dirname(import.meta.dir);
+
+  async function guardHook(
+    args: Record<string, string>,
+    tool = "write",
+  ): Promise<string> {
+    const hooks = await QLabPlugin({ directory: root });
+    const output = { output: "" };
+    await hooks["tool.execute.after"](
+      { tool, sessionID: "ses_test", callID: "call_test", args },
+      output,
+    );
+    return output.output;
+  }
+
+  async function inTmp(
+    name: string,
+    body: string,
+    run: (filePath: string) => Promise<string>,
+  ): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "qlab-guard-"));
+    try {
+      const filePath = join(dir, name);
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, body);
+      return await run(filePath);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  test("appends the guard question for a newly written comment", async () => {
+    const body = "# Increment the counter\nx = 1\n";
+    const output = await inTmp("user.rb", body, (filePath) =>
+      guardHook({ filePath, content: body }),
+    );
+
+    expect(output).toContain("這行說的是 why 還是 what");
+    expect(output).toContain("user.rb:1  # Increment the counter");
+  });
+
+  test("translates OpenCode's camelCase edit args", async () => {
+    const body = "def bump\n  # why not what\n  @n += 1\nend\n";
+    const output = await inTmp("user.rb", body, (filePath) =>
+      guardHook(
+        { filePath, oldString: "def bump\n  @n += 1\nend", newString: body },
+        "edit",
+      ),
+    );
+
+    expect(output).toContain("user.rb:2  # why not what");
+  });
+
+  test("stays silent when the edit adds no comment", async () => {
+    const body = "x = 2\n";
+    const output = await inTmp("user.rb", body, (filePath) =>
+      guardHook({ filePath, oldString: "x = 1", newString: "x = 2" }, "edit"),
+    );
+
+    expect(output).toBe("");
+  });
+
+  test.each(["notes.md", "data.json", "docs/gen.py"])(
+    "skips %s without spawning the guard",
+    async (name) => {
+      const body = "# a comment\n";
+      expect(
+        await inTmp(name, body, (filePath) =>
+          guardHook({ filePath, content: body }),
+        ),
+      ).toBe("");
+    },
+  );
+});
+
+describe("commentPayload", () => {
+  test("maps the write tool to Claude's Write shape", () => {
+    expect(
+      JSON.parse(commentPayload("write", { filePath: "a.rb", content: "# x" })),
+    ).toEqual({
+      tool_name: "Write",
+      tool_input: {
+        file_path: "a.rb",
+        content: "# x",
+        old_string: "",
+        new_string: "",
+      },
+    });
+  });
+
+  test("maps the edit tool and drops non-string args to empty", () => {
+    expect(
+      JSON.parse(
+        commentPayload("edit", {
+          filePath: "a.rb",
+          oldString: "a",
+          newString: 7,
+        }),
+      ),
+    ).toEqual({
+      tool_name: "Edit",
+      tool_input: {
+        file_path: "a.rb",
+        content: "",
+        old_string: "a",
+        new_string: "",
+      },
+    });
+  });
+});
+
+describe("COMMENT_GUARDED", () => {
+  test.each(["a.rb", "a.ts", "a.sql", "a.html", "a.scss", "a.lua"])(
+    "guards %s",
+    (name) => expect(COMMENT_GUARDED.test(name)).toBe(true),
+  );
+
+  test.each(["a.md", "a.json", "a.txt", "a.cfg", "Makefile"])(
+    "leaves %s alone",
+    (name) => expect(COMMENT_GUARDED.test(name)).toBe(false),
+  );
 });
 
 describe("withOpenCodeNote", () => {

@@ -2,9 +2,16 @@ import { dirname, join } from "node:path";
 
 type HookKind = "command" | "file_path";
 type HookResult = { exitCode: number; stdout: string; stderr: string };
+type EditArgs = {
+  filePath?: unknown;
+  content?: unknown;
+  oldString?: unknown;
+  newString?: unknown;
+};
 
 const CHECK_BRANCH = "packages/chronicle/hooks/check-branch.sh";
 const FLIGHTPLAN_LINT = "packages/dispatch/hooks/flightplan-lint.sh";
+const COMMENT_GUARD = "packages/guard/hooks/comment-guard.ts";
 const DECISION_LOG_START =
   "packages/monitor/skills/cockpit/scripts/decision-log-start.ts";
 const SCRIBE_NUDGE = "packages/monitor/skills/cockpit/scripts/scribe-nudge.ts";
@@ -15,6 +22,8 @@ const SCRIBE_NUDGE = "packages/monitor/skills/cockpit/scripts/scribe-nudge.ts";
 const COMMIT_COMMAND = /git\s+commit/; // check-branch.sh:13
 const FLIGHTPLAN_TASK =
   /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/; // flightplan-lint.sh:28
+const COMMENT_GUARDED =
+  /\.(rb|py|sh|yaml|yml|toml|js|ts|jsx|tsx|vue|go|rs|c|h|java|css|scss|sql|lua|html)$/i; // comment-guard.ts MARKERS
 
 // S9/S10/S17: OpenCode has no Agent tool, no "fork" subagent, and a spawned
 // subagent inherits no context. The cockpit scripts are shared with Claude Code
@@ -90,6 +99,22 @@ function stashPending(
 
 function hookPayload(kind: HookKind, value: string): string {
   return JSON.stringify({ tool_input: { [kind]: value } });
+}
+
+/** comment-guard reads Claude's hook shape — a tool name plus snake_case
+ *  tool_input keys. OpenCode names the same arguments in camelCase, so the
+ *  translation belongs here; the script stays Claude-shaped for both harnesses. */
+function commentPayload(tool: string, args: EditArgs): string {
+  const str = (value: unknown) => (typeof value === "string" ? value : "");
+  return JSON.stringify({
+    tool_name: tool === "write" ? "Write" : "Edit",
+    tool_input: {
+      file_path: str(args.filePath),
+      content: str(args.content),
+      old_string: str(args.oldString),
+      new_string: str(args.newString),
+    },
+  });
 }
 
 function guardVerdict(exitCode: number, stdout: string): string | null {
@@ -314,7 +339,12 @@ const QLabPlugin = Object.assign(
       },
 
       "tool.execute.after": async (
-        input: { tool: string; args: { filePath?: unknown } },
+        input: {
+          tool: string;
+          sessionID?: string;
+          callID?: string;
+          args: EditArgs;
+        },
         output: { output: string },
       ) => {
         // S5a is before-hook-specific: after-hooks carry the arguments on the
@@ -326,23 +356,35 @@ const QLabPlugin = Object.assign(
         ) {
           return;
         }
-        if (!FLIGHTPLAN_TASK.test(input.args.filePath)) return;
+        const filePath = input.args.filePath;
 
-        const result = await run(
-          [join(root, FLIGHTPLAN_LINT)],
-          hookPayload("file_path", input.args.filePath),
-        );
-        if (!result) return;
+        // Two independent hooks share this event and their gates do not overlap,
+        // so neither may return early on the other's behalf.
+        if (FLIGHTPLAN_TASK.test(filePath)) {
+          const result = await run(
+            [join(root, FLIGHTPLAN_LINT)],
+            hookPayload("file_path", filePath),
+          );
+          const message = result && lintVerdict(result.exitCode, result.stderr);
+          // S4: the write has landed, so append lint feedback without blocking it.
+          if (message) output.output += message;
+        }
 
-        const message = lintVerdict(result.exitCode, result.stderr);
-        // S4: the write has landed, so append lint feedback without blocking it.
-        if (message) output.output += message;
+        if (COMMENT_GUARDED.test(filePath) && !filePath.includes("/docs/")) {
+          const result = await run(
+            ["bun", join(root, COMMENT_GUARD)],
+            commentPayload(input.tool, input.args),
+          );
+          const message = result && lintVerdict(result.exitCode, result.stderr);
+          if (message) output.output += message;
+        }
       },
     };
   },
   {
     guardVerdict,
     hookPayload,
+    commentPayload,
     lintVerdict,
     withOpenCodeNote,
     stashPending,
@@ -350,6 +392,7 @@ const QLabPlugin = Object.assign(
     PUSH_CAP,
     COMMIT_COMMAND,
     FLIGHTPLAN_TASK,
+    COMMENT_GUARDED,
   },
 );
 
