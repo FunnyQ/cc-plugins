@@ -1,5 +1,27 @@
 # Changelog
 
+## [herdr 0.7.3] - 2026-09-09
+
+_tracks tag `herdr-v0.7.3`_
+
+### Changed
+- The herdr skill's reference docs now track herdr 0.9.0 instead of 0.8.2, verified against the running 0.9.0 CLI rather than copied from release notes. Socket API reference moves from protocol 20 to 22.
+- Documents the new `herdr machine *` command family for remote installations.
+- Documents that `workspace close` no longer implicitly closes linked worktree workspaces: `--group` (CLI) or `close_group` (socket) is now required, and the socket call rejects with `workspace_group_close_required` without it. Also documents the new `--trust-repository` flag on every `worktree` verb.
+- Documents config changes: `kitty_graphics` moved from `[experimental]` to `[terminal]` and now defaults on; `pane_borders` is now a tri-state string (`"auto"|"always"|"off"`, old booleans still map); sidebar rows may be style tables with value-based `rules`; and new `[theme.custom.light]` / `[theme.custom.dark]` layers.
+- Documents socket API growth from 91 to 102 methods, the new `capabilities.endpoint_protocol_generation`, and the two-connection subscribe-then-snapshot ordering now required since `events.subscribe` no longer replays retained events.
+- Removes documentation for `--no-session` and the CLI-level `detection` pane-read source, both dropped in 0.9.0 (`detection` survives only on `agent read`).
+
+### Fixed
+- Corrected a stale internal comment describing `agent prompt --wait`: it does not settle on every lifecycle state as previously noted, only on observed `working` or `blocked` activity, matching herdr 0.9.0's actual behavior. No runtime behavior changed.
+
+## [relay 0.6.10] - 2026-09-09
+
+_tracks tag `relay-v0.6.10`_
+
+### Fixed
+- Corrected a stale comment describing `--until`'s wait semantics: the list is a ceiling, not a floor. An agent that reaches `done` without a visible `working` phase still reports `agent_prompt_stalled`, regardless of how wide the `--until` list is. No runtime behavior changed.
+
 ## [guard 0.3.0] - 2026-09-09
 
 _tracks tag `guard-v0.3.0`_
