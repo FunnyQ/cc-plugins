@@ -345,15 +345,60 @@ describe("commentPayload", () => {
 });
 
 describe("COMMENT_GUARDED", () => {
-  test.each(["a.rb", "a.ts", "a.sql", "a.html", "a.scss", "a.lua"])(
-    "guards %s",
-    (name) => expect(COMMENT_GUARDED.test(name)).toBe(true),
-  );
+  test.each([
+    "a.rb",
+    "a.ts",
+    "a.sql",
+    "a.html",
+    "a.scss",
+    "a.lua",
+    "a.rs",
+    "a.cpp",
+    "a.mjs",
+    "a.erb",
+    "a.vue",
+    "a.php",
+    "a.hs",
+    "a.tf",
+    "src/Rakefile",
+    "src/Dockerfile",
+    "src/Dockerfile.dev",
+  ])("guards %s", (name) => expect(COMMENT_GUARDED.test(name)).toBe(true));
 
-  test.each(["a.md", "a.json", "a.txt", "a.cfg", "Makefile"])(
+  test.each(["a.md", "a.json", "a.txt", "a.cfg", "LICENSE"])(
     "leaves %s alone",
     (name) => expect(COMMENT_GUARDED.test(name)).toBe(false),
   );
+
+  // The prefilter is a hand-kept copy of the hook's tables. A narrowing drift
+  // stops a language being guarded with no error anywhere, so pin both
+  // directions against the hook itself.
+  test("agrees with the hook's own file gate", async () => {
+    const { syntaxFor } = await import(
+      "../packages/guard/hooks/comment-guard.ts"
+    );
+    const paths = [
+      ...[
+        "rb,rake,gemspec,py,sh,bash,zsh,yaml,yml,toml,ex,pl,r,env,ini,conf,tf,hcl",
+        "js,mjs,cjs,jsx,ts,mts,cts,tsx,jsonc,go,rs,c,h,cpp,cc,hpp,m,mm,cs,java,kt",
+        "scala,swift,dart,zig,proto,css,scss,sass,less,styl,html,htm,xml,svg,vue",
+        "svelte,astro,erb,haml,slim,php,sql,lua,hs,md,json,txt,cfg,png,lock",
+      ]
+        .join(",")
+        .split(",")
+        .map((ext) => `src/a.${ext}`),
+      "src/Rakefile",
+      "src/Gemfile",
+      "src/Makefile",
+      "src/Dockerfile",
+      "src/LICENSE",
+    ];
+
+    const disagree = paths.filter(
+      (p) => COMMENT_GUARDED.test(p) !== (syntaxFor(p) !== null),
+    );
+    expect(disagree).toEqual([]);
+  });
 });
 
 describe("withOpenCodeNote", () => {

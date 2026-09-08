@@ -22,8 +22,11 @@ const SCRIBE_NUDGE = "packages/monitor/skills/cockpit/scripts/scribe-nudge.ts";
 const COMMIT_COMMAND = /git\s+commit/; // check-branch.sh:13
 const FLIGHTPLAN_TASK =
   /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/; // flightplan-lint.sh:28
+// comment-guard.ts BY_EXT and BY_NAME. Widening this alone only wastes a spawn;
+// narrowing it past the hook silently stops guarding a language, so
+// plugin.test.ts cross-checks both directions against syntaxFor.
 const COMMENT_GUARDED =
-  /\.(rb|py|sh|yaml|yml|toml|js|ts|jsx|tsx|vue|go|rs|c|h|java|css|scss|sql|lua|html)$/i; // comment-guard.ts MARKERS
+  /(\.(rb|rake|gemspec|py|sh|bash|zsh|fish|yaml|yml|toml|ex|exs|pl|pm|r|env|ini|conf|properties|graphql|gql|tf|hcl|js|mjs|cjs|jsx|ts|mts|cts|tsx|jsonc|json5|go|rs|c|h|cpp|cc|cxx|hpp|hh|hxx|m|mm|cs|java|kt|kts|scala|swift|dart|zig|proto|css|scss|sass|less|styl|html|htm|xml|svg|vue|svelte|astro|erb|haml|slim|php|sql|lua|hs)|(^|\/)(rakefile|gemfile|guardfile|capfile|brewfile|procfile|makefile|dockerfile|justfile)(\.[^/]*)?)$/i;
 
 // S9/S10/S17: OpenCode has no Agent tool, no "fork" subagent, and a spawned
 // subagent inherits no context. The cockpit scripts are shared with Claude Code
