@@ -345,56 +345,39 @@ describe("commentPayload", () => {
 });
 
 describe("COMMENT_GUARDED", () => {
-  test.each([
-    "a.rb",
-    "a.ts",
-    "a.sql",
-    "a.html",
-    "a.scss",
-    "a.lua",
-    "a.rs",
-    "a.cpp",
-    "a.mjs",
-    "a.erb",
-    "a.vue",
-    "a.php",
-    "a.hs",
-    "a.tf",
-    "src/Rakefile",
-    "src/Dockerfile",
-    "src/Dockerfile.dev",
-  ])("guards %s", (name) => expect(COMMENT_GUARDED.test(name)).toBe(true));
-
-  test.each(["a.md", "a.json", "a.txt", "a.cfg", "LICENSE"])(
-    "leaves %s alone",
-    (name) => expect(COMMENT_GUARDED.test(name)).toBe(false),
+  // Absolute anchors. The cross-check below only proves the two sides agree,
+  // so it stays green if both drift together; these pin the truth itself.
+  test.each(["a.rb", "a.ts", "src/Rakefile", "src/Dockerfile.dev"])(
+    "guards %s",
+    (name) => expect(COMMENT_GUARDED.test(name)).toBe(true),
   );
 
-  // The prefilter is a hand-kept copy of the hook's tables. A narrowing drift
-  // stops a language being guarded with no error anywhere, so pin both
-  // directions against the hook itself.
-  test("agrees with the hook's own file gate", async () => {
-    const { syntaxFor } = await import(
+  test.each(["a.md", "a.cfg", "LICENSE"])("leaves %s alone", (name) =>
+    expect(COMMENT_GUARDED.test(name)).toBe(false),
+  );
+
+  // Enumerate from the tables, never a hand-listed sample: a sample is a third copy that drifts the same silent way, missing exactly the entry nobody remembered.
+  test("agrees with the hook's own lookup, entry for entry", async () => {
+    const { BY_EXT, BY_NAME, syntaxFor } = await import(
       "../packages/guard/hooks/comment-guard.ts"
     );
-    const paths = [
-      ...[
-        "rb,rake,gemspec,py,sh,bash,zsh,yaml,yml,toml,ex,pl,r,env,ini,conf,tf,hcl",
-        "js,mjs,cjs,jsx,ts,mts,cts,tsx,jsonc,go,rs,c,h,cpp,cc,hpp,m,mm,cs,java,kt",
-        "scala,swift,dart,zig,proto,css,scss,sass,less,styl,html,htm,xml,svg,vue",
-        "svelte,astro,erb,haml,slim,php,sql,lua,hs,md,json,txt,cfg,png,lock",
-      ]
-        .join(",")
-        .split(",")
-        .map((ext) => `src/a.${ext}`),
-      "src/Rakefile",
-      "src/Gemfile",
-      "src/Makefile",
-      "src/Dockerfile",
+    const covered = [
+      ...Object.keys(BY_EXT).map((ext) => `src/a${ext}`),
+      ...Object.keys(BY_NAME).map((name) => `src/${name}`),
+      "src/Dockerfile.dev",
+    ];
+    const uncovered = [
+      "src/a.md",
+      "src/a.json",
+      "src/a.txt",
+      "src/a.cfg",
+      "src/a.png",
+      "src/a.lock",
       "src/LICENSE",
     ];
 
-    const disagree = paths.filter(
+    expect(Object.keys(BY_EXT).length).toBeGreaterThan(70);
+    const disagree = [...covered, ...uncovered].filter(
       (p) => COMMENT_GUARDED.test(p) !== (syntaxFor(p) !== null),
     );
     expect(disagree).toEqual([]);

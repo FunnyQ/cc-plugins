@@ -4,12 +4,15 @@ import {
   commentFlags,
   flaggedBlocks,
   formatReason,
+  isGuardedPath,
   syntaxFor,
 } from "./comment-guard.ts";
 import type { Syntax } from "./comment-guard.ts";
 
 const rb = syntaxFor("a/user.rb")!;
 const ts = syntaxFor("a/app.ts")!;
+const html = syntaxFor("a/page.html")!;
+const lua = syntaxFor("a/a.lua")!;
 
 const flagsOf = (text: string, syntax: Syntax) =>
   commentFlags(
@@ -54,26 +57,14 @@ describe("syntaxFor", () => {
     expect(syntaxFor("a/p.astro")).toEqual(vue);
   });
 
-  test.each([
-    "a/main.rs",
-    "a/lib.cpp",
-    "a/lib.hpp",
-    "a/A.cs",
-    "a/a.mjs",
-    "a/a.cts",
-    "a/v.erb",
-    "a/a.php",
-    "a/a.swift",
-    "a/A.kt",
-    "a/a.dart",
-    "a/a.ex",
-    "a/a.hs",
-    "a/a.zsh",
-    "a/main.tf",
-    "a/s.less",
-    "a/i.svg",
-  ])("covers %s", (path) => {
-    expect(syntaxFor(path)).not.toBeNull();
+  test("an ERB comment is a pair, not a line marker", () => {
+    expect(syntaxFor("a/v.erb")).toEqual({
+      line: [],
+      block: [
+        ["<%#", "%>"],
+        ["<!--", "-->"],
+      ],
+    });
   });
 
   test.each([
@@ -82,21 +73,37 @@ describe("syntaxFor", () => {
     "a/Makefile",
     "a/Dockerfile",
     "a/Dockerfile.dev",
+    "a/.env",
+    "a/.env.local",
   ])("matches %s on its name, not an extension", (path) => {
     expect(syntaxFor(path)).toEqual({ line: ["#"], block: [] });
   });
 
-  test("skips prose, unknown extensions, and /docs/", () => {
+  test("returns null for an extension it does not know", () => {
     expect(syntaxFor("a/README.md")).toBeNull();
-    expect(syntaxFor("a/data.json")).toBeNull();
-    expect(syntaxFor("a/notes.txt")).toBeNull();
     expect(syntaxFor("a/data.cfg")).toBeNull();
-    expect(syntaxFor("repo/docs/gen.py")).toBeNull();
+    expect(syntaxFor("/a.b/LICENSE")).toBeNull();
   });
 
   test("ignores a dot in a directory name", () => {
-    expect(syntaxFor("/a.b/LICENSE")).toBeNull();
     expect(syntaxFor("/a.b/Makefile")).not.toBeNull();
+  });
+});
+
+describe("isGuardedPath", () => {
+  // Policy, not lookup — `syntaxFor` still answers for a `/docs/` .py file.
+  test("excludes prose files and anything under /docs/", () => {
+    expect(isGuardedPath("repo/docs/gen.py")).toBe(false);
+    expect(isGuardedPath("a/README.md")).toBe(false);
+    expect(isGuardedPath("a/notes.txt")).toBe(false);
+    expect(isGuardedPath("a/data.json")).toBe(false);
+    expect(isGuardedPath("a/Dockerfile.md")).toBe(false);
+  });
+
+  test("admits everything else, including files it has no syntax for", () => {
+    expect(isGuardedPath("a/user.rb")).toBe(true);
+    expect(isGuardedPath("a/data.cfg")).toBe(true);
+    expect(syntaxFor("repo/docs/gen.py")).not.toBeNull();
   });
 });
 
@@ -135,32 +142,27 @@ describe("commentFlags", () => {
   });
 
   test("an HTML comment counts its full height", () => {
-    const html = syntaxFor("a/page.html")!;
     expect(
       flagsOf("<p>x</p>\n<!--\n  one\n  two\n-->\n<p>y</p>", html),
     ).toEqual([false, true, true, true, true, false]);
   });
 
   test("a Lua long comment counts its full height", () => {
-    const lua = syntaxFor("a/a.lua")!;
     expect(
       flagsOf("local a = 1\n--[[\n  one\n  two\n]]\nlocal b = 2", lua),
     ).toEqual([false, true, true, true, true, false]);
   });
 
   test("a Lua line comment does not open a long comment", () => {
-    const lua = syntaxFor("a/a.lua")!;
     expect(flagsOf("-- why\nlocal a = 1", lua)).toEqual([true, false]);
   });
 
   test("a one-line HTML comment does not open a run", () => {
-    const html = syntaxFor("a/page.html")!;
     expect(flagsOf("<!-- why -->\n<p>x</p>", html)).toEqual([true, false]);
   });
 
   test("a Rust doc comment run counts every line", () => {
-    const rs = syntaxFor("a/main.rs")!;
-    expect(flagsOf("fn a() {}\n/// one\n//! two\nfn b() {}", rs)).toEqual([
+    expect(flagsOf("fn a() {}\n/// one\n//! two\nfn b() {}", ts)).toEqual([
       false,
       true,
       true,

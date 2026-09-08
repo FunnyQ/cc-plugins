@@ -19,6 +19,8 @@
  * the module, which is the one place prose is the point.
  */
 
+import { basename, extname } from "node:path";
+
 export type ToolInput = {
   file_path?: string;
   old_string?: string;
@@ -51,10 +53,15 @@ const PHP: Syntax = { line: ["//", "#"], block: [["/*", "*/"]] };
 const SQL: Syntax = { line: ["--"], block: [["/*", "*/"]] };
 const LUA: Syntax = { line: ["--"], block: [["--[[", "]]"]] };
 const HASKELL: Syntax = { line: ["--"], block: [["{-", "-}"]] };
-const ERB: Syntax = { line: ["<%#"], block: [["<!--", "-->"]] };
-// Haml and Slim open an HTML comment with a bare `/`, and Haml a silent one
-// with `-#`. Both are indentation-scoped, so only the opening line is seen.
-const INDENTED: Syntax = { line: ["-#", "/"], block: [] };
+const ERB: Syntax = {
+  line: [],
+  block: [
+    ["<%#", "%>"],
+    ["<!--", "-->"],
+  ],
+};
+// Haml/Slim scope by indentation and the scan sees trimmed lines, so a multi-line `-#` block reports as one and never reaches MIN_BLOCK_LINES.
+const HAML: Syntax = { line: ["-#", "/"], block: [["<!--", "-->"]] };
 // A single-file component mixes a markup template with a script and a style
 // block, so it needs every form its three sections can carry.
 const COMPONENT: Syntax = {
@@ -65,7 +72,7 @@ const COMPONENT: Syntax = {
   ],
 };
 
-const BY_EXT: Record<string, Syntax> = {
+export const BY_EXT: Record<string, Syntax> = {
   ".rb": HASH,
   ".rake": HASH,
   ".gemspec": HASH,
@@ -82,7 +89,6 @@ const BY_EXT: Record<string, Syntax> = {
   ".pl": HASH,
   ".pm": HASH,
   ".r": HASH,
-  ".env": HASH,
   ".ini": HASH,
   ".conf": HASH,
   ".properties": HASH,
@@ -138,8 +144,8 @@ const BY_EXT: Record<string, Syntax> = {
   ".astro": COMPONENT,
 
   ".erb": ERB,
-  ".haml": INDENTED,
-  ".slim": INDENTED,
+  ".haml": HAML,
+  ".slim": HAML,
   ".php": PHP,
   ".sql": SQL,
   ".lua": LUA,
@@ -147,7 +153,8 @@ const BY_EXT: Record<string, Syntax> = {
 };
 
 /** Build files carry no extension, so they are matched on the name instead. */
-const BY_NAME: Record<string, Syntax> = {
+export const BY_NAME: Record<string, Syntax> = {
+  ".env": HASH,
   rakefile: HASH,
   gemfile: HASH,
   guardfile: HASH,
@@ -159,18 +166,18 @@ const BY_NAME: Record<string, Syntax> = {
   justfile: HASH,
 };
 
+// Policy, not lookup: `COMMENT_GUARDED` in opencode/plugin.ts mirrors syntaxFor's half alone, so folding these checks in would leave it compared against a set it cannot encode.
+export function isGuardedPath(filePath: string): boolean {
+  return !filePath.includes("/docs/") && !SKIP_EXTS.has(extname(filePath));
+}
+
 export function syntaxFor(filePath: string): Syntax | null {
-  if (filePath.includes("/docs/")) return null;
+  const ext = extname(filePath).toLowerCase();
+  const known = BY_EXT[ext];
+  if (known) return known;
 
-  const base = filePath.slice(filePath.lastIndexOf("/") + 1);
-  const dot = base.lastIndexOf(".");
-  const ext = dot > 0 ? base.slice(dot).toLowerCase() : "";
-  if (SKIP_EXTS.has(ext)) return null;
-  if (ext && BY_EXT[ext]) return BY_EXT[ext]!;
-
-  // `Dockerfile.dev` is still a Dockerfile, so the stem gets a second look.
-  const stem = dot > 0 ? base.slice(0, dot) : base;
-  return BY_NAME[base.toLowerCase()] ?? BY_NAME[stem.toLowerCase()] ?? null;
+  // `Dockerfile.dev` is still a Dockerfile, so the extension comes off first.
+  return BY_NAME[basename(filePath, ext).toLowerCase()] ?? null;
 }
 
 /**
@@ -329,6 +336,7 @@ async function main(): Promise<number> {
   const filePath = input.file_path ?? "";
   if (!filePath) return 0;
 
+  if (!isGuardedPath(filePath)) return 0;
   const syntax = syntaxFor(filePath);
   if (!syntax) return 0;
 
@@ -347,7 +355,7 @@ async function main(): Promise<number> {
   const blocks = flaggedBlocks(fileText, syntax, added);
   if (blocks.length === 0) return 0;
 
-  const fileName = filePath.slice(filePath.lastIndexOf("/") + 1);
+  const fileName = basename(filePath);
   console.error(formatReason(fileName, blocks));
   return 2;
 }
