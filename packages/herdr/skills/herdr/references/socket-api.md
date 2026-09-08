@@ -1,6 +1,6 @@
 # Herdr Socket API
 
-This document is verified against herdr 0.8.2, protocol 20. If live output disagrees with this doc, trust `herdr api schema --json`.
+This document is verified against herdr 0.9.0, protocol 22. If live output disagrees with this doc, trust `herdr api schema --json`.
 
 Herdr's control surface is a Unix domain socket. The `herdr` CLI is a thin client over it. Every subcommand opens the socket, sends one request, prints the response, and exits.
 
@@ -60,9 +60,12 @@ Send `id`, `method`, and `params`. All three are required — omitting `params` 
 Success returns the request's `id` and a `result` whose `type` names the variant:
 
 ```json
-{"id":"1","result":{"type":"pong","version":"0.8.2","protocol":20,
-  "capabilities":{"live_handoff":true,"detached_server_daemon":true}}}
+{"id":"1","result":{"type":"pong","version":"0.9.0","protocol":22,
+  "capabilities":{"live_handoff":true,"detached_server_daemon":true,
+    "endpoint_protocol_generation":1}}}
 ```
+
+`capabilities.endpoint_protocol_generation` names the endpoint generation the server supports. A client update can now leave a compatible server running: the client checks this field and disables only the actions a missing server feature affects, instead of refusing to connect. A server older than endpoint generation 1 needs a one-time upgrade.
 
 Errors return `code` and `message`, both required:
 
@@ -74,13 +77,13 @@ CLI socket commands use `server_not_running` when no compatible server is availa
 
 **Do not key error handling on `id`.** A request that fails to deserialise comes back with `id: ""`, because the server never read the id.
 
-Gate on `ping` before assuming a shape. Protocol 20 is current here. Treat a supported protocol as a minimum floor unless your client has a verified reason to reject additive future protocols.
+Gate on `ping` before assuming a shape. Protocol 22 is current here. Treat a supported protocol as a minimum floor unless your client has a verified reason to reject additive future protocols.
 
 **Upgrading the binary does not upgrade the socket.** The server keeps running the version it started with, so `ping` reports the old protocol until it restarts or hands off. Compare `herdr status` client and server versions before you trust a new method. `agent.explain` is the usual casualty: it classifies against the *server's* manifest cache, so a stale server explains with stale rules.
 
 ## Methods
 
-There are 91 methods: `agent.*` (12), `client.*` (2), `events.*` (2), `integration.*` (2), `layout.*` (3), `notification.show`, `pane.*` (30), `ping`, `plugin.*` (11), `popup.close`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). Protocol 20 adds `pane.input.set` with `{pane_id, right_click}` for right-click routing.
+There are 102 methods: `agent.*` (12), `client.*` (2), `client_shell.surface.set`, `command.invoke`, `events.*` (2), `integration.*` (3), `layout.*` (3), `notification.show`, `pane.*` (36), `ping`, `plugin.*` (11), `popup.close`, `product_announcement.dismiss`, `release_notes.dismiss`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). `client_shell.surface.set` and `command.invoke` back the terminal UI's own client-shell projection — internal plumbing, undocumented even in the official Socket API page; a plugin or automation client has no reason to call them. Protocol 20 adds `pane.input.set` with `{pane_id, right_click}` for right-click routing.
 
 Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. The mapping for the calls `scripts/herd.ts` makes:
 
@@ -105,6 +108,8 @@ Each CLI subcommand maps to the dotted method of the same name, with flags becom
 Note the shape changes, not just the names. `--env K=V` repeated becomes an `env` **object**. `--until` repeated becomes an `until` **array**. `-- ARGS` becomes `args`. `--no-focus` becomes `focus: false`, which is already the default. On `agent.prompt` the wait flags **nest**: `--wait --until S --timeout MS` becomes one `wait: {until:[…], timeout_ms}` object, and `--wait` alone becomes `wait: {}`. Passing `until` or `timeout_ms` at the top level is a deserialisation error, not a wait.
 
 `pane.input.set` takes `{pane_id, right_click}` and routes one pane's right-click gestures. Send `right_click: "pane"` to forward unmodified hold and drag gestures to a mouse-reporting application. Send `right_click: "herdr"` to restore Herdr's pane menu. Right-clicking the pane frame always opens Herdr's menu. `pane.split` takes the same `right_click` for the pane it creates, defaulting to `herdr`.
+
+`workspace.close` takes `{workspace_id, close_group}`. Closing a primary workspace while its linked worktree workspaces are still open is rejected with `workspace_group_close_required` unless `close_group: true` is set — nothing closes until you opt in explicitly.
 
 Result variants you will unwrap: `agent_list.agents`, `agent_info.agent`, `agent_started.agent`, `pane_list.panes`, `pane_info.pane`, `pane_read.read`, `tab_created.{tab,root_pane}`, `workspace_created.{workspace,tab,root_pane}`, `wait_matched.event`. `PaneReadResult.truncated` is required and reports when older rows were omitted. Simple mutations return `{"type":"ok"}`.
 
@@ -131,6 +136,8 @@ The `keys` array has no enum in the schema, so its vocabulary is not discoverabl
 ## Events
 
 `events.subscribe` is the one capability with no CLI equivalent. It is also the one method that breaks the one-request rule: the server replies once, then **holds the connection open** and streams event lines until you close it.
+
+**Subscribe before you take your initial snapshot.** As of 0.9.0, a subscription starts when the request is accepted and does not replay events retained before that point. `events.subscribe` also holds its connection open, so the snapshot call needs a second connection. To avoid a bootstrap gap: open `events.subscribe` on connection A and wait for `subscription_started`; call `session.snapshot` on connection B while buffering every event connection A delivers; install the snapshot; then apply the buffered events in order. Take the snapshot first, or on the same connection, and any change landing in between never reaches you.
 
 ```json
 {"id":"e","method":"events.subscribe","params":{"subscriptions":[

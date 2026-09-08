@@ -1,6 +1,6 @@
 # Herdr CLI Reference
 
-This document is verified against herdr 0.8.2. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 Most commands output JSON for scripting.
 
@@ -15,7 +15,6 @@ herdr --session work            # named session
 herdr --remote workbox          # SSH attach with local keybindings
 herdr --remote workbox --remote-keybindings server
 herdr --remote workbox --handoff
-herdr --no-session              # single-process escape hatch
 herdr --default-config          # print default config
 herdr --skill                   # print the agent guide bundled with this binary
 herdr completion zsh|bash|fish|powershell|elvish
@@ -30,6 +29,8 @@ herdr api snapshot              # live runtime state
 herdr config check
 herdr config reset-keys
 ```
+
+Every TUI launch attaches to a background server. Detach and the panes keep running; run `herdr server stop` to end the session instead.
 
 `herdr --help` routes AI agents to two more sources. Read https://herdr.dev/agent-guide.md to help a human set Herdr up for the first time. Read https://herdr.dev/llms.txt to debug Herdr itself. Skip `herdr --skill` while this skill is in context.
 
@@ -51,6 +52,20 @@ herdr session stop <name> [--json]
 herdr session delete <name> [--json]
 ```
 
+Use `default` as `<name>` to target the default session for `session stop`.
+
+## Machines
+```bash
+herdr machine list [--json]
+herdr machine add <ssh-target> --label <label> [--remote-session <name>]
+herdr machine rename <profile-id> --label <label>
+herdr machine remove <profile-id>
+herdr machine enable <profile-id>
+herdr machine disable <profile-id>
+```
+
+`machine add` prepares the remote Herdr installation and starts its server before saving. A missing or incompatible remote installation needs approval in an interactive terminal. Changes apply automatically to open local clients. Removing or disabling a machine leaves its remote sessions running. A saved machine holds only a label, SSH target, explicit session name, and enabled state; SSH credentials and key material stay with OpenSSH.
+
 ## Workspaces
 ```bash
 herdr workspace list
@@ -59,16 +74,20 @@ herdr workspace get <id>
 herdr workspace focus <id>
 herdr workspace rename <id> <label>
 herdr workspace report-metadata <id> --source ID [--token NAME=VALUE] [--clear-token NAME] [--seq N] [--ttl-ms N]
-herdr workspace close <id>
+herdr workspace close <id> [--group]
 ```
+
+`workspace close` on a primary workspace no longer closes its open worktree workspaces implicitly. Pass `--group` to close the primary workspace and its linked worktree workspaces together; otherwise the group stays open.
 
 ## Worktrees
 ```bash
-herdr worktree list [--workspace ID | --cwd PATH]
-herdr worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus|--no-focus]
-herdr worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) [--label TEXT] [--focus|--no-focus]
-herdr worktree remove --workspace ID [--force]
+herdr worktree list [--workspace ID | --cwd PATH] [--trust-repository]
+herdr worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus|--no-focus] [--trust-repository]
+herdr worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) [--label TEXT] [--focus|--no-focus] [--trust-repository]
+herdr worktree remove --workspace ID [--force] [--trust-repository]
 ```
+
+`--trust-repository` grants per-request Git trust for one command, including an accessible Windows repository owned by another SID, without changing global Git configuration.
 
 ## Tabs
 ```bash
@@ -109,7 +128,7 @@ Pass `--right-click pane` to forward unmodified right-click gestures to a mouse-
 
 **Read output:**
 ```bash
-herdr pane read <id> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi] [--raw]
+herdr pane read <id> [--source visible|recent|recent-unwrapped] [--lines N] [--format text|ansi] [--ansi] [--raw]
 herdr pane read <id> --source visible --ansi
 ```
 
@@ -118,7 +137,7 @@ herdr pane read <id> --source visible --ansi
 | `visible` | Current rendered screen |
 | `recent` | Recent scrollback with wrapping |
 | `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
-| `detection` | Bottom-buffer snapshot used by agent screen detection |
+| `detection` | Bottom-buffer snapshot used by agent screen detection (`agent read` only) |
 
 `pane read` and `pane wait-output` accept `--flag=value` and take options before or after the pane id. `pane read` and `agent read` print plain text. Recent sources default to 80 rows when `--lines` is omitted. `visible` and `detection` return the full snapshot unless `--lines` limits them. An idle recognized agent at the transcript bottom can collect alternate-screen history when the requested line count exceeds its visible rows. A history request that needs this collection while the agent is working, blocked, or unknown returns `agent_not_idle`.
 
@@ -146,6 +165,8 @@ herdr pane report-agent-session <id> \
 herdr pane release-agent <id> --source ID --agent LABEL [--seq N]
 ```
 
+`pane report-agent` and `pane report-agent-session` accept `--flag=value` and take options before or after the pane id, matching `pane read` and `pane wait-output`.
+
 **Report metadata (display-only):**
 ```bash
 herdr pane report-metadata <id> \
@@ -172,15 +193,15 @@ herdr agent explain <target> [--json|--format text|json] [--verbose]
 herdr agent explain --file PATH --agent LABEL [--json|--format text|json] [--verbose]
 ```
 
-Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `qwen`, `maki`.
+Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `qwen`, `maki`, `muse`.
 
 `agent prompt` handles bracketed paste, waits briefly after writing text, and then presses Enter. When the agent already sits at an approval or question dialog, `agent prompt` fails with `agent_blocked` and sends neither text nor Enter. Inspect the dialog and ask the user before answering it. `agent wait` accepts a repeated `--until` flag. When you omit `--until`, `agent wait` waits for `idle`, `done`, or `blocked`.
 
-`agent prompt --wait` settles in the same call. It rejects `--until` unless `--wait` is also present. An accepted prompt sent from a non-working state must produce an observed lifecycle change within five seconds, or herdr returns `agent_prompt_stalled` — the agent took the text and never acted on it. Set `--timeout` above 5000 to keep that error distinct; at or below it herdr reports a plain `timeout` instead. Once activity is observed, the wait tracks lifecycle state, not one turn, so an already-working agent can satisfy it by finishing its current turn.
+`agent prompt --wait` settles in the same call. It rejects `--until` unless `--wait` is also present. An accepted prompt sent from a non-working state must produce observed `working` or `blocked` activity within five seconds, or herdr returns `agent_prompt_stalled` — the agent took the text and never acted on it. An unrelated `idle`, `done`, or session change does not satisfy this gate. Set `--timeout` above 5000 to keep that error distinct; at or below it herdr reports a plain `timeout` instead. Once activity is observed, the wait tracks lifecycle state, not one turn, so an already-working agent can satisfy it by finishing its current turn.
 
 `agent start` waits for the new pane shell and the first-run agent prompt to be ready before returning. Startup defaults to a 30000 ms timeout; `--timeout` accepts values above 3000 and up to 300000. When detection reports `blocked` during startup, `agent start` returns `agent_not_ready` immediately — the name still resolves for `agent read` and `agent send-keys`, so clear the dialog and prompt once the agent reports `idle`.
 
-`agent explain` classifies against the **running server's** manifest cache. After upgrading the herdr binary, restart or hand off the server before trusting live explain output. Compare the two versions with `herdr status`.
+`agent explain` classifies against the **running server's** manifest cache. After upgrading the herdr binary, restart or hand off the server before trusting live explain output. Compare the two versions with `herdr status`. `agent explain --file PATH` reports an unreadable file as structured JSON instead of a raw error.
 
 Targets: a unique live agent name or the pane id currently hosting that agent.
 

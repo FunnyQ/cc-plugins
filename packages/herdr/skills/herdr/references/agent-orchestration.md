@@ -1,6 +1,6 @@
 # Herdr Agent Orchestration
 
-This document is verified against herdr 0.8.2. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself. This includes inspecting sibling panes, splitting panes, spawning other agents, and coordinating with them over the CLI. This is a live-session operational guide. See `cli.md` for the full command and flag syntax.
 
@@ -13,7 +13,7 @@ Before you do any of this, confirm `HERDR_ENV=1` is set in the environment. If i
 - **Workspaces** are project contexts. Each workspace has one or more tabs. A workspace's label defaults to the first tab's root pane (usually the repo name).
 - **Tabs** are subcontexts inside a workspace. Each tab has one or more panes.
 - **Panes** are terminal splits inside a tab. Each pane runs its own process: a shell, an agent, a server, or a log stream.
-- **Agent status** (`agent_status` field): `idle`, `working`, `blocked`, `done`, `unknown`. `idle` means the agent will accept input *and* its tab has already been seen in the focused UI. `done` is that same ready state after unseen background work finished; focusing the tab, pane, or agent marks it seen, but a CLI read never does. `blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present that herdr cannot classify — it never proves completion. Plain shells exist as panes too. The sidebar's agent section only surfaces detected agents.
+- **Agent status** (`agent_status` field): `idle`, `working`, `blocked`, `done`, `unknown`. `idle` means the agent will accept input *and* its tab has already been seen in the focused UI. `done` is that same ready state after unseen background work finished; focusing the tab, pane, or agent marks it seen, but a CLI read never does. Each TUI client tracks viewed completions independently, so one client's Done badge can differ from another client's and from the CLI. `blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present that herdr cannot classify — it never proves completion. Plain shells exist as panes too. The sidebar's agent section only surfaces detected agents.
 - **IDs are stable opaque handles.** Workspace, tab, and pane ids look like `w1`, `w1:t1`, and `w1:p1`. A pane moved across workspaces receives a new id; continue with `result.move_result.pane.pane_id` or the live agent name. The old id stays at `result.move_result.previous_pane_id`, but it resolves only for the moved process's own inherited context. Do not reuse it as a target.
 - **Agent kinds are a fixed list.** Run `herdr agent` to print the installed kinds before you pass `--kind`. Do not guess a kind from an integration name; `herdr integration install` covers names that `--kind` rejects.
 
@@ -54,7 +54,7 @@ herdr agent prompt reviewer "review the test coverage in src/api/" --wait --time
 
 `agent start` returns only after the new pane shell and the agent's first-run prompt are ready. Add no settle wait *after* it. Do add one *before* it: `pane split` returns as soon as the pane exists, and calling `agent start` back-to-back fails with `agent_pane_busy` most of the time — 13 of 20 measured on 0.8.2 with real agents. herdr waits out a pane held by a foreground command, but not one whose shell has yet to spawn. The refusal is immediate (~115ms), and one 150ms retry clears it; a clean start instead takes ~4.4s to reach `idle`. Retry that one error, fail fast on every other, and do not conclude the race is gone because a probe with ~100ms of slack in it never saw one. A start that returns `agent_not_ready` saw `blocked` during startup: the name still works for `agent read` and `agent send-keys`, so read the pane and clear the dialog before you prompt. Append native agent arguments after `--`; omit the separator when there are none.
 
-`agent prompt --wait` already settles on `idle`, `done`, or `blocked`. Do not restate that set with `--until`.
+`agent prompt --wait` already settles on `idle`, `done`, or `blocked`. Do not restate that set with `--until`. When the agent is not already working, `--wait` first requires observed `working` or `blocked` activity within five seconds; an unrelated `idle`, `done`, or session change does not complete the wait. It returns `agent_prompt_stalled` when no activity appears, and `timeout` when the caller's timeout expires first. The caller timeout includes submission time. Read the agent with `agent get` and `agent read` after either result: neither proves the prompt went undelivered, so do not resubmit blind.
 
 **Coordinate with another agent (block until it is done, then read its output):**
 ```bash
@@ -79,7 +79,7 @@ herdr pane read "$SIBLING_PANE" --source recent-unwrapped --lines 40   # inspect
 
 - `pane wait-output --source recent` matches against **unwrapped** recent text. Pane width and soft-wrapping do not affect the match. This is true even though `pane read --source recent` displays the wrapped version.
 - Use `pane read` for output that already exists. Use `pane wait-output` for output you expect to appear next.
-- `agent prompt` atomically writes and submits text. Use `agent send-keys` only for raw key chords.
+- `agent prompt` writes text and Enter as one ordered submission, and reports success only after both are written. A successful submission does not prove the agent started a turn. A pending submission fails cleanly when the terminal exits. Use `agent send-keys` only for raw key chords.
 - `agent prompt` refuses a `blocked` agent with `agent_blocked` and sends neither text nor Enter. Read the dialog, then answer it with `agent send-keys`. Never poll until the block clears and then prompt blind.
 - `agent send-keys` and `pane send-keys` preserve Shift on `shift+tab`, so an agent's permission mode can be cycled programmatically.
 - Run `herdr agent explain <target>` when a pane reports a state you did not expect. It names the matched detection rule and the manifest it came from.

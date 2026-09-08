@@ -201,6 +201,10 @@ expose `Page.printToPDF` — CDP answers `'Page.printToPDF' wasn't found`. `B ra
 
 **terminal-browser rewrites `~/.config/herdr/config.toml` on first open**, with
 no prompt: it sets `[experimental] kitty_graphics = true` and reloads the config.
+Herdr 0.9.0 enables pane images by default and moved the key to
+`terminal.kitty_graphics`, so that write is now redundant. It is also harmless —
+herdr still accepts the old key, and terminal-browser writes the same `true` the
+default already carries.
 
 ## Cookies and headers
 

@@ -1,6 +1,6 @@
 # Herdr Configuration Reference
 
-This document is verified against herdr 0.8.2. If live CLI output disagrees with this doc, trust `herdr --default-config`.
+This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --default-config`.
 
 Config path: `~/.config/herdr/config.toml`
 
@@ -36,7 +36,10 @@ manifest_check = true  # background agent-detection manifest checks
 default_shell = "nu"       # executable name/path; fallback: $SHELL → /bin/sh
 shell_mode = "auto"        # "auto" | "login" | "non_login"
 new_cwd = "follow"         # "follow" | "home" | "current" | "~/Projects"
+kitty_graphics = true      # render pane images/graphics API in compatible terminals; false disables
 ```
+
+`terminal.kitty_graphics` replaces `experimental.kitty_graphics`. Herdr still accepts the old key; `terminal.kitty_graphics` takes precedence when both are set. Restart the server or reattach the client after changing it.
 
 ### Headless Server
 ```toml
@@ -112,9 +115,19 @@ panel_bg = "reset"
 sidebar_bg = "#181825"     # sidebar background, independent of the base theme
 active_row_bg = "#1e1e2e"  # active Space/Agent row
 selection_bg = "#313244"   # navigate-mode cursor row
+
+[theme.custom.light]
+panel_bg = "#eff1f5"
+text = "#4c4f69"
+
+[theme.custom.dark]
+panel_bg = "#1e1e2e"
+text = "#cdd6f4"
 ```
 
 Values accept hex (`#rrggbb`), named colors, `rgb(r,g,b)`, or `"reset"`. Run `herdr config check` after editing `name` — it now reports an unknown built-in theme name instead of accepting it silently.
+
+`[theme.custom.light]` and `[theme.custom.dark]` layer appearance-specific overrides on top of `[theme.custom]` when `auto_switch` is enabled.
 
 ### UI / Sidebar
 ```toml
@@ -132,7 +145,7 @@ redraw_on_focus_gained = true
 mouse_scroll_lines = 3
 confirm_close = true
 prompt_new_tab_name = true
-pane_borders = true
+pane_borders = "auto"                   # "auto" | "always" | "off"
 pane_outer_borders = true               # false drops the outside frame, keeping internal dividers
 pane_scrollbars = true
 pane_gaps = true
@@ -168,7 +181,20 @@ row_gap = 0
 rows = [["state_icon", "workspace"], ["branch", "git_status"]]
 ```
 
+`pane_borders = "auto"` draws borders only around split panes. `"always"` also frames a single pane, but only while `pane_outer_borders` is enabled. `"off"` disables pane borders entirely. Existing boolean configs keep working: `true` maps to `"auto"`, `false` maps to `"off"`.
+
 Sidebar rows may use built-in tokens or custom `$name` values. Herdr reports these through `pane report-metadata --token` / `workspace report-metadata --token`. An agent-specific entry replaces the default agent rows. It does not extend them.
+
+A row entry may be a table instead of a plain token name, to style that occurrence: `{ token = "workspace", fg = "#89b4fa", bold = true, dim = false }`. Omitted style fields keep the contextual default. `ui.sidebar.spaces` accepts the same style tables; `fg` there only accepts strict `#rgb`/`#rrggbb` hex.
+
+That table also accepts a `rules` array for value-based styling, for example:
+```toml
+{ token = "branch", rules = [
+  { contains = "release/", fg = "yellow" },
+  { equals = "main", fg = "green", bold = true },
+] }
+```
+Rules are ordered; the first match overrides the styles it specifies. Text conditions are `equals`, `contains`, and `starts_with`, and take an optional `ignore_case`. Numeric conditions are `gt` and `lt`, and require a finite number. Limits: 16 rules per token, 16 tokens per row, 16 rows per layout. `state_icon` (both layouts) and `git_status` (spaces only) accept a fixed style only — no `rules`.
 
 `window_title` tokens are `{hostname}`, `{workspace}`, `{tab}`, `{pane}`, and `{terminal_title}`; write `{{` and `}}` for literal braces. The title renders on the Herdr server, so `{hostname}` names the machine the panes run on even under `herdr --remote`.
 
@@ -209,7 +235,6 @@ resume_agents_on_restore = true  # native agent session restore (default on)
 [experimental]
 pane_history = false             # save pane contents across restarts
 allow_nested = false             # herdr inside herdr
-kitty_graphics = false
 reveal_hidden_cursor_for_cjk_ime = false
 cjk_ime_agents = []
 cjk_ime_cursor_shape = "steady_block"

@@ -1,6 +1,6 @@
 # Herdr Plugin Development
 
-This document is verified against herdr 0.8.2. If live CLI output disagrees with this doc, trust `herdr --help`.
+This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --help`.
 
 Plugins are shareable executable workflow packages. You can write a plugin in any language, for example Bash, JS, Rust, Go, Lua, or Python. Herdr owns the host surface. The plugin owns its implementation.
 
@@ -55,7 +55,7 @@ action = "apply"
 **Minimum version:** Set `min_herdr_version` to the oldest herdr that supports the APIs, event names, and manifest fields you use. Herdr refuses to link or install a plugin whose minimum is newer than the running binary. Do not raise it to match the herdr you happen to build on.
 **ID rules:** A plugin id uses ASCII letters, digits, dot, colon, underscore, and hyphen. An action, pane, or link-handler id uses the same characters, but no dots. Each id type must be unique inside a plugin.
 **Platforms:** The top-level field applies to all platforms. An item-level field overrides it. A local plugin with no top-level `platforms` links with a warning.
-**Commands:** Commands are argv arrays. Herdr does NOT shell-expand them. They run with the plugin directory as their working directory.
+**Commands:** Commands are argv arrays. Herdr does NOT shell-expand them. They run with the plugin directory as their working directory. A plugin pane's `PWD` matches its requested working directory unless the open request overrides it with `--cwd`.
 
 ## Startup Hooks
 
@@ -137,9 +137,9 @@ herdr plugin action invoke example.layout.apply
 # Open plugin pane
 herdr plugin pane open --plugin example.layout --entrypoint board
 
-# Override placement with a session-modal popup (cells or percentages)
+# Override placement, working directory, and environment
 herdr plugin pane open --plugin example.layout --entrypoint board \
-  --placement popup --width '80%' --height '80%'
+  --placement split --direction right --cwd /path/to/repo --env KEY=value
 
 # View logs
 herdr plugin log list --plugin example.layout
@@ -179,3 +179,5 @@ herdr plugin uninstall <plugin-id|owner/repo[/subdir...]>
 - `HERDR_PLUGIN_ROOT` is a managed checkout for GitHub installs. Never store user data there.
 - On Windows, herdr resolves `PATHEXT` shims (`.cmd`) automatically for build, action, and event commands.
 - Popup placement does not create a Herdr pane. It has no `HERDR_PANE_ID`, no pane or agent API target, and no tiled-layout change. Custom-command popups can use `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane.
+- Request a popup from the manifest or the `plugin.pane.open` socket request. `herdr plugin pane open --placement` accepts only `overlay`, `split`, `tab`, and `zoomed`. Size it with the manifest or request fields `width` and `height` — numbers for terminal cells, strings like `"80%"` for a share of the terminal area.
+- A `[[link_handlers]]` `pattern` also matches OSC 8 `file://` clicks. A file link matching no handler still does not launch the system URL opener.

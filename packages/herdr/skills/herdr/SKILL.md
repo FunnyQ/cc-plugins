@@ -88,7 +88,7 @@ bun "$HERD" close reviewer-a3f9  # close the agent's pane
 
 To hand off work to a DIFFERENT project, use `tell`; use `ask` instead when you need an ANSWER back. Reach for `spawn` directly only when you want an agent in THIS session's own workspace (a helper, a reviewer, a second pane on the current repo). Read the **`tell` skill** before using either, and the **`ask` skill** on top of it for `ask`.
 
-All verbs print JSON except `read`, which prints the agent's terminal text. It defaults to `--source visible`; pass `--source recent-unwrapped --lines N` for a longer transcript. Herdr 0.8.2 collects alternate-screen history only when the agent is recognized, idle, at the transcript bottom, and `N` exceeds the visible rows — otherwise an explicit history read may return `agent_not_idle`.
+All verbs print JSON except `read`, which prints the agent's terminal text. It defaults to `--source visible`; pass `--source recent-unwrapped --lines N` for a longer transcript. An idle, recognized agent at the transcript bottom can collect alternate-screen history when `N` exceeds the visible rows — otherwise an explicit history read may return `agent_not_idle`.
 
 `send` fails with `agent_blocked` when the agent is parked on an approval or question dialog — herdr sends neither the text nor the Enter. Read the pane, then answer with `keys`; do not retry `send` until the block clears. `spawn --task` reports the same block instead of throwing: check `task: {"sent": false, "reason": "agent_blocked"}` before assuming the task landed. A trust dialog during startup gets the same treatment (`startBlocked: true`, task skipped) — a live name, not a thrown error.
 
