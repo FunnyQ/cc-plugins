@@ -1,5 +1,20 @@
 # Changelog
 
+## [dispatch 4.0.0] - 2026-09-08
+
+_tracks tag `dispatch-v4.0.0`_
+
+**Breaking:** `/preflight` no longer does what it used to. If you want the old behaviour, it's still there under a new name: `/hop`.
+
+### Changed
+- `preflight` — interview, plan, and execute now, in one conversation — is renamed to `hop`. Its behaviour is unchanged, only the name moved.
+- The name `preflight` now belongs to a new, different skill: a short interview that captures what you want as `docs/<slug>/INTENT.md`, then stops. It refuses to answer "how", writes that one file, and never executes — so typing `/preflight` out of habit no longer plans or builds anything. Its SKILL.md opens with a "Route first" section that hands off by name to `hop`, `flightplan`, or `waypoints`, so the change surfaces as a redirect instead of a silent no-op.
+- The tier ladder is now `preflight` → `hop` → `flightplan` → `autopilot`, with `waypoints` still sitting above `flightplan`. The `dispatch-flow.svg` diagram was redrawn for the five-card ladder.
+
+### Added
+- `flightplan`'s interview step now reads an existing `INTENT.md` first: it pre-fills whatever dimensions INTENT.md already answers and interviews only the gaps. INTENT.md stays the frozen baseline — flightplan never generates the task tree from it alone, and never edits it to match a later plan; contradictions go into PLAN.md's `## Context` section instead.
+- `scaffold.ts --check` now recognizes a directory holding only an `INTENT.md` as safe to merge into (reported as `INTENT: <path>`) instead of flagging it as a collision, so running `preflight` and then `flightplan` on the same slug no longer trips the collision guard.
+
 ## [monitor 5.0.0] - 2026-09-08
 
 _tracks tag `monitor-v5.0.0`_
