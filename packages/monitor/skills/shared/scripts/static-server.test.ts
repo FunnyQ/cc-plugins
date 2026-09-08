@@ -77,8 +77,6 @@ describe("serveStaticFile", () => {
     expect(await res.text()).toBe(APP_JS);
   });
 
-  // A client holding the gzip ETag must not get a 304 for a plain request, and
-  // vice versa — the two bodies differ, so the validator has to differ too.
   test("scopes the ETag to the encoding", () => {
     const gz = serveStaticFile(root, "/app.js", req("gzip")).headers.get(
       "ETag",

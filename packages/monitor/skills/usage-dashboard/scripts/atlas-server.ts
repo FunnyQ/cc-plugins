@@ -141,17 +141,13 @@ function startupGuard(): void {
 let statsCache: { fingerprint: string; payload: Promise<unknown> } | null =
   null;
 
-// The same fingerprint that keys the cache above is handed to the browser as an
-// ETag, so a reload with an unchanged corpus costs the ~125ms fingerprint and a
-// 304 instead of 0.58MB. `Cache-Control` is `no-cache`, not `no-store`, because
-// `no-store` forbids the client from keeping the body at all — it would have
-// nothing to revalidate with.
+// `no-cache`, not `no-store`: `no-store` leaves the client nothing to
+// revalidate with, so the same fingerprint that keys the cache can ship as an ETag.
 async function handleStats(req: Request): Promise<Response> {
   try {
     const fingerprint = statsFingerprint();
     const etag = statsEtag(fingerprint);
-    // Vary rides along on the 304 too: a 304 has to carry the cache-relevant
-    // headers the 200 would have, or a client re-keys the entry without it.
+    // A 304 must repeat the cache-relevant headers its 200 would have carried.
     const cacheHeaders = {
       "Cache-Control": "no-cache",
       ETag: etag,

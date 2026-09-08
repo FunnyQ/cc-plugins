@@ -12,10 +12,7 @@ export function jsonResponse(payload: object, status = 200): Response {
   });
 }
 
-// Opt-in gzip, for the one endpoint whose body is measured in megabytes
-// (/api/stats builds ~4.3MB; level 6 takes it to ~0.6MB in ~30ms). Every other
-// caller keeps jsonResponse, so no cockpit endpoint pays the CPU for a payload
-// too small to benefit.
+// Opt-in: only /api/stats (~4.3MB) is large enough to be worth the CPU.
 export function gzipJsonResponse(
   payload: object,
   req: Request,

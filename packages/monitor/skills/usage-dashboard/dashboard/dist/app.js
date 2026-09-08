@@ -18,10 +18,8 @@ async function loadPartial(path) {
   return response.text();
 }
 
-// One level's fetches go out together, and each subtree keeps expanding while
-// its siblings are still loading. Awaiting inside the loop instead made the
-// ~16 partials a fully serial waterfall. The replaceWith pass runs after, in
-// document order, so the assembled markup is identical either way.
+// Awaiting inside the loop made the ~16 partials serial. replaceWith still runs
+// in document order, so the assembled markup is unchanged.
 async function expandPartials(container) {
   const placeholders = [...container.querySelectorAll("[data-partial]")];
   const expanded = await Promise.all(

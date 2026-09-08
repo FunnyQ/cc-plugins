@@ -15,19 +15,15 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
-// woff2, png and jpg carry their own compression — gzipping them burns CPU to
-// make the body slightly bigger.
+// woff2/png/jpg are already compressed — gzip would only make them bigger.
 const COMPRESSIBLE = new Set([".html", ".js", ".mjs", ".css", ".json", ".svg"]);
 
 function mimeFor(path: string): string {
   return MIME[extname(path).toLowerCase()] ?? "application/octet-stream";
 }
 
-// Built from mtime + size, never from the bytes: hashing content would re-read
-// every file on every revalidation, which is the cost the 304 exists to avoid
-// (cockpit's mermaid bundle alone is 3.16MB). Weak, because mtime + size is not
-// proof of identical content. The encoding is part of the key — the gzip and
-// plain bodies differ, so a client holding one must not get a 304 for the other.
+// mtime+size, not a content hash — hashing re-reads the file the 304 exists to
+// skip. Encoding is in the key: the gzip and plain bodies differ.
 function etagFor(
   stat: { mtimeMs: number; size: number },
   gzip: boolean,
@@ -42,8 +38,6 @@ function shouldGzip(filePath: string, req: Request | undefined): boolean {
   return (req.headers.get("accept-encoding") ?? "").includes("gzip");
 }
 
-// `req` is optional so a caller that has no use for compression — a test, a
-// one-off — can keep the two-argument form.
 export function serveStaticFile(
   root: string,
   pathname: string,
@@ -71,8 +65,7 @@ export function serveStaticFile(
     "Cache-Control": "no-cache",
     ETag: etag,
   };
-  // `no-cache` means revalidate every time, not "never cache" — the ETag is
-  // what turns each of those revalidations from a full re-download into a 304.
+  // `no-cache` means revalidate every time, not never cache — hence the ETag.
   if (req?.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers });
   }

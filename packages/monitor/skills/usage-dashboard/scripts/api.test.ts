@@ -423,9 +423,7 @@ describe("statsEtag", () => {
     expect(tag).toContain("42:1788845014383");
   });
 
-  // Pricing resolves partly from a live OpenRouter fetch, which is not a file
-  // and so never moves the fingerprint. Without a per-process component a
-  // browser holding an old ETag would 304 past a restart that repriced.
+  // A repriced restart moves no file, so the fingerprint alone would 304 past it.
   test("differs across processes for the same fingerprint", async () => {
     const read = async () => {
       const proc = Bun.spawn(
