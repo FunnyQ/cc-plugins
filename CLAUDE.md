@@ -4,7 +4,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 
 ## What This Is
 
-`q-lab-marketplace` — a plugin marketplace for Claude Code, Codex, and OpenCode. It holds five plugins. Each plugin ships to Claude Code and Codex and versions independently; OpenCode is a third runtime layered on top of the same skills (see `opencode/` below), versioned with none of them.
+`q-lab-marketplace` — a plugin marketplace for Claude Code, Codex, and OpenCode. It holds six plugins. Each plugin ships to Claude Code and Codex and versions independently; OpenCode is a third runtime layered on top of the same skills (see `opencode/` below), versioned with none of them.
 
 | Plugin | Purpose | Skills |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | **relay** | Delegate a task to another harness CLI | `relay` |
 | **chronicle** | ADR curation, commit, PR/MR, and release automation | `adr`, `commit`, `pr`, `release`, `install` |
 | **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `tell`, `herdr-browser`, `herdr-protocol-upgrade` |
+| **guard** | Coding rules the harness enforces, as hooks | *(none — hooks only)* |
 
 Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: the repo layout, monitor's dashboard internals, and the release rules.
 
@@ -23,14 +24,15 @@ Design facts the `SKILL.md` files do not carry:
 - **dispatch** — a ladder, each rung handing off to the next: `preflight` (captures the want as `docs/<slug>/INTENT.md`, refuses to decide *how*) → `hop` (interview, plan, and execute a small scope in this conversation) → `flightplan` (spec + `tasks/` tree on disk; reads an existing `INTENT.md` as its baseline) → `autopilot` (executes that tree, gated on each task's `## Eval rubric`). `waypoints` sits above flightplan and plans each leg just-in-time, after the previous one lands. **`hop` is the skill that was called `preflight` before dispatch 4.0.0** — the name moved up a rung, the behaviour did not change.
 - **relay** — a backend-agnostic mode layer over a per-harness strategy layer. The capability matrix makes `image` codex-only.
 - **chronicle** — one topology throughout: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents, so diff and git output never reach the main conversation. **Agent hand-offs are files, never replies**, which is what makes a child answering in prose cost nothing. `commit` and `release` put a deterministic script under that topology and re-read their own progress from the log, so an interrupted run resumes. `release` is config-first: the whole-repo versus per-component shape lives in a committed `.chronicle/release.json`.
+- **guard** — the only plugin with no skills: it ships hooks and nothing else, so there is nothing to invoke and no way to turn it off short of uninstalling. `comment-guard` reports every comment line an edit *added* and asks the model whether it says why or what; it never judges the answer itself, because a heuristic that guesses meaning would train the model to phrase around it rather than to delete the comment. Added is a **multiset difference over comment lines only**, not a line diff — moving a comment is not an addition, rewording one is.
 - **monitor** — `usage-dashboard` is the rear-view, `cockpit` the windshield. They run independent servers on separate ports with separate `dist/` SPAs; only the plugin packaging is shared. `install` owns every prerequisite check and config write for the whole plugin.
 
 ## Architecture
 
 ```
 cc-plugins/
-├── .claude-plugin/marketplace.json   # Claude registry (all five plugins; no version field)
-├── .agents/plugins/marketplace.json  # Codex registry (all five plugins; no version field)
+├── .claude-plugin/marketplace.json   # Claude registry (all six plugins; no version field)
+├── .agents/plugins/marketplace.json  # Codex registry (all six plugins; no version field)
 ├── .chronicle/release.json           # release shape: per-component versions + version-file patterns
 ├── CHANGELOG.md                      # Keep a Changelog format, per-plugin headings
 ├── packages/
@@ -96,13 +98,16 @@ cc-plugins/
 │   │           ├── live.ts               # herdr live-pane layer (dynamic import)
 │   │           ├── context-collector.ts / shared.ts / types.ts
 │   │           └── backends/             # gate.ts (pure) + index.ts + codex/opencode/claude
-│   └── herdr/skills/
-│       ├── herdr/
-│       │   ├── references/               # config / cli / plugin-development / agent-orchestration
-│       │   └── scripts/herd.ts           # typed Bun wrapper: spawn/tell/send/keys/wait/read/list/close
-│       ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/text/snapshot/watch/endpoint
-│       ├── tell/                         # hand a job to an agent already open in another project
-│       └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
+│   ├── herdr/skills/
+│   │   ├── herdr/
+│   │   │   ├── references/               # config / cli / plugin-development / agent-orchestration
+│   │   │   └── scripts/herd.ts           # typed Bun wrapper: spawn/tell/send/keys/wait/read/list/close
+│   │   ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/text/snapshot/watch/endpoint
+│   │   ├── tell/                         # hand a job to an agent already open in another project
+│   │   └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
+│   └── guard/                            # hooks only — no skills, nothing to invoke
+│       ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hook
+│       └── hooks/comment-guard.ts        # PostToolUse Edit|Write; exit 2 + stderr
 └── opencode/                          # OpenCode runtime layer — repo infra, outside packages/, owns no version
     ├── plugin.ts                          # the OpenCode plugin module (single file, no repo imports)
     ├── plugin.test.ts
@@ -211,6 +216,7 @@ Hook parity — which Claude hooks port to which OpenCode events:
 | chronicle | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup-spawn-depth.ts --session-check` | **Moved** — becomes the installer's `subagent_depth` write |
 | chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.execute.before` |
 | dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
+| guard | `PostToolUse` (matcher `Edit\|Write`) | `hooks/comment-guard.ts` | Yes → `tool.execute.after`, sharing the event with the lint |
 
 OpenCode has no hook-level "ask" — a plugin's `tool.execute.before` handler can only let a call through or throw. The branch guard degrades accordingly: instead of returning an `ask` permission decision, it throws `check-branch.sh`'s own `systemMessage` verbatim, turning what is a prompt on Claude Code into a hard block on OpenCode.
 
