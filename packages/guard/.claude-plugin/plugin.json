@@ -1,0 +1,30 @@
+{
+  "name": "guard",
+  "version": "0.1.0",
+  "description": "Turn coding rules into harness-enforced ones. comment-guard hands every newly added comment line back to the model with one question: is this why, or is this what?",
+  "author": { "name": "Q" },
+  "license": "MIT",
+  "keywords": [
+    "guard",
+    "hook",
+    "comment",
+    "why-not-what",
+    "coding-discipline",
+    "lint",
+    "code-quality"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/comment-guard.ts\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
