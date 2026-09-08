@@ -54,6 +54,52 @@ describe("serveStaticFile", () => {
     expect(await res.text()).toBe(APP_JS);
   });
 
+  test("answers 304 to a matching If-None-Match, with no body", async () => {
+    const first = serveStaticFile(root, "/app.js", req("gzip"));
+    const etag = first.headers.get("ETag");
+    expect(etag).toBeTruthy();
+
+    const revalidate = new Request("http://127.0.0.1/app.js", {
+      headers: { "Accept-Encoding": "gzip", "If-None-Match": etag as string },
+    });
+    const second = serveStaticFile(root, "/app.js", revalidate);
+    expect(second.status).toBe(304);
+    expect(second.headers.get("ETag")).toBe(etag);
+    expect((await second.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  test("serves the body again when the client's ETag is stale", async () => {
+    const stale = new Request("http://127.0.0.1/app.js", {
+      headers: { "If-None-Match": 'W/"nope-0"' },
+    });
+    const res = serveStaticFile(root, "/app.js", stale);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(APP_JS);
+  });
+
+  // A client holding the gzip ETag must not get a 304 for a plain request, and
+  // vice versa — the two bodies differ, so the validator has to differ too.
+  test("scopes the ETag to the encoding", () => {
+    const gz = serveStaticFile(root, "/app.js", req("gzip")).headers.get(
+      "ETag",
+    );
+    const plain = serveStaticFile(root, "/app.js", req()).headers.get("ETag");
+    expect(gz).not.toBe(plain);
+
+    const crossed = new Request("http://127.0.0.1/app.js", {
+      headers: { "If-None-Match": gz as string },
+    });
+    expect(serveStaticFile(root, "/app.js", crossed).status).toBe(200);
+  });
+
+  test("changes the ETag when the file changes", () => {
+    const before = serveStaticFile(root, "/app.js", req()).headers.get("ETag");
+    writeFileSync(join(root, "app.js"), APP_JS + "// touched\n");
+    const after = serveStaticFile(root, "/app.js", req()).headers.get("ETag");
+    expect(after).not.toBe(before);
+    writeFileSync(join(root, "app.js"), APP_JS);
+  });
+
   test("still resolves / to index.html and 404s outside the root", async () => {
     const index = serveStaticFile(root, "/", req("gzip"));
     const body = Bun.gunzipSync(new Uint8Array(await index.arrayBuffer()));
