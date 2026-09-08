@@ -11,11 +11,23 @@ import {
 } from "node:fs";
 import { Database } from "bun:sqlite";
 import { dirname, join } from "node:path";
-import { dedupKey, hourStartMs, usageTokenTotal, walkFiles } from "./dedup";
+import {
+  countClaudeToolCalls,
+  dedupKey,
+  hourStartMs,
+  usageTokenTotal,
+  walkFiles,
+} from "./dedup";
 import { readJsonlLines } from "../../shared/scripts/jsonl-lines";
+import { openCodexCache, summariseSessions } from "./codex-cache";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
-import { allHourlyRows, openRollupDb } from "./rollup-db";
+import {
+  allHourlyRows,
+  allLedgerModelRows,
+  allLedgerRows,
+  openRollupDb,
+} from "./rollup-db";
 import { updateRollup } from "./rollup-update";
 import { openCodeTimestampMs } from "../../shared/scripts/opencode";
 import { readSessionFiles } from "./session-files";
@@ -210,7 +222,9 @@ type LedgerRow = {
   costBasis: LedgerCostBasis;
   usageByModel?: Record<string, SerializedModelUsage>;
 };
-type InternalLedgerRow = Omit<LedgerRow, "costUSD"> & {
+// `usageByModel` must be omitted as well as replaced: leaving it in produces the
+// intersection `Record<...> & Map<...>`, which nothing can satisfy.
+type InternalLedgerRow = Omit<LedgerRow, "costUSD" | "usageByModel"> & {
   usageByModel: Map<string, ModelUsage>;
 };
 type SerializedModelUsage = {
@@ -1419,17 +1433,6 @@ function openCodeStorageRoots(): string[] {
   return [...roots];
 }
 
-function countClaudeToolCalls(content: unknown): number {
-  if (!Array.isArray(content)) return 0;
-  return content.filter(
-    (part) =>
-      part &&
-      typeof part === "object" &&
-      "type" in part &&
-      part.type === "tool_use",
-  ).length;
-}
-
 type ClaudeAggregates = {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
@@ -1498,6 +1501,74 @@ function readRollupAggregates(db: Database): ClaudeAggregates {
   };
 }
 
+// Sums the rollup's per-file rows into per-session ledger rows. Everything a
+// path or a timestamp can answer is derived here, never stored.
+function readRollupLedger(db: Database): InternalLedgerRow[] {
+  const bySession = new Map<string, InternalLedgerRow>();
+
+  // Rows arrive ordered by (project_ts_ms, path), so the first project a session
+  // supplies is its origin cwd, not a directory an agent later cd'd into.
+  for (const r of allLedgerRows(db)) {
+    let row = bySession.get(r.session_key);
+    if (!row) {
+      row = {
+        id: `claude:${r.session_key}`,
+        provider: "claude",
+        timestampMs: 0,
+        date: "",
+        projectPath: "",
+        projectName: "n/a",
+        model: "n/a",
+        interactions: 0,
+        toolCalls: 0,
+        tokens: 0,
+        costBasis: "unavailable",
+        usageByModel: new Map<string, ModelUsage>(),
+      };
+      bySession.set(r.session_key, row);
+    }
+    if (r.last_ts_ms > row.timestampMs) {
+      row.timestampMs = r.last_ts_ms;
+      row.date = fmtDate(r.last_ts_ms);
+    }
+    if (!row.projectPath && r.project) {
+      row.projectPath = r.project;
+      row.projectName = projectName(r.project);
+    }
+    row.interactions += r.interactions;
+    row.toolCalls += r.tool_calls;
+  }
+
+  for (const m of allLedgerModelRows(db)) {
+    const row = bySession.get(m.session_key);
+    if (!row) continue;
+    const key = modelKey("claude", m.model);
+    const usage = row.usageByModel.get(key) ?? emptyModelUsage();
+    usage.inputTokens += m.input_tokens;
+    usage.outputTokens += m.output_tokens;
+    usage.cacheReadInputTokens += m.cache_read;
+    usage.cacheCreationInputTokens += m.cache_creation;
+    row.usageByModel.set(key, usage);
+    row.tokens +=
+      m.input_tokens + m.output_tokens + m.cache_read + m.cache_creation;
+    row.costBasis = "usage";
+  }
+
+  for (const row of bySession.values()) {
+    if (row.usageByModel.size === 1) {
+      row.model = [...row.usageByModel.keys()][0]!;
+    } else if (row.usageByModel.size > 1) {
+      row.model = "mixed";
+    }
+  }
+
+  return [...bySession.values()].filter(
+    (row) =>
+      row.timestampMs > 0 &&
+      (row.interactions > 0 || row.tokens > 0 || row.toolCalls > 0),
+  );
+}
+
 function parseTranscriptUsage(): {
   modelUsage: Record<string, ModelUsage>;
   dailyModelUsage: Map<string, Map<string, ModelUsage>>;
@@ -1507,156 +1578,38 @@ function parseTranscriptUsage(): {
   ledger: InternalLedgerRow[];
   transcriptFileCount: number;
 } {
-  const modelUsage: Record<string, ModelUsage> = {};
-  const dailyModelUsage = new Map<string, Map<string, ModelUsage>>();
-  const hourlyUsage = new Map<number, HourlyUsageBucket>();
-  const projectTokens = new Map<string, number>();
-  const projectModelUsage = new Map<string, Map<string, ModelUsage>>();
-  const ledgerBySession = new Map<
-    string,
-    InternalLedgerRow & { toolCallIds: Set<string> }
-  >();
-  const seen = new Set<string>();
+  // Directory listing only — never transcript contents. Every number below comes
+  // from the rollup, which the ingest tops up from the newly appended bytes.
   const transcriptFiles = walkFiles(PROJECTS_DIR, ".jsonl");
+  const empty = {
+    modelUsage: {},
+    dailyModelUsage: new Map(),
+    hourlyUsage: new Map(),
+    projectTokens: new Map(),
+    projectModelUsage: new Map(),
+  } satisfies ClaudeAggregates;
 
-  for (const file of transcriptFiles) {
-    for (const line of readJsonlLines(file)) {
-      if (!line.trim()) continue;
-      let entry: TranscriptEntry;
-      try {
-        entry = JSON.parse(line);
-      } catch {
-        continue;
-      }
-
-      const sessionId = entry.sessionId ?? file.split("/").at(-1) ?? file;
-      const parsedTimestamp = entry.timestamp ? Date.parse(entry.timestamp) : 0;
-      const timestampMs = Number.isFinite(parsedTimestamp)
-        ? parsedTimestamp
-        : 0;
-      const projectPath = entry.cwd ?? "";
-      const existingLedger = ledgerBySession.get(sessionId);
-      const ledger =
-        existingLedger ??
-        ({
-          id: `claude:${sessionId}`,
-          provider: "claude",
-          timestampMs,
-          date: timestampMs ? fmtDate(timestampMs) : "",
-          projectPath,
-          projectName: projectPath ? projectName(projectPath) : "n/a",
-          model: "n/a",
-          interactions: 0,
-          toolCalls: 0,
-          tokens: 0,
-          costBasis: "unavailable",
-          usageByModel: new Map<string, ModelUsage>(),
-          toolCallIds: new Set<string>(),
-        } satisfies InternalLedgerRow & { toolCallIds: Set<string> });
-      if (!existingLedger) ledgerBySession.set(sessionId, ledger);
-      if (timestampMs && timestampMs > ledger.timestampMs) {
-        ledger.timestampMs = timestampMs;
-        ledger.date = fmtDate(timestampMs);
-      }
-      if (!ledger.projectPath && projectPath) {
-        ledger.projectPath = projectPath;
-        ledger.projectName = projectName(projectPath);
-      }
-      if (entry.type === "user" && !entry.isMeta) ledger.interactions += 1;
-      const contentToolCalls = countClaudeToolCalls(entry.message?.content);
-      if (contentToolCalls > 0) {
-        const toolKey =
-          entry.message?.id ?? entry.uuid ?? `${file}:${timestampMs}`;
-        if (!ledger.toolCallIds.has(toolKey)) {
-          ledger.toolCallIds.add(toolKey);
-          ledger.toolCalls += contentToolCalls;
-        }
-      }
-
-      const model = entry.message?.model;
-      const usage = entry.message?.usage;
-      if (entry.type !== "assistant" || !model || !usage) continue;
-      if (model === "<synthetic>" || usageTokenTotal(usage) === 0) continue;
-
-      // Dedup billing: Claude Code persists multiple snapshots per API request
-      // with identical usage — count each request once (see dedup.ts).
-      const key = dedupKey(entry, file, seen.size);
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const tokenTotal = usageTokenTotal(usage);
-      const ledgerModel = modelKey("claude", model);
-      const ledgerUsage =
-        ledger.usageByModel.get(ledgerModel) ?? emptyModelUsage();
-      addUsage(ledgerUsage, usage);
-      ledger.usageByModel.set(ledgerModel, ledgerUsage);
-      addHourlyUsage(hourlyUsage, timestampMs, modelKey("claude", model), {
-        inputTokens: usage.input_tokens ?? 0,
-        outputTokens: usage.output_tokens ?? 0,
-        cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
-        cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
-        reasoningOutputTokens: 0,
-      });
-      ledger.tokens += tokenTotal;
-      ledger.costBasis = "usage";
-      ledger.model = ledger.usageByModel.size === 1 ? ledgerModel : "mixed";
-
-      modelUsage[model] ??= emptyModelUsage();
-      addUsage(modelUsage[model], usage);
-
-      if (entry.cwd) {
-        projectTokens.set(
-          entry.cwd,
-          (projectTokens.get(entry.cwd) ?? 0) + tokenTotal,
-        );
-        addNestedTranscriptUsage(projectModelUsage, entry.cwd, model, usage);
-      }
-
-      const date = entry.timestamp ? fmtDate(parsedTimestamp) : "";
-      if (!date) continue;
-      addNestedTranscriptUsage(dailyModelUsage, date, model, usage);
-    }
-  }
-
-  const ledger = Array.from(ledgerBySession.values())
-    .map(({ toolCallIds: _toolCallIds, ...row }) => row)
-    .filter(
-      (row) =>
-        row.timestampMs > 0 &&
-        (row.interactions > 0 || row.tokens > 0 || row.toolCalls > 0),
-    );
-
-  // The aggregate maps come from the persistent rollup (full history, survives
-  // transcript deletion); the per-session ledger + file count stay sourced from
-  // the live walk above (inherently recent — they shrink as files are cleaned up,
-  // which is acceptable). If the rollup is unavailable for any reason, fall back
-  // to the live-walk maps so the dashboard still renders.
-  let aggregates: ClaudeAggregates = {
-    modelUsage,
-    dailyModelUsage,
-    hourlyUsage,
-    projectTokens,
-    projectModelUsage,
-  };
   try {
     const db = openRollupDb();
     try {
-      // Reuse the walk above — the ingest traverses the same tree, and one walk
-      // of ~10k transcripts is ~100ms of pure directory syscalls per request.
       updateRollup(db, { files: transcriptFiles });
-      aggregates = readRollupAggregates(db);
+      return {
+        ...readRollupAggregates(db),
+        ledger: readRollupLedger(db),
+        transcriptFileCount: transcriptFiles.length,
+      };
     } finally {
       db.close();
     }
   } catch {
-    // keep live-walk aggregates
+    // No fallback walk exists any more: an unopenable rollup empties Claude's
+    // panels, leaving Codex and OpenCode to render. Visible beats silently slow.
+    return {
+      ...empty,
+      ledger: [],
+      transcriptFileCount: transcriptFiles.length,
+    };
   }
-
-  return {
-    ...aggregates,
-    ledger,
-    transcriptFileCount: transcriptFiles.length,
-  };
 }
 
 function readCodexSession(file: string): CodexSessionSummary | null {
@@ -1892,9 +1845,23 @@ function parseCodexUsage(): {
   let totalInteractions = 0;
   let totalToolCalls = 0;
 
+  // Summaries come from the cache where the rollout is unchanged (see
+  // codex-cache.ts); without it every build re-read every rollout in full.
+  let summaries: Map<string, CodexSessionSummary | null>;
+  try {
+    const cache = openCodexCache();
+    try {
+      summaries = summariseSessions(cache, sessionFiles, readCodexSession);
+    } finally {
+      cache.close();
+    }
+  } catch {
+    summaries = new Map([...sessionFiles].map((f) => [f, readCodexSession(f)]));
+  }
+
   for (const file of sessionFiles) {
     const row = rowByRollout.get(file);
-    const session = readCodexSession(file);
+    const session = summaries.get(file) ?? null;
     const model = row?.model || session?.model || "unknown";
     const key = modelKey("codex", model);
     const usage = codexUsageFromThread(
@@ -2561,6 +2528,15 @@ export function statsFingerprint(): string {
     note(file);
   }
   return `${count}:${newest}`;
+}
+
+// Per process: pricing partly comes from a live OpenRouter fetch, which is no
+// file and never moves the fingerprint, so a restart that repriced must not 304.
+const BOOT_ID = Math.random().toString(36).slice(2, 10);
+
+/** Weak, because the fingerprint is mtime-based rather than a content hash. */
+export function statsEtag(fingerprint: string): string {
+  return `W/"${BOOT_ID}-${fingerprint}"`;
 }
 
 export async function buildStats() {

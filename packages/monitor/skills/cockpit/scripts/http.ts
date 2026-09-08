@@ -12,6 +12,26 @@ export function jsonResponse(payload: object, status = 200): Response {
   });
 }
 
+// Opt-in: only /api/stats (~4.3MB) is large enough to be worth the CPU.
+export function gzipJsonResponse(
+  payload: object,
+  req: Request,
+  status = 200,
+): Response {
+  if (!(req.headers.get("accept-encoding") ?? "").includes("gzip")) {
+    return jsonResponse(payload, status);
+  }
+  return new Response(Bun.gzipSync(JSON.stringify(payload), { level: 6 }), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Encoding": "gzip",
+      Vary: "Accept-Encoding",
+    },
+  });
+}
+
 /** A human-readable message from any thrown value. */
 export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

@@ -227,7 +227,7 @@ function buildServer() {
         return handlePermissionPull(req);
       if (url.pathname === "/api/permission-resolved")
         return handlePermissionResolved(req);
-      return serveStaticFile(DIST, url.pathname);
+      return serveStaticFile(DIST, url.pathname, req);
     },
   });
 }

@@ -18,15 +18,21 @@ async function loadPartial(path) {
   return response.text();
 }
 
+// Awaiting inside the loop made the ~16 partials serial. replaceWith still runs
+// in document order, so the assembled markup is unchanged.
 async function expandPartials(container) {
   const placeholders = [...container.querySelectorAll("[data-partial]")];
-  for (const placeholder of placeholders) {
-    const partialPath = placeholder.dataset.partial;
-    const template = document.createElement("template");
-    template.innerHTML = await loadPartial(partialPath);
-    await expandPartials(template.content);
-    placeholder.replaceWith(template.content);
-  }
+  const expanded = await Promise.all(
+    placeholders.map(async (placeholder) => {
+      const template = document.createElement("template");
+      template.innerHTML = await loadPartial(placeholder.dataset.partial);
+      await expandPartials(template.content);
+      return template.content;
+    }),
+  );
+  placeholders.forEach((placeholder, i) =>
+    placeholder.replaceWith(expanded[i]),
+  );
 }
 
 window.App = App;

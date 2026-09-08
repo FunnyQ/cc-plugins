@@ -26,7 +26,7 @@ usage-dashboard/
 ├── dashboard/dist/           # static frontend (no build step)
 │   ├── index.html
 │   ├── app.js
-│   ├── style.css
+│   ├── styles/                # 12 sheets, linked individually from index.html
 │   └── vendor/
 │       ├── petite-vue.es.js
 │       └── chart.umd.js
