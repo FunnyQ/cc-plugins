@@ -2,7 +2,12 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
-import { buildStats, refreshPricingOverride, statsFingerprint } from "./api.ts";
+import {
+  buildStats,
+  refreshPricingOverride,
+  statsEtag,
+  statsFingerprint,
+} from "./api.ts";
 import { getLiveSessions, cockpitDaemonPort } from "./live.ts";
 import { decideStartup, type AtlasInfo } from "./atlas-lifecycle";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
@@ -136,14 +141,32 @@ function startupGuard(): void {
 let statsCache: { fingerprint: string; payload: Promise<unknown> } | null =
   null;
 
+// The same fingerprint that keys the cache above is handed to the browser as an
+// ETag, so a reload with an unchanged corpus costs the ~125ms fingerprint and a
+// 304 instead of 0.58MB. `Cache-Control` is `no-cache`, not `no-store`, because
+// `no-store` forbids the client from keeping the body at all — it would have
+// nothing to revalidate with.
 async function handleStats(req: Request): Promise<Response> {
   try {
     const fingerprint = statsFingerprint();
+    const etag = statsEtag(fingerprint);
+    // Vary rides along on the 304 too: a 304 has to carry the cache-relevant
+    // headers the 200 would have, or a client re-keys the entry without it.
+    const cacheHeaders = {
+      "Cache-Control": "no-cache",
+      ETag: etag,
+      Vary: "Accept-Encoding",
+    };
+    if (req.headers.get("if-none-match") === etag) {
+      return new Response(null, { status: 304, headers: cacheHeaders });
+    }
     if (!statsCache || statsCache.fingerprint !== fingerprint) {
       statsCache = { fingerprint, payload: buildStats() };
     }
     try {
-      return gzipJsonResponse((await statsCache.payload) as object, req);
+      const res = gzipJsonResponse((await statsCache.payload) as object, req);
+      for (const [k, v] of Object.entries(cacheHeaders)) res.headers.set(k, v);
+      return res;
     } catch (err) {
       // Never cache a rejection — the next request must retry.
       statsCache = null;

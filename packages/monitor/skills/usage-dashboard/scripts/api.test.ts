@@ -22,6 +22,7 @@ import {
   projectName,
   providerFromModelKey,
   rawModelFromKey,
+  statsEtag,
   usageTokenTotal,
   type ModelUsage,
   type PricingTable,
@@ -401,5 +402,42 @@ describe("misc helpers", () => {
   test("projectName takes the last path segment", () => {
     expect(projectName("/Users/q/Projects/cc-plugins")).toBe("cc-plugins");
     expect(projectName("/Users/q/foo/")).toBe("foo");
+  });
+});
+
+describe("statsEtag", () => {
+  test("is stable for one fingerprint and moves with it", () => {
+    expect(statsEtag("42:1788845014383")).toBe(statsEtag("42:1788845014383"));
+    expect(statsEtag("43:1788845014383")).not.toBe(
+      statsEtag("42:1788845014383"),
+    );
+    expect(statsEtag("42:1788845014384")).not.toBe(
+      statsEtag("42:1788845014383"),
+    );
+  });
+
+  test("is a weak validator and carries the fingerprint", () => {
+    const tag = statsEtag("42:1788845014383");
+    expect(tag.startsWith('W/"')).toBe(true);
+    expect(tag.endsWith('"')).toBe(true);
+    expect(tag).toContain("42:1788845014383");
+  });
+
+  // Pricing resolves partly from a live OpenRouter fetch, which is not a file
+  // and so never moves the fingerprint. Without a per-process component a
+  // browser holding an old ETag would 304 past a restart that repriced.
+  test("differs across processes for the same fingerprint", async () => {
+    const read = async () => {
+      const proc = Bun.spawn(
+        [
+          "bun",
+          "-e",
+          `import {statsEtag} from "${import.meta.dir}/api.ts"; console.log(statsEtag("42:1"))`,
+        ],
+        { stdout: "pipe" },
+      );
+      return (await new Response(proc.stdout).text()).trim();
+    };
+    expect(await read()).not.toBe(await read());
   });
 });

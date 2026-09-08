@@ -2530,6 +2530,19 @@ export function statsFingerprint(): string {
   return `${count}:${newest}`;
 }
 
+// Fresh per process. The fingerprint covers every file the build reads, but
+// pricing also resolves from a live OpenRouter fetch, which is not a file and
+// so never moves it — without this, a browser holding an old ETag would 304
+// straight past a restart that repriced. Scoping the tag to the process makes
+// it mean exactly what the in-memory stats cache means: the payload *this*
+// process would build.
+const BOOT_ID = Math.random().toString(36).slice(2, 10);
+
+/** Weak, because the fingerprint is mtime-based rather than a content hash. */
+export function statsEtag(fingerprint: string): string {
+  return `W/"${BOOT_ID}-${fingerprint}"`;
+}
+
 export async function buildStats() {
   const cache = parseStatsCache();
   const {
