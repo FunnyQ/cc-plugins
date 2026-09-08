@@ -1,167 +1,109 @@
 ---
 name: preflight
-version: 0.1.0
+version: 1.0.0
 description: >-
-  Interactive interviewer that gathers requirements through systematic
-  questioning before writing a lightweight in-conversation plan.
+  Short interview that captures what you want as docs/<slug>/INTENT.md, before
+  anyone decides how to build it. Minutes, one file, no solution.
 when_to_use: >-
-  When the request is vague/ambiguous and needs clarification, or the user
-  wants a spec/PRD/outline before implementing — for a small scope executed
-  in this session. Do NOT trigger for a clear, directly-executable
-  instruction, or for a multi-file spec meant for a later session (use
-  flightplan instead).
+  When the user wants an idea recorded without committing to a solution —
+  "capture this", "write down what I want", "just note the idea", "I don't
+  have time to spec this now". Do NOT trigger when the user wants the work
+  planned and done in this session (use hop), when they want a full spec and
+  task tree frozen to disk (use flightplan), or for a roadmap of milestones
+  (use waypoints).
 argument-hint: "[topic]"
 ---
 
 # Preflight
 
-## Why Plan Mode and AskUserQuestion Matter
+Capture what the user wants *before* anyone decides how to build it. One file, `docs/<slug>/INTENT.md`, then stop.
 
-Preflight's entire value comes from two things.
+This is the first tier of the dispatch ladder:
 
-1. **Plan mode.** The interview output goes into the plan file. This gives the user one document to approve or reject. Without plan mode, there is no approval gate and no structured output. The interview results scatter across the chat history and lose their value.
-
-2. **AskUserQuestion tool.** This tool gives structured options and keeps the conversation interactive. A plain text question gets buried in the output and misses the structured response format. Every question in the interview must go through `AskUserQuestion`.
-
-If you skip either of these, the skill produces no useful artifact. The user then gets a worse experience than plain chatting.
-
-**Wrong: plain text question, no plan mode.**
 ```
-User: /preflight dark mode
-Claude: "Great! Let me ask you some questions. What platforms do you need?"
+preflight   → what you want, no solution        (INTENT.md)
+hop         → interview, plan, execute now      (in conversation)
+flightplan  → full spec + task tree on disk     (PLAN.md + tasks/)
+autopilot   → flies that tree
 ```
 
-**Right: plan mode first, then structured questions.**
-```
-User: /preflight dark mode
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion with structured options]
-```
+## Route first
+
+**If the user wants the work done, this is the wrong skill.** Preflight refuses to decide *how* and never executes, so a request that means "figure this out and build it" gets a file and no code — a silent no-op from the user's point of view.
+
+Check before Step 1. Hand off by name, in one line, and stop:
+
+- Wants it planned and built now, this session → **`hop`** *(this is what `preflight` did before dispatch 4.0.0)*
+- Wants a full spec and a task tree frozen to disk → **`flightplan`**
+- Wants a multi-milestone roadmap → **`waypoints`**
+- Wants the want written down and nothing else → stay here.
+
+Ambiguous? Ask once: *"record the idea, or spec it out properly now?"*
+
+## Setup
+
+`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time *"Base directory for this skill"* banner and set `SCRIPTS="<base-dir>/../flightplan/scripts"` — the collision check is flightplan's script, shared rather than duplicated.
+
+**OpenCode only**: there is no banner. Set `SCRIPTS=~/.config/opencode/skills/flightplan/scripts`.
+
+## Why this exists
+
+PLAN.md already has `Overview`, `Goals`, `Non-goals`, `Context`, and `Open questions`, so an INTENT.md that only restates them is dead weight. Two things it does that PLAN.md structurally cannot:
+
+1. **Capture now, spec later.** Minutes, when there is no time for a full interview. The idea survives without committing to a solution.
+2. **Ordering.** PLAN.md's `Overview` / `Goals` are written *after* the solution is already in the author's head, so they get retro-fitted to it and goal drift becomes invisible. A frozen INTENT.md is the only baseline that catches it.
+
+**The value is the timestamp, not the file.** Everything below protects that.
 
 ## Process
 
-### Step 1: Enter Plan Mode
+Follow `references/intent-template.md`. Its capture rules are the contract, not advice.
 
-Call `EnterPlanMode` immediately. Do this before any text output and before any questions. If you are already in plan mode, skip this step. Everything that follows depends on having a plan file to write to.
+### Step 1 — Enter plan mode, agree the slug
 
-### Step 2: Interview
+Call `EnterPlanMode` before any text output. Then agree a kebab-case topic slug and check it:
 
-Ask 1-2 questions per turn with `AskUserQuestion`. Follow the interview guide below, based on the topic type.
-
-**When to stop:** End the interview when you have enough context to write actionable acceptance criteria for each requirement. This typically takes 2-4 rounds. Signs you are ready:
-- You understand the problem and who it is for.
-- You know the core requirements and can tell MVP apart from nice-to-have.
-- You have identified the key constraints: tech, timeline, scope.
-- Edge cases are at least noted, even when not fully resolved.
-
-Do not over-interview. If the user gives comprehensive answers, 2 rounds may be enough. If answers are terse, or they raise new questions, go up to 4-5 rounds.
-
-### Step 3: Write Plan
-
-Write the spec and implementation plan to the plan file. Use the template below. Tailor the depth to the topic: a small feature needs a lighter plan than a new project.
-
-### Step 4: Exit Plan Mode
-
-Call `ExitPlanMode` so the user can review and approve. Wait for their response.
-
-### Step 5: Execute
-
-After approval, implement the plan. For larger plans, follow these steps:
-- Work in logical stages, for example data model → API → UI.
-- Remind the user to commit after each meaningful stage.
-- If the plan spans multiple files or systems, confirm the order of operations before you start.
-
-## Interview Guide
-
-### Project (new system or app)
-
-Focus on scoping a buildable MVP:
-
-1. **Problem & users** — What problem are you solving? Who is it for?
-2. **Core features** — What are the must-haves for v1? What can wait?
-3. **Tech constraints** — Existing stack? Deployment target? Third-party integrations?
-4. **Success metrics** — How will you know it's working?
-
-### Feature (addition to existing system)
-
-Focus on precise behavior definition:
-
-1. **User story** — Who needs this and why?
-2. **Current vs desired** — What happens now? What should happen instead?
-3. **Acceptance criteria** — How do we verify it works? What are the edge cases?
-4. **Scope boundary** — What's explicitly NOT included?
-
-### Writing (spec, outline, documentation)
-
-Focus on audience and structure:
-
-1. **Audience & purpose** — Who reads this? What should they take away?
-2. **Key message** — What's the one thing this must communicate?
-3. **Tone & format** — Formal/casual? Length constraints? Required sections?
-4. **Structure** — Chronological? Problem-solution? Reference-style?
-
-## Plan File Template
-
-```markdown
-# <Topic>
-
-## Overview
-[1-2 sentence summary of what we're building/writing and why]
-
-## Context
-[Problem being solved, current situation]
-
-## Requirements
-[Structured list from interview — mark MVP vs later if applicable]
-
-## Constraints
-[Technical limitations, timeline, scope boundaries]
-
-## Implementation Plan
-[Step-by-step plan with enough detail to execute — file names, key decisions, order of operations]
-
-## Open Questions
-[Unknowns that surfaced during interview, if any — omit this section if none]
+```bash
+bun "$SCRIPTS"/scaffold.ts --check <slug>
 ```
 
-Adapt the template to fit the topic. A small feature might skip "Open Questions". A writing task might replace "Implementation Plan" with "Outline". Do not force every section if it does not add value.
+- `OK` → proceed.
+- `INTENT: <path>` → an intent already exists for this slug. Read it, then ask: update it, or pick another slug.
+- `EXISTS: <alt>` → a real plan tree is already there. Ask before going further.
 
-## Examples
+### Step 2 — Interview short
 
-### Feature Request
+Three to six `AskUserQuestion` rounds, one to two questions each. Cover problem, outcome, who and what it touches, constraints, and the boundary as it looks today.
 
+**Refuse to answer *how*.** Stack, architecture, file layout, API shape, and task breakdown are all out of scope here. Every one that surfaces goes into `Open questions` as a question — never into the body as an answer. Recommend an answer to every question you *do* ask, first option marked `(Recommended)`, so the user reacts instead of designing from scratch.
+
+**This is minutes, not an interview.** Depth is `flightplan`'s job, and paying for it twice is how the second pass gets skipped.
+
+### Step 3 — Draft INTENT.md inside plan mode
+
+Show it in full so the user can read what you understood, then call `ExitPlanMode`.
+
+**Ship it with `Open questions` still open.** That section is the deliverable. An empty one is a failed capture, not a clean one — it means a vague idea got rendered as confident structure and the user is about to sign off on precision they never had.
+
+### Step 4 — On approval, write exactly one file
+
+```bash
+mkdir -p docs/<slug>
 ```
-User: /preflight dark mode toggle
 
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion: "Where should the toggle live — settings page, navbar, or system preference auto-detect? And is this web only or also mobile?"]
-User: Settings page, web only
+Then write `docs/<slug>/INTENT.md`.
 
-Claude: [calls AskUserQuestion: "Should the preference persist across devices (needs backend) or is local storage fine? And do you have an existing design system or CSS framework?"]
-User: Local storage fine, we use Tailwind
+**Do not run `scaffold.ts`.** A `tasks/` tree here would make the directory read as a real plan, and `--check` would stop reporting it as an intent.
 
-Claude: [writes plan to plan file with spec + implementation steps]
-        [calls ExitPlanMode]
-User: [approves plan]
+Then stop. No PLAN.md, no task files, no implementation. Tell the user that `/flightplan <slug>` picks it up later and reads this file as its baseline.
 
-Claude: [implements the plan]
-```
+## Rules that outlive the capture
 
-### New Project
+- **INTENT.md is never edited to match a later plan.** It is the baseline; rewriting it destroys the only record of the drift. A PLAN.md that contradicts it records the contradiction in its own `## Context`.
+- **Update it only when the underlying want changes** — not when the solution does.
+- **It seeds the interview; it never replaces it.** Architecture, bucketing, dependencies, verification, and rubrics are absent by design, so generating a task tree from INTENT.md alone means inventing all of them. flightplan's Step 3 reads it and interviews the gaps.
+- **Write it in English**, like every other dispatch artifact — a later session or sub-agent picks it up cold. Interview in whatever language the user prefers.
 
-```
-User: I want to build a CLI tool for managing dotfiles, but I'm not sure about the details
+## Additional resources
 
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion: "What's your main pain point with dotfiles today — syncing across machines, version control, or setting up new machines quickly? And is this for personal use or something you'd share?"]
-User: Mainly syncing between my Mac and Linux server. Personal use but might open source later.
-
-Claude: [calls AskUserQuestion: "What dotfiles do you need to manage — shell configs, git, editor settings, others? And do you have a preferred approach — symlinks, templates, or just copy?"]
-User: Shell, git, and neovim configs. Symlinks feel cleanest.
-
-Claude: [calls AskUserQuestion: "Any must-haves for v1 beyond basic symlink management? Like conflict detection, backup before overwrite, or a dry-run mode?"]
-User: Dry-run would be great. Backup not needed since everything's in git.
-
-Claude: [writes plan with MVP scope: symlink manager + dry-run + git-based sync]
-        [calls ExitPlanMode]
-```
+- `references/intent-template.md` — the INTENT.md template and the five capture rules
