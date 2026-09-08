@@ -14,18 +14,26 @@
  *
  * The root `docs/<slug>/` dir is created non-recursively so a TOCTOU race
  * between checkCollision() and mkdir() throws EEXIST instead of silently
- * overwriting.
+ * overwriting. The lone exception is a dir holding only INTENT.md — a captured
+ * intent the caller is now speccing — which is merged into, not refused.
  *
  * Usage:
  *   bun scaffold.ts [--check] <slug> [<bucket>[,<bucket>...]] [--docs-root <path>]
  */
-import { mkdir, access } from "node:fs/promises";
+import { mkdir, access, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 export type CollisionResult = {
   exists: boolean;
+  /**
+   * The dir holds INTENT.md and nothing else — a captured intent waiting to be
+   * specced. Scaffolding into it is the intended flow, so `exists` stays false.
+   */
+  intentOnly: boolean;
   suggestedAlt: string | null;
 };
+
+export const INTENT_FILE = "INTENT.md";
 
 export type ScaffoldInput = {
   slug: string;
@@ -50,12 +58,23 @@ export async function checkCollision(
   docsRoot = "docs",
 ): Promise<CollisionResult> {
   const dir = join(docsRoot, slug);
+  let entries: string[];
   try {
-    await access(dir);
+    entries = await readdir(dir);
   } catch {
-    return { exists: false, suggestedAlt: null };
+    return { exists: false, intentOnly: false, suggestedAlt: null };
   }
-  return { exists: true, suggestedAlt: await nextAvailable(slug, docsRoot) };
+  // Dotfiles are ignored so a docs dir a Finder visit left a .DS_Store in still
+  // reads as intent-only.
+  const meaningful = entries.filter((e) => !e.startsWith("."));
+  if (meaningful.length === 1 && meaningful[0] === INTENT_FILE) {
+    return { exists: false, intentOnly: true, suggestedAlt: null };
+  }
+  return {
+    exists: true,
+    intentOnly: false,
+    suggestedAlt: await nextAvailable(slug, docsRoot),
+  };
 }
 
 async function nextAvailable(slug: string, docsRoot: string): Promise<string> {
@@ -99,9 +118,12 @@ export async function scaffold(input: ScaffoldInput): Promise<ScaffoldResult> {
   const rootDir = join(input.docsRoot, input.slug);
 
   // Ensure docsRoot exists, but create rootDir non-recursively so a TOCTOU
-  // race throws EEXIST instead of silently merging into an existing dir.
+  // race throws EEXIST instead of silently merging into an existing dir. An
+  // intent-only dir is the one root we are allowed to merge into.
   await mkdir(input.docsRoot, { recursive: true });
-  await mkdir(rootDir); // throws if rootDir already exists
+  if (!collision.intentOnly) {
+    await mkdir(rootDir); // throws if rootDir already exists
+  }
 
   const tasksDir = join(rootDir, "tasks");
   await mkdir(tasksDir);
@@ -168,6 +190,12 @@ async function main() {
     if (collision.exists) {
       console.log(`EXISTS: ${collision.suggestedAlt}`);
       process.exit(1);
+    }
+    if (collision.intentOnly) {
+      console.log(
+        `INTENT: ${resolve(join(args.docsRoot, args.slug, INTENT_FILE))}`,
+      );
+      return;
     }
     console.log("OK");
     return;
