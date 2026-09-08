@@ -1,5 +1,21 @@
 # Changelog
 
+## [guard 0.3.0] - 2026-09-09
+
+_tracks tag `guard-v0.3.0`_
+
+### Added
+- `comment-guard` now covers 75+ file extensions, up from about 25 — including the C++ family, C#, PHP, Swift, Kotlin, Scala, Dart, Zig, Elixir, Perl, Haskell, Proto, the JS/TS variants (`.mjs`/`.cjs`/`.mts`/`.cts`), CSS preprocessors, Terraform/HCL, and the shell and config families.
+- Extensionless build files are guarded too: `Rakefile`, `Gemfile`, `Makefile`, `Dockerfile`, `Procfile`, and friends now match by filename, with a stem fallback so `Dockerfile.dev` is caught as well. Previously a file needed an extension to be considered at all.
+- The OpenCode-side prefilter regex was synced to the same expanded language list, so OpenCode users get the same coverage instead of silently missing the hook on every newly supported language.
+
+### Changed
+- Multi-line comment blocks are now counted correctly for every language that uses paired open/close markers, not just `/* */`. An HTML `<!-- ... -->` block or a Lua `--[[ ... ]]` block previously counted as a single line no matter how long it ran; both now count their full height.
+- ERB's `<%# ... %>` comment is now treated as a full block, so a multi-line ERB comment no longer under-reports its size.
+- `.vue`, `.svelte`, and `.astro` files now also recognize `<!-- -->` comments in their template markup — previously only script-style comments (`//`, `/* */`) were seen, so template comments were invisible to the guard.
+- Plain `.css` no longer treats `//` as a comment, since that isn't valid CSS syntax. The preprocessor dialects (`.scss`, `.sass`, `.less`, `.styl`) still allow it.
+- Haml/Slim's indentation-scoped comments and Python's `"""docstring"""` blocks remain known, deliberate gaps: Haml/Slim comments are still reported only by their opening line, and docstrings aren't detected at all, since `"""` can't reliably be told apart from an ordinary multi-line string.
+
 ## [guard 0.2.0] - 2026-09-08
 
 _tracks tag `guard-v0.2.0`_
