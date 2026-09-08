@@ -1,15 +1,22 @@
 #!/usr/bin/env bun
 /**
- * PostToolUse hook: surface newly added comment lines so the model re-judges why vs what.
+ * PostToolUse hook: surface the comment blocks an edit added or grew, so the
+ * model re-judges why vs what.
  *
  * Input (stdin): JSON with tool_name and tool_input.
- * Output: silent unless the edit added comment lines.
+ * Output: silent unless a reportable block exists.
  * Exit codes:
- *   0 = ok / skipped file type / no comment added
- *   2 = comments added (PostToolUse exit 2 + stderr surfaces feedback to the LLM)
+ *   0 = ok / skipped file type / nothing to report
+ *   2 = block reported (PostToolUse exit 2 + stderr surfaces feedback to the LLM)
  *
  * Detects only. The why-vs-what judgement is the model's — this hook never
  * guesses at meaning, it just hands the lines back.
+ *
+ * A block reports when it runs MIN_BLOCK_LINES or longer AND this edit put at
+ * least one line in it. One- and two-line comments never fire: measured over
+ * this repo, that silences 68% of blocks, which is what keeps the hook quiet
+ * enough to leave switched on. The file-header block is exempt — it documents
+ * the module, which is the one place prose is the point.
  */
 
 export type ToolInput = {
@@ -18,6 +25,15 @@ export type ToolInput = {
   new_string?: string;
   content?: string;
 };
+
+/** A contiguous run of comment lines, with the ones this edit added marked. */
+export type CommentBlock = {
+  start: number;
+  lines: string[];
+  added: boolean[];
+};
+
+const MIN_BLOCK_LINES = 3;
 
 const SKIP_EXTS = new Set([".md", ".mdx", ".txt", ".json"]);
 
@@ -63,15 +79,43 @@ export function markersFor(filePath: string): string[] {
   return Object.keys(MARKERS).filter((m) => MARKERS[m]!.includes(ext));
 }
 
+/**
+ * Comment-or-not for each trimmed line.
+ *
+ * Stateful across `/* ... *\/` so a docblock counts its full height rather than
+ * just the opening line. Tracking the open block is what lets `*` continuations
+ * count without becoming a marker of their own — as a marker it would read
+ * `*ptr = 0` and a wrapped multiplication as comments.
+ */
+export function commentFlags(lines: string[], marks: string[]): boolean[] {
+  const hasBlockMarker = marks.includes("/*");
+  const flags: boolean[] = [];
+  let open = false;
+
+  for (const line of lines) {
+    if (open) {
+      flags.push(true);
+      if (line.includes("*/")) open = false;
+      continue;
+    }
+    // Leading marker only. A trailing `#` or `//` is usually inside a string —
+    // matching those flags every `url = "http://..."` as a comment.
+    const starts = marks.some((m) => line.startsWith(m));
+    flags.push(starts);
+    if (
+      starts &&
+      hasBlockMarker &&
+      line.startsWith("/*") &&
+      !line.includes("*/")
+    )
+      open = true;
+  }
+  return flags;
+}
+
 function commentLines(text: string, marks: string[]): string[] {
-  return (
-    text
-      .split("\n")
-      .map((l) => l.trim())
-      // Leading marker only. A trailing `#` or `//` is usually inside a string —
-      // matching those flags every `url = "http://..."` as a comment.
-      .filter((l) => marks.some((m) => l.startsWith(m)))
-  );
+  const lines = text.split("\n").map((l) => l.trim());
+  return lines.filter((_, i) => commentFlags(lines, marks)[i]);
 }
 
 /**
@@ -102,32 +146,74 @@ export function addedCommentLines(
   return added;
 }
 
-/** Trimmed line text -> queue of 1-based line numbers, for reverse lookup. */
-export function lineIndex(fileText: string): Map<string, number[]> {
-  const index = new Map<string, number[]>();
-  fileText.split("\n").forEach((line, i) => {
-    const key = line.trim();
-    const queue = index.get(key);
-    if (queue) queue.push(i + 1);
-    else index.set(key, [i + 1]);
-  });
-  return index;
+/**
+ * The blocks worth reporting, read off the file on disk.
+ *
+ * Blocks come from disk rather than from `new_string` because an Edit fragment
+ * truncates any block that continues past its edges, which would both mis-size
+ * the run and hide whether it sits at the top of the file.
+ */
+export function flaggedBlocks(
+  fileText: string,
+  marks: string[],
+  added: string[],
+): CommentBlock[] {
+  const lines = fileText.split("\n").map((l) => l.trim());
+  const flags = commentFlags(lines, marks);
+
+  const pending = new Map<string, number>();
+  for (const line of added) pending.set(line, (pending.get(line) ?? 0) + 1);
+
+  const blocks: CommentBlock[] = [];
+  let sawCode = false;
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (!flags[i]) {
+      if (line !== "" && !line.startsWith("#!")) sawCode = true;
+      i++;
+      continue;
+    }
+
+    const header = !sawCode;
+    const start = i + 1;
+    const body: string[] = [];
+    const marked: boolean[] = [];
+
+    while (i < lines.length && flags[i]) {
+      const text = lines[i]!;
+      const left = pending.get(text) ?? 0;
+      // Consume in file order so each added occurrence claims one line, and so a
+      // hit landing in an exempt or short block still spends itself.
+      if (left > 0) pending.set(text, left - 1);
+      body.push(text);
+      marked.push(left > 0);
+      i++;
+    }
+
+    if (!header && body.length >= MIN_BLOCK_LINES && marked.some(Boolean)) {
+      blocks.push({ start, lines: body, added: marked });
+    }
+  }
+  return blocks;
 }
 
-export function formatReason(
-  fileName: string,
-  hits: string[],
-  index: Map<string, number[]>,
-): string {
-  const rows = hits.map((line) => {
-    // Same text can appear twice; pop so each hit claims its own line number.
-    const num = index.get(line)?.shift() ?? "?";
-    return `  ${fileName}:${num}  ${line}`;
-  });
-  return [
-    `本次新增 ${hits.length} 行註解，逐行回答：這行說的是 why 還是 what？是 what 就刪掉。`,
-    ...rows,
-  ].join("\n");
+export function formatReason(fileName: string, blocks: CommentBlock[]): string {
+  const total = blocks.reduce((n, b) => n + b.lines.length, 0);
+  const out = [
+    `comment-guard: ${blocks.length} comment block(s), ${total} lines, in ${fileName}.`,
+    `Answer for every line marked +: does it say why, or what? Delete the ones that say what.`,
+  ];
+
+  for (const block of blocks) {
+    const end = block.start + block.lines.length - 1;
+    out.push(`  ${fileName}:${block.start}-${end}`);
+    block.lines.forEach((line, k) => {
+      out.push(`  ${block.added[k] ? "+" : " "} ${block.start + k}  ${line}`);
+    });
+  }
+  return out.join("\n");
 }
 
 async function main(): Promise<number> {
@@ -148,20 +234,23 @@ async function main(): Promise<number> {
   const marks = markersFor(filePath);
   if (marks.length === 0) return 0;
 
-  const hits = addedCommentLines(toolName, input, marks);
-  if (hits.length === 0) return 0;
+  const added = addedCommentLines(toolName, input, marks);
+  if (added.length === 0) return 0;
 
-  // PostToolUse runs after the write landed, so the file on disk carries the
-  // line numbers that tool_input does not.
-  let fileText = "";
+  // PostToolUse runs after the write landed, so the file on disk is the shape
+  // being judged. Without it there is no block sizing worth reporting.
+  let fileText: string;
   try {
     fileText = await Bun.file(filePath).text();
   } catch {
-    // Unreadable file still reports the lines, with `?` for every number.
+    return 0;
   }
 
+  const blocks = flaggedBlocks(fileText, marks, added);
+  if (blocks.length === 0) return 0;
+
   const fileName = filePath.slice(filePath.lastIndexOf("/") + 1);
-  console.error(formatReason(fileName, hits, lineIndex(fileText)));
+  console.error(formatReason(fileName, blocks));
   return 2;
 }
 
