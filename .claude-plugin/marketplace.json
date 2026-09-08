@@ -28,6 +28,11 @@
       "name": "herdr",
       "source": "./packages/herdr",
       "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, controlling sibling panes/agents, and driving web pages in a Herdr browser pane over CDP."
+    },
+    {
+      "name": "guard",
+      "source": "./packages/guard",
+      "description": "Turn coding rules into harness-enforced ones. comment-guard hands every newly added comment line back to the model with one question: is this why, or is this what?"
     }
   ]
 }

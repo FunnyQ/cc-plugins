@@ -63,6 +63,11 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity"
+    },
+    {
+      "name": "guard",
+      "source": "./packages/guard",
+      "description": "Turn coding rules into harness-enforced ones. comment-guard hands every newly added comment line back to the model with one question: is this why, or is this what?"
     }
   ]
 }

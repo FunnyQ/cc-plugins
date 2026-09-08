@@ -37,6 +37,20 @@
       ]
     },
     {
+      "name": "guard",
+      "path": "packages/guard",
+      "versionFiles": [
+        {
+          "path": "packages/guard/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/guard/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    },
+    {
       "name": "herdr",
       "path": "packages/herdr",
       "versionFiles": [
