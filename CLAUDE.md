@@ -9,7 +9,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | Plugin | Purpose | Skills |
 | --- | --- | --- |
 | **monitor** | Usage analytics + live session cockpit | `usage-dashboard`, `cockpit`, `install` |
-| **dispatch** | Interview-driven planning and execution | `preflight`, `flightplan`, `autopilot`, `waypoints` |
+| **dispatch** | Interview-driven planning and execution | `preflight`, `hop`, `flightplan`, `autopilot`, `waypoints`, `deckplan` |
 | **relay** | Delegate a task to another harness CLI | `relay` |
 | **chronicle** | ADR curation, commit, PR/MR, and release automation | `adr`, `commit`, `pr`, `release`, `install` |
 | **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `tell`, `herdr-browser`, `herdr-protocol-upgrade` |
@@ -20,7 +20,7 @@ Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents 
 
 Design facts the `SKILL.md` files do not carry:
 
-- **dispatch** — four tiers, each handing off to the next: `preflight` (in conversation) → `flightplan` (spec + `tasks/` tree on disk) → `autopilot` (executes that tree, gated on each task's `## Eval rubric`). `waypoints` sits above flightplan and plans each leg just-in-time, after the previous one lands.
+- **dispatch** — a ladder, each rung handing off to the next: `preflight` (captures the want as `docs/<slug>/INTENT.md`, refuses to decide *how*) → `hop` (interview, plan, and execute a small scope in this conversation) → `flightplan` (spec + `tasks/` tree on disk; reads an existing `INTENT.md` as its baseline) → `autopilot` (executes that tree, gated on each task's `## Eval rubric`). `waypoints` sits above flightplan and plans each leg just-in-time, after the previous one lands. **`hop` is the skill that was called `preflight` before dispatch 4.0.0** — the name moved up a rung, the behaviour did not change.
 - **relay** — a backend-agnostic mode layer over a per-harness strategy layer. The capability matrix makes `image` codex-only.
 - **chronicle** — one topology throughout: thin `SKILL.md` → nested no-Bash orchestrator → cheap child agents, so diff and git output never reach the main conversation. **Agent hand-offs are files, never replies**, which is what makes a child answering in prose cost nothing. `commit` and `release` put a deterministic script under that topology and re-read their own progress from the log, so an interrupted run resumes. `release` is config-first: the whole-repo versus per-component shape lives in a committed `.chronicle/release.json`.
 - **monitor** — `usage-dashboard` is the rear-view, `cockpit` the windshield. They run independent servers on separate ports with separate `dist/` SPAs; only the plugin packaging is shared. `install` owns every prerequisite check and config write for the whole plugin.
@@ -74,7 +74,9 @@ cc-plugins/
 │   │           └── static-server.ts
 │   ├── dispatch/
 │   │   ├── hooks/flightplan-lint.sh      # PostToolUse, path + content gated
-│   │   └── skills/{preflight,flightplan,autopilot,waypoints}/
+│   │   └── skills/{preflight,hop,flightplan,autopilot,waypoints,deckplan}/
+│   │       # preflight/references/intent-template.md — the INTENT.md contract;
+│   │       # preflight borrows flightplan's scaffold.ts for its collision check
 │   │       # flightplan/scripts/ also hosts autopilot's shared tools:
 │   │       # next-ready / score-task (--log) / flightlog
 │   ├── chronicle/
