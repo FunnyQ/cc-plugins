@@ -8,6 +8,8 @@ You are the main agent. When you complete a logical chunk of work that is genuin
 
 After a non-obvious decision between real alternatives, fire a fork. After using an implementation that looks odd but is deliberate, fire a fork. After learning something tricky while debugging, or after correcting an assumption, fire a fork. After finding a sharp caveat, precondition, or ordering trap worth remembering, fire a fork.
 
+Keep all of this silent. Do not announce a fork before spawning it, do not report that you spawned one, do not say when you skipped one, and do not relay what the fork wrote. The written log is the only output the user wants. When a fork reports completion, treat that report as internal and answer nothing about it.
+
 Skip the fork for typos, one-line trivial edits, pure formatting, and simple lookups. Also skip it for restating something already logged, and for confirmations with no decision content. Prefer one fork per logical chunk of work, not one per file or step.
 
 Before spawning any fork, resolve the current main-agent session id. Use the
@@ -16,18 +18,18 @@ session**. Put that literal id in the fork prompt as `<parent-session-id>`. Do
 not ask the fork to resolve it again. Context inheritance does not imply session
 identity: a background fork can have its own transcript/session row.
 
-On Claude Code, use the Agent tool in the background with `subagent_type: "fork"`. This makes the fork inherit the current conversation context (the "why"). Use this exact prompt:
+On Claude Code, use the Agent tool in the background with `subagent_type: "fork"`. This makes the fork inherit the current conversation context (the "why"), so the prompt carries only what inheritance cannot: which session to file under. Use this exact prompt:
 
 ```text
-Run /cockpit scribe to distill the work we just completed into cockpit decision-trail entries. The initiating parent session is <parent-session-id>. Pass --session <parent-session-id> on every cockpit scribe call.
+Run /cockpit scribe --session <parent-session-id>
 ```
 
 Use `"fork"` specifically. If you omit `subagent_type`, or name any other type, a fresh agent starts with no conversation context. This defeats the point. Do not wait for the fork. Continue or finish the current turn normally.
 
-On Codex, spawn a background sub-agent with `fork_context: true` and no `agent_type`. This makes it inherit the current context. Use a prompt that states the surface is Codex. The prompt must also say every cockpit scribe call needs `--provider codex`. For example:
+On Codex, spawn a background sub-agent with `fork_context: true` and no `agent_type`. This makes it inherit the current context. The prompt must still state the surface is Codex, because every cockpit scribe call there needs `--provider codex`:
 
 ```text
-You are running under Codex. Run /cockpit scribe to distill the work we just completed into cockpit decision-trail entries. The initiating parent session is <parent-session-id>. Pass --session <parent-session-id> and --provider codex on every cockpit scribe call.
+You are running under Codex. Run /cockpit scribe --session <parent-session-id> --provider codex
 ```
 
 Codex has no SessionStart hooks. So `/thoughtful` is the only way to enable this behavior there. When a background fork later reports completion, no action is needed.
