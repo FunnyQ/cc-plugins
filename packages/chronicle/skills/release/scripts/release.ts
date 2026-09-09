@@ -550,6 +550,41 @@ function parseChoices(raw: string): VersionChoice[] {
   }));
 }
 
+/** A stage list, the annalist's inputs, and what a blocked stage is waiting on —
+ *  the three things the caller acts on. The rest of the plan only feeds `run`,
+ *  which reads it from the same units the caller already holds. */
+export function formatPlanDigest(plan: Plan): string {
+  const lines = plan.units.map(
+    (unit) =>
+      `plan       ${unit.component ?? "repo"} ${unit.targetVersion} → ${unit.tagName}   on ${plan.releaseCommit.slice(0, 7)} (${plan.branch}, ${plan.workflow})`,
+  );
+  lines.push(
+    `stages     ${plan.stages.map((stage) => (stage.state === "done" ? `${stage.id}✓` : stage.id)).join(" ")}`,
+  );
+  for (const stage of plan.stages) {
+    if (stage.state === "blocked") {
+      lines.push(`BLOCKED    ${stage.id}: ${stage.note ?? "no reason given"}`);
+    }
+  }
+  lines.push(`files      ${plan.files.join(" ")}`);
+  for (const unit of plan.units) {
+    lines.push(
+      `entry      ${plan.changelogPath} · header "${unit.headerLabel}" · scope ${unit.pathScope ?? "whole repo"} · since ${unit.lastTag ?? "the beginning"}`,
+    );
+  }
+  lines.push(`subject    ${plan.subject}`);
+  return lines.join("\n");
+}
+
+export function formatRunDigest(result: RunResult): string {
+  return [
+    `executed   ${result.executed.join(" ") || "nothing — every stage already done"}`,
+    `skipped    ${result.skipped.join(" ") || "—"}`,
+    `commit     ${result.releaseCommit.slice(0, 7)} on ${result.branch}`,
+    `tags       ${result.tags.join(" ") || "—"}`,
+  ].join("\n");
+}
+
 async function main() {
   const { values, positionals } = parseArgs({
     args: process.argv.slice(2),
@@ -557,6 +592,7 @@ async function main() {
     options: {
       units: { type: "string" },
       through: { type: "string" },
+      json: { type: "boolean" },
       "persist-config": { type: "boolean", default: false },
     },
   });
@@ -587,7 +623,9 @@ async function main() {
 
   if (command === "plan") {
     const result = await plan(config, choices, { persistConfig });
-    console.log(JSON.stringify(result, null, 2));
+    console.log(
+      values.json ? JSON.stringify(result, null, 2) : formatPlanDigest(result),
+    );
     process.exit(result.stages.some((s) => s.state === "blocked") ? 1 : 0);
   }
 
@@ -599,7 +637,9 @@ async function main() {
     persistConfig,
     through: values.through as StageId,
   });
-  console.log(JSON.stringify(result, null, 2));
+  console.log(
+    values.json ? JSON.stringify(result, null, 2) : formatRunDigest(result),
+  );
 }
 
 if (import.meta.main) {

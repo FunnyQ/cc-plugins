@@ -935,6 +935,77 @@ export function briefFacts(
   return full.hasConfig ? rest : { ...rest, suggested };
 }
 
+type FactsComponent = {
+  name: string;
+  current: string | null;
+  lastTag: string | null;
+  commitCount: number | null;
+  fileVersion: string | null;
+  bumps: Record<string, string> | null;
+};
+
+function bumpList(bumps: Record<string, string> | null): string {
+  if (!bumps) return "no version yet — offer 0.1.0";
+  return Object.entries(bumps)
+    .map(([kind, version]) => `${kind} ${version}`)
+    .join(" · ");
+}
+
+function componentLine(unit: FactsComponent): string {
+  const since =
+    unit.commitCount === null
+      ? "commit count unknown"
+      : `${unit.commitCount} commit${unit.commitCount === 1 ? "" : "s"} since ${unit.lastTag ?? "the beginning"}`;
+  // A file version ahead of the tag means someone already picked the target, so
+  // the gate confirms it rather than bumping on top of it.
+  const ahead =
+    unit.fileVersion && unit.fileVersion !== unit.current
+      ? `  [files already at ${unit.fileVersion}]`
+      : "";
+  return `${unit.name.padEnd(10)} ${unit.current ?? "—"} → ${bumpList(unit.bumps)}   ${since}${ahead}`;
+}
+
+/** The gate reads four things: what changed, what it could become, whether the
+ *  config is sound, and where the rest is. Printing the analysis as JSON instead
+ *  put ~100 lines in the conversation to carry those four. */
+export function formatFactsDigest(facts: Record<string, unknown>): string {
+  const lines: string[] = [];
+  const components = facts.components as FactsComponent[] | null;
+
+  if (components) {
+    const changed = components.filter((unit) => unit.commitCount !== 0);
+    const unchanged = components.filter((unit) => unit.commitCount === 0);
+    if (changed.length === 0)
+      lines.push("changed    nothing since the last tag");
+    for (const unit of changed) lines.push(componentLine(unit));
+    if (unchanged.length > 0) {
+      lines.push(`unchanged  ${unchanged.map((unit) => unit.name).join(" ")}`);
+    }
+  } else {
+    lines.push(
+      componentLine({
+        name: "repo",
+        current: facts.current as string | null,
+        lastTag: facts.lastTag as string | null,
+        commitCount: null,
+        fileVersion: facts.fileVersion as string | null,
+        bumps: facts.bumps as Record<string, string> | null,
+      }),
+    );
+  }
+
+  const drift: string[] = [];
+  if (facts.workflowDrift)
+    drift.push("WORKFLOW DRIFT — resolve before the gate");
+  if ((facts.versionFileDrift as unknown[])?.length)
+    drift.push("VERSION FILE DRIFT — resolve before the gate");
+  lines.push(
+    `config     ${facts.hasConfig ? (facts.workflow as string) : "none yet — interview from the payload's `suggested`"} · branch ${facts.branch} · ${drift.length ? drift.join(" · ") : "no drift"}`,
+  );
+  lines.push(`payload    ${facts.outputPath}`);
+  return lines.join("\n");
+}
+
 async function main() {
   const { values } = parseArgs({
     args: process.argv.slice(2),
@@ -943,6 +1014,7 @@ async function main() {
       apply: { type: "string" },
       component: { type: "string" },
       "save-config": { type: "string" },
+      json: { type: "boolean" },
       full: { type: "boolean" },
     },
   });
@@ -1044,9 +1116,13 @@ async function main() {
 
   const outputPath = await writeTempPayload("release", "analysis", out);
   const printed = { outputPath, ...out };
-  console.log(
-    JSON.stringify(values.full ? printed : briefFacts(printed), null, 2),
-  );
+  if (values.json || values.full) {
+    console.log(
+      JSON.stringify(values.full ? printed : briefFacts(printed), null, 2),
+    );
+    return;
+  }
+  console.log(formatFactsDigest(briefFacts(printed)));
 }
 
 if (import.meta.main) {

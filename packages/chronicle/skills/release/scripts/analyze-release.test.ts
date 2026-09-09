@@ -4,6 +4,7 @@ import {
   applyVersionToContent,
   artifactCommand,
   briefFacts,
+  formatFactsDigest,
   cargoLockSpec,
   cargoPackageName,
   computeBumps,
@@ -65,6 +66,104 @@ describe("briefFacts", () => {
     expect(brief.suggested).toEqual({ mode: "whole-repo" });
     expect(brief).not.toHaveProperty("config");
     expect(brief).not.toHaveProperty("tags");
+  });
+});
+
+describe("formatFactsDigest", () => {
+  const facts = {
+    outputPath: "/tmp/chronicle/release/analysis-1.json",
+    branch: "main",
+    workflow: "github-flow",
+    workflowDrift: null,
+    versionFileDrift: [],
+    hasConfig: true,
+    components: [
+      {
+        name: "chronicle",
+        current: "0.15.1",
+        lastTag: "chronicle-v0.15.1",
+        commitCount: 6,
+        fileVersion: "0.15.1",
+        bumps: { patch: "0.15.2", minor: "0.16.0", major: "1.0.0" },
+      },
+      {
+        name: "relay",
+        current: "0.6.10",
+        lastTag: "relay-v0.6.10",
+        commitCount: 0,
+        fileVersion: "0.6.10",
+        bumps: { patch: "0.6.11", minor: "0.7.0", major: "1.0.0" },
+      },
+    ],
+  };
+
+  test("gives a changed component a line and collapses the rest", () => {
+    const digest = formatFactsDigest(facts);
+
+    expect(digest).toContain(
+      "chronicle  0.15.1 → patch 0.15.2 · minor 0.16.0 · major 1.0.0   6 commits since chronicle-v0.15.1",
+    );
+    expect(digest).toContain("unchanged  relay");
+    expect(digest).toContain("config     github-flow · branch main · no drift");
+    expect(digest).toContain(
+      "payload    /tmp/chronicle/release/analysis-1.json",
+    );
+  });
+
+  // Both drifts must stop the gate, so neither may read as an ordinary line.
+  test("shouts about either drift", () => {
+    expect(
+      formatFactsDigest({
+        ...facts,
+        workflowDrift: { missingBranch: "develop" },
+      }),
+    ).toContain("WORKFLOW DRIFT");
+    expect(
+      formatFactsDigest({
+        ...facts,
+        versionFileDrift: [{ component: "chronicle" }],
+      }),
+    ).toContain("VERSION FILE DRIFT");
+  });
+
+  // A version the files already carry means the target is chosen, not open.
+  test("flags a file version ahead of the tag", () => {
+    const ahead = {
+      ...facts,
+      components: [{ ...facts.components[0], fileVersion: "0.16.0" }],
+    };
+
+    expect(formatFactsDigest(ahead)).toContain("[files already at 0.16.0]");
+  });
+
+  test("says so when nothing changed", () => {
+    const quiet = {
+      ...facts,
+      components: facts.components.map((unit) => ({ ...unit, commitCount: 0 })),
+    };
+
+    expect(formatFactsDigest(quiet)).toContain(
+      "changed    nothing since the last tag",
+    );
+  });
+
+  test("names the repo itself on a whole-repo release", () => {
+    const digest = formatFactsDigest({
+      ...facts,
+      components: null,
+      current: "1.2.3",
+      lastTag: "v1.2.3",
+      fileVersion: "1.2.3",
+      bumps: { patch: "1.2.4", minor: "1.3.0", major: "2.0.0" },
+    });
+
+    expect(digest).toContain("repo       1.2.3 → patch 1.2.4");
+  });
+
+  test("points a first run at the payload's suggested shape", () => {
+    const digest = formatFactsDigest({ ...facts, hasConfig: false });
+
+    expect(digest).toContain("none yet — interview from the payload's");
   });
 });
 
