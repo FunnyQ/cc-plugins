@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { shouldSkipDecisionLogReminder } from "./decision-log-reminder";
+import {
+  resolveParentSession,
+  shouldSkipDecisionLogReminder,
+} from "./decision-log-reminder";
 
 describe("shouldSkipDecisionLogReminder", () => {
   it("skips relay-delegated sessions", () => {
@@ -103,5 +106,59 @@ describe("shouldSkipDecisionLogReminder", () => {
         ),
       ).toBe(false);
     });
+  });
+});
+
+describe("resolveParentSession", () => {
+  const finder = (calls: Array<[string, string]>) => (p: string, c: string) => {
+    calls.push([p, c]);
+    return "resolved-id";
+  };
+
+  it("resolves through the same finder the skill would call", () => {
+    const calls: Array<[string, string]> = [];
+    expect(
+      resolveParentSession({}, { cwd: "/repo" }, finder(calls) as never),
+    ).toBe("resolved-id");
+    expect(calls).toEqual([["claude", "/repo"]]);
+  });
+
+  it("resolves against codex when PLUGIN_ROOT marks the harness", () => {
+    const calls: Array<[string, string]> = [];
+    expect(
+      resolveParentSession(
+        { PLUGIN_ROOT: "/plugins/monitor" },
+        { cwd: "/repo" },
+        finder(calls) as never,
+      ),
+    ).toBe("resolved-id");
+    expect(calls).toEqual([["codex", "/repo"]]);
+  });
+
+  it("trusts OpenCode's own id — a directory lookup can hit a sibling session", () => {
+    const calls: Array<[string, string]> = [];
+    expect(
+      resolveParentSession(
+        {},
+        { cwd: "/repo", session_id: "ses_abc", provider: "opencode" },
+        finder(calls) as never,
+      ),
+    ).toBe("ses_abc");
+    expect(calls).toEqual([]);
+  });
+
+  it("falls back to the hook's own session id", () => {
+    expect(
+      resolveParentSession({}, { cwd: "/repo", session_id: "s1" }, () => null),
+    ).toBe("s1");
+    expect(
+      resolveParentSession({}, { cwd: "/repo", session_id: "s1" }, () => {
+        throw new Error("boom");
+      }),
+    ).toBe("s1");
+  });
+
+  it("returns null when nothing resolves", () => {
+    expect(resolveParentSession({}, { cwd: "/repo" }, () => null)).toBe(null);
   });
 });
