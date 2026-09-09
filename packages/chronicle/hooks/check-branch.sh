@@ -29,7 +29,7 @@ if [[ -n "$repo_root" && -f "$pr_config" ]] && command -v jq >/dev/null 2>&1; th
   if [[ "$workflow" == "github-flow" ]]; then
     protected_branch=$(jq -r '.base // empty' "$pr_config" 2>/dev/null || true)
     if [[ -n "$protected_branch" && "$branch" == "$protected_branch" ]]; then
-      # A GitHub Flow repo has one long-lived branch, so `/chronicle:release auto`
+      # A GitHub Flow repo has one long-lived branch, so `/chronicle:release`
       # commits the bump on the base by design. Exempt that one subject — every
       # other commit on the base still asks. Git Flow gets no such exemption: its
       # release commit belongs on develop, so one on production stays suspicious.

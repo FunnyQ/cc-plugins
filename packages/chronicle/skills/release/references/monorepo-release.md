@@ -37,7 +37,7 @@ git tag -a <component>-vX.Y.Z -m "<component>-vX.Y.Z"
 git checkout develop
 git merge --no-ff main -m "Merge branch 'main' back into develop"
 
-# push only in `auto push`
+# skipped in `local`
 git push origin develop main
 git push origin <component>-vX.Y.Z
 ```
@@ -67,7 +67,7 @@ git tag -a monitor-v3.18.3  -m "monitor-v3.18.3"
 git checkout develop
 git merge --no-ff main -m "Merge branch 'main' back into develop"
 
-# push only in `auto push`
+# skipped in `local`
 git push origin develop main
 git push origin chronicle-v0.5.0 monitor-v3.18.3
 ```

@@ -1,13 +1,13 @@
 ---
 name: release
 description: >-
-  Cut a release — bump version files, write the CHANGELOG entry, and (in auto
-  mode) commit, merge, tag, and push.
+  Cut a release — bump version files, write the CHANGELOG entry, then commit,
+  merge, tag, and push. Stops earlier with `local` or `prepare`.
 when_to_use: >-
   When the user wants to cut/ship a release. Auto-detects whole-repo vs
   per-component monorepos, remembered in .chronicle/release.json.
   Human-invoked only — do NOT auto-fire from release planning or talk.
-argument-hint: "[auto|auto push] [version|component...]"
+argument-hint: "[local|prepare] [version|component...]"
 ---
 
 # Chronicle Release
@@ -30,9 +30,8 @@ is the opposite of what it is for.
 
 ```
 save-config?  bump  [artifacts]  entry  commit  [merge]  tag  [back-merge]  push
-                                         ▲                                   ▲
-                                         └─ prepare stops here     auto push ┘
-                                                     auto stops at tag
+                                    ▲                     ▲                  ▲
+                          prepare ──┘             local ──┘       default ───┘
 ```
 
 `merge` / `back-merge` exist only on git-flow. `save-config` only on a first run.
@@ -40,15 +39,19 @@ save-config?  bump  [artifacts]  entry  commit  [merge]  tag  [back-merge]  push
 
 ## Modes → `--through`
 
-- `/chronicle:release` → `--through entry`. Bump and write the entry, then stop.
-  You review and commit.
-- `/chronicle:release auto` → `--through tag`. Everything above, then commit and
-  tag locally.
-- `/chronicle:release auto push` → `--through push`.
+- `/chronicle:release` → `--through push`. The default: bump, entry, commit, tag,
+  and publish. **Say so in the version gate** — the user confirms a run that
+  reaches the remote, not just a bump.
+- `/chronicle:release local` → `--through tag`. Everything except the push.
+- `/chronicle:release prepare` → `--through entry`. Bump and write the entry, then
+  stop. You review and commit.
 
-Run after a prepare, `auto` finishes it: `bump` and `entry` already read as done,
-so it commits what is there and tags that commit. It never writes a second bump or
-a second entry.
+`auto` and `auto push` are older names for the default; treat both as `--through
+push`.
+
+Run after a `prepare`, the default finishes it: `bump` and `entry` already read as
+done, so it commits what is there and tags that commit. It never writes a second
+bump or a second entry.
 
 A version token (`0.5.0`) or component token(s) (`chronicle`, or `chronicle monitor`)
 may follow any mode to skip that part of the gate. Naming two or more components
@@ -148,7 +151,7 @@ report a tag it did not cut.
 
 - **prepare** → confirm the version files read `targetVersion` and the changelog
   holds the entry.
-- **auto / auto push** → for every tag, require non-empty `git tag --list "{tag}"` and
+- **local / default** → for every tag, require non-empty `git tag --list "{tag}"` and
   `git rev-list -n1 "{tag}"` equal to `releaseCommit`. When pushing, also require
   non-empty `git ls-remote --tags origin "{tag}"`.
 - Relay only verified results. Never announce an unverified tag or push.

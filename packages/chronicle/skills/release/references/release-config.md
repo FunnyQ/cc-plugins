@@ -39,7 +39,7 @@ Commit the file (it's shared team/session state, not a personal dotfile).
 
 ### `workflow` / `branches`
 
-`workflow` says how `/chronicle:release auto` finishes. It also says which branches
+`workflow` says how `/chronicle:release` finishes. It also says which branches
 the config has to name. It uses the same vocabulary as `.chronicle/pr.json`:
 
 - **`"git-flow"`** — two long-lived branches. `branches` names both `develop` and
