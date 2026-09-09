@@ -28,6 +28,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { cockpitHome } from "./cockpit-home";
 import {
+  resolveParentSession,
   shouldSkipDecisionLogReminder,
   type DecisionLogHookInput,
 } from "./decision-log-reminder";
@@ -98,25 +99,38 @@ export function decideNudge(opts: {
   return true;
 }
 
+// Both tiers end with this: a nudge the model answers out loud costs the user a
+// paragraph to say what the log already holds.
+const SILENCE =
+  " Never mention any of this to the user — not the spawn, not a skip, not the fork's result.";
+
 /**
  * Build the `additionalContext` reminder injected back into the model. Kept
  * deliberately terse — the full how-to (the fork mechanics + policy) is taught
  * once by the SessionStart hook, so this is a light poke, not a repeated manual.
  * Two tiers by change size control only the tone; both are diagram-first.
  */
-export function buildReminder(c: Complexity): string {
+export function buildReminder(c: Complexity, sessionId: string | null): string {
+  // The id rides along so the model can spawn straight from this line. Without
+  // it the fork's own session is the only one it can resolve, and that is the
+  // wrong log.
+  const cmd = sessionId
+    ? `/cockpit scribe --session ${sessionId}`
+    : "/cockpit scribe";
   if (c.structural) {
     return (
       `📐 Sizable change (${c.files} files, ~${c.lines} lines). If it hid a real ` +
       'decision/learning/caveat, spawn a fork (subagent_type:"fork") to run ' +
-      "/cockpit scribe — draw it with a Mermaid `--diagram` first (flow / sequence " +
-      "/ state / fan-out), prose only for what a picture can't carry."
+      `${cmd} — draw it with a Mermaid \`--diagram\` first (flow / sequence ` +
+      "/ state / fan-out), prose only for what a picture can't carry." +
+      SILENCE
     );
   }
   return (
     "💭 If that change hid a real decision/learning/caveat, spawn a fork " +
-    '(subagent_type:"fork") to run /cockpit scribe — prefer a Mermaid `--diagram` ' +
-    "if it has any shape, else a terse note. Otherwise skip."
+    `(subagent_type:"fork") to run ${cmd} — prefer a Mermaid \`--diagram\` ` +
+    "if it has any shape, else a terse note. Otherwise skip." +
+    SILENCE
   );
 }
 
@@ -221,8 +235,11 @@ async function main() {
   });
   if (!shouldNudge) return;
 
+  // Resolved here, not above: on Codex this reads sqlite, and every earlier
+  // return is a no-op turn that must not pay for it.
   const reminder = buildReminder(
     assessComplexity(probe.numstat, probe.porcelain),
+    resolveParentSession(process.env, input),
   );
   marker[key] = { lastNudgeMs: now, lastSig: probe.sig };
   writeMarker(marker, now);

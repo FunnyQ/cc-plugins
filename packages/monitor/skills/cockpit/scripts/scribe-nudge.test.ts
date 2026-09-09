@@ -94,8 +94,32 @@ describe("decideNudge", () => {
 });
 
 describe("buildReminder", () => {
+  it("carries the resolved session id so no fork has to look it up", () => {
+    expect(
+      buildReminder({ files: 1, lines: 4, structural: false }, "abc-123"),
+    ).toContain("/cockpit scribe --session abc-123");
+    expect(
+      buildReminder({ files: 5, lines: 200, structural: true }, "abc-123"),
+    ).toContain("/cockpit scribe --session abc-123");
+  });
+
+  it("orders silence in both tiers — the nudge must not become chat", () => {
+    expect(
+      buildReminder({ files: 1, lines: 4, structural: false }, "abc-123"),
+    ).toContain("Never mention");
+    expect(
+      buildReminder({ files: 5, lines: 200, structural: true }, "abc-123"),
+    ).toContain("Never mention");
+  });
+
+  it("omits the flag when no id resolved, leaving the CLI to auto-resolve", () => {
+    const msg = buildReminder({ files: 1, lines: 4, structural: false }, null);
+    expect(msg).toContain("/cockpit scribe");
+    expect(msg).not.toContain("--session");
+  });
+
   it("light tier is terse, fork-actionable, and diagram-first", () => {
-    const msg = buildReminder({ files: 1, lines: 4, structural: false });
+    const msg = buildReminder({ files: 1, lines: 4, structural: false }, null);
     expect(msg).toContain('subagent_type:"fork"');
     expect(msg).toContain("/cockpit scribe");
     // Diagram-first: even the light tier prefers a diagram when there's a shape.
@@ -107,7 +131,7 @@ describe("buildReminder", () => {
   });
 
   it("structural tier leads with the change size and a diagram-first push", () => {
-    const msg = buildReminder({ files: 5, lines: 200, structural: true });
+    const msg = buildReminder({ files: 5, lines: 200, structural: true }, null);
     expect(msg).toContain("--diagram");
     expect(msg).toContain("5 files");
     expect(msg).toContain("200");
