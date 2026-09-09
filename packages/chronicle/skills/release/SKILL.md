@@ -40,21 +40,28 @@ save-config?  bump  [artifacts]  entry  commit  [merge]  tag  [back-merge]  push
 ## Modes → `--through`
 
 - `/chronicle:release` → `--through push`. The default: bump, entry, commit, tag,
-  and publish. **Say so in the version gate** — the user confirms a run that
-  reaches the remote, not just a bump.
+  and publish.
 - `/chronicle:release local` → `--through tag`. Everything except the push.
 - `/chronicle:release prepare` → `--through entry`. Bump and write the entry, then
   stop. You review and commit.
 
 `auto` and `auto push` are older names for the default; treat both as `--through
-push`.
+push`. `auto` used to stop at `tag`, so a user reaching for it out of habit is
+asking for a run that now reaches the remote — the push confirmation below is what
+tells them.
+
+**A `push` run needs the user's explicit go-ahead before step 6.** Name the remote,
+the branches, and every tag, and get a yes. Nothing else in the flow waives this:
+not a version token, not a mode word, not a resumed run. Downgrade to `local` when
+the user declines the push but wants the rest.
 
 Run after a `prepare`, the default finishes it: `bump` and `entry` already read as
 done, so it commits what is there and tags that commit. It never writes a second
 bump or a second entry.
 
 A version token (`0.5.0`) or component token(s) (`chronicle`, or `chronicle monitor`)
-may follow any mode to skip that part of the gate. Naming two or more components
+may follow any mode to skip **the version question only** — never the push
+confirmation. Naming two or more components
 cuts a coordinated release: one commit, N scoped tags. A bare version token only
 disambiguates a single-unit release — with several components named, ignore it and
 ask each bump. A per-component `chronicle@0.5.1` form is fine if the user writes it.
@@ -142,6 +149,10 @@ whenever `entry` already reads done — the entry exists, and a second one for t
 same version is a duplicate heading.
 
 ### 6. Run
+
+On a `push` run, confirm the publish first — the remote, the branches, and the tag
+names, as one question. Ask it even when the version gate never ran, and treat a
+decline as `--through tag` rather than a stop.
 
 Spawn Skirnir with `command: "run"`, `units`, and `through`. The result names `executed[]`, `skipped[]`, `releaseCommit`, `tags[]`, and `branch`.
 A stage that runs without taking effect aborts the release — the engine will not
