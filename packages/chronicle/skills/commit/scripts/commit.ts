@@ -3,19 +3,18 @@
 /**
  * The commit executor.
  *
- * Everything a commit run does mechanically — check the groups, decide the shape,
- * check the plan covers the changeset, stage, commit, verify — happens here, in
- * one process, from one file on disk. Only two judgements are left outside it:
- * grouping the diff (the watcher) and writing the prose (the main agent, which
- * is the only party that holds the "why").
+ * Everything a commit run does mechanically — check the plan, decide the shape,
+ * check it covers the changeset, stage, commit, verify — happens here, in one
+ * process, from one file on disk. Only two judgements are left outside it:
+ * grouping the diff and writing the prose.
  *
- * Both agents hand off through a file, never through their final message:
- * `propose` takes the watcher's draft and writes the settled proposal back over
- * it, and `apply` takes the plan the Lawspeaker built from that proposal.
+ * The plan arrives as a file rather than as an agent's final message, because a
+ * run that answered in prose used to strand the whole flow. It carries the split
+ * *and* the message those groups collapse into, so the shape is settled here
+ * without a second round trip back to the agent to write the other one.
  *
  * Usage:
- *   bun commit.ts propose --file <path>      # → { ok, shape, reasons, groups, … }
- *   bun commit.ts apply --plan-file <path>   # → { ok, executed, skipped, verify }
+ *   bun commit.ts apply --plan-file <path>   # → { ok, shape, reasons, executed, verify }
  *
  * Exit codes: 0 done · 2 refused (bad proposal or plan, or a shape git will not accept)
  *             3 committed but the changeset did not land intact
@@ -41,20 +40,15 @@ import {
   composeMessage,
   decideShape,
   resolveResumption,
+  resolveShapedCommits,
   subjectOf,
   validatePlan,
-  validateProposalDraft,
+  validatePlanFile,
   type CommitPlan,
   type LogEntry,
+  type PlanDraft,
   type PlannedCommit,
-  type ProposalDraft,
 } from "./commit-plan";
-
-/** The one artifact `apply` reads: the shaped plan, prose and all. */
-type PlanFile = {
-  shape?: "simple" | "atomic";
-  commits: PlannedCommit[];
-};
 
 function emit(data: unknown): void {
   console.log(JSON.stringify(data, null, 2));
@@ -101,34 +95,30 @@ function insideRepo(absolute: string): boolean {
 }
 
 /**
- * Reads a hand-off file, refusing one written inside the repo.
- *
- * Both hand-off files — the watcher's proposal and the Lawspeaker's plan — are
- * themselves unassigned changes when they live in the tree, and the coverage
- * check would then reject the plan for not planning its own plan.
+ * A plan file living in the tree is itself an unassigned change, and the
+ * coverage check would then reject the plan for not planning its own plan.
  */
-async function readHandoff(path: string, kind: string): Promise<unknown> {
+async function readPlanFile(path: string): Promise<PlanDraft> {
   const absolute = resolve(path);
   if (insideRepo(absolute)) {
-    refuse(`the ${kind} file must live outside the repo, not at ${absolute}`);
+    refuse(`the plan file must live outside the repo, not at ${absolute}`);
   }
 
   const file = Bun.file(absolute);
-  if (!(await file.exists())) refuse(`no ${kind} file at ${path}`);
+  if (!(await file.exists())) refuse(`no plan file at ${path}`);
 
+  let raw: unknown;
   try {
-    return JSON.parse(await file.text());
+    raw = JSON.parse(await file.text());
   } catch (error) {
-    refuse(`${kind} file is not JSON — ${(error as Error).message}`);
+    refuse(`plan file is not JSON — ${(error as Error).message}`);
   }
-}
 
-async function readPlanFile(path: string): Promise<PlanFile> {
-  const plan = (await readHandoff(path, "plan")) as PlanFile;
-  if (!Array.isArray(plan?.commits) || plan.commits.length === 0) {
-    refuse("plan file holds no commits");
+  const errors = validatePlanFile(raw);
+  if (errors.length > 0) {
+    refuse("the plan is not usable — fix the file and re-run", { errors });
   }
-  return plan;
+  return raw as PlanDraft;
 }
 
 async function readChangeset(): Promise<ParsedStatus[]> {
@@ -235,78 +225,34 @@ async function writeCommit(
   await unlink(messagePath).catch(() => {});
 }
 
-/**
- * Validates the watcher's proposal and settles the shape, in place.
- *
- * The groups are a file rather than a return value because an agent's final
- * message is not a reliable channel — the watcher is a Haiku agent, and a run
- * that answered in prose used to strand the whole flow. The file is the
- * hand-off; this command is what makes it trustworthy, and the Lawspeaker reads
- * the same path whatever the watcher said.
- *
- * Refusing rather than repairing is deliberate: the watcher is the only party
- * that read the diff, so a draft that drops a file has to go back to it.
- */
-async function proposeMain(proposalPath: string): Promise<void> {
-  const draft = (await readHandoff(proposalPath, "proposal")) as ProposalDraft;
-
-  const errors = validateProposalDraft(draft);
-  if (errors.length > 0) {
-    refuse("the proposal is not usable — fix the file and re-run", { errors });
-  }
-
-  const groups = draft.groups;
-  const coverage = validatePlan(
-    { shape: "atomic", commits: groups },
-    await readChangeset(),
-  );
-  if (!coverage.ok) {
-    refuse("the groups do not cover the changeset exactly once", coverage);
-  }
-
-  const mode = draft.mode === "simple" ? "simple" : "auto";
-  const decision = decideShape(
-    groups.map((group) => group.type),
-    {
-      mode,
-      totalFiles:
-        Number(draft.totalFiles) ||
-        new Set(groups.flatMap((g) => g.files)).size,
-      moduleSpread: draft.moduleSpread ?? [],
-    },
-  );
-
-  const proposal = { ok: true, ...decision, ...draft, mode };
-  await Bun.write(
-    resolve(proposalPath),
-    `${JSON.stringify(proposal, null, 2)}\n`,
-  );
-  emit(proposal);
-}
-
 async function applyMain(planPath: string): Promise<void> {
   const plan = await readPlanFile(planPath);
-  if (plan.shape !== "simple" && plan.shape !== "atomic") {
-    refuse("plan file has no shape — copy it from the settled proposal");
-  }
-  if (plan.shape === "simple" && plan.commits.length > 1) {
-    refuse(`shape is simple but the plan holds ${plan.commits.length} commits`);
-  }
+  const decision = decideShape(
+    plan.commits.map((commit) => commit.type),
+    {
+      mode: plan.mode === "simple" ? "simple" : "auto",
+      totalFiles:
+        Number(plan.totalFiles) ||
+        new Set(plan.commits.flatMap((commit) => commit.files)).size,
+      moduleSpread: plan.moduleSpread ?? [],
+    },
+  );
+  const commits = resolveShapedCommits(plan, decision.shape);
 
   const emptyTree = (
     await git("hash-object", "-t", "tree", "/dev/null")
   ).trim();
-  const log = await readLog(plan.commits.length + 1);
+  const log = await readLog(commits.length + 1);
   const { landed, base } = resolveResumption(
     log,
-    plan as CommitPlan,
+    { shape: decision.shape, commits } satisfies CommitPlan,
     emptyTree,
   );
-  const pending = plan.commits.slice(landed);
+  const pending = commits.slice(landed);
 
   if (pending.length > 0) {
     const coverage = validatePlan(
-      { shape: plan.shape, commits: pending },
+      { shape: decision.shape, commits: pending },
       await readChangeset(),
     );
     if (!coverage.ok) {
@@ -333,7 +279,7 @@ async function applyMain(planPath: string): Promise<void> {
     }
   }
 
-  const planned = plan.commits.flatMap((commit) => commit.files);
+  const planned = commits.flatMap((commit) => commit.files);
   const [committed, remaining] = await Promise.all([
     committedPathsSince(base),
     remainingPaths(),
@@ -342,10 +288,10 @@ async function applyMain(planPath: string): Promise<void> {
 
   const result = {
     ok: verification.ok,
-    shape: plan.shape,
+    ...decision,
     base,
     executed: pending.map(subjectOf),
-    skipped: plan.commits.slice(0, landed).map(subjectOf),
+    skipped: commits.slice(0, landed).map(subjectOf),
     log: (await gitOrEmpty("log", "--oneline", `${base}..HEAD`))
       .trimEnd()
       .split("\n"),
@@ -364,27 +310,13 @@ async function main(): Promise<void> {
   const repoRoot = (await gitOrEmpty("rev-parse", "--show-toplevel")).trim();
   if (repoRoot) process.chdir(repoRoot);
 
-  const command = process.argv[2];
-  const flagged = (name: string): string => {
-    const index = process.argv.indexOf(`--${name}`);
-    return index === -1 ? "" : (process.argv[index + 1] ?? "");
-  };
+  const index = process.argv.indexOf("--plan-file");
+  const planPath = index === -1 ? "" : (process.argv[index + 1] ?? "");
 
-  const usage = (): never => {
-    console.error(
-      "usage: commit.ts propose --file <path>\n       commit.ts apply --plan-file <path>",
-    );
+  if (process.argv[2] !== "apply" || !planPath) {
+    console.error("usage: commit.ts apply --plan-file <path>");
     process.exit(2);
-  };
-
-  if (command === "propose") {
-    const proposalPath = flagged("file");
-    if (!proposalPath) usage();
-    return await proposeMain(proposalPath);
   }
-
-  const planPath = flagged("plan-file");
-  if (command !== "apply" || !planPath) usage();
 
   return await applyMain(planPath);
 }

@@ -3,16 +3,16 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 // The OpenCode agent definitions are hand-copied chronicle agent bodies with
-// OpenCode frontmatter on top. Ten of the thirteen bodies are byte-identical to
+// OpenCode frontmatter on top. Nine of the eleven bodies are byte-identical to
 // their chronicle source, so an edit to a chronicle agent that never reaches the
 // copy is a silent fork of ~1,600 lines. This pins that identity: drift becomes
 // a test failure instead of two agents quietly disagreeing.
 //
-// The three orchestrators are exempt because their bodies genuinely differ —
-// they carry the OpenCode `task` spawn wording and the `subagent_depth`
+// The two remaining orchestrators are exempt because their bodies genuinely
+// differ — they carry the OpenCode `task` spawn wording and the `subagent_depth`
 // prerequisite, neither of which belongs in the Claude copy. Their *shared*
 // prose is unguarded; that is the known cost of the hand-copy model.
-const DIVERGENT = new Set(["lawspeaker", "storykeeper", "lorekeeper"]);
+const DIVERGENT = new Set(["storykeeper", "lorekeeper"]);
 
 const repoRoot = resolve(import.meta.dir, "..");
 
@@ -33,11 +33,9 @@ const agents = [
   "lorekeeper",
   "messenger",
   "reckoner",
-  "runesmith",
   "skald",
   "skirnir",
   "storykeeper",
-  "watcher",
 ];
 
 describe("opencode agents track their chronicle sources", () => {

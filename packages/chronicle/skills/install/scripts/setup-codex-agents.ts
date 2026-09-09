@@ -12,8 +12,6 @@ import { dirname, join, resolve } from "node:path";
 
 const ROLES = [
   "lawspeaker",
-  "watcher",
-  "runesmith",
   "storykeeper",
   "skald",
   "messenger",
@@ -25,7 +23,15 @@ const ROLES = [
   "codifier",
   "barrowkeeper",
 ] as const;
-const RETIRED_ROLES = ["hammerbearer", "oathkeeper", "seer", "smith"] as const;
+const RETIRED_ROLES = [
+  "hammerbearer",
+  "oathkeeper",
+  "seer",
+  "smith",
+  // Folded into the Lawspeaker, which now runs the commit scripts itself.
+  "watcher",
+  "runesmith",
+] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
 
@@ -44,8 +50,6 @@ function withoutManagedBlock(config: string): string {
 function managedBlock(targetDir: string): string {
   const descriptions = {
     lawspeaker: "Own the Chronicle commit flow and report its result.",
-    watcher: "Group and order the current changeset without committing.",
-    runesmith: "Run the Chronicle commit script and report its result.",
     storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
     skald: "Analyze a branch and draft pull request material.",
     messenger: "Create a pull request from confirmed material.",

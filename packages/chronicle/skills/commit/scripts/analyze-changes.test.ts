@@ -11,6 +11,7 @@ import {
   parseNumstat,
   parseStatus,
   parseStatusRecords,
+  renderDigest,
   shouldSkipDiff,
   unquoteGitPath,
   verifyPlanLanded,
@@ -194,6 +195,73 @@ describe("parseNumstat", () => {
 
   test("treats empty output as zero", () => {
     expect(parseNumstat("")).toEqual({ insertions: 0, deletions: 0 });
+  });
+});
+
+describe("renderDigest", () => {
+  function analyzed(path: string, diff: string) {
+    return {
+      path,
+      staged: false,
+      status: "modified" as const,
+      insertions: 1,
+      deletions: 0,
+      diff,
+    };
+  }
+
+  function analysisOf(...files: ReturnType<typeof analyzed>[]) {
+    return {
+      files,
+      summary: files.map(({ diff, ...rest }) => rest),
+      recentCommits: ["abc1234 🔧 chore: init"],
+      elidedFiles: 0,
+    };
+  }
+
+  const TEMPLATE = "# Commit template\n\n- keep it terse\n";
+
+  test("carries the template and every path without a second read", () => {
+    const digest = renderDigest(
+      analysisOf(analyzed("a.ts", "+a"), analyzed("b.ts", "+b")),
+      TEMPLATE,
+      "/tmp/chronicle/commit/analysis-1.json",
+    );
+
+    expect(digest).toContain("- keep it terse");
+    expect(digest).toContain("/tmp/chronicle/commit/analysis-1.json");
+    expect(digest).toContain("a.ts");
+    expect(digest).toContain("b.ts");
+    expect(digest).toContain("+a");
+    expect(digest).toContain("abc1234 🔧 chore: init");
+  });
+
+  test("holds back the largest diffs, naming them, to stay under budget", () => {
+    const digest = renderDigest(
+      analysisOf(
+        analyzed("small.ts", "+s"),
+        analyzed("huge.ts", "x".repeat(5000)),
+      ),
+      TEMPLATE,
+      "/tmp/payload.json",
+      1000,
+    );
+
+    expect(digest).not.toContain("x".repeat(5000));
+    expect(digest).toContain("1 diff(s) held back");
+    expect(digest).toContain("huge.ts");
+    // The parts every run needs survive the budget; only diff detail goes.
+    expect(digest).toContain("+s");
+    expect(digest).toContain("- keep it terse");
+  });
+
+  test("says nothing about a budget it never hit", () => {
+    const digest = renderDigest(
+      analysisOf(analyzed("a.ts", "+a")),
+      TEMPLATE,
+      "/tmp/payload.json",
+    );
+    expect(digest).not.toContain("held back");
   });
 });
 

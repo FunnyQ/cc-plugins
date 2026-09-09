@@ -41,8 +41,8 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 | [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, and (in the `auto` modes) commit, merge, tag, and push |
 | [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the nested-subagent spawn depth on Claude Code, the named agent roles on Codex |
 
-> **Claude Code 2.1.217+ requires one setting.** Chronicle's `commit`, `pr`, and `adr`
-> flows are orchestrator-shaped (`main → lawspeaker → watcher/runesmith`), and 2.1.217
+> **Claude Code 2.1.217+ requires one setting.** Chronicle's `pr` and `adr`
+> flows are orchestrator-shaped (`main → storykeeper → skald/messenger`), and 2.1.217
 > stopped letting subagents spawn nested subagents by default. Without it those flows
 > fail with `Agent exists but is not enabled in this context`. A `SessionStart` hook writes
 > `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` into `~/.claude/settings.json` for you —
@@ -315,11 +315,11 @@ If you previously ran the old manual symlink (`ln -s .../packages/relay/skills/r
 
 ## chronicle
 
-Chronicle authors your git history — what a commit says, what a pull request argues, and what a release ships. Every skill has the same shape: a thin `SKILL.md` spawns a nested orchestrator that holds the decision, and the orchestrator delegates the mechanical work to cheap child agents. Diff-reading and git output stay out of your conversation.
+Chronicle authors your git history — what a commit says, what a pull request argues, and what a release ships. Every skill has the same shape: a thin `SKILL.md` spawns an agent that holds the decision and runs the mechanical work. Diff-reading and git output stay out of your conversation.
 
-- **commit** — a Haiku watcher reports the changeset, the orchestrator picks one commit or an atomic split, and a second Haiku agent stages whole files and writes the messages. Pass `simple` to force one commit.
+- **commit** — one agent reads the changeset, cuts it into commits that each build on their own, and writes the messages; a script decides whether the split is worth keeping and does the staging. Pass `simple` to force one commit.
 - **pr** — reads the branch, harvests the cockpit decision trail when one exists, and opens a GitHub PR or GitLab MR with a title, a four-section body, and an optional Mermaid overview diagram. The trail is an enrichment, not a requirement; an unrecognized remote stops the flow rather than guessing.
-- **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, then bumps the version files and writes the CHANGELOG entry. `auto` also commits and tags, locally; only `auto push` pushes.
+- **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, then bumps the version files and writes the CHANGELOG entry, commits, tags, and pushes. Pass `local` to stop before the push, or `prepare` to stop after the entry.
 - **install** — sets up each harness's prerequisite: on Claude Code the nested-subagent spawn-depth setting described in the Plugins section above, on Codex the named agent roles the orchestrators are addressed by.
 
 ### Installation

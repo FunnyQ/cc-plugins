@@ -29,11 +29,9 @@ describe("setup-codex-agents", () => {
     const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(13);
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(11);
     for (const role of [
       "lawspeaker",
-      "watcher",
-      "runesmith",
       "storykeeper",
       "skald",
       "messenger",
@@ -59,8 +57,6 @@ describe("setup-codex-agents", () => {
     expect(config).toContain('model = "gpt-5"');
     expect(config).toContain("# BEGIN chronicle codex agents");
     expect(config).toContain("[agents.chronicle_lawspeaker]");
-    expect(config).toContain("[agents.chronicle_watcher]");
-    expect(config).toContain("[agents.chronicle_runesmith]");
     expect(config).toContain("[agents.chronicle_storykeeper]");
     expect(config).toContain("[agents.chronicle_skald]");
     expect(config).toContain("[agents.chronicle_messenger]");
@@ -69,8 +65,6 @@ describe("setup-codex-agents", () => {
     const installed = Object.fromEntries(
       [
         "lawspeaker",
-        "watcher",
-        "runesmith",
         "storykeeper",
         "skald",
         "messenger",
@@ -90,12 +84,7 @@ describe("setup-codex-agents", () => {
       ]),
     );
     expect(installed.lawspeaker).toContain('model = "gpt-5.6-terra"');
-    expect(installed.lawspeaker).toContain("chronicle_watcher");
-    expect(installed.lawspeaker).toContain("chronicle_runesmith");
-    expect(installed.watcher).toContain('model = "gpt-5.6-luna"');
-    expect(installed.runesmith).toContain('model = "gpt-5.6-luna"');
-    expect(installed.runesmith).toContain("commit.ts apply");
-    expect(installed.watcher).toContain("commit.ts propose");
+    expect(installed.lawspeaker).toContain("commit.ts apply");
     expect(installed.storykeeper).toContain('model = "gpt-5.6-terra"');
     expect(installed.storykeeper).toContain("chronicle_skald");
     expect(installed.storykeeper).toContain("chronicle_messenger");

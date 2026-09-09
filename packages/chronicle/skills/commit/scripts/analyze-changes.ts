@@ -13,6 +13,12 @@ const DEFAULT_PROMPT_PATH = resolve(
 const MAX_DIFF_LINES = 400;
 const MAX_TOTAL_DIFF_LINES = 3000;
 const MAX_UNTRACKED_INLINE_BYTES = 256 * 1024;
+/**
+ * Kept under the harness's Bash-output ceiling, so the digest lands whole in one
+ * tool result instead of being cut mid-diff. The payload file stays complete —
+ * this budget shapes the reply, not the analysis.
+ */
+const MAX_DIGEST_CHARS = 40_000;
 
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 export type ParsedStatus = {
@@ -452,6 +458,71 @@ async function analyzeChanges(): Promise<AnalysisResult> {
   };
 }
 
+function fileLine(file: FileSummary): string {
+  const where = file.staged ? "staged  " : "unstaged";
+  const name = file.oldPath ? `${file.path}  (was ${file.oldPath})` : file.path;
+  return `${file.status.padEnd(8)} ${where}  ${name}  +${file.insertions}/-${file.deletions}`;
+}
+
+function diffSection(file: AnalyzedFile): string {
+  const where = file.staged ? "staged" : "unstaged";
+  return `### ${file.path} — ${file.status}, ${where}, +${file.insertions}/-${file.deletions}\n${file.diff}\n`;
+}
+
+/**
+ * Handing the analysis back on stdout is what removes two round trips — one to
+ * read the payload the script had just written, one to read the template it had
+ * only named. Diffs go last and drop largest-first, so a budgeted digest loses
+ * diff detail rather than the parts every run needs; `payloadPath` is where the
+ * dropped detail stays reachable.
+ */
+export function renderDigest(
+  analysis: AnalysisResult,
+  template: string,
+  payloadPath: string,
+  maxChars = MAX_DIGEST_CHARS,
+): string {
+  const head = [
+    `# Changeset — ${analysis.files.length} files, ${analysis.elidedFiles} with an elided diff`,
+    `full payload: ${payloadPath}`,
+    "",
+    "## Files",
+    ...analysis.summary.map(fileLine),
+    "",
+    "## Recent commits, for style",
+    ...analysis.recentCommits,
+    "",
+    "## Commit message template",
+    template.trimEnd(),
+    "",
+    "## Diffs",
+    "",
+  ].join("\n");
+
+  const sections = analysis.files.map(diffSection);
+  const room = maxChars - head.length;
+  const biggestFirst = sections
+    .map((section, index) => ({ size: section.length, index }))
+    .sort((a, b) => b.size - a.size);
+
+  const dropped = new Set<number>();
+  let total = sections.reduce((sum, section) => sum + section.length, 0);
+  for (const { size, index } of biggestFirst) {
+    if (total <= room) break;
+    dropped.add(index);
+    total -= size;
+  }
+
+  const kept = sections
+    .filter((_, index) => !dropped.has(index))
+    .join("\n")
+    .trimEnd();
+  if (dropped.size === 0) return `${head}${kept}\n`;
+
+  const names = [...dropped].map((index) => analysis.files[index]?.path ?? "?");
+  return `${head}${kept}\n\n[${dropped.size} diff(s) held back to fit the digest: ${names.join(", ")}. Read them from the payload above if a grouping turns on them.]\n`;
+}
+
 export type PlanVerification = {
   ok: boolean;
   missing: string[];
@@ -550,16 +621,20 @@ async function main() {
     analyzeChanges(),
     resolvePromptPath(),
   ]);
-  const outputPath = await writeTempPayload("commit", "analysis", analysis);
 
-  console.log(
-    JSON.stringify({
-      outputPath,
-      promptPath,
-      totalFiles: analysis.files.length,
-      elidedFiles: analysis.elidedFiles,
-    }),
-  );
+  if (analysis.files.length === 0) {
+    console.log("# Changeset — nothing to commit");
+    return;
+  }
+
+  const [outputPath, template] = await Promise.all([
+    writeTempPayload("commit", "analysis", analysis),
+    readFile(promptPath, "utf-8").catch(
+      () => `[template unreadable at ${promptPath}]`,
+    ),
+  ]);
+
+  console.log(renderDigest(analysis, template, outputPath));
 }
 
 if (import.meta.main) {

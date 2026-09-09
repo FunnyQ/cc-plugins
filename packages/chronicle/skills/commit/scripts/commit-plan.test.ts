@@ -3,10 +3,12 @@ import {
   composeMessage,
   decideShape,
   resolveResumption,
+  resolveShapedCommits,
   validatePlan,
-  validateProposalDraft,
+  validatePlanFile,
   type CommitGroup,
   type CommitPlan,
+  type PlanDraft,
 } from "./commit-plan";
 import type { ParsedStatus } from "./analyze-changes";
 
@@ -176,100 +178,150 @@ describe("validatePlan", () => {
   });
 });
 
-describe("validateProposalDraft", () => {
+describe("validatePlanFile", () => {
   const draft = {
-    groups: [{ type: "feat", subject: "add a", files: ["a.ts"] }],
+    commits: [{ type: "feat", subject: "add a", files: ["a.ts"] }],
     mode: "auto",
     totalFiles: 1,
     elidedFiles: 0,
     moduleSpread: ["pkg"],
-    promptPath: "/home/q/.claude/commit-template.md",
     notes: ["only one group"],
   };
 
-  test("accepts a well-formed draft", () => {
-    expect(validateProposalDraft(draft)).toEqual([]);
+  const split = {
+    commits: [
+      { type: "feat", subject: "add a", files: ["a.ts"] },
+      { type: "docs", subject: "add b", files: ["b.md"] },
+    ],
+    simple: { type: "feat", subject: "add a and document it" },
+  };
+
+  test("accepts a well-formed one-group plan", () => {
+    expect(validatePlanFile(draft)).toEqual([]);
   });
 
-  test("requires promptPath — the Lawspeaker cannot write prose without it", () => {
-    const { promptPath, ...without } = draft;
-    expect(validateProposalDraft(without)).toHaveLength(1);
-    expect(validateProposalDraft({ ...draft, promptPath: "" })).toHaveLength(1);
+  test("accepts a split that carries its collapsed message", () => {
+    expect(validatePlanFile(split)).toEqual([]);
+  });
+
+  test("requires `simple` once there is more than one group", () => {
+    const { simple, ...without } = split;
+    expect(validatePlanFile(without)).toEqual([
+      "`simple` is missing — write the one-commit message these groups collapse into",
+    ]);
+  });
+
+  test("does not demand `simple` for a single group", () => {
+    expect(validatePlanFile({ commits: draft.commits })).toEqual([]);
+  });
+
+  test("rejects files on `simple` — they are every path in the plan", () => {
+    const errors = validatePlanFile({
+      ...split,
+      simple: { ...split.simple, files: ["a.ts"] },
+    });
+    expect(errors).toEqual(["remove `simple.files`"]);
+  });
+
+  test("names the missing field on `simple`", () => {
+    const errors = validatePlanFile({ ...split, simple: { type: "feat" } });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("simple.subject");
   });
 
   test("rejects a moduleSpread that is not a list of strings", () => {
     // A bare string passes `.length` and then throws inside decideShape's join.
-    expect(
-      validateProposalDraft({ ...draft, moduleSpread: "pkg" }),
-    ).toHaveLength(1);
-    expect(validateProposalDraft({ ...draft, notes: "one note" })).toHaveLength(
-      1,
-    );
-    expect(validateProposalDraft({ ...draft, moduleSpread: [1] })).toHaveLength(
-      1,
-    );
+    expect(validatePlanFile({ ...draft, moduleSpread: "pkg" })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, notes: "one note" })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, moduleSpread: [1] })).toHaveLength(1);
   });
 
   test("rejects a count that is not a non-negative number", () => {
-    expect(
-      validateProposalDraft({ ...draft, totalFiles: "seven" }),
-    ).toHaveLength(1);
-    expect(validateProposalDraft({ ...draft, elidedFiles: -1 })).toHaveLength(
-      1,
-    );
-  });
-
-  test("keeps the optional fields optional", () => {
-    expect(
-      validateProposalDraft({
-        groups: draft.groups,
-        promptPath: draft.promptPath,
-      }),
-    ).toEqual([]);
+    expect(validatePlanFile({ ...draft, totalFiles: "seven" })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, elidedFiles: -1 })).toHaveLength(1);
   });
 
   test("rejects anything that is not an object", () => {
-    expect(validateProposalDraft([draft])).toHaveLength(1);
-    expect(validateProposalDraft("groups")).toHaveLength(1);
+    expect(validatePlanFile([draft])).toHaveLength(1);
+    expect(validatePlanFile("commits")).toHaveLength(1);
   });
 
-  test("rejects a draft that decided the shape itself", () => {
-    const errors = validateProposalDraft({ ...draft, shape: "atomic" });
+  test("rejects a plan that decided the shape itself", () => {
+    const errors = validatePlanFile({ ...draft, shape: "atomic" });
     expect(errors).toEqual(["remove `shape` — the script decides it, not you"]);
   });
 
-  test("rejects a draft that pre-declared success", () => {
-    expect(validateProposalDraft({ ...draft, ok: true })).toHaveLength(1);
+  test("rejects a plan that pre-declared success", () => {
+    expect(validatePlanFile({ ...draft, ok: true })).toHaveLength(1);
   });
 
-  test("rejects empty or missing groups", () => {
-    expect(validateProposalDraft({ ...draft, groups: [] })).toHaveLength(1);
-    const { groups, ...without } = draft;
-    expect(validateProposalDraft(without)).toHaveLength(1);
+  test("rejects empty or missing commits", () => {
+    expect(validatePlanFile({ ...draft, commits: [] })).toHaveLength(1);
+    const { commits, ...without } = draft;
+    expect(validatePlanFile(without)).toHaveLength(1);
   });
 
   test("names the group and field that are wrong", () => {
-    const errors = validateProposalDraft({
-      ...draft,
-      groups: [
+    const errors = validatePlanFile({
+      ...split,
+      commits: [
         { type: "feat", subject: "add a", files: ["a.ts"] },
         { type: " ", files: [] },
       ],
     });
     expect(errors).toHaveLength(3);
-    expect(errors.every((error) => error.startsWith("groups[1]"))).toBe(true);
+    expect(errors.every((error) => error.startsWith("commits[1]"))).toBe(true);
   });
 
   test("rejects an absolute path", () => {
-    const errors = validateProposalDraft({
+    const errors = validatePlanFile({
       ...draft,
-      groups: [{ type: "feat", subject: "add a", files: ["/tmp/a.ts"] }],
+      commits: [{ type: "feat", subject: "add a", files: ["/tmp/a.ts"] }],
     });
     expect(errors[0]).toContain("absolute path");
   });
 
   test("rejects an unknown mode", () => {
-    expect(validateProposalDraft({ ...draft, mode: "atomic" })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, mode: "atomic" })).toHaveLength(1);
+  });
+});
+
+describe("resolveShapedCommits", () => {
+  const split: PlanDraft = {
+    commits: [
+      { type: "feat", subject: "add a", files: ["a.ts"] },
+      { type: "docs", subject: "add b", files: ["b.md", "a.ts"] },
+    ],
+    simple: {
+      type: "feat",
+      subject: "add a and document it",
+      body: "- both halves",
+      summary: "一起加。",
+    },
+  };
+
+  test("an atomic shape writes the groups untouched", () => {
+    expect(resolveShapedCommits(split, "atomic")).toEqual(split.commits);
+  });
+
+  test("a collapse takes `simple`'s prose over every path, deduplicated", () => {
+    expect(resolveShapedCommits(split, "simple")).toEqual([
+      {
+        type: "feat",
+        subject: "add a and document it",
+        body: "- both halves",
+        summary: "一起加。",
+        files: ["a.ts", "b.md"],
+      },
+    ]);
+  });
+
+  test("one group keeps its own prose, `simple` or not", () => {
+    const one: PlanDraft = {
+      commits: [{ type: "fix", subject: "patch it", files: ["a.ts"] }],
+      simple: { type: "feat", subject: "never used" },
+    };
+    expect(resolveShapedCommits(one, "simple")).toEqual(one.commits);
   });
 });
 

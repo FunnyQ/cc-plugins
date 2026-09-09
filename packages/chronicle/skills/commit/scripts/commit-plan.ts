@@ -13,7 +13,7 @@
 
 import type { ParsedStatus } from "./analyze-changes";
 
-/** One cohesive group of files, as proposed by the watcher. */
+/** One cohesive group of files, as cut by the Lawspeaker. */
 export type CommitGroup = {
   /** Optional: derived from `type` when absent. See `emojiFor`. */
   emoji?: string;
@@ -23,7 +23,7 @@ export type CommitGroup = {
   files: string[];
 };
 
-/** A group once the Lawspeaker has written its prose. */
+/** A group with its prose. */
 export type PlannedCommit = CommitGroup & {
   /** English markdown body. Omitted for a trivial one-liner. */
   body?: string;
@@ -45,7 +45,7 @@ export type ShapeDecision = {
 /**
  * Simple or atomic, with no human gate.
  *
- * `moduleSpread` comes from the watcher rather than from the paths here: what
+ * `moduleSpread` comes from the plan rather than from the paths here: what
  * counts as a module is repo-specific (`packages/x` in a monorepo, `app/models`
  * in a Rails tree), and guessing it from segment counts splits one of those two
  * repos wrongly every time.
@@ -160,44 +160,60 @@ export function validatePlan(
   };
 }
 
+/** The prose for the collapsed one-commit form. Its files are derived, not written. */
+export type SimpleProse = Omit<PlannedCommit, "files">;
+
 /**
- * What the watcher writes to disk: the groups, in commit order, plus the scalars
- * the shape decision needs. `shape` and `ok` are absent on purpose — the script
- * adds them, and a draft that already carries them was copied from the schema
- * rather than derived from the diff.
+ * `shape` is absent on purpose: the agent proposes a split and writes both
+ * messages, and the script alone decides which one gets written.
+ *
+ * Carrying both costs about 150 output tokens in the atomic case that discards
+ * `simple`. It buys the round trip a separate `propose` step used to spend
+ * settling the shape before any prose could be written.
  */
-export type ProposalDraft = {
-  groups: CommitGroup[];
-  /** The commit template, which the Lawspeaker reads. From analyze-changes stdout. */
-  promptPath: string;
+export type PlanDraft = {
+  commits: PlannedCommit[];
+  /** Required once `commits` holds more than one group. */
+  simple?: SimpleProse;
   mode?: "auto" | "simple";
   totalFiles?: number;
   elidedFiles?: number;
-  /** Top-level modules the changeset spans — repo-shaped, so the watcher judges it. */
+  /** Top-level modules the changeset spans — repo-shaped, so the agent judges it. */
   moduleSpread?: string[];
   /** Why the groups are in this order. */
   notes?: string[];
-  /** Set alone, with no groups, when there is nothing to commit. */
-  nothingToCommit?: boolean;
 };
+
+/**
+ * A single group stays as it is whatever the shape says: there is nothing to
+ * merge, and its own prose was written for exactly these files. Only a real
+ * collapse reaches for `simple`.
+ */
+export function resolveShapedCommits(
+  plan: PlanDraft,
+  shape: "simple" | "atomic",
+): PlannedCommit[] {
+  if (shape === "atomic" || plan.commits.length === 1) return plan.commits;
+
+  const files = [...new Set(plan.commits.flatMap((commit) => commit.files))];
+  return [{ ...(plan.simple as SimpleProse), files }];
+}
 
 function isFilledString(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
 
 /**
- * Whether a proposal draft is structurally usable, as a list of complaints.
- *
- * The watcher is a Haiku agent writing JSON by hand, so every field here has a
- * plausible way of arriving wrong: a group without files, an absolute path, the
- * shape it was told not to decide. Saying exactly what is wrong lets it fix the
- * file and re-run instead of handing the Lawspeaker something half-formed.
+ * Every field here has a plausible way of arriving wrong — a group without
+ * files, an absolute path, the shape it was told not to decide — and the agent
+ * writes this JSON by hand. Naming each fault lets one re-run fix all of them
+ * instead of trading a round trip per complaint.
  *
  * Coverage of the changeset is `validatePlan`'s job — it needs git, this does not.
  */
-export function validateProposalDraft(raw: unknown): string[] {
+export function validatePlanFile(raw: unknown): string[] {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return ["the proposal must be a JSON object"];
+    return ["the plan must be a JSON object"];
   }
 
   const draft = raw as Record<string, unknown>;
@@ -217,14 +233,6 @@ export function validateProposalDraft(raw: unknown): string[] {
     errors.push('`mode` must be "auto" or "simple"');
   }
 
-  // Required: the Lawspeaker reads the commit template from it, and it fails
-  // there — past the point where re-running the watcher is still an option.
-  if (!isFilledString(draft.promptPath)) {
-    errors.push(
-      "`promptPath` is missing — copy it from analyze-changes stdout",
-    );
-  }
-
   for (const key of ["moduleSpread", "notes"]) {
     const value = draft[key];
     if (value === undefined) continue;
@@ -233,7 +241,7 @@ export function validateProposalDraft(raw: unknown): string[] {
       value.some((item) => typeof item !== "string")
     ) {
       // A bare string survives `.length` and then throws inside decideShape's
-      // join, which reaches the watcher as a JS error it cannot act on.
+      // join, which reaches the agent as a JS error it cannot act on.
       errors.push(`\`${key}\` must be an array of strings`);
     }
   }
@@ -246,39 +254,67 @@ export function validateProposalDraft(raw: unknown): string[] {
     }
   }
 
-  if (!Array.isArray(draft.groups) || draft.groups.length === 0) {
-    errors.push("`groups` must be a non-empty array, in commit order");
+  if (!Array.isArray(draft.commits) || draft.commits.length === 0) {
+    errors.push("`commits` must be a non-empty array, in commit order");
     return errors;
   }
 
-  for (const [index, entry] of draft.groups.entries()) {
-    const at = `groups[${index}]`;
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
-      errors.push(`${at} must be an object`);
-      continue;
-    }
+  for (const [index, entry] of draft.commits.entries()) {
+    errors.push(...proseErrors(entry, `commits[${index}]`, true));
+  }
 
-    const candidate = entry as Record<string, unknown>;
-    if (!isFilledString(candidate.type)) {
-      errors.push(`${at}.type is missing — feat / fix / docs / chore / …`);
-    }
-    if (!isFilledString(candidate.subject)) {
-      errors.push(`${at}.subject is missing — imperative, no trailing period`);
-    }
-
-    const files = candidate.files;
-    if (!Array.isArray(files) || files.length === 0) {
+  // Demanded up front rather than after the shape is known, because finding out
+  // then costs the round trip this whole file exists to save.
+  if (draft.commits.length > 1) {
+    if (draft.simple === undefined) {
       errors.push(
-        `${at}.files must be a non-empty array of repo-relative paths`,
+        "`simple` is missing — write the one-commit message these groups collapse into",
       );
-      continue;
+    } else {
+      errors.push(...proseErrors(draft.simple, "simple", false));
     }
-    for (const path of files) {
-      if (!isFilledString(path)) {
-        errors.push(`${at}.files holds a non-string path`);
-      } else if ((path as string).startsWith("/")) {
-        errors.push(`${at}.files holds an absolute path: ${path}`);
-      }
+  }
+
+  return errors;
+}
+
+function proseErrors(
+  entry: unknown,
+  at: string,
+  needsFiles: boolean,
+): string[] {
+  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+    return [`${at} must be an object`];
+  }
+
+  const candidate = entry as Record<string, unknown>;
+  const errors: string[] = [];
+  if (!isFilledString(candidate.type)) {
+    errors.push(`${at}.type is missing — feat / fix / docs / chore / …`);
+  }
+  if (!isFilledString(candidate.subject)) {
+    errors.push(`${at}.subject is missing — imperative, no trailing period`);
+  }
+
+  if (!needsFiles) {
+    // Its files are every path in the plan, so one written here would either
+    // repeat them or silently disagree with them.
+    if ("files" in candidate) errors.push(`remove \`${at}.files\``);
+    return errors;
+  }
+
+  const files = candidate.files;
+  if (!Array.isArray(files) || files.length === 0) {
+    return [
+      ...errors,
+      `${at}.files must be a non-empty array of repo-relative paths`,
+    ];
+  }
+  for (const path of files) {
+    if (!isFilledString(path)) {
+      errors.push(`${at}.files holds a non-string path`);
+    } else if ((path as string).startsWith("/")) {
+      errors.push(`${at}.files holds an absolute path: ${path}`);
     }
   }
 
