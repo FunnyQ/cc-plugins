@@ -28,13 +28,13 @@ stop. Do not guess another path.
 
 ### Session — honor the parent handoff
 
-A `/thoughtful` background-fork prompt includes the **initiating parent
-session** id. Copy that literal value. Pass
-`--session <parent-session-id>` on every `cockpit scribe` call below:
-`--prep`, `--recent` if used, and every write. Never auto-resolve from inside a
-background fork. Context inheritance gives the fork the parent's
-conversation. The harness can still give the fork its own session or
-transcript id.
+A background-fork prompt carries the **initiating parent session** id as
+`--session <id>` — usually the whole prompt, because the fork inherits the
+conversation and needs nothing else told to it. Copy that literal value onto
+every `cockpit scribe` call below: `--prep`, `--recent` if used, and every
+write. Never auto-resolve from inside a background fork. Context inheritance
+gives the fork the parent's conversation. The harness can still give the fork
+its own session or transcript id.
 
 If a prompt identifies this invocation as a background fork but omits the
 parent session id, stop. Surface the missing handoff instead of risking a
@@ -58,9 +58,9 @@ PROVIDER_FLAG="--provider codex"
 # PROVIDER_FLAG=""
 ```
 
-Decide which surface you are on from the inherited context. The spawn
-prompt notes the surface. Use `$PROVIDER_FLAG` consistently in every call
-below.
+Decide which surface you are on from the inherited context, which carries
+the parent's harness. A Codex spawn prompt also says so outright. Use
+`$PROVIDER_FLAG` consistently in every call below.
 
 ### Run the prep bundle — BEFORE you write anything
 
