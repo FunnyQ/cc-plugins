@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 5.0.1] - 2026-09-10
+
+_tracks tag `monitor-v5.0.1`_
+
+### Fixed
+- Fixed a false "install source drifted" warning that appeared every session when both Claude Code and Codex had the same monitor release cached under their own separate cache roots — the two harnesses were repeatedly overwriting each other's statusline path in the shared settings file. A genuine version mismatch is still detected and reported.
+
 ## [herdr 0.7.4] - 2026-09-09
 
 _tracks tag `herdr-v0.7.4`_
