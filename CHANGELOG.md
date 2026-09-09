@@ -1,5 +1,14 @@
 # Changelog
 
+## [monitor 5.0.2] - 2026-09-10
+
+_tracks tag `monitor-v5.0.2`_
+
+### Changed
+- Cockpit's SessionStart and Stop hooks now resolve the parent session id themselves and bake the literal id into the scribe-fork spawn instructions they print, so the agent no longer has to run a separate lookup command before forking a scribe session.
+- The scribe-fork spawn prompt shrank to a single line (`Run /cockpit scribe --session <id>`), since the fork already inherits the full conversation and no longer needs the work re-described to it.
+- Hook guidance now explicitly tells the agent to stay silent about the scribe flow — no announcing before a spawn, no announcing a skip, and no relaying what the fork wrote back.
+
 ## [monitor 5.0.1] - 2026-09-10
 
 _tracks tag `monitor-v5.0.1`_
