@@ -278,9 +278,16 @@ const QLabPlugin = Object.assign(
         const messages: string[] = [];
         for (const item of pending.items) {
           if (item === CREATED_SEED) {
+            // The payload names the session the guidance tells the model to
+            // scribe against. `provider` marks it as ours: a directory lookup
+            // would pick whichever OpenCode session touched this worktree last.
             const result = await run(
               ["bun", join(root, DECISION_LOG_START)],
-              "{}",
+              JSON.stringify({
+                session_id: input.sessionID,
+                cwd,
+                provider: "opencode",
+              }),
             );
             if (result?.stderr) {
               await logFailure(client, result.stderr.trimEnd());
@@ -293,7 +300,11 @@ const QLabPlugin = Object.assign(
             // disables the nudge entirely. The payload is the behavior.
             const result = await run(
               ["bun", join(root, SCRIBE_NUDGE)],
-              JSON.stringify({ session_id: input.sessionID, cwd }),
+              JSON.stringify({
+                session_id: input.sessionID,
+                cwd,
+                provider: "opencode",
+              }),
             );
             if (result?.stderr) {
               await logFailure(client, result.stderr.trimEnd());
