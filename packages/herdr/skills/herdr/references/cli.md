@@ -2,6 +2,8 @@
 
 This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
+**Neither discovery surface is complete, and they truncate different things.** A bare group listing (`herdr pane`) abbreviates long option lists — it drops `--source detection` from `pane read` and `--session-start-source` from `pane report-agent-session`. A subcommand's `--help` (`herdr workspace close --help`) can omit an option the group listing shows, such as `--group`. Check both before concluding a flag is gone.
+
 Most commands output JSON for scripting.
 
 ## IDs are stable opaque handles
@@ -77,7 +79,7 @@ herdr workspace report-metadata <id> --source ID [--token NAME=VALUE] [--clear-t
 herdr workspace close <id> [--group]
 ```
 
-`workspace close` on a primary workspace no longer closes its open worktree workspaces implicitly. Pass `--group` to close the primary workspace and its linked worktree workspaces together; otherwise the group stays open.
+`workspace close` on a primary workspace no longer closes its open worktree workspaces implicitly. Pass `--group` to close the primary workspace and its linked worktree workspaces together; without it the close is refused with `workspace_group_close_required` and the group stays open. Never add `--group` merely to clear that refusal — it is the user's call.
 
 ## Worktrees
 ```bash
@@ -87,7 +89,7 @@ herdr worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) 
 herdr worktree remove --workspace ID [--force] [--trust-repository]
 ```
 
-`--trust-repository` grants per-request Git trust for one command, including an accessible Windows repository owned by another SID, without changing global Git configuration.
+`--trust-repository` grants per-request Git trust for one command, including an accessible Windows repository owned by another SID, without changing global Git configuration. Pass it only after the user has verified the repository. Do not retry a failed worktree command with it.
 
 ## Tabs
 ```bash
@@ -128,7 +130,7 @@ Pass `--right-click pane` to forward unmodified right-click gestures to a mouse-
 
 **Read output:**
 ```bash
-herdr pane read <id> [--source visible|recent|recent-unwrapped] [--lines N] [--format text|ansi] [--ansi] [--raw]
+herdr pane read <id> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi] [--raw]
 herdr pane read <id> --source visible --ansi
 ```
 
@@ -137,7 +139,7 @@ herdr pane read <id> --source visible --ansi
 | `visible` | Current rendered screen |
 | `recent` | Recent scrollback with wrapping |
 | `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
-| `detection` | Bottom-buffer snapshot used by agent screen detection (`agent read` only) |
+| `detection` | Bottom-buffer snapshot used by agent screen detection |
 
 `pane read` and `pane wait-output` accept `--flag=value` and take options before or after the pane id. `pane read` and `agent read` print plain text. Recent sources default to 80 rows when `--lines` is omitted. `visible` and `detection` return the full snapshot unless `--lines` limits them. An idle recognized agent at the transcript bottom can collect alternate-screen history when the requested line count exceeds its visible rows. A history request that needs this collection while the agent is working, blocked, or unknown returns `agent_not_idle`.
 
@@ -161,7 +163,8 @@ herdr pane report-agent <id> \
   [--agent-session-id ID] [--agent-session-path PATH]
 herdr pane report-agent-session <id> \
   --source ID --agent LABEL [--seq N] \
-  [--agent-session-id ID] [--agent-session-path PATH]
+  [--agent-session-id ID] [--agent-session-path PATH] \
+  [--session-start-source SOURCE]
 herdr pane release-agent <id> --source ID --agent LABEL [--seq N]
 ```
 
