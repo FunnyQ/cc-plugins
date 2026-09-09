@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { sameCollectorRelease } from "./statusline-decision";
 
 export type Level = "required" | "optional";
 export type Check = { label: string; ok: boolean; level: Level; hint?: string };
@@ -15,8 +16,9 @@ const HOME = homedir();
 // usage-dashboard assets live one skill over; resolve cross-skill from here.
 const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
 
-// Exported because "is the statusline wired?" is decided by STRING EQUALITY
-// against the command below. When setup.ts and setup-statusline.ts each built
+// Exported because "is the statusline wired?" is decided by comparing the
+// configured path against the one below. When setup.ts and setup-statusline.ts
+// each built
 // their own copy of this path, any drift between the literals made the drift
 // watch report "unwired" forever while --apply wrote a different value.
 export const COLLECTOR_SCRIPT = join(
@@ -113,16 +115,18 @@ export function dashboardChecks(): Check[] {
   }
   // Installed plugins live at version-pinned cache paths, so a configured path
   // can drift after `claude plugin update` — and the old cache dir often still
-  // exists, so existence isn't enough. Treat it as wired only if it points at
-  // the *exact* live collector path.
+  // exists, so existence isn't enough. Treat it as wired only if it names the
+  // same release, in this harness's cache or another's.
   const referencedCollector =
     statuslineCommand?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
-  const collectorWired = referencedCollector === COLLECTOR_SCRIPT;
+  const collectorWired =
+    referencedCollector !== null &&
+    sameCollectorRelease(referencedCollector, COLLECTOR_SCRIPT);
 
   let usageHint: string | undefined;
   if (!settingsReadable) {
     usageHint = `Couldn't parse ${settingsPath} — fix it, then add a statusLine command running: ${COLLECTOR_COMMAND}`;
-  } else if (referencedCollector && referencedCollector !== COLLECTOR_SCRIPT) {
+  } else if (referencedCollector && !collectorWired) {
     const pathVer = cachePathVersion(referencedCollector);
     const cur = pluginVersion();
     usageHint =

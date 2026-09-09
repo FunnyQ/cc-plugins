@@ -38,7 +38,11 @@ import {
   reapStaleMonitorProcesses,
 } from "./reap-stale";
 import { applyStatusline } from "./setup-statusline";
-import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
+import {
+  decideStatusLine,
+  sameCollectorRelease,
+  type StatusLineConfig,
+} from "./statusline-decision";
 
 const HOME = homedir();
 // Absolute path a user can paste into ~/.claude.json (no $CLAUDE_PLUGIN_ROOT there).
@@ -243,7 +247,7 @@ function applyStatuslinePiece(dryRun: boolean): boolean {
       return false;
     }
   }
-  const decision = decideStatusLine(statusLine, COLLECTOR_COMMAND, existsSync);
+  const decision = decideStatusLine(statusLine, COLLECTOR_COMMAND);
   if (decision.action === "skip") {
     console.log("○ statusline collector already wired — nothing to do.");
     return true;
@@ -327,7 +331,11 @@ function migrate(): string[] {
   }
 
   const sl = statuslineReferencedCollector();
-  if (sl && sl !== COLLECTOR_SCRIPT && applyStatuslinePiece(false)) {
+  if (
+    sl &&
+    !sameCollectorRelease(sl, COLLECTOR_SCRIPT) &&
+    applyStatuslinePiece(false)
+  ) {
     changed.push("statusline collector");
   }
 
@@ -366,7 +374,7 @@ function driftReport(): DriftItem[] {
   }
 
   const items: DriftItem[] = [];
-  if (collector !== COLLECTOR_SCRIPT) {
+  if (!sameCollectorRelease(collector, COLLECTOR_SCRIPT)) {
     items.push({
       key: "statusline-drift",
       message: `the statusline runs the collector from another install (${collector}). Run the /monitor:install skill to re-point it here.`,

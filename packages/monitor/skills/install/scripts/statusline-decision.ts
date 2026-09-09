@@ -20,15 +20,27 @@ export type StatusLineDecision =
       preserved: string | null;
     };
 
+// Claude caches the marketplace at `~/.claude/plugins/cache/…` and Codex at
+// `~/.codex/plugins/cache/…`, so the same release lives at two paths and only
+// the version segment tells two installs apart. Compare from the marketplace
+// segment down; without this the two harnesses re-point the shared
+// settings.json at each other forever, each calling the other a foreign install.
+export function sameCollectorRelease(a: string, b: string): boolean {
+  if (a === b) return true;
+  const suffix = (p: string) => p.split("/plugins/cache/")[1] ?? null;
+  const sa = suffix(a);
+  return sa !== null && sa === suffix(b);
+}
+
 // Decide how to wire `collectorCommand` into `statusLine`.
 //
-// - If the current command already points at the *exact* live collector path,
-//   there's nothing to do.
+// - If the current command already points at the live collector — the same path,
+//   or the same release in another harness's cache — there's nothing to do.
 // - Any other collector reference — a path that no longer exists, or an older
 //   plugin-cache version like `.../monitor/3.1.0/...` — is re-pointed to the
 //   live collector (dropped, not wrapped). This is what fixes version drift:
 //   the old cache dir may still exist on disk, so an existence check isn't
-//   enough; only an exact match to the current path counts as wired.
+//   enough; only `sameCollectorRelease` counts as wired.
 // - A non-collector command is preserved by running it as the collector's inner
 //   command (via the env var the collector reads).
 export function decideStatusLine(
@@ -42,7 +54,11 @@ export function decideStatusLine(
   const referencedCollector =
     existing?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
 
-  if (referencedCollector && referencedCollector === liveCollector) {
+  if (
+    referencedCollector &&
+    liveCollector &&
+    sameCollectorRelease(referencedCollector, liveCollector)
+  ) {
     return { action: "skip" };
   }
 
