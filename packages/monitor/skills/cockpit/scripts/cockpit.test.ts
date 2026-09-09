@@ -510,12 +510,15 @@ describe("cockpit scribe", () => {
     );
 
     expect(command).toContain("Before spawning");
-    expect(command).toContain("initiating parent session");
+    expect(command).toContain("initiating parent");
     expect(command).toContain("--session <parent-session-id>");
-    expect(guide).toContain("--session <parent-session-id>");
+    expect(guide).toContain("--session");
     expect(guide).toContain("Direct/manual");
+    // The hook resolves the id itself and bakes it in; only its fallback branch
+    // still asks the model to substitute one.
+    expect(sessionStart).toContain("--session ${sessionId}");
     expect(sessionStart).toContain("--session <parent-session-id>");
-    expect(sessionStart).toContain("fork must not resolve its own session");
+    expect(sessionStart).toContain("resolves its own session");
   });
 
   test("write mode: creates log file and record with correct shape", () => {

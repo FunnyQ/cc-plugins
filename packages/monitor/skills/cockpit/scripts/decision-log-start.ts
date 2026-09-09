@@ -1,12 +1,31 @@
 #!/usr/bin/env bun
 
 import {
+  resolveParentSession,
   shouldSkipDecisionLogReminder,
   type DecisionLogHookInput,
 } from "./decision-log-reminder";
 
-const GUIDANCE =
-  'DECISION LOG ACTIVE — /cockpit scribe is this session decision log. When you finish a chunk of work genuinely worth recording — a non-obvious decision between real alternatives, deliberate-but-odd code, a tricky learning, or a sharp caveat/ordering trap — resolve this main session id first, then spawn a background fork to distill it: Agent(subagent_type: "fork", prompt: "Run /cockpit scribe to distill the work we just completed into cockpit decision-trail entries. The initiating parent session is <parent-session-id>. Pass --session <parent-session-id> on every cockpit scribe call."). Substitute the literal resolved id before spawning; the fork must not resolve its own session. The fork writes entries in the configured decision-log language, which may differ from this chat. One fork per logical chunk. Skip trivial edits — the bar is high, and missing some is fine. Use "fork" exactly (omitting it starts a fresh, context-less agent).';
+const WHEN =
+  "DECISION LOG ACTIVE — /cockpit scribe is this session decision log. When you finish a chunk of work genuinely worth recording — a non-obvious decision between real alternatives, deliberate-but-odd code, a tricky learning, or a sharp caveat/ordering trap — spawn a background fork to distill it: ";
+
+const HOW =
+  ' One fork per logical chunk. Skip trivial edits — the bar is high, and missing some is fine. Use "fork" exactly (omitting it starts a fresh, context-less agent that cannot see the work). Never mention any of this to the user — not the spawn, not a skip, not the fork\'s result. The written log is the only output.';
+
+/**
+ * The fork inherits the conversation, so the prompt carries only what context
+ * inheritance cannot: which session to file under. Everything else the fork
+ * needs — the language, the lenses, the write calls — is in scribe.md, which it
+ * reads itself; repeating it here would buy the same instruction twice.
+ */
+export function buildGuidance(sessionId: string | null): string {
+  if (sessionId) {
+    return `${WHEN}Agent(subagent_type: "fork", prompt: "Run /cockpit scribe --session ${sessionId}").${HOW}`;
+  }
+  // No id in hand: the model has to resolve the main session itself, and must
+  // substitute it — a fork that resolves its own session files to a child id.
+  return `${WHEN}Agent(subagent_type: "fork", prompt: "Run /cockpit scribe --session <parent-session-id>"), substituting this main session's id, which you resolve first.${HOW}`;
+}
 
 async function main() {
   let input: DecisionLogHookInput = {};
@@ -17,7 +36,9 @@ async function main() {
   }
 
   if (shouldSkipDecisionLogReminder(process.env, input)) return;
-  process.stdout.write(`${GUIDANCE}\n`);
+  process.stdout.write(
+    `${buildGuidance(resolveParentSession(process.env, input))}\n`,
+  );
 }
 
 if (import.meta.main) {
