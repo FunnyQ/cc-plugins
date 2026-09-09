@@ -1,8 +1,8 @@
 # Release under the OpenCode harness
 
 Release is **flat**: the main skill spawns the leaf agents Skirnir and Annalist
-directly. It only ever spawns one level, so unlike commit, PR, and ADR it does
-**not** need `subagent_depth >= 2`.
+directly. It only ever spawns one level, so unlike PR and ADR it does
+**not** need `subagent_depth >= 2`. Commit is flat too.
 
 ## Agent names are bare
 

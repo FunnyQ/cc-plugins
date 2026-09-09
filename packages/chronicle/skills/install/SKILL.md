@@ -85,7 +85,7 @@ repository — not from the installed skill. It supports `--check`,
 `--dry-run`, `--apply`, and `--unlink`. On `--apply`, it raises
 `subagent_depth` to `2` in `~/.config/opencode/opencode.json`.
 
-This depth setting is mandatory for Chronicle's nested commit, PR, and ADR skills
+This depth setting is mandatory for Chronicle's nested PR and ADR skills
 to work. Below the required depth the orchestrator simply stops with no error
-naming the config. Release is flat, spawns only one level, and does not need the
-depth setting.
+naming the config. Commit and release are flat — commit's lawspeaker runs its own
+scripts, release spawns leaf agents directly — so neither needs the depth setting.
