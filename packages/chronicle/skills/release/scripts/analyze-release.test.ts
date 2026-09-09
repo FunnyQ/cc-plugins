@@ -3,6 +3,7 @@ import {
   agreedVersion,
   applyVersionToContent,
   artifactCommand,
+  briefFacts,
   cargoLockSpec,
   cargoPackageName,
   computeBumps,
@@ -27,6 +28,43 @@ describe("normalizeVersion", () => {
   test("strips a leading v", () => {
     expect(normalizeVersion("v1.2.3")).toBe("1.2.3");
     expect(normalizeVersion("1.2.3")).toBe("1.2.3");
+  });
+});
+
+describe("briefFacts", () => {
+  const payload = {
+    outputPath: "/tmp/chronicle/release/analysis-1.json",
+    branch: "main",
+    workflowDrift: null,
+    versionFileDrift: [],
+    hasConfig: true,
+    config: { mode: "per-component" },
+    suggested: { mode: "whole-repo" },
+    tags: ["chronicle-v0.1.0", "chronicle-v0.2.0"],
+    components: [{ name: "chronicle", commitCount: 4 }],
+  };
+
+  test("keeps every field the version gate reads", () => {
+    const brief = briefFacts(payload);
+
+    expect(brief).toEqual({
+      outputPath: "/tmp/chronicle/release/analysis-1.json",
+      branch: "main",
+      workflowDrift: null,
+      versionFileDrift: [],
+      hasConfig: true,
+      components: [{ name: "chronicle", commitCount: 4 }],
+    });
+  });
+
+  // Without a config there is nothing on disk to interview from, so the detected
+  // shape is the one field a first run cannot lose.
+  test("returns suggested on a first run", () => {
+    const brief = briefFacts({ ...payload, hasConfig: false, config: null });
+
+    expect(brief.suggested).toEqual({ mode: "whole-repo" });
+    expect(brief).not.toHaveProperty("config");
+    expect(brief).not.toHaveProperty("tags");
   });
 });
 

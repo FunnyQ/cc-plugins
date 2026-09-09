@@ -921,6 +921,20 @@ async function perComponentFacts(
   );
 }
 
+/** What the version gate actually reads, which is a third of what the analysis
+ *  holds. `tags` is every tag in the repo — the largest field and one no caller has
+ *  ever used. `config` and `suggested` are the two halves of one question: with a
+ *  committed config the caller reads `.chronicle/release.json` itself; without one it
+ *  interviews from `suggested`. Dropping them is a pure function of the payload, so
+ *  the script owes the caller the short form — a sub-agent retyping this JSON to the
+ *  same end could mistype a version instead. */
+export function briefFacts(
+  full: Record<string, unknown>,
+): Record<string, unknown> {
+  const { tags, config, suggested, ...rest } = full;
+  return full.hasConfig ? rest : { ...rest, suggested };
+}
+
 async function main() {
   const { values } = parseArgs({
     args: process.argv.slice(2),
@@ -929,6 +943,7 @@ async function main() {
       apply: { type: "string" },
       component: { type: "string" },
       "save-config": { type: "string" },
+      full: { type: "boolean" },
     },
   });
 
@@ -1028,7 +1043,10 @@ async function main() {
   };
 
   const outputPath = await writeTempPayload("release", "analysis", out);
-  console.log(JSON.stringify({ outputPath, ...out }, null, 2));
+  const printed = { outputPath, ...out };
+  console.log(
+    JSON.stringify(values.full ? printed : briefFacts(printed), null, 2),
+  );
 }
 
 if (import.meta.main) {
