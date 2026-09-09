@@ -20,11 +20,12 @@ You own the two things a script cannot do: **asking which version to cut**, and 
 on a first run — **interviewing the repo's shape**. The changelog entry needs
 judgment too, so one agent writes it.
 
-Run the scripts yourself, with Bash. Each prints a short JSON digest — a few
-kilobytes, already the shape the gates read — so relaying it through an
-errand-runner bought nothing and put a model between you and a version number.
-The full analysis stays on disk at `outputPath` when you need it. Only the
-changelog entry goes to an agent, because only it reads a whole range of commits.
+Run the scripts yourself, with Bash. Each prints four or five lines — the gate's
+own questions, answered — so relaying them through an errand-runner would put a
+model between you and a version number to save nothing. The full analysis stays on
+disk at `outputPath`, and `--json` prints it instead when you need a field the
+digest leaves out. Only the changelog entry goes to an agent, because only it reads
+a whole range of commits.
 
 ## Stages
 
@@ -79,8 +80,11 @@ a usable result — the blocked stage in step 4. **Every other non-zero exit end
 release**: report the exit code and the last meaningful line of stderr, summarizing a
 stack trace to its message rather than pasting it, and stop. Exit 2 means the script
 refused before doing anything — no config, malformed `units`, a missing `--through` —
-so there is no `stages[]` to read and nothing to carry forward. A script that exits 0
+so there is no digest to read and nothing to carry forward. A script that exits 0
 but prints nothing is a failure too, and say so instead of guessing what it meant.
+
+Each command prints a digest for you to act on, never for a machine to parse. Quote a
+line back to the user when it matters; do not paste the whole block into your reply.
 
 ## Your job
 
@@ -96,12 +100,21 @@ not rely on `${CLAUDE_PLUGIN_ROOT}`, and never leave a `$`-prefixed token in the
 command — nothing sets that variable, so it expands to empty and the command runs
 against `/`.
 
-You get back `hasConfig`, `workflow`, `workflowDrift`, `versionFileDrift`,
-`branch`, `outputPath`, and either a whole-repo `current`/`bumps`/`lastTag` or a
-`components[]` list with each unit's `current`, `lastTag`, `commitCount`, and
-`fileVersion`. `suggested` is there only on a first run; `tags` and `config` never
-are — read `.chronicle/release.json` for the committed config, or `outputPath` for
-the whole analysis. `--full` prints everything, for debugging only.
+You get one line per changed unit, one collapsing the unchanged ones, the config
+and branch, and the payload path:
+
+```
+chronicle  0.15.1 → patch 0.15.2 · minor 0.16.0 · major 1.0.0   6 commits since chronicle-v0.15.1
+unchanged  dispatch guard herdr monitor relay
+config     github-flow · branch main · no drift
+payload    /tmp/chronicle/release/analysis-….json
+```
+
+`[files already at X]` on a unit's line is the `fileVersion` case in step 3.
+Either drift prints in capitals on the `config` line — read the payload for its
+details, and handle it before the gate. `--json` prints the digest's source, and
+`--full` adds `tags`, `config`, and `suggested` back; a first run needs `suggested`,
+so use `--full` there or read the payload.
 
 If `workflowDrift` is set, the committed config still says git-flow but its
 `missingBranch` is gone. Say so **before** the gate and offer the one-time edit
@@ -152,7 +165,9 @@ target instead of asking for a bump. Confirm it; do not bump on top of it.
 bun "{SKILL_DIR}/scripts/release.ts" plan --units '{units}'
 ```
 
-Read `stages[]`. Exit 1 means something is **blocked** — report the `note` and stop.
+The `stages` line lists them in order, a done one marked `✓`. The `entry` line
+carries everything step 5 hands the annalist. Exit 1 means something is
+**blocked** — a `BLOCKED` line names the stage and the reason. Report it and stop.
 A blocked stage is always a state the user must resolve (a tag already on another
 commit, a `main` behind its remote); never work around it.
 
@@ -168,10 +183,10 @@ Agent({
 })
 ```
 
-`changelogPath` and each entry's `headerLabel`, `tagName`, `pathScope`, and
-`lastTag` all come from the plan — you never need the raw config for this. Skip this
-whenever `entry` already reads done — the entry exists, and a second one for the
-same version is a duplicate heading.
+`changelogPath` and each entry's `headerLabel`, `pathScope`, and `lastTag` are the
+plan's `entry` line, and `tagName` is its `plan` line — you never need the raw config
+for this. Skip this whenever `entry` reads `entry✓` — the entry exists, and a second
+one for the same version is a duplicate heading.
 
 ### 6. Run
 
@@ -183,9 +198,10 @@ decline as `--through tag` rather than a stop.
 bun "{SKILL_DIR}/scripts/release.ts" run --units '{units}' --through "{stage}"
 ```
 
-The result names `executed[]`, `skipped[]`, `releaseCommit`, `tags[]`, and `branch`.
+The result names what executed, what it skipped, the release commit, and the tags.
 A stage that runs without taking effect aborts the release — the engine will not
-report a tag it did not cut.
+report a tag it did not cut. `executed   nothing` on a resumed run means every
+stage was already done, not that the run failed.
 
 ### 7. Verify before reporting
 
