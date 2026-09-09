@@ -38,7 +38,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 |-------|-------------|
 | [commit](./packages/chronicle/skills/commit) | Craft git commit(s) for the current changes — auto-decides between one simple commit and an atomic split |
 | [pr](./packages/chronicle/skills/pr) | Open a reviewer-legible PR/MR for the current branch, enriched by the cockpit decision trail when present |
-| [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, and (in the `auto` modes) commit, merge, tag, and push |
+| [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, then commit, merge, tag, and push; `local` stops before the push, `prepare` after the entry |
 | [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the nested-subagent spawn depth on Claude Code, the named agent roles on Codex |
 
 > **Claude Code 2.1.217+ requires one setting.** Chronicle's `pr` and `adr`
