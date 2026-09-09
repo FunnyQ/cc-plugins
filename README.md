@@ -315,7 +315,7 @@ If you previously ran the old manual symlink (`ln -s .../packages/relay/skills/r
 
 ## chronicle
 
-Chronicle authors your git history — what a commit says, what a pull request argues, and what a release ships. Every skill has the same shape: a thin `SKILL.md` spawns an agent that holds the decision and runs the mechanical work. Diff-reading and git output stay out of your conversation.
+Chronicle authors your git history — what a commit says, what a pull request argues, and what a release ships. A thin `SKILL.md` sends the bulky reading to an agent — a diff, a branch, a range of commits — and keeps the decisions where you can see them. Diff-reading and git output stay out of your conversation.
 
 - **commit** — one agent reads the changeset, cuts it into commits that each build on their own, and writes the messages; a script decides whether the split is worth keeping and does the staging. Pass `simple` to force one commit.
 - **pr** — reads the branch, harvests the cockpit decision trail when one exists, and opens a GitHub PR or GitLab MR with a title, a four-section body, and an optional Mermaid overview diagram. The trail is an enrichment, not a requirement; an unrecognized remote stops the flow rather than guessing.
