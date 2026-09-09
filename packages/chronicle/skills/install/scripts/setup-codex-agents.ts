@@ -15,7 +15,6 @@ const ROLES = [
   "storykeeper",
   "skald",
   "messenger",
-  "skirnir",
   "annalist",
   "lorekeeper",
   "gleaner",
@@ -23,7 +22,9 @@ const ROLES = [
   "codifier",
   "barrowkeeper",
 ] as const;
-const RETIRED_ROLES = [
+/** Exported so the test enumerates this list rather than a hand-copied sample of it.
+ *  A sample drifts silently and misses exactly the name nobody remembered to add. */
+export const RETIRED_ROLES = [
   "hammerbearer",
   "oathkeeper",
   "seer",
@@ -31,6 +32,8 @@ const RETIRED_ROLES = [
   // Folded into the Lawspeaker, which now runs the commit scripts itself.
   "watcher",
   "runesmith",
+  // Same for release: the skill runs its own scripts, so the errand-runner is gone.
+  "skirnir",
 ] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
@@ -53,7 +56,6 @@ function managedBlock(targetDir: string): string {
     storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
     skald: "Analyze a branch and draft pull request material.",
     messenger: "Create a pull request from confirmed material.",
-    skirnir: "Run the Chronicle release scripts and report their result.",
     annalist: "Write user-facing release changelog entries.",
     lorekeeper:
       "Orchestrate Chronicle ADR triage, promotion, and supersession.",
@@ -130,4 +132,4 @@ function main() {
   console.log("Start a new Codex thread to load the named roles.");
 }
 
-main();
+if (import.meta.main) main();

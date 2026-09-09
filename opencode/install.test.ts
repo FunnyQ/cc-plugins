@@ -48,7 +48,7 @@ const EXPECTED_SKILL_NAMES = [
 
 // Non-skill targets, each fixed by a directory this installer owns.
 const PLUGIN_TARGETS = 1;
-const AGENT_TARGETS = 11;
+const AGENT_TARGETS = 10;
 const COMMAND_TARGETS = 2;
 const CONFIG_TARGETS = 1;
 

@@ -20,11 +20,11 @@ You own the two things a script cannot do: **asking which version to cut**, and 
 on a first run — **interviewing the repo's shape**. The changelog entry needs
 judgment too, so one agent writes it.
 
-You never run the scripts yourself. **Skirnir** runs them and returns only the
-distilled result, so analyzer blobs, git output, and stack traces stay out of this
-conversation. Spawn it with `subagent_type: "chronicle:skirnir"`, one call at a
-time, no `name`, **never a fork** — a fork inherits this whole conversation, which
-is the opposite of what it is for.
+Run the scripts yourself, with Bash. Each prints a short JSON digest — a few
+kilobytes, already the shape the gates read — so relaying it through an
+errand-runner bought nothing and put a model between you and a version number.
+The full analysis stays on disk at `outputPath` when you need it. Only the
+changelog entry goes to an agent, because only it reads a whole range of commits.
 
 ## Stages
 
@@ -66,20 +66,42 @@ cuts a coordinated release: one commit, N scoped tags. A bare version token only
 disambiguates a single-unit release — with several components named, ignore it and
 ask each bump. A per-component `chronicle@0.5.1` form is fine if the user writes it.
 
+## Running the scripts
+
+Run each command **once per step**. `plan` then `run` are two different commands, not
+a rerun, and re-running `run` after an artifact rebuild is the documented fix, not a
+retry. What is forbidden is reaching for a *different* command after one fails: never
+rerun a failed command with changed flags, never substitute another script, and never
+hand-roll the git a stage would have done.
+
+Read the exit code, not just stdout. `plan`'s exit 1 is the one non-zero that carries
+a usable result — the blocked stage in step 4. **Every other non-zero exit ends the
+release**: report the exit code and the last meaningful line of stderr, summarizing a
+stack trace to its message rather than pasting it, and stop. Exit 2 means the script
+refused before doing anything — no config, malformed `units`, a missing `--through` —
+so there is no `stages[]` to read and nothing to carry forward. A script that exits 0
+but prints nothing is a failure too, and say so instead of guessing what it meant.
+
 ## Your job
 
 ### 1. Facts
 
-Spawn Skirnir with `command: "facts"` and the **skill directory** — the skill's
-load-time "Base directory for this skill" banner. Do not hard-code a path or rely
-on `${CLAUDE_PLUGIN_ROOT}`. Pass it as a literal absolute path, never as a
-`$`-prefixed token — nothing sets that variable in a child's shell, so its
-command silently runs against `/`.
+```bash
+bun "{SKILL_DIR}/scripts/analyze-release.ts"
+```
 
-You get back `hasConfig`, `config`, `suggested`, `workflow`, `workflowDrift`,
-`versionFileDrift`, `branch`, and either a whole-repo `current`/`bumps`/`lastTag` or a
+`{SKILL_DIR}` is the skill's load-time "Base directory for this skill" banner.
+Substitute the literal absolute path before running. Do not hard-code a path, do
+not rely on `${CLAUDE_PLUGIN_ROOT}`, and never leave a `$`-prefixed token in the
+command — nothing sets that variable, so it expands to empty and the command runs
+against `/`.
+
+You get back `hasConfig`, `workflow`, `workflowDrift`, `versionFileDrift`,
+`branch`, `outputPath`, and either a whole-repo `current`/`bumps`/`lastTag` or a
 `components[]` list with each unit's `current`, `lastTag`, `commitCount`, and
-`fileVersion`.
+`fileVersion`. `suggested` is there only on a first run; `tags` and `config` never
+are — read `.chronicle/release.json` for the committed config, or `outputPath` for
+the whole analysis. `--full` prints everything, for debugging only.
 
 If `workflowDrift` is set, the committed config still says git-flow but its
 `missingBranch` is gone. Say so **before** the gate and offer the one-time edit
@@ -101,8 +123,7 @@ vs per-component, git-flow vs github-flow, the tag template, the version files, 
 branch names. Add a capture-group `pattern` for odd locations like a Rails
 `config/application.rb` — `suggested` will not include those.
 
-Tell Skirnir to pass `--persist-config` on the first `run`, which adds the
-`save-config` stage.
+Pass `--persist-config` on the first `run`, which adds the `save-config` stage.
 
 ### 3. Version gate
 
@@ -127,7 +148,11 @@ target instead of asking for a bump. Confirm it; do not bump on top of it.
 
 ### 4. Plan
 
-Spawn Skirnir with `command: "plan"` and `units`. Read `stages[]`. Exit 1 means something is **blocked** — report the `note` and stop.
+```bash
+bun "{SKILL_DIR}/scripts/release.ts" plan --units '{units}'
+```
+
+Read `stages[]`. Exit 1 means something is **blocked** — report the `note` and stop.
 A blocked stage is always a state the user must resolve (a tag already on another
 commit, a `main` behind its remote); never work around it.
 
@@ -154,7 +179,11 @@ On a `push` run, confirm the publish first — the remote, the branches, and the
 names, as one question. Ask it even when the version gate never ran, and treat a
 decline as `--through tag` rather than a stop.
 
-Spawn Skirnir with `command: "run"`, `units`, and `through`. The result names `executed[]`, `skipped[]`, `releaseCommit`, `tags[]`, and `branch`.
+```bash
+bun "{SKILL_DIR}/scripts/release.ts" run --units '{units}' --through "{stage}"
+```
+
+The result names `executed[]`, `skipped[]`, `releaseCommit`, `tags[]`, and `branch`.
 A stage that runs without taking effect aborts the release — the engine will not
 report a tag it did not cut.
 
@@ -189,11 +218,10 @@ host guard may still prompt. Answer it; don't work around it.
 
 ## Codex
 
-Same flow, same two roles. Spawn the registered `chronicle_skirnir` for each script
-call and the registered `chronicle_annalist` for the entry — or — with a generic sub-agent API only —
-non-fork generic agents named `chronicle_skirnir` and `chronicle_annalist`, each
-told to read and obey its own TOML under `$CODEX_HOME/agents/chronicle/` (default
-`$CODEX_HOME` to `~/.codex`).
+Same flow, one role. Run the scripts yourself and spawn the registered
+`chronicle_annalist` for the entry — or — with a generic sub-agent API only — a
+non-fork generic agent named `chronicle_annalist`, told to read and obey its TOML
+under `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`).
 Never paste or improvise the role instructions. If it is missing, tell the user to
 run `chronicle:install`.
 

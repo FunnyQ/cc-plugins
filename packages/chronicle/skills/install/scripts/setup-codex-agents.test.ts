@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { RETIRED_ROLES } from "./setup-codex-agents";
+
 const script = resolve(import.meta.dir, "setup-codex-agents.ts");
 const pluginRoot = resolve(import.meta.dir, "../../..");
 let codexHome: string;
@@ -29,13 +31,12 @@ describe("setup-codex-agents", () => {
     const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(11);
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(10);
     for (const role of [
       "lawspeaker",
       "storykeeper",
       "skald",
       "messenger",
-      "skirnir",
       "annalist",
       "lorekeeper",
       "gleaner",
@@ -68,7 +69,6 @@ describe("setup-codex-agents", () => {
         "storykeeper",
         "skald",
         "messenger",
-        "skirnir",
         "annalist",
         "lorekeeper",
         "gleaner",
@@ -110,17 +110,19 @@ describe("setup-codex-agents", () => {
     expect(config.match(/\[agents\.chronicle_lawspeaker\]/g)).toHaveLength(1);
   });
 
+  // Enumerating RETIRED_ROLES is the point: a hand-listed sample here would have
+  // gone on passing while an upgrade left the newest retired role installed.
   it("removes retired role files and preserves unrelated files", () => {
     const targetDir = join(codexHome, "agents", "chronicle");
     Bun.spawnSync(["mkdir", "-p", targetDir]);
-    for (const role of ["hammerbearer", "oathkeeper", "seer", "smith"]) {
+    for (const role of RETIRED_ROLES) {
       writeFileSync(join(targetDir, `${role}.toml`), `legacy = "${role}"\n`);
     }
     writeFileSync(join(targetDir, "personal.toml"), 'name = "personal"\n');
 
     expect(run("--apply").exitCode).toBe(0);
 
-    for (const role of ["hammerbearer", "oathkeeper", "seer", "smith"]) {
+    for (const role of RETIRED_ROLES) {
       expect(existsSync(join(targetDir, `${role}.toml`))).toBe(false);
     }
     expect(readFileSync(join(targetDir, "personal.toml"), "utf8")).toBe(
