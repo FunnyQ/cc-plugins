@@ -1,5 +1,14 @@
 # Changelog
 
+## [herdr 0.7.4] - 2026-09-09
+
+_tracks tag `herdr-v0.7.4`_
+
+### Fixed
+- Corrected the herdr CLI reference to note that neither CLI discovery surface (the `herdr pane` group listing or a subcommand's own `--help`) is complete, and that each truncates different options.
+- Documented that `workspace close` refuses on a primary workspace with `workspace_group_close_required`, and that passing `--group` is the caller's decision, not an automatic fix.
+- Documented the same discovery caveat for `worktree remove --trust-repository`, plus the `pane read --source detection` and `pane report-agent-session --session-start-source` options.
+
 ## [herdr 0.7.3] - 2026-09-09
 
 _tracks tag `herdr-v0.7.3`_
