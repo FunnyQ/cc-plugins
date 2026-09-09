@@ -8,6 +8,7 @@ import {
   classifyLink,
   decideSubagentDepth,
   findSkillDirs,
+  orphanLinks,
   parseJsonc,
   resolveGlobalConfig,
   resolveSkillNames,
@@ -197,6 +198,74 @@ describe("classifyLink", () => {
   >)("classifies %s links", (state, probe) =>
     expect(classifyLink(probe, expected, repoRoot)).toBe(state),
   );
+});
+
+describe("orphanLinks", () => {
+  const agentsDir = join(home, ".config", "opencode", "agents");
+  const claimed = new Set([join(agentsDir, "lawspeaker.md")]);
+  const link = (target: string, exists = true) => ({
+    exists,
+    isSymlink: true,
+    resolved: target,
+  });
+
+  // The upgrade this was written for: chronicle collapsed its three commit agents
+  // into one, so two sources vanished while their symlinks stayed installed.
+  test("finds links left by a retired agent", () => {
+    const entries = [
+      {
+        path: join(agentsDir, "lawspeaker.md"),
+        probe: link(join(repoRoot, "opencode/agents/lawspeaker.md")),
+      },
+      {
+        path: join(agentsDir, "runesmith.md"),
+        probe: link(join(repoRoot, "opencode/agents/runesmith.md"), false),
+      },
+      {
+        path: join(agentsDir, "watcher.md"),
+        probe: link(join(repoRoot, "opencode/agents/watcher.md"), false),
+      },
+    ];
+
+    expect(orphanLinks(entries, claimed, repoRoot)).toEqual([
+      join(agentsDir, "runesmith.md"),
+      join(agentsDir, "watcher.md"),
+    ]);
+  });
+
+  // A rename retires a name while its source lives on, so the survival of the
+  // target says nothing about whether the link is still wanted.
+  test("finds an unclaimed link whose source still exists", () => {
+    const entries = [
+      {
+        path: join(agentsDir, "old-name.md"),
+        probe: link(join(repoRoot, "opencode/agents/lawspeaker.md")),
+      },
+    ];
+
+    expect(orphanLinks(entries, claimed, repoRoot)).toEqual([
+      join(agentsDir, "old-name.md"),
+    ]);
+  });
+
+  test("leaves anything that is not ours", () => {
+    const entries = [
+      {
+        path: join(agentsDir, "handwritten.md"),
+        probe: { exists: true, isSymlink: false, resolved: null },
+      },
+      {
+        path: join(agentsDir, "elsewhere.md"),
+        probe: link("/another/checkout/opencode/agents/elsewhere.md"),
+      },
+      {
+        path: join(agentsDir, "lawspeaker.md"),
+        probe: link(join(repoRoot, "opencode/agents/lawspeaker.md")),
+      },
+    ];
+
+    expect(orphanLinks(entries, claimed, repoRoot)).toEqual([]);
+  });
 });
 
 describe("decideSubagentDepth", () => {

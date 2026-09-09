@@ -24,6 +24,11 @@
 //    names are installed plugin-prefixed (`monitor-install`, `chronicle-install`).
 //    Any duplicate `installed` path that survives that is a bug, and buildTargets
 //    throws rather than letting the last target win.
+// 7. RETIRED LINKS ARE OURS TO REMOVE. buildTargets lists only the sources that
+//    exist now, so a deleted agent or command would otherwise stay installed and
+//    invisible to every mode. orphanLinks finds them by the same test rule 2 uses —
+//    a symlink into this checkout — and --check fails on them, --apply and --unlink
+//    delete them. Rule 2 still holds: a real file or an outward link is untouched.
 // 6. THE CONFIG FILE IS RESOLVED, NOT ASSUMED. OpenCode reads three global config
 //    names and lets the later one win: `config.json`, then `opencode.json`, then
 //    `opencode.jsonc`. Writing `opencode.json` while an `opencode.jsonc` exists
@@ -303,6 +308,36 @@ export function classifyLink(
   return isWithin(probe.resolved, repoRoot) ? "stale" : "foreign";
 }
 
+export type InstalledEntry = {
+  path: string;
+  probe: { exists: boolean; isSymlink: boolean; resolved: string | null };
+};
+
+/** Installed links under a name no current target claims — what a retired agent or
+ *  command leaves behind. `buildTargets` names only the sources that exist today, so
+ *  deleting one drops it out of every mode at once: `--apply` never removes it,
+ *  `--check` still passes, `--unlink` walks past it, and OpenCode goes on loading it.
+ *
+ *  Ours means the link resolves inside this checkout, whether or not its source
+ *  survives — a rename leaves a live link at a dead name. Anything else is a human's
+ *  file and stays, the same rule `--unlink` already follows. */
+export function orphanLinks(
+  entries: readonly InstalledEntry[],
+  claimed: ReadonlySet<string>,
+  repoRoot: string,
+): string[] {
+  return entries
+    .filter(
+      ({ path, probe }) =>
+        !claimed.has(path) &&
+        probe.isSymlink &&
+        probe.resolved !== null &&
+        isWithin(probe.resolved, repoRoot),
+    )
+    .map(({ path }) => path)
+    .sort();
+}
+
 export function decideSubagentDepth(
   config: unknown,
   lossy = false,
@@ -381,6 +416,24 @@ function probeLink(path: string): {
     }
     throw error;
   }
+}
+
+function retiredLinks(targets: Target[], repoRoot: string): string[] {
+  const dirs = new Set(
+    targets
+      .filter((target) => target.group !== "config")
+      .map((target) => dirname(target.installed)),
+  );
+  const entries: InstalledEntry[] = [];
+  for (const dir of [...dirs].sort()) {
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir).sort()) {
+      const path = join(dir, name);
+      entries.push({ path, probe: probeLink(path) });
+    }
+  }
+  const claimed = new Set(targets.map((target) => target.installed));
+  return orphanLinks(entries, claimed, repoRoot);
 }
 
 function readConfig(path: string): {
@@ -491,6 +544,10 @@ function runCheck(targets: Target[], repoRoot: string, home: string): number {
     console.log(`${mark} ${targetLabel(target)} (${state})`);
     success &&= state === "ok";
   }
+  for (const path of retiredLinks(targets, repoRoot)) {
+    console.log(`✗ retired ${path} (orphan)`);
+    success = false;
+  }
   legacyRelayWarning(home);
   return success ? 0 : 1;
 }
@@ -509,6 +566,8 @@ function runApply(
   const { states, config, depth } = collectState(targets, repoRoot);
   const plan = buildApplyPlan(targets, states, depth);
   for (const operation of plan.operations) reportOperation(operation);
+  const retired = retiredLinks(targets, repoRoot);
+  for (const path of retired) console.log(`remove retired ${path}`);
   if (
     plan.operations.some(
       (operation) =>
@@ -521,6 +580,7 @@ function runApply(
   }
 
   if (!dryRun) {
+    for (const path of retired) unlinkSync(path);
     for (const operation of plan.operations) {
       const { target } = operation;
       if (operation.action === "create" || operation.action === "replace") {
@@ -553,6 +613,10 @@ function runApply(
 }
 
 function runUnlink(targets: Target[], repoRoot: string): number {
+  for (const path of retiredLinks(targets, repoRoot)) {
+    unlinkSync(path);
+    console.log(`unlink retired ${path}`);
+  }
   for (const target of targets) {
     if (target.group === "config") {
       console.log(
