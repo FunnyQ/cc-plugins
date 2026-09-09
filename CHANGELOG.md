@@ -1,5 +1,18 @@
 # Changelog
 
+## [chronicle 0.16.0] - 2026-09-10
+
+_tracks tag `chronicle-v0.16.0`_
+
+### Changed
+- A bare `/chronicle:release` now pushes by default instead of stopping after the changelog entry — `local` stops before push, `prepare` keeps the old default of stopping at the entry, and `auto`/`auto push` remain aliases for the new default.
+- Release now asks for an explicit go-ahead before it pushes, on every run — no version or component token skips this question anymore. Declining downgrades the run to stop at the tag instead.
+- Release's own scripts now print a short digest (4-5 lines) instead of a wall of JSON, so a version gate no longer buries the one or two facts it needs in a ~100-line blob; the full JSON is still available with `--full`/`--json`.
+- Commit's three-agent flow (an orchestrator plus two workers) collapsed into a single agent that runs the analysis and commit scripts itself, cutting the cold-start and round-trip cost of every commit; commit no longer needs a raised subagent-spawn-depth setting.
+
+### Removed
+- Skirnir, release's relay agent, is retired — release now runs its three scripts directly instead of spawning a separate agent just to shuttle their output back.
+
 ## [monitor 5.0.2] - 2026-09-10
 
 _tracks tag `monitor-v5.0.2`_
