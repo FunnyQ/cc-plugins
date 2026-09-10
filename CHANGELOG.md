@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.16.2] - 2026-09-10
+
+_tracks tag `chronicle-v0.16.2`_
+
+### Added
+- New `judge` agent dispositions ADR candidate batches (promote/watch/skip) from full record content, biased toward `watch` since a wrong watch only costs a re-review while a wrong promote becomes a permanent ADR.
+
+### Changed
+- `reckoner` now only screens clusters from lightweight skeleton evidence and hands its shortlist to parallel `judge` batches for the real disposition call, instead of fetching full bodies and deciding by itself — so ADR curation scales past what one agent can read serially.
+
 ## [chronicle 0.16.1] - 2026-09-10
 
 _tracks tag `chronicle-v0.16.1`_
