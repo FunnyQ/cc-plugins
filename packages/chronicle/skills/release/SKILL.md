@@ -16,9 +16,9 @@ A release is a short list of stages, run by `scripts/release.ts`. Each stage kno
 whether it has already happened by looking at the repo, so a run picks up wherever
 the last one stopped and re-running one is a no-op rather than an error.
 
-You own the two things a script cannot do: **asking which version to cut**, and —
-on a first run — **interviewing the repo's shape**. The changelog entry needs
-judgment too, so one agent writes it.
+You own the two things a script cannot do: **putting every decision to the user in
+one gate**, and — on a first run — **interviewing the repo's shape**. The changelog
+entry needs judgment too, so one agent writes it.
 
 Run the scripts yourself, with Bash. Each prints four or five lines — the gate's
 own questions, answered — so relaying them through an errand-runner would put a
@@ -51,8 +51,9 @@ push`. `auto` used to stop at `tag`, so a user reaching for it out of habit is
 asking for a run that now reaches the remote — the push confirmation below is what
 tells them.
 
-**A `push` run needs the user's explicit go-ahead before step 6.** Name the remote,
-the branches, and every tag, and get a yes. Nothing else in the flow waives this:
+**A `push` run needs the user's explicit go-ahead.** Name the remote, the branches,
+and every tag, and get a yes. Batching it into step 3's gate moves that question
+earlier; it never makes it shorter or optional. Nothing else in the flow waives it:
 not a version token, not a mode word, not a resumed run. Downgrade to `local` when
 the user declines the push but wants the rest.
 
@@ -76,7 +77,7 @@ rerun a failed command with changed flags, never substitute another script, and 
 hand-roll the git a stage would have done.
 
 Read the exit code, not just stdout. `plan`'s exit 1 is the one non-zero that carries
-a usable result — the blocked stage in step 4. **Every other non-zero exit ends the
+a usable result — the blocked stage in step 5. **Every other non-zero exit ends the
 release**: report the exit code and the last meaningful line of stderr, summarizing a
 stack trace to its message rather than pasting it, and stop. Exit 2 means the script
 refused before doing anything — no config, malformed `units`, a missing `--through` —
@@ -110,11 +111,13 @@ config     github-flow · branch main · no drift
 payload    /tmp/chronicle/release/analysis-….json
 ```
 
-`[files already at X]` on a unit's line is the `fileVersion` case in step 3.
-Either drift prints in capitals on the `config` line — read the payload for its
-details, and handle it before the gate. `--json` prints the digest's source, and
-`--full` adds `tags`, `config`, and `suggested` back; a first run needs `suggested`,
-so use `--full` there or read the payload.
+`[files already at X]` on a unit's line is the `fileVersion` case in step 3a.
+Any drift prints in capitals on the `config` line — read the payload for its
+details, and handle it before the gate. `OFF RELEASE BRANCH` is the third of them:
+the current branch is not the one the release commits on, which is step 3b.
+`--json` prints the digest's source, and `--full` adds `tags`, `config`, and
+`suggested` back; a first run needs `suggested`, so use `--full` there or read the
+payload.
 
 If `workflowDrift` is set, the committed config still says git-flow but its
 `missingBranch` is gone. Say so **before** the gate and offer the one-time edit
@@ -138,10 +141,17 @@ branch names. Add a capture-group `pattern` for odd locations like a Rails
 
 Pass `--persist-config` on the first `run`, which adds the `save-config` stage.
 
-### 3. Version gate
+### 3. One gate — every decision in a single question call
 
-Resolve one `{ component, targetVersion, lastTag }` per unit being cut. Whole-repo
-uses `component: null`.
+`AskUserQuestion` carries **up to four questions per call**. Ask all three decisions
+below in one call, right after the facts. Never spend a round-trip on one of them
+alone: each separate call stalls the run for however long the user is away, and
+these answers do not depend on each other. Drop any question the facts already
+settle, and never ask one whose answer you hold.
+
+**a. Version — one question per unit.** Resolve one
+`{ component, targetVersion, lastTag }` per unit being cut; whole-repo uses
+`component: null`.
 
 - **per-component**: if component tokens were given, use those. Otherwise look at
   `commitCount > 0`. Exactly one changed → default to it. Several → offer them all,
@@ -150,28 +160,77 @@ uses `component: null`.
   unknown, not unchanged.
 - **whole-repo**: ask the bump from the top-level `bumps`. If `current` is null,
   ask for a starting version (offer `0.1.0`).
+- **When `fileVersion` already leads `lastTag`,** a previous prepare run — or a bump
+  merged from a feature branch — already chose the version. Offer `fileVersion` as
+  the target instead of asking for a bump. Confirm it; do not bump on top of it.
 
-**When `fileVersion` already leads `lastTag`,** a previous prepare run — or a bump
-merged from a feature branch — already chose the version. Offer `fileVersion` as the
-target instead of asking for a bump. Confirm it; do not bump on top of it.
+More units than the four-question budget leaves room for: ask one question offering
+the same bump for all of them, with "different per unit" as an option, and make a
+second call only if they pick it. Two calls beat a wrong version.
+
+**b. How the work reaches the release branch** — ask only when step 1's `config`
+line reads `OFF RELEASE BRANCH`. Three options: open a PR, merge locally with
+`--no-ff` now, or the work is already there and this is a bump-only release. Step 4
+acts on the answer.
+
+**c. The push** — on a `push` run, always, and phrased in full. The option text
+names the remote, the branch, and every tag: *push `origin main` +
+`chronicle-v0.16.0` + `monitor-v3.2.0`*. Batching changes when it is asked, nothing
+else about it. A decline means `--through tag`, not a stop.
+
+Build each tag name from the config's template and the versions question a offers.
+One version on the table (a version token, or a `fileVersion` confirm) → name that
+exact tag. Several bumps offered → list the candidate tags per unit
+(`chronicle-v0.15.2 / v0.16.0 / v1.0.0`), so the yes covers the version picked in
+the same call and no other. A tag the plan produces that this option never named —
+the user typed a version of their own — is a moved ground: re-ask at step 7.
+
+**Re-ask when the ground moves.** An answer is good only for the facts it was given
+against. A `BLOCKED` stage, a drift you surface after the gate, a merge that changed
+the commit range, or a plan whose tags differ from what the push option named — ask
+that question again. Never carry a stale answer into a stage.
 
 > In an active **cockpit** session, hand the stick back with `needs_your_call` +
-> `cockpit wait` for these gates instead of `AskUserQuestion` (see
-> [[cockpit-needs-your-call-for-decision-gates]]).
+> `cockpit wait` instead of `AskUserQuestion` (see
+> [[cockpit-needs-your-call-for-decision-gates]]) — same batching: one hand-back
+> carrying every decision.
 
-### 4. Plan
+### 4. Land the work on the release branch
+
+Only when step 3b was asked. `plan` computes its base as
+`git rev-parse <release branch>`, never `HEAD`, and `run` checks that branch out
+before committing — so a release run from a feature branch writes the bump into
+that branch's tree, commits it alone onto the release branch, and cuts a tag holding
+a version bump, a CHANGELOG entry, and none of the work. That has shipped once
+(`odin-session-v3.2.8`).
+
+- **PR** → stop here. `/chronicle:pr` opens it; the release resumes after the merge
+  lands, from step 1.
+- **merge locally** → `git checkout <release branch>` then
+  `git merge --no-ff <branch>`. A dirty tree blocks the checkout — commit it first.
+  Re-run step 1 afterwards: the commit counts and `fileVersion` have moved.
+- **already there** → continue.
+
+### 5. Plan
 
 ```bash
 bun "{SKILL_DIR}/scripts/release.ts" plan --units '{units}'
 ```
 
 The `stages` line lists them in order, a done one marked `✓`. The `entry` line
-carries everything step 5 hands the annalist. Exit 1 means something is
+carries everything step 6 hands the annalist. Exit 1 means something is
 **blocked** — a `BLOCKED` line names the stage and the reason. Report it and stop.
 A blocked stage is always a state the user must resolve (a tag already on another
 commit, a `main` behind its remote); never work around it.
 
-### 5. Entry, if pending
+**Check the base before going on.** The `plan` line ends `on <sha7> (<branch>,
+<workflow>)`. On github-flow that sha must equal `git rev-parse --short=7 HEAD`; on
+git-flow it is `main`'s head by design, so check instead that you are standing on
+`develop`. A mismatch means the work is not on the release branch — go back to
+step 3b. This check caught the mistake both times it happened, including once after
+the digest's own warning was read past.
+
+### 6. Entry, if pending
 
 If the `entry` stage is pending, spawn the annalist **once**, with
 `subagent_type: "chronicle:annalist"`, never a fork, no `name`:
@@ -188,11 +247,13 @@ plan's `entry` line, and `tagName` is its `plan` line — you never need the raw
 for this. Skip this whenever `entry` reads `entry✓` — the entry exists, and a second
 one for the same version is a duplicate heading.
 
-### 6. Run
+### 7. Run
 
-On a `push` run, confirm the publish first — the remote, the branches, and the tag
-names, as one question. Ask it even when the version gate never ran, and treat a
-decline as `--through tag` rather than a stop.
+The publish was confirmed in step 3c. Ask again here only when that yes no longer
+covers what is about to happen: the gate never ran, or the plan's tags, branch, or
+remote are not the ones the option named. Never infer the go-ahead from an answer
+given about something else, and treat a decline as `--through tag` rather than a
+stop.
 
 ```bash
 bun "{SKILL_DIR}/scripts/release.ts" run --units '{units}' --through "{stage}"
@@ -203,7 +264,7 @@ A stage that runs without taking effect aborts the release — the engine will n
 report a tag it did not cut. `executed   nothing` on a resumed run means every
 stage was already done, not that the run failed.
 
-### 7. Verify before reporting
+### 8. Verify before reporting
 
 - **prepare** → confirm the version files read `targetVersion` and the changelog
   holds the entry.
@@ -260,6 +321,9 @@ base-directory banner.
   could be the mistake, and only the user knows which.
 - **A version file that didn't move**: `bump` will not read done afterwards and the
   run aborts there. Never tag a half-bumped tree.
+- **A run started from a feature branch**: `OFF RELEASE BRANCH` on the `config`
+  line. Steps 3b and 4 own it. Nothing downstream catches it — the run succeeds and
+  the tag is wrong.
 - **A repo that migrated to GitHub Flow** after its config was committed: see
   `workflowDrift` above. A missing field is never re-detected on its own.
 - **An artifact whose version command cannot run** — missing file, wrong flag — reads
