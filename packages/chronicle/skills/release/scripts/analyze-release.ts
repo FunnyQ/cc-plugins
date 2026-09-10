@@ -100,6 +100,16 @@ export function effectiveWorkflow(
   return config.workflow ?? "git-flow";
 }
 
+/** The branch the release commit lands on — `release.ts` checks it out itself,
+ *  so a run standing anywhere else leaves the work behind. */
+export function releaseBranchFor(
+  config: Pick<ReleaseConfig, "workflow" | "branches">,
+): string {
+  return effectiveWorkflow(config) === "git-flow"
+    ? (config.branches.develop ?? config.branches.main)
+    : config.branches.main;
+}
+
 export type ManifestFact = {
   path: string;
   version: string | null;
@@ -999,6 +1009,17 @@ export function formatFactsDigest(facts: Record<string, unknown>): string {
     drift.push("WORKFLOW DRIFT — resolve before the gate");
   if ((facts.versionFileDrift as unknown[])?.length)
     drift.push("VERSION FILE DRIFT — resolve before the gate");
+  // Standing off the branch the release commits on tags a commit holding the
+  // bump and nothing else — the work never reaches it.
+  if (
+    facts.releaseBranch &&
+    facts.branch &&
+    facts.branch !== facts.releaseBranch
+  ) {
+    drift.push(
+      `OFF RELEASE BRANCH — the release commits on ${facts.releaseBranch}`,
+    );
+  }
   lines.push(
     `config     ${facts.hasConfig ? (facts.workflow as string) : "none yet — interview from the payload's `suggested`"} · branch ${facts.branch} · ${drift.length ? drift.join(" · ") : "no drift"}`,
   );
@@ -1095,9 +1116,12 @@ async function main() {
     ? hasChangelogEntry(changelog, wholeRepoFileVersion)
     : false;
 
+  const releaseBranch = releaseBranchFor(effective);
+
   const out = {
     root,
     branch,
+    releaseBranch,
     component,
     workflow: effectiveWorkflow(effective),
     workflowDrift: config ? detectWorkflowDrift(config, branches) : null,

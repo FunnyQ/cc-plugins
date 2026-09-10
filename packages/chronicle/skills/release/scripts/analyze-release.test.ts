@@ -19,6 +19,7 @@ import {
   parseBranchNames,
   parseConfig,
   readVersionFromContent,
+  releaseBranchFor,
   scopedTagComponents,
   serializeConfig,
   versionInOutput,
@@ -160,10 +161,59 @@ describe("formatFactsDigest", () => {
     expect(digest).toContain("repo       1.2.3 → patch 1.2.4");
   });
 
+  // The failure this catches is silent: the tag lands on the release branch with
+  // the bump and none of the work, and every digest line above it reads fine.
+  test("shouts when the run stands off the release branch", () => {
+    const digest = formatFactsDigest({
+      ...facts,
+      branch: "feat/thing",
+      releaseBranch: "main",
+    });
+
+    expect(digest).toContain(
+      "branch feat/thing · OFF RELEASE BRANCH — the release commits on main",
+    );
+  });
+
+  test("stays quiet on the release branch itself", () => {
+    expect(
+      formatFactsDigest({ ...facts, branch: "main", releaseBranch: "main" }),
+    ).toContain("config     github-flow · branch main · no drift");
+  });
+
   test("points a first run at the payload's suggested shape", () => {
     const digest = formatFactsDigest({ ...facts, hasConfig: false });
 
     expect(digest).toContain("none yet — interview from the payload's");
+  });
+});
+
+describe("releaseBranchFor", () => {
+  test("github-flow releases on main", () => {
+    expect(
+      releaseBranchFor({ workflow: "github-flow", branches: { main: "main" } }),
+    ).toBe("main");
+  });
+
+  // git-flow commits the bump on develop and only merges it into main, so main
+  // is the wrong branch to stand on there.
+  test("git-flow releases on develop", () => {
+    expect(
+      releaseBranchFor({
+        workflow: "git-flow",
+        branches: { main: "main", develop: "develop" },
+      }),
+    ).toBe("develop");
+  });
+
+  test("a config predating the workflow field is git-flow", () => {
+    expect(
+      releaseBranchFor({ branches: { main: "trunk", develop: "next" } }),
+    ).toBe("next");
+  });
+
+  test("falls back to main when git-flow names no develop", () => {
+    expect(releaseBranchFor({ branches: { main: "main" } })).toBe("main");
   });
 });
 
