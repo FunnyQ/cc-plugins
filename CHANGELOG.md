@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.16.1] - 2026-09-10
+
+_tracks tag `chronicle-v0.16.1`_
+
+### Added
+- `release` now flags when a run is standing off the branch it's about to commit to, so a feature-branch run can't strand the version bump on the wrong branch while the actual work stays behind.
+
+### Changed
+- `release`'s version, branch-handling, and push-confirmation questions now surface together in one prompt instead of three separate interruptions, so an unattended run stalls once instead of three times.
+
 ## [chronicle 0.16.0] - 2026-09-10
 
 _tracks tag `chronicle-v0.16.0`_
