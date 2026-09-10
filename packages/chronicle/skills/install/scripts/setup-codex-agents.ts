@@ -19,6 +19,7 @@ const ROLES = [
   "lorekeeper",
   "gleaner",
   "reckoner",
+  "judge",
   "codifier",
   "barrowkeeper",
 ] as const;
@@ -60,7 +61,9 @@ function managedBlock(targetDir: string): string {
     lorekeeper:
       "Orchestrate Chronicle ADR triage, promotion, and supersession.",
     gleaner: "Collect cockpit decision-trail skeletons without writing.",
-    reckoner: "Cluster trail entries and assign ADR dispositions.",
+    reckoner:
+      "Cluster trail entries and screen them against the ADR threshold.",
+    judge: "Disposition one batch of shortlisted ADR candidates in parallel.",
     codifier: "Draft an Architecture Decision Record from confirmed evidence.",
     barrowkeeper: "Write the confirmed ADR and archive its source sessions.",
   };

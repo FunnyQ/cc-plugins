@@ -31,7 +31,7 @@ describe("setup-codex-agents", () => {
     const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(10);
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(11);
     for (const role of [
       "lawspeaker",
       "storykeeper",

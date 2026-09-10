@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 // The OpenCode agent definitions are hand-copied chronicle agent bodies with
-// OpenCode frontmatter on top. Eight of the ten bodies are byte-identical to
+// OpenCode frontmatter on top. Nine of the eleven bodies are byte-identical to
 // their chronicle source, so an edit to a chronicle agent that never reaches the
 // copy is a silent fork of ~1,600 lines. This pins that identity: drift becomes
 // a test failure instead of two agents quietly disagreeing.
@@ -29,6 +29,7 @@ const agents = [
   "barrowkeeper",
   "codifier",
   "gleaner",
+  "judge",
   "lawspeaker",
   "lorekeeper",
   "messenger",
