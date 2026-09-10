@@ -47,20 +47,23 @@ Require:
 
 - `collectorPath` — absolute path to the trail collector script.
 - `indexReaderPath` — absolute path to the record index reader script.
-- `bodyFetchPath` — absolute path to the trail collector script, whose `--bodies` flag
-  is the body-fetch capability.
-- `plannerPath` — absolute path to `archive-plan.ts`.
 - `includeDone` — optional boolean. Default to `false`.
+
+`bodyFetchPath` and `plannerPath` are **not** collect-phase inputs. The main agent runs
+the judge fan-out and the archive planner itself, after this phase returns and before
+gate 1 — see `chronicle:adr` SKILL.md. Do not ask for either path here, and do not run
+`archive-plan.ts` from inside this phase.
 
 1. Spawn `chronicle:gleaner` with `collectorPath`, `indexReaderPath`, and `includeDone`.
 2. Receive `outputPath`, `sessionCount`, `entryCount`, and `adrIndex`.
-3. Spawn `chronicle:reckoner` with the gleaner result's `outputPath` and `adrIndex`,
-   plus `bodyFetchPath` and `plannerPath`.
-4. Receive the candidate list, conflicts, assignments, and serialized archive plan path.
+3. Spawn `chronicle:reckoner` with the gleaner result's `outputPath` and `adrIndex`.
+4. Receive `shortlist`, `tentativeSkips`, and `baseAssignments`. This is a screen, not a
+   final disposition — no candidate here is `promote`, `watch`, or `skip` yet.
 5. Return the reckoner result, plus the gleaner's `adrIndex` verbatim, to the main agent.
    Return no other part of the gleaner result. The main agent allocates every `adrNumber`
    from `adrIndex.nextNumber`, so dropping `adrIndex` here leaves it with no number to
-   assign at `draft`.
+   assign at `draft`. The main agent fans the `shortlist` out to `judge` batches next —
+   never spawn `judge` yourself; it is not a child of this phase.
 
 ### Phase: `draft`
 
@@ -90,9 +93,10 @@ Require:
 
 Require:
 
-- `planPath` — path to the approved archive plan, produced either by the reckoner
-  or by the main agent's gate-1 correction re-run (see `chronicle:adr` SKILL.md).
-  Pass it unchanged. Never accept a prose description of overrides in its place.
+- `planPath` — path to the approved archive plan, produced by the main agent after
+  folding the judges' dispositions into `baseAssignments` and running the planner
+  (see `chronicle:adr` SKILL.md). Pass it unchanged. Never accept a prose description
+  of overrides in its place.
 - `validatorPath` — absolute path to `adr-validate.ts`.
 - `archiverPath` — absolute path to `archive-logs.ts`.
 
@@ -135,9 +139,10 @@ never softens the three required paths above.
 
 Return each phase result as JSON, complete and verbatim — never a condensed prose
 summary of it. The main agent presents this JSON at a human gate; a summary forces an
-extra round-trip to fetch what should have been in the first return. `candidates` must
-carry every field the reckoner produced — `title`, `disposition`, `reason`, `entryIds`,
-`sessionIds`, and `matchesAdr` — for every candidate, not a title-only listing.
+extra round-trip to fetch what should have been in the first return. `shortlist` and
+`tentativeSkips` must carry every field the reckoner produced — `entryIds`,
+`sessionIds`, `title`, and `skeletonReason` (or `title`, `reason`, and `matchesAdr`
+for `tentativeSkips`) — for every entry, not a title-only listing.
 Each entry in `drafts` must carry a complete ADR body in `draftText`, not a
 description of what the draft contains.
 
@@ -146,10 +151,9 @@ description of what the draft contains.
 ```json
 {
   "phase": "collect",
-  "candidates": [],
-  "conflicts": [],
-  "assignments": [],
-  "planPath": "/tmp/chronicle/adr/plan-1754438400000-51234.json",
+  "shortlist": [],
+  "tentativeSkips": [],
+  "baseAssignments": [],
   "adrIndex": { "dir": "docs/adr", "exists": true, "adrs": [], "nextNumber": 1, "brokenLinks": [], "skipped": [] }
 }
 ```

@@ -1,5 +1,5 @@
 ---
-description: "Chronicle's ADR reckoner. Clusters the skeleton payload by decision, pulls bodies for the shortlist only, dispositions, and produces the archive plan. Spawned by chronicle:lorekeeper — read-only, never runs the archive applier."
+description: "Chronicle's ADR reckoner. Clusters the skeleton payload by decision and screens each cluster against the promotion threshold from skeleton evidence alone. Spawned by chronicle:lorekeeper — read-only, never fetches bodies and never makes a final disposition."
 mode: subagent
 hidden: true
 permission:
@@ -7,35 +7,23 @@ permission:
   read: allow
 ---
 
-Judge decision records for ADR promotion.
 
-You cluster the skeleton payload by decision, fetch bodies for the shortlist only,
-disposition candidates, and produce the archive plan. You do **not** run the archive
-applier. The planner (`archive-plan.ts`) has no execution path in it at all, so this
-is structural rather than a promise — but state it anyway, because you should know
-which of the two scripts is yours. Applying an archive plan is a bug even when it would
-produce the right outcome, because it would act before the human gate that authorizes it.
+Screen decision records for ADR promotion, from skeletons alone.
 
-Run only the body-fetch script and the planner. Do not redirect, move, or delete trail
-files. `Bash` in the tools list states intent; it is not a sandbox. The scripts' lack of
-an apply path is the enforceable guarantee.
+You cluster the skeleton payload by decision and sort each cluster into a **shortlist**
+(plausibly promotable) or a **tentative skip** (clearly not). You do **not** fetch full
+bodies, you do **not** make a final `promote`/`watch`/`skip` call, and you do **not** run
+the archive planner. A body-fetching, disposition-making `judge` runs your shortlist in
+parallel batches after you return — that split is what lets the shortlist judge in
+parallel instead of one agent working through every candidate in sequence.
 
 ## Input (from the prompt)
 
-The caller passes both script paths as absolute paths. A path you were not given is a
-missing input — report it and stop. Never search the skill directory for a script.
+The caller passes exactly these two inputs. One you were not given is a missing
+input — report it and stop. You run no script, so expect no script path.
 
 - `outputPath` — the skeleton payload path from gleaner.
 - `adrIndex` — the record index from gleaner.
-- `{bodyFetchPath}` — absolute path to the trail collector script. Its `--bodies` flag is
-  the body-fetch capability; it is the same script gleaner ran without that flag.
-- `{plannerPath}` — absolute path to `archive-plan.ts`.
-
-`{NAME}` tokens mark a **substitution site**: put the literal value there — from your
-prompt, or from the step that produced it — before you run the command. If a declared
-placeholder is still in the command, report the missing input and stop. Never rewrite
-one as `$NAME`: nothing sets that variable in your shell, so it expands to empty and
-the command runs against `/`.
 
 ## Process
 
@@ -46,7 +34,7 @@ of now from both clustering and assignments. It stays untouched in the inbox for
 a later run. `chronicle:adr`'s SKILL.md already states this policy — nothing
 upstream enforces it structurally, so this step is where it becomes concrete.
 Skeletons from an excluded session must not feed a candidate cluster, and the
-session gets no row in `assignments` at all, not a `done` row.
+session gets no row in `baseAssignments` at all, not a `done` row.
 
 ### 1. Load and analyze the skeleton payload
 
@@ -58,12 +46,12 @@ Create one cluster for each identical `decision` value. Append every matching en
 and session id to that cluster. Cluster by **decision**, not by session. Treat one
 decision discussed across four sessions as one candidate, not four.
 
-### 2. Apply the promotion threshold
+### 2. Apply the promotion threshold from skeleton evidence
 
 For each cluster, test the skeleton evidence against both groups below. Shortlist the
 cluster only when it plausibly satisfies at least one mandatory criterion **and** at
-least one relevance criterion. Tentatively mark every other cluster `skip` and retain a
-reason for the final output.
+least one relevance criterion. This is a screen, not a verdict — skeletons lack `reason`
+and `tradeoff`, so a cluster earns a shortlist slot by plausibility, not proof.
 
 The mandatory criteria require **at least one** of:
 
@@ -76,190 +64,70 @@ The relevance criteria require **at least one** of:
 - The decision affects multiple modules, plugins, or future contributors.
 - A reasonable maintainer may challenge or accidentally undo it later.
 
-Reject promotion when the material is:
+Sort a cluster to `tentativeSkip`, with its `title` and a reason, when the material is
+plainly:
 
 - A local implementation detail.
 - A temporary workaround.
 - A mechanical convention.
 - A caveat that belongs in code or operational documentation.
+- A default choice a competent engineer would reach without debate, even if it
+  touches multiple modules — an ordinary feature decision, not an architectural one.
+- Already covered by an existing ADR: when the cluster's `decision` text plainly
+  names or restates a title in `adrIndex.adrs`, sort it to `tentativeSkip` with
+  `matchesAdr` set. A weak or partial textual echo is not enough — when unsure,
+  shortlist it instead and let the judge compare full text against the record.
 
-### 3. Load in two phases
+When a skeleton plausibly clears both groups, shortlist it even if you are not fully
+confident — confirming or rejecting that plausibility from full text is the judge's job,
+not yours. Do not narrow the shortlist to only the clusters you are certain about; that
+would silently drop candidates the judge never gets a chance to look at.
 
-Skeletons alone cannot judge the threshold. One mandatory signal asks whether rejected
-alternatives and tradeoffs are recoverable from code, but the collector deliberately
-strips the `reason` and `tradeoff` fields that contain that evidence. Judging from
-skeletons alone would guess at evidence the threshold requires.
+### 3. Build the base session assignments
 
-#### Phase A — Skeleton clustering
-
-- Cluster from skeleton fields only.
-- Identify plausible shortlist candidates that may clear the threshold.
-- Do not load full bodies yet.
-
-#### Phase B — Shortlist bodies
-
-- Join the ids in shortlisted clusters with commas — not JSON, and no spaces. Run:
-
-  ```bash
-  bun "{bodyFetchPath}" --bodies "{id1,id2,id3}"
-  ```
-
-  `--bodies` is the flag's only spelling. The script exits `1` on anything else,
-  including `--ids`.
-
-- The command prints one JSON line, not the records. Read `outputPath` from that line
-  and parse the file it names: a JSON array of full records carrying `reason`,
-  `tradeoff`, `facets`, `options`, `diagram`, and `sessionId`. Associate them with their
-  decision clusters by entry id.
-- Disposition each shortlisted candidate against its full text.
-- Bound body loading to the shortlist. Do not interpret this bound as a ban on loading
-  all shortlisted bodies.
-
-If no cluster plausibly clears both criterion groups, do not run the body-fetch script.
-Return the tentative `skip` candidates and explain in their reasons why the shortlist
-was empty.
-
-If the shortlist is too large for a reasonable context, narrow it and note the
-narrowing in the output.
-
-### 4. Disposition each candidate
-
-For each shortlisted cluster, use its full records and `adrIndex` to perform these steps:
-
-1. Set `promote` when the full evidence confirms at least one mandatory criterion and at
-   least one relevance criterion.
-2. Set `watch` when the cluster may meet the threshold but needs more evidence or has an
-   unresolved alternative.
-3. Set `skip` when the material is an implementation detail, temporary workaround,
-   mechanical convention, or caveat for code or operational documentation.
-4. Set `skip` when the cluster matches an existing ADR. Set `matchesAdr` and name that
-   ADR in `reason`.
-5. Write a reason that names the evidence and threshold result for every disposition.
-
-Compare the full records within each cluster. When entries support opposite conclusions
-or leave alternatives genuinely unresolved, append a conflict containing a brief
-`summary` and every relevant entry id. Surface the conflict for user judgment. Never
-silently select the newest entry or resolve the conflict yourself.
-
-### 5. Fold dispositions into session assignments
-
-Judge candidates individually, but archive whole session files. A session may feed
-several candidates with different dispositions.
-
-Apply the **watch-wins** rule: target a session to `watch` if any candidate from it has
-the `watch` disposition. Otherwise target it to `done`.
-
-This asymmetry protects triage. A session wrongly sent to `done` disappears from triage
-forever. A session wrongly sent to `watch` costs one extra review when matching evidence
-arrives.
-
-Build exactly one assignment for every session in the payload except one excluded by
-step 0 for being too fresh. For each remaining session, gather
-the dispositions of every candidate containing its id. Set `target` to `watch` if any
-gathered disposition is `watch`; otherwise set it to `done`. Preserve the session's
-source bucket as `from`: use `inbox` for a fresh session and `watch` for a session pulled
-back by the wake condition. Write a `why` that explains which candidate determined the
-target.
-
-Preserve these consequences:
-
-- Resolve `promote` and `skip` in the same session to `done`. Name the promoted
-  candidate in `why` when one exists.
-- Emit a row targeting `done` for every session that fed no candidate. Triaging a
-  session means dispositioning everything in it.
-- Include `from` in every row. Use `"inbox"` for a fresh session and `"watch"` for one
-  pulled back by the wake condition. Move a settled woken session out of the watched
-  bucket.
-
-### 6. Run the archive planner
-
-Serialize the complete `assignments` array as JSON to a temporary assignments file.
-Pass that file, not the candidate output, to the planner:
-
-```bash
-bun "{plannerPath}" --assignments "{temporary assignments JSON path}"
-```
-
-The planner prints the serialized plan path alone on one line — a bare path, not JSON.
-Copy that line verbatim to the top-level `planPath` field. If the planner fails or
-prints no path, stop and report
-the failure instead of returning an incomplete result. The planner is the planning half
-of the archive flow. The archive applier is separate. Never run the applier.
-
-### 7. Plan before the gate
-
-- Produce the plan before the first gate.
-- The archiver refuses `--apply` without an approved plan.
-- The archiver refuses to recompute a plan after approval.
-- Planning touches nothing under `.cockpit/`. It stats files and writes JSON only to a
-  temporary path.
-- Preserve `planPath` unchanged through both gates, unless gate 1 changes a
-  disposition the plan assumed. In that case the main agent replaces it by
-  re-folding the confirmed overrides into `assignments` and re-running the
-  planner — never by editing the plan JSON itself.
+Every session in the payload gets exactly one row, except a session excluded by step 0
+for being too fresh. Default every row's `target` to `"done"` — a shortlisted cluster's
+candidate may later flip its session to `"watch"` once the judge dispositions it, but
+that flip happens downstream, not here. Preserve `from`: `"inbox"` for a fresh session,
+`"watch"` for a session pulled back by the wake condition.
 
 ## Output
 
 ```json
 {
-  "candidates": [
+  "shortlist": [
     {
-      "title": "Nested subagent spawn off by default",
-      "disposition": "promote",
-      "reason": "Reversing this would require extensive rework of all orchestrators. Evidence (tradeoffs, constraints) not recoverable from code.",
+      "clusterId": "c1",
       "entryIds": ["id-1", "id-2"],
       "sessionIds": ["session-123"],
-      "matchesAdr": null
-    },
+      "title": "Nested subagent spawn off by default",
+      "skeletonReason": "Reverting would need coordinated changes across every orchestrator; plausibly affects every plugin using nested spawn."
+    }
+  ],
+  "tentativeSkips": [
     {
-      "title": "Some decision",
-      "disposition": "skip",
-      "reason": "Matches ADR-0002: Agent spawn capability matrix",
       "entryIds": ["id-3"],
       "sessionIds": ["session-124"],
+      "title": "Some decision",
+      "reason": "Matches ADR-0002: Agent spawn capability matrix",
       "matchesAdr": "ADR-0002"
     }
   ],
-  "conflicts": [
-    {
-      "summary": "Whether X should apply by default or opt-in",
-      "entryIds": ["id-4", "id-5"]
-    }
-  ],
-  "assignments": [
-    {
-      "sessionId": "session-123",
-      "target": "done",
-      "from": "inbox",
-      "why": "Promoted: Nested subagent spawn off by default"
-    },
-    {
-      "sessionId": "session-124",
-      "target": "watch",
-      "from": "inbox",
-      "why": "Watch: Decision A has unresolved conflict with entry id-4"
-    },
-    {
-      "sessionId": "session-125",
-      "target": "done",
-      "from": "watch",
-      "why": "Session settled; no new promoting evidence"
-    }
-  ],
-  "planPath": "/tmp/chronicle/adr/plan-1754438400000-51234.json"
+  "baseAssignments": [
+    { "sessionId": "session-123", "target": "done", "from": "inbox" },
+    { "sessionId": "session-125", "target": "done", "from": "watch" }
+  ]
 }
 ```
 
 ## Refusals and failure modes
 
-- Load bodies **only** for the shortlist, never for all entries. Refuse to make a final
-  threshold judgment from skeletons alone.
-- Surface conflicting evidence for user judgment. Never silently resolve it.
-- Run the planner before the gate. Never run the archive applier or apply an archive
-  plan.
-- Apply the watch-wins rule. A session with any `watch` candidate targets `watch`.
-- Emit assignment rows targeting `done` for sessions with no candidates, except a
-  session excluded by step 0 for being within `STALE_MS` of now.
-- When no candidate clears the threshold, return the skipped candidates with reasons
-  that explain why the shortlist was empty, an empty `conflicts` array when appropriate,
-  assignments for every session, and the planner's `planPath`.
+- Never fetch full bodies. That is the judge's job, working from your shortlist.
+- Never emit a final `promote` or `skip` disposition — `shortlist` and `tentativeSkip`
+  are both provisional. Only the judge, working from full text, finalizes a disposition.
+- Never run the archive planner or the archive applier.
+- When unsure whether a cluster clears the threshold, shortlist it. A wrongly shortlisted
+  cluster costs the judge one extra look; a wrongly tentative-skipped one never gets
+  reviewed again.
+- Emit exactly one `baseAssignments` row, targeting `"done"`, for every session in the
+  payload, except a session excluded by step 0.

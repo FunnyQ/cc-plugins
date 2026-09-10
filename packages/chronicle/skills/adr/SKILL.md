@@ -19,11 +19,17 @@ run the whole flow and return control at both gates because its first return end
 that orchestrator run. Pass the collected plan into draft, then pass the confirmed
 drafts, `newAdrs`, the optional `metadataUpdate`, and the archive plan into commit.
 
+Between `collect` and gate 1, the main agent — not the Lorekeeper — fans the
+reckoner's shortlist out to parallel `judge` batches, merges their dispositions,
+and runs the archive planner itself. See **Judging the shortlist** below.
+
 ## Topology
 
 ```
 chronicle:adr  (this skill — the main agent; owns both gates)
-  ├─ lorekeeper(collect) → gleaner, reckoner   skeletons → clusters → dispositions + assignments
+  ├─ lorekeeper(collect) → gleaner, reckoner   skeletons → clusters → provisional shortlist + base assignments
+  ├─ main agent fans out judge (parallel, haiku, batched) → per-cluster disposition
+  ├─ main agent merges judges, folds watch-wins, runs the planner → candidates + assignments + planPath
   ├─ [GATE 1]  the user confirms the dispositions
   ├─ lorekeeper(draft)   → codifier            draft the ADR from the confirmed candidates
   ├─ [GATE 2]  the user confirms the draft and its target path
@@ -33,9 +39,14 @@ chronicle:adr  (this skill — the main agent; owns both gates)
 Spawn each Lorekeeper as a nested custom agent, never a fork. Spawn one Lorekeeper
 per phase, in one `Agent` call, with no `name`. This chain is nested and
 sequential, not a team: never spawn the gleaner, the reckoner, the codifier, or
-the barrowkeeper yourself, never run two phases at once, and never put two agents
-in one message. It does not inherit
+the barrowkeeper yourself, never run two Lorekeeper phases at once, and never put
+two Lorekeeper spawns in one message. It does not inherit
 the main conversation. Do not put either gate inside Lorekeeper.
+
+The `judge` fan-out is the one deliberate exception to "never spawn a skill child
+yourself": `judge` is not a Lorekeeper child, has no Lorekeeper spec, and is
+spawned directly by the main agent in parallel batches — see **Judging the
+shortlist**.
 
 **Both gates are one local HTML page.** Never hand-write that page and never
 hand-design it — `gatePagePath` renders it. Build the payload, serve it, and end
@@ -118,10 +129,11 @@ ambiguous about which candidates it leaves untouched:
 }
 ```
 
-`entryIds` must match a candidate's `entryIds` from the reckoner output
+`entryIds` must match a candidate's `entryIds` from the merged candidate list
 exactly — it is the candidate's identity, since candidates carry no separate
-id field. `conflictResolutions` covers every entry in the reckoner's
-`conflicts`.
+id field. `conflictResolutions` covers every entry in the merged `conflicts`
+(the reckoner's own screening step raises none; every conflict here comes
+from a judge).
 
 - `group` is optional.
 - Rows that share a `group` value become one ADR.
@@ -168,26 +180,33 @@ child's shell, so its command silently runs against `/`.
 | `archiverPath` | `<skill dir>/scripts/archive-logs.ts` |
 | `gatePagePath` | `<skill dir>/scripts/gate-page.ts` |
 
-`collect` takes `collectorPath`, `indexReaderPath`, `bodyFetchPath`, and
-`plannerPath`. `draft` takes `bodyFetchPath` and `templatePath`. `commit` takes
-`validatorPath` and `archiverPath`. `gatePagePath` belongs to no phase — the main
-agent runs it at both gates and never passes it to a Lorekeeper.
+`collect` takes only `collectorPath` and `indexReaderPath`. `draft` takes
+`bodyFetchPath` and `templatePath`. `commit` takes `validatorPath` and
+`archiverPath`. `gatePagePath` belongs to no phase — the main agent runs it at
+both gates and never passes it to a Lorekeeper. `bodyFetchPath` and
+`plannerPath` are **not** collect-phase inputs — the main agent holds both and
+uses them directly when it fans out `judge` and runs the planner. See
+**Judging the shortlist**.
 
 ## `triage` — process the inbox
 
 This is the primary entry point.
 
-1. Spawn Lorekeeper in `collect` phase with the four collect paths above,
+1. Spawn Lorekeeper in `collect` phase with `collectorPath`, `indexReaderPath`,
    `contextBrief`, the requested mode, and any explicit scope. It scans unarchived
-   logs and the watched bucket. Scanning and judging are read-only.
-2. Cluster by **decision**, not by session. Assign every candidate `promote`,
-   `watch`, or `skip`, and give a reason. Surface assignments from candidates to
-   their source sessions.
+   logs and the watched bucket. Scanning and judging are read-only. It returns a
+   provisional `shortlist`, `tentativeSkips`, and `baseAssignments` — no candidate
+   is dispositioned yet.
+2. Judge the shortlist per **Judging the shortlist** below, then merge the result
+   into the full candidate list: every judged shortlist candidate, plus every
+   `tentativeSkips` entry as a final `skip`. Fold dispositions into session
+   assignments per **Planning the archive** below. Surface every candidate's
+   assignment from candidate to source session.
 3. Present every disposition at gate 1. A triage is done when every stale session
    was dispositioned and every retained candidate is named, not when the inbox is
    empty. Deliberately leave sessions written in the last ten minutes behind. If
-   the reckoner produced more than 12 `promote` candidates, say so, and say that
-   grouping may still bring the run under the cap.
+   the merged candidate list carries more than 12 `promote` candidates, say so,
+   and say that grouping may still bring the run under the cap.
 
    At most 12 groups may reach `draft` in one run. Enforce the cap before the user
    confirms, never after: once gate 1 is confirmed, the disposition set is
@@ -202,9 +221,9 @@ This is the primary entry point.
    the limit was review fatigue, not failure.
 
    Before treating the user's gate-1 response as final, check it for internal
-   contradictions the reckoner cannot see, since a group or a conflict
-   resolution is a gate-1-only decision the reckoner never produces or
-   validates:
+   contradictions neither the reckoner nor any judge can see, since a group or
+   a conflict resolution is a gate-1-only decision produced and validated by
+   nobody upstream:
 
    - **A group with a non-`promote` row.** A `group` that holds any non-`promote` row is a
      contradiction. Re-surface it to the user. Ask whether the remaining rows still form one record,
@@ -222,10 +241,11 @@ This is the primary entry point.
    watched bucket. Otherwise archive it to `done`.
 
    Gate 1 is the first re-plan trigger. If it changed any disposition the
-   reckoner assumed — overriding a candidate, or declining one half of a
-   proposed `merge` — the reckoner's `assignments` and its `planPath` no longer
-   match the user's decision. Apply the confirmed overrides to the candidate
-   dispositions now, and re-plan by **Re-planning the archive** below.
+   judges assumed — overriding a candidate, or declining one half of a
+   proposed `merge` — the merged `assignments` and the `planPath` built in
+   **Planning the archive** no longer match the user's decision. Apply the
+   confirmed overrides to the candidate dispositions now, and re-plan by
+   **Planning the archive** below.
 5. Build the `draft` payload from the confirmed `promote` rows. Fold rows that
    share a `group` value into one entry, in the order the `promote` rows appear
    in the user's confirmed response. A `promote` row with no `group` becomes its own
@@ -261,32 +281,85 @@ This is the primary entry point.
    If every verdict was `drop`, the run promoted nothing. Omit `newAdrs`
    entirely. Never send `[]`.
 7. A gate-2 `drop` defers a group. Its candidates were `promote` at gate 1, so
-   the reckoner already assigned their source sessions `target: "done"`. If
-   nothing corrects that, the dropped decision archives to `done` unrecorded
-   and leaves triage forever.
+   **Planning the archive** already assigned their source sessions `target:
+   "done"`. If nothing corrects that, the dropped decision archives to `done`
+   unrecorded and leaves triage forever.
 
    Gate 2 is the second re-plan trigger. Treat every dropped group's candidates
-   as `watch`, and re-plan by **Re-planning the archive** below.
+   as `watch`, and re-plan by **Planning the archive** below.
 
 During collection, when a fresh candidate cluster matches an entry in the watched
 bucket, pull the watched entry back in and re-judge the combined evidence. Watched
 items never re-queue on their own.
 
-### Re-planning the archive
+### Judging the shortlist
 
-Two triggers, one recipe, one planner run. Run it once, immediately before
-`commit`, folding every correction both gates made. A run whose gates corrected
-nothing keeps the reckoner's original `planPath` and never runs the planner.
+The reckoner only screens from skeletons — it returns a `shortlist` of clusters
+that plausibly clear the promotion threshold, never a final disposition. The
+main agent judges that shortlist itself, in parallel, instead of handing the
+whole thing to one sequential agent:
 
-- Re-fold the `watch`-wins rule across every session the corrected candidates
-  touch, not only the corrected ones — another candidate from the same session
-  may already be `watch`.
-- Keep each row's original `from` untouched.
-- Serialize the corrected `assignments`.
-- Re-run `bun "{plannerPath}" --assignments "{corrected assignments JSON}"`, using
-  the `plannerPath` retained from the collect-phase inputs through both gates.
-- Pass the fresh `planPath` into `commit` — never a prose description of the
-  corrections.
+1. **Batch.** Split `shortlist` into batches of up to 8 clusters each. Order does
+   not matter — a cluster's batch membership has no effect on its disposition.
+2. **Fan out.** Spawn one `judge` per batch, in a **single `Agent` message**
+   holding every batch of the round — this is what makes them run in parallel,
+   not the count. Pass each judge its own batch, `adrIndex`, and `bodyFetchPath`.
+   Never pass one judge another judge's batch. Cap a single round at 10 parallel
+   judges; a shortlist needing more batches than that runs a second round after
+   the first returns.
+3. **Merge.** Merge only after every judge in the round has reported. Each spawn
+   returns a launch receipt, not a result, and a judge that hangs sends no
+   completion notice at all. Concatenate every judge's `candidates` and
+   `conflicts` in the order their batches were dispatched. A judge that fails or
+   returns malformed output does not silently drop its batch — retry that one
+   batch once, and if it fails again, surface its clusters at gate 1 as `watch`
+   with a reason naming the judge failure, never as a silent `skip`.
+   - Before ending a turn to wait, name every batch still outstanding in the
+     reply, so a hung judge shows up as a named batch instead of a silent stall.
+   - When the run resumes with a batch still outstanding, treat that judge as
+     failed and take the retry path above.
+   - Keep the first valid result for each batch and discard any later one — a
+     slow original landing after its retry would otherwise duplicate every
+     candidate's `entryIds`, which is its identity at gate 1.
+4. **Fold in the tentative skips.** Append every `tentativeSkips` entry from the
+   reckoner as a final `skip` candidate, `title`, `reason`, and `matchesAdr`
+   carried through unchanged. These never went to a judge — the reckoner's own screening already
+   settled them.
+
+The result is the same `candidates` and `conflicts` shape the reckoner used to
+return directly. Feed it into **Planning the archive** next.
+
+### Planning the archive
+
+One recipe, run at most twice per triage:
+
+1. Run it once right after **Judging the shortlist**, before gate 1, to build the
+   initial plan.
+2. Run it again only when a gate corrected a disposition — once, immediately
+   before `commit`, folding every correction both gates made.
+
+A run whose gates corrected nothing keeps the initial plan and never re-runs the
+planner.
+
+- Start from the reckoner's `baseAssignments` — one row per session, target
+  `"done"` by default, `from` preserved.
+- Fold the `watch`-wins rule across every session touched by a `promote` or
+  `watch` candidate: if any candidate drawn from a session is `watch`, that
+  session's `target` becomes `"watch"`. A session touched only by `promote` or
+  `skip` candidates, or by none at all, stays `"done"`. Re-fold across every
+  session a correction touches, not only the corrected ones — another candidate
+  from the same session may already be `watch`.
+- Write the resulting `assignments` array as JSON to a temporary file. The
+  planner reads `--assignments` as a file path, so inline JSON fails with
+  `ENOENT`.
+- Run `bun "{plannerPath}" --assignments "{absolute path to that file}"`, using
+  the `plannerPath` the main agent already holds from the skill directory (see
+  **Script paths**) — it was never a collect-phase input.
+- Read the planner's stdout as the plan path: a bare path alone on one line, not
+  JSON. When the planner fails or prints no path, stop and report the failure
+  instead of reaching the gate without a plan.
+- Pass the resulting `planPath` into `commit` — never a prose description of
+  the assignments.
 
 Re-planning after gate 1 and again after gate 2 would start the second run from
 the same corrected `assignments` and orphan the first plan file, so fold both
@@ -316,7 +389,15 @@ implementation choice as architecture.
 
 Reject promotion when the material is a local implementation detail, temporary
 workaround, mechanical convention, or caveat that belongs in code or operational
-documentation.
+documentation. Also reject it when the decision is a default choice a competent
+engineer would reach without debate — an ordinary feature or implementation
+call, not an architectural one, even when it happens to touch multiple modules.
+
+When the evidence is thin or the read is close, disposition `watch`, not
+`promote`. `watch` costs one more review next triage; a wrongly `promote`d
+candidate becomes a permanent ADR. This bias is deliberate and applies hardest
+to `judge`, which runs on a cheap model precisely because being wrong toward
+`watch` is cheap and being wrong toward `promote` is not.
 
 ### No-promotion branch
 
@@ -388,6 +469,11 @@ Codex loads the same three-phase Lorekeeper boundary through one of two paths:
 If neither path is available, tell the user to run `chronicle:install` and start a new
 Codex thread. Do not replace the role boundary with an inline flow.
 
+`chronicle_judge` is not a Lorekeeper phase and follows neither path above the
+same way: the main agent spawns it directly, in parallel batches, exactly as
+under Claude Code (see **Judging the shortlist**) — select the registered
+`chronicle_judge` role, or the generic-agent fallback reading `judge.toml`.
+
 ## OpenCode only — skip on Claude Code and Codex
 
 Follow `~/.config/opencode/skills/adr/references/opencode.md` instead of the
@@ -432,9 +518,9 @@ The user fixes the offending record by hand, then re-runs `triage`. There is no
 archive-only entry point, and this change adds none.
 
 The re-run self-heals: `adrIndex.nextNumber` has advanced past the written
-records, so no path collides; the reckoner skips clusters that match an existing
-ADR, so the same decisions disposition to `skip`; and the run then takes the
-no-promotion branch, where the archive plan finally applies.
+records, so no path collides; the reckoner or the judge skips clusters that
+match an existing ADR, so the same decisions disposition to `skip`; and the run
+then takes the no-promotion branch, where the archive plan finally applies.
 
 ## Edge Cases
 
