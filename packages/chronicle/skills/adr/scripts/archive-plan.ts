@@ -137,6 +137,15 @@ export function planArchive(
   return { trailRoot, moves, refused };
 }
 
+/** Nothing moves and every refusal is `missing`: the signature of a plan built from the wrong cwd. */
+export function everySessionMissing(plan: ArchivePlan): boolean {
+  return (
+    plan.moves.length === 0 &&
+    plan.refused.length > 0 &&
+    plan.refused.every(({ reason }) => reason === "missing")
+  );
+}
+
 /** Writes the plan to a temp path and returns it. The only write this module performs. */
 export async function writePlan(plan: ArchivePlan): Promise<string> {
   return writeTempPayload("adr", "archive-plan", plan);
@@ -150,7 +159,7 @@ function assignmentsPath(argv: string[]): string {
   return path;
 }
 
-function mtimeOf(path: string): number | null {
+export function mtimeOf(path: string): number | null {
   try {
     return statSync(path).mtimeMs;
   } catch {
@@ -165,15 +174,31 @@ async function main(): Promise<void> {
     throw new Error("Assignments JSON must contain an array");
   }
 
+  // A wrong cwd used to plan every session `missing` and still exit 0 with a plan path.
   const trailRoot = logRoot(process.cwd());
+  if (!existsSync(join(trailRoot, ".cockpit"))) {
+    throw new Error(
+      `No .cockpit trail at ${trailRoot}. Run the planner from the repo that owns these sessions.`,
+    );
+  }
   const plan = planArchive(trailRoot, assignments, {
     nowMs: Date.now(),
     mtimeOf,
     exists: existsSync,
   });
+  if (everySessionMissing(plan)) {
+    throw new Error(
+      `Every session is missing from ${trailRoot}. Run the planner from the repo that owns these sessions.`,
+    );
+  }
   console.log(await writePlan(plan));
 }
 
 if (import.meta.main) {
-  await main();
+  try {
+    await main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

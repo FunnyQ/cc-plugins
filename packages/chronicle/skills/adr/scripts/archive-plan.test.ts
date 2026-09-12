@@ -1,5 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { STALE_MS } from "../../../shared/scripts/cockpit-trail";
 import {
@@ -21,13 +31,7 @@ function sessionPath(
   if (bucket === "inbox") {
     return join(TRAIL_ROOT, ".cockpit", "logs", `${sessionId}.jsonl`);
   }
-  return join(
-    TRAIL_ROOT,
-    ".cockpit",
-    "archive",
-    bucket,
-    `${sessionId}.jsonl`,
-  );
+  return join(TRAIL_ROOT, ".cockpit", "archive", bucket, `${sessionId}.jsonl`);
 }
 
 function deps(
@@ -243,6 +247,81 @@ describe("planArchive", () => {
 
     expect(plan.moves[0]?.from).toBe(watch);
     expect(plan.moves[0]?.fromBucket).toBe("watch");
+  });
+});
+
+describe("CLI", () => {
+  const script = join(import.meta.dir, "archive-plan.ts");
+  const directories: string[] = [];
+
+  afterEach(() => {
+    for (const directory of directories.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  function run(cwd: string, assignments: Assignment[]) {
+    const file = join(cwd, "assignments.json");
+    writeFileSync(file, JSON.stringify(assignments));
+    return spawnSync(process.execPath, [script, "--assignments", file], {
+      cwd,
+      encoding: "utf8",
+    });
+  }
+
+  function scratch(): string {
+    const directory = realpathSync(
+      mkdtempSync(join(tmpdir(), "archive-plan-")),
+    );
+    directories.push(directory);
+    return directory;
+  }
+
+  test("exits non-zero and prints no plan when cwd holds no trail", () => {
+    const result = run(scratch(), [{ sessionId: "a", target: "done" }]);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(".cockpit");
+  });
+
+  test("exits non-zero when every session is missing from the trail", () => {
+    const directory = scratch();
+    mkdirSync(join(directory, ".cockpit", "logs"), { recursive: true });
+
+    const result = run(directory, [
+      { sessionId: "a", target: "done" },
+      { sessionId: "b", target: "done" },
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+  });
+
+  test("prints an empty plan for an empty assignment list", async () => {
+    const directory = scratch();
+    mkdirSync(join(directory, ".cockpit", "logs"), { recursive: true });
+
+    const result = run(directory, []);
+
+    expect(result.status).toBe(0);
+    const plan = JSON.parse(await readFile(result.stdout.trim(), "utf8"));
+    expect(plan.moves).toEqual([]);
+  });
+
+  test("prints the plan path when the trail holds the sessions", () => {
+    const directory = scratch();
+    const logs = join(directory, ".cockpit", "logs");
+    mkdirSync(logs, { recursive: true });
+    const log = join(logs, "a.jsonl");
+    writeFileSync(log, "{}\n");
+    const date = new Date(Date.now() - STALE_MS - 1_000);
+    utimesSync(log, date, date);
+
+    const result = run(directory, [{ sessionId: "a", target: "done" }]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim().startsWith("/tmp/chronicle/adr/")).toBe(true);
   });
 });
 
