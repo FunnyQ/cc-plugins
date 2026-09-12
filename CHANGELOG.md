@@ -1,5 +1,16 @@
 # Changelog
 
+## [guard 0.4.0] - 2026-09-12
+
+_tracks tag `guard-v0.4.0`_
+
+### Changed
+- `comment-guard` now judges a Claude Code edit by the actual diff (`structuredPatch`) instead of the raw tool input, fixing several false positives: rewriting a whole file with `Write` no longer re-asks about every existing comment, a `replace_all` Edit that lands in several places is counted once instead of once per hit, and lines are no longer mismarked when two comments share the same text. Re-indenting code (wrapping it in an `if`/`try`/loop) no longer flags every comment inside as newly added.
+- A no-op `Write` over an unchanged file no longer re-reports every comment block in it.
+- A blank line inside a comment run no longer splits one authored block into two smaller pieces that each fall under the reporting threshold.
+- Path matching is stricter: guarded paths match on path segments rather than a loose `/docs/` substring, `vendor`/`node_modules` and `.min.js`/`.min.css` files are excluded, and syntax lookup is case-insensitive so files like `Dockerfile.DEV` are recognized.
+- OpenCode and file-creating Writes (which carry no diff) still fall back to the previous text-comparison path.
+
 ## [chronicle 0.16.3] - 2026-09-12
 
 _tracks tag `chronicle-v0.16.3`_

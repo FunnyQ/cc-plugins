@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Turn coding rules into harness-enforced ones. comment-guard hands back every comment block an edit added or grew, three lines or longer, with one question: is this why, or is this what?",
   "author": { "name": "Q" },
   "license": "MIT",
