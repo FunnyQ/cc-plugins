@@ -1,5 +1,19 @@
 # Changelog
 
+## [chronicle 0.16.3] - 2026-09-12
+
+_tracks tag `chronicle-v0.16.3`_
+
+### Changed
+- ADR triage now runs as a deterministic script (`triage.ts`) instead of the `gleaner` and `reckoner` agents, across Claude Code, Codex, and OpenCode — clustering, batching, and merging happen in-process, and batches are fanned out to `judge` directly, cutting agent round-trips out of the curation flow.
+- `judge` now screens candidates from lightweight skeletons itself, and `lorekeeper` drops its `collect` phase, matching the new triage topology.
+
+### Removed
+- The `gleaner` and `reckoner` agents are gone from all three runtimes (Claude Code, Codex, and OpenCode), replaced by `triage.ts` and `archive-stale.ts`.
+
+### Fixed
+- `archive-plan`'s CLI now refuses to run when the cwd has no `.cockpit` trail or every session comes back missing, instead of silently producing an empty "all missing" plan and exiting successfully.
+
 ## [chronicle 0.16.2] - 2026-09-10
 
 _tracks tag `chronicle-v0.16.2`_
