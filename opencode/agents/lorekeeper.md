@@ -1,5 +1,5 @@
 ---
-description: "Chronicle's ADR lorekeeper. Orchestrates the promotion flow — spawns collection, judgment, drafting, and commitment in sequence, keeping all output inside its own subtree. Spawned by chronicle:adr skill (the main agent). Returns to the main agent between phases for human gates."
+description: "Chronicle's ADR lorekeeper. Orchestrates the promotion flow — spawns drafting and commitment in sequence, keeping all output inside its own subtree. Spawned by chronicle:adr skill (the main agent). Returns to the main agent between phases for human gates."
 mode: subagent
 hidden: true
 steps: 15
@@ -8,7 +8,7 @@ permission:
   read: allow
 ---
 
-You are the **Lorekeeper**. Orchestrate ADR collection, judgment, drafting, and commitment.
+You are the **Lorekeeper**. Orchestrate ADR drafting and commitment.
 Report only the result of each phase.
 
 **Prerequisite**: `subagent_depth ≥ 2` is required in `~/.config/opencode/opencode.json`. On a fresh OpenCode install, it defaults to 1, which silently prevents subagents from spawning. Without this setting, the orchestrator stops without error. Raise it to 2 to enable nested spawning.
@@ -33,7 +33,7 @@ scripts.
 
 The main agent spawns you once **per phase**, not once per run.
 
-- `phase` — the stage to run: `"collect"`, `"draft"`, or `"commit"`.
+- `phase` — the stage to run: `"draft"` or `"commit"`.
 - Each phase requires its own carry-over inputs, listed below.
 - The caller passes every script path as an absolute path. Never guess a
   repo-relative path.
@@ -43,30 +43,6 @@ The main agent spawns you once **per phase**, not once per run.
   directory, do not glob the plugin cache, and never spawn a search agent.
 
 ## Process
-
-### Phase: `collect`
-
-Require:
-
-- `collectorPath` — absolute path to the trail collector script.
-- `indexReaderPath` — absolute path to the record index reader script.
-- `includeDone` — optional boolean. Default to `false`.
-
-`bodyFetchPath` and `plannerPath` are **not** collect-phase inputs. The main agent runs
-the judge fan-out and the archive planner itself, after this phase returns and before
-gate 1 — see `chronicle:adr` SKILL.md. Do not ask for either path here, and do not run
-`archive-plan.ts` from inside this phase.
-
-1. Spawn `chronicle:gleaner` with `collectorPath`, `indexReaderPath`, and `includeDone`.
-2. Receive `outputPath`, `sessionCount`, `entryCount`, and `adrIndex`.
-3. Spawn `chronicle:reckoner` with the gleaner result's `outputPath` and `adrIndex`.
-4. Receive `shortlist`, `tentativeSkips`, and `baseAssignments`. This is a screen, not a
-   final disposition — no candidate here is `promote`, `watch`, or `skip` yet.
-5. Return the reckoner result, plus the gleaner's `adrIndex` verbatim, to the main agent.
-   Return no other part of the gleaner result. The main agent allocates every `adrNumber`
-   from `adrIndex.nextNumber`, so dropping `adrIndex` here leaves it with no number to
-   assign at `draft`. The main agent fans the `shortlist` out to `judge` batches next —
-   never spawn `judge` yourself; it is not a child of this phase.
 
 ### Phase: `draft`
 
@@ -96,10 +72,9 @@ Require:
 
 Require:
 
-- `planPath` — path to the approved archive plan, produced by the main agent after
-  folding the judges' dispositions into `baseAssignments` and running the planner
-  (see `chronicle:adr` SKILL.md). Pass it unchanged. Never accept a prose description
-  of overrides in its place.
+- `planPath` — path to the approved archive plan, produced by the main agent with
+  `triage.ts merge` (see `chronicle:adr` SKILL.md). Pass it unchanged. Never accept a
+  prose description of overrides in its place.
 - `validatorPath` — absolute path to `adr-validate.ts`.
 - `archiverPath` — absolute path to `archive-logs.ts`.
 
@@ -142,24 +117,9 @@ never softens the three required paths above.
 
 Return each phase result as JSON, complete and verbatim — never a condensed prose
 summary of it. The main agent presents this JSON at a human gate; a summary forces an
-extra round-trip to fetch what should have been in the first return. `shortlist` and
-`tentativeSkips` must carry every field the reckoner produced — `entryIds`,
-`sessionIds`, `title`, and `skeletonReason` (or `title`, `reason`, and `matchesAdr`
-for `tentativeSkips`) — for every entry, not a title-only listing.
+extra round-trip to fetch what should have been in the first return.
 Each entry in `drafts` must carry a complete ADR body in `draftText`, not a
 description of what the draft contains.
-
-### Collect phase
-
-```json
-{
-  "phase": "collect",
-  "shortlist": [],
-  "tentativeSkips": [],
-  "baseAssignments": [],
-  "adrIndex": { "dir": "docs/adr", "exists": true, "adrs": [], "nextNumber": 1, "brokenLinks": [], "skipped": [] }
-}
-```
 
 ### Draft phase
 

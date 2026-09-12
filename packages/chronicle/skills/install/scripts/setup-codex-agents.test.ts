@@ -31,7 +31,7 @@ describe("setup-codex-agents", () => {
     const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(11);
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(9);
     for (const role of [
       "lawspeaker",
       "storykeeper",
@@ -39,8 +39,6 @@ describe("setup-codex-agents", () => {
       "messenger",
       "annalist",
       "lorekeeper",
-      "gleaner",
-      "reckoner",
       "codifier",
       "barrowkeeper",
     ]) {
@@ -71,8 +69,6 @@ describe("setup-codex-agents", () => {
         "messenger",
         "annalist",
         "lorekeeper",
-        "gleaner",
-        "reckoner",
         "codifier",
         "barrowkeeper",
       ].map((role) => [
@@ -92,8 +88,6 @@ describe("setup-codex-agents", () => {
     expect(installed.messenger).toContain('model = "gpt-5.6-luna"');
     expect(installed.annalist).toContain('model = "gpt-5.6-terra"');
     expect(installed.lorekeeper).toContain('model = "gpt-5.6-terra"');
-    expect(installed.gleaner).toContain('model = "gpt-5.6-luna"');
-    expect(installed.reckoner).toContain('model = "gpt-5.6-terra"');
     expect(installed.codifier).toContain('model = "gpt-5.6-terra"');
     expect(installed.barrowkeeper).toContain('model = "gpt-5.6-luna"');
     for (const content of Object.values(installed)) {

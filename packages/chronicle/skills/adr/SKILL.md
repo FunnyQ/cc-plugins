@@ -7,29 +7,36 @@ when_to_use: >-
   When the user wants to review the decision trail, record an architecture
   decision, or replace one. Human-invoked only — do NOT auto-fire from a Stop
   hook, a scribe run, or an incidental mention of a decision.
-argument-hint: "triage | promote <candidate-or-topic> | supersede <adr-id>"
+argument-hint: "triage | archive [--all] | promote <candidate-or-topic> | supersede <adr-id>"
 ---
 
 # Chronicle ADR
 
-The **main agent** owns both confirmation gates and holds state between exactly
-three Lorekeeper invocations: collect, draft, and commit. The nested
-**Lorekeeper** orchestrator owns each phase and delegates its mechanics. It cannot
-run the whole flow and return control at both gates because its first return ends
-that orchestrator run. Pass the collected plan into draft, then pass the confirmed
-drafts, `newAdrs`, the optional `metadataUpdate`, and the archive plan into commit.
+The **main agent** owns both confirmation gates and runs triage itself: it runs
+`triage.ts`, fans the batch files out to parallel `judge` agents, and merges
+their results into the gate-1 payload and the archive plan. It hands the nested
+**Lorekeeper** exactly two phases, draft and commit. The Lorekeeper owns each
+phase and delegates its mechanics. It cannot run the whole flow and return
+control at both gates because its first return ends that orchestrator run. Pass
+the confirmed groups into draft, then pass the confirmed drafts, `newAdrs`, the
+optional `metadataUpdate`, and the archive plan into commit.
 
-Between `collect` and gate 1, the main agent — not the Lorekeeper — fans the
-reckoner's shortlist out to parallel `judge` batches, merges their dispositions,
-and runs the archive planner itself. See **Judging the shortlist** below.
+Triage spawns no Lorekeeper. Clustering by identical decision text, base
+session assignments, batching, result validation, merging, and archive planning
+are deterministic, so `triage.ts` does them in seconds. Before it, one
+101-entry run reached gate 1 after about 1,500s: a reckoner agent spent 558s
+emitting 49k tokens of clusters, the Lorekeeper spent about 180s re-emitting that
+JSON verbatim, and the main agent spent about 460s typing a 33KB gate payload by
+hand, twice. Models now only screen and judge.
 
 ## Topology
 
 ```
 chronicle:adr  (this skill — the main agent; owns both gates)
-  ├─ lorekeeper(collect) → gleaner, reckoner   skeletons → clusters → provisional shortlist + base assignments
-  ├─ main agent fans out judge (parallel, haiku, batched) → per-cluster disposition
-  ├─ main agent merges judges, folds watch-wins, runs the planner → candidates + assignments + planPath
+  ├─ triage.ts prep       skeletons → exact-text clusters → ≤10 batch files + base assignments
+  ├─ judge × ≤10          parallel, sonnet: screen, fetch plausible bodies, disposition → triage.ts record
+  ├─ triage.ts merge      results → ledger + gate-1 payload + assignments + archive plan
+  ├─ main agent cross-checks the ledger → overrides → triage.ts merge again
   ├─ [GATE 1]  the user confirms the dispositions
   ├─ lorekeeper(draft)   → codifier            draft the ADR from the confirmed candidates
   ├─ [GATE 2]  the user confirms the draft and its target path
@@ -38,27 +45,31 @@ chronicle:adr  (this skill — the main agent; owns both gates)
 
 Spawn each Lorekeeper as a nested custom agent, never a fork. Spawn one Lorekeeper
 per phase, in one `Agent` call, with no `name`. This chain is nested and
-sequential, not a team: never spawn the gleaner, the reckoner, the codifier, or
-the barrowkeeper yourself, never run two Lorekeeper phases at once, and never put
-two Lorekeeper spawns in one message. It does not inherit
-the main conversation. Do not put either gate inside Lorekeeper.
+sequential, not a team: never spawn the codifier or the barrowkeeper yourself,
+never run two Lorekeeper phases at once, and never put two Lorekeeper spawns in
+one message. It does not inherit the main conversation. Do not put either gate
+inside Lorekeeper.
 
 The `judge` fan-out is the one deliberate exception to "never spawn a skill child
 yourself": `judge` is not a Lorekeeper child, has no Lorekeeper spec, and is
-spawned directly by the main agent in parallel batches — see **Judging the
-shortlist**.
+spawned directly by the main agent — see **Judging the batches**.
 
 **Both gates are one local HTML page.** Never hand-write that page and never
 hand-design it — `gatePagePath` renders it. Build the payload, serve it, and end
 the turn:
 
-1. Write a payload JSON to the scratchpad. Gate 1 takes `gate: 1`, `nextAdr`,
-   `candidates` (each with `entryIds`, `title`, `reason`, `disposition`, and an
-   optional `matchesAdr` and `hint`), an optional `conflicts`, and an optional
-   `scan` for the header facts. Gate 2 takes `gate: 2` and `drafts`, each with
-   `groupId`, `adrNumber`, `proposedPath`, and the codifier's `draftText` verbatim.
-2. Run `bun "{gatePagePath}" --data "{payload.json}" --serve --open` **as a background
-   command**. Pass `--lang zh-TW` when the cockpit decision-log language is zh-TW.
+1. Use a payload in the run directory — see **Run files**. `triage.ts merge`
+   writes gate 1's payload to `<runDir>/gate1.json`; never write or edit it by
+   hand. Write gate 2's payload to `<runDir>/gate2.json`. Gate 1 takes `gate: 1`,
+   `nextAdr`, `candidates` (each with `entryIds`, `title`, `reason`,
+   `disposition`, and an optional `matchesAdr` and `hint`), an optional
+   `conflicts`, and an optional `scan` for the header facts. Gate 2 takes
+   `gate: 2` and `drafts`, each with `groupId`, `adrNumber`, `proposedPath`, and
+   the codifier's `draftText` verbatim.
+2. Run `bun "{gatePagePath}" --data "{payload.json}" --out "{runDir}/gate<N>.html" --serve --open`
+   **as a background command**. Pass `--lang zh-TW` when the cockpit decision-log
+   language is zh-TW. A submitted response also lands beside the page, at
+   `<runDir>/gate<N>.html.response.json`.
 3. Report the served URL to the user and end the turn. Do not poll the command and
    do not re-run it.
 
@@ -107,6 +118,9 @@ this order:
   proposed record at gate 2. This is not `AskUserQuestion`: it is the same
   plaintext round-trip, over the transcript instead of a copy button.
 
+When a gate-1 reply comes back over a fallback surface, write it to
+`<runDir>/gate1-response.json` so `merge` can read it.
+
 This cascade is about the browser, not about the harness. Codex writes files and
 spawns processes like Claude Code does, so it renders and opens the same page
 through the same script.
@@ -129,11 +143,10 @@ ambiguous about which candidates it leaves untouched:
 }
 ```
 
-`entryIds` must match a candidate's `entryIds` from the merged candidate list
-exactly — it is the candidate's identity, since candidates carry no separate
-id field. `conflictResolutions` covers every entry in the merged `conflicts`
-(the reckoner's own screening step raises none; every conflict here comes
-from a judge).
+`entryIds` must match a candidate's `entryIds` from `gate1.json` exactly — it is
+the candidate's identity, since candidates carry no separate id field.
+`conflictResolutions` covers every entry in the merged `conflicts`; every
+conflict comes from a judge.
 
 - `group` is optional.
 - Rows that share a `group` value become one ADR.
@@ -172,41 +185,54 @@ child's shell, so its command silently runs against `/`.
 
 | Input | Path |
 | --- | --- |
-| `collectorPath`, `bodyFetchPath` | `<skill dir>/scripts/collect-adr-context.ts` |
-| `indexReaderPath` | `<skill dir>/scripts/adr-index.ts` |
+| `triagePath` | `<skill dir>/scripts/triage.ts` |
+| `bodyFetchPath` | `<skill dir>/scripts/collect-adr-context.ts` |
 | `plannerPath` | `<skill dir>/scripts/archive-plan.ts` |
 | `templatePath` | `<skill dir>/references/adr-template.md` |
 | `validatorPath` | `<skill dir>/scripts/adr-validate.ts` |
 | `archiverPath` | `<skill dir>/scripts/archive-logs.ts` |
 | `gatePagePath` | `<skill dir>/scripts/gate-page.ts` |
+| `archiveStalePath` | `<skill dir>/scripts/archive-stale.ts` |
 
-`collect` takes only `collectorPath` and `indexReaderPath`. `draft` takes
-`bodyFetchPath` and `templatePath`. `commit` takes `validatorPath` and
-`archiverPath`. `gatePagePath` belongs to no phase — the main agent runs it at
-both gates and never passes it to a Lorekeeper. `bodyFetchPath` and
-`plannerPath` are **not** collect-phase inputs — the main agent holds both and
-uses them directly when it fans out `judge` and runs the planner. See
-**Judging the shortlist**.
+`draft` takes `bodyFetchPath` and `templatePath`. `commit` takes `validatorPath`
+and `archiverPath`. Every `judge` takes `bodyFetchPath`, `triagePath`, and its own
+batch path. The main agent keeps `triagePath`, `plannerPath`, and `gatePagePath`
+for itself and never passes them to a Lorekeeper; `plannerPath` only builds the
+empty plan `promote` and `supersede` pass to `commit`. `archiveStalePath` belongs to no phase — only `archive` runs it.
+
+## Run files
+
+`/tmp/chronicle/adr/` is shared by every repo's runs, so each run gets its own
+directory. `triage.ts prep` creates it as `<trail directory name>-<ms>-<pid>` and
+prints it as `runDir`. Write every file the run needs inside `runDir`: the gate-2
+payload, the cross-check overrides, and the gate-2 drop overrides. Never write a
+fixed name such as `/tmp/chronicle/adr/gate1-payload.json`: a run in another repo
+overwrites it, and a gate then renders that repo's records.
 
 ## `triage` — process the inbox
 
 This is the primary entry point.
 
-1. Spawn Lorekeeper in `collect` phase with `collectorPath`, `indexReaderPath`,
-   `contextBrief`, the requested mode, and any explicit scope. It scans unarchived
-   logs and the watched bucket. Scanning and judging are read-only. It returns a
-   provisional `shortlist`, `tentativeSkips`, and `baseAssignments` — no candidate
-   is dispositioned yet.
-2. Judge the shortlist per **Judging the shortlist** below, then merge the result
-   into the full candidate list: every judged shortlist candidate, plus every
-   `tentativeSkips` entry as a final `skip`. Fold dispositions into session
-   assignments per **Planning the archive** below. Surface every candidate's
-   assignment from candidate to source session.
-3. Present every disposition at gate 1. A triage is done when every stale session
-   was dispositioned and every retained candidate is named, not when the inbox is
-   empty. Deliberately leave sessions written in the last ten minutes behind. If
-   the merged candidate list carries more than 12 `promote` candidates, say so,
-   and say that grouping may still bring the run under the cap.
+1. Run `bun "{triagePath}" prep` from the session's cwd. It prints one JSON line:
+   `hasTrail`, `runDir`, `nextAdr`, `sessions`, `entries`, `clusters`,
+   `tooFresh`, and `batches`, the batch file paths. When `hasTrail` is false,
+   take the **No trail at all** edge case. When `clusters` is 0, say that the
+   inbox holds nothing stale and stop.
+
+   `prep` reads the inbox and the watched bucket, never the registry. It clusters
+   entries whose `decision` text is identical, across sessions, and gives every
+   stale inbox session one base assignment targeting `done`. It deliberately
+   leaves a session written in the last ten minutes behind and counts it in
+   `tooFresh`. It pulls a watched session back only when one of its entries
+   shares its `decision` text with an inbox entry; watched items never re-queue
+   on their own. It sizes the batches so that at most 10 judges run.
+2. Judge the batches per **Judging the batches** below.
+3. Merge and cross-check per **Merging and the archive plan** below, then present
+   every disposition at gate 1 from `<runDir>/gate1.json`. A triage is done when
+   every stale session was dispositioned and every retained candidate is named,
+   not when the inbox is empty. If the merge counts more than 12 `promote`
+   candidates, say so, and say that grouping may still bring the run under the
+   cap.
 
    At most 12 groups may reach `draft` in one run. Enforce the cap before the user
    confirms, never after: once gate 1 is confirmed, the disposition set is
@@ -221,9 +247,8 @@ This is the primary entry point.
    the limit was review fatigue, not failure.
 
    Before treating the user's gate-1 response as final, check it for internal
-   contradictions neither the reckoner nor any judge can see, since a group or
-   a conflict resolution is a gate-1-only decision produced and validated by
-   nobody upstream:
+   contradictions no judge can see, since a group or a conflict resolution is a
+   gate-1-only decision produced and validated by nobody upstream:
 
    - **A group with a non-`promote` row.** A `group` that holds any non-`promote` row is a
      contradiction. Re-surface it to the user. Ask whether the remaining rows still form one record,
@@ -236,16 +261,11 @@ This is the primary entry point.
 
    Re-run the contradiction check and the group-count check after any correction
    the user makes — a fix to one contradiction can introduce another.
-4. After the user confirms, derive the archive target per session. **`watch` wins**: if
-   any candidate drawn from a session is `watch`, archive that session to the
-   watched bucket. Otherwise archive it to `done`.
-
-   Gate 1 is the first re-plan trigger. If it changed any disposition the
-   judges assumed — overriding a candidate, or declining one half of a
-   proposed `merge` — the merged `assignments` and the `planPath` built in
-   **Planning the archive** no longer match the user's decision. Apply the
-   confirmed overrides to the candidate dispositions now, and re-plan by
-   **Planning the archive** below.
+4. After the user confirms, archive each session by **`watch` wins**: a session
+   behind any `watch` candidate archives to the watched bucket, and every other
+   session archives to `done`. Gate 1 is the first re-merge trigger. If it
+   changed any disposition, re-merge with the gate-1 response per **Merging and
+   the archive plan**; `merge` re-folds `watch` wins and rewrites the plan.
 5. Build the `draft` payload from the confirmed `promote` rows. Fold rows that
    share a `group` value into one entry, in the order the `promote` rows appear
    in the user's confirmed response. A `promote` row with no `group` becomes its own
@@ -257,10 +277,9 @@ This is the primary entry point.
    share one `groupId`.
 
    Assign each entry a record number before spawning `draft`. Group `i` takes
-   `adrIndex.nextNumber + i`, with `i` zero-based. `adrIndex` arrives in the
-   collect return; retain it through gate 1, the same way `plannerPath` is
-   retained. The codifier never counts and never reads `adrIndex.nextNumber` for
-   itself — two groups drafted against one `nextNumber` would collide on one
+   `nextAdr + i`, with `i` zero-based. `nextAdr` arrives in the `prep` line;
+   retain it through gate 1. The codifier never counts and never reads the record
+   index for itself — two groups drafted against one number would collide on one
    path, and the barrowkeeper would refuse the whole batch.
 
    ```json
@@ -281,100 +300,115 @@ This is the primary entry point.
    If every verdict was `drop`, the run promoted nothing. Omit `newAdrs`
    entirely. Never send `[]`.
 7. A gate-2 `drop` defers a group. Its candidates were `promote` at gate 1, so
-   **Planning the archive** already assigned their source sessions `target:
-   "done"`. If nothing corrects that, the dropped decision archives to `done`
-   unrecorded and leaves triage forever.
+   the plan already assigned their source sessions `target: "done"`. If nothing
+   corrects that, the dropped decision archives to `done` unrecorded and leaves
+   triage forever.
 
-   Gate 2 is the second re-plan trigger. Treat every dropped group's candidates
-   as `watch`, and re-plan by **Planning the archive** below.
+   Gate 2 is the second re-merge trigger. Write `<runDir>/gate2-drops.json` in
+   the override shape, with every dropped group's candidates at `decision:
+   "watch"`, and re-merge per **Merging and the archive plan**.
 
-During collection, when a fresh candidate cluster matches an entry in the watched
-bucket, pull the watched entry back in and re-judge the combined evidence. Watched
-items never re-queue on their own.
+### Judging the batches
 
-### Judging the shortlist
+Spawn one `judge` per batch file, every one in a **single `Agent` message** — that
+is what makes them run in parallel. Keep each prompt to three literal paths:
+`batchPath`, `bodyFetchPath`, and `triagePath`. Never paste clusters, candidates,
+or the record index into a prompt. The model writes each prompt out before its
+call starts, so in one run five judges with 4,000-character prompts started
+23–26s apart despite sharing one message.
 
-The reckoner only screens from skeletons — it returns a `shortlist` of clusters
-that plausibly clear the promotion threshold, never a final disposition. The
-main agent judges that shortlist itself, in parallel, instead of handing the
-whole thing to one sequential agent:
+Each judge screens its clusters from their skeletons, fetches bodies for the
+plausible ones, and records one candidate per cluster with `triage.ts record`,
+which validates the result and writes `batch-NN.result.json` beside the batch. A
+judge's reply is the recorder's one summary line. Never read candidates from a
+reply.
 
-1. **Batch.** Split `shortlist` into batches of up to 8 clusters each. Order does
-   not matter — a cluster's batch membership has no effect on its disposition.
-2. **Fan out.** Spawn one `judge` per batch, in a **single `Agent` message**
-   holding every batch of the round — this is what makes them run in parallel,
-   not the count. Pass each judge its own batch, `adrIndex`, and `bodyFetchPath`.
-   Never pass one judge another judge's batch. Cap a single round at 10 parallel
-   judges; a shortlist needing more batches than that runs a second round after
-   the first returns.
-3. **Merge.** Merge only after every judge in the round has reported. Each spawn
-   returns a launch receipt, not a result, and a judge that hangs sends no
-   completion notice at all. Concatenate every judge's `candidates` and
-   `conflicts` in the order their batches were dispatched. A judge that fails or
-   returns malformed output does not silently drop its batch — retry that one
-   batch once, and if it fails again, surface its clusters at gate 1 as `watch`
-   with a reason naming the judge failure, never as a silent `skip`.
-   - Before ending a turn to wait, name every batch still outstanding in the
-     reply, so a hung judge shows up as a named batch instead of a silent stall.
-   - When the run resumes with a batch still outstanding, treat that judge as
-     failed and take the retry path above.
-   - Keep the first valid result for each batch and discard any later one — a
-     slow original landing after its retry would otherwise duplicate every
-     candidate's `entryIds`, which is its identity at gate 1.
-4. **Fold in the tentative skips.** Append every `tentativeSkips` entry from the
-   reckoner as a final `skip` candidate, `title`, `reason`, and `matchesAdr`
-   carried through unchanged. These never went to a judge — the reckoner's own screening already
-   settled them.
+1. **Wait for every judge.** Each spawn returns a launch receipt, not a result,
+   and a judge that hangs sends no completion notice at all. Before ending a turn
+   to wait, name every batch still outstanding in the reply, so a hung judge
+   shows up as a named batch instead of a silent stall.
+2. **Retry a failed batch once.** A batch has failed when its judge finished, or
+   the run resumed, without `batch-NN.result.json` on disk. Spawn one fresh judge
+   for that batch alone. The recorder keeps the first result written for a batch
+   and refuses every later one, so a slow original landing after its retry cannot
+   duplicate a candidate's `entryIds`, which is its identity at gate 1.
+3. **Surface a second failure.** When the retry also leaves no result, merge with
+   `--missing-as-watch`. That batch's clusters reach gate 1 as `watch`, with a
+   reason naming the judge failure, never as a silent `skip`. `merge` writes that
+   fallback as the batch's result file, so pass the flag once: every later merge
+   reads the fallback, and a judge landing late is refused like any second result.
 
-The result is the same `candidates` and `conflicts` shape the reckoner used to
-return directly. Feed it into **Planning the archive** next.
+### Merging and the archive plan
 
-### Planning the archive
+Run `bun "{triagePath}" merge --run "{runDir}"` from the same cwd `prep` ran in. It
+prints one JSON line: `gate1Path`, `planPath`, `ledgerPath`, the `promote`,
+`watch`, and `skip` counts, `conflicts`, `moves`, and `refused`. It writes
+`gate1.json`, `assignments.json`, `archive-plan.json`, and `ledger.md` into
+`runDir`, replacing the previous merge's files, so a re-merge never orphans a
+plan. Count dispositions from that line, never from a judge's reply.
 
-One recipe, run at most twice per triage:
+`merge` exits `1` and writes nothing in three cases:
 
-1. Run it once right after **Judging the shortlist**, before gate 1, to build the
-   initial plan.
-2. Run it again only when a gate corrected a disposition — once, immediately
-   before `commit`, folding every correction both gates made.
+- A batch has no result. Take the retry path in **Judging the batches**.
+- An override names no candidate or carries a decision other than `promote`,
+  `watch`, or `skip`.
+- The cwd resolves to a different trail than `prep` recorded, or every session is
+  missing from it. Both mean the wrong cwd, never an empty inbox.
 
-A run whose gates corrected nothing keeps the initial plan and never re-runs the
-planner.
+**Cross-check the batches before gate 1.** Parallel judges drift apart on the
+same kind of material: in one run, one batch skipped two external-API facts as
+reference material while another promoted a third. Read `ledger.md`, which lists
+every candidate by disposition, promotes first. Check every `promote` against the
+**hard skip rules** in **Promotion threshold** and against every `skip` from
+another batch.
 
-- Start from the reckoner's `baseAssignments` — one row per session, target
-  `"done"` by default, `from` preserved.
-- Fold the `watch`-wins rule across every session touched by a `promote` or
-  `watch` candidate: if any candidate drawn from a session is `watch`, that
-  session's `target` becomes `"watch"`. A session touched only by `promote` or
-  `skip` candidates, or by none at all, stays `"done"`. Re-fold across every
-  session a correction touches, not only the corrected ones — another candidate
-  from the same session may already be `watch`.
-- Write the resulting `assignments` array as JSON to a temporary file. The
-  planner reads `--assignments` as a file path, so inline JSON fails with
-  `ENOENT`.
-- Run `bun "{plannerPath}" --assignments "{absolute path to that file}"`, using
-  the `plannerPath` the main agent already holds from the skill directory (see
-  **Script paths**) — it was never a collect-phase input.
-- Read the planner's stdout as the plan path: a bare path alone on one line, not
-  JSON. When the planner fails or prints no path, stop and report the failure
-  instead of reaching the gate without a plan.
-- Pass the resulting `planPath` into `commit` — never a prose description of
-  the assignments.
+- When a `promote`'s own reason says the decision is already documented, or
+  describes a fact about an external system, override it to `skip` and name the
+  rule in `reason`.
+- When a `promote` rests on the same ground another batch skipped, override it to
+  `watch` and name that `skip` candidate's title in `reason`.
+- Never raise a disposition here. Only the user raises one, at gate 1.
 
-Re-planning after gate 1 and again after gate 2 would start the second run from
-the same corrected `assignments` and orphan the first plan file, so fold both
-into the one run.
+Write the overrides to `<runDir>/crosscheck.json` and re-merge with
+`--overrides "{runDir}/crosscheck.json"`. Write no file and skip the re-merge
+when nothing changed.
 
-Never hand-edit `moves[]` or any other field of the serialized plan. A plan's
-`target`, `to`, and `from`/`fromBucket` fields are derived together, so patching
-one desyncs the rest.
+Every override file takes the gate-1 response shape. `merge` matches each row to a
+candidate by its exact `entryIds` set, sets `decision`, replaces `reason` when the
+row carries one, and ignores `group` and `conflictResolutions`:
+
+```json
+{
+  "dispositions": [
+    { "entryIds": ["id-1"], "decision": "watch", "reason": "Same ground as the skipped 'X' in batch 3." }
+  ]
+}
+```
+
+Re-merge whenever a gate changes a disposition. Pass every override file written
+so far, each with its own `--overrides`, in this order; a later file wins:
+
+1. `<runDir>/crosscheck.json`, when the cross-check wrote one.
+2. `<runDir>/gate1.html.response.json`, or `<runDir>/gate1-response.json` for a
+   reply that came back over a fallback surface.
+3. `<runDir>/gate2-drops.json`, after a gate-2 `drop`.
+
+`merge` re-folds `watch` wins across every session, so a correction to one
+candidate also re-targets the other sessions it shares. Pass the final
+`planPath` into `commit` — never a prose description of the assignments.
+
+Never hand-edit `gate1.json`, `assignments.json`, or any field of
+`archive-plan.json`. A plan's `target`, `to`, and `from`/`fromBucket` fields are
+derived together, so patching one desyncs the rest. Change a disposition through
+an override file and re-merge instead.
 
 ### Promotion threshold
 
 Require **at least one** of these durability signals:
 
 - Reversing the decision would need a migration or coordinated changes.
-- The rejected alternatives and tradeoffs are not recoverable from the code alone.
+- The rejected alternatives and tradeoffs are not recoverable from the repo — its
+  code, code comments, and docs.
 
 Also require **at least one** of these longevity signals:
 
@@ -393,37 +427,107 @@ documentation. Also reject it when the decision is a default choice a competent
 engineer would reach without debate — an ordinary feature or implementation
 call, not an architectural one, even when it happens to touch multiple modules.
 
+Two **hard skip rules** settle a candidate as `skip` before the threshold is
+read, unless its records conflict. A conflict comes first and still makes the
+candidate `watch`, so a disputed decision is not archived to `done`:
+
+- **Already written down.** The decision and its reason already sit in a code
+  comment at the site, a reference doc, a README, `CLAUDE.md`, or `AGENTS.md`.
+  A record there is a second copy that drifts.
+- **Not the project's decision.** A fact about an external system — an API's
+  shape, a vendor's limit, an OS or library behaviour — is reference material,
+  whatever the entry's `kind`.
+
 When the evidence is thin or the read is close, disposition `watch`, not
 `promote`. `watch` costs one more review next triage; a wrongly `promote`d
 candidate becomes a permanent ADR. This bias is deliberate and applies hardest
-to `judge`, which runs on a cheap model precisely because being wrong toward
-`watch` is cheap and being wrong toward `promote` is not.
+to `judge`, whose batches run in parallel: every lenient call is also a
+disagreement between batches the user meets at gate 1.
+
+`judge` runs on sonnet, not haiku. On haiku, one 101-entry run promoted 20
+candidates and watched 3 despite this bias, with batches splitting on the same
+kind of material. The user rejected all 20, and 8 of them named the existing doc
+or comment in their own reason.
 
 ### No-promotion branch
 
 At gate 1, if no candidate is `promote`, say that approving the dispositions is
 the last decision in this run. Skip draft and gate 2. Invoke commit with only the
 approved plan; pass no `newAdrs` and no `metadataUpdate`. This branch's "before
-`commit`" is right after gate 1, so re-plan there if gate 1 corrected anything.
+`commit`" is right after gate 1, so re-merge there if gate 1 corrected anything.
 
 A promotion whose source sessions all proved live can produce a draft with an
 empty archive plan. Writing and archiving are independently optional. If the run
 produces neither, report a no-op instead of spawning commit with nothing to do.
 
+## `archive [--all]` — archive stale sessions without triage
+
+Use this when the user wants the inbox cleared and no records written. It spawns
+no Lorekeeper and no judge, and it has no gate. It moves every stale session in
+`.cockpit/logs/` to `done`. It never touches the watched bucket: a `watch`
+disposition is a decision an earlier triage made, and moving it to `done` would
+drop it from every later run.
+
+1. Without `--all`, run `bun "{archiveStalePath}" --apply` from the repo. The
+   script resolves the trail from its cwd, the same way cockpit does.
+2. With `--all`, run `bun "{archiveStalePath}" --all --apply` instead. It walks
+   `~/Projects`, `~/.claude`, and `~/.config` for every `.cockpit/logs/`, and
+   checks `~` itself without descending. It skips `node_modules`, `.git`,
+   Syncthing's `.stversions`, `.Trash`, and every `references/fixtures`
+   directory — chronicle's forward-test trails, which each plugin cache copy
+   also carries.
+3. Report each trail line and the summary. Relay every `warning:` line whole.
+
+When the user asks what `archive` would move, run the same command without
+`--apply`. The output keeps its shape and says `would move`.
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | Every trail was processed. A trail with nothing to move or skip prints no line. |
+| `1` | Bad arguments, no trail at the cwd, or a trail whose plan the archiver refused. Each failing trail's error is on stderr, and the other trails were still processed. |
+
+A `live` skip is not a failure. The planner and the archiver both refuse a log
+written in the last ten minutes, and the next `archive` run moves it.
+
+**The ignore warning.** A repo that ignores `.cockpit/logs/` but not
+`.cockpit/archive/` commits every archived log on its next `git add -A`: 26 in
+one repo and 8 in another before this check existed. The script runs `git check-ignore`
+on every destination under `.cockpit/archive/done/` before moving, warns when
+any one of them is not ignored, and moves the files anyway.
+Tell the user to add `.cockpit/archive/` to that repo's `.gitignore`. Never
+suggest ignoring `.cockpit/` whole, since some repos track other files there,
+such as a build script. Do not edit any `.gitignore` yourself. Archived logs that
+were already committed stay tracked after the rule lands; say so, and leave
+untracking them to the user.
+
 ## `promote <candidate-or-topic>` — direct promotion
 
-Use this escape hatch when the user already knows what should become a record. Collect
-the decision across all relevant sessions, including archived sessions. Ask only
-for material information the logs cannot establish. Apply the same promotion
-threshold and identify any existing ADR before drafting.
+Use this escape hatch when the user already knows what should become a record. Run
+`bun "{triagePath}" prep --evidence` to collect the decision across every session
+in every bucket — inbox, watched, and done, fresh sessions included — and retain
+its `runDir` and `nextAdr`. Evidence mode clusters every entry and assigns no
+session. Find the candidate's clusters by searching the `decision` text in
+`<runDir>/batch-*.json` with `rg` or `jq`; never read every batch into the
+conversation. Fetch bodies with `bun "{bodyFetchPath}" --bodies` when a skeleton is
+not enough. Spawn no judge in this mode. Ask only for material information the
+logs cannot establish. Apply the same promotion threshold and identify any
+existing ADR before drafting.
 
-Pass the reconstructed candidate, confirmed facts, source assignments, and
-archive plan into `draft`, as a one-entry `groups` payload. Build that entry the
+Archive nothing in this mode. A source session can hold other decisions nobody
+has dispositioned, and a watched one holds decisions an earlier triage kept on
+purpose; moving either to `done` would drop them from every later run. The next
+`triage` retires the promoted entries instead, because the judge matches them to
+the new record and skips them. `commit` still requires a `planPath`, so write `[]`
+to `<runDir>/assignments.json` and run
+`bun "{plannerPath}" --assignments "{runDir}/assignments.json"` from the same cwd.
+Its stdout is the path of an empty plan that moves nothing.
+
+Pass the reconstructed candidate and the confirmed facts into `draft`, as a
+one-entry `groups` payload. Build that entry the
 same way step 5 does: `groupId` is `g1`, `entryIds` is the reconstructed
-candidate's own `entryIds`, and `adrNumber` is `adrIndex.nextNumber`. `adrIndex`
-comes from the collect return, as in `triage`; retain it until `draft` is
-spawned. The codifier refuses to derive a number for itself, so a payload
-without `adrNumber` cannot draft.
+candidate's own `entryIds`, and `adrNumber` is `nextAdr`. Retain `nextAdr` from the
+`prep` line until `draft` is spawned. The codifier refuses to derive a number for
+itself, so a payload without `adrNumber` cannot draft.
 
 ```json
 { "groups": [{ "groupId": "g1", "entryIds": ["id-1"], "adrNumber": 27 }] }
@@ -431,31 +535,31 @@ without `adrNumber` cannot draft.
 
 Present the complete draft and proposed path at gate 2 before writing. Its
 gate-2 reply uses the same `verdicts` shape, with one entry. Pass a one-entry
-`newAdrs`, the path, and the archive plan into `commit` — the same contract
+`newAdrs`, the path, and the empty archive plan into `commit` — the same contract
 `triage` uses.
 
 ## `supersede <adr-id>` — replace an accepted record
 
-Collect the existing ADR and the evidence for its replacement. Draft the
-replacement first, through the same one-entry `groups` payload `promote` uses:
-`groupId` `g1`, the replacement's `entryIds`, and `adrNumber`
-`adrIndex.nextNumber` retained from the collect return. The replacement takes a
-fresh number; the superseded record keeps its own. After gate 2, write the
-replacement, then update only the old record's successor lifecycle metadata.
-Never rewrite the old decision's context or consequences.
+Collect the existing ADR and the evidence for its replacement, through the same
+`prep --evidence` search `promote` uses. Draft the replacement first, through
+the same one-entry `groups` payload `promote` uses: `groupId` `g1`, the
+replacement's `entryIds`, and `adrNumber` `nextAdr` retained from the `prep` line.
+The replacement takes a fresh number; the superseded record keeps its own. After
+gate 2, write the replacement, then update only the old record's successor
+lifecycle metadata. Never rewrite the old decision's context or consequences.
 
 This is two writes with no transaction. If the successor-link update fails after
 the replacement lands, do not roll anything back. The new record is valid alone,
 and its missing back-link is repairable by hand. Skip archiving in this mode:
 archiving a session while its record is half-written removes the evidence needed
-to finish the repair.
+to finish the repair. Pass `commit` the same empty plan `promote` builds.
 
 The replacement travels into `commit` as a one-entry `newAdrs`, beside the single
 `metadataUpdate`.
 
 ## Codex
 
-Codex loads the same three-phase Lorekeeper boundary through one of two paths:
+Codex loads the same two-phase Lorekeeper boundary through one of two paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_lorekeeper` per phase. Pass the resolved absolute paths from
@@ -471,7 +575,7 @@ Codex thread. Do not replace the role boundary with an inline flow.
 
 `chronicle_judge` is not a Lorekeeper phase and follows neither path above the
 same way: the main agent spawns it directly, in parallel batches, exactly as
-under Claude Code (see **Judging the shortlist**) — select the registered
+under Claude Code (see **Judging the batches**) — select the registered
 `chronicle_judge` role, or the generic-agent fallback reading `judge.toml`.
 
 ## OpenCode only — skip on Claude Code and Codex
@@ -512,20 +616,21 @@ After the barrowkeeper reports `validation-error`:
 
 - The written records are on disk, uncommitted.
 - The session logs are untouched in `.cockpit/`.
-- The plan file survives at `/tmp/chronicle/adr/`.
+- The plan file survives in the run directory under `/tmp/chronicle/adr/`.
 
-The user fixes the offending record by hand, then re-runs `triage`. There is no
-archive-only entry point, and this change adds none.
+The user fixes the offending record by hand, then re-runs `triage`. Do not use
+`archive` to finish the batch: it sends every stale session to `done`, including
+the sessions this batch assigned to `watch`.
 
-The re-run self-heals: `adrIndex.nextNumber` has advanced past the written
-records, so no path collides; the reckoner or the judge skips clusters that
-match an existing ADR, so the same decisions disposition to `skip`; and the run
-then takes the no-promotion branch, where the archive plan finally applies.
+The re-run self-heals: `nextAdr` has advanced past the written records, so no
+path collides; the judge skips clusters that match an existing ADR, so the same
+decisions disposition to `skip`; and the run then takes the no-promotion branch,
+where the archive plan finally applies.
 
 ## Edge Cases
 
-- **No trail at all**: the collector reports it. Say plainly that there is nothing
-  to triage and stop. Do not create `docs/adr/`.
+- **No trail at all**: `triage.ts prep` prints `hasTrail: false`. Say plainly that
+  there is nothing to triage and stop. Do not create `docs/adr/`.
 - **A candidate matches an existing record**: disposition it `skip` and name the
   matching record instead of drafting a near-duplicate.
 - **Conflicting evidence**: surface the conflict for the user's judgment at gate 1. Never

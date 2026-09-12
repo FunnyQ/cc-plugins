@@ -52,8 +52,8 @@ restarts. Always say this when you report the fix.
 Register the Codex-native commit role (`chronicle_lawspeaker`) and PR roles
 (`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), the release
 role (`chronicle_annalist`), plus the ADR roles
-(`chronicle_lorekeeper`, `chronicle_gleaner`, `chronicle_reckoner`,
-`chronicle_judge`, `chronicle_codifier`, `chronicle_barrowkeeper`).
+(`chronicle_lorekeeper`, `chronicle_judge`, `chronicle_codifier`,
+`chronicle_barrowkeeper`).
 
 Resolve the plugin root from this skill's load-time base directory. The root is
 two directories above this `skills/install` directory. Never point Codex config

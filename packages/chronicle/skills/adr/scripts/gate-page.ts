@@ -225,7 +225,7 @@ const STRINGS: Record<Lang, Strings> = {
     gate1Title: "Gate 1 — confirm the dispositions",
     gate2Title: "Gate 2 — approve the drafts",
     gate1Lede:
-      "The reckoner clustered the decision trail by decision, and the judges proposed a disposition for each cluster from its full records. Override anything below, then copy the response block back into chat. Nothing is written yet — this run is still read-only.",
+      "The decision trail was clustered by identical decision text, and the judges proposed a disposition for each cluster, reading the full records of every cluster that plausibly mattered. Override anything below, then copy the response block back into chat. Nothing is written yet — this run is still read-only.",
     gate2Lede:
       "Read each record in full before it is written. Approve the ones that should land, drop the ones that should wait. A dropped record is deferred, not discarded: its candidates return to the watched bucket and re-queue on the next triage run.",
     sessions: "sessions scanned",
@@ -273,7 +273,7 @@ const STRINGS: Record<Lang, Strings> = {
     gate1Title: "Gate 1 — 確認處置",
     gate2Title: "Gate 2 — 確認草稿",
     gate1Lede:
-      "reckoner 已把決策軌跡依「決定」分群，judge 再依完整記錄替每一群提出處置。你可以在下面覆寫任何一列，再把回應區塊複製回對話。目前尚未寫入任何檔案，這一輪仍是唯讀的。",
+      "決策軌跡已依相同的「決定」文字分群，judge 再替每一群提出處置；可能重要的群都讀過完整記錄。你可以在下面覆寫任何一列，再把回應區塊複製回對話。目前尚未寫入任何檔案，這一輪仍是唯讀的。",
     gate2Lede:
       "寫入之前先把每一筆記錄讀完。該落地的按 approve，該等的按 drop。被 drop 的記錄是延後、不是丟棄：它的候選會回到 watched bucket，下一次分流重新排隊。",
     sessions: "個 session 掃過",

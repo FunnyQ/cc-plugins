@@ -17,8 +17,6 @@ const ROLES = [
   "messenger",
   "annalist",
   "lorekeeper",
-  "gleaner",
-  "reckoner",
   "judge",
   "codifier",
   "barrowkeeper",
@@ -32,6 +30,9 @@ export const RETIRED_ROLES = [
   "smith",
   // Folded into the Lawspeaker, which now runs the commit scripts itself.
   "watcher",
+  // Replaced by `triage.ts prep`; the judge now screens from skeletons itself.
+  "gleaner",
+  "reckoner",
   "runesmith",
   // Same for release: the skill runs its own scripts, so the errand-runner is gone.
   "skirnir",
@@ -60,10 +61,8 @@ function managedBlock(targetDir: string): string {
     annalist: "Write user-facing release changelog entries.",
     lorekeeper:
       "Orchestrate Chronicle ADR triage, promotion, and supersession.",
-    gleaner: "Collect cockpit decision-trail skeletons without writing.",
-    reckoner:
-      "Cluster trail entries and screen them against the ADR threshold.",
-    judge: "Disposition one batch of shortlisted ADR candidates in parallel.",
+    judge:
+      "Screen and disposition one batch of clustered ADR candidates in parallel.",
     codifier: "Draft an Architecture Decision Record from confirmed evidence.",
     barrowkeeper: "Write the confirmed ADR and archive its source sessions.",
   };
