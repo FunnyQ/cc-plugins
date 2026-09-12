@@ -5,6 +5,8 @@ import {
   flaggedBlocks,
   formatReason,
   isGuardedPath,
+  patchLines,
+  resolveAdded,
   syntaxFor,
 } from "./comment-guard.ts";
 import type { Syntax } from "./comment-guard.ts";
@@ -73,6 +75,8 @@ describe("syntaxFor", () => {
     "a/Makefile",
     "a/Dockerfile",
     "a/Dockerfile.dev",
+    "a/Dockerfile.DEV",
+    "a/MAKEFILE",
     "a/.env",
     "a/.env.local",
   ])("matches %s on its name, not an extension", (path) => {
@@ -104,6 +108,20 @@ describe("isGuardedPath", () => {
     expect(isGuardedPath("a/user.rb")).toBe(true);
     expect(isGuardedPath("a/data.cfg")).toBe(true);
     expect(syntaxFor("repo/docs/gen.py")).not.toBeNull();
+  });
+
+  test("matches docs as a path segment, not a substring", () => {
+    expect(isGuardedPath("docs/gen.py")).toBe(false);
+    expect(isGuardedPath("a/mydocs/gen.py")).toBe(true);
+    expect(isGuardedPath("a/docsite/gen.py")).toBe(true);
+  });
+
+  test("excludes third-party and generated trees", () => {
+    expect(isGuardedPath("a/vendor/chart.js")).toBe(false);
+    expect(isGuardedPath("a/node_modules/x/i.js")).toBe(false);
+    expect(isGuardedPath("dist/vendor/mermaid.min.js")).toBe(false);
+    expect(isGuardedPath("dist/app.min.css")).toBe(false);
+    expect(isGuardedPath("dist/modules/diagram.js")).toBe(true);
   });
 });
 
@@ -359,6 +377,308 @@ describe("flaggedBlocks", () => {
     ].join("\n");
     const blocks = flaggedBlocks(two, rb, ["# a one", "# b three"]);
     expect(blocks.map((b) => b.start)).toEqual([2, 7]);
+  });
+});
+
+describe("patchLines", () => {
+  const numbers = (patch: Parameters<typeof patchLines>[0]) =>
+    patchLines(patch).added.map((a) => a.n);
+
+  test("numbers the added lines of a hunk and strips the marker", () => {
+    const patch = [
+      { newStart: 1, lines: ["+// probe", " export const a = 1;"] },
+    ];
+    expect(patchLines(patch).added).toEqual([{ n: 1, text: "// probe" }]);
+  });
+
+  test("a removed line consumes no line in the new file", () => {
+    const patch = [
+      { newStart: 10, lines: [" keep", "-gone", "-also gone", "+fresh"] },
+    ];
+    expect(numbers(patch)).toEqual([11]);
+    expect(patchLines(patch).removed).toEqual(["gone", "also gone"]);
+  });
+
+  test("the no-newline annotation is not a line", () => {
+    const patch = [
+      {
+        newStart: 1,
+        lines: [" a", "\\ No newline at end of file", "+b"],
+      },
+    ];
+    expect(numbers(patch)).toEqual([2]);
+  });
+
+  test("every hunk contributes", () => {
+    const patch = [
+      { newStart: 1, lines: ["+one"] },
+      { newStart: 40, lines: [" ctx", "+two", "+three"] },
+    ];
+    expect(numbers(patch)).toEqual([1, 41, 42]);
+  });
+
+  test("an empty patch marks nothing", () => {
+    expect(patchLines([])).toEqual({ added: [], removed: [] });
+  });
+});
+
+describe("resolveAdded", () => {
+  const patch = [{ newStart: 2, lines: [" const a = 1;", "+// why"] }];
+
+  test("gives line numbers when the file still matches the diff", () => {
+    const onDisk = ["const x = 0;", "const a = 1;", "// why", "const b = 2;"];
+    expect(resolveAdded(patch, onDisk)).toEqual(new Set([3]));
+  });
+
+  // A formatter hook sharing this PostToolUse event can reflow the file in
+  // parallel, which shifts every line the diff named.
+  test("falls back to text when a parallel write shifted the lines", () => {
+    const reflowed = ["const x =", "  0;", "const a = 1;", "// why"];
+    expect(resolveAdded(patch, reflowed)).toEqual(["// why"]);
+  });
+
+  // Wrapping code in an `if` rewrites every line inside it, so the diff shows
+  // the whole block removed and re-added at a deeper indent.
+  test("re-indenting a block adds nothing", () => {
+    const reindent = [
+      {
+        newStart: 2,
+        lines: [
+          "-  // one",
+          "-  // two",
+          "-  go();",
+          "+  if (x) {",
+          "+    // one",
+          "+    // two",
+          "+    go();",
+          "+  }",
+        ],
+      },
+    ];
+    const after = [
+      "function f() {",
+      "if (x) {",
+      "// one",
+      "// two",
+      "go();",
+      "}",
+    ];
+    expect(resolveAdded(reindent, after)).toEqual(new Set([2, 6]));
+  });
+
+  test("rewording a moved comment is still an addition", () => {
+    const reworded = [
+      { newStart: 2, lines: ["-  // one", "+  // one, revised"] },
+    ];
+    const after = ["const a = 1;", "// one, revised"];
+    expect(resolveAdded(reworded, after)).toEqual(new Set([2]));
+  });
+
+  test("adding a second copy of an existing comment still counts", () => {
+    const dupe = [{ newStart: 3, lines: [" const b = 2;", "+// note"] }];
+    const after = ["// note", "const a = 1;", "const b = 2;", "// note"];
+    expect(resolveAdded(dupe, after)).toEqual(new Set([4]));
+  });
+});
+
+describe("flaggedBlocks by line number", () => {
+  // Two identical comment texts; only the second copy is new. The text path has
+  // to guess and marks the first, which is the reason the diff path exists.
+  const twins = [
+    "const a = 1;", // 1
+    "// note", // 2
+    "// b", // 3
+    "// c", // 4
+    "const x = 2;", // 5
+    "// note", // 6
+    "// b", // 7
+    "// c", // 8
+  ].join("\n");
+
+  test("a line number marks the copy that actually changed", () => {
+    const blocks = flaggedBlocks(twins, ts, new Set([6]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.start).toBe(6);
+    expect(blocks[0]!.added).toEqual([true, false, false]);
+  });
+
+  test("the text fallback marks the earlier twin instead", () => {
+    const blocks = flaggedBlocks(twins, ts, ["// note"]);
+    expect(blocks[0]!.start).toBe(2);
+  });
+
+  test("a line number landing on code marks nothing", () => {
+    expect(flaggedBlocks(twins, ts, new Set([5]))).toEqual([]);
+  });
+
+  test("the header stays exempt under line numbers too", () => {
+    const headed = "// one\n// two\n// three\nconst a = 1;";
+    expect(flaggedBlocks(headed, ts, new Set([1, 2, 3]))).toEqual([]);
+  });
+});
+
+describe("flaggedBlocks across a blank line", () => {
+  const para = [
+    "def a", // 1
+    "  # one", // 2
+    "  # two", // 3
+    "", // 4
+    "  # three", // 5
+    "  # four", // 6
+    "end", // 7
+  ].join("\n");
+
+  test("one blank line keeps the run open", () => {
+    const blocks = flaggedBlocks(para, rb, ["# three"]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.start).toBe(2);
+    expect(blocks[0]!.lines).toEqual([
+      "# one",
+      "# two",
+      "",
+      "# three",
+      "# four",
+    ]);
+    expect(blocks[0]!.added).toEqual([false, false, false, true, false]);
+  });
+
+  test("two blanks read as a separation", () => {
+    const split = "def a\n  # one\n  # two\n\n\n  # three\n  # four\nend";
+    expect(flaggedBlocks(split, rb, ["# three"])).toEqual([]);
+  });
+
+  test("the bridged blank does not count toward the threshold", () => {
+    const thin = "def a\n  # one\n\n  # two\nend";
+    expect(flaggedBlocks(thin, rb, ["# two"])).toEqual([]);
+  });
+
+  test("a blank with no comment behind it closes the run", () => {
+    const trailing = "def a\n  # one\n  # two\n  # three\n\nend";
+    const blocks = flaggedBlocks(trailing, rb, ["# three"]);
+    expect(blocks[0]!.lines).toEqual(["# one", "# two", "# three"]);
+  });
+
+  test("code after the blank still closes the run", () => {
+    const parted = "x = 0\n# one\n# two\n\ny = 1\n# three";
+    expect(flaggedBlocks(parted, rb, ["# one", "# three"])).toEqual([]);
+  });
+});
+
+describe("blanks inside a block comment", () => {
+  test("an empty line inside a docblock still counts toward the height", () => {
+    const doc = "const a = 1;\n/*\n\n*/\nconst b = 2;";
+    const blocks = flaggedBlocks(doc, ts, new Set([2, 3, 4]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.height).toBe(3);
+  });
+
+  test("a bridged blank does not count toward the height", () => {
+    const para = "def a\n  # one\n  # two\n\n  # three\nend";
+    expect(flaggedBlocks(para, rb, ["# three"])[0]!.height).toBe(3);
+  });
+
+  test("line numbers bridge the same way text does", () => {
+    const para = "def a\n  # one\n  # two\n\n  # three\nend";
+    const blocks = flaggedBlocks(para, rb, new Set([5]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.start).toBe(2);
+    expect(blocks[0]!.added).toEqual([false, false, false, true]);
+    expect(formatReason("a.rb", blocks)).toContain(
+      "1 comment block(s), 3 lines",
+    );
+  });
+});
+
+describe("main", () => {
+  const HOOK = new URL("./comment-guard.ts", import.meta.url).pathname;
+
+  const run = async (payload: unknown, onDisk: string) => {
+    const dir = `/tmp/cg-main-${Math.random().toString(36).slice(2)}`;
+    const path = `${dir}/app.ts`;
+    await Bun.write(path, onDisk);
+    const json = JSON.stringify(payload).replaceAll("<FILE>", path);
+    const proc = Bun.spawn(["bun", HOOK], {
+      stdin: new TextEncoder().encode(json),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+    await Bun.$`rm -rf ${dir}`.quiet();
+    return { exitCode, stderr };
+  };
+
+  const BLOCKED = "const a = 1;\n// one\n// two\n// three\nconst b = 2;\n";
+
+  test("a Write that changed nothing reports nothing", async () => {
+    const out = await run(
+      {
+        tool_name: "Write",
+        tool_input: { file_path: "<FILE>", content: BLOCKED },
+        tool_response: { type: "update", structuredPatch: [] },
+      },
+      BLOCKED,
+    );
+    expect(out.exitCode).toBe(0);
+    expect(out.stderr).toBe("");
+  });
+
+  // Claude Code sends an empty patch for a create, so the whole file is new and
+  // the text path is the only one that can answer.
+  test("a Write that created the file reports through the text path", async () => {
+    const out = await run(
+      {
+        tool_name: "Write",
+        tool_input: { file_path: "<FILE>", content: BLOCKED },
+        tool_response: { type: "create", structuredPatch: [] },
+      },
+      BLOCKED,
+    );
+    expect(out.exitCode).toBe(2);
+    expect(out.stderr).toContain("1 comment block(s), 3 lines");
+  });
+
+  test("a diff reports only the block it touched", async () => {
+    const file =
+      "const a = 1;\n// old one\n// old two\n// old three\nconst b = 2;\n" +
+      "// new one\n// new two\n// new three\n";
+    const out = await run(
+      {
+        tool_name: "Write",
+        tool_input: { file_path: "<FILE>", content: file },
+        tool_response: {
+          type: "update",
+          structuredPatch: [
+            {
+              newStart: 5,
+              lines: [
+                " const b = 2;",
+                "+// new one",
+                "+// new two",
+                "+// new three",
+              ],
+            },
+          ],
+        },
+      },
+      file,
+    );
+    expect(out.exitCode).toBe(2);
+    expect(out.stderr).toContain("1 comment block(s), 3 lines");
+    expect(out.stderr).toContain("+ 6  // new one");
+    expect(out.stderr).not.toContain("old one");
+  });
+
+  test("no tool_response at all still reports, as on OpenCode", async () => {
+    const out = await run(
+      {
+        tool_name: "Write",
+        tool_input: { file_path: "<FILE>", content: BLOCKED },
+      },
+      BLOCKED,
+    );
+    expect(out.exitCode).toBe(2);
+    expect(out.stderr).toContain("1 comment block(s), 3 lines");
   });
 });
 

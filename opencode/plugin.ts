@@ -384,7 +384,8 @@ const QLabPlugin = Object.assign(
           if (message) output.output += message;
         }
 
-        if (COMMENT_GUARDED.test(filePath) && !filePath.includes("/docs/")) {
+        // The path policy is the hook's own (`isGuardedPath`) and it re-checks on every run, so a copy here would only be a second place to drift.
+        if (COMMENT_GUARDED.test(filePath)) {
           const result = await run(
             ["bun", join(root, COMMENT_GUARD)],
             commentPayload(input.tool, input.args),

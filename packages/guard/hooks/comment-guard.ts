@@ -3,7 +3,8 @@
  * PostToolUse hook: surface the comment blocks an edit added or grew, so the
  * model re-judges why vs what.
  *
- * Input (stdin): JSON with tool_name and tool_input.
+ * Input (stdin): JSON with tool_name, tool_input, and on Claude Code a
+ * tool_response carrying the diff the write produced.
  * Output: silent unless a reportable block exists.
  * Exit codes:
  *   0 = ok / skipped file type / nothing to report
@@ -28,6 +29,17 @@ export type ToolInput = {
   content?: string;
 };
 
+/** One unified-diff hunk as Claude Code reports it on `tool_response`. */
+export type Hunk = {
+  newStart?: number;
+  lines?: string[];
+};
+
+export type ToolResponse = {
+  type?: string;
+  structuredPatch?: Hunk[];
+};
+
 /** A language's comment forms: line markers, plus open/close block pairs. */
 export type Syntax = {
   line: readonly string[];
@@ -39,11 +51,16 @@ export type CommentBlock = {
   start: number;
   lines: string[];
   added: boolean[];
+  /** Comment lines, not counting blanks bridged in from between paragraphs. */
+  height: number;
 };
 
 const MIN_BLOCK_LINES = 3;
 
 const SKIP_EXTS = new Set([".md", ".mdx", ".txt", ".json"]);
+
+// Third-party and generated trees. Their comments are someone else's to justify.
+const SKIP_SEGMENTS = new Set(["docs", "vendor", "node_modules"]);
 
 const HASH: Syntax = { line: ["#"], block: [] };
 const C: Syntax = { line: ["//"], block: [["/*", "*/"]] };
@@ -168,7 +185,10 @@ export const BY_NAME: Record<string, Syntax> = {
 
 // Policy, not lookup: `COMMENT_GUARDED` in opencode/plugin.ts mirrors syntaxFor's half alone, so folding these checks in would leave it compared against a set it cannot encode.
 export function isGuardedPath(filePath: string): boolean {
-  return !filePath.includes("/docs/") && !SKIP_EXTS.has(extname(filePath));
+  if (/\.min\.(js|css)$/.test(filePath)) return false;
+  // Segments, not a substring: a relative `docs/gen.py` has no leading slash.
+  if (filePath.split("/").some((part) => SKIP_SEGMENTS.has(part))) return false;
+  return !SKIP_EXTS.has(extname(filePath));
 }
 
 export function syntaxFor(filePath: string): Syntax | null {
@@ -176,8 +196,10 @@ export function syntaxFor(filePath: string): Syntax | null {
   const known = BY_EXT[ext];
   if (known) return known;
 
-  // `Dockerfile.dev` is still a Dockerfile, so the extension comes off first.
-  return BY_NAME[basename(filePath, ext).toLowerCase()] ?? null;
+  // `Dockerfile.DEV` is still a Dockerfile, and basename's own suffix match is case-sensitive, so both halves are lowered before the extension comes off.
+  const name = basename(filePath).toLowerCase();
+  const stem = ext ? name.slice(0, name.length - ext.length) : name;
+  return BY_NAME[stem] ?? null;
 }
 
 /**
@@ -252,22 +274,94 @@ export function addedCommentLines(
 }
 
 /**
+ * The lines a diff adds — numbered in the new file — and the texts it removes.
+ *
+ * A `-` line consumes no line in the new file, so only context and additions
+ * advance the counter. `\ No newline at end of file` is a diff annotation
+ * rather than a line and is skipped the same way. Text is trimmed on both
+ * sides, because the block scan compares trimmed lines too.
+ */
+export function patchLines(patch: Hunk[]): {
+  added: { n: number; text: string }[];
+  removed: string[];
+} {
+  const added: { n: number; text: string }[] = [];
+  const removed: string[] = [];
+  for (const hunk of patch) {
+    let n = hunk.newStart ?? 1;
+    for (const line of hunk.lines ?? []) {
+      if (line.startsWith("\\")) continue;
+      if (line.startsWith("-")) {
+        removed.push(line.slice(1).trim());
+        continue;
+      }
+      if (line.startsWith("+")) added.push({ n, text: line.slice(1).trim() });
+      n++;
+    }
+  }
+  return { added, removed };
+}
+
+/**
+ * Added lines as numbers, or as text when the file no longer matches the diff.
+ *
+ * A line the diff also removed is not new — re-indenting a block, or moving one
+ * between two points of the same edit, rewrites every line it touches and would
+ * otherwise re-ask for a comment nobody wrote. Subtracting the removed texts as
+ * a multiset is what keeps the diff path agreeing with `addedCommentLines`:
+ * moving a comment is not an addition, rewording one is.
+ *
+ * A formatter running as a second PostToolUse hook rewrites the file in
+ * parallel with this one, and every line the diff named then shifts — marks
+ * land on the wrong lines, or the block falls silent because they land on code.
+ * Text is the weaker answer but it cannot be shifted, so a lost race degrades
+ * instead of lying.
+ */
+export function resolveAdded(
+  patch: Hunk[],
+  lines: string[],
+): Set<number> | string[] {
+  const { added, removed } = patchLines(patch);
+
+  const pool = new Map<string, number>();
+  for (const text of removed) pool.set(text, (pool.get(text) ?? 0) + 1);
+
+  const net = added.filter(({ text }) => {
+    const left = pool.get(text) ?? 0;
+    if (left === 0) return true;
+    pool.set(text, left - 1);
+    return false;
+  });
+
+  const intact = net.every((a) => lines[a.n - 1] === a.text);
+  return intact ? new Set(net.map((a) => a.n)) : net.map((a) => a.text);
+}
+
+/**
  * The blocks worth reporting, read off the file on disk.
  *
  * Blocks come from disk rather than from `new_string` because an Edit fragment
  * truncates any block that continues past its edges, which would both mis-size
  * the run and hide whether it sits at the top of the file.
+ *
+ * `added` is line numbers when the harness handed us a diff, and comment text
+ * otherwise. Text is the weaker answer — an added line whose wording repeats an
+ * untouched one marks whichever comes first in the file — so it is the fallback
+ * for harnesses that report no diff, not the preferred path.
  */
 export function flaggedBlocks(
   fileText: string,
   syntax: Syntax,
-  added: string[],
+  added: string[] | Set<number>,
 ): CommentBlock[] {
   const lines = fileText.split("\n").map((l) => l.trim());
   const flags = commentFlags(lines, syntax);
 
+  const byNumber = added instanceof Set ? added : null;
   const pending = new Map<string, number>();
-  for (const line of added) pending.set(line, (pending.get(line) ?? 0) + 1);
+  if (!(added instanceof Set)) {
+    for (const line of added) pending.set(line, (pending.get(line) ?? 0) + 1);
+  }
 
   const blocks: CommentBlock[] = [];
   let sawCode = false;
@@ -285,27 +379,46 @@ export function flaggedBlocks(
     const start = i + 1;
     const body: string[] = [];
     const marked: boolean[] = [];
+    let bridged = 0;
 
-    while (i < lines.length && flags[i]) {
+    while (i < lines.length) {
+      if (!flags[i]) {
+        // One blank keeps the run open so a paragraph break cannot split a block below the threshold; two blanks read as a real separation.
+        if (lines[i] !== "" || !flags[i + 1]) break;
+        body.push("");
+        marked.push(false);
+        bridged++;
+        i++;
+        continue;
+      }
+
       const text = lines[i]!;
-      const left = pending.get(text) ?? 0;
-      // Consume in file order so each added occurrence claims one line, and so a
-      // hit landing in an exempt or short block still spends itself.
-      if (left > 0) pending.set(text, left - 1);
+      let hit: boolean;
+      if (byNumber) {
+        hit = byNumber.has(i + 1);
+      } else {
+        const left = pending.get(text) ?? 0;
+        // Consume in file order so each added occurrence claims one line, and so a
+        // hit landing in an exempt or short block still spends itself.
+        if (left > 0) pending.set(text, left - 1);
+        hit = left > 0;
+      }
       body.push(text);
-      marked.push(left > 0);
+      marked.push(hit);
       i++;
     }
 
-    if (!header && body.length >= MIN_BLOCK_LINES && marked.some(Boolean)) {
-      blocks.push({ start, lines: body, added: marked });
+    // Counted, not filtered on empty text: a blank line inside a `/* */` is a comment line and still counts, while a bridged one is not and does not.
+    const height = body.length - bridged;
+    if (!header && height >= MIN_BLOCK_LINES && marked.some(Boolean)) {
+      blocks.push({ start, lines: body, added: marked, height });
     }
   }
   return blocks;
 }
 
 export function formatReason(fileName: string, blocks: CommentBlock[]): string {
-  const total = blocks.reduce((n, b) => n + b.lines.length, 0);
+  const total = blocks.reduce((n, b) => n + b.height, 0);
   const out = [
     `comment-guard: ${blocks.length} comment block(s), ${total} lines, in ${fileName}.`,
     `Answer for every line marked +: does it say why, or what? Delete the ones that say what.`,
@@ -322,7 +435,11 @@ export function formatReason(fileName: string, blocks: CommentBlock[]): string {
 }
 
 async function main(): Promise<number> {
-  let payload: { tool_name?: string; tool_input?: ToolInput };
+  let payload: {
+    tool_name?: string;
+    tool_input?: ToolInput;
+    tool_response?: ToolResponse;
+  };
   try {
     payload = JSON.parse(await Bun.stdin.text());
   } catch {
@@ -340,8 +457,11 @@ async function main(): Promise<number> {
   const syntax = syntaxFor(filePath);
   if (!syntax) return 0;
 
-  const added = addedCommentLines(toolName, input, syntax);
-  if (added.length === 0) return 0;
+  const response = payload.tool_response ?? {};
+  const patch = response.structuredPatch;
+  // A Write that creates a file reports no hunks at all (78 of 78 measured), so
+  // an empty patch means "nothing changed" only when the file already existed.
+  if (response.type === "update" && patch?.length === 0) return 0;
 
   // PostToolUse runs after the write landed, so the file on disk is the shape
   // being judged. Without it there is no block sizing worth reporting.
@@ -351,6 +471,15 @@ async function main(): Promise<number> {
   } catch {
     return 0;
   }
+
+  // Live on both harnesses, not dead code: a create Write sends an empty patch, and OpenCode's `commentPayload` sends none at all.
+  const added = patch?.length
+    ? resolveAdded(
+        patch,
+        fileText.split("\n").map((l) => l.trim()),
+      )
+    : addedCommentLines(toolName, input, syntax);
+  if (added instanceof Set ? added.size === 0 : added.length === 0) return 0;
 
   const blocks = flaggedBlocks(fileText, syntax, added);
   if (blocks.length === 0) return 0;
