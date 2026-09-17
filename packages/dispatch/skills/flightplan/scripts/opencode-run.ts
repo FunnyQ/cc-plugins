@@ -37,7 +37,11 @@
  * missing cross-vendor pass must fail the task, never pass quietly).
  */
 import { flagValue } from "./lib/args";
-import { printChangedFiles, readPrompt } from "./lib/harness-run";
+import {
+  NO_ASK_CONTRACT,
+  printChangedFiles,
+  readPrompt,
+} from "./lib/harness-run";
 
 const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode";
 
@@ -93,7 +97,10 @@ function run(mode: Mode, prompt: string, model: string): number {
     return 2;
   }
 
-  const message = mode === "review" ? REVIEW_GUARD + prompt : prompt;
+  // REVIEW_GUARD stays first: it is opencode's only read-only enforcement, with
+  // no sandbox behind it, so nothing may push it down the prompt.
+  const message =
+    (mode === "review" ? REVIEW_GUARD : "") + NO_ASK_CONTRACT + prompt;
 
   let proc: Bun.SyncSubprocess<"pipe", "pipe">;
   try {

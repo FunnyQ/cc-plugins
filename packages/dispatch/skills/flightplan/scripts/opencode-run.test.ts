@@ -70,7 +70,7 @@ describe("opencode-run delegate", () => {
     expect(args).toContain("--format");
     expect(args).toContain("json");
     // delegate sends the raw prompt as the final positional (no read-only guard).
-    expect(args[args.length - 1]).toBe("implement task UI-03");
+    expect(args[args.length - 1]).toContain("implement task UI-03");
   });
 
   test("pipes the prompt via stdin when no --prompt-file", async () => {
@@ -82,7 +82,7 @@ describe("opencode-run delegate", () => {
     });
     expect(res.success).toBe(true);
     const args = await loggedArgs();
-    expect(args[args.length - 1]).toBe("do it from stdin");
+    expect(args[args.length - 1]).toContain("do it from stdin");
   });
 });
 
@@ -194,5 +194,26 @@ describe("parseJsonl", () => {
 
   test("empty stream → empty string", () => {
     expect(parseJsonl("")).toBe("");
+  });
+});
+
+// opencode is the engine that makes this load-bearing headless: it ships a
+// `question` tool (3 uses measured in the local opencode DB), where `codex exec`
+// is handed none at all.
+describe("opencode-run unattended contract", () => {
+  test("every prompt reaches the CLI carrying the no-ask contract", async () => {
+    for (const mode of ["delegate", "review"]) {
+      const res = Bun.spawnSync(["bun", SCRIPT, mode], {
+        stdin: Buffer.from("do the thing"),
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, OPENCODE_BIN: opencodeBin, ARGS_LOG: argsLog },
+      });
+      expect(res.success).toBe(true);
+
+      const message = (await loggedArgs()).at(-1)!;
+      expect(message).toContain("Nobody is watching this run");
+      expect(message).toContain("do the thing");
+    }
   });
 });

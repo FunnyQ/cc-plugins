@@ -36,7 +36,11 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flagValue } from "./lib/args";
-import { printChangedFiles, readPrompt } from "./lib/harness-run";
+import {
+  NO_ASK_CONTRACT,
+  printChangedFiles,
+  readPrompt,
+} from "./lib/harness-run";
 
 const CODEX_BIN = process.env.CODEX_BIN ?? "codex";
 
@@ -89,7 +93,7 @@ function run(
       // and does read this var — only codex's interactive TUI cannot, because
       // that path runs hooks on a daemon whose env froze at its start.
       {
-        stdin: Buffer.from(prompt),
+        stdin: Buffer.from(NO_ASK_CONTRACT + prompt),
         stdout: "pipe",
         stderr: "pipe",
         env: { ...process.env, RELAY_DELEGATED: "1" },

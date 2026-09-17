@@ -76,7 +76,7 @@ describe("codex-run delegate", () => {
     const stdinSeen = (await readFile(argsLog, "utf-8")).split(
       "\n--STDIN--\n",
     )[1];
-    expect(stdinSeen).toBe("do it from stdin");
+    expect(stdinSeen).toContain("do it from stdin");
   });
 });
 
@@ -191,5 +191,26 @@ describe("codex-run errors", () => {
       env: { ...process.env, CODEX_BIN: codexBin, ARGS_LOG: argsLog },
     });
     expect(res.exitCode).toBe(2);
+  });
+});
+
+// The wrappers are autopilot's headless path and nothing else calls them, so the
+// contract is unconditional here — relay's --no-ask covers the live path, and
+// between them no agent is left to paraphrase the rule away.
+describe("codex-run unattended contract", () => {
+  test("every prompt reaches the CLI carrying the no-ask contract", async () => {
+    for (const mode of ["delegate", "review"]) {
+      const res = Bun.spawnSync(["bun", SCRIPT, mode], {
+        stdin: Buffer.from("do the thing"),
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, CODEX_BIN: codexBin, ARGS_LOG: argsLog },
+      });
+      expect(res.success).toBe(true);
+
+      const stdin = (await readFile(argsLog, "utf-8")).split("\n--STDIN--\n")[1]!;
+      expect(stdin).toContain("Nobody is watching this run");
+      expect(stdin).toContain("do the thing");
+    }
   });
 });
