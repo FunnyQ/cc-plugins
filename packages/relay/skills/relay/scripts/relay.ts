@@ -7,6 +7,7 @@ import { capabilityGate, getBackend } from "./backends/gate";
 import { BACKENDS } from "./backends";
 import {
   appendFileContract,
+  appendNoAskContract,
   buildReviewPrompt,
   buildPromptFile,
 } from "./relay-prompt";
@@ -46,6 +47,7 @@ export type RelayFlags = {
   noProject: boolean;
   promptFile?: string;
   dangerous: boolean;
+  noAsk: boolean;
   headless: boolean; // opt out of the live-pane path even inside herdr
   keepPane: boolean; // keep a successful live pane open for follow-up
   waitTimeoutMs?: number; // live poll budget (--wait-timeout, default 10 min)
@@ -99,7 +101,7 @@ function usage(backends: string): string {
     `       relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]`,
     "flags: --task <text> | --files <csv> | --model <provider/model>",
     "       --out <path> | --git-scope <s> | --no-project",
-    "       --prompt-file <p> | --dangerous",
+    "       --prompt-file <p> | --dangerous | --no-ask",
     "       --headless | --keep-pane | --wait-timeout <ms>   (live-pane runs inside herdr)",
   ].join("\n");
 }
@@ -129,6 +131,7 @@ export function parseFlags(argv: string[]): ParsedFlags {
     gitScope: "related",
     noProject: false,
     dangerous: false,
+    noAsk: false,
     headless: false,
     keepPane: false,
   };
@@ -166,6 +169,8 @@ export function parseFlags(argv: string[]): ParsedFlags {
       flags.noProject = true;
     } else if (arg === "--dangerous") {
       flags.dangerous = true;
+    } else if (arg === "--no-ask") {
+      flags.noAsk = true;
     } else if (arg === "--headless") {
       flags.headless = true;
     } else if (arg === "--keep-pane") {
@@ -530,7 +535,12 @@ export async function executeRelay(
     const promptText =
       parsed.mode === "review" ? opts.promptText! : delegatePromptOnce();
     const resultPath = join(dir, "result.md");
-    const livePrompt = appendFileContract(promptText, resultPath);
+    // no-ask first, so the result-file contract stays the prompt's last word —
+    // it is the one the delegate must act on to be collected at all.
+    const livePrompt = appendFileContract(
+      parsed.flags.noAsk ? appendNoAskContract(promptText) : promptText,
+      resultPath,
+    );
     // The full prompt rides a file — a multi-line herd.send submits prematurely
     // in TUI inputs (and risks ARG_MAX); the pane only gets a one-line bootstrap.
     const livePromptPath = join(dir, "live-prompt.md");

@@ -73,6 +73,29 @@ export function buildReviewPrompt(task: string | undefined): string {
 }
 
 /**
+ * Append the unattended contract to a prompt. Opt-in, because a human watching a
+ * live pane can answer a question and may want to — this is for the callers that
+ * have nobody there, and autopilot is the first.
+ *
+ * It belongs to relay rather than to the caller's prompt because only the live
+ * path needs it: a TUI hands the agent an ask tool that the headless form never
+ * gets. Autopilot tried to deliver the same words through the agent that writes
+ * the instruction file, and measured them arriving in neither of two real runs —
+ * an instruction to relay a rule has a paraphrase surface that a flag does not.
+ * Pure function.
+ */
+export function appendNoAskContract(prompt: string): string {
+  return (
+    prompt +
+    "\n\n---\n\n" +
+    "Unattended run (IMPORTANT):\n" +
+    "- Nobody is watching this run, so do not call any ask, clarify, or request-user-input tool, and never wait on a reply to one.\n" +
+    "- Where the request is ambiguous, do exactly what it specifies.\n" +
+    "- Where something genuinely blocks you, never substitute your own scope, framework, or gate to get past it — finish what you can, then name the blocker in your final answer."
+  );
+}
+
+/**
  * Append the live-run result-file contract to a prompt. The delegate runs in
  * an interactive TUI pane, so its final answer is captured via this file.
  * Pane reads may be unavailable while the agent is active, and visible or

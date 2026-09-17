@@ -115,6 +115,7 @@ describe("parseFlags", () => {
       "--prompt-file",
       "/tmp/manual.md",
       "--dangerous",
+      "--no-ask",
       "--headless",
       "--keep-pane",
       "--wait-timeout",
@@ -130,6 +131,7 @@ describe("parseFlags", () => {
       noProject: true,
       promptFile: "/tmp/manual.md",
       dangerous: true,
+      noAsk: true,
       headless: true,
       keepPane: true,
       waitTimeoutMs: 30000,
@@ -705,6 +707,37 @@ describe("executeRelay live routing", () => {
     );
     expect(liveOpts!.bootstrapText).not.toContain("built prompt");
     expect(liveOpts!.resultPath).toBe("/tmp/relay/test-run/result.md");
+  });
+
+  // A live pane's TUI hands the agent an ask tool the headless form never gets,
+  // and relay does not read the pane — so an unattended caller needs the contract
+  // to arrive here, where no intermediate agent can paraphrase or skip it.
+  it("appends the no-ask contract only under --no-ask", async () => {
+    const promptFor = async (argv: string[]): Promise<string> => {
+      const writes = new Map<string, string>();
+      await executeRelay(
+        argv,
+        liveDeps({
+          writeFile: (path, text) => writes.set(path, text),
+          runLive: () => Promise.resolve(liveOk),
+        }),
+      );
+      return writes.get("/tmp/relay/test-run/live-prompt.md")!;
+    };
+
+    const guarded = await promptFor([
+      "codex",
+      "delegate",
+      "--no-ask",
+      "Do",
+      "the",
+      "thing",
+    ]);
+    expect(guarded).toContain("Nobody is watching this run");
+    expect(guarded).toContain("never wait on a reply");
+
+    const plain = await promptFor(["codex", "delegate", "Do", "the", "thing"]);
+    expect(plain).not.toContain("Nobody is watching this run");
   });
 
   it("prints the live answer verbatim, bypassing parseOutput", async () => {

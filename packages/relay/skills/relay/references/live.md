@@ -18,6 +18,7 @@ Flags:
 - `--keep-pane` — after a verified success, keep the live pane open for follow-up conversation. Without this flag, relay closes the pane after it has collected a settled, marker-terminated result.
 - `--wait-timeout <ms>` — how long relay polls for the result (default 600000 = 10 min).
 - `--dangerous` — **YOLO / unattended** live run. The delegate proceeds without stopping on approval prompts (codex `--dangerously-bypass-approvals-and-sandbox`, claude `--dangerously-skip-permissions`, opencode `--auto`). Without it, approval prompts surface **in the pane** for a human to answer. When nobody is watching the pane to press "allow", pass `--dangerous`. Leave it off for supervised runs. opencode nuance: `--auto` auto-approves only what is **not explicitly denied** — config `deny` rules still block, unlike codex's full bypass.
+- `--no-ask` — appends an **unattended contract** to the prompt file: do not call any ask/clarify/request-user-input tool, never wait on a reply, and never widen your own scope to get past a blocker — name it in the final answer instead. A live TUI hands the agent an ask tool the headless form never gets, and relay collects the result file rather than the pane, so a question burns `--wait-timeout` with nobody obliged to answer. Pair it with `--dangerous`: that one stops approval prompts, this one stops the agent's own questions, and an unattended caller needs both. Leave it off when a human is at the pane — answering a real question beats letting the agent guess.
 
 Output contract:
 

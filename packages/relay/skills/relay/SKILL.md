@@ -62,8 +62,10 @@ For brevity, the examples below write `relay.ts <backend> <mode> …` as shortha
 
 Inside herdr (`HERDR_ENV=1`), `delegate` and `review` auto-route to a live TUI pane in a new tab.
 Before running in that environment, read `references/live.md`.
-It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
+It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous` / `--no-ask`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
 `image` stays headless/native.
+
+**`--no-ask` is for callers with nobody at the pane.** A live TUI hands the agent an ask tool the headless form never gets, and relay reads the result file rather than the pane, so a question stops the run against a clock nobody is watching. The flag appends an unattended contract to the prompt file. Leave it off when you are sitting there: answering a good question beats guessing.
 
 **Keep the default live.** `--headless` needs a real reason.
 
