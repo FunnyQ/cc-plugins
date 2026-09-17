@@ -1,5 +1,12 @@
 # Changelog
 
+## [herdr 0.7.6] - 2026-09-17
+
+_tracks tag `herdr-v0.7.6`_
+
+### Fixed
+- Fixed a gap in `protocol-check` where responses decoded straight into a typed struct went untracked because their type string never appeared as a literal in source. The baseline now also credits a response when it's the result of a method the client actually sends, so coverage no longer depends on incidental literal usage — herdr-workbench's tracked responses went from 8 to 17 with no code changes of its own.
+
 ## [herdr 0.7.5] - 2026-09-17
 
 _tracks tag `herdr-v0.7.5`_
