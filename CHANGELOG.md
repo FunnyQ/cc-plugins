@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 4.2.0] - 2026-09-18
+
+_tracks tag `dispatch-v4.2.0`_
+
+### Added
+- `codex-run.ts` now accepts a pinnable, per-mode model: a `--model` flag or `CODEX_MODEL` env var overrides the default, and delegate and review runs get different defaults out of the box (the cheap model writes, the strong one reviews). Previously every codex delegate and review silently ran on whatever `~/.codex/config.toml` happened to say.
+
+### Changed
+- Autopilot's ask flow now asks about the codex model choice too, mirroring the existing opencode model question, and only when a role actually resolves to codex — splitting the questions across two rounds so dependent choices are never asked blind and the four-question cap still holds.
+
+### Fixed
+- External engines delegated to by autopilot (codex, and the cross-vendor review lens) can no longer ask the user a question or wait on a reply mid-flight; a banned-tool rule now travels with their prompts, closing a gap where an engine could hang forever waiting for input that never comes in an unattended run.
+- Autopilot's per-agent usage reporting no longer reads N/A starting from the second wave. Claude Code 2.1.274 splits a workflow agent's opening prompt across two turns, which made membership detection miss every agent after the first wave; detection now waits for the first assistant reply before deciding.
+
 ## [dispatch 4.1.0] - 2026-09-18
 
 _tracks tag `dispatch-v4.1.0`_
