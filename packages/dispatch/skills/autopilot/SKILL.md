@@ -61,6 +61,8 @@ Before touching Workflow, gather the work-list in the main conversation:
    ```
    The in-flight lint at `orchestrator.md` step 6 only ever sees one task file, and the flightplan Edit/Write hook only ran on files written in this repo — neither reaches a plan authored by an older flightplan or by hand. Run it here so a defect fails in the conversation instead of parking a correct task three attempts later.
 
+   **Act on a `[serial-undeclared]` advisory before flying.** It means PLAN.md or a `_context/` file asks for serial execution or a lock, but PLAN.md has no `> **Max parallel**:` header, so autopilot would dispatch the whole wave at once. Ask the user which applies, then add `> **Max parallel**: 1` or `> **Max parallel**: unlimited` to the PLAN.md header. The scout reads the header every wave, so no `CFG` field carries it.
+
    **`scope-git-status` is the one to expect on an older plan.** Flightplan used to recommend a whole-tree `git status` gate, and that gate fails a correct task the moment a sibling in the same wave leaves its own legitimate edits uncommitted. Fix it in the task file — narrow the command with a `--` pathspec listing that task's own files — before flying. Do not fly a tree with violations outstanding.
 6. **Capture the base ref** for the Final review diff scope:
    ```bash
@@ -91,7 +93,7 @@ When the user picks live, leave `CFG.liveCollectRounds` at its default `3`, and 
 
 If the live-pane env is not fulfilled, do not ask the fourth question. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, the headless wrapper path is exactly today's behavior. The three Claude quality lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
 
-Then show the user a one-screen brief. State the slug and how many tasks there are. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
+Then show the user a one-screen brief. State the slug and how many tasks there are. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State the plan's `Max parallel` when it is declared. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
 This is real compute, real edits, and an external code review. Get an explicit go from the user before calling Workflow.
 
@@ -117,7 +119,7 @@ Then call `Workflow({ script: <the adapted script> })`. No `args` needed.
 
 **`CFG.devEngine` and `CFG.reviewEngine` are independent axes.** `devEngine` controls who writes non-final tasks. `reviewEngine` controls the external bug/correctness lens in the closing Final review. The full external-engine behavior, the opencode model fields, and failure handling live in `references/orchestrator.md`.
 
-The orchestrator runs a **wave loop**. Each wave asks an agent to run `next-ready.ts --summary`, then executes the wave's ready tasks **in parallel**. Status changes only happen *inside* the run, so the snapshot must be re-scouted every wave — a static list misses tasks unblocked mid-flight. Each task is a retry pipeline:
+The orchestrator runs a **wave loop**. Each wave asks an agent to run `next-ready.ts --summary`, then executes the wave's ready tasks **in parallel**, at most `maxParallel` at a time when PLAN.md declares `> **Max parallel**:`. Status changes only happen *inside* the run, so the snapshot must be re-scouted every wave — a static list misses tasks unblocked mid-flight. Each task is a retry pipeline:
 
 ```
 Dev (Sonnet) ─ implements + edits Status, logs a note

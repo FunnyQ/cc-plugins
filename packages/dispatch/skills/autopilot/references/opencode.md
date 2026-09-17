@@ -46,7 +46,8 @@ Repeat these steps by hand, one wave at a time:
 
 1. Run the ready-task lister `bun $SCRIPTS/next-ready.ts <tasks-dir> --summary`
    against the tasks directory to get the current wave. Re-run it every wave —
-   a static list misses tasks unblocked mid-flight.
+   a static list misses tasks unblocked mid-flight. When its `maxParallel` is a
+   number, run steps 2–6 for at most that many tasks at once.
 2. For each ready task in the wave, spawn a subagent through the **task tool**
    in the **dev role**, giving it the task file path and the instruction to
    implement that task.

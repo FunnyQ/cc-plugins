@@ -10,6 +10,7 @@ PLAN.md is the master spec. It carries every decision, every constraint, and an 
 > **Status**: draft | approved | in-progress | shipped
 > **Owner**: <name or "unassigned">
 > **Last updated**: YYYY-MM-DD
+> **Max parallel**: unlimited
 
 ## Overview
 
@@ -121,5 +122,7 @@ backend/01 ─────┘
 - **Writing topic**: replace "Architecture" and "Bucketing" with "Outline" (the section structure). Replace "Tech decisions" with "Style decisions".
 - **Migration**: add a "Migration phases" section between "Architecture" and "Bucketing" with the phase definitions.
 - **Greenfield project**: keep all sections. This is what they're designed for.
+
+**Max parallel** caps how many tasks autopilot runs at once. Keep the default `unlimited`: parallel waves are what make autopilot fast. Lower it to `1` only when tasks share a resource the working tree cannot isolate: one build target that compiles every file, a live device or service a verification reinstalls, a local database a migration rewrites. Write `unlimited`, or omit the line, when `Depends on` edges already sequence every conflict. The value is a bare positive integer or `unlimited`. Do not describe a lock or serial execution in prose instead: nothing reads prose, and autopilot will dispatch the whole wave.
 
 Do not omit "Non-goals". It is the single best lever against scope creep.
