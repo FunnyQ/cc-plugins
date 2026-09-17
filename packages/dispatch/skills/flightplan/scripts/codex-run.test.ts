@@ -101,6 +101,62 @@ describe("codex-run review", () => {
   });
 });
 
+describe("codex-run model selection", () => {
+  async function loggedArgs(): Promise<string[]> {
+    return JSON.parse(
+      (await readFile(argsLog, "utf-8")).split("\n--STDIN--\n")[0]!,
+    );
+  }
+
+  function spawn(rest: string[], model?: string) {
+    return Bun.spawnSync(["bun", SCRIPT, ...rest], {
+      stdin: Buffer.from("x"),
+      stdout: "pipe",
+      stderr: "pipe",
+      // CODEX_MODEL is cleared rather than inherited: a developer who exports it
+      // would otherwise see the default test pass against their own value.
+      env: {
+        ...process.env,
+        CODEX_BIN: codexBin,
+        ARGS_LOG: argsLog,
+        CODEX_MODEL: model ?? "",
+      },
+    });
+  }
+
+  // The split is the point: the cheap model writes, the strong one reviews. A single
+  // default for both modes would silently undo that on every flight.
+  test("defaults per mode — sol writes, astra reviews", async () => {
+    for (const [mode, model] of [
+      ["delegate", "gpt-5.6-sol"],
+      ["review", "gpt-6-astra"],
+    ]) {
+      expect(spawn([mode!]).success).toBe(true);
+      const logged = await loggedArgs();
+      expect(logged).toContain("-m");
+      expect(logged[logged.indexOf("-m") + 1]).toBe(model);
+    }
+  });
+
+  test("--model overrides the default", async () => {
+    expect(spawn(["review", "--model", "gpt-5.6-sol"]).success).toBe(true);
+    const logged = await loggedArgs();
+    expect(logged[logged.indexOf("-m") + 1]).toBe("gpt-5.6-sol");
+  });
+
+  test("CODEX_MODEL overrides the default, and --model overrides it", async () => {
+    expect(spawn(["delegate"], "gpt-6-astra").success).toBe(true);
+    const viaEnv = await loggedArgs();
+    expect(viaEnv[viaEnv.indexOf("-m") + 1]).toBe("gpt-6-astra");
+
+    expect(
+      spawn(["delegate", "--model", "gpt-5.6-terra"], "gpt-6-astra").success,
+    ).toBe(true);
+    const viaFlag = await loggedArgs();
+    expect(viaFlag[viaFlag.indexOf("-m") + 1]).toBe("gpt-5.6-terra");
+  });
+});
+
 describe("codex-run errors", () => {
   test("missing binary → CODEX UNREACHABLE + non-zero", () => {
     const res = Bun.spawnSync(["bun", SCRIPT, "review"], {
