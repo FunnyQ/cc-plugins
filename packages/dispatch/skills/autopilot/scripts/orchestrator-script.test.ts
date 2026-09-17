@@ -59,6 +59,7 @@ const snapshot = (tree: object, exitCode = 0): ScoutResult => ({
     unfinished: [],
     invalid: [],
     errors: [],
+    maxParallel: null,
     ...tree,
   }),
   exitCode,
@@ -2204,4 +2205,179 @@ describe("structured-output resilience", () => {
       /unless|except|may still pass|can be ignored|disregard/i,
     );
   });
+});
+
+// PLAN-LEVEL CONCURRENCY CAP
+// ══════════════════════════════════════════════════════════════════════════
+// A plan whose tasks share a resource the working tree cannot express — one
+// SwiftPM target, one live device — declares `> **Max parallel**: N` in
+// PLAN.md, and the scout carries it as `maxParallel`. The cap wraps the WHOLE
+// task pipeline, not just dev: the live incident was a verifier running
+// `swift build` while a sibling's delegate was mid-reinstall, and a verifier is
+// not a writer, so capping writers alone would have let it through.
+describe("plan concurrency cap", () => {
+  const capped = (refs: string[], maxParallel: number | null) =>
+    snapshot({
+      ready: refs.map((ref) => ready(ref)),
+      counts: counts({ total: refs.length, todo: refs.length }),
+      unfinished: refs.map((ref) => ({ ref, state: "todo" })),
+      maxParallel,
+    });
+
+  test("maxParallel 1 runs each task's whole pipeline before the next starts", async () => {
+    const first = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [capped(["ui/01", "ui/02"], 1), complete(2)],
+      devHolds: { "ui/01": first.held },
+      agentCalls: calls,
+    });
+
+    await waitForCall(calls, "dev:ui/01#1");
+    // Give a wrongly-parallel run every chance to dispatch the second task.
+    for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+    expect(calls).not.toContain("dev:ui/02#1");
+    first.release();
+    const { result, labels } = await run;
+
+    expect(result.completed).toEqual(["ui/01", "ui/02"]);
+    expect(labels.indexOf("dev:ui/02#1")).toBeGreaterThan(
+      labels.indexOf("done:ui/01"),
+    );
+  });
+
+  test("a task that parks still frees its slot", async () => {
+    const { result, labels } = await runOrchestrator({
+      scouts: [capped(["ui/01", "ui/02"], 1)],
+      gate: { "ui/01": [null] },
+    });
+
+    expect(labels.indexOf("dev:ui/02#1")).toBeGreaterThan(
+      labels.indexOf("block:ui/01"),
+    );
+    expect(accountsForEveryTask(result, ["ui/01", "ui/02"])).toBe(true);
+  });
+
+  test("a thrown pipeline still frees its slot", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [
+        capped(["ui/01", "ui/02"], 1),
+        snapshot({
+          counts: counts({ total: 2, done: 1, blocked: 1 }),
+          unfinished: [{ ref: "ui/01", state: "blocked" }],
+        }),
+      ],
+      devThrows: ["ui/01"],
+    });
+
+    expect(result.completed).toEqual(["ui/02"]);
+    expect(result.escalations.map((e) => e.task)).toEqual(["ui/01"]);
+  });
+
+  test("maxParallel 2 holds the third task until a slot frees", async () => {
+    const one = latch();
+    const two = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [capped(["ui/01", "ui/02", "ui/03"], 2), complete(3)],
+      devHolds: { "ui/01": one.held, "ui/02": two.held },
+      agentCalls: calls,
+    });
+
+    await waitForCall(calls, "dev:ui/01#1");
+    await waitForCall(calls, "dev:ui/02#1");
+    for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+    expect(calls).not.toContain("dev:ui/03#1");
+    one.release();
+    await waitForCall(calls, "dev:ui/03#1");
+    two.release();
+    const { result } = await run;
+
+    expect(result.completed).toEqual(["ui/01", "ui/02", "ui/03"]);
+  });
+
+  test("a null cap dispatches the whole wave at once", async () => {
+    const holds = ["ui/01", "ui/02", "ui/03"].map(() => latch());
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [capped(["ui/01", "ui/02", "ui/03"], null), complete(3)],
+      devHolds: {
+        "ui/01": holds[0].held,
+        "ui/02": holds[1].held,
+        "ui/03": holds[2].held,
+      },
+      agentCalls: calls,
+    });
+
+    for (const ref of ["ui/01", "ui/02", "ui/03"]) {
+      await waitForCall(calls, `dev:${ref}#1`);
+    }
+    holds.forEach((hold) => hold.release());
+    expect((await run).result.completed).toHaveLength(3);
+  });
+
+  // A serial task has no sibling writing beside it, so a sibling excuse is
+  // always unsupported there and must not buy a requalify.
+  test("a serial wave rejects a sibling deferral", async () => {
+    // The held sibling makes this load-bearing: dispatched in parallel, it would
+    // be a live writer and the deferral would be accepted.
+    const sibling = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      devHolds: { "ui/sibling": sibling.held },
+      agentCalls: calls,
+      scouts: [capped(["ui/main", "ui/sibling"], 1), complete(2)],
+      gate: {
+        "ui/main": [
+          {
+            passed: false,
+            deferred: true,
+            summary: "SUSPECTED SIBLING INTERFERENCE",
+          },
+          { passed: true, summary: "retry passed" },
+        ],
+      },
+    });
+
+    await waitForCall(calls, "verify:ui/main#1");
+    sibling.release();
+    const { labels } = await run;
+
+    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
+    expect(labels).toContain("dev:ui/main#2");
+  });
+
+  // An older or mangled scout that drops the field must not read as "no cap":
+  // that is the silent parallel run a serial plan exists to prevent.
+  test("a snapshot missing maxParallel escalates as a scout failure", async () => {
+    const { maxParallel: _dropped, ...rest } = JSON.parse(
+      capped(["ui/01"], 1)!.stdout,
+    );
+    const { result, labels } = await runOrchestrator({
+      scouts: [{ stdout: JSON.stringify(rest), exitCode: 0, stderr: "" }],
+    });
+
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].reason).toContain('"maxParallel"');
+    expect(labels.some((label) => label.startsWith("dev"))).toBe(false);
+  });
+
+  test.each([0, -1, 1.5, "1"])(
+    "maxParallel %p escalates as a scout failure",
+    async (value) => {
+      const { result } = await runOrchestrator({
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "ui/01", state: "todo" }],
+            maxParallel: value,
+          }),
+        ],
+      });
+
+      expect(result.escalations[0].task).toBe("(scout)");
+      expect(result.escalations[0].reason).toContain('"maxParallel"');
+    },
+  );
 });

@@ -8,7 +8,7 @@ Read the three hard constraints in `SKILL.md` first. They explain every awkward-
 The main agent scouts inline. It then calls `Workflow({ script: <this> })`. **Bake the
 scouted values into the `CFG` block at the top of the script as literals.**
 
-Wave loop: `scout → tree guards → derive fresh ready tasks → stall guard → inter-wave commit → budget-floor check → parallel task dispatch → reconciliation → no-progress stop`.
+Wave loop: `scout → tree guards → derive fresh ready tasks → stall guard → inter-wave commit → budget-floor check → parallel task dispatch, capped by the plan's `maxParallel` → reconciliation → no-progress stop`.
 
 Do NOT rely on the Workflow `args` global. It does not reliably reach the orchestrator.
 An unset `args` becomes `undefined`. The scout then runs `bun undefined/next-ready.ts`
@@ -632,6 +632,24 @@ const makeTreeWatch = (size) => {
 
 const withWriter = async (watch, fn) => { watch.enter(); try { return await fn() } finally { watch.leave() } }
 
+// Caps how many task pipelines run at once. A slot spans the WHOLE pipeline, not
+// only the writer windows: a verifier's build or live check needs the shared
+// resource too, and it is deliberately not a writer. Released in a finally, so a
+// thrown or parked task still hands its slot on.
+const makeSlots = (limit) => {
+  let free = limit
+  const queue = []
+  return async (fn) => {
+    if (free > 0) free--
+    else await new Promise(r => queue.push(r))
+    try { return await fn() } finally {
+      const next = queue.shift()
+      if (next) next()
+      else free++
+    }
+  }
+}
+
 const SIBLING_MARKER = 'SUSPECTED SIBLING INTERFERENCE'
 
 // Every condition a deferral has to clear lives here. A predicate that left the
@@ -958,6 +976,10 @@ while (true) {
       if (typeof snap.counts[k] !== 'number') { derailed = `"counts.${k}" is not a number`; break }
     }
   }
+  // Missing is not "no cap": a dropped field would silently run a serial plan in parallel.
+  if (!derailed && snap.maxParallel !== null && !(Number.isInteger(snap.maxParallel) && snap.maxParallel > 0)) {
+    derailed = `"maxParallel" is not null or a positive integer (got ${JSON.stringify(snap.maxParallel)})`
+  }
 
   if (derailed) {
     const reason = `next-ready scout failed in wave ${wave}: ${derailed}`
@@ -1084,7 +1106,9 @@ while (true) {
     break
   }
 
-  log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}`)
+  // PLAN.md's `Max parallel`, carried by the scout; null means the whole wave at once.
+  const slots = Math.min(fresh.length, snap.maxParallel ?? fresh.length)
+  log(`Wave ${wave}: ${fresh.map(f => f.ref).join(', ')}${slots < fresh.length ? ` (at most ${slots} at a time)` : ''}`)
   // The watch is created per wave, not at module scope, because:
   // - size is a per-wave fact (how many tasks fresh contains this wave), so a
   //   surviving watch either reports a stale dispatch count or has to be mutated
@@ -1102,10 +1126,13 @@ while (true) {
   //   The count cannot strand.
   // - If every task in a wave awaits at once, no writer remains, writers is 0, and
   //   quiet() returns an already-resolved promise rather than registering a waiter.
-  const watch = makeTreeWatch(fresh.length)
+  // Sized by slots, not by the wave: a serial task has no sibling beside it, so
+  // `deferralAccepted` must refuse its sibling excuse.
+  const watch = makeTreeWatch(slots)
+  const inSlot = makeSlots(slots)
   // No `.filter(Boolean)` — reconciliation is by INDEX against `fresh`, so a
   // null result still lands on its own task instead of disappearing.
-  const results = await parallel(fresh.map(item => () => runTaskGuarded(item, watch)))
+  const results = await parallel(fresh.map(item => () => inSlot(() => runTaskGuarded(item, watch))))
 
   // Reconcile every input task. A dropped task would land in NO list: its dev
   // step already set the task to in-progress, and next-ready only offers `todo`,
@@ -1218,4 +1245,5 @@ return { slug: CFG.slug, completed, escalations }
   The rule bans the *restore* family — `git checkout`, `git restore`, `git reset`, `git clean` — in its own sentence, because the "any other command that changes git state" clause genuinely does not reach them: they rewrite the working tree and leave refs and the index alone, so a careful reader concludes they are permitted. A Haiku dev driver did exactly that in run `wf_5903a02b-b6e`, running `git checkout` over a *parallel* task's file to tidy its workspace and reverting a confirmed `Status: done` back to `todo`. The rule also separates the two prohibitions on purpose: editing a source file a sibling also edits is legitimate and common — that is what a parallel wave *is* — so the ban is narrowed to other tasks' files under `tasks/`. A blanket "don't touch files that aren't yours" would forbid the shared-file edits the plan itself schedules.
 - **Commits use inline git, not the atomic-commit skill — the same `no Agent tool` constraint applies.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`. That skill spawns the vör + bragi sub-agents, and a Workflow agent cannot do that. Its analysis script also lives in a *different* plugin's cache, which the agent cannot resolve — there is no `CLAUDE_PLUGIN_ROOT` in agent Bash. The `commitInstructions` builder inlines the skill's whole contract instead: the matched flightlog lifecycle, the atomic grouping principles, plus the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary). So each labeled agent commits over plain git, self-contained. If the commit convention changes, edit the template in that one builder.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`). Passing a wide wave is safe — excess tasks queue.
-- **Do NOT give the dev agent `isolation: 'worktree'`.** It looks like the fix for tasks that mutate shared files in parallel, and it breaks every run: the dev's edits land in a private worktree that is never merged back, while `verify` and `judge` run in the main tree and see nothing. Every attempt then fails its binary gate and every task parks. Isolation would have to wrap a task's whole dev→verify→judge→score pipeline, which separate `agent()` calls cannot express. For real parallel conflicts, sequence the conflicting tasks instead — add a `Depends on` edge between them in the flightplan so `next-ready` never offers them in the same wave.
+- **A plan caps its own concurrency with `> **Max parallel**: N` in PLAN.md, and the scout carries it.** `next-ready.ts --summary` parses the header into `maxParallel` (`null` when absent or `unlimited`), and the wave loop hands each task a slot from `makeSlots`. **The slot spans the whole pipeline — dev, verify, requalify, judge, mark-done, park — not only the writer windows.** The live failure was in `~/.config` `docs/sketchybar-swift-daemon`: seven tasks went out after `core/05`, and a Haiku verifier ran `swift build` and live checks while a sibling's codex delegate was mid-reinstall of the shared bar. The verifier is deliberately not a writer, so a cap on writers alone would have let exactly that through. That plan's workaround was a `mkdir /tmp/sketchybard-live.lock` rule pasted into four prompts; it reached an external delegate only when the Haiku driver copied it, and never reached the requalify agent or the fixer. A slot needs no prompt at all. **The cap is read off disk every wave, never baked into `CFG`**: a baked copy is one more value the main agent must remember to transcribe, and a missed transcription is the same silent parallel run. For the same reason a snapshot that omits `maxParallel` is a `(scout)` failure rather than "no cap", and a malformed header is a parse error in `errors`. The watch is sized by slots, so a serial task's `SUSPECTED SIBLING INTERFERENCE` deferral is refused — there is no sibling. **Serial prose is only an advisory.** `lint-task.ts <tasks-dir>` prints `[serial-undeclared]` when PLAN.md or `_context/*.md` asks for serial execution or a lock without the header; it is not a violation because the matching wording in real plans (2 of ~20 on one machine, before the pattern was narrowed) was already enforced by `Depends on` edges. **Residual:** an external live delegate whose pane was left open and still writing after its driver returned holds no slot, so the next task can start beside it — the same uncounted writer the deferral note above accepts.
+- **Do NOT give the dev agent `isolation: 'worktree'`.** It looks like the fix for tasks that mutate shared files in parallel, and it breaks every run: the dev's edits land in a private worktree that is never merged back, while `verify` and `judge` run in the main tree and see nothing. Every attempt then fails its binary gate and every task parks. Isolation would have to wrap a task's whole dev→verify→judge→score pipeline, which separate `agent()` calls cannot express. For real parallel conflicts, sequence the conflicting tasks instead — add a `Depends on` edge between them in the flightplan so `next-ready` never offers them in the same wave. When every task conflicts through one shared resource, declare `> **Max parallel**: 1` in PLAN.md instead of chaining every pair.
