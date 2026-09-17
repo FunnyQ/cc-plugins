@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 4.2.1] - 2026-09-18
+
+_tracks tag `dispatch-v4.2.1`_
+
+### Fixed
+- Autopilot's no-ask rule for external engines (codex, and the cross-vendor review lens) now actually reaches every run. It previously traveled through a paraphrasing instruction-writer, which could drop or reword it away. The live path now passes it as relay's own `--no-ask` flag instead of asking a driver to relay it in its own words, and the headless path prepends a fixed, unconditional contract to every codex and opencode spawn.
+
+## [relay 0.7.0] - 2026-09-18
+
+_tracks tag `relay-v0.7.0`_
+
+### Added
+- New `--no-ask` flag for live delegates appends an unattended contract to the prompt, so a delegate can't stall a run waiting on a question nobody is there to answer. It's off by default, since a human watching a live pane may want to field a real question.
+
 ## [dispatch 4.2.0] - 2026-09-18
 
 _tracks tag `dispatch-v4.2.0`_
