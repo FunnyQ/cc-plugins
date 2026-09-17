@@ -66,7 +66,9 @@ const CFG = {
   liveCollectRounds:     3,       // live runs only: how many extra `relay collect` windows (8 min each) to keep waiting for a slow delegate or reviewer before failing the attempt; 0 = fail as soon as relay reports pending
   reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — the cross-vendor reviewer in the closing Final review (driven via <engine>-run.ts review)
   liveReviewEngine:      false,   // when HERDR_ENV=1 + relayPath are fulfilled, run the closing cross-vendor review in a visible herdr live pane via relay; headless stays default. Independent of liveDevEngine — the review lens runs whatever devEngine is
-  opencodeDevModel:      '',        // optional opencode model for devEngine or lastShotEngine (empty → wrapper default opencode-go/kimi-k2.7-code); codex ignores -m
+  codexDevModel:         '',        // optional codex model for devEngine or lastShotEngine (empty → wrapper default gpt-5.6-sol)
+  codexReviewModel:      '',        // optional codex model for the review lens (empty → wrapper default gpt-6-astra); only applies when reviewEngine is 'codex'
+  opencodeDevModel:      '',        // optional opencode model for devEngine or lastShotEngine (empty → wrapper default opencode-go/kimi-k2.7-code); ignored when the engine is codex
   opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
   reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 3 final-review Claude lenses (reuse/leanness/efficiency) ONLY; the fixer + rubric judge stay Opus
 }
@@ -110,24 +112,34 @@ const ENGINES = {
   codex:    { wrapper: 'codex-run.ts',    token: 'CODEX UNREACHABLE',    label: 'codex' },
   opencode: { wrapper: 'opencode-run.ts', token: 'OPENCODE UNREACHABLE', label: 'opencode' },
 }
-// Attach an optional `--model` flag for opencode (codex ignores -m). Spread into a
-// fresh object so dev and review never share a mutated entry even when both are
-// opencode. Empty modelFlag → the <engine>-run.ts per-mode default is used.
+// Attach an optional `--model` flag. Spread into a fresh object so dev and review
+// never share a mutated entry even when both name the same engine. Empty modelFlag
+// → the <engine>-run.ts default is used (codex: gpt-5.6-sol).
 // Throws on an unknown key rather than spreading `undefined` — that would yield
 // a truthy `{modelFlag}` object whose `label` is undefined, and the run would die
 // far away, inside a Final review reviewer prompt.
-const withModel = (key, override) => {
-  if (!ENGINES[key]) throw new Error(`unknown engine "${key}" — CFG.devEngine/lastShotEngine/reviewEngine must be codex or opencode`)
-  return { ...ENGINES[key], modelFlag: key === 'opencode' && override ? ` --model ${override}` : '' }
+// Keyed by engine AND role, because the two vocabularies do not overlap
+// (`gpt-6-astra` vs `opencode-go/qwen3.7-max`): handing one CLI the other's model
+// name fails at the far end of a wave, not here. Taking the role rather than a
+// caller-supplied value is what removes that trap — the call sites below can no
+// longer pass opencode's field while running codex.
+const MODEL_CFG = {
+  codex:    { dev: CFG.codexDevModel,    review: CFG.codexReviewModel },
+  opencode: { dev: CFG.opencodeDevModel, review: CFG.opencodeReviewModel },
 }
-const devEngine    = CFG.devEngine && CFG.devEngine !== 'claude' ? withModel(CFG.devEngine, CFG.opencodeDevModel) : null
+const withModel = (key, role) => {
+  if (!ENGINES[key]) throw new Error(`unknown engine "${key}" — CFG.devEngine/lastShotEngine/reviewEngine must be codex or opencode`)
+  const model = MODEL_CFG[key][role]
+  return { ...ENGINES[key], modelFlag: model ? ` --model ${model}` : '' }
+}
+const devEngine    = CFG.devEngine && CFG.devEngine !== 'claude' ? withModel(CFG.devEngine, 'dev') : null
 // Appended, never substituted: replacing the Opus rung would lose every task that
 // only Opus clears. Null whenever devEngine is already external — that ladder
 // already ends on Claude-Opus, so it is already a vendor switch.
 const lastShotEngine = (!devEngine && CFG.lastShotEngine)
-  ? withModel(CFG.lastShotEngine, CFG.opencodeDevModel)
+  ? withModel(CFG.lastShotEngine, 'dev')
   : null
-const reviewEngine = withModel(CFG.reviewEngine ?? 'codex', CFG.opencodeReviewModel)
+const reviewEngine = withModel(CFG.reviewEngine ?? 'codex', 'review')
 // Gates the dev driver's delegate command below.
 const liveDev = !!(devEngine && CFG.liveDevEngine && CFG.relayPath)
 // Gates the closing cross-vendor review lens. Deliberately NOT tied to liveDev:
