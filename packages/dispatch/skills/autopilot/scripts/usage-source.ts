@@ -249,9 +249,14 @@ function mentionsRunId(text: string, runId: string): boolean {
 }
 
 /**
- * Decide membership from the file's first complete line. Both prompt shapes embed
- * the plan's absolute directory path, so the file belongs to this plan when the
- * stringified `message.content` names a path under it. Permanent for one run identity.
+ * Decide membership from the file's opening user turns, permanently for one run identity.
+ *
+ * The verdict cannot come from the first line alone. Claude Code 2.1.274 wraps a workflow
+ * agent's prompt in harness frames, and the frame naming the plan path is the SECOND user
+ * turn — a first-line verdict excluded 16 of 19 agents of a measured run, every wave after
+ * the first. An undecided line leaves the state `pending`, and the first assistant line
+ * closes the window: the prompt is fully delivered by then, so an unrelated transcript
+ * costs one opening turn of scanning and no more.
  */
 function decideMembership(
   planDir: string,
@@ -259,33 +264,37 @@ function decideMembership(
   record: Record<string, unknown>,
   runId?: string,
 ): void {
+  // Kept from the file's own first line, not from the line that decides: pairing
+  // matches an agent to a fleet row by start time.
+  if (state.startedAt === null && typeof record.timestamp === "string") {
+    state.startedAt = record.timestamp;
+  }
+
+  if (record.type === "assistant") {
+    state.membership = "excluded";
+    return;
+  }
+
   const message =
     typeof record.message === "object" && record.message !== null
       ? (record.message as Record<string, unknown>)
       : undefined;
   const content = message ? message.content : undefined;
+  if (content === undefined) return;
   // Stringified once: on a content-block array this is a full JSON.stringify of
-  // the agent's whole opening prompt, and all three checks below read it.
+  // the agent's whole opening prompt, and both checks below read it.
   const text = contentText(content);
 
-  if (!mentionsPlanDir(text, planDir)) {
-    state.membership = "excluded";
-    return;
-  }
+  if (!mentionsPlanDir(text, planDir)) return;
 
   // Identity separates runs; an elapsed-time window includes immediate retries because spawn-to-announce gaps need slack and runs have no minimum interval.
-  if (runId && !mentionsRunId(text, runId)) {
-    state.membership = "excluded";
-    return;
-  }
+  if (runId && !mentionsRunId(text, runId)) return;
 
   state.membership = "included";
   const prompt = parseAgentPromptText(text);
   state.task = prompt.task;
   state.role = prompt.role;
   state.attempt = prompt.attempt;
-  state.startedAt =
-    typeof record.timestamp === "string" ? record.timestamp : null;
 }
 
 /**

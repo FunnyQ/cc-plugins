@@ -560,6 +560,39 @@ describe("createTranscriptSource", () => {
     }
   });
 
+  // Claude Code 2.1.274 delivers a workflow agent's prompt as two user turns, and only
+  // the second names the plan. Judging the first alone lost every wave after the first.
+  test("an announce behind a harness preamble frame still belongs to the plan", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    try {
+      jsonl(agentPath(projectsRoot, slug, "framed"), [
+        {
+          type: "user",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          message: {
+            role: "user",
+            content:
+              "[Workflow harness — user request] The harness relays, verbatim and indented below, the user request that triggered this workflow run.\n  <command-name>/dispatch:autopilot</command-name>",
+          },
+        },
+        { type: "attachment", attachment: { type: "deferred_tools_delta" } },
+        announceUser(planDir, "work/02", "dev", 1, "2026-01-01T00:00:05.000Z"),
+        assistant("m", { input_tokens: 42 }),
+      ]);
+
+      const agents = createTranscriptSource(planDir, projectsRoot).read();
+
+      expect(agents).toHaveLength(1);
+      expect(agents[0]).toMatchObject({ task: "work/02", role: "dev" });
+      expect(agents[0]!.counts.input).toBe(42);
+      // The file's own opening timestamp, not the frame that decided membership:
+      // pairing matches an agent to its fleet row by start time.
+      expect(agents[0]!.startedAt).toBe("2026-01-01T00:00:00.000Z");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   // `docs/foo` and `docs/foo-bar` are siblings under one repo, so a plain substring
   // test hands every `foo-bar` transcript to `foo` and inflates its plan total.
   test("a sibling plan whose name merely starts with this one's is excluded", () => {
