@@ -1313,6 +1313,15 @@ describe("orchestrator cross-vendor review lens", () => {
     return promptFor(log, "review:codex#1");
   };
 
+  // The review lens runs live on flights where the dev step does not, so it meets
+  // the same ask tool the dev driver does and needs the same ban.
+  test("forbids the CLI from asking the absent user", async () => {
+    const prompt = await reviewPrompt();
+
+    expect(prompt).toContain("request-user-input tool");
+    expect(prompt).toContain("never wait on a reply");
+  });
+
   test("defaults to the headless wrapper", async () => {
     const prompt = await reviewPrompt();
 
@@ -1469,6 +1478,21 @@ describe("orchestrator commit ownership", () => {
     const prompt = promptFor(log, "dev-codex:ui/01#1");
 
     expect(prompt).toContain("Include the no-commit rule in that instruction");
+  });
+
+  // A live pane hands the engine an ask tool that `codex exec` never gets, and a
+  // flight is meant to run semi-unattended — an engine that stops to consult the
+  // user has lost the property the whole loop exists to provide, whether or not
+  // the answer it gets is a good one.
+  test("the driver forbids the CLI from asking the absent user", async () => {
+    const log = await runOrchestrator(
+      { scouts: [devWave, complete(2)] },
+      { devEngine: "'codex'" },
+    );
+    const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+    expect(prompt).toContain("request-user-input tool");
+    expect(prompt).toContain("never wait on a reply");
   });
 
   test("the driver may not author the implementation it delegates", async () => {
