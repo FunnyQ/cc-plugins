@@ -1,5 +1,16 @@
 # Changelog
 
+## [dispatch 4.1.0] - 2026-09-18
+
+_tracks tag `dispatch-v4.1.0`_
+
+### Added
+- PLAN.md now supports a `> **Max parallel**: N | unlimited` header, so a plan whose tasks share a resource the working tree can't isolate (for example, a SwiftPM target that compiles every file together) can declare a serial cap. `next-ready`'s `--summary` output and the tree linter both read it, flag a malformed or unreadable header as a violation, and raise a `[serial-undeclared]` advisory when serial-sounding prose has no header backing it up.
+
+### Changed
+- Autopilot's wave loop now caps concurrent task pipelines at the plan's declared max parallel, scoped to the whole pipeline — dev, verify, requalify, and judge — instead of just writer windows. This fixes a race where a verifier ran build or test commands against a sibling task's tree while that sibling was still mid-edit. A parked or failed task always releases its slot, and a scout snapshot missing the cap value is now treated as a scout failure rather than silently running a serial plan unbounded.
+- The autopilot pre-flight checklist, flightplan's tree-lint instructions, and the opencode manual loop now document and honor the new header, including acting on a `[serial-undeclared]` advisory before flying.
+
 ## [herdr 0.7.6] - 2026-09-17
 
 _tracks tag `herdr-v0.7.6`_
