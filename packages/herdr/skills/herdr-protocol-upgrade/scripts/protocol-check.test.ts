@@ -8,6 +8,7 @@ import {
   buildBaseline,
   diff,
   extractLiterals,
+  responseFor,
   shapeOf,
   sourceLiterals,
   summary,
@@ -132,16 +133,18 @@ describe("usedMethods", () => {
         params: { $ref: "#/schemas/request/$defs/TabCreateParams" },
       },
     });
-    expect(
-      usedMethods(schema, new Set(["client.window_title.set"])),
-    ).toEqual(["client.window_title.set"]);
+    expect(usedMethods(schema, new Set(["client.window_title.set"]))).toEqual([
+      "client.window_title.set",
+    ]);
   });
 });
 
 describe("extractLiterals", () => {
   test("finds single-, double-, and backtick-quoted API names", () => {
     expect(
-      extractLiterals(`call("ping"); call('client.window_title.set'); call(\`tab.create\`)`),
+      extractLiterals(
+        `call("ping"); call('client.window_title.set'); call(\`tab.create\`)`,
+      ),
     ).toEqual(new Set(["ping", "client.window_title.set", "tab.create"]));
   });
 
@@ -163,6 +166,39 @@ describe("extractLiterals", () => {
     const repo = mkdtempSync(join(tmpdir(), "protocol-check-"));
     tempRepos.push(repo);
     expect(() => sourceLiterals(repo)).toThrow();
+  });
+});
+
+describe("responseFor", () => {
+  const variants = new Set([
+    "pane_list",
+    "tab_created",
+    "agent_started",
+    "pane_info",
+    "pong",
+    "ok",
+  ]);
+
+  test("matches a result named after its method", () => {
+    expect(responseFor("pane.list", variants)).toBe("pane_list");
+  });
+
+  test("matches a past-tense result", () => {
+    expect(responseFor("tab.create", variants)).toBe("tab_created");
+    expect(responseFor("agent.start", variants)).toBe("agent_started");
+  });
+
+  test("matches a get method to its info result", () => {
+    expect(responseFor("pane.get", variants)).toBe("pane_info");
+  });
+
+  test("matches results whose names do not follow the method", () => {
+    expect(responseFor("ping", variants)).toBe("pong");
+    expect(responseFor("pane.split", variants)).toBe("pane_info");
+  });
+
+  test("returns nothing for a method with no named result", () => {
+    expect(responseFor("pane.focus", variants)).toBeUndefined();
   });
 });
 
@@ -188,6 +224,11 @@ describe("buildBaseline", () => {
 
   test("does not track response variants absent from the plugin source", () => {
     expect(base.responses.ok).toBeUndefined();
+  });
+
+  test("tracks the response of a sent method even when its type never appears in source", () => {
+    const derived = buildBaseline(schemaFixture(), ["tab.create"], new Set());
+    expect(Object.keys(derived.responses)).toEqual(["tab_created"]);
   });
 
   test("dereferences types used by a tracked response", () => {

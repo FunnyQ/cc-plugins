@@ -24,7 +24,7 @@ bun "$SKILL_DIR/scripts/protocol-check.ts" --repo /path/to/plugin
 
 Resolve `$SKILL_DIR` from the load-time **"Base directory for this skill"** banner. `${CLAUDE_PLUGIN_ROOT}` is not reliable inside a Bash call.
 
-The script queries the running server with `herdr api schema --json`, greps the plugin's tracked source for the methods and tagged response variants it uses, and diffs their dereferenced JSON schemas against `.herdr-protocol.json` in the plugin repo. First run writes that baseline — commit it. Later runs ignore new top-level fields and print removed fields, new request requirements, and changed field schemas.
+The script queries the running server with `herdr api schema --json`, greps the plugin's tracked source for the methods and tagged response variants it uses, adds the result each sent method returns by Herdr's naming convention, and diffs their dereferenced JSON schemas against `.herdr-protocol.json` in the plugin repo. First run writes that baseline — commit it. Later runs ignore new top-level fields and print removed fields, new request requirements, and changed field schemas.
 
 Do not dump the schema into context yourself. It is a quarter-megabyte of JSON, and reading it costs tens of thousands of tokens to answer a question the diff answers in one line.
 

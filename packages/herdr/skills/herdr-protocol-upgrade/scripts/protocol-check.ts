@@ -111,6 +111,33 @@ export function usedMethods(schema: any, literals: Set<string>): string[] {
     .sort();
 }
 
+// The schema links no method to its result, so each entry needs outside evidence:
+// `pong` and `wait_matched` from Herdr's socket docs, `pane_info` from a client
+// decoding `pane.split` as `{pane}`.
+const IRREGULAR_RESPONSES: Record<string, string> = {
+  ping: "pong",
+  "pane.split": "pane_info",
+  "events.wait": "wait_matched",
+};
+
+// Source literals alone miss every result a client decodes by struct without
+// spelling its type, so a sent method pulls in its result by name.
+export function responseFor(
+  method: string,
+  variants: Set<string>,
+): string | undefined {
+  const irregular = IRREGULAR_RESPONSES[method];
+  if (irregular) return variants.has(irregular) ? irregular : undefined;
+  const parts = method.split(".");
+  const verb = parts.pop() ?? "";
+  const noun = parts.join("_");
+  return [
+    method.replaceAll(".", "_"),
+    `${noun}_${verb.replace(/e?$/, "ed")}`,
+    ...(verb === "get" ? [`${noun}_info`] : []),
+  ].find((name) => variants.has(name));
+}
+
 export function buildBaseline(
   schema: any,
   used: string[],
@@ -133,9 +160,14 @@ export function buildBaseline(
 
   const okDefs: Record<string, any> =
     schema?.schemas?.success_response?.$defs ?? {};
-  for (const variant of okDefs.ResponseResult?.oneOf ?? []) {
+  const variants: any[] = okDefs.ResponseResult?.oneOf ?? [];
+  const kinds = new Set<string>(
+    variants.map((variant) => variant.properties?.type?.const),
+  );
+  const sent = new Set(used.map((method) => responseFor(method, kinds)));
+  for (const variant of variants) {
     const kind = variant.properties?.type?.const;
-    if (kind && literals.has(kind)) {
+    if (kind && (literals.has(kind) || sent.has(kind))) {
       baseline.responses[kind] = shapeOf(variant, okDefs);
     }
   }
