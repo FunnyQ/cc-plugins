@@ -1,6 +1,6 @@
 # Herdr CLI Reference
 
-This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.1. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 **Neither discovery surface is complete, and they truncate different things.** A bare group listing (`herdr pane`) abbreviates long option lists — it drops `--source detection` from `pane read` and `--session-start-source` from `pane report-agent-session`. A subcommand's `--help` (`herdr workspace close --help`) can omit an option the group listing shows, such as `--group`. Check both before concluding a flag is gone.
 
@@ -17,6 +17,7 @@ herdr --session work            # named session
 herdr --remote workbox          # SSH attach with local keybindings
 herdr --remote workbox --remote-keybindings server
 herdr --remote workbox --handoff
+herdr --machine <label-or-id> <command>   # run an API command on a saved SSH machine
 herdr --default-config          # print default config
 herdr --skill                   # print the agent guide bundled with this binary
 herdr completion zsh|bash|fish|powershell|elvish
@@ -56,6 +57,8 @@ herdr session delete <name> [--json]
 
 Use `default` as `<name>` to target the default session for `session stop`.
 
+`session delete` needs the exact name from `session list`, letter case included — on a case-insensitive filesystem `delete foo` refuses a session named `Foo`. Pass a name that starts with `-` after `--`.
+
 ## Machines
 ```bash
 herdr machine list [--json]
@@ -67,6 +70,19 @@ herdr machine disable <profile-id>
 ```
 
 `machine add` prepares the remote Herdr installation and starts its server before saving. A missing or incompatible remote installation needs approval in an interactive terminal. Changes apply automatically to open local clients. Removing or disabling a machine leaves its remote sessions running. A saved machine holds only a label, SSH target, explicit session name, and enabled state; SSH credentials and key material stay with OpenSSH.
+
+Selecting a machine in the UI never retargets the CLI: a pane's commands keep its inherited session and socket. Put the global `--machine <label-or-id>` prefix before the command instead:
+
+```bash
+herdr --machine "Build machine" agent list
+herdr --machine <profile-id> agent prompt w1:p1 "review this change"
+```
+
+- The selector matches an enabled saved profile id or a unique, case-sensitive label, never a raw SSH hostname. An unknown one fails with `unknown machine '<x>'`.
+- `--machine` uses the saved machine's session; combining it with `--session` or `--remote` is an error.
+- Forwarded: `workspace`, `worktree`, `tab`, `pane`, `notification`, `agent` (except `attach` and local `explain --file`), `api snapshot`, `status server`, `server stop|reload-config|agent-manifests|reload-agent-manifests`, and the API-backed `plugin` commands. Install, config, plugin installation, session management, and terminal attach stay local.
+- No open TUI is needed. Both installations must be 0.9.1 or newer. A failure never falls back to Local and is never retried.
+- Remote ids are not local ids: `--current` cannot name the caller's local pane. Remote worktree paths must be absolute, `~`, or `~/…`.
 
 ## Workspaces
 ```bash
@@ -125,6 +141,8 @@ herdr pane close <id>
 ```
 
 `pane current`, `pane get`, and `pane layout --current` resolve the calling pane, not another client's focused pane.
+
+`pane split` with no target splits the calling pane when `HERDR_PANE_ID` is set, and the UI-focused pane otherwise. Before 0.9.1 it always split the UI-focused pane. `--current` errors when `HERDR_PANE_ID` is unavailable.
 
 Pass `--right-click pane` to forward unmodified right-click gestures to a mouse-reporting application inside the pane. Pass `--right-click herdr` to restore Herdr's pane menu. Right-clicking the pane frame still opens Herdr's menu. Set the same policy at creation with `pane split --right-click pane`.
 
@@ -196,7 +214,7 @@ herdr agent explain <target> [--json|--format text|json] [--verbose]
 herdr agent explain --file PATH --agent LABEL [--json|--format text|json] [--verbose]
 ```
 
-Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `qwen`, `maki`, `muse`.
+Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `qwen`, `letta`, `maki`, `muse`.
 
 `agent prompt` handles bracketed paste, waits briefly after writing text, and then presses Enter. When the agent already sits at an approval or question dialog, `agent prompt` fails with `agent_blocked` and sends neither text nor Enter. Inspect the dialog and ask the user before answering it. `agent wait` accepts a repeated `--until` flag. When you omit `--until`, `agent wait` waits for `idle`, `done`, or `blocked`.
 
@@ -218,6 +236,8 @@ herdr terminal title clear
 # Detach: ctrl+b q  |  Send literal ctrl+b: ctrl+b ctrl+b
 ```
 
+On Linux and macOS, the server disconnects an observer whose socket write makes no progress for 30 seconds. That stream can end without a final `terminal.closed` record, so treat EOF as closed. A quiet pane does not trigger the timeout.
+
 ## Waits
 ```bash
 herdr pane wait-output <pane_id> (--match TEXT | --regex PATTERN) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
@@ -236,6 +256,8 @@ herdr integration install pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|
 herdr integration uninstall <name>
 herdr integration status [--outdated-only]
 ```
+
+`herdr integration install letta` also works but is experimental and CLI-only: the Settings screen and the JSON integration API do not list it. Reinstall the `claude` integration after upgrading to 0.9.1 — v10 narrows its `SessionStart` matcher to `startup|resume|clear|compact|fork`.
 
 ## Plugins (CLI)
 ```bash

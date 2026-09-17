@@ -1,6 +1,6 @@
 # Herdr Socket API
 
-This document is verified against herdr 0.9.0, protocol 22. If live output disagrees with this doc, trust `herdr api schema --json`.
+This document is verified against herdr 0.9.1, protocol 22. If live output disagrees with this doc, trust `herdr api schema --json`.
 
 Herdr's control surface is a Unix domain socket. The `herdr` CLI is a thin client over it. Every subcommand opens the socket, sends one request, prints the response, and exits.
 
@@ -60,7 +60,7 @@ Send `id`, `method`, and `params`. All three are required — omitting `params` 
 Success returns the request's `id` and a `result` whose `type` names the variant:
 
 ```json
-{"id":"1","result":{"type":"pong","version":"0.9.0","protocol":22,
+{"id":"1","result":{"type":"pong","version":"0.9.1","protocol":22,
   "capabilities":{"live_handoff":true,"detached_server_daemon":true,
     "endpoint_protocol_generation":1}}}
 ```
@@ -83,7 +83,7 @@ Gate on `ping` before assuming a shape. Protocol 22 is current here. Treat a sup
 
 ## Methods
 
-There are 102 methods: `agent.*` (12), `client.*` (2), `client_shell.surface.set`, `command.invoke`, `events.*` (2), `integration.*` (3), `layout.*` (3), `notification.show`, `pane.*` (36), `ping`, `plugin.*` (11), `popup.close`, `product_announcement.dismiss`, `release_notes.dismiss`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). `client_shell.surface.set` and `command.invoke` back the terminal UI's own client-shell projection — internal plumbing, undocumented even in the official Socket API page; a plugin or automation client has no reason to call them. Protocol 20 adds `pane.input.set` with `{pane_id, right_click}` for right-click routing.
+There are 103 methods: `agent.*` (12), `client.*` (2), `client_shell.surface.set`, `command.invoke`, `events.*` (2), `integration.*` (3), `layout.*` (3), `notification.show`, `pane.*` (37), `ping`, `plugin.*` (11), `popup.close`, `product_announcement.dismiss`, `release_notes.dismiss`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). `client_shell.surface.set` and `command.invoke` back the terminal UI's own client-shell projection — internal plumbing, undocumented even in the official Socket API page; a plugin or automation client has no reason to call them. Protocol 20 adds `pane.input.set` with `{pane_id, right_click}` for right-click routing. 0.9.1 adds `pane.link.resolve` without a protocol bump: it takes the same params as `pane.link.activate` (`{pane_id, viewport_row, col}`) and returns `pane_link_resolved` with the link's `regions` (`{row, start_col, end_col}`), which backs Ctrl-hover highlighting.
 
 Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. The mapping for the calls `scripts/herd.ts` makes:
 
@@ -162,6 +162,8 @@ Every line after it is an event, and **carries no `id`**:
 A client that routes lines by `id` will drop every event. Route on the presence of `event` instead.
 
 Topics: `workspace.created|updated|metadata_updated|renamed|moved|reordered|closed|focused`, `worktree.created|opened|removed`, `tab.created|closed|focused|renamed|moved`, `pane.created|closed|updated|focused|moved|exited|agent_detected|agent_status_changed|scroll_changed|output_matched`, `layout.updated`.
+
+Since 0.9.1, `pane.focused` also fires when any attached client selects a pane by hand. The payload does not name the client, and reselecting the already-selected pane emits nothing.
 
 Most topics take no extra fields. Three do:
 

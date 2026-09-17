@@ -1,6 +1,6 @@
 # Herdr Configuration Reference
 
-This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --default-config`.
+This document is verified against herdr 0.9.1. If live CLI output disagrees with this doc, trust `herdr --default-config`.
 
 Config path: `~/.config/herdr/config.toml`
 
@@ -194,7 +194,7 @@ That table also accepts a `rules` array for value-based styling, for example:
   { equals = "main", fg = "green", bold = true },
 ] }
 ```
-Rules are ordered; the first match overrides the styles it specifies. Text conditions are `equals`, `contains`, and `starts_with`, and take an optional `ignore_case`. Numeric conditions are `gt` and `lt`, and require a finite number. Limits: 16 rules per token, 16 tokens per row, 16 rows per layout. `state_icon` (both layouts) and `git_status` (spaces only) accept a fixed style only — no `rules`.
+Rules are ordered; the first match overrides the styles it specifies. Set `hide = true` on a rule to drop the matching token and its separator; a row left with no tokens disappears. `{ token = "machine", rules = [{ equals = "Local", hide = true }] }` hides the label `Local`, not the connection type. Text conditions are `equals`, `contains`, and `starts_with`, and take an optional `ignore_case`. Numeric conditions are `gt` and `lt`, and require a finite number. Limits: 16 rules per token, 16 tokens per row, 16 rows per layout. `state_icon` (both layouts) and `git_status` (spaces only) accept a fixed style only — no `rules`.
 
 `window_title` tokens are `{hostname}`, `{workspace}`, `{tab}`, `{pane}`, and `{terminal_title}`; write `{{` and `}}` for literal braces. The title renders on the Herdr server, so `{hostname}` names the machine the panes run on even under `herdr --remote`.
 

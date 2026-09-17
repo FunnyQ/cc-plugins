@@ -1,6 +1,6 @@
 # Herdr Agent Orchestration
 
-This document is verified against herdr 0.9.0. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.1. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself. This includes inspecting sibling panes, splitting panes, spawning other agents, and coordinating with them over the CLI. This is a live-session operational guide. See `cli.md` for the full command and flag syntax.
 
@@ -25,7 +25,7 @@ herdr pane list                # your focused pane + neighbors
 herdr workspace list
 ```
 
-Herdr injects `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID` into every managed pane. Target `--current` or an explicit id. An omitted target resolves the UI-focused pane, which may belong to the user or another client.
+Herdr injects `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID` into every managed pane. Target `--current` or an explicit id. An omitted target resolves the UI-focused pane, which may belong to the user or another client. `pane split` is the exception since 0.9.1: with no target it splits the calling pane when `HERDR_PANE_ID` is set.
 
 ## Recipes
 
