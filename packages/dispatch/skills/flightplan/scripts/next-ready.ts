@@ -10,7 +10,7 @@
  * Usage:
  *   bun next-ready.ts <tasks-dir>              # one ref per line
  *   bun next-ready.ts <tasks-dir> --json       # [{ref,finalReview,path}]
- *   bun next-ready.ts <tasks-dir> --summary    # {ready,counts,invalid,errors}
+ *   bun next-ready.ts <tasks-dir> --summary    # {ready,counts,invalid,errors,maxParallel}
  *
  * Exits 0 when the tree is clean and either lists ready tasks or prints
  * nothing (so a shell loop is safe). Exits 1 when any task file fails to
@@ -32,6 +32,7 @@ import {
   type TaskRef,
 } from "./lib/parse-task";
 import { nodesFromParsedTasks, unmetNodeDependencies } from "./lib/graph-node";
+import { parseMaxParallel, readPlan } from "./lib/max-parallel";
 
 export type LoadError = { file: string; reason: string };
 
@@ -233,7 +234,33 @@ async function main() {
   // escalate, and a bare non-zero exit would hide them.
   if (summaryMode) {
     const { ready, counts, unfinished } = summarizeTree(byRef, pathByRef);
-    console.log(JSON.stringify({ ready, counts, unfinished, invalid, errors }));
+    const planPath = join(tasksDir, "..", "PLAN.md");
+    let maxParallel: number | null = null;
+    // A tree without a PLAN.md beside it declares nothing, so nothing caps it.
+    let plan: string | null = null;
+    try {
+      plan = await readPlan(planPath);
+    } catch (error) {
+      errors.push({
+        file: planPath,
+        reason: `cannot read PLAN.md, so its Max parallel cap is unknown: ${(error as Error).message}`,
+      });
+    }
+    if (plan !== null) {
+      const parsed = parseMaxParallel(plan);
+      if (parsed.ok) maxParallel = parsed.value;
+      else errors.push({ file: planPath, reason: parsed.reason });
+    }
+    console.log(
+      JSON.stringify({
+        ready,
+        counts,
+        unfinished,
+        invalid,
+        errors,
+        maxParallel,
+      }),
+    );
     if (errors.length > 0 || invalid.length > 0) process.exit(1);
     return;
   }

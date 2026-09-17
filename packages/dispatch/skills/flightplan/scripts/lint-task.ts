@@ -20,6 +20,8 @@
  *  - Has a parseable `## Eval rubric` (pass-threshold line + weighted table),
  *    with the threshold inside the scale (strict — every task must score)
  *
+ * Tree mode also checks PLAN.md's `Max parallel` header; see checkPlanConcurrency.
+ *
  * Usage:
  *   bun lint-task.ts <tasks-dir>             # recommended
  *   bun lint-task.ts <file>...               # cherry-pick
@@ -35,6 +37,11 @@ import {
   taskValidity,
   type ParsedTask,
 } from "./lib/parse-task";
+import {
+  parseMaxParallel,
+  readPlan,
+  serialProseHit,
+} from "./lib/max-parallel";
 
 export type Violation = {
   file: string;
@@ -600,6 +607,57 @@ export async function collectTaskFiles(tasksDir: string): Promise<string[]> {
   return out;
 }
 
+/**
+ * Plan-level concurrency: a malformed `Max parallel` header is a violation, and
+ * serial-execution prose with no header is an advisory. Advisory, not a gate —
+ * measured over this machine's plans, the serial wording that matched was
+ * already enforced by Depends on edges, and a gate would ground those plans.
+ */
+export async function checkPlanConcurrency(
+  tasksDir: string,
+): Promise<{ violations: Violation[]; advisory: string | null }> {
+  const planPath = resolve(tasksDir, "..", "PLAN.md");
+  let plan: string | null;
+  try {
+    plan = await readPlan(planPath);
+  } catch (error) {
+    const detail = `cannot read PLAN.md, so its Max parallel cap is unknown: ${(error as Error).message}`;
+    return {
+      violations: [{ file: planPath, rule: "max-parallel", detail }],
+      advisory: null,
+    };
+  }
+  if (plan === null) return { violations: [], advisory: null };
+  const parsed = parseMaxParallel(plan);
+  if (!parsed.ok) {
+    return {
+      violations: [{ file: planPath, rule: "max-parallel", detail: parsed.reason }],
+      advisory: null,
+    };
+  }
+  if (parsed.declared) return { violations: [], advisory: null };
+
+  const contextDir = resolve(tasksDir, "_context");
+  const sources: string[] = [planPath];
+  const contextFiles = await readdir(contextDir).catch(() => [] as string[]);
+  for (const name of contextFiles.sort()) {
+    if (name.endsWith(".md")) sources.push(resolve(contextDir, name));
+  }
+  for (const source of sources) {
+    const text = source === planPath ? plan : await readFile(source, "utf-8");
+    const hit = serialProseHit(text);
+    if (hit === null) continue;
+    return {
+      violations: [],
+      advisory:
+        `[serial-undeclared] ${relative(process.cwd(), source) || source} asks for serial execution, ` +
+        `but PLAN.md declares no cap, so autopilot dispatches every ready task at once:\n  ${hit}\n` +
+        `Add "> **Max parallel**: 1" to the PLAN.md header, or "> **Max parallel**: unlimited" if Depends on edges already sequence the work.`,
+    };
+  }
+  return { violations: [], advisory: null };
+}
+
 async function resolveInputs(
   args: string[],
 ): Promise<{ files: string[]; treeRoots: string[]; missing: string[] }> {
@@ -683,6 +741,9 @@ async function main() {
   if (treeRoot) {
     reportAll(checkFinalReview(parsed, treeRoot));
     reportAll(checkFinalReviewTestNet(parsed, treeRoot));
+    const concurrency = await checkPlanConcurrency(treeRoot);
+    reportAll(concurrency.violations);
+    if (concurrency.advisory) console.log(concurrency.advisory);
     const rows = testNetReport(parsed);
     // Keep this on stdout and before exit: it cannot affect total or disappear on failure.
     if (rows.length > 0) console.log(formatTestNetReport(rows));

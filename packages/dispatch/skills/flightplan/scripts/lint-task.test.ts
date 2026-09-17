@@ -1214,3 +1214,72 @@ describe("task-size advisory", () => {
     expect(violations.some((v) => v.rule === "task-size")).toBe(false);
   });
 });
+
+describe("plan concurrency", () => {
+  const treeWithPlan = (plan: string, shared = "# Shared\n") =>
+    writeTree({
+      "PLAN.md": plan,
+      "tasks/_context/shared.md": shared,
+      "tasks/ui/01-work.md": taskWith({ bucket: "ui", nn: "01" }),
+    });
+
+  const SERIAL = "Execution is serial: each task holds the integration lock.";
+
+  test("serial prose with no Max parallel header prints an advisory", async () => {
+    const root = await treeWithPlan(`# Plan\n\n${SERIAL}\n`);
+    const result = await runCli(join(root, "tasks"));
+    // Advisory, not a gate: plans whose serial wording is already carried by
+    // Depends on edges must still fly.
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("[serial-undeclared]");
+    expect(result.stdout).toContain(SERIAL);
+    expect(result.stdout).toContain("> **Max parallel**: 1");
+    await rm(root, { recursive: true });
+  });
+
+  // The motivating plan kept its lock rule in _context/shared.md, not PLAN.md.
+  test("serial prose in a context file prints the advisory too", async () => {
+    const root = await treeWithPlan(
+      "# Plan\n",
+      "# Shared\n\nAcquire with mkdir /tmp/live.lock first.\n",
+    );
+    const result = await runCli(join(root, "tasks"));
+    expect(result.stdout).toContain("[serial-undeclared]");
+    expect(result.stdout).toContain("_context/shared.md");
+    await rm(root, { recursive: true });
+  });
+
+  test.each(["1", "unlimited"])(
+    "a declared cap of %p silences the advisory",
+    async (value) => {
+      const root = await treeWithPlan(
+        `# Plan\n\n> **Max parallel**: ${value}\n\n${SERIAL}\n`,
+      );
+      const result = await runCli(join(root, "tasks"));
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain("[serial-undeclared]");
+      await rm(root, { recursive: true });
+    },
+  );
+
+  test("an unreadable PLAN.md is a violation, not an undeclared cap", async () => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-work.md": taskWith({ bucket: "ui", nn: "01" }),
+    });
+    await mkdir(join(root, "PLAN.md"));
+    const result = await runCli(join(root, "tasks"));
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("[max-parallel]");
+    expect(result.stderr).toContain("cannot read");
+    await rm(root, { recursive: true });
+  });
+
+  test("a malformed Max parallel header is a violation", async () => {
+    const root = await treeWithPlan("# Plan\n\n> **Max parallel**: serial\n");
+    const result = await runCli(join(root, "tasks"));
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("[max-parallel]");
+    await rm(root, { recursive: true });
+  });
+});

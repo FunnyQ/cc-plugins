@@ -491,6 +491,70 @@ describe("summarizeTree", () => {
       invalid: 0,
     });
     expect(payload.ready.map((r: { ref: string }) => r.ref)).toEqual(["ui/02"]);
+    // No PLAN.md beside tasks/: nothing declared, so nothing caps the wave.
+    expect(payload.maxParallel).toBeNull();
     await rm(root, { recursive: true });
+  });
+
+  const summaryWithPlan = async (plan: string) => {
+    const root = await writeScenario({
+      "ui/01.md": TASK("ui", "01", "none", "todo"),
+    });
+    await writeFile(join(root, "PLAN.md"), plan);
+    const proc = Bun.spawn(
+      [
+        "bun",
+        join(import.meta.dir, "next-ready.ts"),
+        join(root, "tasks"),
+        "--summary",
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const out = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+    await rm(root, { recursive: true });
+    return { exitCode, payload: JSON.parse(out) };
+  };
+
+  // The scout carries the cap off disk every wave, so the orchestrator honours
+  // the plan without the main agent having to copy it into CFG.
+  test("--summary carries the PLAN.md Max parallel cap", async () => {
+    const { exitCode, payload } = await summaryWithPlan(
+      "# Plan\n\n> **Status**: approved\n> **Max parallel**: 1\n",
+    );
+    expect(exitCode).toBe(0);
+    expect(payload.maxParallel).toBe(1);
+  });
+
+  // Only a missing PLAN.md means "nothing declared". A plan that exists but
+  // cannot be read may declare a cap, so treating it as absent would run a
+  // serial plan in parallel with no error anywhere.
+  test("--summary reports an unreadable PLAN.md as a tree error", async () => {
+    const root = await writeScenario({
+      "ui/01.md": TASK("ui", "01", "none", "todo"),
+    });
+    await mkdir(join(root, "PLAN.md"));
+    const proc = Bun.spawn(
+      ["bun", join(import.meta.dir, "next-ready.ts"), join(root, "tasks"), "--summary"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const payload = JSON.parse(await new Response(proc.stdout).text());
+    expect(await proc.exited).toBe(1);
+    expect(payload.maxParallel).toBeNull();
+    expect(payload.errors).toHaveLength(1);
+    expect(payload.errors[0].file).toEndWith("PLAN.md");
+    expect(payload.errors[0].reason).toContain("cannot read");
+    await rm(root, { recursive: true });
+  });
+
+  test("--summary reports a malformed cap as a tree error", async () => {
+    const { exitCode, payload } = await summaryWithPlan(
+      "# Plan\n\n> **Max parallel**: serial\n",
+    );
+    expect(exitCode).toBe(1);
+    expect(payload.maxParallel).toBeNull();
+    expect(payload.errors).toHaveLength(1);
+    expect(payload.errors[0].file).toEndWith("PLAN.md");
+    expect(payload.errors[0].reason).toContain("Max parallel");
   });
 });
