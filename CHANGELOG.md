@@ -1,5 +1,12 @@
 # Changelog
 
+## [herdr 0.7.5] - 2026-09-17
+
+_tracks tag `herdr-v0.7.5`_
+
+### Changed
+- Updated the herdr skill's reference docs to track herdr 0.9.1: the new global `--machine` prefix, `pane split`'s calling-pane default (and its exception to the UI-focused-pane rule), the `letta` agent kind, the Claude integration's narrower SessionStart matcher, the 30s observer disconnect, and case-sensitive `session delete` are now documented. The socket API reference reflects the new `pane.link.resolve` method and `pane.focused` firing on manual selection, and config docs note that sidebar token rules accept `hide = true`.
+
 ## [guard 0.4.0] - 2026-09-12
 
 _tracks tag `guard-v0.4.0`_
