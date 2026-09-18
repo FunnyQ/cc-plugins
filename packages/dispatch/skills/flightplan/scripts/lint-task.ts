@@ -37,11 +37,7 @@ import {
   taskValidity,
   type ParsedTask,
 } from "./lib/parse-task";
-import {
-  parseMaxParallel,
-  readPlan,
-  serialProseHit,
-} from "./lib/max-parallel";
+import { parseMaxParallel, readPlan, serialProseHit } from "./lib/max-parallel";
 
 export type Violation = {
   file: string;
@@ -164,6 +160,38 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
         hits.push({ item: first, kind: "exclusivity" });
       }
     }
+  }
+  return hits;
+}
+
+/**
+ * The tag marking a gate item only a person can perform. It sits at the head of
+ * the item, immediately after the checkbox: `- [ ] (human) sweep the pointer …`.
+ * One fixed position, because the verifier agent and this linter have to read
+ * the same items — a tag accepted anywhere in the text would let the two
+ * disagree about which gate a person owes.
+ */
+const HUMAN_GATE_REGEX = /^\s*[-*]\s+\[[ x]\]\s*\(human\)/i;
+
+/**
+ * Gate sections in which every item is tagged `(human)`.
+ *
+ * The binary gate is the only thing between a task and a `done` it never
+ * earned. A section where nothing is machine-checkable leaves that gate with no
+ * work to do, so the task advances on an attestation alone — and `mark-done.ts`
+ * then ticks every box, leaving a file that reads fully verified. So each gate
+ * section that has items needs at least one a verifier can actually run.
+ *
+ * Returns the offending headings in `GATE_SECTIONS` order.
+ */
+export function humanOnlyGateSections(task: ParsedTask): string[] {
+  const hits: string[] = [];
+  for (const heading of GATE_SECTIONS) {
+    const section = extractSection(task.body, heading);
+    if (section === "") continue;
+    const items = checklistItems(section);
+    if (items.length === 0) continue;
+    if (items.every((item) => HUMAN_GATE_REGEX.test(item))) hits.push(heading);
   }
   return hits;
 }
@@ -331,6 +359,14 @@ export async function lintFile(
         ? `a \`git status\` scope gate with no \`--\` pathspec reads the WHOLE working tree, which no task owns: autopilot runs tasks in parallel in one tree, so a sibling's legitimate uncommitted edits land in your output and fail a correct implementation. Narrow it to this task's own files, e.g. \`git status --short -- <this task's files>\`: ${hit.item}`
         : `a \`git status\` scope gate that claims exclusivity cannot pass under autopilot — the runner edits this very file (Status → in-progress, then mark-done ticks every gate box). Assert that your own paths changed; never claim what else did not: ${hit.item}`;
     push("scope-git-status", detail);
+  }
+
+  for (const heading of humanOnlyGateSections(task)) {
+    push(
+      "human-gate",
+      `every item under \`## ${heading}\` is tagged \`(human)\`, so nothing in it can be machine-checked and the task would advance on an attestation alone. ` +
+        `Autopilot's binary gate needs at least one item a verifier can run itself — add a concrete command, or drop the tag from an item that does not truly need a person.`,
+    );
   }
 
   // Eval rubric — mandatory and machine-parseable (strict). Acceptance criteria
@@ -631,7 +667,9 @@ export async function checkPlanConcurrency(
   const parsed = parseMaxParallel(plan);
   if (!parsed.ok) {
     return {
-      violations: [{ file: planPath, rule: "max-parallel", detail: parsed.reason }],
+      violations: [
+        { file: planPath, rule: "max-parallel", detail: parsed.reason },
+      ],
       advisory: null,
     };
   }

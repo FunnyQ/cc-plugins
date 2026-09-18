@@ -44,7 +44,7 @@ export function foo(bar: Bar): Baz
 
 - [ ] <Verifiable claim 1>
 - [ ] <Verifiable claim 2>
-- [ ] <Verifiable claim 3>
+- [ ] (human) <Claim only a person can check — see "Human-only gate items" below>
 
 ## Verification
 
@@ -129,6 +129,24 @@ Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary g
 
 Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–scaleMax scale. A task passes when the average meets the threshold **and** no veto fires. Customize the anchors for each task. Keep the threshold line and the weighted table shape.
 
+### Human-only gate items (`(human)`)
+
+Some gate items no command can perform: a pointer sweep across a notch, a hardware toggle, a click on a menu-bar app, a visual check on a physical display. Tag each one `(human)`, at the head of the item, immediately after the checkbox:
+
+- ✅ `- [ ] (human) Sweep the pointer across the notch and confirm no widget clips.`
+- ❌ `- [ ] Sweep the pointer across the notch — (human) check.`
+
+The tag position is fixed because `lint-task.ts` and autopilot's verifier agent both read it; a tag accepted mid-text would let the two disagree about which gate a person owes.
+
+What the tag does, and what it does not do:
+
+- Autopilot's verifier does not attempt the item and does not fail the task for it. It reports the item as pending, and the run surfaces it as needing a person instead of parking the task after two attempts. Untagged items are unchanged: the verifier runs them, and any non-zero exit fails the attempt.
+- The tag exempts one item. It never exempts the task, and it never softens a neighbouring item.
+- **`lint-task.ts` rejects a gate section whose items are all `(human)`** — rule `human-gate`. A section with nothing machine-checkable leaves the binary gate no work, so the task would advance on an assertion alone. Keep at least one item per section that a verifier can run itself.
+- `mark-done.ts` ticks a `(human)` box like any other when the task passes. So the task file alone cannot tell you a person still owes a check — `RUNLOG.md` and autopilot's run result are where that lives.
+
+Tag sparingly. An item is `(human)` only when no command could ever check it, not when writing the command is inconvenient.
+
 ## Referring to other tasks: name the thing, not the id
 
 The most common lint failure is this: writing a sibling task id, such as `frontend/01`, into the body out of habit. This happens because you just used the id in `Depends on`. Don't do it. The dependency graph lives in the header. The body must never make the executor open another task.
@@ -150,6 +168,7 @@ Before finalizing a task file, verify each:
 - [ ] Every acceptance criterion is verifiable (no "looks good").
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
 - [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
+- [ ] Each gate section holds at least one item a verifier can run itself — an all-`(human)` section fails lint. See "Human-only gate items" below.
 - [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
 - [ ] Nothing in this file requires opening PLAN.md or another task file to understand.
 - [ ] If duplication with `_context/` is needed for clarity, duplicate it. Don't make the executor cross-reference.

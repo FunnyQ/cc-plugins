@@ -1283,3 +1283,79 @@ describe("plan concurrency", () => {
     await rm(root, { recursive: true });
   });
 });
+
+describe("human-gate", () => {
+  const withGates = (acceptance: string, verification: string) =>
+    VALID_TASK.replace("## Acceptance criteria\n- [ ] One", `## Acceptance criteria\n${acceptance}`)
+      .replace("## Verification\n- [ ] Run `bun test`", `## Verification\n${verification}`);
+
+  const lint = async (body: string) => {
+    const root = await writeTree({
+      "_context/shared.md": "shared",
+      "ui/01-fixture.md": body,
+    });
+    try {
+      return await lintFile(join(root, "ui/01-fixture.md"));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  };
+
+  test("a gate section with one machine-checkable item beside a human one passes", async () => {
+    const violations = await lint(
+      withGates(
+        "- [ ] (human) Sweep the pointer across the notch\n- [ ] The widget renders",
+        "- [ ] Run `bun test`",
+      ),
+    );
+    expect(violations.filter((v) => v.rule === "human-gate")).toEqual([]);
+  });
+
+  test("an all-human acceptance section is rejected", async () => {
+    const violations = await lint(
+      withGates(
+        "- [ ] (human) Sweep the pointer across the notch\n- [ ] (human) Toggle WireGuard",
+        "- [ ] Run `bun test`",
+      ),
+    );
+    const [hit] = violations.filter((v) => v.rule === "human-gate");
+    expect(hit.detail).toContain("## Acceptance criteria");
+    expect(hit.detail).toContain("advance on an attestation alone");
+  });
+
+  test("an all-human verification section is rejected", async () => {
+    const violations = await lint(
+      withGates("- [ ] The widget renders", "- [ ] (human) Click the menu-bar icon"),
+    );
+    expect(
+      violations.filter((v) => v.rule === "human-gate").map((v) => v.detail),
+    ).toHaveLength(1);
+    expect(violations[0].detail).toContain("## Verification");
+  });
+
+  test("the tag counts only at the head of the item", async () => {
+    // A tag accepted mid-text would let the linter and the verifier agent
+    // disagree about which items a person owes.
+    const violations = await lint(
+      withGates(
+        "- [ ] Sweep the pointer across the notch — (human) check",
+        "- [ ] Run `bun test`",
+      ),
+    );
+    expect(violations.filter((v) => v.rule === "human-gate")).toEqual([]);
+  });
+
+  test("a ticked human box still counts as human", async () => {
+    // Otherwise a task passes lint only after mark-done.ts ticks its boxes,
+    // which is exactly when nobody is reading the lint any more.
+    const violations = await lint(
+      withGates("- [x] (human) Sweep the notch", "- [ ] Run `bun test`"),
+    );
+    expect(violations.filter((v) => v.rule === "human-gate")).toHaveLength(1);
+  });
+
+  test("a plan that tags nothing is unaffected", async () => {
+    const violations = await lint(VALID_TASK);
+    expect(violations.filter((v) => v.rule === "human-gate")).toEqual([]);
+  });
+});
