@@ -21,6 +21,7 @@
  */
 
 import { basename, extname } from "node:path";
+import { recordReported } from "./sweep-state.ts";
 
 export type ToolInput = {
   file_path?: string;
@@ -436,6 +437,7 @@ export function formatReason(fileName: string, blocks: CommentBlock[]): string {
 
 async function main(): Promise<number> {
   let payload: {
+    session_id?: string;
     tool_name?: string;
     tool_input?: ToolInput;
     tool_response?: ToolResponse;
@@ -483,6 +485,11 @@ async function main(): Promise<number> {
 
   const blocks = flaggedBlocks(fileText, syntax, added);
   if (blocks.length === 0) return 0;
+
+  if (payload.session_id) {
+    const asked = blocks.flatMap((b) => b.lines.filter((_, k) => b.added[k]));
+    recordReported(payload.session_id, filePath, asked);
+  }
 
   const fileName = basename(filePath);
   console.error(formatReason(fileName, blocks));
