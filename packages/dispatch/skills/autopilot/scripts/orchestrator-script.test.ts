@@ -76,6 +76,7 @@ type RunResult = {
     parked?: boolean;
     reason: string;
   }[];
+  needsHuman: { task: string; criteria: string[] }[];
 };
 
 type Scenario = {
@@ -96,7 +97,16 @@ type Scenario = {
   /** Keyed by task ref; null models an agent that returned no structured result. */
   gate?: Record<
     string,
-    ({ passed: boolean; deferred?: boolean; summary: string } | Throws | null)[]
+    (
+      | {
+          passed: boolean;
+          deferred?: boolean;
+          summary: string;
+          humanPending?: string[];
+        }
+      | Throws
+      | null
+    )[]
   >;
   requalify?: Record<
     string,
@@ -1313,7 +1323,6 @@ describe("orchestrator cross-vendor review lens", () => {
     return promptFor(log, "review:codex#1");
   };
 
-
   test("defaults to the headless wrapper", async () => {
     const prompt = await reviewPrompt();
 
@@ -1483,7 +1492,6 @@ describe("orchestrator commit ownership", () => {
 
     expect(prompt).toContain("Include the no-commit rule in that instruction");
   });
-
 
   // Same reasoning as the review lens: the rule the driver is asked to copy into
   // the instruction file did not arrive in two measured runs, so the flag relay
@@ -2412,4 +2420,300 @@ describe("plan concurrency cap", () => {
       expect(result.escalations[0].reason).toContain('"maxParallel"');
     },
   );
+});
+
+describe("orchestrator human-only gate items", () => {
+  const humanWave: ScoutResult = snapshot({
+    ready: [ready("ui/01")],
+    counts: counts({ total: 1, todo: 1 }),
+    unfinished: [{ ref: "ui/01", state: "todo" }],
+  });
+
+  test("a passing gate with pending human items completes and reports needsHuman", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [humanWave, complete(1)],
+      gate: {
+        "ui/01": [
+          {
+            passed: true,
+            summary: "green; 1 item not machine-checked",
+            humanPending: ["Acceptance criteria: (human) sweep the notch"],
+          },
+        ],
+      },
+    });
+
+    expect(result.completed).toEqual(["ui/01"]);
+    // A pending human item is not a park. Reporting it as one would send the
+    // user to reset a Status that is legitimately `done`.
+    expect(result.escalations).toEqual([]);
+    expect(result.needsHuman).toEqual([
+      {
+        task: "ui/01",
+        criteria: ["Acceptance criteria: (human) sweep the notch"],
+      },
+    ]);
+  });
+
+  test("a failed gate's pending list never reaches needsHuman", async () => {
+    // The retry re-derives the list from the same task file, so carrying a
+    // rejected attempt's list forward would report an item twice.
+    const { result } = await runOrchestrator({
+      scouts: [humanWave],
+      gate: {
+        "ui/01": [
+          { passed: false, summary: "red", humanPending: ["a"] },
+          { passed: false, summary: "red", humanPending: ["a"] },
+          { passed: false, summary: "red", humanPending: ["a"] },
+        ],
+      },
+    });
+
+    expect(result.needsHuman).toEqual([]);
+    expect(result.escalations).toHaveLength(1);
+  });
+
+  test("a verifier that omits humanPending entirely is not a failure", async () => {
+    const { result } = await runOrchestrator({
+      scouts: [humanWave, complete(1)],
+      gate: { "ui/01": [{ passed: true, summary: "green" }] },
+    });
+
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(result.needsHuman).toEqual([]);
+  });
+
+  test("the verifier is told the tag exempts one item, never the task", async () => {
+    const log = await runOrchestrator({ scouts: [humanWave, complete(1)] });
+    const prompt = promptFor(log, "verify:ui/01#1");
+
+    expect(prompt).toContain("(human)");
+    expect(prompt).toContain("humanPending");
+    expect(prompt).toContain("The tag exempts that ONE item");
+    expect(prompt).toContain("You may never add the tag yourself");
+  });
+
+  test("the attestation clause appears only when an attestation file is configured", async () => {
+    const without = await runOrchestrator({ scouts: [humanWave, complete(1)] });
+    expect(promptFor(without, "verify:ui/01#1")).not.toContain(
+      "It is not a blanket pass",
+    );
+
+    const withFile = await runOrchestrator(
+      { scouts: [humanWave, complete(1)] },
+      { attestationFile: "'/abs/repo/docs/my-plan/.flightlog/attested.md'" },
+    );
+    const prompt = promptFor(withFile, "verify:ui/01#1");
+    expect(prompt).toContain("/abs/repo/docs/my-plan/.flightlog/attested.md");
+    expect(prompt).toContain("It is not a blanket pass");
+    // The bound that stops one sentence of attestation excusing every red item.
+    expect(prompt).toContain("covers ONLY the items it names");
+    expect(prompt).toContain("that entry is invalid");
+  });
+});
+
+describe("orchestrator single-task resume", () => {
+  const RESUME_CFG = {
+    resumeTask: "'review/01'",
+    resumeTaskPath: "'/abs/repo/docs/my-plan/tasks/review/01.md'",
+    resumeFinalReview: "true",
+  };
+  const ATTESTED = "'/abs/repo/docs/my-plan/.flightlog/attested.md'";
+
+  test("resuming at verify skips the whole review round and runs no scout", async () => {
+    const { result, labels } = await runOrchestrator(
+      { scouts: [] },
+      {
+        ...RESUME_CFG,
+        resumeFrom: "'verify'",
+        resumeAttempt: "3",
+      },
+    );
+
+    expect(result.completed).toEqual(["review/01"]);
+    expect(result.escalations).toEqual([]);
+    expect(labels.some((l) => l.startsWith("scout-wave-"))).toBe(false);
+    expect(labels.some((l) => l.startsWith("review:"))).toBe(false);
+    expect(labels.some((l) => l.startsWith("fix:"))).toBe(false);
+    expect(labels).toContain("verify:review/01#3");
+    expect(labels).toContain("judge:review/01#3");
+    expect(labels).toContain("done:review/01");
+  });
+
+  test("the resumed run still commits, which is what lands the held-back work", async () => {
+    // The run that parked this task kept its declared paths out of every commit,
+    // so the fixer's edits are still uncommitted when the resume starts.
+    const { labels } = await runOrchestrator(
+      { scouts: [] },
+      {
+        ...RESUME_CFG,
+        resumeFrom: "'verify'",
+        resumeAttempt: "3",
+      },
+    );
+
+    expect(labels).toContain("commit-post-loop");
+  });
+
+  test("resuming past the cap runs the attempts instead of silently re-parking", async () => {
+    // The trap: `for (attempt = 3; attempt <= FINAL_MAX)` is false on entry, so
+    // a cap-keyed loop parks the task having executed nothing at all.
+    const { result, labels } = await runOrchestrator(
+      {
+        scouts: [],
+        gate: {
+          "review/01": [
+            { passed: false, summary: "resumed round still red" },
+            { passed: false, summary: "next round red too" },
+          ],
+        },
+      },
+      { ...RESUME_CFG, resumeFrom: "'verify'", resumeAttempt: "3" },
+    );
+
+    expect(labels).toContain("verify:review/01#3");
+    expect(labels).toContain("verify:review/01#4");
+    expect(result.escalations).toHaveLength(1);
+    expect(result.escalations[0].attempt).toBe(4);
+    expect(result.escalations[0].infrastructure).toBe(false);
+  });
+
+  test("a red resumed gate runs the FULL pipeline on the next attempt", async () => {
+    const { labels } = await runOrchestrator(
+      {
+        scouts: [],
+        gate: {
+          "review/01": [
+            { passed: false, summary: "resumed round still red" },
+            { passed: true, summary: "green" },
+          ],
+        },
+      },
+      { ...RESUME_CFG, resumeFrom: "'verify'", resumeAttempt: "3" },
+    );
+
+    // Attempt 3 skipped the round; attempt 4 must not — a red verify means the
+    // skipped work genuinely does need redoing.
+    expect(labels).not.toContain("review:reuse#3");
+    expect(labels).toContain("review:reuse#4");
+    expect(labels).toContain("fix:review/01#4");
+  });
+
+  test("resuming at judge substitutes the signed gate and runs no verifier", async () => {
+    const log = await runOrchestrator(
+      { scouts: [] },
+      {
+        ...RESUME_CFG,
+        resumeFrom: "'judge'",
+        resumeAttempt: "3",
+        attestationFile: ATTESTED,
+      },
+    );
+
+    expect(log.labels.some((l) => l.startsWith("verify:"))).toBe(false);
+    const prompt = promptFor(log, "judge:review/01#3");
+    expect(prompt).toContain("HUMAN-SUPPLIED BINARY GATE");
+    expect(prompt).toContain("/abs/repo/docs/my-plan/.flightlog/attested.md");
+    expect(prompt).toContain("Do not assume an unnamed item passed");
+    expect(log.result.completed).toEqual(["review/01"]);
+  });
+
+  test("the resumed attempt logs why it has no dev row, and only that attempt", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [],
+        gate: {
+          "review/01": [
+            { passed: false, summary: "red" },
+            { passed: true, summary: "green" },
+          ],
+        },
+      },
+      { ...RESUME_CFG, resumeFrom: "'verify'", resumeAttempt: "3" },
+    );
+
+    expect(promptFor(log, "verify:review/01#3")).toContain("--role resume");
+    expect(promptFor(log, "verify:review/01#4")).not.toContain("--role resume");
+  });
+
+  test("a resumed Claude ladder still runs sonnet before opus", async () => {
+    // Keyed off `cap` rather than `last`, `attempt >= claudeCap` is already true
+    // at attempt 2, so the whole ladder would run on Opus from its first rung.
+    const log = await runOrchestrator(
+      {
+        scouts: [],
+        gate: {
+          "ui/01": [
+            { passed: false, summary: "red" },
+            { passed: false, summary: "red" },
+            { passed: false, summary: "red" },
+          ],
+        },
+      },
+      {
+        resumeTask: "'ui/01'",
+        resumeTaskPath: "'/abs/repo/docs/my-plan/tasks/ui/01.md'",
+        resumeFrom: "'dev'",
+        resumeAttempt: "2",
+      },
+    );
+
+    const devLabels = log.labels.filter((label) => label.startsWith("dev:"));
+    expect(devLabels).toEqual(["dev:ui/01#2", "dev:ui/01#3", "dev:ui/01#4"]);
+    expect(devLabels.map((label) => modelFor(log, label))).toEqual([
+      "sonnet",
+      "sonnet",
+      "opus",
+    ]);
+  });
+
+  test("a resumed task that cannot pass is parked and escalated as usual", async () => {
+    const { result } = await runOrchestrator(
+      { scouts: [], gate: { "review/01": [null] } },
+      { ...RESUME_CFG, resumeFrom: "'verify'", resumeAttempt: "3" },
+    );
+
+    expect(result.completed).toEqual([]);
+    expect(result.escalations).toHaveLength(1);
+    expect(result.escalations[0].task).toBe("review/01");
+    expect(result.escalations[0].infrastructure).toBe(true);
+    expect(result.escalations[0].parked).toBe(true);
+  });
+
+  test.each([
+    [{ resumeFrom: "'score'" }, 'unknown resumeFrom "score"'],
+    [{ resumeTaskPath: "''" }, "resumeTaskPath is empty"],
+    [{ resumeFrom: "'judge'" }, "CFG.attestationFile is required"],
+    // `Math.trunc(Number(0)) || 1` silently renumbers this to attempt 1, which
+    // then collides with the parked run's own attempt 1 in the score rows.
+    [
+      { resumeAttempt: "0" },
+      "resumeAttempt must be a whole number 1 or greater",
+    ],
+    [{ resumeAttempt: "'later'" }, "resumeAttempt must be a whole number"],
+  ])(
+    "rejects bad resume config at script start (%o)",
+    async (over, message) => {
+      await expect(
+        runOrchestrator(
+          { scouts: [] },
+          {
+            ...RESUME_CFG,
+            resumeFrom: "'verify'",
+            resumeAttempt: "3",
+            ...over,
+          },
+        ),
+      ).rejects.toThrow(message);
+    },
+  );
+
+  test("an empty resumeTask leaves the normal wave loop untouched", async () => {
+    const { result, labels } = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+    });
+
+    expect(result.completed).toEqual(["ui/01"]);
+    expect(labels).toContain("scout-wave-1");
+  });
 });

@@ -71,6 +71,12 @@ const CFG = {
   opencodeDevModel:      '',        // optional opencode model for devEngine or lastShotEngine (empty → wrapper default opencode-go/kimi-k2.7-code); ignored when the engine is codex
   opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
   reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 3 final-review Claude lenses (reuse/leanness/efficiency) ONLY; the fixer + rubric judge stay Opus
+  resumeTask:            '',        // '' = normal whole-tree flight. A task ref ('review/01') runs ONLY that task, with no scout and no wave loop
+  resumeTaskPath:        '',        // ABSOLUTE path to that task's file; required with resumeTask, because a resume runs no scout to derive it
+  resumeFinalReview:     false,     // true when the resumed task carries `> **Final review**: true` — the scout normally supplies this
+  resumeFrom:            'dev',     // 'dev' | 'verify' | 'judge' — the step the FIRST resumed attempt starts at; every later attempt runs the whole pipeline
+  resumeAttempt:         1,         // the attempt number the resumed run starts counting at, so the flightlog and the score rows keep rising
+  attestationFile:       '',        // ABSOLUTE path to a human attestation naming which gate items a person performed; REQUIRED when resumeFrom is 'judge'
 }
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
@@ -154,6 +160,41 @@ const COLLECT_ROUNDS = Math.max(0, Math.trunc(Number(CFG.liveCollectRounds ?? 3)
 // count, so a negative or fractional value would render an incoherent one.
 const BUDGET_FLOOR = Math.max(0, Math.trunc(Number(CFG.budgetFloor ?? 0)) || 0)
 
+// ── Single-task resume ──────────────────────────────────────────────────────
+// Re-enter ONE task's pipeline at a named step, taking everything before that
+// step as already satisfied. The case it exists for: a task parked at its gate
+// with the expensive work already correct and on disk — a Final review whose
+// four-lens round and Opus fixer both landed, failing only on a criterion a
+// person had to walk. Resetting Status to todo and re-flying pays for that whole
+// round again to reach one Haiku verify.
+//
+// Every value is validated HERE rather than at the call site, because a resume
+// runs no scout: nothing downstream re-derives the ref, the path, or the step,
+// so a typo would otherwise surface as an agent reading a file that is not there.
+const RESUME_STEPS = ['dev', 'verify', 'judge']
+const RESUME = !CFG.resumeTask ? null : (() => {
+  if (!RESUME_STEPS.includes(CFG.resumeFrom)) {
+    throw new Error(`unknown resumeFrom "${CFG.resumeFrom}" — must be one of ${RESUME_STEPS.join(', ')}`)
+  }
+  if (!CFG.resumeTaskPath) {
+    throw new Error('resumeTask is set but resumeTaskPath is empty — a resume runs no scout, so it cannot derive the task file path')
+  }
+  // Skipping the binary gate means a PERSON performed it. Without a signed
+  // artifact the judge would score correctness against no evidence at all,
+  // which is the one thing `Grounding the score` forbids.
+  if (CFG.resumeFrom === 'judge' && !CFG.attestationFile) {
+    throw new Error('resumeFrom "judge" skips the binary gate, so CFG.attestationFile is required — the human who ran that gate has to sign it')
+  }
+  // No `|| 1` fallback: that turns an explicit 0 into 1 instead of rejecting it,
+  // and a resume that quietly renumbers itself to attempt 1 collides with the
+  // parked run's own attempt 1 in the score rows.
+  const attempt = Math.trunc(Number(CFG.resumeAttempt ?? 1))
+  if (!Number.isFinite(attempt) || attempt < 1) {
+    throw new Error(`resumeAttempt must be a whole number 1 or greater (got ${JSON.stringify(CFG.resumeAttempt)})`)
+  }
+  return { ref: CFG.resumeTask, path: CFG.resumeTaskPath, finalReview: !!CFG.resumeFinalReview, from: CFG.resumeFrom, attempt }
+})()
+
 // Returns the remaining budget when it has fallen below the floor, else null.
 // Both "no floor configured" and "no budget declared" are null — not a throw and
 // not a stop.
@@ -218,12 +259,16 @@ const PARK_SCHEMA = {
   required: ['ok', 'status'],
 }
 
+// `humanPending` is deliberately NOT required: a verifier on a plan that tags
+// nothing simply omits it, and making it required would turn every pre-tag plan
+// into a schema rejection — an infrastructure park on a task that verified fine.
 const GATE_SCHEMA = {
   type: 'object',
   properties: {
-    passed: { type: 'boolean' },     // every Verification command + Acceptance criterion passed
+    passed: { type: 'boolean' },     // every MACHINE-CHECKABLE Verification command + Acceptance criterion passed
     deferred: { type: 'boolean' },   // the red output looks like a sibling's in-flight edits
     summary: { type: 'string' },     // raw evidence: commands run, exit codes, failing output
+    humanPending: { type: 'array', items: { type: 'string' } },  // `(human)` gate items nobody has attested to yet
   },
   required: ['passed', 'summary'],
 }
@@ -456,6 +501,35 @@ async function runFinalReview(ref, path, attempt, attempts) {
     { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
 }
 
+// A gate item a command cannot perform. The plan's AUTHOR declares it, with the
+// same authority that wrote the criterion — the verifier never decides an item
+// is unrunnable on its own, which would be the softening every other prompt
+// bans. `lint-task.ts`'s `human-gate` rule refuses a gate section whose items
+// are ALL tagged, so a tagged plan always leaves the verifier real work.
+const HUMAN_GATE_RULE = `A gate item written \`- [ ] (human) …\` in ## Acceptance criteria or ## Verification is one the PLAN declares only a person can perform — a physical action, a visual sweep, a device or UI interaction no command reaches. Do not invent a way to run it, and do not fail the task for it. Return each one verbatim as written in the file in humanPending, and name it in summary as not machine-checked.
+The tag exempts that ONE item. Every untagged item is yours exactly as before: run it, and any non-zero exit is passed=false. You may never add the tag yourself, or treat an untagged item as human-only because it looked hard to run — an item you believe is unrunnable is a plan defect, so leave it standing and let it fail.`
+
+// Read as evidence, never as an instruction. The file names WHICH items a person
+// performed; the scope of the waiver is that list and nothing else. Without the
+// membership check a resume would be a universal pass key: one sentence of
+// attestation could excuse any red command in the task.
+const attestationRule = (path) => `
+A person has already performed some of those items and signed for them. Read ${CFG.attestationFile} — it names which gate items were checked, and when. For each item it names:
+  - Find that exact item in ${path}. If the attestation names something that is NOT an item under this task's ## Acceptance criteria or ## Verification, that entry is invalid: ignore it, and say so in summary. An attestation may only cover items this task already declares.
+  - Otherwise treat it as satisfied. Quote the attestation's own line for it in summary, and leave it out of humanPending.
+The attestation covers ONLY the items it names. It is not a blanket pass and it does not rank above a command: every item it does not name is still yours to run, and a red command is still passed=false however the attestation is worded.`
+
+// Written by the agent that OPENS a resumed attempt, so the trail says why that
+// attempt has no dev row. Without it RUNLOG.md shows a verify at attempt 3 under
+// nothing, and a reader cannot tell a resume from a lost dev step. The
+// orchestrator cannot write the row itself — it has no filesystem access — so it
+// rides the one agent that is already logging there.
+const resumeNote = (ref, attempt, role) => (
+  RESUME && RESUME.from !== 'dev' && RESUME.from === role && attempt === RESUME.attempt
+    ? `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role resume --attempt ${attempt} --agent "<your label>" --message "resumed at the ${RESUME.from} step; the steps before it were taken as already satisfied${CFG.attestationFile ? `; human attestation at ${CFG.attestationFile}` : ''}"\n`
+    : ''
+)
+
 const verifyPrompt = (ref, path, attempt, requalify = false) => {
   const role = requalify ? 'requalify' : 'verify'
   const closing = requalify
@@ -468,7 +542,7 @@ If — and only if — the evidence points at a sibling task's in-flight edits, 
 Deferring waives nothing and never changes a verdict on its own. An unsupported deferral is counted as a plain failure.`
   return `
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase start
-Then proceed.
+${resumeNote(ref, attempt, role)}Then proceed.
 Use the identical label in both start and end calls.
 
 You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
@@ -478,16 +552,27 @@ Do NOT trust the dev's claims. Open the task file at ${path}, then:
   2. Check every box in ## Acceptance criteria against the actual code/output.
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
+${HUMAN_GATE_RULE}${CFG.attestationFile ? attestationRule(path) : ''}
 ${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
+When humanPending is not empty, end that same message with " — NEEDS HUMAN: <n> item(s)". The run's final report reads the structured list, but RUNLOG.md is what a person opens weeks later, and a pending check that appears in neither is a check nobody makes.
 ${RETURN_CONTRACT}
 `
 }
 
+// Substituted for a verifier's evidence when `resumeFrom: 'judge'` skips the
+// binary gate. It says plainly that no agent ran the commands, so the judge
+// grounds correctness in the signed artifact and in what that artifact omits —
+// rather than in a verdict nobody produced.
+const humanGateSummary = () =>
+  `HUMAN-SUPPLIED BINARY GATE — this run did NOT re-run the task's ## Verification commands. A person performed the binary gate by hand and signed it at ${CFG.attestationFile}. `
+  + `Read that file: it names which gate items were checked, and when. Ground the correctness dimension in it exactly as you would in a verifier's raw output. `
+  + `Treat every gate item the file does NOT name as unverified — say so in your rationale and score correctness accordingly. Do not assume an unnamed item passed.`
+
 const judgePrompt = (ref, path, gateSummary, attempt) => `
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase start
-Then proceed.
+${resumeNote(ref, attempt, 'judge')}Then proceed.
 Use the identical label in both start and end calls.
 
 You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
@@ -684,28 +769,48 @@ async function executeTask(item, watch) {
   // The cross-vendor Final review round gets its own (smaller) cap; everything
   // else uses MAX. Past the cap the task is parked + escalated, never skipped.
   const cap = finalReview ? FINAL_MAX : MAX + (lastShotEngine ? 1 : 0)
+  // A resume is a fresh flight for one task: it gets the WHOLE cap again, and
+  // `first` only moves where the numbering starts so the flightlog and the score
+  // rows keep rising instead of colliding with the parked run's attempt 1 and 2.
+  // Every rung below is therefore keyed off `last`, never off `cap` — with
+  // `first` at 1 the two are equal and the ladder is byte-identical to before,
+  // but on a resume at attempt 3 a cap-keyed `attempt >= cap` is already true on
+  // the first rung, which would run Opus immediately and never run Sonnet at all.
+  const first = RESUME && RESUME.ref === ref ? RESUME.attempt : 1
+  const last = first + cap - 1
   const attempts = []
-  for (let attempt = 1; attempt <= cap; attempt++) {
+  // `(human)` items nobody has attested to. Carried out of the PASSING gate, so
+  // the run can report them; a failed attempt's list is superseded by the retry.
+  let humanPending = []
+  for (let attempt = first; attempt <= last; attempt++) {
+    // Steps before the resume point are taken as already satisfied, and only on
+    // the attempt the resume starts. If that attempt fails its gate, the retry
+    // runs the whole pipeline — a red verify means the skipped work genuinely
+    // does need redoing, including the expensive Final review round.
+    const startAt = RESUME && attempt === first ? RESUME.from : 'dev'
     let attemptModel = 'final-review'
     // One counted window for the whole write step. Every branch below writes the
     // tree, exactly one of them runs, and none outlives this await — so four
     // wrappers opening and closing at the same two points would say nothing more.
     await withWriter(watch, async () => {
-      if (finalReview) {
+      if (startAt !== 'dev') {
+        // Nothing to write: the resume takes this attempt's dev work as done.
+      } else if (finalReview) {
         // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
         await runFinalReview(ref, path, attempt, attempts)
       } else {
         // Dev step. An external devEngine falls back to Claude-Opus at its cap.
-        // `cap > 1` keeps a single-attempt external ladder on its configured engine.
+        // `last > first` keeps a single-attempt external ladder on its configured engine.
         // An opted-in Claude ladder instead appends its external rung after Opus.
-        const lastShot = attempt >= cap && cap > 1
+        const lastShot = attempt >= last && last > first
         // The appended rung is the final attempt, and only exists on a Claude ladder.
-        const vendorRung = !!lastShotEngine && attempt === cap
-        // The last CLAUDE rung. With an appended rung cap is MAX + 1, so the escalation
-        // tier must key off the Claude cap. Keying off `cap` makes `attempt >= cap` false
-        // at attempt MAX, so the ladder would run sonnet, sonnet, sonnet, external and
-        // Opus would never execute — silently turning this append into a replace.
-        const claudeCap = cap - (lastShotEngine ? 1 : 0)
+        const vendorRung = !!lastShotEngine && attempt === last
+        // The last CLAUDE rung. With an appended rung the ladder is MAX + 1 long, so the
+        // escalation tier must key off the Claude rung. Keying off `last` makes
+        // `attempt >= claudeCap` false at the MAXth attempt, so the ladder would run
+        // sonnet, sonnet, sonnet, external and Opus would never execute — silently
+        // turning this append into a replace.
+        const claudeCap = last - (lastShotEngine ? 1 : 0)
         if (vendorRung) {
           attemptModel = lastShotEngine.label
           await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts)),
@@ -729,7 +834,13 @@ async function executeTask(item, watch) {
     // A verifier that returns NO structured result did not verify anything. That
     // is not the same as `passed: false`, which is a real verdict on real work.
     // Conflating them retries the dev loop against an unknown state.
-    let gate = await resilient(retryModel => agent(verifyPrompt(ref, path, attempt),
+    // `startAt: 'judge'` replaces the agent verdict with the human's signed one.
+    // Synthesised rather than skipped, because everything downstream reads
+    // `gate.summary` — the judge grounds correctness in it, and `rejectionOf`
+    // quotes it into the next attempt's feedback.
+    let gate = startAt === 'judge'
+      ? { passed: true, summary: humanGateSummary(), humanPending: [] }
+      : await resilient(retryModel => agent(verifyPrompt(ref, path, attempt),
       { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: GATE_SCHEMA }),
       MODEL.structuredRetry)
     if (!gate) {
@@ -764,6 +875,9 @@ async function executeTask(item, watch) {
       })
       continue
     }
+    // Only a PASSING gate's list is meaningful: a failed attempt is retried, and
+    // the retry's verifier re-derives the list from the same task file.
+    humanPending = Array.isArray(gate.humanPending) ? gate.humanPending : []
 
     // The rubric judge reads the task file and appends only to the self-gitignored
     // flightlog directory, so it is not a tree writer. Counting it would make the
@@ -796,7 +910,7 @@ async function executeTask(item, watch) {
           { label: `done:${ref}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: MARK_DONE_SCHEMA }),
           MODEL.structuredRetry))
       if (finalized && finalized.ok) {
-        return { task: ref, passed: true, attempt, weighted: verdict.weighted }
+        return { task: ref, passed: true, attempt, weighted: verdict.weighted, humanPending }
       }
       const cause = finalized
         ? `the task passed its rubric but mark-done did not confirm a bare "Status: done" (read "${finalized.status}")`
@@ -819,7 +933,7 @@ async function executeTask(item, watch) {
   // Render once: the parked file and the returned reason must carry the same text.
   const history = renderHistory(attempts)
   const parkedOk = await parkBlocked(ref, path, history, watch)
-  return { task: ref, passed: false, infrastructure: false, attempt: cap, parked: parkedOk, reason: history }
+  return { task: ref, passed: false, infrastructure: false, attempt: last, parked: parkedOk, reason: history }
 }
 
 // Wrap every task before it reaches parallel(). Do NOT depend on parallel()
@@ -891,6 +1005,10 @@ return (async () => {
 phase('Execute')
 const completed = []
 const escalations = []
+// `(human)` gate items that passed WITHOUT a machine check and without an
+// attestation. Not an escalation — the task legitimately passed — so it rides
+// its own list, or the main agent would report a park that never happened.
+const needsHuman = []
 const parked = new Set()
 // Task-file paths whose work must stay out of every commit. See commitInstructions.
 const heldBack = new Set()
@@ -939,7 +1057,10 @@ const escalateCommitFailure = (committed, what, threw) => {
   escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
 }
 
-while (true) {
+// Resume mode runs ONE task and no wave loop. Written as a loop condition rather
+// than an if/else wrapper so the wave loop's 240-line body keeps its indentation:
+// a whole-body re-indent would bury this change in a diff nobody can read.
+while (!RESUME) {
   wave++
   // `settled` still wraps the retry: it converts a SECOND throw into the same
   // reportable shape, which is what keeps every finished wave's results alive.
@@ -1159,6 +1280,7 @@ while (true) {
     // wrapper could not return.
     if (r && r.passed) {
       completed.push(item.ref)
+      if (r.humanPending?.length > 0) needsHuman.push({ task: item.ref, criteria: r.humanPending })
       passedThisWave = true
       continue
     }
@@ -1179,6 +1301,35 @@ while (true) {
   if (!passedThisWave) break
 }
 
+// ── Single-task resume ──────────────────────────────────────────────────────
+// One pipeline, no scout, no waves. It then falls through to the post-loop
+// commit, and that is load-bearing rather than incidental: the run that parked
+// this task held its declared paths out of every commit, so the fixer's work is
+// still sitting uncommitted. `heldBack` is empty here, so a passing resume is
+// what finally lands it.
+if (RESUME) {
+  const item = { ref: RESUME.ref, finalReview: RESUME.finalReview, path: RESUME.path }
+  log(`Resuming ${item.ref} at the ${RESUME.from} step, from attempt ${RESUME.attempt}.`)
+  // Sized 1: a resume has no sibling, so a SUSPECTED SIBLING INTERFERENCE
+  // deferral must be refused exactly as it is for a serial wave.
+  const r = await runTaskGuarded(item, makeTreeWatch(1))
+  if (r && r.passed) {
+    completed.push(item.ref)
+    if (r.humanPending?.length > 0) needsHuman.push({ task: item.ref, criteria: r.humanPending })
+  } else {
+    escalations.push({
+      task: item.ref,
+      attempt: r?.attempt ?? 0,
+      infrastructure: r?.infrastructure ?? true,
+      parked: r?.parked ?? false,
+      reason: r?.reason
+        ?? 'no result returned for the resumed task and the harness exposed no cause — the pipeline was dropped, so the task state on disk is unknown',
+    })
+    parked.add(item.ref)
+    heldBack.add(item.path)
+  }
+}
+
 // ── Post-loop commit ────────────────────────────────────────────────────────
 // The last wave (typically Final review) has no subsequent scout to trigger a
 // commit. Run one final atomic-commit here to capture those remaining changes.
@@ -1196,7 +1347,7 @@ if (CFG.commitBetweenWaves && !commitBlocked()) {
   }
 }
 
-return { slug: CFG.slug, completed, escalations }
+return { slug: CFG.slug, completed, escalations, needsHuman }
 })()
 ```
 
@@ -1204,7 +1355,8 @@ return { slug: CFG.slug, completed, escalations }
 
 - `completed` — tasks that passed their rubric **and** whose `mark-done` transition was confirmed, this invocation only. It includes the Final review task, if the run finished cleanly. It is not a tree-completion count; see the note on `counts.done` below.
 - `escalations` — `[{ task, attempt, infrastructure, parked, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` means nothing was judged, so tell the user that verification did not run rather than that the work was rejected. `parked: false` means the task was NOT written back as `blocked`, so its file still reads `in-progress` and `next-ready` will not re-offer it — say so, because the user has to reset that Status by hand before resuming.
-- A task ref appears in `completed` or in `escalations`, never in both.
+- `needsHuman` — `[{ task, criteria }]`, the `(human)` gate items that passed with no machine check and no attestation. Report it **separately from `escalations`**: those tasks are genuinely `done`, nothing is parked, and nothing needs a Status reset. Print the criteria verbatim as the user's closing checklist, and say that `mark-done.ts` ticked their boxes like any other, so the task file no longer shows the check is outstanding.
+- A task ref appears in `completed` or in `escalations`, never in both. A ref in `needsHuman` is always also in `completed`.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
 - **Resume**: after the user unblocks a parked task, reset its `Status` to `todo`. Then re-run autopilot. Completed tasks stay `done`, so the run re-offers only the unblocked work.
 
@@ -1258,4 +1410,12 @@ return { slug: CFG.slug, completed, escalations }
 - **Commits use inline git, not the atomic-commit skill — the same `no Agent tool` constraint applies.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`. That skill spawns the vör + bragi sub-agents, and a Workflow agent cannot do that. Its analysis script also lives in a *different* plugin's cache, which the agent cannot resolve — there is no `CLAUDE_PLUGIN_ROOT` in agent Bash. The `commitInstructions` builder inlines the skill's whole contract instead: the matched flightlog lifecycle, the atomic grouping principles, plus the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary). So each labeled agent commits over plain git, self-contained. If the commit convention changes, edit the template in that one builder.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`). Passing a wide wave is safe — excess tasks queue.
 - **A plan caps its own concurrency with `> **Max parallel**: N` in PLAN.md, and the scout carries it.** `next-ready.ts --summary` parses the header into `maxParallel` (`null` when absent or `unlimited`), and the wave loop hands each task a slot from `makeSlots`. **The slot spans the whole pipeline — dev, verify, requalify, judge, mark-done, park — not only the writer windows.** The live failure was in `~/.config` `docs/sketchybar-swift-daemon`: seven tasks went out after `core/05`, and a Haiku verifier ran `swift build` and live checks while a sibling's codex delegate was mid-reinstall of the shared bar. The verifier is deliberately not a writer, so a cap on writers alone would have let exactly that through. That plan's workaround was a `mkdir /tmp/sketchybard-live.lock` rule pasted into four prompts; it reached an external delegate only when the Haiku driver copied it, and never reached the requalify agent or the fixer. A slot needs no prompt at all. **The cap is read off disk every wave, never baked into `CFG`**: a baked copy is one more value the main agent must remember to transcribe, and a missed transcription is the same silent parallel run. For the same reason a snapshot that omits `maxParallel` is a `(scout)` failure rather than "no cap", and a malformed header is a parse error in `errors`. The watch is sized by slots, so a serial task's `SUSPECTED SIBLING INTERFERENCE` deferral is refused — there is no sibling. **Serial prose is only an advisory.** `lint-task.ts <tasks-dir>` prints `[serial-undeclared]` when PLAN.md or `_context/*.md` asks for serial execution or a lock without the header; it is not a violation because the matching wording in real plans (2 of ~20 on one machine, before the pattern was narrowed) was already enforced by `Depends on` edges. **Residual:** an external live delegate whose pane was left open and still writing after its driver returned holds no slot, so the next task can start beside it — the same uncounted writer the deferral note above accepts.
+- **A single-task resume replaces the wave loop, and gets a whole fresh cap.** `CFG.resumeTask` runs one `executeTask` and no scout: there is no tree to read, and the ref, path and `finalReview` flag come from `CFG` because nothing downstream re-derives them. `CFG.resumeAttempt` only moves where the numbering *starts* — the task still gets `maxAttempts` (or `finalReviewMaxAttempts`) rungs, because a resume is a fresh flight for that task and the number exists so the flightlog and the `score-task.ts --log` verdict rows keep rising instead of colliding with the parked run's. **That is why every rung is keyed off `last` (`first + cap - 1`) and never off `cap`.** Two things break otherwise, both silently. `for (let attempt = 3; attempt <= FINAL_MAX; …)` is false on entry, so the loop body never runs and the task is re-parked having executed nothing — which reads exactly like "it tried again and still failed". And `attempt >= claudeCap` is already true on the first rung, so a resumed Claude ladder runs Opus immediately and never runs Sonnet at all, quietly tripling the cost of a resumed dev step. With `first` at 1 the two are equal and every existing ladder is byte-identical. The loop is written `while (!RESUME)` rather than wrapped in an `if/else` on purpose: an else-wrapper re-indents 240 lines and buries the actual change in a diff nobody can read.
+
+- **`CFG.resumeFrom` skips steps on the resumed attempt only.** `startAt` is `RESUME.from` when `attempt === first`, and `'dev'` on every later attempt. So a resumed attempt that fails its gate runs the *whole* pipeline next time, including the Final review's four-lens round. That is the right default and not a missed optimisation: a red verify says the work below it genuinely does need redoing, and the alternative — a task looping forever on a verifier re-reading the same unchanged tree — is worse than paying for the round. `'judge'` synthesises `gate` rather than skipping it, because `gate.summary` is read downstream by the judge prompt and by `rejectionOf`; a skipped gate would hand both of them `undefined`.
+
+- **Skipping the binary gate requires a signed artifact, and the attestation is scoped to the items it names.** `resumeFrom: 'judge'` throws at script start without `CFG.attestationFile`. The alternative was a free-text `--evidence` string, and it was rejected: once *any* wording can stand in for the gate, every red task can be passed by asserting a person checked it, and no later reader can tell an honest attestation from a convenient one. So the file must name **which gate items** were performed, quoting each as the task file writes it; the verifier is told to reject an entry that is not an item of that task, and never to treat the attestation as ranking above a command. The residual is honest and unclosable from inside the script: a person who signs for a check they did not perform gets the pass, and all the design buys is that the claim is specific, on disk, and attributable. `resumeFrom: 'verify'` needs no attestation — it runs the real gate and only adds evidence.
+
+- **A `(human)` gate item is declared by the plan, skipped by the verifier, and reported at the end of the run.** The tag sits at the head of a gate item (`- [ ] (human) …`) and means no command can perform it — a pointer sweep, a hardware toggle, a click on a menu-bar app. Before this, such an item guaranteed a park: the verifier could only fail it, so the task burned every attempt and stopped the tree on work that was correct. Now the verifier leaves it alone, returns it in `humanPending`, and the task passes on its machine-checkable half; the orchestrator collects those into `needsHuman` and the main agent prints them as a closing checklist. Three rules keep that from becoming a pass key. The **plan author** declares the tag, with the same authority that wrote the criterion — a verifier may never add one, and an item it merely finds hard to run must be left to fail, because an uncheckable item is a plan defect. **`lint-task.ts`'s `human-gate` rule refuses a gate section whose items are all tagged**, so a tagged plan always leaves the verifier real work; that rule is what stops the tag from hollowing out the binary gate one item at a time. And `humanPending` is taken from the **passing** gate only — a failed attempt is retried, and its verifier re-derives the same list, so carrying a rejected attempt's list forward would report every item twice. **Known residual:** `mark-done.ts` ticks a `(human)` box like any other, so the task file alone cannot tell you a person still owes a check. `RUNLOG.md` and the run result are where that lives, which is why the verifier's flightlog message ends with `NEEDS HUMAN: <n> item(s)`.
+
 - **Do NOT give the dev agent `isolation: 'worktree'`.** It looks like the fix for tasks that mutate shared files in parallel, and it breaks every run: the dev's edits land in a private worktree that is never merged back, while `verify` and `judge` run in the main tree and see nothing. Every attempt then fails its binary gate and every task parks. Isolation would have to wrap a task's whole dev→verify→judge→score pipeline, which separate `agent()` calls cannot express. For real parallel conflicts, sequence the conflicting tasks instead — add a `Depends on` edge between them in the flightplan so `next-ready` never offers them in the same wave. When every task conflicts through one shared resource, declare `> **Max parallel**: 1` in PLAN.md instead of chaining every pair.

@@ -9,7 +9,7 @@ when_to_use: >-
   ("/autopilot", "fly the plan", "work through the tasks"). Do NOT trigger
   when no flightplan exists on disk yet (use flightplan first), or for a
   single task done by hand.
-argument-hint: "<slug|path>"
+argument-hint: "<slug|path> [--task <ref> --from dev|verify|judge] [--attest <file>]"
 ---
 
 # Autopilot
@@ -42,6 +42,34 @@ Three hard constraints shape the design. Internalize them:
 1. **The Workflow orchestrator script has no filesystem access.** It also **cannot `import`** our scripts. Anything that reads or writes disk — running `next-ready.ts`, editing a task's `Status`, appending to the flightlog — must run inside a tool-capable **agent** in the workflow. The orchestrator JS must never do this work.
 2. **There is exactly one scoring implementation.** The rubric judge runs `score-task.ts --json --log`. The orchestrator gates on that printed verdict object. Do not duplicate the weighted-average or hard-fail arithmetic in the Workflow script.
 3. **The orchestrator can't pause for input.** On a task that can't pass, it parks the task and keeps going. Escalation to the user happens *after* the workflow returns. See Escalation below.
+
+## Resume one task at a chosen step (`--task <ref> --from <step>`)
+
+When the user names a task and a step, **do not run the flight above**. Run a single-task resume instead: one pipeline, no scout, no wave loop.
+
+```
+/autopilot <slug> --task review/01 --from verify --attest docs/<slug>/.flightlog/attested.md
+```
+
+The case it exists for: a task parked with its expensive work already correct and on disk. A Final review whose four lenses and Opus fixer both landed, failing only on a criterion a person had to walk, costs that entire round again to reach one Haiku verify. `--from` re-enters below the work that already landed.
+
+`--from` takes `dev`, `verify`, or `judge`. Everything before that step is taken as already satisfied, **on the resumed attempt only** — if that attempt fails its gate, the next one runs the whole pipeline, because a red verify means the skipped work genuinely does need redoing.
+
+Scout only what a single task needs, then bake it into `CFG`:
+
+1. Resolve `$SCRIPTS` and `$OWN` exactly as Step 1 does, and the repo root with `git rev-parse --show-toplevel`.
+2. Resolve the task file itself — `<root>/docs/<slug>/tasks/<bucket>/<NN>-*.md` — as an absolute path, into `CFG.resumeTaskPath`. There is no scout to derive it, so the orchestrator throws on an empty one rather than letting an agent read a file that is not there.
+3. Read that file's header. Set `CFG.resumeFinalReview` from its `> **Final review**:` line.
+4. Read the flightlog for the highest attempt already recorded on that ref, and set `CFG.resumeAttempt` to one more. The numbering must keep rising: `score-task.ts --log` keys its verdict rows on ref plus attempt, and `fleet.ts` keeps the first row for a key, so reusing a number leaves the trail contradicting the run.
+   ```bash
+   grep -o '"attempt":[0-9]*' docs/<slug>/.flightlog/run.jsonl | sort -t: -k2 -n | tail -1
+   ```
+5. Set `CFG.resumeTask` to the ref and `CFG.resumeFrom` to the step. Leave every other field as a normal flight would have it — `baseRef`, `planGoal`, and the engine picks all still apply, because a failed resumed attempt runs the full round.
+6. Launch flightdeck as usual, and report as Step 4 does.
+
+**Carrying what a person checked.** `--attest <file>` sets `CFG.attestationFile` to an absolute path. Write the file first, or point at one the user already wrote. It must name **which gate items** a person performed, quoting each item as the task file writes it, plus when. The verifier reads it, treats only the items it names as satisfied, and rejects any entry that is not an item of that task. It is not a blanket pass: every unnamed item is still run, and a red command still fails the attempt however the attestation is worded.
+
+`--from judge` **requires** `--attest`. It skips the binary gate entirely, so a person performed that gate and has to sign for it — without the file the judge would score correctness against no evidence at all, and the orchestrator throws at script start rather than let that run.
 
 ## Step 1 — Scout inline
 
@@ -178,6 +206,7 @@ After the workflow returns:
    ```
    This writes `docs/<slug>/.flightlog/RUNLOG.md`: every attempt and verdict, each linked to its agent label for drill-down.
 2. Tell the user: tasks completed, tasks escalated and why, and where `RUNLOG.md` lives. If everything passed, including Final review, say so plainly and point at what to verify or ship.
+3. **Report `needsHuman` separately from `escalations`.** It lists `{ task, criteria }` for every `(human)` gate item that passed without a machine check and without an attestation. Those tasks are genuinely `done` — nothing is parked and nothing needs resetting — so print them as a closing checklist of what the user still owes, quoting each criterion. Say plainly that `mark-done.ts` ticked those boxes like any other, so the task file alone no longer shows the check is outstanding.
 
 The rest of this document is reference material.
 
@@ -200,6 +229,8 @@ This policy is encoded as a constant table at the top of the orchestrator, so it
 
 The **correctness** dimension must be grounded in **real verification**, not the judge's vibe. The binary gate agent actually runs the task's `## Verification` commands and checks its `## Acceptance criteria`; its pass/fail result and raw output go to the rubric judge, which scores correctness against *that evidence*. The gate must pass before the judge runs at all, so a high correctness score can never sit on top of a failed verification.
 
+**Two carve-outs, both declared by a person, never decided by an agent.** A gate item tagged `(human)` in the task file is skipped by the verifier, reported as pending, and surfaced at the end of the run — the plan's author declared that no command can perform it, and `lint-task.ts` refuses a gate section whose items are *all* tagged, so the verifier always keeps real work. A `--from judge` resume replaces the verifier's evidence with a signed attestation file, and the judge is told to treat every item that file does not name as unverified. An agent may never widen either carve-out: a verifier that finds an item hard to run must let it fail, because an item nobody can check is a plan defect.
+
 ## Escalation — park & continue, then resume
 
 A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or `finalReviewMaxAttempts` for the Final review), or an infrastructure failure stopped it from being judged at all. Either way:
@@ -207,7 +238,11 @@ A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or
 1. The orchestrator **parks** the task at `Status: blocked`, records an escalation, and **keeps flying** the other independent tasks. Dependents of a parked task never become ready, so they wait.
 2. The workflow returns `{ slug, completed: [...], escalations: [{ task, attempt, infrastructure, parked, reason }] }`. The `reason` already embeds the last verdict — the judge's rationale, the binary gate's output, the infrastructure cause, or the scout error.
 3. **You** (the main agent) surface each escalation with its `reason`. In an active cockpit session, hand the stick back via `needs_your_call` + `cockpit wait`; otherwise use `AskUserQuestion`.
-4. After the user unblocks a task, **resume**: reset its `Status` to `todo` and re-run autopilot. Completed tasks stay `done`, so `next-ready` only re-offers the unblocked work.
+4. After the user unblocks a task, **resume**. Two ways, and the cheaper one is usually right:
+   - **Re-enter at a step** — `--task <ref> --from verify|judge`, when the work below that step already landed and is on disk. Leaves `Status` at `blocked`; the resume marks it `done` itself. See "Resume one task at a chosen step" above.
+   - **Re-run the whole task** — reset its `Status` to `todo` and re-run autopilot. Completed tasks stay `done`, so `next-ready` only re-offers the unblocked work. Use this when what failed is the work itself.
+
+**A parked task's source edits are uncommitted.** Every commit in the parking run held back the paths that task declares, so its work sits in the working tree. Whichever resume path you take, the run that finally passes it is what commits them.
 
 **Read the two flags before you report.** `infrastructure: true` means nothing was judged — say that verification did not run or returned no verdict, not that the work was rejected. `parked: false` means the park itself failed, so the file still reads `in-progress` and `next-ready` will not re-offer it; tell the user to reset that Status by hand before resuming.
 

@@ -52,7 +52,11 @@ Repeat these steps by hand, one wave at a time:
    in the **dev role**, giving it the task file path and the instruction to
    implement that task.
 3. Run that task's own `## Verification` commands yourself, and check its
-   `## Acceptance criteria`.
+   `## Acceptance criteria`. **Skip any gate item written `- [ ] (human) …`** —
+   the plan declares that no command can perform it. Do not attempt it, do not
+   fail the task for it, and collect it in a list you report at the end of the
+   run. Every untagged item is yours as before, and you may never add the tag
+   yourself: an item you find unrunnable is a plan defect, so let it fail.
 4. Spawn a second subagent through the **task tool** in the **judge role**, to
    score the task against its `## Eval rubric`.
 5. Write the judge's rationale to a file, then run `bun $SCRIPTS/score-task.ts
