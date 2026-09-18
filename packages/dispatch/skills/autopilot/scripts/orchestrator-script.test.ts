@@ -51,9 +51,14 @@ type ScoutResult = {
   stdout: string;
   exitCode: number;
   stderr: string;
+  /** The scout's structured copy of the cap; optional so a scout can omit it. */
+  maxParallel?: unknown;
 } | null;
 
-const snapshot = (tree: object, exitCode = 0): ScoutResult => ({
+const snapshot = (
+  tree: Record<string, unknown>,
+  exitCode = 0,
+): ScoutResult => ({
   stdout: JSON.stringify({
     ready: [],
     unfinished: [],
@@ -64,6 +69,7 @@ const snapshot = (tree: object, exitCode = 0): ScoutResult => ({
   }),
   exitCode,
   stderr: "",
+  maxParallel: "maxParallel" in tree ? tree.maxParallel : null,
 });
 
 type RunResult = {
@@ -2387,14 +2393,44 @@ describe("plan concurrency cap", () => {
     expect(labels).toContain("dev:ui/main#2");
   });
 
-  // An older or mangled scout that drops the field must not read as "no cap":
-  // that is the silent parallel run a serial plan exists to prevent.
-  test("a snapshot missing maxParallel escalates as a scout failure", async () => {
-    const { maxParallel: _dropped, ...rest } = JSON.parse(
-      capped(["ui/01"], 1)!.stdout,
-    );
+  // wf_84deb543-ea1: the Haiku scout transcribed stdout through "errors":[]} and
+  // dropped the trailing field. The structured copy is what the run trusts.
+  test("stdout missing maxParallel still runs on the structured cap", async () => {
+    const scout = capped(["ui/01", "ui/02"], 1)!;
+    const { maxParallel: _dropped, ...rest } = JSON.parse(scout.stdout);
+    const first = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [{ ...scout, stdout: JSON.stringify(rest) }, complete(2)],
+      devHolds: { "ui/01": first.held },
+      agentCalls: calls,
+    });
+
+    await waitForCall(calls, "dev:ui/01#1");
+    for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+    expect(calls).not.toContain("dev:ui/02#1");
+    first.release();
+    const { result } = await run;
+
+    expect(result.escalations).toEqual([]);
+    expect(result.completed).toEqual(["ui/01", "ui/02"]);
+  });
+
+  // A scout that omits the structured cap must not read as "no cap": that is
+  // the silent parallel run a serial plan exists to prevent.
+  test("a scout missing the structured maxParallel escalates", async () => {
+    const { maxParallel: _dropped, ...scout } = capped(["ui/01"], 1)!;
+    const { result, labels } = await runOrchestrator({ scouts: [scout] });
+
+    expect(result.escalations[0].task).toBe("(scout)");
+    expect(result.escalations[0].reason).toContain('"maxParallel"');
+    expect(labels.some((label) => label.startsWith("dev"))).toBe(false);
+  });
+
+  // Two copies that disagree mean one is wrong, and nothing says which.
+  test("a structured cap that contradicts stdout escalates", async () => {
     const { result, labels } = await runOrchestrator({
-      scouts: [{ stdout: JSON.stringify(rest), exitCode: 0, stderr: "" }],
+      scouts: [{ ...capped(["ui/01"], 1)!, maxParallel: null }],
     });
 
     expect(result.escalations[0].task).toBe("(scout)");
