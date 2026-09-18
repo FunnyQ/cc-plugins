@@ -29,6 +29,7 @@ import {
   type NoteEntry,
   type StateEntry,
 } from "./lib/flightlog";
+import { resumePoint, tasksIn } from "./lib/resume-point";
 
 /** Build a flightlog note entry from narrative metadata (pure). */
 export function buildNoteEntry(meta: {
@@ -142,6 +143,67 @@ async function main() {
     return;
   }
 
+  if (cmd === "progress") {
+    if (!logFile) usage();
+    const entries = await readLog(logFile);
+    const task = flagValue(rest, "--task");
+    const json = rest.includes("--json");
+
+    if (!task) {
+      const points = tasksIn(entries)
+        .map((ref) => resumePoint(entries, ref))
+        .filter((point): point is NonNullable<typeof point> => point !== null);
+      if (json) {
+        console.log(JSON.stringify(points, null, 2));
+        return;
+      }
+      if (points.length === 0) {
+        console.log("no attempts recorded in this trail");
+        return;
+      }
+      const width = Math.max(...points.map((point) => point.task.length));
+      for (const point of points) {
+        console.log(
+          `${point.task.padEnd(width)}  last attempt ${point.last.attempt} · resume --from ${point.from} --attempt ${point.attempt}${point.gateRejected ? " (gate rejected the work)" : ""}`,
+        );
+      }
+      return;
+    }
+
+    const point = resumePoint(entries, task);
+    if (!point) {
+      // Not an error: a task that never ran has nothing to resume from, and the
+      // caller needs to tell that apart from a trail it failed to read.
+      console.log(`no attempts recorded for ${task}`);
+      return;
+    }
+    if (json) {
+      console.log(JSON.stringify(point, null, 2));
+      return;
+    }
+    const steps = point.last.steps
+      .map((step) => `${step.role}${step.completed ? " ✓" : " …"}`)
+      .join(" · ");
+    const verdict = point.last.verdict
+      ? `${point.last.verdict.weighted.toFixed(2)} ${point.last.verdict.passed ? "PASS" : "FAIL"}`
+      : "none recorded";
+    console.log(`task       ${point.task}`);
+    console.log(`attempts   ${point.attempts.join(", ")}`);
+    console.log(
+      `last       attempt ${point.last.attempt} — ${steps || "no pipeline steps recorded"}`,
+    );
+    console.log(`verdict    ${verdict}`);
+    console.log(`resume     --from ${point.from} --attempt ${point.attempt}`);
+    console.log(`reason     ${point.reason}`);
+    if (point.gateRejected) {
+      console.log(
+        `note       a gate REJECTED this work, so the trail cannot support a later restart. ` +
+          `Only a person who has since satisfied the failing items may override with --from verify --attest <file>.`,
+      );
+    }
+    return;
+  }
+
   if (cmd === "report") {
     if (!logFile) usage();
     const entries = await readLog(logFile);
@@ -167,6 +229,7 @@ function usage(): never {
       "Usage:",
       "  bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] [--agent <label>] [--phase <start|end>] [--message <text>]",
       "  bun flightlog.ts state <logfile> --task <ref> --state done|blocked|failed [--agent <label>] [--message <why>]",
+      "  bun flightlog.ts progress <logfile> [--task <ref>] [--json]",
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
     ].join("\n"),
   );

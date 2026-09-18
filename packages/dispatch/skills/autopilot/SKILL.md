@@ -55,15 +55,25 @@ The case it exists for: a task parked with its expensive work already correct an
 
 `--from` takes `dev`, `verify`, or `judge`. Everything before that step is taken as already satisfied, **on the resumed attempt only** — if that attempt fails its gate, the next one runs the whole pipeline, because a red verify means the skipped work genuinely does need redoing.
 
-Scout only what a single task needs, then bake it into `CFG`:
+**Derive the step and the attempt from the trail; do not ask the user to remember them.** The flightlog records every role's start and end plus each attempt's verdict, so where the run stopped is on disk:
+
+```bash
+bun $SCRIPTS/flightlog.ts progress docs/<slug>/.flightlog/run.jsonl --task <ref>
+```
+
+It prints `resume --from <step> --attempt <n>` with the evidence that chose it. Use those values unless the user names their own. Run it with no `--task` to see every task's resume point at once, which is how you pick the ref when the user says only "resume".
+
+Two rules govern what it will and will not suggest, and both are deliberate:
+
+- **It never suggests `judge`.** Skipping the binary gate means a person performed it and signed for it — a human decision no trail can make. And the judge grounds correctness in the verifier's *raw* evidence, which lives only in the orchestrator's memory and dies with the run; the trail keeps the verifier's one-line message, not its output. So `verify` is the earliest point the trail can honestly support.
+- **It restarts at `dev` when a gate or judge rejected the work.** That is not the run dying — it is a verdict on real code, and restarting above it would take rejected work as satisfied. The output says so on a `note` line. Only a person who has since satisfied the failing items may override, with `--from verify --attest <file>`.
+
+Then scout what a single task needs and bake it into `CFG`:
 
 1. Resolve `$SCRIPTS` and `$OWN` exactly as Step 1 does, and the repo root with `git rev-parse --show-toplevel`.
 2. Resolve the task file itself — `<root>/docs/<slug>/tasks/<bucket>/<NN>-*.md` — as an absolute path, into `CFG.resumeTaskPath`. There is no scout to derive it, so the orchestrator throws on an empty one rather than letting an agent read a file that is not there.
 3. Read that file's header. Set `CFG.resumeFinalReview` from its `> **Final review**:` line.
-4. Read the flightlog for the highest attempt already recorded on that ref, and set `CFG.resumeAttempt` to one more. The numbering must keep rising: `score-task.ts --log` keys its verdict rows on ref plus attempt, and `fleet.ts` keeps the first row for a key, so reusing a number leaves the trail contradicting the run.
-   ```bash
-   grep -o '"attempt":[0-9]*' docs/<slug>/.flightlog/run.jsonl | sort -t: -k2 -n | tail -1
-   ```
+4. Set `CFG.resumeAttempt` to the `--attempt` the progress command printed. The numbering must keep rising: `score-task.ts --log` keys its verdict rows on ref plus attempt, and `fleet.ts` keeps the first row for a key, so reusing a number leaves the trail contradicting the run.
 5. Set `CFG.resumeTask` to the ref and `CFG.resumeFrom` to the step. Leave every other field as a normal flight would have it — `baseRef`, `planGoal`, and the engine picks all still apply, because a failed resumed attempt runs the full round.
 6. Launch flightdeck as usual, and report as Step 4 does.
 
@@ -238,7 +248,7 @@ A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or
 1. The orchestrator **parks** the task at `Status: blocked`, records an escalation, and **keeps flying** the other independent tasks. Dependents of a parked task never become ready, so they wait.
 2. The workflow returns `{ slug, completed: [...], escalations: [{ task, attempt, infrastructure, parked, reason }] }`. The `reason` already embeds the last verdict — the judge's rationale, the binary gate's output, the infrastructure cause, or the scout error.
 3. **You** (the main agent) surface each escalation with its `reason`. In an active cockpit session, hand the stick back via `needs_your_call` + `cockpit wait`; otherwise use `AskUserQuestion`.
-4. After the user unblocks a task, **resume**. Two ways, and the cheaper one is usually right:
+4. After the user unblocks a task, **resume**. Run `flightlog.ts progress --task <ref>` first — it names which of these two the trail supports:
    - **Re-enter at a step** — `--task <ref> --from verify|judge`, when the work below that step already landed and is on disk. Leaves `Status` at `blocked`; the resume marks it `done` itself. See "Resume one task at a chosen step" above.
    - **Re-run the whole task** — reset its `Status` to `todo` and re-run autopilot. Completed tasks stay `done`, so `next-ready` only re-offers the unblocked work. Use this when what failed is the work itself.
 
@@ -270,6 +280,7 @@ You run three of them yourself, all in the sibling `skills/flightplan/scripts/` 
 - `next-ready.ts <tasks-dir> [--json | --summary]` — the scout of Step 1 and of every wave. **`--summary` is what the orchestrator uses**: one `{ready, counts, unfinished, invalid, errors}` object, printed even when the command exits 1, so a malformed tree still names its refs. It exits non-zero rather than return a ready set that would unlock work behind a fake `done`.
 - `lint-task.ts <tasks-dir | task-file>` — run it during scout when `next-ready` reports a malformed tree, and fix the tree before flying.
 - `flightlog.ts report <run.jsonl>` — Step 4's audit render. `flightlog.ts log` is the in-run narrative entry point.
+- `flightlog.ts progress <run.jsonl> [--task <ref>] [--json]` — where a task stopped, and the `--from` / `--attempt` a resume should use. Read it before every resume; never hand-count attempts out of the JSONL.
 
 Plus `bun "$OWN"/flightdeck.ts` for the monitor — the one file the launch step runs from autopilot's own `scripts/` directory, whose other modules are flightdeck's server, launcher, and pure derivations, each with a `.test.ts` beside it.
 
