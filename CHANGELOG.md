@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 4.3.2] - 2026-09-19
+
+_tracks tag `dispatch-v4.3.2`_
+
+### Fixed
+- Autopilot no longer dies in a wave with `"maxParallel" is not null or a positive integer (got undefined)` when its Haiku scout drops the trailing `maxParallel` field while transcribing `next-ready.ts`'s summary. The scout now returns `maxParallel` as its own structured field, and the orchestrator reads the cap from it. A missing structured value, or one that contradicts stdout, still escalates as a scout failure rather than being read as "no cap".
+
 ## [guard 0.5.1] - 2026-09-18
 
 _tracks tag `guard-v0.5.1`_
