@@ -182,7 +182,8 @@ export async function sweep(payload: Payload): Promise<string | null> {
     if (added instanceof Set ? added.size === 0 : added.length === 0) continue;
 
     const blocks = flaggedBlocks(text, syntaxFor(file)!, added);
-    if (blocks.length > 0) reasons.push(formatReason(file, blocks));
+    if (blocks.length > 0)
+      reasons.push(formatReason(file, blocks, "🧹 comment-sweep"));
   }
   return reasons.length > 0 ? reasons.join("\n\n") : null;
 }

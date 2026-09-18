@@ -39,7 +39,9 @@ describe("sweep", () => {
     await snapshot(payload);
     await Bun.write(join(repo, "app.ts"), BLOCK);
     const reason = await sweep(payload);
-    expect(reason).toContain("1 comment block(s), 3 lines, in app.ts");
+    expect(reason).toContain(
+      "🧹 comment-sweep: 1 comment block(s), 3 lines, in app.ts",
+    );
     expect(reason).toContain("+ 2  // one");
   });
 

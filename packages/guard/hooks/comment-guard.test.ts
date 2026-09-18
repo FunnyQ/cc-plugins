@@ -690,7 +690,7 @@ describe("formatReason", () => {
       ["# three"],
     );
     expect(formatReason("a.rb", blocks)).toBe(
-      "comment-guard: 1 comment block(s), 3 lines, in a.rb.\n" +
+      "💬 comment-guard: 1 comment block(s), 3 lines, in a.rb.\n" +
         "Answer for every line marked +: does it say why, or what? " +
         "Delete the ones that say what.\n" +
         "  a.rb:2-4\n" +

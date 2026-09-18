@@ -418,10 +418,14 @@ export function flaggedBlocks(
   return blocks;
 }
 
-export function formatReason(fileName: string, blocks: CommentBlock[]): string {
+export function formatReason(
+  fileName: string,
+  blocks: CommentBlock[],
+  label = "💬 comment-guard",
+): string {
   const total = blocks.reduce((n, b) => n + b.height, 0);
   const out = [
-    `comment-guard: ${blocks.length} comment block(s), ${total} lines, in ${fileName}.`,
+    `${label}: ${blocks.length} comment block(s), ${total} lines, in ${fileName}.`,
     `Answer for every line marked +: does it say why, or what? Delete the ones that say what.`,
   ];
 
