@@ -1,5 +1,12 @@
 # Changelog
 
+## [guard 0.5.1] - 2026-09-18
+
+_tracks tag `guard-v0.5.1`_
+
+### Fixed
+- comment-sweep's Stop-hook report was labeled identically to comment-guard's own, so a user couldn't tell which hook had flagged a comment block. Sweep reports now carry their own "🧹 comment-sweep" label, distinct from comment-guard's "💬 comment-guard".
+
 ## [guard 0.5.0] - 2026-09-18
 
 _tracks tag `guard-v0.5.0`_
