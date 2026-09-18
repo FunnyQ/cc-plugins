@@ -1,5 +1,16 @@
 # Changelog
 
+## [dispatch 4.3.0] - 2026-09-18
+
+_tracks tag `dispatch-v4.3.0`_
+
+### Added
+- A flightplan gate item can now be tagged `- [ ] (human) ...` to declare that no command can check it. Autopilot's verifier skips a tagged item instead of failing the task for it, and reports it as still owed once the run ends — so a correct task with one real-person check (a pointer sweep, a toggle click) no longer burns every attempt and parks the whole tree. A new `human-gate` lint rule rejects a gate section where every item is tagged, so a binary gate always keeps at least one machine-checkable item.
+- `/autopilot <slug> --task <ref> --from dev|verify|judge` re-enters a single parked task's pipeline at a named step, skipping the scout and the wave loop over the rest of the tree. A `judge` re-entry requires `--attest <file>` naming which gate items a person actually performed, quoted verbatim from the task file — a free-text evidence string is rejected, since once any wording can stand in for the gate, no later reader can tell an honest attestation from a convenient one.
+
+### Fixed
+- A resumed task's attempt counting now keys off the ladder's actual last attempt instead of its cap, so a resumed run's retry loop executes instead of silently reading as "tried again, still failed," and a resumed Claude ladder no longer skips straight to Opus and triples cost.
+
 ## [dispatch 4.2.1] - 2026-09-18
 
 _tracks tag `dispatch-v4.2.1`_
