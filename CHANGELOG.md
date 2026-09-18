@@ -1,5 +1,19 @@
 # Changelog
 
+## [guard 0.5.0] - 2026-09-18
+
+_tracks tag `guard-v0.5.0`_
+
+### Added
+- A new turn-level comment-sweep hook now catches comment blocks written through `Bash` (`sed -i`, heredocs, codegen) — previously only `Edit`/`Write` calls were checked, so a comment slipped in through a shell command went unreviewed. The sweep shares comment-guard's own rules (re-indenting isn't an addition, a 3-line threshold, the file header is exempt) and tracks what's already been asked so a block edited then swept isn't asked twice. A turn touching more than 20 guarded files is skipped, since that pattern is a checkout, pull, or formatter rather than authored comments.
+
+## [dispatch 4.3.1] - 2026-09-18
+
+_tracks tag `dispatch-v4.3.1`_
+
+### Added
+- A new `flightlog.ts progress` command derives where a parked autopilot task should resume from — the step, the attempt, and the evidence behind that choice — instead of requiring a hand count of attempts from the raw JSONL trail. Autopilot's single-task resume and escalation-resume flows now both use it. It never proposes resuming at the judge step, since skipping the gate is a human sign-off no trail can substitute for.
+
 ## [dispatch 4.3.0] - 2026-09-18
 
 _tracks tag `dispatch-v4.3.0`_
