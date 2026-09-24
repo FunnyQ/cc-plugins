@@ -214,17 +214,19 @@ Hook parity — which Claude hooks port to which OpenCode events:
 | Plugin | Hook | Command | Ported to OpenCode? |
 |---|---|---|---|
 | monitor | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup.ts --session-check` | **No** — dead code outside Claude Code: it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work (statusline-path migration, reaping orphaned Claude processes) is Claude-only |
-| monitor | `SessionStart` (same matcher) | `skills/cockpit/scripts/decision-log-start.ts` | Yes → `session.created` |
-| monitor | `Stop` | `skills/cockpit/scripts/scribe-nudge.ts` | Yes → `session.idle` |
+| monitor | `SessionStart` (same matcher) | `skills/cockpit/scripts/decision-log-start.ts` | Yes → `session.created` event, delivered by the `session.hook("context")` system prompt |
+| monitor | `Stop` | `skills/cockpit/scripts/scribe-nudge.ts` | Yes → `session.idle` event, same delivery |
 | chronicle | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup-spawn-depth.ts --session-check` | **Moved** — becomes the installer's `subagent_depth` write |
-| chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.execute.before` |
-| dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
-| guard | `PostToolUse` (matcher `Edit\|Write`) | `hooks/comment-guard.ts` | Yes → `tool.execute.after`, sharing the event with the lint |
+| chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.hook("execute.before")` on the `shell` tool |
+| dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | Yes → `tool.hook("execute.after")` |
+| guard | `PostToolUse` (matcher `Edit\|Write`) | `hooks/comment-guard.ts` | Yes → `tool.hook("execute.after")`, sharing the hook with the lint |
 | guard | `UserPromptSubmit` + `Stop` | `hooks/comment-sweep.ts snapshot` / `sweep` | **No** — `session.idle` has no way to hand a reason back to the model |
 
-OpenCode has no hook-level "ask" — a plugin's `tool.execute.before` handler can only let a call through or throw. The branch guard degrades accordingly: instead of returning an `ask` permission decision, it throws `check-branch.sh`'s own `systemMessage` verbatim, turning what is a prompt on Claude Code into a hard block on OpenCode.
+The module targets OpenCode's **V2 plugin API** and loads on 2.x only: a default export `{ id, setup(ctx) }`, hooks registered through `ctx.session.hook` / `ctx.tool.hook`, events read from `ctx.event.subscribe`. Read V2 shapes off the installed binary (`strings ~/.opencode/bin/opencode`), never off GitHub `dev` — the two diverged, and `dev` still ships V1. Verified on 2.0.16: the shell tool is `shell` (V1 `bash`), write/edit name the file `path` (V1 `filePath`), and the after-hook feeds the model by mutating `result.content`.
 
-The module itself carries four constraints, each a trap if broken: it is a single file; it imports nothing from anywhere else in this repo, even a helper worth sharing stays module-local; it derives the repo root from `dirname(import.meta.dir)`, never a config file; and it never reads a harness environment variable — Claude's and Codex's own vars must stay meaningless to it.
+OpenCode has no hook-level "ask" — a plugin's `execute.before` hook can only let a call through or throw. The branch guard degrades accordingly: instead of returning an `ask` permission decision, it throws `check-branch.sh`'s own `systemMessage` verbatim, turning what is a prompt on Claude Code into a hard block on OpenCode.
+
+The module itself carries four constraints, each a trap if broken: it is a single file; it imports nothing from anywhere else in this repo, even a helper worth sharing stays module-local — nor from `@opencode-ai/*`, because bare imports resolve from the symlink's directory, so its V2 types are declared locally; it derives the repo root from `dirname(import.meta.dir)`, never a config file; and it never reads a harness environment variable — Claude's and Codex's own vars must stay meaningless to it.
 
 **Version policy.** `opencode/` is repo infrastructure, not a release component. This work bumps no `plugin.json`, cuts no `<plugin>-vX.Y.Z` tag, and adds no `CHANGELOG.md` entry — it belongs to no plugin, so none of them owns a version bump for it.
 

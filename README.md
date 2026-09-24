@@ -107,6 +107,8 @@ After installing a Codex plugin, start a new Codex session so the skill list is 
 
 There is no plugin registry step. The repo is the single source of truth: `opencode/install.ts` symlinks skills, agents, commands, and the plugin module straight into `~/.config/opencode/`, so an update to the checkout is live immediately — no reinstall, no rebuild.
 
+**Requires OpenCode 2.x.** The plugin module targets OpenCode's V2 plugin API (default export `{ id, setup }`). OpenCode 1.x reads a different shape, so on 1.x the module fails to load and none of its hooks run. The skills, agents, and commands do not depend on the plugin module.
+
 ```bash
 bun opencode/install.ts --check     # report what is and is not wired
 bun opencode/install.ts --apply     # symlink everything, raise subagent_depth

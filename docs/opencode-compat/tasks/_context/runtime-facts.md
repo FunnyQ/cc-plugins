@@ -20,6 +20,8 @@ Sandbox recipe: a probe plugin module that logs every event it receives, plus a 
 
 Answer **S7 and S8 first** — both can invalidate the tree's shape rather than just fill in a blank.
 
+> **V2 supersedes the hook shapes below.** Every entry here was observed on opencode 1.18.18 (the V1 plugin API). On 2.0.16 the module shape, hook names, event payload, shell tool name, and file field all changed. Read the V1→V2 table in `opencode/references/opencode-runtime.md` before you act on S3, S4, S5, S11, S18, S19, S20, or S21.
+
 ---
 
 ## S7 — Do cross-directory imports survive the skill symlink? *(answer first)*

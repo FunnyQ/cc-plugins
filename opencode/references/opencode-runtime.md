@@ -8,6 +8,28 @@ Seventeen of eighteen items are resolved from observed behavior. Only S12 remain
 
 ---
 
+## V2 — what changed on opencode 2.0.16 ⚠️ READ FIRST
+
+OpenCode 2.x replaced the plugin API. Every hook-shape item below (S3, S4, S5a, S5b, S5c, S11, S18, S19, S20, S21) was observed on 1.18.18 and describes V1. Their *decisions* still hold — seed synchronously, ride up to `PUSH_CAP` requests, materialize once, translate camelCase — but the names and shapes changed. `plugin.ts` targets V2 and does not load on 1.x.
+
+Read off the 2.0.16 binary (`strings ~/.opencode/bin/opencode`), 2026-09-24. GitHub `dev` (latest release v1.18.32) still ships V1, so it is the wrong source for V2 shapes.
+
+| Concern | V1 (1.18.18) | V2 (2.0.16) |
+|---|---|---|
+| Module shape | exported `async (ctx) => hooks` function | default export `{ id, setup(ctx) }`; the loader reads `.default` alone and rejects anything else with `Plugin must export a default definition with an id and an effect or setup function.` |
+| Cleanup | none | `setup`'s returned function |
+| Working dir (S11) | `ctx.directory` / `ctx.worktree` | `ctx.location.directory` |
+| Events (S1/S20) | `event` hook, `event.properties.sessionID`, dispatched without await | `ctx.event.subscribe({ signal })` async iterable, `event.data.sessionID` |
+| System prompt (S19/S21) | `experimental.chat.system.transform`, `output.system: string[]` | `ctx.session.hook("context", cb)`, `event.system` holds `{ type: "text", text }` parts |
+| Before hook (S3/S5a) | `tool.execute.before(input, output)`, args on `output.args` | `ctx.tool.hook("execute.before", cb)`, args on `event.input`; a throw still blocks |
+| After hook (S4/S5a) | `tool.execute.after(input, output)`, append to `output.output` | `ctx.tool.hook("execute.after", cb)`, `{ status, result: { content } }`; the runtime reads `result.content` back after the hook |
+| Shell tool (S5b) | `bash` | `shell` |
+| File field (S5c) | `filePath` | `path` (write: `path`, `content`; edit: `path`, `oldString`, `newString`) |
+| Failure log (S19) | `client.app.log` | removed; stderr |
+| S18 | every export is called, and a non-function export breaks loading | named exports are ignored; only `.default` counts |
+
+---
+
 ## S7 — Cross-directory imports survive the skill symlink ✅ RESOLVED
 
 **Question**: with a skill directory symlinked into the OpenCode skills root, does a script inside it still resolve an import that reaches outside its own directory?
