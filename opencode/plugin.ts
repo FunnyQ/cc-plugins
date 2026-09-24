@@ -3,10 +3,49 @@ import { dirname, join } from "node:path";
 type HookKind = "command" | "file_path";
 type HookResult = { exitCode: number; stdout: string; stderr: string };
 type EditArgs = {
-  filePath?: unknown;
+  path?: unknown;
   content?: unknown;
   oldString?: unknown;
   newString?: unknown;
+};
+
+// Declared locally: bare imports resolve from the symlink's directory, where only
+// `node:` builtins exist, so importing `@opencode/plugin` would fail to load.
+type SubscriptionEvent = { type: string; data?: { sessionID?: string } };
+type ContextEvent = {
+  sessionID?: string;
+  system: Array<{ type: "text"; text: string }>;
+};
+type ToolBeforeEvent = { tool: string; input: unknown };
+type ToolAfterEvent = {
+  tool: string;
+  input: unknown;
+  status: "completed" | "error";
+  result?: { content?: string | ReadonlyArray<unknown> };
+};
+type PluginContext = {
+  location: { directory: string };
+  event: {
+    subscribe(options?: {
+      signal?: AbortSignal;
+    }): AsyncIterable<SubscriptionEvent>;
+  };
+  session: {
+    hook(
+      name: "context",
+      callback: (event: ContextEvent) => void | Promise<void>,
+    ): Promise<unknown>;
+  };
+  tool: {
+    hook(
+      name: "execute.before",
+      callback: (event: ToolBeforeEvent) => void | Promise<void>,
+    ): Promise<unknown>;
+    hook(
+      name: "execute.after",
+      callback: (event: ToolAfterEvent) => void | Promise<void>,
+    ): Promise<unknown>;
+  };
 };
 
 const CHECK_BRANCH = "packages/chronicle/hooks/check-branch.sh";
@@ -38,27 +77,18 @@ const OPENCODE_SPAWN_NOTE =
 
 // S19: the session scripts write guidance Claude consumes as hook context, but
 // OpenCode feeds the model from the system prompt, not from plugin output — a
-// console write would be red TUI noise the model never reads. The event hooks
-// seed this map synchronously, and experimental.chat.system.transform
+// console write would be red TUI noise the model never reads. The event
+// subscription seeds this map synchronously, and the session context hook
 // materializes the seeds and injects the result into the requests of the turn,
 // so each message reaches the model the way Claude's additionalContext does.
 //
-// Seeds, not messages (S20): opencode dispatches the `event` hook
-// fire-and-forget — `void hook["event"]?.(...)` is never awaited — but awaits
-// the transform. An async stash (spawn the script, then set the entry) could
-// lose the race to the first request, leaving the model with no guidance and
-// no error. A seed lands synchronously the instant the event is dispatched,
-// so the awaited transform always sees it; the transform runs the script
-// itself, exactly when a request makes the guidance worth materializing.
+// Seeds, not messages (S20): events arrive independently of the model request,
+// so an async stash could lose the race to the first request and the model would
+// get no guidance and no error. The seed lands synchronously; the awaited
+// context hook runs the script.
 //
-// No consume-once (S21): the runtime triggers the transform for EVERY LLM
-// request in the session, and the first one is the throwaway title generator
-// (~2KB prompt; its output never surfaces). A consume-on-first-request design
-// hands the guidance to that request and the real one never sees it. A seed
-// therefore rides up to PUSH_CAP requests (the title request is harmless
-// noise), and the session.idle handler retires the entry at the turn
-// boundary — the guidance rides the first turn only, the per-turn nudge rides
-// the next turn.
+// No consume-once (S21): the context hook fires for every request of a turn, so
+// a seed rides up to PUSH_CAP requests and session.idle retires it.
 //
 // Lifecycle: an entry that no request ever rides (a session that ends right
 // after its last nudge, or a created-seed for a session the user never sends
@@ -76,10 +106,9 @@ type PendingGuidance = {
 };
 const PENDING_GUIDANCE = new Map<string, PendingGuidance>();
 const GUIDANCE_CAP = 32;
-// Title + real request (+ a retry) must all ride before the push stops.
 const PUSH_CAP = 3;
 
-// Placeholders the transform materializes by running the matching script.
+// Placeholders the context hook materializes by running the matching script.
 // \u0000 keeps them disjoint from any script output, which is plain text.
 const CREATED_SEED = "\u0000created-guidance";
 const IDLE_SEED = "\u0000idle-nudge";
@@ -112,7 +141,7 @@ function commentPayload(tool: string, args: EditArgs): string {
   return JSON.stringify({
     tool_name: tool === "write" ? "Write" : "Edit",
     tool_input: {
-      file_path: str(args.filePath),
+      file_path: str(args.path),
       content: str(args.content),
       old_string: str(args.oldString),
       new_string: str(args.newString),
@@ -190,225 +219,199 @@ function withOpenCodeNote(message: string | null): string | null {
   return trimmed ? `${trimmed}\n\n${OPENCODE_SPAWN_NOTE}` : null;
 }
 
-// client.app.log is the structured logging surface — plugin stderr would be
-// rendered red in the TUI, so genuine failures go here instead of the console.
-type PluginClient = {
-  app: {
-    log: (options: {
-      body: {
-        service: string;
-        level: "debug" | "info" | "error" | "warn";
-        message: string;
-      };
-    }) => Promise<unknown> | unknown;
-  };
-};
+// V2 dropped client.app.log, so stderr is the only channel left.
+function logFailure(message: string): void {
+  console.error(`[q-lab] ${message}`);
+}
 
-async function logFailure(client: PluginClient | undefined, message: string) {
-  try {
-    await client?.app.log({
-      body: { service: "q-lab", level: "error", message },
+// Synchronous on purpose (S20): the seed must land before the first context hook.
+function seedFromEvent(event: SubscriptionEvent): void {
+  const sessionID = event.data?.sessionID;
+  if (!sessionID) return;
+
+  if (event.type === "session.created") {
+    stashPending(PENDING_GUIDANCE, sessionID, {
+      items: [CREATED_SEED],
+      pushes: 0,
     });
-  } catch {
-    // The log endpoint is best-effort; never let it break a hook.
+  }
+
+  if (event.type === "session.idle") {
+    // S21: turn boundary — anything the turn already rode retires, and a fresh
+    // entry seeds the nudge for the next turn's requests.
+    PENDING_GUIDANCE.delete(sessionID);
+    stashPending(PENDING_GUIDANCE, sessionID, {
+      items: [IDLE_SEED],
+      pushes: 0,
+    });
   }
 }
 
-const QLabPlugin = Object.assign(
-  async function QLabPlugin(context?: {
-    directory?: string;
-    worktree?: string;
-    client?: PluginClient;
-  }) {
+const definition = {
+  id: "q-lab",
+  // Hook registrations are disposed with the plugin; only the subscription needs cleanup.
+  async setup(ctx: PluginContext): Promise<() => void> {
     // S8: symlink-loaded modules expose the checkout's real directory here.
     const root = dirname(import.meta.dir);
-    // S11: the plugin context carries the session's worktree and directory.
-    const cwd = context?.worktree ?? context?.directory ?? process.cwd();
-    const client = context?.client;
+    const cwd = ctx.location.directory;
 
-    return {
-      // S1/S2: created is session-scoped and idle is turn-scoped.
-      event: async ({
-        event,
-      }: {
-        event: { type: string; properties?: { sessionID?: string } };
-      }) => {
-        const sessionID = event.properties?.sessionID;
-        if (!sessionID) return;
+    const contextHook = async (event: ContextEvent) => {
+      const pending = event.sessionID
+        ? PENDING_GUIDANCE.get(event.sessionID)
+        : undefined;
+      if (!pending || pending.pushes >= PUSH_CAP) return;
 
-        // S20: seed synchronously — never spawn here. The event dispatch is
-        // fire-and-forget, so anything async could land after the first
-        // request's transform has already read an empty stash. The transform
-        // materializes the seed by running the script (it is awaited). Map
-        // writes cannot throw, so this handler needs no failure path.
-        if (event.type === "session.created") {
-          stashPending(PENDING_GUIDANCE, sessionID, {
-            items: [CREATED_SEED],
-            pushes: 0,
-          });
+      const messages: string[] = [];
+      for (const item of pending.items) {
+        if (item === CREATED_SEED) {
+          // The payload names the session the guidance tells the model to
+          // scribe against. `provider` marks it as ours: a directory lookup
+          // would pick whichever OpenCode session touched this worktree last.
+          const result = await run(
+            ["bun", join(root, DECISION_LOG_START)],
+            JSON.stringify({
+              session_id: event.sessionID,
+              cwd,
+              provider: "opencode",
+            }),
+          );
+          if (result?.stderr) logFailure(result.stderr.trimEnd());
+          const message = withOpenCodeNote(result?.stdout ?? null);
+          if (message) messages.push(message);
+        } else if (item === IDLE_SEED) {
+          // scribe-nudge reads its session id and cwd from stdin and returns
+          // immediately when that parse fails, so an empty stdin silently
+          // disables the nudge entirely. The payload is the behavior.
+          const result = await run(
+            ["bun", join(root, SCRIBE_NUDGE)],
+            JSON.stringify({
+              session_id: event.sessionID,
+              cwd,
+              provider: "opencode",
+            }),
+          );
+          if (result?.stderr) logFailure(result.stderr.trimEnd());
+          // S15: OpenCode receives the Claude hook wrapper, not plain
+          // reminder text.
+          const message = withOpenCodeNote(
+            result ? sessionMessage(result.stdout) : null,
+          );
+          if (message) messages.push(message);
+        } else {
+          // Already materialized by an earlier request of this turn.
+          messages.push(item);
         }
-
-        if (event.type === "session.idle") {
-          // S21: turn boundary — anything the turn already rode retires, and
-          // a fresh entry seeds the nudge for the next turn's requests.
-          PENDING_GUIDANCE.delete(sessionID);
-          stashPending(PENDING_GUIDANCE, sessionID, {
-            items: [IDLE_SEED],
-            pushes: 0,
-          });
-        }
-      },
-
-      // S19/S20/S21: the model reads guidance from the system prompt. The
-      // transform is triggered for EVERY LLM request in the session — the
-      // first is the throwaway title generator, so consume-once would hand
-      // the guidance to a request whose output never surfaces. A seed rides
-      // up to PUSH_CAP requests (the title request is harmless noise) and the
-      // turn-ending idle retires it. agent.generate triggers without a
-      // sessionID and no-ops here.
-      "experimental.chat.system.transform": async (
-        input: { sessionID?: string },
-        output: { system: string[] },
-      ) => {
-        const pending = input.sessionID
-          ? PENDING_GUIDANCE.get(input.sessionID)
-          : undefined;
-        if (!pending || pending.pushes >= PUSH_CAP) return;
-
-        const messages: string[] = [];
-        for (const item of pending.items) {
-          if (item === CREATED_SEED) {
-            // The payload names the session the guidance tells the model to
-            // scribe against. `provider` marks it as ours: a directory lookup
-            // would pick whichever OpenCode session touched this worktree last.
-            const result = await run(
-              ["bun", join(root, DECISION_LOG_START)],
-              JSON.stringify({
-                session_id: input.sessionID,
-                cwd,
-                provider: "opencode",
-              }),
-            );
-            if (result?.stderr) {
-              await logFailure(client, result.stderr.trimEnd());
-            }
-            const message = withOpenCodeNote(result?.stdout ?? null);
-            if (message) messages.push(message);
-          } else if (item === IDLE_SEED) {
-            // scribe-nudge reads its session id and cwd from stdin and returns
-            // immediately when that parse fails, so an empty stdin silently
-            // disables the nudge entirely. The payload is the behavior.
-            const result = await run(
-              ["bun", join(root, SCRIBE_NUDGE)],
-              JSON.stringify({
-                session_id: input.sessionID,
-                cwd,
-                provider: "opencode",
-              }),
-            );
-            if (result?.stderr) {
-              await logFailure(client, result.stderr.trimEnd());
-            }
-            // S15: OpenCode receives the Claude hook wrapper, not plain
-            // reminder text.
-            const message = withOpenCodeNote(
-              result ? sessionMessage(result.stdout) : null,
-            );
-            if (message) messages.push(message);
-          } else {
-            // Already materialized by an earlier request of this turn.
-            messages.push(item);
-          }
-        }
-        // Materialize once, then replay. Re-running a script per push would
-        // assume it is a pure function of its input; scribe-nudge is not —
-        // it writes a marker and throttles for 8 minutes, so a re-run inside
-        // the turn returns nothing and every request after the first would
-        // push an empty message. Caching the resolved strings is also what
-        // makes PUSH_CAP count requests instead of subprocess spawns.
-        pending.items = messages;
-        pending.pushes += 1;
-        if (messages.length) output.system.push(...messages);
-      },
-
-      "tool.execute.before": async (
-        input: { tool: string },
-        output: { args: { command?: unknown } },
-      ) => {
-        // S5: tool arguments live on the second handler parameter.
-        if (input.tool !== "bash" || typeof output.args.command !== "string")
-          return;
-        if (!COMMIT_COMMAND.test(output.args.command)) return;
-
-        const result = await run(
-          [join(root, CHECK_BRANCH)],
-          hookPayload("command", output.args.command),
+      }
+      // Materialize once, then replay. Re-running a script per push would
+      // assume it is a pure function of its input; scribe-nudge is not — it
+      // writes a marker and throttles for 8 minutes, so a re-run inside the
+      // turn returns nothing and every request after the first would push an
+      // empty message. Caching the resolved strings is also what makes
+      // PUSH_CAP count requests instead of subprocess spawns.
+      pending.items = messages;
+      pending.pushes += 1;
+      if (messages.length) {
+        event.system.push(
+          ...messages.map((text) => ({ type: "text" as const, text })),
         );
-        if (!result) return;
-
-        const message = guardVerdict(result.exitCode, result.stdout);
-        // S3: this throw blocks the command and surfaces the guard message verbatim.
-        // The branch guard is the module's only intentional failure path.
-        if (message) throw message;
-      },
-
-      "tool.execute.after": async (
-        input: {
-          tool: string;
-          sessionID?: string;
-          callID?: string;
-          args: EditArgs;
-        },
-        output: { output: string },
-      ) => {
-        // S5a is before-hook-specific: after-hooks carry the arguments on the
-        // FIRST parameter (`input.args`) and the tool result on the second —
-        // reading output.args.filePath here throws and fails the write.
-        if (
-          (input.tool !== "write" && input.tool !== "edit") ||
-          typeof input.args.filePath !== "string"
-        ) {
-          return;
-        }
-        const filePath = input.args.filePath;
-
-        // Two independent hooks share this event and their gates do not overlap,
-        // so neither may return early on the other's behalf.
-        if (FLIGHTPLAN_TASK.test(filePath)) {
-          const result = await run(
-            [join(root, FLIGHTPLAN_LINT)],
-            hookPayload("file_path", filePath),
-          );
-          const message = result && lintVerdict(result.exitCode, result.stderr);
-          // S4: the write has landed, so append lint feedback without blocking it.
-          if (message) output.output += message;
-        }
-
-        // The path policy is the hook's own (`isGuardedPath`) and it re-checks on every run, so a copy here would only be a second place to drift.
-        if (COMMENT_GUARDED.test(filePath)) {
-          const result = await run(
-            ["bun", join(root, COMMENT_GUARD)],
-            commentPayload(input.tool, input.args),
-          );
-          const message = result && lintVerdict(result.exitCode, result.stderr);
-          if (message) output.output += message;
-        }
-      },
+      }
     };
+
+    const toolBefore = async (event: ToolBeforeEvent) => {
+      const input = event.input as { command?: unknown };
+      if (event.tool !== "shell" || typeof input.command !== "string") return;
+      if (!COMMIT_COMMAND.test(input.command)) return;
+
+      const result = await run(
+        [join(root, CHECK_BRANCH)],
+        hookPayload("command", input.command),
+      );
+      if (!result) return;
+
+      const message = guardVerdict(result.exitCode, result.stdout);
+      // S3: this throw blocks the command and surfaces the guard message verbatim.
+      // The branch guard is the module's only intentional failure path.
+      if (message) throw message;
+    };
+
+    const toolAfter = async (event: ToolAfterEvent) => {
+      if (event.tool !== "write" && event.tool !== "edit") return;
+      const args = event.input as EditArgs;
+      if (typeof args.path !== "string") return;
+      const filePath = args.path;
+
+      // Two independent hooks share this event and their gates do not overlap,
+      // so neither may return early on the other's behalf.
+      let feedback = "";
+      if (FLIGHTPLAN_TASK.test(filePath)) {
+        const result = await run(
+          [join(root, FLIGHTPLAN_LINT)],
+          hookPayload("file_path", filePath),
+        );
+        const message = result && lintVerdict(result.exitCode, result.stderr);
+        // S4: the write has landed, so append lint feedback without blocking it.
+        if (message) feedback += message;
+      }
+
+      // The path policy is the hook's own (`isGuardedPath`) and it re-checks on
+      // every run, so a copy here would only be a second place to drift.
+      if (COMMENT_GUARDED.test(filePath)) {
+        const result = await run(
+          ["bun", join(root, COMMENT_GUARD)],
+          commentPayload(event.tool, args),
+        );
+        const message = result && lintVerdict(result.exitCode, result.stderr);
+        if (message) feedback += message;
+      }
+
+      // The runtime reads `result.content` back after this hook; an errored tool changed no file.
+      if (!feedback || event.status !== "completed" || !event.result) return;
+      const content = event.result.content;
+      const part = { type: "text" as const, text: feedback };
+      event.result.content =
+        typeof content === "string"
+          ? content + feedback
+          : Array.isArray(content)
+            ? [...content, part]
+            : [part];
+    };
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({
+          signal: controller.signal,
+        })) {
+          seedFromEvent(event);
+        }
+      } catch (error) {
+        logFailure(`event subscription ended: ${String(error)}`);
+      }
+    })();
+
+    await ctx.session.hook("context", contextHook);
+    await ctx.tool.hook("execute.before", toolBefore);
+    await ctx.tool.hook("execute.after", toolAfter);
+
+    return () => controller.abort();
   },
-  {
-    guardVerdict,
-    hookPayload,
-    commentPayload,
-    lintVerdict,
-    withOpenCodeNote,
-    stashPending,
-    GUIDANCE_CAP,
-    PUSH_CAP,
-    COMMIT_COMMAND,
-    FLIGHTPLAN_TASK,
-    COMMENT_GUARDED,
-  },
-);
+};
+
+// S18: helpers ride on the plugin object so the module adds no extra export.
+const QLabPlugin = Object.assign(definition, {
+  seedFromEvent,
+  guardVerdict,
+  hookPayload,
+  commentPayload,
+  lintVerdict,
+  withOpenCodeNote,
+  stashPending,
+  GUIDANCE_CAP,
+  PUSH_CAP,
+  COMMIT_COMMAND,
+  FLIGHTPLAN_TASK,
+  COMMENT_GUARDED,
+});
 
 export { QLabPlugin };
+export default QLabPlugin;

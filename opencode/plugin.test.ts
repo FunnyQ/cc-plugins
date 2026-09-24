@@ -5,8 +5,8 @@ import { dirname, join } from "node:path";
 
 import { QLabPlugin } from "./plugin";
 
-// Structurally identical to the module's private type — the module exports
-// nothing but the plugin function (S18), so the tests re-declare it.
+// Structurally identical to the module's private type — the module attaches its
+// pure helpers to the plugin object (S18), so the tests re-declare it.
 type PendingGuidance = { items: string[]; pushes: number };
 
 const {
@@ -22,6 +22,48 @@ const {
   COMMENT_GUARDED,
   FLIGHTPLAN_TASK,
 } = QLabPlugin;
+
+// A fake context captures what setup registers, so tests drive the real
+// entrypoint. Its event stream is empty; tests call seedFromEvent directly.
+type HookCallback = (event: any) => Promise<void> | void;
+type Registered = {
+  toolHooks: Map<string, HookCallback>;
+  sessionHooks: Map<string, HookCallback>;
+};
+
+async function registerHooks(directory: string): Promise<Registered> {
+  const toolHooks = new Map<string, HookCallback>();
+  const sessionHooks = new Map<string, HookCallback>();
+  const ctx = {
+    location: { directory },
+    event: { subscribe: async function* () {} },
+    session: {
+      hook: async (name: string, callback: HookCallback) => {
+        sessionHooks.set(name, callback);
+        return { dispose: async () => {} };
+      },
+    },
+    tool: {
+      hook: async (name: string, callback: HookCallback) => {
+        toolHooks.set(name, callback);
+        return { dispose: async () => {} };
+      },
+    },
+  };
+  await QLabPlugin.setup(ctx as never);
+  return { toolHooks, sessionHooks };
+}
+
+/** The feedback the after-hook appends to the tool result the model receives. */
+function contentText(event: { result?: { content?: unknown } }): string {
+  const content = event.result?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content))
+    return content
+      .map((part) => (part as { text?: string }).text ?? "")
+      .join("");
+  return "";
+}
 
 describe("guardVerdict", () => {
   test("returns an ask message verbatim", () => {
@@ -173,21 +215,18 @@ describe("tool.execute.after handler", () => {
     filePath: string,
     tool = "write",
   ): Promise<{ output: string; thrown?: unknown }> {
-    const hooks = await QLabPlugin({ directory: root });
-    const output = { output: "" };
+    const { toolHooks } = await registerHooks(root);
+    const event = {
+      tool,
+      input: { path: filePath },
+      status: "completed",
+      result: { content: [] as unknown[] },
+    };
     try {
-      await hooks["tool.execute.after"](
-        {
-          tool,
-          sessionID: "ses_test",
-          callID: "call_test",
-          args: { filePath },
-        },
-        output,
-      );
-      return output;
+      await toolHooks.get("execute.after")!(event);
+      return { output: contentText(event) };
     } catch (thrown) {
-      return { output: output.output, thrown };
+      return { output: contentText(event), thrown };
     }
   }
 
@@ -229,13 +268,15 @@ describe("comment guard on tool.execute.after", () => {
     args: Record<string, string>,
     tool = "write",
   ): Promise<string> {
-    const hooks = await QLabPlugin({ directory: root });
-    const output = { output: "" };
-    await hooks["tool.execute.after"](
-      { tool, sessionID: "ses_test", callID: "call_test", args },
-      output,
-    );
-    return output.output;
+    const { toolHooks } = await registerHooks(root);
+    const event = {
+      tool,
+      input: args,
+      status: "completed",
+      result: { content: [] as unknown[] },
+    };
+    await toolHooks.get("execute.after")!(event);
+    return contentText(event);
   }
 
   async function inTmp(
@@ -257,7 +298,7 @@ describe("comment guard on tool.execute.after", () => {
   test("appends the guard question for a newly written comment block", async () => {
     const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
-      guardHook({ filePath, content: body }),
+      guardHook({ path: filePath, content: body }),
     );
 
     expect(output).toContain("does it say why, or what?");
@@ -269,7 +310,11 @@ describe("comment guard on tool.execute.after", () => {
     const body = "def bump\n  # one\n  # two\n  # three\n  @n += 1\nend\n";
     const output = await inTmp("user.rb", body, (filePath) =>
       guardHook(
-        { filePath, oldString: "def bump\n  @n += 1\nend", newString: body },
+        {
+          path: filePath,
+          oldString: "def bump\n  @n += 1\nend",
+          newString: body,
+        },
         "edit",
       ),
     );
@@ -280,7 +325,7 @@ describe("comment guard on tool.execute.after", () => {
   test("stays silent for a comment shorter than the block threshold", async () => {
     const body = "x = 1\n# why not what\ny = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
-      guardHook({ filePath, content: body }),
+      guardHook({ path: filePath, content: body }),
     );
 
     expect(output).toBe("");
@@ -289,7 +334,10 @@ describe("comment guard on tool.execute.after", () => {
   test("stays silent when the edit adds no comment", async () => {
     const body = "x = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
-      guardHook({ filePath, oldString: "x = 1", newString: "x = 2" }, "edit"),
+      guardHook(
+        { path: filePath, oldString: "x = 1", newString: "x = 2" },
+        "edit",
+      ),
     );
 
     expect(output).toBe("");
@@ -301,7 +349,7 @@ describe("comment guard on tool.execute.after", () => {
       const body = "# a comment\n";
       expect(
         await inTmp(name, body, (filePath) =>
-          guardHook({ filePath, content: body }),
+          guardHook({ path: filePath, content: body }),
         ),
       ).toBe("");
     },
@@ -311,7 +359,7 @@ describe("comment guard on tool.execute.after", () => {
 describe("commentPayload", () => {
   test("maps the write tool to Claude's Write shape", () => {
     expect(
-      JSON.parse(commentPayload("write", { filePath: "a.rb", content: "# x" })),
+      JSON.parse(commentPayload("write", { path: "a.rb", content: "# x" })),
     ).toEqual({
       tool_name: "Write",
       tool_input: {
@@ -327,7 +375,7 @@ describe("commentPayload", () => {
     expect(
       JSON.parse(
         commentPayload("edit", {
-          filePath: "a.rb",
+          path: "a.rb",
           oldString: "a",
           newString: 7,
         }),
@@ -399,24 +447,28 @@ describe("withOpenCodeNote", () => {
   );
 });
 
-// S19/S20/S21: guidance must reach the model via the system prompt, not the
-// TUI. The event handler seeds the guidance synchronously; the transform hook
-// materializes the seed and pushes it into every request of the turn (the
-// first request is the throwaway title generator, so consume-once would lose
-// it), and session.idle retires the entry.
-describe("experimental.chat.system.transform", () => {
+// S19/S20/S21: guidance must reach the model via the system prompt, not the TUI.
+describe("session context hook", () => {
   const root = dirname(import.meta.dir);
+
+  async function contextHookFor(sessionID?: string) {
+    const { sessionHooks } = await registerHooks(root);
+    return async (system: string[]): Promise<string[]> => {
+      const event = {
+        sessionID,
+        system: system.map((text) => ({ type: "text" as const, text })),
+      };
+      await sessionHooks.get("context")!(event);
+      return event.system.map((part) => part.text);
+    };
+  }
 
   async function createdAndTransform(
     sessionID = "ses_guidance",
   ): Promise<{ system: string[] }> {
-    const hooks = await QLabPlugin({ directory: root });
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-    const output = { system: ["base system prompt"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, output);
-    return output;
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    const runContext = await contextHookFor(sessionID);
+    return { system: await runContext(["base system prompt"]) };
   }
 
   test("injects the decision-log guidance into the system prompt", async () => {
@@ -427,59 +479,38 @@ describe("experimental.chat.system.transform", () => {
     expect(system[1]).toContain("task tool");
   });
 
-  test("the created seed survives a fire-and-forget dispatch (S20)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
+  test("the created seed lands before the first context hook (S20)", async () => {
     const sessionID = "ses_race";
-    const output = { system: ["base"] };
 
-    // The runtime calls hook["event"] without awaiting it. The handler's
-    // synchronous seeding must land before the transform — the async spawn
-    // that used to live in the handler lost this race and the model never
-    // saw the guidance.
-    void hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-    await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+    // An async stash used to lose the race to the first request.
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    const runContext = await contextHookFor(sessionID);
 
-    expect(output.system[1]).toContain("DECISION LOG ACTIVE");
+    expect((await runContext(["base"]))[1]).toContain("DECISION LOG ACTIVE");
   });
 
-  test("rides the title request AND the real request (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_title_first";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
+  test("rides more than one request of the turn (S21)", async () => {
+    const sessionID = "ses_repeat";
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    const runContext = await contextHookFor(sessionID);
 
-    // The runtime triggers the transform once per LLM request: the first is
-    // the throwaway title generator, the second is the request the user
-    // actually sees. Both must carry the guidance.
-    const title = { system: ["title prompt"] };
-    const main = { system: ["full system prompt"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, title);
-    await hooks["experimental.chat.system.transform"]({ sessionID }, main);
+    const first = await runContext(["first request"]);
+    const second = await runContext(["second request"]);
 
-    expect(title.system[1]).toContain("DECISION LOG ACTIVE");
-    expect(main.system[1]).toContain("DECISION LOG ACTIVE");
+    expect(first[1]).toContain("DECISION LOG ACTIVE");
+    expect(second[1]).toContain("DECISION LOG ACTIVE");
   });
 
   test("materializes the seed once and replays the cache (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
     const sessionID = "ses_cache";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    const runContext = await contextHookFor(sessionID);
 
     const spawn = spyOn(Bun, "spawn");
     try {
-      const outputs = [];
+      const outputs: string[][] = [];
       for (let i = 0; i < PUSH_CAP; i++) {
-        const output = { system: ["base"] };
-        await hooks["experimental.chat.system.transform"](
-          { sessionID },
-          output,
-        );
-        outputs.push(output);
+        outputs.push(await runContext(["base"]));
       }
 
       // Re-running the script per push assumes it is a pure function of its
@@ -487,8 +518,8 @@ describe("experimental.chat.system.transform", () => {
       // re-run inside the same turn returns nothing and the later requests
       // push an empty message. Materialize once, then replay the strings.
       expect(spawn).toHaveBeenCalledTimes(1);
-      for (const output of outputs) {
-        expect(output.system[1]).toContain("DECISION LOG ACTIVE");
+      for (const system of outputs) {
+        expect(system[1]).toContain("DECISION LOG ACTIVE");
       }
     } finally {
       spawn.mockRestore();
@@ -496,61 +527,46 @@ describe("experimental.chat.system.transform", () => {
   });
 
   test("stops pushing after PUSH_CAP requests (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
     const sessionID = "ses_cap";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    const runContext = await contextHookFor(sessionID);
 
-    const outputs = Array.from({ length: PUSH_CAP + 2 }, () => ({
-      system: ["base"],
-    }));
-    for (const output of outputs) {
-      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+    const outputs: string[][] = [];
+    for (let i = 0; i < PUSH_CAP + 2; i++) {
+      outputs.push(await runContext(["base"]));
     }
 
-    for (const output of outputs.slice(0, PUSH_CAP)) {
-      expect(output.system).toHaveLength(2);
+    for (const system of outputs.slice(0, PUSH_CAP)) {
+      expect(system).toHaveLength(2);
     }
-    for (const output of outputs.slice(PUSH_CAP)) {
-      expect(output.system).toHaveLength(1);
+    for (const system of outputs.slice(PUSH_CAP)) {
+      expect(system).toHaveLength(1);
     }
   });
 
   test("session.idle retires the turn's entry and seeds the nudge (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
     const sessionID = "ses_turn";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-    const first = { system: ["base"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, first);
-    expect(first.system[1]).toContain("DECISION LOG ACTIVE");
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    const runContext = await contextHookFor(sessionID);
+
+    const first = await runContext(["base"]);
+    expect(first[1]).toContain("DECISION LOG ACTIVE");
 
     // Turn over: the created guidance must not ride the next turn's requests.
     // The nudge script may or may not push in this environment (it gates on
     // the repo's change signature), but whatever it does, the created
     // guidance — identified by its unique "DECISION LOG ACTIVE" line — is gone.
-    await hooks.event({
-      event: { type: "session.idle", properties: { sessionID } },
-    });
-    const second = { system: ["base"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, second);
-    expect(second.system.join("\n")).not.toContain("DECISION LOG ACTIVE");
+    QLabPlugin.seedFromEvent({ type: "session.idle", data: { sessionID } });
+    const second = await runContext(["base"]);
+    expect(second.join("\n")).not.toContain("DECISION LOG ACTIVE");
   });
 
   test("no-ops without a session id or without pending guidance", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const output = { system: ["base"] };
+    const withoutSession = await contextHookFor(undefined);
+    expect(await withoutSession(["base"])).toHaveLength(1);
 
-    await hooks["experimental.chat.system.transform"]({}, output);
-    expect(output.system).toHaveLength(1);
-
-    await hooks["experimental.chat.system.transform"](
-      { sessionID: "ses_unknown" },
-      output,
-    );
-    expect(output.system).toHaveLength(1);
+    const unknown = await contextHookFor("ses_unknown");
+    expect(await unknown(["base"])).toHaveLength(1);
   });
 });
 
