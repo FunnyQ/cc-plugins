@@ -361,7 +361,7 @@ describe("resolveGlobalConfig", () => {
     (path: string) =>
       present.includes(path);
 
-  test.each(GLOBAL_CONFIG_NAMES)("resolves an existing %s", (name) => {
+  test.each([...GLOBAL_CONFIG_NAMES])("resolves an existing %s", (name) => {
     expect(resolveGlobalConfig(configRoot, only(join(configRoot, name)))).toBe(
       join(configRoot, name),
     );

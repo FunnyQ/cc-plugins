@@ -188,8 +188,8 @@ async function run(
     });
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
-      child.stdout.text(),
-      child.stderr.text(),
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
     ]);
 
     return { exitCode, stdout, stderr };
@@ -397,7 +397,7 @@ const definition = {
   },
 };
 
-// S18: helpers ride on the plugin object so the module adds no extra export.
+// Helpers ride on the plugin object for the tests; the V2 loader decodes only `id` and `setup`.
 const QLabPlugin = Object.assign(definition, {
   seedFromEvent,
   guardVerdict,
