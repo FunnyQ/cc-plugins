@@ -24,19 +24,31 @@ const {
 } = QLabPlugin;
 
 // A fake context captures what setup registers, so tests drive the real
-// entrypoint. Its event stream is empty; tests call seedFromEvent directly.
+// entrypoint.
 type HookCallback = (event: any) => Promise<void> | void;
+type SubscriptionEvent = { type: string; data?: { sessionID?: string } };
 type Registered = {
   toolHooks: Map<string, HookCallback>;
   sessionHooks: Map<string, HookCallback>;
+  cleanup: () => void;
+  signal: () => AbortSignal | undefined;
 };
 
-async function registerHooks(directory: string): Promise<Registered> {
+async function registerHooks(
+  directory: string,
+  subscribe: () => AsyncIterable<SubscriptionEvent> = async function* () {},
+): Promise<Registered> {
   const toolHooks = new Map<string, HookCallback>();
   const sessionHooks = new Map<string, HookCallback>();
+  let signal: AbortSignal | undefined;
   const ctx = {
     location: { directory },
-    event: { subscribe: async function* () {} },
+    event: {
+      subscribe: (options?: { signal?: AbortSignal }) => {
+        signal = options?.signal;
+        return subscribe();
+      },
+    },
     session: {
       hook: async (name: string, callback: HookCallback) => {
         sessionHooks.set(name, callback);
@@ -50,8 +62,20 @@ async function registerHooks(directory: string): Promise<Registered> {
       },
     },
   };
-  await QLabPlugin.setup(ctx as never);
-  return { toolHooks, sessionHooks };
+  const cleanup = await QLabPlugin.setup(ctx as never);
+  return { toolHooks, sessionHooks, cleanup, signal: () => signal };
+}
+
+/** A Bun.spawn stand-in for scripts whose verdict depends on the checkout. */
+function fakeSpawn(stdout: string, exitCode = 0) {
+  return spyOn(Bun, "spawn").mockImplementation(
+    () =>
+      ({
+        exited: Promise.resolve(exitCode),
+        stdout: new Blob([stdout]).stream(),
+        stderr: new Blob([]).stream(),
+      }) as never,
+  );
 }
 
 /** The feedback the after-hook appends to the tool result the model receives. */
@@ -204,11 +228,7 @@ One sentence.
 See PLAN.md for the broader plan.
 `;
 
-// End-to-end through the real handler. The hook contract is the regression
-// under test: after-hooks receive the arguments on the FIRST parameter
-// (`input.args`) and the tool result on the second — the before-hook shape
-// (`output.args`) throws on write/edit and fails the tool call.
-describe("tool.execute.after handler", () => {
+describe("execute.after flightplan lint", () => {
   const root = dirname(import.meta.dir);
 
   async function lintHook(
@@ -261,7 +281,160 @@ describe("tool.execute.after handler", () => {
   });
 });
 
-describe("comment guard on tool.execute.after", () => {
+describe("tool execute.before", () => {
+  const root = dirname(import.meta.dir);
+  const ASK = JSON.stringify({
+    hookSpecificOutput: { permissionDecision: "ask" },
+    systemMessage: "⚠️ on main",
+  });
+
+  async function before(tool: string, command: string): Promise<unknown> {
+    const { toolHooks } = await registerHooks(root);
+    try {
+      await toolHooks.get("execute.before")!({ tool, input: { command } });
+    } catch (thrown) {
+      return thrown;
+    }
+    return undefined;
+  }
+
+  test("throws the branch guard's message for a shell git commit", async () => {
+    const spawn = fakeSpawn(ASK);
+    try {
+      expect(await before("shell", "git commit -m x")).toBe("⚠️ on main");
+      expect(spawn).toHaveBeenCalledTimes(1);
+    } finally {
+      spawn.mockRestore();
+    }
+  });
+
+  test.each([
+    ["bash", "git commit -m x"],
+    ["shell", "git status"],
+  ])("skips %s `%s` without spawning the guard", async (tool, command) => {
+    const spawn = fakeSpawn(ASK);
+    try {
+      expect(await before(tool, command)).toBeUndefined();
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      spawn.mockRestore();
+    }
+  });
+});
+
+describe("tool execute.after result", () => {
+  const root = dirname(import.meta.dir);
+  const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
+
+  async function afterWrite(
+    event: { status: string; result?: { content?: unknown } },
+    input: Record<string, string> = {},
+  ): Promise<{ result?: { content?: unknown } }> {
+    const dir = await mkdtemp(join(tmpdir(), "qlab-result-"));
+    try {
+      const filePath = join(dir, "user.rb");
+      await writeFile(filePath, body);
+      const { toolHooks } = await registerHooks(root);
+      const full = {
+        tool: "write",
+        input: { path: filePath, content: body, ...input },
+        ...event,
+      };
+      await toolHooks.get("execute.after")!(full);
+      return full;
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  test("appends feedback to string content", async () => {
+    const event = await afterWrite({
+      status: "completed",
+      result: { content: "Wrote file." },
+    });
+    expect(event.result?.content).toStartWith("Wrote file.");
+    expect(event.result?.content).toContain("does it say why, or what?");
+  });
+
+  test("creates the content when the result has none", async () => {
+    const event = await afterWrite({ status: "completed", result: {} });
+    expect(event.result?.content).toEqual([
+      { type: "text", text: expect.stringContaining("does it say why") },
+    ]);
+  });
+
+  test("leaves an errored tool's result untouched", async () => {
+    const event = await afterWrite({
+      status: "error",
+      result: { content: "failed" },
+    });
+    expect(event.result?.content).toBe("failed");
+  });
+
+  test("reads V2's `path`, not V1's `filePath`", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "qlab-v1-"));
+    try {
+      const filePath = join(dir, "user.rb");
+      await writeFile(filePath, body);
+      const { toolHooks } = await registerHooks(root);
+      const event = {
+        tool: "write",
+        input: { filePath, content: body },
+        status: "completed",
+        result: { content: "" },
+      };
+      await toolHooks.get("execute.after")!(event);
+      expect(event.result.content).toBe("");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("event subscription", () => {
+  const root = dirname(import.meta.dir);
+
+  test("a streamed session.created seeds the context hook", async () => {
+    const sessionID = "ses_streamed";
+    const { sessionHooks, cleanup } = await registerHooks(
+      root,
+      async function* () {
+        yield { type: "session.created", data: { sessionID } };
+      },
+    );
+    await Bun.sleep(0);
+
+    const event = { sessionID, system: [{ type: "text", text: "base" }] };
+    await sessionHooks.get("context")!(event);
+    cleanup();
+
+    expect(event.system[1]?.text).toContain("DECISION LOG ACTIVE");
+  });
+
+  test("the returned cleanup aborts the subscription", async () => {
+    const { cleanup, signal } = await registerHooks(root);
+    expect(signal()?.aborted).toBe(false);
+    cleanup();
+    expect(signal()?.aborted).toBe(true);
+  });
+
+  test("a failing stream is logged, never thrown out of setup", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await registerHooks(root, async function* () {
+        throw new Error("stream down");
+      });
+      await Bun.sleep(0);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining("stream down"),
+      );
+    } finally {
+      error.mockRestore();
+    }
+  });
+});
+
+describe("execute.after comment guard", () => {
   const root = dirname(import.meta.dir);
 
   async function guardHook(
