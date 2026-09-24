@@ -137,7 +137,7 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 - usage-dashboard reads OpenCode data natively — the shared reader already handles `~/.local/share/opencode/opencode.db`.
 - cockpit **reads and sends** for OpenCode sessions. Precondition: the OpenCode TUI must have been started with a port (`opencode --port <n>`), or `OPENCODE_TUI_SERVER_URL` must be set before cockpit starts.
 - relay `delegate` and `review`.
-- The four ported hook behaviors: decision-log start, the scribe nudge, the chronicle branch guard, and the dispatch flightplan lint.
+- The five ported hook behaviors: decision-log start, the scribe nudge, the chronicle branch guard, the dispatch flightplan lint, and the guard comment check.
 - Both monitor commands.
 - Chronicle's subagents, spawned through the task tool, with `subagent_depth` satisfied as above.
 
