@@ -70,9 +70,10 @@ const CFG = {
   codexReviewModel:      '',        // optional codex model for the review lens (empty → wrapper default gpt-6-astra); only applies when reviewEngine is 'codex'
   opencodeDevModel:      '',        // optional opencode model for devEngine or lastShotEngine (empty → wrapper default opencode-go/kimi-k2.7-code); ignored when the engine is codex
   opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
-  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 3 final-review Claude lenses (reuse/leanness/efficiency) ONLY; the fixer + rubric judge stay Opus
+  reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 3 final-review Claude lenses (reuse/leanness/efficiency) ONLY; task headers independently override the fixer + rubric judge
   resumeTask:            '',        // '' = normal whole-tree flight. A task ref ('review/01') runs ONLY that task, with no scout and no wave loop
   resumeTaskPath:        '',        // ABSOLUTE path to that task's file; required with resumeTask, because a resume runs no scout to derive it
+  resumeModelsRaw:       null,      // verbatim Models header value, or null when absent
   resumeFinalReview:     false,     // true when the resumed task carries `> **Final review**: true` — the scout normally supplies this
   resumeFrom:            'dev',     // 'dev' | 'verify' | 'judge' — the step the FIRST resumed attempt starts at; every later attempt runs the whole pipeline
   resumeAttempt:         1,         // the attempt number the resumed run starts counting at, so the flightlog and the score rows keep rising
@@ -80,26 +81,51 @@ const CFG = {
 }
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
-// Final review reviewers split by what the lens actually needs:
-//   reviewExternal (Haiku) — only DRIVES an external CLI (codex/opencode); the
-//     review intelligence lives in that CLI, so the wrapping agent just invokes
-//     + records.
-//   reviewLens  (Opus default; CFG.reviewLensModel can set 'fable') — the three
-//     Claude lenses must truly *understand* the code to judge
-//     reuse/leanness/efficiency, so they get a strong model. Tunable in
-//     one place via CFG.reviewLensModel ('opus' | 'fable'); this affects ONLY the
-//     three lenses — the fixer and rubric judge stay Opus regardless.
-//   fix (Opus) — reads every finding and applies the changes.
-//   devExternal (Haiku) — used when CFG.devEngine is external or a Claude ladder
-//     reaches CFG.lastShotEngine: a cheap driver that has that CLI write the implementation
-//     (via <engine>-run.ts delegate), then lints the task file and reports what
-//     landed. The coding intelligence lives in the external CLI and the verdict
-//     lives in the verify agent, so the driver just invokes. An external-engine
-//     ladder ends on Claude-Opus; an opted-in Claude ladder ends on the external rung.
-//   structuredRetry (Sonnet) — the model a schema'd call is retried on after the
-//     subagent text-emitted its payload instead of calling the tool. One rung
-//     above the Haiku that every cheap schema'd step runs on; see `resilient`.
-const MODEL = { dev: 'sonnet', devEscalated: 'opus', devExternal: 'haiku', verify: 'haiku', judge: 'opus', reviewExternal: 'haiku', reviewLens: CFG.reviewLensModel ?? 'opus', fix: 'opus', commit: 'haiku', structuredRetry: 'sonnet' }
+// dev implements tasks; the last Claude rung raises its effort one step.
+// verify runs the binary gate and drift re-verify; judge scores the rubric.
+// fix applies Final review findings; commit groups and records wave changes.
+// structuredRetry recovers a failed structured call with a complete choice.
+// devExternal and reviewExternal drive external CLIs that do the reasoning.
+// reviewLens inspects code quality using the configured model without effort.
+// scout reads readiness; markDone and park perform fixed status transitions.
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+const MODEL = {
+  dev: { model: 'opus', effort: 'medium' },
+  verify: { model: 'opus', effort: 'low' },
+  judge: { model: 'opus', effort: 'medium' },
+  fix: { model: 'opus', effort: 'high' },
+  commit: { model: 'opus', effort: 'low' },
+  structuredRetry: { model: 'opus', effort: 'medium' },
+  devExternal: { model: 'haiku', effort: null },
+  reviewExternal: { model: 'haiku', effort: null },
+  reviewLens: { model: CFG.reviewLensModel ?? 'opus', effort: null },
+  scout: { model: 'haiku', effort: null },
+  markDone: { model: 'haiku', effort: null },
+  park: { model: 'haiku', effort: null },
+}
+// Null effort must omit the option so the runtime chooses its own default.
+const pick = (choice) => choice.effort ? { model: choice.model, effort: choice.effort } : { model: choice.model }
+const raise = (choice) => choice.effort
+  ? { ...choice, effort: EFFORTS[Math.min(EFFORTS.indexOf(choice.effort) + 1, EFFORTS.length - 1)] }
+  : choice
+
+// Keep this grammar aligned with flightplan/scripts/lib/parse-task.ts; Workflow cannot import it.
+const parseModels = (raw) => {
+  if (raw === null) return {}
+  if (typeof raw !== 'string' || !raw.trim()) throw new Error('Models: malformed empty or non-string value')
+  const models = {}
+  for (const entry of raw.split(',').map(piece => piece.trim()).filter(Boolean)) {
+    const match = /^([a-z]+)\s*=\s*([a-z]+)(?:\s*\/\s*([a-z]+))?$/.exec(entry)
+    if (!match) throw new Error(`Models entry "${entry}": malformed (expected role=model[/effort])`)
+    const [, role, model, effort] = match
+    if (!['dev', 'verify', 'judge', 'fix'].includes(role)) throw new Error(`Models entry "${entry}": unknown role "${role}"`)
+    if (!['haiku', 'sonnet', 'opus', 'fable'].includes(model)) throw new Error(`Models entry "${entry}": unknown model "${model}"`)
+    if (effort !== undefined && !EFFORTS.includes(effort)) throw new Error(`Models entry "${entry}": unknown effort "${effort}"`)
+    if (models[role]) throw new Error(`Models entry "${entry}": duplicate role "${role}"`)
+    models[role] = { model, effort: effort ?? null }
+  }
+  return models
+}
 const MAX = CFG.maxAttempts ?? 3
 const FINAL_MAX = CFG.finalReviewMaxAttempts ?? 2   // the Final review round loops at most this many times before parking
 const S = CFG.scriptsDir   // abs path to flightplan/scripts
@@ -179,6 +205,7 @@ const RESUME = !CFG.resumeTask ? null : (() => {
   if (!CFG.resumeTaskPath) {
     throw new Error('resumeTask is set but resumeTaskPath is empty — a resume runs no scout, so it cannot derive the task file path')
   }
+  parseModels(CFG.resumeModelsRaw)
   // Skipping the binary gate means a PERSON performed it. Without a signed
   // artifact the judge would score correctness against no evidence at all,
   // which is the one thing `Grounding the score` forbids.
@@ -192,7 +219,7 @@ const RESUME = !CFG.resumeTask ? null : (() => {
   if (!Number.isFinite(attempt) || attempt < 1) {
     throw new Error(`resumeAttempt must be a whole number 1 or greater (got ${JSON.stringify(CFG.resumeAttempt)})`)
   }
-  return { ref: CFG.resumeTask, path: CFG.resumeTaskPath, finalReview: !!CFG.resumeFinalReview, from: CFG.resumeFrom, attempt }
+  return { ref: CFG.resumeTask, path: CFG.resumeTaskPath, modelsRaw: CFG.resumeModelsRaw, finalReview: !!CFG.resumeFinalReview, from: CFG.resumeFrom, attempt }
 })()
 
 // Returns the remaining budget when it has fallen below the floor, else null.
@@ -217,8 +244,16 @@ const SCOUT_SCHEMA = {
     stderr:   { type: 'string' },
     // Copied apart from stdout: a cheap model transcribing the blob drops its trailing null field.
     maxParallel: { type: ['integer', 'null'] },
+    readyModels: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { ref: { type: 'string' }, modelsRaw: { type: ['string', 'null'] } },
+        required: ['ref', 'modelsRaw'],
+      },
+    },
   },
-  required: ['stdout', 'exitCode', 'stderr', 'maxParallel'],
+  required: ['stdout', 'exitCode', 'stderr', 'maxParallel', 'readyModels'],
 }
 
 const COMMIT_SCHEMA = {
@@ -419,11 +454,11 @@ Return a one-paragraph summary: what ${engine.label} implemented and which files
 // codebase*, so nothing used to catch hand-rolled stdlib or a dependency doing
 // what the platform already ships.
 const REVIEW_LENSES = [
-  { key: reviewEngine.label, external: reviewEngine, model: MODEL.reviewExternal, focus:
+  { key: reviewEngine.label, external: reviewEngine, choice: MODEL.reviewExternal, focus:
     'CROSS-VENDOR bug & correctness review — driven through the external CLI wrapper (see the external-engine prompt branch).' },
-  { key: 'reuse', model: MODEL.reviewLens, focus:
+  { key: 'reuse', choice: MODEL.reviewLens, focus:
     'REUSE. Find duplicated logic and code that reinvents something the codebase already provides (existing helpers, utils, types, patterns). Also flag under-engineering: copy-paste that wants a helper. On the abstraction axis you are the only lens that may ask for MORE code — leanness only ever cuts, so a missing abstraction is yours to raise, not its. Each finding: file:line, what duplicates what, the reuse to apply.' },
-  { key: 'leanness', model: MODEL.reviewLens, focus:
+  { key: 'leanness', choice: MODEL.reviewLens, focus:
     `LEANNESS — over-engineering only. Hunt what to DELETE. The diff's best outcome is getting shorter.
 Correctness bugs, security holes, and performance are OUT of scope: another lens owns each. Do not report them.
 Write ONE LINE per finding, in this exact shape:
@@ -441,7 +476,7 @@ Be blunt and concrete. No hedging, no "have you considered", no questions.
   GOOD: \`repo.ts:L88: yagni: AbstractRepository with one implementation. Inline it until a second one exists.\`
 A single smoke test or assert-based self-check is the minimum, not bloat — never flag one for deletion.
 End your file with exactly one summary line: \`net: -<N> lines possible.\` — omit it if you wrote "No findings.".` },
-  { key: 'efficiency', model: MODEL.reviewLens, focus:
+  { key: 'efficiency', choice: MODEL.reviewLens, focus:
     'EFFICIENCY. Find wasteful work — redundant passes, N+1 calls, recomputation, needless allocations/IO. Each finding: file:line, the cheaper approach.' },
 ]
 
@@ -493,14 +528,14 @@ Log a narrative note (which lenses fired, total findings, what you fixed, whethe
 Return a one-paragraph summary: lenses run, cross-vendor status, key fixes, verification result.`
 
 // Run the Final review "dev" step: fan out the lenses in parallel, then one
-// Opus fixer applies every finding. Replaces the single dev agent for the
+// task-selected fixer applies every finding. Replaces the single dev agent for the
 // finalReview task; the binary gate + judge + score gate downstream are unchanged.
-async function runFinalReview(ref, path, attempt, attempts) {
+async function runFinalReview(ref, path, attempt, attempts, fixChoice) {
   await parallel(REVIEW_LENSES.map(lens => () =>
     agent(reviewPrompt(ref, lens, attempt),
-      { label: `review:${lens.key}#${attempt}`, phase: 'Execute', model: lens.model })))
+      { label: `review:${lens.key}#${attempt}`, phase: 'Execute', ...pick(lens.choice) })))
   await agent(fixPrompt(ref, path, attempt, renderHistory(attempts)),
-    { label: `fix:${ref}#${attempt}`, phase: 'Execute', model: MODEL.fix })
+    { label: `fix:${ref}#${attempt}`, phase: 'Execute', ...pick(fixChoice) })
 }
 
 // A gate item a command cannot perform. The plan's AUTHOR declares it, with the
@@ -628,7 +663,7 @@ ${RETURN_CONTRACT}`
 // else is that every call wrapped here is IDEMPOTENT: `verify` and `requalify`
 // only read, `mark-done.ts` validates the header before it writes anything, the
 // park is an idempotent edit, and the scout runs one read-only command. The
-// retry runs on `retryModel` because the models that text-emit are the cheap ones.
+// retry replaces both model and effort so the failed call cannot leak its choice.
 //
 // Two callers are deliberately NOT wrapped, both for the same reason — they
 // persist something before they return, so a second run is not free:
@@ -643,7 +678,7 @@ const resilient = async (make, retryModel) => {
   try {
     return await make(null)
   } catch (error) {
-    log(`retrying a structured call on ${retryModel}: ${error?.message ?? String(error)}`)
+    log(`retrying a structured call on ${retryModel.model}${retryModel.effort ? `/${retryModel.effort}` : ''}: ${error?.message ?? String(error)}`)
     return await make(retryModel)
   }
 }
@@ -679,7 +714,7 @@ async function parkBlocked(ref, path, reason, watch) {
   return withWriter(watch, async () => {
     try {
       const result = await resilient(retryModel => agent(markBlockedPrompt(ref, path, reason),
-        { label: `block:${ref}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: PARK_SCHEMA }),
+        { label: `block:${ref}`, phase: 'Execute', ...pick(retryModel ?? MODEL.park), schema: PARK_SCHEMA }),
         MODEL.structuredRetry)
       return result?.ok === true
     } catch {
@@ -768,6 +803,7 @@ const deferralAccepted = (gate, watch) =>
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item, watch) {
   const { ref, finalReview, path } = item
+  const choices = { ...MODEL, ...parseModels(item.modelsRaw) }
   // The cross-vendor Final review round gets its own (smaller) cap; everything
   // else uses MAX. Past the cap the task is parked + escalated, never skipped.
   const cap = finalReview ? FINAL_MAX : MAX + (lastShotEngine ? 1 : 0)
@@ -777,7 +813,7 @@ async function executeTask(item, watch) {
   // Every rung below is therefore keyed off `last`, never off `cap` — with
   // `first` at 1 the two are equal and the ladder is byte-identical to before,
   // but on a resume at attempt 3 a cap-keyed `attempt >= cap` is already true on
-  // the first rung, which would run Opus immediately and never run Sonnet at all.
+  // the first rung, which would raise effort immediately on every attempt.
   const first = RESUME && RESUME.ref === ref ? RESUME.attempt : 1
   const last = first + cap - 1
   const attempts = []
@@ -798,10 +834,10 @@ async function executeTask(item, watch) {
       if (startAt !== 'dev') {
         // Nothing to write: the resume takes this attempt's dev work as done.
       } else if (finalReview) {
-        // multi-lens review fan-out + Opus fixer (always Opus, no escalation tier)
-        await runFinalReview(ref, path, attempt, attempts)
+        // multi-lens review fan-out + task-selected fixer (no escalation tier)
+        await runFinalReview(ref, path, attempt, attempts, choices.fix)
       } else {
-        // Dev step. An external devEngine falls back to Claude-Opus at its cap.
+        // Dev step. An external devEngine falls back to the task's Claude choice at its cap.
         // `last > first` keeps a single-attempt external ladder on its configured engine.
         // An opted-in Claude ladder instead appends its external rung after Opus.
         const lastShot = attempt >= last && last > first
@@ -810,22 +846,22 @@ async function executeTask(item, watch) {
         // The last CLAUDE rung. With an appended rung the ladder is MAX + 1 long, so the
         // escalation tier must key off the Claude rung. Keying off `last` makes
         // `attempt >= claudeCap` false at the MAXth attempt, so the ladder would run
-        // sonnet, sonnet, sonnet, external and Opus would never execute — silently
+        // base effort, base effort, base effort, external — silently
         // turning this append into a replace.
         const claudeCap = last - (lastShotEngine ? 1 : 0)
         if (vendorRung) {
           attemptModel = lastShotEngine.label
           await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts)),
-            { label: `dev-${lastShotEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
+            { label: `dev-${lastShotEngine.label}:${ref}#${attempt}`, phase: 'Execute', ...pick(MODEL.devExternal) })
         } else if (devEngine && !lastShot) {
           attemptModel = devEngine.label
           await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts)),
-            { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', model: MODEL.devExternal })
+            { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', ...pick(MODEL.devExternal) })
         } else {
-          const devModel = attempt >= claudeCap ? MODEL.devEscalated : MODEL.dev
-          attemptModel = devModel
+          const devChoice = attempt >= claudeCap ? raise(choices.dev) : choices.dev
+          attemptModel = `${devChoice.model}${devChoice.effort ? `/${devChoice.effort}` : ''}`
           await agent(devPrompt(ref, path, attempt, renderHistory(attempts)),
-            { label: `dev:${ref}#${attempt}`, phase: 'Execute', model: devModel })
+            { label: `dev:${ref}#${attempt}`, phase: 'Execute', ...pick(devChoice) })
         }
       }
     })
@@ -843,7 +879,7 @@ async function executeTask(item, watch) {
     let gate = startAt === 'judge'
       ? { passed: true, summary: humanGateSummary(), humanPending: [] }
       : await resilient(retryModel => agent(verifyPrompt(ref, path, attempt),
-      { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: GATE_SCHEMA }),
+      { label: `verify:${ref}#${attempt}`, phase: 'Execute', ...pick(retryModel ?? choices.verify), schema: GATE_SCHEMA }),
       MODEL.structuredRetry)
     if (!gate) {
       const cause = `verification did not run or did not return a verdict on attempt ${attempt}`
@@ -853,7 +889,7 @@ async function executeTask(item, watch) {
     if (deferralAccepted(gate, watch)) {
       await watch.quiet()
       const requalified = await resilient(retryModel => agent(verifyPrompt(ref, path, attempt, true),
-        { label: `requalify:${ref}#${attempt}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: GATE_SCHEMA }),
+        { label: `requalify:${ref}#${attempt}`, phase: 'Execute', ...pick(retryModel ?? choices.verify), schema: GATE_SCHEMA }),
         MODEL.structuredRetry)
       if (!requalified) {
         const cause = `requalification did not run or did not return a verdict on attempt ${attempt}`
@@ -895,7 +931,7 @@ async function executeTask(item, watch) {
     // score row already holds the whole structured verdict. Until that exists,
     // a judge throw parks, which is the pre-existing behaviour and never worse.
     const judged = await agent(judgePrompt(ref, path, gate.summary, attempt),
-      { label: `judge:${ref}#${attempt}`, phase: 'Execute', model: MODEL.judge, schema: JUDGE_SCHEMA })
+      { label: `judge:${ref}#${attempt}`, phase: 'Execute', ...pick(choices.judge), schema: JUDGE_SCHEMA })
     if (!judged) {
       const cause = `the rubric judge returned no structured result on attempt ${attempt}`
         + ` — the task was never scored. The harness exposes no original cause for a null agent result, so none is reported here.`
@@ -909,7 +945,7 @@ async function executeTask(item, watch) {
       // (worse) counted as complete by a run that never checked.
       const finalized = await withWriter(watch, () =>
         resilient(retryModel => agent(markDonePrompt(ref, path),
-          { label: `done:${ref}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: MARK_DONE_SCHEMA }),
+          { label: `done:${ref}`, phase: 'Execute', ...pick(retryModel ?? MODEL.markDone), schema: MARK_DONE_SCHEMA }),
           MODEL.structuredRetry))
       if (finalized && finalized.ok) {
         return { task: ref, passed: true, attempt, weighted: verdict.weighted, humanPending }
@@ -1073,9 +1109,10 @@ while (!RESUME) {
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
     + `Return its stdout verbatim (unmodified), its exit code, and its stderr.\n`
     + `Also return maxParallel: the value of the "maxParallel" key in that JSON, the last key in it — an integer, or null when it prints null.\n`
+    + `Also return readyModels: copy each ready item into { ref, modelsRaw }, preserving its modelsRaw string exactly or null when it prints null.\n`
     + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "command complete"\n`
     + RETURN_CONTRACT,
-    { label: `scout-wave-${wave}`, phase: 'Execute', model: retryModel ?? MODEL.verify, schema: SCOUT_SCHEMA }),
+    { label: `scout-wave-${wave}`, phase: 'Execute', ...pick(retryModel ?? MODEL.scout), schema: SCOUT_SCHEMA }),
     MODEL.structuredRetry))
 
   // Pure in-memory work, so this needs no Workflow filesystem access.
@@ -1121,6 +1158,27 @@ while (!RESUME) {
     derailed = `"maxParallel" is ${JSON.stringify(snap.maxParallel)} in stdout but ${JSON.stringify(scout.maxParallel)} in the scout's structured field`
   }
   if (!derailed) snap.maxParallel = scout.maxParallel
+
+  if (!derailed) {
+    for (const item of snap.ready) {
+      const carried = Array.isArray(scout.readyModels) ? scout.readyModels.find(entry => entry.ref === item.ref) : null
+      if (!carried || !Object.hasOwn(carried, 'modelsRaw')) {
+        derailed = `${item.ref}: missing modelsRaw in the scout's readyModels`
+        break
+      }
+      if ('modelsRaw' in item && item.modelsRaw !== carried.modelsRaw) {
+        derailed = `${item.ref}: modelsRaw is ${JSON.stringify(item.modelsRaw)} in stdout but ${JSON.stringify(carried.modelsRaw)} in the scout's structured field`
+        break
+      }
+      try {
+        parseModels(carried.modelsRaw)
+      } catch (error) {
+        derailed = `${item.ref}: ${error?.message ?? String(error)}`
+        break
+      }
+      item.modelsRaw = carried.modelsRaw
+    }
+  }
 
   if (derailed) {
     const reason = `next-ready scout failed in wave ${wave}: ${derailed}`
@@ -1228,7 +1286,7 @@ while (!RESUME) {
   if (wave > 1 && CFG.commitBetweenWaves && !commitBlocked()) {
     const { value: committed, threw } = await settled(() => agent(
       `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`, [...heldBack])}`,
-      { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA }))
+      { label: `commit-wave-${wave}`, phase: 'Execute', ...pick(MODEL.commit), schema: COMMIT_SCHEMA }))
     if (threw || !committed || committed.failed) {
       escalateCommitFailure(committed, `wave ${wave - 1}`, threw)
       // Continue this wave. A failed commit does NOT block the next one: the
@@ -1316,7 +1374,7 @@ while (!RESUME) {
 // still sitting uncommitted. `heldBack` is empty here, so a passing resume is
 // what finally lands it.
 if (RESUME) {
-  const item = { ref: RESUME.ref, finalReview: RESUME.finalReview, path: RESUME.path }
+  const item = { ref: RESUME.ref, finalReview: RESUME.finalReview, path: RESUME.path, modelsRaw: RESUME.modelsRaw }
   log(`Resuming ${item.ref} at the ${RESUME.from} step, from attempt ${RESUME.attempt}.`)
   // Sized 1: a resume has no sibling, so a SUSPECTED SIBLING INTERFERENCE
   // deferral must be refused exactly as it is for a serial wave.
@@ -1349,7 +1407,7 @@ if (CFG.commitBetweenWaves && !commitBlocked()) {
   const { value: committed, threw } = await settled(() => agent(
     `Commit any remaining uncommitted changes (from the last wave — typically Final review fixes).\n`
     + commitInstructions('commit-post-loop', [...heldBack]),
-    { label: 'commit-post-loop', phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA }))
+    { label: 'commit-post-loop', phase: 'Execute', ...pick(MODEL.commit), schema: COMMIT_SCHEMA }))
   if (threw || !committed || committed.failed) {
     escalateCommitFailure(committed, 'post-loop', threw)
   }
@@ -1418,8 +1476,8 @@ return { slug: CFG.slug, completed, escalations, needsHuman }
   The rule bans the *restore* family — `git checkout`, `git restore`, `git reset`, `git clean` — in its own sentence, because the "any other command that changes git state" clause genuinely does not reach them: they rewrite the working tree and leave refs and the index alone, so a careful reader concludes they are permitted. A Haiku dev driver did exactly that in run `wf_5903a02b-b6e`, running `git checkout` over a *parallel* task's file to tidy its workspace and reverting a confirmed `Status: done` back to `todo`. The rule also separates the two prohibitions on purpose: editing a source file a sibling also edits is legitimate and common — that is what a parallel wave *is* — so the ban is narrowed to other tasks' files under `tasks/`. A blanket "don't touch files that aren't yours" would forbid the shared-file edits the plan itself schedules.
 - **Commits use inline git, not the atomic-commit skill — the same `no Agent tool` constraint applies.** The inter-wave and post-loop commits must NOT invoke `odin-git:atomic-commit`. That skill spawns the vör + bragi sub-agents, and a Workflow agent cannot do that. Its analysis script also lives in a *different* plugin's cache, which the agent cannot resolve — there is no `CLAUDE_PLUGIN_ROOT` in agent Bash. The `commitInstructions` builder inlines the skill's whole contract instead: the matched flightlog lifecycle, the atomic grouping principles, plus the exact commit-message template (emoji/type subject, English body, `---`, zh-TW summary). So each labeled agent commits over plain git, self-contained. If the commit convention changes, edit the template in that one builder.
 - **Concurrency** is capped by the Workflow runtime (`min(16, cores-2)`). Passing a wide wave is safe — excess tasks queue.
-- **A plan caps its own concurrency with `> **Max parallel**: N` in PLAN.md, and the scout carries it.** `next-ready.ts --summary` parses the header into `maxParallel` (`null` when absent or `unlimited`), and the wave loop hands each task a slot from `makeSlots`. **The slot spans the whole pipeline — dev, verify, requalify, judge, mark-done, park — not only the writer windows.** The live failure was in `~/.config` `docs/sketchybar-swift-daemon`: seven tasks went out after `core/05`, and a Haiku verifier ran `swift build` and live checks while a sibling's codex delegate was mid-reinstall of the shared bar. The verifier is deliberately not a writer, so a cap on writers alone would have let exactly that through. That plan's workaround was a `mkdir /tmp/sketchybard-live.lock` rule pasted into four prompts; it reached an external delegate only when the Haiku driver copied it, and never reached the requalify agent or the fixer. A slot needs no prompt at all. **The cap is read off disk every wave, never baked into `CFG`**: a baked copy is one more value the main agent must remember to transcribe, and a missed transcription is the same silent parallel run. For the same reason a scout whose structured `maxParallel` is missing is a `(scout)` failure rather than "no cap", and a malformed header is a parse error in `errors`. The watch is sized by slots, so a serial task's `SUSPECTED SIBLING INTERFERENCE` deferral is refused — there is no sibling. **Serial prose is only an advisory.** `lint-task.ts <tasks-dir>` prints `[serial-undeclared]` when PLAN.md or `_context/*.md` asks for serial execution or a lock without the header; it is not a violation because the matching wording in real plans (2 of ~20 on one machine, before the pattern was narrowed) was already enforced by `Depends on` edges. **Residual:** an external live delegate whose pane was left open and still writing after its driver returned holds no slot, so the next task can start beside it — the same uncounted writer the deferral note above accepts.
-- **A single-task resume replaces the wave loop, and gets a whole fresh cap.** `CFG.resumeTask` runs one `executeTask` and no scout: there is no tree to read, and the ref, path and `finalReview` flag come from `CFG` because nothing downstream re-derives them. `CFG.resumeAttempt` only moves where the numbering *starts* — the task still gets `maxAttempts` (or `finalReviewMaxAttempts`) rungs, because a resume is a fresh flight for that task and the number exists so the flightlog and the `score-task.ts --log` verdict rows keep rising instead of colliding with the parked run's. **That is why every rung is keyed off `last` (`first + cap - 1`) and never off `cap`.** Two things break otherwise, both silently. `for (let attempt = 3; attempt <= FINAL_MAX; …)` is false on entry, so the loop body never runs and the task is re-parked having executed nothing — which reads exactly like "it tried again and still failed". And `attempt >= claudeCap` is already true on the first rung, so a resumed Claude ladder runs Opus immediately and never runs Sonnet at all, quietly tripling the cost of a resumed dev step. With `first` at 1 the two are equal and every existing ladder is byte-identical. The loop is written `while (!RESUME)` rather than wrapped in an `if/else` on purpose: an else-wrapper re-indents 240 lines and buries the actual change in a diff nobody can read.
+- **A plan caps its own concurrency with `> **Max parallel**: N` in PLAN.md, and the scout carries it.** `next-ready.ts --summary` parses the header into `maxParallel` (`null` when absent or `unlimited`), and the wave loop hands each task a slot from `makeSlots`. **The slot spans the whole pipeline — dev, verify, requalify, judge, mark-done, park — not only the writer windows.** The live failure was in `~/.config` `docs/sketchybar-swift-daemon`: seven tasks went out after `core/05`, and a Haiku verifier ran `swift build` and live checks while a sibling's codex delegate was mid-reinstall of the shared bar. The verifier is deliberately not a writer, so a cap on writers alone would have let exactly that through. That plan's workaround was a `mkdir /tmp/sketchybard-live.lock` rule pasted into four prompts; it reached an external delegate only when the Haiku driver copied it, and never reached the requalify agent or the fixer. A slot needs no prompt at all. **The cap is read off disk every wave, never baked into `CFG`**: a baked copy is one more value the main agent must remember to transcribe, and a missed transcription is the same silent parallel run. For the same reason a scout whose structured `maxParallel` is missing is a `(scout)` failure rather than "no cap", and a malformed header is a parse error in `errors`. The watch is sized by slots, so a serial task's `SUSPECTED SIBLING INTERFERENCE` deferral is refused — there is no sibling. **Residual:** a scout that drops `modelsRaw` from stdout and also invents `null` in `readyModels` silently selects defaults; these two coordinated errors can evade the same cross-check used for `maxParallel`. **Serial prose is only an advisory.** `lint-task.ts <tasks-dir>` prints `[serial-undeclared]` when PLAN.md or `_context/*.md` asks for serial execution or a lock without the header; it is not a violation because the matching wording in real plans (2 of ~20 on one machine, before the pattern was narrowed) was already enforced by `Depends on` edges. **Residual:** an external live delegate whose pane was left open and still writing after its driver returned holds no slot, so the next task can start beside it — the same uncounted writer the deferral note above accepts.
+- **A single-task resume replaces the wave loop, and gets a whole fresh cap.** `CFG.resumeTask` runs one `executeTask` and no scout: there is no tree to read, and the ref, path and `finalReview` flag come from `CFG` because nothing downstream re-derives them. `CFG.resumeAttempt` only moves where the numbering *starts* — the task still gets `maxAttempts` (or `finalReviewMaxAttempts`) rungs, because a resume is a fresh flight for that task and the number exists so the flightlog and the `score-task.ts --log` verdict rows keep rising instead of colliding with the parked run's. **That is why every rung is keyed off `last` (`first + cap - 1`) and never off `cap`.** Two things break otherwise, both silently. `for (let attempt = 3; attempt <= FINAL_MAX; …)` is false on entry, so the loop body never runs and the task is re-parked having executed nothing — which reads exactly like "it tried again and still failed". And `attempt >= claudeCap` is already true on the first rung, so a resumed Claude ladder raises effort immediately instead of reserving the increase for its last Claude rung. With `first` at 1 the two are equal and every existing ladder is byte-identical. The loop is written `while (!RESUME)` rather than wrapped in an `if/else` on purpose: an else-wrapper re-indents 240 lines and buries the actual change in a diff nobody can read.
 
 - **`CFG.resumeFrom` skips steps on the resumed attempt only.** `startAt` is `RESUME.from` when `attempt === first`, and `'dev'` on every later attempt. So a resumed attempt that fails its gate runs the *whole* pipeline next time, including the Final review's four-lens round. That is the right default and not a missed optimisation: a red verify says the work below it genuinely does need redoing, and the alternative — a task looping forever on a verifier re-reading the same unchanged tree — is worse than paying for the round. `'judge'` synthesises `gate` rather than skipping it, because `gate.summary` is read downstream by the judge prompt and by `rejectionOf`; a skipped gate would hand both of them `undefined`.
 

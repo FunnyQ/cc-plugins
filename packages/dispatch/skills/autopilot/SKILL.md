@@ -73,9 +73,10 @@ Then scout what a single task needs and bake it into `CFG`:
 1. Resolve `$SCRIPTS` and `$OWN` exactly as Step 1 does, and the repo root with `git rev-parse --show-toplevel`.
 2. Resolve the task file itself — `<root>/docs/<slug>/tasks/<bucket>/<NN>-*.md` — as an absolute path, into `CFG.resumeTaskPath`. There is no scout to derive it, so the orchestrator throws on an empty one rather than letting an agent read a file that is not there.
 3. Read that file's header. Set `CFG.resumeFinalReview` from its `> **Final review**:` line.
-4. Set `CFG.resumeAttempt` to the `--attempt` the progress command printed. The numbering must keep rising: `score-task.ts --log` keys its verdict rows on ref plus attempt, and `fleet.ts` keeps the first row for a key, so reusing a number leaves the trail contradicting the run.
-5. Set `CFG.resumeTask` to the ref and `CFG.resumeFrom` to the step. Leave every other field as a normal flight would have it — `baseRef`, `planGoal`, and the engine picks all still apply, because a failed resumed attempt runs the full round.
-6. Launch flightdeck as usual, and report as Step 4 does.
+4. Read the task's `> **Models**:` line and write its value as the string `CFG.resumeModelsRaw`, or `null` when the line is absent.
+5. Set `CFG.resumeAttempt` to the `--attempt` the progress command printed. The numbering must keep rising: `score-task.ts --log` keys its verdict rows on ref plus attempt, and `fleet.ts` keeps the first row for a key, so reusing a number leaves the trail contradicting the run.
+6. Set `CFG.resumeTask` to the ref and `CFG.resumeFrom` to the step. Leave every other field as a normal flight would have it — `baseRef`, `planGoal`, and the engine picks all still apply, because a failed resumed attempt runs the full round.
+7. Launch flightdeck as usual, and report as Step 4 does.
 
 **Carrying what a person checked.** `--attest <file>` sets `CFG.attestationFile` to an absolute path. Write the file first, or point at one the user already wrote. It must name **which gate items** a person performed, quoting each item as the task file writes it, plus when. The verifier reads it, treats only the items it names as satisfied, and rejects any entry that is not an item of that task. It is not a blanket pass: every unnamed item is still run, and a red command still fails the attempt however the attestation is worded.
 
@@ -222,18 +223,23 @@ The rest of this document is reference material.
 
 ## Model policy
 
-This policy is encoded as a constant table at the top of the orchestrator, so it stays tunable in one place. The dev≠judge split is deliberate: a model that judges its own output is biased toward passing.
+Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge in separate agent calls so scoring uses independent context.
 
-| Role | Model | Why |
+| Role | Model / effort | Why |
 |---|---|---|
-| **Dev** | Sonnet → **Opus on the last attempt** | A model that failed N times rarely clears it by retrying as itself, so the last shot gets the stronger model before we bother the user. |
-| **Dev — external engine** (`CFG.devEngine: 'codex'`/`'opencode'`) | Haiku driver → **Opus on the last attempt** | The coding intelligence is the external CLI's and the verdict is the verify agent's, so the driver only has to invoke `<engine>-run.ts delegate`, lint the task file, and report what landed. |
-| **Binary gate (Acceptance / Verification)** | Haiku | Its job is mechanical — re-run the `## Verification` commands and report pass/fail + raw output — and it runs first so Opus never scores code that doesn't build. |
-| **Rubric judge** | Opus | It decides loop-or-pass, and a weak judge either ships bad code or loops forever. |
-| **Commit (inter-wave + post-loop)** | Haiku | A wave's changes are usually one coherent set, so grouping + message-writing over the inlined `COMMIT_INSTRUCTIONS` is within Haiku's reach. |
-| **Final review — cross-vendor lens** (`CFG.reviewEngine`) | Haiku | The review intelligence lives in the external CLI, so the agent only invokes `<engine>-run.ts review` and records its output. |
-| **Final review — quality lenses** (`CFG.reviewLensModel`) | Opus × 3 (parallel), default — or **Fable 5** (`'fable'`) | reuse / leanness / efficiency must genuinely *understand* the code to judge quality, so they get a strong model; they record findings and never edit. See Step 2 before offering Fable 5. |
-| **Final review — fixer** | Opus | It is the highest-stakes holistic gate — integration, consistency, regressions, met the PLAN goal — capped at `finalReviewMaxAttempts`. |
+| **Dev** | opus / medium | Implement the task with enough reasoning for normal attempts. |
+| **Dev — last Claude rung** | Task's dev choice, effort +1 (default opus / high) | Raise reasoning effort after earlier attempts fail; keep max at max and omitted effort omitted. |
+| **Dev — external driver** | haiku / no effort | Drive the external CLI that writes the implementation. |
+| **Binary gate and drift re-verify** | opus / low | Check acceptance criteria and command output before scoring. |
+| **Rubric judge** | opus / medium | Score the rubric against the gate's evidence. |
+| **Commit (inter-wave + post-loop)** | opus / low | Group changes and write the commit message. |
+| **Final review — cross-vendor lens** | haiku / no effort | Drive the external CLI that performs the review. |
+| **Final review — quality lenses** | `CFG.reviewLensModel` (default opus) / no effort | Inspect reuse, leanness, and efficiency with independent context. |
+| **Final review — fixer** | opus / high | Reconcile the findings and apply integration fixes. |
+| **Scout / mark-done / park** | haiku / no effort | Run the fixed readiness or status transition command. |
+| **Structured retry** | opus / medium | Recover a failed structured call with a complete model and effort choice. |
+
+A task's `> **Models**:` header overrides dev, verify, judge, and fix for that task.
 
 ## Grounding the score (do not skip)
 
