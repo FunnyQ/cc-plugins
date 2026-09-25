@@ -8,7 +8,7 @@
 >
 > **Depends on**: models/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -109,23 +109,23 @@ The test stops the documented example and the parser from drifting apart.
 
 ## Acceptance criteria
 
-- [ ] `rg -n "one build target" packages/dispatch/skills/flightplan` prints nothing.
-- [ ] `plan-template.md` names external live resources (device, LaunchAgent or service, local database) as the only reason to lower `Max parallel` under Claude Code, says a worktree isolates a shared build there, and says a shared build target still needs `Max parallel: 1` under OpenCode's shared-tree loop.
-- [ ] The Step 6.4 paragraph in flightplan's `SKILL.md` describes per-task worktrees under Claude Code, and the shared tree under the OpenCode loop. It keeps the "assert on this task's own declared files" rule.
-- [ ] `task-template.md`'s header template block has no `Models` line. Its `### Models` section holds the one copyable example, with no trailing note. That section states the syntax, all four roles, `fix` only on the final-review task, the model and effort sets, the default table, the effort-raise rule, and when to omit the header.
-- [ ] `task-template.md` states that Verification commands are relative to the repo root.
-- [ ] `task-template.md` scopes the sibling-tree paragraph to the shared-tree OpenCode loop, and still requires a `--` pathspec.
-- [ ] `interview-guide.md` has a per-task models question whose default recommendation is to omit the header.
-- [ ] `lint-task.test.ts` has a test that copies the `### Models` section's example line into a fixture and asserts no `models` violation, and that asserts the template block carries no `Models` line.
+- [x] `rg -n "one build target" packages/dispatch/skills/flightplan` prints nothing.
+- [x] `plan-template.md` names external live resources (device, LaunchAgent or service, local database) as the only reason to lower `Max parallel` under Claude Code, says a worktree isolates a shared build there, and says a shared build target still needs `Max parallel: 1` under OpenCode's shared-tree loop.
+- [x] The Step 6.4 paragraph in flightplan's `SKILL.md` describes per-task worktrees under Claude Code, and the shared tree under the OpenCode loop. It keeps the "assert on this task's own declared files" rule.
+- [x] `task-template.md`'s header template block has no `Models` line. Its `### Models` section holds the one copyable example, with no trailing note. That section states the syntax, all four roles, `fix` only on the final-review task, the model and effort sets, the default table, the effort-raise rule, and when to omit the header.
+- [x] `task-template.md` states that Verification commands are relative to the repo root.
+- [x] `task-template.md` scopes the sibling-tree paragraph to the shared-tree OpenCode loop, and still requires a `--` pathspec.
+- [x] `interview-guide.md` has a per-task models question whose default recommendation is to omit the header.
+- [x] `lint-task.test.ts` has a test that copies the `### Models` section's example line into a fixture and asserts no `models` violation, and that asserts the template block carries no `Models` line.
 
 ## Verification
 
-- [ ] `rg -n "one build target" packages/dispatch/skills/flightplan` exits 1 with no output.
-- [ ] `rg -n "Models" packages/dispatch/skills/flightplan/references/task-template.md` prints the `### Models` heading and its example line.
-- [ ] `rg -n "worktree" packages/dispatch/skills/flightplan/SKILL.md packages/dispatch/skills/flightplan/references/plan-template.md` prints at least one hit in each file.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` passes, including the template-example test.
-- [ ] `rg -n '^> \*\*Models\*\*:' packages/dispatch/skills/flightplan/references/task-template.md` prints a line that ends with the last `role=model` entry and has no parenthesis.
-- [ ] `git status --short -- packages/dispatch/skills/flightplan/SKILL.md packages/dispatch/skills/flightplan/references/plan-template.md packages/dispatch/skills/flightplan/references/task-template.md packages/dispatch/skills/flightplan/references/interview-guide.md packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` shows all five paths modified.
+- [x] `rg -n "one build target" packages/dispatch/skills/flightplan` exits 1 with no output.
+- [x] `rg -n "Models" packages/dispatch/skills/flightplan/references/task-template.md` prints the `### Models` heading and its example line.
+- [x] `rg -n "worktree" packages/dispatch/skills/flightplan/SKILL.md packages/dispatch/skills/flightplan/references/plan-template.md` prints at least one hit in each file.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` passes, including the template-example test.
+- [x] `rg -n '^> \*\*Models\*\*:' packages/dispatch/skills/flightplan/references/task-template.md` prints a line that ends with the last `role=model` entry and has no parenthesis.
+- [x] `git status --short -- packages/dispatch/skills/flightplan/SKILL.md packages/dispatch/skills/flightplan/references/plan-template.md packages/dispatch/skills/flightplan/references/task-template.md packages/dispatch/skills/flightplan/references/interview-guide.md packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` shows all five paths modified.
 
 ## Eval rubric
 

@@ -7,7 +7,7 @@
 >
 > **Depends on**: models/01
 > **Blocks**: worktree/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -111,23 +111,23 @@ The stub `agent()` in `orchestrator-script.test.ts` records `opts.model` into `m
 
 ## Acceptance criteria
 
-- [ ] The `MODEL` table in `orchestrator.md` maps each role to `{model, effort}` and matches the default table in `models.md`. `devEscalated` is gone, and scout, mark-done, and park have their own haiku entry.
-- [ ] No `agent()` call in the script passes `effort: null` or `effort: undefined`. Choices with a null effort omit the key.
-- [ ] A ready item with `modelsRaw: 'dev=sonnet/low'` and a 3-attempt Claude ladder runs its dev rungs on sonnet/low, sonnet/low, and sonnet/medium.
-- [ ] A ready item with `modelsRaw: 'dev=opus/max'` keeps `max` on the last rung.
-- [ ] Each of these derails the wave as a `(scout)` failure that names the ref: a ready ref missing from the structured `readyModels`; structured and stdout `modelsRaw` values that disagree; and a `modelsRaw` the in-script parser rejects.
-- [ ] The in-script parser implements the four-step grammar and gives the stated result for all nine parity fixtures.
-- [ ] `modelsRaw: null` runs every role on its default. `verify=sonnet` runs verify on sonnet with the `effort` key omitted.
-- [ ] A retried structured call (for example, a verify that throws once) runs its retry on opus/medium.
-- [ ] `devEngine` and `lastShotEngine` rungs still run their haiku driver with no effort, on the same attempts as before.
-- [ ] `SKILL.md`'s Model policy table matches the new map, and the resume steps set `CFG.resumeModelsRaw`. A resume with `resumeModelsRaw: 'dev=sonnet/low'` runs its dev on sonnet/low.
+- [x] The `MODEL` table in `orchestrator.md` maps each role to `{model, effort}` and matches the default table in `models.md`. `devEscalated` is gone, and scout, mark-done, and park have their own haiku entry.
+- [x] No `agent()` call in the script passes `effort: null` or `effort: undefined`. Choices with a null effort omit the key.
+- [x] A ready item with `modelsRaw: 'dev=sonnet/low'` and a 3-attempt Claude ladder runs its dev rungs on sonnet/low, sonnet/low, and sonnet/medium.
+- [x] A ready item with `modelsRaw: 'dev=opus/max'` keeps `max` on the last rung.
+- [x] Each of these derails the wave as a `(scout)` failure that names the ref: a ready ref missing from the structured `readyModels`; structured and stdout `modelsRaw` values that disagree; and a `modelsRaw` the in-script parser rejects.
+- [x] The in-script parser implements the four-step grammar and gives the stated result for all nine parity fixtures.
+- [x] `modelsRaw: null` runs every role on its default. `verify=sonnet` runs verify on sonnet with the `effort` key omitted.
+- [x] A retried structured call (for example, a verify that throws once) runs its retry on opus/medium.
+- [x] `devEngine` and `lastShotEngine` rungs still run their haiku driver with no effort, on the same attempts as before.
+- [x] `SKILL.md`'s Model policy table matches the new map, and the resume steps set `CFG.resumeModelsRaw`. A resume with `resumeModelsRaw: 'dev=sonnet/low'` runs its dev on sonnet/low.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes. It includes new tests asserting model and effort for each of these labels: `dev:`, `verify:`, `judge:`, `fix:`, `done:`, `block:`, `scout-wave-`, `commit-wave-`, and a retried call.
-- [ ] That same test file has tests for these: the `dev=sonnet/low` ladder, the `max` ceiling, each of the three `modelsRaw` `(scout)` derails, the `null` defaults, a `resumeModelsRaw` override, and the nine-row parity fixture table. Each test fails when its behaviour is reverted.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
-- [ ] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts packages/dispatch/skills/autopilot/SKILL.md` shows all three paths modified.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes. It includes new tests asserting model and effort for each of these labels: `dev:`, `verify:`, `judge:`, `fix:`, `done:`, `block:`, `scout-wave-`, `commit-wave-`, and a retried call.
+- [x] That same test file has tests for these: the `dev=sonnet/low` ladder, the `max` ceiling, each of the three `modelsRaw` `(scout)` derails, the `null` defaults, a `resumeModelsRaw` override, and the nine-row parity fixture table. Each test fails when its behaviour is reverted.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
+- [x] `git status --short -- packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts packages/dispatch/skills/autopilot/SKILL.md` shows all three paths modified.
 
 ## Eval rubric
 
