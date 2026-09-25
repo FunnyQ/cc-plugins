@@ -8,7 +8,7 @@
 >
 > **Depends on**: worktree/03
 > **Blocks**: worktree/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -104,20 +104,20 @@ Extend the label-routed stub with a `reverify:` route and a per-ref scenario que
 
 ## Acceptance criteria
 
-- [ ] A clean land with `drift: true` runs `reverify:<ref>#<attempt>` in the main tree under the lock, with the task's verify role. A pass records the new fingerprint, then marks the task done and removes its worktree.
-- [ ] A failed `reverify` runs `wt-unland`, then `wt-rebase`, then the next attempt, with `REVERIFY FAIL` and the re-verify summary in its feedback.
-- [ ] The drift-fail `wt-unland` and `wt-rebase` prompts carry `--op a<attempt>-unland` and `--op a<attempt>-rebase` for the failing attempt, and a retried call repeats the same id.
-- [ ] A `reverify` that returns `null` is retried once, because its `make` throws on `null`. A `null` on the retry too runs `wt-unland`, does not rebase, and parks the task as an infrastructure failure with its worktree kept. A retry that passes completes the task.
-- [ ] `resumePoint` returns `from: "dev"` with `gateRejected: true` when the last attempt's `reverify` failed after a passing verdict.
-- [ ] `fleet.ts` parses `reverify:<ref>#<n>` labels, ranks `reverify` after `judge`, and colours its PASS and FAIL outcomes.
-- [ ] A `leak` land result still fails only that task. The tree watch, deferral, requalify, and `heldBack` tests still pass unmodified, apart from inserted labels.
+- [x] A clean land with `drift: true` runs `reverify:<ref>#<attempt>` in the main tree under the lock, with the task's verify role. A pass records the new fingerprint, then marks the task done and removes its worktree.
+- [x] A failed `reverify` runs `wt-unland`, then `wt-rebase`, then the next attempt, with `REVERIFY FAIL` and the re-verify summary in its feedback.
+- [x] The drift-fail `wt-unland` and `wt-rebase` prompts carry `--op a<attempt>-unland` and `--op a<attempt>-rebase` for the failing attempt, and a retried call repeats the same id.
+- [x] A `reverify` that returns `null` is retried once, because its `make` throws on `null`. A `null` on the retry too runs `wt-unland`, does not rebase, and parks the task as an infrastructure failure with its worktree kept. A retry that passes completes the task.
+- [x] `resumePoint` returns `from: "dev"` with `gateRejected: true` when the last attempt's `reverify` failed after a passing verdict.
+- [x] `fleet.ts` parses `reverify:<ref>#<n>` labels, ranks `reverify` after `judge`, and colours its PASS and FAIL outcomes.
+- [x] A `leak` land result still fails only that task. The tree watch, deferral, requalify, and `heldBack` tests still pass unmodified, apart from inserted labels.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes, including the five drift cases (drift pass, drift fail, drift null twice, drift null then pass, drift model).
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/lib/resume-point.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` passes.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep -E "packages/dispatch/skills/(autopilot|flightplan)/scripts"` prints nothing.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes, including the five drift cases (drift pass, drift fail, drift null twice, drift null then pass, drift model).
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/lib/resume-point.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/fleet.test.ts` passes.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep -E "packages/dispatch/skills/(autopilot|flightplan)/scripts"` prints nothing.
 
 ## Eval rubric
 
