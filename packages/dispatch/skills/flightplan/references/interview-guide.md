@@ -165,7 +165,7 @@ Focus: audience and structure. Replace bucketing with section-bucketing.
 
 Recommend omitting the Models header by default. Only when a task stands out as unusually hard (a delicate refactor, a concurrency fix) or unusually easy (a mechanical rename), ask whether to pin per-task models.
 
-Write the Models header as `> **Models**: role=model[/effort], role=model[/effort]`.
+The header syntax lives in `task-template.md` under `### Models`.
 
 For a delicate concurrency fix, ask via `AskUserQuestion`: "Should this task use the defaults or pin per-task models?"
 

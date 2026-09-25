@@ -1121,6 +1121,8 @@ describe("orchestrator failure handling", () => {
     expect(exhausted.result.escalations[0].reason).toContain(
       "attempt 1 (ran on final-review)",
     );
+    // The fixer edited the main tree, and no worktree holds those ungated edits back.
+    expect(exhausted.labels).not.toContain("commit-post-loop");
   });
 
   test("a null judge is an infrastructure failure", async () => {
@@ -2157,6 +2159,16 @@ describe("orchestrator single-task resume", () => {
     );
 
     expect(labels).toContain("commit-post-loop");
+  });
+
+  test("a resumed Final review that fails again commits nothing", async () => {
+    const { labels } = await runOrchestrator(
+      { scouts: [], gate: { "review/01": [{ passed: false, summary: "still red" }] } },
+      { ...RESUME_CFG, resumeFrom: "'verify'", resumeAttempt: "2", finalReviewMaxAttempts: "1" },
+    );
+
+    expect(labels).toContain("block:review/01");
+    expect(labels).not.toContain("commit-post-loop");
   });
 
   test("resuming past the cap runs the attempts instead of silently re-parking", async () => {

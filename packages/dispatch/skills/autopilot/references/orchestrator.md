@@ -106,6 +106,7 @@ const MODEL = {
 }
 // Null effort must omit the option so the runtime chooses its own default.
 const pick = (choice) => choice.effort ? { model: choice.model, effort: choice.effort } : { model: choice.model }
+const modelLabel = (choice) => choice.effort ? `${choice.model}/${choice.effort}` : choice.model
 const raise = (choice) => choice.effort
   ? { ...choice, effort: EFFORTS[Math.min(EFFORTS.indexOf(choice.effort) + 1, EFFORTS.length - 1)] }
   : choice
@@ -358,7 +359,7 @@ ${NO_RESTORE_RULE}`
 
 const worktreeRules = (wtPath) => wtPath ? `WORKTREE: ${wtPath}
 Run cd ${wtPath} before any command. Every source file you create or edit must have an absolute path starting with ${wtPath}/.
-Exactly three kinds of write are exempt: flightlog.ts log into the main-tree flightlog, the task file's Status line in the main tree, and the judge's scratch files under /tmp.
+Exactly three kinds of write are exempt: flightlog.ts log into the main-tree flightlog, the task file's Status line in the main tree, and scratch files under /tmp (the judge's notes, an external driver's instruction file).
 Nothing else may be written outside ${wtPath}/.
 Keep the task file and flightlog at their main-tree absolute paths given below. Read and log there; never copy them into the worktree.
 Run Verification from ${wtPath}; commands are relative to the repo root.
@@ -416,7 +417,7 @@ ${NO_COMMIT_RULE}
    RETRY — this is attempt ${attempt}. The previous attempt was rejected:
 ${feedback}
    Fold that feedback into the instruction so ${engine.label} fixes exactly it. Feedback may only ADD requirements. It may never subtract a verification command, mark a gate optional, or tell ${engine.label} the last attempt's code was already right and only needs re-checking — the rejection means a gate went unmet, and an instruction that opens by excusing the previous attempt reproduces it.` : ''}
-4. Write that instruction to a temp file${wtPath ? ` under ${wtPath}/` : ""}, then run this as ONE FOREGROUND Bash call with \`timeout: 600000\` (the Bash tool maximum):
+4. Write that instruction to a temp file under /tmp, never inside the working tree, then run this as ONE FOREGROUND Bash call with \`timeout: 600000\` (the Bash tool maximum):
   ${wtPath ? `cd ${wtPath} && ` : ""}${liveDev ? `bun ${CFG.relayPath} ${engine.label} delegate --prompt-file <your-instruction-file> --git-scope none --dangerous --no-ask --wait-timeout 480000` : `bun ${S}/${engine.wrapper} delegate${engine.modelFlag} --prompt-file <your-instruction-file>`}
    WAIT RULE — never improvise a wait. Do NOT set \`run_in_background\`. Do NOT write a shell poll loop (\`while\`, \`jobs\`, \`wait\`, repeated \`tail\`). Every Bash call gets a fresh shell, so \`jobs\` can never see a command an earlier call started: such a loop spins until the 600s cap and burns ten minutes AFTER ${engine.label} has already finished. ${liveDev ? `The \`--wait-timeout 480000\` above is sized to expire inside the 600s cap with margin for relay's pane spawn and cleanup, so this one call normally returns on its own. It can still outrun the cap: when relay cannot spawn a pane it falls back to headless inside the same invocation, and headless has no timeout at all.` : ''} If the harness reports that the call outran the cap and was moved to the background, do not poll: wait for the completion notification, then Read the output file it named, once.
    ${liveDev ? `Relay runs ${engine.label} in a visible herdr live pane, edits the working tree directly, prints the delegate result on stdout, then closes the pane on success. Read that stdout — do NOT go looking for any temp/transcript files.` : `The headless wrapper has ${engine.label} edit the working tree directly, then prints its summary plus a \`git status --short\` of what changed, and cleans up its own scratch. Read that stdout — do NOT go looking for any temp/transcript files.`}
@@ -688,7 +689,7 @@ const resilient = async (make, retryModel) => {
   try {
     return await make(null)
   } catch (error) {
-    log(`retrying a structured call on ${retryModel.model}${retryModel.effort ? `/${retryModel.effort}` : ''}: ${error?.message ?? String(error)}`)
+    log(`retrying a structured call on ${modelLabel(retryModel)}: ${error?.message ?? String(error)}`)
     return await make(retryModel)
   }
 }
@@ -885,6 +886,13 @@ async function executeTask(item) {
     // does need redoing, including the expensive Final review round.
     const startAt = RESUME && attempt === first ? RESUME.from : 'dev'
     let attemptModel = 'final-review'
+    const rejected = (gateSummary) => attempts.push({
+      n: attempt, model: attemptModel, gateSummary, rationale: null, weighted: null, hardFailed: false, missing: [],
+    })
+    const rebaseTask = async () => {
+      const rebased = await wtCall(`wt-rebase:${ref}`, wtCommand(`rebase ${ref} --op a${attempt}-rebase`), WT_SCHEMA.rebase)
+      wt.base = rebased.base
+    }
     if (startAt !== 'dev') {
       // Nothing to write: the resume takes this attempt's dev work as done.
     } else if (finalReview) {
@@ -913,7 +921,7 @@ async function executeTask(item) {
           { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', ...pick(MODEL.devExternal) })
       } else {
         const devChoice = attempt >= claudeCap ? raise(choices.dev) : choices.dev
-        attemptModel = `${devChoice.model}${devChoice.effort ? `/${devChoice.effort}` : ''}`
+        attemptModel = modelLabel(devChoice)
         await agent(devPrompt(ref, path, attempt, renderHistory(attempts), wt?.path),
           { label: `dev:${ref}#${attempt}`, phase: 'Execute', ...pick(devChoice) })
       }
@@ -939,15 +947,7 @@ async function executeTask(item) {
       return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
     }
     if (!gate.passed) {
-      attempts.push({
-        n: attempt,
-        model: attemptModel,
-        gateSummary: gate.summary ?? 'no output',
-        rationale: null,
-        weighted: null,
-        hardFailed: false,
-        missing: [],
-      })
+      rejected(gate.summary ?? 'no output')
       continue
     }
     // Only a PASSING gate's list is meaningful: a failed attempt is retried, and
@@ -1000,11 +1000,7 @@ async function executeTask(item) {
                 if (!reverified?.passed) {
                   await wtCall(`wt-unland:${ref}`,
                     wtCommand(`unland ${ref} --op a${attempt}-unland`), WT_SCHEMA.unland)
-                  if (reverified) {
-                    const rebased = await wtCall(`wt-rebase:${ref}`,
-                      wtCommand(`rebase ${ref} --op a${attempt}-rebase`), WT_SCHEMA.rebase)
-                    wt.base = rebased.base
-                  }
+                  if (reverified) await rebaseTask()
                   return result
                 }
               }
@@ -1021,35 +1017,17 @@ async function executeTask(item) {
             const cause = `drift re-verify returned no structured result on attempt ${attempt}; the land was undone`
             return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
           }
-          attempts.push({
-            n: attempt,
-            model: attemptModel,
-            gateSummary: `REVERIFY FAIL:\n${reverified.summary}`,
-            rationale: null,
-            weighted: null,
-            hardFailed: false,
-            missing: [],
-          })
+          rejected(`REVERIFY FAIL:\n${reverified.summary}`)
           continue
         }
         if (landed.status === 'conflict') {
           try {
-            const rebased = await withMainLock(() => wtCall(`wt-rebase:${ref}`,
-              wtCommand(`rebase ${ref} --op a${attempt}-rebase`), WT_SCHEMA.rebase))
-            wt.base = rebased.base
+            await withMainLock(rebaseTask)
           } catch (error) {
             const cause = `worktree rebase failed: ${error?.message ?? String(error)}`
             return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
           }
-          attempts.push({
-            n: attempt,
-            model: attemptModel,
-            gateSummary: `LAND CONFLICT:\n${landed.files.join('\n')}`,
-            rationale: null,
-            weighted: null,
-            hardFailed: false,
-            missing: [],
-          })
+          rejected(`LAND CONFLICT:\n${landed.files.join('\n')}`)
           continue
         }
 
@@ -1174,9 +1152,13 @@ const parked = new Set()
 // task does not: its unlanded edits stay in its worktree, so the rest of the
 // wave still lands. A `(commit)` failure does not either — blocking on it was
 // collective punishment, disabling every later commit over one flaky agent.
+// A failed Final review is the exception: its fixer edits the main tree, so
+// nothing but a blocked commit keeps those ungated edits out of history.
 const COMMIT_SAFE = new Set(['(commit)'])
+const failedInMainTree = new Set()
 const commitBlocked = () =>
-  !!aborted || escalations.some(e => e.infrastructure && !parked.has(e.task) && !COMMIT_SAFE.has(e.task))
+  !!aborted || failedInMainTree.size > 0
+  || escalations.some(e => e.infrastructure && !parked.has(e.task) && !COMMIT_SAFE.has(e.task))
 let wave = 0
 let lastScout = null
 let scoutFailed = false
@@ -1505,6 +1487,7 @@ while (!RESUME) {
         ?? 'no result returned for this task and the harness exposed no cause — the pipeline was dropped, so the task state on disk is unknown',
     })
     parked.add(item.ref)
+    if (item.finalReview) failedInMainTree.add(item.ref)
   }
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
   if (aborted || !passedThisWave) break
@@ -1532,6 +1515,7 @@ if (RESUME && !worktreeFailed) {
         ?? 'no result returned for the resumed task and the harness exposed no cause — the pipeline was dropped, so the task state on disk is unknown',
     })
     parked.add(item.ref)
+    if (item.finalReview) failedInMainTree.add(item.ref)
   }
 }
 

@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: docs/01, docs/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -64,20 +64,20 @@ This is the holistic gate. It does not re-score individual tasks. It checks that
 
 ## Acceptance criteria
 
-- [ ] A task header `> **Models**: dev=sonnet/low` reaches `agent()` as sonnet/low on the early dev rungs and sonnet/medium on the last Claude rung. A covering test in `orchestrator-script.test.ts` shows this.
-- [ ] Every `worktree.ts` subcommand, flag, and JSON field that `orchestrator.md` uses exists in `worktree.ts` with the same name and meaning.
-- [ ] The default role map agrees across three places: `orchestrator.md`, autopilot `SKILL.md`, and `../_context/models.md`.
-- [ ] `packages/dispatch` contains no sibling-interference code, tests, or prompt text. `fleet.ts` and `resume-point.ts` may still parse `requalify` rows from past flightlogs.
-- [ ] A failed drift re-verify leads `resume-point.ts` to `dev`, and `fleet.ts` shows a `reverify` row with a PASS or FAIL outcome. Covering tests exist in `packages/dispatch/skills/flightplan/scripts/lib/resume-point.test.ts` and `packages/dispatch/skills/autopilot/scripts/fleet.test.ts`.
-- [ ] Each doc file listed under "Docs, per file" carries exactly the items listed for it there, and the docs describe the shipped behaviour.
-- [ ] (human) Q runs autopilot on a plan with a two-task-wide wave in a whole-target-build repo (for example janus-hud). Q confirms that both tasks' dev steps overlap in time, notes whether the cloned build cache rebuilt incrementally, and confirms that `git worktree list` shows no path under `<repo-parent>/.<repo-name>-autopilot/<slug>/` afterwards.
+- [x] A task header `> **Models**: dev=sonnet/low` reaches `agent()` as sonnet/low on the early dev rungs and sonnet/medium on the last Claude rung. A covering test in `orchestrator-script.test.ts` shows this.
+- [x] Every `worktree.ts` subcommand, flag, and JSON field that `orchestrator.md` uses exists in `worktree.ts` with the same name and meaning.
+- [x] The default role map agrees across three places: `orchestrator.md`, autopilot `SKILL.md`, and `../_context/models.md`.
+- [x] `packages/dispatch` contains no sibling-interference code, tests, or prompt text. `fleet.ts` and `resume-point.ts` may still parse `requalify` rows from past flightlogs.
+- [x] A failed drift re-verify leads `resume-point.ts` to `dev`, and `fleet.ts` shows a `reverify` row with a PASS or FAIL outcome. Covering tests exist in `packages/dispatch/skills/flightplan/scripts/lib/resume-point.test.ts` and `packages/dispatch/skills/autopilot/scripts/fleet.test.ts`.
+- [x] Each doc file listed under "Docs, per file" carries exactly the items listed for it there, and the docs describe the shipped behaviour.
+- [x] (human) Q runs autopilot on a plan with a two-task-wide wave in a whole-target-build repo (for example janus-hud). Q confirms that both tasks' dev steps overlap in time, notes whether the cloned build cache rebuilt incrementally, and confirms that `git worktree list` shows no path under `<repo-parent>/.<repo-name>-autopilot/<slug>/` afterwards.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/` passes.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch` prints nothing.
-- [ ] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|heldBack|one build target" packages/dispatch` returns nothing.
-- [ ] After the test run, `git worktree list | grep -- "-autopilot/autopilot-worktrees/"` prints nothing. The suite leaves no worktree for this slug registered on this repo. Unrelated worktrees may remain.
+- [x] `bun test packages/dispatch/` passes.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch` prints nothing.
+- [x] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|heldBack|one build target" packages/dispatch` returns nothing.
+- [x] After the test run, `git worktree list | grep -- "-autopilot/autopilot-worktrees/"` prints nothing. The suite leaves no worktree for this slug registered on this repo. Unrelated worktrees may remain.
 
 ## Eval rubric
 

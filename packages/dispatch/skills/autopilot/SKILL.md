@@ -209,7 +209,7 @@ Hold one main-tree lock around every `worktree.ts` call and drift re-verify, inc
 
 Repeat a completed `worktree.ts` call safely with identical arguments: `land`, `unland`, and `rebase` take attempt-and-step `--op <id>` values (`a<attempt>-land`, `a<attempt>-unland`, `a<attempt>-rebase`), record their results under those ids, and return the recorded result on repetition. Route each `worktree.ts` call and `reverify` through a wrapper that throws on a `null` result, because `resilient(...)` retries only on a throw. After a second `null`, treat the missing result as an infrastructure failure for the task, or for the run when the call is a sweep or baseline. For a drift re-verify with no result after its retry, undo the land before parking with the worktree kept.
 
-Write every source file under the task's worktree, with only three write exemptions: `flightlog.ts log` into the main-tree flightlog, the task file's Status line, and the judge's scratch files under `/tmp`.
+Write every source file under the task's worktree, with only three write exemptions: `flightlog.ts log` into the main-tree flightlog, the task file's Status line, and scratch files under `/tmp` (the judge's notes, an external driver's instruction file).
 
 ### Scout result and termination rules
 
