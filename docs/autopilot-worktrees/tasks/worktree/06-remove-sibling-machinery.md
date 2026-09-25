@@ -7,7 +7,7 @@
 >
 > **Depends on**: worktree/05
 > **Blocks**: docs/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -68,18 +68,18 @@ This is a **structural change only**. Remove dead paths and change no surviving 
 
 ## Acceptance criteria
 
-- [ ] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|withWriter|heldBack|requalify|SUSPECTED SIBLING|deferred" packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
-- [ ] `makeSlots` is still defined in `orchestrator.md` and still wraps each task pipeline in the wave loop.
-- [ ] `NO_RESTORE_RULE` still bans `git checkout`, `git restore`, `git reset`, and `git clean`.
-- [ ] No function in the script block takes a parameter it no longer reads, and `commitInstructions` takes only the agent label.
-- [ ] Every test left in `orchestrator-script.test.ts` passes, and no surviving test's assertions were edited.
+- [x] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|withWriter|heldBack|requalify|SUSPECTED SIBLING|deferred" packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
+- [x] `makeSlots` is still defined in `orchestrator.md` and still wraps each task pipeline in the wave loop.
+- [x] `NO_RESTORE_RULE` still bans `git checkout`, `git restore`, `git reset`, and `git clean`.
+- [x] No function in the script block takes a parameter it no longer reads, and `commitInstructions` takes only the agent label.
+- [x] Every test left in `orchestrator-script.test.ts` passes, and no surviving test's assertions were edited.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` exits 0.
-- [ ] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|withWriter|heldBack|requalify|SUSPECTED SIBLING|deferred" packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
-- [ ] `rg -n "makeSlots" packages/dispatch/skills/autopilot/references/orchestrator.md` prints at least the definition and one call site.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` exits 0.
+- [x] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|withWriter|heldBack|requalify|SUSPECTED SIBLING|deferred" packages/dispatch/skills/autopilot/references/orchestrator.md packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
+- [x] `rg -n "makeSlots" packages/dispatch/skills/autopilot/references/orchestrator.md` prints at least the definition and one call site.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` prints nothing.
 
 ## Eval rubric
 
