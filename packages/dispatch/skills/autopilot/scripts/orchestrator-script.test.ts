@@ -123,6 +123,8 @@ type Scenario = {
       | null
     )[]
   >;
+  reverifyHolds?: Record<string, Promise<void>>;
+  reverify?: Record<string, ({ passed: boolean; summary: string } | Throws | null)[]>;
   requalify?: Record<
     string,
     ({ passed: boolean; deferred?: boolean; summary: string } | Throws | null)[]
@@ -246,7 +248,7 @@ async function runOrchestrator(
     if (!queues.has(key)) {
       const source =
         (scenario[
-          bucket as "gate" | "requalify" | "judge" | "markDone" | "park" | "worktree"
+          bucket as "gate" | "requalify" | "reverify" | "judge" | "markDone" | "park" | "worktree"
         ] ?? {})[ref] ?? undefined;
       queues.set(key, source ? [...source] : []);
     }
@@ -301,6 +303,7 @@ async function runOrchestrator(
           previous: /--expect (\S+)/.exec(prompt)?.[1] ?? "",
         },
         "wt-rebase": { path, base: "b1", conflicted: landFiles.get(ref) ?? [] },
+        "wt-unland": { restored: [] },
         "wt-remove": { removed: true },
         "wt-show": { path, base: "b0", exists: true },
         "wt-leak": { fingerprint: "f0", paths: [] },
@@ -318,6 +321,10 @@ async function runOrchestrator(
 
     if (role === "verify") {
       return take("gate", refOf(rest), { passed: true, summary: "green" });
+    }
+    if (role === "reverify") {
+      if (scenario.reverifyHolds?.[refOf(rest)]) await scenario.reverifyHolds[refOf(rest)];
+      return take("reverify", refOf(rest), { passed: true, summary: "green after drift" });
     }
     if (role === "requalify") {
       return take("requalify", refOf(rest), {
@@ -3250,16 +3257,176 @@ describe("task worktree isolation", () => {
     expect(promptFor(log, "wt-sweep:end")).toContain(`--keep ${ref}`);
   });
 
-  test("clean land with drift completes without re-verification", async () => {
+  test("drift pass re-verifies the main tree before completing", async () => {
+    const log = await runOrchestrator({
+      scouts: [multiWave([ref, "ui/02"]), complete(2)],
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+    });
+    const labels = log.labels.filter((label) => label.includes(ref));
+    expect(labels.slice(labels.indexOf(`wt-land:${ref}`))).toEqual([
+      `wt-land:${ref}`, `reverify:${ref}#1`, `done:${ref}`, `wt-remove:${ref}`,
+    ]);
+    expect(log.result.completed).toContain(ref);
+    const prompt = promptFor(log, `reverify:${ref}#1`);
+    expect(prompt).not.toContain("WORKTREE:");
+    expect(prompt).not.toContain(`/wt/${ref}`);
+    expect(prompt).toContain("/abs/repo");
+    expect(prompt).toContain("main tree changed after this task's snapshot");
+    expect(prompt).toContain("--role reverify");
+    expect(prompt).toContain("PASS or FAIL");
+    expect(log.schemas[log.labels.indexOf(`reverify:${ref}#1`)]).toEqual(
+      log.schemas[log.labels.indexOf(`verify:${ref}#1`)],
+    );
+    expect(promptFor(log, "wt-land:ui/02")).toContain("--expect landed");
+  });
+
+  test("drift fail unlands and rebases before a new dev attempt", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: {
+        [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }],
+        [`wt-unland:${ref}`]: [null],
+        [`wt-rebase:${ref}`]: [THROWS],
+      },
+      reverify: { [ref]: [{ passed: false, summary: "merged test broke" }] },
+    });
+    const start = log.labels.indexOf(`reverify:${ref}#1`);
+    expect(log.labels.slice(start, start + 6)).toEqual([
+      `reverify:${ref}#1`, `wt-unland:${ref}`, `wt-unland:${ref}`,
+      `wt-rebase:${ref}`, `wt-rebase:${ref}`, `dev:${ref}#2`,
+    ]);
+    for (const role of ["unland", "rebase"]) {
+      const prompts = log.prompts.filter((_, i) => log.labels[i] === `wt-${role}:${ref}`);
+      expect(prompts).toHaveLength(2);
+      expect(prompts[0]).toBe(prompts[1]);
+      expect(prompts[0]).toContain(`--op a1-${role}`);
+    }
+    expect(promptFor(log, `dev:${ref}#2`)).toContain("REVERIFY FAIL:");
+    expect(promptFor(log, `dev:${ref}#2`)).toContain("merged test broke");
+    expect(log.labels.indexOf(`done:${ref}`)).toBeGreaterThan(log.labels.indexOf(`dev:${ref}#2`));
+    const lands = log.prompts.filter((_, i) => log.labels[i] === `wt-land:${ref}`);
+    expect(lands[1]).toContain("--expect f0 --op a2-land");
+    expect(log.result.completed).toEqual([ref]);
+  });
+
+  test("drift null twice undoes the land and parks with its worktree", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0)],
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+      reverify: { [ref]: [null, null] },
+    });
+    const start = log.labels.indexOf(`reverify:${ref}#1`);
+    expect(log.labels.slice(start, start + 4)).toEqual([
+      `reverify:${ref}#1`, `reverify:${ref}#1`, `wt-unland:${ref}`, `block:${ref}`,
+    ]);
+    expect(log.models[start + 1]).toBe("opus");
+    expect(log.efforts[start + 1]).toBe("medium");
+    expect(log.prompts[start]).toBe(log.prompts[start + 1]);
+    for (const label of [`wt-rebase:${ref}`, `dev:${ref}#2`, `done:${ref}`, `wt-remove:${ref}`]) {
+      expect(log.labels).not.toContain(label);
+    }
+    expect(promptFor(log, `wt-unland:${ref}`)).toContain("--op a1-unland");
+    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, infrastructure: true, parked: true });
+    expect(log.result.escalations[0].reason).toContain("drift re-verify");
+    expect(log.result.escalations[0].reason).toContain("land was undone");
+    expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+  });
+
+  test("drift null then pass retries the same prompt and completes", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0), complete(1)],
       worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+      reverify: { [ref]: [null, { passed: true, summary: "green on retry" }] },
     });
+    const start = log.labels.indexOf(`reverify:${ref}#1`);
+    expect(log.labels.slice(start, start + 4)).toEqual([
+      `reverify:${ref}#1`, `reverify:${ref}#1`, `done:${ref}`, `wt-remove:${ref}`,
+    ]);
+    expect(log.models[start + 1]).toBe("opus");
+    expect(log.efforts[start + 1]).toBe("medium");
+    expect(log.prompts[start]).toBe(log.prompts[start + 1]);
+    expect(log.labels).not.toContain(`wt-unland:${ref}`);
     expect(log.result.completed).toEqual([ref]);
-    expect(log.labels.filter((l) => /^(reverify|verify):/.test(l))).toEqual([`verify:${ref}#1`]);
-    const clean = await runOrchestrator({ scouts: [wave(ref, 1, 0), complete(1)] });
-    expect(log.labels).toEqual(clean.labels);
-    expect(log.result).toEqual(clean.result);
+  });
+
+  test.each([
+    ["verify=sonnet/high", "sonnet", "high"],
+    [null, "opus", "low"],
+  ])("drift model follows the verify role: %s", async (modelsRaw, model, effort) => {
+    const log = await runOrchestrator({
+      scouts: [snapshot({ ready: [ready(ref, false, modelsRaw)], counts: counts({ total: 1, todo: 1 }) }), complete(1)],
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+    });
+    expect(modelFor(log, `reverify:${ref}#1`)).toBe(model!);
+    expect(effortFor(log, `reverify:${ref}#1`)).toBe(effort!);
+  });
+
+  test.each(["reverify", "wt-unland", "wt-rebase"])(
+    "drift holds the main-tree lock during %s", async (heldRole) => {
+      const held = latch();
+      const sibling = latch();
+      const calls: string[] = [];
+      const heldLabel = heldRole === "reverify" ? `reverify:${ref}#1` : `${heldRole}:${ref}`;
+      const run = runOrchestrator({
+        scouts: [multiWave([ref, "ui/02"]), complete(2)],
+        agentCalls: calls,
+        devHolds: { "ui/02": sibling.held },
+        reverifyHolds: heldRole === "reverify" ? { [ref]: held.held } : {},
+        worktreeHolds: heldRole === "reverify" ? {} : { [heldLabel]: held.held },
+        worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+        reverify: { [ref]: [{ passed: heldRole === "reverify", summary: "merged verification" }] },
+      });
+      try {
+        await waitForCall(calls, heldLabel);
+        sibling.release();
+        await waitForCall(calls, "judge:ui/02#1");
+        expect(calls).not.toContain("wt-land:ui/02");
+        expect(calls).not.toContain(`done:${ref}`);
+      } finally {
+        sibling.release();
+        held.release();
+      }
+      const log = await run;
+      expect(log.result.completed).toContain(ref);
+      expect(log.result.completed).toContain("ui/02");
+    },
+  );
+
+  test("drift re-verify retains the Max parallel slot", async () => {
+    const held = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready(ref), ready("ui/02")],
+        counts: counts({ total: 2, todo: 2 }),
+        unfinished: [{ ref, state: "todo" }, { ref: "ui/02", state: "todo" }],
+        maxParallel: 1,
+      }), complete(2)],
+      agentCalls: calls,
+      reverifyHolds: { [ref]: held.held },
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+    });
+    try {
+      await waitForCall(calls, `reverify:${ref}#1`);
+      expect(calls).not.toContain("wt-create:ui/02");
+      expect(calls).not.toContain(`done:${ref}`);
+    } finally {
+      held.release();
+    }
+    expect((await run).result.completed).toEqual([ref, "ui/02"]);
+  });
+
+  test("drift failure on the final attempt parks and keeps the worktree", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0)],
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+      reverify: { [ref]: [{ passed: false, summary: "merged test broke" }] },
+    }, { maxAttempts: "1", lastShotEngine: "null" });
+    expect(log.result.escalations[0]).toMatchObject({ attempt: 1, infrastructure: false, parked: true });
+    expect(log.result.escalations[0].reason).toContain("REVERIFY FAIL:");
+    expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+    expect(log.labels).not.toContain(`done:${ref}`);
+    expect(log.labels).not.toContain(`wt-remove:${ref}`);
   });
 
   test.each([null, THROWS])("failed mark-done after land never parks or unlands: %s", async (failure) => {

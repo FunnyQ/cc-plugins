@@ -579,9 +579,13 @@ const resumeNote = (ref, attempt, role) => (
     : ''
 )
 
-const verifyPrompt = (ref, path, attempt, requalify = false, wtPath) => {
-  const role = requalify ? 'requalify' : 'verify'
-  const closing = requalify
+const verifyPrompt = (ref, path, attempt, requalify = false, wtPath, reverify = false) => {
+  const role = reverify ? 'reverify' : requalify ? 'requalify' : 'verify'
+  const closing = reverify
+    ? `Run this check because the main tree changed after this task's snapshot. A failure means the merged result is broken.
+Run every Verification command exactly as written. Any non-zero exit is passed=false. Do not defer this verdict.
+Never clean, restore, reset, stash or otherwise rewrite the tree to obtain a clean run.`
+    : requalify
     ? `This is the requalify run. Every other task in this wave has stopped writing.
 The sibling explanation no longer applies. Any non-zero exit is passed=false. deferred is ignored on this run.`
     : `Tasks in this wave run in PARALLEL${wtPath ? ", each in its own worktree" : " in the main tree"}.
@@ -590,7 +594,7 @@ Run every Verification command exactly as written. Any non-zero exit is passed=f
 If — and only if — the evidence points at a sibling task's in-flight edits, also return deferred=true, prefix summary with the exact string SUSPECTED SIBLING INTERFERENCE, give the exact command and exit code, failing cases, and concrete evidence for attribution. The commands will then be run again once other tasks stop writing.
 Deferring waives nothing and never changes a verdict on its own. An unsupported deferral is counted as a plain failure.`
   return `
-${worktreeRules(wtPath)}First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase start
+${reverify ? `Work in the repo root: ${CFG.repoRoot}. Run every command from that directory.\n` : worktreeRules(wtPath)}First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase start
 ${resumeNote(ref, attempt, role)}Then proceed.
 Use the identical label in both start and end calls.
 
@@ -821,6 +825,7 @@ const WT_SCHEMA = {
     drift: { type: 'boolean' }, files: wtStrings, paths: wtStrings,
     fingerprint: { type: 'string' }, previous: { type: 'string' },
   }),
+  unland: wtObject({ restored: wtStrings }),
   remove: wtObject({ removed: { type: 'boolean' } }),
   show: wtObject({ path: { type: 'string' }, base: { type: ['string', 'null'] }, exists: { type: 'boolean' } }),
   sweep: wtObject({ removed: wtStrings, kept: { type: 'array', items: wtObject({ ref: { type: 'string' }, path: { type: 'string' } }) } }),
@@ -1021,12 +1026,33 @@ async function executeTask(item, watch) {
     if (verdict.passed) {
       if (wt) {
         let landed
+        let reverified = null
         try {
           landed = await withMainLock(async () => {
             const result = await wtCall(`wt-land:${ref}`,
               wtCommand(`land ${ref} --expect ${mainFingerprint} --op a${attempt}-land`), WT_SCHEMA.land)
             if (result.status === 'clean') {
-              // interim: drift is landed without re-verify; replaced later
+              if (result.drift) {
+                const prompt = verifyPrompt(ref, path, attempt, false, undefined, true)
+                try {
+                  reverified = await resilient(async (retryModel) => {
+                    const checked = await agent(prompt,
+                      { label: `reverify:${ref}#${attempt}`, phase: 'Execute', ...pick(retryModel ?? choices.verify), schema: GATE_SCHEMA })
+                    if (checked === null) throw new Error('drift re-verify returned no structured result')
+                    return checked
+                  }, MODEL.structuredRetry)
+                } catch {}
+                if (!reverified?.passed) {
+                  await wtCall(`wt-unland:${ref}`,
+                    wtCommand(`unland ${ref} --op a${attempt}-unland`), WT_SCHEMA.unland)
+                  if (reverified) {
+                    const rebased = await wtCall(`wt-rebase:${ref}`,
+                      wtCommand(`rebase ${ref} --op a${attempt}-rebase`), WT_SCHEMA.rebase)
+                    wt.base = rebased.base
+                  }
+                  return result
+                }
+              }
               mainFingerprint = result.fingerprint
             }
             return result
@@ -1034,6 +1060,22 @@ async function executeTask(item, watch) {
         } catch (error) {
           const cause = `worktree land failed: ${error?.message ?? String(error)}`
           return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
+        }
+        if (landed.status === 'clean' && landed.drift && !reverified?.passed) {
+          if (!reverified) {
+            const cause = `drift re-verify returned no structured result on attempt ${attempt}; the land was undone`
+            return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
+          }
+          attempts.push({
+            n: attempt,
+            model: attemptModel,
+            gateSummary: `REVERIFY FAIL:\n${reverified.summary}`,
+            rationale: null,
+            weighted: null,
+            hardFailed: false,
+            missing: [],
+          })
+          continue
         }
         if (landed.status === 'conflict') {
           try {
@@ -1687,3 +1729,7 @@ return { slug: CFG.slug, completed, escalations, needsHuman, worktrees: keptWork
 - **Hold the main-tree lock around every `worktree.ts` call.** Prevent an unlocked create from snapshotting half a land and two unlocked state rewrites from losing an entry. Stop the run with its cause if a sweep or baseline fails twice; no task owns that failure.
 
 - **Throw on a null worktree result inside the `make` passed to `resilient`.** Trigger its single retry, which otherwise runs only on a throw. Repeat the identical command, including `--expect` and `--op`; replaying a recorded `--op` in `worktree.ts` makes a land retry safe.
+
+- **Re-verify a clean land with drift before marking the task done.** Hold the main-tree lock and the task slot while `reverify` runs Verification in the repo root with the task's verify model and effort. Record the new fingerprint only after a pass. On failure, run `unland` and `rebase` under the same lock with attempt-specific op ids, then feed `REVERIFY FAIL` and the summary to the next dev attempt. Keep the worktree when the attempt cap parks the task.
+
+- **Retry a null drift re-verify once by throwing inside `resilient`'s `make`.** Repeat the same prompt on the structured retry model. If neither call returns a structured result, unland under the lock, then park as an infrastructure failure without rebasing or starting another attempt. Keep the worktree and the previous main fingerprint.
