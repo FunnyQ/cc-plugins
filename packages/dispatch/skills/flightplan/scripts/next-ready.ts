@@ -9,7 +9,7 @@
  *
  * Usage:
  *   bun next-ready.ts <tasks-dir>              # one ref per line
- *   bun next-ready.ts <tasks-dir> --json       # [{ref,finalReview,path}]
+ *   bun next-ready.ts <tasks-dir> --json       # [{ref,finalReview,path,modelsRaw}]
  *   bun next-ready.ts <tasks-dir> --summary    # {ready,counts,invalid,errors,maxParallel}
  *
  * Exits 0 when the tree is clean and either lists ready tasks or prints
@@ -114,7 +114,12 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
 }
 
 /** A ready task ref plus whether it is the closing final-review task. */
-export type ReadyRef = { ref: string; finalReview: boolean; path: string };
+export type ReadyRef = {
+  ref: string;
+  finalReview: boolean;
+  path: string;
+  modelsRaw: string | null;
+};
 
 /**
  * Same ready set as `findReady`, but each entry carries its `finalReview`
@@ -134,6 +139,7 @@ export function findReadyDetailed(
       ref,
       finalReview: byRef[ref]?.finalReview ?? false,
       path: pathByRef[ref] ?? "",
+      modelsRaw: byRef[ref]?.modelsRaw ?? null,
     };
   });
 }

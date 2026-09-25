@@ -165,6 +165,7 @@ describe("findReadyDetailed", () => {
         ref: "ui/02",
         finalReview: true,
         path: join(root, "tasks", "ui", "02-final.md"),
+        modelsRaw: null,
       },
     ]);
     await rm(root, { recursive: true });
@@ -259,9 +260,53 @@ describe("--json CLI", () => {
         ref: "ui/01",
         finalReview: false,
         path: join(root, "tasks", "ui", "01.md"),
+        modelsRaw: null,
       },
     ]);
     await rm(root, { recursive: true });
+  });
+});
+
+describe("Models CLI output", () => {
+  test.each(["--json", "--summary"])("%s carries raw Models without validating", async (mode) => {
+    const raw = "dev=opus  , verify = haiku";
+    const withModels = (nn: string, value: string) =>
+      TASK("ui", nn, "none", "todo").replace(
+        "> **Status**: todo",
+        `> **Status**: todo\n> **Models**:  ${value}  `,
+      );
+    const root = await writeScenario({
+      "ui/01.md": withModels("01", raw),
+      "ui/02.md": TASK("ui", "02", "none", "todo"),
+      "ui/03.md": withModels("03", "dev=Opus"),
+      "ui/04.md": withModels("04", ""),
+    });
+    try {
+      const proc = Bun.spawn(
+        ["bun", join(import.meta.dir, "next-ready.ts"), join(root, "tasks"), mode],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      const [out, err, code] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]);
+      expect(code).toBe(0);
+      expect(err).toBe("");
+      const payload = JSON.parse(out);
+      const ready = mode === "--json" ? payload : payload.ready;
+      expect(ready).toEqual([
+        { ref: "ui/01", finalReview: false, path: join(root, "tasks/ui/01.md"), modelsRaw: raw },
+        { ref: "ui/02", finalReview: false, path: join(root, "tasks/ui/02.md"), modelsRaw: null },
+        { ref: "ui/03", finalReview: false, path: join(root, "tasks/ui/03.md"), modelsRaw: "dev=Opus" },
+        { ref: "ui/04", finalReview: false, path: join(root, "tasks/ui/04.md"), modelsRaw: "" },
+      ]);
+      for (const item of ready) {
+        expect(item).not.toHaveProperty("models");
+      }
+    } finally {
+      await rm(root, { recursive: true });
+    }
   });
 });
 
