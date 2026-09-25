@@ -56,6 +56,7 @@ Freeze the choices that affect more than one task. These flow into `_context/sha
 - **Stack**: <languages / frameworks>
 - **Storage**: <DB / cache / files>
 - **Deployment**: <target>
+- **Visual design**: <impeccable → `design/mock.html`, tokens in `_context/design.md` | none>
 - **Conventions**: <commit style, branching, code style — point to `_context/shared.md`>
 
 ## Architecture

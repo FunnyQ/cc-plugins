@@ -114,6 +114,29 @@ Contents:
 - Styling system (CSS variables, design tokens, scoped styles)
 - Accessibility baseline
 
+### `design.md`
+
+When the interview chose impeccable. Write it from the approved `docs/<slug>/design/mock.html`, in the DESIGN.md format impeccable reads and writes (authoritative source: impeccable's `reference/document.md`). The tokens are the contract; the mock is the verification pointer.
+
+Open with YAML frontmatter. It is the normative layer:
+
+- `name` and `description`.
+- `colors`, `typography`, `rounded`, `spacing`, and `components`, and no other top-level group. Take every value from the mock.
+- Name component variants as sibling keys (`button-primary`, `button-primary-hover`). Give them only the 8 props `backgroundColor`, `textColor`, `typography`, `rounded`, `padding`, `size`, `height`, `width`, and reference primitives as `{colors.<key>}`.
+
+Follow with these sections, in this order, under these exact headings. Omit a section the mock does not use; never rename one.
+
+1. `## Overview` — the concept in two or three sentences. When the target is not the web, state the unit and colour conversion once here (e.g. CSS px = pt, `#RRGGBBAA` = `0xAARRGGBB`).
+2. `## Colors` — each colour by role: Primary, Secondary, Tertiary, Neutral.
+3. `## Typography` — the families, how the target stack loads them, and the hierarchy.
+4. `## Layout` — the order and arrangement of every region, the container and grid, the spacing rhythm, and what changes at each viewport the mock draws, with its switch point.
+5. `## Elevation & Depth` — shadow, blur, and layering values, which the frontmatter has no group for.
+6. `## Shapes` — radius, border, and clipping.
+7. `## Components` — per component: shape, colours, every state the mock draws (hover, press, focus, selected, disabled, empty, error), and what each click does. Put its motion here, or `None`.
+8. `## Do's and Don'ts` — guardrails the user confirmed, with exact values.
+
+Name a frontmatter value in prose by its role; never restate its number.
+
 ### `data-model.md`
 
 When tasks share a schema or domain model worth pinning.

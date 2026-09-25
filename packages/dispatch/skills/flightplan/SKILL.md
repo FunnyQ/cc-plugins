@@ -97,6 +97,7 @@ Carry INTENT.md's Open questions into PLAN.md's — each is either resolved duri
 - **Acceptance criteria & verification** — per requirement, how it gets validated. **Ask which checks a person has to perform**, and tag each one `- [ ] (human) …` (see `references/task-template.md`). Untagged, such an item guarantees a park: autopilot's verifier can only fail a check it cannot run, so the task burns every attempt on work that was already correct. Tagged, the verifier skips it and the run reports it as owed at the end. `lint-task.ts` rejects a gate section whose items are *all* tagged, so keep at least one check a command can make.
 - **Eval rubric** — the graded quality bar on top of the binary gate. Recommend the defaults (`Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1`, pass `> 4.0`, `Correctness < 4` veto) and adapt. A shared bar goes in `_context/rubric.md`.
 - **Final review** — every plan ends with one terminal task marked `> **Final review**: true` whose `Depends on` reaches every other task, transitively. **It always lives at `review/01`** — its own bucket, never appended as the next number in a feature bucket. It gates integration, consistency, regressions, and whether the PLAN goal was met — it does not re-score individual tasks. Offer a low-weight **Leanness** axis on its rubric too (see `references/task-template.md`); only the whole diff reveals accumulated over-engineering. `lint-task.ts` requires it (single-task plans exempt), and requires its `## Verification` to run a test suite whenever the tree runs tests anywhere.
+- **Visual design** — when the plan builds or reshapes UI and the `impeccable` skill is available, ask whether to design it with impeccable. A yes becomes the design phase in Step 6, which ends in an approved HTML mock. Skip the question when either condition fails.
 - **Conventions worth freezing** — commit style, code style, file layout, naming. These become `_context/shared.md`.
 - **Failure modes & rollback**.
 
@@ -110,7 +111,7 @@ Follow `references/plan-template.md`. PLAN.md carries all decisions, requirement
 
 Call `ExitPlanMode` once PLAN.md is drafted. Always exit, even with open questions — record those in PLAN.md's "Open Questions".
 
-Restate the Step 2 options — engine and depth tier — in one line as part of the plan, right beside the task index. The tier was picked before the task count existed, so this is where a wrong guess gets caught. This is the last decision point: Steps 6–8 ask nothing.
+Restate the Step 2 options — engine and depth tier — in one line as part of the plan, right beside the task index. The tier was picked before the task count existed, so this is where a wrong guess gets caught. When the interview chose impeccable, state the design phase in the same line. This is the last decision point: Steps 6–8 ask nothing, except the impeccable design phase, which runs its own questions.
 
 ### Step 6 — On approval, write the files
 
@@ -133,7 +134,14 @@ Either way, never leave a half-written tree.
 
    **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
-2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription). Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure.
+   **When the interview chose impeccable, run the design phase now** — after scaffold, because scaffold refuses a root that already holds files, and before step 2, because `_context/design.md` is derived from its result.
+   - Invoke the `impeccable` skill with `shape <feature>`. Let it run whichever path it picks, and answer its questions with the user.
+   - When the user compares directions, draw them side by side in `docs/<slug>/design/options.html`.
+   - Write the approved direction as `docs/<slug>/design/mock.html`: one self-contained file, no network, drawing every state the tasks must build. Use the target's real values, and comment each CSS custom property with the target token it stands for. Draw it in HTML even when the target is not the web.
+   - Revise the mock until the user approves it.
+   - When the mock needs work the approved task index lacks, add those tasks and name them in the Step 8 recap.
+
+2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription). Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure. After a design phase, inline every value the mock uses into `_context/design.md`, in impeccable's DESIGN.md format, list it under Required reading in every UI task, and give the task that first makes the UI visible a `- [ ] (human)` check against `docs/<slug>/design/mock.html` opened side by side.
 
 3. **Fan the task files out to forked subagents** — one `Agent` per task file, all in a single message so they run concurrently. Use `subagent_type: "fork"` and only that; omitting it starts a fresh, context-less agent that never saw the interview and will invent the decisions.
 
@@ -157,7 +165,7 @@ Either way, never leave a half-written tree.
    ls docs/<slug>/tasks/*/*.md      # every expected path present?
    git status --short               # anything touched outside docs/<slug>/?
    ```
-   Write any missing file yourself, inline — don't re-spawn the batch, don't trash the tree (a missing file is repairable). Revert any path a fork touched outside `docs/<slug>/`; the brief forbids it but nothing enforces it.
+   Write any missing file yourself, inline — don't re-spawn the batch, don't trash the tree (a missing file is repairable). Revert any path a fork touched outside `docs/<slug>/`; the brief forbids it but nothing enforces it. Keep what the design phase wrote before the fan-out, such as `PRODUCT.md` and `.impeccable/`.
 
    Every task file needs a `## Eval rubric` (threshold line + weighted table), and exactly one task carries `> **Final review**: true`. See `references/task-template.md`.
 
