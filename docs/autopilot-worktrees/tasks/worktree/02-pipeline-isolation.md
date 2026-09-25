@@ -8,7 +8,7 @@
 >
 > **Depends on**: worktree/01, models/02
 > **Blocks**: worktree/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -162,25 +162,25 @@ Also:
 
 ## Acceptance criteria
 
-- [ ] `CFG.repoRoot` exists in the script's `CFG` literal. SKILL.md Step 1 sets it from `git rev-parse --show-toplevel`, and that is SKILL.md's only change.
-- [ ] A clean non-final task records labels in this order: `wt-create:<ref>` → `dev:<ref>#1` → `verify:<ref>#1` → `judge:<ref>#1` → `wt-land:<ref>` → `done:<ref>` → `wt-remove:<ref>`.
-- [ ] Every `dev:`, `dev-<engine>:`, `verify:`, and `judge:` prompt of a non-final task contains its worktree path. It also names the three exempt writes (flightlog log, task Status line, `/tmp` judge scratch) and forbids any other write outside the worktree. The external-driver prompt's wrapper line is prefixed with `cd <path> && `.
-- [ ] A test holds one task's `wt-land` open. It asserts that a second task's `wt-create`, `wt-land`, and `wt-remove` each wait until the first releases.
-- [ ] A `wt-land` whose first result is `null` is retried once with a byte-identical command, carrying the same `--expect` and `--op a1-land`, and the task then completes. A `wt-land` that is `null` twice ends that task as an infrastructure failure, with no `done:` and no `wt-remove:`.
-- [ ] A land returning `conflict` or `leak` ends that task as an infrastructure failure whose cause starts with `LAND NOT CLEAN (`. It records no `done:` or `wt-remove:` for its ref, its `{ref, path}` appears in the run result's `worktrees`, and a sibling task in the same wave still completes.
-- [ ] A `clean` land with `drift: true` completes the task exactly like `drift: false`.
-- [ ] A `finalReview` task records no task-scoped `wt-*` label (`wt-create:`, `wt-land:`, `wt-rebase:`, `wt-remove:` for its ref), and its prompts carry no `WORKTREE:` line. The run-scoped `wt-sweep:start`, `wt-leak:baseline`, and `wt-sweep:end` still run.
-- [ ] `wt-sweep:start` keeps exactly the refs the scout reports as `blocked`. `wt-leak:baseline` runs after it and before wave 1's first `wt-create`. A fully clean run returns `worktrees: []`.
-- [ ] Across runs: the scout reports a leftover ref as `blocked` and the start sweep keeps it with a path. This run never dispatches it. `wt-sweep:end`'s keep list still contains it, and the run result's `worktrees` contains that `{ref, path}`.
-- [ ] The existing `defer and requalify gate`, `held-back paths`, and `plan concurrency cap` tests pass, changed only by inserted `wt-*` labels.
-- [ ] The rewritten isolation note no longer tells readers to sequence conflicts with `Depends on` instead of isolating them.
+- [x] `CFG.repoRoot` exists in the script's `CFG` literal. SKILL.md Step 1 sets it from `git rev-parse --show-toplevel`, and that is SKILL.md's only change.
+- [x] A clean non-final task records labels in this order: `wt-create:<ref>` → `dev:<ref>#1` → `verify:<ref>#1` → `judge:<ref>#1` → `wt-land:<ref>` → `done:<ref>` → `wt-remove:<ref>`.
+- [x] Every `dev:`, `dev-<engine>:`, `verify:`, and `judge:` prompt of a non-final task contains its worktree path. It also names the three exempt writes (flightlog log, task Status line, `/tmp` judge scratch) and forbids any other write outside the worktree. The external-driver prompt's wrapper line is prefixed with `cd <path> && `.
+- [x] A test holds one task's `wt-land` open. It asserts that a second task's `wt-create`, `wt-land`, and `wt-remove` each wait until the first releases.
+- [x] A `wt-land` whose first result is `null` is retried once with a byte-identical command, carrying the same `--expect` and `--op a1-land`, and the task then completes. A `wt-land` that is `null` twice ends that task as an infrastructure failure, with no `done:` and no `wt-remove:`.
+- [x] A land returning `conflict` or `leak` ends that task as an infrastructure failure whose cause starts with `LAND NOT CLEAN (`. It records no `done:` or `wt-remove:` for its ref, its `{ref, path}` appears in the run result's `worktrees`, and a sibling task in the same wave still completes.
+- [x] A `clean` land with `drift: true` completes the task exactly like `drift: false`.
+- [x] A `finalReview` task records no task-scoped `wt-*` label (`wt-create:`, `wt-land:`, `wt-rebase:`, `wt-remove:` for its ref), and its prompts carry no `WORKTREE:` line. The run-scoped `wt-sweep:start`, `wt-leak:baseline`, and `wt-sweep:end` still run.
+- [x] `wt-sweep:start` keeps exactly the refs the scout reports as `blocked`. `wt-leak:baseline` runs after it and before wave 1's first `wt-create`. A fully clean run returns `worktrees: []`.
+- [x] Across runs: the scout reports a leftover ref as `blocked` and the start sweep keeps it with a path. This run never dispatches it. `wt-sweep:end`'s keep list still contains it, and the run result's `worktrees` contains that `{ref, path}`.
+- [x] The existing `defer and requalify gate`, `held-back paths`, and `plan concurrency cap` tests pass, changed only by inserted `wt-*` labels.
+- [x] The rewritten isolation note no longer tells readers to sequence conflicts with `Depends on` instead of isolating them.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot` prints nothing.
-- [ ] `rg -n "repoRoot" packages/dispatch/skills/autopilot/SKILL.md` prints exactly one line.
-- [ ] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|heldBack" packages/dispatch/skills/autopilot/references/orchestrator.md` still prints matches, because the machinery must survive this task.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot` prints nothing.
+- [x] `rg -n "repoRoot" packages/dispatch/skills/autopilot/SKILL.md` prints exactly one line.
+- [x] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|heldBack" packages/dispatch/skills/autopilot/references/orchestrator.md` still prints matches, because the machinery must survive this task.
 
 ## Eval rubric
 
