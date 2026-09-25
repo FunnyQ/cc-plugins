@@ -99,6 +99,10 @@ describe("parseAgentLabel", () => {
       },
     ],
     [
+      "reverify:ui/main#2",
+      { role: "reverify", ref: "ui/main", attempt: 2, raw: "reverify:ui/main#2" },
+    ],
+    [
       "judge:ui/03#2",
       { role: "judge", ref: "ui/03", attempt: 2, raw: "judge:ui/03#2" },
     ],
@@ -456,6 +460,15 @@ describe("aggregateFleet", () => {
     expect(dev?.elapsedMs).toBeUndefined();
   });
 
+  test("reverify starts after judge within the same attempt", () => {
+    const rows = aggregateFleet([
+      note("ui/01", "judge", 2, "2026-01-01T00:00:00Z", "start", "judge:ui/01#2"),
+      note("ui/01", "reverify", 2, "2026-01-01T00:05:00Z", "start", "reverify:ui/01#2"),
+    ]);
+    expect(rows.find((row) => row.role === "judge")?.status).toBe("abandoned");
+    expect(rows.find((row) => row.role === "reverify")?.status).toBe("in-flight");
+  });
+
   test("abandons an open row once a later attempt for the same ref starts", () => {
     const rows = aggregateFleet([
       note("core/03", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev#1"),
@@ -663,7 +676,7 @@ describe("gate outcome", () => {
   // requalify copy carried `agentLabel: "requalify:task/name#1"` against
   // `task: "ui/01"`, and only passed because `outcomeOf` matches on role.
   const gateNote = (
-    role: "verify" | "requalify",
+    role: "verify" | "requalify" | "reverify",
     message: string,
   ): FlightlogEntry => ({
     kind: "note",
@@ -684,8 +697,18 @@ describe("gate outcome", () => {
       (row) =>
         row.role === "verify" ||
         row.role === "requalify" ||
+        row.role === "reverify" ||
         row.role === "judge",
     )?.outcome;
+
+  test.each([
+    ["FAIL — merged verification rejected", "failed"],
+    ["PASS — 7 pass, 0 fail", "passed"],
+    ["merged verification failed", "failed"],
+    ["merged verification passed", "passed"],
+  ] as const)("reads drift re-verify outcome: %s", (message, outcome) => {
+    expect(outcomeOf([gateNote("reverify", message)])).toBe(outcome);
+  });
 
   test("reads the verifier's PASS prefix", () => {
     expect(outcomeOf([verifyNote("PASS — every command green")])).toBe(
