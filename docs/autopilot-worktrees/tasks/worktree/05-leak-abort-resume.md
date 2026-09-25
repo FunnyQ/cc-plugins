@@ -8,7 +8,7 @@
 >
 > **Depends on**: worktree/04
 > **Blocks**: worktree/06
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -97,18 +97,18 @@ A single-task resume (`CFG.resumeTask` set, for a non-final task) runs one pipel
 
 ## Acceptance criteria
 
-- [ ] A leak, from a land or from the wave-end check, sets a run-wide abort. Every task checks it before its slot body, at each attempt, and before each land.
-- [ ] After an abort, no task lands or parks, no commit or end sweep runs, and the run result carries `aborted` plus every entry still in the `live` map and every still-blocked worktree the start sweep kept.
-- [ ] A task whose land was clean before the abort still runs `done:` and `wt-remove:`, and is absent from the aborted run's `worktrees`.
-- [ ] The wave-end leak check runs before the inter-wave commit and is skipped for a wave that ran the Final review.
-- [ ] A `--from verify|judge` resume takes a baseline fingerprint first, then runs in the worktree `wt-show` reports, and halts naming the path when `exists` is false. A `--from dev` resume runs `wt-show` first, reuses an existing worktree, and runs `wt-create` only when it is missing.
-- [ ] A Final review resume takes no baseline and runs no `wt-show` or `wt-create`.
-- [ ] The tree watch, deferral, requalify, and `heldBack` tests still pass unmodified, apart from inserted labels.
+- [x] A leak, from a land or from the wave-end check, sets a run-wide abort. Every task checks it before its slot body, at each attempt, and before each land.
+- [x] After an abort, no task lands or parks, no commit or end sweep runs, and the run result carries `aborted` plus every entry still in the `live` map and every still-blocked worktree the start sweep kept.
+- [x] A task whose land was clean before the abort still runs `done:` and `wt-remove:`, and is absent from the aborted run's `worktrees`.
+- [x] The wave-end leak check runs before the inter-wave commit and is skipped for a wave that ran the Final review.
+- [x] A `--from verify|judge` resume takes a baseline fingerprint first, then runs in the worktree `wt-show` reports, and halts naming the path when `exists` is false. A `--from dev` resume runs `wt-show` first, reuses an existing worktree, and runs `wt-create` only when it is missing.
+- [x] A Final review resume takes no baseline and runs no `wt-show` or `wt-create`.
+- [x] The tree watch, deferral, requalify, and `heldBack` tests still pass unmodified, apart from inserted labels.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes, including all eleven new cases, numbered 1–11 under Tests: waiting sibling, started sibling, Final review exempt, wave-end leak, resume from verify, resume from judge, missing worktree, resume baseline, clean land before the abort, resume from dev reusing a worktree, and resume from dev without one.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot/scripts` prints nothing.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes, including all eleven new cases, numbered 1–11 under Tests: waiting sibling, started sibling, Final review exempt, wave-end leak, resume from verify, resume from judge, missing worktree, resume baseline, clean land before the abort, resume from dev reusing a worktree, and resume from dev without one.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot/scripts` prints nothing.
 
 ## Eval rubric
 
