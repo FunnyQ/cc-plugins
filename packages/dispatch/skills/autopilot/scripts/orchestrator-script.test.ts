@@ -116,7 +116,6 @@ type Scenario = {
     (
       | {
           passed: boolean;
-          deferred?: boolean;
           summary: string;
           humanPending?: string[];
         }
@@ -126,10 +125,6 @@ type Scenario = {
   >;
   reverifyHolds?: Record<string, Promise<void>>;
   reverify?: Record<string, ({ passed: boolean; summary: string } | Throws | null)[]>;
-  requalify?: Record<
-    string,
-    ({ passed: boolean; deferred?: boolean; summary: string } | Throws | null)[]
-  >;
   judge?: Record<
     string,
     ({ verdict: Verdict; rationale: string } | Throws | null)[]
@@ -151,7 +146,7 @@ type Scenario = {
   parkHolds?: Record<string, Promise<void>>;
   /** Keyed by ref; the stubbed mark-done agent awaits this before returning. */
   doneHolds?: Record<string, Promise<void>>;
-  /** Optional live call sink for tests that coordinate held writer windows. */
+  /** Optional live call sink for tests that coordinate held pipeline steps. */
   agentCalls?: string[];
 };
 
@@ -249,7 +244,7 @@ async function runOrchestrator(
     if (!queues.has(key)) {
       const source =
         (scenario[
-          bucket as "gate" | "requalify" | "reverify" | "judge" | "markDone" | "park" | "worktree"
+          bucket as "gate" | "reverify" | "judge" | "markDone" | "park" | "worktree"
         ] ?? {})[ref] ?? undefined;
       queues.set(key, source ? [...source] : []);
     }
@@ -326,12 +321,6 @@ async function runOrchestrator(
     if (role === "reverify") {
       if (scenario.reverifyHolds?.[refOf(rest)]) await scenario.reverifyHolds[refOf(rest)];
       return take("reverify", refOf(rest), { passed: true, summary: "green after drift" });
-    }
-    if (role === "requalify") {
-      return take("requalify", refOf(rest), {
-        passed: true,
-        summary: "green after quiet",
-      });
     }
     if (role === "judge") {
       return take("judge", refOf(rest), { verdict: pass, rationale: "solid" });
@@ -1693,466 +1682,7 @@ describe("orchestrator commit ownership", () => {
   });
 });
 
-describe("held-back paths", () => {
-  // A parked task used to disable every later commit, leaving the whole tree
-  // dirty for the rest of the run. Now only its own paths are held back.
-  test("a parked task holds back its own path and no longer blocks the commit", async () => {
-    const log = await runOrchestrator({
-      scouts: [
-        snapshot({
-          ready: [ready("ui/01"), ready("ui/02")],
-          counts: counts({ total: 3, todo: 3 }),
-          unfinished: [
-            { ref: "ui/01", state: "todo" },
-            { ref: "ui/02", state: "todo" },
-            { ref: "ui/03", state: "todo" },
-          ],
-        }),
-        snapshot({
-          ready: [ready("ui/03")],
-          counts: counts({ total: 3, done: 1, blocked: 1, todo: 1 }),
-          unfinished: [{ ref: "ui/03", state: "todo" }],
-        }),
-        snapshot({
-          counts: counts({ total: 3, done: 2, blocked: 1 }),
-          unfinished: [{ ref: "ui/02", state: "blocked" }],
-        }),
-      ],
-      gate: {
-        "ui/02": [
-          { passed: false, summary: "one" },
-          { passed: false, summary: "two" },
-          { passed: false, summary: "three" },
-        ],
-      },
-    });
-
-    expect(log.labels).toContain("commit-wave-2");
-    const prompt = promptFor(log, "commit-wave-2");
-    expect(prompt).toContain("/abs/repo/docs/my-plan/tasks/ui/02.md");
-    expect(prompt).toContain("Files to create / modify");
-    expect(prompt).not.toContain("/abs/repo/docs/my-plan/tasks/ui/01.md");
-  });
-
-  test("a clean wave carries no held-back block", async () => {
-    const log = await runOrchestrator({
-      scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1)],
-    });
-    expect(promptFor(log, "commit-wave-2")).not.toContain("HELD BACK");
-  });
-});
-
-describe("defer and requalify gate", () => {
-  const siblingMarker = "SUSPECTED SIBLING INTERFERENCE";
-  const twoTaskScouts = () => [
-    multiWave(["ui/main", "ui/sibling"]),
-    complete(2),
-  ];
-
-  test("a deferred failure passes after one requalify without rerunning dev", async () => {
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [
-          {
-            passed: false,
-            deferred: true,
-            summary: `${siblingMarker}: test exited 1`,
-          },
-        ],
-      },
-      requalify: { "ui/main": [{ passed: true, summary: "test exited 0" }] },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-
-    await waitForCall(calls, "verify:ui/main#1");
-    expect(calls).not.toContain("requalify:ui/main#1");
-    sibling.release();
-    const log = await run;
-    const { result, labels } = log;
-    expect(modelFor(log, "requalify:ui/main#1")).toBe("opus");
-    expect(effortFor(log, "requalify:ui/main#1")).toBe("low");
-
-    expect(result.completed).toEqual(["ui/main", "ui/sibling"]);
-    expect(labels.filter((label) => label === "dev:ui/main#1")).toHaveLength(1);
-    expect(
-      labels.filter((label) => label.startsWith("requalify:ui/main")),
-    ).toEqual(["requalify:ui/main#1"]);
-  });
-
-  test("a failing requalify falls through to the next dev attempt", async () => {
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [
-          {
-            passed: false,
-            deferred: true,
-            summary: `${siblingMarker}: test exited 1`,
-          },
-          { passed: true, summary: "retry passed" },
-        ],
-      },
-      requalify: { "ui/main": [{ passed: false, summary: "still red" }] },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const { result, labels } = await run;
-
-    expect(result.completed).toContain("ui/main");
-    expect(labels).toContain("requalify:ui/main#1");
-    expect(labels).toContain("dev:ui/main#2");
-    expect(labels).not.toContain("requalify:ui/main#2");
-  });
-
-  test("requalify waits for a sibling held inside mark-done", async () => {
-    const mainDev = latch();
-    const done = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [
-          {
-            passed: false,
-            deferred: true,
-            summary: `${siblingMarker}: test exited 1`,
-          },
-        ],
-      },
-      devHolds: { "ui/main": mainDev.held },
-      doneHolds: { "ui/sibling": done.held },
-      agentCalls: calls,
-    });
-
-    await waitForCall(calls, "done:ui/sibling");
-    mainDev.release();
-    await waitForCall(calls, "verify:ui/main#1");
-    expect(calls).not.toContain("requalify:ui/main#1");
-    done.release();
-    const { labels } = await run;
-    expect(labels.indexOf("requalify:ui/main#1")).toBeGreaterThan(
-      labels.indexOf("done:ui/sibling"),
-    );
-  });
-
-  test("passed=true rejects deferral", async () => {
-    const { labels, result } = await runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [{ passed: true, deferred: true, summary: siblingMarker }],
-      },
-    });
-    expect(result.completed).toContain("ui/main");
-    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
-  });
-
-  test("a one-task wave rejects deferral", async () => {
-    const { labels } = await runOrchestrator({
-      scouts: [wave("ui/main", 1, 0), complete(1)],
-      gate: {
-        "ui/main": [
-          { passed: false, deferred: true, summary: siblingMarker },
-          { passed: true, summary: "retry passed" },
-        ],
-      },
-    });
-    expect(labels).toContain("dev:ui/main#2");
-    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
-  });
-
-  test("a missing sibling marker rejects deferral", async () => {
-    // The sibling is held so a live writer DOES exist when the gate returns.
-    // Without that hold this test would pass with the marker check deleted — the
-    // live-writer condition alone would reject the deferral, making it a copy of
-    // "no live sibling writer rejects deferral" below. The absent marker has to
-    // be the only failing condition for this test to mean anything.
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [
-          { passed: false, deferred: true, summary: "error: something else" },
-          { passed: true, summary: "retry passed" },
-        ],
-      },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const { labels } = await run;
-
-    expect(labels).toContain("dev:ui/main#2");
-    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
-  });
-
-  test("no live sibling writer rejects deferral", async () => {
-    const { labels } = await runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [
-          { passed: false, deferred: true, summary: siblingMarker },
-          { passed: true, summary: "retry passed" },
-        ],
-      },
-    });
-    expect(labels).toContain("dev:ui/main#2");
-    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
-  });
-
-  test("a deferred flag from requalify is ignored", async () => {
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [
-          { passed: false, deferred: true, summary: siblingMarker },
-          { passed: true, summary: "retry passed" },
-        ],
-      },
-      requalify: {
-        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
-      },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const { labels } = await run;
-    expect(
-      labels.filter((label) => label.startsWith("requalify:ui/main")),
-    ).toEqual(["requalify:ui/main#1"]);
-    expect(labels).toContain("dev:ui/main#2");
-  });
-
-  test("when every task defers the last request is rejected and the wave settles", async () => {
-    const refs = ["ui/01", "ui/02", "ui/03"];
-    const { result, labels } = await runOrchestrator({
-      scouts: [multiWave(refs), complete(3)],
-      gate: Object.fromEntries(
-        refs.map((ref) => [
-          ref,
-          [
-            { passed: false, deferred: true, summary: siblingMarker },
-            { passed: true, summary: "retry passed" },
-          ],
-        ]),
-      ),
-    });
-    expect(result.completed).toEqual(refs);
-    expect(
-      labels.filter((label) => label.startsWith("requalify:")),
-    ).toHaveLength(2);
-    expect(
-      labels.filter(
-        (label) => label.endsWith("#2") && label.startsWith("dev:"),
-      ),
-    ).toHaveLength(1);
-  });
-
-  test("requalify waits for a sibling held inside catch-path park", async () => {
-    const mainDev = latch();
-    const park = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
-      },
-      devThrows: ["ui/sibling"],
-      devHolds: { "ui/main": mainDev.held },
-      parkHolds: { "ui/sibling": park.held },
-      agentCalls: calls,
-    });
-    await waitForCall(calls, "block:ui/sibling");
-    mainDev.release();
-    await waitForCall(calls, "verify:ui/main#1");
-    expect(calls).not.toContain("requalify:ui/main#1");
-    park.release();
-    const { result, labels } = await run;
-    expect(labels.indexOf("requalify:ui/main#1")).toBeGreaterThan(
-      labels.indexOf("block:ui/sibling"),
-    );
-    expect(result.escalations.some((item) => item.task === "ui/sibling")).toBe(
-      true,
-    );
-  });
-
-  test("a null requalify result is an infrastructure failure", async () => {
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
-      },
-      requalify: { "ui/main": [null] },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const { result, labels } = await run;
-    const failure = result.escalations.find((item) => item.task === "ui/main");
-    expect(labels).toContain("requalify:ui/main#1");
-    expect(failure?.infrastructure).toBe(true);
-    expect(failure?.attempt).toBe(1);
-    expect(failure?.reason).toMatch(/requalification did not run/);
-  });
-
-  test("verify prompts keep PASS or FAIL logging and switch role by mode", async () => {
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
-      },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const log = await run;
-    const normal = promptFor(log, "verify:ui/main#1");
-    const requalify = promptFor(log, "requalify:ui/main#1");
-    expect(normal).toContain("--role verify");
-    expect(normal).toContain(siblingMarker);
-    expect(requalify).toContain("--role requalify");
-    expect(requalify).toContain("deferred is ignored");
-    expect(normal).toContain(
-      "message MUST start with the bare word PASS or FAIL",
-    );
-    expect(requalify).toContain(
-      "message MUST start with the bare word PASS or FAIL",
-    );
-  });
-
-  test("both verifier modes keep the strict-exit rule and the restore ban", async () => {
-    // The two modes render from one builder but through different closing text,
-    // so a later edit can drop a clause from one and leave the other intact.
-    // Both are captured here; the ban assertions make requalify the EIGHTH
-    // rendered capture, alongside the seven in "orchestrator commit ownership".
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
-      },
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-    });
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const log = await run;
-    const normal = promptFor(log, "verify:ui/main#1");
-    const requalify = promptFor(log, "requalify:ui/main#1");
-
-    for (const mode of [normal, requalify]) {
-      expect(mode).toContain("Any non-zero exit is passed=false");
-      expect(mode).toContain("do not reason your way past this one");
-      // A waiver clause is the defect the whole plan exists to prevent: the
-      // incident that motivated it ended with a verifier passing two red tests
-      // on its own sibling-attribution. Any hedge near the exit rule is a
-      // finding, so the rendered text may carry none of these words at all.
-      expect(mode).not.toMatch(
-        /unless|except|may still pass|can be ignored|disregard/i,
-      );
-    }
-
-    // Mode-specific halves: neither may leak into the other.
-    expect(normal).toContain(
-      "An unsupported deferral is counted as a plain failure",
-    );
-    expect(requalify).not.toContain(siblingMarker);
-    expect(requalify).toContain("The sibling explanation no longer applies");
-    expect(normal).not.toContain("deferred is ignored");
-  });
-});
-
-// WRITER ACCOUNTING TESTS
-// ══════════════════════════════════════════════════════════════════════════
-// What these tests deliberately cannot prove, and why:
-// - The count has no observable effect until something waits on it, and nothing
-//   here waits. A test that releases a held dev promise only proves the agent
-//   finished; a test that observes the park's label only proves the park ran,
-//   which is equally true with the wrapper removed. So the accounting — that
-//   dev, mark-done and the catch-path park each open a counted window — is only
-//   testable through a consumer that waits on the quiet signal. That consumer
-//   now exists: the "defer and requalify gate" suite above holds a sibling in
-//   dev, in mark-done, and in the catch-path park, and asserts the requalify
-//   agent does not run until the hold is released. The accounting is asserted
-//   there, not here.
-//
-// What these tests do own: the threading is correct, the wrapping does not
-// disturb a normal wave, and the run's shape is unchanged. Note that a
-// miscounted latch presents to the defer suite as a **hang** rather than a
-// failure — so a timeout in that suite is a real defect and must never be
-// "fixed" by raising the limit.
-test("the watch does not disturb a normal wave", async () => {
-  // A multi-task wave with no holds completes with the same completed set and
-  // the same agent-label order as before the watch existed.
-  const { result, labels } = await runOrchestrator({
-    scouts: [multiWave(["ui/01", "ui/02"]), complete(2)],
-  });
-  expect(result.completed).toEqual(["ui/01", "ui/02"]);
-  expect(result.escalations).toEqual([]);
-  // The agent sequence is unchanged by the watch: dev, verify, judge, done for
-  // each task, in any order (parallel tasks in wave 1, then the next wave).
-  const waveOneDev = labels.filter(
-    (l) => l.startsWith("dev") && l.includes("#1"),
-  ).length;
-  const waveOneVerify = labels.filter(
-    (l) => l.startsWith("verify") && l.includes("#1"),
-  ).length;
-  expect(waveOneDev).toBe(2);
-  expect(waveOneVerify).toBe(2);
-});
-
-test("a wave whose every dev step is held, then released, completes", async () => {
-  // All holds are released after the wave is known to be in flight. This proves
-  // the wrapping does not change when a wave finishes. It is NOT a deadlock test:
-  // nothing in this task awaits quiet(), so completion depends only on the holds
-  // being released, and this would still pass if leave() never decremented. Leak
-  // detection belongs to the capability that waits — do not claim it here.
-  const devUI01 = latch();
-  const devUI02 = latch();
-
-  const run = runOrchestrator({
-    scouts: [multiWave(["ui/01", "ui/02"]), complete(2)],
-    devHolds: {
-      "ui/01": devUI01.held,
-      "ui/02": devUI02.held,
-    },
-  });
-
-  await Promise.resolve();
-  devUI01.release();
-  devUI02.release();
-  const { result } = await run;
-
-  expect(result.completed).toEqual(["ui/01", "ui/02"]);
-  expect(result.escalations).toEqual([]);
-});
-
 test("a held catch-path park still reconciles", async () => {
-  // Hold a sibling's dev step so it throws into the guarded wrapper's catch,
-  // hold its park, release both, and assert the task is escalated and parked
-  // exactly as it is today. This proves the extra wrapping did not break the
-  // catch path; it does NOT prove the park is counted.
   const dev = latch();
   const park = latch();
 
@@ -2193,7 +1723,6 @@ const modelsFor = (log: Pick<RunLog, "labels" | "models">, label: string) =>
   );
 
 describe("structured-output resilience", () => {
-  const siblingMarker = "SUSPECTED SIBLING INTERFERENCE";
   const twoTaskScouts = () => [
     multiWave(["ui/main", "ui/sibling"]),
     complete(2),
@@ -2297,9 +1826,6 @@ describe("structured-output resilience", () => {
     const calls: string[] = [];
     const run = runOrchestrator({
       scouts: twoTaskScouts(),
-      gate: {
-        "ui/main": [{ passed: false, deferred: true, summary: siblingMarker }],
-      },
       devHolds: { "ui/sibling": sibling.held },
       agentCalls: calls,
     });
@@ -2310,7 +1836,6 @@ describe("structured-output resilience", () => {
     for (const label of [
       "scout-wave-1",
       "verify:ui/main#1",
-      "requalify:ui/main#1",
       "judge:ui/main#1",
       "done:ui/main",
       "commit-post-loop",
@@ -2436,37 +1961,6 @@ describe("plan concurrency cap", () => {
     }
     holds.forEach((hold) => hold.release());
     expect((await run).result.completed).toHaveLength(3);
-  });
-
-  // A serial task has no sibling writing beside it, so a sibling excuse is
-  // always unsupported there and must not buy a requalify.
-  test("a serial wave rejects a sibling deferral", async () => {
-    // The held sibling makes this load-bearing: dispatched in parallel, it would
-    // be a live writer and the deferral would be accepted.
-    const sibling = latch();
-    const calls: string[] = [];
-    const run = runOrchestrator({
-      devHolds: { "ui/sibling": sibling.held },
-      agentCalls: calls,
-      scouts: [capped(["ui/main", "ui/sibling"], 1), complete(2)],
-      gate: {
-        "ui/main": [
-          {
-            passed: false,
-            deferred: true,
-            summary: "SUSPECTED SIBLING INTERFERENCE",
-          },
-          { passed: true, summary: "retry passed" },
-        ],
-      },
-    });
-
-    await waitForCall(calls, "verify:ui/main#1");
-    sibling.release();
-    const { labels } = await run;
-
-    expect(labels.some((label) => label.startsWith("requalify:"))).toBe(false);
-    expect(labels).toContain("dev:ui/main#2");
   });
 
   // wf_84deb543-ea1: the Haiku scout transcribed stdout through "errors":[]} and
@@ -2652,9 +2146,7 @@ describe("orchestrator single-task resume", () => {
     expect(labels).toContain("done:review/01");
   });
 
-  test("the resumed run still commits, which is what lands the held-back work", async () => {
-    // The run that parked this task kept its declared paths out of every commit,
-    // so the fixer's edits are still uncommitted when the resume starts.
+  test("the resumed run still commits after passing", async () => {
     const { labels } = await runOrchestrator(
       { scouts: [] },
       {
