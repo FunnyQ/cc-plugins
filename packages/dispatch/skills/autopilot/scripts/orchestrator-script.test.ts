@@ -259,6 +259,7 @@ async function runOrchestrator(
   };
 
   let fingerprint = 0;
+  const landFiles = new Map<string, unknown>();
   const agent = async (
     prompt: string,
     opts: { label: string; model?: string; effort?: string; schema?: AgentSchema },
@@ -299,6 +300,7 @@ async function runOrchestrator(
           fingerprint: `f${role === "wt-land" ? ++fingerprint : fingerprint}`,
           previous: /--expect (\S+)/.exec(prompt)?.[1] ?? "",
         },
+        "wt-rebase": { path, base: "b1", conflicted: landFiles.get(ref) ?? [] },
         "wt-remove": { removed: true },
         "wt-show": { path, base: "b0", exists: true },
         "wt-leak": { fingerprint: "f0", paths: [] },
@@ -309,7 +311,9 @@ async function runOrchestrator(
         },
       };
       if (!defaults[role]) throw new Error(`unhandled worktree label: ${label}`);
-      return take("worktree", label, defaults[role]);
+      const result = take("worktree", label, defaults[role]) as Record<string, unknown> | null;
+      if (role === "wt-land" && result) landFiles.set(ref, result.files);
+      return result;
     }
 
     if (role === "verify") {
@@ -3116,26 +3120,129 @@ describe("task worktree isolation", () => {
     });
     expect(callsTo(log.labels, `wt-land:${ref}`)).toBe(2);
     expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, infrastructure: true });
+    expect(log.result.escalations[0].reason).toEndWith(`Worktree kept at /wt/${ref}`);
+    expect(promptFor(log, `block:${ref}`)).toContain(`Worktree kept at /wt/${ref}`);
     expect(log.labels).not.toContain(`done:${ref}`);
     expect(log.labels).not.toContain(`wt-remove:${ref}`);
     expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
   });
 
-  test.each(["conflict", "leak"])("%s keeps unlanded work and lets siblings finish", async (status) => {
+  test("conflict rebases once and retries the full pipeline in the same worktree", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: { [`wt-land:${ref}`]: [
+        { ...cleanLand, status: "conflict", files: ["src/a.ts", "src/b.ts"] },
+        cleanLand,
+      ] },
+    });
+    expect(log.labels).toEqual([
+      "scout-wave-1", "wt-sweep:start", "wt-leak:baseline",
+      `wt-create:${ref}`, `dev:${ref}#1`, `verify:${ref}#1`, `judge:${ref}#1`,
+      `wt-land:${ref}`, `wt-rebase:${ref}`,
+      `dev:${ref}#2`, `verify:${ref}#2`, `judge:${ref}#2`,
+      `wt-land:${ref}`, `done:${ref}`, `wt-remove:${ref}`,
+      "scout-wave-2", "wt-sweep:end", "commit-post-loop",
+    ]);
+    expect(promptFor(log, `wt-rebase:${ref}`)).toContain(
+      `rebase ${ref} --op a1-rebase --repo /abs/repo --slug my-plan`,
+    );
+    const lands = log.prompts.filter((_, i) => log.labels[i] === `wt-land:${ref}`);
+    expect(lands[0]).toContain("--expect f0 --op a1-land");
+    expect(lands[1]).toContain("--expect f0 --op a2-land");
+    expect(promptFor(log, `dev:${ref}#2`)).toContain("LAND CONFLICT:\nsrc/a.ts\nsrc/b.ts");
+    for (const role of ["dev", "verify", "judge"]) {
+      expect(promptFor(log, `${role}:${ref}#2`)).toContain(`WORKTREE: /wt/${ref}`);
+    }
+    expect(callsTo(log.labels, `wt-create:${ref}`)).toBe(1);
+    const schema = log.schemas[log.labels.indexOf(`wt-rebase:${ref}`)]!;
+    expect(schema.required).toEqual(["path", "base", "conflicted"]);
+    expect(schema.properties!.path.type).toBe("string");
+    expect(schema.properties!.base.type).toBe("string");
+    expect(schema.properties!.conflicted.items!.type).toBe("string");
+    expect(log.result.completed).toEqual([ref]);
+    expect(log.result.worktrees).toEqual([]);
+  });
+
+  test.each(["conflict", "verify"])("%s until the cap parks and reports the kept worktree", async (failure) => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), snapshot({
+        counts: counts({ total: 1, blocked: 1 }),
+        unfinished: [{ ref, state: "blocked" }],
+      })],
+      ...(failure === "conflict" ? {
+        worktree: { [`wt-land:${ref}`]: Array.from({ length: 3 }, () => ({
+          ...cleanLand, status: "conflict", files: ["src/a.ts", "src/b.ts"],
+        })) },
+      } : {
+        gate: { [ref]: Array.from({ length: 3 }, () => ({ passed: false, summary: "red" })) },
+      }),
+    }, { maxAttempts: "3", lastShotEngine: "null" });
+    expect(log.result.escalations).toHaveLength(1);
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref, attempt: 3, infrastructure: false, parked: true,
+    });
+    expect(log.result.escalations[0].reason).toEndWith(`Worktree kept at /wt/${ref}`);
+    expect(promptFor(log, `block:${ref}`)).toContain(`Worktree kept at /wt/${ref}`);
+    expect(log.labels).not.toContain(`done:${ref}`);
+    expect(log.labels).not.toContain(`wt-remove:${ref}`);
+    expect(callsTo(log.labels, `wt-create:${ref}`)).toBe(1);
+    expect(callsTo(log.labels, `wt-land:${ref}`)).toBe(failure === "conflict" ? 3 : 0);
+    expect(callsTo(log.labels, `wt-rebase:${ref}`)).toBe(failure === "conflict" ? 3 : 0);
+    expect(log.result.completed).toEqual([]);
+    expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+    expect(promptFor(log, "wt-sweep:end")).toContain(`--keep ${ref}`);
+  });
+
+  test("rebase retries an identical command after a null result", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: {
+        [`wt-land:${ref}`]: [{ ...cleanLand, status: "conflict", files: ["src/a.ts"] }],
+        [`wt-rebase:${ref}`]: [null, { path: `/wt/${ref}`, base: "b2", conflicted: ["src/a.ts"] }],
+      },
+    });
+    const prompts = log.prompts.filter((_, i) => log.labels[i] === `wt-rebase:${ref}`);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[0]).toBe(prompts[1]);
+    expect(prompts[0]).toContain("--op a1-rebase");
+    expect(modelsFor(log, `wt-rebase:${ref}`)).toEqual(["haiku", "opus"]);
+    expect(log.labels).toContain(`dev:${ref}#2`);
+    expect(log.result.completed).toEqual([ref]);
+  });
+
+  test.each([null, THROWS])("rebase double failure parks with its cause and kept path: %s", async (failure) => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0)],
+      worktree: {
+        [`wt-land:${ref}`]: [{ ...cleanLand, status: "conflict", files: ["src/a.ts"] }],
+        [`wt-rebase:${ref}`]: [failure, failure],
+      },
+    });
+    expect(callsTo(log.labels, `wt-rebase:${ref}`)).toBe(2);
+    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, infrastructure: true, parked: true });
+    expect(log.result.escalations[0].reason).toStartWith("worktree rebase failed:");
+    expect(log.result.escalations[0].reason).toEndWith(`Worktree kept at /wt/${ref}`);
+    expect(promptFor(log, `block:${ref}`)).toContain(`Worktree kept at /wt/${ref}`);
+    expect(log.labels).not.toContain(`dev:${ref}#2`);
+    expect(log.labels).not.toContain(`done:${ref}`);
+    expect(log.labels).not.toContain(`wt-remove:${ref}`);
+    expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+  });
+
+  test("interim leak keeps unlanded work and lets siblings finish", async () => {
     const log = await runOrchestrator({
       scouts: [multiWave([ref, "ui/02"]), snapshot({
         counts: counts({ total: 2, blocked: 1, done: 1 }),
         unfinished: [{ ref, state: "blocked" }],
       })],
       worktree: { [`wt-land:${ref}`]: [{
-        ...cleanLand, status,
-        files: status === "conflict" ? ["conflicted.ts"] : [],
-        paths: status === "leak" ? ["leaked.ts"] : [],
+        ...cleanLand, status: "leak", paths: ["x.ts"],
       }] },
     });
-    expect(log.result.escalations[0]).toMatchObject({ task: ref, infrastructure: true });
-    expect(log.result.escalations[0].reason).toStartWith(`LAND NOT CLEAN (${status}):`);
-    expect(log.result.escalations[0].reason).toContain(status === "conflict" ? "conflicted.ts" : "leaked.ts");
+    expect(log.result.escalations[0]).toMatchObject({ task: ref, infrastructure: true, parked: true });
+    expect(log.result.escalations[0].reason).toStartWith("MAIN TREE LEAK:\nx.ts");
+    expect(log.result.escalations[0].reason).toEndWith(`Worktree kept at /wt/${ref}`);
+    expect(promptFor(log, `block:${ref}`)).toContain(`Worktree kept at /wt/${ref}`);
     expect(log.labels).not.toContain(`done:${ref}`);
     expect(log.labels).not.toContain(`wt-remove:${ref}`);
     expect(log.result.completed).toEqual(["ui/02"]);
@@ -3150,6 +3257,9 @@ describe("task worktree isolation", () => {
     });
     expect(log.result.completed).toEqual([ref]);
     expect(log.labels.filter((l) => /^(reverify|verify):/.test(l))).toEqual([`verify:${ref}#1`]);
+    const clean = await runOrchestrator({ scouts: [wave(ref, 1, 0), complete(1)] });
+    expect(log.labels).toEqual(clean.labels);
+    expect(log.result).toEqual(clean.result);
   });
 
   test.each([null, THROWS])("failed mark-done after land never parks or unlands: %s", async (failure) => {
@@ -3264,6 +3374,50 @@ describe("task worktree isolation", () => {
     expect(log.result.completed).toEqual(["ui/02"]);
     expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, infrastructure: true });
     expect(log.labels).not.toContain(`dev:${ref}#1`);
+    expect(log.result.escalations[0].reason).not.toContain("Worktree kept at");
+    expect(promptFor(log, `block:${ref}`)).not.toContain("Worktree kept at");
+  });
+
+  test("a held rebase blocks a sibling land until the main-tree lock is released", async () => {
+    const rebase = latch();
+    const sibling = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [multiWave([ref, "ui/02"]), complete(2)],
+      agentCalls: calls,
+      devHolds: { "ui/02": sibling.held },
+      worktreeHolds: { [`wt-rebase:${ref}`]: rebase.held },
+      worktree: { [`wt-land:${ref}`]: [{
+        ...cleanLand, status: "conflict", files: ["src/a.ts"],
+      }] },
+    });
+    try {
+      await waitForCall(calls, `wt-rebase:${ref}`);
+      sibling.release();
+      await waitForCall(calls, "judge:ui/02#1");
+      expect(calls).not.toContain("wt-land:ui/02");
+    } finally {
+      sibling.release();
+      rebase.release();
+    }
+    const log = await run;
+    expect(log.result.completed).toEqual([ref, "ui/02"]);
+    expect(log.labels).toContain("wt-land:ui/02");
+  });
+
+  test("a parked final review reports no worktree path", async () => {
+    const log = await runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready("review/01", true)],
+        counts: counts({ total: 1, todo: 1 }),
+        unfinished: [{ ref: "review/01", state: "todo" }],
+      })],
+      gate: { "review/01": [{ passed: false, summary: "red" }] },
+    }, { finalReviewMaxAttempts: "1" });
+    expect(log.result.escalations[0]).toMatchObject({ task: "review/01", parked: true });
+    expect(log.result.escalations[0].reason).not.toContain("Worktree kept at");
+    expect(promptFor(log, "block:review/01")).not.toContain("Worktree kept at");
+    expect(log.result.worktrees).toEqual([]);
   });
 
   test.each(["create", "land", "remove"])("a held land blocks another task's %s", async (operation) => {
