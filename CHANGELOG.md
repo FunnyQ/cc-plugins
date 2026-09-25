@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 5.1.1] - 2026-09-26
+
+_tracks tag `dispatch-v5.1.1`_
+
+### Changed
+- Flightplan's design phase grounds each mock in the project's real UI (a screenshot, its real colours and assets) and loads impeccable's `craft-floor.md` before drawing. Every page is rendered in a browser and its screenshot inspected before you see it, and again after each revision.
+- The impeccable engine is pre-warmed with one run at the maximum Bash timeout before the skill starts, so a slow first download can finish. If it still fails, the phase follows impeccable's "Launcher unavailable" path instead of retrying in a loop.
+- The design phase passes the interview summary into `shape`, so it confirms purpose, users, and states instead of asking them again.
+- The design phase is code-led. Images come from `relay:codex image` first, then impeccable's `generate-image` API once you agree to its cost, and otherwise the card is drawn in HTML alone.
+- When impeccable's decision page already picked the direction, `options.html` compares only layout structures within it, so you never pick a direction twice.
+- Design edits are reconciled back into `PLAN.md`, and adding tasks asks first.
+- The fork revert step diffs a `git status --short -uall` snapshot taken before the spawn, so new files inside untracked directories are caught too.
+- `_context/design.md` must hold every value the mock uses. The plan reviewer reads Markdown only, so the human side-by-side check is the only guard against drift between the mock and `design.md`.
+
 ## [dispatch 5.1.0] - 2026-09-26
 
 _tracks tag `dispatch-v5.1.0`_
