@@ -18,6 +18,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parseModels } from "../../flightplan/scripts/lib/parse-task";
 
 const ORCHESTRATOR = join(
   import.meta.dir,
@@ -53,6 +54,7 @@ type ScoutResult = {
   stderr: string;
   /** The scout's structured copy of the cap; optional so a scout can omit it. */
   maxParallel?: unknown;
+  readyModels?: { ref: string; modelsRaw?: unknown }[];
 } | null;
 
 const snapshot = (
@@ -69,6 +71,9 @@ const snapshot = (
   }),
   exitCode,
   stderr: "",
+  readyModels: ((tree.ready ?? []) as ReturnType<typeof ready>[]).map(
+    ({ ref, modelsRaw }) => ({ ref, modelsRaw }),
+  ),
   maxParallel: "maxParallel" in tree ? tree.maxParallel : null,
 });
 
@@ -163,7 +168,8 @@ const fail: Verdict = {
   missing: [],
 };
 
-const ready = (ref: string, finalReview = false) => ({
+const ready = (ref: string, finalReview = false, modelsRaw: string | null = null) => ({
+  modelsRaw,
   ref,
   finalReview,
   path: `/abs/repo/docs/my-plan/tasks/${ref}.md`,
@@ -203,6 +209,8 @@ type RunLog = {
   prompts: string[];
   /** Every agent model, in call order. */
   models: (string | undefined)[];
+  efforts: (string | undefined)[];
+  effortKeys: boolean[];
 };
 
 async function runOrchestrator(
@@ -213,6 +221,8 @@ async function runOrchestrator(
   const labels: string[] = [];
   const prompts: string[] = [];
   const models: (string | undefined)[] = [];
+  const efforts: (string | undefined)[] = [];
+  const effortKeys: boolean[] = [];
   let budgetSpent = scenario.budget?.spent ?? 0;
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
@@ -236,13 +246,15 @@ async function runOrchestrator(
 
   const agent = async (
     prompt: string,
-    opts: { label: string; model?: string },
+    opts: { label: string; model?: string; effort?: string },
   ) => {
     const label = opts.label;
     labels.push(label);
     scenario.agentCalls?.push(label);
     prompts.push(prompt);
     models.push(opts.model);
+    efforts.push(opts.effort);
+    effortKeys.push(Object.hasOwn(opts, "effort"));
 
     if (label.startsWith("scout-wave-")) {
       const next = scouts.length > 0 ? scouts.shift() : null;
@@ -327,7 +339,7 @@ async function runOrchestrator(
     `return (async () => {\n${src}\n})()`,
   );
   const result = (await factory(...parameterValues)) as RunResult;
-  return { result, labels, prompts, models };
+  return { result, labels, prompts, models, efforts, effortKeys };
 }
 
 const counts = (over: Partial<Counts> & { total: number }): Counts => ({
@@ -385,6 +397,12 @@ function modelFor(log: Pick<RunLog, "labels" | "models">, label: string) {
   const index = log.labels.indexOf(label);
   if (index === -1) throw new Error(`agent label not found: ${label}`);
   return log.models[index];
+}
+
+function effortFor(log: Pick<RunLog, "labels" | "efforts">, label: string) {
+  const index = log.labels.indexOf(label);
+  if (index === -1) throw new Error(`agent label not found: ${label}`);
+  return log.efforts[index];
 }
 
 /**
@@ -870,7 +888,7 @@ describe("orchestrator failure handling", () => {
       "EARLIER ATTEMPTS on this task — already tried and rejected. Do not repeat them:",
     );
     expect(thirdPrompt).toContain(
-      "- attempt 1 (ran on sonnet): Binary gate failed (verification/acceptance):\nattempt one tests red",
+      "- attempt 1 (ran on opus/medium): Binary gate failed (verification/acceptance):\nattempt one tests red",
     );
     expect(thirdPrompt.indexOf("attempt two lint red")).toBeLessThan(
       thirdPrompt.indexOf("attempt one tests red"),
@@ -888,7 +906,7 @@ describe("orchestrator failure handling", () => {
     expect(esc.reason).toContain("attempt one tests red");
   });
 
-  test("the default Claude ladder remains sonnet, sonnet, opus", async () => {
+  test("the default Claude ladder raises effort on the final opus rung", async () => {
     const log = await runOrchestrator({
       scouts: [oneTask("ui/01")],
       gate: {
@@ -902,9 +920,12 @@ describe("orchestrator failure handling", () => {
     const devLabels = log.labels.filter((label) => label.startsWith("dev"));
     expect(devLabels).toEqual(["dev:ui/01#1", "dev:ui/01#2", "dev:ui/01#3"]);
     expect(devLabels.map((label) => modelFor(log, label))).toEqual([
-      "sonnet",
-      "sonnet",
       "opus",
+      "opus",
+      "opus",
+    ]);
+    expect(devLabels.map((label) => effortFor(log, label))).toEqual([
+      "medium", "medium", "high",
     ]);
     expect(log.result.escalations[0].attempt).toBe(3);
   });
@@ -1698,7 +1719,10 @@ describe("defer and requalify gate", () => {
     await waitForCall(calls, "verify:ui/main#1");
     expect(calls).not.toContain("requalify:ui/main#1");
     sibling.release();
-    const { result, labels } = await run;
+    const log = await run;
+    const { result, labels } = log;
+    expect(modelFor(log, "requalify:ui/main#1")).toBe("opus");
+    expect(effortFor(log, "requalify:ui/main#1")).toBe("low");
 
     expect(result.completed).toEqual(["ui/main", "ui/sibling"]);
     expect(labels.filter((label) => label === "dev:ui/main#1")).toHaveLength(1);
@@ -2123,7 +2147,7 @@ describe("structured-output resilience", () => {
     complete(2),
   ];
 
-  test("a verifier that text-emits its payload is retried one rung stronger", async () => {
+  test("a verifier that text-emits its payload is retried with the structured choice", async () => {
     const log = await runOrchestrator({
       scouts: [wave("ui/01", 1, 0), complete(1)],
       gate: { "ui/01": [THROWS, { passed: true, summary: "green" }] },
@@ -2131,7 +2155,7 @@ describe("structured-output resilience", () => {
     expect(log.result.completed).toEqual(["ui/01"]);
     expect(log.result.escalations).toEqual([]);
     expect(callsTo(log.labels, "verify:ui/01#1")).toBe(2);
-    expect(modelsFor(log, "verify:ui/01#1")).toEqual(["haiku", "sonnet"]);
+    expect(modelsFor(log, "verify:ui/01#1")).toEqual(["opus", "opus"]);
   });
 
   test("the retry does not consume an attempt", async () => {
@@ -2166,7 +2190,7 @@ describe("structured-output resilience", () => {
     });
     expect(log.result.completed).toEqual(["ui/01"]);
     expect(log.result.escalations).toEqual([]);
-    expect(modelsFor(log, "scout-wave-1")).toEqual(["haiku", "sonnet"]);
+    expect(modelsFor(log, "scout-wave-1")).toEqual(["haiku", "opus"]);
   });
 
   test("the judge is NOT retried — it persists a verdict before it returns", async () => {
@@ -2672,9 +2696,9 @@ describe("orchestrator single-task resume", () => {
     expect(promptFor(log, "verify:review/01#4")).not.toContain("--role resume");
   });
 
-  test("a resumed Claude ladder still runs sonnet before opus", async () => {
+  test("a resumed Claude ladder raises effort only on its final rung", async () => {
     // Keyed off `cap` rather than `last`, `attempt >= claudeCap` is already true
-    // at attempt 2, so the whole ladder would run on Opus from its first rung.
+    // at attempt 2, so the whole ladder would raise effort from its first rung.
     const log = await runOrchestrator(
       {
         scouts: [],
@@ -2697,9 +2721,12 @@ describe("orchestrator single-task resume", () => {
     const devLabels = log.labels.filter((label) => label.startsWith("dev:"));
     expect(devLabels).toEqual(["dev:ui/01#2", "dev:ui/01#3", "dev:ui/01#4"]);
     expect(devLabels.map((label) => modelFor(log, label))).toEqual([
-      "sonnet",
-      "sonnet",
       "opus",
+      "opus",
+      "opus",
+    ]);
+    expect(devLabels.map((label) => effortFor(log, label))).toEqual([
+      "medium", "medium", "high",
     ]);
   });
 
@@ -2751,5 +2778,219 @@ describe("orchestrator single-task resume", () => {
 
     expect(result.completed).toEqual(["ui/01"]);
     expect(labels).toContain("scout-wave-1");
+  });
+});
+
+describe("per-role model and effort choices", () => {
+  const modelWave = (modelsRaw: string | null, finalReview = false) =>
+    snapshot({
+      ready: [ready("ui/01", finalReview, modelsRaw)],
+      counts: counts({ total: 1, todo: 1 }),
+      unfinished: [{ ref: "ui/01", state: "todo" }],
+    });
+  const red = { passed: false, summary: "red" };
+  const assertChoice = (
+    log: RunLog,
+    label: string,
+    model: string,
+    effort?: string,
+  ) => {
+    expect(modelFor(log, label)).toBe(model);
+    expect(effortFor(log, label)).toBe(effort);
+    expect(log.effortKeys[log.labels.indexOf(label)]).toBe(
+      effort !== undefined,
+    );
+  };
+
+  test("null modelsRaw uses every role's default", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        modelWave(null),
+        snapshot({
+          ready: [ready("review/01", true)],
+          counts: counts({ total: 2, todo: 1, done: 1 }),
+          unfinished: [{ ref: "review/01", state: "todo" }],
+        }),
+        complete(2),
+      ],
+    });
+    expect(log.result.escalations).toEqual([]);
+    assertChoice(log, "dev:ui/01#1", "opus", "medium");
+    assertChoice(log, "verify:ui/01#1", "opus", "low");
+    assertChoice(log, "judge:ui/01#1", "opus", "medium");
+    assertChoice(log, "fix:review/01#1", "opus", "high");
+    assertChoice(log, "done:ui/01", "haiku");
+    assertChoice(log, "scout-wave-1", "haiku");
+    assertChoice(log, "commit-wave-2", "opus", "low");
+    assertChoice(log, "commit-post-loop", "opus", "low");
+    assertChoice(log, "review:codex#1", "haiku");
+    for (const lens of ["reuse", "leanness", "efficiency"]) {
+      assertChoice(log, `review:${lens}#1`, "opus");
+    }
+    const blocked = await runOrchestrator({
+      scouts: [modelWave(null)],
+      gate: { "ui/01": [null] },
+    });
+    assertChoice(blocked, "block:ui/01", "haiku");
+  });
+
+  test.each([
+    ["dev=sonnet/low", "sonnet", ["low", "low", "medium"]],
+    ["dev=opus/max", "opus", ["max", "max", "max"]],
+    ["dev=opus", "opus", [undefined, undefined, undefined]],
+    [null, "opus", ["medium", "medium", "high"]],
+  ] as const)("dev ladder uses %s", async (raw, model, efforts) => {
+    const log = await runOrchestrator({
+      scouts: [modelWave(raw)],
+      gate: { "ui/01": [red, red, red] },
+    });
+    efforts.forEach((effort, index) =>
+      assertChoice(log, `dev:ui/01#${index + 1}`, model, effort),
+    );
+    expect(log.result.escalations[0].reason).toContain(
+      `ran on ${model}${efforts[0] ? `/${efforts[0]}` : ""}`,
+    );
+  });
+
+  test("verify override drops the default effort and structured retry replaces both fields", async () => {
+    const log = await runOrchestrator({
+      scouts: [modelWave("verify=sonnet"), complete(1)],
+      gate: { "ui/01": [THROWS, { passed: true, summary: "green" }] },
+    });
+    assertChoice(log, "verify:ui/01#1", "sonnet");
+    const retry = log.labels.lastIndexOf("verify:ui/01#1");
+    expect([
+      log.models[retry],
+      log.efforts[retry],
+      log.effortKeys[retry],
+    ]).toEqual(["opus", "medium", true]);
+    expect(log.result.completed).toEqual(["ui/01"]);
+  });
+
+  test("fix override replaces its whole choice", async () => {
+    const log = await runOrchestrator({
+      scouts: [modelWave("fix=fable/low", true), complete(1)],
+    });
+    assertChoice(log, "fix:ui/01#1", "fable", "low");
+  });
+
+  test.each(["missing", "mismatch", "invalid"])(
+    "scout rejects %s modelsRaw",
+    async (kind) => {
+      const scout = modelWave("dev=sonnet/low")!;
+      if (kind === "missing") scout.readyModels = [];
+      if (kind === "mismatch")
+        scout.readyModels = [{ ref: "ui/01", modelsRaw: "dev=opus" }];
+      if (kind === "invalid") {
+        scout.readyModels = [{ ref: "ui/01", modelsRaw: "dev=Opus" }];
+        scout.stdout = scout.stdout.replace("dev=sonnet/low", "dev=Opus");
+      }
+      const log = await runOrchestrator({ scouts: [scout] });
+      expect(log.result.escalations[0].task).toBe("(scout)");
+      expect(log.result.escalations[0].reason).toContain("ui/01");
+      expect(log.labels.some((label) => label.startsWith("dev:"))).toBe(false);
+      if (kind === "mismatch") {
+        expect(log.result.escalations[0].reason).toContain("dev=sonnet/low");
+        expect(log.result.escalations[0].reason).toContain("dev=opus");
+      }
+    },
+  );
+
+  const parityFixtures: {
+    raw: string;
+    choices: Record<string, { model: string; effort: string | null }> | null;
+  }[] = [
+    {
+      raw: "dev=opus/high, verify=sonnet",
+      choices: {
+        dev: { model: "opus", effort: "high" },
+        verify: { model: "sonnet", effort: null },
+      },
+    },
+    {
+      raw: "judge = opus / xhigh",
+      choices: { judge: { model: "opus", effort: "xhigh" } },
+    },
+    { raw: "dev=opus,", choices: { dev: { model: "opus", effort: null } } },
+    {
+      raw: " dev=sonnet/low , verify=haiku ",
+      choices: {
+        dev: { model: "sonnet", effort: "low" },
+        verify: { model: "haiku", effort: null },
+      },
+    },
+    ...[
+      "dev=opus, dev=sonnet",
+      "dev=gpt5",
+      "dev=Opus",
+      "",
+      "dev=opus/high/max",
+    ].map((raw) => ({ raw, choices: null })),
+  ];
+  test.each(parityFixtures)("parser parity: $raw", async ({ raw, choices }) => {
+    const parsed = parseModels(raw);
+    const log = await runOrchestrator({
+      scouts: [modelWave(raw), complete(1)],
+    });
+    if (choices === null) {
+      expect(parsed.errors.length).toBeGreaterThan(0);
+      expect(log.result.escalations[0].task).toBe("(scout)");
+      expect(log.result.escalations[0].reason).toContain("ui/01");
+      expect(log.result.completed).toEqual([]);
+    } else {
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.models).toEqual(choices);
+      expect(log.result.completed).toEqual(["ui/01"]);
+      for (const [role, choice] of Object.entries(choices)) {
+        assertChoice(
+          log,
+          `${role}:ui/01#1`,
+          choice.model,
+          choice.effort ?? undefined,
+        );
+      }
+    }
+  });
+
+  test.each([
+    [
+      { devEngine: "'codex'", lastShotEngine: "'opencode'" },
+      ["dev-codex:ui/01#1", "dev-codex:ui/01#2"],
+    ],
+    [{ lastShotEngine: "'codex'" }, ["dev-codex:ui/01#4"]],
+  ] as [ConfigOverrides, string[]][])(
+    "external driver preserves rungs %o",
+    async (config, labels) => {
+      const log = await runOrchestrator(
+        {
+          scouts: [modelWave("dev=sonnet/low")],
+          gate: { "ui/01": [red, red, red, red] },
+        },
+        config,
+      );
+      labels.forEach((label) => assertChoice(log, label, "haiku"));
+      assertChoice(log, "dev:ui/01#3", "sonnet", "medium");
+    },
+  );
+
+  const resume = {
+    resumeTask: "'ui/01'",
+    resumeTaskPath: "'/abs/task.md'",
+    resumeModelsRaw: "'dev=sonnet/low'",
+  };
+  test("resume carries the model header", async () => {
+    const log = await runOrchestrator({ scouts: [] }, resume);
+    assertChoice(log, "dev:ui/01#1", "sonnet", "low");
+    expect(log.result.completed).toEqual(["ui/01"]);
+  });
+  test("invalid resume models fail before any agent", async () => {
+    const agentCalls: string[] = [];
+    await expect(
+      runOrchestrator(
+        { scouts: [], agentCalls },
+        { ...resume, resumeModelsRaw: "'dev=Opus'" },
+      ),
+    ).rejects.toThrow("Models");
+    expect(agentCalls).toEqual([]);
   });
 });
