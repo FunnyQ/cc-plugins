@@ -7,6 +7,7 @@
  * already landed, while picking one too LATE takes unfinished work as
  * satisfied. The second is silent, so the choice belongs in a tested function.
  *
+ * A failed drift re-verify supersedes the verdict that preceded it.
  * The derivation never suggests skipping the binary gate. Two reasons, and both
  * are load-bearing rather than caution: `--from judge` means a person performed
  * that gate and signed for it, which is a human decision no trail can make; and
@@ -135,10 +136,18 @@ export function resumePoint(
     steps.filter((step) => predicate(step) && step.completed).pop() ?? null;
   const wrote = at((step) => WRITE_ROLES.has(step.role));
   const gate = at((step) => GATE_ROLES.has(step.role));
+  const reverify = at((step) => step.role === "reverify");
 
-  // Ordered latest-evidence-first: a verdict supersedes the gate that fed it,
-  // and the gate supersedes the write step it judged.
+  // Ordered latest-evidence-first: a failed re-verify supersedes the verdict,
+  // the verdict supersedes the gate, and the gate supersedes the write step.
   const decide = (): Pick<ResumePoint, "from" | "reason" | "gateRejected"> => {
+    if (reverify && /^FAIL\b/.test(reverify.message ?? "")) {
+      return {
+        from: "dev",
+        gateRejected: true,
+        reason: `the drift re-verify failed on attempt ${lastAttempt}: ${reverify.message}`,
+      };
+    }
     if (verdict && !verdict.passed) {
       return {
         from: "dev",

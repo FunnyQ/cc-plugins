@@ -154,6 +154,33 @@ describe("resumePoint", () => {
     );
   });
 
+  test("a failed drift re-verify supersedes a passing verdict", () => {
+    const point = resumePoint([
+      score(REF, 2, true, 4.6),
+      ...ran(REF, "reverify", 2, "FAIL — merged tests are red"),
+    ], REF)!;
+    expect(point.from).toBe("dev");
+    expect(point.gateRejected).toBe(true);
+    expect(point.attempt).toBe(3);
+    expect(point.reason).toContain("drift re-verify");
+    expect(point.reason).toContain("attempt 2");
+    expect(point.reason).toContain("FAIL — merged tests are red");
+  });
+
+  test.each(["PASS — merged tests are green", null])(
+    "a passing or unfinished re-verify leaves the verdict intact: %s", (message) => {
+      const point = resumePoint([
+        score(REF, 2, true, 4.6),
+        ...(message === null
+          ? [note(REF, "reverify", 2, "start", "FAIL is not a completed result")]
+          : ran(REF, "reverify", 2, message)),
+      ], REF)!;
+      expect(point.from).toBe("verify");
+      expect(point.gateRejected).toBe(false);
+      expect(point.attempt).toBe(3);
+    },
+  );
+
   test("only the LAST attempt decides, and the attempt list keeps the rest", () => {
     const point = resumePoint(
       [
