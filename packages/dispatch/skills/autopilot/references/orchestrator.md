@@ -8,7 +8,7 @@ Read the three hard constraints in `SKILL.md` first. They explain every awkward-
 The main agent scouts inline. It then calls `Workflow({ script: <this> })`. **Bake the
 scouted values into the `CFG` block at the top of the script as literals.**
 
-Wave loop: `scout → tree guards → derive fresh ready tasks → stall guard → inter-wave commit → budget-floor check → parallel task dispatch, capped by the plan's `maxParallel` → reconciliation → no-progress stop`.
+Wave loop: `scout → tree guards → derive fresh ready tasks → stall guard → inter-wave commit → budget-floor check → parallel task dispatch, capped by the plan's `maxParallel` → wave-end leak check (except Final review) → reconciliation → abort/no-progress stop`.
 
 Do NOT rely on the Workflow `args` global. It does not reliably reach the orchestrator.
 An unset `args` becomes `undefined`. The scout then runs `bun undefined/next-ready.ts`
@@ -731,13 +731,18 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
 // agent that returns a fluent summary having changed nothing is the failure mode
 // this guards, so a non-null result is not evidence of anything.
 async function parkBlocked(ref, path, reason, watch) {
+  checkAbort()
   return withWriter(watch, async () => {
     try {
-      const result = await resilient(retryModel => agent(markBlockedPrompt(ref, path, withKeptWorktree(ref, reason)),
-        { label: `block:${ref}`, phase: 'Execute', ...pick(retryModel ?? MODEL.park), schema: PARK_SCHEMA }),
-        MODEL.structuredRetry)
+      const result = await resilient(retryModel => {
+        checkAbort()
+        return agent(markBlockedPrompt(ref, path, withKeptWorktree(ref, reason)),
+          { label: `block:${ref}`, phase: 'Execute', ...pick(retryModel ?? MODEL.park), schema: PARK_SCHEMA })
+      }, MODEL.structuredRetry)
+      checkAbort()
       return result?.ok === true
     } catch {
+      checkAbort()
       return false
     }
   })
@@ -811,6 +816,10 @@ const withMainLock = (fn) => {
   return run
 }
 let mainFingerprint = ''
+let aborted = null
+const checkAbort = () => {
+  if (aborted) throw new Error(`run aborted: ${aborted.reason}`)
+}
 const live = new Map()
 const cleanupFailures = []
 const wtArgs = `--repo ${CFG.repoRoot} --slug ${CFG.slug}`
@@ -893,10 +902,22 @@ async function executeTask(item, watch) {
   if (!finalReview) {
     try {
       wt = await withMainLock(async () => {
+        if (RESUME) {
+          const shown = await wtCall(`wt-show:${ref}`, wtCommand(`show ${ref}`), WT_SCHEMA.show)
+          if (shown.exists) {
+            live.set(ref, shown.path)
+            return shown
+          }
+          if (RESUME.from !== 'dev') {
+            return infrastructureFailure(ref, first,
+              `the kept worktree for ${ref} is gone: ${shown.path} — resume from dev instead`, false)
+          }
+        }
         const created = await wtCall(`wt-create:${ref}`, wtCommand(`create ${ref}`), WT_SCHEMA.create)
         live.set(ref, created.path)
         return created
       })
+      if (wt.infrastructure) return wt
       // Keep initial dev dispatch concurrent for the legacy sibling writer watch.
       await mainTail
     } catch (error) {
@@ -905,6 +926,7 @@ async function executeTask(item, watch) {
     }
   }
   for (let attempt = first; attempt <= last; attempt++) {
+    checkAbort()
     // Steps before the resume point are taken as already satisfied, and only on
     // the attempt the resume starts. If that attempt fails its gate, the retry
     // runs the whole pipeline — a red verify means the skipped work genuinely
@@ -950,6 +972,7 @@ async function executeTask(item, watch) {
       }
     })
 
+    checkAbort()
     // The verifier is deliberately not a writer: it must only inspect the tree.
     // Individual review lenses are also not wrapped; the one final-review window
     // encloses their fan-out because the fixer in that operation does write.
@@ -965,6 +988,7 @@ async function executeTask(item, watch) {
       : await resilient(retryModel => agent(verifyPrompt(ref, path, attempt, false, wt?.path),
       { label: `verify:${ref}#${attempt}`, phase: 'Execute', ...pick(retryModel ?? choices.verify), schema: GATE_SCHEMA }),
       MODEL.structuredRetry)
+    checkAbort()
     if (!gate) {
       const cause = `verification did not run or did not return a verdict on attempt ${attempt}`
         + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
@@ -972,9 +996,11 @@ async function executeTask(item, watch) {
     }
     if (deferralAccepted(gate, watch)) {
       await watch.quiet()
+      checkAbort()
       const requalified = await resilient(retryModel => agent(verifyPrompt(ref, path, attempt, true, wt?.path),
         { label: `requalify:${ref}#${attempt}`, phase: 'Execute', ...pick(retryModel ?? choices.verify), schema: GATE_SCHEMA }),
         MODEL.structuredRetry)
+      checkAbort()
       if (!requalified) {
         const cause = `requalification did not run or did not return a verdict on attempt ${attempt}`
           + ` — the requalify agent produced no structured result.`
@@ -1016,6 +1042,7 @@ async function executeTask(item, watch) {
     // a judge throw parks, which is the pre-existing behaviour and never worse.
     const judged = await agent(judgePrompt(ref, path, gate.summary, attempt, wt?.path),
       { label: `judge:${ref}#${attempt}`, phase: 'Execute', ...pick(choices.judge), schema: JUDGE_SCHEMA })
+    checkAbort()
     if (!judged) {
       const cause = `the rubric judge returned no structured result on attempt ${attempt}`
         + ` — the task was never scored. The harness exposes no original cause for a null agent result, so none is reported here.`
@@ -1029,8 +1056,13 @@ async function executeTask(item, watch) {
         let reverified = null
         try {
           landed = await withMainLock(async () => {
+            checkAbort()
             const result = await wtCall(`wt-land:${ref}`,
               wtCommand(`land ${ref} --expect ${mainFingerprint} --op a${attempt}-land`), WT_SCHEMA.land)
+            if (result.status === 'leak') {
+              aborted ??= { reason: `main tree leak observed by ${ref}`, paths: result.paths }
+              checkAbort()
+            }
             if (result.status === 'clean') {
               if (result.drift) {
                 const prompt = verifyPrompt(ref, path, attempt, false, undefined, true)
@@ -1097,11 +1129,6 @@ async function executeTask(item, watch) {
           })
           continue
         }
-        if (landed.status === 'leak') {
-          // interim: a leak fails only this task; replaced by a run-wide abort later
-          const cause = `MAIN TREE LEAK:\n${landed.paths.join('\n')}`
-          return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
-        }
 
         let finalized = null
         let doneError = ''
@@ -1161,10 +1188,13 @@ async function executeTask(item, watch) {
 // null carries neither the task ref nor the cause. Catching here keeps both.
 async function runTaskGuarded(item, watch) {
   try {
+    // The caller has acquired its slot; queued tasks must check before creating a worktree.
+    checkAbort()
     return await executeTask(item, watch)
   } catch (error) {
     const cause = `the task pipeline threw: ${error?.message ?? String(error)}`
-    return infrastructureFailure(item.ref, 0, cause, await parkBlocked(item.ref, item.path, cause, watch))
+    const parked = aborted ? false : await parkBlocked(item.ref, item.path, cause, watch).catch(() => false)
+    return infrastructureFailure(item.ref, 0, aborted ? `run aborted: ${aborted.reason}` : cause, aborted ? false : parked)
   }
 }
 
@@ -1239,7 +1269,7 @@ const heldBack = new Set()
 // collective punishment, disabling every later commit over one flaky agent.
 const COMMIT_SAFE = new Set(['(commit)'])
 const commitBlocked = () =>
-  escalations.some(e => e.infrastructure && !parked.has(e.task) && !COMMIT_SAFE.has(e.task))
+  !!aborted || escalations.some(e => e.infrastructure && !parked.has(e.task) && !COMMIT_SAFE.has(e.task))
 let wave = 0
 let lastScout = null
 let scoutFailed = false
@@ -1254,8 +1284,8 @@ const keptWorktrees = () => {
 }
 const sweep = (stage, refs) => withMainLock(() => wtCall(`wt-sweep:${stage}`,
   wtCommand(`sweep${stage === 'list' ? ' --keep-all' : refs.length ? ` --keep ${refs.join(',')}` : ''}`), WT_SCHEMA.sweep))
-const baseline = () => withMainLock(async () => {
-  const result = await wtCall('wt-leak:baseline', wtCommand('fingerprint'), WT_SCHEMA.fingerprint)
+const baseline = (stage = 'baseline') => withMainLock(async () => {
+  const result = await wtCall(`wt-leak:${stage}`, wtCommand('fingerprint'), WT_SCHEMA.fingerprint)
   mainFingerprint = result.fingerprint
 })
 const worktreeFailure = (error) => {
@@ -1551,6 +1581,18 @@ while (!RESUME) {
   // null result still lands on its own task instead of disappearing.
   const results = await parallel(fresh.map(item => () => inSlot(() => runTaskGuarded(item, watch))))
 
+  if (!fresh.some(item => item.finalReview)) {
+    await withMainLock(async () => {
+      try {
+        const result = await wtCall(`wt-leak:${wave}`,
+          wtCommand(`fingerprint --expect ${mainFingerprint}`), WT_SCHEMA.fingerprint)
+        if (result.paths.length) aborted ??= { reason: `main tree leak after wave ${wave}`, paths: result.paths }
+      } catch {
+        aborted ??= { reason: 'wave-end leak check returned no result', paths: [] }
+      }
+    })
+  }
+
   // Reconcile every input task. A dropped task would land in NO list: its dev
   // step already set the task to in-progress, and next-ready only offers `todo`,
   // so it could never be re-offered — the run would end "clean" and the
@@ -1582,7 +1624,7 @@ while (!RESUME) {
     heldBack.add(item.path)
   }
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
-  if (!passedThisWave) break
+  if (aborted || !passedThisWave) break
 }
 
 // ── Single-task resume ──────────────────────────────────────────────────────
@@ -1592,7 +1634,7 @@ while (!RESUME) {
 // still sitting uncommitted. `heldBack` is empty here, so a passing resume is
 // what finally lands it.
 if (RESUME && !RESUME.finalReview) {
-  try { await baseline() } catch (error) { worktreeFailure(error) }
+  try { await baseline('resume') } catch (error) { worktreeFailure(error) }
 }
 if (RESUME && !worktreeFailed) {
   const item = { ref: RESUME.ref, finalReview: RESUME.finalReview, path: RESUME.path, modelsRaw: RESUME.modelsRaw }
@@ -1617,7 +1659,7 @@ if (RESUME && !worktreeFailed) {
   }
 }
 
-if (!RESUME && !worktreeFailed) {
+if (!RESUME && !worktreeFailed && !aborted) {
   try {
     if (!lastScout) {
       startKept = (await sweep('list', [])).kept
@@ -1646,12 +1688,13 @@ if (CFG.commitBetweenWaves && !commitBlocked()) {
   }
 }
 
-return { slug: CFG.slug, completed, escalations, needsHuman, worktrees: keptWorktrees(), cleanupFailures: cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref)) }
+return { slug: CFG.slug, aborted, completed, escalations, needsHuman, worktrees: keptWorktrees(), cleanupFailures: cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref)) }
 })()
 ```
 
 ## What the main agent does with the result
 
+- `aborted` — `null` or the first `{ reason, paths }` that stopped the run. Report the cause and leak paths. Inspect the retained worktrees before resuming; the run performed no further commits or end sweep after this abort.
 - `completed` — tasks that passed their rubric **and** whose `mark-done` transition was confirmed, this invocation only. It includes the Final review task, if the run finished cleanly. It is not a tree-completion count; see the note on `counts.done` below.
 - `escalations` — `[{ task, attempt, infrastructure, parked, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` identifies a pipeline or mechanical failure; report the cause rather than claiming the work was rejected. When the cause says "landed, but Status was not marked done", tell the user to run `mark-done.ts` by hand before another run. `parked: false` means the task was NOT confirmed as `blocked`; report its Status as unknown and follow the escalation's recovery instruction.
 - `needsHuman` — `[{ task, criteria }]`, the `(human)` gate items that passed with no machine check and no attestation. Report it **separately from `escalations`**: those tasks are genuinely `done`, nothing is parked, and nothing needs a Status reset. Print the criteria verbatim as the user's closing checklist, and say that `mark-done.ts` ticked their boxes like any other, so the task file no longer shows the check is outstanding.
@@ -1662,6 +1705,22 @@ return { slug: CFG.slug, completed, escalations, needsHuman, worktrees: keptWork
 - **Resume**: after the user unblocks a parked task, reset its `Status` to `todo`. Then re-run autopilot. Completed tasks stay `done`, so the run re-offers only the unblocked work.
 
 ## Notes / gotchas
+
+### Run-wide abort and kept-worktree resume
+
+Preserve unlanded work when a main-tree leak aborts the run. Resume each non-final task in its kept worktree against a fresh fingerprint baseline.
+
+- Keep one script-level `aborted` state, initially `null`, holding `{ reason, paths }` after the first cause. When a land returns `leak`, record the observing ref in the reason and retain its returned paths. Preserve the first cause if another check subsequently fails.
+- After each wave's `parallel(...)` resolves, run `wt-leak:<wave>` under the main-tree lock before any other wave-loop action, including the no-progress exit and either commit site. Compare against the last recorded fingerprint with `fingerprint --expect`. Run this check even when no task passed. When paths are non-empty, abort the run. When the check returns no structured result after its retry, abort with reason `wave-end leak check returned no result` and empty paths.
+- Use one abort-check helper inside the acquired `Max parallel` slot before the task body, at every attempt's start, and under the main-tree lock immediately before each land. When a task observes the abort, return an infrastructure failure with reason `run aborted: <abort reason>`. Leave its Status untouched, invoke no `block:` agent, and retain its unlanded worktree in `live` and on disk.
+- After a clean land, finish `done:` and `wt-remove:` even if another task aborts the run in the meantime. Remove that landed task from `live` after confirmed cleanup. Preserve the existing separate reporting of cleanup failures.
+- After the current wave resolves with an abort, stop scouting and skip all remaining commits and `wt-sweep:end`. Return `aborted` with the sorted `worktrees` union of entries still in `live` and still-blocked leftovers retained by the start sweep. Preserve the existing tree watch, deferral, requalify, and `heldBack` machinery.
+- When a wave runs Final review, skip its wave-end leak check and make no later fingerprint comparison against the main tree it intentionally changes. Keep the normal run's startup baseline. When resuming Final review from `dev`, `verify`, or `judge`, use the main tree without a resume baseline, `wt-show`, or `wt-create`.
+- When resuming a non-final task, first take the main-tree lock and record `fingerprint` without `--expect`, labelled `wt-leak:resume`. Use that fresh baseline for subsequent land expectations. Then run the existing `wt-show:<ref>` under the same main-tree lock discipline before any task agent.
+- When resuming from `verify` or `judge`, reuse the existing worktree reported by `wt-show`, add its path to `live`, and pass that path as `WORKTREE` to every resumed step. If it is missing, halt with an infrastructure failure naming the path and instructing a resume from `dev`; never recreate the only copy of the work being resumed. When starting at `judge`, continue reading `CFG.attestationFile`.
+- When resuming from `dev`, reuse the worktree if `wt-show` reports it exists. Only when it is missing, create a fresh worktree under the lock. After a clean land, remove the resumed worktree; when the task parks, retain it. Run neither a scout nor a wave loop for a single-task resume.
+
+### Existing behavior and rationale
 
 - **Wave re-scout is non-negotiable.** Statuses change only inside the run. The orchestrator must recompute the ready set each wave. A task unblocked by a wave-N completion is picked up in wave N+1.
 - **The scout TRANSCRIBES.** It runs one command and hands back exactly what the command printed (`stdout`, `exitCode`, `stderr`). The script does every interpretation. Nothing the agent returns requires it to understand the tree. The script parses and validates the summary before deriving `{ready, counts, unfinished, invalidRefs, parseErrors}`. Note `--summary` prints its JSON **before** exiting non-zero on a malformed tree, so a non-zero exit alone is not a scout failure.
