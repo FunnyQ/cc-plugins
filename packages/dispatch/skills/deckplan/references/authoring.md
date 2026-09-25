@@ -53,7 +53,7 @@ Keep development, verification, judging, and retries as roles and attempts again
 Follow the conventions parsed by [autopilot/scripts/fleet.ts](../../autopilot/scripts/fleet.ts):
 
 - Use `dev:<ref>#<attempt>` for development, or `dev-<engine>:<ref>#<attempt>` with a lowercase alphabetic engine name for an external developer.
-- Use `verify:<ref>#<attempt>`, `requalify:<ref>#<attempt>`, `judge:<ref>#<attempt>`, or `fix:<ref>#<attempt>` for those roles.
+- Use `verify:<ref>#<attempt>`, `reverify:<ref>#<attempt>`, `requalify:<ref>#<attempt>`, `judge:<ref>#<attempt>`, or `fix:<ref>#<attempt>` for those roles.
 - Use `review:<lens>#<attempt>` for a review lens.
 - Use `done:<ref>` or `block:<ref>` for terminal helpers.
 - Use `scout-wave-<number>` for wave scouting and `commit-post-loop` for the post-loop commit helper when those activities exist.

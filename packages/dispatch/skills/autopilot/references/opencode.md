@@ -42,6 +42,8 @@ under both the symlink root and the realpath.
 
 ## The wave loop
 
+Keep one shared working tree in the OpenCode hand-driven loop. Apply none of the Claude Code worktree isolation, main-tree lock, drift re-verify, or leak abort behavior here. When the plan will run under OpenCode, set `> **Max parallel**: 1` for a shared build target that compiles every file: the hand-driven loop still shares one working tree (see `autopilot/references/opencode.md`). Apply the per-role model map only under Claude Code.
+
 Repeat these steps by hand, one wave at a time:
 
 1. Run the ready-task lister `bun $SCRIPTS/next-ready.ts <tasks-dir> --summary`

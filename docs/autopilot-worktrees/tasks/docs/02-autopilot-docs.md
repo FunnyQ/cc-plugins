@@ -8,7 +8,7 @@
 >
 > **Depends on**: worktree/06
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -110,26 +110,26 @@ Add a short note (two to four sentences) under `## The wave loop` in `packages/d
 
 ## Acceptance criteria
 
-- [ ] `rg -n "held back|heldBack" packages/dispatch/skills/autopilot/SKILL.md` prints nothing.
-- [ ] `rg -n "git worktree list" packages/dispatch/skills/autopilot/SKILL.md` hits the cleanup rule that a clean run leaves no worktree for the slug.
-- [ ] `rg -n "Worktree cleanup" packages/dispatch/skills/autopilot/SKILL.md` hits the new subsection.
-- [ ] `rg -n "Models\*\*:" packages/dispatch/skills/autopilot/SKILL.md` hits the override sentence in the Model policy section.
-- [ ] Every row of the SKILL.md Model policy table names the same model and effort as `../_context/models.md`.
-- [ ] `rg -n "Sonnet" packages/dispatch/skills/autopilot/SKILL.md` shows no dev-role default of Sonnet. Sonnet may appear only as a user-chosen or task-override option.
-- [ ] `rg -n "shared working tree" packages/dispatch/skills/autopilot/references/opencode.md` hits the new note.
-- [ ] `rg -n "worktree" CLAUDE.md` hits both the dispatch summary bullet and the Architecture tree comment, and `rg -n "worktree\.ts" CLAUDE.md` hits the summary bullet.
-- [ ] Autopilot `SKILL.md` covers each item the plan requires of it, one per `rg` hit: the model table (`rg -n "opus / medium"`), isolation (`rg -n "own git worktree"`), the abort (`rg -n "abort"`), resume in a kept worktree (`rg -n "kept worktree"`), and the cleanup rule (`rg -n "Worktree cleanup"`).
-- [ ] `rg -n "reverify:" packages/dispatch/skills/deckplan/references/authoring.md` hits rule 7's label list, and `rg -n "requalify:" packages/dispatch/skills/deckplan/references/authoring.md` still hits.
+- [x] `rg -n "held back|heldBack" packages/dispatch/skills/autopilot/SKILL.md` prints nothing.
+- [x] `rg -n "git worktree list" packages/dispatch/skills/autopilot/SKILL.md` hits the cleanup rule that a clean run leaves no worktree for the slug.
+- [x] `rg -n "Worktree cleanup" packages/dispatch/skills/autopilot/SKILL.md` hits the new subsection.
+- [x] `rg -n "Models\*\*:" packages/dispatch/skills/autopilot/SKILL.md` hits the override sentence in the Model policy section.
+- [x] Every row of the SKILL.md Model policy table names the same model and effort as `../_context/models.md`.
+- [x] `rg -n "Sonnet" packages/dispatch/skills/autopilot/SKILL.md` shows no dev-role default of Sonnet. Sonnet may appear only as a user-chosen or task-override option.
+- [x] `rg -n "shared working tree" packages/dispatch/skills/autopilot/references/opencode.md` hits the new note.
+- [x] `rg -n "worktree" CLAUDE.md` hits both the dispatch summary bullet and the Architecture tree comment, and `rg -n "worktree\.ts" CLAUDE.md` hits the summary bullet.
+- [x] Autopilot `SKILL.md` covers each item the plan requires of it, one per `rg` hit: the model table (`rg -n "opus / medium"`), isolation (`rg -n "own git worktree"`), the abort (`rg -n "abort"`), resume in a kept worktree (`rg -n "kept worktree"`), and the cleanup rule (`rg -n "Worktree cleanup"`).
+- [x] `rg -n "reverify:" packages/dispatch/skills/deckplan/references/authoring.md` hits rule 7's label list, and `rg -n "requalify:" packages/dispatch/skills/deckplan/references/authoring.md` still hits.
 
 ## Verification
 
-- [ ] Run `rg -n "held back|heldBack" packages/dispatch/skills/autopilot/SKILL.md` and confirm it prints nothing.
-- [ ] Run `rg -n "worktree" packages/dispatch/skills/autopilot/SKILL.md` and confirm the hits include the Cleanup subsection and the park paragraph.
-- [ ] Run `rg -n "shared working tree" packages/dispatch/skills/autopilot/references/opencode.md` and confirm one hit.
-- [ ] Run `rg -n "worktree" CLAUDE.md` and confirm the dispatch bullet and the tree comment both hit.
-- [ ] Run `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` and confirm it passes. Some tests read the docs, so a broken anchor fails here.
-- [ ] Run `rg -n "reverify:" packages/dispatch/skills/deckplan/references/authoring.md` and confirm one hit in rule 7.
-- [ ] Run `git status --short -- packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/autopilot/references/opencode.md packages/dispatch/skills/deckplan/references/authoring.md CLAUDE.md` and confirm all four paths are modified.
+- [x] Run `rg -n "held back|heldBack" packages/dispatch/skills/autopilot/SKILL.md` and confirm it prints nothing.
+- [x] Run `rg -n "worktree" packages/dispatch/skills/autopilot/SKILL.md` and confirm the hits include the Cleanup subsection and the park paragraph.
+- [x] Run `rg -n "shared working tree" packages/dispatch/skills/autopilot/references/opencode.md` and confirm one hit.
+- [x] Run `rg -n "worktree" CLAUDE.md` and confirm the dispatch bullet and the tree comment both hit.
+- [x] Run `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` and confirm it passes. Some tests read the docs, so a broken anchor fails here.
+- [x] Run `rg -n "reverify:" packages/dispatch/skills/deckplan/references/authoring.md` and confirm one hit in rule 7.
+- [x] Run `git status --short -- packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/autopilot/references/opencode.md packages/dispatch/skills/deckplan/references/authoring.md CLAUDE.md` and confirm all four paths are modified.
 
 ## Eval rubric
 
