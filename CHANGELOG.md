@@ -1,5 +1,23 @@
 # Changelog
 
+## [dispatch 5.0.0] - 2026-09-25
+
+_tracks tag `dispatch-v5.0.0`_
+
+### Added
+- Autopilot now runs each non-final task in its own git worktree, so parallel tasks no longer share a working tree and can no longer step on each other's uncommitted edits. `worktree.ts` creates, lands, rebases, unlands, fingerprints, and removes these worktrees automatically as a wave progresses, and sweeps stale ones left behind by an interrupted run.
+- When the main tree changed after a task's worktree was created, autopilot re-runs that task's Verification in the main tree right after landing it ("reverify"). A reverify failure unlands the change, rebases the worktree, and retries with dev instead of letting a stale pass stand.
+- A task file can now declare a `> **Models**:` header to override which model and effort level run its dev, verify, judge, or fix step, on top of the plugin's own defaults (dev: Opus/medium, verify: Opus/low, and so on for every other role).
+
+### Changed
+- Landing a task's worktree into the main tree is now serialized under a lock. A land conflict rebases the worktree onto the current main tree and retries (counted as one attempt) instead of failing the task outright.
+- A run now halts as an infrastructure failure when the main tree changes outside a land (an agent writing through a main-tree path instead of its worktree). It lists the changed paths and reverts nothing.
+- The old shared-tree sibling-interference machinery (`SUSPECTED SIBLING INTERFERENCE` deferral and requalification) is gone now that per-task worktrees make that kind of cross-task interference impossible. OpenCode's hand-driven loop still runs on a shared tree and is unaffected.
+- Serializing on "max parallel" now only applies to external live resources shared across tasks (a shared dev server, for example); tasks isolated in their own worktrees no longer need to queue behind it.
+
+### Fixed
+- Autopilot's live dev delegate command silently dropped the model flag, so a dev model chosen at the flight brief was ignored in favor of the relay engine's own config default. It now passes the model through, matching the headless and live-review delegate paths.
+
 ## [dispatch 4.3.2] - 2026-09-19
 
 _tracks tag `dispatch-v4.3.2`_
