@@ -47,7 +47,7 @@ Call `EnterPlanMode` immediately, before any text output or question. Skip if al
 
 ### Step 2 — Confirm the run options
 
-Ask these **before the interview**, in one `AskUserQuestion` call. A question asked an hour later lands on a user who has stopped tracking the details, so every choice the run needs gets settled while attention is highest. After the plan is approved in Step 6, the rest of the run is unattended.
+Ask these **before the interview**, in one `AskUserQuestion` call. A question asked an hour later lands on a user who has stopped tracking the details, so every choice the run needs gets settled while attention is highest. After the plan is approved in Step 6, the rest of the run is unattended, except an impeccable design phase.
 
 **Review engine** — who critiques the written tree in Step 7. All three share one source of criteria; only the reviewer changes.
 
@@ -135,13 +135,16 @@ Either way, never leave a half-written tree.
    **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
    **When the interview chose impeccable, run the design phase now** — after scaffold, because scaffold refuses a root that already holds files, and before step 2, because `_context/design.md` is derived from its result.
-   - Invoke the `impeccable` skill with `shape <feature>`. Let it run whichever path it picks, and answer its questions with the user.
-   - When the user compares directions, draw them side by side in `docs/<slug>/design/options.html`.
+   - Pre-warm the engine before invoking the skill: run `<impeccable skill dir>/scripts/impeccable context` once at the maximum Bash timeout, because its first run downloads the engine and the skill's own Setup runs it under the default timeout. When the skill directory is unknown until the skill loads, make this the first Setup command, at the same timeout. When that run fails or times out, take impeccable's own "Launcher unavailable" path and continue from its reference docs. Never re-run it in a loop.
+   - Invoke the `impeccable` skill with `shape <feature>`, followed by the interview's summary: goal, users, states, constraints, and the existing visual world. Shape then needs a compact confirmation, not a second discovery round. Let it run whichever path it picks, and answer its questions with the user.
+   - Run the phase code-led: author every decision-page payload with a code-led `buildPath`. When a card or comp needs an image, try in this order: `relay:codex image`, one image at a time since it is not concurrency-safe; then impeccable's `generate-image` API, after the user agrees to its cost; then no image, carrying the card in HTML alone. Open each image before using it.
+   - Draw the HTML yourself, since shape returns a brief and never code. Ground it in the real UI first: a screenshot, the real colours, the real assets. Load impeccable's `reference/craft-floor.md` before drawing.
+   - Draw two or three layout structures side by side in `docs/<slug>/design/options.html`, with synthetic data and live hover. When impeccable ran a decision page, the user already picked the direction there, so compare structures inside that direction only. When the visual world is established and no decision page ran, options.html is the comparison, inside the existing world.
    - Write the approved direction as `docs/<slug>/design/mock.html`: one self-contained file, no network, drawing every state the tasks must build. Use the target's real values, and comment each CSS custom property with the target token it stands for. Draw it in HTML even when the target is not the web.
-   - Revise the mock until the user approves it.
-   - When the mock needs work the approved task index lacks, add those tasks and name them in the Step 8 recap.
+   - Render each page in a browser (`herdr-browser` when Herdr runs) and inspect the screenshot before showing it. Open the page for the user, not just its path. Re-render and re-check after every revision, until the user approves the mock.
+   - Reconcile PLAN.md with the approved mock: a design edit that changes a plan decision changes PLAN.md too. When the mock needs work the approved task index lacks, ask before adding tasks, and name each added task in the Step 8 recap. A grown tree is evidence for Step 7's one tier re-cut.
 
-2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription). Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure. After a design phase, inline every value the mock uses into `_context/design.md`, in impeccable's DESIGN.md format, list it under Required reading in every UI task, and give the task that first makes the UI visible a `- [ ] (human)` check against `docs/<slug>/design/mock.html` opened side by side.
+2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription, plus any design-phase reconciliation). Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure. After a design phase, inline every value the mock uses into `_context/design.md`, in impeccable's DESIGN.md format, list it under Required reading in every UI task, and give the task that first makes the UI visible a `- [ ] (human)` check against `docs/<slug>/design/mock.html` opened side by side.
 
 3. **Fan the task files out to forked subagents** — one `Agent` per task file, all in a single message so they run concurrently. Use `subagent_type: "fork"` and only that; omitting it starts a fresh, context-less agent that never saw the interview and will invent the decisions.
 
@@ -160,12 +163,16 @@ Either way, never leave a half-written tree.
    - On lint feedback, fix and rewrite that file until clean, then stop.
    - Report one line: the path written, plus any unresolved violation.
 
-   **Join before moving on.** A fork can die on an API error, time out, or claim success without leaving a file, and none of that raises on its own. Keep the expected-path list; once every fork returns:
+   **Join before moving on.** A fork can die on an API error, time out, or claim success without leaving a file, and none of that raises on its own. Keep the expected-path list, and snapshot the worktree right before the spawn:
+   ```bash
+   git status --short -uall | sort > /tmp/flightplan-<slug>-status.txt
+   ```
+   Once every fork returns:
    ```bash
    ls docs/<slug>/tasks/*/*.md      # every expected path present?
-   git status --short               # anything touched outside docs/<slug>/?
+   git status --short -uall | sort | comm -13 /tmp/flightplan-<slug>-status.txt -   # what changed since the spawn?
    ```
-   Write any missing file yourself, inline — don't re-spawn the batch, don't trash the tree (a missing file is repairable). Revert any path a fork touched outside `docs/<slug>/`; the brief forbids it but nothing enforces it. Keep what the design phase wrote before the fan-out, such as `PRODUCT.md` and `.impeccable/`.
+   Write any missing file yourself, inline — don't re-spawn the batch, don't trash the tree (a missing file is repairable). Revert any new path outside `docs/<slug>/`; the brief forbids it but nothing enforces it. The snapshot keeps what existed before the spawn, such as the design phase's `PRODUCT.md` and `.impeccable/`. `-uall` lists each file inside an untracked directory, so a new file there still shows. A file already dirty before the spawn keeps its status line when a fork edits it again, so the snapshot cannot catch that edit.
 
    Every task file needs a `## Eval rubric` (threshold line + weighted table), and exactly one task carries `> **Final review**: true`. See `references/task-template.md`.
 

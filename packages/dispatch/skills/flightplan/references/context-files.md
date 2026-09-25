@@ -137,6 +137,10 @@ Follow with these sections, in this order, under these exact headings. Omit a se
 
 Name a frontmatter value in prose by its role; never restate its number.
 
+Every value the mock uses appears in this file. A value the frontmatter cannot hold — a shadow, a blur, a focus ring — goes in the prose of its section, never only in impeccable's `.impeccable/design.json` sidecar, which executors never read.
+
+The Step 7 reviewer bundles Markdown only, so it never sees the mock. The `(human)` side-by-side check is the only guard against drift between the mock and this file.
+
 ### `data-model.md`
 
 When tasks share a schema or domain model worth pinning.
