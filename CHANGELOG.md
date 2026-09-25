@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 5.1.0] - 2026-09-26
+
+_tracks tag `dispatch-v5.1.0`_
+
+### Added
+- Flightplan's interview can now offer an optional visual-design phase, powered by impeccable, when the plan touches UI and impeccable is available. It's asked as part of Step 3, right alongside the other planning questions.
+- When enabled, the design phase runs after scaffolding and before the plan and context files are written, producing an approved `mock.html` that `_context/design.md` is derived from (in impeccable's DESIGN.md format, with layout and component states spelled out).
+- Every UI task lists `_context/design.md` as required reading, and the task that first makes the UI visible carries a human side-by-side check against `mock.html`.
+
+### Changed
+- Fork-join revert no longer deletes `PRODUCT.md` or `.impeccable/`, since impeccable writes those outside `docs/<slug>/` and an undo shouldn't touch them.
+
 ## [dispatch 5.0.0] - 2026-09-25
 
 _tracks tag `dispatch-v5.0.0`_
