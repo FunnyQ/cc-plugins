@@ -48,6 +48,8 @@ export function foo(bar: Bar): Baz
 
 ## Verification
 
+Write Verification commands relative to the repo root. Autopilot runs them from inside the task's worktree, so an absolute path into the main tree checks the wrong copy.
+
 - [ ] <Concrete command, manual step, or test the executor runs>
 - [ ] <Concrete command, manual step, or test the executor runs>
 
@@ -117,6 +119,31 @@ A plan with a single task is exempt. That task is its own terminal. Don't mark m
 
 If any task in the tree runs a test suite, the closing review task's `## Verification` must run one too. This requirement belongs on the closing task because it is the last writer: it applies edits after every other task has run, and only its own `## Verification` gates those edits. Recognized runners are `bun test`, `npm test` / `pnpm test` / `yarn test`, `cargo test`, `go test`, `rspec`, `make test`, and `pytest`. A docs-only tree that runs no tests anywhere needs nothing and triggers nothing. The linter enforces presence, not reach, so a narrow test path satisfies the rule; read the advisory report to judge whether the suite is broad enough.
 
+### Models
+
+Treat the Models header as optional. Use the Models header rarely. Unless a task is unusually hard (a delicate refactor, a concurrency fix) or unusually easy (a mechanical rename), omit the Models header. Run-wide roles (scout, commit, review lenses) cannot be set per task.
+
+```markdown
+> **Models**: dev=opus/high, verify=sonnet
+```
+
+Write comma-separated entries as `role=model` or `role=model/effort`. Use lowercase tokens. Allow whitespace around `=`, `/`, and each entry. Allow a trailing comma. Keep explanations outside the example line: a trailing note becomes part of the last entry and fails parsing.
+
+Use only the roles `dev`, `verify`, `judge`, and `fix`. Write each role at most once. Write `fix` only on the task that carries `> **Final review**: true`. Use only the models `haiku`, `sonnet`, `opus`, and `fable`. Use only the efforts `low`, `medium`, `high`, `xhigh`, and `max`. When a role's effort is omitted, that role runs with no effort option.
+
+Autopilot reads the Models header value as written: `next-ready.ts` passes it along as `modelsRaw`, and the orchestrator parses it. Roles the Models header does not name keep autopilot's default map:
+
+| Role | Default |
+|---|---|
+| dev | opus/medium |
+| verify | opus/low |
+| judge | opus/medium |
+| fix | opus/high |
+
+The last Claude dev attempt raises the dev effort one step and keeps the model. The ladder is `low → medium → high → xhigh → max`, and `max` stays `max`. For example, `dev=sonnet/low` over 3 attempts gives sonnet/low, sonnet/low, sonnet/medium.
+
+`lint-task.ts` rejects an unknown role, model, or effort, a duplicate role, a malformed entry, and `fix` on a non-final task.
+
 ### `Eval rubric` (required, machine-parseable)
 
 Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary gate** (pass or fail). The rubric is the **graded quality score** on top of that gate. A judge agent, or you, uses the rubric to decide "good enough". A workflow loops against the rubric until the task passes.
@@ -164,9 +191,10 @@ Before finalizing a task file, verify each:
 
 - [ ] All function signatures, schemas, or interfaces the executor will write are inline.
 - [ ] If behavior is non-obvious, sample inputs and outputs are inline.
-- [ ] File paths are absolute from project root (no "in the auth folder" hand-waving).
+- [ ] Write file paths relative to the repo root (no "in the auth folder" hand-waving).
 - [ ] Every acceptance criterion is verifiable (no "looks good").
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
+- [ ] Write Verification commands relative to the repo root so they check the task's worktree, not an absolute path into the main tree.
 - [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
 - [ ] Each gate section holds at least one item a verifier can run itself — an all-`(human)` section fails lint. See "Human-only gate items" below.
 - [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
@@ -186,7 +214,7 @@ Two separate failures made every whole-tree form unusable.
 
 **The runner edits the task file.** The dev step sets `Status: in-progress`, and `mark-done.ts` ticks every `## Acceptance criteria` and `## Verification` box. So an exclusivity claim is false from the first attempt. Worse, a dev agent under a failing gate reverts the runner's own `Status` edit to make the check pass — observed live, with the agent reporting "task file correctly restored". A reverted `Status` un-schedules the task: `next-ready.ts` only offers `todo`, and `mark-done.ts` validates the header before it writes.
 
-**Sibling tasks share the tree.** Autopilot dispatches every ready task of a wave in parallel into one working tree, and forbids each of them to commit. So a correct task sees its siblings' correct, uncommitted edits in `git status` and reports them as its own violation. Observed live: a task passed all 7 acceptance criteria and 245 tests, then failed three attempts and parked, on four paths that were the declared file list of a task running beside it. The exemption `plus at most this task file` only ever covered the runner's self-edits; it never covered siblings.
+**Sibling tasks share the tree where tasks still use one working tree.** Today, this applies to the hand-driven OpenCode loop. There, a correct task sees its siblings' correct, uncommitted edits in `git status` and reports them as its own violation. Observed live: a task passed all 7 acceptance criteria and 245 tests, then failed three attempts and parked, on four paths that were the declared file list of a task running beside it. The exemption `plus at most this task file` only ever covered the runner's self-edits; it never covered siblings. Under Claude Code, each task has its own worktree. Keep the `--` pathspec form required anyway, because one task file must work on both runtimes.
 
 You cannot recover the missing information by rewording. In a shared tree a dirty path looks identical whether your task dirtied it or a sibling did.
 

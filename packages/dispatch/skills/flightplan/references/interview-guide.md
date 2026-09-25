@@ -161,6 +161,17 @@ Focus: audience and structure. Replace bucketing with section-bucketing.
 
 - How is the writing evaluated? Reviewer? Style guide? Examples to match?
 
+## Per-task models (ask during decomposition)
+
+Recommend omitting the Models header by default. Only when a task stands out as unusually hard (a delicate refactor, a concurrency fix) or unusually easy (a mechanical rename), ask whether to pin per-task models.
+
+Write the Models header as `> **Models**: role=model[/effort], role=model[/effort]`.
+
+For a delicate concurrency fix, ask via `AskUserQuestion`: "Should this task use the defaults or pin per-task models?"
+
+- **Use the defaults (Recommended)** — Omit the Models header to keep autopilot's default role map.
+- **Pin per-task models** — Set the Models header for this task's unusual difficulty.
+
 ## Eval rubric (ask per task)
 
 A required dimension across **every** topic. Acceptance criteria answers "is it done?". The rubric answers "is it good enough?" — the graded bar a judge agent or a workflow loops against. Don't skip it. A task with no rubric can't be scored. `lint-task.ts` will reject it.
