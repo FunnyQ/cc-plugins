@@ -114,6 +114,40 @@ async function runCli(input: string) {
 }
 
 describe("lintFile Models", () => {
+  test("task template Models example lints clean without setting template defaults", async () => {
+    const template = await readFile(
+      join(import.meta.dir, "../references/task-template.md"),
+      "utf8",
+    );
+    const templateBlock = template.match(
+      /^## Template\n\n```markdown\n([\s\S]*?)\n```\n\n## Header rules/m,
+    );
+    expect(templateBlock).not.toBeNull();
+    expect(templateBlock![1].match(/^> \*\*Models\*\*:.*$/m)).toBeNull();
+
+    const sectionStart = template.indexOf("### Models\n");
+    expect(sectionStart).toBeGreaterThanOrEqual(0);
+    const sectionBody = template.slice(sectionStart + "### Models\n".length);
+    const nextHeading = sectionBody.search(/^#{2,3} /m);
+    const section = sectionBody.slice(0, nextHeading < 0 ? undefined : nextHeading);
+    const example = section.match(/^> \*\*Models\*\*:.*$/m);
+    expect(example).not.toBeNull();
+
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": VALID_TASK.replace(
+        "> **Status**: todo",
+        `> **Status**: todo\n${example![0]}`,
+      ),
+    });
+    try {
+      const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+      expect(violations.filter((v) => v.rule === "models")).toHaveLength(0);
+    } finally {
+      await rm(root, { recursive: true });
+    }
+  });
+
   test.each([
     ["dev", "malformed"],
     ["scout=haiku", "unknown role"],
