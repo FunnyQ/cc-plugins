@@ -705,6 +705,9 @@ const resilient = async (make, retryModel) => {
 //                    second attempt on top of an unknown state, so the task is
 //                    escalated immediately; only unlanded tasks are parked.
 // The distinction has to survive to the wave loop, so it rides in the result.
+const withKeptWorktree = (ref, reason) => reason
+  + (live.has(ref) ? `\nWorktree kept at ${live.get(ref)}` : '')
+
 const infrastructureFailure = (ref, attempt, cause, parked) => ({
   task: ref,
   passed: false,
@@ -713,7 +716,7 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
   // here would misrepresent the run.
   attempt,
   parked,
-  reason: cause,
+  reason: withKeptWorktree(ref, cause),
 })
 
 // Best-effort park before land. Every pre-land catch path must record whether it
@@ -726,7 +729,7 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
 async function parkBlocked(ref, path, reason, watch) {
   return withWriter(watch, async () => {
     try {
-      const result = await resilient(retryModel => agent(markBlockedPrompt(ref, path, reason),
+      const result = await resilient(retryModel => agent(markBlockedPrompt(ref, path, withKeptWorktree(ref, reason)),
         { label: `block:${ref}`, phase: 'Execute', ...pick(retryModel ?? MODEL.park), schema: PARK_SCHEMA }),
         MODEL.structuredRetry)
       return result?.ok === true
@@ -812,6 +815,7 @@ const wtObject = (properties) => ({ type: 'object', properties, required: Object
 const wtStrings = { type: 'array', items: { type: 'string' } }
 const WT_SCHEMA = {
   create: wtObject({ path: { type: 'string' }, base: { type: 'string' } }),
+  rebase: wtObject({ path: { type: 'string' }, base: { type: 'string' }, conflicted: wtStrings }),
   land: wtObject({
     status: { type: 'string', enum: ['clean', 'conflict', 'leak'] },
     drift: { type: 'boolean' }, files: wtStrings, paths: wtStrings,
@@ -1021,16 +1025,39 @@ async function executeTask(item, watch) {
           landed = await withMainLock(async () => {
             const result = await wtCall(`wt-land:${ref}`,
               wtCommand(`land ${ref} --expect ${mainFingerprint} --op a${attempt}-land`), WT_SCHEMA.land)
-            if (result.status === 'clean') mainFingerprint = result.fingerprint
+            if (result.status === 'clean') {
+              // interim: drift is landed without re-verify; replaced later
+              mainFingerprint = result.fingerprint
+            }
             return result
           })
         } catch (error) {
           const cause = `worktree land failed: ${error?.message ?? String(error)}`
           return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
         }
-        if (landed.status !== 'clean') {
-          // clean-only land; conflict rebase, park reporting and drift/leak handling replace this
-          const cause = `LAND NOT CLEAN (${landed.status}): ${(landed.status === 'conflict' ? landed.files : landed.paths).join(', ')}`
+        if (landed.status === 'conflict') {
+          try {
+            const rebased = await withMainLock(() => wtCall(`wt-rebase:${ref}`,
+              wtCommand(`rebase ${ref} --op a${attempt}-rebase`), WT_SCHEMA.rebase))
+            wt.base = rebased.base
+          } catch (error) {
+            const cause = `worktree rebase failed: ${error?.message ?? String(error)}`
+            return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
+          }
+          attempts.push({
+            n: attempt,
+            model: attemptModel,
+            gateSummary: `LAND CONFLICT:\n${landed.files.join('\n')}`,
+            rationale: null,
+            weighted: null,
+            hardFailed: false,
+            missing: [],
+          })
+          continue
+        }
+        if (landed.status === 'leak') {
+          // interim: a leak fails only this task; replaced by a run-wide abort later
+          const cause = `MAIN TREE LEAK:\n${landed.paths.join('\n')}`
           return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
         }
 
@@ -1084,7 +1111,7 @@ async function executeTask(item, watch) {
   // Render once: the parked file and the returned reason must carry the same text.
   const history = renderHistory(attempts)
   const parkedOk = await parkBlocked(ref, path, history, watch)
-  return { task: ref, passed: false, infrastructure: false, attempt: last, parked: parkedOk, reason: history }
+  return { task: ref, passed: false, infrastructure: false, attempt: last, parked: parkedOk, reason: withKeptWorktree(ref, history) }
 }
 
 // Wrap every task before it reaches parallel(). Do NOT depend on parallel()
@@ -1652,6 +1679,10 @@ return { slug: CFG.slug, completed, escalations, needsHuman, worktrees: keptWork
 - **A `(human)` gate item is declared by the plan, skipped by the verifier, and reported at the end of the run.** The tag sits at the head of a gate item (`- [ ] (human) …`) and means no command can perform it — a pointer sweep, a hardware toggle, a click on a menu-bar app. Before this, such an item guaranteed a park: the verifier could only fail it, so the task burned every attempt and stopped the tree on work that was correct. Now the verifier leaves it alone, returns it in `humanPending`, and the task passes on its machine-checkable half; the orchestrator collects those into `needsHuman` and the main agent prints them as a closing checklist. Three rules keep that from becoming a pass key. The **plan author** declares the tag, with the same authority that wrote the criterion — a verifier may never add one, and an item it merely finds hard to run must be left to fail, because an uncheckable item is a plan defect. **`lint-task.ts`'s `human-gate` rule refuses a gate section whose items are all tagged**, so a tagged plan always leaves the verifier real work; that rule is what stops the tag from hollowing out the binary gate one item at a time. And `humanPending` is taken from the **passing** gate only — a failed attempt is retried, and its verifier re-derives the same list, so carrying a rejected attempt's list forward would report every item twice. **Known residual:** `mark-done.ts` ticks a `(human)` box like any other, so the task file alone cannot tell you a person still owes a check. `RUNLOG.md` and the run result are where that lives, which is why the verifier's flightlog message ends with `NEEDS HUMAN: <n> item(s)`.
 
 - **Do NOT give the dev agent `isolation: 'worktree'`.** Avoid `agent({isolation: 'worktree'})`: it isolates one agent call and never merges back. Let the orchestrator own one worktree per task across dev → verify → judge, with mechanical agents creating and landing it through `worktree.ts`. Admit a judged pass into the main tree only through a three-way land under the main-tree lock.
+
+- **Rebase the task worktree onto the current main tree after a land conflict.** Charge one attempt because dev must resolve the conflict markers. Allow conflicting edits within a wave without a `Depends on` edge.
+
+- **Use a land op id per attempt.** After a conflict fix, let the next attempt's land act instead of replaying the old conflict.
 
 - **Hold the main-tree lock around every `worktree.ts` call.** Prevent an unlocked create from snapshotting half a land and two unlocked state rewrites from losing an entry. Stop the run with its cause if a sweep or baseline fails twice; no task owns that failure.
 
