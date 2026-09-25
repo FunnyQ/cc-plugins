@@ -280,6 +280,11 @@ export async function lintFile(
     push(validity.rule, validity.reason);
   }
 
+  for (const message of task.modelErrors) push("models", message);
+  if (task.models.fix && !task.finalReview) {
+    push("models", "`fix` is legal only on the Final review task");
+  }
+
   // Required reading — exact shape ../_context/<name>.md and resolvable.
   if (task.requiredReading.length === 0) {
     push("required-reading", "no Required reading paths listed");

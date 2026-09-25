@@ -113,6 +113,59 @@ async function runCli(input: string) {
   return { stdout, stderr, exitCode };
 }
 
+describe("lintFile Models", () => {
+  test.each([
+    ["dev", "malformed"],
+    ["scout=haiku", "unknown role"],
+    ["dev=unknown", "unknown model"],
+    ["dev=opus/extreme", "unknown effort"],
+    ["dev=opus, dev=sonnet", "duplicate role"],
+    ["", "malformed"],
+    ["dev=Opus", "malformed"],
+  ])("reports %s as %s", async (value, kind) => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": VALID_TASK.replace(
+        "> **Status**: todo",
+        `> **Status**: todo\n> **Models**: ${value}`,
+      ),
+    });
+    try {
+      const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+      const models = violations.filter((v) => v.rule === "models");
+      expect(models).toHaveLength(1);
+      expect(models[0].detail).toContain(kind);
+    } finally {
+      await rm(root, { recursive: true });
+    }
+  });
+
+  test.each([
+    ["dev=opus/high, verify=sonnet", false, 0],
+    ["fix=opus", false, 1],
+    ["fix=opus", true, 0],
+    ["dev, scout=haiku, fix=opus", false, 3],
+  ] as const)("checks %s with finalReview=%s", async (value, finalReview, count) => {
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": VALID_TASK.replace(
+        "> **Status**: todo",
+        `> **Status**: todo\n> **Models**: ${value}${finalReview ? "\n> **Final review**: true" : ""}`,
+      ),
+    });
+    try {
+      const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+      const models = violations.filter((v) => v.rule === "models");
+      expect(models).toHaveLength(count);
+      if (count > 0) {
+        expect(models.at(-1)?.detail).toBe("`fix` is legal only on the Final review task");
+      }
+    } finally {
+      await rm(root, { recursive: true });
+    }
+  });
+});
+
 describe("lintFile", () => {
   test("valid task → no violations", async () => {
     const root = await writeTree({
