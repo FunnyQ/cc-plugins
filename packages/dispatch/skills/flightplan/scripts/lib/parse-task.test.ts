@@ -5,6 +5,7 @@ import {
   refToString,
   taskValidity,
   uncheckedGateItems,
+  type TaskModels,
 } from "./parse-task";
 
 // Mirrors a real-world engine task rubric — the format flightplan rubrics
@@ -154,6 +155,114 @@ describe("parseTask", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.task.blocks).toEqual([]);
+  });
+});
+
+describe("parseTask Models", () => {
+  const parse = (value?: string) => {
+    const result = parseTask(
+      value === undefined
+        ? VALID
+        : VALID.replace(
+            "> **Status**: todo",
+            `> **Status**: todo\n> **Models**: ${value}`,
+          ),
+    );
+    if (!result.ok) throw new Error(result.reason);
+    return result.task;
+  };
+
+  test("absent header has empty models and errors and null raw value", () => {
+    const task = parse();
+    expect(task.models).toEqual({});
+    expect(task.modelsRaw).toBeNull();
+    expect(task.modelErrors).toEqual([]);
+  });
+
+  const fixtures: [string, TaskModels | null][] = [
+    ["dev=opus/high, verify=sonnet", {
+      dev: { model: "opus", effort: "high" },
+      verify: { model: "sonnet", effort: null },
+    }],
+    ["judge = opus / xhigh", { judge: { model: "opus", effort: "xhigh" } }],
+    ["dev=opus,", { dev: { model: "opus", effort: null } }],
+    [" dev=sonnet/low , verify=haiku ", {
+      dev: { model: "sonnet", effort: "low" },
+      verify: { model: "haiku", effort: null },
+    }],
+    ["dev=opus, dev=sonnet", null],
+    ["dev=gpt5", null],
+    ["dev=Opus", null],
+    ["", null],
+    ["dev=opus/high/max", null],
+  ];
+
+  test.each(fixtures)("parity fixture: %s", (value, expected) => {
+    const task = parse(value);
+    expect(task.modelsRaw).toBe(value.trim());
+    if (expected === null) {
+      expect(task.modelErrors).toHaveLength(1);
+    } else {
+      expect(task.models).toEqual(expected);
+      expect(task.modelErrors).toEqual([]);
+    }
+  });
+
+  test("raw value trims only the outer whitespace", () => {
+    const task = parse(" dev=opus  , verify = haiku  ");
+    expect(task.modelsRaw).toBe("dev=opus  , verify = haiku");
+    expect(task.models).toEqual({
+      dev: { model: "opus", effort: null },
+      verify: { model: "haiku", effort: null },
+    });
+    expect(task.modelErrors).toEqual([]);
+  });
+
+  test.each([
+    ["dev", "malformed"],
+    ["dev=", "malformed"],
+    ["dev=opus/high/max", "malformed"],
+    ["dev=Opus", "malformed"],
+    ["dev=gpt5", "malformed"],
+    ["scout=haiku", "unknown role"],
+    ["dev=unknown", "unknown model"],
+    ["dev=opus/extreme", "unknown effort"],
+    ["", "malformed"],
+  ])("drops %s with one %s error", (value, kind) => {
+    const task = parse(value);
+    expect(task.models).toEqual({});
+    expect(task.modelErrors).toHaveLength(1);
+    expect(task.modelErrors[0]).toContain(`Models entry "${value}"`);
+    expect(task.modelErrors[0]).toContain(kind);
+  });
+
+  test("duplicate roles keep the first choice", () => {
+    const task = parse("dev=opus, dev=sonnet");
+    expect(task.models).toEqual({ dev: { model: "opus", effort: null } });
+    expect(task.modelErrors).toHaveLength(1);
+    expect(task.modelErrors[0]).toContain('Models entry "dev=sonnet"');
+    expect(task.modelErrors[0]).toContain("duplicate role");
+  });
+
+  test("drops empty comma pieces and accepts every remaining model and effort", () => {
+    const task = parse(", dev=haiku/medium,, verify=sonnet/low, judge=opus/high, fix=fable/max, ");
+    expect(task.models).toEqual({
+      dev: { model: "haiku", effort: "medium" },
+      verify: { model: "sonnet", effort: "low" },
+      judge: { model: "opus", effort: "high" },
+      fix: { model: "fable", effort: "max" },
+    });
+    expect(task.modelErrors).toEqual([]);
+  });
+
+  test("reports each invalid entry while retaining valid entries", () => {
+    const task = parse("dev=opus, scout=haiku, verify=unknown, judge=opus/extreme");
+    expect(task.models).toEqual({ dev: { model: "opus", effort: null } });
+    expect(task.modelErrors).toEqual([
+      'Models entry "scout=haiku": unknown role "scout" (expected dev, verify, judge, fix)',
+      'Models entry "verify=unknown": unknown model "unknown" (expected haiku, sonnet, opus, fable)',
+      'Models entry "judge=opus/extreme": unknown effort "extreme" (expected low, medium, high, xhigh, max)',
+    ]);
   });
 });
 

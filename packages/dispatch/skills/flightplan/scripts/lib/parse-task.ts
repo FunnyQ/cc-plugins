@@ -22,6 +22,12 @@ export type TaskRef = {
   nn: string; // zero-padded, e.g. "01"
 };
 
+export type ModelRole = "dev" | "verify" | "judge" | "fix";
+export type ModelName = "haiku" | "sonnet" | "opus" | "fable";
+export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+export type ModelChoice = { model: ModelName; effort: Effort | null };
+export type TaskModels = Partial<Record<ModelRole, ModelChoice>>;
+
 export type ParsedTask = {
   /** Bucket directory name as found in the path (e.g. "ui"). */
   bucket: string;
@@ -41,6 +47,12 @@ export type ParsedTask = {
   status: TaskStatus | null;
   /** True if the header carries `> **Final review**: true` — the closing gate. */
   finalReview: boolean;
+  /** Parsed Models header; lint consumes this, absent headers give `{}`. */
+  models: TaskModels;
+  /** Edge-trimmed header value for next-ready; null when absent. */
+  modelsRaw: string | null;
+  /** One diagnostic per malformed Models entry for lint. */
+  modelErrors: string[];
   /** Section headings present in the body (e.g. ["Goal", "Acceptance criteria"]). */
   sections: string[];
   /** Body text after the header blockquote, used by self-containment checks. */
@@ -112,6 +124,47 @@ export function parseStatusValue(raw: string): TaskStatus | null {
     : null;
 }
 
+/** Pure parser; invalid entries are dropped so lint can report every error. */
+export function parseModels(value: string): { models: TaskModels; errors: string[] } {
+  const models: TaskModels = {};
+  const errors: string[] = [];
+  const roles: readonly string[] = ["dev", "verify", "judge", "fix"];
+  const names: readonly string[] = ["haiku", "sonnet", "opus", "fable"];
+  const efforts: readonly string[] = ["low", "medium", "high", "xhigh", "max"];
+  if (!value.trim()) {
+    return { models, errors: ['Models entry "": malformed empty value'] };
+  }
+
+  for (const entry of value.split(",").map((piece) => piece.trim()).filter(Boolean)) {
+    const match = /^([a-z]+)\s*=\s*([a-z]+)(?:\s*\/\s*([a-z]+))?$/.exec(entry);
+    const prefix = `Models entry "${entry}": `;
+    if (!match) {
+      errors.push(`${prefix}malformed (expected role=model[/effort])`);
+      continue;
+    }
+    const [, role, model, effort] = match;
+    if (!roles.includes(role)) {
+      errors.push(`${prefix}unknown role "${role}" (expected ${roles.join(", ")})`);
+      continue;
+    }
+    if (!names.includes(model)) {
+      errors.push(`${prefix}unknown model "${model}" (expected ${names.join(", ")})`);
+      continue;
+    }
+    if (effort !== undefined && !efforts.includes(effort)) {
+      errors.push(`${prefix}unknown effort "${effort}" (expected ${efforts.join(", ")})`);
+      continue;
+    }
+    const key = role as ModelRole;
+    if (models[key]) {
+      errors.push(`${prefix}duplicate role "${role}"`);
+      continue;
+    }
+    models[key] = { model: model as ModelName, effort: (effort as Effort | undefined) ?? null };
+  }
+  return { models, errors };
+}
+
 /**
  * Parse a task-file string into structured fields.
  * Returns null + a reason if the file is too malformed to parse.
@@ -148,6 +201,9 @@ export function parseTask(
   const quote = lines.slice(quoteStart, quoteEnd).join("\n");
   const bodyLines = lines.slice(quoteEnd);
   const body = bodyLines.join("\n");
+  const modelsRaw = extractModelsRaw(quote);
+  const { models, errors: modelErrors } =
+    modelsRaw === null ? { models: {}, errors: [] } : parseModels(modelsRaw);
 
   return {
     ok: true,
@@ -161,6 +217,9 @@ export function parseTask(
       blocks: extractRefs(quote, "Blocks"),
       status: extractStatus(quote),
       finalReview: extractFinalReview(quote),
+      models,
+      modelsRaw,
+      modelErrors,
       sections: extractSections(bodyLines),
       body,
       rubric: parseRubric(body),
@@ -330,6 +389,15 @@ function extractFinalReview(quote: string): boolean {
     }
   }
   return false;
+}
+
+function extractModelsRaw(quote: string): string | null {
+  const lines = quote.split("\n").map((l) => l.replace(/^>\s?/, ""));
+  for (const line of lines) {
+    const match = /^\*\*Models\*\*\s*:\s*(.*)$/.exec(line.trim());
+    if (match) return match[1].trim();
+  }
+  return null;
 }
 
 function extractSections(bodyLines: string[]): string[] {
