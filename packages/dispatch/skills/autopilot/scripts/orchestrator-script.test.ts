@@ -88,9 +88,13 @@ type RunResult = {
     reason: string;
   }[];
   needsHuman: { task: string; criteria: string[] }[];
+  worktrees: { ref: string; path: string }[];
+  cleanupFailures: { ref: string; path: string }[];
 };
 
 type Scenario = {
+  worktree?: Record<string, (Record<string, unknown> | Throws | null)[]>;
+  worktreeHolds?: Record<string, Promise<void>>;
   /** One entry per wave, consumed in order. THROWS models a rejecting agent. */
   scouts: (ScoutResult | Throws)[];
   /** Omit to leave the Workflow runtime's `budget` global undeclared. */
@@ -187,7 +191,7 @@ async function loadScript(overrides: ConfigOverrides = {}): Promise<string> {
   const end = doc.indexOf("\n```", bodyStart);
   if (end === -1) throw new Error("unterminated ```javascript block");
   let script = doc.slice(bodyStart, end);
-  for (const [field, literal] of Object.entries(overrides)) {
+  for (const [field, literal] of Object.entries({ repoRoot: "'/abs/repo'", ...overrides })) {
     const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(`^(\\s*${escaped}:\\s*)[^,\\n]+(,.*)$`, "m");
     if (!pattern.test(script)) {
@@ -201,6 +205,14 @@ async function loadScript(overrides: ConfigOverrides = {}): Promise<string> {
   return script.replace(/^export const meta/m, "const meta");
 }
 
+type AgentSchema = {
+  type: string | string[];
+  properties?: Record<string, AgentSchema>;
+  required?: string[];
+  items?: AgentSchema;
+  enum?: string[];
+};
+
 type RunLog = {
   result: RunResult;
   /** Every agent label, in call order. */
@@ -211,6 +223,7 @@ type RunLog = {
   models: (string | undefined)[];
   efforts: (string | undefined)[];
   effortKeys: boolean[];
+  schemas: (AgentSchema | undefined)[];
 };
 
 async function runOrchestrator(
@@ -223,6 +236,7 @@ async function runOrchestrator(
   const models: (string | undefined)[] = [];
   const efforts: (string | undefined)[] = [];
   const effortKeys: boolean[] = [];
+  const schemas: (AgentSchema | undefined)[] = [];
   let budgetSpent = scenario.budget?.spent ?? 0;
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
@@ -232,7 +246,7 @@ async function runOrchestrator(
     if (!queues.has(key)) {
       const source =
         (scenario[
-          bucket as "gate" | "requalify" | "judge" | "markDone" | "park"
+          bucket as "gate" | "requalify" | "judge" | "markDone" | "park" | "worktree"
         ] ?? {})[ref] ?? undefined;
       queues.set(key, source ? [...source] : []);
     }
@@ -244,9 +258,10 @@ async function runOrchestrator(
     return next;
   };
 
+  let fingerprint = 0;
   const agent = async (
     prompt: string,
-    opts: { label: string; model?: string; effort?: string },
+    opts: { label: string; model?: string; effort?: string; schema?: AgentSchema },
   ) => {
     const label = opts.label;
     labels.push(label);
@@ -255,6 +270,7 @@ async function runOrchestrator(
     models.push(opts.model);
     efforts.push(opts.effort);
     effortKeys.push(Object.hasOwn(opts, "effort"));
+    schemas.push(opts.schema);
 
     if (label.startsWith("scout-wave-")) {
       const next = scouts.length > 0 ? scouts.shift() : null;
@@ -271,6 +287,30 @@ async function runOrchestrator(
     }
     const [role, rest] = [label.slice(0, label.indexOf(":")), label];
     const refOf = (l: string) => l.slice(l.indexOf(":") + 1).split("#")[0];
+
+    if (role.startsWith("wt-")) {
+      if (scenario.worktreeHolds?.[label]) await scenario.worktreeHolds[label];
+      const ref = refOf(label);
+      const path = `/wt/${ref}`;
+      const defaults: Record<string, Record<string, unknown>> = {
+        "wt-create": { path, base: "b0" },
+        "wt-land": {
+          status: "clean", drift: false, files: [], paths: [],
+          fingerprint: `f${role === "wt-land" ? ++fingerprint : fingerprint}`,
+          previous: /--expect (\S+)/.exec(prompt)?.[1] ?? "",
+        },
+        "wt-remove": { removed: true },
+        "wt-show": { path, base: "b0", exists: true },
+        "wt-leak": { fingerprint: "f0", paths: [] },
+        "wt-sweep": {
+          removed: [],
+          kept: (/--keep (\S+)/.exec(prompt)?.[1].split(",") ?? [])
+            .map((ref) => ({ ref, path: `/wt/${ref}` })),
+        },
+      };
+      if (!defaults[role]) throw new Error(`unhandled worktree label: ${label}`);
+      return take("worktree", label, defaults[role]);
+    }
 
     if (role === "verify") {
       return take("gate", refOf(rest), { passed: true, summary: "green" });
@@ -339,7 +379,7 @@ async function runOrchestrator(
     `return (async () => {\n${src}\n})()`,
   );
   const result = (await factory(...parameterValues)) as RunResult;
-  return { result, labels, prompts, models, efforts, effortKeys };
+  return { result, labels, prompts, models, efforts, effortKeys, schemas };
 }
 
 const counts = (over: Partial<Counts> & { total: number }): Counts => ({
@@ -2992,5 +3032,397 @@ describe("per-role model and effort choices", () => {
       ),
     ).rejects.toThrow("Models");
     expect(agentCalls).toEqual([]);
+  });
+});
+
+describe("task worktree isolation", () => {
+  const ref = "ui/01";
+  const cleanLand = {
+    status: "clean", drift: false, files: [], paths: [],
+    fingerprint: "landed", previous: "f0",
+  };
+  const kept = { ref: "old/01", path: "/old/worktree" };
+  const blockedWave = () => snapshot({
+    ready: [ready(ref)],
+    counts: counts({ total: 2, todo: 1, blocked: 1 }),
+    unfinished: [{ ref, state: "todo" }, { ref: kept.ref, state: "blocked" }],
+  });
+  const blockedEnd = () => snapshot({
+    counts: counts({ total: 2, done: 1, blocked: 1 }),
+    unfinished: [{ ref: kept.ref, state: "blocked" }],
+  });
+
+  test("clean pipeline creates, judges, lands, marks done, then removes", async () => {
+    const log = await runOrchestrator({ scouts: [wave(ref, 1, 0), complete(1)] });
+    expect(log.labels).toEqual([
+      "scout-wave-1", "wt-sweep:start", "wt-leak:baseline",
+      `wt-create:${ref}`, `dev:${ref}#1`, `verify:${ref}#1`, `judge:${ref}#1`,
+      `wt-land:${ref}`, `done:${ref}`, `wt-remove:${ref}`,
+      "scout-wave-2", "wt-sweep:end", "commit-post-loop",
+    ]);
+    expect(log.result.worktrees).toEqual([]);
+    expect(log.result.cleanupFailures).toEqual([]);
+    expect(log.result.completed).toEqual([ref]);
+    for (const label of log.labels.filter((label) => label.startsWith("wt-"))) {
+      expect(promptFor(log, label)).toContain("--repo /abs/repo --slug my-plan");
+      expect(promptFor(log, label)).toContain("StructuredOutput");
+      expect(modelFor(log, label)).toBe("haiku");
+      expect(effortFor(log, label)).toBeUndefined();
+    }
+  });
+
+  test.each(["claude", "codex", "opencode", "live"])("%s pipeline carries worktree rules", async (engine) => {
+    const log = await runOrchestrator({ scouts: [wave(ref, 1, 0), complete(1)] }, {
+      devEngine: `'${engine === "live" ? "codex" : engine}'`,
+      ...(engine === "live" ? { liveDevEngine: "true", relayPath: "'/abs/relay.ts'" } : {}),
+    });
+    const driver = engine === "live" ? "codex" : engine;
+    const dev = engine === "claude" ? `dev:${ref}#1` : `dev-${driver}:${ref}#1`;
+    for (const label of [dev, `verify:${ref}#1`, `judge:${ref}#1`]) {
+      const prompt = promptFor(log, label);
+      expect(prompt).toContain(`WORKTREE: /wt/${ref}`);
+      expect(prompt).toContain(`cd /wt/${ref}`);
+      expect(prompt).toContain("flightlog.ts log");
+      expect(prompt).toContain("Status line");
+      expect(prompt).toContain("/tmp");
+      expect(prompt).toContain("Nothing else may be written outside");
+      expect(prompt).toContain("absolute path");
+      expect(prompt).toContain("relative to the repo root");
+    }
+    if (engine !== "claude") {
+      expect(promptFor(log, dev)).toMatch(new RegExp(`cd /wt/${ref} && bun .+delegate`));
+      expect(promptFor(log, dev)).toContain("Include the worktree rules in that instruction");
+    }
+    expect(promptFor(log, `done:${ref}`)).not.toContain("WORKTREE:");
+  });
+
+  test("land retries an identical command after a null result", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: { [`wt-land:${ref}`]: [null, cleanLand] },
+    });
+    const prompts = log.prompts.filter((_, i) => log.labels[i] === `wt-land:${ref}`);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[0]).toBe(prompts[1]);
+    expect(prompts[0]).toContain(`land ${ref} --expect f0 --op a1-land --repo /abs/repo --slug my-plan`);
+    expect(modelsFor(log, `wt-land:${ref}`)).toEqual(["haiku", "opus"]);
+    expect(log.result.completed).toEqual([ref]);
+  });
+
+  test.each([null, THROWS])("land double failure keeps its worktree: %s", async (failure) => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0)],
+      worktree: { [`wt-land:${ref}`]: [failure, failure] },
+    });
+    expect(callsTo(log.labels, `wt-land:${ref}`)).toBe(2);
+    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, infrastructure: true });
+    expect(log.labels).not.toContain(`done:${ref}`);
+    expect(log.labels).not.toContain(`wt-remove:${ref}`);
+    expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+  });
+
+  test.each(["conflict", "leak"])("%s keeps unlanded work and lets siblings finish", async (status) => {
+    const log = await runOrchestrator({
+      scouts: [multiWave([ref, "ui/02"]), snapshot({
+        counts: counts({ total: 2, blocked: 1, done: 1 }),
+        unfinished: [{ ref, state: "blocked" }],
+      })],
+      worktree: { [`wt-land:${ref}`]: [{
+        ...cleanLand, status,
+        files: status === "conflict" ? ["conflicted.ts"] : [],
+        paths: status === "leak" ? ["leaked.ts"] : [],
+      }] },
+    });
+    expect(log.result.escalations[0]).toMatchObject({ task: ref, infrastructure: true });
+    expect(log.result.escalations[0].reason).toStartWith(`LAND NOT CLEAN (${status}):`);
+    expect(log.result.escalations[0].reason).toContain(status === "conflict" ? "conflicted.ts" : "leaked.ts");
+    expect(log.labels).not.toContain(`done:${ref}`);
+    expect(log.labels).not.toContain(`wt-remove:${ref}`);
+    expect(log.result.completed).toEqual(["ui/02"]);
+    expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+    expect(promptFor(log, "wt-sweep:end")).toContain(`--keep ${ref}`);
+  });
+
+  test("clean land with drift completes without re-verification", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+    });
+    expect(log.result.completed).toEqual([ref]);
+    expect(log.labels.filter((l) => /^(reverify|verify):/.test(l))).toEqual([`verify:${ref}#1`]);
+  });
+
+  test.each([null, THROWS])("failed mark-done after land never parks or unlands: %s", async (failure) => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0)], markDone: { [ref]: [failure, failure] },
+    });
+    expect(callsTo(log.labels, `done:${ref}`)).toBe(2);
+    expect(log.labels).toContain(`wt-remove:${ref}`);
+    expect(log.labels).not.toContain(`block:${ref}`);
+    expect(log.labels.some((l) => l.startsWith("wt-unland:"))).toBe(false);
+    expect(log.result.completed).toEqual([]);
+    expect(log.result.escalations[0]).toMatchObject({ infrastructure: true, parked: false });
+    expect(log.result.escalations[0].reason).toContain("landed, but Status was not marked done");
+    expect(log.result.escalations[0].reason).toContain("mark-done.ts");
+    expect(log.result.worktrees).toEqual([]);
+  });
+
+  test.each([false, true, null])("remove failure probes existence: %s", async (exists) => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: {
+        [`wt-remove:${ref}`]: [null, null],
+        [`wt-show:${ref}`]: exists === null ? [null, null] : [{ path: `/wt/${ref}`, base: "b0", exists }],
+      },
+    });
+    expect(log.result.completed).toEqual([ref]);
+    expect(log.result.escalations).toEqual([]);
+    expect(log.result.needsHuman).toEqual([]);
+    expect(log.result.worktrees).toEqual([]);
+    expect(log.result.cleanupFailures).toEqual(exists === false ? [] : [{ ref, path: `/wt/${ref}` }]);
+    expect(promptFor(log, "wt-sweep:end")).not.toContain("--keep ");
+    expect(callsTo(log.labels, `wt-remove:${ref}`)).toBe(2);
+    expect(log.labels).toContain(`wt-show:${ref}`);
+  });
+
+  test("ordinary retries reuse one worktree and land with the passing attempt id", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      gate: { [ref]: [{ passed: false, summary: "red" }] },
+      judge: { [ref]: [{ verdict: fail, rationale: "fix it" }] },
+    });
+    expect(callsTo(log.labels, `wt-create:${ref}`)).toBe(1);
+    expect(promptFor(log, `wt-land:${ref}`)).toContain("--op a3-land");
+    expect(log.result.completed).toEqual([ref]);
+  });
+
+  test("the next land reads the fingerprint assigned by the prior clean land", async () => {
+    const log = await runOrchestrator({
+      scouts: [multiWave([ref, "ui/02"]), complete(2)],
+      worktree: { [`wt-land:${ref}`]: [cleanLand] },
+    });
+    expect(promptFor(log, "wt-land:ui/02")).toContain("--expect landed");
+  });
+
+  test("final review stays in the main tree while run sweeps still execute", async () => {
+    const log = await runOrchestrator({ scouts: [snapshot({
+      ready: [ready("review/01", true)],
+      counts: counts({ total: 1, todo: 1 }),
+      unfinished: [{ ref: "review/01", state: "todo" }],
+    }), complete(1)] });
+    expect(log.labels.filter((l) => l.startsWith("wt-"))).toEqual([
+      "wt-sweep:start", "wt-leak:baseline", "wt-sweep:end",
+    ]);
+    expect(log.prompts.every((p) => !p.includes("WORKTREE:"))).toBe(true);
+  });
+
+  test("sweeps retain blocked leftovers without dispatching them", async () => {
+    const log = await runOrchestrator({
+      scouts: [blockedWave(), blockedEnd()],
+      worktree: { "wt-sweep:start": [{ removed: [], kept: [kept] }] },
+    });
+    expect(promptFor(log, "wt-sweep:start")).toContain(`sweep --keep ${kept.ref} --repo`);
+    expect(promptFor(log, "wt-sweep:end")).toContain(`sweep --keep ${kept.ref} --repo`);
+    expect(log.result.worktrees).toEqual([kept]);
+    expect(log.labels).not.toContain(`wt-create:${kept.ref}`);
+  });
+
+  test("first scout failure lists every worktree without sweeping", async () => {
+    const log = await runOrchestrator({
+      scouts: [null],
+      worktree: { "wt-sweep:list": [{ removed: [], kept: [kept] }] },
+    });
+    expect(log.labels.filter((l) => l.startsWith("wt-"))).toEqual(["wt-sweep:list"]);
+    expect(promptFor(log, "wt-sweep:list")).toContain("sweep --keep-all");
+    expect(log.result.worktrees).toEqual([kept]);
+  });
+
+  test("later scout failure skips the end sweep and preserves startKept", async () => {
+    const log = await runOrchestrator({
+      scouts: [blockedWave(), null],
+      worktree: { "wt-sweep:start": [{ removed: [], kept: [kept] }] },
+    });
+    expect(log.labels).not.toContain("wt-sweep:end");
+    expect(log.result.worktrees).toEqual([kept]);
+  });
+
+  test.each(["wt-sweep:start", "wt-leak:baseline", "wt-sweep:end", "wt-sweep:list"])("run-scoped double failure stops with its cause: %s", async (label) => {
+    const log = await runOrchestrator({
+      scouts: label === "wt-sweep:list" ? [null] : [wave(ref, 1, 0), complete(1)],
+      worktree: { [label]: [null, null] },
+    });
+    expect(callsTo(log.labels, label)).toBe(2);
+    expect(log.result.escalations.some((e) => e.infrastructure && e.reason.includes(label))).toBe(true);
+    if (label !== "wt-sweep:end") expect(log.labels).not.toContain(`wt-create:${ref}`);
+  });
+
+  test("failed create reports infrastructure failure and lets its sibling run", async () => {
+    const log = await runOrchestrator({
+      scouts: [multiWave([ref, "ui/02"]), complete(2)],
+      worktree: { [`wt-create:${ref}`]: [null, null] },
+    });
+    expect(log.result.completed).toEqual(["ui/02"]);
+    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, infrastructure: true });
+    expect(log.labels).not.toContain(`dev:${ref}#1`);
+  });
+
+  test.each(["create", "land", "remove"])("a held land blocks another task's %s", async (operation) => {
+    const land = latch();
+    const writer = latch();
+    const sibling = latch();
+    const calls: string[] = [];
+    const refs = operation === "create" ? [ref, "ui/02", "ui/03"] : [ref, "ui/02"];
+    const run = runOrchestrator({
+      scouts: [snapshot({
+        ready: refs.map((r) => ready(r)),
+        counts: counts({ total: refs.length, todo: refs.length }),
+        unfinished: refs.map((ref) => ({ ref, state: "todo" })),
+        maxParallel: 2,
+      }), complete(refs.length)],
+      agentCalls: calls,
+      worktreeHolds: { [`wt-land:${ref}`]: land.held },
+      ...(operation === "land" ? { devHolds: { "ui/02": sibling.held } } : {}),
+      ...(operation === "remove" ? {
+        devHolds: { [ref]: writer.held }, doneHolds: { "ui/02": sibling.held },
+      } : {}),
+      ...(operation === "create" ? {
+        devHolds: { [ref]: writer.held },
+        gate: { "ui/02": [null] }, parkHolds: { "ui/02": sibling.held },
+      } : {}),
+    });
+    if (operation !== "land") {
+      await waitForCall(calls, operation === "create" ? "block:ui/02" : "done:ui/02");
+      writer.release();
+    }
+    await waitForCall(calls, `wt-land:${ref}`);
+    sibling.release();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const next = `wt-${operation}:${operation === "create" ? "ui/03" : "ui/02"}`;
+    expect(calls).not.toContain(next);
+    land.release();
+    const log = await run;
+    expect(log.labels).toContain(next);
+    expect(log.result.completed).toContain(ref);
+  });
+});
+
+describe("worktree contract boundaries", () => {
+  test("mechanical schemas require every printed field, including nested kept entries", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      worktree: { "wt-remove:ui/01": [null, null] },
+    });
+    const fields: Record<string, string[]> = {
+      "wt-create": ["path", "base"],
+      "wt-land": ["status", "drift", "files", "paths", "fingerprint", "previous"],
+      "wt-remove": ["removed"],
+      "wt-show": ["path", "base", "exists"],
+      "wt-sweep": ["removed", "kept"],
+      "wt-leak": ["fingerprint", "paths"],
+    };
+    for (const [index, label] of log.labels.entries()) {
+      if (!label.startsWith("wt-")) continue;
+      const schema = log.schemas[index]!;
+      expect(schema.type).toBe("object");
+      expect(schema.required).toEqual(fields[label.split(":")[0]]);
+      expect(Object.keys(schema.properties!)).toEqual(schema.required!);
+      if (label.startsWith("wt-land:")) {
+        expect(schema.properties!.status.enum).toEqual(["clean", "conflict", "leak"]);
+        expect(schema.properties!.drift.type).toBe("boolean");
+        expect(schema.properties!.files.items!.type).toBe("string");
+        expect(schema.properties!.paths.items!.type).toBe("string");
+      }
+      if (label.startsWith("wt-show:")) expect(schema.properties!.base.type).toEqual(["string", "null"]);
+      if (label.startsWith("wt-sweep:")) expect(schema.properties!.kept.items!.required).toEqual(["ref", "path"]);
+    }
+  });
+
+  test("a missing remove result recovered on retry needs no show or cleanup report", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave("ui/01", 1, 0), complete(1)],
+      worktree: { "wt-remove:ui/01": [null, { removed: false }] },
+    });
+    expect(log.result.completed).toEqual(["ui/01"]);
+    expect(log.result.cleanupFailures).toEqual([]);
+    expect(log.result.worktrees).toEqual([]);
+    expect(log.labels).not.toContain("wt-show:ui/01");
+  });
+
+  test("kept worktrees are sorted, deduplicated, and never derived from end sweep output", async () => {
+    const log = await runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready("z/01")],
+        counts: counts({ total: 3, todo: 1, blocked: 2 }),
+        unfinished: [
+          { ref: "z/01", state: "todo" },
+          { ref: "a/01", state: "blocked" },
+          { ref: "b/01", state: "blocked" },
+        ],
+      })],
+      gate: { "z/01": [null] },
+      worktree: {
+        "wt-sweep:start": [{ removed: [], kept: [
+          { ref: "b/01", path: "/wt/b/01" },
+          { ref: "a/01", path: "/wt/a/01" },
+          { ref: "a/01", path: "/wt/a/01" },
+        ] }],
+        "wt-sweep:end": [{ removed: [], kept: [{ ref: "fake/01", path: "/fake" }] }],
+      },
+    });
+    expect(log.result.worktrees).toEqual([
+      { ref: "a/01", path: "/wt/a/01" },
+      { ref: "b/01", path: "/wt/b/01" },
+      { ref: "z/01", path: "/wt/z/01" },
+    ]);
+    expect(promptFor(log, "wt-sweep:end")).toContain("--keep a/01,b/01,z/01");
+  });
+
+  test("a leftover no longer blocked is removed from the end keep list and report", async () => {
+    const log = await runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready("ui/01")],
+        counts: counts({ total: 2, todo: 1, blocked: 1 }),
+        unfinished: [{ ref: "ui/01", state: "todo" }, { ref: "old/01", state: "blocked" }],
+      }), complete(2)],
+    });
+    expect(promptFor(log, "wt-sweep:start")).toContain("--keep old/01");
+    expect(promptFor(log, "wt-sweep:end")).not.toContain("--keep ");
+    expect(log.result.worktrees).toEqual([]);
+  });
+
+  test("cleanup failures stay sorted and separate even after the end sweep succeeds", async () => {
+    const log = await runOrchestrator({
+      scouts: [multiWave(["z/01", "a/01"]), complete(2)],
+      worktree: {
+        "wt-remove:z/01": [null, null],
+        "wt-remove:a/01": [null, null],
+        "wt-sweep:end": [{ removed: ["z/01", "a/01"], kept: [] }],
+      },
+    });
+    expect(log.result.cleanupFailures).toEqual([
+      { ref: "a/01", path: "/wt/a/01" }, { ref: "z/01", path: "/wt/z/01" },
+    ]);
+    expect(log.result.worktrees).toEqual([]);
+    expect(log.result.escalations).toEqual([]);
+    expect(log.result.completed).toEqual(["z/01", "a/01"]);
+  });
+
+  test("the parallel slot includes removal after a successful land", async () => {
+    const removal = latch();
+    const calls: string[] = [];
+    const run = runOrchestrator({
+      scouts: [snapshot({
+        ready: [ready("ui/01"), ready("ui/02")],
+        counts: counts({ total: 2, todo: 2 }),
+        unfinished: [{ ref: "ui/01", state: "todo" }, { ref: "ui/02", state: "todo" }],
+        maxParallel: 1,
+      }), complete(2)],
+      agentCalls: calls,
+      worktreeHolds: { "wt-remove:ui/01": removal.held },
+    });
+    await waitForCall(calls, "wt-remove:ui/01");
+    expect(calls).not.toContain("wt-create:ui/02");
+    removal.release();
+    expect((await run).result.completed).toEqual(["ui/01", "ui/02"]);
   });
 });
