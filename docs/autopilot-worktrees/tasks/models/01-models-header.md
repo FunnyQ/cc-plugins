@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: models/02, docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -121,19 +121,19 @@ The orchestrator's in-script parser must agree with `parseTask()` on this exact 
 
 ## Acceptance criteria
 
-- [ ] `parseTask()` implements the four-step grammar and returns the stated result for all nine parity fixtures.
-- [ ] `parseTask()` returns `models` and `modelErrors` exactly as the examples table states, `modelsRaw` equal to the header value with only its outer whitespace trimmed, and `{}` / `null` / `[]` when the header is absent.
-- [ ] For the line `> **Models**:  dev=opus  , verify = haiku  ` (with trailing spaces), `modelsRaw` is exactly `dev=opus  , verify = haiku`: the outer whitespace is trimmed and the inner text is untouched.
-- [ ] `lintFile()` reports rule `models` for malformed, unknown-role, unknown-model, unknown-effort, duplicate-role, empty-value, and `fix`-on-non-final headers. It reports none for a clean header or for `fix` on a Final review task.
-- [ ] Every `next-ready.ts --json` and `--summary` ready item has a `modelsRaw` key, `null` when the task declares none, and no ready item has a `models` key.
-- [ ] No existing test in the three touched test files changes its expectation, except where a `ReadyRef` literal now has to include `modelsRaw: null`.
+- [x] `parseTask()` implements the four-step grammar and returns the stated result for all nine parity fixtures.
+- [x] `parseTask()` returns `models` and `modelErrors` exactly as the examples table states, `modelsRaw` equal to the header value with only its outer whitespace trimmed, and `{}` / `null` / `[]` when the header is absent.
+- [x] For the line `> **Models**:  dev=opus  , verify = haiku  ` (with trailing spaces), `modelsRaw` is exactly `dev=opus  , verify = haiku`: the outer whitespace is trimmed and the inner text is untouched.
+- [x] `lintFile()` reports rule `models` for malformed, unknown-role, unknown-model, unknown-effort, duplicate-role, empty-value, and `fix`-on-non-final headers. It reports none for a clean header or for `fix` on a Final review task.
+- [x] Every `next-ready.ts --json` and `--summary` ready item has a `modelsRaw` key, `null` when the task declares none, and no ready item has a `models` key.
+- [x] No existing test in the three touched test files changes its expectation, except where a `ReadyRef` literal now has to include `modelsRaw: null`.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/lib/parse-task.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/next-ready.test.ts` passes.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep -E 'flightplan/scripts/(lib/parse-task|lint-task|next-ready)'` prints nothing.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/lib/parse-task.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/lint-task.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/next-ready.test.ts` passes.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep -E 'flightplan/scripts/(lib/parse-task|lint-task|next-ready)'` prints nothing.
 
 ## Eval rubric
 

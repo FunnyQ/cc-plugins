@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: worktree/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -128,28 +128,28 @@ Follow "Rebase" in `../_context/worktree.md`.
 
 ## Acceptance criteria
 
-- [ ] `create` returns a `path` under `<parent>/.<repo>-autopilot/<slug>/`. That worktree holds the tracked files and an **untracked** file from the main tree, holds an ignored `node_modules/x/index.js` seeded from the main tree, and does **not** hold `docs/<slug>/`.
-- [ ] **Clean land:** a worktree edit to `a.txt` returns all six keys: `status: "clean"`, `drift: false`, `files: ["a.txt"]`, `paths: []`, `previous` equal to the pre-land `fingerprint` output, and `fingerprint` equal to a fresh `fingerprint` output taken after the land. The main tree's `a.txt` now carries the edit.
-- [ ] **Drift:** when a second path in main changes after `create` and matches `--expect`, `land` returns `status: "clean"` with `drift: true`, and both edits are present in main.
-- [ ] **Conflict:** when main and the worktree edit the same line, `land` returns all six keys: `status: "conflict"`, `files: [that file]`, `paths: []`, and `fingerprint` and `previous` both equal to the unchanged main fingerprint. Main is byte-identical to before. `rebase` then leaves `<<<<<<<` markers in the worktree file and returns it in `conflicted`.
-- [ ] `unland` after a clean land restores every landed path to its pre-land bytes and returns them in `restored`.
-- [ ] **Leak:** `land --expect <stale tree>` returns all six keys: `status: "leak"`, `drift: false`, `files: []`, `paths` = the differing paths, `fingerprint` = the actual main fingerprint, and `previous` = the stale tree passed in. Main is untouched. `fingerprint --expect` returns the same `paths`.
-- [ ] **show:** it returns `exists: true` and the recorded `base` after `create`, and `exists: false` with `base` unchanged after the worktree dir is deleted from disk. An unknown ref returns the computed `path`, `base: null`, `exists: false`, and exits 0.
-- [ ] Changes under `docs/<slug>/` in main change neither `fingerprint` nor the `--expect` leak check.
-- [ ] The real index is unchanged across `create`, `land`, `unland`, and `rebase`: `git diff --cached --name-only` stays empty, and the index file's bytes are identical before and after.
-- [ ] With two worktrees created, `sweep --keep-all` removes nothing, prints both as `kept` with their paths, and `git worktree list` still shows both.
-- [ ] With three worktrees created, `sweep --keep <one of their refs>` removes the other two and keeps the named one, and `git worktree list` afterwards shows only the main tree plus the kept one. A worktree under another slug's root and a user worktree outside `.<repo>-autopilot/` both survive the sweep. `remove` twice returns `removed: true`, then `removed: false`, both exit 0.
-- [ ] **Repeat op:** after a clean land, a second `land` with the same `--op` and `--expect` prints a result deep-equal to the first (`status: "clean"`, never `"leak"`), and the main tree is byte-identical to the state after the first call. A repeated `unland` with the same `--op` prints the same `restored` and leaves main byte-identical.
-- [ ] **New op acts:** `land --op a1-land` returns `conflict`; the worktree is then fixed so the conflicting line matches main; `land --op a2-land` with the same `--expect` returns `status: "clean"`, and the fix is present in main.
-- [ ] **Rebase per op:** two `rebase` calls with different `--op` ids both act, and each moves `base` to the main snapshot current at that call.
-- [ ] **Repeat create:** calling `create` twice for one ref leaves exactly one worktree registered for it in `git worktree list`, at the same `path`.
-- [ ] The CLI exits `2` for a missing `--repo`, an unknown subcommand, `unland` on a ref with no state, and a `land`, `unland`, or `rebase` without `--op`.
+- [x] `create` returns a `path` under `<parent>/.<repo>-autopilot/<slug>/`. That worktree holds the tracked files and an **untracked** file from the main tree, holds an ignored `node_modules/x/index.js` seeded from the main tree, and does **not** hold `docs/<slug>/`.
+- [x] **Clean land:** a worktree edit to `a.txt` returns all six keys: `status: "clean"`, `drift: false`, `files: ["a.txt"]`, `paths: []`, `previous` equal to the pre-land `fingerprint` output, and `fingerprint` equal to a fresh `fingerprint` output taken after the land. The main tree's `a.txt` now carries the edit.
+- [x] **Drift:** when a second path in main changes after `create` and matches `--expect`, `land` returns `status: "clean"` with `drift: true`, and both edits are present in main.
+- [x] **Conflict:** when main and the worktree edit the same line, `land` returns all six keys: `status: "conflict"`, `files: [that file]`, `paths: []`, and `fingerprint` and `previous` both equal to the unchanged main fingerprint. Main is byte-identical to before. `rebase` then leaves `<<<<<<<` markers in the worktree file and returns it in `conflicted`.
+- [x] `unland` after a clean land restores every landed path to its pre-land bytes and returns them in `restored`.
+- [x] **Leak:** `land --expect <stale tree>` returns all six keys: `status: "leak"`, `drift: false`, `files: []`, `paths` = the differing paths, `fingerprint` = the actual main fingerprint, and `previous` = the stale tree passed in. Main is untouched. `fingerprint --expect` returns the same `paths`.
+- [x] **show:** it returns `exists: true` and the recorded `base` after `create`, and `exists: false` with `base` unchanged after the worktree dir is deleted from disk. An unknown ref returns the computed `path`, `base: null`, `exists: false`, and exits 0.
+- [x] Changes under `docs/<slug>/` in main change neither `fingerprint` nor the `--expect` leak check.
+- [x] The real index is unchanged across `create`, `land`, `unland`, and `rebase`: `git diff --cached --name-only` stays empty, and the index file's bytes are identical before and after.
+- [x] With two worktrees created, `sweep --keep-all` removes nothing, prints both as `kept` with their paths, and `git worktree list` still shows both.
+- [x] With three worktrees created, `sweep --keep <one of their refs>` removes the other two and keeps the named one, and `git worktree list` afterwards shows only the main tree plus the kept one. A worktree under another slug's root and a user worktree outside `.<repo>-autopilot/` both survive the sweep. `remove` twice returns `removed: true`, then `removed: false`, both exit 0.
+- [x] **Repeat op:** after a clean land, a second `land` with the same `--op` and `--expect` prints a result deep-equal to the first (`status: "clean"`, never `"leak"`), and the main tree is byte-identical to the state after the first call. A repeated `unland` with the same `--op` prints the same `restored` and leaves main byte-identical.
+- [x] **New op acts:** `land --op a1-land` returns `conflict`; the worktree is then fixed so the conflicting line matches main; `land --op a2-land` with the same `--expect` returns `status: "clean"`, and the fix is present in main.
+- [x] **Rebase per op:** two `rebase` calls with different `--op` ids both act, and each moves `base` to the main snapshot current at that call.
+- [x] **Repeat create:** calling `create` twice for one ref leaves exactly one worktree registered for it in `git worktree list`, at the same `path`.
+- [x] The CLI exits `2` for a missing `--repo`, an unknown subcommand, `unland` on a ref with no state, and a `land`, `unland`, or `rebase` without `--op`.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/worktree.test.ts` passes.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/flightplan/scripts/worktree` prints nothing.
-- [ ] `rg -n "from \"[./]*guard|packages/guard" packages/dispatch/skills/flightplan/scripts/worktree.ts` prints nothing.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/worktree.test.ts` passes.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/flightplan/scripts/worktree` prints nothing.
+- [x] `rg -n "from \"[./]*guard|packages/guard" packages/dispatch/skills/flightplan/scripts/worktree.ts` prints nothing.
 
 ## Eval rubric
 
