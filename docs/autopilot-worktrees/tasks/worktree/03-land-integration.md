@@ -8,7 +8,7 @@
 >
 > **Depends on**: worktree/02
 > **Blocks**: worktree/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -87,21 +87,21 @@ A parked task keeps its worktree and never lands. This covers the attempt cap, a
 
 ## Acceptance criteria
 
-- [ ] A `conflict` land runs `wt-rebase:<ref>` under the main-tree lock with `--op a<attempt>-rebase`. The next attempt reuses the same worktree path, runs no second `wt-create`, and its dev prompt contains `LAND CONFLICT:` plus every conflicted file.
-- [ ] After a conflict on attempt 1, attempt 2's land carries `--op a2-land`. A conflicted land leaves `mainFingerprint` unchanged, so attempt 2's `--expect` equals attempt 1's.
-- [ ] A task that conflicts on every attempt parks through the attempt cap, and its escalation contains `Worktree kept at <path>`.
-- [ ] Every parked task whose worktree was created reports `Worktree kept at <path>` in both its parked reason and its escalation. It records no `wt-land` success and no `wt-remove:`, and appears in the run result's `worktrees`.
-- [ ] A retried `wt-land` or `wt-rebase` repeats a byte-identical command, with the same `--op`, and for a land the same `--expect`.
-- [ ] A `leak` land fails only that task, with a cause starting `MAIN TREE LEAK:`. A `clean` land with `drift: true` completes like `drift: false`. Both interim branches carry their one-line comment.
-- [ ] The `LAND NOT CLEAN (` cause no longer appears anywhere in `orchestrator.md`.
-- [ ] Every existing test still passes, including `defer and requalify gate`, `held-back paths`, and `plan concurrency cap`.
+- [x] A `conflict` land runs `wt-rebase:<ref>` under the main-tree lock with `--op a<attempt>-rebase`. The next attempt reuses the same worktree path, runs no second `wt-create`, and its dev prompt contains `LAND CONFLICT:` plus every conflicted file.
+- [x] After a conflict on attempt 1, attempt 2's land carries `--op a2-land`. A conflicted land leaves `mainFingerprint` unchanged, so attempt 2's `--expect` equals attempt 1's.
+- [x] A task that conflicts on every attempt parks through the attempt cap, and its escalation contains `Worktree kept at <path>`.
+- [x] Every parked task whose worktree was created reports `Worktree kept at <path>` in both its parked reason and its escalation. It records no `wt-land` success and no `wt-remove:`, and appears in the run result's `worktrees`.
+- [x] A retried `wt-land` or `wt-rebase` repeats a byte-identical command, with the same `--op`, and for a land the same `--expect`.
+- [x] A `leak` land fails only that task, with a cause starting `MAIN TREE LEAK:`. A `clean` land with `drift: true` completes like `drift: false`. Both interim branches carry their one-line comment.
+- [x] The `LAND NOT CLEAN (` cause no longer appears anywhere in `orchestrator.md`.
+- [x] Every existing test still passes, including `defer and requalify gate`, `held-back paths`, and `plan concurrency cap`.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes, including the seven new cases.
-- [ ] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot` prints nothing.
-- [ ] `rg -n "LAND NOT CLEAN" packages/dispatch/skills/autopilot/references/orchestrator.md` prints nothing.
-- [ ] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|heldBack" packages/dispatch/skills/autopilot/references/orchestrator.md` still prints matches, because the machinery must survive this task.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` passes, including the seven new cases.
+- [x] `bunx --bun tsc --noEmit 2>&1 | grep packages/dispatch/skills/autopilot` prints nothing.
+- [x] `rg -n "LAND NOT CLEAN" packages/dispatch/skills/autopilot/references/orchestrator.md` prints nothing.
+- [x] `rg -n "SIBLING_MARKER|makeTreeWatch|deferralAccepted|heldBack" packages/dispatch/skills/autopilot/references/orchestrator.md` still prints matches, because the machinery must survive this task.
 
 ## Eval rubric
 
