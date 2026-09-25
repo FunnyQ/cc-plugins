@@ -88,6 +88,7 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 1. **Resolve both scripts paths once**, from the skill's load-time *"Base directory for this skill"* banner: `<base>/../flightplan/scripts` is `$SCRIPTS` (the shared tools autopilot borrows), `<base>/scripts` is `$OWN`. Both must be absolute. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash — never use it for either path. `$SCRIPTS` is also what you bake into `CFG.scriptsDir` in Step 3.
 2. Resolve the plan dir **as an absolute path**. The user names a slug or a path; the tree lives at `docs/<slug>/tasks/`. Capture the real repo root with `git rev-parse --show-toplevel`, and build `tasksDir`, `planPath`, and `logFile` from it (`<root>/docs/<slug>/...`). Bake them into `CFG` in Step 3. These paths MUST be absolute — Workflow agents share no cwd. See "Why every path is absolute" in `references/orchestrator.md`.
+   Set `CFG.repoRoot` to the absolute repo root already captured by `git rev-parse --show-toplevel`.
 3. Read `docs/<slug>/PLAN.md` for the goal and the bucketing. Final review scores against "did we meet the PLAN goal", so the orchestrator needs that goal in hand as `CFG.planGoal`.
 4. Confirm there is ready work, and read the whole-tree shape at the same time:
    ```bash
