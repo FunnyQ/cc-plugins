@@ -34,16 +34,25 @@ function gitFailure(root: string, args: string[], stderr: string): Error {
   return new Error(`git -C ${root} ${args.join(" ")}\n${stderr}`);
 }
 
+function gitRaw(
+  root: string,
+  args: string[],
+  options: { env?: Record<string, string>; stdin?: Uint8Array } = {},
+) {
+  return Bun.spawnSync(["git", "-C", root, ...args], {
+    stdin: options.stdin,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, ...options.env },
+  });
+}
+
 function git(
   root: string,
   args: string[],
   env?: Record<string, string>,
 ): string {
-  const result = Bun.spawnSync(["git", "-C", root, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, ...env },
-  });
+  const result = gitRaw(root, args, { env });
   if (result.exitCode !== 0) throw gitFailure(root, args, result.stderr.toString());
   return result.stdout.toString();
 }
@@ -65,9 +74,13 @@ function rootOf(options: Options): string {
   return join(dirname(repo), `.${basename(repo)}-autopilot`, options.slug);
 }
 
+// A bucket may contain "-" but never "/", and NN never contains "-", so the last "-" is the separator.
+const dirNameOf = (ref: string) => ref.replace("/", "-");
+const refOfDir = (dir: string) => dir.replace(/-([^-]+)$/, "/$1");
+
 function pathOf(options: RefOptions): string {
   validateRef(options.ref);
-  return join(rootOf(options), options.ref.replace("/", "-"));
+  return join(rootOf(options), dirNameOf(options.ref));
 }
 
 function readState(root: string): State {
@@ -100,7 +113,7 @@ function record<T extends OpResult>(options: OpOptions, state: State, result: T)
   return result;
 }
 
-function snapshot(root: string, slug: string): { tree: string; commit: string } {
+function snapshot(root: string, slug: string): string {
   const scratch = mkdtempSync(join(tmpdir(), "autopilot-snapshot-"));
   const index = join(scratch, "index");
   try {
@@ -117,12 +130,15 @@ function snapshot(root: string, slug: string): { tree: string; commit: string } 
     const env = { GIT_INDEX_FILE: index };
     git(root, ["add", "-A"], env);
     git(root, ["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", `docs/${slug}`], env);
-    const tree = git(root, ["write-tree"], env).trim();
-    const commit = git(root, ["commit-tree", tree, "-p", "HEAD", "-m", `autopilot snapshot ${slug}`], env).trim();
-    return { tree, commit };
+    return git(root, ["write-tree"], env).trim();
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+}
+
+// Only land, rebase, and create need a commit; fingerprints stay commit-free.
+function commitOf(root: string, tree: string, slug: string): string {
+  return git(root, ["commit-tree", tree, "-p", "HEAD", "-m", `autopilot snapshot ${slug}`]).trim();
 }
 
 function changedPaths(repo: string, from: string, to: string): string[] {
@@ -132,9 +148,7 @@ function changedPaths(repo: string, from: string, to: string): string[] {
 
 function merge(repo: string, base: string, ours: string, theirs: string) {
   const args = ["merge-tree", "--write-tree", "--name-only", "-z", `--merge-base=${base}`, ours, theirs];
-  const result = Bun.spawnSync(["git", "-C", repo, ...args], {
-    stdout: "pipe", stderr: "pipe", env: process.env,
-  });
+  const result = gitRaw(repo, args);
   if (result.exitCode !== 0 && result.exitCode !== 1) {
     throw gitFailure(repo, args, result.stderr.toString());
   }
@@ -153,18 +167,18 @@ function merge(repo: string, base: string, ours: string, theirs: string) {
 }
 
 function applyDiff(repo: string, from: string, to: string): void {
-  const diffArgs = ["diff", "--binary", "--no-ext-diff", "--no-textconv", from, to, "--"];
+  // Pin what user config could change: diff.noprefix, color.ui, apply.whitespace=fix.
+  const diffArgs = [
+    "diff", "--binary", "--no-ext-diff", "--no-textconv", "--no-color",
+    "--src-prefix=a/", "--dst-prefix=b/", from, to, "--",
+  ];
   // Git text patches can contain non-UTF-8 bytes; decoding them would corrupt files.
-  const patch = Bun.spawnSync(["git", "-C", repo, ...diffArgs], {
-    stdout: "pipe", stderr: "pipe", env: process.env,
-  });
+  const patch = gitRaw(repo, diffArgs);
   if (patch.exitCode !== 0) throw gitFailure(repo, diffArgs, patch.stderr.toString());
   // Git rejects an empty patch, while a no-change land or unland is successful.
   if (!patch.stdout.length) return;
-  const args = ["apply", "--binary"];
-  const result = Bun.spawnSync(["git", "-C", repo, ...args], {
-    stdin: patch.stdout, stdout: "pipe", stderr: "pipe", env: process.env,
-  });
+  const args = ["apply", "--binary", "--whitespace=nowarn"];
+  const result = gitRaw(repo, args, { stdin: patch.stdout });
   if (result.exitCode !== 0) throw gitFailure(repo, args, result.stderr.toString());
 }
 
@@ -233,7 +247,7 @@ export function create(options: RefOptions): Location {
     delete state[options.ref];
     writeState(root, state);
   }
-  const { commit: base } = snapshot(options.repo, options.slug);
+  const base = commitOf(options.repo, snapshot(options.repo, options.slug), options.slug);
   mkdirSync(root, { recursive: true });
   git(options.repo, ["worktree", "add", "--detach", path, base]);
   seedIgnored(options.repo, path, options.slug);
@@ -247,30 +261,30 @@ export function land(options: OpOptions & { expect: string }): LandResult {
   const { path, state, entry, cached } = operation(options);
   if (cached) return cached as LandResult;
   const ours = snapshot(options.repo, options.slug);
-  if (options.expect !== ours.tree) {
+  if (options.expect !== ours) {
     return record(options, state, {
       status: "leak", drift: false, files: [],
-      paths: changedPaths(options.repo, options.expect, ours.tree),
-      fingerprint: ours.tree, previous: options.expect,
+      paths: changedPaths(options.repo, options.expect, ours),
+      fingerprint: ours, previous: options.expect,
     });
   }
   if (!isDirectory(path)) throw new ArgumentError(`Missing worktree: ${path}`);
-  const theirs = snapshot(path, options.slug);
-  const drift = git(options.repo, ["rev-parse", `${entry.base}^{tree}`]).trim() !== ours.tree;
-  const merged = merge(options.repo, entry.base, ours.commit, theirs.commit);
+  const theirs = commitOf(path, snapshot(path, options.slug), options.slug);
+  const drift = git(options.repo, ["rev-parse", `${entry.base}^{tree}`]).trim() !== ours;
+  const merged = merge(options.repo, entry.base, commitOf(options.repo, ours, options.slug), theirs);
   if (merged.conflict) {
     return record(options, state, {
       status: "conflict", drift, files: merged.conflicted, paths: [],
-      fingerprint: ours.tree, previous: ours.tree,
+      fingerprint: ours, previous: ours,
     });
   }
-  const files = changedPaths(options.repo, ours.tree, merged.tree);
-  applyDiff(options.repo, ours.tree, merged.tree);
-  entry.previous = ours.tree;
+  const files = changedPaths(options.repo, ours, merged.tree);
+  applyDiff(options.repo, ours, merged.tree);
+  entry.previous = ours;
   entry.landed = merged.tree;
   return record(options, state, {
     status: "clean", drift, files, paths: [],
-    fingerprint: merged.tree, previous: ours.tree,
+    fingerprint: merged.tree, previous: ours,
   });
 }
 
@@ -291,18 +305,18 @@ export function rebase(options: OpOptions): RebaseResult {
   const { path, state, entry, cached } = operation(options);
   if (cached) return cached as RebaseResult;
   if (!isDirectory(path)) throw new ArgumentError(`Missing worktree: ${path}`);
-  const ours = snapshot(options.repo, options.slug);
-  const theirs = snapshot(path, options.slug);
-  const merged = merge(options.repo, entry.base, ours.commit, theirs.commit);
-  git(path, ["reset", "--soft", ours.commit]);
+  const ours = commitOf(options.repo, snapshot(options.repo, options.slug), options.slug);
+  const theirs = commitOf(path, snapshot(path, options.slug), options.slug);
+  const merged = merge(options.repo, entry.base, ours, theirs);
+  git(path, ["reset", "--soft", ours]);
   git(path, ["read-tree", "-u", "--reset", merged.tree]);
-  entry.base = ours.commit;
-  return record(options, state, { path, base: ours.commit, conflicted: merged.conflicted });
+  entry.base = ours;
+  return record(options, state, { path, base: ours, conflicted: merged.conflicted });
 }
 
 export function fingerprint(options: Options & { expect?: string }): { fingerprint: string; paths: string[] } {
   rootOf(options);
-  const { tree } = snapshot(options.repo, options.slug);
+  const tree = snapshot(options.repo, options.slug);
   return { fingerprint: tree, paths: options.expect ? changedPaths(options.repo, options.expect, tree) : [] };
 }
 
@@ -333,9 +347,10 @@ export function sweep(options: Options & { keep?: string[]; keepAll?: boolean })
   for (const ref of options.keep ?? []) validateRef(ref);
   const directories = existsSync(root) ? readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory()).map((entry) => entry.name) : [];
-  const paths = new Map(directories.map((dir) => [dir.replace(/-([^-]+)$/, "/$1"), join(root, dir)]));
+  const paths = new Map(directories.map((dir) => [refOfDir(dir), join(root, dir)]));
+  const sorted = () => [...paths].sort(([a], [b]) => a.localeCompare(b));
   if (options.keepAll) {
-    return { removed: [], kept: [...paths].sort(([a], [b]) => a.localeCompare(b)).map(([ref, path]) => ({ ref, path })) };
+    return { removed: [], kept: sorted().map(([ref, path]) => ({ ref, path })) };
   }
   const state = readState(root);
   const registered = registeredPaths(options.repo);
@@ -343,7 +358,7 @@ export function sweep(options: Options & { keep?: string[]; keepAll?: boolean })
   const keep = new Set(options.keep);
   const removed: string[] = [];
   const kept: { ref: string; path: string }[] = [];
-  for (const [ref, path] of [...paths].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [ref, path] of sorted()) {
     if (keep.has(ref)) {
       if (isDirectory(path)) kept.push({ ref, path });
       continue;

@@ -22,9 +22,12 @@ export type TaskRef = {
   nn: string; // zero-padded, e.g. "01"
 };
 
-export type ModelRole = "dev" | "verify" | "judge" | "fix";
-export type ModelName = "haiku" | "sonnet" | "opus" | "fable";
-export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+const MODEL_ROLES = ["dev", "verify", "judge", "fix"] as const;
+const MODEL_NAMES = ["haiku", "sonnet", "opus", "fable"] as const;
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type ModelRole = (typeof MODEL_ROLES)[number];
+export type ModelName = (typeof MODEL_NAMES)[number];
+export type Effort = (typeof EFFORTS)[number];
 export type ModelChoice = { model: ModelName; effort: Effort | null };
 export type TaskModels = Partial<Record<ModelRole, ModelChoice>>;
 
@@ -128,9 +131,9 @@ export function parseStatusValue(raw: string): TaskStatus | null {
 export function parseModels(value: string): { models: TaskModels; errors: string[] } {
   const models: TaskModels = {};
   const errors: string[] = [];
-  const roles: readonly string[] = ["dev", "verify", "judge", "fix"];
-  const names: readonly string[] = ["haiku", "sonnet", "opus", "fable"];
-  const efforts: readonly string[] = ["low", "medium", "high", "xhigh", "max"];
+  const roles: readonly string[] = MODEL_ROLES;
+  const names: readonly string[] = MODEL_NAMES;
+  const efforts: readonly string[] = EFFORTS;
   if (!value.trim()) {
     return { models, errors: ['Models entry "": malformed empty value'] };
   }
