@@ -71,10 +71,26 @@ Call `ExitPlanMode` so the user can review and approve. Wait for their response.
 
 ### Step 5: Execute
 
-After approval, implement the plan. For larger plans, follow these steps:
+After approval, record the base commit with `git rev-parse HEAD` before the first edit. Step 6 reviews everything since that commit. Then implement the plan. For larger plans, follow these steps:
 - Work in logical stages, for example data model → API → UI.
 - Remind the user to commit after each meaningful stage.
 - If the plan spans multiple files or systems, confirm the order of operations before you start.
+
+### Step 6: Verify at high effort (optional)
+
+Execution ran at the session's effort, with the user in the loop. A fresh reviewer at high effort hunts the edge cases the loop missed. It does not fix a wrong approach, so run it only after the user agrees the direction is right.
+
+Ask via `AskUserQuestion` whether to run the review. Recommend running it when the change has hidden edge cases: parsing, concurrency, security, data migration, or a bug fix in existing code. Recommend skipping it for docs, config, and mechanical edits.
+
+When the user accepts, invoke `/relay:claude-cli` with this argument, filling in the plan file path and the base commit:
+
+```
+review "Review every change since <base> (run git diff <base>, and list untracked files with git status --short) against the plan at <plan file>. Hunt edge cases the acceptance criteria miss. Run the tests. Report each finding with file:line and the concrete fix." --model opus --effort high --headless
+```
+
+Skip relay's save-to-config question: `--model` is this step's fixed choice, not a user pick. When relay rejects `--effort` as an unknown flag, tell the user to update relay; do not rerun without the flag.
+
+Fix every finding you can confirm. Report the rest to the user with your reason for leaving each one.
 
 ## Interview Guide
 
