@@ -17,7 +17,7 @@ Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 | Backend | TUI binary | `--model` mapping | `--dangerous` (YOLO) mapping |
 |---|---|---|---|
 | codex | `codex` (`CODEX_BIN`) | `-m <model>` | `--dangerously-bypass-approvals-and-sandbox` |
-| claude | `claude` | `--model <model>` | `--dangerously-skip-permissions` |
+| claude | `claude` | `--model <model>`, plus `--effort <level>` | `--dangerously-skip-permissions` |
 | opencode | `opencode` | `-m <model>` | `--auto` (auto-approve permissions not explicitly denied) |
 
 `--dangerous` is a **uniform YOLO switch** across all three live backends. It lets an **unattended** run proceed without stopping on approval prompts.
@@ -166,9 +166,9 @@ claude -p "<review prompt>" --output-format json
 
 Relay uses the same report-only prompt contract as the other backends. It does not invoke the PR-oriented `/code-review` command.
 
-### Model
+### Model and effort
 
-Unset. claude uses its session or configured default.
+Unset by default, so claude uses its configured default. When a caller passes `--model <model>`, relay appends `--model <model>` to both the headless and the live form. When a caller passes `--effort <low|medium|high|xhigh|max>`, relay appends `--effort <level>` the same way. Relay refuses `--effort` on codex and opencode rather than dropping it.
 
 ---
 

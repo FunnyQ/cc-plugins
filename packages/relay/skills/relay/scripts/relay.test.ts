@@ -120,6 +120,8 @@ describe("parseFlags", () => {
       "--keep-pane",
       "--wait-timeout",
       "30000",
+      "--effort",
+      "high",
     ]);
 
     expect(parsed.flags).toEqual({
@@ -135,7 +137,14 @@ describe("parseFlags", () => {
       headless: true,
       keepPane: true,
       waitTimeoutMs: 30000,
+      effort: "high",
     });
+  });
+
+  it("rejects an unknown --effort level", () => {
+    expect(() =>
+      parseFlags(["claude", "review", "--effort", "ultra"]),
+    ).toThrow("--effort must be one of low, medium, high, xhigh, max");
   });
 
   it("does not validate backend names in the parser", () => {
@@ -301,6 +310,53 @@ describe("executeRelay", () => {
 
     expect(result.code).toBe(1);
     expect(errors.join("")).toContain("Unknown mode: inspect");
+  });
+
+  it("refuses --effort on a backend other than claude", async () => {
+    let spawned = false;
+    const errors: string[] = [];
+
+    const result = await executeRelay(
+      ["codex", "review", "--effort", "high"],
+      deps({
+        run: () => {
+          spawned = true;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(spawned).toBe(false);
+    expect(errors.join("")).toContain("--effort is supported on claude only");
+  });
+
+  it("hands claude the model and effort on a headless review", async () => {
+    let argv: string[] = [];
+
+    const result = await executeRelay(
+      [
+        "claude",
+        "review",
+        "--prompt-file",
+        "/tmp/manual.md",
+        "--model",
+        "opus",
+        "--effort",
+        "high",
+        "--headless",
+      ],
+      deps({
+        run: (cmd) => {
+          argv = cmd;
+          return { ok: true, stdout: "done", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(argv.slice(-4)).toEqual(["--model", "opus", "--effort", "high"]);
   });
 
   it("runs capability gate before spawning", async () => {

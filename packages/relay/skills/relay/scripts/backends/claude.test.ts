@@ -15,6 +15,15 @@ describe("claudeBackend", () => {
       });
     });
 
+    it("maps effort", () => {
+      expect(
+        claudeBackend.invokeLive!("review", { model: "opus", effort: "high" }),
+      ).toEqual({
+        agentBin: "claude",
+        argv: ["--model", "opus", "--effort", "high"],
+      });
+    });
+
     it("passes no extra args by default", () => {
       expect(claudeBackend.invokeLive!("review", {})).toEqual({
         agentBin: "claude",
@@ -73,6 +82,25 @@ describe("claudeBackend", () => {
           "json",
         ]);
       });
+    });
+
+    it("maps model and effort in headless mode", () => {
+      const result = claudeBackend.invoke("review", {
+        promptText: "p",
+        model: "opus",
+        effort: "high",
+      });
+      expect(result.argv).toEqual([
+        "claude",
+        "-p",
+        "p",
+        "--output-format",
+        "json",
+        "--model",
+        "opus",
+        "--effort",
+        "high",
+      ]);
     });
 
     describe("review mode", () => {

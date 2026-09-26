@@ -37,11 +37,13 @@ import {
 } from "./shared";
 
 const MODES = new Set<Mode>(["delegate", "review", "image"]);
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 export type RelayFlags = {
   task?: string;
   files: string[];
   model?: string;
+  effort?: string;
   out?: string;
   gitScope: "all" | "related" | "none";
   noProject: boolean;
@@ -100,6 +102,7 @@ function usage(backends: string): string {
     `       relay config set-model <${backends}> <delegate|review|image> <model>`,
     `       relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]`,
     "flags: --task <text> | --files <csv> | --model <provider/model>",
+    "       --effort <low|medium|high|xhigh|max>   (claude only)",
     "       --out <path> | --git-scope <s> | --no-project",
     "       --prompt-file <p> | --dangerous | --no-ask",
     "       --headless | --keep-pane | --wait-timeout <ms>   (live-pane runs inside herdr)",
@@ -148,6 +151,13 @@ export function parseFlags(argv: string[]): ParsedFlags {
       i++;
     } else if (arg === "--model") {
       flags.model = requireValue(rest, i, arg);
+      i++;
+    } else if (arg === "--effort") {
+      const value = requireValue(rest, i, arg);
+      if (!EFFORTS.includes(value)) {
+        throw new UsageError(`--effort must be one of ${EFFORTS.join(", ")}`);
+      }
+      flags.effort = value;
       i++;
     } else if (arg === "--out") {
       flags.out = requireValue(rest, i, arg);
@@ -445,6 +455,12 @@ export async function executeRelay(
     return { code: 1 };
   }
 
+  // Only the claude CLI takes an effort flag; dropping it elsewhere would run at a default nobody asked for.
+  if (parsed.flags.effort && backend.name !== "claude") {
+    deps.stderr(`--effort is supported on claude only, not ${backend.name}\n`);
+    return { code: 1 };
+  }
+
   const task = parsed.flags.task ?? parsed.positional;
 
   if (parsed.mode === "image" && !task.trim()) {
@@ -474,6 +490,7 @@ export async function executeRelay(
       parsed.mode === "review" ? buildReviewPrompt(effectiveTask) : undefined,
     out: parsed.flags.out,
     model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
+    effort: parsed.flags.effort,
     lastFile: join(dir, "raw.txt"),
     dangerous: parsed.flags.dangerous,
   };

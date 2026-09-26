@@ -14,6 +14,7 @@ export type InvokeOpts = {
   task?: string; // raw delegate, review, or image task
   out?: string; // image output path (--out; the backend owns the default)
   model?: string; // resolved model (may be undefined → CLI default)
+  effort?: string; // claude-only reasoning effort (--effort); undefined → CLI default
   lastFile?: string; // pre-created output-capture path (codex `-o <lastFile>`); relay creates the tmp dir first
   dangerous?: boolean; // delegate sandbox opt-out
   runStartedAt?: Date; // wall-clock just before the backend spawn (codex image: cutoff for newest-PNG search)

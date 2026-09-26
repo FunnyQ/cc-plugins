@@ -7,14 +7,16 @@ export const claudeBackend: Backend = {
   invoke(_mode: Mode, opts: InvokeOpts) {
     // Both supported modes use the prompt text that relay.ts has already built.
     // Always use --output-format json to get a structured envelope.
-    return {
-      argv: ["claude", "-p", opts.promptText || "", "--output-format", "json"],
-    };
+    const argv = ["claude", "-p", opts.promptText || "", "--output-format", "json"];
+    if (opts.model) argv.push("--model", opts.model);
+    if (opts.effort) argv.push("--effort", opts.effort);
+    return { argv };
   },
 
   invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
     const argv: string[] = [];
     if (opts.model) argv.push("--model", opts.model);
+    if (opts.effort) argv.push("--effort", opts.effort);
     if (opts.dangerous) argv.push("--dangerously-skip-permissions");
     return { agentBin: "claude", argv };
   },
