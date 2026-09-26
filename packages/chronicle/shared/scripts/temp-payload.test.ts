@@ -10,7 +10,8 @@ afterEach(() => {
 });
 
 describe("writeTempPayload", () => {
-  test("writes pretty JSON under /tmp/chronicle/<subdir> with a unique name", async () => {
+  test("writes pretty JSON under /tmp/q-lab/chronicle/<subdir> with a unique name", async () => {
+    expect(TEMP_ROOT).toBe("/tmp/q-lab/chronicle");
     const path = await writeTempPayload("adr-test", "sample", { a: 1 });
     written.push(path);
 

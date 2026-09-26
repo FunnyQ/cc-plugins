@@ -321,7 +321,7 @@ describe("CLI", () => {
     const result = run(directory, [{ sessionId: "a", target: "done" }]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim().startsWith("/tmp/chronicle/adr/")).toBe(true);
+    expect(result.stdout.trim().startsWith("/tmp/q-lab/chronicle/adr/")).toBe(true);
   });
 });
 
@@ -343,7 +343,7 @@ describe("writePlan", () => {
     const outputPath = await writePlan(plan);
     const parsed = JSON.parse(await readFile(outputPath, "utf8"));
 
-    expect(outputPath.startsWith("/tmp/chronicle/adr/")).toBe(true);
+    expect(outputPath.startsWith("/tmp/q-lab/chronicle/adr/")).toBe(true);
     expect(parsed).toEqual(plan);
     expect(Object.keys(parsed)).toEqual(["trailRoot", "moves", "refused"]);
   });

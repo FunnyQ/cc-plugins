@@ -108,7 +108,7 @@ and branch, and the payload path:
 chronicle  0.15.1 → patch 0.15.2 · minor 0.16.0 · major 1.0.0   6 commits since chronicle-v0.15.1
 unchanged  dispatch guard herdr monitor relay
 config     github-flow · branch main · no drift
-payload    /tmp/chronicle/release/analysis-….json
+payload    /tmp/q-lab/chronicle/release/analysis-….json
 ```
 
 `[files already at X]` on a unit's line is the `fileVersion` case in step 3a.

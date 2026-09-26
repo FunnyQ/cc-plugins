@@ -104,7 +104,7 @@ shape is not yours to decide, and a collapsed split costs nothing.
 ## 3. Write the plan file
 
 Write it to an absolute path **outside the repo**, at
-`/tmp/chronicle/commit/plan-<something distinctive>.json`. A plan file inside the
+`/tmp/q-lab/chronicle/commit/plan-<something distinctive>.json`. A plan file inside the
 repo is itself an unassigned change, and `apply` refuses it.
 
 ```ts

@@ -2,10 +2,10 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Root for every chronicle hand-off payload. One place so a cleanup can find them all. */
-export const TEMP_ROOT = join("/tmp", "chronicle");
+export const TEMP_ROOT = join("/tmp", "q-lab", "chronicle");
 
 /**
- * Writes a hand-off payload to `/tmp/chronicle/<subdir>/<prefix>-<ms>-<pid>.json`
+ * Writes a hand-off payload to `/tmp/q-lab/chronicle/<subdir>/<prefix>-<ms>-<pid>.json`
  * and returns the path. Agents pass paths, never payloads, between phases.
  *
  * The `<ms>-<pid>` suffix is the uniqueness guarantee: each caller writes one

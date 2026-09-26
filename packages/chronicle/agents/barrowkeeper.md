@@ -28,7 +28,7 @@ write kinds:
     "path": "docs/adr/0003-....md",
     "set": { "Status": "Superseded", "Superseded by": "ADR-0027" }
   },
-  "planPath": "/tmp/chronicle/adr/archive-plan-1754438400000-51234.json",
+  "planPath": "/tmp/q-lab/chronicle/adr/archive-plan-1754438400000-51234.json",
   "validatorPath": ".../skills/adr/scripts/adr-validate.ts",
   "archiverPath": ".../skills/adr/scripts/archive-logs.ts"
 }

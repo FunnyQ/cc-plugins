@@ -26,8 +26,7 @@
 
 import { $ } from "bun";
 import { existsSync, realpathSync } from "node:fs";
-import { unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, unlink } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import {
   committedPathsSince,
@@ -36,6 +35,7 @@ import {
   verifyPlanLanded,
   type ParsedStatus,
 } from "./analyze-changes";
+import { TEMP_ROOT } from "../../../shared/scripts/temp-payload";
 import {
   composeMessage,
   decideShape,
@@ -209,10 +209,9 @@ async function writeCommit(
 ): Promise<void> {
   // Kept on failure on purpose: the message is the part of a broken run that is
   // expensive to reproduce, and the reported path is how the user recovers it.
-  const messagePath = join(
-    tmpdir(),
-    `chronicle-commit-${process.pid}-${index}.txt`,
-  );
+  const messageDir = join(TEMP_ROOT, "commit");
+  await mkdir(messageDir, { recursive: true });
+  const messagePath = join(messageDir, `message-${process.pid}-${index}.txt`);
   await Bun.write(messagePath, composeMessage(commit));
 
   const toStage = stageable(commit.files, cached);

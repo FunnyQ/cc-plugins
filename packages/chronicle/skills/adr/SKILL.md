@@ -202,11 +202,11 @@ empty plan `promote` and `supersede` pass to `commit`. `archiveStalePath` belong
 
 ## Run files
 
-`/tmp/chronicle/adr/` is shared by every repo's runs, so each run gets its own
+`/tmp/q-lab/chronicle/adr/` is shared by every repo's runs, so each run gets its own
 directory. `triage.ts prep` creates it as `<trail directory name>-<ms>-<pid>` and
 prints it as `runDir`. Write every file the run needs inside `runDir`: the gate-2
 payload, the cross-check overrides, and the gate-2 drop overrides. Never write a
-fixed name such as `/tmp/chronicle/adr/gate1-payload.json`: a run in another repo
+fixed name such as `/tmp/q-lab/chronicle/adr/gate1-payload.json`: a run in another repo
 overwrites it, and a gate then renders that repo's records.
 
 ## `triage` — process the inbox
@@ -616,7 +616,7 @@ After the barrowkeeper reports `validation-error`:
 
 - The written records are on disk, uncommitted.
 - The session logs are untouched in `.cockpit/`.
-- The plan file survives in the run directory under `/tmp/chronicle/adr/`.
+- The plan file survives in the run directory under `/tmp/q-lab/chronicle/adr/`.
 
 The user fixes the offending record by hand, then re-runs `triage`. Do not use
 `archive` to finish the batch: it sends every stale session to `done`, including
