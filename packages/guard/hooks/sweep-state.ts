@@ -14,13 +14,12 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export type Baseline = { root: string; tree: string };
 
 function dir(): string {
-  const path = process.env.GUARD_STATE_DIR ?? join(tmpdir(), "q-lab-guard");
+  const path = process.env.GUARD_STATE_DIR ?? "/tmp/q-lab/guard";
   mkdirSync(path, { recursive: true });
   return path;
 }
