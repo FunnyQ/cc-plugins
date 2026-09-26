@@ -7,7 +7,7 @@ when_to_use: >-
   When you want to commit the current changes now. The `simple` argument
   forces one commit instead of the auto-decided atomic split. Human-invoked
   only — do NOT auto-fire from an incidental mention of committing.
-argument-hint: "[simple]"
+argument-hint: "[simple] [exclude <path>...]"
 ---
 
 # Chronicle Commit
@@ -49,6 +49,9 @@ reads a single signal.
 1. **Parse the mode**. `mode: "simple"` if the argument is `simple`
    (case-insensitive) or the user's phrasing clearly asks for one commit ("one
    commit", "快速 commit", "single commit"). Otherwise `mode: "auto"`.
+   **Collect `exclude`**: the repo-root-relative paths that follow the `exclude` argument, or
+   the ones the user explicitly asks to leave out ("don't commit X", "X 先不要 commit").
+   Never exclude a path on your own judgement. Omit `exclude` when there are none.
 2. **Distill `contextBrief`** — terse intent and non-obvious rationale from this
    chat. The Lawspeaker sees the diff but not the conversation, so this is the only
    source of *why* for every commit body it writes. Everything the reader of a
@@ -64,10 +67,14 @@ reads a single signal.
    - `branch` — the current branch. If it is protected, defer to the user's existing
      branch guard before spawning; do not re-implement branch protection.
    - `mode` (from step 1).
+   - `exclude` (from step 1), only when it holds paths.
 4. **Verify against git, not against the report.** The Lawspeaker returns `base`.
    Run `git log --oneline {base}..HEAD` and report that.
    - No `base`, or the range is empty → report no commit plus the Lawspeaker's
      reason. Do not respawn.
+   - If you passed `exclude`, relay the Lawspeaker's `warning` line to the user. An excluded
+     file the committed code needs leaves a HEAD that does not build, and only the user can
+     judge that.
 
 There is no baseline to record before the spawn: `apply` computes `base` from the
 log itself, so a second `rev-parse` here would only re-derive it at the most
@@ -82,12 +89,12 @@ Codex uses the same topology through one of two role-loading paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_lawspeaker` and pass the literal skill directory, `contextBrief`,
-   `branch`, and `mode`.
+   `branch`, `mode`, and any `exclude`.
 2. **Generic sub-agent API only**: first verify the stable role file exists at
    `$CODEX_HOME/agents/chronicle/lawspeaker.toml` (default `$CODEX_HOME` to
    `~/.codex`). Spawn exactly one non-fork generic agent with task name
    `chronicle_lawspeaker` and no inherited turns. Tell it to read and obey the
-   `developer_instructions` in `lawspeaker.toml` before it handles the same four
+   `developer_instructions` in `lawspeaker.toml` before it handles the same
    inputs. Do not paste or improvise the role instructions.
 
 Both paths return only the final log. After Codex returns, apply the `base` check
@@ -114,7 +121,9 @@ base-directory banner.
   no hunk splitting.
 - **Merge or cherry-pick in progress**: git demands the whole index, so only one
   commit is possible. `apply` refuses an atomic plan there rather than letting the
-  first commit swallow the rest.
+  first commit swallow the rest. For the same reason, `apply` refuses any `exclude` there.
+- **Leaving files out**: `exclude` is whole-file and opt-in. A changed path that is neither
+  planned nor excluded still fails the coverage check. Hunk-level exclusion does not exist.
 - **A re-run after any failure**: safe. `apply` reads how much of the plan is already
   at HEAD off the log, not off a stored flag.
 - **A changeset too wide for one digest**: `analyze-changes.ts` holds back the

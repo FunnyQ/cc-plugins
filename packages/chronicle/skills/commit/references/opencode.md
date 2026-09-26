@@ -14,7 +14,7 @@ subagent_type: "lawspeaker"
 ## Nothing is inherited
 
 OpenCode task-tool subagents do **not** inherit parent context. Pass
-`contextBrief`, `branch`, and `mode` explicitly on the spawn, exactly as in the
+`contextBrief`, `branch`, `mode`, and any `exclude` explicitly on the spawn, exactly as in the
 Claude Code flow, plus the **skill directory** as a literal:
 
 ```text
