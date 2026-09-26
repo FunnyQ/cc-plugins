@@ -1,13 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="820" viewBox="0 0 1320 820" font-family="'Helvetica Neue', Arial, 'PingFang TC', 'Microsoft JhengHei', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="900" viewBox="0 0 1320 900" font-family="'Helvetica Neue', Arial, 'PingFang TC', 'Microsoft JhengHei', sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#FBFDFE"/>
       <stop offset="1" stop-color="#ECF3F6"/>
-    </linearGradient>
-    <linearGradient id="runway" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#35CAD2" stop-opacity="0"/>
-      <stop offset="0.5" stop-color="#35CAD2" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#34A879" stop-opacity="0.18"/>
     </linearGradient>
     <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#21455A" flood-opacity="0.14"/>
@@ -23,194 +18,205 @@
       .ink{fill:#1B2A36}.mut{fill:#5E7686}.wt{fill:#fff}
       .h1{font-size:26px;font-weight:700}
       .sub{font-size:13px}
-      .ctitle{font-size:15px;font-weight:700}
+      .sec{font-size:12px;font-weight:700;letter-spacing:1.2px}
       .ntitle{font-size:19px;font-weight:700}
-      .role{font-size:13.5px}.role2{font-size:12.5px}
+      .q{font-size:12.5px;font-style:italic}
+      .role{font-size:13.5px}.role2{font-size:12px}
       .nlbl{font-size:13px;font-weight:600}.nsub{font-size:10.5px}
       .tag{font-size:11px;font-weight:600}
       .chip{font-size:12px;font-weight:600}
+      .mc{font-size:11px;font-weight:700}
       .note{font-size:11.5px}
       .ln{stroke-width:2;fill:none}
+      .lo{fill:#E4F3F4;stroke:#9ED6DA}.lo-t{fill:#16808A}
+      .me{fill:#EEF0FF;stroke:#BDC4F4}.me-t{fill:#4F5EC4}
+      .hi{fill:#F3E8F8;stroke:#D5B6E6}.hi-t{fill:#7E3FA0}
+      .na{fill:#EEF3F6;stroke:#D2DFE6}.na-t{fill:#5E7686}
     </style>
   </defs>
 
-  <rect width="1320" height="820" fill="url(#bg)"/>
+  <rect width="1320" height="900" fill="url(#bg)"/>
 
   <!-- Title -->
-  <text class="h1 ink" x="60" y="48">Dispatch — plan at the right altitude, then fly</text>
-  <text class="sub mut" x="61" y="74">preflight captures the want · hop plans &amp; runs it now · waypoints maps milestone legs · flightplan writes the executable tree · autopilot runs waves, gates, commits, final review</text>
+  <text class="h1 ink" x="60" y="50">Dispatch — pick the altitude, then fly</text>
+  <text class="sub mut" x="61" y="76">Plan only as heavily as the work needs. Hand a frozen plan to autopilot, which builds cheap and spends its effort hunting what the build missed.</text>
 
-  <!-- through-line behind top tier -->
-  <rect x="60" y="166" width="1135" height="8" rx="4" fill="url(#runway)"/>
+  <!-- ===== 1 · CHOOSE THE ALTITUDE ===== -->
+  <text class="sec mut" x="60" y="112">1 · CHOOSE THE ALTITUDE</text>
 
-  <!-- ===== TOP TIER: planning tiers + execution ===== -->
-  <!-- arrows between cards -->
-  <line class="ln" x1="253" y1="170" x2="272" y2="170" stroke="#7E96A6" marker-end="url(#ah-slate)"/>
-  <line class="ln" x1="469" y1="170" x2="488" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <line class="ln" x1="685" y1="170" x2="704" y2="170" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
-  <line class="ln" x1="901" y1="170" x2="920" y2="170" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <line class="ln" x1="1117" y1="170" x2="1158" y2="170" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <!-- Card: preflight -->
+  <g filter="url(#soft)"><rect x="60" y="124" width="282" height="152" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="60" y="124" width="6" height="152" rx="3" fill="#7E96A6"/>
+  <text class="q mut" x="82" y="148">Know the want, not the how?</text>
+  <text class="ntitle ink" x="82" y="182">preflight</text>
+  <rect x="176" y="167" width="54" height="20" rx="10" fill="#EAF1F4"/><text class="tag" fill="#5E7686" x="203" y="181" text-anchor="middle">intent</text>
+  <text class="role ink" x="82" y="224">→ INTENT.md · minutes</text>
+  <text class="role2 mut" x="82" y="250">no solution chosen; hop and</text>
+  <text class="role2 mut" x="82" y="266">flightplan read it as their baseline</text>
 
-  <!-- Card P: preflight -->
-  <g filter="url(#soft)"><rect x="60" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="60" y="104" width="6" height="132" rx="3" fill="#7E96A6"/>
-  <circle cx="92" cy="138" r="15" fill="#7E96A6"/><text class="wt" font-size="14" font-weight="700" x="92" y="143" text-anchor="middle">1</text>
-  <text class="ntitle ink" x="116" y="144">preflight</text>
-  <rect x="116" y="156" width="62" height="20" rx="10" fill="#EAF1F4"/><text class="tag" fill="#5E7686" x="147" y="170" text-anchor="middle">intent</text>
-  <text class="role ink" x="80" y="202">Capture the want</text>
-  <text class="role2 mut" x="80" y="223">→ INTENT.md, no how</text>
+  <!-- Card: hop -->
+  <g filter="url(#soft)"><rect x="366" y="124" width="282" height="152" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="366" y="124" width="6" height="152" rx="3" fill="#35CAD2"/>
+  <text class="q mut" x="388" y="148">Small scope, doing it now?</text>
+  <text class="ntitle ink" x="388" y="182">hop</text>
+  <rect x="428" y="167" width="62" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="459" y="181" text-anchor="middle">in chat</text>
+  <text class="role ink" x="388" y="224">→ interview · plan · run</text>
+  <text class="role2 mut" x="388" y="250">you stay in the loop; optional</text>
+  <text class="role2 mut" x="388" y="266">closing review of the diff at</text>
+  <rect x="557" y="255" width="74" height="16" rx="8" class="hi"/><text class="mc hi-t" x="594" y="267" text-anchor="middle">opus · high</text>
 
-  <!-- Card H: hop -->
-  <g filter="url(#soft)"><rect x="276" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="276" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
-  <circle cx="308" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="308" y="143" text-anchor="middle">2</text>
-  <text class="ntitle ink" x="332" y="144">hop</text>
-  <rect x="332" y="156" width="56" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="360" y="170" text-anchor="middle">light</text>
-  <text class="role ink" x="296" y="202">Clarify work to do now</text>
-  <text class="role2 mut" x="296" y="223">→ one chat plan, run</text>
+  <!-- Card: flightplan -->
+  <g filter="url(#soft)"><rect x="672" y="124" width="282" height="152" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="672" y="124" width="6" height="152" rx="3" fill="#1FA7B0"/>
+  <text class="q mut" x="694" y="148">A feature to hand off?</text>
+  <text class="ntitle ink" x="694" y="182">flightplan</text>
+  <rect x="793" y="167" width="76" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="831" y="181" text-anchor="middle">blueprint</text>
+  <text class="role ink" x="694" y="224">→ PLAN.md + tasks/ tree</text>
+  <text class="role2 mut" x="694" y="250">every task carries a rubric; the plan</text>
+  <text class="role2 mut" x="694" y="266">is reviewed by codex or</text>
+  <rect x="834" y="255" width="74" height="16" rx="8" class="hi"/><text class="mc hi-t" x="871" y="267" text-anchor="middle">opus · high</text>
 
-  <!-- Card W: waypoints -->
-  <g filter="url(#soft)"><rect x="492" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="492" y="104" width="6" height="132" rx="3" fill="#6473D7"/>
-  <circle cx="524" cy="138" r="15" fill="#6473D7"/><text class="wt" font-size="14" font-weight="700" x="524" y="143" text-anchor="middle">3</text>
-  <text class="ntitle ink" x="548" y="144">waypoints</text>
-  <rect x="548" y="156" width="74" height="20" rx="10" fill="#EEF0FF"/><text class="tag" fill="#6473D7" x="585" y="170" text-anchor="middle">roadmap</text>
-  <text class="role ink" x="512" y="202">Plan milestone legs</text>
-  <text class="role2 mut" x="512" y="223">→ WAYPOINTS.md + leg</text>
+  <!-- Card: waypoints -->
+  <g filter="url(#soft)"><rect x="978" y="124" width="282" height="152" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <rect x="978" y="124" width="6" height="152" rx="3" fill="#6473D7"/>
+  <text class="q mut" x="1000" y="148">Many milestones ahead?</text>
+  <text class="ntitle ink" x="1000" y="182">waypoints</text>
+  <rect x="1106" y="167" width="68" height="20" rx="10" fill="#EEF0FF"/><text class="tag" fill="#6473D7" x="1140" y="181" text-anchor="middle">roadmap</text>
+  <text class="role ink" x="1000" y="224">→ WAYPOINTS.md + legs</text>
+  <text class="role2 mut" x="1000" y="250">plans each leg just in time,</text>
+  <text class="role2 mut" x="1000" y="266">after the previous one lands</text>
 
-  <!-- Card F: flightplan -->
-  <g filter="url(#soft)"><rect x="708" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="708" y="104" width="6" height="132" rx="3" fill="#35CAD2"/>
-  <circle cx="740" cy="138" r="15" fill="#35CAD2"/><text class="wt" font-size="14" font-weight="700" x="740" y="143" text-anchor="middle">4</text>
-  <text class="ntitle ink" x="764" y="144">flightplan</text>
-  <rect x="764" y="156" width="84" height="20" rx="10" fill="#E6F6F7"/><text class="tag" fill="#1FA7B0" x="806" y="170" text-anchor="middle">blueprint</text>
-  <text class="role ink" x="728" y="202">Write executable specs</text>
-  <text class="role2 mut" x="728" y="223">→ PLAN.md + tasks tree</text>
+  <!-- scope axis -->
+  <line x1="60" y1="298" x2="700" y2="298" stroke="#9AB0BD" stroke-width="1.5" marker-end="url(#ah-slate)"/>
+  <text class="note mut" x="62" y="316">more scope, longer hand-off →</text>
 
-  <!-- Card A: autopilot -->
-  <g filter="url(#soft)"><rect x="924" y="104" width="191" height="132" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <rect x="924" y="104" width="6" height="132" rx="3" fill="#34A879"/>
-  <circle cx="956" cy="138" r="15" fill="#34A879"/><text class="wt" font-size="14" font-weight="700" x="956" y="143" text-anchor="middle">5</text>
-  <text class="ntitle ink" x="980" y="144">autopilot</text>
-  <rect x="980" y="156" width="54" height="20" rx="10" fill="#E5F5EE"/><text class="tag" fill="#2F9C70" x="1007" y="170" text-anchor="middle">auto</text>
-  <text class="role ink" x="944" y="202">Fly tasks in waves</text>
-  <text class="role2 mut" x="944" y="223">→ gates, commits, review</text>
+  <!-- waypoints → flightplan, one tree per leg -->
+  <path class="ln" d="M1119,276 L1119,298 L873,298 L873,280" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
+  <text class="note" fill="#6473D7" x="900" y="316">one flightplan per leg</text>
 
-  <!-- Ship -->
-  <g filter="url(#soft)"><circle cx="1218" cy="170" r="46" fill="#fff" stroke="#34A879"/></g>
-  <text font-size="26" x="1218" y="170" text-anchor="middle">🚀</text>
-  <text class="nlbl" fill="#2F9C70" x="1218" y="200" text-anchor="middle">shipped</text>
+  <!-- flightplan → autopilot -->
+  <path class="ln" d="M783,276 L783,340" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
+  <text class="note" fill="#1FA7B0" x="792" y="328">autopilot runs the tree</text>
 
-  <!-- connectors from F and A down into the detail boxes -->
-  <path class="ln" d="M588,236 L588,264 L205,264 L205,298" stroke="#6473D7" marker-end="url(#ah-indigo)"/>
-  <text class="note mut" x="214" y="258">roadmaps</text>
-  <path class="ln" d="M804,236 L804,280 L330,280 L330,298" stroke="#1FA7B0" marker-end="url(#ah-teal)"/>
-  <text class="note mut" x="340" y="274">writes</text>
-  <path class="ln" d="M1020,236 L1020,264 L930,264 L930,298" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <text class="note mut" x="938" y="258">reads &amp; runs</text>
+  <!-- ===== 2 · AUTOPILOT ===== -->
+  <g filter="url(#soft)"><rect x="60" y="344" width="1200" height="456" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
+  <text class="sec mut" x="84" y="374">2 · AUTOPILOT FLIES THE TREE</text>
+  <text class="note mut" x="84" y="394">Each wave, next-ready scouts the tasks whose dependencies are done. They run in parallel, each in its own git worktree, and the wave is committed before the next scout.</text>
 
-  <!-- ===== LEFT: flightplan artifact tree ===== -->
-  <g filter="url(#soft)"><rect x="60" y="300" width="500" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <text class="ctitle ink" x="84" y="334">waypoints + flightplan artifacts</text>
+  <!-- left: the tree -->
+  <text class="nlbl ink" x="84" y="426">tasks/ tree</text>
+  <rect x="84" y="436" width="248" height="28" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
+  <text class="chip ink" x="98" y="455">PLAN.md · _context/ rubric</text>
+  <text class="note mut" x="86" y="486">tasks/&lt;bucket-a&gt;/</text>
+  <rect x="84" y="494" width="76" height="26" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="98" y="512">01 ⓡ</text>
+  <rect x="168" y="494" width="76" height="26" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="182" y="512">02 ⓡ</text>
+  <rect x="252" y="494" width="76" height="26" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="266" y="512">03 ⓡ</text>
+  <text class="note mut" x="86" y="542">tasks/&lt;bucket-b&gt;/</text>
+  <rect x="84" y="550" width="76" height="26" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="98" y="568">01 ⓡ</text>
+  <rect x="168" y="550" width="76" height="26" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="182" y="568">02 ⓡ</text>
+  <rect x="84" y="592" width="248" height="28" rx="8" fill="#FBF1E4" stroke="#E7C79B"/>
+  <text class="chip" fill="#B5701E" x="98" y="611">final-review · depends on all</text>
+  <text class="note mut" x="84" y="646">ⓡ = the task's ## Eval rubric</text>
+  <text class="note mut" x="84" y="668">A task with dense hidden edge cases</text>
+  <text class="note mut" x="84" y="686">can raise its own dev effort:</text>
+  <rect x="84" y="694" width="160" height="20" rx="10" class="hi"/><text class="mc hi-t" x="164" y="708" text-anchor="middle">Models: dev=opus/high</text>
+  <text class="note mut" x="84" y="736">An ambiguous task gets a sharper</text>
+  <text class="note mut" x="84" y="754">spec instead: effort cannot fix</text>
+  <text class="note mut" x="84" y="772">a wrong reading.</text>
 
-  <rect x="84" y="350" width="452" height="30" rx="8" fill="#EEF0FF" stroke="#C8CEF7"/>
-  <text class="chip ink" x="98" y="370">WAYPOINTS.md — roadmap legs: [x] landed · [~] active · [ ] later</text>
-  <rect x="84" y="390" width="452" height="30" rx="8" fill="#EEF0FF" stroke="#C8CEF7"/>
-  <text class="chip ink" x="98" y="410">legs/NN-slug/ — each active leg gets its own flightplan tree</text>
+  <!-- ready → dev -->
+  <path class="ln" d="M336,452 L370,452" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <text class="note mut" x="336" y="444">ready</text>
 
-  <rect x="84" y="436" width="240" height="30" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
-  <text class="chip ink" x="98" y="456">PLAN.md — source of truth</text>
-  <rect x="84" y="476" width="452" height="30" rx="8" fill="#EAF1F4" stroke="#D2DFE6"/>
-  <text class="chip ink" x="98" y="496">_context/ — shared.md · rubric.md (shared scale/dims)</text>
+  <!-- pipeline: Dev → Binary gate → Rubric judge → Score gate -->
+  <rect x="372" y="414" width="180" height="78" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="462" y="436" text-anchor="middle">Dev</text>
+  <text class="nsub mut" x="462" y="452" text-anchor="middle">writes the task, runs its checks</text>
+  <rect x="423" y="462" width="78" height="20" rx="10" class="lo"/><text class="mc lo-t" x="462" y="476" text-anchor="middle">opus · low</text>
+  <line class="ln" x1="554" y1="452" x2="582" y2="452" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
-  <!-- bucket A -->
-  <text class="note mut" x="86" y="532">tasks/&lt;bucket-a&gt;/</text>
-  <g>
-    <rect x="84" y="540" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="559">01 ⓡ</text>
-    <rect x="178" y="540" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="559">02 ⓡ</text>
-    <rect x="272" y="540" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="288" y="559">03 ⓡ</text>
-  </g>
-  <!-- bucket B -->
-  <text class="note mut" x="86" y="588">tasks/&lt;bucket-b&gt;/</text>
-  <g>
-    <rect x="84" y="596" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="100" y="615">01 ⓡ</text>
-    <rect x="178" y="596" width="86" height="28" rx="8" fill="#EFF7F8" stroke="#BFE4E7"/><text class="chip ink" x="194" y="615">02 ⓡ</text>
-  </g>
+  <rect x="584" y="414" width="180" height="78" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="674" y="436" text-anchor="middle">Binary gate</text>
+  <text class="nsub mut" x="674" y="452" text-anchor="middle">re-runs ## Verification + criteria</text>
+  <rect x="635" y="462" width="78" height="20" rx="10" class="lo"/><text class="mc lo-t" x="674" y="476" text-anchor="middle">opus · low</text>
+  <line class="ln" x1="766" y1="452" x2="794" y2="452" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
-  <!-- final review task -->
-  <rect x="84" y="646" width="452" height="36" rx="9" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="chip" fill="#B5701E" x="100" y="669">final-review · Final review: true · depends on all tasks</text>
+  <rect x="796" y="414" width="180" height="78" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="886" y="436" text-anchor="middle">Rubric judge</text>
+  <text class="nsub mut" x="886" y="452" text-anchor="middle">scores against the gate's evidence</text>
+  <rect x="838" y="462" width="96" height="20" rx="10" class="me"/><text class="mc me-t" x="886" y="476" text-anchor="middle">opus · medium</text>
+  <line class="ln" x1="978" y1="452" x2="1006" y2="452" stroke="#33485A" marker-end="url(#ah-ink)"/>
 
-  <text class="note mut" x="84" y="700">ⓡ = task carries its ## Eval rubric; lint requires one final-review task</text>
-  <text class="note mut" x="84" y="720">dependency graph sets order → next-ready finds tasks with all deps done</text>
+  <rect x="1008" y="414" width="180" height="78" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
+  <text class="nlbl ink" x="1098" y="442" text-anchor="middle">Score gate</text>
+  <text class="nsub mut" x="1098" y="460" text-anchor="middle">weighted average + veto</text>
+  <text class="nsub mut" x="1098" y="476" text-anchor="middle">script, no model</text>
 
-  <!-- feed arrow tree -> loop -->
-  <path class="ln" d="M540,554 L598,554" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <text class="note mut" x="544" y="545">ready</text>
+  <!-- fail → back to dev -->
+  <path class="ln" d="M1040,492 L1040,528 L462,528 L462,496" stroke="#C9603F" marker-end="url(#ah-red)"/>
+  <text class="note" fill="#C9603F" x="560" y="520">fail → the rejection feeds the next dev attempt</text>
 
-  <!-- ===== RIGHT: autopilot per-task loop ===== -->
-  <g filter="url(#soft)"><rect x="600" y="300" width="660" height="430" rx="14" fill="#fff" stroke="#D7E3EA"/></g>
-  <text class="ctitle ink" x="624" y="334">autopilot — wave loop (ready tasks run in parallel)</text>
-  <text class="note mut" x="624" y="354">choose dev engine: claude / codex / opencode · reviewer: codex / opencode · lenses: opus / fable</text>
-  <text class="note mut" x="624" y="370">next-ready re-scouts each wave → run in parallel → atomic-commit between waves ↻</text>
+  <!-- retry ladder -->
+  <rect x="372" y="552" width="392" height="96" rx="10" fill="#FCF6F4" stroke="#EBCBBF"/>
+  <text class="nlbl" fill="#B2522F" x="388" y="574">Dev retry ladder</text>
+  <text class="note ink" x="388" y="596">attempts 1 … n−1</text>
+  <rect x="520" y="584" width="78" height="18" rx="9" class="lo"/><text class="mc lo-t" x="559" y="597" text-anchor="middle">opus · low</text>
+  <text class="note ink" x="388" y="618">last attempt</text>
+  <rect x="520" y="606" width="80" height="18" rx="9" class="hi"/><text class="mc hi-t" x="560" y="619" text-anchor="middle">opus · high</text>
+  <text class="note mut" x="608" y="619">or the task's dev= +1</text>
+  <text class="note mut" x="388" y="640">codex / opencode can write instead, driven by</text>
+  <rect x="660" y="628" width="78" height="18" rx="9" class="lo"/><text class="mc lo-t" x="699" y="641" text-anchor="middle">opus · low</text>
 
-  <!-- pipeline nodes: Dev → Binary gate → Rubric judge → score gate -->
-  <rect x="628" y="378" width="116" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
-  <text class="nlbl ink" x="686" y="409" text-anchor="middle">Dev</text>
-  <line class="ln" x1="746" y1="405" x2="770" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <!-- park -->
+  <text class="note mut" x="784" y="574">Past the attempt cap: park the task,</text>
+  <text class="note mut" x="784" y="592">keep flying independent work,</text>
+  <text class="note mut" x="784" y="610">then hand the parked task back to you.</text>
 
-  <rect x="772" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
-  <text class="nlbl ink" x="832" y="402" text-anchor="middle">Binary gate</text>
-  <text class="nsub mut" x="832" y="419" text-anchor="middle">re-run verify + accept</text>
-  <line class="ln" x1="894" y1="405" x2="918" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <!-- pass → done → wave commit -->
+  <line class="ln" x1="1098" y1="492" x2="1098" y2="552" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <text class="note" fill="#2F9C70" x="1106" y="520">pass</text>
+  <rect x="1028" y="554" width="140" height="34" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="chip" fill="#2F9C70" x="1098" y="576" text-anchor="middle">Status: done ✓</text>
+  <line class="ln" x1="1098" y1="588" x2="1098" y2="606" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <rect x="1008" y="608" width="228" height="30" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="chip" fill="#2F9C70" x="1122" y="628" text-anchor="middle">commit wave → scout next ↻</text>
+  <rect x="1150" y="642" width="78" height="18" rx="9" class="lo"/><text class="mc lo-t" x="1189" y="655" text-anchor="middle">opus · low</text>
+  <text class="note mut" x="1070" y="655">commit agent</text>
 
-  <rect x="920" y="378" width="120" height="54" rx="10" fill="#F4FBFB" stroke="#BFE4E7"/>
-  <text class="nlbl ink" x="980" y="402" text-anchor="middle">Rubric judge</text>
-  <text class="nsub mut" x="980" y="419" text-anchor="middle">scores rubric dims</text>
-  <line class="ln" x1="1042" y1="405" x2="1066" y2="405" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <!-- all done → final review -->
+  <line class="ln" x1="1040" y1="638" x2="1040" y2="682" stroke="#D9852E" marker-end="url(#ah-amber)"/>
+  <text class="note" fill="#B5701E" x="950" y="672">all tasks done</text>
 
-  <rect x="1068" y="378" width="120" height="54" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="1128" y="402" text-anchor="middle">score gate</text>
-  <text class="nsub" fill="#B5701E" x="1128" y="419" text-anchor="middle">weighted avg + veto</text>
+  <!-- final review -->
+  <rect x="372" y="684" width="864" height="100" rx="12" fill="#FDF8F0" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="388" y="706">Final review — the last task, run against the whole branch</text>
 
-  <!-- score -> diamond -->
-  <line class="ln" x1="1128" y1="432" x2="1128" y2="470" stroke="#33485A" marker-end="url(#ah-ink)"/>
+  <rect x="388" y="718" width="104" height="22" rx="11" class="na"/><text class="mc na-t" x="440" y="733" text-anchor="middle">codex · bugs</text>
+  <rect x="498" y="718" width="92" height="22" rx="11" class="hi"/><text class="mc hi-t" x="544" y="733" text-anchor="middle">reuse · high</text>
+  <rect x="596" y="718" width="110" height="22" rx="11" class="hi"/><text class="mc hi-t" x="651" y="733" text-anchor="middle">leanness · high</text>
+  <rect x="388" y="746" width="118" height="22" rx="11" class="hi"/><text class="mc hi-t" x="447" y="761" text-anchor="middle">efficiency · high</text>
+  <text class="note mut" x="514" y="761">4 lenses record findings, edit nothing</text>
 
-  <!-- decision diamond -->
-  <polygon points="1128,470 1191,508 1128,546 1065,508" fill="#fff" stroke="#9AB0BD"/>
-  <text class="nlbl ink" x="1128" y="513" text-anchor="middle">pass?</text>
+  <line class="ln" x1="742" y1="742" x2="770" y2="742" stroke="#D9852E" marker-end="url(#ah-amber)"/>
+  <rect x="772" y="716" width="146" height="54" rx="10" fill="#fff" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="845" y="738" text-anchor="middle">Fixer</text>
+  <rect x="797" y="746" width="96" height="18" rx="9" class="me"/><text class="mc me-t" x="845" y="759" text-anchor="middle">opus · medium</text>
 
-  <!-- fail -> feedback -> back to Dev (binary gate fail OR low rubric score) -->
-  <path class="ln" d="M1065,508 L686,508 L686,434" stroke="#C9603F" marker-end="url(#ah-red)"/>
-  <text class="note" fill="#C9603F" x="700" y="500">fail → feedback ↺ (verify fail or low score)</text>
+  <line class="ln" x1="920" y1="742" x2="948" y2="742" stroke="#D9852E" marker-end="url(#ah-amber)"/>
+  <rect x="950" y="716" width="130" height="54" rx="10" fill="#fff" stroke="#E7C79B"/>
+  <text class="nlbl" fill="#B5701E" x="1015" y="738" text-anchor="middle">gate + judge</text>
+  <text class="nsub mut" x="1015" y="756" text-anchor="middle">same as every task</text>
 
-  <!-- pass -> done -->
-  <line class="ln" x1="1128" y1="546" x2="1128" y2="576" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <rect x="1063" y="576" width="130" height="38" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="chip" fill="#2F9C70" x="1128" y="600" text-anchor="middle">Status: done ✓</text>
-  <text class="note" fill="#2F9C70" x="1201" y="599">pass</text>
+  <line class="ln" x1="1082" y1="742" x2="1110" y2="742" stroke="#2F9C70" marker-end="url(#ah-green)"/>
+  <rect x="1112" y="716" width="112" height="54" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
+  <text class="nlbl" fill="#2F9C70" x="1168" y="748" text-anchor="middle">Ship 🚀</text>
 
-  <!-- inter-wave atomic commit on the done → next-wave cycle -->
-  <path class="ln" d="M1063,582 L902,532" stroke="#2F9C70" stroke-dasharray="4 3" marker-end="url(#ah-green)"/>
-  <rect x="676" y="516" width="224" height="26" rx="9" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="chip" fill="#2F9C70" x="788" y="534" text-anchor="middle">atomic-commit between waves</text>
-
-  <text class="note mut" x="624" y="566">loop has MAX_ATTEMPTS; external dev can run headless or in a live herdr pane</text>
-  <text class="note mut" x="624" y="584">on cap → park task, keep flying independent work, then hand back to you</text>
-
-  <!-- all done -> final review -> ship -->
-  <path class="ln" d="M1063,595 L900,595 L900,626" stroke="#33485A" marker-end="url(#ah-ink)"/>
-  <text class="note mut" x="912" y="620">all tasks done</text>
-
-  <rect x="624" y="630" width="300" height="62" rx="10" fill="#FBF1E4" stroke="#E7C79B"/>
-  <text class="nlbl" fill="#B5701E" x="774" y="650" text-anchor="middle">Final review</text>
-  <text class="nsub" fill="#B5701E" x="774" y="667" text-anchor="middle">reviewer + 4 lenses → Opus fixer · capped loop</text>
-  <text class="nsub" fill="#B5701E" x="774" y="683" text-anchor="middle">integration · goal · consistency · no regressions</text>
-
-  <line class="ln" x1="924" y1="661" x2="1006" y2="661" stroke="#2F9C70" marker-end="url(#ah-green)"/>
-  <rect x="1008" y="638" width="140" height="46" rx="10" fill="#E9F7F0" stroke="#A9DCC4"/>
-  <text class="nlbl" fill="#2F9C70" x="1078" y="666" text-anchor="middle">Ship</text>
-
-  <!-- legend -->
-  <text class="note mut" x="624" y="710">green = gate passed / ship · amber = rubric scoring / final review · red = failed, sent back</text>
+  <!-- ===== EFFORT RULE ===== -->
+  <rect x="60" y="820" width="1200" height="56" rx="12" fill="#fff" stroke="#D7E3EA"/>
+  <text class="nlbl ink" x="84" y="843">Build at low effort, hunt at high.</text>
+  <text class="note mut" x="84" y="863">Effort buys self-checking and edge-case hunting. It does not fix a wrong approach, so builders run low and the steps that look for problems run high.</text>
+  <rect x="960" y="833" width="64" height="20" rx="10" class="lo"/><text class="mc lo-t" x="992" y="847" text-anchor="middle">low</text>
+  <rect x="1032" y="833" width="72" height="20" rx="10" class="me"/><text class="mc me-t" x="1068" y="847" text-anchor="middle">medium</text>
+  <rect x="1112" y="833" width="64" height="20" rx="10" class="hi"/><text class="mc hi-t" x="1144" y="847" text-anchor="middle">high</text>
+  <text class="note mut" x="1184" y="847">effort</text>
 </svg>
