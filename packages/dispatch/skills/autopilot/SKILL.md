@@ -124,9 +124,9 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 The split is not cosmetic. Neither codex-model question is worth asking until the first call has said whether codex took that role at all, and the live-panes question offers a dev-delegate option only when the dev engine turned out external. Folding them into one call would ask every dependent question blind, and would also breach `AskUserQuestion`'s four-question cap.
 
-- **Dev engine** (`CFG.devEngine`) — Choose **Claude** (default; Opus/medium, raised to Opus/high on the last Claude rung), **Codex** (`'codex'`, via `codex-run.ts`), or **OpenCode** (`'opencode'`, via `opencode-run.ts`). With Codex or OpenCode, use a Haiku driver for the external CLI. Keep the Claude judge in a separate call.
+- **Dev engine** (`CFG.devEngine`) — Choose **Claude** (default; Opus/low, then Opus/high on the last Claude rung), **Codex** (`'codex'`, via `codex-run.ts`), or **OpenCode** (`'opencode'`, via `opencode-run.ts`). With Codex or OpenCode, use a Haiku driver for the external CLI. Keep the Claude judge in a separate call.
 - **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
-- **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the three Claude quality lenses (reuse / leanness / efficiency) in the closing Final review. This choice affects **only** those three lenses. Keep the fixer and rubric judge on their per-role model choices, including task header overrides. **Fable 5 is Anthropic's most capable model and is priced above Opus** ($10/$50 per MTok vs Opus's $5/$25) — pick it for maximum lens quality on a hard review, not to save cost. Never describe it to the user as the cheaper option.
+- **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the three Claude quality lenses (reuse / leanness / efficiency) in the closing Final review. Both run the lenses at high effort. This choice affects **only** those three lenses. Keep the fixer and rubric judge on their per-role model choices, including task header overrides. **Fable 5 is Anthropic's most capable model and is priced above Opus** ($10/$50 per MTok vs Opus's $5/$25) — pick it for maximum lens quality on a hard review, not to save cost. Never describe it to the user as the cheaper option.
 - **Codex dev model** (`CFG.codexDevModel`) — **gpt-5.6-sol** (default) or **gpt-6-astra** — ask **only when the dev engine resolved to codex**. This is the model that writes each task.
 - **Codex review model** (`CFG.codexReviewModel`) — **gpt-6-astra** (default) or **gpt-5.6-sol** — ask **only when the cross-vendor reviewer resolved to codex**, which is the default, so a default flight does get asked. This is the model that reviews the branch diff.
 
@@ -171,7 +171,7 @@ Run the orchestrator's **wave loop** with a fresh `next-ready.ts --summary` scou
 create worktree
    │
    ▼
-Dev (Opus/medium; Opus/high on the last Claude rung) ─ implements + edits Status, logs a note
+Dev (Opus/low; Opus/high on the last Claude rung) ─ implements + edits Status, logs a note
    │
    ▼
 Binary gate (Opus/low) ─ INDEPENDENTLY re-runs the task's ## Verification commands
@@ -219,7 +219,7 @@ The `Final review` task (`> **Final review**: true`) depends transitively on eve
 
 ### The closing multi-lens review round
 
-For Final review's "dev" step, fan out independent record-only reviewers. Then use one fixer (default Opus/high, subject to the task's `fix` override) to apply fixes. Re-run verification after the fixes:
+For Final review's "dev" step, fan out independent record-only reviewers. Then use one fixer (default Opus/medium, subject to the task's `fix` override) to apply fixes. Re-run verification after the fixes:
 
 - `<reviewEngine>`: codex/opencode CLI bug and correctness review.
 - `reuse`: duplicated logic, missed existing helpers, copy-paste that wants one. On the abstraction axis, the only lens that may ask for more code — `leanness` is its counterweight.
@@ -248,21 +248,21 @@ Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge
 
 | Role | Model / effort | Why |
 |---|---|---|
-| **Dev** | opus / medium | Implement the task with enough reasoning for normal attempts. |
-| **Dev — last Claude rung** | Task's dev choice, effort +1 (default opus / high) | Raise reasoning effort after earlier attempts fail; keep max at max and omitted effort omitted. |
+| **Dev** | opus / low | Implement the task cheaply; the task's gate and judge catch what low effort misses. |
+| **Dev — last Claude rung** | opus / high, or the task's dev choice with effort +1 | Spend verification effort after earlier attempts fail. |
 | **Dev — external driver** | haiku / no effort | Drive the external CLI that writes the implementation. |
 | **Binary gate and drift re-verify** | opus / low | Check acceptance criteria and command output before scoring. |
 | **Rubric judge** | opus / medium | Score the rubric against the gate's evidence. |
 | **Commit (inter-wave + post-loop)** | opus / low | Group changes and write the commit message. |
 | **Final review — cross-vendor lens** | haiku / no effort | Drive the external CLI that performs the review. |
-| **Final review — quality lenses** | `CFG.reviewLensModel` (default opus) / no effort | Inspect reuse, leanness, and efficiency with independent context. |
-| **Final review — fixer** | opus / high | Reconcile the findings and apply integration fixes. |
+| **Final review — quality lenses** | `CFG.reviewLensModel` (default opus) / high | Hunt reuse, leanness, and efficiency issues with independent context. |
+| **Final review — fixer** | opus / medium | Apply findings the high-effort lenses already found. |
 | **Scout / mark-done / park** | haiku / no effort | Run the fixed readiness or status transition command. |
 | **Structured retry** | opus / medium | Recover a failed structured call with a complete model and effort choice. |
 
 A task's `> **Models**:` header overrides dev, verify, judge, and fix for that task.
 
-On the last Claude dev rung, raise the task's dev effort one step on the same model, leaving `max` at `max` and omitted effort omitted.
+On the last Claude dev rung, run opus/high. When the task's Models header names `dev`, raise that choice one step on the same model instead, leaving `max` at `max` and omitted effort omitted.
 
 ## Grounding the score (do not skip)
 

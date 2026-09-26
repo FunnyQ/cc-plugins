@@ -962,7 +962,7 @@ describe("orchestrator failure handling", () => {
       "EARLIER ATTEMPTS on this task — already tried and rejected. Do not repeat them:",
     );
     expect(thirdPrompt).toContain(
-      "- attempt 1 (ran on opus/medium): Binary gate failed (verification/acceptance):\nattempt one tests red",
+      "- attempt 1 (ran on opus/low): Binary gate failed (verification/acceptance):\nattempt one tests red",
     );
     expect(thirdPrompt.indexOf("attempt two lint red")).toBeLessThan(
       thirdPrompt.indexOf("attempt one tests red"),
@@ -999,8 +999,8 @@ describe("orchestrator failure handling", () => {
       "opus",
     ]);
     expect(devLabels.map((label) => effortFor(log, label))).toEqual([
-      "medium",
-      "medium",
+      "low",
+      "low",
       "high",
     ]);
     expect(log.result.escalations[0].attempt).toBe(3);
@@ -2340,8 +2340,8 @@ describe("orchestrator single-task resume", () => {
       "opus",
     ]);
     expect(devLabels.map((label) => effortFor(log, label))).toEqual([
-      "medium",
-      "medium",
+      "low",
+      "low",
       "high",
     ]);
   });
@@ -2431,17 +2431,17 @@ describe("per-role model and effort choices", () => {
       ],
     });
     expect(log.result.escalations).toEqual([]);
-    assertChoice(log, "dev:ui/01#1", "opus", "medium");
+    assertChoice(log, "dev:ui/01#1", "opus", "low");
     assertChoice(log, "verify:ui/01#1", "opus", "low");
     assertChoice(log, "judge:ui/01#1", "opus", "medium");
-    assertChoice(log, "fix:review/01#1", "opus", "high");
+    assertChoice(log, "fix:review/01#1", "opus", "medium");
     assertChoice(log, "done:ui/01", "haiku");
     assertChoice(log, "scout-wave-1", "haiku");
     assertChoice(log, "commit-wave-2", "opus", "low");
     assertChoice(log, "commit-post-loop", "opus", "low");
     assertChoice(log, "review:codex#1", "haiku");
     for (const lens of ["reuse", "leanness", "efficiency"]) {
-      assertChoice(log, `review:${lens}#1`, "opus");
+      assertChoice(log, `review:${lens}#1`, "opus", "high");
     }
     const blocked = await runOrchestrator({
       scouts: [modelWave(null)],
@@ -2454,7 +2454,7 @@ describe("per-role model and effort choices", () => {
     ["dev=sonnet/low", "sonnet", ["low", "low", "medium"]],
     ["dev=opus/max", "opus", ["max", "max", "max"]],
     ["dev=opus", "opus", [undefined, undefined, undefined]],
-    [null, "opus", ["medium", "medium", "high"]],
+    [null, "opus", ["low", "low", "high"]],
   ] as const)("dev ladder uses %s", async (raw, model, efforts) => {
     const log = await runOrchestrator({
       scouts: [modelWave(raw)],
@@ -2466,6 +2466,25 @@ describe("per-role model and effort choices", () => {
     expect(log.result.escalations[0].reason).toContain(
       `ran on ${model}${efforts[0] ? `/${efforts[0]}` : ""}`,
     );
+  });
+
+  test("reviewLensModel fable keeps the lenses at high effort", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(1),
+        ],
+      },
+      { reviewLensModel: "'fable'" },
+    );
+    for (const lens of ["reuse", "leanness", "efficiency"]) {
+      assertChoice(log, `review:${lens}#1`, "fable", "high");
+    }
   });
 
   test("verify override drops the default effort and structured retry replaces both fields", async () => {

@@ -135,12 +135,12 @@ Autopilot reads the Models header value as written: `next-ready.ts` passes it al
 
 | Role | Default |
 |---|---|
-| dev | opus/medium |
+| dev | opus/low |
 | verify | opus/low |
 | judge | opus/medium |
-| fix | opus/high |
+| fix | opus/medium |
 
-The last Claude dev attempt raises the dev effort one step and keeps the model. The ladder is `low → medium → high → xhigh → max`, and `max` stays `max`. For example, `dev=sonnet/low` over 3 attempts gives sonnet/low, sonnet/low, sonnet/medium.
+The last Claude dev attempt runs opus/high. When the Models header names `dev`, the last attempt raises that dev effort one step and keeps the model instead. The ladder is `low → medium → high → xhigh → max`, and `max` stays `max`. For example, `dev=sonnet/low` over 3 attempts gives sonnet/low, sonnet/low, sonnet/medium.
 
 `lint-task.ts` rejects an unknown role, model, or effort, a duplicate role, a malformed entry, and `fix` on a non-final task.
 

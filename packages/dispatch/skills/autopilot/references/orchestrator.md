@@ -82,24 +82,26 @@ const CFG = {
 }
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
-// dev implements tasks; the last Claude rung raises its effort one step.
+// dev implements tasks at low effort; devLast runs the last Claude rung, unless a
+// task header names dev, whose last rung raises that choice one step instead.
 // verify runs the binary gate and drift re-verify; judge scores the rubric.
 // fix applies Final review findings; commit groups and records wave changes.
 // structuredRetry recovers a failed structured call with a complete choice.
 // devExternal and reviewExternal drive external CLIs that do the reasoning.
-// reviewLens inspects code quality using the configured model without effort.
+// reviewLens hunts quality issues at high effort on the configured model.
 // scout reads readiness; markDone and park perform fixed status transitions.
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const MODEL = {
-  dev: { model: 'opus', effort: 'medium' },
+  dev: { model: 'opus', effort: 'low' },
+  devLast: { model: 'opus', effort: 'high' },
   verify: { model: 'opus', effort: 'low' },
   judge: { model: 'opus', effort: 'medium' },
-  fix: { model: 'opus', effort: 'high' },
+  fix: { model: 'opus', effort: 'medium' },
   commit: { model: 'opus', effort: 'low' },
   structuredRetry: { model: 'opus', effort: 'medium' },
   devExternal: { model: 'haiku', effort: null },
   reviewExternal: { model: 'haiku', effort: null },
-  reviewLens: { model: CFG.reviewLensModel ?? 'opus', effort: null },
+  reviewLens: { model: CFG.reviewLensModel ?? 'opus', effort: 'high' },
   scout: { model: 'haiku', effort: null },
   markDone: { model: 'haiku', effort: null },
   park: { model: 'haiku', effort: null },
@@ -834,7 +836,9 @@ const removeLanded = async (ref, path) => {
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item) {
   const { ref, finalReview, path } = item
-  const choices = { ...MODEL, ...parseModels(item.modelsRaw) }
+  const header = parseModels(item.modelsRaw)
+  const choices = { ...MODEL, ...header }
+  const devLast = header.dev ? raise(header.dev) : MODEL.devLast
   // The cross-vendor Final review round gets its own (smaller) cap; everything
   // else uses MAX. Past the cap the task is parked + escalated, never skipped.
   const cap = finalReview ? FINAL_MAX : MAX + (lastShotEngine ? 1 : 0)
@@ -920,7 +924,7 @@ async function executeTask(item) {
         await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts), wt?.path),
           { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', ...pick(MODEL.devExternal) })
       } else {
-        const devChoice = attempt >= claudeCap ? raise(choices.dev) : choices.dev
+        const devChoice = attempt >= claudeCap ? devLast : choices.dev
         attemptModel = modelLabel(devChoice)
         await agent(devPrompt(ref, path, attempt, renderHistory(attempts), wt?.path),
           { label: `dev:${ref}#${attempt}`, phase: 'Execute', ...pick(devChoice) })
