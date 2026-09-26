@@ -163,14 +163,14 @@ Focus: audience and structure. Replace bucketing with section-bucketing.
 
 ## Per-task models (ask during decomposition)
 
-Recommend omitting the Models header by default. Only when a task stands out as unusually hard (a delicate refactor, a concurrency fix) or unusually easy (a mechanical rename), ask whether to pin per-task models.
+Recommend omitting the Models header by default. Ask only when a task has dense hidden edge cases — a sanitizer, a parser, concurrency, numerical code, storage or a migration, a brownfield bug fix, a behaviour-preserving refactor. The rules and syntax live in `task-template.md` under `### Models`.
 
-The header syntax lives in `task-template.md` under `### Models`.
+For such a task, ask via `AskUserQuestion`: "This task has many hidden edge cases. Should dev run at high effort?"
 
-For a delicate concurrency fix, ask via `AskUserQuestion`: "Should this task use the defaults or pin per-task models?"
+- **dev=opus/high (Recommended)** — Dev spends effort testing its own work and hunting edge cases.
+- **Use the defaults** — Omit the Models header; dev runs at low and only the last attempt runs at high.
 
-- **Use the defaults (Recommended)** — Omit the Models header to keep autopilot's default role map.
-- **Pin per-task models** — Set the Models header for this task's unusual difficulty.
+When a task has two plausible readings, do not offer higher effort. Ask which reading is meant, and write the answer into the task file.
 
 ## Eval rubric (ask per task)
 

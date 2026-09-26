@@ -121,10 +121,14 @@ If any task in the tree runs a test suite, the closing review task's `## Verific
 
 ### Models
 
-Treat the Models header as optional. Use the Models header rarely. Unless a task is unusually hard (a delicate refactor, a concurrency fix) or unusually easy (a mechanical rename), omit the Models header. Run-wide roles (scout, commit, review lenses) cannot be set per task.
+Treat the Models header as optional. Pick it by where the task would fail, not by how hard it looks. Effort buys self-verification: the model tests its own work and hunts edge cases. More effort does not fix a wrong approach. Run-wide roles (scout, commit, review lenses) cannot be set per task.
+
+- **Dense hidden edge cases** — a sanitizer, a parser, concurrency, numerical code, storage or a migration, a brownfield bug fix from a crash report, a behaviour-preserving refactor. Set `dev=opus/high`.
+- **An ambiguous approach** — two plausible readings of the goal. Do not raise effort: higher effort commits harder to whichever reading it picks. Pin the chosen reading in `## Implementation notes` and `## Acceptance criteria` instead.
+- **Everything else** — rulebook work, wiring, following an existing pattern, a mechanical rename. Omit the Models header; dev already defaults to low.
 
 ```markdown
-> **Models**: dev=opus/high, verify=sonnet
+> **Models**: dev=opus/high, judge=opus/high
 ```
 
 Write comma-separated entries as `role=model` or `role=model/effort`. Use lowercase tokens. Allow whitespace around `=`, `/`, and each entry. Allow a trailing comma. Keep explanations outside the example line: a trailing note becomes part of the last entry and fails parsing.
@@ -140,7 +144,7 @@ Autopilot reads the Models header value as written: `next-ready.ts` passes it al
 | judge | opus/medium |
 | fix | opus/medium |
 
-The last Claude dev attempt runs opus/high. When the Models header names `dev`, the last attempt raises that dev effort one step and keeps the model instead. The ladder is `low → medium → high → xhigh → max`, and `max` stays `max`. For example, `dev=sonnet/low` over 3 attempts gives sonnet/low, sonnet/low, sonnet/medium.
+The last Claude dev attempt runs opus/high. When the Models header names `dev`, the last attempt raises that dev effort one step and keeps the model instead. The ladder is `low → medium → high → xhigh → max`, and `max` stays `max`. For example, `dev=opus/high` over 3 attempts gives opus/high, opus/high, opus/xhigh.
 
 `lint-task.ts` rejects an unknown role, model, or effort, a duplicate role, a malformed entry, and `fix` on a non-final task.
 
