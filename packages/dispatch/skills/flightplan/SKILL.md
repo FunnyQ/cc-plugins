@@ -165,12 +165,13 @@ Either way, never leave a half-written tree.
 
    **Join before moving on.** A fork can die on an API error, time out, or claim success without leaving a file, and none of that raises on its own. Keep the expected-path list, and snapshot the worktree right before the spawn:
    ```bash
-   git status --short -uall | sort > /tmp/flightplan-<slug>-status.txt
+   mkdir -p /tmp/q-lab/dispatch/flightplan/<project>/<slug>   # <project>: basename of the repo root
+   git status --short -uall | sort > /tmp/q-lab/dispatch/flightplan/<project>/<slug>/status.txt
    ```
    Once every fork returns:
    ```bash
    ls docs/<slug>/tasks/*/*.md      # every expected path present?
-   git status --short -uall | sort | comm -13 /tmp/flightplan-<slug>-status.txt -   # what changed since the spawn?
+   git status --short -uall | sort | comm -13 /tmp/q-lab/dispatch/flightplan/<project>/<slug>/status.txt -   # what changed since the spawn?
    ```
    Write any missing file yourself, inline — don't re-spawn the batch, don't trash the tree (a missing file is repairable). Revert any new path outside `docs/<slug>/`; the brief forbids it but nothing enforces it. The snapshot keeps what existed before the spawn, such as the design phase's `PRODUCT.md` and `.impeccable/`. `-uall` lists each file inside an untracked directory, so a new file there still shows. A file already dirty before the spawn keeps its status line when a fork edits it again, so the snapshot cannot catch that edit.
 
@@ -196,6 +197,8 @@ Either way, never leave a half-written tree.
 
 Once lint passes, run an independent review over the whole tree, then **loop**: review → fix → re-review. This is a mandatory content-quality gate, a different lens from `lint-task.ts`'s structural checks. Cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects here, not nitpicks.
 
+**Make one fresh review directory before pass 1**, and call the path it prints `<review>`: `mkdir -p /tmp/q-lab/dispatch/flightplan/<project>/<slug> && mktemp -d /tmp/q-lab/dispatch/flightplan/<project>/<slug>/review-XXXXXX`. A fixed path would hand an earlier review's `pass-1.md` to this one.
+
 **Run the engine the user picked in Step 2 — do not ask again.** Ask here only when Step 2 never happened (a resumed or handed-over session). All three share one source of criteria — the 7-point checklist baked into `review-plan.ts`. Only *who critiques* changes.
 
 - **Codex** (default) — the cross-vendor signal an all-Claude author can't produce:
@@ -208,11 +211,11 @@ Once lint passes, run an independent review over the whole tree, then **loop**: 
   ```
   Both bundle the plan files, so the scope is exactly the tree regardless of other uncommitted changes. If the CLI isn't installed the script exits 0 with a warning — skip the gate, note it as a Known gap in `tasks/README.md`, and go to Step 8.
 - **Opus** — a strong Claude reviewer, but **you wrote this plan, so you must not review it yourself**; author bias defeats the gate. Each pass:
-  1. Capture the same bundle the CLIs get into a file: `mkdir -p /tmp/flightplan-review-<slug> && bun "$SCRIPTS"/review-plan.ts docs/<slug> --print > /tmp/flightplan-review-<slug>/bundle.md`
-  2. Invoke `/relay:claude-cli` with `review --prompt-file /tmp/flightplan-review-<slug>/bundle.md --model opus --effort high --headless`. Relay runs a fresh `claude -p` process on opus/high under its read-only review contract. The fresh process starts context-less, so the author never reviews its own plan. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out). `--model` here is this step's fixed choice, not a user pick, so skip relay's save-to-config question. When relay rejects `--effort` as an unknown flag, the installed relay predates it: tell the user to update relay, and do not rerun without the flag.
+  1. Capture the same bundle the CLIs get into a file: `bun "$SCRIPTS"/review-plan.ts docs/<slug> --print > <review>/bundle.md`
+  2. Invoke `/relay:claude-cli` with `review --prompt-file <review>/bundle.md --model opus --effort high --headless`. Relay runs a fresh `claude -p` process on opus/high under its read-only review contract. The fresh process starts context-less, so the author never reviews its own plan. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out). `--model` here is this step's fixed choice, not a user pick, so skip relay's save-to-config question. When relay rejects `--effort` as an unknown flag, the installed relay predates it: tell the user to update relay, and do not rerun without the flag.
   3. Take the findings back to the loop. A fresh subagent each pass keeps reviewer ≠ author — the same anti-bias split autopilot uses.
 
-**From pass 2 on, hand the reviewer what the last pass found.** Save each pass's raw findings to `/tmp/flightplan-review-<slug>/pass-N.md` (outside the tree — these are scratch, not artifacts), then add `--prior-findings /tmp/flightplan-review-<slug>/pass-<N-1>.md` to the next pass's command. It works on all three engines, `--print` included. Every reviewer starts context-less by design, so without this each pass re-files findings you already fixed or already dispositioned — and since the loop exits only on a P1-clean pass, that is what makes a Light review run past 15 rounds. The bundle also carries `tasks/README.md`, so a gap banked there is visible to the reviewer as a decision.
+**From pass 2 on, hand the reviewer what the last pass found.** Save each pass's raw findings to `<review>/pass-N.md` (outside the tree — these are scratch, not artifacts), then add `--prior-findings <review>/pass-<N-1>.md` to the next pass's command. It works on all three engines, `--print` included. Every reviewer starts context-less by design, so without this each pass re-files findings you already fixed or already dispositioned — and since the loop exits only on a P1-clean pass, that is what makes a Light review run past 15 rounds. The bundle also carries `tasks/README.md`, so a gap banked there is visible to the reviewer as a decision.
 
 **Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings; the loop is where most of the quality comes from, because the first pass catches the loud problems and the *revised* plan then exposes what they were masking. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap in `tasks/README.md` with the reason, and don't re-fix it when a later pass raises it again.
 
@@ -236,7 +239,7 @@ A broad prompt aimed at a plan that has already been revised a dozen times manuf
 
 ```bash
 bun "$SCRIPTS"/review-plan.ts docs/<slug> --narrow --prior-passes <broad passes run> \
-  --prior-findings /tmp/flightplan-review-<slug>/pass-<last>.md
+  --prior-findings <review>/pass-<last>.md
 ```
 
 On the Opus engine, add the same two flags to the `--print` capture (`--print --narrow --prior-passes <n>`) and invoke relay exactly as before — `/relay:claude-cli`, never a fork.

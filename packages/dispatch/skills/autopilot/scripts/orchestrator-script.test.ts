@@ -1775,6 +1775,26 @@ const modelsFor = (log: Pick<RunLog, "labels" | "models">, label: string) =>
     seen === label ? [log.models[index]] : [],
   );
 
+describe("judge scratch files", () => {
+  test("the judge writes scores and rationale into a fresh mktemp directory", async () => {
+    const wave = snapshot({
+      ready: [ready("ui/01")],
+      counts: counts({ total: 1, todo: 1 }),
+      unfinished: [{ ref: "ui/01", state: "todo" }],
+    });
+    const log = await runOrchestrator({ scouts: [wave, complete(1)] });
+    const prompt = promptFor(log, "judge:ui/01#1");
+
+    expect(prompt).toContain(
+      "mktemp -d /tmp/q-lab/dispatch/autopilot/repo/my-plan/judge-ui-01-a1-XXXXXX",
+    );
+    expect(prompt).toContain("--rationale-file <dir>/rationale.md");
+    // A fixed path let another plan's leftover rationale reach this run's trail.
+    expect(prompt).not.toContain("/tmp/rationale-");
+    expect(prompt).not.toContain("/tmp/scores-");
+  });
+});
+
 describe("structured-output resilience", () => {
   const twoTaskScouts = () => [
     multiWave(["ui/main", "ui/sibling"]),
