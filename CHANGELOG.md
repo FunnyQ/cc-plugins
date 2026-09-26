@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.2.1] - 2026-09-26
+
+_tracks tag `dispatch-v5.2.1`_
+
+### Fixed
+- Autopilot's external-CLI driver (`devExternal`) moves from a cheap, no-effort model to opus at low effort. It doesn't write code itself, but it turns a task file into the instruction file that codex or opencode implement from — a judgment call, not a translation — and the Haiku driver had been caught paraphrasing a critical rule out of the instructions it produced. The review-relay driver is unaffected.
+
 ## [dispatch 5.2.0] - 2026-09-26
 
 _tracks tag `dispatch-v5.2.0`_
