@@ -176,6 +176,67 @@ describe("validatePlan", () => {
     ]);
     expect(result.ok).toBe(true);
   });
+
+  test("accepts a changed file the caller excluded", () => {
+    const result = validatePlan(
+      planOf(group("feat", ["a.ts"])),
+      changed("a.ts", "unrelated.ts"),
+      ["unrelated.ts"],
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  test("still reports a file neither planned nor excluded", () => {
+    const result = validatePlan(
+      planOf(group("feat", ["a.ts"])),
+      changed("a.ts", "b.ts", "unrelated.ts"),
+      ["unrelated.ts"],
+    );
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual(["b.ts"]);
+  });
+
+  test("reports a path both planned and excluded", () => {
+    const result = validatePlan(
+      planOf(group("feat", ["a.ts"])),
+      changed("a.ts"),
+      ["a.ts"],
+    );
+    expect(result.ok).toBe(false);
+    expect(result.duplicated).toEqual(["a.ts"]);
+  });
+
+  test("reports an excluded path the changeset does not hold", () => {
+    const result = validatePlan(
+      planOf(group("feat", ["a.ts"])),
+      changed("a.ts"),
+      ["ghost.ts"],
+    );
+    expect(result.ok).toBe(false);
+    expect(result.unknown).toEqual(["ghost.ts"]);
+  });
+
+  test("rejects excluding one half of a rename", () => {
+    const result = validatePlan(
+      planOf(group("refactor", ["old.ts"])),
+      [{ path: "new.ts", oldPath: "old.ts", staged: true, status: "renamed" }],
+      ["new.ts"],
+    );
+    expect(result.ok).toBe(false);
+    expect(result.splitRenames).toEqual(["old.ts -> new.ts"]);
+  });
+
+  test("accepts excluding both halves of a rename", () => {
+    const result = validatePlan(
+      planOf(group("feat", ["a.ts"])),
+      [
+        { path: "a.ts", staged: false, status: "modified" },
+        { path: "new.ts", oldPath: "old.ts", staged: true, status: "renamed" },
+      ],
+      ["old.ts", "new.ts"],
+    );
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("validatePlanFile", () => {
@@ -283,6 +344,17 @@ describe("validatePlanFile", () => {
 
   test("rejects an unknown mode", () => {
     expect(validatePlanFile({ ...draft, mode: "atomic" })).toHaveLength(1);
+  });
+
+  test("accepts an exclude list of repo-relative paths", () => {
+    expect(validatePlanFile({ ...draft, exclude: ["b.ts"] })).toEqual([]);
+  });
+
+  test("rejects an exclude that is not a list of repo-relative paths", () => {
+    expect(validatePlanFile({ ...draft, exclude: "b.ts" })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, exclude: ["/tmp/b.ts"] })).toHaveLength(
+      1,
+    );
   });
 });
 

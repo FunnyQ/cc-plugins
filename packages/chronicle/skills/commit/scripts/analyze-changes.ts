@@ -527,6 +527,7 @@ export type PlanVerification = {
   ok: boolean;
   missing: string[];
   leftover: string[];
+  excluded: string[];
 };
 
 function normalizePath(path: string): string {
@@ -545,17 +546,22 @@ export function verifyPlanLanded(
   planned: string[],
   committed: string[],
   remaining: string[],
+  exclude: string[] = [],
 ): PlanVerification {
   const committedPaths = new Set(committed.map(normalizePath));
   const missing = [...new Set(planned.map(normalizePath))].filter(
     (path) => !committedPaths.has(path),
   );
-  const leftover = [...new Set(remaining.map(normalizePath))];
+  const excludedPaths = new Set(exclude.map(normalizePath));
+  const left = [...new Set(remaining.map(normalizePath))];
+  const leftover = left.filter((path) => !excludedPaths.has(path));
+  const excluded = left.filter((path) => excludedPaths.has(path));
 
   return {
     ok: missing.length === 0 && leftover.length === 0,
     missing,
     leftover,
+    excluded,
   };
 }
 

@@ -438,7 +438,21 @@ describe("verifyPlanLanded", () => {
       ok: true,
       missing: [],
       leftover: [],
+      excluded: [],
     });
+  });
+
+  test("reports an excluded change as excluded, not leftover", () => {
+    const result = verifyPlanLanded(
+      ["a.ts"],
+      ["a.ts"],
+      ["unrelated.ts", "stray.ts"],
+      ["./unrelated.ts"],
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.leftover).toEqual(["stray.ts"]);
+    expect(result.excluded).toEqual(["unrelated.ts"]);
   });
 
   test("reports planned files that never landed", () => {
@@ -474,7 +488,12 @@ describe("verifyPlanLanded", () => {
   test("ignores duplicate paths in the plan", () => {
     const result = verifyPlanLanded(["a.ts", "a.ts"], ["a.ts"], []);
 
-    expect(result).toEqual({ ok: true, missing: [], leftover: [] });
+    expect(result).toEqual({
+      ok: true,
+      missing: [],
+      leftover: [],
+      excluded: [],
+    });
   });
 
   test("tolerates commits carrying more files than the plan named", () => {

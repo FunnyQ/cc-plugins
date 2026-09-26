@@ -36,6 +36,7 @@ type PlanShape = {
   simple?: SimpleProse;
   moduleSpread?: string[];
   totalFiles?: number;
+  exclude?: string[];
 };
 
 // Outside the repo on purpose — a plan file inside it is part of the changeset.
@@ -581,5 +582,63 @@ describe("apply", () => {
     const { exitCode, json } = await run("apply", planPath);
     expect(exitCode).toBe(2);
     expect(json.error).toContain("merge or cherry-pick");
+  });
+
+  test("leaves an excluded file uncommitted, even when it is staged", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed("README.md", "# repo, edited elsewhere\n");
+    await $`git add -- README.md`.cwd(repo).quiet();
+    const planPath = await writePlan({
+      commits: [
+        { emoji: "✨", type: "feat", subject: "add a", files: ["a.ts"] },
+      ],
+      exclude: ["README.md"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.ok).toBe(true);
+    expect(json.excluded).toEqual(["README.md"]);
+    expect(json.warning).toContain("README.md");
+    expect(json.verify.excluded).toEqual(["README.md"]);
+    expect(json.verify.leftover).toEqual([]);
+    const shown = await $`git show --name-only --format= HEAD`
+      .cwd(repo)
+      .quiet();
+    expect(shown.stdout.toString().trim()).toBe("a.ts");
+    const staged = await $`git diff --cached --name-only`.cwd(repo).quiet();
+    expect(staged.stdout.toString().trim()).toBe("README.md");
+  });
+
+  test("refuses an exclude while a merge is in progress", async () => {
+    await baseCommit();
+    await $`git checkout -q -b side`.cwd(repo).quiet();
+    await seed("c.ts", "side\n");
+    await $`git add -A`.cwd(repo).quiet();
+    await $`git commit -q -m ${"✨ feat: side"}`.cwd(repo).quiet();
+    await $`git checkout -q main`.cwd(repo).quiet();
+    await seed("c.ts", "main\n");
+    await $`git add -A`.cwd(repo).quiet();
+    await $`git commit -q -m ${"✨ feat: main"}`.cwd(repo).quiet();
+    await $`git merge side`.cwd(repo).quiet().nothrow();
+
+    await seed("d.ts", "d\n");
+    const planPath = await writePlan({
+      commits: [
+        {
+          emoji: "🐛",
+          type: "fix",
+          subject: "resolve conflict",
+          files: ["c.ts"],
+        },
+      ],
+      exclude: ["d.ts"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(2);
+    expect(json.error).toContain("exclude");
+    expect(await subjects()).not.toContain("🐛 fix: resolve conflict");
   });
 });

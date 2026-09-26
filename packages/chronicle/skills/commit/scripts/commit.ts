@@ -249,11 +249,13 @@ async function applyMain(planPath: string): Promise<void> {
     emptyTree,
   );
   const pending = commits.slice(landed);
+  const exclude = plan.exclude ?? [];
 
   if (pending.length > 0) {
     const coverage = validatePlan(
       { shape: decision.shape, commits: pending },
       await readChangeset(),
+      exclude,
     );
     if (!coverage.ok) {
       refuse("the plan does not cover the changeset exactly once", coverage);
@@ -263,6 +265,12 @@ async function applyMain(planPath: string): Promise<void> {
     if (duringMerge && pending.length > 1) {
       refuse(
         `a merge or cherry-pick is in progress — it can carry one commit, not ${pending.length}`,
+      );
+    }
+    // The merge commit takes the whole index, so it would carry a staged excluded file.
+    if (duringMerge && exclude.length > 0) {
+      refuse(
+        "a merge or cherry-pick is in progress — git commits the whole index, so nothing can be excluded",
       );
     }
 
@@ -284,12 +292,16 @@ async function applyMain(planPath: string): Promise<void> {
     committedPathsSince(base),
     remainingPaths(),
   ]);
-  const verification = verifyPlanLanded(planned, committed, remaining);
+  const verification = verifyPlanLanded(planned, committed, remaining, exclude);
 
   const result = {
     ok: verification.ok,
     ...decision,
     base,
+    ...(exclude.length > 0 && {
+      excluded: exclude,
+      warning: `left uncommitted on request: ${exclude.join(", ")} — if the committed code depends on them, HEAD does not build`,
+    }),
     executed: pending.map(subjectOf),
     skipped: commits.slice(0, landed).map(subjectOf),
     log: (await gitOrEmpty("log", "--oneline", `${base}..HEAD`))

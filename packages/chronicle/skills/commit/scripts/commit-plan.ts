@@ -109,10 +109,15 @@ export type PlanValidation = {
  * path leaves the old path's deletion staged behind: the tree ends up holding
  * both files, and the post-commit check catches it only once the broken commit
  * is already written. That is why this runs before anything is staged.
+ *
+ * An excluded path counts as assigned to a commit that never runs, so every rule
+ * above applies to it unchanged: planned and excluded is a duplicate, a rename
+ * cannot straddle it, and a path neither planned nor excluded is still missing.
  */
 export function validatePlan(
   plan: CommitPlan,
   changed: ParsedStatus[],
+  exclude: string[] = [],
 ): PlanValidation {
   const required = new Set(changed.map((entry) => entry.path));
   const allowed = new Set(required);
@@ -124,8 +129,15 @@ export function validatePlan(
   const duplicated: string[] = [];
   const unknown: string[] = [];
 
-  for (const [index, commit] of plan.commits.entries()) {
-    for (const path of commit.files) {
+  const groups: [number, string[]][] = [
+    [-1, exclude],
+    ...plan.commits.map((commit, index): [number, string[]] => [
+      index,
+      commit.files,
+    ]),
+  ];
+  for (const [index, files] of groups) {
+    for (const path of files) {
       if (owner.has(path)) {
         if (!duplicated.includes(path)) duplicated.push(path);
         continue;
@@ -182,6 +194,8 @@ export type PlanDraft = {
   moduleSpread?: string[];
   /** Why the groups are in this order. */
   notes?: string[];
+  /** Changed paths the caller asked to leave uncommitted. Never the agent's own call. */
+  exclude?: string[];
 };
 
 /**
@@ -243,6 +257,21 @@ export function validatePlanFile(raw: unknown): string[] {
       // A bare string survives `.length` and then throws inside decideShape's
       // join, which reaches the agent as a JS error it cannot act on.
       errors.push(`\`${key}\` must be an array of strings`);
+    }
+  }
+
+  if (draft.exclude !== undefined) {
+    if (
+      !Array.isArray(draft.exclude) ||
+      draft.exclude.some((path) => !isFilledString(path))
+    ) {
+      errors.push("`exclude` must be an array of repo-relative paths");
+    } else {
+      for (const path of draft.exclude as string[]) {
+        if (path.startsWith("/")) {
+          errors.push(`\`exclude\` holds an absolute path: ${path}`);
+        }
+      }
     }
   }
 
