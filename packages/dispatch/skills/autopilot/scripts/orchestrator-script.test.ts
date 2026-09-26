@@ -1029,7 +1029,8 @@ describe("orchestrator failure handling", () => {
       "dev-codex:ui/01#4",
     ]);
     expect(modelFor(log, "dev:ui/01#3")).toBe("opus");
-    expect(modelFor(log, "dev-codex:ui/01#4")).toBe("haiku");
+    expect(modelFor(log, "dev-codex:ui/01#4")).toBe("opus");
+    expect(effortFor(log, "dev-codex:ui/01#4")).toBe("low");
     expect(log.result.escalations[0].attempt).toBe(4);
   });
 
@@ -1054,8 +1055,8 @@ describe("orchestrator failure handling", () => {
       "dev:ui/01#3",
     ]);
     expect(devLabels.map((label) => modelFor(log, label))).toEqual([
-      "haiku",
-      "haiku",
+      "opus",
+      "opus",
       "opus",
     ]);
     expect(log.result.escalations[0].attempt).toBe(3);
@@ -2603,7 +2604,7 @@ describe("per-role model and effort choices", () => {
         },
         config,
       );
-      labels.forEach((label) => assertChoice(log, label, "haiku"));
+      labels.forEach((label) => assertChoice(log, label, "opus", "low"));
       assertChoice(log, "dev:ui/01#3", "sonnet", "medium");
     },
   );

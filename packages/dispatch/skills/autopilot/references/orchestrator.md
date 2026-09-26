@@ -87,7 +87,8 @@ const CFG = {
 // verify runs the binary gate and drift re-verify; judge scores the rubric.
 // fix applies Final review findings; commit groups and records wave changes.
 // structuredRetry recovers a failed structured call with a complete choice.
-// devExternal and reviewExternal drive external CLIs that do the reasoning.
+// devExternal writes the external CLI's instruction file — judgment Haiku got wrong in the field.
+// reviewExternal drives an external CLI that does the reasoning.
 // reviewLens hunts quality issues at high effort on the configured model.
 // scout reads readiness; markDone and park perform fixed status transitions.
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
@@ -99,7 +100,7 @@ const MODEL = {
   fix: { model: 'opus', effort: 'medium' },
   commit: { model: 'opus', effort: 'low' },
   structuredRetry: { model: 'opus', effort: 'medium' },
-  devExternal: { model: 'haiku', effort: null },
+  devExternal: { model: 'opus', effort: 'low' },
   reviewExternal: { model: 'haiku', effort: null },
   reviewLens: { model: CFG.reviewLensModel ?? 'opus', effort: 'high' },
   scout: { model: 'haiku', effort: null },

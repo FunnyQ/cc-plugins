@@ -124,7 +124,7 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 The split is not cosmetic. Neither codex-model question is worth asking until the first call has said whether codex took that role at all, and the live-panes question offers a dev-delegate option only when the dev engine turned out external. Folding them into one call would ask every dependent question blind, and would also breach `AskUserQuestion`'s four-question cap.
 
-- **Dev engine** (`CFG.devEngine`) — Choose **Claude** (default; Opus/low, then Opus/high on the last Claude rung), **Codex** (`'codex'`, via `codex-run.ts`), or **OpenCode** (`'opencode'`, via `opencode-run.ts`). With Codex or OpenCode, use a Haiku driver for the external CLI. Keep the Claude judge in a separate call.
+- **Dev engine** (`CFG.devEngine`) — Choose **Claude** (default; Opus/low, then Opus/high on the last Claude rung), **Codex** (`'codex'`, via `codex-run.ts`), or **OpenCode** (`'opencode'`, via `opencode-run.ts`). With Codex or OpenCode, an Opus/low driver writes the external CLI's instruction file. Keep the Claude judge in a separate call.
 - **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
 - **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable 5** (`'fable'`) — the model for the three Claude quality lenses (reuse / leanness / efficiency) in the closing Final review. Both run the lenses at high effort. This choice affects **only** those three lenses. Keep the fixer and rubric judge on their per-role model choices, including task header overrides. **Fable 5 is Anthropic's most capable model and is priced above Opus** ($10/$50 per MTok vs Opus's $5/$25) — pick it for maximum lens quality on a hard review, not to save cost. Never describe it to the user as the cheaper option.
 - **Codex dev model** (`CFG.codexDevModel`) — **gpt-5.6-sol** (default) or **gpt-6-astra** — ask **only when the dev engine resolved to codex**. This is the model that writes each task.
@@ -250,7 +250,7 @@ Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge
 |---|---|---|
 | **Dev** | opus / low | Implement the task cheaply; the task's gate and judge catch what low effort misses. |
 | **Dev — last Claude rung** | opus / high, or the task's dev choice with effort +1 | Spend verification effort after earlier attempts fail. |
-| **Dev — external driver** | haiku / no effort | Drive the external CLI that writes the implementation. |
+| **Dev — external driver** | opus / low | Turn the task file into the external CLI's instruction file, then drive the CLI. A Haiku driver paraphrased a rule out of that file in the field. |
 | **Binary gate and drift re-verify** | opus / low | Check acceptance criteria and command output before scoring. |
 | **Rubric judge** | opus / medium | Score the rubric against the gate's evidence. |
 | **Commit (inter-wave + post-loop)** | opus / low | Group changes and write the commit message. |
