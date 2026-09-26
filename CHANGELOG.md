@@ -1,5 +1,27 @@
 # Changelog
 
+## [dispatch 5.2.0] - 2026-09-26
+
+_tracks tag `dispatch-v5.2.0`_
+
+### Changed
+- Retuned autopilot's default model/effort split per Terminal-Bench 3.0 data showing effort buys verification and edge-case hunting, not a fix for a wrong approach: implementation dev rungs now default to opus/low instead of opus/medium, with a fixed opus/high last Claude dev rung (`MODEL.devLast`) so the final pass doesn't quietly lose rigor now that earlier rungs run cheaper — a task's own `Models` `dev=` header still raises one step above that rung. Final review's quality lenses (reuse, leanness, efficiency) now run at high effort, including when `reviewLensModel` is `fable`, while the final review fixer drops from opus/high to opus/medium since the lenses now do the hunting and the fixer just applies it.
+- flightplan Step 7's Opus review pass now runs through `/relay:claude-cli review --model opus --effort high` instead of an Agent spawn, since Agent has no effort parameter. This requires relay 0.7.1 or newer.
+- Rewrote the per-task `Models` header guidance to pick effort by where a task would fail rather than how hard it looks: dense hidden edge cases (sanitizers, parsers, concurrency, numerical code, storage migrations, brownfield fixes, behaviour-preserving refactors) now call for `dev=opus/high`, while an ambiguous approach should be resolved by pinning the intended reading in the task's notes or acceptance criteria instead of raising effort, since higher effort was measured to make a wrong reading worse.
+
+### Added
+- hop gains an optional Step 6: a high-effort relay review of `git diff <base>` against the plan, run once the user has confirmed the direction is right. Step 5 now records the base commit up front so this diff is available even when work was committed in stages.
+
+## [relay 0.7.1] - 2026-09-26
+
+_tracks tag `relay-v0.7.1`_
+
+### Added
+- New `--effort <low|medium|high|xhigh|max>` flag, passed through to the claude backend on both its headless and live-pane paths. The codex and opencode backends reject it with an explicit error instead of silently dropping it.
+
+### Fixed
+- The claude backend's headless invocation now passes `--model`. Previously only the live-pane path did, so a headless call requesting a specific model silently ran on the CLI's default instead.
+
 ## [dispatch 5.1.1] - 2026-09-26
 
 _tracks tag `dispatch-v5.1.1`_
