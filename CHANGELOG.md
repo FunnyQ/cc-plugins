@@ -1,5 +1,43 @@
 # Changelog
 
+## [chronicle 0.17.2] - 2026-09-27
+
+_tracks tag `chronicle-v0.17.2`_
+
+### Changed
+- Chronicle's scratch files (commit-message temp files and other transient state) now live under `/tmp/q-lab/chronicle` instead of `/tmp/chronicle`, avoiding collisions with any other tool using that shared root.
+
+## [dispatch 5.2.2] - 2026-09-27
+
+_tracks tag `dispatch-v5.2.2`_
+
+### Fixed
+- Fixed a bug where autopilot's judge could pick up a stale rationale or score file left over from a previous run on the same plan, because those scratch files used a predictable, reused path. Judge notes, the external driver's instructions, and cross-vendor review files now each get a freshly created, unique temp directory, so a rerun of the same plan can no longer collide with leftovers from an earlier run.
+
+### Changed
+- Autopilot and flightplan scratch now lives under `/tmp/q-lab/dispatch/<skill>/<project>/<slug>/` instead of loose `/tmp/rationale-*`, `/tmp/scores-*`, and `/tmp/flightplan-*` paths.
+
+## [guard 0.5.2] - 2026-09-27
+
+_tracks tag `guard-v0.5.2`_
+
+### Changed
+- Guard's state directory now lives under `/tmp/q-lab/guard` instead of `$TMPDIR/q-lab-guard`, matching the shared repo-wide scratch convention.
+
+## [herdr 0.7.7] - 2026-09-27
+
+_tracks tag `herdr-v0.7.7`_
+
+### Changed
+- Herdr's `ask` scratch directory now lives under `/tmp/q-lab/herdr/ask` instead of `$TMPDIR/herd-ask`, matching the shared repo-wide scratch convention.
+
+## [relay 0.7.2] - 2026-09-27
+
+_tracks tag `relay-v0.7.2`_
+
+### Changed
+- Relay's scratch root now lives under `/tmp/q-lab/relay/relay` instead of `/tmp/relay`, so a different tool sharing that name can no longer collide with relay's temp files.
+
 ## [chronicle 0.17.1] - 2026-09-27
 
 _tracks tag `chronicle-v0.17.1`_
