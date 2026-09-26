@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.17.0] - 2026-09-26
+
+_tracks tag `chronicle-v0.17.0`_
+
+### Changed
+- `chronicle:pr` now opens pull requests ready for review by default instead of as a draft, so reviewers are notified and CI starts immediately. Pass `draft:true` when you actually want a draft.
+
 ## [dispatch 5.2.1] - 2026-09-26
 
 _tracks tag `dispatch-v5.2.1`_
