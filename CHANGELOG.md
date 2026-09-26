@@ -1,5 +1,15 @@
 # Changelog
 
+## [chronicle 0.17.1] - 2026-09-27
+
+_tracks tag `chronicle-v0.17.1`_
+
+### Added
+- `chronicle:commit` now accepts an opt-in `exclude` list, so pre-existing modified files unrelated to the current work can be left out of a run instead of forcing you to stash or commit them anyway. Excluded paths are reported separately as `excluded` (not lumped in with `leftover`), and every run that excludes files warns that HEAD may not build if the committed code depends on one of them. Exclude is refused while a merge or cherry-pick is in progress, since that would risk smuggling a staged excluded file into the merge commit.
+
+### Changed
+- Raised the Lawspeaker agent's turn budget from 12 to 20 (Claude Code `maxTurns` and OpenCode `steps`) after a real run hit the old cap while hunting for an exclude option that didn't exist yet.
+
 ## [chronicle 0.17.0] - 2026-09-26
 
 _tracks tag `chronicle-v0.17.0`_
