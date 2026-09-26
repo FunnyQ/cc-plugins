@@ -112,6 +112,10 @@ describe("addTimestampSuffix", () => {
 });
 
 describe("createTmpRunDir", () => {
+  it("roots under the q-lab namespace", () => {
+    expect(TMP_ROOT).toBe("/tmp/q-lab/relay/relay");
+  });
+
   it("returns a path under TMP_ROOT", () => {
     const dir = createTmpRunDir();
     expect(dir.startsWith(TMP_ROOT)).toBe(true);

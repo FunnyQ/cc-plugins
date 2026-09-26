@@ -343,6 +343,6 @@ describe("buildPromptFile", () => {
       noProject: true,
     });
 
-    expect(promptPath).toContain("/tmp/relay/");
+    expect(promptPath).toContain("/tmp/q-lab/relay/relay/");
   });
 });

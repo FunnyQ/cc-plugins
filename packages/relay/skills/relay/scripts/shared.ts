@@ -5,7 +5,7 @@ import { homedir } from "os";
 import type { Mode, RunResult } from "./types";
 
 // Temp directory root for relay runs
-export const TMP_ROOT = "/tmp/relay";
+export const TMP_ROOT = "/tmp/q-lab/relay/relay";
 
 // Default models per backend and mode (precedence: flag > config > constant > undefined)
 export const DEFAULT_MODELS: Record<string, Partial<Record<Mode, string>>> = {
