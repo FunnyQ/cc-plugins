@@ -323,6 +323,7 @@ count is zero.
 - Take no external npm dependencies at runtime. Vendor libraries are committed in `dashboard/dist/vendor/`. `devDependencies` may carry types-only packages — `@types/bun` is there so the typecheck above resolves Bun's globals.
 - Vendor mermaid as the UMD bundle (`mermaid.min.js`, ~3.3MB, sets `globalThis.mermaid`). The ESM build is code-split and cannot ship as one file. `modules/diagram.js` lazy-loads it on the first diagram render, themes it with concrete hex (mermaid's khroma engine cannot parse `oklch()`), and sanitizes the SVG through DOMPurify's SVG profile.
 - Price per 1M tokens in USD.
+- Put scratch that outlives its process under `/tmp/q-lab/<plugin>/<skill>/`, or `/tmp/q-lab/<plugin>/` for a plugin with no skills. The `q-lab` segment keeps a third-party plugin of the same name out of our files. A path an agent writes with the Write tool must end in a `mktemp -d` leaf: Write refuses to overwrite a file it has not read, so a fixed path hands the next run the last run's file. Keep a `mkdtemp` scratch that the same process deletes in `os.tmpdir()`.
 
 ## Releasing
 
