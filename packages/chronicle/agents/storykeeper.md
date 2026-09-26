@@ -55,7 +55,7 @@ Do not emit waiting prose.
 - `base` — the explicit target branch, already resolved with the user. Pass it to the
   skald unchanged. Never infer or replace it.
 - `branch` — the current branch, already checked safe by the main agent.
-- `draft` — defaults to `true`.
+- `draft` — defaults to `false`.
 - `skipReview` — the user's answer at the skill's review gate. Defaults to `false`.
   Pass it to the messenger inside `CreateInput`. Never pass it to the skald, and never
   edit the title yourself — `request-creator.ts` stamps the ` [skip-review]` marker.

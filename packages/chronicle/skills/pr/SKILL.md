@@ -33,8 +33,8 @@ the main conversation.
 
 There is **no final creation confirmation gate**. Invoking the skill is the
 consent. The flow auto-creates after any first-run config interview. `draft`
-defaults to `true`. A draft PR is the safe default for an auto-open. The main
-agent may pass `draft:false` to open it ready.
+defaults to `false`, so the request opens ready for review. The main agent may
+pass `draft:true` to open it as a draft.
 
 The three agents live at `packages/chronicle/agents/{storykeeper,skald,messenger}.md`.
 They auto-register as `chronicle:storykeeper` / `chronicle:skald` /
@@ -114,8 +114,8 @@ live in those files.
    - `base` — the explicit branch selected in step 1. Never pass `auto`.
    - `branch` — the current branch. If it is a protected branch, defer to the user's
      existing git-flow guard before spawning.
-   - `draft` — optional. Default `true`. Pass `false` only if the user asked to open
-     the PR ready rather than as a draft.
+   - `draft` — optional. Default `false`. Pass `true` only if the user asked to open
+     the PR as a draft.
    - `skipReview` — the answer from step 2. Always pass it explicitly.
 
 **Verify before reporting:**
