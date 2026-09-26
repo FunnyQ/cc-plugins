@@ -21,7 +21,7 @@ export type CodexRun = {
   startedAt: string | null;
   /**
    * Relay scratch directory this run was driven from, when relay drove it. The
-   * delegation prompt arrives as `Read the file /tmp/relay/<dir>/live-prompt.md`,
+   * delegation prompt arrives as `Read the file /tmp/q-lab/relay/relay/<dir>/live-prompt.md`,
    * and the driver's own transcript names the same directory.
    */
   relayDir: string | null;
@@ -308,7 +308,7 @@ function insideRepo(cwd: string | null, root: string): boolean {
  *
  * Two joins, strongest first:
  *
- *  1. **Relay directory.** A live-pane delegation names `/tmp/relay/<dir>/live-prompt.md`
+ *  1. **Relay directory.** A live-pane delegation names `/tmp/q-lab/relay/relay/<dir>/live-prompt.md`
  *     in the codex rollout, and the driver's own transcript names `<dir>` in the command
  *     that created it. That is an exact string match on a per-delegation identifier —
  *     no guessing, and it survives parallel waves.

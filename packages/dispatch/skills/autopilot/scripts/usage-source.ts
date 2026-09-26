@@ -342,9 +342,9 @@ function applyUsage(
 }
 
 // Relay names each delegation's scratch directory `<stamp>-<ms>-<pid>-<hash>` under
-// /tmp/relay. Matched on the raw line rather than on parsed content because the path
-// can surface in a tool_use input, a tool result, or assistant prose, and scanning the
-// string once is cheaper than walking three shapes.
+// /tmp/q-lab/relay/relay. Matched on the raw line rather than on parsed content because
+// the path can surface in a tool_use input, a tool result, or assistant prose, and
+// scanning the string once is cheaper than walking three shapes.
 const RELAY_DIR = /\/relay\/(\d{8}-\d{6}-\d+-\d+-[0-9a-f]+)/g;
 
 // The headless path leaves no relay directory — the prompt goes to `codex exec` on
