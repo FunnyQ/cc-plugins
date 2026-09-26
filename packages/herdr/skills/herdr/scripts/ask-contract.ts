@@ -12,7 +12,6 @@
 
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export const ASK_RESULT_END_MARKER = "==== ASK RESULT END ====";
@@ -54,8 +53,7 @@ export function createAskRunDir(exactDir?: string): string {
   const dir =
     exactDir ??
     join(
-      tmpdir(),
-      "herd-ask",
+      "/tmp/q-lab/herdr/ask",
       `${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`,
     );
   mkdirSync(dir, { recursive: true });

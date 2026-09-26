@@ -57,6 +57,7 @@ describe("createAskRunDir", () => {
     const a = createAskRunDir();
     const b = createAskRunDir();
     expect(a).not.toBe(b);
+    expect(a.startsWith("/tmp/q-lab/herdr/ask/")).toBe(true);
     await rm(a, { recursive: true, force: true });
     await rm(b, { recursive: true, force: true });
   });

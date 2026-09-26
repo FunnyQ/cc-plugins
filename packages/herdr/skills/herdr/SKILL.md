@@ -60,7 +60,7 @@ bun "$HERD" ask api-service "what port does the dev server run on?"
 bun "$HERD" ask --keep-pane diqi "what directory are you in?"
 
 # Timed out while still working? Redeem it later without re-asking.
-bun "$HERD" collect diqi-90d4 --result /tmp/herd-ask/.../result.md
+bun "$HERD" collect diqi-90d4 --result /tmp/q-lab/herdr/ask/.../result.md
 
 # Atomically send and submit a prompt to a running agent
 bun "$HERD" send reviewer-a3f9 "now check error handling"
