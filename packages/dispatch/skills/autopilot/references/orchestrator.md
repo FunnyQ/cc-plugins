@@ -5,8 +5,9 @@ Read the three hard constraints in `SKILL.md` first. They explain every awkward-
 
 > **OpenCode only**: this script describes the **Claude Code Workflow path only**. Every spawn path it asserts — the orchestrator JS layer, `agent()`, the parallel wave dispatch — exists only under the Workflow tool, and OpenCode has no Workflow tool and no equivalent orchestrator process. Under OpenCode, the person or agent invoking the `/autopilot` skill performs the orchestrator's role **by hand**, following the eight-step manual wave loop in `~/.config/opencode/skills/autopilot/references/opencode.md`. Read that file for the steps and the runtime prerequisites. Nothing in this file is ported to OpenCode.
 
-The main agent scouts inline. It then calls `Workflow({ script: <this> })`. **Bake the
-scouted values into the `CFG` block at the top of the script as literals.**
+The main agent scouts inline. It then runs `scripts/bake-orchestrator.ts`, which bakes the
+scouted values into the `CFG` block at the top of the script as literals, and calls
+`Workflow({ scriptPath: <the printed path> })`.
 
 Wave loop: `scout → tree guards → derive fresh ready tasks → stall guard → inter-wave commit → budget-floor check → parallel task dispatch, capped by the plan's `maxParallel` → wave-end leak check (except Final review) → reconciliation → abort/no-progress stop`.
 
@@ -33,7 +34,7 @@ directly.
 
 ## The script
 
-When adapting this script for the Workflow call, strip the explanatory comments. They are for the adapter, not the runtime. Keep only the one-line CFG field comments.
+`bake-orchestrator.ts` extracts the first fenced `javascript` block in this file and replaces `CFG` values only. Keep the script below as that first block, never write the fence opener in prose above it, and keep each `CFG` field on one `name: value, // comment` line. The explanatory comments ride along; `scriptPath` has no transcription cost to trim.
 
 ```javascript
 export const meta = {

@@ -19,6 +19,7 @@ import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseModels } from "../../flightplan/scripts/lib/parse-task";
+import { bakeConfig, extractScript } from "./bake-orchestrator";
 
 const ORCHESTRATOR = join(
   import.meta.dir,
@@ -189,26 +190,10 @@ type ConfigOverrides = Record<string, string>;
 
 async function loadScript(overrides: ConfigOverrides = {}): Promise<string> {
   const doc = await readFile(ORCHESTRATOR, "utf-8");
-  const start = doc.indexOf("```javascript");
-  if (start === -1)
-    throw new Error("no ```javascript block in orchestrator.md");
-  const bodyStart = doc.indexOf("\n", start) + 1;
-  const end = doc.indexOf("\n```", bodyStart);
-  if (end === -1) throw new Error("unterminated ```javascript block");
-  let script = doc.slice(bodyStart, end);
-  for (const [field, literal] of Object.entries({
+  const script = bakeConfig(extractScript(doc), {
     repoRoot: "'/abs/repo'",
     ...overrides,
-  })) {
-    const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`^(\\s*${escaped}:\\s*)[^,\\n]+(,.*)$`, "m");
-    if (!pattern.test(script)) {
-      throw new Error(
-        `config field not found in orchestrator script: ${field}`,
-      );
-    }
-    script = script.replace(pattern, `$1${literal}$2`);
-  }
+  });
   // `export` is invalid inside a Function body; the runtime hoists meta itself.
   return script.replace(/^export const meta/m, "const meta");
 }

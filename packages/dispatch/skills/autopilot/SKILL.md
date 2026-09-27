@@ -159,9 +159,19 @@ If the command exits non-zero, note that the monitor is unavailable and fly anyw
 
 ## Step 3 — Call Workflow with the wave-loop orchestrator
 
-Adapt `references/orchestrator.md`; it is the canonical script. **Copy its `CFG` block field-for-field** — that block is the authoritative field list — and replace each placeholder with the value you scouted, as a literal. Do not rely on the Workflow `args` global. Every path field must be absolute. Keep any field you did not scout at the default the block already carries.
+Bake `references/orchestrator.md`, the canonical script, with `$OWN/bake-orchestrator.ts`. Its `CFG` block is the authoritative field list. Pipe every scouted value in as one JSON object keyed by `CFG` field name, with JSON types (`true`, `3`, `null`, strings):
 
-Then call `Workflow({ script: <the adapted script> })`. No `args` needed.
+```bash
+bun "$OWN"/bake-orchestrator.ts <<'EOF'
+{ "slug": "my-plan", "repoRoot": "/abs/repo", "tasksDir": "/abs/repo/docs/my-plan/tasks", ... }
+EOF
+```
+
+The script requires `slug`, `repoRoot`, `tasksDir`, `planPath`, `logFile`, `planGoal`, `scriptsDir`, and `baseRef`. It rejects a relative path and any key the `CFG` block does not carry. Omit a field you did not scout, and it keeps the block's default. It writes `<plan dir>/.flightlog/orchestrator.js`, drops the `.flightlog/` self-ignore, and prints that absolute path. On a non-zero exit, fix the reported field and re-run.
+
+Then call `Workflow({ scriptPath: <the printed path> })`. No `args` needed. Do not rely on the Workflow `args` global.
+
+**Use `scriptPath` here, not an inline `script`.** The Workflow tool's own guidance says to pass the script inline and not Write it first. That guidance assumes a script you author. This one is ~1,500 lines of generated source, and transcribing it inline is unreliable. Do not move the baked file: `scriptPath` accepts only a path the tool returned or a file inside the working directory, so a `/tmp` path fails with `scriptPath must be a script path this tool returned, or a file you can already read`. The plan dir sits inside the repo, and the worktree leak check excludes it.
 
 **`CFG.devEngine` and `CFG.reviewEngine` are independent axes.** `devEngine` controls who writes non-final tasks. `reviewEngine` controls the external bug/correctness lens in the closing Final review. The full external-engine behavior, the opencode model fields, and failure handling live in `references/orchestrator.md`.
 
@@ -332,4 +342,4 @@ The remaining shared tools — `score-task.ts`, `mark-done.ts`, `codex-run.ts`, 
 
 ## Additional resources
 
-- `references/orchestrator.md` — the canonical Workflow script (wave loop, per-task retry pipeline, inline score gate, agent prompts and schemas). Adapt this. Do not write one from scratch.
+- `references/orchestrator.md` — the canonical Workflow script (wave loop, per-task retry pipeline, inline score gate, agent prompts and schemas). Bake it with `scripts/bake-orchestrator.ts`. Do not write one from scratch.
