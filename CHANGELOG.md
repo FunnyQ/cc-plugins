@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.2.3] - 2026-09-27
+
+_tracks tag `dispatch-v5.2.3`_
+
+### Fixed
+- Fixed autopilot's orchestrator failing to load on large plans: handing the ~1,500-line orchestrator script inline could get garbled in transcription. It's now baked to a file inside the plan's working directory before autopilot runs it, which also lets the script carry its explanatory comments without any transcription cost.
+
 ## [chronicle 0.17.2] - 2026-09-27
 
 _tracks tag `chronicle-v0.17.2`_
