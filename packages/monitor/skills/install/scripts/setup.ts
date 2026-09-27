@@ -27,7 +27,6 @@ import { join, resolve } from "node:path";
 import {
   type Check,
   COLLECTOR_COMMAND,
-  COLLECTOR_SCRIPT,
   dashboardChecks,
   pluginVersion,
   printReport,
@@ -38,11 +37,7 @@ import {
   reapStaleMonitorProcesses,
 } from "./reap-stale";
 import { applyStatusline } from "./setup-statusline";
-import {
-  decideStatusLine,
-  sameCollectorRelease,
-  type StatusLineConfig,
-} from "./statusline-decision";
+import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
 
 const HOME = homedir();
 // Absolute path a user can paste into ~/.claude.json (no $CLAUDE_PLUGIN_ROOT there).
@@ -319,24 +314,14 @@ function scriptPermissionChecks(): Check[] {
   ];
 }
 
-// --- migrate: re-point drifted pieces + clean up the stale channel entry ----
-// Never fresh-wires the statusline — that's the initial opt-in, which stays
-// manual. It only re-points an already-wired statusline that drifted to an older
-// plugin-cache path, and removes a stale hand-wired channel entry (now packaged).
+// --- migrate: clean up the stale channel entry -----------------------------
+// Never touches the statusline: any collector path keeps working across plugin
+// updates, and wiring it is the user's opt-in via /monitor:install.
 function migrate(): string[] {
   const changed: string[] = [];
 
   if (unwireChannel(false) === "removed") {
     changed.push("cockpit-channel cleanup");
-  }
-
-  const sl = statuslineReferencedCollector();
-  if (
-    sl &&
-    !sameCollectorRelease(sl, COLLECTOR_SCRIPT) &&
-    applyStatuslinePiece(false)
-  ) {
-    changed.push("statusline collector");
   }
 
   return changed;
@@ -374,12 +359,6 @@ function driftReport(): DriftItem[] {
   }
 
   const items: DriftItem[] = [];
-  if (!sameCollectorRelease(collector, COLLECTOR_SCRIPT)) {
-    items.push({
-      key: "statusline-drift",
-      message: `the statusline runs the collector from another install (${collector}). Run the /monitor:install skill to re-point it here.`,
-    });
-  }
   if (channelConfiguredPath() !== null) {
     items.push({
       key: "stale-channel",

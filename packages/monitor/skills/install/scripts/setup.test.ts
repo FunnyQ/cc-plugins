@@ -293,7 +293,7 @@ describe("version drift", () => {
   const OLD_CHANNEL =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/cockpit/scripts/cockpit-channel.ts";
 
-  test("--check flags a drifted statusline path with the version mismatch", () => {
+  test("--check flags a statusline running a collector at another path", () => {
     writeFileSync(
       join(home, ".claude", "settings.json"),
       JSON.stringify({
@@ -306,7 +306,7 @@ describe("version drift", () => {
     );
     const { stdout } = run();
     expect(stdout).toContain("○ live usage limits");
-    expect(stdout).toContain("monitor 3.1.0");
+    expect(stdout).toContain("another path");
   });
 
   test("--apply re-points a drifted statusline to the current path", () => {
@@ -338,11 +338,11 @@ describe("version drift", () => {
   });
 });
 
-describe("--migrate (re-point only, never fresh-wire)", () => {
+describe("--migrate (channel cleanup only, never fresh-wire)", () => {
   const OLD_COLLECTOR =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
 
-  test("re-points a drifted statusline but leaves an unconfigured channel alone", () => {
+  test("leaves a wired statusline alone, whatever collector path it runs", () => {
     writeFileSync(
       join(home, ".claude", "settings.json"),
       JSON.stringify({
@@ -354,8 +354,8 @@ describe("--migrate (re-point only, never fresh-wire)", () => {
       }),
     );
     const { stdout } = run(["--migrate"]);
-    expect(stdout).toContain("Re-pointed: statusline collector");
-    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
+    expect(stdout).toContain("Nothing to migrate");
+    expect(settingsJson().statusLine.command).toBe(`bun ${OLD_COLLECTOR}`);
     // Channel was never configured — migrate must NOT create it.
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
   });
@@ -467,21 +467,21 @@ describe("malformed config", () => {
 describe("--session-check drift watch (every session, read-only)", () => {
   const OLD_COLLECTOR =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+  const PERMISSIONS = [
+    "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
+    "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+  ];
 
-  function wireCurrent() {
+  function wire(collector = COLLECTOR_SCRIPT, allow = PERMISSIONS) {
     writeFileSync(
       join(home, ".claude", "settings.json"),
       JSON.stringify({
-        statusLine: { type: "command", command: `bun ${COLLECTOR_SCRIPT}` },
-        permissions: {
-          allow: [
-            "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
-            "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
-          ],
-        },
+        statusLine: { type: "command", command: `bun ${collector}` },
+        permissions: { allow },
       }),
     );
   }
+  const unapproved = () => wire(COLLECTOR_SCRIPT, []);
 
   test("a notice is a single JSON object with a systemMessage", () => {
     const { out } = run(["--session-check"]);
@@ -490,26 +490,27 @@ describe("--session-check drift watch (every session, read-only)", () => {
   });
 
   test("says nothing when the wiring matches this install", () => {
-    wireCurrent();
+    wire();
+    const { out } = run(["--session-check"]);
+    expect(out.trim()).toBe("");
+  });
+
+  test("says nothing about a collector at another path", () => {
+    wire(OLD_COLLECTOR);
     const { out } = run(["--session-check"]);
     expect(out.trim()).toBe("");
   });
 
   test("notices drift that appears within the same version, and writes nothing", () => {
-    wireCurrent();
+    wire();
     run(["--session-check"]); // stamps the version marker + a clean drift signature
     // Same version, so the migrate gate is closed — the drift watch must still see this.
-    writeFileSync(
-      join(home, ".claude", "settings.json"),
-      JSON.stringify({
-        statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
-      }),
-    );
+    unapproved();
     const before = readFileSync(join(home, ".claude", "settings.json"), "utf-8");
 
     const { stdout } = run(["--session-check"]);
 
-    expect(stdout).toContain("another install");
+    expect(stdout).toContain("permissions.allow");
     expect(stdout).toContain("/monitor:install");
     // Notice only — the same-version path never repairs.
     expect(readFileSync(join(home, ".claude", "settings.json"), "utf-8")).toBe(
@@ -518,12 +519,7 @@ describe("--session-check drift watch (every session, read-only)", () => {
   });
 
   test("reports every drifted piece in one notice", () => {
-    writeFileSync(
-      join(home, ".claude", "settings.json"),
-      JSON.stringify({
-        statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
-      }),
-    );
+    unapproved();
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -537,41 +533,71 @@ describe("--session-check drift watch (every session, read-only)", () => {
 
     const { out } = run(["--session-check"]);
     const message = JSON.parse(out.trim()).systemMessage as string;
-    expect(message).toContain("another install");
     expect(message).toContain("cockpit-channel");
     expect(message).toContain("permissions.allow");
   });
 
   test("repeats nothing while the same drift persists", () => {
-    wireCurrent();
+    wire();
     run(["--session-check"]);
-    writeFileSync(
-      join(home, ".claude", "settings.json"),
-      JSON.stringify({
-        statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
-      }),
-    );
-    expect(run(["--session-check"]).stdout).toContain("another install");
+    unapproved();
+    expect(run(["--session-check"]).stdout).toContain("permissions.allow");
     expect(run(["--session-check"]).out.trim()).toBe("");
   });
 
   test("notices again after the drift is fixed and returns", () => {
-    wireCurrent();
+    wire();
     run(["--session-check"]);
-    const drifted = JSON.stringify({
-      statusLine: { type: "command", command: `bun ${OLD_COLLECTOR}` },
-    });
-    writeFileSync(join(home, ".claude", "settings.json"), drifted);
+    unapproved();
     run(["--session-check"]);
-    wireCurrent();
+    wire();
     run(["--session-check"]); // clean again — clears the signature
-    writeFileSync(join(home, ".claude", "settings.json"), drifted);
-    expect(run(["--session-check"]).stdout).toContain("another install");
+    unapproved();
+    expect(run(["--session-check"]).stdout).toContain("permissions.allow");
   });
 
   test("names an unparseable settings.json instead of guessing past it", () => {
     writeFileSync(join(home, ".claude", "settings.json"), "{ not json");
     const { stdout } = run(["--session-check"]);
     expect(stdout).toContain("not valid JSON");
+  });
+});
+
+describe("stable collector path", () => {
+  // A marketplace clone registered with Claude Code. Its path carries no
+  // version, so a statusline wired here survives plugin updates.
+  function registerMarketplace(withCollector: boolean): string {
+    const root = join(home, "mkt");
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+    writeFileSync(
+      join(root, ".claude-plugin", "marketplace.json"),
+      JSON.stringify({ plugins: [{ name: "monitor", source: "./pkgs/mon" }] }),
+    );
+    const collector = join(
+      root,
+      "pkgs/mon/skills/usage-dashboard/scripts/statusline-collector.ts",
+    );
+    if (withCollector) {
+      mkdirSync(join(collector, ".."), { recursive: true });
+      writeFileSync(collector, "");
+    }
+    mkdirSync(join(home, ".claude", "plugins"), { recursive: true });
+    writeFileSync(
+      join(home, ".claude", "plugins", "known_marketplaces.json"),
+      JSON.stringify({ "q-lab-marketplace": { installLocation: root } }),
+    );
+    return collector;
+  }
+
+  test("--apply wires the marketplace clone's collector", () => {
+    const collector = registerMarketplace(true);
+    run(["--apply"]);
+    expect(settingsJson().statusLine.command).toBe(`bun ${collector}`);
+  });
+
+  test("falls back to this install's collector when the clone lacks it", () => {
+    registerMarketplace(false);
+    run(["--apply"]);
+    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
   });
 });

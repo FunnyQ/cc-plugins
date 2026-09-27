@@ -7,7 +7,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { sameCollectorRelease } from "./statusline-decision";
 
 export type Level = "required" | "optional";
 export type Check = { label: string; ok: boolean; level: Level; hint?: string };
@@ -16,16 +15,47 @@ const HOME = homedir();
 // usage-dashboard assets live one skill over; resolve cross-skill from here.
 const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
 
+const LIVE_COLLECTOR = join(DASH, "scripts", "statusline-collector.ts");
+
+// The same collector inside the marketplace clone Claude Code keeps at
+// ~/.claude/plugins/marketplaces/. The clone updates in place, while the plugin
+// cache path carries the version and goes stale on every plugin update. Null when
+// the marketplace isn't registered or its monitor isn't a relative-path source.
+function marketplaceCollector(): string | null {
+  try {
+    const known = JSON.parse(
+      readFileSync(
+        join(HOME, ".claude", "plugins", "known_marketplaces.json"),
+        "utf-8",
+      ),
+    );
+    const root = known?.["q-lab-marketplace"]?.installLocation;
+    if (typeof root !== "string") return null;
+    const manifest = JSON.parse(
+      readFileSync(join(root, ".claude-plugin", "marketplace.json"), "utf-8"),
+    );
+    const source = manifest?.plugins?.find(
+      (p: { name?: string }) => p?.name === "monitor",
+    )?.source;
+    if (typeof source !== "string") return null;
+    const collector = join(
+      root,
+      source,
+      "skills",
+      "usage-dashboard",
+      "scripts",
+      "statusline-collector.ts",
+    );
+    return existsSync(collector) ? collector : null;
+  } catch {
+    return null;
+  }
+}
+
 // Exported because "is the statusline wired?" is decided by comparing the
-// configured path against the one below. When setup.ts and setup-statusline.ts
-// each built
-// their own copy of this path, any drift between the literals made the drift
-// watch report "unwired" forever while --apply wrote a different value.
-export const COLLECTOR_SCRIPT = join(
-  DASH,
-  "scripts",
-  "statusline-collector.ts",
-);
+// configured path against this one; setup.ts and setup-statusline.ts must not
+// build their own copy, or the check and the write disagree.
+export const COLLECTOR_SCRIPT = marketplaceCollector() ?? LIVE_COLLECTOR;
 export const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
 export const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 // The plugin manifest sits three levels up from skills/install/scripts/.
@@ -45,13 +75,6 @@ export function pluginVersion(): string | null {
   } catch {
     return null;
   }
-}
-
-// Extract the version segment from a plugin-cache path, else null. Installed
-// plugins live at `.../plugins/cache/<marketplace>/<plugin>/<version>/...`, so a
-// configured path encodes the version it was wired at.
-export function cachePathVersion(p: string): string | null {
-  return p.match(/\/plugins\/cache\/[^/]+\/[^/]+\/([^/]+)\//)?.[1] ?? null;
 }
 
 // All read-only checks the dashboard cares about: bun, Claude data, committed
@@ -113,28 +136,18 @@ export function dashboardChecks(): Check[] {
   } catch {
     settingsReadable = false;
   }
-  // Installed plugins live at version-pinned cache paths, so a configured path
-  // can drift after `claude plugin update` — and the old cache dir often still
-  // exists, so existence isn't enough. Treat it as wired only if it names the
-  // same release, in this harness's cache or another's.
   const referencedCollector =
     statuslineCommand?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
   const collectorWired =
-    referencedCollector !== null &&
-    sameCollectorRelease(referencedCollector, COLLECTOR_SCRIPT);
+    referencedCollector !== null && referencedCollector === COLLECTOR_SCRIPT;
 
   let usageHint: string | undefined;
   if (!settingsReadable) {
     usageHint = `Couldn't parse ${settingsPath} — fix it, then add a statusLine command running: ${COLLECTOR_COMMAND}`;
   } else if (referencedCollector && !collectorWired) {
-    const pathVer = cachePathVersion(referencedCollector);
-    const cur = pluginVersion();
     usageHint =
-      pathVer && cur && pathVer !== cur
-        ? `statusLine points at monitor ${pathVer} but the current version is ${cur}.\n` +
-          `   Re-run setup to update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`
-        : `statusLine points at a different/stale collector path.\n` +
-          `   Update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`;
+      `statusLine runs a collector at another path (${referencedCollector}).\n` +
+      `   Re-run setup to update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`;
   } else if (statuslineCommand) {
     usageHint =
       `statusLine is set but doesn't run the collector, so live rate_limits aren't captured.\n` +
