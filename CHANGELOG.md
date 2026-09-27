@@ -1,5 +1,15 @@
 # Changelog
 
+## [monitor 5.1.0] - 2026-09-28
+
+_tracks tag `monitor-v5.1.0`_
+
+### Fixed
+- `/monitor:install` no longer churns `settings.json` on every plugin update: the statusline collector path now wires from the version-less marketplace clone instead of a version-pinned cache path, so a wired path stays valid across updates instead of going stale.
+
+### Changed
+- Session-start migration no longer re-points or reports the statusline collector path — it now only cleans up a stale cockpit-channel entry.
+
 ## [dispatch 5.2.3] - 2026-09-27
 
 _tracks tag `dispatch-v5.2.3`_
