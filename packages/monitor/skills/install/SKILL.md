@@ -123,18 +123,13 @@ The plugin ships a `SessionStart` hook, declared in
 Gated on `$CLAUDE_PLUGIN_DATA/.wired-version`. An upgrade is the only drift
 this hook repairs on its own, because the upgrade is what caused it.
 
-- **Statusline drift** — if an *already-wired* statusline points at an older
-  plugin-cache version (for example `.../monitor/3.1.0/...` after an
-  update), the hook **re-points** it to the current path (backed up first).
-  Installed plugins keep old cache dirs, so a path can resolve yet still be
-  stale. The check compares the exact current path, not mere existence.
 - **Stale channel entry** — the hook **removes** a leftover hand-wired
   `cockpit-channel` in `~/.claude.json` (backed up first). This entry is left
   over from versions before the channel was plugin-packaged. Removing it keeps
   the packaged channel from being registered twice.
-- **Never fresh-wires** — initial statusline opt-in, the first `--apply`,
-  always stays manual. The hook only re-points or cleans up state the user
-  already has.
+- **Never touches the statusline** — wiring it is the user's opt-in via
+  `--apply`. A collector at an older cache path still runs, so the hook leaves
+  it alone.
 
 ### Drift watch — every session, read-only
 
@@ -143,7 +138,6 @@ restored backup, a reinstall under a different cache root. The repair half
 never sees any of it, so a second half runs on every session, writes nothing,
 and asks the user to fix what it finds. It reports:
 
-- a statusline collector belonging to another install;
 - a stale hand-wired `cockpit-channel` in `~/.claude.json`;
 - the `q-lab` script patterns missing from `permissions.allow`;
 - a `settings.json` that no longer parses (reported alone — nothing past it
@@ -159,8 +153,7 @@ Repetition is keyed on **which** pieces are off, recorded in
 `$CLAUDE_PLUGIN_DATA/.drift-notice`. The same complaint is made once; a drift
 that is fixed and later returns is reported again.
 
-Manual equivalents: `setup.ts --migrate` re-points drift and cleans up the
-stale channel now, with no version gate. `setup.ts --session-check` is a no-op
+Manual equivalents: `setup.ts --migrate` cleans up the stale channel now, with no version gate. `setup.ts --session-check` is a no-op
 when `$CLAUDE_PLUGIN_DATA` is unset, so it's safe to run by hand.
 
 ## Notes
@@ -168,8 +161,13 @@ when `$CLAUDE_PLUGIN_DATA` is unset, so it's safe to run by hand.
 - The engine is idempotent. If the statusline is already wired and no stale
   channel entry remains, re-running `--apply` reports "nothing to do" and
   writes nothing.
-- "Wired" means the configured path equals the **current** live path. An
-  older version's path counts as not-wired, and the hook re-points it.
+- `--apply` wires the collector inside the marketplace clone
+  (`~/.claude/plugins/marketplaces/q-lab-marketplace/...`), resolved through
+  `~/.claude/plugins/known_marketplaces.json`. That path carries no version, so
+  it survives plugin updates. When the clone has no collector, `--apply` falls
+  back to this install's cache path.
+- "Wired" means the configured path equals the path `--apply` would write.
+  Only a manual `--apply` re-points a different path.
 - Backups: any `~/.claude.json` write uses `<file>.bak-<timestamp>`. The
   statusline write keeps the dashboard's existing `settings.json.bak`
   convention.

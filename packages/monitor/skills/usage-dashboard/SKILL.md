@@ -79,10 +79,9 @@ claude-powerline rendering).
 **Don't hand-write the path.** The precheck (`install.ts`) reports whether the
 collector is wired (the `○ live usage limits (statusline collector)` line). Use
 its resolved path rather than `${CLAUDE_PLUGIN_ROOT}`: that variable is not
-expanded in the status-line context, and installed plugins live at
-version-pinned cache paths, so the absolute path must be resolved at runtime.
-After `claude plugin update` the cache path changes; the precheck detects the
-now-stale path, so re-running the dashboard re-surfaces the offer below.
+expanded in the status-line context. The precheck resolves the collector inside
+the marketplace clone, which carries no version, so the path survives
+`claude plugin update`.
 
 ## Optional Remote Usage Export
 
