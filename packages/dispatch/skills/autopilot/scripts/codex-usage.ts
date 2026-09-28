@@ -1,6 +1,6 @@
 // Codex token usage, folded into the agent that drove it.
 //
-// With `CFG.devEngine: 'codex'` the dev step is a cheap Haiku *driver* that shells out
+// With `CFG.devEngine: 'codex'` the dev step is a Claude *driver* that shells out
 // to the codex CLI. Only the driver leaves a Claude transcript, so flightdeck used to
 // report the driver's own spend as if it were the dev step's — the codex side landed in
 // ~/.codex/ and was counted nowhere. This module reads that side and adds it back.
@@ -303,7 +303,7 @@ function insideRepo(cwd: string | null, root: string): boolean {
  *
  * Attached, never added: `counts` stays the driver's own Claude spend and `codexCounts`
  * carries the external model's, so the panel can print the two side by side. Merging
- * them would make a 40K Haiku driver and a 210K codex run indistinguishable from one
+ * them would make a 40K Claude driver and a 210K codex run indistinguishable from one
  * 250K Claude agent.
  *
  * Two joins, strongest first:

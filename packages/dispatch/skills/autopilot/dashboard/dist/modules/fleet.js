@@ -54,7 +54,7 @@ function tokenTitle(usage) {
 // the agent, and a whole column bought one number per row at the cost of the
 // width the message needs.
 // The external CLI's own spend, printed beside the driver's rather than added to it.
-// A dev-codex row is a cheap Haiku driver plus an expensive external model, and one
+// A dev-codex row is a Claude driver plus an expensive external model, and one
 // merged figure would read as a single very expensive Claude agent.
 //
 // Tiered on the same thresholds as the Claude figure: the reader is scanning one

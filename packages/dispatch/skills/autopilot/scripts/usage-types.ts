@@ -72,7 +72,7 @@ export type AgentUsage = {
   counts: TokenCounts;
   /**
    * Spend of the codex CLI run this agent drove, kept OUT of `counts` on purpose.
-   * A dev-codex row is a cheap Haiku driver plus an expensive external model, and
+   * A dev-codex row is a Claude driver plus an expensive external model, and
    * one merged figure would hide which side burned what. Undefined for an agent
    * that drove no external CLI — never a zeroed object, which would read as a
    * measured "codex did nothing".
