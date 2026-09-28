@@ -57,5 +57,6 @@ Claude: [bun scaffold.ts course-player ui,backend,api,review]
 - **The skill stops after writing.** It does not begin implementing
   `ui/01-fixture-shell.md`. That work belongs to a future session with a
   fresh context budget.
-- **The hand-off message names a specific starting task file.** The
-  executor does not have to guess where to begin.
+- **The hand-off message names `/autopilot <slug>` as the next step.**
+  Autopilot derives the first ready task from the tree, so nobody has to
+  guess where to begin.
