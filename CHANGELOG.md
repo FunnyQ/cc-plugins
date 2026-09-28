@@ -1,5 +1,19 @@
 # Changelog
 
+## [relay 0.8.0] - 2026-09-28
+
+_tracks tag `relay-v0.8.0`_
+
+### Fixed
+- Headless Codex delegate and review calls now actually honor a chosen model. Previously `--model` was silently dropped outside live mode, so a request for a specific model quietly ran on the default one instead.
+
+## [dispatch 5.3.0] - 2026-09-28
+
+_tracks tag `dispatch-v5.3.0`_
+
+### Changed
+- `hop`'s review step now asks which harness (Claude, Codex, or OpenCode) and which model should perform the review, instead of always reviewing with Claude's opus at high effort. Picking a Codex model requires relay 0.8.0 or later.
+
 ## [monitor 5.1.0] - 2026-09-28
 
 _tracks tag `monitor-v5.1.0`_
