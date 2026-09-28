@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.3.1] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.1`_
+
+### Added
+- `hop` gained an optional visual-design step, mirroring flightplan's: when the work touches UI, the interview now asks whether to run an impeccable design pass before execution, recommended for a new screen or layout change and skippable for a small tweak.
+
 ## [relay 0.8.0] - 2026-09-28
 
 _tracks tag `relay-v0.8.0`_
