@@ -12,7 +12,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | **dispatch** | Interview-driven planning and execution | `preflight`, `hop`, `flightplan`, `autopilot`, `waypoints`, `deckplan` |
 | **relay** | Delegate a task to another harness CLI | `relay` |
 | **chronicle** | ADR curation, commit, PR/MR, and release automation | `adr`, `commit`, `pr`, `release`, `install` |
-| **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `tell`, `herdr-browser`, `herdr-protocol-upgrade` |
+| **herdr** | Reference + agent orchestration for the Herdr terminal | `herdr`, `tell`, `ask`, `herdr-browser`, `herdr-protocol-upgrade` |
 | **guard** | Coding rules the harness enforces, as hooks | *(none — hooks only)* |
 
 Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: the repo layout, monitor's dashboard internals, and the release rules.
@@ -101,9 +101,10 @@ cc-plugins/
 │   ├── herdr/skills/
 │   │   ├── herdr/
 │   │   │   ├── references/               # config / cli / plugin-development / agent-orchestration
-│   │   │   └── scripts/herd.ts           # typed Bun wrapper: spawn/tell/send/keys/wait/read/list/close
+│   │   │   └── scripts/herd.ts           # typed Bun wrapper: spawn/tell/send/ask/collect/keys/wait/read/list/close
 │   │   ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/text/snapshot/watch/endpoint
-│   │   ├── tell/                         # hand a job to an agent already open in another project
+│   │   ├── tell/                         # hand a job to another project's agent, fire-and-forget
+│   │   ├── ask/                          # ask another project's agent and get the answer back
 │   │   └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
 │   └── guard/                            # hooks only — no skills, nothing to invoke
 │       ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hook
@@ -141,7 +142,7 @@ Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The roll
 - `rollup-update.ts` tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`. The same pass fills the session ledger — one parse, both outputs.
 - The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively. The ledger follows the same rule: `date`, `projectName`, `model` and `tokens` are all derived in `readRollupLedger()`, never stored.
 - `hour_ms` is the local hour start. It matches `hourStartMs`, so daily and heatmap reconstruction is byte-identical.
-- Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudgeRollup()` from `statusline-collector.ts` (secondary). There is no daemon.
+- Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudge()` of `rollup-update.ts` from `statusline-collector.ts` (secondary). There is no daemon.
 - A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, v2 → v3 rewinds every cursor to backfill the ledger, and unsupported versions are refused — including a *newer* one, so an older monitor build refuses a v3 file rather than corrupting it. `openRollupDb()` writes `<db>.v<old>.bak` via `VACUUM INTO` before any version-changing migration (a plain copy of a WAL database can read back short). The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
 - The DB lives at `~/.local/share/q-lab/token-atlas/rollup.db`, outside dotfile sync.
 
@@ -311,7 +312,7 @@ name. Real errors then hide among a dozen fake ones — this is how a `Target`
 literal missing a required field once shipped and failed at runtime on every
 command.
 
-The repo-wide run is **not** green: 86 pre-existing errors sit outside herdr, so
+The repo-wide run is **not** green — pre-existing errors remain elsewhere — so
 a change is clean when `grep <path-you-touched>` prints nothing, not when the
 count is zero.
 
