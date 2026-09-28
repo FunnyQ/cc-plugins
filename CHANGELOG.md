@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.3.2] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.2`_
+
+### Changed
+- Clarified when waypoint mode's leg planning asks about an impeccable visual-design pass and when it runs it, closing a gap where the timing depended on how the reviewing model read an earlier reference to another step. The design phase always runs right after the leg's directory is scaffolded, never before, avoiding a directory-already-exists error.
+
 ## [dispatch 5.3.1] - 2026-09-29
 
 _tracks tag `dispatch-v5.3.1`_
