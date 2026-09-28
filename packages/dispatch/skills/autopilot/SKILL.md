@@ -264,10 +264,10 @@ Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge
 | **Binary gate and drift re-verify** | opus / low | Check acceptance criteria and command output before scoring. |
 | **Rubric judge** | opus / medium | Score the rubric against the gate's evidence. |
 | **Commit (inter-wave + post-loop)** | opus / low | Group changes and write the commit message. |
-| **Final review — cross-vendor lens** | haiku / no effort | Drive the external CLI that performs the review. |
+| **Final review — cross-vendor lens** | sonnet / low | Drive the external CLI that performs the review. |
 | **Final review — quality lenses** | `CFG.reviewLensModel` (default opus) / high | Hunt reuse, leanness, and efficiency issues with independent context. |
 | **Final review — fixer** | opus / medium | Apply findings the high-effort lenses already found. |
-| **Scout / mark-done / park** | haiku / no effort | Run the fixed readiness or status transition command. |
+| **Scout / mark-done / park / worktree calls** | sonnet / low | Run the fixed readiness, status transition, or `worktree.ts` command. |
 | **Structured retry** | opus / medium | Recover a failed structured call with a complete model and effort choice. |
 
 A task's `> **Models**:` header overrides dev, verify, judge, and fix for that task.

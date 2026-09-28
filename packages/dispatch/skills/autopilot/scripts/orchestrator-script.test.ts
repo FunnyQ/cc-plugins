@@ -1829,7 +1829,7 @@ describe("structured-output resilience", () => {
     });
     expect(log.result.completed).toEqual(["ui/01"]);
     expect(log.result.escalations).toEqual([]);
-    expect(modelsFor(log, "scout-wave-1")).toEqual(["haiku", "opus"]);
+    expect(modelsFor(log, "scout-wave-1")).toEqual(["sonnet", "opus"]);
   });
 
   test("the judge is NOT retried — it persists a verdict before it returns", async () => {
@@ -2441,11 +2441,11 @@ describe("per-role model and effort choices", () => {
     assertChoice(log, "verify:ui/01#1", "opus", "low");
     assertChoice(log, "judge:ui/01#1", "opus", "medium");
     assertChoice(log, "fix:review/01#1", "opus", "medium");
-    assertChoice(log, "done:ui/01", "haiku");
-    assertChoice(log, "scout-wave-1", "haiku");
+    assertChoice(log, "done:ui/01", "sonnet", "low");
+    assertChoice(log, "scout-wave-1", "sonnet", "low");
     assertChoice(log, "commit-wave-2", "opus", "low");
     assertChoice(log, "commit-post-loop", "opus", "low");
-    assertChoice(log, "review:codex#1", "haiku");
+    assertChoice(log, "review:codex#1", "sonnet", "low");
     for (const lens of ["reuse", "leanness", "efficiency"]) {
       assertChoice(log, `review:${lens}#1`, "opus", "high");
     }
@@ -2453,7 +2453,7 @@ describe("per-role model and effort choices", () => {
       scouts: [modelWave(null)],
       gate: { "ui/01": [null] },
     });
-    assertChoice(blocked, "block:ui/01", "haiku");
+    assertChoice(blocked, "block:ui/01", "sonnet", "low");
   });
 
   test.each([
@@ -2690,8 +2690,8 @@ describe("task worktree isolation", () => {
         "--repo /abs/repo --slug my-plan",
       );
       expect(promptFor(log, label)).toContain("StructuredOutput");
-      expect(modelFor(log, label)).toBe("haiku");
-      expect(effortFor(log, label)).toBeUndefined();
+      expect(modelFor(log, label)).toBe("sonnet");
+      expect(effortFor(log, label)).toBe("low");
     }
   });
 
@@ -2746,7 +2746,7 @@ describe("task worktree isolation", () => {
     expect(prompts[0]).toContain(
       `land ${ref} --expect f0 --op a1-land --repo /abs/repo --slug my-plan`,
     );
-    expect(modelsFor(log, `wt-land:${ref}`)).toEqual(["haiku", "opus"]);
+    expect(modelsFor(log, `wt-land:${ref}`)).toEqual(["sonnet", "opus"]);
     expect(log.result.completed).toEqual([ref]);
   });
 
@@ -2912,7 +2912,7 @@ describe("task worktree isolation", () => {
     expect(prompts).toHaveLength(2);
     expect(prompts[0]).toBe(prompts[1]);
     expect(prompts[0]).toContain("--op a1-rebase");
-    expect(modelsFor(log, `wt-rebase:${ref}`)).toEqual(["haiku", "opus"]);
+    expect(modelsFor(log, `wt-rebase:${ref}`)).toEqual(["sonnet", "opus"]);
     expect(log.labels).toContain(`dev:${ref}#2`);
     expect(log.result.completed).toEqual([ref]);
   });
