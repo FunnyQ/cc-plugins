@@ -39,9 +39,12 @@ export function formatPrompt(options: FormatOptions): string {
       separator +
       `Task: ${task}\n\n` +
       "Execution constraints:\n" +
-      "- Modify only the files needed for this task. If possible, stay within: " +
+      "- Modify only the files needed for this task, within: " +
       fileScope +
       "\n" +
+      (files.length > 0
+        ? "- If the task truly needs a file outside that scope, change it and name it in your final answer.\n"
+        : "") +
       "- Do not revert user changes or unrelated dirty work.\n" +
       "- Do not create commits.\n" +
       "- After finishing, list changed files and verification commands/results."

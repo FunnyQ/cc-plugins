@@ -90,7 +90,10 @@ describe("formatPrompt", () => {
       expect(result).toContain("Execution constraints:");
       expect(result).toContain("Modify only the files needed for this task");
       expect(result).toContain(
-        "If possible, stay within: src/form.ts, src/validator.ts",
+        "this task, within: src/form.ts, src/validator.ts",
+      );
+      expect(result).toContain(
+        "If the task truly needs a file outside that scope",
       );
       expect(result).toContain("Do not revert user changes");
       expect(result).toContain("Do not create commits");
@@ -109,7 +112,8 @@ describe("formatPrompt", () => {
 
       const result = formatPrompt(options);
 
-      expect(result).toContain("stay within: (no explicit file scope)");
+      expect(result).toContain("within: (no explicit file scope)");
+      expect(result).not.toContain("outside that scope");
     });
 
     it("should throw when task is missing", () => {
