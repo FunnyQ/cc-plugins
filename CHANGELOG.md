@@ -1,5 +1,55 @@
 # Changelog
 
+## [chronicle 0.17.3] - 2026-09-29
+
+_tracks tag `chronicle-v0.17.3`_
+
+### Fixed
+- The Codex storykeeper agent no longer defaults to draft PRs, matching the Claude version.
+- The OpenCode lorekeeper agent no longer tries to spawn prefixed agent names that do not exist there, and its wording is tightened.
+
+### Changed
+- Corrected stale facts in chronicle prompts: wrong step numbers, nonexistent agent names and a wrong SessionStart matcher. Release wording now follows the terminal-default asking rule.
+
+## [dispatch 5.3.3] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.3`_
+
+### Changed
+- Autopilot's cheap roles (external review, scout, markDone, park) now default to sonnet/low instead of haiku. The fixer prompt no longer hard-codes "on Opus", since a task's Models header can override the fix model. The SKILL.md model table and orchestrator docs match.
+- Fixed stale facts in dispatch docs: a commit instruction that contradicted autopilot's no-commit rule, removed flags and wrong step numbers.
+- The flightplan example hand-off note now points at `/autopilot <slug>` and says autopilot derives the first ready task from the tree.
+- Comments no longer call the dev-codex driver a Haiku agent (no behaviour change).
+
+## [herdr 0.7.8] - 2026-09-29
+
+_tracks tag `herdr-v0.7.8`_
+
+### Changed
+- Herdr docs now say `tell` defers to `ask`, since pane reads cannot prove a job completed.
+
+## [monitor 5.1.1] - 2026-09-29
+
+_tracks tag `monitor-v5.1.1`_
+
+### Fixed
+- Codex sessions now receive the decision-log instructions in Codex's own shape (with `--provider codex`) instead of the Claude-only fork Agent format.
+- The Stop nudge no longer re-appends the silence rule on every fire, and pressure language was removed from the thoughtful and scribe prompts. Claude output is unchanged.
+
+### Changed
+- Removed a cockpit doc claim that contradicted the terminal-as-default asking rule, keeping the real reason: an unlogged ask leaves a gap in the decision trail.
+- Corrected renamed functions and outdated pricing and step references in monitor docs.
+
+## [relay 0.8.2] - 2026-09-29
+
+_tracks tag `relay-v0.8.2`_
+
+### Fixed
+- The relay prompt now states the file scope as a requirement rather than "if possible, stay within", which some models read as permission to leave scope.
+
+### Changed
+- Corrected outdated references in relay docs.
+
 ## [relay 0.8.1] - 2026-09-29
 
 _tracks tag `relay-v0.8.1`_
