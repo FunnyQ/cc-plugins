@@ -43,7 +43,7 @@ Reattach to the pane a pending report named and watch it for another bounded win
 
 `collect` never spawns a second pane and never re-sends the prompt — it only watches. On a verified result it closes the pane, like a normal live success.
 
-**For a pending run, use `collect`, not a hand-rolled `herd wait`.** A status wait only reports what the pane's agent is doing, and it defaults to `idle` — which codex never returns to, because it parks at `done` when it finishes. `collect` gates on relay's own settled test instead: `idle` **or** `done`, **plus** the result-file marker. The marker is the part a status wait cannot replace. Without it, a settled pane is indistinguishable from one that never started work.
+**For a pending run, use `collect`, not a hand-rolled `herd wait`.** A status wait only reports what the pane's agent is doing, and it defaults to `idle` — which a live pane in its own unfocused tab never reaches, because it settles at `done`. `collect` gates on relay's own settled test instead: `idle` **or** `done`, **plus** the result-file marker. The marker is the part a status wait cannot replace. Without it, a settled pane is indistinguishable from one that never started work.
 
 Do not use `collect` to poll. One bounded call, then act on what it returns.
 

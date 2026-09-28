@@ -111,7 +111,7 @@ For non-review tasks: implementing features, refactoring, suggesting an approach
 Review is report-only. Unless the user asks separately, do not apply changes from review output.
 
 - No task: run `relay.ts <backend> review`. Relay reviews only uncommitted changes.
-- Task present: pass it unchanged as positional text. Do not translate it into `--scope`, `--files`, or `--focus`.
+- Task present: pass it unchanged as positional text. Do not translate it into `--files` or any other flag.
 
 ```bash
 relay.ts codex review
