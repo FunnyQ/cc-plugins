@@ -62,6 +62,10 @@ Each task header has a `> **Status**: <status>` line. The executor updates it as
 
 `<bucket>/NN-<kebab-slug>.md` — `NN` is two-digit zero-padded (`01`, `02`, … `19`, `20`).
 
+## Where to start
+
+<First task to execute. Usually the foundation task in the earliest bucket.>
+
 ## Suggested execution order
 
 <Describe the natural sequence. For multi-bucket plans, identify which buckets can run in parallel and which must wait.>
@@ -112,11 +116,6 @@ Decisions or design questions that surfaced during planning but weren't resolved
 
 2. **<Gap title>** (<scope: which task affected>)
    <Context, what needs to happen, who can decide.>
-
-## Where to start
-
-<First task to execute. Usually the foundation task in the earliest bucket.>
-
 ```
 
 ## Tailoring rules

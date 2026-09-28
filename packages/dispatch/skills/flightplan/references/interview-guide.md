@@ -24,7 +24,7 @@ Stop when **all** of these hold:
 - Edge cases are acknowledged (resolved or explicitly deferred to "Open Questions").
 - Reading back the running summary produces no new corrections from the user.
 
-When in doubt, ask one more question. One extra round costs little. A missing decision discovered mid-execution costs much more.
+A missing decision discovered mid-execution costs far more than one more round, so keep asking while any item above is unmet, and stop once they all hold.
 
 ## Project (new system or app)
 

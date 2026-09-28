@@ -1,9 +1,12 @@
 # Autopilot under the OpenCode harness
 
 Read this only when the OpenCode agent is the one invoking `/autopilot`. It
-replaces the "How orchestration works" section of `SKILL.md`. The rest of that
-file — the scout step, the task tree, the rubric gate, escalation — still
-applies.
+replaces the "How orchestration works" section of `SKILL.md`. The scout step,
+the task tree, the rubric gate, and escalation still apply. These sections do
+not, because each drives the Workflow runtime or the Workflow-baked `CFG`:
+"Resume one task at a chosen step", Step 1's live-pane probe (item 9),
+"Launch flightdeck after confirmation", "Step 3 — Call Workflow", and
+"Worktree cleanup".
 
 **Two different things share the name "OpenCode" in this skill. This file is
 only the first one.** Running autopilot **under** the OpenCode harness is what

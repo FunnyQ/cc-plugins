@@ -22,7 +22,7 @@
  *
  * Model (opencode requires `-m provider/model`): `--model` flag > `OPENCODE_MODEL`
  * env > per-mode default (delegate `opencode-go/kimi-k2.7-code`, review
- * `opencode-go/qwen3.7-max` — the same defaults as the relay opencode backend).
+ * `opencode-go/qwen3.7-max`).
  *
  * The prompt comes from `--prompt-file <path>` or, if omitted, stdin — the same
  * caller interface as `codex-run.ts`, even though opencode takes the prompt as an

@@ -18,7 +18,7 @@ argument-hint: "[topic]"
 
 A short flight you fly yourself: interview, plan, execute — all in this session, no handoff. `flightplan` is the long haul, where the plan is frozen to disk and someone else flies it.
 
-**Renamed from `preflight` in dispatch 4.0.0.** `preflight` is now the tier above: it captures *what you want* before anyone decides how to build it. If the user wants the work done now, this skill is the right one.
+`preflight` is the tier above: it captures *what you want* before anyone decides how to build it. If the user wants the work done now, this skill is the right one.
 
 ## Why Plan Mode and AskUserQuestion Matter
 

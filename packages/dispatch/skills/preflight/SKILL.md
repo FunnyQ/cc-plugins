@@ -33,7 +33,7 @@ autopilot   → flies that tree
 
 Check before Step 1. Hand off by name, in one line, and stop:
 
-- Wants it planned and built now, this session → **`hop`** *(this is what `preflight` did before dispatch 4.0.0)*
+- Wants it planned and built now, this session → **`hop`** *(the skill once named `preflight`)*
 - Wants a full spec and a task tree frozen to disk → **`flightplan`**
 - Wants a multi-milestone roadmap → **`waypoints`**
 - Wants the want written down and nothing else → stay here.

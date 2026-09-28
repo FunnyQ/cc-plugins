@@ -93,7 +93,7 @@ Write Verification commands relative to the repo root. Autopilot runs them from 
 - `done` — merged / shipped
 - `blocked` — waiting on a decision, upstream task, or external resource
 
-Status is mutated in-place. Sub-agents update this when they pick up or finish a task.
+Status is mutated in-place. Whoever picks up a task sets `in-progress`. Under autopilot, only the pipeline sets `done`, through `mark-done.ts`, so a dev sub-agent never writes it.
 
 **Write the value bare.** The line must read exactly `> **Status**: <value>`, where `<value>` is one of the four words above and nothing else follows it. `parseTask()`, `lint-task.ts`, `next-ready.ts`, and `mark-done.ts` all read this one rule, and a decorated value is not a status — it is an unparseable task that fails lint and stalls readiness.
 
