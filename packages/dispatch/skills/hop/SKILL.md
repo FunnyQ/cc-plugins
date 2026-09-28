@@ -82,13 +82,23 @@ Execution ran at the session's effort, with the user in the loop. A fresh review
 
 Ask via `AskUserQuestion` whether to run the review. Recommend running it when the change has hidden edge cases: parsing, concurrency, security, data migration, or a bug fix in existing code. Recommend skipping it for docs, config, and mechanical edits.
 
-When the user accepts, invoke `/relay:claude-cli` with this argument, filling in the plan file path and the base commit:
+When the user accepts, ask two more `AskUserQuestion` rounds. First ask the harness: `claude` (recommended), `codex`, or `opencode`. Then ask the model, with options for the chosen harness:
+
+| Harness | Command | Model options | Extra flag |
+| --- | --- | --- | --- |
+| claude | `/relay:claude-cli` | `opus` (recommended), `sonnet` | `--effort high` |
+| codex | `/relay:codex` | `default` (recommended), `gpt-5.6-sol` | none |
+| opencode | `/relay:opencode` | `default` (recommended), `opencode-go/deepseek-v4-pro` | none |
+
+`default` means omit `--model`, so the harness uses its own configured model. A model typed through "Other" passes through verbatim.
+
+Invoke the chosen command with this argument, filling in the plan file path, the base commit, and the flags:
 
 ```
-review "Review every change since <base> (run git diff <base>, and list untracked files with git status --short) against the plan at <plan file>. Hunt edge cases the acceptance criteria miss. Run the tests. Report each finding with file:line and the concrete fix." --model opus --effort high --headless
+review "Review every change since <base> (run git diff <base>, and list untracked files with git status --short) against the plan at <plan file>. Hunt edge cases the acceptance criteria miss. Run the tests. Report each finding with file:line and the concrete fix." [--model <model>] [--effort high] --headless
 ```
 
-Skip relay's save-to-config question: `--model` is this step's fixed choice, not a user pick. When relay rejects `--effort` as an unknown flag, tell the user to update relay; do not rerun without the flag.
+Pass `--effort high` only to claude: relay refuses `--effort` on codex and opencode. Skip relay's save-to-config question: the pick is for this review, not relay's default. When relay rejects `--model` or `--effort` as an unknown flag, tell the user to update relay; do not rerun without the flag. A codex model needs relay 0.8.0 or later, because older relay drops `--model` on headless codex without an error.
 
 Fix every finding you can confirm. Report the rest to the user with your reason for leaving each one.
 
