@@ -65,7 +65,7 @@ Put those candidates to the user through the harness's own question tool. On Cla
 
 **Ask before telling anything destructive.** The receiving agent has its own permissions in its own working tree. Deleting, force-pushing, releasing, or deploying there deserves the same confirmation it would deserve here.
 
-**It does not wait.** `tell` returns as soon as the text is submitted. There is no answer in the result. To collect one, use the `herdr` skill's `wait` and `read` against the same address.
+**It does not wait.** `tell` returns as soon as the text is submitted. There is no answer in the result. When you need an answer back, use the `ask` skill instead.
 
 **Your own pane is excluded.** Telling your own project label finds a sibling, or nothing. Never yourself.
 

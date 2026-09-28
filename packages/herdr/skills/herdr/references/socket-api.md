@@ -85,7 +85,7 @@ Gate on `ping` before assuming a shape. Protocol 22 is current here. Treat a sup
 
 There are 103 methods: `agent.*` (12), `client.*` (2), `client_shell.surface.set`, `command.invoke`, `events.*` (2), `integration.*` (3), `layout.*` (3), `notification.show`, `pane.*` (37), `ping`, `plugin.*` (11), `popup.close`, `product_announcement.dismiss`, `release_notes.dismiss`, `server.*` (5), `session.snapshot`, `tab.*` (7), `workspace.*` (9), `worktree.*` (4). `client_shell.surface.set` and `command.invoke` back the terminal UI's own client-shell projection — internal plumbing, undocumented even in the official Socket API page; a plugin or automation client has no reason to call them. Protocol 20 adds `pane.input.set` with `{pane_id, right_click}` for right-click routing. 0.9.1 adds `pane.link.resolve` without a protocol bump: it takes the same params as `pane.link.activate` (`{pane_id, viewport_row, col}`) and returns `pane_link_resolved` with the link's `regions` (`{row, start_col, end_col}`), which backs Ctrl-hover highlighting.
 
-Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. The mapping for the calls `scripts/herd.ts` makes:
+Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. Common mappings:
 
 | CLI | Method | Params |
 |---|---|---|

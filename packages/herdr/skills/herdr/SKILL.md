@@ -78,7 +78,7 @@ bun "$HERD" keys reviewer-a3f9 shift+tab
 # Block until it will accept input, then read its screen
 bun "$HERD" wait reviewer-a3f9 --status idle --timeout 120000
 
-# --status is repeatable. codex parks at `done`, so a "has it stopped" wait needs both.
+# --status is repeatable. An unfocused pane settles at `done`, so a "has it stopped" wait needs both.
 bun "$HERD" wait reviewer-a3f9 --status idle --status done --timeout 120000
 bun "$HERD" read reviewer-a3f9 --lines 60
 
@@ -94,7 +94,7 @@ All verbs print JSON except `read`, which prints the agent's terminal text. It d
 
 `send` takes `--wait` / `--status` / `--timeout` to collapse a send-then-wait pair into one call; either of the latter two implies `--wait`. Put these flags **before** the target — everything from the target onward is positional, which keeps prompt text like `"--please fix this"` intact. Prefer the waiting form: a prompt accepted from a non-working state that produces no lifecycle change within five seconds fails with `agent_prompt_stalled` (the agent took the text and never acted on it) — a separate `wait` cannot tell you that. Keep `--timeout` above 5000, or herdr reports a plain `timeout` and loses that distinction.
 
-`wait` takes the full status enum and a repeatable `--status` (one `--until` per value). Its default is `idle` — the only status meaning "ready for input". Never wait on `blocked`: it hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done` — codex parks at `done`, not `idle`. Treat even that as a hint: a fresh agent also reports `idle` before its first turn. Pair it with your own evidence, such as a result-file marker.
+`wait` takes the full status enum and a repeatable `--status` (one `--until` per value). Its default is `idle`; `done` is the same ready state after work finished in an unseen tab. Never wait on `blocked`: it hands a stuck pane to an unattended caller. For "has it stopped", pass `--status idle --status done` — a pane nobody has focused settles at `done`, not `idle`. Treat even that as a hint: a fresh agent also reports `idle` before its first turn. Pair it with your own evidence, such as a result-file marker.
 
 If the wrapper doesn't cover something, for example worktrees, layout, notifications, waiting on arbitrary pane output, or plugin panes, drop to the raw CLI. See `references/agent-orchestration.md` for live recipes. See `references/cli.md` for the full command surface.
 
