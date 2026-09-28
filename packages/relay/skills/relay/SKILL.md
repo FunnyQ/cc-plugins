@@ -26,7 +26,7 @@ Wraps the local `codex`, `opencode`, and `claude` CLIs to delegate tasks across 
 
 - **`delegate`** — ask a backend to *do* something (implement, refactor, debug). Code changes expected.
 - **`review`** — ask a backend for analysis. Output is critique + suggestions. No code changes.
-- **`image`** — generate an image (codex only via gpt-image-2).
+- **`image`** — generate an image (codex only, via its built-in imagegen skill).
 
 If the user says "review", "看看", "檢查", "找問題" → use `review`.
 If the user says "幫我做", "實作", "重構", "想個辦法" → use `delegate`.
@@ -123,7 +123,7 @@ relay.ts claude review "Review changes since main"
 
 ## `/relay:relay codex image [prompt] [--out <path>]`
 
-Generate an image via codex (gpt-image-2). **Image mode is codex-only.**
+Generate an image via codex, which uses its built-in imagegen skill. **Image mode is codex-only.**
 
 If **prompt** is missing, ask the user:
 

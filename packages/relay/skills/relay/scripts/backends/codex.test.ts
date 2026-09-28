@@ -159,7 +159,7 @@ describe("codexBackend", () => {
           "exec",
           "-o",
           "/tmp/last.txt",
-          "Generate an image of: a sunset over mountains. Use gpt-image-2.",
+          "Generate an image of: a sunset over mountains.",
         ]);
         expect(result.stdin).toBeUndefined();
       });
@@ -168,7 +168,7 @@ describe("codexBackend", () => {
         const opts: InvokeOpts = { lastFile: "/tmp/last.txt" };
         const result = codexBackend.invoke("image", opts);
         expect(result.argv[result.argv.length - 1]).toBe(
-          "Generate an image of: an image. Use gpt-image-2.",
+          "Generate an image of: an image.",
         );
       });
     });
@@ -187,23 +187,23 @@ describe("codexBackend", () => {
   });
 
   describe("buildImagePrompt", () => {
-    it("should format prompt with gpt-image-2", () => {
+    it("should format prompt without naming a model", () => {
       const result = buildImagePrompt("a blue ocean");
       expect(result).toBe(
-        "Generate an image of: a blue ocean. Use gpt-image-2.",
+        "Generate an image of: a blue ocean.",
       );
     });
 
     it("should handle prompts with special characters", () => {
       const result = buildImagePrompt("a cat & dog on a beach");
       expect(result).toBe(
-        "Generate an image of: a cat & dog on a beach. Use gpt-image-2.",
+        "Generate an image of: a cat & dog on a beach.",
       );
     });
 
     it("should handle empty prompt", () => {
       const result = buildImagePrompt("");
-      expect(result).toBe("Generate an image of: . Use gpt-image-2.");
+      expect(result).toBe("Generate an image of: .");
     });
   });
 

@@ -14,11 +14,11 @@ import { addTimestampSuffix } from "../shared";
 const CODEX_BIN = process.env.CODEX_BIN ?? "codex";
 
 /**
- * Build the gpt-image-2 prompt for codex image generation.
+ * Names no model: codex routes image requests to its built-in imagegen skill.
  * Pure function for testing.
  */
 export function buildImagePrompt(prompt: string): string {
-  return `Generate an image of: ${prompt}. Use gpt-image-2.`;
+  return `Generate an image of: ${prompt}.`;
 }
 
 /**
@@ -139,7 +139,7 @@ export const codexBackend: Backend = {
   },
 
   invokeLive(mode: Mode, opts: InvokeOpts): LiveSpec | null {
-    // image stays headless/native — gpt-image-2 generation has no TUI story.
+    // image stays headless/native — image generation has no TUI story.
     if (mode === "image") return null;
     const argv: string[] = [];
     if (opts.model) argv.push("-m", opts.model);
