@@ -18,16 +18,20 @@ main agent between phases so confirmation gates can happen there.
 An orchestrator that tries to prompt from inside a subagent is unverified behaviour and
 must not be written in.
 
-Keep `tools: ["Agent", "Read"]` unscoped. A scoped child-agent form silently grants no
-spawn capability inside a subagent definition. The tools list states intent; it is not
-a sandbox.
-
 ## Child protocol
 
 Spawn the children of the requested phase once each, in the order listed under
 that phase. Never spawn helpers, replacements, or two children together. Never
 pass a child a `name` — these are nested subagents, not a team. Do not inspect
 scripts.
+
+After each task-tool call:
+
+- Result payload: validate it, then continue.
+- Launch receipt: end the turn without prose. Resume from the completion notification.
+- Missing or invalid completion: fail immediately.
+
+Never treat a receipt as a result.
 
 ## Input (from the main agent)
 
@@ -64,7 +68,7 @@ Require:
 - `bodyFetchPath` — absolute path to the trail collector script, for `--bodies`.
 - `templatePath` — absolute path to `references/adr-template.md`.
 
-1. Spawn `chronicle:codifier` with `groups`, `bodyFetchPath`, and `templatePath`.
+1. Spawn `codifier` with `groups`, `bodyFetchPath`, and `templatePath`.
 2. Receive `drafts`.
 3. Return `drafts` to the main agent.
 
@@ -102,7 +106,7 @@ Optional, and each independently so:
   silently.
 - `metadataUpdate` — `{ "path": ..., "set": { ... } }` for a supersession back-link.
 
-1. Spawn `chronicle:barrowkeeper` with `planPath`, `validatorPath`, `archiverPath`, and
+1. Spawn `barrowkeeper` with `planPath`, `validatorPath`, `archiverPath`, and
    whichever of `newAdrs` and `metadataUpdate` the gate approved.
 2. Receive what was written, what was archived, and what was refused.
 3. Return the result to the main agent.
@@ -155,13 +159,3 @@ could silently replace a candidate list the user already approved.
 PHASE MISSING INPUT: phase=<name>. Required: <list>. Received: <what was sent>.
 Did not spawn child.
 ```
-
-## Child protocol
-
-- Never spawn helpers or replacements.
-- Never spawn both children together.
-- After each task-tool call:
-  - Result payload: validate it, then continue.
-  - Launch receipt: end the turn without prose. Resume from the completion notification.
-  - Missing or invalid completion: fail immediately.
-- Never treat a receipt as a result.

@@ -26,6 +26,14 @@ that phase. Never spawn helpers, replacements, or two children together. Never
 pass a child a `name` — these are nested subagents, not a team. Do not inspect
 scripts.
 
+After each `Agent()` call:
+
+- Result payload: validate it, then continue.
+- Launch receipt: end the turn without prose. Resume from the completion notification.
+- Missing or invalid completion: fail immediately.
+
+Never treat a receipt as a result.
+
 ## Input (from the main agent)
 
 The main agent spawns you once **per phase**, not once per run.
@@ -152,13 +160,3 @@ could silently replace a candidate list the user already approved.
 PHASE MISSING INPUT: phase=<name>. Required: <list>. Received: <what was sent>.
 Did not spawn child.
 ```
-
-## Child protocol
-
-- Never spawn helpers or replacements.
-- Never spawn both children together.
-- After each `Agent()` call:
-  - Result payload: validate it, then continue.
-  - Launch receipt: end the turn without prose. Resume from the completion notification.
-  - Missing or invalid completion: fail immediately.
-- Never treat a receipt as a result.
