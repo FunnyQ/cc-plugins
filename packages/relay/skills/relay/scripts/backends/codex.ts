@@ -104,14 +104,25 @@ export const codexBackend: Backend = {
       const sandbox = opts.dangerous
         ? ["--dangerously-bypass-approvals-and-sandbox"]
         : ["-s", "danger-full-access"];
+      const model = opts.model ? ["-m", opts.model] : [];
       return {
-        argv: [CODEX_BIN, "exec", ...sandbox, "-o", opts.lastFile!, "-"],
+        argv: [
+          CODEX_BIN,
+          "exec",
+          ...model,
+          ...sandbox,
+          "-o",
+          opts.lastFile!,
+          "-",
+        ],
         stdin: opts.promptText,
       };
     }
 
     if (mode === "review") {
       const argv = [CODEX_BIN, "review"];
+      // `codex review` has no -m; a JSON string is also a valid TOML string.
+      if (opts.model) argv.push("-c", `model=${JSON.stringify(opts.model)}`);
       if (!opts.task?.trim()) argv.push("--uncommitted");
       argv.push("-");
       return { argv, stdin: opts.promptText };

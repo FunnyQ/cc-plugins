@@ -90,6 +90,26 @@ describe("codexBackend", () => {
         ]);
         expect(result.stdin).toBe("test prompt");
       });
+
+      it("passes the model with -m", () => {
+        const opts: InvokeOpts = {
+          promptText: "test prompt",
+          lastFile: "/tmp/last.txt",
+          model: "gpt-5.6-sol",
+        };
+        const result = codexBackend.invoke("delegate", opts);
+        expect(result.argv).toEqual([
+          "codex",
+          "exec",
+          "-m",
+          "gpt-5.6-sol",
+          "-s",
+          "danger-full-access",
+          "-o",
+          "/tmp/last.txt",
+          "-",
+        ]);
+      });
     });
 
     describe("review native mode", () => {
@@ -108,6 +128,22 @@ describe("codexBackend", () => {
         const result = codexBackend.invoke("review", opts);
         expect(result.argv).toEqual(["codex", "review", "-"]);
         expect(result.stdin).toBe("custom review prompt");
+      });
+
+      it("passes the model as a -c config override", () => {
+        const opts: InvokeOpts = {
+          task: "review the auth flow",
+          promptText: "custom review prompt",
+          model: "gpt-5.6-sol",
+        };
+        const result = codexBackend.invoke("review", opts);
+        expect(result.argv).toEqual([
+          "codex",
+          "review",
+          "-c",
+          'model="gpt-5.6-sol"',
+          "-",
+        ]);
       });
     });
 

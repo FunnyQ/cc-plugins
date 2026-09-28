@@ -84,7 +84,7 @@ Generated PNGs land under `~/.codex/generated_images/`. After the run, locate th
 
 ### Model
 
-Unset. codex uses its own configured or last-used model. Do not pass `-m`.
+Unset by default, so codex uses its own configured model. When a caller passes `--model <model>`, delegate and live append `-m <model>`, and review appends `-c model="<model>"` because `codex review` has no `-m`. Image ignores it.
 
 ### Output capture
 
