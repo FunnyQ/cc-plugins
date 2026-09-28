@@ -61,6 +61,8 @@ Ask 1-2 questions per turn with `AskUserQuestion`. Follow the interview guide be
 
 Do not over-interview. If the user gives comprehensive answers, 2 rounds may be enough. If answers are terse, or they raise new questions, go up to 4-5 rounds.
 
+**Visual design.** When the work builds or reshapes UI and the `impeccable` skill is available, ask whether to design it with impeccable first. Recommend it for a new screen or a layout change, and recommend skipping it for a tweak inside an existing layout. A yes adds Step 5 and a `## Design` line to the plan. Skip the question when either condition fails.
+
 ### Step 3: Write Plan
 
 Write the spec and implementation plan to the plan file. Use the template below. Tailor the depth to the topic: a small feature needs a lighter plan than a new project.
@@ -69,14 +71,24 @@ Write the spec and implementation plan to the plan file. Use the template below.
 
 Call `ExitPlanMode` so the user can review and approve. Wait for their response.
 
-### Step 5: Execute
+### Step 5: Design with impeccable (only when the interview chose it)
 
-After approval, record the base commit with `git rev-parse HEAD` before the first edit. Step 6 reviews everything since that commit. Then implement the plan. For larger plans, follow these steps:
+Run this after approval, because plan mode allows no file writes. Record the base commit with `git rev-parse HEAD` first, since impeccable may write `PRODUCT.md` and `.impeccable/` into the repo.
+
+1. Pre-warm the engine: run `<impeccable skill dir>/scripts/impeccable context` once at the maximum Bash timeout, because its first run downloads the engine. When the skill directory is unknown until the skill loads, make this the first Setup command, at the same timeout. When that run fails or times out, take impeccable's own "Launcher unavailable" path. Never re-run it in a loop.
+2. Invoke the `impeccable` skill with `shape <feature>`, followed by the interview's summary: goal, users, states, constraints, and the existing visual world. Answer its questions with the user.
+3. Draw the approved direction yourself as one self-contained `mock.html`, since shape returns a brief and never code. Ground it in the real UI first: a screenshot, the real colours, the real assets. Load impeccable's `reference/craft-floor.md` before drawing. Draw every state the plan builds, and use the target's real values. Write it under a `mktemp -d` leaf in `/tmp/q-lab/dispatch/hop/`.
+4. Render the mock in a browser (`herdr-browser` when Herdr runs) and inspect the screenshot before showing it. Open the page for the user. Re-render after every revision until the user approves the mock.
+5. When the approved mock changes a plan decision or adds work, list each change and get the user's yes before Step 6.
+
+### Step 6: Execute
+
+After approval, record the base commit with `git rev-parse HEAD` before the first edit, unless Step 5 already recorded it. Step 7 reviews everything since that commit. After a design phase, build the UI to the mock's values, and end by opening the built UI and the mock side by side for the user to compare. Then implement the plan. For larger plans, follow these steps:
 - Work in logical stages, for example data model → API → UI.
 - Remind the user to commit after each meaningful stage.
 - If the plan spans multiple files or systems, confirm the order of operations before you start.
 
-### Step 6: Verify at high effort (optional)
+### Step 7: Verify at high effort (optional)
 
 Execution ran at the session's effort, with the user in the loop. A fresh reviewer at high effort hunts the edge cases the loop missed. It does not fix a wrong approach, so run it only after the user agrees the direction is right.
 
@@ -147,6 +159,9 @@ Focus on audience and structure:
 
 ## Constraints
 [Technical limitations, timeline, scope boundaries]
+
+## Design
+[impeccable → mock.html before execution — omit this section when the interview skipped it]
 
 ## Implementation Plan
 [Step-by-step plan with enough detail to execute — file names, key decisions, order of operations]
