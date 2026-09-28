@@ -249,9 +249,8 @@ are optional: omit them for a pure free-text ask. Then park with
 `cockpit wait <id>`, per your provider's wait policy. The ask surfaces as
 the warm "your turn" moment. The user answers in the dashboard, or via
 `cockpit send <id> <answer>`. The question and its answer then land in the
-trail. Falling back to `AskUserQuestion` splits the user's attention off
-the cockpit. It leaves the decision trail with a hole where a turn should
-be.
+trail. An ask that skips the log leaves the decision trail with a hole
+where a turn should be, even when `wait` routes it to the terminal.
 
 ### Nobody is watching — ask in the terminal
 
