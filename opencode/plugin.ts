@@ -73,7 +73,7 @@ const COMMENT_GUARDED =
 // than substituted — an upstream reword can never silently defeat a note that
 // only adds a sentence, the way a text substitution would.
 const OPENCODE_SPAWN_NOTE =
-  'OPENCODE: ignore any Agent(subagent_type: "fork") instruction above — that tool does not exist here. Spawn with the task tool as `general`, and pass the parent session id literally in the prompt, because an OpenCode subagent inherits no context.';
+  'OPENCODE: ignore any instruction above to spawn a "fork" subagent, in whatever form it is written — neither the Agent tool nor a fork subagent exists here. Spawn with the task tool as `general`, and pass the parent session id literally in the prompt, because an OpenCode subagent inherits no context.';
 
 // S19: the session scripts write guidance Claude consumes as hook context, but
 // OpenCode feeds the model from the system prompt, not from plugin output — a

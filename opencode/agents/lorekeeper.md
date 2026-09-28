@@ -15,8 +15,8 @@ Report only the result of each phase.
 
 You do **not** ask the user anything. You do **not** decide at gates. You return to the
 main agent between phases so confirmation gates can happen there.
-An orchestrator that tries to prompt from inside a subagent is unverified behaviour and
-must not be written in.
+Prompting the user from inside a subagent is unverified behaviour, so every question
+waits for the main agent.
 
 ## Child protocol
 

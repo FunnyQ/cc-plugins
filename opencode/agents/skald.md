@@ -125,8 +125,7 @@ the command runs against `/`.
        confident the block parses, write the section in prose instead.
        (`monitor` has a real Mermaid linter, `skills/cockpit/scripts/diagram-lint.ts`,
        which runs the vendored parser headless. Chronicle cannot import
-       across plugin boundaries. Wiring one up properly would close this hole
-       for good.)
+       across plugin boundaries.)
    - **What to focus on**: turn `tradeoff` fields, `kind:"caveat"` records,
      and `needs_your_call:true` records into review guidance. Call out risky
      files from `decisions[].files`.
