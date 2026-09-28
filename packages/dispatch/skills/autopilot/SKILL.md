@@ -109,6 +109,8 @@ Before touching Workflow, gather the work-list in the main conversation:
    git rev-parse HEAD
    ```
    Bake this as `CFG.baseRef`. The Final review lenses read `git diff <baseRef>..HEAD`, because the working-tree diff is empty after inter-wave commits.
+
+   **Keep `commitBetweenWaves: true` and do not ask about it.** When PLAN.md or a task says the user commits after the run, read that as a rule for the task agents, which already never commit. It does not switch off the orchestrator's inter-wave and post-loop commits, which give each wave one revertable checkpoint. The user can squash or reword the commits after `CFG.baseRef` once the run ends. Set `commitBetweenWaves: false` only when the user says so in this conversation.
 7. Decide `maxAttempts` (default **3**, per task) and `finalReviewMaxAttempts` (default **2**, the Final review round). Confirm the rest of the model policy only if the user wants to change it.
 8. Version-check whichever external CLIs Step 2 will offer — an external dev engine and the closing review round both shell out to them:
    ```bash
@@ -139,7 +141,7 @@ When the user picks live, leave `CFG.liveCollectRounds` at its default `3`, and 
 
 If the live-pane env is not fulfilled, omit the live-panes question from the second call. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when the user is not in herdr, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, every external step runs through the headless wrappers. The three Claude quality lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
 
-Then show the user a one-screen brief. State the slug and how many tasks there are. State that non-final tasks run in isolated worktrees at `<repo-parent>/.<repo-name>-autopilot/<slug>/<bucket>-<NN>`. State the per-role model map and any task whose `> **Models**:` header overrides it. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State each codex model whose role resolved to codex. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State the plan's `Max parallel` when it is declared. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
+Then show the user a one-screen brief. State the slug and how many tasks there are. State that non-final tasks run in isolated worktrees at `<repo-parent>/.<repo-name>-autopilot/<slug>/<bucket>-<NN>`. State the per-role model map and any task whose `> **Models**:` header overrides it. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State each codex model whose role resolved to codex. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State the plan's `Max parallel` when it is declared. State that each wave is committed before the next one starts. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
 This is real compute, real edits, and an external code review. Get an explicit go from the user before calling Workflow.
 
