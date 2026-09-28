@@ -85,11 +85,8 @@ entries. If the diff is fully described by existing entries, skip to Step
 3. If git context is unavailable, the command prints labeled notices and
 still exits 0.
 
-This is non-negotiable. It overrides everything else. Even if the
-conversation you inherited and this prompt are entirely in English, every
-`--title` / `--text` you write **must** be in the printed language.
-Mentally compose each entry in that language from the start. Do not draft
-in another language. Do not rely on translating later.
+Write every `--title` / `--text` in the printed language, even when the
+inherited conversation and this prompt are in English.
 
 ---
 
@@ -122,8 +119,7 @@ The pilot reads diagrams faster than prose. Default to **diagram-first**.
 For each surviving entry, first try to express the insight as a Mermaid
 `--diagram` — a flow, state machine, sequence, fan-out, before/after, or
 decision tree. The `--diagram` rides *alongside* `--text`. The picture
-carries the shape. The text carries what a picture cannot. Reaching for it
-costs you nothing, and it is pure upside.
+carries the shape. The text carries what a picture cannot.
 
 **Guardrail — diagram-first is not diagram-always.** When the insight is
 genuinely *flat* — a single `caveat` sentence ("X must run before Y"), or a

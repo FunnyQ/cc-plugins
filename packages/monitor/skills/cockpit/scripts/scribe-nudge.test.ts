@@ -103,13 +103,25 @@ describe("buildReminder", () => {
     ).toContain("/cockpit scribe --session abc-123");
   });
 
-  it("orders silence in both tiers — the nudge must not become chat", () => {
+  it("leaves the standing silence rule to the SessionStart guidance", () => {
     expect(
       buildReminder({ files: 1, lines: 4, structural: false }, "abc-123"),
-    ).toContain("Never mention");
+    ).not.toContain("Never mention");
     expect(
       buildReminder({ files: 5, lines: 200, structural: true }, "abc-123"),
-    ).toContain("Never mention");
+    ).not.toContain("Never mention");
+  });
+
+  it("gives Codex its own spawn shape and provider flag in both tiers", () => {
+    for (const c of [
+      { files: 1, lines: 4, structural: false },
+      { files: 5, lines: 200, structural: true },
+    ]) {
+      const msg = buildReminder(c, "abc-123", true);
+      expect(msg).toContain("fork_context: true");
+      expect(msg).toContain("--session abc-123 --provider codex");
+      expect(msg).not.toContain("subagent_type");
+    }
   });
 
   it("omits the flag when no id resolved, leaving the CLI to auto-resolve", () => {

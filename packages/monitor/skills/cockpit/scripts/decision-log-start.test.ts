@@ -23,6 +23,20 @@ describe("buildGuidance", () => {
     }
   });
 
+  it("gives Codex its own spawn shape and provider flag", () => {
+    for (const msg of [
+      buildGuidance("abc-123", true),
+      buildGuidance(null, true),
+    ]) {
+      expect(msg).toContain("fork_context: true");
+      expect(msg).toContain("--provider codex");
+      expect(msg).not.toContain("subagent_type");
+      expect(msg).not.toContain('Use "fork" exactly');
+      expect(msg).not.toContain("\n");
+    }
+    expect(buildGuidance("abc-123", true)).toContain("--session abc-123");
+  });
+
   it("stays one line — the hook writes it as a single stdout record", () => {
     expect(buildGuidance("abc-123")).not.toContain("\n");
     expect(buildGuidance(null)).not.toContain("\n");

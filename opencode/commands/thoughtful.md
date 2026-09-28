@@ -32,14 +32,14 @@ On Codex, spawn a background sub-agent with `fork_context: true` and no `agent_t
 You are running under Codex. Run /cockpit scribe --session <parent-session-id> --provider codex
 ```
 
-Codex has no SessionStart hooks. So `/thoughtful` is the only way to enable this behavior there. When a background fork later reports completion, no action is needed.
+When a background fork later reports completion, no action is needed.
 
-On OpenCode, resolve the initiating parent session id first with `cockpit log-root`. OpenCode has no SessionStart hook, so invoking this command is the only way to enable this behavior. Spawn a background subagent with `subagent_type: general`, the built-in subagent. Treat the fork as a briefing, not a handoff. The child starts clean and sees none of the parent's conversation. Pass an inline prompt with the resolved parent session id substituted literally for `<parent-session-id>`. Use this prompt:
+On OpenCode, resolve the initiating parent session id first with `bun ~/.config/opencode/skills/cockpit/scripts/find-session.ts --provider opencode`. OpenCode has no SessionStart hook, so invoking this command is the only way to enable this behavior. Spawn a background subagent with `subagent_type: general`, the built-in subagent. Treat the fork as a briefing, not a handoff. The child starts clean and sees none of the parent's conversation. Pass an inline prompt with the resolved parent session id substituted literally for `<parent-session-id>`. Use this prompt:
 
 ```text
-You are running under OpenCode. Run /cockpit scribe to distill this briefing into cockpit decision-trail entries. The initiating parent session is <parent-session-id>. Pass --session <parent-session-id> on every cockpit scribe call.
+You are running under OpenCode. Briefing: <what was decided, the alternatives rejected and why, anything learned, any caveat — written by you, since the child sees none of this conversation>. Run /cockpit scribe to distill this briefing into cockpit decision-trail entries. The initiating parent session is <parent-session-id>. Pass --session <parent-session-id> on every cockpit scribe call.
 ```
 
 Do not ask the fork to resolve the session id again. Do not pass a special provider flag. Do not wait for the fork. Continue or finish the current turn normally.
 
-This mode is best-effort, not a guarantee. Over a long session, this behavior may fade. When you notice a worthy moment, re-affirm the behavior internally. Missing some entries is acceptable. Do not force forks on trivial turns to compensate.
+This mode is best-effort, not a guarantee. Missing some entries is acceptable. Do not force forks on trivial turns to compensate.

@@ -32,6 +32,6 @@ On Codex, spawn a background sub-agent with `fork_context: true` and no `agent_t
 You are running under Codex. Run /cockpit scribe --session <parent-session-id> --provider codex
 ```
 
-Codex has no SessionStart hooks. So `/thoughtful` is the only way to enable this behavior there. When a background fork later reports completion, no action is needed.
+When a background fork later reports completion, no action is needed.
 
-This mode is best-effort, not a guarantee. Over a long session, this behavior may fade. When you notice a worthy moment, re-affirm the behavior internally. Missing some entries is acceptable. Do not force forks on trivial turns to compensate.
+This mode is best-effort, not a guarantee. Missing some entries is acceptable. Do not force forks on trivial turns to compensate.
