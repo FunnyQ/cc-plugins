@@ -16,7 +16,7 @@ argument-hint: "[project goal]"
 
 ## Why this skill exists
 
-`waypoints` is the fourth tier above `flightplan`. It creates a whole-project milestone roadmap. Each milestone becomes a detailed flightplan only when that leg is ready.
+`waypoints` sits above `flightplan` on the dispatch ladder. It creates a whole-project milestone roadmap. Each milestone becomes a detailed flightplan only when that leg is ready.
 
 This is rolling-wave planning. Do not fully decompose a large project up front. Land one leg. Record what actually shipped. Then plan the next leg from reality, not from stale assumptions.
 

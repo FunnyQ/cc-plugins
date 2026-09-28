@@ -20,7 +20,7 @@ Resolve the sibling script from this skill's load-time base directory:
    ```bash
    bun "$WAYPOINTS_SCRIPT" active <proj>
    ```
-2. Confirm the run options before interviewing, exactly as SKILL.md Step 2 does — the review engine is asked once, up front, and never re-asked at step 6.
+2. Confirm the run options before interviewing, exactly as SKILL.md Step 2 does — the review engine is asked once, up front, and never re-asked at Step 7.
 3. Interview for **that leg's done-state only**. Use the prior-legs digest as rolling-wave context. Do not re-plan the whole project. Ask the **Visual design** question from SKILL.md Step 3 under the same two conditions, judged for this leg alone.
 4. Scaffold with the waypoints script, not `scaffold.ts`:
    ```bash

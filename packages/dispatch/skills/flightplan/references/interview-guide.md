@@ -1,6 +1,6 @@
 # Interview Guide
 
-Topic-specific question banks. Use these as a starting point. Adapt them to what the user says. Every question must go through `AskUserQuestion` with structured options. Never use plain text. Every question must include a recommended answer as the first option.
+Topic-specific question banks. They are a checklist of topics, not a script: the round numbers show a typical order, and the design tree's dependencies override it. Adapt them to what the user says. Every question must go through `AskUserQuestion` with structured options. Never use plain text. Every question must include a recommended answer as the first option.
 
 ## Interview philosophy
 

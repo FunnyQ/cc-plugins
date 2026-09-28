@@ -33,28 +33,27 @@ Claude: [drafts PLAN.md content: overview, goals, non-goals, requirements,
 
 User: [approves explicitly — "yes, ship it"]
 
-Claude: [writes docs/course-player/PLAN.md]
-        [writes docs/course-player/tasks/_context/shared.md]
-        [writes docs/course-player/tasks/_context/api-contract.md]
-        [writes docs/course-player/tasks/ui/01-fixture-shell.md, ui/02-..., ...]
-        [writes docs/course-player/tasks/backend/01-..., ...]
-        [writes docs/course-player/tasks/api/01-..., ...]
-        [writes docs/course-player/tasks/README.md]
-        "Spec written to docs/course-player/. Start a new session and point
-         a sub-agent at docs/course-player/tasks/ui/01-fixture-shell.md to begin."
+Claude: [bun scaffold.ts course-player ui,backend,api,review]
+        [writes docs/course-player/PLAN.md and every tasks/_context/*.md itself]
+        [forks one agent per task file in one message; joins and checks every path]
+        [bun lint-task.ts docs/course-player/tasks; bun build-readme.ts docs/course-player/tasks]
+        [review loop with codex until a P1-clean pass at or past the floor]
+        "Plan written to docs/course-player/ (3 buckets + review/01). Run
+         /autopilot course-player to execute it."
 ```
 
 ## What to notice
 
 - **The run options are settled in Step 2**, before the interview starts.
-  Nothing after the approval asks the user anything.
+  Nothing after the approval asks the user anything, except an impeccable
+  design phase or a non-converged review.
 - **The slug collision check happens in Step 3**, immediately after the
   slug is agreed. It does not happen after approval.
 - **Approval must be explicit.** "yes, ship it" works. Silence does not
   count as approval.
-- **All files are written together, in one batch:** PLAN.md, every
-  `_context/*.md` file, every task file, and README.md. The skill makes no
-  partial writes.
+- **PLAN.md and `_context/` are written before any task file**, because the
+  forks read them off disk. The write is not transactional; a missing file is
+  repaired in place.
 - **The skill stops after writing.** It does not begin implementing
   `ui/01-fixture-shell.md`. That work belongs to a future session with a
   fresh context budget.

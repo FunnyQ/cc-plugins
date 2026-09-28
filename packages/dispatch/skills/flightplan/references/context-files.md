@@ -55,7 +55,7 @@ Inline the rules executors actually need:
 - Branch off: <base branch>
 - Commit format: <emoji + conventional, or whatever the team uses>
 - PR target: <branch>
-- Use `/odin-git:simple-commit` (single change) or `/odin-git:atomic-commit` (multiple logical changes).
+- Tasks do not commit. Under autopilot, a commit agent commits each wave; leave changes unstaged.
 
 ## Verification baseline
 

@@ -83,10 +83,7 @@ Run this after approval, because plan mode allows no file writes. Record the bas
 
 ### Step 6: Execute
 
-After approval, record the base commit with `git rev-parse HEAD` before the first edit, unless Step 5 already recorded it. Step 7 reviews everything since that commit. After a design phase, build the UI to the mock's values, and end by opening the built UI and the mock side by side for the user to compare. Then implement the plan. For larger plans, follow these steps:
-- Work in logical stages, for example data model → API → UI.
-- Remind the user to commit after each meaningful stage.
-- If the plan spans multiple files or systems, confirm the order of operations before you start.
+After approval, record the base commit with `git rev-parse HEAD` before the first edit, unless Step 5 already recorded it. Step 7 reviews everything since that commit. After a design phase, build the UI to the mock's values, and end by opening the built UI and the mock side by side for the user to compare. Then implement the plan. For larger plans, remind the user to commit after each meaningful stage.
 
 ### Step 7: Verify at high effort (optional)
 

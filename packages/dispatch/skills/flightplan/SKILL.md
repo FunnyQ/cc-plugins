@@ -75,7 +75,7 @@ Carry both answers to Step 7 and do not re-ask them there. The tier is a guess a
 2. **Resolve upstream choices first.** Ask in dependency order; surface the dependency when it isn't obvious.
 3. **Recommend an answer to every question.** First `AskUserQuestion` option carries `(Recommended)` plus rationale, so the user reacts instead of designing from scratch.
 4. **Ask 1–2 questions per turn.** Multi-question calls only for tightly coupled pairs.
-5. **Reflect every 4–6 rounds** — 3–5 bullets of what's decided, confirmed.
+5. **Reflect back what's decided when a branch closes**, and get it confirmed.
 
 `references/interview-guide.md` holds the per-topic question banks, tree-walking examples, question-design checklist, and stop criteria.
 
@@ -260,7 +260,7 @@ On the Opus engine, add the same two flags to the `--print` capture (`--print --
 
 ### Step 8 — Stop. Do not execute.
 
-Tell the user where the files live and which task to start from. Do not start implementing — the whole point is that execution happens elsewhere with fresh context.
+Tell the user where the files live and that `/autopilot <slug>` executes the tree; name the first task for anyone running it by hand. Do not start implementing — the whole point is that execution happens elsewhere with fresh context.
 
 **Hand back a short recap in the user's reply language** (the files stay English; only this recap is localized). Glanceable: the goal in one line, the buckets and task counts, the suggested first task, and any Known gaps. It lets the user sanity-check the plan's shape without opening every file — it is not a re-paste of the plan.
 
