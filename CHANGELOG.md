@@ -1,5 +1,51 @@
 # Changelog
 
+## [monitor 5.2.0] - 2026-09-29
+
+_tracks tag `monitor-v5.2.0`_
+
+### Added
+- Cockpit sends to OpenCode 2.x now land. Prompts go through the background service's session prompt endpoint, discovered via its service file and authenticated with Basic auth.
+- When only the legacy 1.x TUI bridge is available, cockpit still sends through it and shows an `opencode upgrade` notice in warnings, the send button title, and a TUI toast.
+
+### Fixed
+- Cockpit sends to OpenCode 2.x previously never arrived because the 1.x TUI bridge no longer exists there.
+- A service URL is paired only with its own password, and 401/403 responses are reported instead of falling back, so one service's password is never sent to another.
+
+### Changed
+- Reworded the cockpit scribe references to state current rules and tone down emphasis.
+
+## [chronicle 0.17.4] - 2026-09-29
+
+_tracks tag `chronicle-v0.17.4`_
+
+### Changed
+- Reworded chronicle and OpenCode agent prompts as current rules with less stacked emphasis, and re-synced the Claude, Codex and OpenCode versions of lorekeeper and skald.
+- The Codex skald agent now follows the same Mermaid diagram rule as the Claude skald.
+- The OpenCode spawn note now covers any form of the fork-subagent instruction.
+
+## [dispatch 5.3.4] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.4`_
+
+### Changed
+- Reworded dispatch skill and reference prompts as current rules. Autopilot's OpenCode reference now lists the SKILL.md sections that do not apply under OpenCode.
+- Removed a false comment in `opencode-run.ts` claiming its defaults match relay's.
+
+## [herdr 0.7.9] - 2026-09-29
+
+_tracks tag `herdr-v0.7.9`_
+
+### Changed
+- Reworded the herdr references as current rules with less stacked emphasis.
+
+## [relay 0.8.3] - 2026-09-29
+
+_tracks tag `relay-v0.8.3`_
+
+### Changed
+- Softened the result-file contract wording ("FULL" is now lower-case); the test matches.
+
 ## [chronicle 0.17.3] - 2026-09-29
 
 _tracks tag `chronicle-v0.17.3`_
