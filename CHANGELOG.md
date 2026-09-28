@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.3.5] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.5`_
+
+### Fixed
+- Autopilot no longer stops mid-setup to ask whether it may commit between waves. A PLAN.md line such as "user commits after the run" was being read as conflicting with wave commits, but it only binds task agents, which never commit. Autopilot now keeps each wave as one revertable checkpoint, and the pre-flight brief says so up front. You can squash after `CFG.baseRef` if you want a single commit.
+
 ## [monitor 5.2.0] - 2026-09-29
 
 _tracks tag `monitor-v5.2.0`_
