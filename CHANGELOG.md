@@ -1,5 +1,12 @@
 # Changelog
 
+## [relay 0.8.1] - 2026-09-29
+
+_tracks tag `relay-v0.8.1`_
+
+### Fixed
+- Codex image prompts no longer name `gpt-image-2`. Codex routes image requests to its own built-in imagegen skill, so naming a model was unnecessary and could steer it wrong.
+
 ## [dispatch 5.3.2] - 2026-09-29
 
 _tracks tag `dispatch-v5.3.2`_
