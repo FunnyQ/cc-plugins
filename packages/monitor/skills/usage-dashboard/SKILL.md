@@ -138,6 +138,6 @@ For external (non-Anthropic) models without dedicated cache pricing, the dashboa
 ## Troubleshooting
 
 - **Empty dashboard / "Missing or unreadable: stats-cache.json"** — open Claude Code. Run `/stats` once to seed the cache.
-- **Port in use** — the script auto-kills whatever holds the port. If you would rather use a different port, pass `--port 9000` (or any free port).
+- **Port in use** — a previous dashboard is reused or superseded automatically; a foreign process makes the server exit 1. Pass `--port <n>` with a free port.
 - **No projects shown** — `history.jsonl` may be missing, or you've used Claude Code for less than a few sessions.
 - **All costs look identical / wrong** — drop a custom pricing override at `~/.config/cc-dashboard/pricing.json`.

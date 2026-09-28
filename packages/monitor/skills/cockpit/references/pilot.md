@@ -233,14 +233,11 @@ buries your reasoning. The user is then left feeling they made every
 decision, and you made none. If you can decide and explain, decide and log
 it. Gate only when you genuinely cannot proceed without the user.
 
-When you do need the user, the cockpit is their single surface for being
-asked. While a session is active, **route that question through
-`needs_your_call`. Do not use the harness question tool (e.g.
-`AskUserQuestion`). Do not use a bare chat prompt.** This also applies when
-another skill or workflow says to "ask the user." If Cockpit is live in
-this conversation, translate that ask into a `needs_your_call` log entry.
-Wait for the cockpit answer instead of asking in chat. Two cases, one
-channel:
+When you need the user while Cockpit is live — including when another skill
+or workflow says to "ask the user" — log a `needs_your_call` entry and park
+`cockpit wait` on it. `wait` decides where the question lands: it returns the
+cockpit answer when the user is watching there, and exits `4` otherwise, in
+which case ask in the terminal (below). Two cases, one channel:
 
 - **A decision fork** — autopilot hit a branch and needs the user to pick a heading.
 - **Missing information** — you need a value, preference, or confirmation only the user
@@ -258,8 +255,7 @@ be.
 
 ### Nobody is watching — ask in the terminal
 
-The rule above assumes the user wants to be asked in the cockpit. By default
-they do not — the terminal is the default asking surface. `wait` exits `4`
+The terminal is the default asking surface. `wait` exits `4`
 unless **both** hold:
 
 - the user turned on the cockpit's **Ask me here** switch, and
