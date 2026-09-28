@@ -563,7 +563,7 @@ Codex loads the same two-phase Lorekeeper boundary through one of two paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_lorekeeper` per phase. Pass the resolved absolute paths from
-   **Script paths**, `contextBrief`, and the phase-specific carry-over state.
+   **Script paths** that the phase takes, and the phase-specific carry-over state.
 2. **Generic sub-agent API only**: verify stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
    exactly one non-fork generic agent per phase with task name

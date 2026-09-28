@@ -38,8 +38,7 @@
   still carry the subject.
 - The `---` separator is literal. It is always present when a 繁中 summary
   follows.
-- Stage files by explicit name. The message describes only the files in
-  *this* commit.
+- The message describes only the files in *this* commit.
 
 ## Length guardrail
 

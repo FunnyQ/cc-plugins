@@ -61,8 +61,8 @@ Never leave either line as a placeholder containing `ADR-NNNN`. The literal
 Store records at `docs/adr/NNNN-<kebab-title>.md`. Use a four-digit, zero-padded
 number. Write the same four digits in the H1 ID as `ADR-NNNN`.
 
-Choose the next number by adding one to the highest existing number. Use `0001`
-when the directory is empty.
+Numbers come from the highest existing number plus one (`0001` for an empty
+directory). In a chronicle run the caller allocates it; use the number you were given.
 
 For example, this filename and H1 correspond:
 

@@ -160,7 +160,6 @@ path, which would break the release commit.
 ```
 
 `path` scopes a component's changelog diff (`git log {tag}..HEAD -- {path}`) and its
-"did it change?" commit count. Each component lists **all** of its version files. In
-this repo, that's the paired Claude + Codex `plugin.json`. Marketplace registries
-carry no version and are never listed. The changelog header is per-component (e.g.
+"did it change?" commit count. Each component lists **all** of its version files. For
+example, a plugin that ships to two harnesses lists both of its `plugin.json` files. The changelog header is per-component (e.g.
 `## [chronicle 0.5.0]`). See `monorepo-release.md`.

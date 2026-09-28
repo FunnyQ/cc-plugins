@@ -50,8 +50,8 @@ each entry's scope keeps its notes distinct. Get today's date once: `date +%F`.
 
 ### 2. Categorize (Keep a Changelog)
 
-For each entry, group changes into `Added` / `Changed` / `Fixed` / `Removed` /
-`Deprecated` / `Security` as they apply. Omit empty sections. Rewrite each line as a
+For each entry, group changes into `Added` / `Changed` / `Deprecated` / `Removed` /
+`Fixed` / `Security`, in that order, as they apply. Omit empty sections. Rewrite each line as a
 user-facing sentence. Drop pure-chore noise (lockfile bumps, formatting) unless it's
 the only change.
 

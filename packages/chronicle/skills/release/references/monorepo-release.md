@@ -1,8 +1,7 @@
 # Per-component (monorepo) release — the scoped-tag finish
 
 Some monorepos ship each package on its own cadence: independent versions,
-independent tags, independent changelog entries. This repo (`cc-plugins`) is the
-reference case. `git flow release finish` can't produce a scoped
+independent tags, independent changelog entries. `git flow release finish` can't produce a scoped
 `<component>-vX.Y.Z` tag cleanly. So the release engine replicates the finish with
 plain git.
 
@@ -21,7 +20,9 @@ plain git.
   `git rev-list --count <component>-vLAST..HEAD -- packages/<component>`.
 - **Bump only what changed** — leave every other component's version alone.
 
-## The finish (plain git, replicating gitflow)
+## The git-flow finish (plain git, replicating gitflow)
+
+On `github-flow` there is no merge: the bump commit lands on `main` and every tag sits on it (see `release-config.md`).
 
 For version `X.Y.Z` of `<component>`, tag `<component>-vX.Y.Z`:
 
@@ -72,8 +73,7 @@ git push origin develop main
 git push origin chronicle-v0.5.0 monitor-v3.18.3
 ```
 
-This replaces the previously hand-driven coordinated release. The single-component
-finish above is just the N=1 case.
+The single-component finish above is just the N=1 case.
 
 ## Whole-repo contrast
 

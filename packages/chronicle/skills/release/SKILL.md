@@ -122,7 +122,7 @@ payload.
 If `workflowDrift` is set, the committed config still says git-flow but its
 `missingBranch` is gone. Say so **before** the gate and offer the one-time edit
 (`"workflow": "github-flow"`, drop `branches.develop`). Never apply it silently, and
-never run `auto` against the drifted config.
+never run the release against the drifted config.
 
 If `versionFileDrift` is non-empty, the config bumps a `manifest` but not the
 companion file carrying the same version — a `Cargo.toml` without its `Cargo.lock`
@@ -190,10 +190,10 @@ against. A `BLOCKED` stage, a drift you surface after the gate, a merge that cha
 the commit range, or a plan whose tags differ from what the push option named — ask
 that question again. Never carry a stale answer into a stage.
 
-> In an active **cockpit** session, hand the stick back with `needs_your_call` +
-> `cockpit wait` instead of `AskUserQuestion` (see
-> [[cockpit-needs-your-call-for-decision-gates]]) — same batching: one hand-back
-> carrying every decision.
+> In an active **cockpit** session the gate may go through `needs_your_call` +
+> `cockpit wait` (cockpit's `references/pilot.md`) — same batching: one hand-back
+> carrying every decision. On exit `4` nobody is watching; ask with
+> `AskUserQuestion` as above.
 
 ### 4. Land the work on the release branch
 

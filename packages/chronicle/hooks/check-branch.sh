@@ -64,7 +64,7 @@ fi
 prod_branch=$(git config --get gitflow.branch.master 2>/dev/null || true)
 if [[ -n "$prod_branch" && "$branch" == "$prod_branch" ]] || [[ "$branch" == "main" || "$branch" == "master" ]]; then
   cat <<EOF
-{"hookSpecificOutput":{"permissionDecision":"ask"},"systemMessage":"⚠️ You're on \`$branch\` in a git-flow repo. Commits should go to \`$develop_branch\`. Use AskUserQuestion to confirm with the user before retrying."}
+{"hookSpecificOutput":{"permissionDecision":"ask"},"systemMessage":"⚠️ You're on \`$branch\` in a git-flow repo. Commit on \`$develop_branch\`, or confirm explicitly before retrying."}
 EOF
   exit 0
 fi

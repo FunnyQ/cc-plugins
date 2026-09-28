@@ -19,7 +19,7 @@ spawns it directly, never through the Lorekeeper.
 ## Nothing is inherited
 
 OpenCode task-tool subagents do **not** inherit parent context. On **every**
-Lorekeeper spawn, pass all resolved literal script paths, `contextBrief`, and
+Lorekeeper spawn, pass that phase's literal script paths (per **Script paths** in SKILL.md) and
 the phase-specific carry-over state explicitly, plus the **skill directory** as a literal:
 
 ```text

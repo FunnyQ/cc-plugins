@@ -4,7 +4,7 @@ description: >-
   Set up Chronicle's prerequisites — the nested-subagent spawn depth on Claude
   Code, and the named agent roles on Codex.
 when_to_use: >-
-  Setting up or repairing Chronicle. On Claude Code: when commit/pr/release fail
+  Setting up or repairing Chronicle. On Claude Code: when pr/adr fail
   with "Agent exists but is not enabled in this context". On Codex: registering or
   refreshing the commit/PR/ADR agents (chronicle_lawspeaker,
   chronicle_storykeeper, chronicle_lorekeeper, etc.).

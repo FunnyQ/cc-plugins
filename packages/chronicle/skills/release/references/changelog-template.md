@@ -35,7 +35,7 @@ _tracks tag `<tagName>`_
 - `<headerLabel>` — per-component `chronicle 0.5.0`; whole-repo `0.5.0`.
 - Only include sections that have entries. Order: Added, Changed, Deprecated,
   Removed, Fixed, Security.
-- Match the existing file's heading **style** (this repo heads per-plugin:
+- Match the existing file's heading **style** (a per-component repo heads per component:
   `## [chronicle 0.4.0]`). Write a *new* heading in that same shape; do not reuse or
   edit an existing one. Placement is always the same regardless of style: put a new
   entry at the **top of the entry list**, directly below the `# Changelog` preamble
