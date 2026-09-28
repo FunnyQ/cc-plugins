@@ -210,7 +210,7 @@ describe("appendFileContract", () => {
     // The file is mandatory (relay does not read the pane), with a human-visible
     // escape hatch for sandboxes that genuinely cannot write it.
     expect(result).toContain("relay does not read the pane");
-    expect(result).toContain("print the FULL answer in the pane");
+    expect(result).toContain("print the full answer in the pane");
   });
 });
 

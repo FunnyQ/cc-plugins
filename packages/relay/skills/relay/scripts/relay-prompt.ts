@@ -109,12 +109,12 @@ export function appendFileContract(prompt: string, resultPath: string): string {
   return (
     prompt +
     "\n\n---\n\n" +
-    "Result-file contract (IMPORTANT):\n" +
-    `- When your answer is FINAL, write it — the COMPLETE final answer, as markdown — to: ${resultPath}\n` +
+    "Result-file contract:\n" +
+    `- When your answer is final, write it — the complete final answer, as markdown — to: ${resultPath}\n` +
     `- The file's last line must be exactly: ${RESULT_END_MARKER}\n` +
     "- Do not write the file until the answer is final; write it once, in full.\n" +
     "- The file is how your answer is collected — relay does not read the pane. Writing it is mandatory.\n" +
-    "- If writing it is genuinely impossible (e.g. a sandbox blocks the path), print the FULL answer in the pane and state you could not write the file — a human reads it from the pane (relay reports the pane's name when it gives up waiting)."
+    "- If writing it is genuinely impossible (e.g. a sandbox blocks the path), print the full answer in the pane and state you could not write the file — a human reads it from the pane (relay reports the pane's name when it gives up waiting)."
   );
 }
 
