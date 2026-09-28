@@ -95,7 +95,7 @@ herdr workspace report-metadata <id> --source ID [--token NAME=VALUE] [--clear-t
 herdr workspace close <id> [--group]
 ```
 
-`workspace close` on a primary workspace no longer closes its open worktree workspaces implicitly. Pass `--group` to close the primary workspace and its linked worktree workspaces together; without it the close is refused with `workspace_group_close_required` and the group stays open. Never add `--group` merely to clear that refusal — it is the user's call.
+`workspace close` on a primary workspace leaves its open worktree workspaces alone. Pass `--group` to close the primary workspace and its linked worktree workspaces together; without it the close is refused with `workspace_group_close_required` and the group stays open. Never add `--group` merely to clear that refusal — it is the user's call.
 
 ## Worktrees
 ```bash

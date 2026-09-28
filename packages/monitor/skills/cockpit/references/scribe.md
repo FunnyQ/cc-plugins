@@ -190,9 +190,9 @@ over SQLite to stay dependency-free in Bun."
 
 **Dedup across lenses — don't collapse to one.** The bar is per-*insight*,
 not per-entry-count. Cut entries that repeat each other or restate the
-diff mechanically. Do NOT cut a genuine `caveat` or `learning` just to keep
+diff mechanically. Do not cut a genuine `caveat` or `learning` just to keep
 the total low. A few high-signal entries spanning two or three lenses is
-the target. It is NOT one entry per file, step, or command. It is NOT a
+the target. It is not one entry per file, step, or command. It is not a
 single lonely `decision` when the work also taught something or hid a
 trap. If the sweep in Step 2 truly surfaced nothing worth keeping (e.g.,
 purely mechanical changes), write nothing. End.

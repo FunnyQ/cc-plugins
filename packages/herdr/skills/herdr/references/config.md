@@ -125,7 +125,7 @@ panel_bg = "#1e1e2e"
 text = "#cdd6f4"
 ```
 
-Values accept hex (`#rrggbb`), named colors, `rgb(r,g,b)`, or `"reset"`. Run `herdr config check` after editing `name` — it now reports an unknown built-in theme name instead of accepting it silently.
+Values accept hex (`#rrggbb`), named colors, `rgb(r,g,b)`, or `"reset"`. Run `herdr config check` after editing `name` — it reports an unknown built-in theme name.
 
 `[theme.custom.light]` and `[theme.custom.dark]` layer appearance-specific overrides on top of `[theme.custom]` when `auto_switch` is enabled.
 

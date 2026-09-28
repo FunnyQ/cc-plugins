@@ -65,7 +65,7 @@ Success returns the request's `id` and a `result` whose `type` names the variant
     "endpoint_protocol_generation":1}}}
 ```
 
-`capabilities.endpoint_protocol_generation` names the endpoint generation the server supports. A client update can now leave a compatible server running: the client checks this field and disables only the actions a missing server feature affects, instead of refusing to connect. A server older than endpoint generation 1 needs a one-time upgrade.
+`capabilities.endpoint_protocol_generation` names the endpoint generation the server supports. A client update can leave a compatible server running: the client checks this field and disables only the actions a missing server feature affects, instead of refusing to connect. A server older than endpoint generation 1 needs a one-time upgrade.
 
 Errors return `code` and `message`, both required:
 
