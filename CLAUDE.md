@@ -100,7 +100,7 @@ cc-plugins/
 │   │           └── backends/             # gate.ts (pure) + index.ts + codex/opencode/claude
 │   ├── herdr/skills/
 │   │   ├── herdr/
-│   │   │   ├── references/               # config / cli / plugin-development / agent-orchestration
+│   │   │   ├── references/               # config / cli / socket-api / plugin-development / agent-orchestration
 │   │   │   └── scripts/herd.ts           # typed Bun wrapper: spawn/tell/send/ask/collect/keys/wait/read/list/close
 │   │   ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/text/snapshot/watch/endpoint
 │   │   ├── tell/                         # hand a job to another project's agent, fire-and-forget
@@ -202,7 +202,7 @@ Do not infer intent from visibility. `document.hidden` stays false when another 
 
 **Leave the permission relay ungated.** Its protocol is notification-based and the terminal prompt stays live beside the cockpit card, so it already defaults to the TUI.
 
-**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends use the TUI HTTP bridge (`opencode-send.ts`): the running TUI is discovered from `OPENCODE_TUI_SERVER_URL` or a `ps` scan for `opencode --port <n>` (a `serve` process is excluded from that scan), then delivered through `/tui/append-prompt` followed by `/tui/submit-prompt`. The channel is UI→agent only; the agent's answers ride the transcript.
+**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends go through `opencode-send.ts`. On opencode 2.x it finds the per-user background service from `$XDG_STATE_HOME/opencode/service.json`, authenticates with Basic `opencode:<password>`, confirms `/api/info` returns JSON — unknown paths return the web UI's HTML with a 200 — and posts `/api/session/<id>/prompt` with `delivery: "steer"`. **A URL and its password always come from one source**: `OPENCODE_SERVER_URL` pairs only with `OPENCODE_PASSWORD` / `OPENCODE_SERVER_PASSWORD`, the registration only with its own password, so one service's password never reaches another. A 401/403 is reported, never masked by the fallback. Only when no 2.x service answers does it fall back to the 1.x TUI bridge (`OPENCODE_TUI_SERVER_URL`, `OPENCODE_SERVER_URL`, or a `ps` scan for `opencode --port <n>`, then `/tui/append-prompt` followed by `/tui/submit-prompt`), and every 1.x send tells the user to run `opencode upgrade`: in the report's `warnings`, on the dashboard's send button, and as a once-per-server TUI toast. The channel is UI→agent only; the agent's answers ride the transcript.
 
 ## Harness constraints
 
