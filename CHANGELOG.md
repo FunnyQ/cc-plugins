@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.18.2] - 2026-09-29
+
+_tracks tag `chronicle-v0.18.2`_
+
+### Fixed
+- The release changelog writer now knows its entries file must be an array with one entry per release, so it no longer has to guess the shape, including when there is only one release.
+
 ## [chronicle 0.18.1] - 2026-09-29
 
 _tracks tag `chronicle-v0.18.1`_
