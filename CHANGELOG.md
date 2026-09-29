@@ -1,5 +1,18 @@
 # Changelog
 
+## [chronicle 0.19.1] - 2026-09-29
+
+_tracks tag `chronicle-v0.19.1`_
+
+### Added
+- The adr skill now applies gate 2 verdicts through a new adr-commit engine, so drafts are no longer retyped by the main agent and partial, unknown, or duplicate verdict sets are refused.
+
+### Changed
+- The adr flow is shorter: the main agent now spawns the codifier and barrowkeeper directly, the codifier writes the gate 2 payload itself, and the lorekeeper agent is retired.
+
+### Removed
+- Chronicle no longer installs a spawn-depth setting or its SessionStart hook, because no chronicle agent spawns a child anymore; a value written earlier is harmless and left alone.
+
 ## [chronicle 0.19.0] - 2026-09-29
 
 _tracks tag `chronicle-v0.19.0`_
