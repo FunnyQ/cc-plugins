@@ -39,6 +39,10 @@ export type Backend = {
   invoke(mode: Mode, opts: InvokeOpts): { argv: string[]; stdin?: string };
   // Extract clean final text from a completed run (file content or stdout).
   parseOutput(raw: string): string;
+  // Optional: pull a readable failure out of a failed run's stdout, for CLIs that report
+  // errors as stream events rather than stderr (opencode --format json). undefined → relay
+  // falls back to stderr.
+  parseError?(raw: string): string | undefined;
   // Optional post-run step run by relay.ts AFTER the spawn + parseOutput. Receives the parsed
   // text + opts, returns the final text relay prints. This is the generic seam for backend-only
   // side effects (e.g. codex image: locate the PNG, copy it to opts.out, return "Image saved: <path>").

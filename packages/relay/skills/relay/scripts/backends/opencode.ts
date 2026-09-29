@@ -4,9 +4,9 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
  * opencode Backend: delegate + emulated (prompt-based) review.
  *
  * Both modes run off relay's built prompt (no native review).
- * Model defaults: delegate → opencode-go/deepseek-v4-light; review → opencode-go/deepseek-v4-pro.
- * Delegate uses the max reasoning variant.
- * --model flag overrides the defaults.
+ * Model: no built-in default — without --model or a relay config entry, `-m` is
+ * omitted and opencode uses its own configured model. Hosted ids churn too fast
+ * to pin here. Delegate uses the max reasoning variant.
  *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
  * and live TUI). Headless `run` auto-REJECTS approval prompts when `--auto` is
@@ -87,6 +87,24 @@ export const opencodeBackend: Backend = {
   parseOutput(raw: string): string {
     // Extract the concatenated `text` parts from the JSONL stream.
     return parseJsonl(raw);
+  },
+
+  parseError(raw: string): string | undefined {
+    // A failed `run` exits 1 with empty stderr; the cause arrives as a
+    // `{"type":"error","error":{name,data:{message}}}` event on stdout.
+    for (const line of raw.split("\n")) {
+      try {
+        const obj = JSON.parse(line.trim());
+        if (obj.type !== "error") continue;
+        const name = obj.error?.name;
+        const message = obj.error?.data?.message;
+        if (name && message) return `${name}: ${message}`;
+        if (name || message) return name ?? message;
+      } catch {
+        continue;
+      }
+    }
+    return undefined;
   },
 };
 

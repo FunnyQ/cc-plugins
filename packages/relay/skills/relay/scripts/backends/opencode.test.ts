@@ -276,3 +276,27 @@ describe("parseJsonl", () => {
     expect(result).toBe("Valid");
   });
 });
+
+describe("parseError", () => {
+  it("extracts the message from an opencode error event (real unknown-model output)", () => {
+    const raw =
+      '{"type":"error","timestamp":1790687813378,"sessionID":"ses_x","error":{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_ae288f25"}}}';
+    expect(opencodeBackend.parseError!(raw)).toBe(
+      "UnknownError: Unexpected server error. Check server logs for details.",
+    );
+  });
+
+  it("falls back to the error name when the event carries no message", () => {
+    const raw = '{"type":"error","error":{"name":"ProviderModelNotFoundError"}}';
+    expect(opencodeBackend.parseError!(raw)).toBe("ProviderModelNotFoundError");
+  });
+
+  it("returns undefined when the stream has no error event", () => {
+    const raw = [
+      '{"type":"step_start","part":{"type":"step-start"}}',
+      "not json",
+      '{"type":"text","part":{"type":"text","text":"hello"}}',
+    ].join("\n");
+    expect(opencodeBackend.parseError!(raw)).toBeUndefined();
+  });
+});
