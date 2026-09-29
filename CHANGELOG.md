@@ -1,5 +1,19 @@
 # Changelog
 
+## [chronicle 0.19.0] - 2026-09-29
+
+_tracks tag `chronicle-v0.19.0`_
+
+### Added
+- The PR creator now reads its material and body text from files and refuses to open a PR with a not-pushed result when the exact branch is not on a remote, so an unpushed branch prompts you instead of failing mid-creation.
+
+### Changed
+- PR creation is faster and simpler: the skald and messenger agents are retired in favour of a single storykeeper that writes the PR body once and creates the PR, and the first live run took 38s against a 187s median for the old three-agent flow.
+
+### Fixed
+- The TypeSafe grouping line now always appears, showing either Jev's time or the reason it was skipped, including for fewer than 2 or more than 20 files and in simple mode.
+- The storykeeper no longer runs the PR creator before the body file exists, which could make the creator read a missing file.
+
 ## [chronicle 0.18.2] - 2026-09-29
 
 _tracks tag `chronicle-v0.18.2`_
