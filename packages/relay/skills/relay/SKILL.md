@@ -77,6 +77,22 @@ Editing capability is identical: same CLI, model, and write access. So "more pre
 
 ---
 
+## opencode model check
+
+relay pins no opencode model — hosted model ids churn too fast. Before every `opencode delegate` / `opencode review` that has no `--model`:
+
+1. Run `relay.ts config get-model opencode <mode>`.
+2. It prints a model → say which one in one line (`使用 <model>`) and run.
+3. It prints nothing → run `opencode models`, then ask:
+   ```
+   AskUserQuestion("opencode <mode> 要用哪個模型？")
+   ```
+   Offer a few listed models plus "opencode 預設（不指定 -m）". A picked model is passed as `--model`, so the Save-to-Config flow below follows. "opencode 預設" runs without `--model`.
+
+In non-interactive contexts (sub-agent or headless caller), skip the question and run without `--model`.
+
+---
+
 ## `/relay:relay <backend> delegate <task>`
 
 For non-review tasks: implementing features, refactoring, suggesting an approach, debugging.

@@ -99,7 +99,7 @@ Binary: `opencode`. Headless subcommand: `opencode run [message..]`.
 ### Delegate
 
 ```bash
-opencode run -m opencode-go/deepseek-v4-light --variant max --format json -- "<prompt>"
+opencode run [-m <provider/model>] --variant max --format json -- "<prompt>"
 ```
 
 Write-capable by default. `--dangerous` maps to `--auto` on the headless path
@@ -111,7 +111,7 @@ loudly. Use `--dangerous` for unattended headless runs that may need approvals.
 ### Review (emulated, read-only prompt)
 
 ```bash
-opencode run -m opencode-go/deepseek-v4-pro --format json -- "<read-only review prompt>"
+opencode run [-m <provider/model>] --format json -- "<read-only review prompt>"
 ```
 
 There is no native review. The prompt must instruct "analyze only, do not modify files."
@@ -125,7 +125,7 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Relevant flags
 
-- `-m, --model <provider/model>` — model specification (optional; falls back to the configured default model — relay always resolves one per mode)
+- `-m, --model <provider/model>` — model specification (optional; falls back to the configured default model — relay passes it only when `--model` or relay config sets one)
 - `--agent <name>` — agent profile (optional)
 - `--format <default|json>` — output format
 - `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous`. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist on `run` and currently collapse to the same boolean (1.18.18) — they are not a stronger bypass. `--auto` still respects explicit deny rules, unlike codex's full bypass.
@@ -142,7 +142,11 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Model
 
-Delegate resolves to opencode-go/deepseek-v4-light with `--variant max`. Review resolves to opencode-go/deepseek-v4-pro. The `--model` flag overrides the model. Format is `provider/model`.
+relay pins no opencode model: hosted ids churn, and a pinned one (`deepseek-v4-light`) once vanished and broke every out-of-box delegate. Precedence is `--model` flag > relay config (`relay.ts config set-model opencode <mode> <provider/model>`) > opencode's own configured default (`-m` omitted). Delegate always adds `--variant max`. Format is `provider/model`; `opencode models` lists what exists.
+
+### Errors
+
+A failed `run` exits 1 with **empty stderr**. The cause arrives on stdout as a `{"type":"error","error":{"name":…,"data":{"message":…}}}` event — an unknown model shows up only as `UnknownError: Unexpected server error`. relay's `parseError` pulls that event out and prints it with the resolved model, so a stale model id is visible in the failure line.
 
 ---
 
