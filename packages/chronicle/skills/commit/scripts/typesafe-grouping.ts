@@ -43,7 +43,10 @@ type Question = {
 type Answer = { type: string; choice?: string; noul?: number };
 
 export type Group = { files: string[]; types: string[] };
-export type Suggestion = { groups: Group[] } | { skipped: string };
+/** `ms` is the round trip, so the user sees what the call cost this commit. */
+export type Suggestion =
+  | { groups: Group[]; ms: number }
+  | { skipped: string; ms?: number };
 
 export function buildRequest(input: GroupInput[]) {
   const seen = new Set<string>();
@@ -120,11 +123,14 @@ export async function suggestGroups(
   files: GroupInput[],
   opts: { apiKey: string | undefined; fetch?: typeof fetch },
 ): Promise<Suggestion | null> {
+  if (!opts.apiKey) return { skipped: "TYPESAFE_API_KEY not set" };
   const unique = new Set(files.map((f) => f.path)).size;
-  if (!opts.apiKey || unique < 2 || unique > MAX_FILES) return null;
+  if (unique < 2 || unique > MAX_FILES) return null;
 
   const body = buildRequest(files);
   const paths = body.state.files.map((f) => f.path);
+  const started = performance.now();
+  const ms = () => Math.round(performance.now() - started);
   try {
     const response = await (opts.fetch ?? fetch)(ENDPOINT, {
       method: "POST",
@@ -135,24 +141,28 @@ export async function suggestGroups(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!response.ok) return { skipped: `HTTP ${response.status}` };
+    if (!response.ok) return { skipped: `HTTP ${response.status}`, ms: ms() };
 
     const { answers } = (await response.json()) as {
       answers?: Record<string, Answer>;
     };
     if (!answers || Object.keys(body.questions).some((k) => !answers[k])) {
-      return { skipped: "response is missing answers" };
+      return { skipped: "response is missing answers", ms: ms() };
     }
-    return { groups: groupFromAnswers(paths, answers) };
+    return { groups: groupFromAnswers(paths, answers), ms: ms() };
   } catch (err) {
-    return { skipped: err instanceof Error ? err.message : String(err) };
+    return {
+      skipped: err instanceof Error ? err.message : String(err),
+      ms: ms(),
+    };
   }
 }
 
 export function renderSuggestion(suggestion: Suggestion | null): string {
   if (!suggestion) return "";
   if ("skipped" in suggestion) {
-    return `\n[TypeSafe grouping skipped: ${suggestion.skipped}]\n`;
+    const after = suggestion.ms === undefined ? "" : ` after ${suggestion.ms} ms`;
+    return `\n[TypeSafe grouping skipped${after}: ${suggestion.skipped}]\n`;
   }
   const lines = suggestion.groups.map(
     (group, i) =>
@@ -162,6 +172,8 @@ export function renderSuggestion(suggestion: Suggestion | null): string {
     "",
     "## Suggested groups (TypeSafe, advisory — unordered)",
     ...lines,
+    "",
+    `[TypeSafe grouping: ${suggestion.ms} ms]`,
     "",
   ].join("\n");
 }

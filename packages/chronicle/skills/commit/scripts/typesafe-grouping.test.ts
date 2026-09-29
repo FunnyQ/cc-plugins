@@ -73,13 +73,13 @@ describe("groupFromAnswers", () => {
 });
 
 describe("suggestGroups", () => {
-  test("returns null without an API key and never calls fetch", async () => {
+  test("reports a missing API key and never calls fetch", async () => {
     const { impl, calls } = fakeFetch({});
-    const result = await suggestGroups([file("a"), file("b")], {
-      apiKey: undefined,
-      fetch: impl,
-    });
-    expect(result).toBeNull();
+    for (const apiKey of [undefined, ""]) {
+      expect(
+        await suggestGroups([file("a"), file("b")], { apiKey, fetch: impl }),
+      ).toEqual({ skipped: "TYPESAFE_API_KEY not set" });
+    }
     expect(calls).toHaveLength(0);
   });
 
@@ -109,6 +109,7 @@ describe("suggestGroups", () => {
     ).toBe("Bearer secret");
     expect(result).toEqual({
       groups: [{ files: ["a", "b"], types: ["fix", "fix"] }],
+      ms: expect.any(Number),
     });
   });
 
@@ -118,7 +119,7 @@ describe("suggestGroups", () => {
       apiKey: "k",
       fetch: impl,
     });
-    expect(result).toEqual({ skipped: "HTTP 429" });
+    expect(result).toEqual({ skipped: "HTTP 429", ms: expect.any(Number) });
   });
 
   test("reports a skip when the answers are incomplete", async () => {
@@ -127,7 +128,10 @@ describe("suggestGroups", () => {
       apiKey: "k",
       fetch: impl,
     });
-    expect(result).toEqual({ skipped: "response is missing answers" });
+    expect(result).toEqual({
+      skipped: "response is missing answers",
+      ms: expect.any(Number),
+    });
   });
 });
 
@@ -142,6 +146,7 @@ describe("renderSuggestion", () => {
         { files: ["a", "b"], types: ["feat", "test"] },
         { files: ["c"], types: ["docs"] },
       ],
+      ms: 1,
     });
     expect(text).toContain("## Suggested groups");
     expect(text).toContain("1. a [feat], b [test]");
@@ -149,6 +154,22 @@ describe("renderSuggestion", () => {
   });
 
   test("names the reason when the call was skipped", () => {
-    expect(renderSuggestion({ skipped: "HTTP 429" })).toContain("HTTP 429");
+    expect(renderSuggestion({ skipped: "TYPESAFE_API_KEY not set" })).toContain(
+      "[TypeSafe grouping skipped: TYPESAFE_API_KEY not set]",
+    );
+  });
+
+  test("names the time a failed call took", () => {
+    expect(renderSuggestion({ skipped: "HTTP 429", ms: 812 })).toContain(
+      "[TypeSafe grouping skipped after 812 ms: HTTP 429]",
+    );
+  });
+
+  test("names the time a successful call took", () => {
+    const text = renderSuggestion({
+      groups: [{ files: ["a"], types: ["fix"] }],
+      ms: 142,
+    });
+    expect(text).toContain("[TypeSafe grouping: 142 ms]");
   });
 });
