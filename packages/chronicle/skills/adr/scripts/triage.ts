@@ -480,7 +480,7 @@ export function mergeTriage(
     }
   });
 
-  const keyOf = (entryIds: string[]) => [...entryIds].sort().join(" ");
+  const keyOf = (entryIds: string[]) => [...entryIds].sort().join("\0");
   const rowByKey = new Map(rows.map((row) => [keyOf(row.entryIds), row]));
   for (const file of overrides) {
     for (const override of file.dispositions ?? []) {
