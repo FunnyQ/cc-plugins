@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   assessComplexity,
+  buildHeadlessScribe,
   buildHookOutput,
   buildReminder,
   decideNudge,
@@ -148,6 +149,40 @@ describe("buildReminder", () => {
     expect(msg).toContain("5 files");
     expect(msg).toContain("200");
     expect(msg).toContain('subagent_type:"fork"');
+  });
+});
+
+describe("buildHeadlessScribe", () => {
+  const argv = buildHeadlessScribe({
+    claude: "/bin/claude",
+    skillDir: "/cache/monitor/9.9.9/skills/cockpit",
+    resumeId: "resume-1",
+    scribeSession: "scribe-1",
+  });
+  const cli = "/cache/monitor/9.9.9/skills/cockpit/scripts/cockpit.ts";
+
+  it("forks the parent session headless, at low effort, without persisting", () => {
+    expect(argv[0]).toBe("/bin/claude");
+    expect(argv[1]).toBe("-p");
+    const flags = argv.join(" ");
+    expect(flags).toContain("--resume resume-1 --fork-session");
+    expect(flags).toContain("--no-session-persistence");
+    expect(flags).toContain("--effort low");
+    expect(flags).toContain("--output-format json");
+  });
+
+  it("puts the prompt before the variadic --allowedTools, which ends argv", () => {
+    const prompt = argv[2]!;
+    expect(prompt).toContain(`bun ${cli} scribe --prep --session scribe-1`);
+    expect(prompt).toContain(
+      "/cache/monitor/9.9.9/skills/cockpit/references/scribe.md",
+    );
+    expect(prompt).not.toContain("resume-1");
+    const at = argv.indexOf("--allowedTools");
+    expect(argv.slice(at + 1)).toEqual([
+      `Bash(bun ${cli} scribe:*)`,
+      "Read(//cache/monitor/9.9.9/skills/cockpit/references/**)",
+    ]);
   });
 });
 

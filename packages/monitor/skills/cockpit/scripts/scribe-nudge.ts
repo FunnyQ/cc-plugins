@@ -21,13 +21,18 @@
  *
  * Stop hooks must emit JSON to influence the model — plain stdout does NOT reach
  * the context (unlike SessionStart). We print `{ hookSpecificOutput: { ... } }`.
+ *
+ * On Claude Code with `claude` on PATH there is no reminder at all: the hook
+ * launches the scribe itself as a detached headless fork of the session, and
+ * the model is never asked. Codex and OpenCode keep the reminder.
  */
 
-import { join } from "node:path";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
 import { cockpitHome } from "./cockpit-home";
 import {
+  isClaudeCode,
   resolveParentSession,
   shouldSkipDecisionLogReminder,
   type DecisionLogHookInput,
@@ -134,6 +139,43 @@ export function buildReminder(
   );
 }
 
+// Headless beats an in-session fork: it still hits the parent's prompt cache
+// (92,831 read vs 773 written) and never wakes the main agent to notify.
+export function buildHeadlessScribe(opts: {
+  claude: string;
+  skillDir: string;
+  resumeId: string;
+  scribeSession: string;
+}): string[] {
+  const { claude, skillDir, resumeId, scribeSession } = opts;
+  const cli = `${skillDir}/scripts/cockpit.ts`;
+  const refs = `${skillDir}/references`;
+  const prompt =
+    "Scribe this session's decision log. " +
+    `In one turn, read ${refs}/scribe.md and run \`bun ${cli} scribe --prep --session ${scribeSession}\`. ` +
+    `Then follow scribe.md: the CLI is ${cli}, and every call passes --session ${scribeSession}. ` +
+    // A shell variable would not match the --allowedTools prefix rule below.
+    `Spell each call as \`bun ${cli} scribe …\`, never through a shell variable. ` +
+    "When done, reply with one line.";
+  return [
+    claude,
+    "-p",
+    prompt,
+    "--resume",
+    resumeId,
+    "--fork-session",
+    "--no-session-persistence",
+    "--effort",
+    "low",
+    "--output-format",
+    "json",
+    // Variadic, so it must come last or it swallows what follows.
+    "--allowedTools",
+    `Bash(bun ${cli} scribe:*)`,
+    `Read(/${refs}/**)`,
+  ];
+}
+
 /** Build the runtime-specific Stop output accepted by each harness. */
 export function buildHookOutput(reminder: string, isCodex: boolean) {
   if (isCodex) return { systemMessage: reminder };
@@ -194,6 +236,22 @@ function codeSignature(
   return { sig: hasher.digest("hex"), numstat, porcelain };
 }
 
+function launchDetached(argv: string[], cwd: string): void {
+  // The run's JSON result is the only trace a detached failure leaves.
+  const dir = "/tmp/q-lab/monitor/cockpit";
+  mkdirSync(dir, { recursive: true });
+  const out = openSync(join(dir, `scribe-${Date.now()}.json`), "w");
+  const child = spawn(argv[0]!, argv.slice(1), {
+    cwd,
+    detached: true,
+    stdio: ["ignore", out, out],
+    // Keeps the fork's own SessionStart and Stop hooks from logging or
+    // spawning another scribe.
+    env: { ...process.env, RELAY_DELEGATED: "1" },
+  });
+  child.unref();
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -238,14 +296,32 @@ async function main() {
   // Resolved here, not above: on Codex this reads sqlite, and every earlier
   // return is a no-op turn that must not pay for it.
   const isCodex = Boolean(process.env.PLUGIN_ROOT);
-  const reminder = buildReminder(
-    assessComplexity(probe.numstat, probe.porcelain),
-    resolveParentSession(process.env, input),
-    isCodex,
-  );
+  const scribeSession = resolveParentSession(process.env, input);
   marker[key] = { lastNudgeMs: now, lastSig: probe.sig };
   writeMarker(marker, now);
 
+  const claude =
+    isClaudeCode(process.env, input) && input.session_id && scribeSession
+      ? Bun.which("claude")
+      : null;
+  if (claude) {
+    launchDetached(
+      buildHeadlessScribe({
+        claude,
+        skillDir: dirname(import.meta.dir),
+        resumeId: input.session_id!,
+        scribeSession: scribeSession!,
+      }),
+      cwd,
+    );
+    return;
+  }
+
+  const reminder = buildReminder(
+    assessComplexity(probe.numstat, probe.porcelain),
+    scribeSession,
+    isCodex,
+  );
   process.stdout.write(JSON.stringify(buildHookOutput(reminder, isCodex)));
 }
 
