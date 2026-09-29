@@ -317,15 +317,25 @@ describe("buildSessions archived", () => {
     ).toBeUndefined();
   });
 
-  // The deliberate boundary: only an archived log hides a row. A log deleted by
-  // hand, or one on a detached volume, keeps its session visible — hiding those
-  // would be a behaviour change nobody asked for.
-  test("keeps an ended session whose log is merely missing", () => {
+  // A registered session that never wrote its log leaves nothing to archive, so
+  // only hiding it keeps the list from filling with empty rows until the TTL reap.
+  test("hides an ended session whose log is missing", () => {
     const p = mkProject("deleted-log");
     const sid = "aaaaaaaa-0000-0000-0000-000000000003";
     start(p, sid);
     rmSync(join(p, ".cockpit", "logs", `${sid}.jsonl`));
     age(sid);
+
+    expect(
+      mod.buildSessions().find((s) => s.sessionId === sid),
+    ).toBeUndefined();
+  });
+
+  test("keeps an active session whose log is not written yet", () => {
+    const p = mkProject("no-log-yet");
+    const sid = "aaaaaaaa-0000-0000-0000-000000000006";
+    start(p, sid);
+    rmSync(join(p, ".cockpit", "logs", `${sid}.jsonl`));
 
     expect(mod.buildSessions().find((s) => s.sessionId === sid)).toBeDefined();
   });

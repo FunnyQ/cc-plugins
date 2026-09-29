@@ -7,7 +7,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { getLiveSessions } from "./live-sessions";
 import { latestOpenCallId } from "./call-log";
 import { subagentCountFor } from "./subagents";
@@ -107,24 +107,6 @@ function logMtime(logPath: string): number {
   } catch {
     return 0;
   }
-}
-
-// `chronicle:adr` triage moves a dispositioned session's log out of the inbox
-// into `.cockpit/archive/{done,watch}/`. `resolveLogPath` in log-stream.ts
-// confines every read to `logs/`, so such a row can only ever render an empty
-// trail — hide the session instead of leaving a dead entry behind.
-//
-// Deliberately narrower than "the log is gone": a log deleted by hand, or one on
-// a detached volume, keeps its session visible. Only a log we can still see
-// sitting in an archive bucket earns the hide.
-function isArchivedAway(logPath: string): boolean {
-  if (!logPath || existsSync(logPath)) return false;
-  const cockpitDir = dirname(dirname(logPath));
-  const file = basename(logPath);
-  return (
-    existsSync(join(cockpitDir, "archive", "done", file)) ||
-    existsSync(join(cockpitDir, "archive", "watch", file))
-  );
 }
 
 export function statusOf(e: RegistryEntry, now = Date.now()): SessionStatus {
@@ -242,14 +224,14 @@ export function buildSessions(now = Date.now()): SessionView[] {
   const seen = new Set<string>();
   const titleUpdates: TitleUpdate[] = [];
 
-  // A live session is never hidden: archive-plan.ts refuses any log younger than
-  // STALE_MS, so an archived-yet-live pairing means something outside the skill
-  // moved the file — keep the row rather than lose a running session.
+  // log-stream.ts confines reads to `logs/`, so an ended session without a log
+  // there — archived by chronicle:adr or never written — renders an empty trail.
   const tracked = readRegistry()
     .filter(
       (e) =>
         liveByKey.has(`${e.provider}:${e.sessionId}`) ||
-        !isArchivedAway(e.logPath),
+        statusOf(e, now) === "active" ||
+        existsSync(e.logPath),
     )
     .map((e): SessionView => {
       const key = `${e.provider}:${e.sessionId}`;
