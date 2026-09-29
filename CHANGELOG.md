@@ -1,5 +1,23 @@
 # Changelog
 
+## [chronicle 0.18.1] - 2026-09-29
+
+_tracks tag `chronicle-v0.18.1`_
+
+### Added
+- Release now asks TypeSafe's Jev to suggest a changelog section for commits whose type cannot decide it, and prints a `[TypeSafe classify ...]` line with the round-trip time; without a key nothing changes.
+- Commit's grouping plan now carries mandatory rules derived from paths, such as keeping a test with its implementation and a lock file with its manifest.
+- Commit now reports every TypeSafe grouping outcome: the round-trip time on success, the wait and reason on failure, and a hint when no API key is set.
+
+### Changed
+- The release agent treats a Jev-suggested section as a hint it can overrule, and the release skill relays the TypeSafe classify line to you.
+- The commit agent understands the new digest rules and final splits, and the commit skill relays every TypeSafe grouping line.
+
+### Fixed
+- Release now errors when a tag is drafted twice or a git range is invalid, instead of skipping coverage checks or passing an empty changelog.
+- When a file is excluded from a commit, its must-share partner is now committed alone rather than leaving no valid plan.
+- Commit plans no longer require a fallback simple message for final splits of more than five files, which never used it.
+
 ## [chronicle 0.18.0] - 2026-09-29
 
 _tracks tag `chronicle-v0.18.0`_
