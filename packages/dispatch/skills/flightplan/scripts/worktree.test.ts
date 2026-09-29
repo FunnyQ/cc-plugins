@@ -306,6 +306,38 @@ describe("worktree lifecycle", () => {
     });
   });
 
+  test("a nested plan dir excludes its Status edits from leaks and seeds", () => {
+    const options = {
+      ...fixture(),
+      slug: "02-hub-live",
+      planDir: "docs/site-rebuild/legs/02-hub-live",
+    };
+    const task = `${options.planDir}/tasks/content/01-task.md`;
+    put(options.repo, task, "> **Status**: todo\n");
+    put(options.repo, `${options.planDir}/.flightlog/run.jsonl`, "log\n");
+    git(options.repo, "add", ".");
+    git(options.repo, "commit", "-qm", "nested plan");
+    const wt = create(options);
+    expect(existsSync(join(wt.path, options.planDir))).toBe(false);
+    const baseline = fingerprint(options).fingerprint;
+    put(options.repo, task, "> **Status**: in-progress\n");
+    put(wt.path, "a.txt", "task\n");
+    const absolute = {
+      ...options,
+      planDir: join(options.repo, options.planDir),
+    };
+    expect(fingerprint({ ...absolute, expect: baseline })).toEqual({
+      fingerprint: baseline,
+      paths: [],
+    });
+    const result = land({ ...options, expect: baseline, op: "a1-land" });
+    expect(result.status).toBe("clean");
+    expect(result.files).toEqual(["a.txt"]);
+    expect(readFileSync(join(options.repo, task), "utf8")).toBe(
+      "> **Status**: in-progress\n",
+    );
+  });
+
   test("new rebase ops update the base each time", () => {
     const options = fixture();
     const wt = create(options);
@@ -581,7 +613,14 @@ describe("worktree lifecycle", () => {
 describe("CLI argument and git failures", () => {
   test("every subcommand prints one JSON object and clean, leak, and conflict all exit 0", () => {
     const options = fixture();
-    const common = ["--repo", options.repo, "--slug", options.slug];
+    const common = [
+      "--repo",
+      options.repo,
+      "--slug",
+      options.slug,
+      "--plan-dir",
+      join(options.repo, "docs", options.slug),
+    ];
     function invoke(...args: string[]) {
       const result = cli([...args, ...common]);
       expect(result.exitCode).toBe(0);
@@ -649,6 +688,9 @@ describe("CLI argument and git failures", () => {
       ["create", "bucket/001", ...common],
       ["create", options.ref, "--repo", "relative", "--slug", options.slug],
       ["create", options.ref, "--repo", options.repo, "--slug", "../escape"],
+      ["create", options.ref, ...common, "--plan-dir", "../outside"],
+      ["create", options.ref, ...common, "--plan-dir", dirname(options.repo)],
+      ["create", options.ref, ...common, "--plan-dir", "."],
       ["land", options.ref, ...common, "--expect", "HEAD"],
       ["unland", options.ref, ...common],
       ["rebase", options.ref, ...common],

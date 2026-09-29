@@ -52,6 +52,15 @@ describe("bakeOrchestrator", () => {
     ).not.toThrow();
   });
 
+  test("derives planDir from planPath so a nested plan reaches worktree.ts", () => {
+    const script = bakeOrchestrator(DOC, {
+      ...scouted("/r"),
+      planPath: "/r/docs/site/legs/02-hub/PLAN.md",
+    });
+    expect(script).toMatch(/^\s*planDir:\s*"\/r\/docs\/site\/legs\/02-hub",/m);
+    expect(script).toContain("--plan-dir ${CFG.planDir}");
+  });
+
   test("refuses a missing required field", () => {
     const { baseRef: _, ...values } = scouted("/r");
     expect(() => bakeOrchestrator(DOC, values)).toThrow(

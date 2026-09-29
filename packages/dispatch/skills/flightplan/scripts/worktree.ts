@@ -4,9 +4,9 @@ import {
   readFileSync, readdirSync, rmSync, rmdirSync, statSync, utimesSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-type Options = { repo: string; slug: string };
+type Options = { repo: string; slug: string; planDir?: string };
 type RefOptions = Options & { ref: string };
 type OpOptions = RefOptions & { op: string };
 type Location = { path: string; base: string };
@@ -74,6 +74,16 @@ function rootOf(options: Options): string {
   return join(dirname(repo), `.${basename(repo)}-autopilot`, options.slug);
 }
 
+// The plan dir, repo-relative with "/" separators, as git pathspecs and ls-files output spell it.
+function planOf(options: Options): string {
+  const repo = resolve(options.repo);
+  const plan = relative(repo, resolve(repo, options.planDir ?? `docs/${options.slug}`));
+  if (!plan || plan === ".." || plan.startsWith(`..${sep}`) || isAbsolute(plan)) {
+    throw new ArgumentError(`--plan-dir must be a directory inside --repo: ${options.planDir}`);
+  }
+  return plan.split(sep).join("/");
+}
+
 // A bucket may contain "-" but never "/", and NN never contains "-", so the last "-" is the separator.
 const dirNameOf = (ref: string) => ref.replace("/", "-");
 const refOfDir = (dir: string) => dir.replace(/-([^-]+)$/, "/$1");
@@ -113,7 +123,7 @@ function record<T extends OpResult>(options: OpOptions, state: State, result: T)
   return result;
 }
 
-function snapshot(root: string, slug: string): string {
+function snapshot(root: string, plan: string): string {
   const scratch = mkdtempSync(join(tmpdir(), "autopilot-snapshot-"));
   const index = join(scratch, "index");
   try {
@@ -129,7 +139,7 @@ function snapshot(root: string, slug: string): string {
     }
     const env = { GIT_INDEX_FILE: index };
     git(root, ["add", "-A"], env);
-    git(root, ["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", `docs/${slug}`], env);
+    git(root, ["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", plan], env);
     return git(root, ["write-tree"], env).trim();
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -186,8 +196,7 @@ function isDirectory(path: string): boolean {
   return existsSync(path) && lstatSync(path).isDirectory();
 }
 
-function seedIgnored(repo: string, path: string, slug: string): void {
-  const excluded = `docs/${slug}`;
+function seedIgnored(repo: string, path: string, excluded: string): void {
   function copy(relative: string): void {
     relative = relative.replace(/\/$/, "");
     if (relative === excluded || relative.startsWith(`${excluded}/`)) return;
@@ -247,10 +256,10 @@ export function create(options: RefOptions): Location {
     delete state[options.ref];
     writeState(root, state);
   }
-  const base = commitOf(options.repo, snapshot(options.repo, options.slug), options.slug);
+  const base = commitOf(options.repo, snapshot(options.repo, planOf(options)), options.slug);
   mkdirSync(root, { recursive: true });
   git(options.repo, ["worktree", "add", "--detach", path, base]);
-  seedIgnored(options.repo, path, options.slug);
+  seedIgnored(options.repo, path, planOf(options));
   state[options.ref] = { path, base };
   writeState(root, state);
   return { path, base };
@@ -260,7 +269,7 @@ export function land(options: OpOptions & { expect: string }): LandResult {
   if (!options.expect) throw new ArgumentError("--expect is required for land");
   const { path, state, entry, cached } = operation(options);
   if (cached) return cached as LandResult;
-  const ours = snapshot(options.repo, options.slug);
+  const ours = snapshot(options.repo, planOf(options));
   if (options.expect !== ours) {
     return record(options, state, {
       status: "leak", drift: false, files: [],
@@ -269,7 +278,7 @@ export function land(options: OpOptions & { expect: string }): LandResult {
     });
   }
   if (!isDirectory(path)) throw new ArgumentError(`Missing worktree: ${path}`);
-  const theirs = commitOf(path, snapshot(path, options.slug), options.slug);
+  const theirs = commitOf(path, snapshot(path, planOf(options)), options.slug);
   const drift = git(options.repo, ["rev-parse", `${entry.base}^{tree}`]).trim() !== ours;
   const merged = merge(options.repo, entry.base, commitOf(options.repo, ours, options.slug), theirs);
   if (merged.conflict) {
@@ -305,8 +314,8 @@ export function rebase(options: OpOptions): RebaseResult {
   const { path, state, entry, cached } = operation(options);
   if (cached) return cached as RebaseResult;
   if (!isDirectory(path)) throw new ArgumentError(`Missing worktree: ${path}`);
-  const ours = commitOf(options.repo, snapshot(options.repo, options.slug), options.slug);
-  const theirs = commitOf(path, snapshot(path, options.slug), options.slug);
+  const ours = commitOf(options.repo, snapshot(options.repo, planOf(options)), options.slug);
+  const theirs = commitOf(path, snapshot(path, planOf(options)), options.slug);
   const merged = merge(options.repo, entry.base, ours, theirs);
   git(path, ["reset", "--soft", ours]);
   git(path, ["read-tree", "-u", "--reset", merged.tree]);
@@ -316,7 +325,7 @@ export function rebase(options: OpOptions): RebaseResult {
 
 export function fingerprint(options: Options & { expect?: string }): { fingerprint: string; paths: string[] } {
   rootOf(options);
-  const tree = snapshot(options.repo, options.slug);
+  const tree = snapshot(options.repo, planOf(options));
   return { fingerprint: tree, paths: options.expect ? changedPaths(options.repo, options.expect, tree) : [] };
 }
 
@@ -386,7 +395,7 @@ function main(): void {
     if (!commands.includes(command)) throw new ArgumentError(`Unknown subcommand: ${command ?? "(missing)"}`);
     const flags: Record<string, string> = {};
     const positional: string[] = [];
-    const allowed = new Set(["--repo", "--slug"]);
+    const allowed = new Set(["--repo", "--slug", "--plan-dir"]);
     if (["land", "unland", "rebase"].includes(command)) allowed.add("--op");
     if (["land", "fingerprint"].includes(command)) allowed.add("--expect");
     if (command === "sweep") { allowed.add("--keep"); allowed.add("--keep-all"); }
@@ -401,8 +410,9 @@ function main(): void {
     }
     const needsRef = !["fingerprint", "sweep"].includes(command);
     if (positional.length !== (needsRef ? 1 : 0)) throw new ArgumentError(`Invalid arguments for ${command}`);
-    const options = { repo: flags["--repo"], slug: flags["--slug"] };
+    const options = { repo: flags["--repo"], slug: flags["--slug"], planDir: flags["--plan-dir"] };
     rootOf(options);
+    planOf(options);
     const refOptions = { ...options, ref: positional[0] };
     const opOptions = { ...refOptions, op: flags["--op"] };
     let result: unknown;

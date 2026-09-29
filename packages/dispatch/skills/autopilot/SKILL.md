@@ -169,7 +169,7 @@ bun "$OWN"/bake-orchestrator.ts <<'EOF'
 EOF
 ```
 
-The script requires `slug`, `repoRoot`, `tasksDir`, `planPath`, `logFile`, `planGoal`, `scriptsDir`, and `baseRef`. It rejects a relative path and any key the `CFG` block does not carry. Omit a field you did not scout, and it keeps the block's default. It writes `<plan dir>/.flightlog/orchestrator.js`, drops the `.flightlog/` self-ignore, and prints that absolute path. On a non-zero exit, fix the reported field and re-run.
+The script requires `slug`, `repoRoot`, `tasksDir`, `planPath`, `logFile`, `planGoal`, `scriptsDir`, and `baseRef`. It rejects a relative path and any key the `CFG` block does not carry. It derives `planDir` from `planPath`, so a plan nested deeper than `docs/<slug>/` — a waypoints leg — keeps its own Status edits out of the worktree leak check. Omit a field you did not scout, and it keeps the block's default. It writes `<plan dir>/.flightlog/orchestrator.js`, drops the `.flightlog/` self-ignore, and prints that absolute path. On a non-zero exit, fix the reported field and re-run.
 
 Then call `Workflow({ scriptPath: <the printed path> })`. No `args` needed. Do not rely on the Workflow `args` global.
 

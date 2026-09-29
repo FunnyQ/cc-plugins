@@ -53,6 +53,7 @@ const CFG = {
   repoRoot:              '/abs/repo',                          // ABSOLUTE (from git rev-parse --show-toplevel)
   tasksDir:              '/abs/repo/docs/my-plan/tasks',          // ABSOLUTE (from git rev-parse --show-toplevel)
   planPath:              '/abs/repo/docs/my-plan/PLAN.md',        // ABSOLUTE
+  planDir:               '/abs/repo/docs/my-plan',                // ABSOLUTE; bake-orchestrator.ts derives it from planPath
   logFile:               '/abs/repo/docs/my-plan/.flightlog/run.jsonl',  // ABSOLUTE
   planGoal:              '<one-line goal copied from PLAN.md>',
   maxAttempts:           3,
@@ -801,7 +802,7 @@ const checkAbort = () => {
 }
 const live = new Map()
 const cleanupFailures = []
-const wtArgs = `--repo ${CFG.repoRoot} --slug ${CFG.slug}`
+const wtArgs = `--repo ${CFG.repoRoot} --slug ${CFG.slug} --plan-dir ${CFG.planDir}`
 const wtCommand = (args) => `bun ${S}/worktree.ts ${args} ${wtArgs}`
 const wtObject = (properties) => ({ type: 'object', properties, required: Object.keys(properties) })
 const wtStrings = { type: 'array', items: { type: 'string' } }

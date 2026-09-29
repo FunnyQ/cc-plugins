@@ -40,6 +40,7 @@ const PATHS = [
   "repoRoot",
   "tasksDir",
   "planPath",
+  "planDir",
   "logFile",
   "scriptsDir",
   "relayPath",
@@ -101,6 +102,8 @@ export function bakeOrchestrator(
       throw new Error(`CFG.${field} must be an absolute path: ${value}`);
     }
   }
+  // worktree.ts cannot assume docs/<slug>: a waypoints leg nests its plan deeper.
+  values = { planDir: dirname(values.planPath as string), ...values };
   const literals = Object.fromEntries(
     Object.entries(values).map(([field, value]) => [
       field,
