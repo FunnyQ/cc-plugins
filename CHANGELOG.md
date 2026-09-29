@@ -1,5 +1,15 @@
 # Changelog
 
+## [monitor 5.2.1] - 2026-09-29
+
+_tracks tag `monitor-v5.2.1`_
+
+### Added
+- On Claude Code with `claude` on PATH, the Stop hook now launches the decision-log scribe as a detached headless fork, so it no longer wakes the main agent; in a live run it took 3 turns and 20.6 s (397k cache-read tokens), against a 14-day median of 34.7 s, 10 turns and 1.48M cache-read tokens for in-session forks. The trade-off is that every Stop passing the signature and 8-minute gate now spends one headless run, and Codex, OpenCode and setups without `claude` keep the reminder.
+
+### Fixed
+- The SessionStart guidance no longer tells the agent to spawn a scribe fork when the Stop hook already launches one, so decisions are not recorded twice.
+
 ## [chronicle 0.19.1] - 2026-09-29
 
 _tracks tag `chronicle-v0.19.1`_
