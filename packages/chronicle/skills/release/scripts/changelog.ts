@@ -7,6 +7,7 @@
  * a changelog that becomes immutable once its tag is pushed.
  */
 
+import { askJev, type JevResult } from "../../../shared/scripts/typesafe";
 import { git } from "./analyze-release";
 import type { Unit } from "./stages";
 
@@ -28,6 +29,9 @@ export type Commit = {
   subject: string;
   body: string;
   section: Suggestion;
+  /** Set when Jev replaced a `judge` — a suggestion read from text, never the diff. */
+  judgedBy?: "jev";
+  confidence?: number;
 };
 
 export type UnitFacts = {
@@ -191,4 +195,62 @@ export function spliceEntries(changelog: string, blocks: string[]): string {
   }
   const base = changelog.trim() ? changelog : PREAMBLE;
   return `${base.endsWith("\n") ? base : `${base}\n`}\n${block}\n`;
+}
+
+/** Jev caps state plus the longest question at 32k tokens; ~4 chars per token. */
+const STATE_CHAR_BUDGET = 60_000;
+
+const SECTION_CRITERIA: Record<Section | "omit", string> = {
+  Added: "Gives users a capability they did not have",
+  Changed: "Changes how something users already rely on behaves",
+  Deprecated: "Marks something users rely on for future removal",
+  Removed: "Takes away something users could use",
+  Fixed: "Corrects behaviour users saw as wrong",
+  Security: "Closes a vulnerability",
+  omit: "No effect a user of the released software could notice",
+};
+
+export async function classifyJudged(
+  facts: UnitFacts[],
+  opts: { apiKey: string | undefined; fetch?: typeof fetch },
+): Promise<JevResult | null> {
+  const judged = facts.flatMap((unit) =>
+    unit.commits.filter((commit) => commit.section === "judge"),
+  );
+  if (!opts.apiKey) return { skipped: "TYPESAFE_API_KEY not set" };
+  if (judged.length === 0) return null;
+
+  const bodyChars = Math.floor(STATE_CHAR_BUDGET / judged.length);
+  const questions = Object.fromEntries(
+    judged.map((_, i) => [
+      `section:${i}`,
+      {
+        type: "choice" as const,
+        instructions: `Which Keep a Changelog section does \`commits[${i}]\` belong in, for a reader of the release notes? A commit that edits a skill or agent prompt changes behaviour.`,
+        criteria: SECTION_CRITERIA,
+      },
+    ]),
+  );
+  const result = await askJev(
+    {
+      state: {
+        commits: judged.map((commit, index) => ({
+          index,
+          subject: commit.subject,
+          body: commit.body.slice(0, bodyChars),
+        })),
+      },
+      questions,
+    },
+    opts,
+  );
+  if ("answers" in result) {
+    judged.forEach((commit, i) => {
+      const answer = result.answers[`section:${i}`];
+      commit.section = (answer?.choice ?? "judge") as Suggestion;
+      commit.judgedBy = "jev";
+      commit.confidence = answer?.confidence;
+    });
+  }
+  return result;
 }

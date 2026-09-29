@@ -39,6 +39,7 @@ import {
   type Workflow,
 } from "./analyze-release";
 import {
+  classifyJudged,
   gatherFacts,
   renderEntry,
   spliceEntries,
@@ -46,6 +47,7 @@ import {
   type EntryDraft,
 } from "./changelog";
 import { writeTempPayload } from "../../../shared/scripts/temp-payload";
+import { renderJevLine } from "../../../shared/scripts/typesafe";
 import {
   artifactsDone,
   bumpDone,
@@ -627,7 +629,9 @@ export function formatFactsDigest(
   if (facts.length === 0) return "facts      every entry already written";
   const lines = facts.map((unit) => {
     const judge = unit.commits.filter((c) => c.section === "judge").length;
-    return `facts      ${unit.tagName} · ${unit.commits.length} commits · ${judge} to judge`;
+    const byJev = unit.commits.filter((c) => c.judgedBy === "jev").length;
+    const jev = byJev ? ` · ${byJev} suggested by Jev` : "";
+    return `facts      ${unit.tagName} · ${unit.commits.length} commits · ${judge} to judge${jev}`;
   });
   lines.push(`payload    ${path}`);
   return lines.join("\n");
@@ -696,8 +700,12 @@ async function main() {
     const facts = await gatherFacts(
       current.units.filter((u) => !entryDone(u, changelog)),
     );
+    const jev = await classifyJudged(facts, {
+      apiKey: process.env.TYPESAFE_API_KEY,
+    });
     const path = await writeTempPayload("release", "facts", facts);
     console.log(formatFactsDigest(facts, path));
+    if (jev) console.log(renderJevLine("classify", jev));
     return;
   }
 

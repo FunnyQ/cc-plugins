@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  classifyJudged,
   parseCommitLog,
   renderEntry,
   sectionFor,
@@ -179,5 +180,66 @@ describe("spliceEntries", () => {
       "## [b]",
     ]);
     expect(out).toBe(`${preamble}\n## [a]\n\n## [b]\n\n## [old] - y\n`);
+  });
+});
+
+describe("classifyJudged", () => {
+  const judged = (): UnitFacts[] => [
+    {
+      tagName: "x-v1.0.0",
+      headerLabel: "x 1.0.0",
+      commits: [
+        { sha: "a1", subject: "📖 docs: Change skill", body: "", section: "judge" },
+        { sha: "b2", subject: "✨ feat: New", body: "", section: "Added" },
+        { sha: "c3", subject: "♻️ refactor: Split", body: "", section: "judge" },
+      ],
+    },
+  ];
+
+  function fetchAnswering(answers: Record<string, unknown>) {
+    const calls: RequestInit[] = [];
+    const impl = (async (_url: string, init: RequestInit) => {
+      calls.push(init);
+      return new Response(JSON.stringify({ answers }));
+    }) as unknown as typeof fetch;
+    return { impl, calls };
+  }
+
+  test("asks one Choice per judged commit and marks Jev's answer", async () => {
+    const facts = judged();
+    const { impl, calls } = fetchAnswering({
+      "section:0": { type: "choice", choice: "Changed", confidence: 0.8 },
+      "section:1": { type: "choice", choice: "omit", confidence: 0.6 },
+    });
+    const result = await classifyJudged(facts, { apiKey: "k", fetch: impl });
+    const body = JSON.parse(String(calls[0]?.body));
+    expect(Object.keys(body.questions)).toEqual(["section:0", "section:1"]);
+    expect(body.state.commits.map((c: { subject: string }) => c.subject)).toEqual([
+      "📖 docs: Change skill",
+      "♻️ refactor: Split",
+    ]);
+    expect(result).toEqual({ answers: expect.any(Object), ms: expect.any(Number) });
+    expect(facts[0]!.commits).toEqual([
+      { sha: "a1", subject: "📖 docs: Change skill", body: "", section: "Changed", judgedBy: "jev", confidence: 0.8 },
+      { sha: "b2", subject: "✨ feat: New", body: "", section: "Added" },
+      { sha: "c3", subject: "♻️ refactor: Split", body: "", section: "omit", judgedBy: "jev", confidence: 0.6 },
+    ]);
+  });
+
+  test("leaves facts untouched and reports why without a key", async () => {
+    const facts = judged();
+    expect(await classifyJudged(facts, { apiKey: undefined })).toEqual({
+      skipped: "TYPESAFE_API_KEY not set",
+    });
+    expect(facts).toEqual(judged());
+  });
+
+  test("makes no call when nothing needs judging", async () => {
+    const { impl, calls } = fetchAnswering({});
+    const facts: UnitFacts[] = [
+      { tagName: "x", headerLabel: "x", commits: [{ sha: "b2", subject: "feat: y", body: "", section: "Added" }] },
+    ];
+    expect(await classifyJudged(facts, { apiKey: "k", fetch: impl })).toBeNull();
+    expect(calls).toHaveLength(0);
   });
 });
