@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.3.6] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.6`_
+
+### Fixed
+- Autopilot now runs plans that live deeper than `docs/<slug>/`, such as a waypoints leg, instead of aborting every land with a false main-tree leak report.
+
 ## [monitor 5.2.2] - 2026-09-29
 
 _tracks tag `monitor-v5.2.2`_
