@@ -1,5 +1,22 @@
 # Changelog
 
+## [chronicle 0.20.0] - 2026-09-29
+
+_tracks tag `chronicle-v0.20.0`_
+
+### Added
+- ADR triage now pre-screens clusters with Jev and skips those it is highly confident are not worth judging, so fewer clusters reach the sonnet judge; watched clusters and --evidence runs are never screened.
+
+### Fixed
+- Fixed pre-existing type errors in the adr scripts so the typecheck is cleaner, with no change in behaviour.
+
+## [guard 0.6.0] - 2026-09-29
+
+_tracks tag `guard-v0.6.0`_
+
+### Added
+- Comment reports are now screened through Jev first, so blocks that clearly explain why are no longer sent back to the model, saving an extra turn; this only runs with TYPESAFE_API_KEY and any failure keeps the original behaviour.
+
 ## [monitor 5.2.1] - 2026-09-29
 
 _tracks tag `monitor-v5.2.1`_
