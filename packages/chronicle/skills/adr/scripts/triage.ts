@@ -3,6 +3,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { logRoot, STALE_MS } from "../../../shared/scripts/cockpit-trail";
 import { TEMP_ROOT } from "../../../shared/scripts/temp-payload";
+import {
+  askJev,
+  renderJevLine,
+  type JevQuestion,
+  type JevResult,
+} from "../../../shared/scripts/typesafe";
 import { buildIndex, type AdrMeta } from "./adr-index";
 import {
   everySessionMissing,
@@ -13,7 +19,9 @@ import {
 } from "./archive-plan";
 import {
   collectContext,
+  fetchBodies,
   type AdrContext,
+  type EntryBody,
   type SessionFile,
 } from "./collect-adr-context";
 import type {
@@ -198,6 +206,111 @@ export function planBatches<T>(items: T[]): T[][] {
     batches.push(items.slice(index, index + size));
   }
   return batches;
+}
+
+// Measured on 37 past ADR sources and 95 user-confirmed skips: 0.9 lost 2 sources (both supporting evidence) and screened 41 skips.
+const PRESCREEN_SKIP = 0.9;
+const PRESCREEN_BATCH = 10;
+const REASON_CHARS = 2_500;
+
+const PRESCREEN_PROJECT =
+  "A Claude Code plugin marketplace (TypeScript/Bun). Entries are decision-trail records written during coding sessions; triage decides which become Architecture Decision Records.";
+
+const PRESCREEN_CRITERIA: Record<Disposition, string> = {
+  promote:
+    "Reversing it needs a migration or coordinated changes, or its rejected alternatives are not recoverable from the code; AND it stays relevant across sessions, spans modules, or a maintainer may undo it by accident",
+  watch: "May meet that bar, but the evidence is thin or the call is close",
+  skip: "An implementation detail, bug post-mortem, caveat for code, workaround, mechanical convention, a fact about an external system or tool, or a default any competent engineer would pick",
+};
+
+/** Any Jev failure keeps every cluster, so a run without Jev judges exactly what it judged before. */
+export async function prescreen(
+  clusters: Cluster[],
+  bodies: EntryBody[],
+  opts: { apiKey: string | undefined; fetch?: typeof fetch },
+): Promise<{
+  kept: Cluster[];
+  skipped: RecordedCandidate[];
+  jev: JevResult | null;
+}> {
+  // Watched clusters are always plausible: an earlier triage already judged they might matter.
+  const asked = clusters.filter(({ watched }) => !watched);
+  if (asked.length === 0) return { kept: clusters, skipped: [], jev: null };
+  if (!opts.apiKey) {
+    return {
+      kept: clusters,
+      skipped: [],
+      jev: { skipped: "TYPESAFE_API_KEY not set" },
+    };
+  }
+
+  const bodyById = new Map(bodies.map((body) => [body.id, body]));
+  const groups: Cluster[][] = [];
+  for (let index = 0; index < asked.length; index += PRESCREEN_BATCH) {
+    groups.push(asked.slice(index, index + PRESCREEN_BATCH));
+  }
+  const results = await Promise.all(
+    groups.map((group) => {
+      const questions: Record<string, JevQuestion> = {};
+      const entries = group.map((cluster, index) => {
+        questions[`d:${index}`] = {
+          type: "choice",
+          instructions: `Should \`entries[${index}]\` become an Architecture Decision Record for this project? Most entries should not.`,
+          criteria: PRESCREEN_CRITERIA,
+        };
+        const body = cluster.entryIds
+          .map((id) => bodyById.get(id))
+          .find(Boolean);
+        return {
+          index,
+          kinds: cluster.kinds,
+          decision: cluster.decision,
+          files: cluster.files,
+          reason: (body?.reason ?? "").slice(0, REASON_CHARS),
+          tradeoff: body?.tradeoff ?? "",
+          options: body?.options ?? [],
+        };
+      });
+      return askJev(
+        { state: { project: PRESCREEN_PROJECT, entries }, questions },
+        opts,
+      );
+    }),
+  );
+
+  const skipP = new Map<string, number>();
+  results.forEach((result, position) => {
+    if (!("answers" in result)) return;
+    groups[position]!.forEach((cluster, index) => {
+      const p = result.answers[`d:${index}`]?.probabilities?.skip;
+      if (p !== undefined && p >= PRESCREEN_SKIP)
+        skipP.set(cluster.clusterId, p);
+    });
+  });
+
+  const answered = results.filter((result) => "answers" in result);
+  const jev: JevResult =
+    answered.length > 0
+      ? {
+          answers: {},
+          ms: Math.max(...answered.map((result) => result.ms ?? 0)),
+        }
+      : results[0]!;
+  return {
+    kept: clusters.filter(({ clusterId }) => !skipP.has(clusterId)),
+    skipped: clusters
+      .filter(({ clusterId }) => skipP.has(clusterId))
+      .map((cluster) => ({
+        clusterId: cluster.clusterId,
+        entryIds: cluster.entryIds,
+        sessionIds: cluster.sessionIds,
+        title: cluster.decision,
+        reason: `Jev pre-screen: P(skip)=${skipP.get(cluster.clusterId)!.toFixed(2)}`,
+        disposition: "skip" as const,
+        matchesAdr: null,
+      })),
+    jev,
+  };
 }
 
 /** Pure. Checks one judge's result against its batch; `result` is null whenever `errors` is not empty. */
@@ -512,12 +625,46 @@ async function prep(argv: string[]): Promise<void> {
     title,
     status,
   }));
-  const batches = planBatches(triage.clusters);
+  // `promote` searches for evidence, so a pre-screen skip there would hide what the user asked for.
+  const screened = evidence
+    ? { kept: triage.clusters, skipped: [], jev: null }
+    : await prescreen(
+        triage.clusters,
+        await fetchBodies(
+          context.trailRoot,
+          triage.clusters
+            .filter(({ watched }) => !watched)
+            .flatMap(({ entryIds }) => entryIds),
+        ),
+        { apiKey: process.env.TYPESAFE_API_KEY },
+      );
+  const batches = planBatches(screened.kept);
   const batchFiles = batches.map((clusters, position) => {
     const path = batchPath(runDir, position + 1);
     writeJson(path, { batch: position + 1, adrs, clusters } satisfies Batch);
     return path;
   });
+  let batchCount = batches.length;
+  if (screened.skipped.length > 0) {
+    // Recorded as one more batch with its result already on disk, so merge reads it like any judge's and no judge is spawned for it.
+    batchCount += 1;
+    const path = batchPath(runDir, batchCount);
+    const skippedIds = new Set(
+      screened.skipped.map(({ clusterId }) => clusterId),
+    );
+    writeJson(path, {
+      batch: batchCount,
+      adrs,
+      clusters: triage.clusters.filter(({ clusterId }) =>
+        skippedIds.has(clusterId),
+      ),
+    } satisfies Batch);
+    writeJson(resultPath(path), {
+      batch: batchCount,
+      candidates: screened.skipped,
+      conflicts: [],
+    } satisfies BatchResult);
+  }
   const scan = {
     sessions: triage.sessions,
     entries: triage.entries,
@@ -530,7 +677,7 @@ async function prep(argv: string[]): Promise<void> {
     nextAdr: index.nextNumber,
     scan,
     assignments: triage.assignments,
-    batchCount: batches.length,
+    batchCount,
   } satisfies RunMeta);
 
   console.log(
@@ -540,6 +687,10 @@ async function prep(argv: string[]): Promise<void> {
       nextAdr: index.nextNumber,
       ...scan,
       batches: batchFiles,
+      prescreened: screened.skipped.length,
+      ...(screened.jev
+        ? { jev: renderJevLine("pre-screen", screened.jev) }
+        : {}),
     }),
   );
 }

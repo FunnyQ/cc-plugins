@@ -33,7 +33,7 @@ hand, twice. Models now only screen and judge.
 
 ```
 chronicle:adr  (this skill — the main agent; owns both gates)
-  ├─ triage.ts prep       skeletons → exact-text clusters → ≤10 batch files + base assignments
+  ├─ triage.ts prep       skeletons → exact-text clusters → Jev pre-screen → ≤10 batch files + base assignments
   ├─ judge × ≤10          parallel, sonnet: screen, fetch plausible bodies, disposition → triage.ts record
   ├─ triage.ts merge      results → ledger + gate-1 payload + assignments + archive plan
   ├─ main agent cross-checks the ledger → overrides → triage.ts merge again
@@ -228,6 +228,12 @@ This is the primary entry point.
    `tooFresh`. It pulls a watched session back only when one of its entries
    shares its `decision` text with an inbox entry; watched items never re-queue
    on their own. It sizes the batches so that at most 10 judges run.
+
+   When `TYPESAFE_API_KEY` is set, `prep` first asks Jev about every unwatched
+   cluster and records each one with P(skip) ≥ 0.9 as `skip` in a batch it leaves
+   out of `batches`, with its result already on disk. `prescreened` counts those
+   clusters, and `jev` is the line to show the user. Show that line. When
+   `batches` is empty, spawn no judge and go straight to the merge.
 2. Judge the batches per **Judging the batches** below.
 3. Merge and cross-check per **Merging and the archive plan** below, then present
    every disposition at gate 1 from `<runDir>/gate1.json`. A triage is done when

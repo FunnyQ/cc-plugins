@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { STALE_MS } from "../../../shared/scripts/cockpit-trail";
 import type {
   AdrContext,
+  EntryBody,
   EntrySkeleton,
   SessionFile,
 } from "./collect-adr-context";
@@ -22,9 +23,11 @@ import {
   fallbackResult,
   mergeTriage,
   planBatches,
+  prescreen,
   validateJudgment,
   type Batch,
   type BatchResult,
+  type Cluster,
   type RunMeta,
 } from "./triage";
 
@@ -205,6 +208,159 @@ describe("buildTriage", () => {
       ["D", false],
     ]);
     expect(triage.assignments).toEqual([]);
+  });
+});
+
+describe("prescreen", () => {
+  function cluster(n: number, watched = false): Cluster {
+    return {
+      clusterId: `c${n}`,
+      decision: `decision ${n}`,
+      entryIds: [`e${n}`],
+      sessionIds: ["s1"],
+      kinds: ["decision"],
+      files: [`f${n}.ts`],
+      watched,
+    };
+  }
+
+  function body(n: number): EntryBody {
+    return {
+      id: `e${n}`,
+      type: "decision",
+      kind: "decision",
+      decision: `decision ${n}`,
+      reason: "x".repeat(5_000),
+      tradeoff: "t",
+      facets: [],
+      needs_your_call: false,
+      options: ["a"],
+      files: [`f${n}.ts`],
+      timestamp: "2026-09-10T00:00:00Z",
+      sessionId: "s1",
+    };
+  }
+
+  function skipAt(p: number) {
+    return {
+      type: "choice",
+      choice: p >= 0.5 ? "skip" : "watch",
+      confidence: 0.5,
+      probabilities: { promote: (1 - p) / 2, watch: (1 - p) / 2, skip: p },
+    };
+  }
+
+  /** Answers each request from `pSkip` by the cluster's decision text, so batching order does not matter. */
+  function fetchScoring(pSkip: Record<string, number>, fail = false) {
+    const calls: {
+      questions: Record<string, unknown>;
+      state: { entries: { decision: string; reason?: string }[] };
+    }[] = [];
+    const impl = (async (_url: string, init: RequestInit) => {
+      const request = JSON.parse(String(init.body));
+      calls.push(request);
+      if (fail) return new Response("overloaded", { status: 529 });
+      const answers = Object.fromEntries(
+        request.state.entries.map((entry: { decision: string }, i: number) => [
+          `d:${i}`,
+          skipAt(pSkip[entry.decision] ?? 0),
+        ]),
+      );
+      return new Response(JSON.stringify({ answers }));
+    }) as unknown as typeof fetch;
+    return { impl, calls };
+  }
+
+  test("records a confident skip and keeps every other cluster for the judges", async () => {
+    const clusters = [cluster(1), cluster(2), cluster(3)];
+    const { impl } = fetchScoring({ "decision 1": 0.94, "decision 2": 0.89 });
+
+    const result = await prescreen(clusters, [body(1), body(2), body(3)], {
+      apiKey: "k",
+      fetch: impl,
+    });
+
+    expect(result.kept.map(({ clusterId }) => clusterId)).toEqual(["c2", "c3"]);
+    expect(result.skipped).toEqual([
+      {
+        clusterId: "c1",
+        entryIds: ["e1"],
+        sessionIds: ["s1"],
+        title: "decision 1",
+        reason: "Jev pre-screen: P(skip)=0.94",
+        disposition: "skip",
+        matchesAdr: null,
+      },
+    ]);
+  });
+
+  test("never asks about a watched cluster", async () => {
+    const { impl, calls } = fetchScoring({
+      "decision 1": 0.99,
+      "decision 2": 0.99,
+    });
+
+    const result = await prescreen(
+      [cluster(1, true), cluster(2)],
+      [body(1), body(2)],
+      {
+        apiKey: "k",
+        fetch: impl,
+      },
+    );
+
+    expect(
+      calls.flatMap(({ state }) =>
+        state.entries.map(({ decision }) => decision),
+      ),
+    ).toEqual(["decision 2"]);
+    expect(result.kept.map(({ clusterId }) => clusterId)).toEqual(["c1"]);
+  });
+
+  test("asks at most 10 clusters per request and sends each full record, reason capped", async () => {
+    const clusters = Array.from({ length: 23 }, (_, i) => cluster(i + 1));
+    const { impl, calls } = fetchScoring({});
+
+    await prescreen(
+      clusters,
+      clusters.map((_, i) => body(i + 1)),
+      { apiKey: "k", fetch: impl },
+    );
+
+    expect(
+      calls.map(({ questions }) => Object.keys(questions).length).sort(),
+    ).toEqual([10, 10, 3]);
+    const entry = calls[0]!.state.entries[0]! as Record<string, unknown>;
+    expect(Object.keys(entry).sort()).toEqual(
+      [
+        "decision",
+        "files",
+        "index",
+        "kinds",
+        "options",
+        "reason",
+        "tradeoff",
+      ].sort(),
+    );
+    expect(String(entry.reason).length).toBe(2_500);
+  });
+
+  test("keeps every cluster when Jev fails or no key is set", async () => {
+    const clusters = [cluster(1), cluster(2)];
+    const bodies = [body(1), body(2)];
+    const { impl } = fetchScoring({ "decision 1": 0.99 }, true);
+
+    const failed = await prescreen(clusters, bodies, {
+      apiKey: "k",
+      fetch: impl,
+    });
+    const unkeyed = await prescreen(clusters, bodies, { apiKey: undefined });
+
+    for (const result of [failed, unkeyed]) {
+      expect(result.kept).toEqual(clusters);
+      expect(result.skipped).toEqual([]);
+    }
+    expect(unkeyed.jev).toEqual({ skipped: "TYPESAFE_API_KEY not set" });
   });
 });
 
@@ -491,6 +647,8 @@ describe("CLI", () => {
       cwd,
       encoding: "utf8",
       input,
+      // An empty key skips the Jev pre-screen, so no test run reaches the network.
+      env: { ...process.env, TYPESAFE_API_KEY: "" },
     });
   }
 

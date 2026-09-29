@@ -18,6 +18,7 @@ export type JevAnswer = {
   type: string;
   choice?: string;
   confidence?: number;
+  probabilities?: Record<string, number>;
   noul?: number;
 };
 
