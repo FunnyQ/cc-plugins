@@ -1,0 +1,167 @@
+/**
+ * Advisory commit grouping from TypeSafe's Jev model, used only when
+ * `TYPESAFE_API_KEY` is set. It saves the Lawspeaker the grouping pass, never
+ * the ordering: which order lets every commit build is an import question, and
+ * the Lawspeaker still owns it. Every failure degrades to "no suggestion".
+ */
+
+const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
+const MODEL = "jev-latest";
+/** Pairs grow as N²/2 — 20 files is 190 questions. */
+const MAX_FILES = 20;
+/** Jev caps state plus the longest question at 32k tokens; ~4 chars per token. */
+const STATE_CHAR_BUDGET = 60_000;
+const MAX_EXCERPT_LINES = 40;
+const SAME_GROUP_THRESHOLD = 0.7;
+const TIMEOUT_MS = 5_000;
+
+const TYPES: Record<string, string> = {
+  feat: "Adds a new user-facing capability",
+  fix: "Corrects a bug or wrong behaviour",
+  docs: "Changes documentation or prose only",
+  style: "Formatting only, no behaviour change",
+  refactor: "Restructures code without changing behaviour",
+  perf: "Makes existing behaviour faster or cheaper",
+  test: "Adds or changes tests only",
+  chore: "Build, dependency, config, or tooling upkeep",
+};
+
+export type GroupInput = {
+  path: string;
+  status: string;
+  insertions: number;
+  deletions: number;
+  diff: string;
+};
+
+type Question = {
+  type: "choice" | "noul";
+  instructions: string;
+  criteria?: Record<string, string>;
+};
+
+type Answer = { type: string; choice?: string; noul?: number };
+
+export type Group = { files: string[]; types: string[] };
+export type Suggestion = { groups: Group[] } | { skipped: string };
+
+export function buildRequest(input: GroupInput[]) {
+  const seen = new Set<string>();
+  const files = input.filter((f) => !seen.has(f.path) && seen.add(f.path));
+  const excerptChars = Math.floor(STATE_CHAR_BUDGET / files.length);
+
+  const state = {
+    files: files.map((f, index) => ({
+      index,
+      path: f.path,
+      status: f.status,
+      stats: `+${f.insertions}/-${f.deletions}`,
+      excerpt: f.diff
+        .split("\n")
+        .slice(0, MAX_EXCERPT_LINES)
+        .join("\n")
+        .slice(0, excerptChars),
+    })),
+  };
+
+  const questions: Record<string, Question> = {};
+  files.forEach((_, i) => {
+    questions[`type:${i}`] = {
+      type: "choice",
+      instructions: `Which conventional-commit type best describes the change to \`files[${i}]\`?`,
+      criteria: TYPES,
+    };
+  });
+  for (let i = 0; i < files.length; i += 1) {
+    for (let j = i + 1; j < files.length; j += 1) {
+      questions[`pair:${i}:${j}`] = {
+        type: "noul",
+        instructions: `Do the changes to \`files[${i}]\` and \`files[${j}]\` belong in the same git commit?`,
+        criteria: {
+          true: "Same concern: one change, a test and the code it tests, or one file cannot work without the other's change",
+          false:
+            "Unrelated concerns that could be committed and reviewed separately",
+        },
+      };
+    }
+  }
+
+  return { model: MODEL, state, questions };
+}
+
+export function groupFromAnswers(
+  paths: string[],
+  answers: Record<string, Answer>,
+  threshold = SAME_GROUP_THRESHOLD,
+): Group[] {
+  const parent = paths.map((_, i) => i);
+  const root = (i: number): number =>
+    parent[i] === i ? i : (parent[i] = root(parent[i]!));
+
+  for (let i = 0; i < paths.length; i += 1) {
+    for (let j = i + 1; j < paths.length; j += 1) {
+      if ((answers[`pair:${i}:${j}`]?.noul ?? 0) >= threshold) {
+        parent[root(j)] = root(i);
+      }
+    }
+  }
+
+  const byRoot = new Map<number, Group>();
+  paths.forEach((path, i) => {
+    const group = byRoot.get(root(i)) ?? { files: [], types: [] };
+    group.files.push(path);
+    group.types.push(answers[`type:${i}`]?.choice ?? "?");
+    byRoot.set(root(i), group);
+  });
+  return [...byRoot.values()];
+}
+
+export async function suggestGroups(
+  files: GroupInput[],
+  opts: { apiKey: string | undefined; fetch?: typeof fetch },
+): Promise<Suggestion | null> {
+  const unique = new Set(files.map((f) => f.path)).size;
+  if (!opts.apiKey || unique < 2 || unique > MAX_FILES) return null;
+
+  const body = buildRequest(files);
+  const paths = body.state.files.map((f) => f.path);
+  try {
+    const response = await (opts.fetch ?? fetch)(ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!response.ok) return { skipped: `HTTP ${response.status}` };
+
+    const { answers } = (await response.json()) as {
+      answers?: Record<string, Answer>;
+    };
+    if (!answers || Object.keys(body.questions).some((k) => !answers[k])) {
+      return { skipped: "response is missing answers" };
+    }
+    return { groups: groupFromAnswers(paths, answers) };
+  } catch (err) {
+    return { skipped: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function renderSuggestion(suggestion: Suggestion | null): string {
+  if (!suggestion) return "";
+  if ("skipped" in suggestion) {
+    return `\n[TypeSafe grouping skipped: ${suggestion.skipped}]\n`;
+  }
+  const lines = suggestion.groups.map(
+    (group, i) =>
+      `${i + 1}. ${group.files.map((f, k) => `${f} [${group.types[k]}]`).join(", ")}`,
+  );
+  return [
+    "",
+    "## Suggested groups (TypeSafe, advisory — unordered)",
+    ...lines,
+    "",
+  ].join("\n");
+}

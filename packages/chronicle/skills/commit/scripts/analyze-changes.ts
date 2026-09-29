@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, resolve } from "node:path";
 import { writeTempPayload } from "../../../shared/scripts/temp-payload";
+import { renderSuggestion, suggestGroups } from "./typesafe-grouping";
 
 const SCRIPT_DIR = import.meta.dir;
 const DEFAULT_PROMPT_PATH = resolve(
@@ -633,14 +634,22 @@ async function main() {
     return;
   }
 
-  const [outputPath, template] = await Promise.all([
+  const simple = process.argv.includes("--simple");
+  const [outputPath, template, suggestion] = await Promise.all([
     writeTempPayload("commit", "analysis", analysis),
     readFile(promptPath, "utf-8").catch(
       () => `[template unreadable at ${promptPath}]`,
     ),
+    simple
+      ? null
+      : suggestGroups(analysis.files, {
+          apiKey: process.env.TYPESAFE_API_KEY,
+        }),
   ]);
 
-  console.log(renderDigest(analysis, template, outputPath));
+  console.log(
+    renderDigest(analysis, template, outputPath) + renderSuggestion(suggestion),
+  );
 }
 
 if (import.meta.main) {
