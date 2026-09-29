@@ -8,10 +8,12 @@ import {
   applyTotalDiffBudget,
   capDiff,
   isBinaryFile,
+  mustPairs,
   parseNumstat,
   parseStatus,
   parseStatusRecords,
   renderDigest,
+  renderRules,
   shouldSkipDiff,
   unquoteGitPath,
   verifyPlanLanded,
@@ -500,5 +502,72 @@ describe("verifyPlanLanded", () => {
     const result = verifyPlanLanded(["a.ts"], ["a.ts", "b.ts"], []);
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("mustPairs", () => {
+  test("pairs a same-directory test with its implementation", () => {
+    expect(
+      mustPairs(["src/a.ts", "src/a.test.ts", "src/b.spec.js", "src/b.js", "src/c.ts"]),
+    ).toEqual([
+      { files: ["src/a.test.ts", "src/a.ts"], reason: "test with its implementation" },
+      { files: ["src/b.spec.js", "src/b.js"], reason: "test with its implementation" },
+    ]);
+  });
+
+  test("pairs Rails specs and tests with app/ and lib/ code", () => {
+    expect(
+      mustPairs([
+        "app/models/user.rb",
+        "spec/models/user_spec.rb",
+        "lib/tasks/sync.rb",
+        "test/tasks/sync_test.rb",
+      ]),
+    ).toEqual([
+      { files: ["spec/models/user_spec.rb", "app/models/user.rb"], reason: "test with its implementation" },
+      { files: ["test/tasks/sync_test.rb", "lib/tasks/sync.rb"], reason: "test with its implementation" },
+    ]);
+  });
+
+  test("pairs Go and Python test naming", () => {
+    expect(mustPairs(["pkg/x.go", "pkg/x_test.go", "m/test_y.py", "m/y.py"])).toEqual([
+      { files: ["pkg/x_test.go", "pkg/x.go"], reason: "test with its implementation" },
+      { files: ["m/test_y.py", "m/y.py"], reason: "test with its implementation" },
+    ]);
+  });
+
+  test("pairs a lock file with its manifest in the same directory", () => {
+    expect(
+      mustPairs(["package.json", "bun.lock", "web/Gemfile", "web/Gemfile.lock", "Cargo.lock"]),
+    ).toEqual([
+      { files: ["bun.lock", "package.json"], reason: "lock file with its manifest" },
+      { files: ["web/Gemfile.lock", "web/Gemfile"], reason: "lock file with its manifest" },
+    ]);
+  });
+
+  test("ignores a test whose implementation did not change", () => {
+    expect(mustPairs(["src/a.test.ts", "src/b.ts"])).toEqual([]);
+  });
+});
+
+describe("renderRules", () => {
+  test("says a split is final above five files", () => {
+    const text = renderRules(["a", "b", "c", "d", "e", "f"]);
+    expect(text).toContain("6 files");
+    expect(text).toContain("omit `simple`");
+  });
+
+  test("says nothing about the shape at five files or fewer", () => {
+    expect(renderRules(["a", "b"])).not.toContain("simple");
+  });
+
+  test("lists pairs that must share a commit", () => {
+    expect(renderRules(["x.ts", "x.test.ts"])).toContain(
+      "- x.test.ts + x.ts (test with its implementation)",
+    );
+  });
+
+  test("renders nothing when there is nothing to say", () => {
+    expect(renderRules(["a.ts"])).toBe("");
   });
 });

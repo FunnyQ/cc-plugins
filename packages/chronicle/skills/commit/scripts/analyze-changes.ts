@@ -524,6 +524,82 @@ export function renderDigest(
   return `${head}${kept}\n\n[${dropped.size} diff(s) held back to fit the digest: ${names.join(", ")}. Read them from the payload above if a grouping turns on them.]\n`;
 }
 
+export type MustPair = { files: [string, string]; reason: string };
+
+const LOCK_MANIFESTS: Record<string, string> = {
+  "bun.lock": "package.json",
+  "bun.lockb": "package.json",
+  "package-lock.json": "package.json",
+  "yarn.lock": "package.json",
+  "pnpm-lock.yaml": "package.json",
+  "Gemfile.lock": "Gemfile",
+  "Cargo.lock": "Cargo.toml",
+  "poetry.lock": "pyproject.toml",
+  "uv.lock": "pyproject.toml",
+  "go.sum": "go.mod",
+  "composer.lock": "composer.json",
+};
+
+/** Where the implementation of a test file would live, most likely first. */
+function implementationsOf(path: string): string[] {
+  const slash = path.lastIndexOf("/");
+  const dir = path.slice(0, slash + 1);
+  const name = path.slice(slash + 1);
+  const rails = /^(?:spec|test)\/(.+)_(?:spec|test)\.rb$/.exec(path);
+  if (rails) return [`app/${rails[1]}.rb`, `lib/${rails[1]}.rb`];
+  const patterns: [RegExp, string][] = [
+    [/^(.+)\.(?:test|spec)(\.[^.]+)$/, "$1$2"],
+    [/^(.+)_(?:test|spec)(\.[^.]+)$/, "$1$2"],
+    [/^test_(.+\.py)$/, "$1"],
+  ];
+  for (const [pattern, replacement] of patterns) {
+    if (pattern.test(name)) return [dir + name.replace(pattern, replacement)];
+  }
+  return [];
+}
+
+// Found from paths alone, so the agent spends no judgement here and it holds without a TypeSafe key.
+export function mustPairs(paths: string[]): MustPair[] {
+  const changed = new Set(paths);
+  const pairs: MustPair[] = [];
+  for (const path of changed) {
+    const impl = implementationsOf(path).find((p) => changed.has(p));
+    if (impl) {
+      pairs.push({
+        files: [path, impl],
+        reason: "test with its implementation",
+      });
+      continue;
+    }
+    const slash = path.lastIndexOf("/");
+    const manifest = LOCK_MANIFESTS[path.slice(slash + 1)];
+    const manifestPath = manifest && path.slice(0, slash + 1) + manifest;
+    if (manifestPath && changed.has(manifestPath)) {
+      pairs.push({
+        files: [path, manifestPath],
+        reason: "lock file with its manifest",
+      });
+    }
+  }
+  return pairs;
+}
+
+/** What the plan must follow, decided here so the agent only writes prose around it. */
+export function renderRules(paths: string[]): string {
+  const unique = [...new Set(paths)];
+  const lines: string[] = [];
+  if (unique.length > 5) {
+    lines.push(
+      `Split is final: ${unique.length} files, so any 2+ groups commit atomic — omit \`simple\` (unless \`exclude\` leaves 5 or fewer).`,
+    );
+  }
+  for (const pair of mustPairs(unique)) {
+    lines.push(`- ${pair.files.join(" + ")} (${pair.reason})`);
+  }
+  if (lines.length === 0) return "";
+  return ["", "## Rules the plan must follow", ...lines, ""].join("\n");
+}
+
 export type PlanVerification = {
   ok: boolean;
   missing: string[];
@@ -648,7 +724,9 @@ async function main() {
   ]);
 
   console.log(
-    renderDigest(analysis, template, outputPath) + renderSuggestion(suggestion),
+    renderDigest(analysis, template, outputPath) +
+      renderRules(analysis.files.map((file) => file.path)) +
+      renderSuggestion(suggestion),
   );
 }
 
