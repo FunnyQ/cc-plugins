@@ -10,7 +10,16 @@ import {
   remotePushUrlArgs,
   resolveCrossFork,
   selectBaseRef,
+  textPathFor,
 } from "./analyze-branch";
+
+describe("textPathFor", () => {
+  test("names a sibling of the material file for the drafted text", () => {
+    expect(
+      textPathFor("/tmp/q-lab/chronicle/pr/branch-material-1-2.json"),
+    ).toBe("/tmp/q-lab/chronicle/pr/branch-material-1-2.text.json");
+  });
+});
 
 function decision(
   id: string,

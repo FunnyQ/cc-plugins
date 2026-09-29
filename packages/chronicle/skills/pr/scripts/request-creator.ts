@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { errorMessage } from "../../../shared/scripts/errors";
-import type { Provider } from "./analyze-branch";
+import type { BranchMaterial, Provider } from "./analyze-branch";
 
 export type CreateInput = {
   provider: Provider;
@@ -26,7 +26,7 @@ export type CreateResult =
   | { ok: true; url: string }
   | {
       ok: false;
-      reason: "missing-cli" | "no-remote" | "cli-error";
+      reason: "missing-cli" | "no-remote" | "not-pushed" | "cli-error";
       message: string;
     };
 
@@ -203,13 +203,68 @@ export async function createRequest(
   };
 }
 
-async function readInputJson(): Promise<string> {
-  const argvInput = process.argv[2];
-  if (argvInput) {
-    return argvInput;
+export function inputFromFiles(
+  material: Pick<BranchMaterial, "provider" | "base" | "head" | "repo">,
+  text: { title: string; body: string },
+  flags: { draft: boolean; skipReview: boolean },
+): CreateInput {
+  if (!text.title?.trim()) throw new Error("Drafted text has no title.");
+  if (!text.body?.trim()) throw new Error("Drafted text has no body.");
+
+  return {
+    provider: material.provider,
+    title: text.title,
+    body: text.body,
+    base: material.base,
+    head: material.head,
+    draft: flags.draft,
+    ...(material.repo ? { repo: material.repo } : {}),
+    ...(flags.skipReview ? { skipReview: true } : {}),
+  };
+}
+
+// Local remote-tracking refs only, so a push the last fetch has not seen reads
+// as unpushed; that errs toward asking, never toward a request with no commits.
+export async function checkPushed(
+  head: string,
+  run: Runner,
+): Promise<CreateResult | null> {
+  const branch = head.slice(head.indexOf(":") + 1);
+  const result = await run([
+    "git",
+    "for-each-ref",
+    "--contains",
+    "HEAD",
+    "--format=%(refname:lstrip=3)",
+    "refs/remotes",
+  ]);
+  const remoteBranches = result.stdout.split("\n").map((line) => line.trim());
+
+  if (result.exitCode === 0 && remoteBranches.includes(branch)) {
+    return null;
   }
 
-  return await Bun.stdin.text();
+  return {
+    ok: false,
+    reason: "not-pushed",
+    message: `No remote branch named ${branch} contains HEAD. Push it, then rerun request-creator.ts with the same files.`,
+  };
+}
+
+function parseCliArgs(argv: string[]) {
+  const value = (flag: string) => {
+    const index = argv.indexOf(flag);
+    const found = index === -1 ? undefined : argv[index + 1];
+    if (!found) throw new Error(`Missing ${flag} <path>.`);
+    return found;
+  };
+
+  return {
+    materialPath: value("--material"),
+    textPath: value("--text"),
+    draft: argv.includes("--draft"),
+    skipReview: argv.includes("--skip-review"),
+  };
 }
 
 async function realRunner(cmd: string[]): ReturnType<Runner> {
@@ -233,8 +288,15 @@ async function realRunner(cmd: string[]): ReturnType<Runner> {
 
 if (import.meta.main) {
   try {
-    const input = JSON.parse(await readInputJson()) as CreateInput;
-    const result = await createRequest(input, realRunner);
+    const args = parseCliArgs(Bun.argv.slice(2));
+    const input = inputFromFiles(
+      await Bun.file(args.materialPath).json(),
+      await Bun.file(args.textPath).json(),
+      args,
+    );
+    const result =
+      (await checkPushed(input.head, realRunner)) ??
+      (await createRequest(input, realRunner));
     console.log(JSON.stringify(result));
   } catch (error) {
     const result: CreateResult = {

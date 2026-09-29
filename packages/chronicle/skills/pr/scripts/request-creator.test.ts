@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildArgs,
+  checkPushed,
   createRequest,
+  inputFromFiles,
   type CreateInput,
   type Runner,
 } from "./request-creator";
@@ -193,6 +195,90 @@ describe("createRequest", () => {
       ok: false,
       reason: "cli-error",
       message: "GraphQL: title is too short",
+    });
+  });
+});
+
+describe("inputFromFiles", () => {
+  const material = {
+    provider: "github" as const,
+    base: "main",
+    head: "feature/request-creator",
+    repo: null,
+  };
+  const text = { title: "Ship request creator", body: "Body text" };
+
+  test("joins branch material, drafted text, and the flags", () => {
+    expect(
+      inputFromFiles(material, text, { draft: true, skipReview: true }),
+    ).toEqual({
+      ...githubInput,
+      draft: true,
+      skipReview: true,
+    });
+  });
+
+  test("carries a cross-fork repo through", () => {
+    expect(
+      inputFromFiles(
+        { ...material, repo: "acme/repo", head: "me:feature/x" },
+        text,
+        { draft: false, skipReview: false },
+      ),
+    ).toMatchObject({ repo: "acme/repo", head: "me:feature/x" });
+  });
+
+  test("rejects a draft with an empty title or body", () => {
+    const flags = { draft: false, skipReview: false };
+    expect(() =>
+      inputFromFiles(material, { ...text, title: " " }, flags),
+    ).toThrow(/title/);
+    expect(() =>
+      inputFromFiles(material, { ...text, body: "" }, flags),
+    ).toThrow(/body/);
+  });
+});
+
+describe("checkPushed", () => {
+  const refs =
+    (stdout: string): Runner =>
+    async (cmd) => {
+      expect(cmd).toEqual([
+        "git",
+        "for-each-ref",
+        "--contains",
+        "HEAD",
+        "--format=%(refname:lstrip=3)",
+        "refs/remotes",
+      ]);
+      return { exitCode: 0, stdout, stderr: "" };
+    };
+
+  test("passes when a remote branch of the same name contains HEAD", async () => {
+    await expect(
+      checkPushed("feature/x", refs("main\nfeature/x\n")),
+    ).resolves.toBeNull();
+  });
+
+  test("matches the branch part of a cross-fork head", async () => {
+    await expect(
+      checkPushed("me:feature/x", refs("feature/x\n")),
+    ).resolves.toBeNull();
+  });
+
+  // A suffix match would pass `x` against `feature/x` and open a request for
+  // commits the remote does not have.
+  test("reports not-pushed when only a longer name ends with the branch", async () => {
+    await expect(checkPushed("x", refs("feature/x\n"))).resolves.toMatchObject({
+      ok: false,
+      reason: "not-pushed",
+    });
+  });
+
+  test("reports not-pushed when no remote ref contains HEAD", async () => {
+    await expect(checkPushed("feature/x", refs(""))).resolves.toMatchObject({
+      ok: false,
+      reason: "not-pushed",
     });
   });
 });

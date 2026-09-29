@@ -75,7 +75,7 @@ export function qualifyHead(
 // behavior rather than guessing.
 //
 // `owner:branch` is gh's syntax, and only gh's. glab reads `--source-branch` as a
-// plain branch name (a cross-project MR needs --source-project, which the messenger
+// plain branch name (a cross-project MR needs --source-project, which request-creator.ts
 // does not speak yet), so on any non-GitHub provider we keep today's bare head
 // rather than hand glab a head it cannot parse.
 export function resolveCrossFork(
@@ -327,6 +327,11 @@ async function harvestCockpit(
   }
 }
 
+// Unique because the material path is, so the drafter's Write never meets a stale file.
+export function textPathFor(outputPath: string): string {
+  return outputPath.replace(/\.json$/, ".text.json");
+}
+
 async function writePayload(payload: BranchMaterial): Promise<string> {
   return writeTempPayload("pr", "branch-material", payload);
 }
@@ -372,6 +377,7 @@ async function main(): Promise<void> {
     console.log(
       JSON.stringify({
         outputPath,
+        textPath: textPathFor(outputPath),
         provider,
         hasCockpit: cockpit.hasCockpit,
         commitCount: payload.commits.length,
