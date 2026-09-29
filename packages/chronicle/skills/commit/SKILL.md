@@ -75,6 +75,8 @@ reads a single signal.
    - If you passed `exclude`, relay the Lawspeaker's `warning` line to the user. An excluded
      file the committed code needs leaves a HEAD that does not build, and only the user can
      judge that.
+   - Relay a `[TypeSafe grouping skipped: …]` line to the user. It means
+     `TYPESAFE_API_KEY` is set but failing, and nothing else surfaces that.
 
 There is no baseline to record before the spawn: `apply` computes `base` from the
 log itself, so a second `rev-parse` here would only re-derive it at the most

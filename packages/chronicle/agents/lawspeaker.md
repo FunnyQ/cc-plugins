@@ -171,7 +171,8 @@ only hide the first one's outcome. Never fall back to hand-rolled git: never
 - **`ok: true`** → relay the `log` verbatim, prefixed with `simple commit (forced)`,
   `simple commit`, or `atomic split — N commits`. Append the `verify` counts as one
   line of evidence, and `base` on its own line so the main agent can check HEAD.
-  When the result carries `warning`, relay it verbatim on its own line.
+  When the result carries `warning`, relay it verbatim on its own line. When the
+  digest held a `[TypeSafe grouping skipped: …]` line, relay it verbatim too.
 - **`ok: false` with `errors`** — the plan file is malformed. Every complaint names
   its field. Fix them all in one rewrite and run `apply` again.
 - **`ok: false` with `missing` / `duplicated` / `unknown` / `splitRenames`** — the
