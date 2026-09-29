@@ -11,6 +11,9 @@ import {
 } from "./comment-guard.ts";
 import type { Syntax } from "./comment-guard.ts";
 
+// A key in the developer's shell would send these fixtures to Jev; jev-screen.test.ts covers that path offline.
+delete process.env.TYPESAFE_API_KEY;
+
 const rb = syntaxFor("a/user.rb")!;
 const ts = syntaxFor("a/app.ts")!;
 const html = syntaxFor("a/page.html")!;

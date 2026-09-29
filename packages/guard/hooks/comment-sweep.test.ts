@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { snapshot, sweep } from "./comment-sweep.ts";
 import { recordReported } from "./sweep-state.ts";
 
+// A key in the developer's shell would send these fixtures to Jev; jev-screen.test.ts covers that path offline.
+delete process.env.TYPESAFE_API_KEY;
+
 let repo: string;
 let state: string;
 const SESSION = "s-1";

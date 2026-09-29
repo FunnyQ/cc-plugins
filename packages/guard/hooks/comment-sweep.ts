@@ -26,8 +26,10 @@ import {
   isGuardedPath,
   resolveAdded,
   syntaxFor,
+  type CommentBlock,
   type Hunk,
 } from "./comment-guard.ts";
+import { screenBlocks } from "./jev-screen.ts";
 import {
   clearBaseline,
   clearReported,
@@ -149,7 +151,7 @@ export async function sweep(payload: Payload): Promise<string | null> {
     .filter((f) => f && isGuardedPath(f) && syntaxFor(f));
   if (files.length === 0 || files.length > MAX_FILES) return null;
 
-  const reasons: string[] = [];
+  const found: { file: string; blocks: CommentBlock[] }[] = [];
   for (const file of files) {
     const diff = git(root, [
       "diff-tree",
@@ -182,9 +184,20 @@ export async function sweep(payload: Payload): Promise<string | null> {
     if (added instanceof Set ? added.size === 0 : added.length === 0) continue;
 
     const blocks = flaggedBlocks(text, syntaxFor(file)!, added);
-    if (blocks.length > 0)
-      reasons.push(formatReason(file, blocks, "🧹 comment-sweep"));
+    if (blocks.length > 0) found.push({ file, blocks });
   }
+
+  // In parallel: 20 files asked one by one could outlast the hook's 10 s timeout.
+  const screened = await Promise.all(
+    found.map(({ file, blocks }) =>
+      screenBlocks(file, blocks, { apiKey: process.env.TYPESAFE_API_KEY }),
+    ),
+  );
+  const reasons = found.flatMap(({ file }, i) =>
+    screened[i]!.length > 0
+      ? [formatReason(file, screened[i]!, "🧹 comment-sweep")]
+      : [],
+  );
   return reasons.length > 0 ? reasons.join("\n\n") : null;
 }
 

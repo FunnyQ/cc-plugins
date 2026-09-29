@@ -21,6 +21,7 @@
  */
 
 import { basename, extname } from "node:path";
+import { screenBlocks } from "./jev-screen.ts";
 import { recordReported } from "./sweep-state.ts";
 
 export type ToolInput = {
@@ -496,7 +497,11 @@ async function main(): Promise<number> {
   }
 
   const fileName = basename(filePath);
-  console.error(formatReason(fileName, blocks));
+  const unsure = await screenBlocks(fileName, blocks, {
+    apiKey: process.env.TYPESAFE_API_KEY,
+  });
+  if (unsure.length === 0) return 0;
+  console.error(formatReason(fileName, unsure));
   return 2;
 }
 
