@@ -11,10 +11,9 @@ export const TMP_ROOT = "/tmp/q-lab/relay/relay";
 export const DEFAULT_MODELS: Record<string, Partial<Record<Mode, string>>> = {
   codex: {}, // unset → CLI default
   claude: {}, // unset → CLI default
-  opencode: {
-    delegate: "opencode-go/deepseek-v4-light",
-    review: "opencode-go/deepseek-v4-pro",
-  },
+  // unset → opencode config default. Hosted model ids churn (deepseek-v4-light
+  // vanished upstream and broke every out-of-box delegate), so relay pins none.
+  opencode: {},
 };
 
 // Config file path for relay models (XDG standard)

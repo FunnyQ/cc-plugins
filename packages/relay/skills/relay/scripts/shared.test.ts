@@ -24,9 +24,9 @@ describe("resolveModel", () => {
     expect(result).toBe("config-model");
   });
 
-  it("returns DEFAULT_MODELS[backend][mode] when flag and config absent", () => {
+  it("returns undefined for opencode when flag and config absent (opencode picks its own default)", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({}));
-    expect(result).toBe("opencode-go/deepseek-v4-light");
+    expect(result).toBeUndefined();
   });
 
   it("returns undefined for codex delegate when flag, config, and constant absent", () => {
@@ -43,8 +43,7 @@ describe("resolveModel", () => {
     const result = resolveModel("opencode", "review", undefined, () => {
       throw new Error("file not found");
     });
-    // Should fall back to DEFAULT_MODELS
-    expect(result).toBe("opencode-go/deepseek-v4-pro");
+    expect(result).toBeUndefined();
   });
 
   it("handles malformed JSON gracefully (no throw)", () => {
@@ -52,26 +51,26 @@ describe("resolveModel", () => {
       // Simulate a readConfig that encounters invalid JSON
       return undefined;
     });
-    expect(result).toBe("opencode-go/deepseek-v4-light");
+    expect(result).toBeUndefined();
   });
 
   it("falls back to constant when config is invalid shape", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: { someBackend: { someMode: "model" } }, // wrong backend
     }));
-    expect(result).toBe("opencode-go/deepseek-v4-light");
+    expect(result).toBeUndefined();
   });
 
   it("falls back to constant when config.models is missing", () => {
     const result = resolveModel("opencode", "review", undefined, () => ({}));
-    expect(result).toBe("opencode-go/deepseek-v4-pro");
+    expect(result).toBeUndefined();
   });
 
   it("falls back to constant when config.models[backend] is missing", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: {},
     }));
-    expect(result).toBe("opencode-go/deepseek-v4-light");
+    expect(result).toBeUndefined();
   });
 
   it("falls back to constant when config.models[backend][mode] is missing", () => {
@@ -160,8 +159,7 @@ describe("DEFAULT_MODELS", () => {
     expect(DEFAULT_MODELS.claude).toEqual({});
   });
 
-  it("has delegate and review for opencode", () => {
-    expect(DEFAULT_MODELS.opencode.delegate).toBe("opencode-go/deepseek-v4-light");
-    expect(DEFAULT_MODELS.opencode.review).toBe("opencode-go/deepseek-v4-pro");
+  it("has empty object for opencode (defers to opencode config)", () => {
+    expect(DEFAULT_MODELS.opencode).toEqual({});
   });
 });
