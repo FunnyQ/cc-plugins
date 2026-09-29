@@ -18,7 +18,7 @@
  * committed binary what it is, is the only way to know.
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -38,6 +38,14 @@ import {
   type ReleaseConfig,
   type Workflow,
 } from "./analyze-release";
+import {
+  gatherFacts,
+  renderEntry,
+  spliceEntries,
+  validateEntries,
+  type EntryDraft,
+} from "./changelog";
+import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 import {
   artifactsDone,
   bumpDone,
@@ -397,7 +405,7 @@ async function checkout(branch: string): Promise<void> {
 export async function run(
   config: ReleaseConfig,
   choices: VersionChoice[],
-  opts: { persistConfig: boolean; through: StageId },
+  opts: { persistConfig: boolean; through: StageId; entriesFile?: string },
 ): Promise<RunResult> {
   const root = await repoRoot();
   const main = config.branches.main;
@@ -427,7 +435,13 @@ export async function run(
       throw new Error(`${id} is blocked: ${stage.note}`);
     }
 
-    await execute(id, config, current, { root, main, develop, commitBranch });
+    await execute(id, config, current, {
+      root,
+      main,
+      develop,
+      commitBranch,
+      entriesFile: opts.entriesFile,
+    });
 
     current = await plan(config, choices, opts);
     const after = current.stages.find((s) => s.id === id)!;
@@ -454,7 +468,13 @@ async function execute(
   id: StageId,
   config: ReleaseConfig,
   p: Plan,
-  ctx: { root: string; main: string; develop?: string; commitBranch: string },
+  ctx: {
+    root: string;
+    main: string;
+    develop?: string;
+    commitBranch: string;
+    entriesFile?: string;
+  },
 ): Promise<void> {
   switch (id) {
     case "save-config":
@@ -485,15 +505,39 @@ async function execute(
       return;
     }
 
-    // The one stage this engine cannot do: turning commits into user-facing
-    // prose is the annalist's job. Refusing here rather than committing keeps a
-    // bumped tree from being tagged with no CHANGELOG entry behind it.
-    case "entry":
-      throw new Error(
-        `the CHANGELOG entry is missing for ${p.units
-          .map((u) => u.headerLabel)
-          .join(", ")} — spawn chronicle:annalist to write it, then re-run`,
+    // The prose is the annalist's; everything around it is here. Refusing without
+    // a draft keeps a bumped tree from being tagged with no CHANGELOG entry.
+    case "entry": {
+      if (!ctx.entriesFile) {
+        throw new Error(
+          `the CHANGELOG entry is missing for ${p.units
+            .map((u) => u.headerLabel)
+            .join(", ")} — run \`release.ts facts\`, spawn chronicle:annalist, then re-run with --entries-file`,
+        );
+      }
+      const path = resolve(ctx.root, p.changelogPath);
+      const changelog = await readFile(path, "utf-8").catch(() => "");
+      const pending = p.units.filter((u) => !entryDone(u, changelog));
+      const facts = await gatherFacts(pending);
+      const tags = new Set(pending.map((u) => u.tagName));
+      const drafts = (
+        JSON.parse(await readFile(ctx.entriesFile, "utf-8")) as EntryDraft[]
+      ).filter((d) => tags.has(d.tagName));
+      const errors = validateEntries(drafts, facts);
+      if (errors.length > 0) {
+        throw new Error(`entries file rejected:\n  ${errors.join("\n  ")}`);
+      }
+      const date = new Date().toLocaleDateString("sv-SE");
+      const blocks = pending.map((u) =>
+        renderEntry(
+          drafts.find((d) => d.tagName === u.tagName)!,
+          u.headerLabel,
+          date,
+        ),
       );
+      await writeFile(path, spliceEntries(changelog, blocks));
+      return;
+    }
 
     case "commit":
       await checkout(ctx.commitBranch);
@@ -576,6 +620,19 @@ export function formatPlanDigest(plan: Plan): string {
   return lines.join("\n");
 }
 
+export function formatFactsDigest(
+  facts: Awaited<ReturnType<typeof gatherFacts>>,
+  path: string,
+): string {
+  if (facts.length === 0) return "facts      every entry already written";
+  const lines = facts.map((unit) => {
+    const judge = unit.commits.filter((c) => c.section === "judge").length;
+    return `facts      ${unit.tagName} · ${unit.commits.length} commits · ${judge} to judge`;
+  });
+  lines.push(`payload    ${path}`);
+  return lines.join("\n");
+}
+
 export function formatRunDigest(result: RunResult): string {
   return [
     `executed   ${result.executed.join(" ") || "nothing — every stage already done"}`,
@@ -594,13 +651,14 @@ async function main() {
       through: { type: "string" },
       json: { type: "boolean" },
       "persist-config": { type: "boolean", default: false },
+      "entries-file": { type: "string" },
     },
   });
 
   const command = positionals[0];
-  if (command !== "plan" && command !== "run") {
+  if (command !== "plan" && command !== "run" && command !== "facts") {
     console.error(
-      "usage: release.ts plan|run --units <json> [--through <stage>]",
+      "usage: release.ts plan|facts|run --units <json> [--through <stage>] [--entries-file <path>]",
     );
     process.exit(2);
   }
@@ -629,6 +687,20 @@ async function main() {
     process.exit(result.stages.some((s) => s.state === "blocked") ? 1 : 0);
   }
 
+  if (command === "facts") {
+    const current = await plan(config, choices, { persistConfig });
+    const changelog = await readFile(
+      resolve(root, current.changelogPath),
+      "utf-8",
+    ).catch(() => "");
+    const facts = await gatherFacts(
+      current.units.filter((u) => !entryDone(u, changelog)),
+    );
+    const path = await writeTempPayload("release", "facts", facts);
+    console.log(formatFactsDigest(facts, path));
+    return;
+  }
+
   if (!values.through) {
     console.error("--through <stage> is required for run");
     process.exit(2);
@@ -636,6 +708,7 @@ async function main() {
   const result = await run(config, choices, {
     persistConfig,
     through: values.through as StageId,
+    entriesFile: values["entries-file"],
   });
   console.log(
     values.json ? JSON.stringify(result, null, 2) : formatRunDigest(result),

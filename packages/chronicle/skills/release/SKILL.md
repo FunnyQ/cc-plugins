@@ -217,8 +217,7 @@ a version bump, a CHANGELOG entry, and none of the work. That has shipped once
 bun "{SKILL_DIR}/scripts/release.ts" plan --units '{units}'
 ```
 
-The `stages` line lists them in order, a done one marked `✓`. The `entry` line
-carries everything step 6 hands the annalist. Exit 1 means something is
+The `stages` line lists them in order, a done one marked `✓`. Exit 1 means something is
 **blocked** — a `BLOCKED` line names the stage and the reason. Report it and stop.
 A blocked stage is always a state the user must resolve (a tag already on another
 commit, a `main` behind its remote); never work around it.
@@ -232,20 +231,30 @@ the digest's own warning was read past.
 
 ### 6. Entry, if pending
 
-If the `entry` stage is pending, spawn the annalist **once**, with
-`subagent_type: "chronicle:annalist"`, never a fork, no `name`:
+If the `entry` stage is pending, gather the facts:
+
+```bash
+bun "{SKILL_DIR}/scripts/release.ts" facts --units '{units}'
+```
+
+It prints one line per unit (commit count, how many the commit type cannot
+classify) and the `payload` path. The engine owns the commit list, so none can be
+missed. Then spawn the annalist **once**, with `subagent_type: "chronicle:annalist"`,
+never a fork, no `name`:
 
 ```
 Agent({
   subagent_type: "chronicle:annalist",
-  prompt: "skill directory (absolute, literal): <the base-directory banner value>. Write a CHANGELOG entry per release. changelogPath=<the plan's changelogPath>; entries=<[{headerLabel,tagName,pathScope,lastTag}, ...] JSON>. Read references/changelog-template.md. Prepend all entries as one contiguous newest-first block at the top. Return the entry text + the changelog path."
+  prompt: "skill directory (absolute, literal): <the base-directory banner value>. factsPath=<the payload path>. Write the entries file. Return its path."
 })
 ```
 
-`changelogPath` and each entry's `headerLabel`, `pathScope`, and `lastTag` are the
-plan's `entry` line, and `tagName` is its `plan` line — you never need the raw config
-for this. Skip this whenever `entry` reads `entry✓` — the entry exists, and a second
-one for the same version is a duplicate heading.
+Pass the returned path to step 7 as `--entries-file`. The `entry` stage validates
+that every commit is accounted for, renders the markdown, and splices it above the
+first existing heading. A rejected file names each problem: resume the same
+annalist with that list through `SendMessage`, never a second spawn. Skip this
+whole step whenever `entry` reads `entry✓` — the entry exists, and a second one for
+the same version is a duplicate heading.
 
 ### 7. Run
 
@@ -256,8 +265,10 @@ given about something else, and treat a decline as `--through tag` rather than a
 stop.
 
 ```bash
-bun "{SKILL_DIR}/scripts/release.ts" run --units '{units}' --through "{stage}"
+bun "{SKILL_DIR}/scripts/release.ts" run --units '{units}' --through "{stage}" --entries-file "{entriesFile}"
 ```
+
+Drop `--entries-file` when `entry` already reads `entry✓`.
 
 The result names what executed, what it skipped, the release commit, and the tags.
 A stage that runs without taking effect aborts the release — the engine will not
