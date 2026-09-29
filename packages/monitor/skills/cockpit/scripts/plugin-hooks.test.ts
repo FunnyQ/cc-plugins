@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import claudeManifest from "../../../.claude-plugin/plugin.json";
 import codexManifest from "../../../.codex-plugin/plugin.json";
 import codexHooks from "../../../.codex-plugin/hooks.json";
@@ -67,23 +69,42 @@ describe("decision-log SessionStart hook", () => {
     expect(result.stdout.toString()).toBe("");
   });
 
-  it("injects guidance for ordinary sessions", () => {
-    expect(decisionLogHook).toBeDefined();
+  const runStartHook = (path: string) => {
     const env = { ...process.env };
     Object.assign(env, {
       CLAUDE_PLUGIN_ROOT: pluginRoot,
       CLAUDE_CODE_ENTRYPOINT: "cli",
+      PATH: path,
     });
     delete env.RELAY_DELEGATED;
-    const result = Bun.spawnSync(["sh", "-c", decisionLogHook!.command], {
-      env,
-      stdin: Buffer.from("{}"),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    delete env.PLUGIN_ROOT;
+    return Bun.spawnSync(
+      [
+        "sh",
+        "-c",
+        decisionLogHook!.command.replace(/^bun /, `${process.execPath} `),
+      ],
+      { env, stdin: Buffer.from("{}"), stdout: "pipe", stderr: "pipe" },
+    );
+  };
 
+  it("injects guidance when no claude binary can run the scribe headless", () => {
+    expect(decisionLogHook).toBeDefined();
+    const result = runStartHook("/usr/bin:/bin");
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("DECISION LOG ACTIVE");
+  });
+
+  it("stays quiet on Claude Code with claude on PATH — the Stop hook scribes", () => {
+    const bin = mkdtempSync(join(tmpdir(), "claude-bin-"));
+    try {
+      writeFileSync(join(bin, "claude"), "#!/bin/sh\n", { mode: 0o755 });
+      const result = runStartHook(`${bin}:/usr/bin:/bin`);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toBe("");
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
   });
 
   it("stays quiet for SDK sessions and subagents", () => {

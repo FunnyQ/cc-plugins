@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import {
+  isClaudeCode,
   resolveParentSession,
   shouldSkipDecisionLogReminder,
   type DecisionLogHookInput,
@@ -48,6 +49,8 @@ async function main() {
   }
 
   if (shouldSkipDecisionLogReminder(process.env, input)) return;
+  // scribe-nudge launches the scribe itself here; guidance would double it.
+  if (isClaudeCode(process.env, input) && Bun.which("claude")) return;
   process.stdout.write(
     `${buildGuidance(resolveParentSession(process.env, input), Boolean(process.env.PLUGIN_ROOT))}\n`,
   );
