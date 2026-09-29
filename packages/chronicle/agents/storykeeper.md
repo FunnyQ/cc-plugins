@@ -141,8 +141,9 @@ the command runs against `/`.
    `outputPath` itself, so a cross-fork `repo` and a qualified `head` reach it
    untouched.
 
-6. Open the request. Add `--draft` only when `draft` is true, and
-   `--skip-review` only when `skipReview` is true:
+6. Open the request only after the `Write` has returned — never in the same tool
+   block, because the creator reads `textPath` the moment it starts. Add `--draft`
+   only when `draft` is true, and `--skip-review` only when `skipReview` is true:
 
    ```bash
    bun "{SKILL_DIR}/scripts/request-creator.ts" --material "{outputPath}" --text "{textPath}"
