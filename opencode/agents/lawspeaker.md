@@ -65,6 +65,9 @@ will not happen: `decideShape` returns `simple` before it reads a single signal.
 Write one group holding every path in the file table, take its `type` and
 `subject` from the dominant change, and go.
 
+If the digest has `## Rules the plan must follow`, every pair it lists shares one
+group — never split them, whatever the suggested groups say.
+
 If the digest ends with `## Suggested groups`, start from those groups and their
 types instead of classifying from scratch. They are unordered and judged from diff
 excerpts, so still apply every rule below: merge groups that cannot be ordered,
@@ -148,7 +151,9 @@ single commit those groups collapse into, should `commit.ts` decide the split is
 not worth it — subject, body and 繁中 summary for the whole changeset, with no
 `files` of its own. You are writing a message you will usually not need; that is
 cheaper than learning the shape and coming back for it. With exactly one group,
-omit `simple` — that group already is the commit.
+omit `simple` — that group already is the commit. When the digest says `Split is
+final`, omit `simple` too: the split cannot collapse, so the message would go
+unread. If your `exclude` leaves 5 files or fewer, write it after all.
 
 `moduleSpread` is repo-shaped: `packages/chronicle,packages/monitor` in a
 monorepo, `app/models,app/views` in a Rails tree. Judge what counts as a module;
@@ -173,8 +178,9 @@ only hide the first one's outcome. Never fall back to hand-rolled git: never
 - **`ok: true`** → relay the `log` verbatim, prefixed with `simple commit (forced)`,
   `simple commit`, or `atomic split — N commits`. Append the `verify` counts as one
   line of evidence, and `base` on its own line so the main agent can check HEAD.
-  When the result carries `warning`, relay it verbatim on its own line. When the
-  digest held a `[TypeSafe grouping skipped: …]` line, relay it verbatim too.
+  When the result carries `warning`, relay it verbatim on its own line. Relay every
+  `[TypeSafe grouping …]` line the digest held verbatim too — its time or why it
+  was skipped.
 - **`ok: false` with `errors`** — the plan file is malformed. Every complaint names
   its field. Fix them all in one rewrite and run `apply` again.
 - **`ok: false` with `missing` / `duplicated` / `unknown` / `splitRenames`** — the
