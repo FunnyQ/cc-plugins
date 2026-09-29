@@ -33,7 +33,14 @@ section). The facts are an array, one element per release:
 type UnitFacts = {
   tagName: string;
   headerLabel: string;
-  commits: { sha: string; subject: string; body: string; section: Suggestion }[];
+  commits: {
+    sha: string;
+    subject: string;
+    body: string;
+    section: Suggestion;
+    judgedBy?: "jev";   // section came from TypeSafe's Jev, not the commit type
+    confidence?: number;
+  }[];
 };
 type Suggestion =
   | "Added" | "Changed" | "Deprecated" | "Removed" | "Fixed" | "Security"
@@ -44,6 +51,9 @@ type Suggestion =
 default. `omit` is a chore, a test, or a release commit. `judge` means the type
 cannot settle it: decide from the subject and body. In this kind of repo a `docs`
 commit that edits a skill or agent file changes behaviour, so it is rarely `omit`.
+A section with `judgedBy: "jev"` was a `judge` that TypeSafe's Jev classified from
+the subject and body alone. Take it as a suggestion, and overrule it when the text
+says otherwise.
 
 ### 2. Write the entries file
 

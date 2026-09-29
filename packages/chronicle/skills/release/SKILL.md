@@ -239,7 +239,9 @@ bun "{SKILL_DIR}/scripts/release.ts" facts --units '{units}'
 
 It prints one line per unit (commit count, how many the commit type cannot
 classify) and the `payload` path. The engine owns the commit list, so none can be
-missed. Then spawn the annalist **once**, with `subagent_type: "chronicle:annalist"`,
+missed. Relay its `[TypeSafe classify …]` line to the user: how long Jev took to
+suggest sections for the unclassifiable commits, or why it did not run — no key,
+or a key that is failing. Then spawn the annalist **once**, with `subagent_type: "chronicle:annalist"`,
 never a fork, no `name`:
 
 ```
