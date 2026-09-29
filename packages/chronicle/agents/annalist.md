@@ -63,7 +63,8 @@ Create a fresh directory and write the file inside it:
 mktemp -d /tmp/q-lab/chronicle/release/entries.XXXXXX
 ```
 
-Write `<that dir>/entries.json`:
+Write `<that dir>/entries.json` as an array of `EntryDraft`, one per element of the
+facts, even when there is only one:
 
 ```ts
 type EntryDraft = {
