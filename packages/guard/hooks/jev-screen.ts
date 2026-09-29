@@ -64,15 +64,31 @@ async function allWhy(
   }
 }
 
+/** `ms` is the slowest request, since they run in parallel; absent when nothing was sent. */
+export type Screen = { kept: CommentBlock[]; withdrawn: number; ms?: number };
+
 export async function screenBlocks(
   file: string,
   blocks: CommentBlock[],
   opts: { apiKey: string | undefined; fetch?: typeof fetch },
-): Promise<CommentBlock[]> {
+): Promise<Screen> {
   const { apiKey } = opts;
-  if (!apiKey) return blocks;
+  if (!apiKey) return { kept: blocks, withdrawn: 0 };
+  const started = performance.now();
   const passed = await Promise.all(
     blocks.map((block) => allWhy(file, block, { apiKey, fetch: opts.fetch })),
   );
-  return blocks.filter((_, i) => !passed[i]);
+  const kept = blocks.filter((_, i) => !passed[i]);
+  return {
+    kept,
+    withdrawn: blocks.length - kept.length,
+    ms: Math.round(performance.now() - started),
+  };
+}
+
+// Silent when nothing was withdrawn: a withdrawal is the one outcome nobody would otherwise see.
+export function screenNote(label: string, screen: Screen): string | null {
+  if (screen.withdrawn === 0) return null;
+  const total = screen.kept.length + screen.withdrawn;
+  return `${label}: Jev withdrew ${screen.withdrawn} of ${total} comment block(s) as why (${screen.ms} ms)`;
 }

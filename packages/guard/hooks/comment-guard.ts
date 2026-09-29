@@ -21,7 +21,7 @@
  */
 
 import { basename, extname } from "node:path";
-import { screenBlocks } from "./jev-screen.ts";
+import { screenBlocks, screenNote } from "./jev-screen.ts";
 import { recordReported } from "./sweep-state.ts";
 
 export type ToolInput = {
@@ -497,11 +497,17 @@ async function main(): Promise<number> {
   }
 
   const fileName = basename(filePath);
-  const unsure = await screenBlocks(fileName, blocks, {
+  const screen = await screenBlocks(fileName, blocks, {
     apiKey: process.env.TYPESAFE_API_KEY,
   });
-  if (unsure.length === 0) return 0;
-  console.error(formatReason(fileName, unsure));
+  const note = screenNote("💬 comment-guard", screen);
+  // Claude Code reads stdout JSON only on exit 0, so a full withdrawal is the one case that can reach the user.
+  if (screen.kept.length === 0) {
+    if (note) console.log(JSON.stringify({ systemMessage: note }));
+    return 0;
+  }
+  const reason = formatReason(fileName, screen.kept);
+  console.error(note ? `${reason}\n${note}` : reason);
   return 2;
 }
 

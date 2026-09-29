@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { CommentBlock } from "./comment-guard.ts";
-import { screenBlocks } from "./jev-screen.ts";
+import { screenBlocks, screenNote } from "./jev-screen.ts";
 
 const block = (
   start: number,
@@ -43,7 +43,7 @@ function fakeJev(pWhy: Record<string, number>, sent: Sent[] = []) {
 
 describe("screenBlocks", () => {
   test("drops a block whose every added line is confidently why", async () => {
-    const kept = await screenBlocks("a.ts", [WHY, WHAT], {
+    const { kept } = await screenBlocks("a.ts", [WHY, WHAT], {
       apiKey: "k",
       fetch: fakeJev({ "// a": 0.93, "// x": 0.2 }),
     });
@@ -51,7 +51,7 @@ describe("screenBlocks", () => {
   });
 
   test("keeps a block Jev leans why on but below the threshold", async () => {
-    const kept = await screenBlocks("a.ts", [WHY], {
+    const { kept } = await screenBlocks("a.ts", [WHY], {
       apiKey: "k",
       fetch: fakeJev({ "// a": 0.79 }),
     });
@@ -72,7 +72,7 @@ describe("screenBlocks", () => {
 
   test("keeps every block without a key, and sends nothing", async () => {
     const sent: Sent[] = [];
-    const kept = await screenBlocks("a.ts", [WHY], {
+    const { kept } = await screenBlocks("a.ts", [WHY], {
       apiKey: undefined,
       fetch: fakeJev({}, sent),
     });
@@ -83,10 +83,28 @@ describe("screenBlocks", () => {
   test("keeps every block when Jev fails", async () => {
     const failing = (async () =>
       new Response("", { status: 529 })) as unknown as typeof fetch;
-    const kept = await screenBlocks("a.ts", [WHY, WHAT], {
+    const { kept } = await screenBlocks("a.ts", [WHY, WHAT], {
       apiKey: "k",
       fetch: failing,
     });
     expect(kept).toEqual([WHY, WHAT]);
+  });
+
+  test("reports how many blocks it withdrew and how long Jev took", async () => {
+    const screen = await screenBlocks("a.ts", [WHY, WHAT], {
+      apiKey: "k",
+      fetch: fakeJev({ "// a": 0.93, "// x": 0.2 }),
+    });
+    expect(screen.withdrawn).toBe(1);
+    expect(screen.ms).toBeGreaterThanOrEqual(0);
+    expect(screenNote("💬 comment-guard", { ...screen, ms: 231 })).toBe(
+      "💬 comment-guard: Jev withdrew 1 of 2 comment block(s) as why (231 ms)",
+    );
+  });
+
+  test("stays silent when it withdrew nothing", () => {
+    expect(
+      screenNote("💬 comment-guard", { kept: [WHY], withdrawn: 0, ms: 200 }),
+    ).toBeNull();
   });
 });

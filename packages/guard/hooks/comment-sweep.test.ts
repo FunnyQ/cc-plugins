@@ -41,7 +41,7 @@ describe("sweep", () => {
   test("reports a block a script wrote into a new file", async () => {
     await snapshot(payload);
     await Bun.write(join(repo, "app.ts"), BLOCK);
-    const reason = await sweep(payload);
+    const reason = (await sweep(payload))?.reason;
     expect(reason).toContain(
       "🧹 comment-sweep: 1 comment block(s), 3 lines, in app.ts",
     );
@@ -57,7 +57,7 @@ describe("sweep", () => {
     git("commit", "-qm", "init");
     await snapshot(payload);
     await Bun.write(join(repo, "app.ts"), BLOCK);
-    const reason = await sweep(payload);
+    const reason = (await sweep(payload))?.reason;
     expect(reason).toContain("+ 4  // three");
     expect(reason).toContain("  2  // one");
   });

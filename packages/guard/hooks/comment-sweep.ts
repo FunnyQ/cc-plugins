@@ -29,7 +29,7 @@ import {
   type CommentBlock,
   type Hunk,
 } from "./comment-guard.ts";
-import { screenBlocks } from "./jev-screen.ts";
+import { screenBlocks, screenNote } from "./jev-screen.ts";
 import {
   clearBaseline,
   clearReported,
@@ -121,7 +121,10 @@ export async function snapshot(payload: Payload): Promise<void> {
   else clearBaseline(sessionId);
 }
 
-export async function sweep(payload: Payload): Promise<string | null> {
+/** The Stop hook's stdout; `systemMessage` alone means Jev withdrew every block. */
+type SweepOutput = { decision?: "block"; reason?: string; systemMessage?: string };
+
+export async function sweep(payload: Payload): Promise<SweepOutput | null> {
   const sessionId = payload.session_id;
   if (!sessionId) return null;
   const baseline = readBaseline(sessionId);
@@ -194,11 +197,22 @@ export async function sweep(payload: Payload): Promise<string | null> {
     ),
   );
   const reasons = found.flatMap(({ file }, i) =>
-    screened[i]!.length > 0
-      ? [formatReason(file, screened[i]!, "🧹 comment-sweep")]
+    screened[i]!.kept.length > 0
+      ? [formatReason(file, screened[i]!.kept, "🧹 comment-sweep")]
       : [],
   );
-  return reasons.length > 0 ? reasons.join("\n\n") : null;
+  const note = screenNote("🧹 comment-sweep", {
+    kept: screened.flatMap((s) => s.kept),
+    withdrawn: screened.reduce((n, s) => n + s.withdrawn, 0),
+    ms: Math.max(0, ...screened.map((s) => s.ms ?? 0)),
+  });
+  const out: SweepOutput = {};
+  if (reasons.length > 0) {
+    out.decision = "block";
+    out.reason = reasons.join("\n\n");
+  }
+  if (note) out.systemMessage = note;
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 async function main(): Promise<void> {
@@ -210,8 +224,8 @@ async function main(): Promise<void> {
   }
   if (process.argv[2] === "snapshot") return snapshot(payload);
   if (process.argv[2] !== "sweep") return;
-  const reason = await sweep(payload);
-  if (reason) console.log(JSON.stringify({ decision: "block", reason }));
+  const out = await sweep(payload);
+  if (out) console.log(JSON.stringify(out));
 }
 
 if (import.meta.main) {
