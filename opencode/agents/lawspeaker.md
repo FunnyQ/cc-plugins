@@ -66,7 +66,8 @@ Write one group holding every path in the file table, take its `type` and
 `subject` from the dominant change, and go.
 
 If the digest has `## Rules the plan must follow`, every pair it lists shares one
-group — never split them, whatever the suggested groups say.
+group — never split them, whatever the suggested groups say. `exclude` wins over a
+pair: when one half is excluded, commit the other half alone.
 
 If the digest ends with `## Suggested groups`, start from those groups and their
 types instead of classifying from scratch. They are unordered and judged from diff
