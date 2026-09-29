@@ -100,6 +100,7 @@ function usage(backends: string): string {
   return [
     `Usage: relay <${backends}> <delegate|review|image> [flags]`,
     `       relay config set-model <${backends}> <delegate|review|image> <model>`,
+    `       relay config get-model <${backends}> <delegate|review|image>`,
     `       relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]`,
     "flags: --task <text> | --files <csv> | --model <provider/model>",
     "       --effort <low|medium|high|xhigh|max>   (claude only)",
@@ -236,16 +237,21 @@ async function executeConfigCommand(
   availableBackends: string,
 ): Promise<RelayExecution> {
   const [, subcommand, backendName, modeName, model, ...extra] = argv;
+  const isGet = subcommand === "get-model";
 
   if (
-    subcommand !== "set-model" ||
+    (subcommand !== "set-model" && !isGet) ||
     !backendName ||
     !modeName ||
-    !model ||
+    (isGet ? model !== undefined : !model) ||
     extra.length > 0
   ) {
     deps.stderr(
-      `Usage: relay config set-model <${availableBackends}> <delegate|review|image> <model>\n`,
+      [
+        `Usage: relay config set-model <${availableBackends}> <delegate|review|image> <model>`,
+        `       relay config get-model <${availableBackends}> <delegate|review|image>`,
+        "",
+      ].join("\n"),
     );
     return { code: 1 };
   }
@@ -270,6 +276,19 @@ async function executeConfigCommand(
       }\n`,
     );
     return { code: 1 };
+  }
+
+  // Prints the model relay would pass (config > built-in default), or nothing
+  // when the CLI will pick its own — the skill asks the user in that case.
+  if (isGet) {
+    const resolved = resolveModel(
+      backendName,
+      modeName,
+      undefined,
+      () => config,
+    );
+    if (resolved) deps.stdout(`${resolved}\n`);
+    return { code: 0 };
   }
 
   const nextConfig = mergeModelConfig(config, backendName, modeName, model);
@@ -489,7 +508,9 @@ export async function executeRelay(
     promptText:
       parsed.mode === "review" ? buildReviewPrompt(effectiveTask) : undefined,
     out: parsed.flags.out,
-    model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
+    model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model, () =>
+      readJsonObject(CONFIG_PATH, deps),
+    ),
     effort: parsed.flags.effort,
     lastFile: join(dir, "raw.txt"),
     dangerous: parsed.flags.dangerous,
@@ -662,11 +683,16 @@ export async function executeRelay(
   });
 
   if (!result.ok) {
+    // The fallback names the model, never the argv: argv carries the whole
+    // prompt, which buried the actual cause when a pinned model disappeared.
+    const label = `${parsed.backend} ${parsed.mode} failed`;
+    const model = `model: ${opts.model ?? "CLI default"}`;
+    const streamError = backend.parseError?.(result.stdout);
     deps.stderr(
-      result.stderr ||
-        `Backend command failed with exit code ${result.code}: ${invocation.argv.join(
-          " ",
-        )}\n`,
+      streamError
+        ? `${label} (${model}): ${streamError}\n`
+        : result.stderr ||
+            `${label} with exit code ${result.code} (${model})\n`,
     );
     return { code: result.code, dir, lastFile: opts.lastFile };
   }

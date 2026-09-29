@@ -142,9 +142,9 @@ describe("parseFlags", () => {
   });
 
   it("rejects an unknown --effort level", () => {
-    expect(() =>
-      parseFlags(["claude", "review", "--effort", "ultra"]),
-    ).toThrow("--effort must be one of low, medium, high, xhigh, max");
+    expect(() => parseFlags(["claude", "review", "--effort", "ultra"])).toThrow(
+      "--effort must be one of low, medium, high, xhigh, max",
+    );
   });
 
   it("does not validate backend names in the parser", () => {
@@ -267,6 +267,36 @@ describe("executeRelay", () => {
       },
     });
     expect(printed.join("")).toContain("Saved default model");
+  });
+
+  it("config get-model prints the configured model, or nothing when unset", async () => {
+    const files = new Map<string, string>([
+      [
+        CONFIG_PATH,
+        JSON.stringify({ models: { opencode: { review: "provider/rev" } } }),
+      ],
+    ]);
+    const printed: string[] = [];
+    const fsDeps = {
+      readFile: (path: string) => files.get(path) ?? "",
+      fileExists: (path: string) => files.has(path),
+      stdout: (text: string) => printed.push(text),
+    };
+
+    const configured = await executeRelay(
+      ["config", "get-model", "opencode", "review"],
+      deps(fsDeps),
+    );
+    expect(configured.code).toBe(0);
+    expect(printed.join("")).toBe("provider/rev\n");
+
+    printed.length = 0;
+    const unset = await executeRelay(
+      ["config", "get-model", "opencode", "delegate"],
+      deps(fsDeps),
+    );
+    expect(unset.code).toBe(0);
+    expect(printed.join("")).toBe("");
   });
 
   it("rejects config set-model for unknown backend or mode", async () => {
@@ -614,6 +644,45 @@ describe("executeRelay", () => {
 
     expect(result.code).toBe(7);
     expect(errors.join("")).toBe("failed");
+  });
+
+  it("surfaces the backend's stdout error event with the model on non-zero exit", async () => {
+    const errors: string[] = [];
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--model", "opencode-go/gone"],
+      deps({
+        run: () => ({
+          ok: false,
+          stdout:
+            '{"type":"error","error":{"name":"UnknownError","data":{"message":"Unexpected server error."}}}',
+          stderr: "",
+          code: 1,
+        }),
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(errors.join("")).toBe(
+      "opencode delegate failed (model: opencode-go/gone): UnknownError: Unexpected server error.\n",
+    );
+  });
+
+  it("names the CLI default model and never echoes the prompt when nothing explains the exit", async () => {
+    const errors: string[] = [];
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "secret task text"],
+      deps({
+        run: () => ({ ok: false, stdout: "", stderr: "", code: 3 }),
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(3);
+    expect(errors.join("")).toBe(
+      "opencode delegate failed with exit code 3 (model: CLI default)\n",
+    );
+    expect(errors.join("")).not.toContain("built prompt");
   });
 });
 
