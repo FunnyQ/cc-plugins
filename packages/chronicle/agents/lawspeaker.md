@@ -40,6 +40,8 @@ what the diff already shows is the failure this rule exists to prevent.
 bun "{SKILL_DIR}/scripts/analyze-changes.ts"
 ```
 
+When `mode` is `simple`, append `--simple` to that command.
+
 Run it directly; do not test for the file first. A wrong path makes bun print
 `error: Module not found "<path>"` and exit 1 before anything runs, and that
 printed path is how you see an unsubstituted `{SKILL_DIR}`. Report it and stop.
@@ -60,6 +62,12 @@ Classify a held-back or elided diff from its path and stats. Lock files are
 will not happen: `decideShape` returns `simple` before it reads a single signal.
 Write one group holding every path in the file table, take its `type` and
 `subject` from the dominant change, and go.
+
+If the digest ends with `## Suggested groups`, start from those groups and their
+types instead of classifying from scratch. They are unordered and judged from diff
+excerpts, so still apply every rule below: merge groups that cannot be ordered,
+split a group that mixes change types, and put them in build order. Without that
+section, classify each file yourself.
 
 Classify each file's change type (feat/fix/docs/style/refactor/test/chore/…) from
 its diff, then group by functional cohesion:
