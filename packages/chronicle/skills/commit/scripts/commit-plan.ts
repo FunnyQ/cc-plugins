@@ -293,9 +293,22 @@ export function validatePlanFile(raw: unknown): string[] {
   }
 
   // Demanded up front rather than after the shape is known, because finding out
-  // then costs the round trip this whole file exists to save.
+  // then costs the round trip this whole file exists to save. Past five files a
+  // split can never collapse (see decideShape), so the fallback would go unread.
+  const plannedFiles = new Set(
+    draft.commits.flatMap((entry) =>
+      Array.isArray((entry as { files?: unknown })?.files)
+        ? (entry as { files: unknown[] }).files
+        : [],
+    ),
+  ).size;
+  const cannotCollapse =
+    draft.mode !== "simple" &&
+    plannedFiles > 5 &&
+    !(typeof draft.totalFiles === "number" && draft.totalFiles <= 5);
   if (draft.commits.length > 1) {
     if (draft.simple === undefined) {
+      if (cannotCollapse) return errors;
       errors.push(
         "`simple` is missing — write the one-commit message these groups collapse into",
       );

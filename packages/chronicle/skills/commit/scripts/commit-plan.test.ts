@@ -272,6 +272,35 @@ describe("validatePlanFile", () => {
     ]);
   });
 
+  const wide = {
+    commits: [
+      { type: "feat", subject: "add a", files: ["a1", "a2", "a3"] },
+      { type: "feat", subject: "add b", files: ["b1", "b2", "b3"] },
+    ],
+  };
+
+  test("does not demand `simple` when the split cannot collapse", () => {
+    expect(validatePlanFile(wide)).toEqual([]);
+    // The invariant the relaxation rests on: those groups always commit atomic.
+    expect(
+      decideShape(["feat", "feat"], {
+        mode: "auto",
+        totalFiles: 6,
+        moduleSpread: [],
+      }).shape,
+    ).toBe("atomic");
+  });
+
+  test("still demands `simple` when totalFiles says the split may collapse", () => {
+    expect(validatePlanFile({ ...wide, totalFiles: 5 })).toEqual([
+      "`simple` is missing — write the one-commit message these groups collapse into",
+    ]);
+  });
+
+  test("still demands `simple` for a forced simple mode", () => {
+    expect(validatePlanFile({ ...wide, mode: "simple" })).toHaveLength(1);
+  });
+
   test("does not demand `simple` for a single group", () => {
     expect(validatePlanFile({ commits: draft.commits })).toEqual([]);
   });
