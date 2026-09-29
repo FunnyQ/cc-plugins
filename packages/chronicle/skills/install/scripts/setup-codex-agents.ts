@@ -13,8 +13,6 @@ import { dirname, join, resolve } from "node:path";
 const ROLES = [
   "lawspeaker",
   "storykeeper",
-  "skald",
-  "messenger",
   "annalist",
   "lorekeeper",
   "judge",
@@ -36,6 +34,9 @@ export const RETIRED_ROLES = [
   "runesmith",
   // Same for release: the skill runs its own scripts, so the errand-runner is gone.
   "skirnir",
+  // Folded into the Storykeeper, which now drafts and runs request-creator.ts itself.
+  "skald",
+  "messenger",
 ] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
@@ -55,9 +56,7 @@ function withoutManagedBlock(config: string): string {
 function managedBlock(targetDir: string): string {
   const descriptions = {
     lawspeaker: "Own the Chronicle commit flow and report its result.",
-    storykeeper: "Orchestrate Chronicle pull request drafting and creation.",
-    skald: "Analyze a branch and draft pull request material.",
-    messenger: "Create a pull request from confirmed material.",
+    storykeeper: "Draft and open a Chronicle pull request.",
     annalist: "Write user-facing release changelog entries.",
     lorekeeper:
       "Orchestrate Chronicle ADR triage, promotion, and supersession.",

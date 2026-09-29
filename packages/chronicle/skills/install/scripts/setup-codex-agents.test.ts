@@ -31,12 +31,10 @@ describe("setup-codex-agents", () => {
     const output = result.stdout.toString();
 
     expect(result.exitCode).toBe(0);
-    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(9);
+    expect(output.match(/^\[agents\.chronicle_/gm)).toHaveLength(7);
     for (const role of [
       "lawspeaker",
       "storykeeper",
-      "skald",
-      "messenger",
       "annalist",
       "lorekeeper",
       "codifier",
@@ -57,16 +55,14 @@ describe("setup-codex-agents", () => {
     expect(config).toContain("# BEGIN chronicle codex agents");
     expect(config).toContain("[agents.chronicle_lawspeaker]");
     expect(config).toContain("[agents.chronicle_storykeeper]");
-    expect(config).toContain("[agents.chronicle_skald]");
-    expect(config).toContain("[agents.chronicle_messenger]");
+    expect(config).not.toContain("[agents.chronicle_skald]");
+    expect(config).not.toContain("[agents.chronicle_messenger]");
     expect(config).toContain("[agents.chronicle_annalist]");
 
     const installed = Object.fromEntries(
       [
         "lawspeaker",
         "storykeeper",
-        "skald",
-        "messenger",
         "annalist",
         "lorekeeper",
         "codifier",
@@ -82,10 +78,8 @@ describe("setup-codex-agents", () => {
     expect(installed.lawspeaker).toContain('model = "gpt-5.6-terra"');
     expect(installed.lawspeaker).toContain("commit.ts apply");
     expect(installed.storykeeper).toContain('model = "gpt-5.6-terra"');
-    expect(installed.storykeeper).toContain("chronicle_skald");
-    expect(installed.storykeeper).toContain("chronicle_messenger");
-    expect(installed.skald).toContain('model = "gpt-5.6-terra"');
-    expect(installed.messenger).toContain('model = "gpt-5.6-luna"');
+    expect(installed.storykeeper).toContain("request-creator.ts --material");
+    expect(installed.storykeeper).not.toContain("chronicle_skald");
     expect(installed.annalist).toContain('model = "gpt-5.6-terra"');
     expect(installed.lorekeeper).toContain('model = "gpt-5.6-terra"');
     expect(installed.codifier).toContain('model = "gpt-5.6-terra"');

@@ -10,37 +10,40 @@ when_to_use: >-
 
 # Chronicle PR Skill
 
-Spawn ONE **Storykeeper**. The Storykeeper owns the whole flow. It spawns a skald
-to analyze the branch and synthesize a reviewer-legible body. It then spawns a
-messenger to open the request. This keeps all branch/diff/`gh` output out of the
-main conversation, and it preserves the "why" behind the change. This skill is
+Spawn ONE **Storykeeper**. The Storykeeper owns the whole flow: it analyzes the
+branch, writes a reviewer-legible title and body to a file, and opens the request
+from that file. This keeps all branch/diff/`gh` output out of the main
+conversation, and it preserves the "why" behind the change. This skill is
 human-invoked only. Do not auto-trigger it from incidental PR/MR mentions.
 
 ## Topology
 
 ```
 main agent  (holds the conversation = the "why")
-  └─ chronicle:storykeeper   (subagent_type — a nested custom agent, NOT a fork)
-       ├─ chronicle:skald    (sonnet) — analyze-branch.ts → harvest cockpit → title + 4-section body (+ overview diagram)
-       └─ chronicle:messenger  (haiku)  — request-creator.ts → opens the PR/MR, returns the URL
+  └─ chronicle:storykeeper   (sonnet; subagent_type — a custom agent, NOT a fork)
+       ├─ analyze-branch.ts   → branch material file + textPath
+       ├─ writes { title, body } to textPath (4 sections, optional overview diagram)
+       └─ request-creator.ts --material --text  → opens the PR/MR, returns the URL
 ```
 
 Spawn via `subagent_type`, never fork. Spawn exactly one Storykeeper, in one
-`Agent` call, with no `name`. This chain is nested and sequential, not a team:
-never spawn the skald or the messenger yourself, and never put two agents in one
-message. The Storykeeper must be able to spawn its children. It does not inherit
-the main conversation.
+`Agent` call, with no `name`. It spawns nothing itself and does not inherit the
+main conversation.
+
+The Storykeeper once relayed to a skald (drafting) and a messenger (creation).
+Across 9 runs the subtree took a median 187s, of which the skald's drafting was
+39s: the messenger spent ~30s retyping the body into a heredoc, and the relay
+spent ~60s passing it along. Nothing either child returned was large, so neither
+boundary protected the main conversation.
 
 There is **no final creation confirmation gate**. Invoking the skill is the
 consent. The flow auto-creates after any first-run config interview. `draft`
 defaults to `false`, so the request opens ready for review. The main agent may
 pass `draft:true` to open it as a draft.
 
-The three agents live at `packages/chronicle/agents/{storykeeper,skald,messenger}.md`.
-They auto-register as `chronicle:storykeeper` / `chronicle:skald` /
-`chronicle:messenger`. Their full procedures — the four-section body spec, the
-optional Mermaid overview diagram, and the `CreateInput`/`CreateResult` contract —
-live in those files.
+The agent lives at `packages/chronicle/agents/storykeeper.md` and auto-registers
+as `chronicle:storykeeper`. Its full procedure — the four-section body spec, the
+optional Mermaid overview diagram, and the `CreateResult` contract — lives there.
 
 ## The main agent's job (thin)
 
@@ -92,9 +95,9 @@ live in those files.
    run, before spawning. Never infer the answer from the diff size or the branch name.
 
    - "Needs review" → `skipReview` is `false`.
-   - "No review needed" → `skipReview` is `true`. The messenger's script appends
+   - "No review needed" → `skipReview` is `true`. `request-creator.ts` appends
      ` [skip-review]` to the title. Do not write the marker into the title yourself,
-     and never ask the skald to.
+     and never ask the Storykeeper to.
 
    If no structured question tool is available, ask in plain text and resume only after
    the answer. If the user already stated the answer in the current request ("no review
@@ -117,6 +120,17 @@ live in those files.
    - `draft` — optional. Default `false`. Pass `true` only if the user asked to open
      the PR as a draft.
    - `skipReview` — the answer from step 2. Always pass it explicitly.
+
+**On `PR NOT PUSHED`:** no remote branch of the same name contains `HEAD`. Ask the
+user whether to push. On yes, run `git push -u <remote> <branch>` visibly, then
+rerun only the creator with the two paths from the report — the drafted text is
+already on disk, so nothing is redrafted:
+
+```bash
+bun "{SKILL_DIR}/scripts/request-creator.ts" --material "{outputPath}" --text "{textPath}"
+```
+
+Append `--draft` and `--skip-review` exactly as you passed them to the Storykeeper.
 
 **Verify before reporting:**
 
@@ -147,13 +161,12 @@ Codex uses the same topology through one of two role-loading paths:
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
    exactly one non-fork generic agent with task name `chronicle_storykeeper` and no
    inherited turns. Tell it to read and obey the `developer_instructions` in
-   `storykeeper.toml` before it handles the same six inputs. Its stable instructions
-   delegate sequentially to generic Skald and Messenger children that self-load their
-   own TOMLs. Do not paste or improvise the role instructions in the spawn prompt.
+   `storykeeper.toml` before it handles the same six inputs. Do not paste or
+   improvise the role instructions in the spawn prompt.
 
 If the registered role and stable TOMLs are both unavailable, tell the user to run
 `chronicle:install` and start a new Codex thread. Do not silently replace the
-Storykeeper → Skald → Messenger boundary with an inline flow.
+Storykeeper boundary with an inline flow.
 
 Apply the same verification after Codex returns. Check with `gh pr view "{url}"` or
 `glab mr view "{id-or-url}"`. On a no or failed URL, run the `--head`/`--source-branch`
@@ -168,14 +181,15 @@ base-directory banner.
 
 ## Edge Cases
 
-- **No commits**: skald reports it. The Storykeeper returns `nothing to propose` and
-  stops.
+- **No commits**: the Storykeeper returns `nothing to propose` and stops.
 - **No `.chronicle/pr.json`**: run the first-use workflow interview and commit the
   generated config with the current branch.
 - **Invalid `.chronicle/pr.json`**: report the validation error and stop; committed
   intent must be fixed explicitly.
 - **Unknown provider** (no recognizable `github`/`gitlab` remote): the Storykeeper stops
   before creation — there is nothing it can open.
-- **Creation failure** (missing CLI / no remote / CLI error): the messenger returns
-  `{ ok:false, reason, message }`; the Storykeeper relays it plainly. Never pretend
-  success.
+- **Branch not pushed**: `request-creator.ts` refuses before calling `gh`/`glab`;
+  see **On `PR NOT PUSHED`** above.
+- **Creation failure** (missing CLI / no remote / CLI error): `request-creator.ts`
+  returns `{ ok:false, reason, message }`; the Storykeeper relays it plainly. Never
+  pretend success.

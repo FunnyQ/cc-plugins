@@ -15,12 +15,12 @@ when_to_use: >-
 
 ## Claude Code — nested subagent spawn depth
 
-Chronicle's PR and ADR flows are orchestrator-shaped: `main → storykeeper →
-skald/messenger`, and the same for `lorekeeper`. Claude Code **2.1.217** stopped
-letting subagents spawn nested subagents by default. Those orchestrators then fail
-with `Agent exists but is not enabled in this context`, and nothing lands.
-(`release` is flat — it spawns leaf agents directly. So is `commit`, whose
-lawspeaker runs its own scripts.)
+Chronicle's ADR flow is orchestrator-shaped: `main → lorekeeper →
+codifier/barrowkeeper`. Claude Code **2.1.217** stopped letting subagents spawn
+nested subagents by default. That orchestrator then fails with `Agent exists but
+is not enabled in this context`, and nothing lands. (`release` is flat — it spawns
+leaf agents directly. So are `commit` and `pr`, whose lawspeaker and storykeeper
+run their own scripts.)
 
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` re-enables it. Chronicle needs `2`.
 
@@ -50,7 +50,7 @@ restarts. Always say this when you report the fix.
 ## Codex — named agent roles
 
 Register the Codex-native commit role (`chronicle_lawspeaker`) and PR roles
-(`chronicle_storykeeper`, `chronicle_skald`, `chronicle_messenger`), the release
+(`chronicle_storykeeper`), the release
 role (`chronicle_annalist`), plus the ADR roles
 (`chronicle_lorekeeper`, `chronicle_judge`, `chronicle_codifier`,
 `chronicle_barrowkeeper`).

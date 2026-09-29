@@ -41,9 +41,9 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 | [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, then commit, merge, tag, and push; `local` stops before the push, `prepare` after the entry |
 | [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the nested-subagent spawn depth on Claude Code, the named agent roles on Codex |
 
-> **Claude Code 2.1.217+ requires one setting.** Chronicle's `pr` and `adr`
-> flows are orchestrator-shaped (`main → storykeeper → skald/messenger`), and 2.1.217
-> stopped letting subagents spawn nested subagents by default. Without it those flows
+> **Claude Code 2.1.217+ requires one setting.** Chronicle's `adr` flow is
+> orchestrator-shaped (`main → lorekeeper → codifier/barrowkeeper`), and 2.1.217
+> stopped letting subagents spawn nested subagents by default. Without it that flow
 > fail with `Agent exists but is not enabled in this context`. A `SessionStart` hook writes
 > `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` into `~/.claude/settings.json` for you —
 > **restart Claude Code afterwards**, since the value is only read at session start.
