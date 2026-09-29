@@ -1,5 +1,17 @@
 # Changelog
 
+## [chronicle 0.18.0] - 2026-09-29
+
+_tracks tag `chronicle-v0.18.0`_
+
+### Added
+- Commit digests can now include grouping suggestions from TypeSafe's Jev model when TYPESAFE_API_KEY is set, and the commit flow is unchanged when the key is unset or the call fails.
+- Release changelogs are now built from a complete commit list, so a release can no longer silently miss a commit and existing changelog headings can never be renamed.
+
+### Changed
+- A configured TYPESAFE_API_KEY that fails is now reported in the commit result instead of being skipped silently.
+- The Codex and OpenCode versions of lawspeaker now follow the same commit rules as the Claude one, including suggested groups, --simple, and the skip notice.
+
 ## [dispatch 5.3.5] - 2026-09-29
 
 _tracks tag `dispatch-v5.3.5`_
