@@ -14,8 +14,8 @@ import {
   fetchBodies,
   parseCliArgs,
   toSkeleton,
-  type DecisionRecord,
 } from "./collect-adr-context";
+import type { DecisionRecord } from "../../../shared/scripts/cockpit-trail";
 
 const roots: string[] = [];
 

@@ -1,5 +1,11 @@
 #!/usr/bin/env bun
-import { lstatSync, mkdirSync, realpathSync, renameSync } from "node:fs";
+import {
+  lstatSync,
+  mkdirSync,
+  realpathSync,
+  renameSync,
+  type Stats,
+} from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { logRoot, STALE_MS } from "../../../shared/scripts/cockpit-trail";
 import { bucketDirectory } from "./archive-plan";
@@ -14,7 +20,7 @@ import type {
 /** `moved` carries the moves that actually ran, so callers never re-probe the filesystem to find out which. */
 export type ApplyResult = { moved: Move[]; failed: Refusal[] };
 
-function probeLstat(path: string): ReturnType<typeof lstatSync> | null {
+function probeLstat(path: string): Stats | null {
   try {
     return lstatSync(path);
   } catch {

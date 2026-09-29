@@ -146,7 +146,7 @@ export function serveGatePage(opts: {
       return Response.json({ ok: true });
     },
   });
-  const port = server.port;
+  const port = server.port!;
   const url = `http://127.0.0.1:${port}/${nonce}`;
   const submitUrl = `${url}/submit`;
   html = opts.render(submitUrl);
