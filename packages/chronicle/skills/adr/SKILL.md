@@ -14,14 +14,14 @@ argument-hint: "triage | archive [--all] | promote <candidate-or-topic> | supers
 
 The **main agent** owns both confirmation gates and runs triage itself: it runs
 `triage.ts`, fans the batch files out to parallel `judge` agents, and merges
-their results into the gate-1 payload and the archive plan. It hands the nested
-**Lorekeeper** exactly two phases, draft and commit. The Lorekeeper owns each
-phase and delegates its mechanics. It cannot run the whole flow and return
-control at both gates because its first return ends that orchestrator run. Pass
-the confirmed groups into draft, then pass the confirmed drafts, `newAdrs`, the
-optional `metadataUpdate`, and the archive plan into commit.
+their results into the gate-1 payload and the archive plan. After gate 1 it
+spawns the **codifier**, which writes every draft into the gate-2 payload file.
+After gate 2, `adr-commit.ts verdicts` turns the reply into the records to write,
+and the main agent spawns the **barrowkeeper**, which runs `adr-commit.ts apply`.
+Every hand-off is a file path, so no record's text passes through the main
+conversation unless the user edited it at gate 2.
 
-Triage spawns no Lorekeeper. Clustering by identical decision text, base
+Triage spawns no orchestrator. Clustering by identical decision text, base
 session assignments, batching, result validation, merging, and archive planning
 are deterministic, so `triage.ts` does them in seconds. Before it, one
 101-entry run reached gate 1 after about 1,500s: a reckoner agent spent 558s
@@ -38,21 +38,20 @@ chronicle:adr  (this skill — the main agent; owns both gates)
   ├─ triage.ts merge      results → ledger + gate-1 payload + assignments + archive plan
   ├─ main agent cross-checks the ledger → overrides → triage.ts merge again
   ├─ [GATE 1]  the user confirms the dispositions
-  ├─ lorekeeper(draft)   → codifier            draft the ADR from the confirmed candidates
-  ├─ [GATE 2]  the user confirms the draft and its target path
-  └─ lorekeeper(commit)  → barrowkeeper        write, apply any link update, validate, archive
+  ├─ codifier            sonnet: fetch bodies, draft every group → <runDir>/gate2.json
+  ├─ [GATE 2]  the user confirms each draft and its target path
+  ├─ adr-commit.ts verdicts   reply → new-adrs.json + gate2-drops.json
+  └─ barrowkeeper        haiku: adr-commit.ts apply → collision check, write, link, validate, archive
 ```
 
-Spawn each Lorekeeper as a nested custom agent, never a fork. Spawn one Lorekeeper
-per phase, in one `Agent` call, with no `name`. This chain is nested and
-sequential, not a team: never spawn the codifier or the barrowkeeper yourself,
-never run two Lorekeeper phases at once, and never put two Lorekeeper spawns in
-one message. It does not inherit the main conversation. Do not put either gate
-inside Lorekeeper.
+Spawn the codifier and the barrowkeeper as custom agents, never forks, one per
+`Agent` call, with no `name`. Neither spawns anything, and neither inherits the
+main conversation. Never put a gate inside either.
 
-The `judge` fan-out is the one deliberate exception to "never spawn a skill child
-yourself": `judge` is not a Lorekeeper child, has no Lorekeeper spec, and is
-spawned directly by the main agent — see **Judging the batches**.
+A Lorekeeper once sat between the main agent and these two. It returned every
+draft to the main agent "complete and verbatim", which then retyped each one into
+`gate2.json` and again into the commit phase — up to 12 records of 3–5 KB, three
+times over, through the context the subagents exist to protect.
 
 **Both gates are one local HTML page.** Never hand-write that page and never
 hand-design it — `gatePagePath` renders it. Build the payload, serve it, and end
@@ -60,12 +59,13 @@ the turn:
 
 1. Use a payload in the run directory — see **Run files**. `triage.ts merge`
    writes gate 1's payload to `<runDir>/gate1.json`; never write or edit it by
-   hand. Write gate 2's payload to `<runDir>/gate2.json`. Gate 1 takes `gate: 1`,
+   hand. The codifier writes gate 2's payload to `<runDir>/gate2.json`; never write
+   or read its drafts yourself. Gate 1 takes `gate: 1`,
    `nextAdr`, `candidates` (each with `entryIds`, `title`, `reason`,
    `disposition`, and an optional `matchesAdr` and `hint`), an optional
    `conflicts`, and an optional `scan` for the header facts. Gate 2 takes
-   `gate: 2` and `drafts`, each with `groupId`, `adrNumber`, `proposedPath`, and
-   the codifier's `draftText` verbatim.
+   `gate: 2` and `drafts`, each with `groupId`, `adrNumber`, `entryIds`,
+   `proposedPath`, and `draftText`.
 2. Run `bun "{gatePagePath}" --data "{payload.json}" --out "{runDir}/gate<N>.html" --serve --open`
    **as a background command**. Pass `--lang zh-TW` when the cockpit decision-log
    language is zh-TW. A submitted response also lands beside the page, at
@@ -189,16 +189,18 @@ child's shell, so its command silently runs against `/`.
 | `bodyFetchPath` | `<skill dir>/scripts/collect-adr-context.ts` |
 | `plannerPath` | `<skill dir>/scripts/archive-plan.ts` |
 | `templatePath` | `<skill dir>/references/adr-template.md` |
-| `validatorPath` | `<skill dir>/scripts/adr-validate.ts` |
-| `archiverPath` | `<skill dir>/scripts/archive-logs.ts` |
+| `commitPath` | `<skill dir>/scripts/adr-commit.ts` |
 | `gatePagePath` | `<skill dir>/scripts/gate-page.ts` |
 | `archiveStalePath` | `<skill dir>/scripts/archive-stale.ts` |
 
-`draft` takes `bodyFetchPath` and `templatePath`. `commit` takes `validatorPath`
-and `archiverPath`. Every `judge` takes `bodyFetchPath`, `triagePath`, and its own
-batch path. The main agent keeps `triagePath`, `plannerPath`, and `gatePagePath`
-for itself and never passes them to a Lorekeeper; `plannerPath` only builds the
-empty plan `promote` and `supersede` pass to `commit`. `archiveStalePath` belongs to no phase — only `archive` runs it.
+The codifier takes `bodyFetchPath`, `templatePath`, and `gate2Path`
+(`<runDir>/gate2.json`). The barrowkeeper takes `commitPath` and `planPath`, plus
+`newAdrsPath` and `metadataPath` when they exist. Every `judge` takes
+`bodyFetchPath`, `triagePath`, and its own batch path. The main agent keeps
+`triagePath`, `plannerPath`, and `gatePagePath` for itself, and runs `commitPath`'s
+`verdicts` command itself; `plannerPath` only builds the empty plan `promote` and
+`supersede` pass to the barrowkeeper. `archiveStalePath` belongs to no agent — only
+`archive` runs it.
 
 ## Run files
 
@@ -234,7 +236,7 @@ This is the primary entry point.
    candidates, say so, and say that grouping may still bring the run under the
    cap.
 
-   At most 12 groups may reach `draft` in one run. Enforce the cap before the user
+   At most 12 groups may reach the codifier in one run. Enforce the cap before the user
    confirms, never after: once gate 1 is confirmed, the disposition set is
    complete and the archive plan already covers every candidate, so dropping
    groups after confirmation would archive an unrecorded decision to `done`.
@@ -276,7 +278,7 @@ This is the primary entry point.
    collide with a single-member group the user never labelled, and two entries would
    share one `groupId`.
 
-   Assign each entry a record number before spawning `draft`. Group `i` takes
+   Assign each entry a record number before spawning the codifier. Group `i` takes
    `nextAdr + i`, with `i` zero-based. `nextAdr` arrives in the `prep` line;
    retain it through gate 1. The codifier never counts and never reads the record
    index for itself — two groups drafted against one number would collide on one
@@ -290,23 +292,34 @@ This is the primary entry point.
      ]
    }
    ```
-6. After gate 2, build `newAdrs` from the verdicts. Keep every `approve`
-   verdict, in the order the drafts were proposed. Drop every `drop` verdict.
-   For each kept verdict, set `path` to its `proposedPath`, and set `content`
-   to the verdict's own `draftText` when it carries one, otherwise to the
-   codifier's `draftText` for that draft. A verdict's `draftText` is the user's edit,
-   and it always wins over the codifier's text.
+   Spawn the codifier (`subagent_type: "chronicle:codifier"`) with `groups`,
+   `bodyFetchPath`, `templatePath`, and `gate2Path`. It replies with the path and a
+   draft count; serve that file at gate 2 without reading it.
+6. After gate 2, run the verdict fold. When the reply came back over a fallback
+   surface, write it to `<runDir>/gate2-response.json` first and pass
+   `--response` with that path:
 
-   If every verdict was `drop`, the run promoted nothing. Omit `newAdrs`
-   entirely. Never send `[]`.
+   ```bash
+   bun "{commitPath}" verdicts --run "{runDir}"
+   ```
+
+   It refuses a partial, unknown, or duplicated verdict set — re-surface that to the
+   user. Otherwise it writes `<runDir>/new-adrs.json` from the `approve` verdicts, in
+   draft order, with the user's edited `draftText` winning over the codifier's, and
+   prints `newAdrsPath`. When every verdict was `drop`, `newAdrsPath` is `null`:
+   the run promoted nothing.
 7. A gate-2 `drop` defers a group. Its candidates were `promote` at gate 1, so
    the plan already assigned their source sessions `target: "done"`. If nothing
    corrects that, the dropped decision archives to `done` unrecorded and leaves
    triage forever.
 
-   Gate 2 is the second re-merge trigger. Write `<runDir>/gate2-drops.json` in
-   the override shape, with every dropped group's candidates at `decision:
-   "watch"`, and re-merge per **Merging and the archive plan**.
+   Gate 2 is the second re-merge trigger. `verdicts` already wrote every dropped
+   group's entries at `decision: "watch"` to `<runDir>/gate2-drops.json` and
+   printed it as `dropsPath`; when it is not `null`, re-merge per **Merging and the
+   archive plan**.
+8. Spawn the barrowkeeper (`subagent_type: "chronicle:barrowkeeper"`) with
+   `commitPath`, `planPath`, and `newAdrsPath` when it is not `null`. Relay its
+   JSON result.
 
 ### Judging the batches
 
@@ -395,7 +408,7 @@ so far, each with its own `--overrides`, in this order; a later file wins:
 
 `merge` re-folds `watch` wins across every session, so a correction to one
 candidate also re-targets the other sessions it shares. Pass the final
-`planPath` into `commit` — never a prose description of the assignments.
+`planPath` to the barrowkeeper — never a prose description of the assignments.
 
 Never hand-edit `gate1.json`, `assignments.json`, or any field of
 `archive-plan.json`. A plan's `target`, `to`, and `from`/`fromBucket` fields are
@@ -452,18 +465,19 @@ or comment in their own reason.
 ### No-promotion branch
 
 At gate 1, if no candidate is `promote`, say that approving the dispositions is
-the last decision in this run. Skip draft and gate 2. Invoke commit with only the
-approved plan; pass no `newAdrs` and no `metadataUpdate`. This branch's "before
-`commit`" is right after gate 1, so re-merge there if gate 1 corrected anything.
+the last decision in this run. Skip the codifier and gate 2. Spawn the
+barrowkeeper with only `commitPath` and the approved plan; pass no `newAdrsPath`
+and no `metadataPath`. This branch's "before the barrowkeeper" is right after
+gate 1, so re-merge there if gate 1 corrected anything.
 
 A promotion whose source sessions all proved live can produce a draft with an
 empty archive plan. Writing and archiving are independently optional. If the run
-produces neither, report a no-op instead of spawning commit with nothing to do.
+produces neither, report a no-op instead of spawning the barrowkeeper with nothing to do.
 
 ## `archive [--all]` — archive stale sessions without triage
 
 Use this when the user wants the inbox cleared and no records written. It spawns
-no Lorekeeper and no judge, and it has no gate. It moves every stale session in
+no codifier, no barrowkeeper, and no judge, and it has no gate. It moves every stale session in
 `.cockpit/logs/` to `done`. It never touches the watched bucket: a `watch`
 disposition is a decision an earlier triage made, and moving it to `done` would
 drop it from every later run.
@@ -517,25 +531,25 @@ Archive nothing in this mode. A source session can hold other decisions nobody
 has dispositioned, and a watched one holds decisions an earlier triage kept on
 purpose; moving either to `done` would drop them from every later run. The next
 `triage` retires the promoted entries instead, because the judge matches them to
-the new record and skips them. `commit` still requires a `planPath`, so write `[]`
+the new record and skips them. `apply` still requires a `planPath`, so write `[]`
 to `<runDir>/assignments.json` and run
 `bun "{plannerPath}" --assignments "{runDir}/assignments.json"` from the same cwd.
 Its stdout is the path of an empty plan that moves nothing.
 
-Pass the reconstructed candidate and the confirmed facts into `draft`, as a
+Pass the reconstructed candidate and the confirmed facts to the codifier, as a
 one-entry `groups` payload. Build that entry the
 same way step 5 does: `groupId` is `g1`, `entryIds` is the reconstructed
 candidate's own `entryIds`, and `adrNumber` is `nextAdr`. Retain `nextAdr` from the
-`prep` line until `draft` is spawned. The codifier refuses to derive a number for
+`prep` line until the codifier is spawned. The codifier refuses to derive a number for
 itself, so a payload without `adrNumber` cannot draft.
 
 ```json
 { "groups": [{ "groupId": "g1", "entryIds": ["id-1"], "adrNumber": 27 }] }
 ```
 
-Present the complete draft and proposed path at gate 2 before writing. Its
-gate-2 reply uses the same `verdicts` shape, with one entry. Pass a one-entry
-`newAdrs`, the path, and the empty archive plan into `commit` — the same contract
+Present the draft and proposed path at gate 2 before writing. Its gate-2 reply
+uses the same `verdicts` shape, with one entry. Run `verdicts`, then spawn the
+barrowkeeper with its `newAdrsPath` and the empty plan — the same contract
 `triage` uses.
 
 ## `supersede <adr-id>` — replace an accepted record
@@ -552,31 +566,30 @@ This is two writes with no transaction. If the successor-link update fails after
 the replacement lands, do not roll anything back. The new record is valid alone,
 and its missing back-link is repairable by hand. Skip archiving in this mode:
 archiving a session while its record is half-written removes the evidence needed
-to finish the repair. Pass `commit` the same empty plan `promote` builds.
+to finish the repair. Pass the barrowkeeper the same empty plan `promote` builds.
 
-The replacement travels into `commit` as a one-entry `newAdrs`, beside the single
-`metadataUpdate`.
+The replacement travels as a one-entry `new-adrs.json` from `verdicts`. Write the
+back-link to `<runDir>/metadata.json` as
+`{ "path": "docs/adr/<old>.md", "set": { "Status": "Superseded", "Superseded by": "ADR-NNNN" } }`
+and pass it as `metadataPath`. `apply` rewrites only `Status`, `Supersedes`,
+`Superseded by`, and `Deprecated`, and refuses any other field.
 
 ## Codex
 
-Codex loads the same two-phase Lorekeeper boundary through one of two paths:
+Codex spawns the same three roles directly, exactly as under Claude Code —
+`chronicle_judge` in parallel batches, then `chronicle_codifier`, then
+`chronicle_barrowkeeper` — through one of two paths:
 
-1. **Named-role selector available**: spawn exactly one registered
-   `chronicle_lorekeeper` per phase. Pass the resolved absolute paths from
-   **Script paths** that the phase takes, and the phase-specific carry-over state.
+1. **Named-role selector available**: spawn the registered role and pass the
+   resolved absolute paths from **Script paths** that it takes.
 2. **Generic sub-agent API only**: verify stable role files exist under
-   `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
-   exactly one non-fork generic agent per phase with task name
-   `chronicle_lorekeeper` and no inherited turns. Tell it to read and obey
-   `developer_instructions` in `lorekeeper.toml` before handling the same inputs.
+   `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn a
+   non-fork generic agent with the role's task name and no inherited turns. Tell
+   it to read and obey `developer_instructions` in its TOML before handling the
+   same inputs.
 
 If neither path is available, tell the user to run `chronicle:install` and start a new
-Codex thread. Do not replace the role boundary with an inline flow.
-
-`chronicle_judge` is not a Lorekeeper phase and follows neither path above the
-same way: the main agent spawns it directly, in parallel batches, exactly as
-under Claude Code (see **Judging the batches**) — select the registered
-`chronicle_judge` role, or the generic-agent fallback reading `judge.toml`.
+Codex thread. Do not replace a role boundary with an inline flow.
 
 ## OpenCode only — skip on Claude Code and Codex
 
@@ -604,10 +617,10 @@ base-directory banner.
    enters git, so path references are guaranteed to rot.
 6. **Exclude secrets, credentials, personal data, and raw transcript text from
    evidence.** Preserve the decision without leaking its surrounding conversation.
-7. **One `draft`, gate-2, and `commit` cycle promotes up to 12 records.** The
-   codifier returns `drafts`, one entry per input group. The barrowkeeper takes
-   `newAdrs`, and writes every entry in one batch. `supersede <adr-id>` still
-   replaces one record per run. `metadataUpdate` stays a single object and is
+7. **One codifier, gate-2, and barrowkeeper cycle promotes up to 12 records.** The
+   codifier writes one draft per input group into `gate2.json`. `apply` writes every
+   approved entry of `new-adrs.json` in one batch. `supersede <adr-id>` still
+   replaces one record per run. The metadata update stays a single object and is
    never batched.
 
 ## Recovering a failed batch

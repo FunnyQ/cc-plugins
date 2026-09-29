@@ -14,7 +14,6 @@ const ROLES = [
   "lawspeaker",
   "storykeeper",
   "annalist",
-  "lorekeeper",
   "judge",
   "codifier",
   "barrowkeeper",
@@ -37,6 +36,8 @@ export const RETIRED_ROLES = [
   // Folded into the Storykeeper, which now drafts and runs request-creator.ts itself.
   "skald",
   "messenger",
+  // Folded into the main agent, which spawns the codifier and barrowkeeper itself.
+  "lorekeeper",
 ] as const;
 const BEGIN = "# BEGIN chronicle codex agents";
 const END = "# END chronicle codex agents";
@@ -58,8 +59,6 @@ function managedBlock(targetDir: string): string {
     lawspeaker: "Own the Chronicle commit flow and report its result.",
     storykeeper: "Draft and open a Chronicle pull request.",
     annalist: "Write user-facing release changelog entries.",
-    lorekeeper:
-      "Orchestrate Chronicle ADR triage, promotion, and supersession.",
     judge:
       "Screen and disposition one batch of clustered ADR candidates in parallel.",
     codifier: "Draft an Architecture Decision Record from confirmed evidence.",

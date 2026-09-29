@@ -7,7 +7,7 @@ when_to_use: >-
   Setting up or repairing Chronicle. On Claude Code: when pr/adr fail
   with "Agent exists but is not enabled in this context". On Codex: registering or
   refreshing the commit/PR/ADR agents (chronicle_lawspeaker,
-  chronicle_storykeeper, chronicle_lorekeeper, etc.).
+  chronicle_storykeeper, chronicle_codifier, etc.).
   Not monitor:install (that wires the usage-dashboard statusline).
 ---
 
@@ -49,11 +49,9 @@ restarts. Always say this when you report the fix.
 
 ## Codex — named agent roles
 
-Register the Codex-native commit role (`chronicle_lawspeaker`) and PR roles
-(`chronicle_storykeeper`), the release
-role (`chronicle_annalist`), plus the ADR roles
-(`chronicle_lorekeeper`, `chronicle_judge`, `chronicle_codifier`,
-`chronicle_barrowkeeper`).
+Register the Codex-native commit role (`chronicle_lawspeaker`), PR role
+(`chronicle_storykeeper`), release role (`chronicle_annalist`), and ADR roles
+(`chronicle_judge`, `chronicle_codifier`, `chronicle_barrowkeeper`).
 
 Resolve the plugin root from this skill's load-time base directory. The root is
 two directories above this `skills/install` directory. Never point Codex config

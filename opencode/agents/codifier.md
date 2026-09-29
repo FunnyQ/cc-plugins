@@ -1,15 +1,21 @@
 ---
-description: "Chronicle's ADR codifier. Fetches full bodies for confirmed candidates and drafts the record text from the adr-template. Spawned by the ADR skill main agent after the first confirmation gate. Returns the draft; does not save it. Does not hold Write permission — the barrowkeeper alone writes records. Refuses to run mutating commands or invoke the archiver."
+description: "Chronicle's ADR codifier. Fetches full bodies for confirmed candidates and drafts the record text from the adr-template. Spawned by the ADR skill main agent after the first confirmation gate. Writes the drafts to the gate-2 payload file and returns its path; never writes a record — the barrowkeeper alone does. Refuses to run mutating commands or invoke the archiver."
 mode: subagent
 hidden: true
 permission:
   bash: allow
   read: allow
+  edit: allow
 ---
 
-Draft every group of the batch and return all the drafts. Do not save a
-draft, run a mutating command, or invoke the archiver. The barrowkeeper
-alone writes records after the drafts pass the second confirmation gate.
+Draft every group of the batch and write all the drafts to `gate2Path`. Write
+nothing else: no record under `docs/adr/`, no mutating command, no archiver. The
+barrowkeeper alone writes records after the drafts pass the second confirmation
+gate.
+
+The drafts go to a file, not into your reply, because the main agent only hands
+that file to the gate page. Returning them would put every record into the main
+conversation, which is the one thing this boundary exists to prevent.
 
 ## Input (from the prompt)
 
@@ -30,6 +36,8 @@ The caller gives you:
 - `{templatePath}` — the absolute path to the ADR template.
 - `{bodyFetchPath}` — the absolute path to the trail collector script, whose `--bodies`
   flag is the body-fetch capability.
+- `{gate2Path}` — the absolute path to write the gate-2 payload to, inside the run
+  directory. It does not exist yet.
 
 Use the supplied absolute script paths. Never guess a repo-relative path.
 
@@ -83,8 +91,7 @@ the command runs against `/`.
    `Cross-references` section of the template holds the full rule and its test.
 9. Bake the group's given `adrNumber` into the H1, as `# ADR-0027:` for `adrNumber` 27.
    Bake the same number into `proposedPath`, as `docs/adr/<NNNN>-<kebab-title>.md`, with
-   `<NNNN>` zero-padded to four digits. Propose the path without creating it. Return the
-   drafts only.
+   `<NNNN>` zero-padded to four digits. Propose the path without creating it.
 
    `adr-validate.ts`'s `id-mismatch` rule compares the filename number to the H1 number.
    A drift between the two fails validation after the barrowkeeper already wrote the
@@ -92,15 +99,18 @@ the command runs against `/`.
 
 ## Output
 
-Return valid JSON with exactly this shape:
+`Write` the gate-2 payload to `gate2Path`:
 
 ```json
 {
+  "gate": 2,
   "drafts": [
     {
       "groupId": "g1",
-      "draftText": "<complete record text ready to be written>",
-      "proposedPath": "docs/adr/0001-....md"
+      "adrNumber": 27,
+      "entryIds": ["id-1", "id-2"],
+      "proposedPath": "docs/adr/0027-....md",
+      "draftText": "<complete record text ready to be written>"
     }
   ]
 }
@@ -108,5 +118,11 @@ Return valid JSON with exactly this shape:
 
 Rules:
 
-- Return one entry per input group, in the same order, carrying the same `groupId`.
+- Write one entry per input group, in the same order, carrying the same `groupId`,
+  `adrNumber`, and `entryIds` it arrived with. `adr-commit.ts verdicts` turns a
+  dropped group's `entryIds` into a watch override, so a missing one archives that
+  decision unrecorded.
 - `draftText` is the complete record body, never a description of it.
+
+Then reply with one line: `gate2Path` and the number of drafts. On a refusal, write
+nothing and reply with the reason.
