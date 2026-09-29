@@ -122,10 +122,13 @@ export function groupFromAnswers(
 export async function suggestGroups(
   files: GroupInput[],
   opts: { apiKey: string | undefined; fetch?: typeof fetch },
-): Promise<Suggestion | null> {
+): Promise<Suggestion> {
   if (!opts.apiKey) return { skipped: "TYPESAFE_API_KEY not set" };
   const unique = new Set(files.map((f) => f.path)).size;
-  if (unique < 2 || unique > MAX_FILES) return null;
+  if (unique < 2) return { skipped: `${unique} file, nothing to group` };
+  if (unique > MAX_FILES) {
+    return { skipped: `${unique} files, over the ${MAX_FILES}-file limit` };
+  }
 
   const body = buildRequest(files);
   const paths = body.state.files.map((f) => f.path);
@@ -158,8 +161,7 @@ export async function suggestGroups(
   }
 }
 
-export function renderSuggestion(suggestion: Suggestion | null): string {
-  if (!suggestion) return "";
+export function renderSuggestion(suggestion: Suggestion): string {
   if ("skipped" in suggestion) {
     const after = suggestion.ms === undefined ? "" : ` after ${suggestion.ms} ms`;
     return `\n[TypeSafe grouping skipped${after}: ${suggestion.skipped}]\n`;

@@ -76,8 +76,8 @@ reads a single signal.
      file the committed code needs leaves a HEAD that does not build, and only the user can
      judge that.
    - Relay every `[TypeSafe grouping …]` line to the user: how long the call took,
-     or why it did not run — no key, or a key that is failing. Nothing else
-     surfaces either.
+     or why it did not run — no key, a key that is failing, `simple` mode, or a
+     changeset under 2 or over 20 files. Nothing else surfaces either.
 
 There is no baseline to record before the spawn: `apply` computes `base` from the
 log itself, so a second `rev-parse` here would only re-derive it at the most

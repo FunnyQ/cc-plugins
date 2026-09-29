@@ -717,7 +717,7 @@ async function main() {
       () => `[template unreadable at ${promptPath}]`,
     ),
     simple
-      ? null
+      ? { skipped: "simple mode" }
       : suggestGroups(analysis.files, {
           apiKey: process.env.TYPESAFE_API_KEY,
         }),

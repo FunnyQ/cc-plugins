@@ -83,13 +83,16 @@ describe("suggestGroups", () => {
     expect(calls).toHaveLength(0);
   });
 
-  test("returns null for fewer than two files or more than the cap", async () => {
+  // A silent null once hid the line on a 22-file commit; the user must always see why Jev did not run.
+  test("reports a skip for fewer than two files or more than the cap", async () => {
     const { impl, calls } = fakeFetch({});
     expect(
       await suggestGroups([file("a")], { apiKey: "k", fetch: impl }),
-    ).toBeNull();
+    ).toEqual({ skipped: "1 file, nothing to group" });
     const many = Array.from({ length: 21 }, (_, i) => file(`f${i}`));
-    expect(await suggestGroups(many, { apiKey: "k", fetch: impl })).toBeNull();
+    expect(await suggestGroups(many, { apiKey: "k", fetch: impl })).toEqual({
+      skipped: "21 files, over the 20-file limit",
+    });
     expect(calls).toHaveLength(0);
   });
 
@@ -136,8 +139,10 @@ describe("suggestGroups", () => {
 });
 
 describe("renderSuggestion", () => {
-  test("renders nothing for null", () => {
-    expect(renderSuggestion(null)).toBe("");
+  test("renders a skip reason without a time when nothing was sent", () => {
+    expect(renderSuggestion({ skipped: "simple mode" })).toBe(
+      "\n[TypeSafe grouping skipped: simple mode]\n",
+    );
   });
 
   test("renders one line per group", () => {
