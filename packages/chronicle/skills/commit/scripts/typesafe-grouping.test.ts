@@ -36,7 +36,6 @@ describe("buildRequest", () => {
     );
     expect(body.questions["type:0"]?.type).toBe("choice");
     expect(body.questions["pair:0:1"]?.type).toBe("noul");
-    expect(body.model).toBe("jev-latest");
   });
 
   test("deduplicates a path listed both staged and unstaged", () => {
@@ -110,6 +109,7 @@ describe("suggestGroups", () => {
     expect(
       (calls[0]?.init.headers as Record<string, string>).Authorization,
     ).toBe("Bearer secret");
+    expect(JSON.parse(calls[0]?.init.body as string).model).toBe("jev-latest");
     expect(result).toEqual({
       groups: [{ files: ["a", "b"], types: ["fix", "fix"] }],
       ms: expect.any(Number),

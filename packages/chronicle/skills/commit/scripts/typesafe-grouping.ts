@@ -5,15 +5,14 @@
  * the Lawspeaker still owns it. Every failure degrades to "no suggestion".
  */
 
-const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-const MODEL = "jev-latest";
+import { askJev, type JevAnswer, type JevQuestion } from "../../../shared/scripts/typesafe";
+
 /** Pairs grow as N²/2 — 20 files is 190 questions. */
 const MAX_FILES = 20;
 /** Jev caps state plus the longest question at 32k tokens; ~4 chars per token. */
 const STATE_CHAR_BUDGET = 60_000;
 const MAX_EXCERPT_LINES = 40;
 const SAME_GROUP_THRESHOLD = 0.7;
-const TIMEOUT_MS = 5_000;
 
 const TYPES: Record<string, string> = {
   feat: "Adds a new user-facing capability",
@@ -34,13 +33,6 @@ export type GroupInput = {
   diff: string;
 };
 
-type Question = {
-  type: "choice" | "noul";
-  instructions: string;
-  criteria?: Record<string, string>;
-};
-
-type Answer = { type: string; choice?: string; noul?: number };
 
 export type Group = { files: string[]; types: string[] };
 /** `ms` is the round trip, so the user sees what the call cost this commit. */
@@ -67,7 +59,7 @@ export function buildRequest(input: GroupInput[]) {
     })),
   };
 
-  const questions: Record<string, Question> = {};
+  const questions: Record<string, JevQuestion> = {};
   files.forEach((_, i) => {
     questions[`type:${i}`] = {
       type: "choice",
@@ -89,12 +81,12 @@ export function buildRequest(input: GroupInput[]) {
     }
   }
 
-  return { model: MODEL, state, questions };
+  return { state, questions };
 }
 
 export function groupFromAnswers(
   paths: string[],
-  answers: Record<string, Answer>,
+  answers: Record<string, JevAnswer>,
   threshold = SAME_GROUP_THRESHOLD,
 ): Group[] {
   const parent = paths.map((_, i) => i);
@@ -131,34 +123,10 @@ export async function suggestGroups(
   }
 
   const body = buildRequest(files);
+  const result = await askJev(body, opts);
+  if ("skipped" in result) return result;
   const paths = body.state.files.map((f) => f.path);
-  const started = performance.now();
-  const ms = () => Math.round(performance.now() - started);
-  try {
-    const response = await (opts.fetch ?? fetch)(ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${opts.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!response.ok) return { skipped: `HTTP ${response.status}`, ms: ms() };
-
-    const { answers } = (await response.json()) as {
-      answers?: Record<string, Answer>;
-    };
-    if (!answers || Object.keys(body.questions).some((k) => !answers[k])) {
-      return { skipped: "response is missing answers", ms: ms() };
-    }
-    return { groups: groupFromAnswers(paths, answers), ms: ms() };
-  } catch (err) {
-    return {
-      skipped: err instanceof Error ? err.message : String(err),
-      ms: ms(),
-    };
-  }
+  return { groups: groupFromAnswers(paths, result.answers), ms: result.ms };
 }
 
 export function renderSuggestion(suggestion: Suggestion): string {
