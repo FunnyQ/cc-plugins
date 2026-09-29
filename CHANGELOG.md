@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 5.2.2] - 2026-09-29
+
+_tracks tag `monitor-v5.2.2`_
+
+### Fixed
+- The cockpit session list no longer shows ended sessions that never wrote a log, which used to linger for up to 14 days as rows with an empty trail.
+
 ## [chronicle 0.20.1] - 2026-09-29
 
 _tracks tag `chronicle-v0.20.1`_
