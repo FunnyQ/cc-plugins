@@ -1,5 +1,19 @@
 # Changelog
 
+## [chronicle 0.20.1] - 2026-09-29
+
+_tracks tag `chronicle-v0.20.1`_
+
+### Fixed
+- ADR triage source no longer looks like a binary file to git and grep, so diffs and searches stop silently skipping it.
+
+## [guard 0.6.1] - 2026-09-29
+
+_tracks tag `guard-v0.6.1`_
+
+### Added
+- Comment hooks now show a visible note with the count and time whenever Jev withdraws a flagged comment block, instead of dropping it silently.
+
 ## [chronicle 0.20.0] - 2026-09-29
 
 _tracks tag `chronicle-v0.20.0`_
