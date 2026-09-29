@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  isClaudeCode,
   resolveParentSession,
   shouldSkipDecisionLogReminder,
 } from "./decision-log-reminder";
@@ -106,6 +107,17 @@ describe("shouldSkipDecisionLogReminder", () => {
         ),
       ).toBe(false);
     });
+  });
+});
+
+describe("isClaudeCode", () => {
+  it("is Claude Code when neither Codex nor OpenCode marks the payload", () => {
+    expect(isClaudeCode({}, { session_id: "s1" })).toBe(true);
+  });
+
+  it("is not Claude Code under Codex or OpenCode", () => {
+    expect(isClaudeCode({ PLUGIN_ROOT: "/plugins/monitor" }, {})).toBe(false);
+    expect(isClaudeCode({}, { provider: "opencode" })).toBe(false);
   });
 });
 

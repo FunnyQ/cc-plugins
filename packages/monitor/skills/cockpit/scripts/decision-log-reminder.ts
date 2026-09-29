@@ -51,6 +51,13 @@ export function shouldSkipDecisionLogReminder(
   }
 }
 
+export function isClaudeCode(
+  env: Record<string, string | undefined>,
+  input: DecisionLogHookInput,
+): boolean {
+  return !env.PLUGIN_ROOT && input.provider !== "opencode";
+}
+
 /**
  * A scribe fork must never resolve its own session — the harness may hand it a
  * child id. The hook runs in the main session, so it resolves once and bakes
