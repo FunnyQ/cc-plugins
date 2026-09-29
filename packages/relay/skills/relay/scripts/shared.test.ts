@@ -54,26 +54,26 @@ describe("resolveModel", () => {
     expect(result).toBeUndefined();
   });
 
-  it("falls back to constant when config is invalid shape", () => {
+  it("returns undefined when config is invalid shape", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: { someBackend: { someMode: "model" } }, // wrong backend
     }));
     expect(result).toBeUndefined();
   });
 
-  it("falls back to constant when config.models is missing", () => {
+  it("returns undefined when config.models is missing", () => {
     const result = resolveModel("opencode", "review", undefined, () => ({}));
     expect(result).toBeUndefined();
   });
 
-  it("falls back to constant when config.models[backend] is missing", () => {
+  it("returns undefined when config.models[backend] is missing", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: {},
     }));
     expect(result).toBeUndefined();
   });
 
-  it("falls back to constant when config.models[backend][mode] is missing", () => {
+  it("returns undefined when config.models[backend][mode] is missing", () => {
     const result = resolveModel("opencode", "image", undefined, () => ({
       models: { opencode: {} },
     }));
