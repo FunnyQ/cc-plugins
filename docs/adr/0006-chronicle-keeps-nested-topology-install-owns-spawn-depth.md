@@ -1,7 +1,8 @@
 # ADR-0006: Chronicle keeps nested subagent topology; install owns the spawn-depth prerequisite
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-07-22
+- Superseded by: ADR-0028
 
 ## Context
 
