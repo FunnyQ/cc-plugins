@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   classifyJudged,
+  gatherFacts,
   parseCommitLog,
   renderEntry,
   sectionFor,
@@ -109,6 +110,17 @@ describe("validateEntries", () => {
       "chronicle-v0.2.0: bullet cites unknown commit zz",
     );
     expect(errors).toContain("monitor-v1.0.0: no entry drafted");
+  });
+
+  test("rejects a tag drafted twice, since only one draft can be rendered", () => {
+    const partial: EntryDraft = {
+      tagName: "chronicle-v0.2.0",
+      sections: { Added: [{ text: "Only A.", commits: ["a1"] }] },
+      omitted: [],
+    };
+    expect(validateEntries([partial, good[0]!], facts)).toContain(
+      "chronicle-v0.2.0: drafted more than once",
+    );
   });
 
   test("rejects an entry with no bullets", () => {
@@ -241,5 +253,24 @@ describe("classifyJudged", () => {
     ];
     expect(await classifyJudged(facts, { apiKey: "k", fetch: impl })).toBeNull();
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("gatherFacts", () => {
+  test("fails loudly on a bad range instead of reporting no commits", async () => {
+    await expect(
+      gatherFacts([
+        {
+          component: "chronicle",
+          targetVersion: "9.9.9",
+          lastTag: "definitely-not-a-real-tag",
+          tagName: "chronicle-v9.9.9",
+          headerLabel: "chronicle 9.9.9",
+          pathScope: "packages/chronicle",
+          versionFiles: [],
+          artifacts: [],
+        },
+      ]),
+    ).rejects.toThrow();
   });
 });

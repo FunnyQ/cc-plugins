@@ -8,7 +8,7 @@
  */
 
 import { askJev, type JevResult } from "../../../shared/scripts/typesafe";
-import { git } from "./analyze-release";
+import { $ } from "bun";
 import type { Unit } from "./stages";
 
 export const SECTIONS = [
@@ -87,8 +87,18 @@ export async function gatherFacts(units: Unit[]): Promise<UnitFacts[]> {
     units.map(async (unit) => {
       const range = unit.lastTag ? [`${unit.lastTag}..HEAD`] : ["HEAD"];
       const scope = unit.pathScope ? ["--", unit.pathScope] : [];
-      const raw =
-        await git`git log --format=%h%x1f%s%x1f%b%x1e ${range} ${scope}`;
+      // Throws on a bad range: the shared helper's "" would read as "no commits"
+      // and let an entry that covers nothing through the coverage check.
+      const log =
+        await $`git log --format=%h%x1f%s%x1f%b%x1e ${range} ${scope}`
+          .quiet()
+          .nothrow();
+      if (log.exitCode !== 0) {
+        throw new Error(
+          `git log ${range.join(" ")} failed: ${log.stderr.toString().trim()}`,
+        );
+      }
+      const raw = log.stdout.toString();
       return {
         tagName: unit.tagName,
         headerLabel: unit.headerLabel,
@@ -104,6 +114,13 @@ export function validateEntries(
 ): string[] {
   const errors: string[] = [];
   const byTag = new Map(drafts.map((d) => [d.tagName, d]));
+  const seen = new Set<string>();
+  for (const draft of drafts) {
+    if (seen.has(draft.tagName)) {
+      errors.push(`${draft.tagName}: drafted more than once`);
+    }
+    seen.add(draft.tagName);
+  }
 
   for (const draft of drafts) {
     if (!facts.some((f) => f.tagName === draft.tagName)) {
