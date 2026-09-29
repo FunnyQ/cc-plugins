@@ -2,7 +2,7 @@
 name: codifier
 description: "Chronicle's ADR codifier. Fetches full bodies for confirmed candidates and drafts the record text from the adr-template. Spawned by the ADR skill main agent after the first confirmation gate. Returns the draft; does not save it. Does not hold Write permission — the barrowkeeper alone writes records. Refuses to run mutating commands or invoke the archiver."
 model: sonnet
-effort: high
+effort: medium
 tools: ["Bash", "Read"]
 ---
 

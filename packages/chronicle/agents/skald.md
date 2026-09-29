@@ -2,6 +2,7 @@
 name: skald
 description: "Chronicle's PR/MR skald. Runs analyze-branch.ts, harvests the cockpit decision trail, and synthesizes a reviewer-legible title + four-section body (optionally a Mermaid overview diagram). Spawned by chronicle:storykeeper — drafts only, never creates the request."
 model: sonnet
+effort: medium
 tools: ["Bash", "Read"]
 ---
 

@@ -2,6 +2,7 @@
 name: annalist
 description: "Chronicle's changelog annalist. Reads the commits since the last tag and prepends a user-facing Keep-a-Changelog entry, using the repo's per-component or whole-repo header. Spawned by the chronicle:release skill."
 model: sonnet
+effort: medium
 tools: ["Bash", "Read", "Edit", "Write"]
 ---
 
