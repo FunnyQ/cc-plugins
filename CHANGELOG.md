@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.3.7] - 2026-09-29
+
+_tracks tag `dispatch-v5.3.7`_
+
+### Fixed
+- Autopilot legs in nested plan directories can now read their task inputs (such as design mockups and assets) inside their worktree, because the plan directory is linked in from the main tree instead of being dropped.
+
 ## [dispatch 5.3.6] - 2026-09-29
 
 _tracks tag `dispatch-v5.3.6`_
