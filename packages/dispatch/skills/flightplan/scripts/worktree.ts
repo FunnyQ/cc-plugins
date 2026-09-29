@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import {
   copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync,
-  readFileSync, readdirSync, rmSync, rmdirSync, statSync, utimesSync, writeFileSync,
+  readFileSync, readdirSync, rmSync, rmdirSync, statSync, symlinkSync, utimesSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -260,6 +260,10 @@ export function create(options: RefOptions): Location {
   mkdirSync(root, { recursive: true });
   git(options.repo, ["worktree", "add", "--detach", path, base]);
   seedIgnored(options.repo, path, planOf(options));
+  // Tasks read plan assets (design/ mocks) by repo-relative path; a link stays live and snapshots drop it.
+  const link = join(path, planOf(options));
+  mkdirSync(dirname(link), { recursive: true });
+  symlinkSync(join(resolve(options.repo), planOf(options)), link);
   state[options.ref] = { path, base };
   writeState(root, state);
   return { path, base };

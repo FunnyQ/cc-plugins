@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -132,9 +133,57 @@ describe("worktree lifecycle", () => {
         "utf8",
       ),
     ).toBe("nested\n");
-    expect(existsSync(join(result.path, "docs/test-plan"))).toBe(false);
+    expect(
+      git(result.path, "ls-tree", "-r", "--name-only", "HEAD"),
+    ).not.toContain("docs/test-plan");
+    expect(realpathSync(join(result.path, "docs/test-plan"))).toBe(
+      join(options.repo, "docs/test-plan"),
+    );
     expect(git(result.path, "rev-parse", "HEAD")).toBe(result.base);
     expect(show(options)).toEqual({ ...result, exists: true });
+  });
+
+  test("the plan link exposes live main-tree plan files without landing or leaking", () => {
+    const options = { ...fixture(), planDir: "docs/test-plan/legs/02-hub" };
+    put(options.repo, "docs/test-plan/legs/02-hub/design/mock.html", "mock\n");
+    put(options.repo, "docs/test-plan/legs/01-done/PLAN.md", "sibling leg\n");
+    const baseline = fingerprint(options).fingerprint;
+    const wt = create(options);
+    expect(
+      readFileSync(
+        join(wt.path, "docs/test-plan/legs/02-hub/design/mock.html"),
+        "utf8",
+      ),
+    ).toBe("mock\n");
+    expect(
+      readFileSync(
+        join(wt.path, "docs/test-plan/legs/01-done/PLAN.md"),
+        "utf8",
+      ),
+    ).toBe("sibling leg\n");
+    put(
+      options.repo,
+      "docs/test-plan/legs/02-hub/design/mock.html",
+      "revised\n",
+    );
+    expect(
+      readFileSync(
+        join(wt.path, "docs/test-plan/legs/02-hub/design/mock.html"),
+        "utf8",
+      ),
+    ).toBe("revised\n");
+    put(wt.path, "a.txt", "task edit\n");
+    const result = land({ ...options, expect: baseline, op: "a1-land" });
+    expect(result.status).toBe("clean");
+    expect(result.files).toEqual(["a.txt"]);
+    const rebased = rebase({ ...options, op: "a1-rebase" });
+    expect(rebased.conflicted).toEqual([]);
+    expect(
+      readFileSync(
+        join(wt.path, "docs/test-plan/legs/02-hub/design/mock.html"),
+        "utf8",
+      ),
+    ).toBe("revised\n");
   });
 
   test("clean land and unland preserve the real index and replay operations before checking leaks", () => {
@@ -318,7 +367,7 @@ describe("worktree lifecycle", () => {
     git(options.repo, "add", ".");
     git(options.repo, "commit", "-qm", "nested plan");
     const wt = create(options);
-    expect(existsSync(join(wt.path, options.planDir))).toBe(false);
+    expect(lstatSync(join(wt.path, options.planDir)).isSymbolicLink()).toBe(true);
     const baseline = fingerprint(options).fingerprint;
     put(options.repo, task, "> **Status**: in-progress\n");
     put(wt.path, "a.txt", "task\n");
@@ -572,7 +621,7 @@ describe("worktree lifecycle", () => {
     put(options.repo, ".gitignore", "docs/\n");
     put(options.repo, "docs/other/guide.md", "keep\n");
     const wt = create(options);
-    expect(existsSync(join(wt.path, "docs/test-plan"))).toBe(false);
+    expect(lstatSync(join(wt.path, "docs/test-plan")).isSymbolicLink()).toBe(true);
     expect(readFileSync(join(wt.path, "docs/other/guide.md"), "utf8")).toBe(
       "keep\n",
     );
