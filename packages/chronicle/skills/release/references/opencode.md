@@ -1,8 +1,8 @@
 # Release under the OpenCode harness
 
 Release is **flat**: the main skill runs the scripts itself and spawns the leaf
-agent Annalist directly. It only ever spawns one level, so unlike PR and ADR it
-does **not** need `subagent_depth >= 2`. Commit is flat too.
+agent Annalist directly. It only ever spawns one level, so it does **not** need
+`subagent_depth >= 2`. Every chronicle skill is flat.
 
 ## Agent names are bare
 

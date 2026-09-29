@@ -2,7 +2,7 @@
 
 // Installer for the OpenCode harness: links this checkout's skills, plugin module,
 // chronicle agents and monitor commands into ~/.config/opencode/, and raises
-// subagent_depth so chronicle's orchestrators can spawn their children.
+// subagent_depth so dispatch's autopilot driver can spawn its roles.
 //
 // Rules a reader must know before changing anything here:
 //

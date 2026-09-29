@@ -34,8 +34,7 @@ main agent  (holds the conversation = the "why")
 ```
 
 Spawn via `subagent_type`, never a fork. Spawn exactly one Lawspeaker, in one
-`Agent` call, with no `name`. It spawns nobody, so this flow does not need a
-raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`; `pr` and `adr` do.
+`Agent` call, with no `name`. It spawns nobody.
 
 The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers as
 `chronicle:lawspeaker`.

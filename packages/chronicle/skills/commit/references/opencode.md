@@ -29,6 +29,4 @@ the result.
 ## Spawn depth
 
 This skill is flat: the Lawspeaker spawns nobody, so it runs at OpenCode's default
-`subagent_depth` of `1`, as does `release`. Chronicle's `pr` and `adr` skills are
-still nested and still need `>= 2` in `~/.config/opencode/opencode.json`, which
-`opencode/install.ts --apply` raises.
+`subagent_depth` of `1`. Every chronicle skill is flat now.

@@ -1,51 +1,25 @@
 ---
 name: install
 description: >-
-  Set up Chronicle's prerequisites — the nested-subagent spawn depth on Claude
-  Code, and the named agent roles on Codex.
+  Set up Chronicle's prerequisites — the named agent roles on Codex.
 when_to_use: >-
-  Setting up or repairing Chronicle. On Claude Code: when pr/adr fail
-  with "Agent exists but is not enabled in this context". On Codex: registering or
-  refreshing the commit/PR/ADR agents (chronicle_lawspeaker,
+  Setting up or repairing Chronicle on Codex: registering or refreshing the
+  commit/PR/ADR agents (chronicle_lawspeaker,
   chronicle_storykeeper, chronicle_codifier, etc.).
   Not monitor:install (that wires the usage-dashboard statusline).
 ---
 
 # Chronicle install
 
-## Claude Code — nested subagent spawn depth
+## Claude Code — nothing to set up
 
-Chronicle's ADR flow is orchestrator-shaped: `main → lorekeeper →
-codifier/barrowkeeper`. Claude Code **2.1.217** stopped letting subagents spawn
-nested subagents by default. That orchestrator then fails with `Agent exists but
-is not enabled in this context`, and nothing lands. (`release` is flat — it spawns
-leaf agents directly. So are `commit` and `pr`, whose lawspeaker and storykeeper
-run their own scripts.)
+Claude Code needs no setup. Chronicle's agents register from the plugin, and none of
+them spawns a child, so no subagent spawn depth has to be raised.
 
-`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` re-enables it. Chronicle needs `2`.
-
-A `SessionStart` hook runs this automatically and writes the setting when it is
-missing or too low. A fresh install self-heals this way. Run it by hand to check
-or repair:
-
-`{SKILL_DIR}` is a **placeholder** for the skill's load-time "Base directory for
-this skill" banner value. Substitute the literal absolute path before running.
-Never write it as `$SKILL_DIR` — nothing sets that variable, so the path silently
-becomes empty and the command runs against `/`.
-
-```bash
-bun "{SKILL_DIR}/scripts/setup-spawn-depth.ts"            # report only (default)
-bun "{SKILL_DIR}/scripts/setup-spawn-depth.ts" --dry-run  # show the resulting file
-bun "{SKILL_DIR}/scripts/setup-spawn-depth.ts" --apply    # write it
-```
-
-It only ever **raises** the value. A larger depth set by the user or another
-plugin is left alone. It also preserves unrelated settings, and it backs up the
-file as `settings.json.bak-chronicle` before a changed write.
-
-⚠️ **The env var is read at session start.** A session that triggers the write
-still runs without it. Chronicle's flows keep failing until Claude Code
-restarts. Always say this when you report the fix.
+Chronicle used to need `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` of `2` for its `pr` and
+`adr` orchestrators, and a `SessionStart` hook wrote it. Both orchestrators are gone.
+A value an earlier version wrote into `~/.claude/settings.json` is harmless: leave it,
+or remove it by hand if nothing else needs it.
 
 ## Codex — named agent roles
 
@@ -83,7 +57,5 @@ repository — not from the installed skill. It supports `--check`,
 `--dry-run`, `--apply`, and `--unlink`. On `--apply`, it raises
 `subagent_depth` to `2` in `~/.config/opencode/opencode.json`.
 
-This depth setting is mandatory for Chronicle's nested PR and ADR skills
-to work. Below the required depth the orchestrator simply stops with no error
-naming the config. Commit and release are flat — commit's lawspeaker runs its own
-scripts, release spawns leaf agents directly — so neither needs the depth setting.
+Chronicle no longer needs that setting: every chronicle skill is flat. The installer
+still raises it for dispatch's `autopilot`, whose OpenCode reference requires it.

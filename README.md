@@ -39,20 +39,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 | [commit](./packages/chronicle/skills/commit) | Craft git commit(s) for the current changes — auto-decides between one simple commit and an atomic split |
 | [pr](./packages/chronicle/skills/pr) | Open a reviewer-legible PR/MR for the current branch, enriched by the cockpit decision trail when present |
 | [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, then commit, merge, tag, and push; `local` stops before the push, `prepare` after the entry |
-| [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the nested-subagent spawn depth on Claude Code, the named agent roles on Codex |
-
-> **Claude Code 2.1.217+ requires one setting.** Chronicle's `adr` flow is
-> orchestrator-shaped (`main → lorekeeper → codifier/barrowkeeper`), and 2.1.217
-> stopped letting subagents spawn nested subagents by default. Without it that flow
-> fail with `Agent exists but is not enabled in this context`. A `SessionStart` hook writes
-> `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` into `~/.claude/settings.json` for you —
-> **restart Claude Code afterwards**, since the value is only read at session start.
-> To check or repair it by hand:
->
-> ```bash
-> bun packages/chronicle/skills/install/scripts/setup-spawn-depth.ts           # report
-> bun packages/chronicle/skills/install/scripts/setup-spawn-depth.ts --apply   # write
-> ```
+| [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the named agent roles on Codex (Claude Code needs none) |
 
 **herdr** is a single skill:
 
@@ -123,11 +110,11 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 |---|---|---|
 | Skills | 15 | `~/.config/opencode/skills/<name>/` |
 | Plugin module | 1 | `~/.config/opencode/plugin/q-lab.ts` |
-| Chronicle agents | 13 | `~/.config/opencode/agents/<name>.md` |
+| Chronicle agents | 6 | `~/.config/opencode/agents/<name>.md` |
 | Commands | 2 | `~/.config/opencode/commands/<name>.md` |
 | `subagent_depth` | 1 edit | `~/.config/opencode/opencode.json` |
 
-**The `subagent_depth` prerequisite.** `--apply` raises `subagent_depth` to **at least 2** in `~/.config/opencode/opencode.json`, the one config file it touches outside symlinks. The edit is raise-only — every other key in that file is preserved, and a value already `≥ 2` is left alone. OpenCode ships defaulting `subagent_depth` to `1`, which blocks nesting outright, so this isn't a hypothetical edge case — it's the shipped default. Below the required depth, one of chronicle's orchestrators simply stops mid-run with no error naming the config: the failure reads exactly like a plugin bug. Anyone hand-editing `opencode.json` instead of running `--apply` needs to set this key to `2` themselves.
+**The `subagent_depth` prerequisite.** `--apply` raises `subagent_depth` to **at least 2** in `~/.config/opencode/opencode.json`, the one config file it touches outside symlinks. The edit is raise-only — every other key in that file is preserved, and a value already `≥ 2` is left alone. OpenCode ships defaulting `subagent_depth` to `1`, which blocks nesting outright, so this isn't a hypothetical edge case — it's the shipped default. Chronicle no longer needs it — none of its agents spawns a child — but dispatch's `autopilot` does: below the required depth its driver simply stops mid-run with no error naming the config, and the failure reads exactly like a plugin bug. Anyone hand-editing `opencode.json` instead of running `--apply` needs to set this key to `2` themselves.
 
 **Which config file gets the edit.** OpenCode merges three global config names in order — `config.json`, then `opencode.json`, then `opencode.jsonc` — so the last one present wins. The installer patches whichever of those already exists, highest precedence first, and creates `opencode.json` only when none does. Two consequences: an existing `opencode.jsonc` is the file that gets raised, and a config carrying **comments** is read but never rewritten, because re-serializing it would delete them — `--check` and `--apply` report `manual` and print the line to add by hand.
 
@@ -139,7 +126,7 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 - relay `delegate` and `review`.
 - The five ported hook behaviors: decision-log start, the scribe nudge, the chronicle branch guard, the dispatch flightplan lint, and the guard comment check.
 - Both monitor commands.
-- Chronicle's subagents, spawned through the task tool, with `subagent_depth` satisfied as above.
+- Chronicle's subagents, spawned through the task tool.
 
 **Does not work under OpenCode:**
 
