@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 5.4.0] - 2026-09-30
+
+_tracks tag `dispatch-v5.4.0`_
+
+### Added
+- Headless codex-run and opencode-run now follow your relay config for model choice, so a flight picks the same model headless as it does in a live pane; note the model can change mid-flight if you edit relay config between waves.
+
+### Changed
+- Autopilot's codex model question now defaults to "Relay config", showing the resolved model in the label, so you no longer have to pick one by hand.
+
 ## [chronicle 0.21.0] - 2026-09-30
 
 _tracks tag `chronicle-v0.21.0`_
