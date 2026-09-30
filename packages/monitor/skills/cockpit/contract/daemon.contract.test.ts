@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { chmodSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { request } from "node:http";
-import { PLUGIN_ROOT } from "./launcher";
+import { command, PLUGIN_ROOT } from "./launcher";
 import {
   appendTrail, baseEnv, cleanup, DECISION_RECORD, fixtureEnv, freePort, makeHomes,
   makeProviderFixtures, openSse, readJsonl, run, seedRegistry, seedTrail,
@@ -84,14 +84,53 @@ describe("server: startup", () => {
   test("writes the exact daemon record and reuses its live PID", async () => {
     const raw = readFileSync(join(c.h.cockpitHome, "daemon.json"), "utf8");
     expect(raw).toBe(JSON.stringify(c.d.info, null, 2) + "\n");
-    expect(Object.keys(c.d.info).sort()).toEqual(["pid", "port", "root", "token"]);
+    expect(Object.keys(c.d.info)).toEqual(["pid", "port", "token", "root"]);
+    expect(c.d.token).toMatch(/^[0-9a-f]{32}$/);
     expect(c.d.info).toEqual({ pid: c.d.proc.pid, port: c.d.port, root: expect.any(String), token: expect.any(String) });
-    expect(c.d.info.root.endsWith("/skills/cockpit/scripts")).toBe(true);
+    expect(c.d.info.root).toBe(join(PLUGIN_ROOT, "skills/cockpit/scripts"));
     const second = run("server", ["--no-open", "--port", String(await freePort())], { env: c.env });
     expect(second.exitCode).toBe(0);
+    expect(second.stdout).toBe(`cockpit daemon already running → http://localhost:${c.d.port} (pid ${c.d.proc.pid})\n`);
+    expect(second.stderr).toBe("");
     expect(() => process.kill(c.d.proc.pid, 0)).not.toThrow();
     expect(JSON.parse(readFileSync(join(c.h.cockpitHome, "daemon.json"), "utf8"))).toEqual(c.d.info);
   });
+  test("uses the environment port when no port flag is present", async () => {
+    await stopDaemon(c.d);
+    const port = await freePort();
+    const proc = Bun.spawn(command("server", ["--no-open"]), {
+      env: { ...c.env, COCKPIT_SERVER_PORT: String(port) }, stdout: "pipe", stderr: "pipe",
+    });
+    const stdout = new Response(proc.stdout).text();
+    const stderr = new Response(proc.stderr).text();
+    const base = `http://127.0.0.1:${port}`;
+    try {
+      let ready = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        expect(proc.exitCode).toBeNull();
+        try {
+          const info = JSON.parse(readFileSync(join(c.h.cockpitHome, "daemon.json"), "utf8"));
+          if (info.pid === proc.pid && info.port === port) {
+            const res = await fetch(`${base}/api/token`, { signal: AbortSignal.timeout(100) });
+            if (res.ok) {
+              expect(await json(res)).toEqual({ token: info.token });
+              c.d = { proc, port, base, token: info.token, info };
+              ready = true;
+              break;
+            }
+            await res.body?.cancel();
+          }
+        } catch { /* The record and listener become ready asynchronously. */ }
+        await Bun.sleep(50);
+      }
+      expect(ready).toBe(true);
+    } finally {
+      await stopDaemon({ proc, port, base, token: "", info: null });
+      expect(await stdout).toBe(`cockpit → http://localhost:${port}\n`);
+      expect(await stderr).toBe("");
+      c.d = await startDaemon(c.env);
+    }
+  }, 15000);
   test("replaces a different-root live process with SIGTERM", async () => {
     await stopDaemon(c.d);
     const dummy = Bun.spawn(["sleep", "30"], { stdout: "ignore", stderr: "ignore" });
@@ -118,6 +157,17 @@ describe("server: meta", () => {
   const c = group();
   test("returns exactly the public token envelope", async () => {
     expect(await get(c.d, "/api/token", { token: "wrong" })).toEqual({ token: c.d.token });
+  });
+  test("reads the token fresh for every request and accepts POST", async () => {
+    const path = join(c.h.cockpitHome, "daemon.json");
+    const raw = readFileSync(path, "utf8");
+    try {
+      writeFileSync(path, JSON.stringify({ ...c.d.info, token: "replacement-token" }));
+      expect(await get(c.d, "/api/token")).toEqual({ token: "replacement-token" });
+      expect(await json(await fetch(c.d.base + "/api/token", { method: "POST" }))).toEqual({ token: "replacement-token" });
+      writeFileSync(path, "{}");
+      expect(await get(c.d, "/api/token", {}, 503)).toEqual({ error: "daemon token unavailable" });
+    } finally { writeFileSync(path, raw); }
   });
 });
 
@@ -153,9 +203,31 @@ describe("server: static", () => {
     expect(compressed.headers.get("cache-control")).toBe("no-cache");
     expect(await compressed.text()).toBe(text);
   });
+  test("compresses each available text extension and revalidates gzip", async () => {
+    for (const path of ["/index.html", "/app.js", "/style.css", "/vendor/purify.es.mjs"]) {
+      const plain = await fetch(c.d.base + path, { headers: { "accept-encoding": "identity" } });
+      expect(plain.status).toBe(200);
+      expect(plain.headers.get("content-encoding")).toBeNull();
+      expect(plain.headers.get("vary")).toBeNull();
+      const text = await plain.text();
+      const gzip = await fetch(c.d.base + path, { headers: { "accept-encoding": "br, gzip" } });
+      expect(gzip.status).toBe(200);
+      expect(gzip.headers.get("content-encoding")).toBe("gzip");
+      expect(gzip.headers.get("vary")).toBe("Accept-Encoding");
+      const etag = gzip.headers.get("etag")!;
+      expect(etag).toMatch(/-gz"$/);
+      expect(await gzip.text()).toBe(text);
+      const cached = await fetch(c.d.base + path, { headers: { "accept-encoding": "gzip", "if-none-match": etag } });
+      expect(cached.status).toBe(304);
+      expect(cached.headers.get("etag")).toBe(etag);
+      expect(cached.headers.get("content-type")).toBe(plain.headers.get("content-type"));
+      expect(cached.headers.get("cache-control")).toBe("no-cache");
+      expect(await cached.text()).toBe("");
+    }
+  });
   test("refuses unknown paths and literal/encoded traversal without SPA fallback", async () => {
     // pins TS quirk: URL normalization consumes dot segments before static routing.
-    for (const path of ["/no/such/page", "/../../package.json", "/%2e%2e/%2e%2e/package.json", "/%2e%2e%2fpackage.json"]) {
+    for (const path of ["/no/such/page", "/modules", "/vendor/", "/../../package.json", "/%2e%2e/%2e%2e/package.json", "/%2e%2e%2fpackage.json"]) {
       const res = await fetch(c.d.base + path);
       expect(res.status).toBe(404);
       expect(res.headers.get("content-type")).toBe("text/plain;charset=utf-8");

@@ -13,9 +13,28 @@ libc = "~0.2"
 clap = { version = "~4.5", features = ["derive"] }
 serde = { version = "~1.0", features = ["derive"] }
 serde_json = { version = "~1.0", features = ["preserve_order"] }
-tokio = { version = "~1.49", features = ["rt"] }
+tokio = { version = "~1.49", features = ["net", "time", "sync", "fs", "process", "signal", "macros", "rt", "io-util"] }
 
 rusqlite = { version = "~0.40", features = ["bundled"] }
+
+# Serve HTTP routes, SSE streams and long polls.
+axum = "~0.8"
+# Watch transcript and decision files for stream updates.
+notify = "~8.2"
+# Connect to the Codex app-server WebSocket over its Unix socket.
+tokio-tungstenite = "~0.28"
+# Parse DESIGN.md YAML frontmatter with a maintained serde parser.
+serde_norway = "~0.9"
+# Match color patterns and process-list fields without lookaround.
+regex = "~1.12"
+# Preserve Bun's level-6 gzip representation for compressible static assets.
+flate2 = "~1.1"
+# Send OpenCode HTTP bridge requests without unnecessary TLS dependencies.
+reqwest = { version = "~0.12", default-features = false, features = ["json"] }
+# Parse RFC 3339 heartbeats and emit UTC timestamps with millisecond precision.
+jiff = "~0.2"
+# Generate RFC 4122 v4 record ids compatible with crypto.randomUUID().
+uuid = { version = "~1.23", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "~3.24"

@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/02, core/03, contract/02
 > **Blocks**: server/02, server/04, server/06, server/07, server/08
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -122,22 +122,22 @@ Implement every method fully here (behavior as commented), with `cargo test` for
 
 ## Acceptance criteria
 
-- [ ] `cockpit server --port <p> --no-open` binds, writes `daemon.json` with `root = <plugin root>/skills/cockpit/scripts`, and a second identical launch prints the reuse line and exits 0.
-- [ ] With no `--port`, `COCKPIT_SERVER_PORT=<p>` makes the server bind `<p>`.
-- [ ] A launch whose root differs from a live recorded daemon supersedes it (old pid gone, new `daemon.json`).
-- [ ] Every `server: startup`, `server: meta`, and `server: static` contract test passes against the Rust binary and still passes against TS.
-- [ ] Static serving returns 404 for traversal and unknown paths, 304 on a matching `If-None-Match`, and gzip only for the compressible set.
-- [ ] `AppState` carries the presence registry and all eight group state fields named above; each stub module compiles to an empty router, so the later groups need no edit to `mod.rs` or `Cargo.toml`.
-- [ ] `Cargo.toml` carries every server dependency listed above with justification comments.
-- [ ] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are clean.
+- [x] `cockpit server --port <p> --no-open` binds, writes `daemon.json` with `root = <plugin root>/skills/cockpit/scripts`, and a second identical launch prints the reuse line and exits 0.
+- [x] With no `--port`, `COCKPIT_SERVER_PORT=<p>` makes the server bind `<p>`.
+- [x] A launch whose root differs from a live recorded daemon supersedes it (old pid gone, new `daemon.json`).
+- [x] Every `server: startup`, `server: meta`, and `server: static` contract test passes against the Rust binary and still passes against TS.
+- [x] Static serving returns 404 for traversal and unknown paths, 304 on a matching `If-None-Match`, and gzip only for the compressible set.
+- [x] `AppState` carries the presence registry and all eight group state fields named above; each stub module compiles to an empty router, so the later groups need no edit to `mod.rs` or `Cargo.toml`.
+- [x] `Cargo.toml` carries every server dependency listed above with justification comments.
+- [x] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are clean.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (startup|meta|static)"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (startup|meta|static)"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (startup|meta|static)"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (startup|meta|static)"` (TS still green)
 
 ## Eval rubric
 

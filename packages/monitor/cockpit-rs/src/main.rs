@@ -1,6 +1,10 @@
 use clap::{Args, Parser, Subcommand};
 use std::process::ExitCode;
 
+mod server;
+
+mod hook;
+
 // Consumed by later subcommand ports.
 #[allow(dead_code)]
 mod paths;
@@ -33,6 +37,8 @@ mod find_session;
 // Consumed by later subcommand ports.
 #[allow(dead_code)]
 mod nudge_toggle;
+
+mod cli;
 
 #[derive(Parser)]
 #[command(name = "cockpit", version)]
@@ -78,21 +84,25 @@ fn stub(subcommand: &str, _args: TrailingArgs) -> ExitCode {
 }
 
 fn main() -> ExitCode {
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(code) = cli::preflight(&argv) {
+        return code;
+    }
     match Cli::parse().command {
-        Command::Server(args) => stub("server", args),
+        Command::Server(args) => server::run(&args.args),
         Command::Channel(args) => stub("channel", args),
-        Command::Log(args) => stub("log", args),
-        Command::Scribe(args) => stub("scribe", args),
-        Command::Prep(args) => stub("prep", args),
-        Command::Config(args) => stub("config", args),
+        Command::Log(args) => cli::run("log", &args.args),
+        Command::Scribe(args) => cli::run("scribe", &args.args),
+        Command::Prep(args) => cli::run("prep", &args.args),
+        Command::Config(args) => cli::run("config", &args.args),
         Command::Wait(args) => stub("wait", args),
         Command::Send(args) => stub("send", args),
         Command::Restart(args) => stub("restart", args),
-        Command::Nudge(args) => stub("nudge", args),
-        Command::FindSession(args) => stub("find-session", args),
+        Command::Nudge(args) => cli::run("nudge", &args.args),
+        Command::FindSession(args) => cli::run("find-session", &args.args),
         Command::Hook { command } => match command {
-            HookCommand::SessionStart(args) => stub("hook session-start", args),
-            HookCommand::Stop(args) => stub("hook stop", args),
+            HookCommand::SessionStart(_) => hook::run(true),
+            HookCommand::Stop(_) => hook::run(false),
         },
     }
 }
