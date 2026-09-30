@@ -44,7 +44,25 @@ function replaceCollector(
   re: RegExp,
   collectorCommand: string,
 ): string {
-  return command.replace(re, () => collectorCommand);
+  return command.replace(re, (m) => {
+    // A quote closed outside the match, or one enclosing a multi-word match,
+    // belongs to the user's command (e.g. `hud statusline 'bun …'`), so keep it.
+    const outer = /\s/.test(m.slice(1, -1));
+    const first = m[0];
+    const last = m[m.length - 1];
+    const next = m.indexOf(first, 1);
+    const prev = m.lastIndexOf(last, m.length - 2);
+    const open =
+      (first === '"' || first === "'") &&
+      (next === -1 || (next === m.length - 1 && outer))
+        ? first
+        : "";
+    const close =
+      (last === '"' || last === "'") && (prev === -1 || (prev === 0 && outer))
+        ? last
+        : "";
+    return `${open}${collectorCommand}${close}`;
+  });
 }
 
 // Stale collectors are re-pointed in place so a wrapped user command survives.

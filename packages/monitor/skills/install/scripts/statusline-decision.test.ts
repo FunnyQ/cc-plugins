@@ -79,6 +79,22 @@ describe("decideStatusLine", () => {
     });
   });
 
+  test("re-points a shim inside a user command's quoted argument, keeping the quotes", () => {
+    const d = decideStatusLine(
+      {
+        command:
+          "/opt/hud/sketchybar statusline '/old/skills/cockpit/bin/cockpit atlas statusline'",
+      },
+      COLLECTOR,
+    );
+    expect(d).toEqual({
+      action: "write",
+      command: `/opt/hud/sketchybar statusline '${COLLECTOR}'`,
+      padding: 0,
+      preserved: null,
+    });
+  });
+
   test("wires fresh when there is no existing statusLine", () => {
     const d = decideStatusLine({}, COLLECTOR);
     expect(d).toEqual({
@@ -155,6 +171,31 @@ describe("migrateCollectorCommand", () => {
     expect(
       migrateCollectorCommand(
         `"/opt/bun" '${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts'`,
+        CLONE_SHIM,
+      ),
+    ).toBe(CLONE_SHIM);
+  });
+
+  test("keeps the quotes of a user command that takes the collector as one argument", () => {
+    const HUD = "/opt/hud/sketchybar statusline";
+    expect(
+      migrateCollectorCommand(
+        `${HUD} 'bun ${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts'`,
+        CLONE_SHIM,
+      ),
+    ).toBe(`${HUD} '${CLONE_SHIM}'`);
+    expect(
+      migrateCollectorCommand(
+        `${HUD} "/opt/bun ${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts"`,
+        CLONE_SHIM,
+      ),
+    ).toBe(`${HUD} "${CLONE_SHIM}"`);
+  });
+
+  test("drops quotes that only wrapped the script path", () => {
+    expect(
+      migrateCollectorCommand(
+        `"${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts"`,
         CLONE_SHIM,
       ),
     ).toBe(CLONE_SHIM);
