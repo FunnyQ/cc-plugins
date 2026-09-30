@@ -1,5 +1,22 @@
 # Changelog
 
+## [chronicle 0.21.0] - 2026-09-30
+
+_tracks tag `chronicle-v0.21.0`_
+
+### Added
+- Commit `exclude` now accepts a directory (an entry ending in `/`), expanded at apply time to every changed path under it, so exclude lists no longer go stale and get refused as `missing` when files change between planning and apply.
+
+## [monitor 5.2.4] - 2026-09-30
+
+_tracks tag `monitor-v5.2.4`_
+
+### Changed
+- Cockpit prompts (pilot, scribe, thoughtful) and the monitor install prompt were audited for stale facts, cutting about 14% of the words, listing every scribe spawn path, and giving /thoughtful a concrete find-session command.
+
+### Fixed
+- The usage-dashboard prompt no longer contradicts monitor:install: statusline wiring goes through install, the misleading "restart Claude Code" advice is gone, and the plugin root resolves from the base-directory banner.
+
 ## [dispatch 5.3.9] - 2026-09-30
 
 _tracks tag `dispatch-v5.3.9`_
