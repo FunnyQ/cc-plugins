@@ -76,43 +76,7 @@ Any decision the user made during flightplan's interview that affects multiple t
 
 ## What sometimes exists
 
-Create additional `_context/*.md` files only when the same body of context is referenced by multiple tasks. The patterns below are common. Create the ones that match the topic.
-
-### `api-contract.md`
-
-When frontend and backend (or client and server) need a shared interface definition.
-
-Contents:
-
-- Endpoint list with paths and methods
-- Request/response schemas (TypeScript types or JSON Schema)
-- Auth model (token shape, header names, refresh rules)
-- Error envelope
-- Fixture / mock state shape if applicable
-
-### `backend-conventions.md`
-
-When several backend tasks need the same scaffolding rules.
-
-Contents:
-
-- Framework-specific structure (Rails engine layout, Nuxt server dir, etc.)
-- Resource / controller / serializer patterns
-- Auth implementation pointers (e.g., Rodauth tables, Devise modules)
-- Authorization patterns (Pundit, CanCan, etc.)
-- Testing conventions
-
-### `frontend-conventions.md`
-
-When several UI tasks need the same scaffolding rules.
-
-Contents:
-
-- Component organization (atoms / molecules, feature folders, etc.)
-- State management approach
-- Routing patterns
-- Styling system (CSS variables, design tokens, scoped styles)
-- Accessibility baseline
+Create additional `_context/*.md` files only when the same body of context is referenced by multiple tasks. Common ones: `api-contract.md` (a client/server interface), `backend-conventions.md` / `frontend-conventions.md` (scaffolding rules several tasks share), `data-model.md` (a shared schema), `migration-plan.md` (phases, cutover criteria, rollback), and `style-guide.md` (writing topics). Two have a fixed shape:
 
 ### `design.md`
 
@@ -140,40 +104,6 @@ Name a frontmatter value in prose by its role; never restate its number.
 Every value the mock uses appears in this file. A value the frontmatter cannot hold — a shadow, a blur, a focus ring — goes in the prose of its section, never only in impeccable's `.impeccable/design.json` sidecar, which executors never read.
 
 The Step 7 reviewer bundles Markdown only, so it never sees the mock. The `(human)` side-by-side check is the only guard against drift between the mock and this file.
-
-### `data-model.md`
-
-When tasks share a schema or domain model worth pinning.
-
-Contents:
-
-- ER diagram or table-by-table breakdown
-- Field definitions and types
-- Relationships
-- Constraints (uniqueness, nullability, enums)
-
-### `migration-plan.md`
-
-For migration / refactor topics.
-
-Contents:
-
-- Phase definitions
-- Cutover criteria for each phase
-- Rollback steps
-- What runs in parallel vs sequential
-
-### `style-guide.md`
-
-For writing topics.
-
-Contents:
-
-- Voice / tone rules
-- Vocabulary preferences
-- Forbidden phrases
-- Length targets
-- Reference examples
 
 ### `rubric.md`
 

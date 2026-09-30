@@ -185,7 +185,7 @@ Tag sparingly. An item is `(human)` only when no command could ever check it, no
 
 ## Referring to other tasks: name the thing, not the id
 
-The most common lint failure is this: writing a sibling task id, such as `frontend/01`, into the body out of habit. This happens because you just used the id in `Depends on`. Don't do it. The dependency graph lives in the header. The body must never make the executor open another task.
+The dependency graph lives in the header. The body must never make the executor open another task, so it names the thing a sibling produces, never the sibling's id.
 
 - ❌ `Built on the client from frontend/01.`
 - ✅ ``Built on the API client (`apiFetch(path): Promise<Res>` — signature below).``
@@ -202,8 +202,7 @@ Before finalizing a task file, verify each:
 - [ ] If behavior is non-obvious, sample inputs and outputs are inline.
 - [ ] Write file paths relative to the repo root (no "in the auth folder" hand-waving).
 - [ ] Every acceptance criterion is verifiable (no "looks good").
-- [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
-- [ ] Write Verification commands relative to the repo root so they check the task's worktree, not an absolute path into the main tree.
+- [ ] Verification steps are concrete commands or manual checks, not vague QA notes, with paths relative to the repo root.
 - [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
 - [ ] Every Final review gate that checks which files changed uses `git diff --name-only <baseRef> -- <paths>`, never `git status`.
 - [ ] Every criterion about a report names the report's file in backticks, for example `` The report at `docs/<slug>/review-notes.md` lists … ``. In the Final review, `lint-task.ts` flags "the report" with no path as the `report-path` rule, because a verifier checks disk and finds nothing to check.
@@ -221,13 +220,10 @@ A gate that reads `git status` without a `--` pathspec reads the **whole working
 - ❌ `` Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation. ``
 - ✅ `` Run `git status --short -- README.md docs/<slug>/tasks/<bucket>/NN-<slug>.md` and confirm both paths are dirty. ``
 
-Two separate failures made every whole-tree form unusable.
+A whole-tree form fails a correct task for two reasons:
 
-**The runner edits the task file.** The dev step sets `Status: in-progress`, and `mark-done.ts` ticks every `## Acceptance criteria` and `## Verification` box. So an exclusivity claim is false from the first attempt. Worse, a dev agent under a failing gate reverts the runner's own `Status` edit to make the check pass — observed live, with the agent reporting "task file correctly restored". A reverted `Status` un-schedules the task: `next-ready.ts` only offers `todo`, and `mark-done.ts` validates the header before it writes.
-
-**Sibling tasks share the tree where tasks still use one working tree.** Today, this applies to the hand-driven OpenCode loop. There, a correct task sees its siblings' correct, uncommitted edits in `git status` and reports them as its own violation. Observed live: a task passed all 7 acceptance criteria and 245 tests, then failed three attempts and parked, on four paths that were the declared file list of a task running beside it. The exemption `plus at most this task file` only ever covered the runner's self-edits; it never covered siblings. Under Claude Code, each task has its own worktree. Keep the `--` pathspec form required anyway, because one task file must work on both runtimes.
-
-You cannot recover the missing information by rewording. In a shared tree a dirty path looks identical whether your task dirtied it or a sibling did.
+- **The runner edits the task file.** The dev step sets `Status: in-progress`, and `mark-done.ts` ticks every gate box, so an exclusivity claim is false from the first attempt. A dev agent under such a failing gate will revert the runner's `Status` edit to make it pass, which un-schedules the task: `next-ready.ts` only offers `todo`, and `mark-done.ts` validates the header before it writes.
+- **Siblings share the tree under the hand-driven OpenCode loop.** A correct task sees a sibling's uncommitted edits in `git status` and reports them as its own violation, and no rewording helps — a dirty path looks the same whoever dirtied it. Under Claude Code each task has its own worktree, but one task file must work on both runtimes.
 
 **What the pathspec form buys, and what it doesn't.** It asserts your own declared paths changed, which still catches a dev engine that implemented nothing. It cannot detect edits outside your declared list — treat that as a weak signal, not a scope gate, and let the acceptance criteria and tests carry correctness.
 
@@ -241,13 +237,10 @@ Aim for 1 task = 1 commit or 1 PR. Concretely:
 - A task touching more than ~6 files probably wants splitting.
 - A task that says "and also..." in the goal is two tasks.
 
-The file count is the one the linter checks. `lint-task.ts --authoring` reports a
-`task-size` violation above **11 declared files**, and the Edit/Write hook passes
-that flag, so an oversized task is flagged as you write it. The `~6` above stays
-the target; `11` is where the field data turns hard against you — over one
-47-task flight the first-attempt retry rate ran 43% at ≤8 declared files, 56% at
-9–11, 70% at 12–14, and 89% at ≥15. Autopilot's own lint calls omit the flag, so
-a plan written before this rule still flies.
+The file count is the one the linter checks: the Edit/Write hook runs
+`lint-task.ts --authoring`, which reports a `task-size` violation above **11
+declared files**. The `~6` above stays the target; first-attempt retry rates climb
+steeply past 11.
 
 ## Naming
 

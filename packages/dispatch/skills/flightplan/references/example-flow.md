@@ -19,7 +19,7 @@ Claude: [calls AskUserQuestion: topic slug + scope — what does "course player"
 
 User: slug "course-player", in: video playback + progress tracking. Out: admin tools.
 
-Claude: [checks docs/course-player/ — does not exist, continues]
+Claude: [bun scaffold.ts --check course-player → OK, continues]
         [calls AskUserQuestion: who's the user, and what's the tech stack?]
 
 User: members only. Nuxt 3 frontend, Rails API backend.
@@ -41,22 +41,3 @@ Claude: [bun scaffold.ts course-player ui,backend,api,review]
         "Plan written to docs/course-player/ (3 buckets + review/01). Run
          /autopilot course-player to execute it."
 ```
-
-## What to notice
-
-- **The run options are settled in Step 2**, before the interview starts.
-  Nothing after the approval asks the user anything, except an impeccable
-  design phase or a non-converged review.
-- **The slug collision check happens in Step 3**, immediately after the
-  slug is agreed. It does not happen after approval.
-- **Approval must be explicit.** "yes, ship it" works. Silence does not
-  count as approval.
-- **PLAN.md and `_context/` are written before any task file**, because the
-  forks read them off disk. The write is not transactional; a missing file is
-  repaired in place.
-- **The skill stops after writing.** It does not begin implementing
-  `ui/01-fixture-shell.md`. That work belongs to a future session with a
-  fresh context budget.
-- **The hand-off message names `/autopilot <slug>` as the next step.**
-  Autopilot derives the first ready task from the tree, so nobody has to
-  guess where to begin.

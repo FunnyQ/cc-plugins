@@ -124,7 +124,7 @@ backend/01 ─────┘
 - **Migration**: add a "Migration phases" section between "Architecture" and "Bucketing" with the phase definitions.
 - **Greenfield project**: keep all sections. This is what they're designed for.
 
-**Max parallel** caps how many tasks autopilot runs at once. Keep the default `unlimited`. Under Claude Code, autopilot runs each non-final task's whole pipeline (dev, verify, judge) in its own git worktree. It lands only judged-passing work into the main tree. A worktree isolates a shared build target, including one that compiles every file, so that build needs no cap. Autopilot removes each worktree after its task lands, leaving no worktree for the plan after a clean run. A parked task keeps its worktree for inspection. Cleanup touches only paths under the plan's worktree root.
+**Max parallel** caps how many tasks autopilot runs at once. Keep the default `unlimited`. Under Claude Code, autopilot runs each non-final task in its own git worktree, which isolates a shared build target, including one that compiles every file, so that build needs no cap.
 
 Under Claude Code, lower **Max parallel** only when tasks share an **external live resource** that a worktree cannot isolate: a live device, a LaunchAgent or service that a verification reinstalls, or a local database that a migration rewrites. When the plan will run under OpenCode, set `> **Max parallel**: 1` for a shared build target that compiles every file: the hand-driven loop still shares one working tree (see `autopilot/references/opencode.md`). When `Depends on` edges already sequence every conflict, write `unlimited` or omit the line. Write the value as a bare positive integer or `unlimited`. Do not describe a lock or serial execution in prose instead: nothing reads it.
 

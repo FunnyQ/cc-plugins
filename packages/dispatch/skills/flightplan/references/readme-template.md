@@ -1,8 +1,8 @@
 # `tasks/README.md` Template
 
-`tasks/README.md` is the entry point for any executor, human or sub-agent. It explains how to read the tree, the status conventions, the dependency graph, and known gaps.
+`tasks/README.md` is the entry point for any executor, human or sub-agent. An executor that finds it incomplete will guess, which is the failure flightplan exists to prevent.
 
-**Most of this file is generated.** `scripts/build-readme.ts` parses every task header. It then regenerates three things, all between the markers below: the task index (Bucket / NN / Title / Status / **Pass line** / Depends on), the per-bucket dep graphs, and the cross-bucket dep table. The Pass line column shows each task's Eval-rubric pass threshold, for example `> 4`, or `—` if the rubric is unparseable:
+**Most of this file is generated.** `scripts/build-readme.ts` parses every task header and regenerates, between the markers below, the status conventions, the task index (Bucket / NN / Title / Status / **Pass line** / Depends on), one dependency graph for the whole tree, and — for multi-bucket plans — a cross-bucket dependency table. The Pass line column shows each task's Eval-rubric pass threshold, for example `> 4`, or `—` if the rubric is unparseable. Do not hand-write any of these.
 
 ```
 <!-- flightplan:generated:start -->
@@ -10,102 +10,25 @@
 <!-- flightplan:generated:end -->
 ```
 
-The prologue (purpose, directory layout, reading order, naming) and epilogue (`## Known gaps`) are human-authored. Regeneration preserves both. Rerun `build-readme.ts` whenever a task's header changes (status, deps, title).
+The prologue (above the markers) and epilogue (`## Known gaps`, below them) are human-authored, and regeneration preserves both. On first run the script writes a skeleton with every prologue section already filled in except the two placeholders you own. Rerun `build-readme.ts` whenever a task's header changes (status, deps, title).
 
 ## Template
 
 ```markdown
 # <Topic> — Task System
 
-<One-line topic description.>
-
 ## Purpose
-
-Each task file is a **self-contained, independently pickable unit**. An executor needs only:
-
-1. The `_context/` files listed in the task's `Required reading` header
-2. The task file itself
-
-They should not need to open `PLAN.md` or any other task file. `PLAN.md` remains the master spec / source of truth; `_context/` is its surgical extract; task files describe "what to do" without re-explaining "why".
-
 ## Directory layout
-
-```
-tasks/
-├── README.md                  ← this file
-├── _context/                  ← shared context (every task references these)
-│   ├── shared.md              ← decisions, conventions, commit style
-│   └── <other>.md             ← topic-specific shared context
-├── <bucket>/                  ← bucket description
-│   ├── 01-<slug>.md
-│   └── ...
-└── <bucket>/
-    └── ...
-```
-
 ## Reading order for executors
-
-1. `_context/shared.md` — decisions, conventions, commit style. Required for every task.
-2. Topic-specific context per task's `Required reading` header.
-3. The task file itself.
-
-## Status conventions
-
-Each task header has a `> **Status**: <status>` line. The executor updates it as they go:
-
-- `todo` — not started
-- `in-progress` — actively being worked on
-- `done` — merged / shipped into the target branch
-- `blocked` — waiting on a decision, upstream task, or external resource
-
 ## Naming convention
-
-`<bucket>/NN-<kebab-slug>.md` — `NN` is two-digit zero-padded (`01`, `02`, … `19`, `20`).
+(these four ship pre-filled in the skeleton; edit only to add topic-specific detail)
 
 ## Where to start
 
-<First task to execute. Usually the foundation task in the earliest bucket.>
+<First task to execute, by path. Usually the foundation task in the earliest bucket.>
 
-## Suggested execution order
-
-<Describe the natural sequence. For multi-bucket plans, identify which buckets can run in parallel and which must wait.>
-
-```
-<bucket-1> (all)  ───────┐
-                          ↓
-   (after <bucket-1> task NN, <bucket-2> can start in parallel)
-                          ↓
-<bucket-2> (all)  ───────┤
-                          ↓
-                       <bucket-3>
-                          ↓
-                       Ship
-```
-
-## Dependency graphs
-
-### `<bucket>/`
-
-```
-01-<slug> ─┬─→ 02-<slug> ─→ 04-<slug>
-            └─→ 03-<slug>
-```
-
-### `<bucket>/`
-
-```
-01-<slug> ─→ 02-<slug> ─┬─→ 03-<slug>
-                        └─→ 04-<slug>
-```
-
-## Cross-bucket dependencies
-
-For multi-bucket plans, document which tasks across buckets are linked:
-
-| Task | Needs | Why |
-|---|---|---|
-| api/01 | backend/01, ui/02 | <reason> |
-| api/02 | backend/01 | <reason> |
+<!-- flightplan:generated:start -->
+<!-- flightplan:generated:end -->
 
 ## Known gaps
 
@@ -113,25 +36,9 @@ Decisions or design questions that surfaced during planning but weren't resolved
 
 1. **<Gap title>** (<scope: which task affected>)
    <Context, what needs to happen, who can decide.>
-
-2. **<Gap title>** (<scope: which task affected>)
-   <Context, what needs to happen, who can decide.>
 ```
 
 ## Tailoring rules
 
-- **Single-bucket plans**: drop the dependency-graph-per-bucket section. Show one graph instead. Task files still live under `tasks/<bucket-name>/`, never flat under `tasks/`.
-- **No cross-bucket deps**: drop that table.
-- **No open gaps**: drop "Known gaps". First verify that no gaps exist rather than hiding them.
-- **Writing topic**: replace "Suggested execution order" with "Suggested drafting order". Dependency graphs become section-ordering graphs.
-
-## Why this file matters
-
-A sub-agent in a future session may be the only executor. The README is what orients them. Treat it as a contract:
-
-- Naming conventions documented here are the conventions they will follow.
-- Status values documented here are the values they will use.
-- The dependency graph here is what tells them what's safe to start.
-- Known gaps prevent them from inferring decisions that haven't been made.
-
-If the README is incomplete, the executor will guess. Guessing is the failure mode flightplan exists to prevent.
+- **Cross-bucket rationale**: when the reason a task needs another bucket's work would help executors, explain it under `## Where to start`. Anything written between the markers is lost on the next regeneration.
+- **No open gaps**: verify that none exist before leaving `## Known gaps` empty, rather than hiding them.
