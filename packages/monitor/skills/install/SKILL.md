@@ -40,11 +40,7 @@ What `--apply` does:
 
 1. **statusline collector** → `~/.claude/settings.json` (usage-dashboard live usage limits; wraps any existing statusline)
 2. **stale-channel cleanup** → removes a leftover hand-wired `cockpit-channel` from `~/.claude.json` if present
-3. **plugin script permissions** → adds `Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts[ *])` to `permissions.allow` in `~/.claude/settings.json`. This lets the marketplace's own scripts run without a permission prompt. This matters for nested sub-agents, for example `chronicle:messenger` under `chronicle:storykeeper`: a deeply-nested agent can't surface a permission prompt to be answered. So an un-allowlisted `bun` call is silently denied, and the flow stalls.
-
-The dashboard precheck (`install.ts`) and the statusline wiring
-(`setup-statusline.ts`) live in this skill. usage-dashboard imports both, so
-there is one source of truth for setup logic.
+3. **plugin script permissions** → adds `Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts[ *])` to `permissions.allow` in `~/.claude/settings.json`, so the marketplace's own scripts run without a permission prompt. A background agent cannot surface a prompt, so an un-allowlisted `bun` call there is silently denied and the flow stalls.
 
 ## OpenCode only — skip on Claude Code and Codex
 
@@ -114,47 +110,13 @@ bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts" --apply-statusline
 
 ## Automatic maintenance (SessionStart hook)
 
-The plugin ships a `SessionStart` hook, declared in
-`.claude-plugin/plugin.json` with matcher `startup|resume|clear|compact`. The hook runs
-`setup.ts --session-check`, which has two halves with different rules.
-
-### Repair — marker-gated, at most once per version
-
-Gated on `$CLAUDE_PLUGIN_DATA/.wired-version`. An upgrade is the only drift
-this hook repairs on its own, because the upgrade is what caused it.
-
-- **Stale channel entry** — the hook **removes** a leftover hand-wired
-  `cockpit-channel` in `~/.claude.json` (backed up first). This entry is left
-  over from versions before the channel was plugin-packaged. Removing it keeps
-  the packaged channel from being registered twice.
-- **Never touches the statusline** — wiring it is the user's opt-in via
-  `--apply`. A collector at an older cache path still runs, so the hook leaves
-  it alone.
-
-### Drift watch — every session, read-only
-
-Config also drifts *within* a version: a hand-edited `settings.json`, a
-restored backup, a reinstall under a different cache root. The repair half
-never sees any of it, so a second half runs on every session, writes nothing,
-and asks the user to fix what it finds. It reports:
-
-- a stale hand-wired `cockpit-channel` in `~/.claude.json`;
-- the `q-lab` script patterns missing from `permissions.allow`;
-- a `settings.json` that no longer parses (reported alone — nothing past it
-  can be read);
-- nothing wired at all, as the one fresh-install nudge (it subsumes the rest).
-
-The notice goes out as a `systemMessage` in a **single JSON object on stdout**
-— that field is what reaches the user; bare stdout only reaches the model. So
-nothing else in `--session-check` may print, and `migrate()`'s own output is
-captured rather than echoed.
-
-Repetition is keyed on **which** pieces are off, recorded in
-`$CLAUDE_PLUGIN_DATA/.drift-notice`. The same complaint is made once; a drift
-that is fixed and later returns is reported again.
-
-Manual equivalents: `setup.ts --migrate` cleans up the stale channel now, with no version gate. `setup.ts --session-check` is a no-op
-when `$CLAUDE_PLUGIN_DATA` is unset, so it's safe to run by hand.
+A `SessionStart` hook runs `setup.ts --session-check`. Once per plugin
+version it removes a stale hand-wired `cockpit-channel` entry; it never
+touches the statusline. On every session it checks for drift — a stale
+channel entry, missing `permissions.allow` patterns, an unparseable
+`settings.json`, or nothing wired — and reports each new finding once, asking
+the user to run `/monitor:install`. `setup.ts --migrate` removes the stale
+channel entry now, with no version gate.
 
 ## Notes
 
