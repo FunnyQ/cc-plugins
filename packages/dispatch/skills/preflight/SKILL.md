@@ -16,16 +16,7 @@ argument-hint: "[topic]"
 
 # Preflight
 
-Capture what the user wants *before* anyone decides how to build it. One file, `docs/<slug>/INTENT.md`, then stop.
-
-This is the first tier of the dispatch ladder:
-
-```
-preflight   → what you want, no solution        (INTENT.md)
-hop         → interview, plan, execute now      (in conversation)
-flightplan  → full spec + task tree on disk     (PLAN.md + tasks/)
-autopilot   → flies that tree
-```
+Capture what the user wants *before* anyone decides how to build it. One file, `docs/<slug>/INTENT.md`, then stop. This is the first tier of the dispatch ladder.
 
 ## Route first
 
@@ -73,17 +64,11 @@ bun "$SCRIPTS"/scaffold.ts --check <slug>
 
 ### Step 2 — Interview short
 
-Three to six `AskUserQuestion` rounds, one to two questions each. Cover problem, outcome, who and what it touches, constraints, and the boundary as it looks today.
-
-**Refuse to answer *how*.** Stack, architecture, file layout, API shape, and task breakdown are all out of scope here. Every one that surfaces goes into `Open questions` as a question — never into the body as an answer. Recommend an answer to every question you *do* ask, first option marked `(Recommended)`, so the user reacts instead of designing from scratch.
-
-**This is minutes, not an interview.** Depth is `flightplan`'s job, and paying for it twice is how the second pass gets skipped.
+Three to six `AskUserQuestion` rounds, one to two questions each. Cover problem, outcome, who and what it touches, constraints, and the boundary as it looks today. Anything about *how* goes into `Open questions` (capture rule 1). Recommend an answer to every question you *do* ask, first option marked `(Recommended)`, so the user reacts instead of designing from scratch.
 
 ### Step 3 — Draft INTENT.md inside plan mode
 
-Show it in full so the user can read what you understood, then call `ExitPlanMode`.
-
-**Ship it with `Open questions` still open.** That section is the deliverable. An empty one is a failed capture, not a clean one — it means a vague idea got rendered as confident structure and the user is about to sign off on precision they never had.
+Show it in full so the user can read what you understood, then call `ExitPlanMode`. Ship it with `Open questions` still open (capture rule 2).
 
 ### Step 4 — On approval, write exactly one file
 
@@ -99,9 +84,7 @@ Then stop. No PLAN.md, no task files, no implementation. Tell the user that `/fl
 
 ## Rules that outlive the capture
 
-- **INTENT.md is never edited to match a later plan.** It is the baseline; rewriting it destroys the only record of the drift. A PLAN.md that contradicts it records the contradiction in its own `## Context`.
-- **Update it only when the underlying want changes** — not when the solution does.
-- **It seeds the interview; it never replaces it.** Architecture, bucketing, dependencies, verification, and rubrics are absent by design, so generating a task tree from INTENT.md alone means inventing all of them. flightplan's Step 3 reads it and interviews the gaps.
+- **Update INTENT.md only when the underlying want changes, never to match a later plan.** It is the baseline; rewriting it destroys the only record of the drift. A PLAN.md that contradicts it records the contradiction in its own `## Context`.
 - **Write it in English**, like every other dispatch artifact — a later session or sub-agent picks it up cold. Interview in whatever language the user prefers.
 
 ## Additional resources

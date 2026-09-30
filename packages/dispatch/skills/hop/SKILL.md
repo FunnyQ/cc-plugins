@@ -7,7 +7,7 @@ description: >-
 when_to_use: >-
   When the request is vague/ambiguous and needs clarification, or the user
   wants a spec/PRD/outline before implementing — for a small scope executed
-  in this session. This is the skill formerly named `preflight`. Do NOT
+  in this session. Do NOT
   trigger for a clear, directly-executable instruction, for a multi-file spec
   meant for a later session (use flightplan), or when the user wants only to
   record what they want without deciding how to build it (use preflight).
@@ -28,21 +28,6 @@ Hop's entire value comes from two things.
 
 2. **AskUserQuestion tool.** This tool gives structured options and keeps the conversation interactive. A plain text question gets buried in the output and misses the structured response format. Every question in the interview must go through `AskUserQuestion`.
 
-If you skip either of these, the skill produces no useful artifact. The user then gets a worse experience than plain chatting.
-
-**Wrong: plain text question, no plan mode.**
-```
-User: /hop dark mode
-Claude: "Great! Let me ask you some questions. What platforms do you need?"
-```
-
-**Right: plan mode first, then structured questions.**
-```
-User: /hop dark mode
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion with structured options]
-```
-
 ## Process
 
 ### Step 1: Enter Plan Mode
@@ -51,21 +36,19 @@ Call `EnterPlanMode` immediately. Do this before any text output and before any 
 
 ### Step 2: Interview
 
-Ask 1-2 questions per turn with `AskUserQuestion`. Follow the interview guide below, based on the topic type.
+Ask 1-2 questions per turn with `AskUserQuestion`, focused by topic type:
 
-**When to stop:** End the interview when you have enough context to write actionable acceptance criteria for each requirement. This typically takes 2-4 rounds. Signs you are ready:
-- You understand the problem and who it is for.
-- You know the core requirements and can tell MVP apart from nice-to-have.
-- You have identified the key constraints: tech, timeline, scope.
-- Edge cases are at least noted, even when not fully resolved.
+- **Project** (new system or app) — scope a buildable MVP: problem and users, v1 must-haves versus later, stack and deployment constraints, how success is measured.
+- **Feature** (addition to an existing system) — pin behavior: who needs it, current versus desired behavior, acceptance criteria and edge cases, what is explicitly out.
+- **Writing** (spec, outline, docs) — audience and purpose, the one key message, tone and format, structure.
 
-Do not over-interview. If the user gives comprehensive answers, 2 rounds may be enough. If answers are terse, or they raise new questions, go up to 4-5 rounds.
+Stop when you can write actionable acceptance criteria for each requirement: you know the problem and its users, can separate MVP from nice-to-have, know the key constraints, and have at least noted the edge cases.
 
 **Visual design.** When the work builds or reshapes UI and the `impeccable` skill is available, ask whether to design it with impeccable first. Recommend it for a new screen or a layout change, and recommend skipping it for a tweak inside an existing layout. A yes adds Step 5 and a `## Design` line to the plan. Skip the question when either condition fails.
 
 ### Step 3: Write Plan
 
-Write the spec and implementation plan to the plan file. Use the template below. Tailor the depth to the topic: a small feature needs a lighter plan than a new project.
+Write the spec and implementation plan to the plan file, using the template below. Size it to the topic, and drop or rename sections that add nothing (a writing task might use "Outline" for "Implementation Plan").
 
 ### Step 4: Exit Plan Mode
 
@@ -96,10 +79,10 @@ When the user accepts, ask two more `AskUserQuestion` rounds. First ask the harn
 | Harness | Command | Model options | Extra flag |
 | --- | --- | --- | --- |
 | claude | `/relay:claude-cli` | `opus` (recommended), `sonnet` | `--effort high` |
-| codex | `/relay:codex` | `default` (recommended), `gpt-5.6-sol` | none |
-| opencode | `/relay:opencode` | `default` (recommended), `opencode-go/deepseek-v4-pro` | none |
+| codex | `/relay:codex` | `default` (recommended) | none |
+| opencode | `/relay:opencode` | `default` (recommended) | none |
 
-`default` means omit `--model`, so the harness uses its own configured model. A model typed through "Other" passes through verbatim.
+`default` means omit `--model`, so relay resolves the model from its own config and suggestions. A model typed through "Other" passes through verbatim.
 
 Invoke the chosen command with this argument, filling in the plan file path, the base commit, and the flags:
 
@@ -107,38 +90,9 @@ Invoke the chosen command with this argument, filling in the plan file path, the
 review "Review every change since <base> (run git diff <base>, and list untracked files with git status --short) against the plan at <plan file>. Hunt edge cases the acceptance criteria miss. Run the tests. Report each finding with file:line and the concrete fix." [--model <model>] [--effort high] --headless
 ```
 
-Pass `--effort high` only to claude: relay refuses `--effort` on codex and opencode. Skip relay's save-to-config question: the pick is for this review, not relay's default. When relay rejects `--model` or `--effort` as an unknown flag, tell the user to update relay; do not rerun without the flag. A codex model needs relay 0.8.0 or later, because older relay drops `--model` on headless codex without an error.
+Pass `--effort high` only to claude: relay refuses `--effort` on codex and opencode. Skip relay's save-to-config question: the pick is for this review, not relay's default. When relay rejects `--model` or `--effort` as an unknown flag, tell the user to update relay; do not rerun without the flag.
 
 Fix every finding you can confirm. Report the rest to the user with your reason for leaving each one.
-
-## Interview Guide
-
-### Project (new system or app)
-
-Focus on scoping a buildable MVP:
-
-1. **Problem & users** — What problem are you solving? Who is it for?
-2. **Core features** — What are the must-haves for v1? What can wait?
-3. **Tech constraints** — Existing stack? Deployment target? Third-party integrations?
-4. **Success metrics** — How will you know it's working?
-
-### Feature (addition to existing system)
-
-Focus on precise behavior definition:
-
-1. **User story** — Who needs this and why?
-2. **Current vs desired** — What happens now? What should happen instead?
-3. **Acceptance criteria** — How do we verify it works? What are the edge cases?
-4. **Scope boundary** — What's explicitly NOT included?
-
-### Writing (spec, outline, documentation)
-
-Focus on audience and structure:
-
-1. **Audience & purpose** — Who reads this? What should they take away?
-2. **Key message** — What's the one thing this must communicate?
-3. **Tone & format** — Formal/casual? Length constraints? Required sections?
-4. **Structure** — Chronological? Problem-solution? Reference-style?
 
 ## Plan File Template
 
@@ -165,46 +119,4 @@ Focus on audience and structure:
 
 ## Open Questions
 [Unknowns that surfaced during interview, if any — omit this section if none]
-```
-
-Adapt the template to fit the topic. A small feature might skip "Open Questions". A writing task might replace "Implementation Plan" with "Outline". Do not force every section if it does not add value.
-
-## Examples
-
-### Feature Request
-
-```
-User: /hop dark mode toggle
-
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion: "Where should the toggle live — settings page, navbar, or system preference auto-detect? And is this web only or also mobile?"]
-User: Settings page, web only
-
-Claude: [calls AskUserQuestion: "Should the preference persist across devices (needs backend) or is local storage fine? And do you have an existing design system or CSS framework?"]
-User: Local storage fine, we use Tailwind
-
-Claude: [writes plan to plan file with spec + implementation steps]
-        [calls ExitPlanMode]
-User: [approves plan]
-
-Claude: [implements the plan]
-```
-
-### New Project
-
-```
-User: I want to build a CLI tool for managing dotfiles, but I'm not sure about the details
-
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion: "What's your main pain point with dotfiles today — syncing across machines, version control, or setting up new machines quickly? And is this for personal use or something you'd share?"]
-User: Mainly syncing between my Mac and Linux server. Personal use but might open source later.
-
-Claude: [calls AskUserQuestion: "What dotfiles do you need to manage — shell configs, git, editor settings, others? And do you have a preferred approach — symlinks, templates, or just copy?"]
-User: Shell, git, and neovim configs. Symlinks feel cleanest.
-
-Claude: [calls AskUserQuestion: "Any must-haves for v1 beyond basic symlink management? Like conflict detection, backup before overwrite, or a dry-run mode?"]
-User: Dry-run would be great. Backup not needed since everything's in git.
-
-Claude: [writes plan with MVP scope: symlink manager + dry-run + git-based sync]
-        [calls ExitPlanMode]
 ```

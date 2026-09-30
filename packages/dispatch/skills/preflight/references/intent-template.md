@@ -57,9 +57,3 @@ file — resist letting it come out empty.
 3. **Keep the originator's words.** Do not upgrade "the dashboard is slow to read" into "reduce time-to-first-insight". The point of capturing early is a record of what was actually meant.
 4. **Stop at one page.** Capture is minutes, not an interview. Depth is `flightplan`'s job, and paying for it twice is how the second pass gets skipped.
 5. **Constraints are facts, not preferences.** "Must run offline" is a constraint. "Should use SQLite" is a decision that has not been made yet — that is an Open question.
-
-## After capture
-
-INTENT.md sits at `docs/<slug>/INTENT.md` with nothing else in that directory, which is exactly what `scaffold.ts --check` reports as `INTENT: <path>`. The eventual `flightplan <slug>` run scaffolds around it and leaves it untouched.
-
-Update it only when the underlying want changes. A PLAN.md that drifts from INTENT.md is a finding to surface, not a reason to rewrite the intent.
