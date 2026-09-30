@@ -53,10 +53,10 @@ const CFG = {
   liveCollectRounds:     3,       // live runs only: how many extra `relay collect` windows (8 min each) to keep waiting for a slow delegate or reviewer before failing the attempt; 0 = fail as soon as relay reports pending
   reviewEngine:          'codex',   // 'codex' (default) or 'opencode' — the cross-vendor reviewer in the closing Final review (driven via <engine>-run.ts review)
   liveReviewEngine:      false,   // when HERDR_ENV=1 + relayPath are fulfilled, run the closing cross-vendor review in a visible herdr live pane via relay; headless stays default. Independent of liveDevEngine — the review lens runs whatever devEngine is
-  codexDevModel:         '',        // optional codex model for devEngine or lastShotEngine (empty → wrapper default gpt-5.6-sol)
-  codexReviewModel:      '',        // optional codex model for the review lens (empty → wrapper default gpt-6-astra); only applies when reviewEngine is 'codex'
-  opencodeDevModel:      '',        // optional opencode model for devEngine or lastShotEngine (empty → wrapper default opencode-go/kimi-k2.7-code); ignored when the engine is codex
-  opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
+  codexDevModel:         '',        // optional codex model for devEngine or lastShotEngine (empty → relay config models.codex.delegate, else wrapper default gpt-5.6-sol)
+  codexReviewModel:      '',        // optional codex model for the review lens (empty → relay config models.codex.review, else wrapper default gpt-6-astra); only applies when reviewEngine is 'codex'
+  opencodeDevModel:      '',        // optional opencode model for devEngine or lastShotEngine (empty → relay config models.opencode.delegate, else wrapper default opencode-go/kimi-k2.7-code); ignored when the engine is codex
+  opencodeReviewModel:   '',        // optional opencode model for the review lens (empty → relay config models.opencode.review, else wrapper default opencode-go/qwen3.7-max); only applies when reviewEngine is 'opencode'
   reviewLensModel:       'opus',    // 'opus' (default) or 'fable' — model for the 3 final-review Claude lenses (reuse/leanness/efficiency) ONLY; task headers independently override the fixer + rubric judge
   resumeTask:            '',        // '' = normal whole-tree flight. A task ref ('review/01') runs ONLY that task, with no scout and no wave loop
   resumeTaskPath:        '',        // ABSOLUTE path to that task's file; required with resumeTask, because a resume runs no scout to derive it
@@ -137,7 +137,7 @@ const ENGINES = {
 }
 // Attach an optional `--model` flag. Spread into a fresh object so dev and review
 // never share a mutated entry even when both name the same engine. Empty modelFlag
-// → the <engine>-run.ts default is used (codex: gpt-5.6-sol).
+// → relay's config picks, on the headless and live paths alike.
 // Throws on an unknown key rather than spreading `undefined` — that would yield
 // a truthy `{modelFlag}` object whose `label` is undefined, and the run would die
 // far away, inside a Final review reviewer prompt.
