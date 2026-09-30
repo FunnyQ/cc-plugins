@@ -347,4 +347,6 @@ git tag --sort=-creatordate | head -5
 
 **Prefer `/chronicle:release`.** This repo dogfoods its own release skill. Its `.chronicle/release.json` records each plugin as an independently-versioned component with its two `plugin.json` files as version-file patterns. Pick the touched components at the version gate. Coordinated multi-component releases are native: name several components and the finisher cuts N scoped tags on one bump commit.
 
+**relay's `config.suggested.json` versions by unix time, not by release.** Set its `version` to `date +%s` only when its `models` or `suggestions` change; `config check` prompts every user whose `version` differs. Merge refreshes an entry only while it still equals its `applied` value, so a withdrawn suggestion does not outlive a merge.
+
 To cut a release by hand: bump the two `plugin.json` files, add a `CHANGELOG.md` entry headed per plugin (`## [chronicle 0.1.0]`), commit on `main`, cut an annotated `<plugin>-vX.Y.Z` tag on that commit, then push `main` and the tag.
