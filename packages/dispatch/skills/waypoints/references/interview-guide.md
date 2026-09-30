@@ -10,13 +10,7 @@ Interview at milestone depth. The output is `WAYPOINTS.md`, not a task tree.
 4. Dependency order: what must be true before the next leg can be planned or built.
 5. Leg size: each leg should be one `flightplan` worth of work, not a whole project inside the project.
 
-## Scope ladder
-
-- `hop`: one small goal or early clarification.
-- `flightplan`: one feature or one coherent build slice that needs tasks now.
-- `waypoints`: a whole project that should be planned as several milestone legs.
-
-If the interview starts turning into task files, stop. Move back up. `waypoints` names the legs; `flightplan` later decomposes the active leg.
+If the interview starts turning into task files, stop and move back up: `waypoints` names the legs; `flightplan` later decomposes the active leg.
 
 ## How to identify vertical slices
 

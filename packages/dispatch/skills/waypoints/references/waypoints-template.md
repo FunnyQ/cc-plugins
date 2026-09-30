@@ -20,27 +20,14 @@ Use this file shape for `docs/<proj>/WAYPOINTS.md`. The roadmap is the single so
       → legs/03-<slug>/
 ```
 
-## Legend
-
-- `# <Project Name> — Waypoints`: the roadmap title.
-- `[ ]`: pending leg, not planned in detail yet.
-- `[~]`: active leg, the only leg `flightplan` should plan next.
-- `[x]`: landed leg.
-- `N.`: human-readable leg number. The zero-padded `NN` comes from this number: leg `2.` uses `02`.
-- `<Milestone title>`: short label for the leg.
-- ` — `: space-padded em dash, U+2014. This is the only title/done-state separator.
-- `<done-state>`: acceptance summary for the leg. It states what must be true when the leg lands.
-- `→ legs/NN-slug/`: mandatory pointer for every leg, including pending legs.
-- `· landed <date> · outcome: <one line>`: continuation metadata on landed legs.
-
 ## Rules
 
-- Each leg is one top-level `- [ ]` / `- [~]` / `- [x]` list item under `## Legs`, numbered `N.`.
-- The **NN** leg directory prefix is the zero-padded number: leg `2.` -> `legs/02-<slug>/`.
-- Every leg carries a `→ legs/NN-slug/` pointer.
-- At most one leg is `[~]` active. Exactly one leg is active while a roadmap is in progress. Zero legs are active only when every leg is `[x]`.
-- The done-state is the text after the padded em dash ` — ` on the leg item line.
-- A landed leg's continuation line carries `· landed <date> · outcome: <one line>`.
+- Each leg is one top-level `- [ ]` / `- [~]` / `- [x]` item under `## Legs`: pending (not planned in detail yet), active (the only leg `flightplan` plans next), landed.
+- Exactly one leg is `[~]` while the roadmap is in progress; zero only when every leg is `[x]`. The script rejects more than one.
+- `N.` is the leg number; its zero-padded form is the directory prefix: leg `2.` → `legs/02-<slug>/`.
+- ` — ` (space-padded em dash, U+2014) is the only separator between the milestone title and the done-state, which states what must be true when the leg lands.
+- Every leg, pending ones included, carries the `→ legs/NN-slug/` pointer on its continuation line. `advance` appends `· landed <date> · outcome: <one line>` there.
+- `advance` rewrites the whole file in this shape, so anything outside the title and `## Legs` is lost.
 
 ## Filled example
 

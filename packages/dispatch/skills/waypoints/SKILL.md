@@ -42,27 +42,19 @@ Resolve the scripts path once. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in B
 1. Interview for the roadmap using `references/interview-guide.md`. Elicit milestone legs and each leg's done-state. Do **not** break legs into tasks.
 2. After the user approves, write `docs/<proj>/WAYPOINTS.md` using `references/waypoints-template.md`. This skill authors the roadmap. There is no CLI verb for creating it. Mark leg 1 `[~]` and every later leg `[ ]`.
 3. To plan a leg, hand off to `flightplan`. It detects the project's `WAYPOINTS.md`, reads the active leg, and runs in waypoint mode.
-4. To land a leg after its autopilot run, use the two-step `advance` write interface (see [`advance`](#advance-proj) below). Preview first: this step writes nothing. The human then confirms or edits the one-line outcome. Write it with `--outcome` only after that confirmation — this is the confirmation gate. Never teach a bare writing `advance`.
+4. To land a leg after its autopilot run, preview with `advance` (it writes nothing), have the human confirm or edit the drafted one-line outcome, then write it with `advance --outcome`. See [`advance`](#advance-proj) below.
 
 ## The three verbs
 
-All verbs run through:
-
-```bash
-bun "$SCRIPTS"/waypoints.ts <verb> ...
-```
-
-`<proj>` is the directory under `docs/`, so the roadmap lives at `docs/<proj>/WAYPOINTS.md`. Run every verb from the project root. `docs/<proj>` resolves against the current working directory.
+Run every verb from the project root as `bun "$SCRIPTS"/waypoints.ts <verb> ...`. `<proj>` is the directory under `docs/`, so the roadmap lives at `docs/<proj>/WAYPOINTS.md`. When no leg is `[~]`, `active` and `advance` exit non-zero and say whether the roadmap is complete or no leg has been promoted yet.
 
 ### `active <proj>`
-
-Invocation:
 
 ```bash
 bun "$SCRIPTS"/waypoints.ts active <proj>
 ```
 
-This command reads `docs/<proj>/WAYPOINTS.md` and prints the active leg, plus a rolling-wave digest of prior landed legs:
+Prints the active leg plus a rolling-wave digest of prior landed legs:
 
 ```text
 ACTIVE: 02-profile
@@ -73,80 +65,20 @@ PRIOR LANDED LEGS:
   goal: <first line of legs/01-auth/PLAN.md Overview, if present>
 ```
 
-If there is no `[~]` leg, it exits non-zero with a clear message. It distinguishes two cases. Roadmap complete means every leg is `[x]`. Nothing active yet means pending legs exist but none is promoted. The `goal:` line is best-effort, drawn from the landed leg's `PLAN.md` Overview. It is omitted when unavailable.
-
 ### `leg-scaffold <proj> <NN-slug> <buckets>`
 
-Invocation:
-
-```bash
-bun "$SCRIPTS"/waypoints.ts leg-scaffold <proj> <NN-slug> <buckets>
-```
-
-`<buckets>` is comma-separated. The command builds a nested leg flightplan tree:
-
-```text
-docs/<proj>/legs/<NN-slug>/tasks/_context/
-docs/<proj>/legs/<NN-slug>/tasks/<bucket>/     # one per bucket
-```
-
-Expected output prints each created directory:
-
-```text
-created docs/<proj>/legs/<NN-slug>/
-created docs/<proj>/legs/<NN-slug>/tasks/
-created docs/<proj>/legs/<NN-slug>/tasks/_context/
-created docs/<proj>/legs/<NN-slug>/tasks/<bucket>/
-```
-
-Rules:
-
-- `docs/<proj>/legs/` is created recursively. The leg dir itself is created non-recursively, so an existing leg throws `EEXIST` instead of being silently reused.
-- `<NN-slug>` must match `^\d{2}-[a-z][a-z0-9-]*$`.
-- Each bucket must be a single lowercase token with no internal dashes.
+Called by flightplan's waypoint mode, not by this skill. Creates `docs/<proj>/legs/<NN-slug>/tasks/_context/` and one `tasks/<bucket>/` per comma-separated bucket. `<NN-slug>` must match `^\d{2}-[a-z][a-z0-9-]*$`; each bucket is one lowercase token with no dashes. The leg dir is created non-recursively, so an existing leg throws `EEXIST` instead of being reused.
 
 ### `advance <proj>`
 
-Preview invocations:
-
 ```bash
-bun "$SCRIPTS"/waypoints.ts advance <proj>
-bun "$SCRIPTS"/waypoints.ts advance <proj> --dry-run
-```
-
-Preview only. It never writes. It drafts one outcome line from `docs/<proj>/legs/NN-slug/.flightlog/RUNLOG.md`, plus the leg flightplan's goal. Then it prints:
-
-```text
-DRAFT OUTCOME: <drafted one-line outcome>
-```
-
-Write invocation:
-
-```bash
+bun "$SCRIPTS"/waypoints.ts advance <proj>                                   # preview, never writes
 bun "$SCRIPTS"/waypoints.ts advance <proj> --outcome "<confirmed line>" [--date YYYY-MM-DD]
 ```
 
-The presence of `--outcome` is the confirmation gate. `--date` defaults to today.
+The preview drafts one outcome line from `docs/<proj>/legs/<NN-slug>/.flightlog/RUNLOG.md` and the leg's PLAN.md goal, printed as `DRAFT OUTCOME: <line>`. `--dry-run` forces a preview even with `--outcome`.
 
-On write, the command atomically:
-
-1. It flips the active leg `[~]` → `[x]`, appending `· landed <date> · outcome: <confirmed line>`.
-2. It promotes the next `[ ]` → `[~]`. If none remains, it reports the roadmap complete.
-3. It serializes the result back to `WAYPOINTS.md`.
-
-Expected write output:
-
-```text
-Landed 02-profile, promoting 03-billing to active.
-```
-
-For the final leg:
-
-```text
-Landed 04-admin. Roadmap complete.
-```
-
-If there is no active leg, it exits non-zero. It distinguishes roadmap complete from nothing active yet.
+`--outcome` is the confirmation gate. It flips the active leg `[~]` → `[x]`, appends `· landed <date> · outcome: <line>` (`--date` defaults to today), promotes the next `[ ]` to `[~]` or reports the roadmap complete, and rewrites `WAYPOINTS.md`.
 
 ## What waypoints does NOT do
 
