@@ -1,7 +1,7 @@
 {
   "name": "chronicle",
   "version": "0.20.1",
-  "description": "Write and guard your project's history \u2014 craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail.",
+  "description": "Write and guard your project's history \u2014 craft commits (auto simple/atomic), author reviewer-legible PRs/MRs, cut config-first releases, and promote cockpit decisions into ADRs.",
   "author": {
     "name": "Q"
   },
@@ -19,8 +19,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Chronicle",
-    "shortDescription": "Craft commits and author reviewer-legible PRs/MRs.",
-    "longDescription": "Chronicle writes and guards your project's history: a unified commit skill that auto-decides simple vs atomic, and a PR/MR author that turns commit history plus the cockpit decision trail into a reviewer-legible request on GitHub or GitLab.",
+    "shortDescription": "Craft commits, PRs/MRs, releases, and ADRs.",
+    "longDescription": "Chronicle writes and guards your project's history: a unified commit skill that auto-decides simple vs atomic, a PR/MR author that turns commit history plus the cockpit decision trail into a reviewer-legible request on GitHub or GitLab, a config-first release engine that bumps versions, writes the changelog, and cuts tags, and an ADR curator for the decision trail.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],

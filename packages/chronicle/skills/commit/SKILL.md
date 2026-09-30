@@ -39,10 +39,6 @@ Spawn via `subagent_type`, never a fork. Spawn exactly one Lawspeaker, in one
 The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers as
 `chronicle:lawspeaker`.
 
-`simple` skips classification, cohesion grouping, `moduleSpread`, and ordering:
-that work was always discarded, because `decideShape` returns `simple` before it
-reads a single signal.
-
 ## The main agent's job (thin)
 
 1. **Parse the mode**. `mode: "simple"` if the argument is `simple`

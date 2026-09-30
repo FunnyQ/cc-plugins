@@ -17,10 +17,8 @@ the changelog, bump versions, commit, or tag.
 - `{SKILL_DIR}` — absolute path to `.../skills/release`.
 - `factsPath` — the JSON `release.ts facts` wrote.
 
-`{NAME}` tokens mark a **substitution site**: put the literal value there before
-you run the command. If a declared placeholder is still in the command, report the
-missing input and stop. Never rewrite one as `$NAME`: nothing sets that variable in
-your shell, so it expands to empty and the command runs against `/`.
+Replace `{SKILL_DIR}` below with the literal path. If the prompt lacks either
+input, report which and stop.
 
 ## Process
 

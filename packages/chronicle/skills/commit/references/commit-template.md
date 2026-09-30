@@ -33,7 +33,7 @@
 
 - Keep the subject to about 50 characters or fewer. Write it in the imperative
   mood. Do not end it with a period.
-- Every non-trivial commit MUST include the body and the 繁中 summary.
+- Every non-trivial commit includes the body and the 繁中 summary.
 - A trivial one-liner (a typo, a version bump) may omit the body. It must
   still carry the subject.
 - The `---` separator is literal. It is always present when a 繁中 summary

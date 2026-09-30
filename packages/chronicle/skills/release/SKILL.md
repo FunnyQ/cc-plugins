@@ -46,10 +46,8 @@ save-config?  bump  [artifacts]  entry  commit  [merge]  tag  [back-merge]  push
 - `/chronicle:release prepare` → `--through entry`. Bump and write the entry, then
   stop. You review and commit.
 
-`auto` and `auto push` are older names for the default; treat both as `--through
-push`. `auto` used to stop at `tag`, so a user reaching for it out of habit is
-asking for a run that now reaches the remote — the push confirmation below is what
-tells them.
+`auto` and `auto push` are aliases for the default: `--through push`, push
+confirmation included.
 
 **A `push` run needs the user's explicit go-ahead.** Name the remote, the branches,
 and every tag, and get a yes. Batching it into step 3's gate moves that question
@@ -115,9 +113,8 @@ payload    /tmp/q-lab/chronicle/release/analysis-….json
 Any drift prints in capitals on the `config` line — read the payload for its
 details, and handle it before the gate. `OFF RELEASE BRANCH` is the third of them:
 the current branch is not the one the release commits on, which is step 3b.
-`--json` prints the digest's source, and `--full` adds `tags`, `config`, and
-`suggested` back; a first run needs `suggested`, so use `--full` there or read the
-payload.
+`--json` prints the digest's source, `suggested` included on a first run; `--full`
+adds `tags` and `config` back.
 
 If `workflowDrift` is set, the committed config still says git-flow but its
 `missingBranch` is gone. Say so **before** the gate and offer the one-time edit
@@ -139,7 +136,15 @@ vs per-component, git-flow vs github-flow, the tag template, the version files, 
 branch names. Add a capture-group `pattern` for odd locations like a Rails
 `config/application.rb` — `suggested` will not include those.
 
-Pass `--persist-config` on the first `run`, which adds the `save-config` stage.
+Save it before `plan`, because `plan`, `facts`, and `run` all read the config from
+disk and exit 2 without it. Write the JSON to a file under a `mktemp -d` directory, then
+validate and save it:
+
+```bash
+bun "{SKILL_DIR}/scripts/analyze-release.ts" --save-config "{configFile}"
+```
+
+Then pass `--persist-config` on the first `run`, so the file rides in the release commit.
 
 ### 3. One gate — every decision in a single question call
 
@@ -201,8 +206,7 @@ Only when step 3b was asked. `plan` computes its base as
 `git rev-parse <release branch>`, never `HEAD`, and `run` checks that branch out
 before committing — so a release run from a feature branch writes the bump into
 that branch's tree, commits it alone onto the release branch, and cuts a tag holding
-a version bump, a CHANGELOG entry, and none of the work. That has shipped once
-(`odin-session-v3.2.8`).
+a version bump, a CHANGELOG entry, and none of the work.
 
 - **PR** → stop here. `/chronicle:pr` opens it; the release resumes after the merge
   lands, from step 1.
@@ -226,8 +230,7 @@ commit, a `main` behind its remote); never work around it.
 <workflow>)`. On github-flow that sha must equal `git rev-parse --short=7 HEAD`; on
 git-flow it is `main`'s head by design, so check instead that you are standing on
 `develop`. A mismatch means the work is not on the release branch — go back to
-step 3b. This check caught the mistake both times it happened, including once after
-the digest's own warning was read past.
+step 3b. Run this check even when step 1 printed no `OFF RELEASE BRANCH`.
 
 ### 6. Entry, if pending
 
@@ -300,11 +303,13 @@ Either way the rebuilt file is staged with the release commit.
 
 ## Protected branches
 
-Release operates on the branches the config names. Defer to the user's existing
-branch guard; don't re-implement branch protection. A github-flow release commits
-**on `main` by design** — chronicle's `check-branch.sh` exempts exactly that commit
-(a `🔧 release:` subject on a `.chronicle/pr.json` github-flow base). A different
-host guard may still prompt. Answer it; don't work around it.
+Release operates on the branches the config names; don't re-implement branch
+protection. A github-flow release commits **on `main` by design**. The engine runs
+that commit inside `release.ts`, so no Bash-level guard sees it — only the repo's
+own git hooks do; a failing one aborts `commit`, and the fix is the user's. When you
+commit by hand after `prepare`, chronicle's `check-branch.sh` exempts a
+`🔧 release:` subject on a `.chronicle/pr.json` github-flow base. Answer any other
+guard's prompt; don't work around it.
 
 ## Codex
 

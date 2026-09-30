@@ -31,6 +31,9 @@ The caller gives you:
   }
   ```
 
+  A `supersede` run adds `"supersedes": "ADR-NNNN"` to its one group. Put
+  `- Supersedes: ADR-NNNN` in that record's metadata list.
+
 - `{templatePath}` — the absolute path to the ADR template.
 - `{bodyFetchPath}` — the absolute path to the trail collector script, whose `--bodies`
   flag is the body-fetch capability.
@@ -39,10 +42,7 @@ The caller gives you:
 
 Use the supplied absolute script paths. Never guess a repo-relative path.
 
-Rules:
-
-- The caller pre-allocates every `adrNumber`. The Codifier never counts, and it never
-  reads `adrIndex.nextNumber` for itself.
+The caller pre-allocates every `adrNumber`. Never derive a number yourself.
 
 `{NAME}` tokens mark a **substitution site**: put the literal value there — from your
 prompt, or from the step that produced it — before you run the command. If a declared

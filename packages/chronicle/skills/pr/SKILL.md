@@ -13,8 +13,7 @@ when_to_use: >-
 Spawn ONE **Storykeeper**. The Storykeeper owns the whole flow: it analyzes the
 branch, writes a reviewer-legible title and body to a file, and opens the request
 from that file. This keeps all branch/diff/`gh` output out of the main
-conversation, and it preserves the "why" behind the change. This skill is
-human-invoked only. Do not auto-trigger it from incidental PR/MR mentions.
+conversation, and it preserves the "why" behind the change.
 
 ## Topology
 
@@ -29,12 +28,6 @@ main agent  (holds the conversation = the "why")
 Spawn via `subagent_type`, never fork. Spawn exactly one Storykeeper, in one
 `Agent` call, with no `name`. It spawns nothing itself and does not inherit the
 main conversation.
-
-The Storykeeper once relayed to a skald (drafting) and a messenger (creation).
-Across 9 runs the subtree took a median 187s, of which the skald's drafting was
-39s: the messenger spent ~30s retyping the body into a heredoc, and the relay
-spent ~60s passing it along. Nothing either child returned was large, so neither
-boundary protected the main conversation.
 
 There is **no final creation confirmation gate**. Invoking the skill is the
 consent. The flow auto-creates after any first-run config interview. `draft`
@@ -103,15 +96,15 @@ optional Mermaid overview diagram, and the `CreateResult` contract — lives the
    the answer. If the user already stated the answer in the current request ("no review
    needed", "skip review"), take it and skip the question.
 3. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
-   drawn from this conversation (the Storykeeper and its children can't see the chat).
-   This is the only "why" they get beyond the cockpit trail and commits.
+   drawn from this conversation (the Storykeeper can't see the chat).
+   This is the only "why" it gets beyond the cockpit trail and commits.
 4. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
    - the **skill directory** — the skill's load-time "Base directory for this
-     skill" banner value (so the children resolve `<skill dir>/scripts/analyze-branch.ts`
+     skill" banner value (so the Storykeeper resolves `<skill dir>/scripts/analyze-branch.ts`
      and `<skill dir>/scripts/request-creator.ts`). Do not hard-code a
      repo-relative path or rely on `${CLAUDE_PLUGIN_ROOT}`.
      Pass it as a **literal absolute path**, never as a `$`-prefixed token —
-     nothing sets that variable in a child's shell, so its command silently
+     nothing sets that variable in the Storykeeper's shell, so its command silently
      runs against `/`.
    - `contextBrief` (from step 3).
    - `base` — the explicit branch selected in step 1. Never pass `auto`.
@@ -168,9 +161,7 @@ If the registered role and stable TOMLs are both unavailable, tell the user to r
 `chronicle:install` and start a new Codex thread. Do not silently replace the
 Storykeeper boundary with an inline flow.
 
-Apply the same verification after Codex returns. Check with `gh pr view "{url}"` or
-`glab mr view "{id-or-url}"`. On a no or failed URL, run the `--head`/`--source-branch`
-lookup above before reporting failure. Never trust an unverified URL.
+Apply the same **Verify before reporting** steps after Codex returns.
 
 ## OpenCode only — skip on Claude Code and Codex
 

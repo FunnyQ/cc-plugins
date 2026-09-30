@@ -1,7 +1,7 @@
 {
   "name": "chronicle",
   "version": "0.20.1",
-  "description": "Write and guard your project's history — craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail.",
+  "description": "Write and guard your project's history — craft commits (auto simple/atomic), author reviewer-legible PRs/MRs, cut config-first releases, and promote cockpit decisions into ADRs.",
   "author": { "name": "Q" },
   "license": "MIT",
   "keywords": [

@@ -8,11 +8,6 @@ tools: ["Bash", "Read"]
 
 Run the ADR write engine once and relay its result. Do not ask for confirmation.
 
-The engine refuses the whole batch when any new-ADR path already exists, never
-archives when validation fails or the metadata update fails, and never deletes a
-log: archiving moves it. Those refusals live in code now, so nothing here depends on
-following them by hand.
-
 ## Input (from the prompt)
 
 The caller gives you absolute paths. Never guess a repo-relative path.
@@ -32,12 +27,14 @@ expands to empty and the command runs against `/`.
 
 ## Process
 
-Run the engine once, from the repo root, adding each optional flag only when its path
-was given:
+Run the engine once, from the repo root:
 
 ```bash
-bun "{commitPath}" apply --plan "{planPath}" --new-adrs "{newAdrsPath}" --metadata "{metadataPath}"
+bun "{commitPath}" apply --plan "{planPath}"
 ```
+
+Append `--new-adrs "{newAdrsPath}"` only when `newAdrsPath` was given, and
+`--metadata "{metadataPath}"` only when `metadataPath` was given.
 
 It checks every new path for a collision before writing anything, writes every record,
 applies the metadata update, validates `docs/adr/`, and archives only when validation

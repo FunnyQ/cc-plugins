@@ -64,18 +64,13 @@ the config has to name. It uses the same vocabulary as `.chronicle/pr.json`:
 Either way **every tag of a coordinated release lands on one commit** — the merge
 commit on git-flow, the bump commit on github-flow.
 
-**A missing `workflow` means `git-flow`.** A config written before the field existed
-keeps working byte-for-byte. Chronicle never re-detects the workflow behind a
-committed config. So, if a repo later drops `develop`, edit its config by hand: add
-`"workflow": "github-flow"` and remove `branches.develop`. Chronicle never re-shapes
-the config silently. Detection only seeds the first-run interview: no `develop`
-branch (local or `origin/`) suggests `github-flow`.
-
-That edit is the **only** migration this feature needs. It applies only to a repo
-whose committed config names a `develop` that no longer exists. The analyzer reports
-that case as `workflowDrift`. So `/chronicle:release` offers the fix, instead of
-failing mid-finish. Every other committed config — `develop` still alive — needs no
-change.
+**A missing `workflow` means `git-flow`.** Chronicle never re-detects the workflow
+behind a committed config; detection only seeds the first-run interview, where no
+`develop` branch (local or `origin/`) suggests `github-flow`. When a committed
+config names a `develop` that no longer exists, the analyzer reports
+`workflowDrift` and `/chronicle:release` offers the hand edit — add
+`"workflow": "github-flow"`, remove `branches.develop` — instead of failing
+mid-finish.
 
 ### `versionFiles` / component `versionFiles` entries
 

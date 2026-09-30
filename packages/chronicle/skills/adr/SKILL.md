@@ -23,11 +23,8 @@ conversation unless the user edited it at gate 2.
 
 Triage spawns no orchestrator. Clustering by identical decision text, base
 session assignments, batching, result validation, merging, and archive planning
-are deterministic, so `triage.ts` does them in seconds. Before it, one
-101-entry run reached gate 1 after about 1,500s: a reckoner agent spent 558s
-emitting 49k tokens of clusters, the Lorekeeper spent about 180s re-emitting that
-JSON verbatim, and the main agent spent about 460s typing a 33KB gate payload by
-hand, twice. Models now only screen and judge.
+are deterministic, so `triage.ts` does them in seconds, and models only screen
+and judge.
 
 ## Topology
 
@@ -47,11 +44,6 @@ chronicle:adr  (this skill — the main agent; owns both gates)
 Spawn the codifier and the barrowkeeper as custom agents, never forks, one per
 `Agent` call, with no `name`. Neither spawns anything, and neither inherits the
 main conversation. Never put a gate inside either.
-
-A Lorekeeper once sat between the main agent and these two. It returned every
-draft to the main agent "complete and verbatim", which then retyped each one into
-`gate2.json` and again into the commit phase — up to 12 records of 3–5 KB, three
-times over, through the context the subagents exist to protect.
 
 **Both gates are one local HTML page.** Never hand-write that page and never
 hand-design it — `gatePagePath` renders it. Build the payload, serve it, and end
@@ -332,9 +324,8 @@ This is the primary entry point.
 Spawn one `judge` per batch file, every one in a **single `Agent` message** — that
 is what makes them run in parallel. Keep each prompt to three literal paths:
 `batchPath`, `bodyFetchPath`, and `triagePath`. Never paste clusters, candidates,
-or the record index into a prompt. The model writes each prompt out before its
-call starts, so in one run five judges with 4,000-character prompts started
-23–26s apart despite sharing one message.
+or the record index into a prompt: each prompt streams out before its call
+starts, so long prompts stagger judges that share one message.
 
 Each judge screens its clusters from their skeletons, fetches bodies for the
 plausible ones, and records one candidate per cluster with `triage.ts record`,
@@ -435,11 +426,6 @@ Also require **at least one** of these longevity signals:
 - The decision affects multiple modules, plugins, or future contributors.
 - A reasonable maintainer may challenge or accidentally undo it later.
 
-Reject a flat "any two of five" threshold. Almost every non-trivial decision
-affects multiple modules and may be undone, so that form would promote nearly
-everything. It would contradict the skill's non-goal of treating every
-implementation choice as architecture.
-
 Reject promotion when the material is a local implementation detail, temporary
 workaround, mechanical convention, or caveat that belongs in code or operational
 documentation. Also reject it when the decision is a default choice a competent
@@ -462,11 +448,6 @@ When the evidence is thin or the read is close, disposition `watch`, not
 candidate becomes a permanent ADR. This bias is deliberate and applies hardest
 to `judge`, whose batches run in parallel: every lenient call is also a
 disagreement between batches the user meets at gate 1.
-
-`judge` runs on sonnet, not haiku. On haiku, one 101-entry run promoted 20
-candidates and watched 3 despite this bias, with batches splitting on the same
-kind of material. The user rejected all 20, and 8 of them named the existing doc
-or comment in their own reason.
 
 ### No-promotion branch
 
@@ -510,8 +491,8 @@ A `live` skip is not a failure. The planner and the archiver both refuse a log
 written in the last ten minutes, and the next `archive` run moves it.
 
 **The ignore warning.** A repo that ignores `.cockpit/logs/` but not
-`.cockpit/archive/` commits every archived log on its next `git add -A`: 26 in
-one repo and 8 in another before this check existed. The script runs `git check-ignore`
+`.cockpit/archive/` commits every archived log on its next `git add -A`. The
+script runs `git check-ignore`
 on every destination under `.cockpit/archive/done/` before moving, warns when
 any one of them is not ignored, and moves the files anyway.
 Tell the user to add `.cockpit/archive/` to that repo's `.gitignore`. Never
@@ -564,6 +545,9 @@ Collect the existing ADR and the evidence for its replacement, through the same
 `prep --evidence` search `promote` uses. Draft the replacement first, through
 the same one-entry `groups` payload `promote` uses: `groupId` `g1`, the
 replacement's `entryIds`, and `adrNumber` `nextAdr` retained from the `prep` line.
+Add `"supersedes": "ADR-<old>"` to that entry so the draft carries a
+`- Supersedes:` line: `apply` validates both link directions after writing, and a
+one-way link fails `link-not-mutual`.
 The replacement takes a fresh number; the superseded record keeps its own. After
 gate 2, write the replacement, then update only the old record's successor
 lifecycle metadata. Never rewrite the old decision's context or consequences.

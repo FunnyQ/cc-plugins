@@ -102,9 +102,7 @@ The relevance criteria require **at least one** of:
 Check the two **hard skip rules** before the threshold. Either one settles the cluster as
 `skip`, whatever the threshold read — unless its records conflict. A conflict comes first:
 it still makes the cluster `watch`, per the conflict rule below, so a disputed decision
-stays in the watched bucket instead of archiving to `done`. In one 101-entry run, 8 of 20
-promotes named the doc or comment that already held the decision in their own reason, and
-the user rejected all 20.
+stays in the watched bucket instead of archiving to `done`.
 
 - **Already written down.** The decision and its reason already sit where a maintainer
   meets them: a comment in a file the records name in `files`, a reference doc, a README,
