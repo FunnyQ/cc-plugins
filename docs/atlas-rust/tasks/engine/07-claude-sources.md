@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/03, contract/03
 > **Blocks**: engine/08, cli/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -127,23 +127,23 @@ Deep-equality ignores object key order, but array order must match TS.
 
 ## Acceptance criteria
 
-- [ ] `claude.rs` exposes exactly the `engine-api.md` signatures for `ClaudeSource`, `load`, `read_usage_limits`, and `source_json`. `model.rs` is unchanged.
-- [ ] Under the fixture home, `cockpit atlas stats --source claude` deep-equals the recorded TS golden (golden test `source claude` passes against Rust).
-- [ ] `load` never opens a `.jsonl` transcript itself. Transcript bytes are read only by `update_rollup`.
-- [ ] `hour_ms = 0` rows appear in `modelUsage` and `projectTokens` but not in `hourlyUsage` or `dailyModelUsage`. A session spanning two files yields one ledger row whose counts are summed and whose project is the earliest-`project_ts_ms` cwd. Each has a `cargo test`.
-- [ ] `cargo test` units cover the missing, unreadable, missing-rate-limits, and stale `read_usage_limits` branches
+- [x] `claude.rs` exposes exactly the `engine-api.md` signatures for `ClaudeSource`, `load`, `read_usage_limits`, and `source_json`. `model.rs` is unchanged.
+- [x] Under the fixture home, `cockpit atlas stats --source claude` deep-equals the recorded TS golden (golden test `source claude` passes against Rust).
+- [x] `load` never opens a `.jsonl` transcript itself. Transcript bytes are read only by `update_rollup`.
+- [x] `hour_ms = 0` rows appear in `modelUsage` and `projectTokens` but not in `hourlyUsage` or `dailyModelUsage`. A session spanning two files yields one ledger row whose counts are summed and whose project is the earliest-`project_ts_ms` cwd. Each has a `cargo test`.
+- [x] `cargo test` units cover the missing, unreadable, missing-rate-limits, and stale `read_usage_limits` branches
   - a history file with malformed and blank lines skipped
-- [ ] An unopenable rollup DB (for example, `TOKEN_ATLAS_ROLLUP_DB` pointing into a non-directory) makes `load` return empty aggregates with the correct `transcript_file_count`. A missing `stats-cache.json` makes `load` return `Err`.
-- [ ] The rollup golden tests stay green against Rust.
+- [x] An unopenable rollup DB (for example, `TOKEN_ATLAS_ROLLUP_DB` pointing into a non-directory) makes `load` return empty aggregates with the correct `transcript_file_count`. A missing `stats-cache.json` makes `load` return `Err`.
+- [x] The rollup golden tests stay green against Rust.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source claude"`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "rollup"`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::claude`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source claude"`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "rollup"`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::claude`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
 
 ## Eval rubric
 
