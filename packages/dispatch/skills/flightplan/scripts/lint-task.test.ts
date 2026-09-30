@@ -1554,3 +1554,44 @@ describe("human-gate", () => {
     expect(violations.filter((v) => v.rule === "human-gate")).toEqual([]);
   });
 });
+
+describe("scope-pgrep rule", () => {
+  const lintGate = async (item: string) => {
+    const root = await writeTree({
+      "tasks/ui/01-fixture-state-shell.md": VALID_TASK.replace(
+        "- [ ] Run `bun test`",
+        item,
+      ),
+    });
+    const violations = await lintFile(
+      join(root, "tasks/ui/01-fixture-state-shell.md"),
+    );
+    await rm(root, { recursive: true, force: true });
+    return violations.filter((v) => v.rule === "scope-pgrep");
+  };
+
+  test("flags an unanchored pgrep -f pattern", async () => {
+    const hits = await lintGate(
+      "- [ ] Run `pgrep -f cockpit-channel.ts; test $? -eq 1`",
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0].detail).toContain("machine-wide");
+  });
+
+  test("flags quoted patterns and combined flag clusters", async () => {
+    expect(await lintGate('- [ ] Run `pgrep -f "cockpit-channel.ts"`')).toHaveLength(1);
+    expect(await lintGate("- [ ] Run `pgrep -af 'cockpit-channel.ts'`")).toHaveLength(1);
+    expect(await lintGate("- [ ] Run `pgrep -f -l cockpit-channel.ts`")).toHaveLength(1);
+  });
+
+  test("passes a pattern anchored to a flag or a path", async () => {
+    expect(
+      await lintGate("- [ ] Run `pgrep -f 'cockpit-server.ts --no-open --port'`"),
+    ).toEqual([]);
+    expect(await lintGate("- [ ] Run `pgrep -f /tmp/x/cockpit-server.ts`")).toEqual([]);
+  });
+
+  test("ignores pgrep without -f", async () => {
+    expect(await lintGate("- [ ] Run `pgrep cockpit-channel`")).toEqual([]);
+  });
+});

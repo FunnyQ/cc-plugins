@@ -164,6 +164,35 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
   return hits;
 }
 
+// `pgrep -f` reads every process on the machine, including other sessions'.
+const PGREP_REGEX = /\bpgrep\b([^`;|&\n]*)/g;
+
+/**
+ * Checklist items running `pgrep -f` with a pattern the task does not control.
+ * A pattern is anchored by a `/` or a flag token (`--port`), which only the
+ * task's own process would carry. Returns first lines, in document order.
+ */
+export function scopePgrepChecks(task: ParsedTask): string[] {
+  const hits: string[] = [];
+  for (const heading of GATE_SECTIONS) {
+    for (const item of checklistItems(extractSection(task.body, heading))) {
+      for (const m of item.matchAll(PGREP_REGEX)) {
+        const tokens = m[1].trim().split(/\s+/).filter(Boolean);
+        const optEnd = tokens.findIndex((t) => !/^-[A-Za-z]+$/.test(t));
+        const opts = optEnd === -1 ? tokens : tokens.slice(0, optEnd);
+        const pattern = optEnd === -1 ? [] : tokens.slice(optEnd);
+        if (!opts.some((t) => /f/.test(t))) continue;
+        const anchored = pattern.some((t) => /\//.test(t) || /^['"]?-/.test(t));
+        if (pattern.length > 0 && !anchored) {
+          hits.push(item.split("\n")[0].trim());
+          break;
+        }
+      }
+    }
+  }
+  return hits;
+}
+
 /** Final review gate items that read `git status`, first line only, in document order. */
 export function finalReviewGitStatusItems(task: ParsedTask): string[] {
   if (!task.finalReview) return [];
@@ -394,6 +423,13 @@ export async function lintFile(
         ? `a \`git status\` scope gate with no \`--\` pathspec reads the WHOLE working tree, which no task owns: autopilot runs tasks in parallel in one tree, so a sibling's legitimate uncommitted edits land in your output and fail a correct implementation. Narrow it to this task's own files, e.g. \`git status --short -- <this task's files>\`: ${hit.item}`
         : `a \`git status\` scope gate that claims exclusivity cannot pass under autopilot — the runner edits this very file (Status → in-progress, then mark-done ticks every gate box). Assert that your own paths changed; never claim what else did not: ${hit.item}`;
     push("scope-git-status", detail);
+  }
+
+  for (const item of scopePgrepChecks(task)) {
+    push(
+      "scope-pgrep",
+      `\`pgrep -f\` matches process command lines machine-wide, so another session's process can satisfy or fail this gate. Anchor the pattern to a flag or path this task itself passes, e.g. \`pgrep -f 'server.ts --port 5999'\`: ${item}`,
+    );
   }
 
   for (const item of finalReviewGitStatusItems(task)) {

@@ -229,6 +229,8 @@ A whole-tree form fails a correct task for two reasons:
 
 `lint-task.ts` enforces this as the `scope-git-status` rule: a `git status` in `## Acceptance criteria` or `## Verification` with no `--` pathspec fails, and a pathspec-limited one still fails if it claims exclusivity. Option flags such as `--short` and `--porcelain` do not count as a pathspec.
 
+The `scope-pgrep` rule is the same class of check: a `pgrep -f` pattern in a gate that carries no `/` and no flag token matches processes machine-wide (other sessions), so anchor it to a flag or path the task itself passes.
+
 ## Sizing
 
 Aim for 1 task = 1 commit or 1 PR. Concretely:
