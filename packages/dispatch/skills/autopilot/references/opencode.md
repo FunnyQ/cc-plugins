@@ -21,12 +21,10 @@ tool list is `bash, edit, glob, grep, read, skill, task, todowrite, webfetch,
 write`, and `task` is the only spawn mechanism. Autopilot therefore runs here
 as a **hand-driven wave loop over the task tool**.
 
-**Read this before the steps.** The loop below is behaviorally close to the
-Claude Code flight but **not identical**: there is **no automatic parallel-wave
-scheduling** and **no orchestrator process**. The waves are driven **by hand,
-one at a time, by whoever invoked the skill**, who must stay at the keyboard
-between waves. Autopilot under OpenCode is not the same unattended flight — do
-not report it to the user as one.
+The loop below is close to the Claude Code flight but has no automatic
+parallel-wave scheduling and no orchestrator process: whoever invoked the skill
+drives the waves by hand, one at a time, and stays at the keyboard between
+them. Do not report it to the user as an unattended flight.
 
 ## Script root
 

@@ -37,7 +37,7 @@ Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent 
 
 Use the **hybrid shape**. Scout inline first to discover the work-list. Then hand the fan-out to a Workflow script.
 
-Three hard constraints shape the design. Internalize them:
+Three hard constraints shape the design:
 
 1. **The Workflow orchestrator script has no filesystem access.** It also **cannot `import`** our scripts. Anything that reads or writes disk — running `next-ready.ts`, editing a task's `Status`, appending to the flightlog — must run inside a tool-capable **agent** in the workflow. The orchestrator JS must never do this work.
 2. **There is exactly one scoring implementation.** The rubric judge runs `score-task.ts --json --log`. The orchestrator gates on that printed verdict object. Do not duplicate the weighted-average or hard-fail arithmetic in the Workflow script.
@@ -103,7 +103,7 @@ Before touching Workflow, gather the work-list in the main conversation:
 
    **Act on a `[serial-undeclared]` advisory before flying.** Check PLAN.md and `_context/` for serial execution or lock requirements without a `> **Max parallel**:` header. Under Claude Code, lower **Max parallel** only when tasks share an **external live resource** that a worktree cannot isolate: a live device, a LaunchAgent or service that a verification reinstalls, or a local database that a migration rewrites. For that external live resource, set `> **Max parallel**: 1`. Under Claude Code, keep a shared build target uncapped because each task builds in its own worktree. When the plan will run under OpenCode, set `> **Max parallel**: 1` for a shared build target that compiles every file: the hand-driven loop still shares one working tree (see `autopilot/references/opencode.md`). When `Depends on` edges already sequence every conflict, write `unlimited` or omit the line. Read the header through the scout every wave.
 
-   **`scope-git-status` is the one to expect on an older plan.** Flightplan used to recommend a whole-tree `git status` gate, and that gate fails a correct task the moment a sibling in the same wave leaves its own legitimate edits uncommitted. Fix it in the task file — narrow the command with a `--` pathspec listing that task's own files — before flying. Do not fly a tree with violations outstanding.
+   **Fix a `scope-git-status` violation in the task file.** A whole-tree `git status` gate fails a correct task as soon as a sibling in the same wave leaves its own edits uncommitted; narrow the command with a `--` pathspec listing that task's own files. Do not fly a tree with violations outstanding.
 6. **Capture the base ref** for the Final review diff scope:
    ```bash
    git rev-parse HEAD
@@ -215,17 +215,11 @@ completed   (next wave's next-ready will see it)
 
 On a **clean** land, merge the result into the main tree. On a **conflict**, count the attempt as failed after rebasing the worktree with conflict markers. On **drift** because something else landed since the task started, re-run the task's Verification in the main tree as `reverify:<ref>#<attempt>`, whose failure undoes the land and rebases the worktree as a failed attempt that supersedes the judge's passing score. On a **leak** because the main tree changed outside a land, abort the run with every task stopped before its next slot, attempt, or land, no further commits or end sweep, and no changes reverted.
 
-After a leak abort, report the leaked paths plus every worktree still in `live` and every still-blocked leftover kept by the start sweep. For a task whose land was clean before the abort, finish mark-done because its work is already in the main tree. Then run `remove` for that task. Preserve worktrees with unlanded work for inspection. Report unconfirmed removal separately as `cleanupFailures`.
-
-Hold one main-tree lock around every `worktree.ts` call and drift re-verify, including the snapshot a new worktree starts from, so no worktree starts from a half-applied land and no two calls rewrite `state.json` at once.
-
-Repeat a completed `worktree.ts` call safely with identical arguments: `land`, `unland`, and `rebase` take attempt-and-step `--op <id>` values (`a<attempt>-land`, `a<attempt>-unland`, `a<attempt>-rebase`), record their results under those ids, and return the recorded result on repetition. Route each `worktree.ts` call and `reverify` through a wrapper that throws on a `null` result, because `resilient(...)` retries only on a throw. After a second `null`, treat the missing result as an infrastructure failure for the task, or for the run when the call is a sweep or baseline. For a drift re-verify with no result after its retry, undo the land before parking with the worktree kept.
-
-Write every source file under the task's worktree, with only three write exemptions: `flightlog.ts log` into the main-tree flightlog, the task file's Status line, and scratch files under `/tmp/q-lab/dispatch/autopilot/<project>/<slug>/` (the judge's notes, an external driver's instruction file).
+After a leak abort, report the leaked paths, the kept `worktrees` (preserved for inspection because they hold unlanded work), and any `cleanupFailures`. The main-tree lock, the `--op` replay ids, and the null-result retries around `worktree.ts` live in `references/orchestrator.md`.
 
 ### Scout result and termination rules
 
-The scout runs `next-ready.ts --summary` and echoes its `{ready, counts, unfinished, invalid, errors}` snapshot verbatim; the script does every interpretation. **`references/orchestrator.md` owns the nine terminal conditions and their guards** — do not restate or re-derive them here.
+The scout runs `next-ready.ts --summary` and echoes its `{ready, counts, unfinished, invalid, errors}` snapshot verbatim; the script does every interpretation. **`references/orchestrator.md` owns the terminal conditions and their guards** — do not restate or re-derive them here.
 
 The `Final review` task (`> **Final review**: true`) depends transitively on every other task, so the wave loop **naturally schedules it last** — no special phase is needed. Its dev step is **not** a Claude self-review but the multi-lens fan-out below; the binary gate, rubric judge, and score gate are unchanged, grading that round against the Final review task's own `## Eval rubric`.
 
@@ -262,7 +256,7 @@ Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge
 |---|---|---|
 | **Dev** | opus / low | Implement the task cheaply; the task's gate and judge catch what low effort misses. |
 | **Dev — last Claude rung** | opus / high, or the task's dev choice with effort +1 | Spend verification effort after earlier attempts fail. |
-| **Dev — external driver** | opus / low | Turn the task file into the external CLI's instruction file, then drive the CLI. A Haiku driver paraphrased a rule out of that file in the field. |
+| **Dev — external driver** | opus / low | Turn the task file into the external CLI's instruction file, then drive the CLI. Writing that file is judgment: a weaker driver paraphrased a rule out of it. |
 | **Binary gate and drift re-verify** | opus / low | Check acceptance criteria and command output before scoring. |
 | **Rubric judge** | opus / medium | Score the rubric against the gate's evidence. |
 | **Commit (inter-wave + post-loop)** | opus / low | Group changes and write the commit message. |
@@ -276,7 +270,7 @@ A task's `> **Models**:` header overrides dev, verify, judge, and fix for that t
 
 On the last Claude dev rung, run opus/high. When the task's Models header names `dev`, raise that choice one step on the same model instead, leaving `max` at `max` and omitted effort omitted.
 
-## Grounding the score (do not skip)
+## Grounding the score
 
 The **correctness** dimension must be grounded in **real verification**, not the judge's vibe. The binary gate agent actually runs the task's `## Verification` commands and checks its `## Acceptance criteria`; its pass/fail result and raw output go to the rubric judge, which scores correctness against *that evidence*. The gate must pass before the judge runs at all, so a high correctness score can never sit on top of a failed verification.
 
@@ -293,22 +287,15 @@ A task escalates for one of two reasons: it exhausted its cap (`maxAttempts`, or
    - **Re-enter at a step** — When the work before that step is already correct in the kept worktree, use `--task <ref> --from verify|judge`. Leave `Status` at `blocked` for the resume to mark `done`. For Final review, resume in the main tree. See "Resume one task at a chosen step" above.
    - **Re-run the whole task** — reset its `Status` to `todo` and re-run autopilot. Completed tasks stay `done`, so `next-ready` only re-offers the unblocked work. Use this when what failed is the work itself.
 
-For a parked non-final task, keep its unlanded work in its worktree outside the main tree. Include the kept worktree's path in the escalation's `reason`. To inspect or hand-fix the task, work inside that worktree. For `--task <ref> --from verify|judge`, look up the kept worktree. When it exists, run the resumed steps there. If the worktree is gone, halt with a message naming the missing path. At the start of a non-final resume, take a fresh main-tree baseline for the land's leak check. When a drift re-verify failed after a passing judge, resume from `dev` on the next attempt. For a resume from `dev`, look up the worktree first. When it exists, reuse it because it may hold unlanded work from a failed drift re-verify. Only when none exists, create a fresh worktree from the current main tree. In the run that finally passes the task, land its work. For Final review, resume in the main tree without a worktree lookup or resume baseline.
+A parked non-final task keeps its unlanded work in its worktree, and the escalation's `reason` names that path; inspect or hand-fix the task there. A `--from verify|judge` resume runs in that worktree and halts naming the path if it is gone. A `--from dev` resume reuses the worktree when it exists, because it may hold unlanded work from a failed drift re-verify. Final review always resumes in the main tree.
 
 ### Worktree cleanup
 
-Apply these rules to the wave-loop run; for a single-task resume, run no sweeps.
+The orchestrator sweeps `<repo-parent>/.<repo-name>-autopilot/<slug>/` at run start and end, keeping live and still-`blocked` tasks' worktrees and skipping the end sweep after a leak abort or a scout failure; `references/orchestrator.md` carries the rules. Your part:
 
-1. At run start, sweep the slug's worktree root to remove this slug's leftovers from a previous run, except those whose task `Status` is `blocked`.
-2. After each clean land and mark-done, remove that task's worktree.
-3. At run end, sweep again while keeping every worktree still in the `live` map, including parked tasks, plus every worktree the start sweep kept whose task `Status` is still `blocked`. Keep a still-blocked task's worktree even when this run never touched it.
-4. If a leak aborted the run, skip the end sweep to keep every worktree with unlanded work for inspection. For a task that landed cleanly before the abort, still remove its worktree.
-5. On a clean end or abort, report every kept worktree path in the run result. Build the list from the orchestrator's `live` map, set on create or resume and cleared on remove, plus each `{ref, path}` the start sweep kept whose task `Status` is still `blocked`. Never read the kept list from the end sweep.
-6. After a clean run, confirm that no worktree for the slug remains: `git worktree list` must show no path under `.<repo-name>-autopilot/<slug>/`.
-7. For every sweep, touch only paths under the slug's worktree root, `<repo-parent>/.<repo-name>-autopilot/<slug>/`. Leave worktrees outside that root untouched.
-8. If the first scout fails, list every worktree under the root without sweeping. If a later scout fails, skip the end sweep. After a scout failure, report the returned kept list without filtering it further.
-9. When a landed task's worktree removal cannot be confirmed, report its path in `cleanupFailures` separately from the kept list so the user can delete it. Keep the task counted as completed. Treat the run as not clean.
-10. To discard a kept worktree by hand, run `git worktree remove --force <path>`. Then run `git worktree prune`.
+- Report `worktrees` (kept, returned as-is) and `cleanupFailures` separately. A cleanup failure is a landed task whose removal could not be confirmed: the task still counts as completed, the run is not clean, and the user deletes that path.
+- After a clean run, confirm `git worktree list` shows no path under `.<repo-name>-autopilot/<slug>/`.
+- To discard a kept worktree by hand, run `git worktree remove --force <path>`, then `git worktree prune`.
 
 **Read the two flags before you report.** `infrastructure: true` means nothing was judged — say that verification did not run or returned no verdict, not that the work was rejected. `parked: false` means the park itself failed, so the file still reads `in-progress` and `next-ready` will not re-offer it; tell the user to reset that Status by hand before resuming.
 
@@ -331,7 +318,7 @@ Each entry records an `agentLabel` so a suspicious verdict can be traced back to
 
 ## Bundled scripts
 
-You run three of them yourself, all in the sibling `skills/flightplan/scripts/` directory (`$SCRIPTS`):
+You run these yourself, all in the sibling `skills/flightplan/scripts/` directory (`$SCRIPTS`):
 
 - `next-ready.ts <tasks-dir> [--json | --summary]` — the scout of Step 1 and of every wave. **`--summary` is what the orchestrator uses**: one `{ready, counts, unfinished, invalid, errors}` object, printed even when the command exits 1, so a malformed tree still names its refs. It exits non-zero rather than return a ready set that would unlock work behind a fake `done`.
 - `lint-task.ts <tasks-dir | task-file>` — run it during scout when `next-ready` reports a malformed tree, and fix the tree before flying.
