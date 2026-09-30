@@ -6,7 +6,7 @@
 >
 > **Depends on**: ship/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 
