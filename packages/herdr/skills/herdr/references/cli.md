@@ -142,7 +142,7 @@ herdr pane close <id>
 
 `pane current`, `pane get`, and `pane layout --current` resolve the calling pane, not another client's focused pane.
 
-`pane split` with no target splits the calling pane when `HERDR_PANE_ID` is set, and the UI-focused pane otherwise. Before 0.9.1 it always split the UI-focused pane. `--current` errors when `HERDR_PANE_ID` is unavailable.
+`pane split` with no target splits the calling pane when `HERDR_PANE_ID` is set, and the UI-focused pane otherwise. `--current` errors when `HERDR_PANE_ID` is unavailable.
 
 Pass `--right-click pane` to forward unmodified right-click gestures to a mouse-reporting application inside the pane. Pass `--right-click herdr` to restore Herdr's pane menu. Right-clicking the pane frame still opens Herdr's menu. Set the same policy at creation with `pane split --right-click pane`.
 
@@ -243,7 +243,7 @@ On Linux and macOS, the server disconnects an observer whose socket write makes 
 herdr pane wait-output <pane_id> (--match TEXT | --regex PATTERN) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
 ```
 
-For agent-status waits, use `herdr agent wait <target> --until <status>` (see Agents). Herdr removed the old top-level `wait output` / `wait agent-status` commands in 0.7.5.
+For agent-status waits, use `herdr agent wait <target> --until <status>` (see Agents).
 
 ## Notifications
 ```bash

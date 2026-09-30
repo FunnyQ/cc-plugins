@@ -28,8 +28,6 @@ The script queries the running server with `herdr api schema --json`, greps the 
 
 Do not dump the schema into context yourself. It is a quarter-megabyte of JSON, and reading it costs tens of thousands of tokens to answer a question the diff answers in one line.
 
-The schema-shaping and diff logic is pure and exported; only the CLI entry point shells out. Run `bun test scripts/protocol-check.test.ts` after changing it.
-
 ## Act on the result
 
 **No breaking change** (exit 0) — raise the plugin's minimum-protocol constant only if you have a reason to; an upgrade that changed nothing relevant needs no code change at all. Then rebuild, rerun with `--update`, and commit the refreshed baseline alongside.

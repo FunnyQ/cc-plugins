@@ -199,13 +199,6 @@ tab inside the browser you already have.
 expose `Page.printToPDF` — CDP answers `'Page.printToPDF' wasn't found`. `B raw
 -- pdf` fails the same way, so this is a limit of the browser, not of the skill.
 
-**terminal-browser rewrites `~/.config/herdr/config.toml` on first open**, with
-no prompt: it sets `[experimental] kitty_graphics = true` and reloads the config.
-Herdr 0.9.0 enables pane images by default and moved the key to
-`terminal.kitty_graphics`, so that write is now redundant. It is also harmless —
-herdr still accepts the old key, and terminal-browser writes the same `true` the
-default already carries.
-
 ## Cookies and headers
 
 ```bash
@@ -259,20 +252,12 @@ Read its surface with `B raw -- <command> --help` rather than guessing flags —
 `cookies set` takes `<name> <value>`, not `name=value`, and the wrong shape
 fails as a CDP error, not a usage error.
 
-**Prefer a native command whenever one exists** — but the gap is narrower than
-it looks, and it is worth knowing where it actually is. agent-browser is verbose
-in exactly one place: `snapshot`, where it prints the whole accessibility tree
-and this skill prints only what you can act on (27,363 chars to our 5,340 on
-Hacker News). Everywhere else it is already terse — measured on the same page,
-`get value` and `is visible` answer in 0 and 4 chars, `get box` in 61, and
-`fill` and `scroll` in 7. Reimplementing those natively would save nothing, so
-they are deliberately left on `raw`.
+Prefer a native command when one exists. Use `B snapshot`, never `raw --
+snapshot`: agent-browser prints the whole accessibility tree (~5x larger).
 
-agent-browser keeps session state across separate `raw` calls — a `network
-route`, a `storage local set`, or a set of `headers` outlives the command that
-made it, because a daemon holds it. That is also why `route` cannot be native
-here: this skill attaches and detaches per command, and a CDP interception
-handler needs a connection that stays open.
+agent-browser keeps state across separate `raw` calls — a `route`, a `storage
+local set`, or `headers` outlives the command that made it, because a daemon
+holds it.
 
 ## External CDP clients
 

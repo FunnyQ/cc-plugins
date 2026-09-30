@@ -42,25 +42,7 @@ bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
 
-# Hand work to an agent already running in ANOTHER project, fire-and-forget.
-# No live agent matches? Falls back to the project registry, then zoxide, and
-# auto-spawns one. See the `tell` skill for the fallback chain and addressing rules.
-bun "$HERD" tell api-service "rebase onto main and run the suite"
-
-# Slash-narrow when one project runs several agents
-bun "$HERD" tell web-app/dashboard "restart the dev server"
-
-# Ask a question and get the ANSWER back — same addressing/fallback as tell, but
-# blocks up to 10 min. ALWAYS run via Bash with run_in_background: true.
-# See the `ask` skill before using this.
-bun "$HERD" ask api-service "what port does the dev server run on?"
-
-# Flags go BEFORE the fragment (see the `ask` skill — a trailing flag is
-# silently swallowed into the question).
-bun "$HERD" ask --keep-pane diqi "what directory are you in?"
-
-# Timed out while still working? Redeem it later without re-asking.
-bun "$HERD" collect diqi-90d4 --result /tmp/q-lab/herdr/ask/.../result.md
+# Another project: `tell` (fire-and-forget) / `ask` (answer back) — read those skills first.
 
 # Atomically send and submit a prompt to a running agent
 bun "$HERD" send reviewer-a3f9 "now check error handling"
