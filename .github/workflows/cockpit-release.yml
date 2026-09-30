@@ -70,9 +70,11 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: mlugg/setup-zig@v2
         if: runner.os == 'Linux'
-      - name: Install cargo-zigbuild
+      # Prebuilt binary; cargo install compiled it from source in each Linux job.
+      - uses: taiki-e/install-action@v2
         if: runner.os == 'Linux'
-        run: cargo install cargo-zigbuild --locked
+        with:
+          tool: cargo-zigbuild
       - name: Build asset
         env:
           TARGET: ${{ matrix.target }}
