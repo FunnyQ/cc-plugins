@@ -120,7 +120,7 @@ base-directory banner.
 - **Merge or cherry-pick in progress**: git demands the whole index, so only one
   commit is possible. `apply` refuses an atomic plan there rather than letting the
   first commit swallow the rest. For the same reason, `apply` refuses any `exclude` there.
-- **Leaving files out**: `exclude` is whole-file and opt-in. A changed path that is neither
+- **Leaving files out**: `exclude` is whole-file and opt-in. A path ending in `/` excludes every changed path under that directory, read when `apply` runs, so files added there after the plan is written stay out too. A changed path that is neither
   planned nor excluded still fails the coverage check. Hunk-level exclusion does not exist.
 - **A re-run after any failure**: safe. `apply` reads how much of the plan is already
   at HEAD off the log, not off a stored flag.

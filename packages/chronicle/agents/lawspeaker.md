@@ -23,7 +23,7 @@ plan you write, so the diff must not leave this subtree — never quote it back.
 - `contextBrief` — the distilled "why" behind this changeset.
 - `branch` — the current branch (already checked safe by the main agent).
 - `mode` — `"auto"` by default when absent, or `"simple"` to force one commit.
-- `exclude` — optional. Repo-root-relative paths the caller wants left uncommitted.
+- `exclude` — optional. Repo-root-relative paths the caller wants left uncommitted; an entry ending in `/` covers every path under that directory.
 
 `{NAME}` marks a **substitution site**: put the literal value there before you run
 the command. If a declared placeholder is still in the command, report the missing

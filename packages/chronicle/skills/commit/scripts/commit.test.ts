@@ -1,8 +1,8 @@
 import { $ } from "bun";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { PlannedCommit, SimpleProse } from "./commit-plan";
 
 const SCRIPT = resolve(import.meta.dir, "commit.ts");
@@ -19,6 +19,7 @@ async function initRepo(): Promise<string> {
 }
 
 async function seed(name: string, body: string): Promise<void> {
+  await mkdir(dirname(join(repo, name)), { recursive: true });
   await writeFile(join(repo, name), body);
 }
 
@@ -609,6 +610,30 @@ describe("apply", () => {
     expect(shown.stdout.toString().trim()).toBe("a.ts");
     const staged = await $`git diff --cached --name-only`.cwd(repo).quiet();
     expect(staged.stdout.toString().trim()).toBe("README.md");
+  });
+
+  test("leaves a whole excluded directory uncommitted, files added later included", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed("drafts/one.md", "one\n");
+    const planPath = await writePlan({
+      commits: [
+        { emoji: "✨", type: "feat", subject: "add a", files: ["a.ts"] },
+      ],
+      exclude: ["drafts/"],
+    });
+    // Written after the plan: a per-file exclude list would miss it.
+    await seed("drafts/two.md", "two\n");
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.ok).toBe(true);
+    expect(json.excluded).toEqual(["drafts/one.md", "drafts/two.md"]);
+    expect(json.verify.leftover).toEqual([]);
+    const shown = await $`git show --name-only --format= HEAD`
+      .cwd(repo)
+      .quiet();
+    expect(shown.stdout.toString().trim()).toBe("a.ts");
   });
 
   test("refuses an exclude while a merge is in progress", async () => {

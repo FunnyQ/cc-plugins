@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   composeMessage,
   decideShape,
+  expandExclude,
   resolveResumption,
   resolveShapedCommits,
   validatePlan,
@@ -214,6 +215,45 @@ describe("validatePlan", () => {
     );
     expect(result.ok).toBe(false);
     expect(result.unknown).toEqual(["ghost.ts"]);
+  });
+
+  test("expands a trailing-slash exclude to every changed path under it", () => {
+    expect(
+      expandExclude(
+        ["docs/draft/", "README.md"],
+        changed(
+          "a.ts",
+          "docs/draft/x.md",
+          "docs/draft/sub/y.md",
+          "docs/other.md",
+        ),
+      ),
+    ).toEqual(["docs/draft/x.md", "docs/draft/sub/y.md", "README.md"]);
+  });
+
+  test("keeps a directory exclude that matches nothing, so it reports as unknown", () => {
+    const expanded = expandExclude(["ghost/"], changed("a.ts"));
+    expect(expanded).toEqual(["ghost/"]);
+    expect(
+      validatePlan(planOf(group("feat", ["a.ts"])), changed("a.ts"), expanded)
+        .unknown,
+    ).toEqual(["ghost/"]);
+  });
+
+  test("a directory exclude catches the old path of a rename out of it", () => {
+    expect(
+      expandExclude(
+        ["docs/draft/"],
+        [
+          {
+            path: "docs/final.md",
+            oldPath: "docs/draft/final.md",
+            staged: true,
+            status: "renamed",
+          },
+        ],
+      ),
+    ).toEqual(["docs/draft/final.md"]);
   });
 
   test("rejects excluding one half of a rename", () => {

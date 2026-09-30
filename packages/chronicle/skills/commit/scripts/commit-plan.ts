@@ -99,6 +99,35 @@ export type PlanValidation = {
 };
 
 /**
+ * Resolve a trailing-slash entry to the changed paths under it, read at apply
+ * time, so a directory still being written to stays excluded as it grows.
+ *
+ * A directory entry that matches nothing is kept as written, so `validatePlan`
+ * reports it as unknown instead of silently excluding nothing.
+ */
+export function expandExclude(
+  exclude: string[],
+  changed: ParsedStatus[],
+): string[] {
+  const paths = [
+    ...new Set(
+      changed.flatMap((entry) =>
+        entry.oldPath ? [entry.path, entry.oldPath] : [entry.path],
+      ),
+    ),
+  ];
+  return [
+    ...new Set(
+      exclude.flatMap((entry) => {
+        if (!entry.endsWith("/")) return [entry];
+        const under = paths.filter((path) => path.startsWith(entry));
+        return under.length > 0 ? under : [entry];
+      }),
+    ),
+  ];
+}
+
+/**
  * Whether the plan covers the changeset exactly once.
  *
  * Run before anything is staged. A plan that drops a file produces a commit that

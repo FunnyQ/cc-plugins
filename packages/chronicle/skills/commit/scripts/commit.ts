@@ -39,6 +39,7 @@ import { TEMP_ROOT } from "../../../shared/scripts/temp-payload";
 import {
   composeMessage,
   decideShape,
+  expandExclude,
   resolveResumption,
   resolveShapedCommits,
   subjectOf,
@@ -248,12 +249,13 @@ async function applyMain(planPath: string): Promise<void> {
     emptyTree,
   );
   const pending = commits.slice(landed);
-  const exclude = plan.exclude ?? [];
+  const changeset = await readChangeset();
+  const exclude = expandExclude(plan.exclude ?? [], changeset);
 
   if (pending.length > 0) {
     const coverage = validatePlan(
       { shape: decision.shape, commits: pending },
-      await readChangeset(),
+      changeset,
       exclude,
     );
     if (!coverage.ok) {
