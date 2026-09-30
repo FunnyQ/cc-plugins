@@ -45,7 +45,9 @@ if [ "${1:-}" = hook ]; then
 fi
 
 BASE=${COCKPIT_RELEASE_BASE_URL:-https://github.com/FunnyQ/cc-plugins/releases/download}
-DEADLINE=$(($(date +%s) + 30))
+# Foreground stays under Claude's 30s MCP connect timeout; the hook's background fetch may take minutes on a slow GitHub link.
+if [ "${1:-}" = __download ]; then LIMIT=600; else LIMIT=30; fi
+DEADLINE=$(($(date +%s) + LIMIT))
 REASON='download failed'
 TEMP_DIR=
 LOCK_HELD=0
@@ -59,14 +61,14 @@ trap 'exit 1' INT TERM
 fetch() {
     REMAINING=$((DEADLINE - $(date +%s)))
     [ "$REMAINING" -gt 0 ] || return 1
-    curl -fsSL --max-time "$REMAINING" "$BASE/monitor-v$VERSION/$1" -o "$2" 2>/dev/null
+    curl -fsSL --max-time "$REMAINING" "$@" 2>/dev/null
 }
 
 download() {
     mkdir -p "$(dirname "$BIN_DIR")" || return 1
     if mkdir "$BIN_DIR.lock" 2>/dev/null; then
         LOCK_HELD=1
-    elif [ -n "$(find "$BIN_DIR.lock" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+    elif [ -n "$(find "$BIN_DIR.lock" -maxdepth 0 -mmin +11 2>/dev/null)" ]; then
         rmdir "$BIN_DIR.lock" 2>/dev/null || :
         if mkdir "$BIN_DIR.lock" 2>/dev/null; then LOCK_HELD=1; fi
     fi
@@ -84,22 +86,25 @@ download() {
     [ ! -x "$BIN" ] || return 0
     TEMP_DIR=$(mktemp -d "$BIN_DIR.tmp.XXXXXX") || return 1
     ASSET=cockpit-$TARGET
-    fetch "$ASSET" "$TEMP_DIR/$ASSET" || return 1
-    fetch SHA256SUMS "$TEMP_DIR/SHA256SUMS" || return 1
+    # Outlives a timed-out attempt so the next one resumes instead of restarting from byte 0.
+    PART=$BIN_DIR.part
+    fetch -C - "$BASE/monitor-v$VERSION/$ASSET" -o "$PART" || return 1
+    fetch "$BASE/monitor-v$VERSION/SHA256SUMS" -o "$TEMP_DIR/SHA256SUMS" || return 1
     EXPECTED=$(awk -v asset="$ASSET" '$2 == asset { print $1; exit }' "$TEMP_DIR/SHA256SUMS")
     if command -v shasum >/dev/null 2>&1; then
-        HASH=$(shasum -a 256 "$TEMP_DIR/$ASSET") || return 1
+        HASH=$(shasum -a 256 "$PART") || return 1
     else
-        HASH=$(sha256sum "$TEMP_DIR/$ASSET") || return 1
+        HASH=$(sha256sum "$PART") || return 1
     fi
     HASH=${HASH%% *}
     if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$HASH" ]; then
+        rm -f "$PART"
         REASON='checksum mismatch'
         return 1
     fi
-    chmod +x "$TEMP_DIR/$ASSET" || return 1
+    chmod +x "$PART" || return 1
     mkdir -p "$BIN_DIR" || return 1
-    mv "$TEMP_DIR/$ASSET" "$BIN" || return 1
+    mv "$PART" "$BIN" || return 1
 }
 
 if download 2>/dev/null; then

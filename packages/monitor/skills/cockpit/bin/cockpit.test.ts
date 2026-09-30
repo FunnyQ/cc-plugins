@@ -14,7 +14,7 @@ const hasCargo = Bun.spawnSync(["sh", "-c", "command -v cargo"]).exitCode === 0;
 const cleanups: (() => void)[] = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); });
 
-function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: number; version?: string; assetsDir?: string } = {}) {
+function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: number; assetDelay?: number; version?: string; assetsDir?: string } = {}) {
   const version = options.version ?? "9.9.9";
   const root = mkdtempSync(join(import.meta.dir, ".test-"));
   cleanups.push(() => rmSync(root, { recursive: true, force: true }));
@@ -31,8 +31,9 @@ function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: numb
   const installed = join(data, `q-lab/cockpit-bin/${version}/cockpit`);
   let requests = 0;
   let assets = 0;
+  const ranges: (string | null)[] = [];
   const server = Bun.serve({
-    hostname: "127.0.0.1", port: 0,
+    hostname: "127.0.0.1", port: 0, idleTimeout: 60,
     async fetch(request) {
       requests++;
       if (options.delay) await Bun.sleep(options.delay);
@@ -42,7 +43,14 @@ function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: numb
         const name = path.slice(`/monitor-v${version}/`.length);
         if (name === `cockpit-${target}` || name === "SHA256SUMS") return new Response(Bun.file(join(options.assetsDir, name)));
       }
-      if (path === `/monitor-v${version}/cockpit-${target}`) { assets++; return new Response(binary); }
+      if (path === `/monitor-v${version}/cockpit-${target}`) {
+        assets++;
+        const range = request.headers.get("range");
+        ranges.push(range);
+        if (options.assetDelay) await Bun.sleep(options.assetDelay);
+        const from = Number(range?.match(/^bytes=(\d+)-$/)?.[1] ?? 0);
+        return from ? new Response(binary.slice(from), { status: 206, headers: { "content-range": `bytes ${from}-${binary.length - 1}/${binary.length}` } }) : new Response(binary);
+      }
       if (path === `/monitor-v${version}/SHA256SUMS`) {
         const hash = options.wrongHash ? "0".repeat(64) : createHash("sha256").update(binary).digest("hex");
         return new Response(`${hash}  cockpit-${target}\n`);
@@ -60,7 +68,7 @@ function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: numb
     return { stdout, stderr, code };
   }
   function place(path = installed) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, binary); chmodSync(path, 0o755); return path; }
-  return { root, plugin: realpathSync(plugin), shim, installed, run, place, requests: () => requests, assets: () => assets };
+  return { root, plugin: realpathSync(plugin), shim, installed, run, place, requests: () => requests, assets: () => assets, ranges };
 }
 
 function success(result: { stdout: string; stderr: string; code: number }, plugin: string, args = "--version") {
@@ -116,6 +124,23 @@ test("Hook fail-soft", async () => {
   expect(existsSync(f.installed)).toBe(true);
 });
 
+test("Resume partial download", async () => {
+  const f = fixture();
+  mkdirSync(dirname(dirname(f.installed)), { recursive: true });
+  writeFileSync(`${dirname(f.installed)}.part`, binary.slice(0, 10));
+  success(await f.run(), f.plugin);
+  expect(f.ranges).toEqual(["bytes=10-"]);
+  expect(existsSync(`${dirname(f.installed)}.part`)).toBe(false);
+});
+
+test("Background download outlives the foreground deadline", async () => {
+  const f = fixture({ assetDelay: 31000 });
+  expect(await f.run(["hook", "session-start"])).toEqual({ code: 0, stdout: "", stderr: "" });
+  const deadline = Date.now() + 40000;
+  while (!existsSync(f.installed) && Date.now() < deadline) await Bun.sleep(100);
+  expect(existsSync(f.installed)).toBe(true);
+}, 45000);
+
 test("Foreground failure", async () => {
   const f = fixture({ missing: true });
   const result = await f.run();
@@ -150,7 +175,7 @@ test("Concurrent lock", async () => {
   expect(f.assets()).toBe(1);
   rmSync(dirname(f.installed), { recursive: true });
   const lock = `${dirname(f.installed)}.lock`; mkdirSync(lock);
-  const old = new Date(Date.now() - 300000); utimesSync(lock, old, old);
+  const old = new Date(Date.now() - 720000); utimesSync(lock, old, old);
   success(await f.run(), f.plugin);
   expect(f.assets()).toBe(2);
   expect(existsSync(lock)).toBe(false);
