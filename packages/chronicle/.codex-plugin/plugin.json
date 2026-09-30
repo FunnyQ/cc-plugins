@@ -1,6 +1,6 @@
 {
   "name": "chronicle",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "Write and guard your project's history \u2014 craft commits (auto simple/atomic), author reviewer-legible PRs/MRs, cut config-first releases, and promote cockpit decisions into ADRs.",
   "author": {
     "name": "Q"

@@ -1,5 +1,55 @@
 # Changelog
 
+## [monitor 6.0.0] - 2026-09-30
+
+_tracks tag `monitor-v6.0.0`_
+
+### Added
+- Every cockpit process (daemon, per-session channel MCP server, CLI, and hooks) is now a single Rust binary, cutting idle memory from about 55 MB to 8.8 MiB for the channel and from about 86 MB to 11.7 MiB for the server.
+- A POSIX sh shim (skills/cockpit/bin/cockpit) fetches the prebuilt binary on darwin-arm64, darwin-x64, linux-x64, and linux-arm64; set COCKPIT_BIN to use a local build instead.
+- The Claude and Codex manifests, the OpenCode plugin, and the setup check now launch the cockpit through the shim, and setup pre-approves it in permissions.allow. A newer channel still supersedes an older running daemon, so existing sessions share the new one.
+
+### Changed
+- The cockpit binary cache now lives under q-lab/cockpit-bin, outside the cockpit home, so a legacy ~/.cockpit still migrates.
+
+### Removed
+- The TypeScript cockpit is deleted; the Rust binary replaces it, and the docs now point at it. usage-dashboard is unchanged and stays on Bun.
+
+### Fixed
+- Dashboard messages and permission relay no longer silently fail to reach a session: the channel refuses MCP server/discover so Claude Code falls back to protocol 2025-11-25, which keeps channel notifications working after Claude Code drops them on 2026-07-28.
+- Usage stats now count sessions per provider activity shape correctly and typecheck cleanly.
+
+## [dispatch 5.5.0] - 2026-09-30
+
+_tracks tag `dispatch-v5.5.0`_
+
+### Added
+- Autopilot parks a task at once when the dev or verifier reports a plan defect, instead of burning retry attempts on it.
+- The land step now runs on opus and resolves rebase conflicts itself, parking unresolvable ones as infrastructure; touching <planDir>/.flightlog/drain stops new dispatch while in-flight tasks finish and land.
+- resume-point suggests restarting from dev after a land that ended in a conflict, and the fleet view recognises the land role.
+- Task lint flags pgrep -f patterns that are not anchored to something the task controls, so a gate can no longer match live Claude sessions and become impossible to pass.
+- worktree gains a reset command that restores a recorded rebase, so a land retry starts clean rather than on top of a half-finished conflict resolution.
+
+### Changed
+- Autopilot worktree calls run on haiku.
+
+## [chronicle 0.21.1] - 2026-09-30
+
+_tracks tag `chronicle-v0.21.1`_
+
+### Removed
+- Code comments now point at the Rust cockpit sources that replaced the deleted TypeScript scripts.
+
+## [relay 0.9.1] - 2026-09-30
+
+_tracks tag `relay-v0.9.1`_
+
+### Added
+- Headless codex-run and opencode-run now follow your relay config (--model, then CODEX_MODEL/OPENCODE_MODEL, then models.<backend>.<mode>), so headless and live runs pick the same model; editing the config between waves can change the model mid-flight.
+
+### Removed
+- Code comments now point at the Rust cockpit sources that replaced the deleted TypeScript scripts.
+
 ## [dispatch 5.4.0] - 2026-09-30
 
 _tracks tag `dispatch-v5.4.0`_
