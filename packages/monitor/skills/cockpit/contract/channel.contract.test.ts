@@ -208,6 +208,17 @@ describe("channel: handshake", () => {
 });
 
 describe("channel: inbox", () => {
+  test("re-parks immediately after a message without charging the timeout floor", async () => withStub(async (client, stub) => {
+    await client.initialize();
+    await until(() => stub.requests.some((req) => req.path === "/api/inbox"));
+    const count = stub.requests.filter((req) => req.path === "/api/inbox").length;
+    const start = Date.now();
+    stub.push("/api/inbox", { message: "repark" });
+    await until(() => stub.requests.filter((req) => req.path === "/api/inbox").length > count);
+    expect(Date.now() - start).toBeLessThan(500);
+    expect((await client.nextNotification(PREFIX)).params?.content).toBe("repark");
+  }));
+
   test("delivers two messages in order with exact params", async () => withStub(async (client, stub) => {
     await client.initialize();
     // Mimic inbox.ts handleInbox delivered response.
@@ -227,6 +238,28 @@ describe("channel: inbox", () => {
 });
 
 describe("channel: permission", () => {
+  test("coerces partial requests, suppresses abandoned verdicts, and supersedes a parked pull", async () => withStub(async (client, stub) => {
+    await client.initialize();
+    client.notify(`${PREFIX}/permission_request`, { request_id: "old", tool_name: 7 });
+    await until(() => stub.requests.some((req) => req.path === "/api/permission-pull"));
+    expect(stub.requests.find((req) => req.path === "/api/permission-request")?.body).toEqual({ session: SESSION, token: TOKEN, request_id: "old", tool_name: "", description: "", input_preview: "" });
+    client.notify(`${PREFIX}/permission_request`, { request_id: "new" });
+    await until(() => stub.requests.filter((req) => req.path === "/api/permission-request").length === 2);
+    await until(() => stub.requests.filter((req) => req.path === "/api/permission-pull").length >= 2);
+    stub.push("/api/permission-pull", { abandoned: true });
+    await Bun.sleep(100);
+    expect(client.notifications.filter((msg) => msg.method === `${PREFIX}/permission`)).toEqual([]);
+    client.notify(`${PREFIX}/permission_request`, { request_id: "verbatim / id" });
+    await until(() => stub.requests.filter((req) => req.path === "/api/permission-request").length === 3);
+    await until(() => stub.requests.filter((req) => req.path === "/api/permission-pull").length >= 3);
+    stub.push("/api/permission-pull", { request_id: "verbatim / id", behavior: "deny" });
+    expect((await client.nextNotification(`${PREFIX}/permission`)).params).toEqual({ request_id: "verbatim / id", behavior: "deny" });
+    client.notify(`${PREFIX}/permission_cancel`, { request_id: false });
+    await until(() => stub.requests.some((req) => req.path === "/api/permission-resolved"));
+    expect(stub.requests.find((req) => req.path === "/api/permission-resolved")?.body).toEqual({ session: SESSION, token: TOKEN, request_id: "" });
+    stub.assertAuth();
+  }));
+
   test("relays request and verdict, all cancel spellings, and the undocumented fallback", async () => withStub(async (client, stub) => {
     await client.initialize();
     const params = { request_id: "request-1", tool_name: "Bash", description: "Run command", input_preview: "pwd" };

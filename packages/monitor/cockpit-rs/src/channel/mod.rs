@@ -12,11 +12,25 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+mod daemon;
+mod inbox;
+mod permission;
+mod session;
+
 type NotificationHandler = Box<dyn Fn(String, Option<Value>) + Send>;
 
 #[derive(Clone, Default)]
 struct ChannelServer {
     handler: Arc<Mutex<Option<NotificationHandler>>>,
+}
+
+impl ChannelServer {
+    fn on_notification(&mut self, f: impl Fn(String, Option<Value>) + Send + 'static) {
+        *self
+            .handler
+            .lock()
+            .expect("notification handler mutex is not poisoned") = Some(Box::new(f));
+    }
 }
 
 impl ServerHandler for ChannelServer {
@@ -48,13 +62,11 @@ impl ServerHandler for ChannelServer {
 }
 
 // Keep future channel callers independent of rmcp's notification types.
-#[allow(dead_code)]
+#[derive(Clone)]
 pub struct ChannelPeer {
     peer: Peer<RoleServer>,
-    handler: Arc<Mutex<Option<NotificationHandler>>>,
 }
 
-#[allow(dead_code)]
 impl ChannelPeer {
     pub async fn notify(&self, method: &str, params: Value) -> anyhow::Result<()> {
         self.peer
@@ -63,13 +75,6 @@ impl ChannelPeer {
             ))
             .await?;
         Ok(())
-    }
-
-    pub fn on_notification(&mut self, f: impl Fn(String, Option<Value>) + Send + 'static) {
-        *self
-            .handler
-            .lock()
-            .expect("notification handler mutex is not poisoned") = Some(Box::new(f));
     }
 }
 
@@ -89,10 +94,27 @@ pub fn run() -> ExitCode {
         let mut term = signal(SignalKind::terminate())?;
         let mut interrupt = signal(SignalKind::interrupt())?;
         let serve = async {
-            let service = match ChannelServer::default()
-                .serve(rmcp::transport::stdio())
-                .await
-            {
+            let session = session::resolve_session_id().await;
+            if session.is_none() {
+                eprintln!(
+                    "cockpit-channel: could not resolve a Claude session id; channel will stay idle"
+                );
+            }
+            if daemon::ensure_cockpit_daemon().await.is_none() {
+                eprintln!("cockpit-channel: cockpit daemon unavailable; retrying in loop");
+            }
+            // Reuse the installed TLS-free client instead of adding another HTTP stack.
+            let client = reqwest::Client::builder().no_proxy().http1_only().build()?;
+            let mut server = ChannelServer::default();
+            let (peer_tx, peer_rx) = tokio::sync::watch::channel(None);
+            if let Some(id) = &session {
+                permission::register(&mut server, id.clone(), client.clone(), peer_rx.clone());
+            }
+            let shutdown = AbortToken::default();
+            if let Some(id) = session {
+                tokio::spawn(inbox::run(id, client, peer_rx, shutdown.clone()));
+            }
+            let service = match server.serve(rmcp::transport::stdio()).await {
                 Ok(service) => service,
                 Err(
                     rmcp::service::ServerInitializeError::ConnectionClosed(_)
@@ -100,7 +122,13 @@ pub fn run() -> ExitCode {
                 ) => return Ok(()),
                 Err(error) => return Err(error.into()),
             };
-            service.waiting().await?;
+            let peer = ChannelPeer {
+                peer: service.peer().clone(),
+            };
+            peer_tx.send_replace(Some(peer.clone()));
+            let result = service.waiting().await;
+            shutdown.abort();
+            result?;
             anyhow::Ok(())
         };
         tokio::select! {
@@ -118,6 +146,50 @@ pub fn run() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+// Watch retains cancellation even when abort precedes the first waiter.
+#[derive(Clone)]
+pub(super) struct AbortToken(tokio::sync::watch::Sender<bool>);
+
+impl Default for AbortToken {
+    fn default() -> Self {
+        Self(tokio::sync::watch::channel(false).0)
+    }
+}
+
+impl AbortToken {
+    pub(super) fn abort(&self) {
+        self.0.send_replace(true);
+    }
+    pub(super) fn is_aborted(&self) -> bool {
+        *self.0.borrow()
+    }
+    pub(super) async fn cancelled(&self) {
+        let mut receiver = self.0.subscribe();
+        loop {
+            if *receiver.borrow_and_update() {
+                return;
+            }
+            if receiver.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+}
+
+pub(super) async fn sleep(ms: u64, token: &AbortToken) {
+    tokio::select! {
+        biased;
+        _ = token.cancelled() => {},
+        _ = tokio::time::sleep(std::time::Duration::from_millis(ms)) => {},
+    }
+}
+
+// UUID supplies jitter without installing a second random-number dependency.
+pub(super) fn jitter() -> f64 {
+    let bytes = uuid::Uuid::new_v4().into_bytes();
+    f64::from(u16::from_le_bytes([bytes[0], bytes[1]])) / 65536.0
 }
 
 #[cfg(test)]
@@ -143,9 +215,9 @@ mod tests {
             }}));
             write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.unwrap();
             let service = serving.await.unwrap();
-            let mut peer = ChannelPeer { peer: service.peer().clone(), handler };
+            let peer = ChannelPeer { peer: service.peer().clone() };
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-            peer.on_notification(move |method, params| { if method == "notifications/claude/channel/permission_request" { tx.send((method, params)).unwrap(); } });
+            ChannelServer { handler }.on_notification(move |method, params| { if method == "notifications/claude/channel/permission_request" { tx.send((method, params)).unwrap(); } });
             for (method, params) in [
                 ("notifications/claude/channel", json!({"content":"text","meta":{"source":"cockpit"}})),
                 ("notifications/claude/channel/permission", json!({"request_id":"id","behavior":"allow"})),

@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: channel/01, core/03, server/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -217,24 +217,24 @@ The printed number is KB, and must be ≤ 10240.
 
 ## Acceptance criteria
 
-- [ ] The `channel: inbox`, `channel: permission`, `channel: lifecycle` and `channel: spawn` contract groups pass against the Rust binary, and still pass against TS. `channel: spawn` runs the real Rust server that the channel spawns on the free port in `COCKPIT_SERVER_PORT`.
-- [ ] `should_supersede_daemon` implements the exact TS rule, and cargo tests cover all six supersede cases listed above.
-- [ ] `ensure_server` spawns `<current_exe> server --no-open` detached with null stdio and `COCKPIT_PLUGIN_ROOT` passed through, and only when the rule says so.
-- [ ] The session-id chain resolves in the order env → session file → ancestor argv → find-session (3 s retry), covered by cargo tests.
-- [ ] The inbox loop never awaits notification delivery inline, applies the 1000 ms floor plus jitter only to `{timeout:true}` hops, and backs off `min(1000·2^n, 30000)` ms on failure. It re-reads `daemon.json` or re-ensures the daemon after every failure.
-- [ ] The permission relay forwards requests, pulls verdicts within a 5 min budget, aborts a superseded pull, sends a verdict notification only for a real verdict, and forwards cancel-shaped notifications to `/api/permission-resolved`.
-- [ ] `cockpit channel` RSS is ≤ 10240 KB (macOS arm64, `ps -o rss=`) while idle with one inbox long-poll parked against the stub daemon above.
+- [x] The `channel: inbox`, `channel: permission`, `channel: lifecycle` and `channel: spawn` contract groups pass against the Rust binary, and still pass against TS. `channel: spawn` runs the real Rust server that the channel spawns on the free port in `COCKPIT_SERVER_PORT`.
+- [x] `should_supersede_daemon` implements the exact TS rule, and cargo tests cover all six supersede cases listed above.
+- [x] `ensure_server` spawns `<current_exe> server --no-open` detached with null stdio and `COCKPIT_PLUGIN_ROOT` passed through, and only when the rule says so.
+- [x] The session-id chain resolves in the order env → session file → ancestor argv → find-session (3 s retry), covered by cargo tests.
+- [x] The inbox loop never awaits notification delivery inline, applies the 1000 ms floor plus jitter only to `{timeout:true}` hops, and backs off `min(1000·2^n, 30000)` ms on failure. It re-reads `daemon.json` or re-ensures the daemon after every failure.
+- [x] The permission relay forwards requests, pulls verdicts within a 5 min budget, aborts a superseded pull, sends a verdict notification only for a real verdict, and forwards cancel-shaped notifications to `/api/permission-resolved`.
+- [x] `cockpit channel` RSS is ≤ 10240 KB (macOS arm64, `ps -o rss=`) while idle with one inbox long-poll parked against the stub daemon above.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: "`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: "` (TS still green)
-- [ ] Run the RSS snippet under "RSS measurement against a stub daemon" and confirm the printed value is ≤ 10240.
-- [ ] `head -1 packages/monitor/cockpit-rs/src/channel/mod.rs | grep -E '^// MCP transport: '` (the transport decision line is intact)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: "`
+- [x] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: "` (TS still green)
+- [x] Run the RSS snippet under "RSS measurement against a stub daemon" and confirm the printed value is ≤ 10240.
+- [x] `head -1 packages/monitor/cockpit-rs/src/channel/mod.rs | grep -E '^// MCP transport: '` (the transport decision line is intact)
 
 ## Eval rubric
 
