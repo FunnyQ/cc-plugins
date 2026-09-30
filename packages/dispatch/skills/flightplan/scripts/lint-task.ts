@@ -167,11 +167,7 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
 // `pgrep -f` reads every process on the machine, including other sessions'.
 const PGREP_REGEX = /\bpgrep\b([^`;|&\n]*)/g;
 
-/**
- * Checklist items running `pgrep -f` with a pattern the task does not control.
- * A pattern is anchored by a `/` or a flag token (`--port`), which only the
- * task's own process would carry. Returns first lines, in document order.
- */
+// A `/` or a flag token (`--port`) anchors the pattern: only the task's own process carries it.
 export function scopePgrepChecks(task: ParsedTask): string[] {
   const hits: string[] = [];
   for (const heading of GATE_SECTIONS) {
