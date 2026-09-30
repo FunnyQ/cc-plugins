@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 5.2.3] - 2026-09-30
+
+_tracks tag `monitor-v5.2.3`_
+
+### Removed
+- Cockpit no longer sends to OpenCode 2.x services, and the "run opencode upgrade" notice is gone from warnings, the send button, and the TUI toast; sends use the supported 1.x TUI bridge only.
+
 ## [dispatch 5.3.8] - 2026-09-30
 
 _tracks tag `dispatch-v5.3.8`_
