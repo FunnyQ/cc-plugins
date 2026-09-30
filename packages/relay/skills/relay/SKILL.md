@@ -77,16 +77,16 @@ Editing capability is identical: same CLI, model, and write access. So "more pre
 
 ---
 
-## Config check (before delegate or review)
+## Config check (opencode delegate or review)
 
-Run this before step 1 of `delegate` and before `review`.
+Run this before step 1 of `delegate` and before `review`, for the `opencode` backend only. The suggested config covers only opencode, so a codex or claude run skips this section.
 In a non-interactive context (a sub-agent or headless caller), skip the questions below and run relay with the config as it is.
 
-1. For the `opencode` backend, run `opencode --version` first. On `2.` or later, tell the user relay supports opencode 1.x only and suggest downgrading to 1.x. Stop.
+1. Run `opencode --version` first. On `2.` or later, tell the user relay supports opencode 1.x only and suggest downgrading to 1.x. Stop.
 2. Run `relay.ts config check`. It prints one JSON report and exits with a status code.
 3. On exit `4` (`malformed`), report `path` and `error` to the user. Stop. Do not offer an update or ask for a model.
 4. On exit `3` (`missing`, `no-version`, or `outdated`), show the user `suggested.models` beside their `models` and `version`.
-   - Ask with the harness's question tool. Offer: Merge (keep the chosen models, fill only the missing ones), Overwrite (replace with the suggested models), Skip this time.
+   - Ask with the harness's question tool. Offer: Merge (keep models the user chose, refresh the ones an earlier apply wrote, fill the missing ones), Overwrite (replace with the suggested models), Skip this time.
    - For `missing`, merge and overwrite write the same file, so offer only Apply and Skip this time.
    - Apply the answer with `relay.ts config apply --merge` or `relay.ts config apply --overwrite`.
    - Leave the file untouched on Skip this time. The question returns on the next run.

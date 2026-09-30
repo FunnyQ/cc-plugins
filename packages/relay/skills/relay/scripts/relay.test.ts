@@ -1268,7 +1268,38 @@ describe("relay config check / apply", () => {
         opencode: { delegate: "s/delegate", review: "u/r" },
         claude: { delegate: "opus" },
       },
+      applied: suggested.models,
     });
+  });
+
+  it("merge replaces a model apply wrote, and keeps one the user changed since", async () => {
+    const c = configDeps(
+      JSON.stringify({
+        version: 1780000000,
+        models: { opencode: { delegate: "old/delegate", review: "u/r" } },
+        applied: { opencode: { delegate: "old/delegate", review: "old/review" } },
+      }),
+    );
+
+    const result = await executeRelay(["config", "apply", "--merge"], c.deps);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
+      version: 1790740000,
+      models: { opencode: { delegate: "s/delegate", review: "u/r" } },
+      applied: suggested.models,
+    });
+  });
+
+  it("set-model leaves the applied record alone", async () => {
+    const applied = { opencode: { delegate: "s/delegate" } };
+    const c = configDeps(
+      JSON.stringify({ models: { opencode: { delegate: "s/delegate" } }, applied }),
+    );
+
+    await executeRelay(["config", "set-model", "opencode", "delegate", "u/d"], c.deps);
+
+    expect(JSON.parse(c.files.get(CONFIG_PATH)!).applied).toEqual(applied);
   });
 
   it("overwrite replaces the user config with the suggested version and models", async () => {
@@ -1282,6 +1313,7 @@ describe("relay config check / apply", () => {
     expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
       version: 1790740000,
       models: suggested.models,
+      applied: suggested.models,
     });
   });
 

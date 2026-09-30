@@ -146,7 +146,7 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 `relay.ts` pins no opencode model. Precedence is `--model` flag, then relay config, then opencode's own default (`-m` omitted). A `cli-default` value also omits `-m`. Format is `provider/model`. Relay passes no `--variant`, so the model runs at its default variant.
 
-The suggested models ship in `references/config.suggested.json` and reach the user's config only through `relay.ts config apply`. Its `version` is a unix timestamp in seconds. Set it to `date +%s` whenever its `models` or `suggestions` change, and only then. A user config whose `version` is not a number counts as having no version. `config check` compares that `version` with the user's, so an unchanged file never prompts anyone.
+The suggested models ship in `references/config.suggested.json` and reach the user's config only through `relay.ts config apply`. Its `version` is a unix timestamp in seconds. Set it to `date +%s` whenever its `models` or `suggestions` change, and only then. A user config whose `version` is not a number counts as having no version. Apply records the models it wrote under `applied`. Merge replaces an entry whose value still equals its `applied` value, and keeps any entry the user changed, so a withdrawn suggestion does not outlive a merge. `config check` compares that `version` with the user's, so an unchanged file never prompts anyone.
 
 ### Errors
 

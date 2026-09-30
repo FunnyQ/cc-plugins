@@ -296,7 +296,8 @@ function executeConfigCheck(deps: RelayDeps): RelayExecution {
   return report("current", { version: config.version, models });
 }
 
-// Merge keeps every choice the user made and fills only the missing entries.
+// `applied` records what apply wrote, so merge can tell a stale suggestion (value
+// unchanged since apply → replace) from a user's own choice (keep).
 function executeConfigApply(
   flags: string[],
   deps: RelayDeps,
@@ -313,7 +314,11 @@ function executeConfigApply(
   let next: Record<string, unknown>;
 
   if (how === "--overwrite") {
-    next = { version: suggested.version, models: suggestedModels };
+    next = {
+      version: suggested.version,
+      models: suggestedModels,
+      applied: suggestedModels,
+    };
   } else {
     let config: Record<string, unknown>;
     try {
@@ -323,14 +328,24 @@ function executeConfigApply(
       return { code: 1 };
     }
     const userModels = isObject(config.models) ? config.models : {};
+    const applied = isObject(config.applied) ? config.applied : {};
     const models: Record<string, unknown> = { ...userModels };
     for (const [backend, modes] of Object.entries(suggestedModels)) {
-      models[backend] = {
-        ...(isObject(modes) ? modes : {}),
-        ...(isObject(userModels[backend]) ? userModels[backend] : {}),
-      };
+      const userModes = isObject(userModels[backend]) ? userModels[backend] : {};
+      const appliedModes = isObject(applied[backend]) ? applied[backend] : {};
+      const chosen = Object.fromEntries(
+        Object.entries(userModes).filter(
+          ([mode, model]) => model !== appliedModes[mode],
+        ),
+      );
+      models[backend] = { ...(isObject(modes) ? modes : {}), ...chosen };
     }
-    next = { ...config, version: suggested.version, models };
+    next = {
+      ...config,
+      version: suggested.version,
+      models,
+      applied: suggestedModels,
+    };
   }
 
   writeConfig(next, deps);
