@@ -261,11 +261,11 @@ fn system_ms(time: SystemTime) -> i64 {
     }
 }
 
-fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     system_ms(SystemTime::now())
 }
 
-fn iso_timestamp(ms: i64) -> String {
+pub fn iso_timestamp(ms: i64) -> String {
     let seconds = ms.div_euclid(1000) as libc::time_t;
     // gmtime_r writes every calendar field into the supplied storage without shared state.
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };

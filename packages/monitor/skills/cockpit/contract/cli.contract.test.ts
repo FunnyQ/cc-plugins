@@ -81,6 +81,8 @@ describe("cli: trail", () => {
     success(["log", "--session", sid, "--decision", "Use files", "--reason", "Portable", "--tradeoff", "IO", "--facet", "RISK: latency", "--file", "a.ts", "--option", "SQLite"], `cockpit: logged decision for ${sid}\n`);
     const [record] = readJsonl(trail());
     expect(record).toEqual({ id: expect.any(String), type: "decision", kind: "decision", source: "agent", decision: "Use files", reason: "Portable", tradeoff: "IO", facets: [{ label: "RISK", text: "latency" }], needs_your_call: false, options: ["SQLite"], files: ["a.ts"], timestamp: expect.any(String) });
+    expect(Object.keys(record)).toEqual(["id", "type", "kind", "source", "decision", "reason", "tradeoff", "facets", "needs_your_call", "options", "files", "timestamp"]);
+    expect(readFileSync(registry(), "utf8")).toBe(JSON.stringify(json(registry()), null, 2));
     expect(record.id).toMatch(/^[0-9a-f-]{36}$/); expect(new Date(record.timestamp).toISOString()).toBe(record.timestamp);
     const entry = json(registry()).sessions[0];
     expect(entry).toEqual({ provider: "claude", project: f.projectDir, sessionId: sid, logPath: trail(), lastHeartbeat: expect.any(String) });
@@ -97,6 +99,34 @@ describe("cli: trail", () => {
     // pins TS quirk: prep does not print the seeded trail.
     success(["prep", "--session", sid], `Session id:\n${sid}\n\nDecision-log language:\nEnglish\n`);
   });
+  test("recent lists scribe records in timestamp order and prep includes git context", () => {
+    success(["scribe", "--session", f.claudeSessionId, "--recent"], `(no decision log yet — looked in: ${trail()})\n`);
+    seed();
+    success(["scribe", "--session", f.claudeSessionId, "--recent"], "(no scribe entries yet)\n");
+    const entries = Array.from({ length: 10 }, (_, i) => ({ id: `entry-${i}`, type: "decision", source: "scribe", kind: "learning", decision: `Lesson ${i}`, timestamp: `2026-09-30T00:00:${String(i).padStart(2, "0")}.000Z` }));
+    writeFileSync(trail(), entries.toReversed().map(r => JSON.stringify(r)).join("\n") + "\nnot json\n");
+    const listing = (n: number) => entries.slice(-n).map(r => `learning · ${r.decision} · ${r.timestamp}\n`).join("");
+    success(["scribe", "--recent", "--session", f.claudeSessionId], listing(8));
+    success(["scribe", "--recent", "2", "--session", f.claudeSessionId], listing(2));
+    const gitBlocks = [["git diff", ["diff"]], ["git diff --staged", ["diff", "--staged"]], ["git log --oneline -5", ["log", "--oneline", "-5"]]].map(([label, args]) => {
+      const result = Bun.spawnSync(["git", ...(args as string[])], { cwd: f.projectDir, env, stdout: "pipe", stderr: "pipe" });
+      const out = result.stdout.toString(); const err = result.stderr.toString();
+      return `$ ${label}\n${result.exitCode === 0 ? out.trimEnd() || "(no output)" : `(not available: ${(err || out || `exit ${result.exitCode}`).trim()})`}`;
+    }).join("\n\n");
+    success(["scribe", "--prep", "--session", f.claudeSessionId], `Decision-log language:\nEnglish\n\nRecent scribe entries:\n${listing(8)}\nGit change context:\n${gitBlocks}\n`);
+  });
+  test("unknown flags and scribe validation report exact errors without writing", () => {
+    expect(cli(["log", "--surprise"])).toEqual({ exitCode: 1, stdout: "", stderr: `cockpit: unknown flag "--surprise"\n${usage}` });
+    for (const [args, message] of [
+      [[], "--type <kind> is required (or use --recent to list recent entries)"],
+      [["--type", "other"], 'invalid --type "other" — must be one of: decision, rationale, learning, caveat'],
+      [["--type", "learning"], "--text <body> is required"],
+    ] as [string[], string][]) {
+      expect(cli(["scribe", ...args])).toEqual({ exitCode: 1, stdout: "", stderr: `cockpit scribe: ${message}\n` });
+    }
+    expect(existsSync(trail())).toBe(false); expect(existsSync(registry())).toBe(false);
+    success(["--help"], usage); success(["scribe", "--type", "learning", "-h"], usage);
+  });
   test("diagram lint preserves valid source and rejects malformed source without writing", () => {
     const args = ["log", "--session", f.claudeSessionId, "--decision", "Diagram", "--reason", "Show flow", "--diagram"];
     success([...args, "flowchart LR\n  A-->B"], `cockpit: logged decision for ${f.claudeSessionId}\n`);
@@ -106,6 +136,10 @@ describe("cli: trail", () => {
     expect(result.exitCode).toBe(1); expect(result.stdout).toBe("");
     expect(result.stderr).toStartWith("cockpit log: --diagram failed lint — fix the Mermaid source and re-run:\n");
     expect(result.stderr).toContain("\n  - "); expect(readFileSync(trail(), "utf8")).toBe(before);
+    const scribeResult = cli(["scribe", "--session", f.claudeSessionId, "--type", "learning", "--text", "Body", "--diagram", "flowchart LR\n  A-->"]);
+    expect(scribeResult.exitCode).toBe(1); expect(scribeResult.stdout).toBe("");
+    expect(scribeResult.stderr).toStartWith("cockpit scribe: --diagram failed lint — fix the Mermaid source and re-run:\n");
+    expect(readFileSync(trail(), "utf8")).toBe(before);
   });
   test("help and unknown subcommand do not write", () => {
     success(["log", "--help"], usage); expect(existsSync(trail())).toBe(false); expect(existsSync(registry())).toBe(false);
@@ -125,6 +159,13 @@ describe("cli: config", () => {
     }
     expect(readFileSync(config(), "utf8")).toBe(JSON.stringify(json(config()), null, 2) + "\n");
   });
+  test("config and nudge errors retain exact diagnostics", () => {
+    expect(cli(["config", "--answer-here", "maybe"])).toEqual({ exitCode: 1, stdout: "", stderr: "cockpit config: --answer-here takes on | off\n" });
+    expect(cli(["config"])).toEqual({ exitCode: 1, stdout: "", stderr: "usage: cockpit config --log-language <lang> | get-language | --answer-here on|off | get-answer-here\n" });
+    const nudgeUsage = "usage: cockpit nudge <on|off|toggle|clear|status> [--scope session|project|user]\n";
+    expect(cli(["nudge", "--scope", "invalid"])).toEqual({ exitCode: 1, stdout: "", stderr: `cockpit nudge: invalid scope "invalid"\n${nudgeUsage}` });
+    expect(cli(["nudge", "INVALID"])).toEqual({ exitCode: 1, stdout: "", stderr: `cockpit nudge: unknown action "invalid"\n${nudgeUsage}` });
+  });
   test("nudge actions, persistence and session > project > user precedence", () => {
     env.CLAUDE_CODE_SESSION_ID = f.claudeSessionId;
     const states: Record<string, string> = { session: "default", project: "default", user: "default" };
@@ -136,6 +177,8 @@ describe("cli: config", () => {
     nudge("status", "session", "default"); nudge("off", "user", "OFF"); nudge("on", "project", "ON"); nudge("off", "session", "OFF");
     expect(json(config()).nudges).toEqual({ user: "off", projects: { [f.projectDir]: "on" } });
     const store = json(join(h.cockpitHome, "scribe-nudge-toggle.json"));
+    expect(readFileSync(join(h.cockpitHome, "scribe-nudge-toggle.json"), "utf8")).toBe(JSON.stringify(store));
+    expect(readFileSync(config(), "utf8")).toBe(JSON.stringify(json(config()), null, 2) + "\n");
     expect(store).toEqual({ [f.claudeSessionId]: { state: "off", ts: expect.any(Number) } });
     for (const scope of ["session", "project", "user"]) {
       nudge("status", scope, states[scope]); nudge("toggle", scope, states[scope] === "OFF" ? "ON" : "OFF");
@@ -151,6 +194,9 @@ describe("cli: find-session", () => {
     for (const [provider, sid] of [["claude", f.claudeSessionId], ["codex", f.codexThreadId], ["opencode", f.opencodeSessionId]]) success(["find-session", "--provider", provider, f.projectDir], `${sid}\n`);
     const missing = join(h.root, "empty"); mkdirSync(missing);
     expect(cli(["find-session", "--provider", "claude", missing])).toEqual({ exitCode: 1, stdout: "", stderr: `find-session: no transcript dir for ${missing}\n  (looked in ${join(f.claudeProjectsDir, missing.replace(/[/.]/g, "-"))})\n` });
+    for (const [provider, message] of [["codex", `no Codex thread for ${missing}`], ["opencode", `no OpenCode session for ${missing}`]]) {
+      expect(cli(["find-session", "--provider", provider, missing])).toEqual({ exitCode: 1, stdout: "", stderr: `find-session: ${message}\n` });
+    }
     expect(cli(["find-session", "--provider", "x", f.projectDir])).toEqual({ exitCode: 1, stdout: "", stderr: 'find-session: invalid provider "x"\n' });
   });
 });

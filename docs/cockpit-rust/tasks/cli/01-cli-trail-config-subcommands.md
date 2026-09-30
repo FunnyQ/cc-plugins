@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/03, contract/04
 > **Blocks**: cli/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -204,24 +204,24 @@ Lookup is the crate's `find_session` module: `pub fn find_session(provider: Prov
 
 ## Acceptance criteria
 
-- [ ] Against Rust, the `cli: trail` group passes: `log`, the `scribe` write / `--recent` / `--prep` modes, `prep`, `--help`, the unknown-flag error, and a failing `--diagram` exiting 1 with nothing written.
-- [ ] Against Rust, the `cli: config` group passes: every `config` form and every `nudge` action/scope, byte-identical writes to `config.json` and `scribe-nudge-toggle.json`.
-- [ ] Against Rust, the `cli: find-session` group passes for claude, codex, and opencode fixtures, including the not-found stderr lines and exit 1.
-- [ ] A record written by Rust `log` parses back with the TS key order, and `registry.json` has no trailing newline.
-- [ ] `bun packages/monitor/skills/cockpit/scripts/diagram-lint.ts <<< 'flowchart TD'` prints a JSON array and exits 0, and existing TS importers of `lintDiagram` are unaffected.
-- [ ] `cargo test` covers the pure pieces: the facet split, the argv parser (`--recent` numeric lookahead, unknown flag), `nudge` argv parsing (invalid scope, unknown action), and the 14-day registry reap.
+- [x] Against Rust, the `cli: trail` group passes: `log`, the `scribe` write / `--recent` / `--prep` modes, `prep`, `--help`, the unknown-flag error, and a failing `--diagram` exiting 1 with nothing written.
+- [x] Against Rust, the `cli: config` group passes: every `config` form and every `nudge` action/scope, byte-identical writes to `config.json` and `scribe-nudge-toggle.json`.
+- [x] Against Rust, the `cli: find-session` group passes for claude, codex, and opencode fixtures, including the not-found stderr lines and exit 1.
+- [x] A record written by Rust `log` parses back with the TS key order, and `registry.json` has no trailing newline.
+- [x] `bun packages/monitor/skills/cockpit/scripts/diagram-lint.ts <<< 'flowchart TD'` prints a JSON array and exits 0, and existing TS importers of `lintDiagram` are unaffected.
+- [x] `cargo test` covers the pure pieces: the facet split, the argv parser (`--recent` numeric lookahead, unknown flag), `nudge` argv parsing (invalid scope, unknown action), and the 14-day registry reap.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: trail"`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: config"`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: find-session"`
-- [ ] The same three groups, run without `COCKPIT_BIN` (against TS), still pass.
-- [ ] `bunx --bun tsc --noEmit | grep diagram-lint` prints nothing.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: trail"`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: config"`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: find-session"`
+- [x] The same three groups, run without `COCKPIT_BIN` (against TS), still pass.
+- [x] `bunx --bun tsc --noEmit | grep diagram-lint` prints nothing.
 
 ## Eval rubric
 

@@ -273,3 +273,10 @@ export async function lintDiagram(src: string): Promise<string[]> {
 
   return problems;
 }
+
+// CLI entry for the Rust `cockpit log|scribe --diagram` gate: source on stdin,
+// problems as a JSON array on stdout.
+if (import.meta.main) {
+  const problems = await lintDiagram(await Bun.stdin.text());
+  process.stdout.write(JSON.stringify(problems) + "\n");
+}
