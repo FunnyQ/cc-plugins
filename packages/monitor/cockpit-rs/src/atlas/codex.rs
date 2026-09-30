@@ -2,15 +2,17 @@
 use super::dedup::walk_files;
 use super::jsonl::read_jsonl_lines;
 use super::model::{
-    Ctx, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage, UsageLimitWindow,
-    UsageLimits, add_hourly_usage, add_model_usage, add_nested_model_usage,
-    build_usage_limit_window, coerce_number, display_path, empty_model_usage, fmt_date, model_key,
-    model_usage_total, now_ms, project_name,
+    Ctx, FIVE_HOUR_MS, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage,
+    RATE_LIMITS_STALE_AFTER_MS, SEVEN_DAY_MS, UsageLimitWindow, UsageLimits, add_hourly_usage,
+    add_model_usage, add_nested_model_usage, build_usage_limit_window, coerce_number, display_path,
+    empty_model_usage, fmt_date, iso_ms, js_date_parse, ledger_project_name, model_key,
+    model_usage_total, now_ms,
 };
 use super::paths;
 use super::rollup_db::open_sqlite_file;
+use crate::server::opencode::js_truthy;
 use indexmap::{IndexMap, IndexSet};
-use jiff::{Timestamp, civil, tz::TimeZone};
+use jiff::{Timestamp, tz::TimeZone};
 use rusqlite::{Connection, OpenFlags, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -21,9 +23,6 @@ use std::time::Duration;
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/codex/usage";
 const CODEX_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 const CODEX_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
-const RATE_LIMITS_STALE_AFTER_MS: f64 = 5.0 * 60.0 * 1000.0;
-const FIVE_HOUR_MS: i64 = 5 * 60 * 60 * 1000;
-const SEVEN_DAY_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 // Anything longer than a day is a weekly Codex window; see build_codex_usage_limits.
 const CODEX_WEEKLY_MIN_MS: i64 = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(4);
@@ -106,17 +105,6 @@ struct CodexSessionSummary {
     tool_calls: i64,
 }
 
-// Private copy of model.rs's js_truthy, which that module keeps private.
-fn truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
-        Value::String(s) => !s.is_empty(),
-        _ => true,
-    }
-}
-
 fn json_i64(value: &Value) -> Option<i64> {
     value.as_i64().or_else(|| value.as_f64().map(|n| n as i64))
 }
@@ -131,29 +119,6 @@ fn token_usage_from(value: &Value) -> CodexTokenUsage {
         reasoning_output_tokens: field("reasoning_output_tokens"),
         total_tokens: field("total_tokens"),
     }
-}
-
-// JS Date.parse for the ISO forms Codex and this dashboard write; other formats read as NaN.
-fn js_date_parse(text: &str) -> Option<i64> {
-    let text = text.trim();
-    if let Ok(ts) = text.parse::<Timestamp>() {
-        return Some(ts.as_millisecond());
-    }
-    // A date-only form is UTC in JS; a date-time without an offset is local.
-    if !text.contains(['T', 't', ' ']) {
-        let date = text.parse::<civil::Date>().ok()?;
-        return TimeZone::UTC
-            .to_ambiguous_timestamp(date.to_datetime(civil::Time::midnight()))
-            .compatible()
-            .ok()
-            .map(|ts| ts.as_millisecond());
-    }
-    let datetime = text.parse::<civil::DateTime>().ok()?;
-    TimeZone::system()
-        .to_ambiguous_timestamp(datetime)
-        .compatible()
-        .ok()
-        .map(|ts| ts.as_millisecond())
 }
 
 fn read_codex_session(file: &Path) -> Option<CodexSessionSummary> {
@@ -222,7 +187,7 @@ fn read_codex_session(file: &Path) -> Option<CodexSessionSummary> {
                     let total = payload
                         .and_then(|payload| payload.get("info"))
                         .and_then(|info| info.get("total_token_usage"))
-                        .filter(|total| truthy(total));
+                        .filter(|total| js_truthy(total));
                     if let Some(total) = total {
                         let usage = token_usage_from(total);
                         let event_ms = entry_timestamp.map_or(Some(0), js_date_parse);
@@ -460,14 +425,6 @@ fn local_day_hour(ms: i64) -> Option<(usize, usize)> {
         zoned.weekday().to_sunday_zero_offset() as usize,
         zoned.hour() as usize,
     ))
-}
-
-fn ledger_project_name(cwd: &str) -> String {
-    if cwd.is_empty() {
-        "n/a".to_owned()
-    } else {
-        project_name(cwd)
-    }
 }
 
 pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
@@ -751,12 +708,6 @@ fn read_json_with_error(path: &Path) -> JsonRead {
     }
 }
 
-fn iso_ms(ms: i64) -> Option<String> {
-    Timestamp::from_millisecond(ms)
-        .ok()
-        .map(|ts| ts.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
-}
-
 fn codex_usage_base(error: Option<String>) -> UsageLimits {
     UsageLimits {
         source: "codex-api".to_owned(),
@@ -781,7 +732,7 @@ fn build_codex_usage_limits(
     let bucket = |name: &str| {
         rate_limit
             .and_then(|limits| limits.get(name))
-            .filter(|bucket| truthy(bucket))
+            .filter(|bucket| js_truthy(bucket))
     };
     let primary = bucket("primary_window");
     let secondary = bucket("secondary_window");
@@ -915,7 +866,7 @@ async fn fetch_codex_usage(usage_url: &str, token_url: &str) -> Result<Value, St
     let auth = match read_json_with_error(&paths::codex_auth()) {
         JsonRead::Missing => return Err("missing-auth".to_owned()),
         JsonRead::Error(error) => return Err(error),
-        JsonRead::Data(auth) if !truthy(&auth) => return Err("unreadable-auth".to_owned()),
+        JsonRead::Data(auth) if !js_truthy(&auth) => return Err("unreadable-auth".to_owned()),
         JsonRead::Data(auth) => auth,
     };
     let tokens = auth.get("tokens");
@@ -947,7 +898,7 @@ fn read_codex_usage_cache() -> UsageLimits {
     let cache = match read_json_with_error(&paths::codex_usage_cache()) {
         JsonRead::Missing => return codex_usage_base(Some("missing".to_owned())),
         JsonRead::Error(error) => return codex_usage_base(Some(error)),
-        JsonRead::Data(cache) if !truthy(&cache) => {
+        JsonRead::Data(cache) if !js_truthy(&cache) => {
             return codex_usage_base(Some("unreadable".to_owned()));
         }
         JsonRead::Data(cache) => cache,
@@ -957,7 +908,7 @@ fn read_codex_usage_cache() -> UsageLimits {
     let captured_at_ms = match cache.get("capturedAtEpochMs").filter(|ms| !ms.is_null()) {
         Some(ms) => ms.as_f64().unwrap_or(f64::NAN),
         None => captured_at
-            .filter(|at| truthy(at))
+            .filter(|at| js_truthy(at))
             .and_then(Value::as_str)
             .and_then(js_date_parse)
             .map_or(f64::NAN, |ms| ms as f64),

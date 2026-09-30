@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { atlasCommand, DEFAULT_BIN, isRust, type AtlasSub } from "./launcher";
+import { atlasCommand, DEFAULT_BIN, type AtlasSub } from "./launcher";
 
 const SUBS: AtlasSub[] = ["serve", "stats", "live", "rollup-update", "statusline", "push-usage"];
 const MISSING =
@@ -18,10 +18,6 @@ afterEach(() => {
 });
 
 describe("atlas launcher", () => {
-  test("isRust is always true", () => {
-    expect(isRust()).toBe(true);
-  });
-
   test("set COCKPIT_BIN maps each subcommand to `<bin> atlas <sub>`", () => {
     process.env.COCKPIT_BIN = "/opt/cockpit";
     for (const sub of SUBS) {

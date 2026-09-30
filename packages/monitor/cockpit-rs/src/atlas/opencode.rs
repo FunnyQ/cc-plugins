@@ -2,8 +2,8 @@
 use super::dedup::walk_files;
 use super::model::{
     Ctx, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage, add_hourly_usage,
-    add_model_usage, add_nested_model_usage, empty_model_usage, fmt_date, model_key,
-    model_usage_total, project_name,
+    add_model_usage, add_nested_model_usage, empty_model_usage, fmt_date, ledger_project_name,
+    model_key, model_usage_total, project_name,
 };
 use super::paths;
 use indexmap::IndexMap;
@@ -93,7 +93,7 @@ fn count_open_code_tool_calls(parts: Option<&Value>) -> i64 {
     })
 }
 
-fn open_code_storage_roots() -> Vec<PathBuf> {
+pub(super) fn open_code_storage_roots() -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     let storage = paths::opencode_storage_dir();
     if storage.exists() {
@@ -183,11 +183,7 @@ impl Ingest {
                     timestamp_ms,
                     date: fmt_date(timestamp_ms),
                     project_path: cwd.clone(),
-                    project_name: if cwd.is_empty() {
-                        "n/a".to_owned()
-                    } else {
-                        project_name(&cwd)
-                    },
+                    project_name: ledger_project_name(&cwd),
                     model: "n/a".to_owned(),
                     interactions: 0,
                     tool_calls: 0,

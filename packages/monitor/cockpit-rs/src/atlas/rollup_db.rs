@@ -1,7 +1,5 @@
 // Port of rollup-db.ts: the rollup outlives transcript deletion, so every write here guards
 // history that nothing else can rebuild.
-// Only tests call the accessors until the ingest port lands; its first caller removes this allow.
-#![allow(dead_code)]
 
 use anyhow::{Context, anyhow};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
@@ -125,6 +123,13 @@ pub fn open_sqlite_file(path: &Path) -> anyhow::Result<Connection> {
 
 pub fn open_rollup_db(path: &Path) -> anyhow::Result<Connection> {
     let mut conn = open_sqlite_file(path)?;
+    // Already v3 and Rust-written, so both backups and the migration are no-ops: skip the write
+    // transaction every stats build and nudged ingest would otherwise take.
+    if get_meta(&conn, "schema_version").ok().flatten() == Some(SCHEMA_VERSION.to_string())
+        && get_meta(&conn, "writer").ok().flatten().as_deref() == Some("rust")
+    {
+        return Ok(conn);
+    }
     let in_memory = path == Path::new(":memory:");
     // First, so the snapshot is the file exactly as the TS last left it, before its own
     // upgrade backup or cursor rewind below changes anything.
@@ -155,8 +160,17 @@ fn backup_before_rust(conn: &Connection, path: &Path) -> anyhow::Result<()> {
     if writer.as_deref() == Some("rust") || dest.exists() {
         return Ok(());
     }
-    // A partial file left by a failed write is not removed: a concurrent opener may own it.
-    vacuum_into(conn, &dest).map_err(|cause| anyhow!("pre-rust backup failed: {cause}"))
+    // Written to a per-process temp name and linked into place, so a crash mid-VACUUM can never
+    // leave a partial file under the name every later open trusts, and a concurrent opener's
+    // finished backup is never replaced.
+    let tmp = sibling(path, &format!(".pre-rust.bak.tmp-{}", std::process::id()));
+    let _ = std::fs::remove_file(&tmp);
+    let published = vacuum_into(conn, &tmp).and_then(|()| match std::fs::hard_link(&tmp, &dest) {
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && dest.exists() => Ok(()),
+        other => Ok(other?),
+    });
+    let _ = std::fs::remove_file(&tmp);
+    published.map_err(|cause| anyhow!("pre-rust backup failed: {cause}"))
 }
 
 // One snapshot per source version, taken before the version check as the TS does, so even a
@@ -247,18 +261,15 @@ pub(crate) fn get_ingested_file(
     conn: &Connection,
     path: &str,
 ) -> rusqlite::Result<Option<IngestedFile>> {
-    conn.query_row(
-        "SELECT path, bytes_parsed, mtime_ms FROM ingested_files WHERE path = ?",
-        [path],
-        |row| {
+    conn.prepare_cached("SELECT path, bytes_parsed, mtime_ms FROM ingested_files WHERE path = ?")?
+        .query_row([path], |row| {
             Ok(IngestedFile {
                 path: row.get(0)?,
                 bytes_parsed: row.get(1)?,
                 mtime_ms: row.get(2)?,
             })
-        },
-    )
-    .optional()
+        })
+        .optional()
 }
 
 pub(crate) fn upsert_ingested_file(
@@ -266,33 +277,33 @@ pub(crate) fn upsert_ingested_file(
     file: &IngestedFile,
     updated_at: i64,
 ) -> rusqlite::Result<()> {
-    conn.execute(
+    conn.prepare_cached(
         "INSERT INTO ingested_files (path, bytes_parsed, mtime_ms, updated_at)
      VALUES (?, ?, ?, ?)
      ON CONFLICT(path) DO UPDATE SET
        bytes_parsed = excluded.bytes_parsed,
        mtime_ms = excluded.mtime_ms,
        updated_at = excluded.updated_at",
-        params![file.path, file.bytes_parsed, file.mtime_ms, updated_at],
-    )?;
+    )?
+    .execute(params![
+        file.path,
+        file.bytes_parsed,
+        file.mtime_ms,
+        updated_at
+    ])?;
     Ok(())
 }
 
 pub(crate) fn has_seen_request(conn: &Connection, key: &str) -> rusqlite::Result<bool> {
-    conn.query_row(
-        "SELECT 1 FROM seen_requests WHERE request_key = ?",
-        [key],
-        |_| Ok(()),
-    )
-    .optional()
-    .map(|row| row.is_some())
+    conn.prepare_cached("SELECT 1 FROM seen_requests WHERE request_key = ?")?
+        .query_row([key], |_| Ok(()))
+        .optional()
+        .map(|row| row.is_some())
 }
 
 pub(crate) fn mark_seen_request(conn: &Connection, key: &str, path: &str) -> rusqlite::Result<()> {
-    conn.execute(
-        "INSERT OR IGNORE INTO seen_requests (request_key, path) VALUES (?, ?)",
-        [key, path],
-    )?;
+    conn.prepare_cached("INSERT OR IGNORE INTO seen_requests (request_key, path) VALUES (?, ?)")?
+        .execute([key, path])?;
     Ok(())
 }
 
@@ -309,13 +320,10 @@ pub(crate) fn has_seen_tool_call(
     session_key: &str,
     key: &str,
 ) -> rusqlite::Result<bool> {
-    conn.query_row(
-        "SELECT 1 FROM seen_tool_calls WHERE session_key = ? AND tool_key = ?",
-        [session_key, key],
-        |_| Ok(()),
-    )
-    .optional()
-    .map(|row| row.is_some())
+    conn.prepare_cached("SELECT 1 FROM seen_tool_calls WHERE session_key = ? AND tool_key = ?")?
+        .query_row([session_key, key], |_| Ok(()))
+        .optional()
+        .map(|row| row.is_some())
 }
 
 pub(crate) fn mark_seen_tool_call(
@@ -323,10 +331,10 @@ pub(crate) fn mark_seen_tool_call(
     session_key: &str,
     key: &str,
 ) -> rusqlite::Result<()> {
-    conn.execute(
+    conn.prepare_cached(
         "INSERT OR IGNORE INTO seen_tool_calls (session_key, tool_key) VALUES (?, ?)",
-        [session_key, key],
-    )?;
+    )?
+    .execute([session_key, key])?;
     Ok(())
 }
 
@@ -339,7 +347,7 @@ pub(crate) fn prune_seen_tool_calls(conn: &Connection) -> rusqlite::Result<()> {
 
 // Additive, never an overwrite: each run adds its newly parsed bytes onto the bucket.
 pub(crate) fn add_hourly_row(conn: &Connection, row: &HourlyRow) -> rusqlite::Result<()> {
-    conn.execute(
+    conn.prepare_cached(
         "INSERT INTO usage_hourly
        (hour_ms, project, model, input_tokens, output_tokens, cache_read, cache_creation, reasoning, message_count)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -350,7 +358,8 @@ pub(crate) fn add_hourly_row(conn: &Connection, row: &HourlyRow) -> rusqlite::Re
        cache_creation = cache_creation + excluded.cache_creation,
        reasoning      = reasoning      + excluded.reasoning,
        message_count  = message_count  + excluded.message_count",
-        params![
+    )?
+    .execute(params![
             row.hour_ms,
             row.project,
             row.model,
@@ -360,8 +369,7 @@ pub(crate) fn add_hourly_row(conn: &Connection, row: &HourlyRow) -> rusqlite::Re
             row.cache_creation,
             row.reasoning,
             row.message_count,
-        ],
-    )?;
+        ])?;
     Ok(())
 }
 
@@ -408,7 +416,7 @@ pub(crate) fn clear_ledger_for_file(conn: &Connection, path: &str) -> rusqlite::
 }
 
 pub(crate) fn add_ledger_row(conn: &Connection, row: &LedgerFileRow) -> rusqlite::Result<()> {
-    conn.execute(
+    conn.prepare_cached(
         "INSERT INTO session_ledger
        (path, session_key, project, project_ts_ms, last_ts_ms, interactions, tool_calls)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -426,7 +434,8 @@ pub(crate) fn add_ledger_row(conn: &Connection, row: &LedgerFileRow) -> rusqlite
        last_ts_ms   = MAX(last_ts_ms, excluded.last_ts_ms),
        interactions = interactions + excluded.interactions,
        tool_calls   = tool_calls   + excluded.tool_calls",
-        params![
+    )?
+    .execute(params![
             row.path,
             row.session_key,
             row.project,
@@ -434,8 +443,7 @@ pub(crate) fn add_ledger_row(conn: &Connection, row: &LedgerFileRow) -> rusqlite
             row.last_ts_ms,
             row.interactions,
             row.tool_calls,
-        ],
-    )?;
+        ])?;
     Ok(())
 }
 
@@ -443,7 +451,7 @@ pub(crate) fn add_ledger_model_row(
     conn: &Connection,
     row: &LedgerModelRow,
 ) -> rusqlite::Result<()> {
-    conn.execute(
+    conn.prepare_cached(
         "INSERT INTO session_model_usage
        (path, session_key, model, input_tokens, output_tokens, cache_read, cache_creation)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -452,16 +460,16 @@ pub(crate) fn add_ledger_model_row(
        output_tokens  = output_tokens  + excluded.output_tokens,
        cache_read     = cache_read     + excluded.cache_read,
        cache_creation = cache_creation + excluded.cache_creation",
-        params![
-            row.path,
-            row.session_key,
-            row.model,
-            row.input_tokens,
-            row.output_tokens,
-            row.cache_read,
-            row.cache_creation,
-        ],
-    )?;
+    )?
+    .execute(params![
+        row.path,
+        row.session_key,
+        row.model,
+        row.input_tokens,
+        row.output_tokens,
+        row.cache_read,
+        row.cache_creation,
+    ])?;
     Ok(())
 }
 
@@ -636,6 +644,12 @@ mod tests {
         assert_eq!(without_writer(dump(&path)), before);
         assert_eq!(meta(&path, "writer").as_deref(), Some("rust"));
         assert!(!sibling(&path, ".v3.bak").exists());
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".tmp-"))
+            .collect();
+        assert!(names.is_empty(), "temp backup left behind: {names:?}");
     }
 
     #[test]

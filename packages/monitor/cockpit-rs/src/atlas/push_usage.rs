@@ -1,5 +1,5 @@
 use std::process::ExitCode;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use serde_json::json;
 
@@ -33,10 +33,7 @@ async fn push(ctx: &Ctx, url: &str) {
     let claude = claude::read_usage_limits(ctx);
     let codex = codex::read_codex_usage_limits(ctx).await;
     // Real clock: push-usage.ts stamps Date.now(), not the TOKEN_ATLAS_NOW_MS seam.
-    let captured_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0);
+    let captured_at = jiff::Timestamp::now().as_millisecond();
     let payload = json!({ "capturedAt": captured_at, "claude": claude, "codex": codex });
     let Ok(body) = serde_json::to_string(&payload) else {
         return;

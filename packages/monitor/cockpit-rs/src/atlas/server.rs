@@ -4,13 +4,12 @@ use super::{live, pricing, stats};
 use crate::server::{json_error, json_response, static_files};
 use crate::{paths, process_alive};
 use axum::Router;
+use axum::body::Bytes;
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use flate2::{Compression, write::GzEncoder};
 use serde_json::{Number, Value, json};
 use std::future::Future;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::sync::{Arc, Mutex};
@@ -21,19 +20,11 @@ const DEFAULT_PORT: u16 = 5938;
 
 // ---------- argv ----------
 
-// JavaScript parseInt: optional leading whitespace and sign, then the leading digits.
-fn parse_port_value(value: &str) -> Option<u16> {
-    let value = value.trim_start();
-    let digits = value.strip_prefix('+').unwrap_or(value);
-    let end = digits.bytes().take_while(u8::is_ascii_digit).count();
-    digits[..end].parse::<u16>().ok().filter(|port| *port > 0)
-}
-
 fn parse_port(args: &[String]) -> u16 {
     args.iter()
         .position(|arg| arg == "--port")
         .and_then(|index| args.get(index + 1))
-        .and_then(|value| parse_port_value(value))
+        .and_then(|value| crate::server::parse_port(value))
         .unwrap_or(DEFAULT_PORT)
 }
 
@@ -114,16 +105,36 @@ fn decide_startup(
     }
 }
 
+// The encoded bodies, not the payload's Value tree: the tree is several times the JSON's size and
+// would otherwise live for the whole process, and each 200 would re-serialize and re-gzip it.
+struct StatsBody {
+    json: Bytes,
+    gzip: Bytes,
+    models: Vec<String>,
+}
+
+impl StatsBody {
+    fn encode(payload: Value) -> anyhow::Result<Self> {
+        let json = serde_json::to_vec(&payload)?;
+        let gzip = static_files::gzip6(&json)?;
+        Ok(Self {
+            models: stats::models_in(&payload),
+            json: json.into(),
+            gzip: gzip.into(),
+        })
+    }
+}
+
 // tokio's OnceCell rather than a Shared future (`futures` is not a dependency): concurrent callers
 // await one build, and a failed or cancelled init leaves the cell empty so the next caller rebuilds,
 // which is TS's "never cache a rejection" without a separate clear step.
-type StatsSlot = Mutex<Option<(String, Arc<OnceCell<Arc<Value>>>)>>;
+type StatsSlot = Mutex<Option<(String, Arc<OnceCell<Arc<StatsBody>>>)>>;
 
 async fn cached_stats<F, Fut>(
     slot: &StatsSlot,
     fingerprint: &str,
     build: F,
-) -> anyhow::Result<Arc<Value>>
+) -> anyhow::Result<Arc<StatsBody>>
 where
     F: FnOnce() -> Fut,
     Fut: Future<Output = anyhow::Result<Value>>,
@@ -140,7 +151,10 @@ where
         }
     };
     let value = cell
-        .get_or_try_init(|| async { build().await.map(Arc::new) })
+        .get_or_try_init(|| async {
+            let payload = build().await?;
+            tokio::task::spawn_blocking(move || StatsBody::encode(payload).map(Arc::new)).await?
+        })
         .await?;
     Ok(value.clone())
 }
@@ -178,13 +192,14 @@ async fn dispatch(State(app): State<Arc<App>>, req: Request) -> Response {
     result.unwrap_or_else(|error| json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
+async fn current_fingerprint(ctx: &Arc<Ctx>) -> anyhow::Result<String> {
+    let ctx = ctx.clone();
+    Ok(tokio::task::spawn_blocking(move || stats::fingerprint(&ctx)).await?)
+}
+
 async fn handle_stats(app: &App, request_headers: &HeaderMap) -> anyhow::Result<Response> {
     let ctx = Arc::new(app.ctx());
-    let fingerprint = tokio::task::spawn_blocking({
-        let ctx = ctx.clone();
-        move || stats::fingerprint(&ctx)
-    })
-    .await?;
+    let fingerprint = current_fingerprint(&ctx).await?;
     let etag = format!("W/\"{}-{fingerprint}\"", app.boot_id);
     // A 304 must repeat the cache-relevant headers its 200 would have carried.
     let mut headers = HeaderMap::new();
@@ -198,21 +213,13 @@ async fn handle_stats(app: &App, request_headers: &HeaderMap) -> anyhow::Result<
     {
         return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
     }
-    let payload = cached_stats(&app.stats, &fingerprint, || stats::build(&ctx)).await?;
-    let gzip = request_headers
-        .get(header::ACCEPT_ENCODING)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.contains("gzip"));
-    let body = tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
-        let json = serde_json::to_vec(&*payload)?;
-        if !gzip {
-            return Ok(json);
-        }
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::new(6));
-        encoder.write_all(&json)?;
-        Ok(encoder.finish()?)
-    })
-    .await??;
+    let cached = cached_stats(&app.stats, &fingerprint, || stats::build(&ctx)).await?;
+    let gzip = static_files::accepts_gzip(request_headers);
+    let body = if gzip {
+        cached.gzip.clone()
+    } else {
+        cached.json.clone()
+    };
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/json; charset=utf-8"),
@@ -256,10 +263,15 @@ async fn handle_pricing_refresh(app: &App, req: Request) -> anyhow::Result<Respo
         .filter(|model| !model.is_empty())
         .map(str::to_owned)
         .collect();
-    let ctx = app.ctx();
-    // refreshPricingOverride derives from a fresh build whenever the usable list is empty.
+    let ctx = Arc::new(app.ctx());
+    // refreshPricingOverride derives the list from a build whenever the usable list is empty; the
+    // cached one for the current fingerprint has the same models, so reuse it or join the one in flight.
     if models.is_empty() {
-        models = stats::models_in(&stats::build(&ctx).await?);
+        let fingerprint = current_fingerprint(&ctx).await?;
+        models = cached_stats(&app.stats, &fingerprint, || stats::build(&ctx))
+            .await?
+            .models
+            .clone();
     }
     let result = pricing::refresh_pricing_override(&ctx, models).await?;
     Ok(json_response(StatusCode::OK, serde_json::to_value(result)?))
@@ -511,14 +523,18 @@ mod tests {
                 Err(anyhow::anyhow!("boom"))
             })
             .await;
-            assert_eq!(failed.unwrap_err().to_string(), "boom");
+            assert_eq!(failed.err().map(|e| e.to_string()).as_deref(), Some("boom"));
             let retried = cached_stats(&slot, "1:1", || async {
                 builds.fetch_add(1, Ordering::SeqCst);
                 Ok(json!({"n": 2}))
             })
             .await
             .unwrap();
-            assert_eq!(*retried, json!({"n": 2}));
+            assert_eq!(retried.json, serde_json::to_vec(&json!({"n": 2})).unwrap());
+            assert_eq!(
+                static_files::gzip6(&retried.json).unwrap(),
+                retried.gzip.to_vec()
+            );
             assert_eq!(builds.load(Ordering::SeqCst), 2);
         });
     }

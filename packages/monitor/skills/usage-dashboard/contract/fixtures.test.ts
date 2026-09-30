@@ -146,7 +146,7 @@ describe("fixture home", () => {
   });
 });
 
-describe("TS engine against the fixture home", () => {
+describe("atlas engine against the fixture home", () => {
   let f: Fixture;
   let first: Run;
   beforeAll(async () => {

@@ -1,11 +1,10 @@
 // api.ts types and helpers that more than one provider source needs.
+use crate::server::opencode::js_truthy;
 use indexmap::IndexMap;
 use jiff::{Timestamp, tz::TimeZone};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-
-pub use super::dedup::DedupUsage as TranscriptUsage;
 
 pub fn now_ms() -> i64 {
     if let Some(pinned) = std::env::var("TOKEN_ATLAS_NOW_MS")
@@ -18,6 +17,7 @@ pub fn now_ms() -> i64 {
     Timestamp::now().as_millisecond()
 }
 
+#[derive(Clone)]
 pub struct Ctx {
     pub now_ms: i64,
     pub plugin_root: PathBuf,
@@ -163,13 +163,6 @@ pub fn empty_model_usage() -> ModelUsage {
     }
 }
 
-pub fn add_usage(target: &mut ModelUsage, usage: &TranscriptUsage) {
-    target.input_tokens += usage.input_tokens.unwrap_or(0);
-    target.output_tokens += usage.output_tokens.unwrap_or(0);
-    target.cache_read_input_tokens += usage.cache_read_input_tokens.unwrap_or(0);
-    target.cache_creation_input_tokens += usage.cache_creation_input_tokens.unwrap_or(0);
-}
-
 pub fn add_model_usage(target: &mut ModelUsage, source: &ModelUsage) {
     target.input_tokens += source.input_tokens;
     target.output_tokens += source.output_tokens;
@@ -233,6 +226,15 @@ pub fn project_name(path: &str) -> String {
         .to_owned()
 }
 
+// A ledger row with no cwd reads "n/a", as both the Codex and OpenCode ledgers do.
+pub fn ledger_project_name(cwd: &str) -> String {
+    if cwd.is_empty() {
+        "n/a".to_owned()
+    } else {
+        project_name(cwd)
+    }
+}
+
 // String.replace semantics: the first occurrence of HOME anywhere, not only as a prefix.
 pub fn display_path(path: &Path) -> String {
     let path = path.to_string_lossy();
@@ -242,6 +244,36 @@ pub fn display_path(path: &Path) -> String {
         return path.into_owned();
     }
     path.replacen(home.as_ref(), "~", 1)
+}
+
+// JS Date.parse for the ISO forms Claude, Codex and this dashboard write; other formats read as NaN.
+pub fn js_date_parse(text: &str) -> Option<i64> {
+    let text = text.trim();
+    if let Ok(ts) = text.parse::<Timestamp>() {
+        return Some(ts.as_millisecond());
+    }
+    // A date-only form is UTC in JS; a date-time without an offset is local.
+    if !text.contains(['T', 't', ' ']) {
+        let date = text.parse::<jiff::civil::Date>().ok()?;
+        return TimeZone::UTC
+            .to_ambiguous_timestamp(date.to_datetime(jiff::civil::Time::midnight()))
+            .compatible()
+            .ok()
+            .map(|ts| ts.as_millisecond());
+    }
+    let datetime = text.parse::<jiff::civil::DateTime>().ok()?;
+    TimeZone::system()
+        .to_ambiguous_timestamp(datetime)
+        .compatible()
+        .ok()
+        .map(|ts| ts.as_millisecond())
+}
+
+// `new Date(ms).toISOString()`; None where Date would be Invalid.
+pub fn iso_ms(ms: i64) -> Option<String> {
+    Timestamp::from_millisecond(ms)
+        .ok()
+        .map(|ts| ts.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
 }
 
 pub fn fmt_date(ms: i64) -> String {
@@ -297,15 +329,10 @@ pub fn coerce_number(value: &Value) -> Option<f64> {
     }
 }
 
-fn js_truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
-        Value::String(s) => !s.is_empty(),
-        _ => true,
-    }
-}
+// Shared by the Claude statusline cache and the Codex usage limits.
+pub const RATE_LIMITS_STALE_AFTER_MS: f64 = 5.0 * 60.0 * 1000.0;
+pub const FIVE_HOUR_MS: i64 = 5 * 60 * 60 * 1000;
+pub const SEVEN_DAY_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 pub fn build_usage_limit_window(
     bucket: Option<&Value>,
@@ -325,9 +352,7 @@ pub fn build_usage_limit_window(
     };
     let reset_at_ms = reset_at_seconds * 1000.0;
     // new Date(x) truncates to whole milliseconds before toISOString.
-    let reset_at = Timestamp::from_millisecond(reset_at_ms.trunc() as i64)
-        .ok()
-        .map(|ts| ts.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
+    let reset_at = iso_ms(reset_at_ms.trunc() as i64);
     let duration = duration_ms as f64;
     let start_at_ms = reset_at_ms - duration;
     let elapsed_ms = 0f64.max(duration.min(now_ms as f64 - start_at_ms));
@@ -428,15 +453,11 @@ mod tests {
 
     #[test]
     fn usage_arithmetic_and_nesting_keep_order() {
-        let mut target = empty_model_usage();
-        add_usage(
-            &mut target,
-            &TranscriptUsage {
-                input_tokens: Some(1),
-                output_tokens: Some(2),
-                ..Default::default()
-            },
-        );
+        let mut target = ModelUsage {
+            input_tokens: 1,
+            output_tokens: 2,
+            ..empty_model_usage()
+        };
         let source = ModelUsage {
             cache_read_input_tokens: 3,
             cost_usd: Some(0.5),

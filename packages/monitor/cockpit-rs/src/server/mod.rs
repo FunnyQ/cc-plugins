@@ -33,7 +33,8 @@ pub struct AppState {
     pub plugin_root: Arc<Path>,
 }
 
-fn parse_port(value: &str) -> Option<u16> {
+// JavaScript parseInt: optional leading whitespace and sign, then the leading digits.
+pub(crate) fn parse_port(value: &str) -> Option<u16> {
     let value = value.trim_start();
     let digits = value.strip_prefix('+').unwrap_or(value);
     let end = digits.bytes().take_while(u8::is_ascii_digit).count();

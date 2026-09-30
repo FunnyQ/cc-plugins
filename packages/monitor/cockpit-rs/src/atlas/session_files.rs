@@ -1,24 +1,53 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+
+// Plain `Option<Value>` reads an explicit null as absent, and the TS passes `"version": null` through.
+fn present<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
+    Value::deserialize(d).map(Some)
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 // Only sessionId, cwd and startedAt are validated by the TS; the rest pass through untyped.
 pub struct ClaudeSessionFile {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub pid: Option<Value>,
     pub session_id: String,
     pub cwd: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub status: Option<Value>,
     pub started_at: serde_json::Number,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub updated_at: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub version: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub kind: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub entrypoint: Option<Value>,
     // Every other key passes through whole, as readSessionFiles pushes the parsed object.
     #[serde(flatten)]
@@ -105,7 +134,8 @@ mod tests {
     fn passes_unknown_keys_through() {
         let src = serde_json::json!({
             "sessionId": "s", "cwd": "/r", "startedAt": 5, "pid": 7,
-            "name": "n", "peerFeatures": {"a": [1, {"b": true}]}
+            "name": "n", "peerFeatures": {"a": [1, {"b": true}]},
+            "version": null, "status": null
         });
         let files = read_one(&src.to_string());
         assert_eq!(files.len(), 1);

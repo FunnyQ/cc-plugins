@@ -1,26 +1,16 @@
 pub mod claude;
 pub mod codex;
-// Only tests call it until the engine ports land; the first caller removes this allow.
-#[allow(dead_code)]
 pub mod dedup;
-// Only tests call it until the engine ports land; the first caller removes this allow.
-#[allow(dead_code)]
 pub mod jsonl;
 pub mod live;
-// Only tests call it until the engine ports land; the first caller removes this allow.
-#[allow(dead_code)]
 pub mod model;
 pub mod opencode;
-// Only tests call it until the engine ports land; the first caller removes this allow.
-#[allow(dead_code)]
 pub mod paths;
 pub mod pricing;
 pub mod push_usage;
 pub mod rollup_db;
 pub mod rollup_update;
 pub mod server;
-// Only tests call it until the engine ports land; the first caller removes this allow.
-#[allow(dead_code)]
 pub mod session_files;
 pub mod stats;
 pub mod statusline;

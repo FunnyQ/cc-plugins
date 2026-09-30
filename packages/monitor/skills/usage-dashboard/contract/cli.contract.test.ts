@@ -135,6 +135,18 @@ describe("statusline", () => {
     expect(r.code).toBe(3);
   });
 
+  test("inner command does not inherit TOKEN_ATLAS_STATUSLINE_COMMAND", async () => {
+    const f = await fixture();
+    const r = await run(f, "statusline", {
+      stdin: "{}",
+      env: {
+        TOKEN_ATLAS_STATUSLINE_COMMAND:
+          'printf "%s" "${TOKEN_ATLAS_STATUSLINE_COMMAND-unset}"',
+      },
+    });
+    expect(r.stdout).toBe("unset");
+  });
+
   test("rollup nudge creates its marker, runs rollup-update, and throttles", async () => {
     const f = await fixture();
     const marker = join(cacheDir(f), ".rollup-nudge");
@@ -177,22 +189,18 @@ describe("statusline", () => {
     expect(r.elapsedMs).toBeLessThan(2_000);
   });
 
-  test(
-    "inner command printing 1 MB before reading 1 MB of stdin does not deadlock",
-    async () => {
-      const f = await fixture();
-      const mb = 1024 * 1024;
-      const r = await run(f, "statusline", {
-        stdin: "x".repeat(mb),
-        env: {
-          TOKEN_ATLAS_STATUSLINE_COMMAND: `head -c ${mb} /dev/zero | tr '\\0' y; cat >/dev/null`,
-        },
-      });
-      expect(r.code).toBe(0);
-      expect(r.stdout.length).toBe(mb);
-    },
-    15_000,
-  );
+  test("inner command printing 1 MB before reading 1 MB of stdin does not deadlock", async () => {
+    const f = await fixture();
+    const mb = 1024 * 1024;
+    const r = await run(f, "statusline", {
+      stdin: "x".repeat(mb),
+      env: {
+        TOKEN_ATLAS_STATUSLINE_COMMAND: `head -c ${mb} /dev/zero | tr '\\0' y; cat >/dev/null`,
+      },
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout.length).toBe(mb);
+  }, 15_000);
 });
 
 describe("push-usage", () => {

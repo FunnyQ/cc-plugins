@@ -7,10 +7,12 @@ use super::dedup::{
     count_claude_tool_calls, dedup_key, hour_start_ms, usage_token_total,
 };
 use super::jsonl::{JsonlLinesOptions, read_jsonl_lines};
+use super::model::js_date_parse;
 use super::paths;
 use super::rollup_db::{
     self, HourlyRow, IngestedFile, LEDGER_REBUILD_PENDING, LedgerFileRow, LedgerModelRow,
 };
+use crate::server::opencode::js_truthy;
 use indexmap::IndexMap;
 use rusqlite::Connection;
 use serde::Serialize;
@@ -18,7 +20,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,39 +50,8 @@ struct IngestContext {
     ledger_seen: HashSet<String>,
 }
 
-// JS truthiness, for the TS `!x` / `x &&` checks on untyped transcript fields.
-fn truthy(value: Option<&Value>) -> bool {
-    match value {
-        None | Some(Value::Null) => false,
-        Some(Value::Bool(b)) => *b,
-        Some(Value::Number(n)) => n.as_f64().is_some_and(|n| n != 0.0),
-        Some(Value::String(s)) => !s.is_empty(),
-        Some(_) => true,
-    }
-}
-
 fn str_field<'a>(value: Option<&'a Value>, key: &str) -> Option<&'a str> {
     value?.get(key)?.as_str()
-}
-
-// JS Date.parse: an offset or Z is absolute, a bare date-time is local, a bare date is UTC.
-fn parse_timestamp_ms(raw: &str) -> i64 {
-    if let Ok(ts) = raw.parse::<jiff::Timestamp>() {
-        return ts.as_millisecond();
-    }
-    if raw.contains('T')
-        && let Ok(dt) = raw.parse::<jiff::civil::DateTime>()
-    {
-        return dt
-            .to_zoned(jiff::tz::TimeZone::system())
-            .map_or(0, |z| z.timestamp().as_millisecond());
-    }
-    if let Ok(date) = raw.parse::<jiff::civil::Date>() {
-        return date
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .map_or(0, |z| z.timestamp().as_millisecond());
-    }
-    0
 }
 
 fn billed(usage: &DedupUsage) -> BilledTokens {
@@ -120,7 +91,8 @@ fn parse_slice(
             .to_string();
         let timestamp_ms = str_field(entry, "timestamp")
             .filter(|t| !t.is_empty())
-            .map_or(0, parse_timestamp_ms);
+            .and_then(js_date_parse)
+            .unwrap_or(0);
         let cwd = str_field(entry, "cwd");
         let kind = str_field(entry, "type");
         let row = out
@@ -143,7 +115,7 @@ fn parse_slice(
             row.project = cwd.to_string();
             row.project_ts_ms = timestamp_ms;
         }
-        if kind == Some("user") && !truthy(entry.and_then(|e| e.get("isMeta"))) {
+        if kind == Some("user") && !entry.and_then(|e| e.get("isMeta")).is_some_and(js_truthy) {
             row.interactions += 1;
         }
         let content = message.and_then(|m| m.get("content"));
@@ -167,7 +139,7 @@ fn parse_slice(
         let Some(usage) = message.and_then(|m| m.get("usage")) else {
             continue;
         };
-        if kind != Some("assistant") || !truthy(Some(usage)) {
+        if kind != Some("assistant") || !js_truthy(usage) {
             continue;
         }
         let usage = DedupUsage {
@@ -376,9 +348,7 @@ pub fn update_rollup(
     }
 
     // Real clock: the TS stamps updated_at with Date.now(), which TOKEN_ATLAS_NOW_MS never pins.
-    let now_ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis() as i64);
+    let now_ms = jiff::Timestamp::now().as_millisecond();
     let mut ctx = IngestContext {
         now_ms,
         ledger_rebuild,
@@ -686,20 +656,20 @@ mod tests {
     fn timestamps_parse_like_js_date_parse() {
         // Expected values from `bun -e 'Date.parse(s)'`.
         assert_eq!(
-            parse_timestamp_ms("2026-09-28T15:10:00.000Z"),
-            1790608200000
+            js_date_parse("2026-09-28T15:10:00.000Z"),
+            Some(1790608200000)
         );
         assert_eq!(
-            parse_timestamp_ms("2026-09-28T23:10:00+08:00"),
-            1790608200000
+            js_date_parse("2026-09-28T23:10:00+08:00"),
+            Some(1790608200000)
         );
         assert_eq!(
-            parse_timestamp_ms("2026-09-28T15:10:00.123456Z"),
-            1790608200123
+            js_date_parse("2026-09-28T15:10:00.123456Z"),
+            Some(1790608200123)
         );
-        assert_eq!(parse_timestamp_ms("2026-09-28"), 1790553600000);
-        assert_eq!(parse_timestamp_ms("1969-12-31T23:59:59.999Z"), -1);
-        assert_eq!(parse_timestamp_ms("nope"), 0);
+        assert_eq!(js_date_parse("2026-09-28"), Some(1790553600000));
+        assert_eq!(js_date_parse("1969-12-31T23:59:59.999Z"), Some(-1));
+        assert_eq!(js_date_parse("nope"), None);
     }
 
     #[test]
@@ -915,7 +885,7 @@ mod tests {
         let updated_at: i64 = db
             .query_row("SELECT updated_at FROM ingested_files", [], |r| r.get(0))
             .unwrap();
-        let wall = SystemTime::now()
+        let wall = std::time::SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as i64;

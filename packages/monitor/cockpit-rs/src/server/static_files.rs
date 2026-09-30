@@ -94,10 +94,7 @@ pub async fn serve_dir(root: &Path, uri: &Uri, request_headers: &HeaderMap) -> R
     let gzip = matches!(
         extension.as_str(),
         "html" | "js" | "mjs" | "css" | "json" | "svg"
-    ) && request_headers
-        .get(header::ACCEPT_ENCODING)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.contains("gzip"));
+    ) && accepts_gzip(request_headers);
     // Integer milliseconds deliberately replace TS's fractional base-36 mtime; clients compare equality only.
     let mtime = metadata
         .modified()
@@ -137,18 +134,26 @@ pub async fn serve_dir(root: &Path, uri: &Uri, request_headers: &HeaderMap) -> R
     };
     if gzip {
         // Off the single runtime thread: gzipping the 3.3 MB mermaid bundle would stall every open stream.
-        let compressed = tokio::task::spawn_blocking(move || {
-            let mut encoder = GzEncoder::new(Vec::new(), Compression::new(6));
-            encoder.write_all(&body)?;
-            encoder.finish()
-        })
-        .await;
+        let compressed = tokio::task::spawn_blocking(move || gzip6(&body)).await;
         let Ok(Ok(compressed)) = compressed else {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         };
         body = compressed;
     }
     (headers, body).into_response()
+}
+
+pub(crate) fn accepts_gzip(request_headers: &HeaderMap) -> bool {
+    request_headers
+        .get(header::ACCEPT_ENCODING)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("gzip"))
+}
+
+pub(crate) fn gzip6(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::new(6));
+    encoder.write_all(bytes)?;
+    encoder.finish()
 }
 
 #[cfg(test)]

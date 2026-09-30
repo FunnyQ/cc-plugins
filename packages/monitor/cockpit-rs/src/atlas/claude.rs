@@ -1,11 +1,13 @@
 // Port of api.ts's Claude source: stats-cache, history, the rollup aggregates and ledger,
 // and the statusline rate-limit windows.
 use super::model::{
-    Ctx, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage, UsageLimits,
-    add_hourly_usage, add_model_usage, add_nested_model_usage, build_usage_limit_window,
-    display_path, empty_model_usage, fmt_date, model_key, model_usage_total, now_ms, project_name,
+    Ctx, FIVE_HOUR_MS, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage,
+    RATE_LIMITS_STALE_AFTER_MS, SEVEN_DAY_MS, UsageLimits, add_hourly_usage, add_model_usage,
+    add_nested_model_usage, build_usage_limit_window, display_path, empty_model_usage, fmt_date,
+    model_key, model_usage_total, now_ms, project_name,
 };
 use super::{dedup, jsonl, paths, rollup_db, rollup_update};
+use crate::server::opencode::js_truthy;
 use indexmap::IndexMap;
 use jiff::{Timestamp, tz::TimeZone};
 use rusqlite::Connection;
@@ -13,10 +15,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-
-const RATE_LIMITS_STALE_AFTER_MS: f64 = 5.0 * 60.0 * 1000.0;
-const FIVE_HOUR_MS: i64 = 18_000_000;
-const SEVEN_DAY_MS: i64 = 604_800_000;
 
 // ---------- Types ----------
 
@@ -68,6 +66,9 @@ pub struct StatsCache {
     pub longest_session: Option<StatsCacheLongestSession>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_session_date: Option<String>,
+    // Keys Claude Code adds later (e.g. dailyModelTokensVersion) pass through, as the TS spread the parsed file.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -294,43 +295,42 @@ fn read_rollup_ledger(db: &Connection) -> rusqlite::Result<Vec<InternalLedgerRow
         .collect())
 }
 
-fn read_rollup(projects_dir: &Path) -> anyhow::Result<(ProviderUsage, Vec<InternalLedgerRow>)> {
+// Also returns the ingest's own `.jsonl` count, so a build walks the projects tree once, not twice.
+fn read_rollup(
+    projects_dir: &Path,
+) -> anyhow::Result<(ProviderUsage, Vec<InternalLedgerRow>, usize)> {
     let mut db = rollup_db::open_rollup_db(&paths::rollup_db_path())?;
-    rollup_update::update_rollup(
+    let update = rollup_update::update_rollup(
         &mut db,
         projects_dir,
         rollup_update::UpdateOptions { rebuild: false },
     )?;
-    Ok((read_rollup_aggregates(&db)?, read_rollup_ledger(&db)?))
+    Ok((
+        read_rollup_aggregates(&db)?,
+        read_rollup_ledger(&db)?,
+        update.files_scanned,
+    ))
 }
 
 pub fn load(ctx: &Ctx) -> anyhow::Result<ClaudeSource> {
-    // Directory listing only; transcript bytes are read solely by update_rollup.
+    // Transcript bytes are read solely by update_rollup.
     let projects_dir = paths::projects_dir();
-    let mut files: Vec<PathBuf> = Vec::new();
-    dedup::walk_files(&projects_dir, ".jsonl", &mut files);
     // An unopenable rollup empties Claude's usage rather than failing the payload, as TS does.
-    let (usage, ledger) = read_rollup(&projects_dir).unwrap_or_default();
+    let (usage, ledger, transcript_file_count) = read_rollup(&projects_dir).unwrap_or_else(|_| {
+        let mut files: Vec<PathBuf> = Vec::new();
+        dedup::walk_files(&projects_dir, ".jsonl", &mut files);
+        (ProviderUsage::default(), Vec::new(), files.len())
+    });
     Ok(ClaudeSource {
         usage,
         ledger,
-        transcript_file_count: files.len(),
+        transcript_file_count,
         stats_cache: parse_stats_cache()?,
         history: parse_history(ctx.now_ms),
     })
 }
 
 // ---------- Usage limits ----------
-
-fn js_truthy(value: Option<&Value>) -> bool {
-    match value {
-        None | Some(Value::Null) => false,
-        Some(Value::Bool(b)) => *b,
-        Some(Value::Number(n)) => n.as_f64().is_some_and(|n| n != 0.0),
-        Some(Value::String(s)) => !s.is_empty(),
-        Some(_) => true,
-    }
-}
 
 pub fn read_usage_limits(_ctx: &Ctx) -> UsageLimits {
     let path = paths::rate_limits_cache();
@@ -378,7 +378,7 @@ pub fn read_usage_limits(_ctx: &Ctx) -> UsageLimits {
         !captured_at_ms.is_finite() || now as f64 - captured_at_ms > RATE_LIMITS_STALE_AFTER_MS;
     limits.captured_at = captured_at.map(str::to_owned);
 
-    let Some(rate_limits) = data.get("rate_limits").filter(|v| js_truthy(Some(v))) else {
+    let Some(rate_limits) = data.get("rate_limits").filter(|v| js_truthy(v)) else {
         limits.error = Some("missing-rate-limits".into());
         return limits;
     };
@@ -662,8 +662,16 @@ mod tests {
         assert!(src.usage.model_usage.is_empty());
         assert!(src.ledger.is_empty());
         let json = source_json(&ctx(), &src);
-        assert_eq!(json["statsCache"], json!({"version": 2}));
+        // safeReadJSON returned the whole parsed file, unknown keys included.
+        assert_eq!(json["statsCache"], json!({"version": 2, "extra": 1}));
         assert_eq!(json["transcriptFileCount"], json!(2));
         assert_eq!(json["usageLimits"]["error"], json!("missing"));
+    }
+
+    #[test]
+    fn stats_cache_passes_unknown_top_level_keys_through() {
+        let src = json!({"version": 2, "dailyModelTokensVersion": 1, "future": {"a": [1]}});
+        let cache: StatsCache = serde_json::from_value(src.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&cache).unwrap(), src);
     }
 }

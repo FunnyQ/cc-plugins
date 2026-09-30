@@ -1,7 +1,5 @@
 // Port of api.ts `// ---------- Pricing ----------`.
-// Stats assembly and the refresh route call the rest; the first of them removes this allow.
-#![allow(dead_code)]
-use super::model::{Ctx, ModelUsage, raw_model_from_key};
+use super::model::{Ctx, ModelUsage, display_path, raw_model_from_key};
 use super::paths;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -61,6 +59,10 @@ pub struct PricingTable {
     pub fallback: ModelPrice,
     #[serde(default)]
     pub external_model_prefixes: Vec<String>,
+    // Built on the first normalized lookup and reused for every later one in the build; every
+    // writer finishes inserting into `models` before anything is priced.
+    #[serde(skip)]
+    normalized: OnceLock<HashMap<String, String>>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -141,14 +143,8 @@ fn defaults_path(ctx: &Ctx) -> PathBuf {
         .join("skills/usage-dashboard/references/pricing-defaults.json")
 }
 
-fn override_path() -> PathBuf {
+pub(super) fn override_path() -> PathBuf {
     paths::home().join(".config/cc-dashboard/pricing.json")
-}
-
-fn tilde(path: &Path) -> String {
-    let home = paths::home();
-    path.to_string_lossy()
-        .replacen(home.to_string_lossy().as_ref(), "~", 1)
 }
 
 fn read_defaults(ctx: &Ctx) -> anyhow::Result<PricingTable> {
@@ -289,7 +285,7 @@ async fn build_pricing_load(ctx: &Ctx) -> anyhow::Result<PricingLoad> {
             error: None,
         },
         user_override: UserOverrideMeta {
-            path: tilde(&override_file),
+            path: display_path(&override_file),
             loaded: false,
             error: None,
         },
@@ -363,9 +359,8 @@ pub fn normalize_model_id(id: &str) -> String {
         .collect()
 }
 
-// Rebuilt per call (O(table) each); memoize per table if stats assembly shows it in profiles.
-fn normalized_model_index(table: &PricingTable) -> HashMap<String, &str> {
-    let mut idx: HashMap<String, &str> = HashMap::new();
+fn normalized_model_index(table: &PricingTable) -> HashMap<String, String> {
+    let mut idx: HashMap<String, String> = HashMap::new();
     for key in table.models.keys() {
         let n = normalize_model_id(key);
         if n.is_empty() {
@@ -374,7 +369,7 @@ fn normalized_model_index(table: &PricingTable) -> HashMap<String, &str> {
         match idx.get(&n) {
             Some(prev) if !(prev.contains(':') && !key.contains(':')) => {}
             _ => {
-                idx.insert(n, key);
+                idx.insert(n, key.clone());
             }
         }
     }
@@ -392,7 +387,11 @@ fn resolve_model_key(model: &str, table: &PricingTable) -> Option<String> {
     if n.is_empty() {
         return None;
     }
-    normalized_model_index(table).get(&n).map(|k| k.to_string())
+    table
+        .normalized
+        .get_or_init(|| normalized_model_index(table))
+        .get(&n)
+        .cloned()
 }
 
 pub fn price_for(model: &str, table: &PricingTable) -> ModelPrice {
@@ -458,6 +457,7 @@ pub async fn refresh_pricing_override(
         models: live.models,
         fallback: defaults.fallback,
         external_model_prefixes: defaults.external_model_prefixes,
+        normalized: OnceLock::new(),
     };
 
     let path = override_path();
@@ -495,7 +495,7 @@ pub async fn refresh_pricing_override(
 
     Ok(PricingRefreshResult {
         ok: true,
-        override_path: tilde(&path),
+        override_path: display_path(&path),
         open_router_error: live.error,
         written_count: resolved.len(),
         resolved,
@@ -537,6 +537,7 @@ mod tests {
             ]),
             fallback: price(1.0, 1.0, None, None),
             external_model_prefixes: vec!["openai/".into(), "minimax/".into()],
+            normalized: OnceLock::new(),
         }
     }
 
@@ -562,6 +563,7 @@ mod tests {
             ]),
             fallback: price(1.0, 1.0, None, None),
             external_model_prefixes: vec!["openai/".into(), "minimax/".into()],
+            normalized: OnceLock::new(),
         }
     }
 

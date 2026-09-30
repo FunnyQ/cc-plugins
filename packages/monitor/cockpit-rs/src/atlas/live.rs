@@ -1,14 +1,13 @@
 // Ports live.ts (I/O + caches) and live-sessions.ts (pure shaping) for the "Live now" panel.
-use super::model::{Ctx, now_ms};
+use super::model::{Ctx, iso_ms, now_ms, project_name};
 use super::session_files::{ClaudeSessionFile, read_session_files};
-use jiff::Timestamp;
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub const STALE_CUTOFF_MS: i64 = 600_000;
 pub const BUSY_CUTOFF_MS: i64 = 60_000;
@@ -60,13 +59,6 @@ pub struct OpenCodeRow {
 }
 
 // ---------- pure helpers (live-sessions.ts) ----------
-
-pub fn project_name_for(cwd: &str) -> String {
-    cwd.split('/')
-        .rfind(|segment| !segment.is_empty())
-        .unwrap_or(cwd)
-        .to_owned()
-}
 
 pub fn status_rank(status: &str) -> u8 {
     match status {
@@ -123,9 +115,7 @@ fn opencode_timestamp_ms(value: Option<f64>) -> f64 {
 
 // `new Date(ms).toISOString()`: Date truncates the ms toward zero.
 fn iso(ms: f64) -> String {
-    Timestamp::from_millisecond(ms.trunc() as i64)
-        .map(|ts| ts.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
-        .unwrap_or_default()
+    iso_ms(ms.trunc() as i64).unwrap_or_default()
 }
 
 fn age(now: i64, updated_at_ms: f64) -> i64 {
@@ -159,7 +149,7 @@ pub fn build_claude_live_sessions(
             LiveSession {
                 provider: "claude".into(),
                 id: session.session_id.clone(),
-                project_name: project_name_for(&session.cwd),
+                project_name: project_name(&session.cwd),
                 cwd: session.cwd.clone(),
                 status: session
                     .status
@@ -206,7 +196,7 @@ pub fn build_codex_live_sessions(
             LiveSession {
                 provider: "codex".into(),
                 id: row.id.clone(),
-                project_name: project_name_for(&row.cwd),
+                project_name: project_name(&row.cwd),
                 cwd: row.cwd.clone(),
                 status: inferred_status(age_ms).into(),
                 status_source: "codex-sqlite-rollout".into(),
@@ -240,7 +230,7 @@ pub fn build_opencode_live_sessions(
             LiveSession {
                 provider: "opencode".into(),
                 id: row.id.clone(),
-                project_name: project_name_for(&row.directory),
+                project_name: project_name(&row.directory),
                 cwd: row.directory.clone(),
                 status: inferred_status(age_ms).into(),
                 status_source: "opencode-sqlite-session".into(),
@@ -331,10 +321,11 @@ fn read_opencode_session_rows() -> Vec<OpenCodeRow> {
     query().unwrap_or_default()
 }
 
-type Cache<T> = Mutex<Option<(i64, T)>>;
+type Cache<T> = Mutex<Option<(i64, Arc<T>)>>;
 
-// One 5 s TTL slot keyed on now_ms(), shared by the three caches live.ts keeps.
-fn cached<T: Clone>(slot: &Cache<T>, load: impl FnOnce() -> T) -> T {
+// One 5 s TTL slot keyed on now_ms(), shared by the three caches live.ts keeps. An Arc, so a hit
+// on every 3 s poll does not deep-copy the transcript index.
+fn cached<T>(slot: &Cache<T>, load: impl FnOnce() -> T) -> Arc<T> {
     let now = now_ms();
     let mut guard = slot.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((at, value)) = guard.as_ref()
@@ -342,7 +333,7 @@ fn cached<T: Clone>(slot: &Cache<T>, load: impl FnOnce() -> T) -> T {
     {
         return value.clone();
     }
-    let value = load();
+    let value = Arc::new(load());
     *guard = Some((now, value.clone()));
     value
 }
@@ -373,7 +364,7 @@ fn walk_jsonl(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-fn transcript_index() -> HashMap<String, String> {
+fn transcript_index() -> Arc<HashMap<String, String>> {
     cached(&TRANSCRIPT_INDEX, || {
         let mut paths = Vec::new();
         walk_jsonl(&super::paths::projects_dir(), &mut paths);
@@ -393,17 +384,17 @@ fn transcript_index() -> HashMap<String, String> {
     })
 }
 
-fn cockpit_session_keys() -> HashSet<String> {
+fn cockpit_session_keys() -> Arc<HashSet<String>> {
     cached(&COCKPIT_KEYS, || {
-        std::fs::read_to_string(crate::paths::cockpit_home().join("registry.json"))
+        std::fs::read_to_string(crate::paths::registry_path())
             .map(|raw| parse_cockpit_keys(&raw))
             .unwrap_or_default()
     })
 }
 
 pub fn cockpit_daemon_port() -> Option<serde_json::Number> {
-    cached(&DAEMON_PORT, || {
-        let raw = std::fs::read_to_string(crate::paths::cockpit_home().join("daemon.json")).ok()?;
+    let port = cached(&DAEMON_PORT, || {
+        let raw = std::fs::read_to_string(crate::paths::daemon_info_path()).ok()?;
         let info: Value = serde_json::from_str(&raw).ok()?;
         let pid = info.get("pid")?.as_f64()?;
         // process.kill rejects a fractional pid; pid <= 0 is dead here, where kill(0) would not be.
@@ -417,7 +408,8 @@ pub fn cockpit_daemon_port() -> Option<serde_json::Number> {
             Some(Value::Number(port)) => port.clone(),
             _ => 5858.into(),
         })
-    })
+    });
+    (*port).clone()
 }
 
 pub fn live_sessions(ctx: &Ctx) -> Vec<LiveSession> {
@@ -493,12 +485,9 @@ mod tests {
 
     #[test]
     fn project_name_for_cases() {
-        assert_eq!(
-            project_name_for("/Users/q/Projects/cc-plugins"),
-            "cc-plugins"
-        );
-        assert_eq!(project_name_for("/Users/q/foo/"), "foo");
-        assert_eq!(project_name_for(""), "");
+        assert_eq!(project_name("/Users/q/Projects/cc-plugins"), "cc-plugins");
+        assert_eq!(project_name("/Users/q/foo/"), "foo");
+        assert_eq!(project_name(""), "");
     }
 
     #[test]
@@ -859,7 +848,7 @@ mod tests {
         TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + 10).to_string());
         assert!(cockpit_session_keys().is_empty());
         TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS).to_string());
-        assert_eq!(cockpit_session_keys(), keys(&["claude:x"]));
+        assert_eq!(*cockpit_session_keys(), keys(&["claude:x"]));
     }
 
     #[test]

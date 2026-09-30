@@ -3,15 +3,14 @@ use super::claude::{ClaudeSource, HistoryDay, StatsCacheDailyActivity};
 use super::codex::CodexSource;
 use super::model::{
     Ctx, HourlyUsageBucket, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, UsageLimits,
-    add_hourly_usage, display_path, fmt_date, model_key, model_usage_total, now_ms, project_name,
-    provider_from_model_key, raw_model_from_key,
+    add_hourly_usage, display_path, fmt_date, iso_ms, model_key, model_usage_total, now_ms,
+    project_name, provider_from_model_key, raw_model_from_key,
 };
 use super::opencode::OpenCodeSource;
 use super::pricing::{PricingLoad, PricingTable};
 use super::session_files::{ClaudeSessionFile, read_session_files};
 use super::{claude, codex, dedup, opencode, paths, pricing};
 use indexmap::{IndexMap, IndexSet};
-use jiff::Timestamp;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::cmp::Ordering;
@@ -23,10 +22,6 @@ use std::time::{Duration, SystemTime};
 const USAGE: &str = "usage: cockpit atlas stats [--source claude|codex|opencode|pricing]";
 
 type ProjectModelUsage = IndexMap<String, IndexMap<String, ModelUsage>>;
-
-fn pricing_override_path() -> PathBuf {
-    paths::home().join(".config/cc-dashboard/pricing.json")
-}
 
 fn budget_config_path() -> PathBuf {
     paths::home().join(".config/cc-dashboard/budget.json")
@@ -40,10 +35,7 @@ pub async fn build(ctx: &Ctx) -> anyhow::Result<Value> {
         codex::read_codex_usage_limits(ctx)
     );
     let pricing_load = pricing_load?;
-    let ctx = Ctx {
-        now_ms: ctx.now_ms,
-        plugin_root: ctx.plugin_root.clone(),
-    };
+    let ctx = ctx.clone();
     // Every parse runs off the runtime thread: a blocking build on current_thread stalls /api/live.
     tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
         wait_for_test_barrier();
@@ -143,12 +135,6 @@ struct DataHealthCounts {
 struct DataHealth {
     sources: Vec<DataHealthSource>,
     counts: DataHealthCounts,
-}
-
-fn iso_ms(ms: i64) -> Option<String> {
-    Timestamp::from_millisecond(ms)
-        .ok()
-        .map(|ts| ts.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
 }
 
 fn mtime_ms(meta: &std::fs::Metadata) -> Option<f64> {
@@ -274,7 +260,7 @@ fn build_data_health(counts: DataHealthCounts) -> DataHealth {
         ),
         (
             "Pricing override",
-            pricing_override_path(),
+            pricing::override_path(),
             "optional user pricing",
         ),
         ("Budget config", budget_config_path(), "optional budget"),
@@ -484,15 +470,17 @@ fn serialize_ledger_rows(rows: Vec<InternalLedgerRow>, table: &PricingTable) -> 
     let mut out: Vec<LedgerRow> = rows
         .into_iter()
         .map(|row| {
-            let cost_usd = (!row.usage_by_model.is_empty()
+            // Summed off the serialized rows, in the same order: one pricing pass, same bits.
+            let usage_by_model = serialize_usage_by_model(&row.usage_by_model, table);
+            let cost_usd = (!usage_by_model.is_empty()
                 && row.cost_basis != LedgerCostBasis::Unavailable)
                 .then(|| {
-                    row.usage_by_model.iter().fold(0.0, |sum, (model, usage)| {
-                        sum + usage_cost(usage, raw_model_from_key(model), table)
-                    })
+                    usage_by_model
+                        .values()
+                        .fold(0.0, |sum, usage| sum + usage.cost_usd)
                 });
             LedgerRow {
-                usage_by_model: serialize_usage_by_model(&row.usage_by_model, table),
+                usage_by_model,
                 id: row.id,
                 provider: row.provider,
                 timestamp_ms: row.timestamp_ms,
@@ -774,12 +762,13 @@ fn build_daily(
         .map(|date| {
             let activity = activity_by_date.get(date);
             let tokens_by_model = tokens_by_date.get(date).cloned().unwrap_or_default();
-            let usage_by_model = combined.get(date);
-            let cost_usd = usage_by_model.map_or(0.0, |by_model| {
-                by_model.iter().fold(0.0, |sum, (model, usage)| {
-                    sum + usage_cost(usage, raw_model_from_key(model), table)
-                })
-            });
+            let usage_by_model = combined
+                .get(date)
+                .map(|by_model| serialize_usage_by_model(by_model, table))
+                .unwrap_or_default();
+            let cost_usd = usage_by_model
+                .values()
+                .fold(0.0, |sum, usage| sum + usage.cost_usd);
             let codex_day = codex.daily_activity.get(date);
             let opencode_day = opencode.daily_activity.get(date);
             let codex_threads = codex_day.map_or(0, |a| a.thread_count);
@@ -813,9 +802,7 @@ fn build_daily(
                     + providers.opencode.tool_calls,
                 tokens: tokens_by_model.values().sum(),
                 tokens_by_model,
-                usage_by_model: usage_by_model
-                    .map(|by_model| serialize_usage_by_model(by_model, table))
-                    .unwrap_or_default(),
+                usage_by_model,
                 cost_usd,
                 providers,
             }
@@ -1201,29 +1188,8 @@ fn assemble(loaded: Loaded, pricing_load: &PricingLoad, codex_usage_limits: Usag
 
 // ---------- fingerprint ----------
 
-// A copy of opencode.rs's private helper, which this task may not widen; the two must stay equal.
-#[allow(dead_code)]
-fn open_code_storage_roots() -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = Vec::new();
-    let storage = paths::opencode_storage_dir();
-    if storage.exists() {
-        roots.push(storage);
-    }
-    if let Ok(entries) = std::fs::read_dir(paths::opencode_project_dir()) {
-        for entry in entries.flatten() {
-            let storage = entry.path().join("storage");
-            if storage.exists() && !roots.contains(&storage) {
-                roots.push(storage);
-            }
-        }
-    }
-    roots
-}
-
 // "<count>:<newest mtime ms>" as statsFingerprint; the float prints Rust's way, which is fine
 // because the string only has to be stable within one process.
-// atlas serve (server/02) is the first caller; it removes this allow.
-#[allow(dead_code)]
 pub fn fingerprint(_ctx: &Ctx) -> String {
     let mut count = 0usize;
     let mut newest = 0f64;
@@ -1239,7 +1205,7 @@ pub fn fingerprint(_ctx: &Ctx) -> String {
         (paths::projects_dir(), ".jsonl"),
         (paths::codex_sessions_dir(), ".jsonl"),
     ];
-    for root in open_code_storage_roots() {
+    for root in opencode::open_code_storage_roots() {
         trees.push((root.join("session"), ".json"));
         trees.push((root.join("message"), ".json"));
     }
@@ -1259,7 +1225,7 @@ pub fn fingerprint(_ctx: &Ctx) -> String {
         paths::rate_limits_cache(),
         paths::codex_usage_cache(),
         // Not transcripts, but a pricing refresh or a budget edit changes the numbers.
-        pricing_override_path(),
+        pricing::override_path(),
         budget_config_path(),
     ] {
         note(&file);
@@ -1268,8 +1234,6 @@ pub fn fingerprint(_ctx: &Ctx) -> String {
 }
 
 // refreshPricingOverride's fallback list when the request names no models.
-// atlas serve (server/02) is the first caller; it removes this allow.
-#[allow(dead_code)]
 pub fn models_in(stats: &Value) -> Vec<String> {
     stats
         .get("byModel")

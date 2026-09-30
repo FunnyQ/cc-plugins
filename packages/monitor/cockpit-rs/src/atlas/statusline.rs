@@ -1,10 +1,12 @@
+use crate::server::opencode::js_truthy;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, ExitCode, ExitStatus, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use serde_json::{Value, json};
 
+use super::model::iso_ms;
 use super::paths;
 
 const ROLLUP_NUDGE_THROTTLE_MS: i64 = 5 * 60 * 1000;
@@ -36,36 +38,17 @@ pub fn run(_args: &[String]) -> ExitCode {
 
 // The TS stamps rate-limits.json and throttles nudges off the real clock, not the TOKEN_ATLAS_NOW_MS seam.
 fn real_now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
-}
-
-fn is_js_falsy(value: &Value) -> bool {
-    match value {
-        Value::Null => true,
-        Value::Bool(b) => !b,
-        Value::Number(n) => n.as_f64() == Some(0.0),
-        Value::String(s) => s.is_empty(),
-        Value::Array(_) | Value::Object(_) => false,
-    }
-}
-
-fn iso_string(ms: i64) -> String {
-    jiff::Timestamp::from_millisecond(ms)
-        .map(|ts| ts.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
-        .unwrap_or_default()
+    jiff::Timestamp::now().as_millisecond()
 }
 
 fn build_rate_limits_record(payload: &[u8], now_ms: i64) -> Option<Value> {
     let parsed: Value = serde_json::from_slice(payload).ok()?;
     let rate_limits = parsed.get("rate_limits")?;
-    if is_js_falsy(rate_limits) {
+    if !js_truthy(rate_limits) {
         return None;
     }
     Some(json!({
-        "capturedAt": iso_string(now_ms),
+        "capturedAt": iso_ms(now_ms).unwrap_or_default(),
         "capturedAtEpochMs": now_ms,
         "rate_limits": rate_limits,
     }))
@@ -130,6 +113,8 @@ fn run_statusline(payload: Vec<u8>) -> i32 {
     let spawned = Command::new("sh")
         .arg("-c")
         .arg(&command)
+        // An inner command that is itself `atlas statusline` would otherwise re-read the var and spawn forever.
+        .env_remove("TOKEN_ATLAS_STATUSLINE_COMMAND")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -204,7 +189,7 @@ mod tests {
     #[test]
     fn iso_string_keeps_milliseconds() {
         let ms = 1_779_712_496_000 + 7;
-        assert_eq!(iso_string(ms), "2026-05-25T12:34:56.007Z");
+        assert_eq!(iso_ms(ms).unwrap(), "2026-05-25T12:34:56.007Z");
     }
 
     #[test]

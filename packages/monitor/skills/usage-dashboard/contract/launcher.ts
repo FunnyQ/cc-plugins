@@ -21,10 +21,6 @@ if (!process.env.COCKPIT_BIN && !existsSync(DEFAULT_BIN)) {
   );
 }
 
-export function isRust(): boolean {
-  return true;
-}
-
 export function atlasCommand(sub: AtlasSub, args: string[] = []): string[] {
   return [process.env.COCKPIT_BIN || DEFAULT_BIN, "atlas", sub, ...args];
 }
