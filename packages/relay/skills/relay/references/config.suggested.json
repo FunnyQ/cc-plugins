@@ -2,14 +2,14 @@
   "version": 1790747142,
   "models": {
     "opencode": {
-      "delegate": "opencode-go/deepseek-v4-flash",
-      "review": "opencode-go/deepseek-v4-pro"
+      "delegate": "opencode-go/deepseek-v4.1-flash",
+      "review": "opencode-go/deepseek-v4.1-flash"
     }
   },
   "suggestions": {
     "opencode": {
-      "delegate": ["opencode-go/kimi-k3", "opencode-go/glm-5.3"],
-      "review": ["opencode-go/qwen3.8-max", "opencode-go/kimi-k3"]
+      "delegate": ["opencode-go/qwen3.8-flash", "opencode-go/glm-5.3-flash"],
+      "review": ["opencode-go/gpt-6-luna"]
     }
   }
 }
