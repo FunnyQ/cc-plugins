@@ -1182,7 +1182,7 @@ describe("relay collect", () => {
 
 describe("relay config check / apply", () => {
   const suggested = {
-    version: "0.9.0",
+    version: 1790740000,
     models: { opencode: { delegate: "s/delegate", review: "s/review" } },
     suggestions: { opencode: { delegate: ["s/alt"], review: ["s/alt"] } },
   };
@@ -1217,7 +1217,7 @@ describe("relay config check / apply", () => {
 
   it("reports current with exit 0 when the version matches", async () => {
     const { code, report } = await check(
-      JSON.stringify({ version: "0.9.0", models: { opencode: { review: "u/r" } } }),
+      JSON.stringify({ version: 1790740000, models: { opencode: { review: "u/r" } } }),
     );
 
     expect(code).toBe(0);
@@ -1228,14 +1228,17 @@ describe("relay config check / apply", () => {
   it("reports missing, no-version, and outdated with exit 3 and the suggestion", async () => {
     const missing = await check();
     const noVersion = await check(JSON.stringify({ models: {} }));
-    const outdated = await check(JSON.stringify({ version: "0.8.0" }));
+    const outdated = await check(JSON.stringify({ version: 1780000000 }));
+    const semver = await check(JSON.stringify({ version: "0.9.0" }));
 
     expect([missing, noVersion, outdated].map((r) => [r.code, r.report.status])).toEqual([
       [3, "missing"],
       [3, "no-version"],
       [3, "outdated"],
     ]);
-    expect(outdated.report.version).toBe("0.8.0");
+    expect(outdated.report.version).toBe(1780000000);
+    // A non-number version predates unix-time versioning and counts as absent.
+    expect(semver.report.status).toBe("no-version");
     expect(outdated.report.suggested).toEqual(suggested);
   });
 
@@ -1260,7 +1263,7 @@ describe("relay config check / apply", () => {
     expect(result.code).toBe(0);
     expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
       keep: true,
-      version: "0.9.0",
+      version: 1790740000,
       models: {
         opencode: { delegate: "s/delegate", review: "u/r" },
         claude: { delegate: "opus" },
@@ -1277,7 +1280,7 @@ describe("relay config check / apply", () => {
 
     expect(result.code).toBe(0);
     expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
-      version: "0.9.0",
+      version: 1790740000,
       models: suggested.models,
     });
   });
@@ -1297,7 +1300,7 @@ describe("relay config check / apply", () => {
     );
 
     expect(overwriteResult.code).toBe(0);
-    expect(JSON.parse(overwrite.files.get(CONFIG_PATH)!).version).toBe("0.9.0");
+    expect(JSON.parse(overwrite.files.get(CONFIG_PATH)!).version).toBe(1790740000);
   });
 
   it("rejects apply without exactly one of --merge or --overwrite", async () => {

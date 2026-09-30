@@ -137,7 +137,9 @@ describe("the shipped suggested config", () => {
   const suggested = JSON.parse(readFileSync(SUGGESTED_CONFIG_PATH, "utf-8"));
 
   it("carries a version and provider/model ids for opencode delegate and review", () => {
-    expect(suggested.version).toMatch(/^\d+\.\d+\.\d+$/);
+    // Unix seconds: a 10-digit integer until 2286.
+    expect(Number.isInteger(suggested.version)).toBe(true);
+    expect(String(suggested.version)).toMatch(/^\d{10}$/);
     for (const mode of ["delegate", "review"]) {
       expect(suggested.models.opencode[mode]).toMatch(/^[\w-]+\/.+/);
       for (const id of suggested.suggestions.opencode[mode]) {

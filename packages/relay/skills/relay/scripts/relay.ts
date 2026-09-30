@@ -289,7 +289,7 @@ function executeConfigCheck(deps: RelayDeps): RelayExecution {
   }
 
   const models = isObject(config.models) ? config.models : {};
-  if (typeof config.version !== "string") return report("no-version", { models });
+  if (typeof config.version !== "number") return report("no-version", { models });
   if (config.version !== suggested.version) {
     return report("outdated", { version: config.version, models });
   }
