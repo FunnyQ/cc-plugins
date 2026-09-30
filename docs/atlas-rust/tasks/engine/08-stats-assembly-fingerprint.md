@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/03, engine/04, engine/05, engine/06, engine/07
 > **Blocks**: server/02
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high, judge=opus/high
 
 ## Goal
@@ -82,23 +82,23 @@ Time `atlas stats` for Rust and TS on the fixture home (`hyperfine` or three `ti
 
 ## Acceptance criteria
 
-- [ ] `atlas stats` against Rust passes every golden `stats key <k>` test (all 19 top-level keys).
-- [ ] The whole `golden.contract.test.ts` file passes against Rust and still passes against TS.
-- [ ] `build` runs every synchronous source parse and the assembly inside one `spawn_blocking`; only the pricing load and Codex limits run on the runtime.
-- [ ] `fingerprint` watches exactly the listed trees and files; a cargo test proves touching `budget.json`, adding a transcript, and deleting `rate-limits.json` each change the string, and an unrelated file does not.
-- [ ] Cargo unit tests port the `api.test.ts`, `project-cost.test.ts`, and `daily-activity.test.ts` cases that cover code in this module (project cost aggregation, daily merge precedence, data-health statuses, Claude stats-cache fallback).
-- [ ] `meta.generatedAt` and every other clock-derived value follow `TOKEN_ATLAS_NOW_MS`.
-- [ ] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean.
+- [x] `atlas stats` against Rust passes every golden `stats key <k>` test (all 19 top-level keys).
+- [x] The whole `golden.contract.test.ts` file passes against Rust and still passes against TS.
+- [x] `build` runs every synchronous source parse and the assembly inside one `spawn_blocking`; only the pricing load and Codex limits run on the runtime.
+- [x] `fingerprint` watches exactly the listed trees and files; a cargo test proves touching `budget.json`, adding a transcript, and deleting `rate-limits.json` each change the string, and an unrelated file does not.
+- [x] Cargo unit tests port the `api.test.ts`, `project-cost.test.ts`, and `daily-activity.test.ts` cases that cover code in this module (project cost aggregation, daily merge precedence, data-health statuses, Claude stats-cache fallback).
+- [x] `meta.generatedAt` and every other clock-derived value follow `TOKEN_ATLAS_NOW_MS`.
+- [x] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "stats key"`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts`
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::stats`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "stats key"`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts`
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::stats`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
 
 ## Eval rubric
 
