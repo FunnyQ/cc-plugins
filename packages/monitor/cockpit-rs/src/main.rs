@@ -1,3 +1,5 @@
+mod channel;
+
 use clap::{Args, Parser, Subcommand};
 use std::process::ExitCode;
 
@@ -90,7 +92,7 @@ fn main() -> ExitCode {
     }
     match Cli::parse().command {
         Command::Server(args) => server::run(&args.args),
-        Command::Channel(args) => stub("channel", args),
+        Command::Channel(_) => channel::run(),
         Command::Log(args) => cli::run("log", &args.args),
         Command::Scribe(args) => cli::run("scribe", &args.args),
         Command::Prep(args) => cli::run("prep", &args.args),

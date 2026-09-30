@@ -13,7 +13,7 @@ libc = "~0.2"
 clap = { version = "~4.5", features = ["derive"] }
 serde = { version = "~1.0", features = ["derive"] }
 serde_json = { version = "~1.0", features = ["preserve_order"] }
-tokio = { version = "~1.49", features = ["net", "time", "sync", "fs", "process", "signal", "macros", "rt", "io-util"] }
+tokio = { version = "~1.49", features = ["net", "time", "sync", "fs", "process", "signal", "macros", "rt", "io-std", "io-util"] }
 
 rusqlite = { version = "~0.40", features = ["bundled"] }
 
@@ -35,6 +35,9 @@ reqwest = { version = "~0.12", default-features = false, features = ["json"] }
 jiff = "~0.2"
 # Generate RFC 4122 v4 record ids compatible with crypto.randomUUID().
 uuid = { version = "~1.23", features = ["v4"] }
+# Verify experimental capabilities and arbitrary notifications without HTTP transports.
+rmcp = { version = "=3.5.0", default-features = false, features = ["server", "transport-io"] }
+anyhow = "~1.0"
 
 # sha1 of the git state: the signature stored in scribe-nudge.json must stay stable across releases
 sha1_smol = "~1.0"
