@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/03, engine/05, engine/07, contract/04
 > **Blocks**: ship/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -110,24 +110,24 @@ Subtract the cost of running `sh -c true` alone (measure it the same way) to get
 
 ## Acceptance criteria
 
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts -t "statusline|push-usage|rollup-update"` passes with no failing test.
-- [ ] The same suite still passes against TS (COCKPIT_BIN unset).
-- [ ] `rate-limits.json` written by Rust has key order `capturedAt, capturedAtEpochMs, rate_limits`, 2-space indent, no trailing newline, and `capturedAt` in `toISOString()` form; JS-falsy `rate_limits` writes nothing.
-- [ ] The marker is written before the spawn; a second run inside the throttle window leaves the marker mtime unchanged and spawns nothing; `.push-nudge` appears only with a non-empty `LLM_QUOTA_INGEST_URL`.
-- [ ] The inner command gets the exact stdin bytes; its stdout is forwarded, stderr inherited, and its exit code returned (spawn failure → 1, signal → 0).
-- [ ] `atlas push-usage` with no URL exits 0 without building a runtime or touching the network; with a URL it POSTs the pinned headers and `capturedAt, claude, codex` body within 8 s and exits 0 on every failure.
-- [ ] `statusline.rs` builds no tokio runtime (`grep -n 'tokio' packages/monitor/cockpit-rs/src/atlas/statusline.rs` prints nothing).
-- [ ] The task report states the measured statusline overhead (median ms, method, and the `sh -c true` baseline subtracted) against the ≤ 10 ms target.
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts -t "statusline|push-usage|rollup-update"` passes with no failing test.
+- [x] The same suite still passes against TS (COCKPIT_BIN unset).
+- [x] `rate-limits.json` written by Rust has key order `capturedAt, capturedAtEpochMs, rate_limits`, 2-space indent, no trailing newline, and `capturedAt` in `toISOString()` form; JS-falsy `rate_limits` writes nothing.
+- [x] The marker is written before the spawn; a second run inside the throttle window leaves the marker mtime unchanged and spawns nothing; `.push-nudge` appears only with a non-empty `LLM_QUOTA_INGEST_URL`.
+- [x] The inner command gets the exact stdin bytes; its stdout is forwarded, stderr inherited, and its exit code returned (spawn failure → 1, signal → 0).
+- [x] `atlas push-usage` with no URL exits 0 without building a runtime or touching the network; with a URL it POSTs the pinned headers and `capturedAt, claude, codex` body within 8 s and exits 0 on every failure.
+- [x] `statusline.rs` builds no tokio runtime (`grep -n 'tokio' packages/monitor/cockpit-rs/src/atlas/statusline.rs` prints nothing).
+- [x] The task report states the measured statusline overhead (median ms, method, and the `sh -c true` baseline subtracted) against the ≤ 10 ms target.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts -t "statusline|push-usage|rollup-update"`
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `grep -n 'tokio' packages/monitor/cockpit-rs/src/atlas/statusline.rs` prints nothing.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts -t "statusline|push-usage|rollup-update"`
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `grep -n 'tokio' packages/monitor/cockpit-rs/src/atlas/statusline.rs` prints nothing.
 
 ## Eval rubric
 

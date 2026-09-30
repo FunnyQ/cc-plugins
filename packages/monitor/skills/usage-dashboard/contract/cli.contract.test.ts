@@ -10,7 +10,7 @@ import {
   mkdirSync,
 } from "node:fs";
 import { join } from "node:path";
-import { atlasCommand, type AtlasSub } from "./launcher";
+import { atlasCommand, isRust, type AtlasSub } from "./launcher";
 import { freePort, makeFixtureHome, STUB_PATHS } from "./fixtures";
 
 type Fixture = Awaited<ReturnType<typeof makeFixtureHome>>;
@@ -176,6 +176,23 @@ describe("statusline", () => {
     // Catches a collector that waits on its nudges; cannot prove the child is fully detached.
     expect(r.elapsedMs).toBeLessThan(2_000);
   });
+
+  test.skipIf(!isRust())(
+    "inner command printing 1 MB before reading 1 MB of stdin does not deadlock",
+    async () => {
+      const f = await fixture();
+      const mb = 1024 * 1024;
+      const r = await run(f, "statusline", {
+        stdin: "x".repeat(mb),
+        env: {
+          TOKEN_ATLAS_STATUSLINE_COMMAND: `head -c ${mb} /dev/zero | tr '\\0' y; cat >/dev/null`,
+        },
+      });
+      expect(r.code).toBe(0);
+      expect(r.stdout.length).toBe(mb);
+    },
+    15_000,
+  );
 });
 
 describe("push-usage", () => {
