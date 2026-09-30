@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/01, contract/03
 > **Blocks**: channel/02
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 
@@ -138,3 +138,7 @@ Spike RSS: <n> KB (macOS arm64, idle, stdin open, transport: rmcp|hand-rolled)
 
 - Daemon coordinates, inbox long-poll, permission relay, session-id resolution, and spawning the server. Deferred to the full-channel task in this bucket, which builds on `notify` / `on_notification`.
 - Meeting the 10 MB RSS target. This task only records the number, and that number decides nothing.
+
+## Run notes
+
+Spike RSS: 2784 KB (macOS arm64, idle, stdin open, transport: rmcp)
