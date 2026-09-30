@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 6.0.1] - 2026-10-01
+
+_tracks tag `monitor-v6.0.1`_
+
+### Fixed
+- The cockpit binary download now resumes after an interruption and the hook's background fetch gets 10 minutes instead of 30 seconds, so on a slow GitHub link hooks and the channel no longer stay silently off after updating to 6.0.0; the first session after updating may still start without the channel, and a later session picks up the finished binary.
+
 ## [monitor 6.0.0] - 2026-09-30
 
 _tracks tag `monitor-v6.0.0`_
