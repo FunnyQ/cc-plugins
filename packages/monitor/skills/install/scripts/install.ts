@@ -16,14 +16,7 @@ const HOME = homedir();
 // usage-dashboard assets live one skill over; resolve cross-skill from here.
 const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
 
-const LIVE_SHIM = resolve(
-  import.meta.dir,
-  "..",
-  "..",
-  "cockpit",
-  "bin",
-  "cockpit",
-);
+const LIVE_SHIM = resolve(import.meta.dir, "../../cockpit/bin/cockpit");
 
 // The same shim inside the marketplace clone Claude Code keeps at
 // ~/.claude/plugins/marketplaces/. The clone updates in place, while the plugin

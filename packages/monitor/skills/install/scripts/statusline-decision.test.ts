@@ -62,6 +62,23 @@ describe("decideStatusLine", () => {
     });
   });
 
+  test("never wraps a quoted shim around the collector itself", () => {
+    expect(
+      decideStatusLine({ command: `'${SHIM}' atlas statusline` }, COLLECTOR),
+    ).toEqual({ action: "skip" });
+    expect(
+      decideStatusLine(
+        { command: `"/old/skills/cockpit/bin/cockpit" atlas statusline` },
+        COLLECTOR,
+      ),
+    ).toEqual({
+      action: "write",
+      command: COLLECTOR,
+      padding: 0,
+      preserved: null,
+    });
+  });
+
   test("wires fresh when there is no existing statusLine", () => {
     const d = decideStatusLine({}, COLLECTOR);
     expect(d).toEqual({
@@ -117,6 +134,30 @@ describe("migrateCollectorCommand", () => {
         CLONE_SHIM,
       ),
     ).toBeNull();
+  });
+
+  test("replaces an absolute bun path whole, not just its `bun` tail", () => {
+    expect(
+      migrateCollectorCommand(
+        `/home/q/.bun/bin/bun ${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts`,
+        CLONE_SHIM,
+      ),
+    ).toBe(CLONE_SHIM);
+  });
+
+  test("replaces a quoted script and a quoted bun without leaving a quote", () => {
+    expect(
+      migrateCollectorCommand(
+        `${WRAP} bun "${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts"`,
+        CLONE_SHIM,
+      ),
+    ).toBe(`${WRAP} ${CLONE_SHIM}`);
+    expect(
+      migrateCollectorCommand(
+        `"/opt/bun" '${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts'`,
+        CLONE_SHIM,
+      ),
+    ).toBe(CLONE_SHIM);
   });
 
   test("leaves a foreign statusline-collector.ts alone", () => {

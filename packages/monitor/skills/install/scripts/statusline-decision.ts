@@ -7,12 +7,16 @@
 // setup.ts import them, because a second literal drifts and makes "is it
 // wired?" disagree with what the writer produces.
 
-// New form: `<path>/skills/cockpit/bin/cockpit atlas statusline`.
+// New form: `<path>/skills/cockpit/bin/cockpit atlas statusline`. Quotes
+// around the path are matched too: a hand-quoted shim read as a user command
+// would be wrapped around the collector itself.
 export const SHIM_COLLECTOR_RE =
-  /(\S*\/skills\/cockpit\/bin\/cockpit) atlas statusline\b/;
+  /["']?([^\s"']*\/skills\/cockpit\/bin\/cockpit)["']? atlas statusline\b/;
 // Old form: the removed `bun <path>/statusline-collector.ts`. The optional
-// `bun ` is part of the match so a rewrite replaces the whole collector part.
-export const TS_COLLECTOR_RE = /(?:\bbun\s+)?(\S*statusline-collector\.ts)/;
+// `bun` (bare or absolute, quoted or not) and the quotes around the script are
+// part of the match so a rewrite replaces the whole collector part.
+export const TS_COLLECTOR_RE =
+  /(?:(?<!\S)["']?(?:[^\s"']*\/)?bun["']?\s+)?["']?([^\s"']*statusline-collector\.ts)["']?/;
 const TS_COLLECTOR_SUFFIX =
   "/skills/usage-dashboard/scripts/statusline-collector.ts";
 
@@ -58,20 +62,9 @@ export function decideStatusLine(
   if (referencedShim && referencedShim === liveShim) {
     return { action: "skip" };
   }
-  if (existing && referencedShim) {
-    const command = replaceCollector(
-      existing,
-      SHIM_COLLECTOR_RE,
-      collectorCommand,
-    );
-    return { action: "write", command, padding, preserved: null };
-  }
-  if (existing && TS_COLLECTOR_RE.test(existing)) {
-    const command = replaceCollector(
-      existing,
-      TS_COLLECTOR_RE,
-      collectorCommand,
-    );
+  if (existing && (referencedShim || TS_COLLECTOR_RE.test(existing))) {
+    const re = referencedShim ? SHIM_COLLECTOR_RE : TS_COLLECTOR_RE;
+    const command = replaceCollector(existing, re, collectorCommand);
     return { action: "write", command, padding, preserved: null };
   }
 
