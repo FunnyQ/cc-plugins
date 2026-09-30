@@ -43,15 +43,15 @@ pub fn add_model_usage(target: &mut ModelUsage, source: &ModelUsage);
 pub fn model_usage_total(usage: &ModelUsage) -> i64;
 pub fn fmt_date(ms: i64) -> String;                       // api.ts fmtDate, local time
 // Helpers every provider source needs; owned here so no source keeps a private copy.
-pub fn add_hourly_usage(/* api.ts addHourlyUsage params */);
-pub fn add_nested_model_usage(/* api.ts addNestedModelUsage params */);
+pub fn add_hourly_usage(buckets: &mut IndexMap<i64, HourlyUsageBucket>, timestamp_ms: i64, model: &str, usage: &ModelUsage);
+pub fn add_nested_model_usage(outer: &mut IndexMap<String, IndexMap<String, ModelUsage>>, key: &str, model: &str, usage: &ModelUsage);
 pub fn project_name(path: &str) -> String;                // api.ts projectName
 pub fn display_path(path: &Path) -> String;               // api.ts displayPath: home prefix → "~"
 pub fn coerce_number(value: &serde_json::Value) -> Option<f64>;           // api.ts coerceNumber
-pub fn build_usage_limit_window(/* api.ts buildUsageLimitWindow params */) -> Option<UsageLimitWindow>;
+pub fn build_usage_limit_window(bucket: Option<&serde_json::Value>, duration_ms: i64, now_ms: i64) -> Option<UsageLimitWindow>;
 ```
 
-`dedup.rs` ports `dedup.ts` (`walk_files`, `dedup_key`, `usage_token_total`, `count_claude_tool_calls`, `add_billed_tokens`, `hour_start_ms` — local hour). `jsonl.rs` ports `shared/scripts/jsonl-lines.ts` (UTF-8-safe cursor reader returning lines + the byte offset after the last complete line). `session_files.rs` ports `session-files.ts` (`read_session_files() -> Vec<ClaudeSessionFile>`; `pub struct ClaudeSessionFile` lives in `session_files.rs`, mirroring the TS type of the same name). `paths.rs` ports `paths.ts` plus `rollup_db_path()` and `codex_cache_path()`.
+`dedup.rs` ports `dedup.ts` (`walk_files`, `dedup_key`, `usage_token_total`, `count_claude_tool_calls`, `add_billed_tokens`, `hour_start_ms` — local hour). `jsonl.rs` ports `shared/scripts/jsonl-lines.ts`: `read_jsonl_lines(path, JsonlLinesOptions { start, chunk_size, emit_partial }) -> JsonlLines`, an `Iterator<Item = String>` whose `bytes_consumed()` is the byte offset after the last complete line (`TranscriptUsage` is `dedup::DedupUsage` re-exported). Every `source_json` returns the full `--source` shape; `stats::run_cli` only prints it. `session_files.rs` ports `session-files.ts` (`read_session_files() -> Vec<ClaudeSessionFile>`; `pub struct ClaudeSessionFile` lives in `session_files.rs`, mirroring the TS type of the same name). `paths.rs` ports `paths.ts` plus `rollup_db_path()` and `codex_cache_path()`.
 
 ## `rollup_db.rs`
 
@@ -116,10 +116,10 @@ pub struct PricingLoad { pub table: PricingTable, pub meta: PricingMeta }
 pub async fn load_pricing_with_meta(ctx: &Ctx) -> anyhow::Result<PricingLoad>; // process-wide cache, as TS pricingCache; Err where TS throws
 pub fn clear_pricing_cache();
 pub fn price_for(model: &str, table: &PricingTable) -> ModelPrice;
-pub fn calc_cost(/* api.ts calcCost params */) -> f64;
+pub fn calc_cost(usage: &ModelUsage, model: &str, table: &PricingTable) -> f64;
 pub fn normalize_model_id(id: &str) -> String;
-pub fn pricing_model_aliases(/* api.ts params */) -> Vec<String>;
-pub fn pricing_meta_for_models(/* api.ts pricingMetaForModels params */) -> serde_json::Value;
+pub fn pricing_model_aliases(model: &str, table: &PricingTable) -> Vec<String>;
+pub fn pricing_meta_for_models(pricing: &PricingLoad, models: &[String]) -> serde_json::Value;
 #[derive(Serialize)] pub struct PricingRefreshResult { /* api.ts PricingRefreshResult */ }
 pub async fn refresh_pricing_override(ctx: &Ctx, models: Vec<String>) -> anyhow::Result<PricingRefreshResult>;
 pub fn source_json(load: &PricingLoad) -> serde_json::Value;         // `atlas stats --source pricing`

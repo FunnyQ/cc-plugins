@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: engine/02, engine/04, engine/05, engine/06, server/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -118,24 +118,24 @@ rustls pulls `ring` (C/asm). CI (`.github/workflows/cockpit-release.yml`) builds
 
 ## Acceptance criteria
 
-- [ ] `cargo build --release` succeeds with reqwest's rustls feature and `indexmap` enabled; both dependencies carry a justification comment in `Cargo.toml`.
-- [ ] `cockpit atlas bogus` and bare `cockpit atlas` print the usage line to stderr and exit 2.
-- [ ] `cockpit atlas stats --source nope` exits 2 with the stats usage line and without calling any stub (no panic output).
-- [ ] Every module listed in `engine-api.md` exists with its exact public signature; `paths`, `dedup`, `jsonl`, `model`, `session_files` are fully implemented (no `todo!()`).
-- [ ] The cargo tests listed above exist and pass, including the DST case and the jsonl multibyte boundary case.
-- [ ] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean.
-- [ ] Cockpit's contract suite is green against the rebuilt binary after the `serve_dir` extraction.
-- [ ] The musl cross-build either succeeds locally or is reported as untested with the `cargo check --target aarch64-apple-darwin` result.
+- [x] `cargo build --release` succeeds with reqwest's rustls feature and `indexmap` enabled; both dependencies carry a justification comment in `Cargo.toml`.
+- [x] `cockpit atlas bogus` and bare `cockpit atlas` print the usage line to stderr and exit 2.
+- [x] `cockpit atlas stats --source nope` exits 2 with the stats usage line and without calling any stub (no panic output).
+- [x] Every module listed in `engine-api.md` exists with its exact public signature; `paths`, `dedup`, `jsonl`, `model`, `session_files` are fully implemented (no `todo!()`).
+- [x] The cargo tests listed above exist and pass, including the DST case and the jsonl multibyte boundary case.
+- [x] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean.
+- [x] Cockpit's contract suite is green against the rebuilt binary after the `serve_dir` extraction.
+- [x] The musl cross-build either succeeds locally or is reported as untested with the `cargo check --target aarch64-apple-darwin` result.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `packages/monitor/cockpit-rs/target/release/cockpit atlas bogus; test $? -eq 2`
-- [ ] `packages/monitor/cockpit-rs/target/release/cockpit atlas stats --source nope; test $? -eq 2`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `packages/monitor/cockpit-rs/target/release/cockpit atlas bogus; test $? -eq 2`
+- [x] `packages/monitor/cockpit-rs/target/release/cockpit atlas stats --source nope; test $? -eq 2`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/`
 
 ## Eval rubric
 

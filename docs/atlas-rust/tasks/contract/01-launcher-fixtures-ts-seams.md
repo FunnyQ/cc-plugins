@@ -6,7 +6,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: contract/02, contract/03, contract/04
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -88,21 +88,21 @@ Contents of the home — each item exists to exercise one rule:
 
 ## Acceptance criteria
 
-- [ ] `atlasCommand` returns `[COCKPIT_BIN, "atlas", sub, ...args]` when `COCKPIT_BIN` is set and `["bun", <abs path>, ...args]` for each of the six subcommands when it is not; `launcher.test.ts` covers all six plus the Rust form.
-- [ ] `makeFixtureHome()` builds every item listed under "Contents of the home", and two calls produce homes whose files have identical relative paths, sizes, and mtimes.
-- [ ] With the fixture env, `bun packages/monitor/skills/usage-dashboard/scripts/api.ts` prints a payload whose `summary.providers.claude`, `.codex`, and `.opencode` each report non-zero tokens, and the stub recorded at least one OpenRouter request and one Codex token-refresh request.
-- [ ] With the fixture env, `bun packages/monitor/skills/usage-dashboard/scripts/api.ts --source codex` prints JSON whose `usage.modelUsage` is non-empty; the other three source names each print valid JSON with the top-level keys listed above.
-- [ ] Two runs of `bun api.ts` under the same fixture env print identical JSON (the pinned clock makes `meta.generatedAt` stable).
-- [ ] With the three URL vars and `TOKEN_ATLAS_NOW_MS` unset, `api.ts` uses the original literal URLs and the real clock (asserted in `fixtures.test.ts` by importing the constants / `nowMs()`).
-- [ ] The only remaining `Date.now()` / `new Date()` reads in `api.ts`, `live.ts`, `live-sessions.ts` are inside `nowMs()`.
-- [ ] Existing unit tests under `packages/monitor/skills/usage-dashboard/scripts/` still pass, and the touched TS typechecks clean.
+- [x] `atlasCommand` returns `[COCKPIT_BIN, "atlas", sub, ...args]` when `COCKPIT_BIN` is set and `["bun", <abs path>, ...args]` for each of the six subcommands when it is not; `launcher.test.ts` covers all six plus the Rust form.
+- [x] `makeFixtureHome()` builds every item listed under "Contents of the home", and two calls produce homes whose files have identical relative paths, sizes, and mtimes.
+- [x] With the fixture env, `bun packages/monitor/skills/usage-dashboard/scripts/api.ts` prints a payload whose `summary.providers.claude`, `.codex`, and `.opencode` each report non-zero tokens, and the stub recorded at least one OpenRouter request and one Codex token-refresh request.
+- [x] With the fixture env, `bun packages/monitor/skills/usage-dashboard/scripts/api.ts --source codex` prints JSON whose `usage.modelUsage` is non-empty; the other three source names each print valid JSON with the top-level keys listed above.
+- [x] Two runs of `bun api.ts` under the same fixture env print identical JSON (the pinned clock makes `meta.generatedAt` stable).
+- [x] With the three URL vars and `TOKEN_ATLAS_NOW_MS` unset, `api.ts` uses the original literal URLs and the real clock (asserted in `fixtures.test.ts` by importing the constants / `nowMs()`).
+- [x] The only remaining `Date.now()` / `new Date()` reads in `api.ts`, `live.ts`, `live-sessions.ts` are inside `nowMs()`.
+- [x] Existing unit tests under `packages/monitor/skills/usage-dashboard/scripts/` still pass, and the touched TS typechecks clean.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/usage-dashboard/scripts/`
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/launcher.test.ts packages/monitor/skills/usage-dashboard/contract/fixtures.test.ts`
-- [ ] `grep -nE 'Date\.now\(\)|new Date\(\)' packages/monitor/skills/usage-dashboard/scripts/api.ts packages/monitor/skills/usage-dashboard/scripts/live.ts packages/monitor/skills/usage-dashboard/scripts/live-sessions.ts` lists only the line inside `nowMs()`.
-- [ ] `bunx --bun tsc --noEmit | grep usage-dashboard` prints nothing.
+- [x] `bun test packages/monitor/skills/usage-dashboard/scripts/`
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/launcher.test.ts packages/monitor/skills/usage-dashboard/contract/fixtures.test.ts`
+- [x] `grep -nE 'Date\.now\(\)|new Date\(\)' packages/monitor/skills/usage-dashboard/scripts/api.ts packages/monitor/skills/usage-dashboard/scripts/live.ts packages/monitor/skills/usage-dashboard/scripts/live-sessions.ts` lists only the line inside `nowMs()`.
+- [x] `bunx --bun tsc --noEmit | grep usage-dashboard` prints nothing.
 
 ## Eval rubric
 
