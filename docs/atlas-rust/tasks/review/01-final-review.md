@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: ship/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 > **Models**: judge=opus/high, fix=opus/high
 
@@ -48,25 +48,25 @@ Fix integration defects in place. Do not rewrite a module whose golden or contra
 
 ## Acceptance criteria
 
-- [ ] `docs/atlas-rust/review-notes.md` exists and gives each of the seven review areas above a verdict with evidence (file:line or command output).
-- [ ] `rg -n --glob '!*.test.ts' --glob '!docs/**' 'bun [^ ]*usage-dashboard/scripts/(atlas-server|api|live|rollup-update|statusline-collector|push-usage)\.ts' packages opencode CLAUDE.md README.md` prints nothing.
-- [ ] The atlas contract + golden suite passes against the Rust binary with zero failures.
-- [ ] `docs/atlas-rust/review-notes.md` quotes all three measured targets and the real-home golden result from `docs/atlas-rust/measurements.md` and states pass or miss for each, with the cause of any miss.
-- [ ] `packages/monitor/cockpit-rs/Cargo.toml` version equals the `version` in `packages/monitor/.claude-plugin/plugin.json` and `packages/monitor/.codex-plugin/plugin.json`, and `.chronicle/release.json` is unchanged: `git diff --name-only <baseRef> -- .chronicle/release.json` prints nothing.
-- [ ] (human) Q opens the Rust-served dashboard on real data and checks every panel, the pricing refresh button, and the live panel's click-through to cockpit.
-- [ ] (human) Q confirms the Claude Code statusline renders after the session-check migration rewrote `statusLine.command`.
+- [x] `docs/atlas-rust/review-notes.md` exists and gives each of the seven review areas above a verdict with evidence (file:line or command output).
+- [x] `rg -n --glob '!*.test.ts' --glob '!docs/**' 'bun [^ ]*usage-dashboard/scripts/(atlas-server|api|live|rollup-update|statusline-collector|push-usage)\.ts' packages opencode CLAUDE.md README.md` prints nothing.
+- [x] The atlas contract + golden suite passes against the Rust binary with zero failures.
+- [x] `docs/atlas-rust/review-notes.md` quotes all three measured targets and the real-home golden result from `docs/atlas-rust/measurements.md` and states pass or miss for each, with the cause of any miss.
+- [x] `packages/monitor/cockpit-rs/Cargo.toml` version equals the `version` in `packages/monitor/.claude-plugin/plugin.json` and `packages/monitor/.codex-plugin/plugin.json`, and `.chronicle/release.json` is unchanged: `git diff --name-only <baseRef> -- .chronicle/release.json` prints nothing.
+- [x] (human) Q opens the Rust-served dashboard on real data and checks every panel, the pricing refresh button, and the live panel's click-through to cockpit.
+- [x] (human) Q confirms the Claude Code statusline renders after the session-check migration rewrote `statusLine.command`.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/`
-- [ ] `bun test --parallel packages/monitor/ opencode/`
-- [ ] `bunx --bun tsc --noEmit | grep -E 'packages/monitor/skills/(usage-dashboard|install|cockpit)|opencode/'` prints nothing.
-- [ ] `git diff --name-only <baseRef> -- packages/monitor/cockpit-rs/src/atlas packages/monitor/skills/usage-dashboard packages/monitor/skills/install CLAUDE.md README.md` lists paths under each of those five areas.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/`
+- [x] `bun test --parallel packages/monitor/ opencode/`
+- [x] `bunx --bun tsc --noEmit | grep -E 'packages/monitor/skills/(usage-dashboard|install|cockpit)|opencode/'` prints nothing.
+- [x] `git diff --name-only <baseRef> -- packages/monitor/cockpit-rs/src/atlas packages/monitor/skills/usage-dashboard packages/monitor/skills/install CLAUDE.md README.md` lists paths under each of those five areas.
 
 ## Eval rubric
 
