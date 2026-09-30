@@ -202,6 +202,30 @@ describe("cli: find-session", () => {
 });
 
 describe("cli: wait", () => {
+  test("missing session and missing or dead daemon fail", () => {
+    expect(cli(["wait"])).toEqual({ exitCode: 1, stdout: "", stderr: "cockpit wait: <sessionId> is required\n" });
+    const expected = { exitCode: 1, stdout: "", stderr: "cockpit daemon not running — start the dashboard first\n" };
+    expect(cli(["wait", f.claudeSessionId])).toEqual(expected);
+    writeFileSync(join(h.cockpitHome, "daemon.json"), JSON.stringify({ pid: 2147483647, port: 12345, token: "test" }));
+    expect(cli(["wait", f.claudeSessionId])).toEqual(expected);
+  });
+  test("answer-here on without a tab returns no-watcher exit 4", async () => {
+    seed(); await daemon(); success(["config", "--answer-here", "on"], "cockpit: answer_here = on\n");
+    expect(await background(["wait", f.claudeSessionId]).result).toEqual({ exitCode: 4, stdout: "", stderr: "cockpit wait: nobody is watching — no cockpit tab has this session open\n" });
+  });
+  test("timeout sentinel re-polls and accepts an empty answer", async () => {
+    const call = seed(); let polls = 0;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: await freePort(), fetch(req) {
+      const url = new URL(req.url);
+      expect(url.pathname).toBe("/api/wait"); expect(url.searchParams.get("call")).toBe(call);
+      expect(url.searchParams.get("require_watcher")).toBe("1");
+      return Response.json(++polls === 1 ? { answer: null, timeout: true } : { answer: "" });
+    } }); servers.push(server);
+    writeFileSync(join(h.cockpitHome, "daemon.json"), JSON.stringify({ pid: process.pid, port: server.port, token: "test" }));
+    expect(await background(["wait", f.claudeSessionId]).result).toEqual({ exitCode: 0, stdout: "\n", stderr: "" });
+    expect(polls).toBe(2);
+  });
+
   test("answer-here off returns not_watching exit 4", async () => {
     seed(); await daemon();
     success(["config", "--answer-here", "off"], "cockpit: answer_here = off\n");

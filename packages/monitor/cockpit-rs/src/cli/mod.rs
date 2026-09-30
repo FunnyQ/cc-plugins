@@ -1,3 +1,5 @@
+pub mod broker_client;
+pub mod restart;
 pub mod settings;
 pub mod trail;
 use crate::{
@@ -187,6 +189,13 @@ pub fn upsert(
     ));
     Ok(())
 }
+pub fn flag_value<'a>(rest: &'a [String], name: &str) -> Option<&'a str> {
+    rest.iter()
+        .position(|s| s == &format!("--{name}"))
+        .and_then(|i| rest.get(i + 1))
+        .map(String::as_str)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: cli/01, server/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -99,23 +99,23 @@ pub fn classify_daemon(pid: Option<i64>, root: Option<&str>, my_root: &str, is_a
 
 ## Acceptance criteria
 
-- [ ] Against Rust, `cli: wait` passes: an answer string (including empty) exits 0 with it on stdout; superseded exits 3; `not_watching` exits 4 with the right message for each reason; a dead or missing daemon exits 1; the timeout sentinel re-polls.
-- [ ] Against Rust, `cli: send` passes: the `delivered: true` / `delivered: false` output, a non-2xx exiting 1 with `<error> (HTTP <status>)`, and the call id auto-resolved from the session's log.
-- [ ] Against Rust, `cli: restart` passes: it replaces a running daemon, confirms `daemon.json.root` equals `<plugin root>/skills/cockpit/scripts`, and prints the two success lines.
-- [ ] `classify_daemon` has `cargo test` cases for absent (no record, no pid, dead pid), ours, and foreign.
-- [ ] The query string uses `encodeURIComponent` semantics, with a `cargo test` over a session id containing `/`, space, and `&`.
-- [ ] The `restart` source comment names the one intended behavioral difference (spawns its own exe instead of `bun cockpit-server.ts`).
+- [x] Against Rust, `cli: wait` passes: an answer string (including empty) exits 0 with it on stdout; superseded exits 3; `not_watching` exits 4 with the right message for each reason; a dead or missing daemon exits 1; the timeout sentinel re-polls.
+- [x] Against Rust, `cli: send` passes: the `delivered: true` / `delivered: false` output, a non-2xx exiting 1 with `<error> (HTTP <status>)`, and the call id auto-resolved from the session's log.
+- [x] Against Rust, `cli: restart` passes: it replaces a running daemon, confirms `daemon.json.root` equals `<plugin root>/skills/cockpit/scripts`, and prints the two success lines.
+- [x] `classify_daemon` has `cargo test` cases for absent (no record, no pid, dead pid), ours, and foreign.
+- [x] The query string uses `encodeURIComponent` semantics, with a `cargo test` over a session id containing `/`, space, and `&`.
+- [x] The `restart` source comment names the one intended behavioral difference (spawns its own exe instead of `bun cockpit-server.ts`).
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: wait"`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: send"`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: restart"`
-- [ ] The same three groups, run without `COCKPIT_BIN` (against TS), still pass.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: wait"`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: send"`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: restart"`
+- [x] The same three groups, run without `COCKPIT_BIN` (against TS), still pass.
 
 ## Eval rubric
 

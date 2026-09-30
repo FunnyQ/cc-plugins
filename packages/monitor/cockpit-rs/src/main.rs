@@ -80,11 +80,6 @@ enum HookCommand {
     Stop(TrailingArgs),
 }
 
-fn stub(subcommand: &str, _args: TrailingArgs) -> ExitCode {
-    eprintln!("cockpit: {subcommand} not implemented yet");
-    ExitCode::from(2)
-}
-
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     if let Some(code) = cli::preflight(&argv) {
@@ -97,9 +92,9 @@ fn main() -> ExitCode {
         Command::Scribe(args) => cli::run("scribe", &args.args),
         Command::Prep(args) => cli::run("prep", &args.args),
         Command::Config(args) => cli::run("config", &args.args),
-        Command::Wait(args) => stub("wait", args),
-        Command::Send(args) => stub("send", args),
-        Command::Restart(args) => stub("restart", args),
+        Command::Wait(args) => cli::broker_client::run("wait", &args.args),
+        Command::Send(args) => cli::broker_client::run("send", &args.args),
+        Command::Restart(args) => cli::restart::run(&args.args),
         Command::Nudge(args) => cli::run("nudge", &args.args),
         Command::FindSession(args) => cli::run("find-session", &args.args),
         Command::Hook { command } => match command {
