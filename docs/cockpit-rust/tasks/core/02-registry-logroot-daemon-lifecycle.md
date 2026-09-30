@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/01
 > **Blocks**: core/03, server/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -150,22 +150,22 @@ Use `tempfile` dirs, a real `git init` for log-root cases (skip gracefully if gi
 
 ## Acceptance criteria
 
-- [ ] `read_registry` normalizes provider, drops non-string `sessionId` entries, survives a corrupt file and a single malformed entry, and preserves unknown keys through a rewrite.
-- [ ] `write_registry` reaps entries older than 14 days by max(heartbeat, log mtime) and writes 2-space JSON with no trailing newline; `persist_title_updates` writes only on change and does not reap.
-- [ ] `status_of` and `derive_live_status` follow the priority and 10-minute rule above.
-- [ ] `log_root` never returns a directory above the git root, honors the nearest existing `.cockpit/`, returns cwd outside a repo, and normalizes symlinked paths.
-- [ ] `decide_startup`, `version_from_root`, `compare_versions`, and `should_supersede_daemon` return the documented result for every case in the mirrored TS tests, including unversioned roots → no supersede.
-- [ ] `write_daemon_info` output is byte-identical to TS for the same values (key order pid, port, token, root; trailing newline); `new_token` is 32 lowercase hex chars.
-- [ ] `latest_open_call_id` and `call_matches` match every case in `call-log.test.ts`.
-- [ ] fmt and clippy (`-D warnings`) are clean.
+- [x] `read_registry` normalizes provider, drops non-string `sessionId` entries, survives a corrupt file and a single malformed entry, and preserves unknown keys through a rewrite.
+- [x] `write_registry` reaps entries older than 14 days by max(heartbeat, log mtime) and writes 2-space JSON with no trailing newline; `persist_title_updates` writes only on change and does not reap.
+- [x] `status_of` and `derive_live_status` follow the priority and 10-minute rule above.
+- [x] `log_root` never returns a directory above the git root, honors the nearest existing `.cockpit/`, returns cwd outside a repo, and normalizes symlinked paths.
+- [x] `decide_startup`, `version_from_root`, `compare_versions`, and `should_supersede_daemon` return the documented result for every case in the mirrored TS tests, including unversioned roots → no supersede.
+- [x] `write_daemon_info` output is byte-identical to TS for the same values (key order pid, port, token, root; trailing newline); `new_token` is 32 lowercase hex chars.
+- [x] `latest_open_call_id` and `call_matches` match every case in `call-log.test.ts`.
+- [x] fmt and clippy (`-D warnings`) are clean.
 
 ## Verification
 
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml log_root` runs at least one test that asserts a `.cockpit` directory above the git root is ignored.
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml log_root` runs at least one test that asserts a `.cockpit` directory above the git root is ignored.
 
 ## Eval rubric
 

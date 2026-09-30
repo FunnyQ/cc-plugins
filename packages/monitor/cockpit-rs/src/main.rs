@@ -11,6 +11,22 @@ mod config;
 #[allow(dead_code)]
 mod tunables;
 
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod registry;
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod log_root;
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod daemon_info;
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod process_alive;
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod call_log;
+
 #[derive(Parser)]
 #[command(name = "cockpit", version)]
 struct Cli {

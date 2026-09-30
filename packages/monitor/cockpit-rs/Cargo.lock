@@ -109,6 +109,7 @@ name = "cockpit"
 version = "5.2.4"
 dependencies = [
  "clap",
+ "libc",
  "serde",
  "serde_json",
  "tempfile",

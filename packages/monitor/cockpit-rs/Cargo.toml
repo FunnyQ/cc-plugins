@@ -8,6 +8,8 @@ name = "cockpit"
 path = "src/main.rs"
 
 [dependencies]
+# Prevent treating EPERM from kill(pid, 0) as a dead process.
+libc = "~0.2"
 clap = { version = "~4.5", features = ["derive"] }
 serde = { version = "~1.0", features = ["derive"] }
 serde_json = { version = "~1.0", features = ["preserve_order"] }
