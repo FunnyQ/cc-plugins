@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: ship/04
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 > **Models**: judge=opus/high, fix=opus/high
 
@@ -41,22 +41,22 @@ Fix integration defects in place. Do not re-score or rewrite a port that its own
 
 ## Acceptance criteria
 
-- [ ] `docs/cockpit-rust/review-notes.md` exists and lists each of the five review areas above with a verdict and evidence (file:line or command output).
-- [ ] `rg -n --glob '!*.test.ts' 'bun [^ ]*cockpit/scripts/(cockpit|cockpit-server|cockpit-channel|decision-log-start|scribe-nudge|find-session)\.ts' packages opencode CLAUDE.md` prints nothing. Test fixtures are excluded on purpose: the reaper keeps tests that match old TS process lines.
-- [ ] The full contract suite passes against the Rust binary.
-- [ ] `packages/monitor/cockpit-rs/Cargo.toml` version equals the `version` in `packages/monitor/.claude-plugin/plugin.json` and `packages/monitor/.codex-plugin/plugin.json`.
-- [ ] `docs/cockpit-rust/review-notes.md` quotes both RSS numbers from `docs/cockpit-rust/rss.md` against the targets (channel ≤ 10 MB, server ≤ 30 MB) and states pass or miss for each.
-- [ ] (human) Q runs one real Claude Code session with the plugin's shim and `COCKPIT_BIN` pointing at the release build: a dashboard message arrives, a permission prompt is approved from the cockpit, and the dashboard panels render.
+- [x] `docs/cockpit-rust/review-notes.md` exists and lists each of the five review areas above with a verdict and evidence (file:line or command output).
+- [x] `rg -n --glob '!*.test.ts' 'bun [^ ]*cockpit/scripts/(cockpit|cockpit-server|cockpit-channel|decision-log-start|scribe-nudge|find-session)\.ts' packages opencode CLAUDE.md` prints nothing. Test fixtures are excluded on purpose: the reaper keeps tests that match old TS process lines.
+- [x] The full contract suite passes against the Rust binary.
+- [x] `packages/monitor/cockpit-rs/Cargo.toml` version equals the `version` in `packages/monitor/.claude-plugin/plugin.json` and `packages/monitor/.codex-plugin/plugin.json`.
+- [x] `docs/cockpit-rust/review-notes.md` quotes both RSS numbers from `docs/cockpit-rust/rss.md` against the targets (channel ≤ 10 MB, server ≤ 30 MB) and states pass or miss for each.
+- [x] (human) Q runs one real Claude Code session with the plugin's shim and `COCKPIT_BIN` pointing at the release build: a dashboard message arrives, a permission prompt is approved from the cockpit, and the dashboard panels render.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit COCKPIT_PLUGIN_ROOT=$PWD/packages/monitor bun test packages/monitor/skills/cockpit/contract/`
-- [ ] `bun test packages/monitor/ opencode/`
-- [ ] `git diff --name-only <baseRef> -- packages/monitor/cockpit-rs/Cargo.toml packages/monitor/skills/cockpit/bin/cockpit .github/workflows/cockpit-release.yml` lists all three paths.
-- [ ] `bunx --bun tsc --noEmit | grep -E 'packages/monitor/skills/(cockpit|install|usage-dashboard)|opencode/'` prints nothing.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit COCKPIT_PLUGIN_ROOT=$PWD/packages/monitor bun test packages/monitor/skills/cockpit/contract/`
+- [x] `bun test packages/monitor/ opencode/`
+- [x] `git diff --name-only <baseRef> -- packages/monitor/cockpit-rs/Cargo.toml packages/monitor/skills/cockpit/bin/cockpit .github/workflows/cockpit-release.yml` lists all three paths.
+- [x] `bunx --bun tsc --noEmit | grep -E 'packages/monitor/skills/(cockpit|install|usage-dashboard)|opencode/'` prints nothing.
 
 ## Eval rubric
 
