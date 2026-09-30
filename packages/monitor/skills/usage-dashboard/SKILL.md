@@ -44,11 +44,11 @@ If you see that line, surface it and offer `--port <n>`. A port held by a
 previous dashboard is not this case — the server reuses or supersedes it and
 prints the URL as usual.
 
-**`<plugin-root>`** resolves per runtime. Under Claude Code, use
-`${CLAUDE_PLUGIN_ROOT}`. Under Codex, resolve it from the installed skill root
-that contains this skill. In a development checkout of this repository,
-`${CLAUDE_PLUGIN_ROOT}` is empty. Substitute `packages/monitor` from the repo
-root instead, for example `bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts`.
+**`<plugin-root>`** resolves per runtime. Under Claude Code, it is the "Base
+directory for this skill" path with `/skills/usage-dashboard` removed. Under
+Codex, resolve it from the installed skill root that contains this skill. In a
+development checkout of this repository, use `packages/monitor` from the repo
+root.
 
 **OpenCode only** — skip on Claude Code and Codex: follow
 `~/.config/opencode/skills/usage-dashboard/references/opencode.md`. The path is
@@ -76,13 +76,6 @@ the unchanged payload to its inner statusline (default
 `TOKEN_ATLAS_STATUSLINE_COMMAND` env var to keep an existing line like
 claude-powerline rendering).
 
-**Don't hand-write the path.** The precheck (`install.ts`) reports whether the
-collector is wired (the `○ live usage limits (statusline collector)` line). Use
-its resolved path rather than `${CLAUDE_PLUGIN_ROOT}`: that variable is not
-expanded in the status-line context. The precheck resolves the collector inside
-the marketplace clone, which carries no version, so the path survives
-`claude plugin update`.
-
 ## Optional Remote Usage Export
 
 The statusline collector can also push the latest Claude + Codex usage-window
@@ -103,23 +96,11 @@ It does not send transcripts, message content, or project/session lists. If
 
 ### Offer to wire it up
 
-When the precheck shows the usage-limits check as `○` (not wired), **ask the
-user with the `AskUserQuestion` tool** whether they want it set up
-automatically. Do not silently edit their global config. Offer these
-options:
-
-- **Set it up for me** — run
-  `bun ${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup-statusline.ts`, then
-  relay its output. The script edits `~/.claude/settings.json`. It backs up
-  the file to `settings.json.bak` first. It preserves any existing status
-  line by wrapping it via `TOKEN_ATLAS_STATUSLINE_COMMAND`. The script is
-  idempotent. It refuses to touch the file if the file isn't valid JSON.
-  Tell the user to **restart Claude Code** for the new status line to take
-  effect.
-- **Show manual steps** — print the precheck's paste-ready
-  `statusLine.command` hint verbatim. Then stop.
-- **Skip** — launch the dashboard without usage limits. The panel stays
-  empty.
+When the precheck shows the usage-limits check as `○` (not wired), ask the
+user with `AskUserQuestion` whether to wire it. Do not edit their global
+config yourself. If they agree, run the `monitor:install` skill, which owns
+every config write for this plugin. If they decline, launch the dashboard
+anyway; the usage-limits panel stays empty.
 
 ## Pricing
 
