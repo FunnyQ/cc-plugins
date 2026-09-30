@@ -419,6 +419,10 @@ export function flaggedBlocks(
   return blocks;
 }
 
+// Kept out of formatReason so the sweep asks once however many files it reports.
+export const ASK =
+  "Answer for every line marked +: does it say why, or what? Delete the ones that say what.";
+
 export function formatReason(
   fileName: string,
   blocks: CommentBlock[],
@@ -427,7 +431,6 @@ export function formatReason(
   const total = blocks.reduce((n, b) => n + b.height, 0);
   const out = [
     `${label}: ${blocks.length} comment block(s), ${total} lines, in ${fileName}.`,
-    `Answer for every line marked +: does it say why, or what? Delete the ones that say what.`,
   ];
 
   for (const block of blocks) {
@@ -506,7 +509,7 @@ async function main(): Promise<number> {
     if (note) console.log(JSON.stringify({ systemMessage: note }));
     return 0;
   }
-  const reason = formatReason(fileName, screen.kept);
+  const reason = `${formatReason(fileName, screen.kept)}\n${ASK}`;
   console.error(note ? `${reason}\n${note}` : reason);
   return 2;
 }

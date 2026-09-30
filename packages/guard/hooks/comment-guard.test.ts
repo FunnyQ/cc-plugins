@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   addedCommentLines,
+  ASK,
   commentFlags,
   flaggedBlocks,
   formatReason,
@@ -669,6 +670,7 @@ describe("main", () => {
     expect(out.exitCode).toBe(2);
     expect(out.stderr).toContain("1 comment block(s), 3 lines");
     expect(out.stderr).toContain("+ 6  // new one");
+    expect(out.stderr).toContain(ASK);
     expect(out.stderr).not.toContain("old one");
   });
 
@@ -694,8 +696,6 @@ describe("formatReason", () => {
     );
     expect(formatReason("a.rb", blocks)).toBe(
       "💬 comment-guard: 1 comment block(s), 3 lines, in a.rb.\n" +
-        "Answer for every line marked +: does it say why, or what? " +
-        "Delete the ones that say what.\n" +
         "  a.rb:2-4\n" +
         "    2  # one\n" +
         "    3  # two\n" +

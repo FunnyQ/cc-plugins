@@ -21,6 +21,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  ASK,
   flaggedBlocks,
   formatReason,
   isGuardedPath,
@@ -209,7 +210,7 @@ export async function sweep(payload: Payload): Promise<SweepOutput | null> {
   const out: SweepOutput = {};
   if (reasons.length > 0) {
     out.decision = "block";
-    out.reason = reasons.join("\n\n");
+    out.reason = [...reasons, ASK].join("\n\n");
   }
   if (note) out.systemMessage = note;
   return Object.keys(out).length > 0 ? out : null;

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ASK } from "./comment-guard.ts";
 import { snapshot, sweep } from "./comment-sweep.ts";
 import { recordReported } from "./sweep-state.ts";
 
@@ -46,6 +47,7 @@ describe("sweep", () => {
       "🧹 comment-sweep: 1 comment block(s), 3 lines, in app.ts",
     );
     expect(reason).toContain("+ 2  // one");
+    expect(reason).toEndWith(ASK);
   });
 
   test("reports a block a script grew in a committed file", async () => {
