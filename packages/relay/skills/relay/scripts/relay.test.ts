@@ -649,6 +649,28 @@ describe("executeRelay", () => {
     expect(errors.join("")).not.toContain("SECRET-PROMPT");
   });
 
+  it("prefers the parsed stdout error over a terse stderr code", async () => {
+    const errors: string[] = [];
+    await executeRelay(
+      ["claude", "delegate", "--task", "x", "--headless"],
+      deps({
+        run: () => ({
+          ok: false,
+          stdout: JSON.stringify([
+            { type: "result", is_error: true, result: "Bad model" },
+          ]),
+          stderr: "[claude-code:unrecognized_model] {}\n",
+          code: 1,
+        }),
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(errors.join("")).toBe(
+      "claude failed (exit 1, model: CLI default): Bad model\n",
+    );
+  });
+
   it("omits -m for opencode when nothing is configured", async () => {
     let invocation: string[] = [];
     await executeRelay(

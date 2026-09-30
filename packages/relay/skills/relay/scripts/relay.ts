@@ -678,8 +678,8 @@ export async function executeRelay(
   if (!result.ok) {
     // Never echo argv: it carries the whole prompt.
     const detail =
-      result.stderr.trim() ||
       backend.parseError?.(result.stdout) ||
+      result.stderr.trim() ||
       "no error output";
     deps.stderr(
       `${backend.name} failed (exit ${result.code}, model: ${

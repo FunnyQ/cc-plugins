@@ -162,6 +162,8 @@ claude -p "<prompt>" --output-format json
 
 Parse the JSON envelope for the final assistant text.
 
+On failure, stderr holds only a code such as `[claude-code:unrecognized_model]`. Relay prints the `result` text of the `is_error` result event instead.
+
 ### Review
 
 ```bash
