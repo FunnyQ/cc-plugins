@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/01, contract/04
 > **Blocks**: server/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -103,22 +103,22 @@ Every "now" goes through `model::now_ms()` so `TOKEN_ATLAS_NOW_MS` pins ages and
 
 ## Acceptance criteria
 
-- [ ] Every `live-sessions.test.ts` case is ported as a cargo test in `live.rs` (builders, `status_rank`, `codex_updated_at_ms` falsy fallbacks, `parse_cockpit_keys` on corrupt/missing input, sort order) and passes.
-- [ ] Cargo tests cover the 5 s cache: a daemon.json change inside the TTL is not observed, one after it is (drive time through `TOKEN_ATLAS_NOW_MS` or an injected clock).
-- [ ] `cockpit_daemon_port()` returns `Some(port)` unchanged for an alive pid (cargo tests include `70000` and `5999.5`, echoed as-is like the TS), `Some(5858)` when `port` is not a number, `None` for a dead pid, missing file, or corrupt JSON.
-- [ ] `live.contract.test.ts` exists, is skipped without `COCKPIT_BIN`, and with it the Rust `atlas live` output deep-equals TS `live.ts` output on the extended fixture, covering every status value and the `cockpit: true` tag.
-- [ ] The `atlas live` test in `cli.contract.test.ts` passes against Rust.
-- [ ] `live.rs` never reads transcript contents and never uses cockpit's `COCKPIT_CODEX_*` / `COCKPIT_CLAUDE_*` path helpers.
+- [x] Every `live-sessions.test.ts` case is ported as a cargo test in `live.rs` (builders, `status_rank`, `codex_updated_at_ms` falsy fallbacks, `parse_cockpit_keys` on corrupt/missing input, sort order) and passes.
+- [x] Cargo tests cover the 5 s cache: a daemon.json change inside the TTL is not observed, one after it is (drive time through `TOKEN_ATLAS_NOW_MS` or an injected clock).
+- [x] `cockpit_daemon_port()` returns `Some(port)` unchanged for an alive pid (cargo tests include `70000` and `5999.5`, echoed as-is like the TS), `Some(5858)` when `port` is not a number, `None` for a dead pid, missing file, or corrupt JSON.
+- [x] `live.contract.test.ts` exists, is skipped without `COCKPIT_BIN`, and with it the Rust `atlas live` output deep-equals TS `live.ts` output on the extended fixture, covering every status value and the `cockpit: true` tag.
+- [x] The `atlas live` test in `cli.contract.test.ts` passes against Rust.
+- [x] `live.rs` never reads transcript contents and never uses cockpit's `COCKPIT_CODEX_*` / `COCKPIT_CLAUDE_*` path helpers.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::live`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check` and `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/live.contract.test.ts`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts -t "live"`
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/live.contract.test.ts` (no `COCKPIT_BIN`) reports the test as skipped, not failed.
-- [ ] `bunx --bun tsc --noEmit | grep usage-dashboard/contract/live` prints nothing.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::live`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check` and `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/live.contract.test.ts`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts -t "live"`
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/live.contract.test.ts` (no `COCKPIT_BIN`) reports the test as skipped, not failed.
+- [x] `bunx --bun tsc --noEmit | grep usage-dashboard/contract/live` prints nothing.
 
 ## Eval rubric
 
