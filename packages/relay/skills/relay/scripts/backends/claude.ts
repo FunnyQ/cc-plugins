@@ -82,4 +82,17 @@ export const claudeBackend: Backend = {
     // Fallback: return raw text trimmed.
     return raw.trim();
   },
+
+  // stderr carries only a code like `[claude-code:unrecognized_model]`; the
+  // readable message is the `result` of an is_error result event.
+  parseError(stdout: string): string | undefined {
+    try {
+      const events: unknown = JSON.parse(stdout);
+      if (!Array.isArray(events)) return undefined;
+      const failed = events.find((e) => e?.type === "result" && e.is_error);
+      return typeof failed?.result === "string" ? failed.result : undefined;
+    } catch {
+      return undefined;
+    }
+  },
 };

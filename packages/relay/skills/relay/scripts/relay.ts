@@ -28,12 +28,14 @@ import {
   type RunLiveOpts,
 } from "./live";
 import {
+  CLI_DEFAULT,
   CONFIG_PATH,
   createTmpRunDir,
   isObject,
   parseCsv,
   resolveModel,
   run,
+  SUGGESTED_CONFIG_PATH,
 } from "./shared";
 
 const MODES = new Set<Mode>(["delegate", "review", "image"]);
@@ -99,7 +101,7 @@ class UsageError extends Error {}
 function usage(backends: string): string {
   return [
     `Usage: relay <${backends}> <delegate|review|image> [flags]`,
-    `       relay config set-model <${backends}> <delegate|review|image> <model>`,
+    `       relay config set-model|check|apply ...   (relay config for details)`,
     `       relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]`,
     "flags: --task <text> | --files <csv> | --model <provider/model>",
     "       --effort <low|medium|high|xhigh|max>   (claude only)",
@@ -209,6 +211,17 @@ function readJsonObject(
   return isObject(parsed) ? parsed : {};
 }
 
+function configReadError(error: unknown): string {
+  return `Could not read relay config (${CONFIG_PATH}): ${
+    error instanceof Error ? error.message : String(error)
+  }\n`;
+}
+
+function writeConfig(config: Record<string, unknown>, deps: RelayDeps): void {
+  deps.ensureDir(dirname(CONFIG_PATH));
+  deps.writeFile(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
+}
+
 function mergeModelConfig(
   config: Record<string, unknown>,
   backend: string,
@@ -230,12 +243,131 @@ function mergeModelConfig(
   };
 }
 
+function configUsage(backends: string): string {
+  return [
+    `Usage: relay config set-model <${backends}> <delegate|review|image> <model|${CLI_DEFAULT}>`,
+    "       relay config check",
+    "       relay config apply --merge|--overwrite",
+  ].join("\n");
+}
+
+// Exit codes of `config check`; SKILL.md branches on them.
+const CHECK_EXIT = {
+  current: 0,
+  missing: 3,
+  "no-version": 3,
+  outdated: 3,
+  malformed: 4,
+} as const;
+
+function readSuggestedConfig(deps: RelayDeps): Record<string, unknown> {
+  return JSON.parse(deps.readFile(SUGGESTED_CONFIG_PATH));
+}
+
+// A distinct exit code for a malformed file, so SKILL.md never reads it as "nothing configured".
+function executeConfigCheck(deps: RelayDeps): RelayExecution {
+  const suggested = readSuggestedConfig(deps);
+  const report = (
+    status: keyof typeof CHECK_EXIT,
+    extra: Record<string, unknown> = {},
+  ): RelayExecution => {
+    deps.stdout(
+      `${JSON.stringify({ status, path: CONFIG_PATH, ...extra, suggested }, null, 2)}\n`,
+    );
+    return { code: CHECK_EXIT[status] };
+  };
+
+  if (!deps.fileExists(CONFIG_PATH)) return report("missing");
+
+  let config: Record<string, unknown>;
+  try {
+    config = readJsonObject(CONFIG_PATH, deps);
+  } catch (error) {
+    return report("malformed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  const models = isObject(config.models) ? config.models : {};
+  if (typeof config.version !== "number") return report("no-version", { models });
+  if (config.version !== suggested.version) {
+    return report("outdated", { version: config.version, models });
+  }
+  return report("current", { version: config.version, models });
+}
+
+// `applied` records what apply wrote, so merge can tell a stale suggestion (value
+// unchanged since apply → replace) from a user's own choice (keep).
+function executeConfigApply(
+  flags: string[],
+  deps: RelayDeps,
+  availableBackends: string,
+): RelayExecution {
+  const [how, ...extra] = flags;
+  if ((how !== "--merge" && how !== "--overwrite") || extra.length > 0) {
+    deps.stderr(`${configUsage(availableBackends)}\n`);
+    return { code: 1 };
+  }
+
+  const suggested = readSuggestedConfig(deps);
+  const suggestedModels = isObject(suggested.models) ? suggested.models : {};
+  let next: Record<string, unknown>;
+
+  if (how === "--overwrite") {
+    next = {
+      version: suggested.version,
+      models: suggestedModels,
+      applied: suggestedModels,
+    };
+  } else {
+    let config: Record<string, unknown>;
+    try {
+      config = readJsonObject(CONFIG_PATH, deps);
+    } catch (error) {
+      deps.stderr(configReadError(error));
+      return { code: 1 };
+    }
+    const userModels = isObject(config.models) ? config.models : {};
+    const applied = isObject(config.applied) ? config.applied : {};
+    const models: Record<string, unknown> = { ...userModels };
+    for (const [backend, modes] of Object.entries(suggestedModels)) {
+      const userModes = isObject(userModels[backend]) ? userModels[backend] : {};
+      const appliedModes = isObject(applied[backend]) ? applied[backend] : {};
+      const chosen = Object.fromEntries(
+        Object.entries(userModes).filter(
+          ([mode, model]) => model !== appliedModes[mode],
+        ),
+      );
+      models[backend] = { ...(isObject(modes) ? modes : {}), ...chosen };
+    }
+    next = {
+      ...config,
+      version: suggested.version,
+      models,
+      applied: suggestedModels,
+    };
+  }
+
+  writeConfig(next, deps);
+  deps.stdout(
+    `Applied suggested relay config ${suggested.version} (${how.slice(2)})\n`,
+  );
+  return { code: 0 };
+}
+
 async function executeConfigCommand(
   argv: string[],
   deps: RelayDeps,
   availableBackends: string,
 ): Promise<RelayExecution> {
   const [, subcommand, backendName, modeName, model, ...extra] = argv;
+
+  if (subcommand === "check" && argv.length === 2) {
+    return executeConfigCheck(deps);
+  }
+  if (subcommand === "apply") {
+    return executeConfigApply(argv.slice(2), deps, availableBackends);
+  }
 
   if (
     subcommand !== "set-model" ||
@@ -244,9 +376,7 @@ async function executeConfigCommand(
     !model ||
     extra.length > 0
   ) {
-    deps.stderr(
-      `Usage: relay config set-model <${availableBackends}> <delegate|review|image> <model>\n`,
-    );
+    deps.stderr(`${configUsage(availableBackends)}\n`);
     return { code: 1 };
   }
 
@@ -264,17 +394,11 @@ async function executeConfigCommand(
   try {
     config = readJsonObject(CONFIG_PATH, deps);
   } catch (error) {
-    deps.stderr(
-      `Could not read relay config: ${
-        error instanceof Error ? error.message : String(error)
-      }\n`,
-    );
+    deps.stderr(configReadError(error));
     return { code: 1 };
   }
 
-  const nextConfig = mergeModelConfig(config, backendName, modeName, model);
-  deps.ensureDir(dirname(CONFIG_PATH));
-  deps.writeFile(CONFIG_PATH, `${JSON.stringify(nextConfig, null, 2)}\n`);
+  writeConfig(mergeModelConfig(config, backendName, modeName, model), deps);
   deps.stdout(`Saved default model for ${backendName} ${modeName}: ${model}\n`);
   return { code: 0 };
 }
@@ -479,6 +603,16 @@ export async function executeRelay(
     return { code: 1 };
   }
 
+  let model: string | undefined;
+  try {
+    model = resolveModel(parsed.backend, parsed.mode, parsed.flags.model, () =>
+      readJsonObject(CONFIG_PATH, deps),
+    );
+  } catch (error) {
+    deps.stderr(configReadError(error));
+    return { code: 1 };
+  }
+
   const dir = deps.createTmpRunDir();
   const effectiveTask =
     parsed.mode === "review" && parsed.flags.promptFile
@@ -489,7 +623,7 @@ export async function executeRelay(
     promptText:
       parsed.mode === "review" ? buildReviewPrompt(effectiveTask) : undefined,
     out: parsed.flags.out,
-    model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
+    model,
     effort: parsed.flags.effort,
     lastFile: join(dir, "raw.txt"),
     dangerous: parsed.flags.dangerous,
@@ -662,11 +796,15 @@ export async function executeRelay(
   });
 
   if (!result.ok) {
+    // Never echo argv: it carries the whole prompt.
+    const detail =
+      backend.parseError?.(result.stdout) ||
+      result.stderr.trim() ||
+      "no error output";
     deps.stderr(
-      result.stderr ||
-        `Backend command failed with exit code ${result.code}: ${invocation.argv.join(
-          " ",
-        )}\n`,
+      `${backend.name} failed (exit ${result.code}, model: ${
+        opts.model ?? "CLI default"
+      }): ${detail}\n`,
     );
     return { code: result.code, dir, lastFile: opts.lastFile };
   }

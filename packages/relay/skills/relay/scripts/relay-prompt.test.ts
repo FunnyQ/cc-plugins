@@ -295,7 +295,7 @@ describe("buildPromptFile", () => {
     const originalExit = process.exit;
     const originalError = console.error;
 
-    let exitCode: number | null = null;
+    let exitCode = null as number | null;
     let errorMsg = "";
 
     process.exit = ((code: number) => {

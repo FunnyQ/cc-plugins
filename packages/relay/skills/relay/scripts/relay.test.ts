@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { BACKENDS } from "./backends";
 import { executeRelay, parseFlags, type RelayDeps } from "./relay";
-import { CONFIG_PATH } from "./shared";
+import { CLI_DEFAULT, CONFIG_PATH, SUGGESTED_CONFIG_PATH } from "./shared";
 import type { RunResult } from "./types";
 import {
   DEFAULT_WAIT_TIMEOUT_MS,
@@ -40,6 +40,12 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
         ok: false,
         pending: false,
         error: "runLive not stubbed",
+      }),
+    collectLive: () =>
+      Promise.resolve({
+        ok: false,
+        pending: false,
+        error: "collectLive not stubbed",
       }),
     ...overrides,
   };
@@ -613,7 +619,112 @@ describe("executeRelay", () => {
     );
 
     expect(result.code).toBe(7);
-    expect(errors.join("")).toBe("failed");
+    expect(errors.join("")).toBe(
+      "claude failed (exit 7, model: CLI default): failed\n",
+    );
+  });
+
+  it("surfaces the backend's stdout error and the model, never argv or the prompt", async () => {
+    const errors: string[] = [];
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "SECRET-PROMPT", "--model", "p/m"],
+      deps({
+        run: () => ({
+          ok: false,
+          stdout: JSON.stringify({
+            type: "error",
+            error: { name: "UnknownError", data: { message: "Model not found" } },
+          }),
+          stderr: "",
+          code: 1,
+        }),
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(errors.join("")).toBe(
+      "opencode failed (exit 1, model: p/m): Model not found\n",
+    );
+    expect(errors.join("")).not.toContain("SECRET-PROMPT");
+  });
+
+  it("prefers the parsed stdout error over a terse stderr code", async () => {
+    const errors: string[] = [];
+    await executeRelay(
+      ["claude", "delegate", "--task", "x", "--headless"],
+      deps({
+        run: () => ({
+          ok: false,
+          stdout: JSON.stringify([
+            { type: "result", is_error: true, result: "Bad model" },
+          ]),
+          stderr: "[claude-code:unrecognized_model] {}\n",
+          code: 1,
+        }),
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(errors.join("")).toBe(
+      "claude failed (exit 1, model: CLI default): Bad model\n",
+    );
+  });
+
+  it("omits -m for opencode when nothing is configured", async () => {
+    let invocation: string[] = [];
+    await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(invocation).not.toContain("-m");
+  });
+
+  it("uses the configured model when the flag is absent", async () => {
+    let invocation: string[] = [];
+    const config = JSON.stringify({
+      models: { opencode: { delegate: "cfg/model" } },
+    });
+    await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        fileExists: (path) => path === CONFIG_PATH || path === "/tmp/prompt.md",
+        readFile: (path) => (path === CONFIG_PATH ? config : "built prompt"),
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(invocation.slice(2, 4)).toEqual(["-m", "cfg/model"]);
+  });
+
+  it("fails on a malformed config instead of running with the CLI default", async () => {
+    const errors: string[] = [];
+    let spawned = false;
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        fileExists: (path) => path === CONFIG_PATH,
+        readFile: () => "{not json",
+        run: () => {
+          spawned = true;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(spawned).toBe(false);
+    expect(errors.join("")).toContain(`Could not read relay config (${CONFIG_PATH})`);
   });
 });
 
@@ -1066,5 +1177,190 @@ describe("relay collect", () => {
 
     expect(res.code).toBe(1);
     expect(err.join("")).toContain("herd.ts");
+  });
+});
+
+describe("relay config check / apply", () => {
+  const suggested = {
+    version: 1790740000,
+    models: { opencode: { delegate: "s/delegate", review: "s/review" } },
+    suggestions: { opencode: { delegate: ["s/alt"], review: ["s/alt"] } },
+  };
+
+  // A config-only deps: the suggested file ships with relay, the user file may be absent.
+  function configDeps(userConfig?: string) {
+    const files = new Map<string, string>([
+      [SUGGESTED_CONFIG_PATH, JSON.stringify(suggested)],
+    ]);
+    if (userConfig !== undefined) files.set(CONFIG_PATH, userConfig);
+    const out: string[] = [];
+    const errors: string[] = [];
+    return {
+      files,
+      out,
+      errors,
+      deps: deps({
+        readFile: (path) => files.get(path) ?? "",
+        writeFile: (path, text) => files.set(path, text),
+        fileExists: (path) => files.has(path),
+        stdout: (text) => out.push(text),
+        stderr: (text) => errors.push(text),
+      }),
+    };
+  }
+
+  const check = async (userConfig?: string) => {
+    const c = configDeps(userConfig);
+    const result = await executeRelay(["config", "check"], c.deps);
+    return { code: result.code, report: JSON.parse(c.out.join("")) };
+  };
+
+  it("reports current with exit 0 when the version matches", async () => {
+    const { code, report } = await check(
+      JSON.stringify({ version: 1790740000, models: { opencode: { review: "u/r" } } }),
+    );
+
+    expect(code).toBe(0);
+    expect(report.status).toBe("current");
+    expect(report.models).toEqual({ opencode: { review: "u/r" } });
+  });
+
+  it("reports missing, no-version, and outdated with exit 3 and the suggestion", async () => {
+    const missing = await check();
+    const noVersion = await check(JSON.stringify({ models: {} }));
+    const outdated = await check(JSON.stringify({ version: 1780000000 }));
+    const semver = await check(JSON.stringify({ version: "0.9.0" }));
+
+    expect([missing, noVersion, outdated].map((r) => [r.code, r.report.status])).toEqual([
+      [3, "missing"],
+      [3, "no-version"],
+      [3, "outdated"],
+    ]);
+    expect(outdated.report.version).toBe(1780000000);
+    // A non-number version predates unix-time versioning and counts as absent.
+    expect(semver.report.status).toBe("no-version");
+    expect(outdated.report.suggested).toEqual(suggested);
+  });
+
+  it("reports malformed with exit 4, never as missing", async () => {
+    const { code, report } = await check("{not json");
+
+    expect(code).toBe(4);
+    expect(report.status).toBe("malformed");
+    expect(report.path).toBe(CONFIG_PATH);
+  });
+
+  it("merge keeps the user's models and fills only what is missing", async () => {
+    const c = configDeps(
+      JSON.stringify({
+        keep: true,
+        models: { opencode: { review: "u/r" }, claude: { delegate: "opus" } },
+      }),
+    );
+
+    const result = await executeRelay(["config", "apply", "--merge"], c.deps);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
+      keep: true,
+      version: 1790740000,
+      models: {
+        opencode: { delegate: "s/delegate", review: "u/r" },
+        claude: { delegate: "opus" },
+      },
+      applied: suggested.models,
+    });
+  });
+
+  it("merge replaces a model apply wrote, and keeps one the user changed since", async () => {
+    const c = configDeps(
+      JSON.stringify({
+        version: 1780000000,
+        models: { opencode: { delegate: "old/delegate", review: "u/r" } },
+        applied: { opencode: { delegate: "old/delegate", review: "old/review" } },
+      }),
+    );
+
+    const result = await executeRelay(["config", "apply", "--merge"], c.deps);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
+      version: 1790740000,
+      models: { opencode: { delegate: "s/delegate", review: "u/r" } },
+      applied: suggested.models,
+    });
+  });
+
+  it("set-model leaves the applied record alone", async () => {
+    const applied = { opencode: { delegate: "s/delegate" } };
+    const c = configDeps(
+      JSON.stringify({ models: { opencode: { delegate: "s/delegate" } }, applied }),
+    );
+
+    await executeRelay(["config", "set-model", "opencode", "delegate", "u/d"], c.deps);
+
+    expect(JSON.parse(c.files.get(CONFIG_PATH)!).applied).toEqual(applied);
+  });
+
+  it("overwrite replaces the user config with the suggested version and models", async () => {
+    const c = configDeps(
+      JSON.stringify({ keep: true, models: { claude: { delegate: "opus" } } }),
+    );
+
+    const result = await executeRelay(["config", "apply", "--overwrite"], c.deps);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
+      version: 1790740000,
+      models: suggested.models,
+      applied: suggested.models,
+    });
+  });
+
+  it("merge refuses a malformed config; overwrite replaces it", async () => {
+    const merge = configDeps("{not json");
+    const mergeResult = await executeRelay(["config", "apply", "--merge"], merge.deps);
+
+    expect(mergeResult.code).toBe(1);
+    expect(merge.errors.join("")).toContain("Could not read relay config");
+    expect(merge.files.get(CONFIG_PATH)).toBe("{not json");
+
+    const overwrite = configDeps("{not json");
+    const overwriteResult = await executeRelay(
+      ["config", "apply", "--overwrite"],
+      overwrite.deps,
+    );
+
+    expect(overwriteResult.code).toBe(0);
+    expect(JSON.parse(overwrite.files.get(CONFIG_PATH)!).version).toBe(1790740000);
+  });
+
+  it("rejects apply without exactly one of --merge or --overwrite", async () => {
+    const c = configDeps();
+
+    expect((await executeRelay(["config", "apply"], c.deps)).code).toBe(1);
+    expect(
+      (await executeRelay(["config", "apply", "--merge", "--overwrite"], c.deps)).code,
+    ).toBe(1);
+    expect(c.files.has(CONFIG_PATH)).toBe(false);
+  });
+
+  it("runs without -m when the config says cli-default", async () => {
+    let invocation: string[] = [];
+    const config = JSON.stringify({ models: { opencode: { delegate: CLI_DEFAULT } } });
+    await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        fileExists: (path) => path === CONFIG_PATH || path === "/tmp/prompt.md",
+        readFile: (path) => (path === CONFIG_PATH ? config : "built prompt"),
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(invocation).not.toContain("-m");
+    expect(invocation).not.toContain(CLI_DEFAULT);
   });
 });

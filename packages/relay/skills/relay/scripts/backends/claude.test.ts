@@ -268,3 +268,28 @@ describe("claudeBackend", () => {
     });
   });
 });
+
+describe("claudeBackend.parseError", () => {
+  it("returns the result text of an is_error result event", () => {
+    const raw = JSON.stringify([
+      { type: "system", subtype: "init" },
+      {
+        type: "result",
+        is_error: true,
+        result: "There's an issue with the selected model (x).",
+      },
+    ]);
+
+    expect(claudeBackend.parseError!(raw)).toBe(
+      "There's an issue with the selected model (x).",
+    );
+  });
+
+  it("returns undefined for a successful result, non-JSON, or empty output", () => {
+    const ok = JSON.stringify([{ type: "result", is_error: false, result: "done" }]);
+
+    expect(claudeBackend.parseError!(ok)).toBeUndefined();
+    expect(claudeBackend.parseError!("not json")).toBeUndefined();
+    expect(claudeBackend.parseError!("")).toBeUndefined();
+  });
+});

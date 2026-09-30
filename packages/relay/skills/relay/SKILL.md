@@ -9,7 +9,7 @@ when_to_use: >-
   fire on a passing mention of another CLI ("codex said…"). `image` is
   codex-only.
 argument-hint: "<codex|opencode|claude> <delegate|review> [task] · codex image [--out]"
-version: 0.3.0
+version: 0.5.5
 ---
 
 # Relay Skill
@@ -74,6 +74,32 @@ If a run comes back with a **pending report**, the delegate is still working —
 Editing capability is identical: same CLI, model, and write access. So "more precise" or "deterministic" is never a valid reason. Override only for nested delegation, no live seam, or no pane surface.
 
 `relay.ts` is one blocking call. Do not poll it while it runs. See `references/live.md`.
+
+---
+
+## Config check (opencode delegate or review)
+
+Run this before step 1 of `delegate` and before `review`, for the `opencode` backend only. The suggested config covers only opencode, so a codex or claude run skips this section.
+In a non-interactive context (a sub-agent or headless caller), skip the questions below and run relay with the config as it is.
+
+1. Run `opencode --version` first. On `2.` or later, tell the user relay supports opencode 1.x only and suggest downgrading to 1.x. Stop.
+2. Run `relay.ts config check`. It prints a JSON report; branch on its exit code.
+3. On exit `4` (`malformed`), report `path` and `error` to the user. Stop. Do not offer an update or ask for a model.
+4. On exit `3` (`missing`, `no-version`, or `outdated`), show the user `suggested.models` beside their `models` and `version`.
+   - Ask with the harness's question tool. Offer: Merge (keep models the user chose, refresh the ones an earlier apply wrote, fill the missing ones), Overwrite (replace with the suggested models), Skip this time.
+   - For `missing`, merge and overwrite write the same file, so offer only Apply and Skip this time.
+   - Apply the answer with `relay.ts config apply --merge` or `relay.ts config apply --overwrite`.
+5. On exit `0` (`current`), continue.
+
+### Model pick
+
+Run this after the config check when the user passed no `--model` and `models.opencode.<mode>` is absent. Re-run `config check` after an apply to read the updated `models`.
+
+1. Run `opencode models`. Keep the ids from `suggested.models.opencode.<mode>` and `suggested.suggestions.opencode.<mode>` that appear in its output.
+2. Ask with the harness's question tool. Offer up to 3 surviving ids, plus opencode defaults.
+3. Save a picked id with `relay.ts config set-model opencode <mode> "<id>"`.
+4. Save opencode defaults with `relay.ts config set-model opencode <mode> cli-default`. Relay then omits `-m`, and the question does not return.
+5. Run relay without `--model`. It reads the saved choice.
 
 ---
 
@@ -192,6 +218,8 @@ When the user passes an explicit `--model` flag:
    ```
 
 Config file location: `~/.config/q-lab/cc-plugins/relay/config.json`.
+
+Model precedence is `--model` flag, then this config, then the backend CLI's own default. The value `cli-default` in either place omits the model flag. A malformed config file fails the run with `Could not read relay config`. Report that file to the user. Do not ask for a model.
 
 ---
 

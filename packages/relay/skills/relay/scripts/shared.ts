@@ -1,21 +1,11 @@
 import { randomUUID } from "crypto";
-import { mkdirSync, readFileSync } from "fs";
+import { mkdirSync } from "fs";
 import { join, parse } from "path";
 import { homedir } from "os";
 import type { Mode, RunResult } from "./types";
 
 // Temp directory root for relay runs
 export const TMP_ROOT = "/tmp/q-lab/relay/relay";
-
-// Default models per backend and mode (precedence: flag > config > constant > undefined)
-export const DEFAULT_MODELS: Record<string, Partial<Record<Mode, string>>> = {
-  codex: {}, // unset → CLI default
-  claude: {}, // unset → CLI default
-  opencode: {
-    delegate: "opencode-go/deepseek-v4-light",
-    review: "opencode-go/deepseek-v4-pro",
-  },
-};
 
 // Config file path for relay models (XDG standard)
 export const CONFIG_PATH = join(
@@ -26,6 +16,17 @@ export const CONFIG_PATH = join(
   "relay",
   "config.json",
 );
+
+// Ships with relay; `config check` compares the user's version against it.
+export const SUGGESTED_CONFIG_PATH = join(
+  import.meta.dir,
+  "..",
+  "references",
+  "config.suggested.json",
+);
+
+// A stored choice to omit the model flag, so an unset entry can still mean "never asked".
+export const CLI_DEFAULT = "cli-default";
 
 export function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -98,48 +99,26 @@ export function addTimestampSuffix(filePath: string): string {
   return join(dir, newName);
 }
 
-// Resolve model with precedence: flag > config > constant > undefined
+// Resolve model with precedence: flag > config > undefined (the CLI's own default).
+// A readConfig error propagates so a broken config never looks like "nothing configured".
 export function resolveModel(
   backend: string,
   mode: Mode,
-  flagModel?: string,
-  readConfig?: () => unknown,
+  flagModel: string | undefined,
+  readConfig: () => unknown,
 ): string | undefined {
-  // Precedence 1: explicit flag
-  if (flagModel) return flagModel;
+  const model = flagModel || configuredModel(readConfig(), backend, mode);
+  return model === CLI_DEFAULT ? undefined : model;
+}
 
-  // Precedence 2: config file
-  if (!readConfig) {
-    // Default config reader
-    readConfig = () => {
-      try {
-        const content = readFileSync(CONFIG_PATH, "utf-8");
-        return JSON.parse(content);
-      } catch {
-        return undefined;
-      }
-    };
-  }
-
-  // Note: the outer try/catch is required even though the *default* reader
-  // already swallows errors — an injected readConfig (tests, callers) may throw.
-  let config: unknown;
-  try {
-    config = readConfig();
-  } catch {
-    config = undefined;
-  }
-  if (isObject(config) && isObject(config.models)) {
-    const backendModels = config.models[backend];
-    if (isObject(backendModels) && typeof backendModels[mode] === "string") {
-      return backendModels[mode];
-    }
-  }
-
-  // Precedence 3: built-in constant
-  const defaultModel = DEFAULT_MODELS[backend]?.[mode];
-  if (defaultModel) return defaultModel;
-
-  // Precedence 4: undefined
-  return undefined;
+function configuredModel(
+  config: unknown,
+  backend: string,
+  mode: Mode,
+): string | undefined {
+  if (!isObject(config) || !isObject(config.models)) return undefined;
+  const backendModels = config.models[backend];
+  return isObject(backendModels) && typeof backendModels[mode] === "string"
+    ? backendModels[mode]
+    : undefined;
 }

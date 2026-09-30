@@ -62,6 +62,8 @@ Repeat these steps by hand, one wave at a time:
    fail the task for it, and collect it in a list you report at the end of the
    run. Every untagged item is yours as before, and you may never add the tag
    yourself: an item you find unrunnable is a plan defect, so let it fail.
+   Where a command says `<baseRef>`, substitute the commit HEAD pointed at
+   before the first wave — capture `git rev-parse HEAD` then.
 4. Spawn a second subagent through the **task tool** in the **judge role**, to
    score the task against its `## Eval rubric`.
 5. Write the judge's rationale to a file, then run `bun $SCRIPTS/score-task.ts
