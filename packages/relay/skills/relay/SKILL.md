@@ -9,7 +9,7 @@ when_to_use: >-
   fire on a passing mention of another CLI ("codex said…"). `image` is
   codex-only.
 argument-hint: "<codex|opencode|claude> <delegate|review> [task] · codex image [--out]"
-version: 0.3.0
+version: 0.5.5
 ---
 
 # Relay Skill
