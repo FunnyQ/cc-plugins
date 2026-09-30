@@ -1,0 +1,111 @@
+#!/bin/sh
+set -eu
+
+if [ "${COCKPIT_BIN+x}" = x ]; then
+    exec "$COCKPIT_BIN" "$@"
+fi
+
+SHIM=$0
+while [ -L "$SHIM" ]; do
+    LINK=$(readlink "$SHIM")
+    case "$LINK" in
+        /*) SHIM=$LINK ;;
+        *) SHIM=$(dirname "$SHIM")/$LINK ;;
+    esac
+done
+COCKPIT_PLUGIN_ROOT=$(cd -P "$(dirname "$SHIM")/../../.." && pwd)
+export COCKPIT_PLUGIN_ROOT
+VERSION_FILE=$COCKPIT_PLUGIN_ROOT/.claude-plugin/plugin.json
+VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$VERSION_FILE" 2>/dev/null | head -n 1)
+if [ -z "$VERSION" ]; then
+    printf 'cockpit: cannot read version from %s\n' "$VERSION_FILE" >&2
+    exit 1
+fi
+OS=$(uname -s)
+ARCH=$(uname -m)
+case "$OS/$ARCH" in
+    Darwin/arm64) TARGET=aarch64-apple-darwin ;;
+    Darwin/x86_64) TARGET=x86_64-apple-darwin ;;
+    Linux/x86_64) TARGET=x86_64-unknown-linux-musl ;;
+    Linux/aarch64|Linux/arm64) TARGET=aarch64-unknown-linux-musl ;;
+    *) printf 'cockpit: unsupported platform %s/%s\n' "$OS" "$ARCH" >&2; exit 1 ;;
+esac
+BIN_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/q-lab/cockpit/bin/$VERSION
+BIN=$BIN_DIR/cockpit
+if [ -x "$BIN" ]; then
+    if [ "${1:-}" = __download ]; then exit 0; fi
+    exec "$BIN" "$@"
+fi
+if [ "${1:-}" = hook ]; then
+    nohup sh "$SHIM" __download >/dev/null 2>&1 </dev/null &
+    exit 0
+fi
+
+BASE=${COCKPIT_RELEASE_BASE_URL:-https://github.com/FunnyQ/cc-plugins/releases/download}
+DEADLINE=$(($(date +%s) + 30))
+REASON='download failed'
+TEMP_DIR=
+LOCK_HELD=0
+cleanup() {
+    if [ -n "$TEMP_DIR" ]; then rm -rf "$TEMP_DIR"; fi
+    if [ "$LOCK_HELD" = 1 ]; then rmdir "$BIN_DIR.lock" 2>/dev/null || :; fi
+}
+trap cleanup EXIT
+trap 'exit 1' INT TERM
+
+fetch() {
+    REMAINING=$((DEADLINE - $(date +%s)))
+    [ "$REMAINING" -gt 0 ] || return 1
+    curl -fsSL --max-time "$REMAINING" "$BASE/monitor-v$VERSION/$1" -o "$2" 2>/dev/null
+}
+
+download() {
+    mkdir -p "$(dirname "$BIN_DIR")" || return 1
+    if mkdir "$BIN_DIR.lock" 2>/dev/null; then
+        LOCK_HELD=1
+    elif [ -n "$(find "$BIN_DIR.lock" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+        rmdir "$BIN_DIR.lock" 2>/dev/null || :
+        if mkdir "$BIN_DIR.lock" 2>/dev/null; then LOCK_HELD=1; fi
+    fi
+    if [ "$LOCK_HELD" = 0 ]; then
+        while [ ! -x "$BIN" ]; do
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                REASON='timed out waiting for another download'
+                return 1
+            fi
+            sleep 0.5
+        done
+        return 0
+    fi
+    # A competing installer may have finished between the cache check and lock acquisition.
+    [ ! -x "$BIN" ] || return 0
+    TEMP_DIR=$(mktemp -d "$BIN_DIR.tmp.XXXXXX") || return 1
+    ASSET=cockpit-$TARGET
+    fetch "$ASSET" "$TEMP_DIR/$ASSET" || return 1
+    fetch SHA256SUMS "$TEMP_DIR/SHA256SUMS" || return 1
+    EXPECTED=$(awk -v asset="$ASSET" '$2 == asset { print $1; exit }' "$TEMP_DIR/SHA256SUMS")
+    if command -v shasum >/dev/null 2>&1; then
+        HASH=$(shasum -a 256 "$TEMP_DIR/$ASSET") || return 1
+    else
+        HASH=$(sha256sum "$TEMP_DIR/$ASSET") || return 1
+    fi
+    HASH=${HASH%% *}
+    if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$HASH" ]; then
+        REASON='checksum mismatch'
+        return 1
+    fi
+    chmod +x "$TEMP_DIR/$ASSET" || return 1
+    mkdir -p "$BIN_DIR" || return 1
+    mv "$TEMP_DIR/$ASSET" "$BIN" || return 1
+}
+
+if download 2>/dev/null; then
+    cleanup
+    TEMP_DIR=
+    LOCK_HELD=0
+    trap - EXIT INT TERM
+    if [ "${1:-}" = __download ]; then exit 0; fi
+    exec "$BIN" "$@"
+fi
+printf 'cockpit: binary for %s/%s unavailable (%s); retry later or set COCKPIT_BIN\n' "$VERSION" "$TARGET" "$REASON" >&2
+exit 1

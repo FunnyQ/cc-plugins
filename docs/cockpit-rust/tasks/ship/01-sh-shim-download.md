@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/01
 > **Blocks**: ship/02, ship/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -85,21 +85,21 @@ The host triple in tests comes from the same `uname` mapping, computed in TS. Sk
 
 ## Acceptance criteria
 
-- [ ] `packages/monitor/skills/cockpit/bin/cockpit` exists, starts with `#!/bin/sh`, and is executable (`test -x`).
-- [ ] The shim implements contracts.md §7 steps 1–8, including the exact stderr strings above.
-- [ ] The hook path never writes to stdout or stderr and returns in under 1 s when the binary is missing.
-- [ ] A checksum mismatch installs nothing and leaves no temp dir behind in the bin parent dir.
-- [ ] Two concurrent first runs download the asset exactly once.
-- [ ] Symlinked invocation resolves `COCKPIT_PLUGIN_ROOT` to the real `packages/monitor` dir.
-- [ ] No bashisms: `sh -n` passes, and `shellcheck -s sh` is clean when shellcheck is installed.
+- [x] `packages/monitor/skills/cockpit/bin/cockpit` exists, starts with `#!/bin/sh`, and is executable (`test -x`).
+- [x] The shim implements contracts.md §7 steps 1–8, including the exact stderr strings above.
+- [x] The hook path never writes to stdout or stderr and returns in under 1 s when the binary is missing.
+- [x] A checksum mismatch installs nothing and leaves no temp dir behind in the bin parent dir.
+- [x] Two concurrent first runs download the asset exactly once.
+- [x] Symlinked invocation resolves `COCKPIT_PLUGIN_ROOT` to the real `packages/monitor` dir.
+- [x] No bashisms: `sh -n` passes, and `shellcheck -s sh` is clean when shellcheck is installed.
 
 ## Verification
 
-- [ ] `test -x packages/monitor/skills/cockpit/bin/cockpit && head -n 1 packages/monitor/skills/cockpit/bin/cockpit | grep -qx '#!/bin/sh'`
-- [ ] `sh -n packages/monitor/skills/cockpit/bin/cockpit`
-- [ ] `command -v shellcheck >/dev/null && shellcheck -s sh packages/monitor/skills/cockpit/bin/cockpit || echo "shellcheck not installed — skipped"`
-- [ ] `bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts` passes all 9 cases.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/bin/` prints nothing.
+- [x] `test -x packages/monitor/skills/cockpit/bin/cockpit && head -n 1 packages/monitor/skills/cockpit/bin/cockpit | grep -qx '#!/bin/sh'`
+- [x] `sh -n packages/monitor/skills/cockpit/bin/cockpit`
+- [x] `command -v shellcheck >/dev/null && shellcheck -s sh packages/monitor/skills/cockpit/bin/cockpit || echo "shellcheck not installed — skipped"`
+- [x] `bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts` passes all 9 cases.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/bin/` prints nothing.
 
 ## Eval rubric
 
