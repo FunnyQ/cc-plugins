@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/01, contract/03
 > **Blocks**: engine/08
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -107,22 +107,22 @@ Token counts are `i64`. `costUSD` is `f64`. `timestampMs` values from JSON may b
 
 ## Acceptance criteria
 
-- [ ] `cockpit atlas stats --source opencode` under the fixture home prints JSON deep-equal to the recorded TS golden (golden test `source opencode` passes against Rust).
-- [ ] `open_code_usage_from_tokens` maps `{input 10, output 5, reasoning 3, cache {read 2, write 1}}` to `{inputTokens 10, outputTokens 5, cacheReadInputTokens 2, cacheCreationInputTokens 1, reasoningOutputTokens 3}`, and an empty token object to all zeros (cargo unit test).
-- [ ] `open_code_timestamp_ms` returns `0` for `0`, negative, and NaN, multiplies `1_700_000_000` by 1000, and leaves `1_700_000_000_000` unchanged (cargo unit test).
-- [ ] With no DB file and no storage dirs, `load` returns `Ok` with empty usage, empty ledger, and all four counts `0` (cargo unit test using a temp dir via `COCKPIT_OPENCODE_DB`).
-- [ ] When the DB has message rows, legacy message files are counted in `open_code_message_file_count` but not ingested; when it has none, they are ingested (cargo unit test with a temp DB and temp storage).
-- [ ] An assistant message with zero tokens and no positive cost adds nothing, and a user message repeated with the same id counts one interaction (cargo unit test).
-- [ ] The DB is opened read-only; a DB file whose schema lacks the `part` table leaves counts as TS would and does not error out of `load`.
-- [ ] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are clean.
+- [x] `cockpit atlas stats --source opencode` under the fixture home prints JSON deep-equal to the recorded TS golden (golden test `source opencode` passes against Rust).
+- [x] `open_code_usage_from_tokens` maps `{input 10, output 5, reasoning 3, cache {read 2, write 1}}` to `{inputTokens 10, outputTokens 5, cacheReadInputTokens 2, cacheCreationInputTokens 1, reasoningOutputTokens 3}`, and an empty token object to all zeros (cargo unit test).
+- [x] `open_code_timestamp_ms` returns `0` for `0`, negative, and NaN, multiplies `1_700_000_000` by 1000, and leaves `1_700_000_000_000` unchanged (cargo unit test).
+- [x] With no DB file and no storage dirs, `load` returns `Ok` with empty usage, empty ledger, and all four counts `0` (cargo unit test using a temp dir via `COCKPIT_OPENCODE_DB`).
+- [x] When the DB has message rows, legacy message files are counted in `open_code_message_file_count` but not ingested; when it has none, they are ingested (cargo unit test with a temp DB and temp storage).
+- [x] An assistant message with zero tokens and no positive cost adds nothing, and a user message repeated with the same id counts one interaction (cargo unit test).
+- [x] The DB is opened read-only; a DB file whose schema lacks the `part` table leaves counts as TS would and does not error out of `load`.
+- [x] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are clean.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source opencode"`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::opencode`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source opencode"`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::opencode`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
 
 ## Eval rubric
 
