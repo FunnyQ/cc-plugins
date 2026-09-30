@@ -1,5 +1,20 @@
 # Changelog
 
+## [dispatch 5.3.9] - 2026-09-30
+
+_tracks tag `dispatch-v5.3.9`_
+
+### Changed
+- Corrected the autopilot, flightplan, hop, preflight, waypoints, and deckplan prompts where they contradicted the code (for example, a bare waypoints `advance` only previews and `--outcome` is what writes), so agents follow behaviour that actually exists.
+- Trimmed stale model names, misleading examples, and repeated rules from dispatch prompts, so each skill loads with fewer tokens and hop no longer pins outdated model or relay versions.
+
+## [herdr 0.7.10] - 2026-09-30
+
+_tracks tag `herdr-v0.7.10`_
+
+### Changed
+- Trimmed the herdr skill docs to drop notes an agent cannot act on and version-history phrasing, so the skill loads with fewer tokens.
+
 ## [chronicle 0.20.2] - 2026-09-30
 
 _tracks tag `chronicle-v0.20.2`_
