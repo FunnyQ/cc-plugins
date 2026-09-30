@@ -1,5 +1,21 @@
 # Changelog
 
+## [chronicle 0.20.2] - 2026-09-30
+
+_tracks tag `chronicle-v0.20.2`_
+
+### Changed
+- Chronicle prompts are cleaned of stale and contradictory guidance, and the codifier now writes Supersedes: in replacement ADR drafts so supersede runs no longer fail on non-mutual links.
+- The release skill now saves its first-run interview to .chronicle/release.json, so a fresh repo no longer stalls on release.ts exiting with an error.
+
+## [guard 0.6.2] - 2026-09-30
+
+_tracks tag `guard-v0.6.2`_
+
+### Fixed
+- comment-sweep now asks its "answer for every line marked +" question once per sweep instead of once per file, cutting repeated noise.
+- Manifest descriptions now match actual behaviour: comment-sweep is named, file-header blocks are exempt, and Jev can withdraw a block.
+
 ## [monitor 5.2.3] - 2026-09-30
 
 _tracks tag `monitor-v5.2.3`_
