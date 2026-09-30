@@ -1,8 +1,6 @@
 # Authoring a Workflow for flightdeck
 
-Use this reference to explain how to author a script, not to interview, scaffold, generate artifacts, or launch a run. Read [packages/dispatch/skills/autopilot/references/graph-contract.md](../../autopilot/references/graph-contract.md) before applying the guidance.
-
-Keep the on-disk layout and directory naming in section 2 of that specification. Keep the graph shape, defaults, validation, event types, state resolution, and narrow node type in sections 3–5. Do not reproduce those definitions here. Copy the shell command templates from section 4 verbatim, because an author needs the exact flags in the prompt being prepared.
+Read [packages/dispatch/skills/autopilot/references/graph-contract.md](../../autopilot/references/graph-contract.md) before applying the guidance. It owns the on-disk layout (section 2), the graph shape, defaults, and validation (section 3), the event types and reset procedure (section 4), state resolution (section 5), and token attribution (section 6). Copy the shell command templates from section 4 verbatim, because an author needs the exact flags in the prompt being prepared.
 
 ## 1. Declare the graph before writing the script
 
@@ -14,7 +12,7 @@ Use only the Workflow globals `agent`, `phase`, `parallel`, `pipeline`, and `met
 
 ## 3. Bake absolute paths into prompts
 
-Resolve the installed CLI path, run directory, log path, and working repository before building prompt strings. Interpolate the resolved absolute values into every initial prompt. Expand home-directory notation and environment variables before recording the prompt. Never pass a shell variable through for a child to resolve. An unset child-shell variable expands to the empty string and reports the path as "not set"; this has already cost a real run in this repo.
+Resolve the installed CLI path, run directory, log path, and working repository before building prompt strings. Interpolate the resolved absolute values into every initial prompt. Expand home-directory notation and environment variables before recording the prompt. Never pass a shell variable through for a child to resolve. An unset child-shell variable expands to the empty string and reports the path as "not set".
 
 Include the current run identifier literally in each initial prompt. Name the working repository consistently with the graph's repository setting, following section 6 of the specification. Membership uses the first message, so later shell expansion cannot repair missing attribution text.
 
@@ -74,7 +72,7 @@ Once the run begins, allow agents only to append to the trail. Never let an agen
 
 ## Before the first run
 
-Work through graph-contract section 7's conformance checklist for the graph, the run identifier, and the prepared prompts. It is the single copy; do not restate it here. Then check the three items this guide adds about the script itself:
+Work through graph-contract section 7's conformance checklist for the graph, the run identifier, and the prepared prompts. Then check the three items this guide adds about the script itself:
 
 - [ ] Is the complete graph fixed before the script, so layout has the whole node set?
 - [ ] Does the script use only Workflow globals, with no imports or filesystem access?

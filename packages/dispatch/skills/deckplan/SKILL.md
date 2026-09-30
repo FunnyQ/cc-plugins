@@ -14,13 +14,13 @@ when_to_use: >-
 
 # Deckplan
 
-Use this reference-only skill to explain Workflow script authoring for flightdeck. Run no interview, scaffold nothing, and generate no script or other artifact. Bundle no `scripts/` directory. Treat the steps below as guidance for the author, not actions this skill executes.
+Use this reference-only skill to explain Workflow script authoring for flightdeck. Run no interview, scaffold nothing, and generate no script or other artifact. Treat the steps below as guidance for the author, not actions this skill executes.
 
 ## Read the right reference
 
 Read [authoring guidance](references/authoring.md) for prompt construction, lifecycle commands, labels, reset discipline, and the before-run checklist.
 
-Read the normative specification at [packages/dispatch/skills/autopilot/references/graph-contract.md](../autopilot/references/graph-contract.md) for the on-disk layout, directory naming, graph shape, field defaults, validation, event types, state resolution, and narrow node type. Keep those definitions there. Never reproduce its JSON shape, TypeScript entry types, validation list, field defaults, or numbered state-resolution order in this skill. Copy its shell command shapes verbatim: commands are usage, not a second schema.
+Read the normative specification at [packages/dispatch/skills/autopilot/references/graph-contract.md](../autopilot/references/graph-contract.md) for the on-disk layout, directory naming, graph shape, field defaults, validation, event types, and state resolution. This skill points at it rather than restating it, so the two cannot drift. Copy its shell command shapes verbatim, because the prompts being prepared need the exact flags.
 
 ## Short-form rules
 
