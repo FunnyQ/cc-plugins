@@ -1,5 +1,22 @@
 # Changelog
 
+## [relay 0.9.0] - 2026-09-30
+
+_tracks tag `relay-v0.9.0`_
+
+### Added
+- Relay ships a versioned suggested opencode model config, with `config check` to see whether yours is current, outdated, or malformed, and `config apply --merge|--overwrite` to keep your picks or take the suggestions.
+- Failed opencode and claude runs now report the real cause, such as an unrecognized model, instead of an empty or bare error code.
+
+### Changed
+- The suggested opencode delegate and review models are refreshed to current ids.
+- Relay's skill text is trimmed and now documents model precedence and how failures surface, so the agent loads fewer tokens each run.
+
+### Fixed
+- `/relay:opencode delegate` no longer fails out of the box: relay stops pinning an opencode model that upstream had removed, and uses your flag, then your config, then the CLI default.
+- Relay now targets opencode 1.x only, restoring live-mode model selection and warning 2.x users to downgrade.
+- Merging the suggested config now replaces models that were withdrawn upstream while keeping the ones you changed, and the config check runs only for the opencode backend.
+
 ## [dispatch 5.3.7] - 2026-09-29
 
 _tracks tag `dispatch-v5.3.7`_
