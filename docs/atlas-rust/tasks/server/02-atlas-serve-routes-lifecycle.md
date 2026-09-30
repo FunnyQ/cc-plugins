@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/01, engine/08, contract/02
 > **Blocks**: ship/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -120,23 +120,23 @@ Unless `--no-open`: `open <url>` on macOS, `xdg-open <url>` elsewhere, stdio nul
 
 ## Acceptance criteria
 
-- [ ] `cockpit atlas serve` serves every route in contracts.md §2 with the exact status codes, bodies, and headers listed there, including 304 on `/api/stats` and static ETags.
-- [ ] Two concurrent `/api/stats` requests for one fingerprint run one `stats::build` (cargo test or a log-free counter test); a failed build is not cached and the next request retries.
-- [ ] `/api/live` answers in under 1 s while a `/api/stats` build is pending (the Rust-only contract test passes and does not pass vacuously).
-- [ ] Reuse, supersede, start, port-in-use (stderr text + exit 1), and corrupt `atlas.json` behave as contracts.md §3, and `atlas.json` is byte-identical in shape to the TS writer's (`{pid, port, root}`, 2-space, trailing newline, root ending `/skills/usage-dashboard/scripts`).
-- [ ] The 6 startup-decision cases and `--port` parsing have cargo tests.
-- [ ] `http.contract.test.ts` and `lifecycle.contract.test.ts` pass against Rust and against TS.
-- [ ] Cockpit's own contract suite still passes.
-- [ ] (human) With the TS dashboard stopped, build a root with the real-data recipe in `../_context/shared.md`, run `packages/monitor/cockpit-rs/target/release/cockpit atlas serve --port <free port>` under its env, and confirm every panel renders as under the TS server, the live panel updates every 3 s, and clicking a live row opens the running cockpit (the copied `daemon.json` lets `cockpitPort` resolve).
+- [x] `cockpit atlas serve` serves every route in contracts.md §2 with the exact status codes, bodies, and headers listed there, including 304 on `/api/stats` and static ETags.
+- [x] Two concurrent `/api/stats` requests for one fingerprint run one `stats::build` (cargo test or a log-free counter test); a failed build is not cached and the next request retries.
+- [x] `/api/live` answers in under 1 s while a `/api/stats` build is pending (the Rust-only contract test passes and does not pass vacuously).
+- [x] Reuse, supersede, start, port-in-use (stderr text + exit 1), and corrupt `atlas.json` behave as contracts.md §3, and `atlas.json` is byte-identical in shape to the TS writer's (`{pid, port, root}`, 2-space, trailing newline, root ending `/skills/usage-dashboard/scripts`).
+- [x] The 6 startup-decision cases and `--port` parsing have cargo tests.
+- [x] `http.contract.test.ts` and `lifecycle.contract.test.ts` pass against Rust and against TS.
+- [x] Cockpit's own contract suite still passes.
+- [x] (human) With the TS dashboard stopped, build a root with the real-data recipe in `../_context/shared.md`, run `packages/monitor/cockpit-rs/target/release/cockpit atlas serve --port <free port>` under its env, and confirm every panel renders as under the TS server, the live panel updates every 3 s, and clicking a live row opens the running cockpit (the copied `daemon.json` lets `cockpitPort` resolve).
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts` passes with no skipped Rust-only test.
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts` (against TS) passes.
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/` passes.
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml` passes.
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check` and `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings` are clean.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts` passes with no skipped Rust-only test.
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts` (against TS) passes.
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/` passes.
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml` passes.
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check` and `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings` are clean.
 
 ## Eval rubric
 
