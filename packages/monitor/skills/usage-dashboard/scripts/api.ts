@@ -2653,13 +2653,14 @@ export async function buildStats() {
       tokensByDate.set(date, dayTokens);
     }
   }
-  for (const [source, sessionField] of [
-    [codexUsage.dailyActivity, "threadCount"],
-    [openCodeUsage.dailyActivity, "sessionCount"],
-  ] as const) {
+  for (const source of [
+    codexUsage.dailyActivity,
+    openCodeUsage.dailyActivity,
+  ]) {
     for (const [date, activity] of source.entries()) {
       const current = activityByDate.get(date);
-      const sessionCount = activity[sessionField];
+      const sessionCount =
+        "threadCount" in activity ? activity.threadCount : activity.sessionCount;
       if (current) {
         current.sessionCount += sessionCount;
       } else {

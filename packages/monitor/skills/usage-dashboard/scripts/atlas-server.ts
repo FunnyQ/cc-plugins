@@ -234,7 +234,7 @@ try {
 
 writeAtlasInfo({
   pid: process.pid,
-  port: server.port,
+  port: server.port ?? port,
   root: ROOT,
 });
 
