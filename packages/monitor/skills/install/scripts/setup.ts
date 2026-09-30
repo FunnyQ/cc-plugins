@@ -537,7 +537,7 @@ function main() {
     if (!dryRun && ok) {
       console.log("Done. Launch an opted-in session with:");
       console.log(
-        `   bun ${resolve(import.meta.dir, "..", "..", "cockpit", "scripts", "monitor-up.ts")}`,
+        "   claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace",
       );
     }
     process.exit(ok ? 0 : 1);

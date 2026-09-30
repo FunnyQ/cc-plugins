@@ -19,7 +19,7 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 // Grace period before the hero collapses again after the pilot answers a call.
 const HERO_RECOLLAPSE_MS = 60_000;
 
-// Valid decision-trail kinds. Keep in sync with cockpit.ts DecisionKind /
+// Valid decision-trail kinds. Keep in sync with cockpit-rs/src/cli/trail.rs scribe validation /
 // VALID_KINDS (no-build-step SPA can't import the TS source). Module-level so
 // the array isn't re-allocated on every card render.
 const KINDS = ["decision", "rationale", "learning", "caveat"];

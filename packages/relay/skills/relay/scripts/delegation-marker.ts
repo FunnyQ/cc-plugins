@@ -10,7 +10,7 @@
  * does see the var, which is why the headless path needs nothing here.)
  *
  * So the live-codex path drops a file the hook can find. The reader lives in
- * monitor — `packages/monitor/skills/cockpit/scripts/delegation-marker.ts` —
+ * monitor — `packages/monitor/cockpit-rs/src/hook/delegation_marker.rs` —
  * and the two plugins version independently, so they share a PATH AND A SHAPE,
  * never code. Change either side and you must change the other:
  *

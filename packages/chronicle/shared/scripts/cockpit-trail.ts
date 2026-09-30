@@ -21,13 +21,13 @@ export type DecisionRecord = {
 
 export type RegistryEntry = { project?: string; logPath?: string };
 
-// Ported from packages/monitor/skills/cockpit/scripts/log-root.ts — chronicle cannot
+// Ported from packages/monitor/cockpit-rs/src/log_root.rs — chronicle cannot
 // import across the plugin boundary. That file is the spec; keep this in sync by hand.
 export type LogRootDeps = {
   gitRoot?: (cwd: string) => string | null;
 };
 
-// Ported from packages/monitor/skills/cockpit/scripts/registry.ts — chronicle cannot
+// Ported from packages/monitor/cockpit-rs/src/registry.rs — chronicle cannot
 // import across the plugin boundary. That file is the spec; keep this in sync by hand.
 export const STALE_MS = 10 * 60 * 1000;
 
@@ -52,7 +52,7 @@ function realpathOr(path: string): string {
   }
 }
 
-// Ported from packages/monitor/skills/cockpit/scripts/log-root.ts — chronicle cannot
+// Ported from packages/monitor/cockpit-rs/src/log_root.rs — chronicle cannot
 // import across the plugin boundary. That file is the spec; keep this in sync by hand.
 export function gitRootOf(cwd: string): string | null {
   try {
@@ -69,7 +69,7 @@ export function gitRootOf(cwd: string): string | null {
   }
 }
 
-// Ported from packages/monitor/skills/cockpit/scripts/log-root.ts — chronicle cannot
+// Ported from packages/monitor/cockpit-rs/src/log_root.rs — chronicle cannot
 // import across the plugin boundary. That file is the spec; keep this in sync by hand.
 export function logRoot(cwd: string, deps: LogRootDeps = {}): string {
   const resolveGitRoot = deps.gitRoot ?? gitRootOf;

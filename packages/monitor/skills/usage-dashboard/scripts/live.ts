@@ -146,7 +146,7 @@ function cockpitSessionKeys(): Set<string> {
 // Companion read of cockpit's daemon PID file (same machine, same author). The
 // Live panel's rows open a session's transcript in cockpit (port 5858), so a
 // dead daemon means a dead tab — surface it as a notice instead. Mirrors
-// cockpit-server.ts's own liveness check (PID file + signal-0 probe).
+// cockpit-rs/src/daemon_info.rs's own liveness check (PID file + signal-0 probe).
 const COCKPIT_DAEMON = join(cockpitHome(), "daemon.json");
 let cockpitDaemonPortCache: number | null = null;
 let cockpitDaemonPortAt = 0;

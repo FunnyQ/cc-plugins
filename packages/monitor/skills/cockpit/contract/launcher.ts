@@ -1,22 +1,19 @@
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type Proc = "server" | "channel" | "cli" | "hook";
-const binary = process.env.COCKPIT_BIN;
-export const underTest: "ts" | "rust" = binary ? "rust" : "ts";
+export const underTest: "ts" | "rust" = "rust";
 export const PLUGIN_ROOT = resolve(import.meta.dir, "../../..");
 export const SCRIPTS_DIR = join(PLUGIN_ROOT, "skills/cockpit/scripts");
+// The ported TS processes are deleted, so a missing binary must fail the suite.
+const binary = process.env.COCKPIT_BIN || join(PLUGIN_ROOT, "cockpit-rs/target/release/cockpit");
+if (!process.env.COCKPIT_BIN && !existsSync(binary)) {
+  throw new Error("contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN");
+}
+
+// Legacy contract branches inspect this variable to select Rust behavior.
+process.env.COCKPIT_BIN = binary;
 
 export function command(proc: Proc, argv: string[]): string[] {
-  if (binary) return proc === "cli" ? [binary, ...argv] : [binary, proc, ...argv];
-  if (proc === "server" || proc === "channel") {
-    return ["bun", join(SCRIPTS_DIR, `cockpit-${proc}.ts`), ...argv];
-  }
-  if (proc === "cli") {
-    return argv[0] === "find-session"
-      ? ["bun", join(SCRIPTS_DIR, "find-session.ts"), ...argv.slice(1)]
-      : ["bun", join(SCRIPTS_DIR, "cockpit.ts"), ...argv];
-  }
-  if (argv[0] === "session-start") return ["bun", join(SCRIPTS_DIR, "decision-log-start.ts")];
-  if (argv[0] === "stop") return ["bun", join(SCRIPTS_DIR, "scribe-nudge.ts")];
-  throw new Error(`Unknown cockpit hook: ${argv[0]}`);
+  return proc === "cli" ? [binary, ...argv] : [binary, proc, ...argv];
 }

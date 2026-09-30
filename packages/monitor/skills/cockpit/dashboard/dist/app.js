@@ -124,7 +124,7 @@ export const store = reactive({
     return this.selectedStatus === "active" ? "Flying" : "Arrived";
   },
 
-  // Fine-grained status of the selected session (registry.ts LiveStatus) —
+  // Fine-grained status of the selected session (cockpit-rs/src/registry.rs LiveStatus) —
   // drives the transcript panel's breathing status bar. "ended" when nothing is
   // selected or the field is absent, so the bar rests dim rather than glowing.
   get selectedLiveStatus() {
@@ -316,7 +316,7 @@ export const store = reactive({
     this.expandedOverrides[group.project] = !this.isProjectExpanded(group);
   },
 
-  // Human label for a leg's fine-grained status (see registry.ts LiveStatus).
+  // Human label for a leg's fine-grained status (see cockpit-rs/src/registry.rs LiveStatus).
   // Falls back to the coarse active/ended for any unexpected value.
   legStatusLabel(s) {
     return (
