@@ -20,6 +20,7 @@ import {
   land,
   rebase,
   remove,
+  reset,
   show,
   sweep,
   unland,
@@ -279,6 +280,7 @@ describe("worktree lifecycle", () => {
       path: wt.path,
       base: expect.any(String),
       conflicted: ["a.txt"],
+      tree: expect.stringMatching(/^[a-f0-9]{40,64}$/),
     });
     expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toContain("<<<<<<<");
     expect(git(wt.path, "rev-parse", "HEAD")).toBe(rebased.base);
@@ -774,5 +776,50 @@ describe("CLI argument and git failures", () => {
     expect(response.stdout.toString()).toBe("");
     expect(response.stderr.toString()).toContain("git -C");
     expect(response.stderr.toString()).toContain("not a git repository");
+  });
+});
+
+describe("reset", () => {
+  function conflicted() {
+    const options = fixture();
+    const wt = create(options);
+    put(wt.path, "a.txt", "task edit\n");
+    put(options.repo, "a.txt", "main edit\n");
+    return { options, wt };
+  }
+
+  test("is a no-op when the rebase op was never recorded", () => {
+    const { options, wt } = conflicted();
+    put(wt.path, "a.txt", "half edited\n");
+    expect(reset({ ...options, op: "a1-rebase" })).toEqual({ reset: false });
+    expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe("half edited\n");
+  });
+
+  test("restores conflict markers, drops untracked files, keeps ignored files and the plan link", () => {
+    const { options, wt } = conflicted();
+    const rebased = rebase({ ...options, op: "a1-rebase" });
+    const markers = readFileSync(join(wt.path, "a.txt"), "utf8");
+    expect(markers).toContain("<<<<<<<");
+    put(wt.path, "a.txt", "resolved\n");
+    put(wt.path, "scratch/new.txt", "new\n");
+    put(wt.path, "node_modules/dep/index.js", "dep\n");
+    const result = reset({ ...options, op: "a1-rebase" });
+    expect(result).toEqual({ reset: true, path: wt.path, tree: rebased.tree });
+    expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe(markers);
+    expect(existsSync(join(wt.path, "scratch/new.txt"))).toBe(false);
+    expect(existsSync(join(wt.path, "node_modules/dep/index.js"))).toBe(true);
+    expect(lstatSync(join(wt.path, "docs/test-plan")).isSymbolicLink()).toBe(true);
+    expect(git(wt.path, "rev-parse", "HEAD")).toBe(rebased.base);
+    expect(git(wt.path, "write-tree")).toBe(rebased.tree);
+  });
+
+  test("rejects a recorded op that is not a rebase and records nothing", () => {
+    const { options, wt } = conflicted();
+    unland;
+    land({ ...options, expect: fingerprint(options).fingerprint, op: "a1-land" });
+    const before = JSON.stringify(state(options));
+    expect(() => reset({ ...options, op: "a1-land" })).toThrow(/not a rebase/);
+    expect(JSON.stringify(state(options))).toBe(before);
+    expect(wt.path).toBeTruthy();
   });
 });

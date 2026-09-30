@@ -19,7 +19,7 @@ export type LandResult = {
   previous: string;
 };
 type UnlandResult = { restored: string[] };
-type RebaseResult = Location & { conflicted: string[] };
+type RebaseResult = Location & { conflicted: string[]; tree: string };
 type OpResult = LandResult | UnlandResult | RebaseResult;
 type Entry = Location & {
   previous?: string;
@@ -324,7 +324,25 @@ export function rebase(options: OpOptions): RebaseResult {
   git(path, ["reset", "--soft", ours]);
   git(path, ["read-tree", "-u", "--reset", merged.tree]);
   entry.base = ours;
-  return record(options, state, { path, base: ours, conflicted: merged.conflicted });
+  return record(options, state, { path, base: ours, conflicted: merged.conflicted, tree: merged.tree });
+}
+
+// Restores the exact post-rebase state so a retried resolver starts from the markers again.
+export function reset(options: OpOptions): { reset: false } | { reset: true; path: string; tree: string } {
+  const path = pathOf(options);
+  if (!options.op) throw new ArgumentError("--op is required");
+  const recorded = readState(rootOf(options))[options.ref]?.ops;
+  if (!recorded || !Object.hasOwn(recorded, options.op)) return { reset: false };
+  const result = recorded[options.op] as Partial<RebaseResult>;
+  if (typeof result.tree !== "string" || typeof result.base !== "string" || !Array.isArray(result.conflicted)) {
+    throw new ArgumentError(`Op ${options.op} is not a rebase result`);
+  }
+  if (!isDirectory(path)) throw new ArgumentError(`Missing worktree: ${path}`);
+  git(path, ["reset", "--soft", result.base]);
+  git(path, ["read-tree", "-u", "--reset", result.tree]);
+  // No -x: ignored seeds stay. -e keeps the untracked plan symlink.
+  git(path, ["clean", "-fdq", "-e", `/${planOf(options)}`]);
+  return { reset: true, path, tree: result.tree };
 }
 
 export function fingerprint(options: Options & { expect?: string }): { fingerprint: string; paths: string[] } {
@@ -395,12 +413,12 @@ export function sweep(options: Options & { keep?: string[]; keepAll?: boolean })
 function main(): void {
   try {
     const [command, ...args] = process.argv.slice(2);
-    const commands = ["create", "land", "unland", "rebase", "fingerprint", "show", "remove", "sweep"];
+    const commands = ["create", "land", "unland", "rebase", "reset", "fingerprint", "show", "remove", "sweep"];
     if (!commands.includes(command)) throw new ArgumentError(`Unknown subcommand: ${command ?? "(missing)"}`);
     const flags: Record<string, string> = {};
     const positional: string[] = [];
     const allowed = new Set(["--repo", "--slug", "--plan-dir"]);
-    if (["land", "unland", "rebase"].includes(command)) allowed.add("--op");
+    if (["land", "unland", "rebase", "reset"].includes(command)) allowed.add("--op");
     if (["land", "fingerprint"].includes(command)) allowed.add("--expect");
     if (command === "sweep") { allowed.add("--keep"); allowed.add("--keep-all"); }
     for (let i = 0; i < args.length; i++) {
@@ -425,6 +443,7 @@ function main(): void {
       case "land": result = land({ ...opOptions, expect: flags["--expect"] }); break;
       case "unland": result = unland(opOptions); break;
       case "rebase": result = rebase(opOptions); break;
+      case "reset": result = reset(opOptions); break;
       case "fingerprint": result = fingerprint({ ...options, expect: flags["--expect"] }); break;
       case "show": result = show(refOptions); break;
       case "remove": result = remove(refOptions); break;
