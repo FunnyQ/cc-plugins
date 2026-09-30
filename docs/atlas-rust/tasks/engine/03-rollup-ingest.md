@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/02, contract/03
 > **Blocks**: engine/07, engine/08, cli/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high, judge=opus/high
 
 ## Goal
@@ -102,21 +102,21 @@ pub fn run(args: &[String]) -> std::process::ExitCode;
 
 ## Acceptance criteria
 
-- [ ] Every golden test whose name contains `rollup` passes against Rust: `rollup table <table>` for every table in `_context/contracts.md` §5, `rollup incremental append`, `rollup transcript deleted`, `rollup rebuild`, `rollup migrate v2`, `rollup refuse newer`, and `rollup pre-rust backup`.
-- [ ] The same filter still passes against TS (with no `COCKPIT_BIN`), so the golden files were not edited to fit Rust.
-- [ ] `cockpit atlas rollup-update --db <tmp>` prints `{"filesScanned", "rebuilt", "usageHourlyRows"}` in that order and exits 0; `--rebuild` sets `rebuilt: true`.
-- [ ] Repeated usage snapshots of one request are billed once, first occurrence wins, exactly as TS; `cargo test` covers it.
-- [ ] `cargo test` covers the five unit cases listed in Implementation notes, and they pass.
-- [ ] The ingest reads only bytes from `bytes_parsed` onward (streamed through the jsonl reader), never a whole-file read on an incremental run.
-- [ ] The executor's report gives the wall-clock time of `atlas rollup-update` on the fixture home for Rust and for TS (informational, not a gate).
+- [x] Every golden test whose name contains `rollup` passes against Rust: `rollup table <table>` for every table in `_context/contracts.md` §5, `rollup incremental append`, `rollup transcript deleted`, `rollup rebuild`, `rollup migrate v2`, `rollup refuse newer`, and `rollup pre-rust backup`.
+- [x] The same filter still passes against TS (with no `COCKPIT_BIN`), so the golden files were not edited to fit Rust.
+- [x] `cockpit atlas rollup-update --db <tmp>` prints `{"filesScanned", "rebuilt", "usageHourlyRows"}` in that order and exits 0; `--rebuild` sets `rebuilt: true`.
+- [x] Repeated usage snapshots of one request are billed once, first occurrence wins, exactly as TS; `cargo test` covers it.
+- [x] `cargo test` covers the five unit cases listed in Implementation notes, and they pass.
+- [x] The ingest reads only bytes from `bytes_parsed` onward (streamed through the jsonl reader), never a whole-file read on an incremental run.
+- [x] The executor's report gives the wall-clock time of `atlas rollup-update` on the fixture home for Rust and for TS (informational, not a gate).
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "rollup"` passes.
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "rollup"` passes (TS side, Rust-only test skipped).
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::rollup_update` passes.
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check` and `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings` are clean.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "rollup"` passes.
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "rollup"` passes (TS side, Rust-only test skipped).
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::rollup_update` passes.
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check` and `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings` are clean.
 
 ## Eval rubric
 
