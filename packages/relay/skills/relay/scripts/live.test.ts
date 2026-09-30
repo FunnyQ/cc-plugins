@@ -944,7 +944,9 @@ describe("runLive", () => {
     // explicitly. Omit it and a detection wobble on a delivered bootstrap burns
     // the budget and surfaces as a plain `timeout`.
     const sends = calls.filter((c) => c.verb === "send");
-    expect(sends[0].args[2].status).toContain("unknown");
+    expect((sends[0].args[2] as { status: string[] }).status).toContain(
+      "unknown",
+    );
   });
 
   it("treats a timeout on the confirmation as a warning, not a failed run", async () => {
@@ -958,7 +960,7 @@ describe("runLive", () => {
 
     // Confirming is a diagnostic, not a gate — it must never fail a run that
     // would have proceeded before the confirmation existed.
-    expect(String(result.error ?? "")).not.toContain(
+    expect(String("error" in result ? result.error : "")).not.toContain(
       "failed to send bootstrap",
     );
     expect(errors.some((e) => e.includes("could not confirm activity"))).toBe(
@@ -976,7 +978,7 @@ describe("runLive", () => {
 
     // Nothing was sent and the pane needs a human — do not pretend otherwise.
     expect(result.ok).toBe(false);
-    expect(String(result.error ?? "")).toContain("failed to send bootstrap");
+    expect(String("error" in result ? result.error : "")).toContain("failed to send bootstrap");
   });
 
   it("treats agent_prompt_stalled as a warning, not a failed run", async () => {
@@ -991,7 +993,7 @@ describe("runLive", () => {
     const result = await run();
 
     // A cold start can exceed herdr's window; the nudge loop heals a real miss.
-    expect(String(result.error ?? "")).not.toContain(
+    expect(String("error" in result ? result.error : "")).not.toContain(
       "failed to send bootstrap",
     );
     expect(errors.some((e) => e.includes("agent_prompt_stalled"))).toBe(true);
