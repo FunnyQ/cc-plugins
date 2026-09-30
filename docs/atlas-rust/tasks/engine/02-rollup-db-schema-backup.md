@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/01
 > **Blocks**: engine/03
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high, judge=opus/high
 
 ## Goal
@@ -130,22 +130,22 @@ Unknown meta keys are ignored by the TS, so `writer` is safe in a mixed TS/Rust 
 
 ## Acceptance criteria
 
-- [ ] A fresh temp DB opened with `open_rollup_db` has `schema_version = "3"` and `writer = "rust"`, and no `.pre-rust.bak` or `.v*.bak` sits next to it.
-- [ ] A TS-shaped v3 DB with rows in every table and no `writer` key produces `<db>.pre-rust.bak` whose tables equal the original row for row. The original's rows are also unchanged after the open.
-- [ ] Opening the same DB a second time leaves the `.pre-rust.bak` mtime and size unchanged. A pre-existing `.pre-rust.bak` placed by the test is never overwritten.
-- [ ] A v2 DB (v2 DDL without the two ledger tables, `schema_version = "2"`, a non-zero `bytes_parsed`) opens to v3. `<db>.v2.bak` exists. Every `bytes_parsed` is 0 and `ledger_rebuild_pending = "1"`. `seen_requests` and `usage_hourly` are unchanged.
-- [ ] A v1 DB whose `seen_requests` lacks `path` gains the column with `''` for existing keys, and those keys survive.
-- [ ] A DB with `schema_version = "99"` makes `open_rollup_db` return an error whose message is `Unsupported rollup schema version: 99`. The main file's rows and meta are unchanged, and `writer` is not set.
-- [ ] `PRAGMA journal_mode` returns `wal` and `PRAGMA busy_timeout` returns `5000` on a handle from `open_sqlite_file`.
-- [ ] `add_hourly_row` twice on the same key sums every count column. `add_ledger_row` keeps the earliest non-zero `project_ts_ms` and its `project`. `rewind_rollup` zeroes cursors and empties `seen_tool_calls` but not `seen_requests`. Each of these has a unit test.
+- [x] A fresh temp DB opened with `open_rollup_db` has `schema_version = "3"` and `writer = "rust"`, and no `.pre-rust.bak` or `.v*.bak` sits next to it.
+- [x] A TS-shaped v3 DB with rows in every table and no `writer` key produces `<db>.pre-rust.bak` whose tables equal the original row for row. The original's rows are also unchanged after the open.
+- [x] Opening the same DB a second time leaves the `.pre-rust.bak` mtime and size unchanged. A pre-existing `.pre-rust.bak` placed by the test is never overwritten.
+- [x] A v2 DB (v2 DDL without the two ledger tables, `schema_version = "2"`, a non-zero `bytes_parsed`) opens to v3. `<db>.v2.bak` exists. Every `bytes_parsed` is 0 and `ledger_rebuild_pending = "1"`. `seen_requests` and `usage_hourly` are unchanged.
+- [x] A v1 DB whose `seen_requests` lacks `path` gains the column with `''` for existing keys, and those keys survive.
+- [x] A DB with `schema_version = "99"` makes `open_rollup_db` return an error whose message is `Unsupported rollup schema version: 99`. The main file's rows and meta are unchanged, and `writer` is not set.
+- [x] `PRAGMA journal_mode` returns `wal` and `PRAGMA busy_timeout` returns `5000` on a handle from `open_sqlite_file`.
+- [x] `add_hourly_row` twice on the same key sums every count column. `add_ledger_row` keeps the earliest non-zero `project_ts_ms` and its `project`. `rewind_rollup` zeroes cursors and empties `seen_tool_calls` but not `seen_requests`. Each of these has a unit test.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::rollup_db` passes and runs at least the eight cases above.
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] Every test DB is created under a temp dir. `grep -n "token-atlas" packages/monitor/cockpit-rs/src/atlas/rollup_db.rs` shows no hard-coded real-home path inside `mod tests`.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::rollup_db` passes and runs at least the eight cases above.
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] Every test DB is created under a temp dir. `grep -n "token-atlas" packages/monitor/cockpit-rs/src/atlas/rollup_db.rs` shows no hard-coded real-home path inside `mod tests`.
 
 The black-box golden tests `rollup migrate v2`, `rollup refuse newer`, and `rollup pre-rust backup` drive this module through the `atlas rollup-update` CLI. That CLI's body belongs to the ingest port, so those tests are not a gate here. They go green once the ingest lands.
 
