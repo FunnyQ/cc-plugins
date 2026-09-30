@@ -1,0 +1,106 @@
+name: Cockpit release
+
+on:
+  push:
+    tags: ['monitor-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing monitor-v<version> tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      TAG: ${{ steps.tag.outputs.TAG }}
+    steps:
+      - id: tag
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          [[ "$TAG" == monitor-v* && "$TAG" != *$'\n'* ]] || exit 1
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: tag
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple's linker adds the ad-hoc signature required by arm64 macOS.
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            flags: ''
+          - runner: macos-14
+            target: x86_64-apple-darwin
+            flags: ''
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            flags: '--zig'
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            flags: '--zig'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.TAG }}
+      # The shim requests plugin.json's version, so mismatched tags produce unreachable assets.
+      - name: Verify release version
+        env:
+          TAG: ${{ needs.tag.outputs.TAG }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, tomllib
+          version = os.environ["TAG"].removeprefix("monitor-v")
+          with open("packages/monitor/.claude-plugin/plugin.json") as file:
+              plugin_version = json.load(file)["version"]
+          with open("packages/monitor/cockpit-rs/Cargo.toml", "rb") as file:
+              crate_version = tomllib.load(file)["package"]["version"]
+          if version != plugin_version or version != crate_version:
+              raise SystemExit(f"Version mismatch: tag={version}, plugin={plugin_version}, crate={crate_version}")
+          PYTHON
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: mlugg/setup-zig@v2
+        if: runner.os == 'Linux'
+      - name: Install cargo-zigbuild
+        if: runner.os == 'Linux'
+        run: cargo install cargo-zigbuild --locked
+      - name: Build asset
+        env:
+          TARGET: ${{ matrix.target }}
+          FLAGS: ${{ matrix.flags }}
+        run: packages/monitor/cockpit-rs/scripts/build-release.sh "$TARGET" dist $FLAGS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-${{ matrix.target }}
+          path: dist/cockpit-${{ matrix.target }}
+          if-no-files-found: error
+
+  release:
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cockpit-*
+          path: dist
+          merge-multiple: true
+      - run: packages/monitor/cockpit-rs/scripts/build-release.sh --sums dist
+      - name: Publish assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.tag.outputs.TAG }}
+        run: |
+          gh release view "$TAG" || gh release create "$TAG" --title "$TAG" --notes "cockpit binaries for $TAG" --verify-tag
+          gh release upload "$TAG" dist/cockpit-* dist/SHA256SUMS --clobber

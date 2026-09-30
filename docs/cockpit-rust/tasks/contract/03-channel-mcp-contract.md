@@ -112,7 +112,7 @@ return Number.isFinite(envPort) && envPort > 0 && envPort < 65536 ? envPort : DE
 - [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts` passes (`COCKPIT_BIN` unset).
 - [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: handshake"` passes on its own.
 - [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: spawn"` passes on its own.
-- [ ] `pgrep -f cockpit-channel.ts; test $? -eq 1` after the run (no leaked channel).
+- [ ] `ps -eo command= | grep '[c]ockpit-channel.ts' | grep -v '/.claude/plugins/cache/'; test $? -eq 1` after the run (no leaked channel).
 - [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/scripts/cockpit-server.ts` prints nothing.
 - [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 

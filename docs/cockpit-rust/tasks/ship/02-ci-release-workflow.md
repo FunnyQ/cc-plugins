@@ -7,7 +7,7 @@
 >
 > **Depends on**: ship/01
 > **Blocks**: ship/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -84,19 +84,19 @@ This proves the asset name, the sums format, and the shim's verify step agree en
 
 ## Acceptance criteria
 
-- [ ] `.github/workflows/cockpit-release.yml` triggers on `monitor-v*` tags, builds all four triples, darwin on a macOS runner and linux musl via cargo-zigbuild, and uploads `cockpit-<triple>` plus `SHA256SUMS` with `gh release upload --clobber`.
-- [ ] The workflow fails before building when the tag version differs from either `plugin.json` or `Cargo.toml`.
-- [ ] `build-release.sh <host triple> <dir>` produces `<dir>/cockpit-<host triple>`. `--sums <dir>` writes a `sha256sum`-format file that `sha256sum -c` or `shasum -a 256 -c` accepts from inside `<dir>`.
-- [ ] `.chronicle/release.json` lists `packages/monitor/cockpit-rs/Cargo.toml` with `kind: "toml"` under monitor, and nowhere else.
-- [ ] The new shim test case passes: the shim downloads, verifies, and execs a binary built by the release script.
+- [x] `.github/workflows/cockpit-release.yml` triggers on `monitor-v*` tags, builds all four triples, darwin on a macOS runner and linux musl via cargo-zigbuild, and uploads `cockpit-<triple>` plus `SHA256SUMS` with `gh release upload --clobber`.
+- [x] The workflow fails before building when the tag version differs from either `plugin.json` or `Cargo.toml`.
+- [x] `build-release.sh <host triple> <dir>` produces `<dir>/cockpit-<host triple>`. `--sums <dir>` writes a `sha256sum`-format file that `sha256sum -c` or `shasum -a 256 -c` accepts from inside `<dir>`.
+- [x] `.chronicle/release.json` lists `packages/monitor/cockpit-rs/Cargo.toml` with `kind: "toml"` under monitor, and nowhere else.
+- [x] The new shim test case passes: the shim downloads, verifies, and execs a binary built by the release script.
 
 ## Verification
 
-- [ ] `command -v actionlint >/dev/null && actionlint .github/workflows/cockpit-release.yml || bun -e 'const y=require("fs").readFileSync(".github/workflows/cockpit-release.yml","utf8"); Bun.YAML ? Bun.YAML.parse(y) : (()=>{throw new Error("no YAML parser")})(); console.log("yaml ok")'`
-- [ ] `sh -n packages/monitor/cockpit-rs/scripts/build-release.sh && test -x packages/monitor/cockpit-rs/scripts/build-release.sh`
-- [ ] `T=$(mktemp -d) && H=$(rustc -vV | sed -n 's/^host: //p') && packages/monitor/cockpit-rs/scripts/build-release.sh "$H" "$T" && packages/monitor/cockpit-rs/scripts/build-release.sh --sums "$T" && (cd "$T" && (shasum -a 256 -c SHA256SUMS 2>/dev/null || sha256sum -c SHA256SUMS))`
-- [ ] `bun -e 'const c=JSON.parse(require("fs").readFileSync(".chronicle/release.json","utf8")); const m=c.components.find(x=>x.name==="monitor"); if(!m.versionFiles.some(f=>f.path==="packages/monitor/cockpit-rs/Cargo.toml"&&f.kind==="toml")) process.exit(1)'`
-- [ ] `bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts`
+- [x] `command -v actionlint >/dev/null && actionlint .github/workflows/cockpit-release.yml || bun -e 'const y=require("fs").readFileSync(".github/workflows/cockpit-release.yml","utf8"); Bun.YAML ? Bun.YAML.parse(y) : (()=>{throw new Error("no YAML parser")})(); console.log("yaml ok")'`
+- [x] `sh -n packages/monitor/cockpit-rs/scripts/build-release.sh && test -x packages/monitor/cockpit-rs/scripts/build-release.sh`
+- [x] `T=$(mktemp -d) && H=$(rustc -vV | sed -n 's/^host: //p') && packages/monitor/cockpit-rs/scripts/build-release.sh "$H" "$T" && packages/monitor/cockpit-rs/scripts/build-release.sh --sums "$T" && (cd "$T" && (shasum -a 256 -c SHA256SUMS 2>/dev/null || sha256sum -c SHA256SUMS))`
+- [x] `bun -e 'const c=JSON.parse(require("fs").readFileSync(".chronicle/release.json","utf8")); const m=c.components.find(x=>x.name==="monitor"); if(!m.versionFiles.some(f=>f.path==="packages/monitor/cockpit-rs/Cargo.toml"&&f.kind==="toml")) process.exit(1)'`
+- [x] `bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts`
 
 ## Eval rubric
 

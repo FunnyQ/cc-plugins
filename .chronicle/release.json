@@ -75,6 +75,14 @@
         {
           "path": "packages/monitor/.codex-plugin/plugin.json",
           "kind": "json"
+        },
+        {
+          "path": "packages/monitor/cockpit-rs/Cargo.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "packages/monitor/cockpit-rs/Cargo.lock",
+          "pattern": "name = \"cockpit\"\\nversion = \"([^\"]+)\""
         }
       ]
     },
