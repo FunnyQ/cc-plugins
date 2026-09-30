@@ -137,6 +137,7 @@ export function resumePoint(
   const wrote = at((step) => WRITE_ROLES.has(step.role));
   const gate = at((step) => GATE_ROLES.has(step.role));
   const reverify = at((step) => step.role === "reverify");
+  const land = at((step) => step.role === "land");
 
   // Ordered latest-evidence-first: a failed re-verify supersedes the verdict,
   // the verdict supersedes the gate, and the gate supersedes the write step.
@@ -146,6 +147,13 @@ export function resumePoint(
         from: "dev",
         gateRejected: true,
         reason: `the drift re-verify failed on attempt ${lastAttempt}: ${reverify.message}`,
+      };
+    }
+    if (land && /^CONFLICT\b/.test(land.message ?? "")) {
+      return {
+        from: "dev",
+        gateRejected: false,
+        reason: `the land conflicted on attempt ${lastAttempt}, so the worktree may hold conflict markers or a half-finished resolution and only a fresh dev step is an honest restart`,
       };
     }
     if (verdict && !verdict.passed) {

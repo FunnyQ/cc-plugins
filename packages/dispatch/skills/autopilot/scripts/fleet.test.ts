@@ -107,6 +107,10 @@ describe("parseAgentLabel", () => {
       { role: "judge", ref: "ui/03", attempt: 2, raw: "judge:ui/03#2" },
     ],
     [
+      "land:ui/03#2",
+      { role: "land", ref: "ui/03", attempt: 2, raw: "land:ui/03#2" },
+    ],
+    [
       "review:reuse#1",
       { role: "review", lens: "reuse", attempt: 1, raw: "review:reuse#1" },
     ],

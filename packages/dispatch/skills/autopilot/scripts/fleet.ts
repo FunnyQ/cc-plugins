@@ -16,6 +16,7 @@ const KNOWN_ROLES = [
   "requalify",
   "reverify",
   "judge",
+  "land",
   "review",
   "fix",
   "done",
@@ -123,7 +124,7 @@ export type FleetRow = {
 
 /** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */
 const DEV = /^dev(?:-[a-z]+)?:(.+)#(\d+)$/;
-const REF_ATTEMPT = /^(verify|requalify|reverify|judge|fix):(.+)#(\d+)$/;
+const REF_ATTEMPT = /^(verify|requalify|reverify|judge|land|fix):(.+)#(\d+)$/;
 const REVIEW = /^review:([^#]+)#(\d+)$/;
 const TERMINAL = /^(done|block):(.+)$/;
 const SCOUT = /^scout-wave-(\d+)$/;
@@ -141,7 +142,7 @@ export function parseAgentLabel(label: string): ParsedLabel {
   match = REF_ATTEMPT.exec(label);
   if (match) {
     return {
-      role: match[1] as "verify" | "requalify" | "reverify" | "judge" | "fix",
+      role: match[1] as "verify" | "requalify" | "reverify" | "judge" | "land" | "fix",
       ref: match[2],
       attempt: Number(match[3]),
       raw: label,
@@ -347,7 +348,7 @@ function gateOutcome(row: FleetRow): GateOutcome | undefined {
 
 /**
  * How far through one attempt a role sits. The per-task loop is strictly
- * dev → review → fix → verify → judge → reverify, so a role starting proves every lower
+ * dev → review → fix → verify → judge → land → reverify, so a role starting proves every lower
  * role of that attempt is over. Review shares one rank on purpose: the
  * final-review fan-out runs its lenses concurrently at the same identity, and
  * they must never close each other.
@@ -359,7 +360,8 @@ const ROLE_PROGRESS: Partial<Record<AgentRole, number>> = {
   verify: 3,
   requalify: 4, // The second gate check runs after verify and before judge.
   judge: 5,
-  reverify: 6,
+  land: 6,
+  reverify: 7,
 };
 
 /** Ordinal of (attempt, role) within one ref. Monotonic as the run advances. */

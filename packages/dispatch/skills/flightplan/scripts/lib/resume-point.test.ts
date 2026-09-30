@@ -167,6 +167,25 @@ describe("resumePoint", () => {
     expect(point.reason).toContain("FAIL — merged tests are red");
   });
 
+  test("a land that ended CONFLICT restarts from dev even after a passing verdict", () => {
+    const point = resumePoint([
+      score(REF, 2, true, 4.6),
+      ...ran(REF, "land", 2, "CONFLICT — src/a.ts"),
+    ], REF)!;
+    expect(point.from).toBe("dev");
+    expect(point.gateRejected).toBe(false);
+    expect(point.attempt).toBe(3);
+    expect(point.reason).toContain("conflicted on attempt 2");
+  });
+
+  test("a land that ended CLEAN changes nothing", () => {
+    const point = resumePoint([
+      score(REF, 2, true, 4.6),
+      ...ran(REF, "land", 2, "CLEAN — src/a.ts"),
+    ], REF)!;
+    expect(point.from).toBe("verify");
+  });
+
   test.each(["PASS — merged tests are green", null])(
     "a passing or unfinished re-verify leaves the verdict intact: %s", (message) => {
       const point = resumePoint([
