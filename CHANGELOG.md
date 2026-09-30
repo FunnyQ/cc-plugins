@@ -1,5 +1,21 @@
 # Changelog
 
+## [monitor 7.0.0] - 2026-10-01
+
+_tracks tag `monitor-v7.0.0`_
+
+### Added
+- The usage dashboard (token atlas) now runs inside the cockpit Rust binary as `cockpit atlas serve|stats|live|rollup-update|statusline|push-usage`, keeping port 5938, the same SPA, and the same rollup.db schema v3; serving RSS drops from about 600 MB to 77.8 MB on a real home.
+- rollup.db is backed up once to `<db>.pre-rust.bak` before the Rust engine first writes it, so history stays recoverable.
+- The statusline command migrates automatically at session start from `bun …/statusline-collector.ts` to `…/cockpit atlas statusline`, keeping any wrapper command you put around it, and the drift watch reports a leftover old-form collector.
+
+### Removed
+- The Bun/TypeScript atlas scripts under usage-dashboard are deleted; the Rust binary is now the only engine.
+
+### Fixed
+- Migrating the statusline no longer strips quotes from your own wrapper command, so commands like `hud statusline 'bun …collector.ts'` keep working, and quoted paths and absolute `bun` paths are now recognised.
+- Live sessions pass unknown session-file fields through unchanged, and the statusline inner command no longer inherits `TOKEN_ATLAS_STATUSLINE_COMMAND`, after a final review pass over the Rust atlas.
+
 ## [monitor 6.0.1] - 2026-10-01
 
 _tracks tag `monitor-v6.0.1`_
