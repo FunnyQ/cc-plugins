@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: server/04, server/02
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -78,20 +78,20 @@ Only when the pending entry exists with that id: tear down its guard and timer, 
 
 ## Acceptance criteria
 
-- [ ] Every `server: permission` contract test passes against the Rust binary and still passes against TS.
-- [ ] Request → stream frame → verdict → pull returns the verdict; a verdict given before the pull parks is delivered from the stash.
-- [ ] A verdict for a superseded or expired request answers 409 `stale request`.
-- [ ] Growing the session's transcript after the guard window withdraws the request: subscribers get a `resolved`/`elsewhere` frame and a parked pull gets `{"abandoned": true}`; growth inside the window does not.
-- [ ] A dashboard that subscribes after the request was made immediately receives the pending `request` frame.
-- [ ] Every `server: presence` contract test passes against the Rust binary and still passes against TS: with `answer_here` on and a live permission stream, a `require_watcher=1` wait parks and receives the answer; closing every stream for the session makes the gate answer `no_tab`.
+- [x] Every `server: permission` contract test passes against the Rust binary and still passes against TS.
+- [x] Request → stream frame → verdict → pull returns the verdict; a verdict given before the pull parks is delivered from the stash.
+- [x] A verdict for a superseded or expired request answers 409 `stale request`.
+- [x] Growing the session's transcript after the guard window withdraws the request: subscribers get a `resolved`/`elsewhere` frame and a parked pull gets `{"abandoned": true}`; growth inside the window does not.
+- [x] A dashboard that subscribes after the request was made immediately receives the pending `request` frame.
+- [x] Every `server: presence` contract test passes against the Rust binary and still passes against TS: with `answer_here` on and a live permission stream, a `require_watcher=1` wait parks and receives the answer; closing every stream for the session makes the gate answer `no_tab`.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (permission|presence|broker)"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (permission|presence)"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (permission|presence|broker)"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (permission|presence)"` (TS still green)
 
 ## Eval rubric
 

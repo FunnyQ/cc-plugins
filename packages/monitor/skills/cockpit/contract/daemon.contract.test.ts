@@ -247,12 +247,15 @@ describe("server: views", () => {
     const subdir = join(transcriptPath(c.f).slice(0, -6), "subagents");
     mkdirSync(subdir, { recursive: true });
     writeFileSync(join(subdir, "agent-fixture.jsonl"), JSON.stringify({ type: "user", message: { role: "user", content: "Work" } }) + "\n");
+    writeFileSync(join(subdir, "agent-done.jsonl"), JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Done" }], stop_reason: null } }) + "\n");
+    writeFileSync(join(subdir, "agent-stale.jsonl"), JSON.stringify({ type: "user" }) + "\n");
+    utimesSync(join(subdir, "agent-stale.jsonl"), new Date(0), new Date(0));
     const sessions = (await get(c.d, "/api/sessions")).sessions;
     expect(sessions).toHaveLength(4);
     const live = sessions.find((s: any) => s.sessionId === c.f.claudeSessionId);
     const { titleResolved: _, ...entry } = c.entries[0]!;
     expect(live).toEqual({ ...entry, status: "active", liveStatus: "your-call", subagents: 1, channel: false, tracked: true });
-    expect(Object.keys(live).sort()).toEqual(["channel", "lastHeartbeat", "liveStatus", "logPath", "project", "provider", "sessionId", "status", "subagents", "title", "tracked"]);
+    expect(Object.keys(live)).toEqual(["provider", "project", "sessionId", "title", "logPath", "status", "liveStatus", "subagents", "channel", "lastHeartbeat", "tracked"]);
     expect(sessions.find((s: any) => s.sessionId === stale)).toEqual({ provider: "claude", project: c.f.projectDir,
       sessionId: stale, title: "Ended", logPath: trail, status: "ended", liveStatus: "ended", subagents: 0,
       channel: false, lastHeartbeat: "2000-01-01T00:00:00.000Z", tracked: true });
@@ -271,6 +274,107 @@ describe("server: views", () => {
       typography: [], rounded: [], spacing: [], components: [], rules: [] });
     expect(await get(c.d, "/api/project-info", {}, 400)).toEqual({ error: "unknown project" });
     expect(await get(c.d, "/api/design-system", {}, 404)).toEqual({ error: "project required" });
+  });
+  test("tracks channel presence while parked and expires it after delivery", async () => {
+    const session = c.f.claudeSessionId;
+    const poll = get(c.d, "/api/inbox", { session });
+    await Bun.sleep(100);
+    const find = async () => (await get(c.d, "/api/sessions")).sessions.find((s: any) => s.sessionId === session);
+    expect((await find()).channel).toBe(true);
+    expect(await post(c.d, "/api/send-message", { session, text: "Views presence" })).toEqual({ delivered: true });
+    expect(await poll).toEqual({ message: "Views presence" });
+    await Bun.sleep(300);
+    expect((await find()).channel).toBe(false);
+  });
+  test("persists historical and live titles with no trailing newline", async () => {
+    const path = join(c.h.cockpitHome, "registry.json");
+    const saved = readFileSync(path, "utf8");
+    const livePath = join(c.f.claudeSessionsDir, `${process.pid}.json`);
+    const original = readFileSync(livePath, "utf8");
+    try {
+      const historical = crypto.randomUUID();
+      const historyPath = join(c.f.claudeProjectsDir, c.f.projectDir.replace(/[/.]/g, "-"), `${historical}.jsonl`);
+      writeFileSync(historyPath, JSON.stringify({ type: "user", message: { role: "user", content: "  Historical   request\ntext  " } }) + "\n");
+      const trail = seedTrail(c.f.projectDir, historical, []);
+      seedRegistry(c.h.cockpitHome, [
+        { ...c.entries[0]!, title: undefined, titleResolved: undefined },
+        { provider: "claude", project: c.f.projectDir, sessionId: historical, logPath: trail, lastHeartbeat: new Date().toISOString() },
+        { provider: "codex", project: c.f.projectDir, sessionId: c.f.codexThreadId, logPath: "", lastHeartbeat: new Date().toISOString() },
+        { provider: "opencode", project: c.f.projectDir, sessionId: c.f.opencodeSessionId, logPath: "", lastHeartbeat: new Date().toISOString() },
+      ]);
+      writeFileSync(livePath, JSON.stringify({ ...JSON.parse(original), name: "  Live title  " }));
+      const sessions = (await get(c.d, "/api/sessions")).sessions;
+      for (const [id, title] of [[c.f.claudeSessionId, "Live title"], [historical, "Historical request text"], [c.f.codexThreadId, "Fixture thread"], [c.f.opencodeSessionId, "Fixture session"]]) {
+        expect(sessions.find((s: any) => s.sessionId === id).title).toBe(title);
+      }
+      const persisted = readFileSync(path, "utf8");
+      expect(persisted.endsWith("\n")).toBe(false);
+      expect(JSON.parse(persisted).sessions.every((s: any) => s.titleResolved === true)).toBe(true);
+    } finally {
+      writeFileSync(path, saved);
+      writeFileSync(livePath, original);
+    }
+  });
+  test("excludes Codex children and counts only unfinished recent subagents", async () => {
+    const db = new Database(c.f.codexStateDb);
+    const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    try {
+      db.exec("create table thread_spawn_edges (parent_thread_id text, child_thread_id text, status text)");
+      for (const [index, id] of ids.entries()) {
+        const rollout = join(c.f.codexSessionsDir, `rollout-${id}.jsonl`);
+        writeFileSync(rollout, JSON.stringify({ type: "event_msg", payload: { type: index === 1 ? "task_complete" : "task_started" } }) + "\n");
+        const now = Date.now();
+        db.query("insert into threads values (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(id, c.f.projectDir, "Child", 0, rollout, Math.floor(now / 1000), Math.floor(now / 1000), now, now);
+        db.query("insert into thread_spawn_edges values (?, ?, ?)").run(c.f.codexThreadId, id, index === 2 ? "closed" : "open");
+      }
+      const sessions = (await get(c.d, "/api/sessions")).sessions;
+      expect(sessions.find((s: any) => s.sessionId === c.f.codexThreadId)).toMatchObject({ tracked: false, title: "Fixture thread", subagents: 1, logPath: "", liveStatus: "working" });
+      expect(sessions.find((s: any) => s.sessionId === c.f.opencodeSessionId)).toMatchObject({ tracked: false, subagents: 0, title: "Fixture session", liveStatus: "working" });
+      expect(sessions.some((s: any) => ids.includes(s.sessionId))).toBe(false);
+    } finally {
+      for (const id of ids) db.query("delete from threads where id = ?").run(id);
+      db.exec("drop table thread_spawn_edges");
+      db.close();
+    }
+  });
+  test("rejects unknown projects and preserves rich design payloads", async () => {
+    const unknown = { project: c.f.projectDir + "-unknown" };
+    expect(await get(c.d, "/api/project-info", unknown, 400)).toEqual({ error: "unknown project" });
+    expect(await get(c.d, "/api/design-system", unknown, 404)).toEqual({ error: "unknown project" });
+    const path = join(c.f.projectDir, "DESIGN.md");
+    const original = readFileSync(path, "utf8");
+    try {
+      writeFileSync(path, '---\nname: Rich\ntypography:\n  body:\n    fontFamily: Inter\n    fontWeight: 400\nrounded:\n  small: 4px\nspacing:\n  gap: 8\ncomponents:\n  card:\n    padding: 8px\n---\n**The First Rule.** Keep   space.\n\n**The Second Rule.** Use color.\n## Next\nIgnored');
+      expect(await get(c.d, "/api/design-system", { project: join(c.f.projectDir, "child") })).toEqual({ name: "Rich", description: "", colors: [], typography: [{ key: "body", name: "Body", value: "Inter", fontWeight: "400" }], rounded: [{ key: "small", name: "Small", value: "4px" }], spacing: [{ key: "gap", name: "Gap", value: "8" }], components: [{ key: "card", name: "Card", padding: "8px" }], rules: [{ name: "The First Rule", body: "Keep space." }, { name: "The Second Rule", body: "Use color." }] });
+      writeFileSync(path, "No frontmatter");
+      expect(await get(c.d, "/api/design-system", { project: c.f.projectDir }, 404)).toEqual({ error: "DESIGN.md frontmatter not found" });
+    } finally { writeFileSync(path, original); }
+  });
+  test("confines root markdown and design candidates and supports lowercase design", async () => {
+    const { renameSync, symlinkSync, unlinkSync } = require("node:fs") as typeof import("node:fs");
+    const design = join(c.f.projectDir, "DESIGN.md");
+    const lower = join(c.f.projectDir, "design.md");
+    const instructions = join(c.f.projectDir, "CLAUDE.md");
+    const backup = instructions + ".backup";
+    const outside = join(c.h.root, "outside.md");
+    writeFileSync(outside, "Outside instructions");
+    const savedDesign = readFileSync(design, "utf8");
+    renameSync(design, design + ".backup");
+    renameSync(instructions, backup);
+    try {
+      symlinkSync(outside, instructions);
+      symlinkSync(outside, design);
+      expect((await get(c.d, "/api/project-info", { project: c.f.projectDir })).claudeMd).toBeNull();
+      expect(await get(c.d, "/api/design-system", { project: c.f.projectDir }, 404)).toEqual({ error: "DESIGN.md not found" });
+      unlinkSync(design);
+      writeFileSync(lower, savedDesign);
+      expect((await get(c.d, "/api/design-system", { project: c.f.projectDir })).name).toBe("Fixture Design");
+    } finally {
+      unlinkSync(instructions);
+      unlinkSync(lower);
+      renameSync(backup, instructions);
+      renameSync(design + ".backup", design);
+    }
   });
   test("pins the public views' missing and bad token behavior", async () => {
     // pins TS quirk: none of the four view handlers authenticates a token.
@@ -637,6 +741,71 @@ describe("server: permission", () => {
       expect(await s.next()).toEqual({ event: "message", data: { type: "resolved", request_id: "permission-two", source: "elsewhere" } });
       expect(await post(c.d, "/api/permission-resolved", { session, request_id: "permission-two" })).toEqual({ resolved: false });
     } finally { await s.close(); }
+  });
+  test("replays pending requests and stashes verdicts before a pull", async () => {
+    const session = crypto.randomUUID();
+    await post(c.d, "/api/permission-request", { session, request_id: "replay", tool_name: 42, description: null, input_preview: [] });
+    const s = await subscribe(c.d, session);
+    try {
+      expect(await s.next()).toEqual({ event: "message", data: { type: "request", request_id: "replay", tool_name: "", description: "", input_preview: "" } });
+      expect(await post(c.d, "/api/permission-verdict", { session, request_id: "replay", behavior: "deny" })).toEqual({ delivered: false });
+      expect(await get(c.d, "/api/permission-pull", { session })).toEqual({ request_id: "replay", behavior: "deny" });
+    } finally { await s.close(); }
+  });
+  test("supersedes pending requests and rejects expired verdicts", async () => {
+    const session = crypto.randomUUID();
+    await post(c.d, "/api/permission-request", { session, request_id: "old" });
+    const pull = get(c.d, "/api/permission-pull", { session });
+    await Bun.sleep(100);
+    await post(c.d, "/api/permission-request", { session, request_id: "new" });
+    expect(await pull).toEqual({ abandoned: true });
+    expect(await post(c.d, "/api/permission-verdict", { session, request_id: "old", behavior: "allow" }, 409)).toEqual({ error: "stale request" });
+    await Bun.sleep(2100);
+    expect(await post(c.d, "/api/permission-verdict", { session, request_id: "new", behavior: "allow" }, 409)).toEqual({ error: "stale request" });
+  });
+  test("ignores growth inside the guard and withdraws after forward progress", async () => {
+    const session = c.f.claudeSessionId;
+    const path = transcriptPath(c.f);
+    const s = await subscribe(c.d, session);
+    try {
+      await post(c.d, "/api/permission-request", { session, request_id: "progress" });
+      expect((await s.next()).data.type).toBe("request");
+      writeFileSync(path, readFileSync(path, "utf8") + "{}\n");
+      await Bun.sleep(40);
+      const replay = await subscribe(c.d, session);
+      try { expect((await replay.next()).data.request_id).toBe("progress"); } finally { await replay.close(); }
+      const pull = get(c.d, "/api/permission-pull", { session });
+      await Bun.sleep(150);
+      writeFileSync(path, readFileSync(path, "utf8") + "{}\n");
+      expect(await pull).toEqual({ abandoned: true });
+      expect(await s.next()).toEqual({ event: "message", data: { type: "resolved", request_id: "progress", source: "elsewhere" } });
+    } finally { await s.close(); }
+  });
+  test("validates malformed JSON, sessions, request ids and behaviors", async () => {
+    const session = crypto.randomUUID();
+    for (const path of ["/api/permission-request", "/api/permission-verdict", "/api/permission-resolved"]) {
+      expect(await json(await fetch(c.d.base + path, { method: "POST", body: "{" }), 400)).toEqual({ error: "invalid json" });
+      for (const invalid of ["", "bad", session.toUpperCase(), null, 42]) {
+        expect(await post(c.d, path, { session: invalid, request_id: "validation", behavior: "allow" }, 400)).toEqual({ error: "invalid session" });
+      }
+      for (const request_id of ["", null, 42]) {
+        expect(await post(c.d, path, { session, request_id, behavior: "allow" }, 400)).toEqual({ error: "invalid request_id" });
+      }
+    }
+    for (const path of ["/api/permission-stream", "/api/permission-pull"]) {
+      expect(await get(c.d, path, { session: "bad" }, 400)).toEqual({ error: "invalid session" });
+    }
+    expect(await post(c.d, "/api/permission-verdict", { session, request_id: "validation", behavior: "bad" }, 400)).toEqual({ error: "invalid behavior" });
+  });
+  test("replacing a pull times out the old park and preserves the new park", async () => {
+    const session = crypto.randomUUID();
+    await post(c.d, "/api/permission-request", { session, request_id: "replacement" });
+    const first = get(c.d, "/api/permission-pull", { session });
+    await Bun.sleep(100);
+    const second = get(c.d, "/api/permission-pull", { session });
+    expect(await first).toEqual({ verdict: null, timeout: true });
+    expect(await post(c.d, "/api/permission-verdict", { session, request_id: "replacement", behavior: "allow" })).toEqual({ delivered: true });
+    expect(await second).toEqual({ request_id: "replacement", behavior: "allow" });
   });
   test("pins permission timeout and every guarded route's token rejection", async () => {
     expect(await get(c.d, "/api/permission-pull", { session: crypto.randomUUID() })).toEqual({ verdict: null, timeout: true });

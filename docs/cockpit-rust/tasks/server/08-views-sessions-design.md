@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/01, server/04
 > **Blocks**: server/03
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -62,19 +62,19 @@ Declare both modules `pub(crate)` so other server modules can call them; nothing
 
 ## Acceptance criteria
 
-- [ ] Every `server: views` contract test passes against the Rust binary and still passes against TS.
-- [ ] `/api/sessions` and `/api/projects` match the TS payload field-for-field on the contract fixtures, including untracked live sessions, `your-call`, the `channel` flag (true while the test holds an `/api/inbox` poll parked for that session; false after the poll closes and `COCKPIT_CHANNEL_TTL_MS`, shrunk in the test, expires), and title persistence without a trailing newline in `registry.json`.
-- [ ] `/api/project-info` and `/api/design-system` return the TS status codes for missing, unknown, and not-found projects, and identical token/rule payloads for the fixture DESIGN.md.
-- [ ] Subagent counts are correct for the Claude and Codex fixtures and 0 for OpenCode and ended sessions.
-- [ ] Only `views.rs` and files under `src/server/views/` change in `packages/monitor/cockpit-rs/src/`.
+- [x] Every `server: views` contract test passes against the Rust binary and still passes against TS.
+- [x] `/api/sessions` and `/api/projects` match the TS payload field-for-field on the contract fixtures, including untracked live sessions, `your-call`, the `channel` flag (true while the test holds an `/api/inbox` poll parked for that session; false after the poll closes and `COCKPIT_CHANNEL_TTL_MS`, shrunk in the test, expires), and title persistence without a trailing newline in `registry.json`.
+- [x] `/api/project-info` and `/api/design-system` return the TS status codes for missing, unknown, and not-found projects, and identical token/rule payloads for the fixture DESIGN.md.
+- [x] Subagent counts are correct for the Claude and Codex fixtures and 0 for OpenCode and ended sessions.
+- [x] Only `views.rs` and files under `src/server/views/` change in `packages/monitor/cockpit-rs/src/`.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: views"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: views"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: views"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: views"` (TS still green)
 
 ## Eval rubric
 
