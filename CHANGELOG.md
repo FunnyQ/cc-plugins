@@ -1,5 +1,13 @@
 # Changelog
 
+## [dispatch 5.3.8] - 2026-09-30
+
+_tracks tag `dispatch-v5.3.8`_
+
+### Changed
+- The flightplan linter now rejects Final review gates that run `git status` (which misses earlier waves' already-committed edits) and asks for `git diff --name-only <baseRef>` instead.
+- The linter also flags Final review gate items that cite "the report" without naming its file path in backticks, so verifiers know where to look.
+
 ## [relay 0.9.0] - 2026-09-30
 
 _tracks tag `relay-v0.9.0`_
