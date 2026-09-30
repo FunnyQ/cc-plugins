@@ -1,6 +1,6 @@
 // Deterministic fixture HOME for the atlas contract suite. Every item below is
-// named for the engine rule it exercises; shapes follow how the TS parses them
-// (api.ts, rollup-update.ts, live.ts, session-files.ts), not a published schema.
+// named for the engine rule it exercises; shapes follow how the engine parses them
+// (cockpit-rs/src/atlas/), not a published schema.
 import { Database } from "bun:sqlite";
 import {
   mkdirSync,
@@ -895,7 +895,7 @@ function writeConfigAndCache(home: string): void {
     join(home, ".config", "cc-dashboard", "budget.json"),
     JSON.stringify({ monthlyBudgetUSD: 200 }, null, 2),
   );
-  // buildRateLimitsRecord's shape, written the way statusline-collector.ts writes
+  // buildRateLimitsRecord's shape, written the way `cockpit atlas statusline` writes
   // it; captured a minute before now, so readUsageLimits reports it fresh.
   const captured = FIXTURE_NOW_MS - 60_000;
   writeText(

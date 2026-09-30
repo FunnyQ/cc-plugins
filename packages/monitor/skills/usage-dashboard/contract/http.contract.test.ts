@@ -18,7 +18,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
-import { isRust } from "./launcher.ts";
 import {
   FIXTURE_IDS,
   STUB_PATHS,
@@ -375,7 +374,7 @@ describe("concurrency", () => {
   });
 
   // Skipped for TS: it builds stats synchronously on its one event loop, so /api/live blocks behind it.
-  test.skipIf(!isRust())("live answers during a stats build", async () => {
+  test("live answers during a stats build", async () => {
     fx = await makeFixtureHome();
     tmp = mkdtempSync(join(tmpdir(), "atlas-barrier-"));
     const barrier = join(tmp, "barrier");

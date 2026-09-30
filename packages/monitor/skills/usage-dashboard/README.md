@@ -15,14 +15,12 @@ Human-facing overview for the usage dashboard skill.
 
 ## File layout
 
+The engine and server are Rust: `packages/monitor/cockpit-rs/src/atlas/`, run as `cockpit atlas serve|stats|live|rollup-update|statusline`.
+
 ```
 usage-dashboard/
 ├── SKILL.md
-├── scripts/
-│   ├── api.ts                # data engine (also CLI: prints JSON)
-│   ├── atlas-server.ts       # HTTP server + auto-open
-│   └── statusline-collector.ts # captures live rate_limits and chains ccstatusline
-│                             # (precheck install.ts + setup-statusline.ts now live in the install skill)
+├── contract/               # black-box suite + golden/ fixtures for `cockpit atlas`
 ├── dashboard/dist/           # static frontend (no build step)
 │   ├── index.html
 │   ├── app.js

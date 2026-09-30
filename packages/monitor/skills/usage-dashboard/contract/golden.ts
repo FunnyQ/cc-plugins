@@ -1,6 +1,5 @@
-// Helpers shared by record-golden.ts and golden.contract.test.ts: whatever the
-// recorder writes and whatever the suite compares must come out of the same code,
-// or a green run could just mean the two copies drifted the same way.
+// Helpers for golden.contract.test.ts. The golden files were recorded from the TS
+// through these same helpers, so recording and comparing could not drift apart.
 import { Database } from "bun:sqlite";
 import {
   appendFileSync,

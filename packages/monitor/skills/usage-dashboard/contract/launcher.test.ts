@@ -1,18 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
-import { atlasCommand, isRust, type AtlasSub } from "./launcher";
+import { join, resolve } from "node:path";
+import { atlasCommand, DEFAULT_BIN, isRust, type AtlasSub } from "./launcher";
 
-const SCRIPTS = resolve(import.meta.dir, "../scripts");
-const SUBS: Array<[AtlasSub, string]> = [
-  ["serve", "atlas-server.ts"],
-  ["stats", "api.ts"],
-  ["live", "live.ts"],
-  ["rollup-update", "rollup-update.ts"],
-  ["statusline", "statusline-collector.ts"],
-  ["push-usage", "push-usage.ts"],
-];
+const SUBS: AtlasSub[] = ["serve", "stats", "live", "rollup-update", "statusline", "push-usage"];
+const MISSING =
+  "atlas contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN";
 
 let saved: string | undefined;
 beforeEach(() => {
@@ -24,50 +18,40 @@ afterEach(() => {
 });
 
 describe("atlas launcher", () => {
-  test("unset COCKPIT_BIN maps each subcommand to its TS script", () => {
-    delete process.env.COCKPIT_BIN;
-    expect(isRust()).toBe(false);
-    for (const [sub, script] of SUBS) {
-      const argv = atlasCommand(sub, ["--flag", "value"]);
-      expect(argv).toEqual(["bun", join(SCRIPTS, script), "--flag", "value"]);
-      expect(isAbsolute(argv[1])).toBe(true);
-      expect(existsSync(argv[1])).toBe(true);
-    }
-    expect(atlasCommand("stats")).toEqual(["bun", join(SCRIPTS, "api.ts")]);
-  });
-
-  test("empty COCKPIT_BIN still means the TS", () => {
-    process.env.COCKPIT_BIN = "";
-    expect(isRust()).toBe(false);
-    expect(atlasCommand("live")[0]).toBe("bun");
+  test("isRust is always true", () => {
+    expect(isRust()).toBe(true);
   });
 
   test("set COCKPIT_BIN maps each subcommand to `<bin> atlas <sub>`", () => {
     process.env.COCKPIT_BIN = "/opt/cockpit";
-    expect(isRust()).toBe(true);
-    for (const [sub] of SUBS) {
-      expect(atlasCommand(sub, ["--port", "1"])).toEqual([
-        "/opt/cockpit",
-        "atlas",
-        sub,
-        "--port",
-        "1",
-      ]);
+    for (const sub of SUBS) {
+      expect(atlasCommand(sub, ["--port", "1"])).toEqual(["/opt/cockpit", "atlas", sub, "--port", "1"]);
     }
-    expect(atlasCommand("stats")).toEqual(["/opt/cockpit", "atlas", "stats"]);
   });
 
-  test("paths do not depend on the caller's cwd", () => {
-    const source = `const { atlasCommand } = await import(${JSON.stringify(join(import.meta.dir, "launcher.ts"))}); console.log(JSON.stringify(atlasCommand("stats")));`;
-    const env: Record<string, string> = { PATH: process.env.PATH ?? "" };
-    const child = Bun.spawnSync([process.execPath, "-e", source], {
-      env,
-      cwd: tmpdir(),
-    });
-    expect(child.exitCode).toBe(0);
-    expect(JSON.parse(child.stdout.toString())).toEqual([
-      "bun",
-      join(SCRIPTS, "api.ts"),
-    ]);
+  test("unset COCKPIT_BIN runs the absolute local release binary", () => {
+    delete process.env.COCKPIT_BIN;
+    const expected = resolve(import.meta.dir, "../../../cockpit-rs/target/release/cockpit");
+    expect(DEFAULT_BIN).toBe(expected);
+    for (const sub of SUBS) expect(atlasCommand(sub, ["-x"])).toEqual([expected, "atlas", sub, "-x"]);
+  });
+
+  test("a missing default binary throws the exact message at import", () => {
+    // A copy of the launcher where ../../../cockpit-rs/target/release/cockpit does not exist.
+    const dir = mkdtempSync(join(tmpdir(), "atlas-launcher-"));
+    try {
+      const copy = join(dir, "a/b/c/launcher.ts");
+      cpSync(join(import.meta.dir, "launcher.ts"), copy);
+      expect(existsSync(join(dir, "cockpit-rs"))).toBe(false);
+      const child = Bun.spawnSync([process.execPath, "-e", `await import(${JSON.stringify(copy)})`], {
+        env: { PATH: process.env.PATH ?? "" },
+        cwd: tmpdir(),
+        stderr: "pipe",
+      });
+      expect(child.exitCode).not.toBe(0);
+      expect(child.stderr.toString()).toContain(MISSING);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

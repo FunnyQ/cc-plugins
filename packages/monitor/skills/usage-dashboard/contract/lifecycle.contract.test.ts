@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { freePort, makeFixtureHome } from "./fixtures.ts";
-import { isRust } from "./launcher.ts";
 import { spawnAtlas, startAtlas, type AtlasProc } from "./serve.ts";
 
 type Fixture = Awaited<ReturnType<typeof makeFixtureHome>>;
@@ -76,28 +75,6 @@ test("reuse: same install prints the running server and exits 0", async () => {
   );
   expect(await refuses(secondPort)).toBe(true);
 });
-
-// Optional: proves a TS server and a Rust server from one checkout write the same root.
-test.skipIf(!isRust())(
-  "mixed fleet: Rust reuses a running TS server",
-  async () => {
-    const bin = process.env.COCKPIT_BIN;
-    delete process.env.COCKPIT_BIN;
-    let ts: AtlasProc;
-    try {
-      ts = await start(await freePort());
-    } finally {
-      process.env.COCKPIT_BIN = bin;
-    }
-    const rust = spawnAtlas(fx.env, await freePort());
-    kills.push(() => rust.proc.kill("SIGKILL"));
-    expect(await exitWithin(rust.proc, 5000)).toBe(0);
-    await rust.drained;
-    expect(rust.stdout()).toBe(
-      `Claude Stats Dashboard already running → http://localhost:${ts.port} (pid ${ts.proc.pid})\n`,
-    );
-  },
-);
 
 test("supersede: a live foreign root is killed and replaced", async () => {
   const sleeper = Bun.spawn(["sleep", "60"]);

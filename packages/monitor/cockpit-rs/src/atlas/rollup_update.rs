@@ -1,4 +1,4 @@
-// Port of rollup-update.ts: tail-parses only the bytes appended to each transcript since the last
+// `cockpit atlas rollup-update`: tail-parses only the bytes appended to each transcript since the last
 // run, dedups billing through seen_requests, and adds token totals into usage_hourly. A truncation
 // replays every transcript with the existing dedup keys, so already-billed history survives.
 

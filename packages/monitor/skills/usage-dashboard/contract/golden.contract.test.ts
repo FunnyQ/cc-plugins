@@ -1,5 +1,5 @@
-// Golden suite: whichever implementation the launcher picks must reproduce the
-// TS outputs recorded by record-golden.ts. Test names are frozen — every port's
+// Regenerating golden files now means writing Rust output over them and reviewing that diff by hand: no reference implementation remains.
+// Golden suite: the Rust binary must reproduce the TS outputs recorded here before the TS was deleted. Test names are frozen — every port's
 // verification filters on them with `bun test <file> -t "<name>"`.
 import { Database } from "bun:sqlite";
 import { beforeAll, describe, expect, test } from "bun:test";
@@ -33,7 +33,6 @@ import {
   type Dump,
   type Row,
 } from "./golden";
-import { isRust } from "./launcher";
 
 // One line per volatile-keys.json entry: why it differs between two recordings.
 const VOLATILE_REASONS: Record<string, string> = {
@@ -248,7 +247,7 @@ describe("golden rollup", () => {
     SPAWN_TIMEOUT_MS,
   );
 
-  test.skipIf(!isRust())(
+  test(
     "rollup pre-rust backup",
     async () => {
       await withFixture(async (f) => {

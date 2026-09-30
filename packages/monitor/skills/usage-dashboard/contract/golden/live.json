@@ -1,0 +1,97 @@
+{
+  "sessions": [
+    {
+      "provider": "opencode",
+      "id": "ses_fixture_live_active",
+      "projectName": "proj-a",
+      "cwd": "/work/proj-a",
+      "status": "active-inferred",
+      "statusSource": "opencode-sqlite-session",
+      "updatedAt": "2026-09-28T17:59:40.000Z",
+      "ageMs": 20000,
+      "isStale": false,
+      "cockpit": false
+    },
+    {
+      "provider": "codex",
+      "id": "019a0000-0000-7000-8000-000000000002",
+      "projectName": "proj-c",
+      "cwd": "/work/proj-c",
+      "status": "active-inferred",
+      "statusSource": "codex-sqlite-rollout",
+      "updatedAt": "2026-09-28T17:59:30.000Z",
+      "ageMs": 30000,
+      "isStale": false,
+      "transcriptPath": "<FIXTURE>/home/.codex/sessions/2026/09/28/rollout-2026-09-28T16-00-00-019a0000-0000-7000-8000-000000000002.jsonl",
+      "cockpit": true
+    },
+    {
+      "provider": "claude",
+      "id": "22222222-2222-4222-8222-222222222222",
+      "projectName": "proj-b",
+      "cwd": "/work/proj-b",
+      "status": "busy",
+      "statusSource": "claude-session-file",
+      "updatedAt": "2026-09-28T17:58:00.000Z",
+      "ageMs": 120000,
+      "isStale": false,
+      "transcriptPath": "<FIXTURE>/home/.claude/projects/-work-proj-b/22222222-2222-4222-8222-222222222222.jsonl",
+      "version": "2.1.300",
+      "cockpit": true
+    },
+    {
+      "provider": "claude",
+      "id": "44444444-4444-4444-8444-444444444444",
+      "projectName": "proj-c",
+      "cwd": "/work/proj-c",
+      "status": "waiting",
+      "statusSource": "claude-session-file",
+      "updatedAt": "2026-09-28T17:59:15.000Z",
+      "ageMs": 45000,
+      "isStale": false,
+      "version": "2.1.300",
+      "cockpit": false
+    },
+    {
+      "provider": "codex",
+      "id": "019a0000-0000-7000-8000-0000000000a1",
+      "projectName": "proj-b",
+      "cwd": "/work/proj-b",
+      "status": "recent",
+      "statusSource": "codex-sqlite-rollout",
+      "updatedAt": "2026-09-28T17:56:00.000Z",
+      "ageMs": 240000,
+      "isStale": false,
+      "transcriptPath": "<FIXTURE>/home/live-rollouts/rollout-019a0000-0000-7000-8000-0000000000a1.jsonl",
+      "model": "gpt-5.1-codex",
+      "cockpit": false
+    },
+    {
+      "provider": "opencode",
+      "id": "ses_fixture_db_1",
+      "projectName": "proj-c",
+      "cwd": "/work/proj-c",
+      "status": "recent",
+      "statusSource": "opencode-sqlite-session",
+      "updatedAt": "2026-09-28T17:55:00.000Z",
+      "ageMs": 300000,
+      "isStale": false,
+      "cockpit": true
+    },
+    {
+      "provider": "claude",
+      "id": "33333333-3333-4333-8333-333333333333",
+      "projectName": "proj-c",
+      "cwd": "/work/proj-c",
+      "status": "idle",
+      "statusSource": "claude-session-file",
+      "updatedAt": "2026-09-28T17:57:00.000Z",
+      "ageMs": 180000,
+      "isStale": false,
+      "version": "2.1.300",
+      "cockpit": false
+    }
+  ],
+  "cockpitUp": true,
+  "cockpitPort": 5999
+}

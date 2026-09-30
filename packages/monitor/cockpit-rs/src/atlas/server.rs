@@ -1,4 +1,4 @@
-// Port of atlas-server.ts + atlas-lifecycle.ts: `cockpit atlas serve [--port N] [--no-open]`.
+// `cockpit atlas serve [--port N] [--no-open]`.
 use super::model::{Ctx, now_ms};
 use super::{live, pricing, stats};
 use crate::server::{json_error, json_response, static_files};
@@ -323,7 +323,7 @@ pub fn run(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    // The string atlas-server.ts writes as import.meta.dir, so TS and Rust from one install reuse each other.
+    // The root the retired TS server wrote, so a Rust server reuses one still running from the same install.
     let my_root = plugin_root
         .join("skills/usage-dashboard/scripts")
         .to_string_lossy()

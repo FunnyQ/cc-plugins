@@ -1,5 +1,5 @@
-// Black-box contract for the atlas CLI subcommands (contracts.md §4). Launcher-driven,
-// so the same file gates the TS scripts and, with COCKPIT_BIN set, the Rust port.
+// Black-box contract for the atlas CLI subcommands (contracts.md §4). Launcher-driven:
+// runs COCKPIT_BIN, or the locally built release binary.
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   existsSync,
@@ -10,7 +10,7 @@ import {
   mkdirSync,
 } from "node:fs";
 import { join } from "node:path";
-import { atlasCommand, isRust, type AtlasSub } from "./launcher";
+import { atlasCommand, type AtlasSub } from "./launcher";
 import { freePort, makeFixtureHome, STUB_PATHS } from "./fixtures";
 
 type Fixture = Awaited<ReturnType<typeof makeFixtureHome>>;
@@ -177,7 +177,7 @@ describe("statusline", () => {
     expect(r.elapsedMs).toBeLessThan(2_000);
   });
 
-  test.skipIf(!isRust())(
+  test(
     "inner command printing 1 MB before reading 1 MB of stdin does not deadlock",
     async () => {
       const f = await fixture();

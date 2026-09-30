@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 export type AtlasSub =
@@ -8,24 +9,22 @@ export type AtlasSub =
   | "statusline"
   | "push-usage";
 
-export const SCRIPTS_DIR = join(import.meta.dir, "..", "scripts");
+export const DEFAULT_BIN = join(
+  import.meta.dir,
+  "../../../cockpit-rs/target/release/cockpit",
+);
 
-const TS_SCRIPT: Record<AtlasSub, string> = {
-  serve: "atlas-server.ts",
-  stats: "api.ts",
-  live: "live.ts",
-  "rollup-update": "rollup-update.ts",
-  statusline: "statusline-collector.ts",
-  "push-usage": "push-usage.ts",
-};
+// No TS fallback: the TS engine is deleted, and a silent skip would pass a suite that tested nothing.
+if (!process.env.COCKPIT_BIN && !existsSync(DEFAULT_BIN)) {
+  throw new Error(
+    "atlas contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN",
+  );
+}
 
-// Unlike cockpit's launcher, an unset COCKPIT_BIN is not an error: it means "test the TS".
 export function isRust(): boolean {
-  return !!process.env.COCKPIT_BIN;
+  return true;
 }
 
 export function atlasCommand(sub: AtlasSub, args: string[] = []): string[] {
-  const binary = process.env.COCKPIT_BIN;
-  if (binary) return [binary, "atlas", sub, ...args];
-  return ["bun", join(SCRIPTS_DIR, TS_SCRIPT[sub]), ...args];
+  return [process.env.COCKPIT_BIN || DEFAULT_BIN, "atlas", sub, ...args];
 }

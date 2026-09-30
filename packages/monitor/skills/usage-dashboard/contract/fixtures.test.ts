@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+
 import { join, relative } from "node:path";
 import {
   FIXTURE_IDS,
@@ -311,69 +311,6 @@ describe("TS engine against the fixture home", () => {
       expect(run.code).toBe(2);
       expect(run.out).toBe("");
       expect(run.err).toContain("--source claude|codex|opencode|pricing");
-    }
-  });
-});
-
-describe("TS seams", () => {
-  const API = join(import.meta.dir, "..", "scripts", "api.ts");
-  const probe = `const api = await import(${JSON.stringify(API)}); console.log(JSON.stringify({ usage: api.CODEX_USAGE_URL, token: api.CODEX_TOKEN_URL, openRouter: api.OPENROUTER_URL, now: api.nowMs() }));`;
-
-  async function readSeams(extra: Record<string, string>) {
-    const proc = Bun.spawn([process.execPath, "-e", probe], {
-      env: { PATH: process.env.PATH ?? "", HOME: tmpdir(), ...extra },
-      stdout: "pipe",
-    });
-    const out = await new Response(proc.stdout).text();
-    expect(await proc.exited).toBe(0);
-    return JSON.parse(out) as {
-      usage: string;
-      token: string;
-      openRouter: string;
-      now: number;
-    };
-  }
-
-  test("unset vars keep the literal URLs and the real clock", async () => {
-    const before = Date.now();
-    const seams = await readSeams({});
-    expect(seams.usage).toBe("https://chatgpt.com/backend-api/codex/usage");
-    expect(seams.token).toBe("https://auth.openai.com/oauth/token");
-    expect(seams.openRouter).toBe("https://openrouter.ai/api/v1/models");
-    expect(seams.now).toBeGreaterThanOrEqual(before);
-    expect(seams.now).toBeLessThanOrEqual(Date.now());
-  });
-
-  test("empty URL vars fall back to the literals", async () => {
-    const seams = await readSeams({
-      TOKEN_ATLAS_CODEX_USAGE_URL: "",
-      TOKEN_ATLAS_CODEX_TOKEN_URL: "",
-      TOKEN_ATLAS_OPENROUTER_URL: "",
-    });
-    expect(seams.usage).toBe("https://chatgpt.com/backend-api/codex/usage");
-    expect(seams.openRouter).toBe("https://openrouter.ai/api/v1/models");
-  });
-
-  test("set vars override URLs and pin the clock", async () => {
-    const seams = await readSeams({
-      TOKEN_ATLAS_CODEX_USAGE_URL: "http://127.0.0.1:9/u",
-      TOKEN_ATLAS_CODEX_TOKEN_URL: "http://127.0.0.1:9/t",
-      TOKEN_ATLAS_OPENROUTER_URL: "http://127.0.0.1:9/o",
-      TOKEN_ATLAS_NOW_MS: "1790000000000",
-    });
-    expect(seams).toEqual({
-      usage: "http://127.0.0.1:9/u",
-      token: "http://127.0.0.1:9/t",
-      openRouter: "http://127.0.0.1:9/o",
-      now: 1790000000000,
-    });
-  });
-
-  test("a non-positive-integer TOKEN_ATLAS_NOW_MS means the real clock", async () => {
-    for (const value of ["0", "-5", "12.5", "abc", " "]) {
-      const before = Date.now();
-      const { now } = await readSeams({ TOKEN_ATLAS_NOW_MS: value });
-      expect(now).toBeGreaterThanOrEqual(before);
     }
   });
 });
