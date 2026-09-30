@@ -1,6 +1,6 @@
 # Herdr Configuration Reference
 
-This document is verified against herdr 0.9.1. If live CLI output disagrees with this doc, trust `herdr --default-config`.
+This document is verified against herdr 0.9.3. If live CLI output disagrees with this doc, trust `herdr --default-config`.
 
 Config path: `~/.config/herdr/config.toml`
 
@@ -36,8 +36,10 @@ manifest_check = true  # background agent-detection manifest checks
 default_shell = "nu"       # executable name/path; fallback: $SHELL → /bin/sh
 shell_mode = "auto"        # "auto" | "login" | "non_login"
 new_cwd = "follow"         # "follow" | "home" | "current" | "~/Projects"
-kitty_graphics = true      # render pane images/graphics API in compatible terminals; false disables
+kitty_graphics = true      # render pane images in Kitty graphics-compatible terminals; false disables
 ```
+
+Apps show images by writing standard Kitty graphics to their terminal. The Herdr-specific `pane.graphics.*` API was removed in 0.9.2 and returns `unknown_method`.
 
 `terminal.kitty_graphics` replaces `experimental.kitty_graphics`. Herdr still accepts the old key; `terminal.kitty_graphics` takes precedence when both are set. Restart the server or reattach the client after changing it.
 
@@ -65,7 +67,7 @@ manage_ssh_config = true  # temporary SSH config with keepalive fallback
 ### Keybindings
 ```toml
 [keys]
-prefix = "ctrl+b"
+prefix = "ctrl+b"                      # or several: ["ctrl+space", "ctrl+s"]
 goto = "prefix+g"
 new_tab = "prefix+c"
 next_tab = "prefix+n"
@@ -76,6 +78,7 @@ focus_pane_left = "prefix+h"
 navigate_workspace_down = "j"
 navigate_pane_down = "j"
 split_horizontal = "prefix+minus"
+clear_pane = "prefix+ctrl+k"           # unset by default; clears screen + scrollback, keeps the prompt line
 resize_mode = "prefix+r"
 resize_pane_left = "ctrl+shift+alt+left"   # unset by default; resizes without entering resize mode
 resize_pane_down = "ctrl+shift+alt+down"   # also resize_pane_up, resize_pane_right
@@ -231,6 +234,7 @@ claude = "on"
 ```toml
 [session]
 resume_agents_on_restore = true  # native agent session restore (default on)
+startup_per_agent_delay_ms = 100 # spacing between restored agents; 0 starts them all at once
 
 [experimental]
 pane_history = false             # save pane contents across restarts

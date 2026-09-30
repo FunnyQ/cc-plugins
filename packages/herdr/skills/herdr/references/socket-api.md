@@ -1,6 +1,6 @@
 # Herdr Socket API
 
-This document is verified against herdr 0.9.1, protocol 22. If live output disagrees with this doc, trust `herdr api schema --json`.
+This document is verified against herdr 0.9.3, protocol 22. If live output disagrees with this doc, trust `herdr api schema --json`.
 
 Herdr's control surface is a Unix domain socket. The `herdr` CLI is a thin client over it. Every subcommand opens the socket, sends one request, prints the response, and exits.
 
@@ -135,7 +135,7 @@ The `keys` array has no enum in the schema, so its vocabulary is not discoverabl
 
 ## Events
 
-`events.subscribe` is the one capability with no CLI equivalent. It is also the one method that breaks the one-request rule: the server replies once, then **holds the connection open** and streams event lines until you close it.
+`events.subscribe` is the one capability with no CLI equivalent. It is also the one method that breaks the one-request rule: the server replies once, then **holds the connection open** and streams event lines until you close it. Since 0.9.2, a reader that falls too far behind gets an `events_lost` error instead of silently skipped events; treat it as a gap and resynchronize from `session.snapshot`.
 
 **Subscribe before you take your initial snapshot.** As of 0.9.0, a subscription starts when the request is accepted and does not replay events retained before that point. `events.subscribe` also holds its connection open, so the snapshot call needs a second connection. To avoid a bootstrap gap: open `events.subscribe` on connection A and wait for `subscription_started`; call `session.snapshot` on connection B while buffering every event connection A delivers; install the snapshot; then apply the buffered events in order. Take the snapshot first, or on the same connection, and any change landing in between never reaches you.
 

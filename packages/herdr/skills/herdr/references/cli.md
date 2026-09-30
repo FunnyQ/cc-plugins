@@ -1,6 +1,6 @@
 # Herdr CLI Reference
 
-This document is verified against herdr 0.9.1. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.3. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
 
 **Neither discovery surface is complete, and they truncate different things.** A bare group listing (`herdr pane`) abbreviates long option lists — it drops `--source detection` from `pane read` and `--session-start-source` from `pane report-agent-session`. A subcommand's `--help` (`herdr workspace close --help`) can omit an option the group listing shows, such as `--group`. Check both before concluding a flag is gone.
 
@@ -62,7 +62,9 @@ Use `default` as `<name>` to target the default session for `session stop`.
 ## Machines
 ```bash
 herdr machine list [--json]
-herdr machine add <ssh-target> --label <label> [--remote-session <name>]
+herdr machine status [<label-or-id>]   # checks without prompting for auth
+herdr machine reconnect <label-or-id>  # finishes SSH auth (incl. MFA) in this terminal
+herdr machine add <ssh-target> [--label <label>] [--remote-session <name>]  # label defaults to the SSH host
 herdr machine rename <profile-id> --label <label>
 herdr machine remove <profile-id>
 herdr machine enable <profile-id>
