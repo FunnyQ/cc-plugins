@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/01, engine/02, contract/03
 > **Blocks**: engine/08, cli/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -165,23 +165,23 @@ The port needs `add_model_usage`, `model_usage_total`, `empty_model_usage`, `mod
 
 ## Acceptance criteria
 
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source codex"` passes. The fixture home's 401 → refresh → retry path runs, and the stub records one token POST carrying the fixed `client_id`.
-- [ ] Every `CodexSource` field is populated per the aggregation rules above. The ledger keeps session-set insertion order, and threads with an empty `rollout_path` appear after the rollout-backed rows.
-- [ ] The `codex-sessions.db` cache hits when size and floor(mtime) are unchanged, recomputes on a change or a corrupt row, caches `null` summaries, and prunes rows outside the current file set. Each case has a cargo test on a temp DB.
-- [ ] A summary JSON row written by the TS (a literal in a cargo test) deserializes, and a Rust-written row serializes to the same camelCase / snake_case shape.
-- [ ] The usage-limit error paths each return the TS error string: `missing` cache, `missing-auth`, `missing-access-token`, `http-500` without a refresh, `refresh-http-<status>`, and a stale cache that keeps `capturedAt` on fetch failure. These are cargo tests or golden-fixture variants.
-- [ ] `auth.json` is byte-identical after a refresh, and a fresh cache (under 5 min old) makes no HTTP request.
-- [ ] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean.
-- [ ] (human) In two roots built by the real-data recipe in `../_context/shared.md` (skip its `codex-usage-limits.json` copy so both runs fetch), run `packages/monitor/cockpit-rs/target/release/cockpit atlas stats --source codex` in one and `bun packages/monitor/skills/usage-dashboard/scripts/api.ts --source codex` in the other, back to back. The two `usageLimits` show the same plan, the same windows and the same `usedPercent`. This calls the real Codex API with the real `auth.json` (read through the symlink); every write stays in the temp roots.
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source codex"` passes. The fixture home's 401 → refresh → retry path runs, and the stub records one token POST carrying the fixed `client_id`.
+- [x] Every `CodexSource` field is populated per the aggregation rules above. The ledger keeps session-set insertion order, and threads with an empty `rollout_path` appear after the rollout-backed rows.
+- [x] The `codex-sessions.db` cache hits when size and floor(mtime) are unchanged, recomputes on a change or a corrupt row, caches `null` summaries, and prunes rows outside the current file set. Each case has a cargo test on a temp DB.
+- [x] A summary JSON row written by the TS (a literal in a cargo test) deserializes, and a Rust-written row serializes to the same camelCase / snake_case shape.
+- [x] The usage-limit error paths each return the TS error string: `missing` cache, `missing-auth`, `missing-access-token`, `http-500` without a refresh, `refresh-http-<status>`, and a stale cache that keeps `capturedAt` on fetch failure. These are cargo tests or golden-fixture variants.
+- [x] `auth.json` is byte-identical after a refresh, and a fresh cache (under 5 min old) makes no HTTP request.
+- [x] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean.
+- [x] (human) In two roots built by the real-data recipe in `../_context/shared.md` (skip its `codex-usage-limits.json` copy so both runs fetch), run `packages/monitor/cockpit-rs/target/release/cockpit atlas stats --source codex` in one and `bun packages/monitor/skills/usage-dashboard/scripts/api.ts --source codex` in the other, back to back. The two `usageLimits` show the same plan, the same windows and the same `usedPercent`. This calls the real Codex API with the real `auth.json` (read through the symlink); every write stays in the temp roots.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::codex`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source codex"`
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source codex"` still passes against TS, which proves the fixture was not bent to fit Rust.
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::codex`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source codex"`
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source codex"` still passes against TS, which proves the fixture was not bent to fit Rust.
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
 
 ## Eval rubric
 
