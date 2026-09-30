@@ -7,7 +7,7 @@
 >
 > **Depends on**: engine/01, contract/03
 > **Blocks**: engine/08
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -94,21 +94,21 @@ Port every pricing case from `packages/monitor/skills/usage-dashboard/scripts/ap
 
 ## Acceptance criteria
 
-- [ ] `atlas stats --source pricing` under the fixture home deep-equals the recorded TS golden (golden test `source pricing` passes against Rust).
-- [ ] Resolution order is defaults → OpenRouter live → user override; each entry's `sourceByModel` value matches that order, and a failed live fetch leaves the defaults in place with `meta.openRouter.error` set.
-- [ ] `calc_cost` returns bit-identical f64 values to the TS formula for both the cache-priced and cache-folded branches (cargo tests).
-- [ ] Every pricing case from `api.test.ts` has a passing cargo test counterpart.
-- [ ] `refresh_pricing_override` preserves existing override entries, writes 2-space JSON with a trailing newline, clears the cache, and returns `PricingRefreshResult` with `writtenCount == resolved.len()` (cargo test with a temp HOME and a local stub).
-- [ ] Load uses a 3 s timeout and refresh a 10 s timeout; the URL honors `TOKEN_ATLAS_OPENROUTER_URL`.
-- [ ] No `unwrap()` on network or file data; `cargo clippy -D warnings` and `cargo fmt --check` are clean.
+- [x] `atlas stats --source pricing` under the fixture home deep-equals the recorded TS golden (golden test `source pricing` passes against Rust).
+- [x] Resolution order is defaults → OpenRouter live → user override; each entry's `sourceByModel` value matches that order, and a failed live fetch leaves the defaults in place with `meta.openRouter.error` set.
+- [x] `calc_cost` returns bit-identical f64 values to the TS formula for both the cache-priced and cache-folded branches (cargo tests).
+- [x] Every pricing case from `api.test.ts` has a passing cargo test counterpart.
+- [x] `refresh_pricing_override` preserves existing override entries, writes 2-space JSON with a trailing newline, clears the cache, and returns `PricingRefreshResult` with `writtenCount == resolved.len()` (cargo test with a temp HOME and a local stub).
+- [x] Load uses a 3 s timeout and refresh a 10 s timeout; the URL honors `TOKEN_ATLAS_OPENROUTER_URL`.
+- [x] No `unwrap()` on network or file data; `cargo clippy -D warnings` and `cargo fmt --check` are clean.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source pricing"`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::pricing`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts -t "source pricing"`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml atlas::pricing`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
 
 ## Eval rubric
 
