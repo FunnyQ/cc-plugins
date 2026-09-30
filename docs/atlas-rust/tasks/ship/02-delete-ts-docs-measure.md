@@ -4,9 +4,9 @@
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
-> **Depends on**: ship/01
+> **Depends on**: ship/01, engine/09
 > **Blocks**: review/01
-> **Status**: blocked
+> **Status**: todo
 
 ## Goal
 
@@ -128,7 +128,7 @@ Drive each measurement from a bun script outside the repo, never a shell pipelin
 
 | Metric | How | Target | Baseline |
 |---|---|---|---|
-| `atlas serve` RSS | Start the server, fetch `/api/stats` once (the dashboard's first load), keep one `/api/live` poll going, then take the max of 5 readings of `ps -o rss= -p <pid>`, 1 s apart | ≤ 40 MB | 197 MB (TS, 2026-10-01) |
+| `atlas serve` RSS | Start the server, fetch `/api/stats` once (the dashboard's first load), keep one `/api/live` poll going, then take the max of 5 readings of `ps -o rss= -p <pid>`, 1 s apart | ≤ 40 MB (Q accepted a MISS at 77.8 MB on 2026-10-01; record the measured value as a MISS, it no longer blocks) | 197 MB (TS, 2026-10-01) |
 | `/api/stats` cold build | First request after launch, wall time. Take the median of 3 launches for each implementation on the same home and the same DB copy. TS is measured in step 1. | Rust ≤ TS | measured TS |
 | `atlas statusline` overhead | With `TOKEN_ATLAS_STATUSLINE_COMMAND=true`, pipe a fixture statusline JSON to the subcommand 20 times and take the median wall time. Set the nudge markers fresh first so no nudge spawns. Measure `sh -c true` the same way and subtract it; record total, baseline, and net. The target applies to net. | ≤ 10 ms net | TS `bun statusline-collector.ts` median, measured in step 1 |
 
@@ -141,7 +141,7 @@ Record each number, its target, and PASS or MISS. A miss is reported plainly, wi
 3. Run `packages/monitor/cockpit-rs/target/release/cockpit atlas stats` under the second root's env.
 4. Normalize each output's root prefix to a placeholder (the `normalizeFixturePaths` helper in `contract/golden.ts` with the root dir).
 5. Parse both outputs and delete the paths in `contract/golden/volatile-keys.json`.
-6. Deep-compare the two results.
+6. Deep-compare the two results. Two numbers are equal when `|a - b| <= 1e-9 * max(|a|, |b|)`; every other value compares exactly. Q accepted this tolerance on 2026-10-01: cost sums differ from TS only in the last float digit.
 7. Record `equal` or the list of differing paths in `measurements.md`.
 
 A difference is a blocking finding. Report it; do not delete the TS over it.
