@@ -99,7 +99,7 @@ Binary: `opencode`. Headless subcommand: `opencode run [message..]`.
 ### Delegate
 
 ```bash
-opencode run -m opencode-go/deepseek-v4-light --variant max --format json -- "<prompt>"
+opencode run --variant max --format json -- "<prompt>"
 ```
 
 Write-capable by default. `--dangerous` maps to `--auto` on the headless path
@@ -111,7 +111,7 @@ loudly. Use `--dangerous` for unattended headless runs that may need approvals.
 ### Review (emulated, read-only prompt)
 
 ```bash
-opencode run -m opencode-go/deepseek-v4-pro --format json -- "<read-only review prompt>"
+opencode run --format json -- "<read-only review prompt>"
 ```
 
 There is no native review. The prompt must instruct "analyze only, do not modify files."
@@ -125,7 +125,7 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Relevant flags
 
-- `-m, --model <provider/model>` — model specification (optional; falls back to the configured default model — relay always resolves one per mode)
+- `-m, --model <provider/model>` — model specification (optional; relay passes it only when `--model` or the relay config sets one, otherwise opencode uses its own configured or provider default)
 - `--agent <name>` — agent profile (optional)
 - `--format <default|json>` — output format
 - `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous`. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist on `run` and currently collapse to the same boolean (1.18.18) — they are not a stronger bypass. `--auto` still respects explicit deny rules, unlike codex's full bypass.
@@ -142,7 +142,11 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Model
 
-Delegate resolves to opencode-go/deepseek-v4-light with `--variant max`. Review resolves to opencode-go/deepseek-v4-pro. The `--model` flag overrides the model. Format is `provider/model`.
+Relay pins no opencode model. Precedence is `--model` flag, then relay config, then opencode's own default (`-m` omitted). Format is `provider/model`. Delegate adds `--variant max`.
+
+### Errors
+
+`opencode run` exits 1 with empty stderr. The cause is a JSONL `error` event on stdout. Relay prints its message, or the error name when there is no message. The failure line names the model or "CLI default". It never echoes the argv or the prompt.
 
 ---
 

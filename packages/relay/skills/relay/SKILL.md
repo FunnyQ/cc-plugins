@@ -193,6 +193,8 @@ When the user passes an explicit `--model` flag:
 
 Config file location: `~/.config/q-lab/cc-plugins/relay/config.json`.
 
+Model precedence is `--model` flag, then this config, then the backend CLI's own default. Relay pins no opencode model. A malformed config file fails the run with `Could not read relay config`. Report that file to Q. Do not ask for a model.
+
 ---
 
 ## Failure Handling
