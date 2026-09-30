@@ -11,12 +11,12 @@ Everything else is shared by that mode.
 Resolve `<plugin-root>` from the installed skill root that contains this
 skill. In a development checkout of this repository, substitute
 `packages/monitor` from the repo root. For example:
-`bun packages/monitor/skills/cockpit/scripts/...`.
+`packages/monitor/skills/cockpit/bin/cockpit <subcommand>`.
 
 ## Session id (Step 1)
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/find-session.ts --provider codex
+<plugin-root>/skills/cockpit/bin/cockpit find-session --provider codex
 ```
 
 This command reads `~/.codex/state_5.sqlite`. It finds the latest

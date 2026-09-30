@@ -39,6 +39,7 @@ cc-plugins/
 │   ├── monitor/
 │   │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks + cockpit channel
 │   │   ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hooks
+│   │   ├── cockpit-rs/                  # Rust crate: server, channel, CLI, hook subcommands
 │   │   ├── commands/                     # thoughtful.md, nudge.md
 │   │   └── skills/
 │   │       ├── usage-dashboard/
@@ -57,13 +58,12 @@ cc-plugins/
 │   │       │   ├── SKILL.md              # router only
 │   │       │   ├── PRODUCT.md / DESIGN.md  # brand + Night Flight design system
 │   │       │   ├── references/           # pilot / scribe / restart / claude-cli / codex
-│   │       │   ├── scripts/
-│   │       │   │   ├── cockpit-server.ts # Bun daemon, port 5858
-│   │       │   │   ├── cockpit.ts        # CLI: log / scribe / prep / wait / send / config / nudge / restart
-│   │       │   │   ├── cockpit-channel.ts    # channel MCP server (stdio)
-│   │       │   │   ├── codex-control-probe.ts
-│   │       │   │   ├── log-root.ts       # per-repo trail anchoring
-│   │       │   │   └── config.ts
+│   │       │   ├── bin/cockpit          # POSIX sh shim: fetch + verify + exec
+│   │       │   ├── contract/            # permanent Bun black-box suite
+│   │       │   ├── scripts/             # kept TS + their tests
+│   │       │   │   ├── cockpit-home.ts  # shared usage-dashboard paths
+│   │       │   │   ├── http.ts          # shared usage-dashboard responses
+│   │       │   │   └── diagram-lint.ts  # Mermaid gate spawned by Rust
 │   │       │   └── dashboard/dist/
 │   │       ├── install/scripts/
 │   │       │   ├── setup.ts              # plugin-wide check + wire (--check/--dry-run/--apply/--session-check)
@@ -166,7 +166,7 @@ Ledger rows are keyed `(path, session_key)` and summed per session on read. A se
 
 `GET /api/live` returns active sessions from both providers: Claude from `~/.claude/sessions/*.json` (status `busy` / `idle` / `waiting`, stale-filtered at 10 minutes) and Codex from the `threads` table in `~/.codex/state_5.sqlite` (status `active-inferred` / `recent`). The panel polls every 3 seconds and pauses while the tab is hidden.
 
-Clicking a row calls `openInCockpit(session)`. The port comes from `/api/live`'s `cockpitPort`, read from `~/.local/share/q-lab/cockpit/daemon.json`, falling back to `5858`. Rows stay inert while `cockpitUp` is false. usage-dashboard renders no transcript — cockpit's `transcript-stream.ts` and `modules/transcript.js` are the single source.
+Clicking a row calls `openInCockpit(session)`. The port comes from `/api/live`'s `cockpitPort`, read from `~/.local/share/q-lab/cockpit/daemon.json`, falling back to `5858`. Rows stay inert while `cockpitUp` is false. usage-dashboard renders no transcript — cockpit's Rust transcript routes and `modules/transcript.js` are the single source.
 
 ### Key design decisions
 
@@ -186,16 +186,16 @@ Clicking a row calls `openInCockpit(session)`. The port comes from `/api/live`'s
 
 These rules are not obvious from the code. Break one and the failure is silent.
 
-**Anchor the decision trail per repo, never per cwd.** `log-root.ts` walks up from cwd for an existing `.cockpit/`, bounded by the git root, then falls back to the git root, then to cwd outside a repo. An agent that cd'd into `frontend/` still logs to the root trail. A hand-made `packages/x/.cockpit` keeps its own. **The walk-up must never cross the git root** — `~/.cockpit` is a real leftover of the pre-XDG cockpit home, and an unbounded walk would collapse every repo under `$HOME` into one trail.
+**Anchor the decision trail per repo, never per cwd.** `cockpit-rs/src/log_root.rs` walks up from cwd for an existing `.cockpit/`, bounded by the git root, then falls back to the git root, then to cwd outside a repo. An agent that cd'd into `frontend/` still logs to the root trail. A hand-made `packages/x/.cockpit` keeps its own. **The walk-up must never cross the git root** — `~/.cockpit` is a real leftover of the pre-XDG cockpit home, and an unbounded walk would collapse every repo under `$HOME` into one trail.
 
-**Resolve sessions by raw cwd.** `find-session` looks sessions up by cwd. For a tracked session, the registry entry's absolute `logPath` is authoritative in `log-stream.ts`, `project-info.ts`, and `design-system.ts` — not the request's `project` param.
+**Resolve sessions by raw cwd.** `find-session` looks sessions up by cwd. For a tracked session, the registry entry's absolute `logPath` is authoritative in `cockpit-rs/src/server/log_stream.rs`. Resolve project metadata and design requests through `known_project()` in `cockpit-rs/src/server/views.rs`, then read them in `cockpit-rs/src/server/views/design.rs`.
 
 **Keep cockpit config global.** It lives at `~/.config/q-lab/cockpit/config.json`: the decision-log language and the scribe-nudge preferences. Per-project nudge opinions live keyed by project root inside that one file. Never write a repo dotfile.
 
 **Gate `needs_your_call` on presence.** The TUI is the default asking surface. `cockpit wait` passes `require_watcher=1`, and `/api/wait` refuses with `{not_watching:true, reason}` (CLI exit `4`) unless two factors hold:
 
 1. **Intent** — the user's explicit `answer_here` switch. Global, default off, in the XDG config. Set it from the dashboard toggle, `cockpit config --answer-here on|off`, or `GET/POST /api/answer-here`.
-2. **Liveness** — `hasVisibleSubscriber()` in `permission.ts` sees a live permission-stream subscriber for that session.
+2. **Liveness** — `Presence::has_visible_subscriber()` in `cockpit-rs/src/server/presence.rs` sees a live permission-stream subscriber for that session.
 
 Place the gate **after** the stash drain and the superseded check, so a fast answer still lands and a moot call still reports `superseded`.
 
@@ -203,7 +203,7 @@ Do not infer intent from visibility. `document.hidden` stays false when another 
 
 **Leave the permission relay ungated.** Its protocol is notification-based and the terminal prompt stays live beside the cockpit card, so it already defaults to the TUI.
 
-**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends use the opencode 1.x TUI HTTP bridge (`opencode-send.ts`): the running TUI is discovered from `OPENCODE_TUI_SERVER_URL`, `OPENCODE_SERVER_URL`, or a `ps` scan for `opencode --port <n>` (a `serve` process is excluded from that scan), then delivered through `/tui/append-prompt` followed by `/tui/submit-prompt`. The channel is UI→agent only; the agent's answers ride the transcript.
+**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends use the opencode 1.x TUI HTTP bridge (`cockpit-rs/src/server/opencode.rs`): the running TUI is discovered from `OPENCODE_TUI_SERVER_URL`, `OPENCODE_SERVER_URL`, or a `ps` scan for `opencode --port <n>` (a `serve` process is excluded from that scan), then delivered through `/tui/append-prompt` followed by `/tui/submit-prompt`. The channel is UI→agent only; the agent's answers ride the transcript.
 
 ## Harness constraints
 
@@ -216,8 +216,8 @@ Hook parity — which Claude hooks port to which OpenCode events:
 | Plugin | Hook | Command | Ported to OpenCode? |
 |---|---|---|---|
 | monitor | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup.ts --session-check` | **No** — dead code outside Claude Code: it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work (statusline-path migration, reaping orphaned Claude processes) is Claude-only |
-| monitor | `SessionStart` (same matcher) | `skills/cockpit/scripts/decision-log-start.ts` | Yes → `session.created` event, delivered by `experimental.chat.system.transform` |
-| monitor | `Stop` | `skills/cockpit/scripts/scribe-nudge.ts` | Yes → `session.idle` event, same delivery |
+| monitor | `SessionStart` (same matcher) | `skills/cockpit/bin/cockpit hook session-start` | Yes → `session.created` event, delivered by `experimental.chat.system.transform` |
+| monitor | `Stop` | `skills/cockpit/bin/cockpit hook stop` | Yes → `session.idle` event, same delivery |
 | chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.execute.before` on the `bash` tool |
 | dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
 | guard | `PostToolUse` (matcher `Edit\|Write`) | `hooks/comment-guard.ts` | Yes → `tool.execute.after`, sharing the event with the lint |
@@ -235,7 +235,7 @@ The module itself carries four constraints, each a trap if broken: it is a singl
 
 To test hook behavior for free, pass a bogus `-m` model — SessionStart and UserPromptSubmit fire and the rollout persists before the 400 lands, so no tokens are spent. Do **not** try to debug this by adding a probe hook to `~/.codex/hooks.json`: codex gates every hook on a `trusted_hash` under `[hooks.state."<file>:<event>:<i>:<j>"]` in `~/.codex/config.toml`, and an entry whose hash does not match is skipped with no warning.
 
-**The delegation marker crosses that daemon boundary.** relay's live codex path drops a file that monitor's decision-log hooks read, because no environment variable can reach them. The writer is `packages/relay/skills/relay/scripts/delegation-marker.ts`, the reader is `packages/monitor/skills/cockpit/scripts/delegation-marker.ts`, and the two plugins version independently — **they share a path and a shape, never code**, so a change to one is a change to both:
+**The delegation marker crosses that daemon boundary.** relay's live codex path drops a file that monitor's decision-log hooks read, because no environment variable can reach them. The writer is `packages/relay/skills/relay/scripts/delegation-marker.ts`, the reader is `packages/monitor/cockpit-rs/src/hook/delegation_marker.rs`, and the two plugins version independently — **they share a path and a shape, never code**, so a change to one is a change to both:
 
 ```
 ~/.local/share/q-lab/delegation/<startedAt>-<rand>.json
@@ -251,6 +251,8 @@ A `pending` live result keeps its marker: the pane is still running and still be
 **The statusline collector runs from the marketplace clone.** `install.ts` resolves `~/.claude/plugins/marketplaces/q-lab-marketplace/packages/monitor/...` through `known_marketplaces.json`, because the plugin cache path encodes the version (`.../monitor/3.1.0/...`). monitor's `SessionStart` hook never touches the statusline; once per version (marker `$CLAUDE_PLUGIN_DATA/.wired-version`) it only reaps old daemons and removes a stale channel entry. The hook never fresh-wires — initial opt-in stays manual.
 
 **Drift inside a version is noticed, never fixed.** The same hook then runs a read-only drift watch on every session, because the marker gate is blind to a hand-edited `settings.json`, a restored backup, or a reinstall under another cache root. It reports a foreign collector path, a stale hand-wired channel, missing `permissions.allow` patterns, and an unparseable `settings.json`, then tells the user to run `/monitor:install`. Two rules make it work: the notice ships as a `systemMessage` inside **one** JSON object on stdout — bare stdout reaches only the model, so nothing else in `--session-check` may print and `migrate()`'s output is captured — and repetition is keyed on which pieces are off, stored in `$CLAUDE_PLUGIN_DATA/.drift-notice`, so one complaint is made once but a drift that returns is reported again.
+
+**Cockpit Rust distribution.** Fetch `cockpit-<triple>` and `SHA256SUMS` from the `monitor-v<version>` GitHub release through `skills/cockpit/bin/cockpit`. Cache the verified binary in `$XDG_DATA_HOME/q-lab/cockpit/bin/<version>/`. Set `COCKPIT_BIN` to override the fetch. Hooks fail soft while the binary downloads. Keep `daemon.json.root` at `<plugin root>/skills/cockpit/scripts` so version-aware supersede works across a mixed fleet. Treat `cockpit-rs/Cargo.toml` as a monitor version file. Finish the release workflow before users update, or their first session runs without hooks.
 
 ## Commands
 
@@ -271,26 +273,29 @@ bun packages/monitor/skills/install/scripts/setup.ts                  # --check 
 bun packages/monitor/skills/install/scripts/install.ts                # dashboard precheck only
 
 # Cockpit daemon (port 5858)
-bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
+packages/monitor/skills/cockpit/bin/cockpit server
 
 # Restart the daemon onto THIS install's code. Supersedes any concurrent MCP
 # respawn, then verifies our root won the port. Run it from the updated cache.
-bun packages/monitor/skills/cockpit/scripts/cockpit.ts restart        # [--port N] [--no-open]
+packages/monitor/skills/cockpit/bin/cockpit restart        # [--port N] [--no-open]
 
 # Cockpit config (global, XDG)
-bun packages/monitor/skills/cockpit/scripts/cockpit.ts config get-language
-bun packages/monitor/skills/cockpit/scripts/cockpit.ts config --log-language zh-TW
-bun packages/monitor/skills/cockpit/scripts/cockpit.ts config --answer-here on
-bun packages/monitor/skills/cockpit/scripts/cockpit.ts nudge status   # on|off|toggle|clear|status
+packages/monitor/skills/cockpit/bin/cockpit config get-language
+packages/monitor/skills/cockpit/bin/cockpit config --log-language zh-TW
+packages/monitor/skills/cockpit/bin/cockpit config --answer-here on
+packages/monitor/skills/cockpit/bin/cockpit nudge status   # on|off|toggle|clear|status
                                                                      # [--scope session|project|user]
 
 # Cockpit dev: isolate from the cached daemon entirely
-COCKPIT_HOME=/tmp/cockpit-dev bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts --port 5999
+COCKPIT_HOME=/tmp/cockpit-dev COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit packages/monitor/skills/cockpit/bin/cockpit server --port 5999
 
 # OpenCode installer — symlinks skills/plugin/agents/commands into ~/.config/opencode/, raises subagent_depth
 bun opencode/install.ts                                                # --check | --dry-run | --apply | --unlink
 
 # Tests
+cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml
+bun test packages/monitor/skills/cockpit/contract/
+COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/
 bun test packages/monitor/skills/cockpit/scripts/
 bun test packages/monitor/skills/install/scripts/
 bun test packages/monitor/skills/usage-dashboard/scripts/rollup-update.test.ts

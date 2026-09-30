@@ -7,7 +7,7 @@ Toggle the cockpit **scribe nudges**. These are the 💭 "spawn a fork to run /c
 Run this exactly. Report the printed result back to me:
 
 ```bash
-bun ~/.config/opencode/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS
+~/.config/opencode/skills/cockpit/bin/cockpit nudge $ARGUMENTS
 ```
 
 **Actions** (default `status`): `on`, `off`, `toggle`, `clear` (drop this scope's opinion), `status`.

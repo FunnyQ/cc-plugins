@@ -1,15 +1,15 @@
 # /cockpit restart
 
 Bounce the cockpit dashboard daemon onto **this install's code**. Use it
-after a plugin update, a `/monitor:install`, or a working-tree edit to any
-cockpit script. The running daemon keeps serving the code it booted with. A
-plain re-run of `cockpit-server.ts` from the same install reuses the running
+after a plugin update, a `/monitor:install`, or a working-tree edit to the
+Rust crate. The running daemon keeps serving the code it booted with. A
+plain re-run of `cockpit server` from the same install reuses the running
 daemon and changes nothing.
 
 ## Step 1 — Restart
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts restart
+<plugin-root>/skills/cockpit/bin/cockpit restart
 ```
 
 Optional flags: `--port <n>` sets the port, for when the daemon runs off
@@ -40,7 +40,7 @@ and the wait/send broker. It does **not** refresh the cockpit **channel MCP
 server** of an already running Claude session. That process was spawned
 from whatever plugin cache the session started with.
 
-If the fix the user is chasing lives in `cockpit-channel.ts`, the daemon
+If the fix the user is chasing lives in `cockpit channel`, the daemon
 restart is not enough. The user needs to restart the session itself. Say so
 plainly. Do not imply that the update fully landed.
 
@@ -49,5 +49,4 @@ plainly. Do not imply that the update fully landed.
 - `<plugin-root>` is an **absolute filesystem path** resolved per your provider
   reference (Step 0). Never type `${CLAUDE_PLUGIN_ROOT}` into a Bash command.
 - Restart from the install whose code you want to serve. The repo's
-  `cockpit.ts` serves the repo. The plugin cache's `cockpit.ts` serves the
-  cache.
+  shim serves the repo with `COCKPIT_BIN` set to its release build. The updated plugin cache's shim serves that cache.

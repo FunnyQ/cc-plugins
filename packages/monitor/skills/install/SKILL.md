@@ -100,7 +100,7 @@ bun "${CLAUDE_PLUGIN_ROOT}/skills/install/scripts/setup.ts" --apply-statusline
   opted-in session with:
 
   ```bash
-  bun "${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/monitor-up.ts"
+  claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace
   ```
 
   (This passes `--dangerously-load-development-channels plugin:monitor@q-lab-marketplace`.

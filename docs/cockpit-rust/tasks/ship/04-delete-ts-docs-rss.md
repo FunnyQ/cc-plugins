@@ -7,7 +7,7 @@
 >
 > **Depends on**: ship/02, ship/03
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -131,24 +131,24 @@ A miss is written down with its number and is not blocked on. The task still pas
 
 ## Acceptance criteria
 
-- [ ] Only the keep-set (`cockpit-home.ts`, `http.ts`, `diagram-lint.ts`, their transitive imports, and any module a surviving importer names in `docs/cockpit-rust/rss.md`) remains among `packages/monitor/skills/cockpit/scripts/*.ts`. Every deleted module's unit test is deleted with it.
-- [ ] Nothing outside the deleted set imports a deleted module, so a whole-repo typecheck shows no new unresolved-import error.
-- [ ] With `COCKPIT_BIN` unset, the contract suite runs against `target/release/cockpit`. With the binary absent, it fails loudly with the exact message above.
-- [ ] No runtime `bun …/cockpit/scripts/*.ts` invocation remains in the cockpit skill docs, both `nudge.md` commands, or CLAUDE.md, except `diagram-lint.ts`, which the binary spawns.
-- [ ] CLAUDE.md describes the crate, the shim, `COCKPIT_BIN`, the release assets, and the unchanged `daemon.json.root` rule.
-- [ ] `docs/cockpit-rust/rss.md` records measured channel and server RSS against the 10 MB and 30 MB targets, with commands and machine.
-- [ ] The full contract suite against the release binary is green, and so are the monitor and opencode test dirs.
+- [x] Only the keep-set (`cockpit-home.ts`, `http.ts`, `diagram-lint.ts`, their transitive imports, and any module a surviving importer names in `docs/cockpit-rust/rss.md`) remains among `packages/monitor/skills/cockpit/scripts/*.ts`. Every deleted module's unit test is deleted with it.
+- [x] Nothing outside the deleted set imports a deleted module, so a whole-repo typecheck shows no new unresolved-import error.
+- [x] With `COCKPIT_BIN` unset, the contract suite runs against `target/release/cockpit`. With the binary absent, it fails loudly with the exact message above.
+- [x] No runtime `bun …/cockpit/scripts/*.ts` invocation remains in the cockpit skill docs, both `nudge.md` commands, or CLAUDE.md, except `diagram-lint.ts`, which the binary spawns.
+- [x] CLAUDE.md describes the crate, the shim, `COCKPIT_BIN`, the release assets, and the unchanged `daemon.json.root` rule.
+- [x] `docs/cockpit-rust/rss.md` records measured channel and server RSS against the 10 MB and 30 MB targets, with commands and machine.
+- [x] The full contract suite against the release binary is green, and so are the monitor and opencode test dirs.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/` passes (defaults to the built binary).
-- [ ] `bun test packages/monitor/ opencode/`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `bunx --bun tsc --noEmit | grep -E 'packages/monitor|opencode/'` prints nothing new versus the pre-change run. The executor saves the pre-change output to a temp file first and diffs against it.
-- [ ] `! rg -n 'bun [^ ]*cockpit/scripts/(cockpit|cockpit-server|cockpit-channel|decision-log-start|scribe-nudge|find-session)\.ts' packages/monitor/skills/cockpit packages/monitor/commands opencode/commands CLAUDE.md`
-- [ ] `test -f docs/cockpit-rust/rss.md && rg -q 'channel' docs/cockpit-rust/rss.md && rg -q 'server' docs/cockpit-rust/rss.md`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/`
+- [x] `bun test packages/monitor/skills/cockpit/contract/` passes (defaults to the built binary).
+- [x] `bun test packages/monitor/ opencode/`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `bunx --bun tsc --noEmit | grep -E 'packages/monitor|opencode/'` prints nothing new versus the pre-change run. The executor saves the pre-change output to a temp file first and diffs against it.
+- [x] `! rg -n 'bun [^ ]*cockpit/scripts/(cockpit|cockpit-server|cockpit-channel|decision-log-start|scribe-nudge|find-session)\.ts' packages/monitor/skills/cockpit packages/monitor/commands opencode/commands CLAUDE.md`
+- [x] `test -f docs/cockpit-rust/rss.md && rg -q 'channel' docs/cockpit-rust/rss.md && rg -q 'server' docs/cockpit-rust/rss.md`
 
 ## Eval rubric
 

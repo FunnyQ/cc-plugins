@@ -29,6 +29,9 @@ Then **read the matching reference once**. It defines the provider value,
 - OpenCode → `~/.config/opencode/skills/cockpit/references/opencode.md`
   (absolute, because OpenCode prints no skill base-directory banner)
 
+Run cockpit commands through `<plugin-root>/skills/cockpit/bin/cockpit`.
+Set `COCKPIT_BIN` to a local release build when developing the Rust crate.
+
 ## Mode dispatch
 
 - If invoked as `/cockpit scribe`, or the fork prompt says to run

@@ -16,10 +16,10 @@ OpenCode prints no *"Base directory for this skill"* banner, and
 ```
 
 So every command in a mode reference becomes
-`bun ~/.config/opencode/skills/cockpit/scripts/…`. In `scribe.md`'s Step 1,
-set `CLI="$HOME/.config/opencode/skills/cockpit/scripts/cockpit.ts"`. There is
+`~/.config/opencode/skills/cockpit/bin/cockpit …`. In `scribe.md`'s Step 1,
+set `CLI="$HOME/.config/opencode/skills/cockpit/bin/cockpit"`. There is
 no banner to substitute here, so the path is fixed — run it directly and let
-bun's `error: Module not found "<path>"` report a broken install.
+the shell's missing-executable error report a broken install.
 
 The skill directory is a symlink into a checkout of this repository, so an
 edit in the checkout is live with no reinstall.
@@ -27,7 +27,7 @@ edit in the checkout is live with no reinstall.
 ## Session id (Step 1)
 
 ```bash
-bun ~/.config/opencode/skills/cockpit/scripts/find-session.ts --provider opencode
+~/.config/opencode/skills/cockpit/bin/cockpit find-session --provider opencode
 ```
 
 It returns `OPENCODE_SESSION_ID` or `OPENCODE_SESSION` when either is set.
@@ -59,7 +59,7 @@ then record the answer with `cockpit send`. See "Nobody is watching" in
 ## Sends go over the TUI HTTP bridge
 
 OpenCode never registers the cockpit channel MCP server, so a send takes a
-different path: `scripts/opencode-send.ts`, served by the cockpit daemon at
+different path: the Rust OpenCode send bridge, served by the cockpit daemon at
 `/api/send-opencode-message`. It discovers the TUI server from
 `OPENCODE_TUI_SERVER_URL` or `OPENCODE_SERVER_URL`, falls back to a `ps` scan
 for `opencode --port <n>`, health-checks `/global/health`, resolves the

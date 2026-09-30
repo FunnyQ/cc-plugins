@@ -30,7 +30,7 @@ A bare `${CLAUDE_PLUGIN_ROOT}/skills/...` in the shell collapses to a broken
 ## Session id (Step 1)
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/find-session.ts --provider claude
+<plugin-root>/skills/cockpit/bin/cockpit find-session --provider claude
 ```
 
 This command returns the live session id from `CLAUDE_CODE_SESSION_ID`. This

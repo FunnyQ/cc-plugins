@@ -14,12 +14,11 @@ If your prompt names the CLI, use it. Otherwise build it from the
 off Claude Code:
 
 ```bash
-CLI="<plugin-root>/skills/cockpit/scripts/cockpit.ts"   # absolute, substituted literally
+CLI="<plugin-root>/skills/cockpit/bin/cockpit"   # absolute, substituted literally
 PROVIDER_FLAG=""   # "--provider codex" under Codex, "--provider opencode" under OpenCode
 ```
 
-Do not test for the file first. A wrong path makes bun print
-`error: Module not found "<path>"` and exit 1; surface that and stop rather
+Do not test for the file first. A wrong path makes the shell report a missing executable; surface that and stop rather
 than guess another path. Use `$PROVIDER_FLAG` on every call below — without
 it, scribe resolves against Claude sessions and can write to the wrong one.
 
@@ -42,7 +41,7 @@ omit `--session` and let the CLI auto-resolve the live session.
 ### Run the prep bundle before you write anything
 
 ```bash
-bun "$CLI" scribe --prep --session "<parent-session-id>" $PROVIDER_FLAG
+"$CLI" scribe --prep --session "<parent-session-id>" $PROVIDER_FLAG
 ```
 
 For a direct/manual invocation, omit the shown `--session` argument.
@@ -106,7 +105,7 @@ For each insight that is genuinely worth recording and not yet covered,
 pick a `kind` and call:
 
 ```bash
-bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" --session "<parent-session-id>" $PROVIDER_FLAG
+"$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" --session "<parent-session-id>" $PROVIDER_FLAG
 ```
 
 ### Kind values and when to use them

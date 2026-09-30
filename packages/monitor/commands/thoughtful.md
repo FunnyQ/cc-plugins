@@ -15,7 +15,7 @@ Skip the fork for typos, one-line trivial edits, pure formatting, and simple loo
 Before spawning any fork, resolve the current main-agent session id:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/find-session.ts --provider claude
+${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit find-session --provider claude
 ```
 
 This is the **initiating parent session**. Put that literal id in the fork prompt as `<parent-session-id>`. Do not ask the fork to resolve it again. Context inheritance does not imply session identity: a background fork can have its own transcript/session row.

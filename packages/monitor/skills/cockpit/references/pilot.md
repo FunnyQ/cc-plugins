@@ -11,7 +11,7 @@ live transcript. Resolve that id and the configured decision-log language in
 one call:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts prep --provider <provider>
+<plugin-root>/skills/cockpit/bin/cockpit prep --provider <provider>
 ```
 
 If it exits non-zero because the session id cannot be resolved, generate one
@@ -26,7 +26,7 @@ session auto-registers on the first `log` or `scribe` write.
 If the user explicitly asks to change it, run:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts config --log-language "<lang>"
+<plugin-root>/skills/cockpit/bin/cockpit config --log-language "<lang>"
 ```
 
 ## Step 3 — Open the cockpit
@@ -37,7 +37,7 @@ running**. The channel MCP launches it headless, with no browser. Either
 way, run:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit-server.ts
+<plugin-root>/skills/cockpit/bin/cockpit server
 ```
 
 This command is an idempotent **ensure + open**. If the daemon is already
@@ -66,7 +66,7 @@ session.
   with `--port <n>`.
 - **It powers `wait` / `send`.** The control loop talks to this daemon. The
   daemon must be running before you park a `cockpit wait` (see below).
-- **Restarting onto new code.** Re-running `cockpit-server.ts` from the
+- **Restarting onto new code.** Re-running `cockpit server` from the
   *same* install reuses the live daemon. It does not pick up a plugin
   update or a working-tree edit. Use `/cockpit restart` for that. Offer it
   after a `/monitor:install`, a plugin update, or an edit to any cockpit
@@ -89,11 +89,11 @@ Write `--decision` / `--reason` / `--tradeoff` in the configured language.
 Read it back if you are unsure which is in effect:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts config get-language
+<plugin-root>/skills/cockpit/bin/cockpit config get-language
 ```
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts log \
+<plugin-root>/skills/cockpit/bin/cockpit log \
   [--session <id>] \
   --decision "what you chose / did — the one-line headline" \
   --reason   "why this path, in a sentence or two" \
@@ -201,7 +201,7 @@ context intact.
   to the user. Supply the choices via `--option`. Then park immediately with:
 
   ```bash
-  bun <plugin-root>/skills/cockpit/scripts/cockpit.ts wait <id>
+  <plugin-root>/skills/cockpit/bin/cockpit wait <id>
   ```
 
   Run `wait` according to the **wait policy in your provider reference**.
@@ -265,7 +265,7 @@ or in chat. Then record their answer through the bridge, so the card still
 closes with a durable `response`:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts send <id> "<answer>"
+<plugin-root>/skills/cockpit/bin/cockpit send <id> "<answer>"
 ```
 
 Never re-run `wait` for that same call after falling back. The user is
@@ -280,7 +280,7 @@ that message as the answer to the open call. Do not ask them to repeat it
 in cockpit. Immediately record it through the same bridge:
 
 ```bash
-bun <plugin-root>/skills/cockpit/scripts/cockpit.ts send <id> "<answer from chat>"
+<plugin-root>/skills/cockpit/bin/cockpit send <id> "<answer from chat>"
 ```
 
 Use `--call <callId>` if you have the call id from the preceding `log`

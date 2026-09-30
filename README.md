@@ -203,7 +203,7 @@ Cockpit is a per-project dashboard and skill for active work. Start with a sessi
 In Claude Code or Codex, invoke the cockpit skill and confirm the proposed goals. From a development checkout, the dashboard can also be started directly:
 
 ```bash
-bun packages/monitor/skills/cockpit/scripts/cockpit-server.ts
+packages/monitor/skills/cockpit/bin/cockpit server
 ```
 
 Opens `http://localhost:5858` in your default browser.
@@ -212,7 +212,7 @@ Opens `http://localhost:5858` in your default browser.
 
 - Claude Code transcripts resolve from `~/.claude/projects/**/<session>.jsonl`.
 - Codex transcripts resolve from `~/.codex/state_5.sqlite` thread rows and rollout files under `~/.codex/sessions`.
-- OpenCode transcripts resolve via the `opencode` provider in `transcript-stream.ts`, reading the same `~/.local/share/opencode/opencode.db` the usage-dashboard uses.
+- OpenCode transcripts resolve via the `opencode` provider in `packages/monitor/cockpit-rs/src/server/transcript.rs`, reading the same `~/.local/share/opencode/opencode.db` the usage-dashboard uses.
 - Decision logs live per-project under `.cockpit/`; the registry and wait/send bridge are shared through `~/.local/share/q-lab/cockpit/`.
 
 ### Channel (send box)
@@ -228,10 +228,10 @@ Channels require Claude Code 2.1.80 or later and are still behind the research-p
 Launch an opted-in session — the channel only attaches to sessions started with the development channel flag and cannot retro-attach to an already-running session:
 
 ```bash
-bun packages/monitor/skills/cockpit/scripts/monitor-up.ts
+claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace
 ```
 
-Extra arguments pass through to `claude` (e.g. `monitor-up.ts --resume`). See the [cockpit skill](./packages/monitor/skills/cockpit/SKILL.md) for the full setup.
+Append Claude Code arguments to this command (e.g. `--resume`). See the [cockpit skill](./packages/monitor/skills/cockpit/SKILL.md) for the full setup.
 
 For Codex send support, install and enable the managed standalone Codex remote-control daemon:
 

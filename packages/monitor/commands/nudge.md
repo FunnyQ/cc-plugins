@@ -8,7 +8,7 @@ Toggle the cockpit **scribe nudges**. These are the 💭 "spawn a fork to run /c
 Run this exactly. Report the printed result back to me:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS
+${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit nudge $ARGUMENTS
 ```
 
 **Actions** (default `status`): `on`, `off`, `toggle`, `clear` (drop this scope's opinion), `status`.

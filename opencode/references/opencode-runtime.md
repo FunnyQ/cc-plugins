@@ -2,6 +2,8 @@
 
 Observed on **opencode 1.18.18**, macOS (darwin 25.6.0), bun 1.3.13, 2026-08-15.
 
+Use `~/.config/opencode/skills/cockpit/bin/cockpit find-session --provider opencode` for current session lookup. Read `packages/monitor/cockpit-rs/src/hook/session_start.rs` and `hook/stop.rs` for the current seed and nudge implementations. Keep the deleted TS names below as dated spike observations.
+
 This is the narrative log. The executable gate is `docs/opencode-compat/tasks/_context/runtime-facts.md`, which carries the same answers in the form the task tree reads. Keep the two in sync.
 
 Seventeen of eighteen items are resolved from observed behavior. Only S12 remains open, and it was never a gate.
