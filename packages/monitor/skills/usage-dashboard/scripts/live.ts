@@ -16,6 +16,7 @@ import { readSessionFiles } from "./session-files";
 import { cockpitHome } from "../../cockpit/scripts/cockpit-home";
 import { isAlive } from "../../shared/scripts/process-alive";
 import { CODEX_STATE_DB, OPENCODE_DB, PROJECTS_DIR } from "./paths";
+import { nowMs } from "./api";
 
 export type { LiveSession } from "./live-sessions";
 
@@ -59,7 +60,7 @@ function readCodexThreadRows(limit = 24): CodexThreadRow[] {
            order by coalesce(updated_at_ms, updated_at * 1000, created_at_ms, created_at * 1000) desc
            limit ?`,
         )
-        .all(Date.now() - STALE_CUTOFF_MS, limit) as CodexThreadRow[];
+        .all(nowMs() - STALE_CUTOFF_MS, limit) as CodexThreadRow[];
     } finally {
       db.close();
     }
@@ -99,7 +100,7 @@ let transcriptIndexAt = 0;
 // most polls do no fs work at all. The stream endpoint deliberately does NOT use
 // this cache — a brand-new transcript must resolve immediately.
 function getTranscriptIndex(): Map<string, string> {
-  const now = Date.now();
+  const now = nowMs();
   if (transcriptIndex && now - transcriptIndexAt < TRANSCRIPT_INDEX_TTL_MS) {
     return transcriptIndex;
   }
@@ -124,7 +125,7 @@ let cockpitSessionKeysCache: Set<string> | null = null;
 let cockpitSessionKeysAt = 0;
 
 function cockpitSessionKeys(): Set<string> {
-  const now = Date.now();
+  const now = nowMs();
   if (
     cockpitSessionKeysCache &&
     now - cockpitSessionKeysAt < COCKPIT_FILE_TTL_MS
@@ -156,7 +157,7 @@ let cockpitDaemonPortAt = 0;
 // must open that port, not a hardcoded 5858, or a custom-port cockpit opens a
 // dead tab despite reading as up.
 export function cockpitDaemonPort(): number | null {
-  const now = Date.now();
+  const now = nowMs();
   if (now - cockpitDaemonPortAt < COCKPIT_FILE_TTL_MS) {
     return cockpitDaemonPortCache;
   }
@@ -177,7 +178,7 @@ export function cockpitDaemonPort(): number | null {
 }
 
 export function getLiveSessions(): LiveSession[] {
-  const now = Date.now();
+  const now = nowMs();
   const index = getTranscriptIndex();
   const cockpitKeys = cockpitSessionKeys();
   const claudeSessions = buildClaudeLiveSessions(

@@ -61,10 +61,17 @@ const USER_PRICING_OVERRIDE = join(
   "pricing.json",
 );
 const USER_BUDGET_CONFIG = join(HOME, ".config", "cc-dashboard", "budget.json");
-const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/codex/usage";
-const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
+// The env overrides are test seams: the contract suite points them at a local stub.
+export const CODEX_USAGE_URL =
+  process.env.TOKEN_ATLAS_CODEX_USAGE_URL ||
+  "https://chatgpt.com/backend-api/codex/usage";
+export const CODEX_TOKEN_URL =
+  process.env.TOKEN_ATLAS_CODEX_TOKEN_URL ||
+  "https://auth.openai.com/oauth/token";
 const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
+export const OPENROUTER_URL =
+  process.env.TOKEN_ATLAS_OPENROUTER_URL ||
+  "https://openrouter.ai/api/v1/models";
 const RATE_LIMITS_STALE_AFTER_MS = 5 * 60 * 1000;
 const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
 const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -386,6 +393,14 @@ type TranscriptEntry = {
 
 // ---------- Utils ----------
 
+// Test seam: a pinned TOKEN_ATLAS_NOW_MS makes fixture runs byte-reproducible.
+export function nowMs(): number {
+  const pinned = process.env.TOKEN_ATLAS_NOW_MS ?? "";
+  return /^[0-9]+$/.test(pinned) && Number(pinned) > 0
+    ? Number(pinned)
+    : Date.now();
+}
+
 function safeReadJSON<T>(path: string): T | null {
   const result = readJSONWithError<T>(path);
   return result.data;
@@ -627,10 +642,10 @@ export function readUsageLimits(): UsageLimits {
   const capturedAtMs =
     cache.data.capturedAtEpochMs ??
     (cache.data.capturedAt ? Date.parse(cache.data.capturedAt) : Number.NaN);
-  const nowMs = Date.now();
+  const now = nowMs();
   const stale =
     !Number.isFinite(capturedAtMs) ||
-    nowMs - capturedAtMs > RATE_LIMITS_STALE_AFTER_MS;
+    now - capturedAtMs > RATE_LIMITS_STALE_AFTER_MS;
   const rateLimits = cache.data.rate_limits;
 
   if (!rateLimits) {
@@ -647,8 +662,8 @@ export function readUsageLimits(): UsageLimits {
     capturedAt: cache.data.capturedAt ?? null,
     stale,
     error: null,
-    fiveHour: buildUsageLimitWindow(rateLimits.five_hour, FIVE_HOUR_MS, nowMs),
-    weekly: buildUsageLimitWindow(rateLimits.seven_day, SEVEN_DAY_MS, nowMs),
+    fiveHour: buildUsageLimitWindow(rateLimits.five_hour, FIVE_HOUR_MS, now),
+    weekly: buildUsageLimitWindow(rateLimits.seven_day, SEVEN_DAY_MS, now),
   };
 }
 
@@ -806,7 +821,7 @@ function readCodexUsageCache(): UsageLimits {
     cache.data.capturedAt ?? null,
     capturedAtMs,
     null,
-    Date.now(),
+    nowMs(),
   );
 }
 
@@ -816,7 +831,7 @@ export async function readCodexUsageLimits(): Promise<UsageLimits> {
 
   try {
     const usage = await fetchCodexUsage();
-    const capturedAtEpochMs = Date.now();
+    const capturedAtEpochMs = nowMs();
     const cache: CodexUsageCache = {
       capturedAt: new Date(capturedAtEpochMs).toISOString(),
       capturedAtEpochMs,
@@ -1256,7 +1271,7 @@ function parseHistory(): {
     } else {
       byProject.set(path, {
         messageCount: 1,
-        firstSeen: ts || Date.now(),
+        firstSeen: ts || nowMs(),
         lastSeen: ts || 0,
         path,
       });
@@ -2660,7 +2675,9 @@ export async function buildStats() {
     for (const [date, activity] of source.entries()) {
       const current = activityByDate.get(date);
       const sessionCount =
-        "threadCount" in activity ? activity.threadCount : activity.sessionCount;
+        "threadCount" in activity
+          ? activity.threadCount
+          : activity.sessionCount;
       if (current) {
         current.sessionCount += sessionCount;
       } else {
@@ -3049,18 +3066,65 @@ export async function buildStats() {
       longestSession: cache.longestSession ?? null,
     },
     meta: {
-      generatedAt: new Date().toISOString(),
+      generatedAt: new Date(nowMs()).toISOString(),
       cacheVersion: cache.version ?? null,
       lastComputedDate: cache.lastComputedDate ?? null,
     },
   };
 }
 
+const SOURCES = ["claude", "codex", "opencode", "pricing"] as const;
+type SourceName = (typeof SOURCES)[number];
+const SOURCE_USAGE =
+  "usage: bun api.ts [--source claude|codex|opencode|pricing]";
+
+// One data source's intermediate result, so the Rust port can prove parity per
+// source before the full payload exists.
+async function readSource(name: SourceName): Promise<unknown> {
+  switch (name) {
+    case "claude": {
+      const { ledger, transcriptFileCount, ...usage } = parseTranscriptUsage();
+      return {
+        usage,
+        ledger,
+        transcriptFileCount,
+        statsCache: parseStatsCache(),
+        history: parseHistory(),
+        usageLimits: readUsageLimits(),
+      };
+    }
+    case "codex":
+      return {
+        usage: parseCodexUsage(),
+        usageLimits: await readCodexUsageLimits(),
+      };
+    case "opencode":
+      return { usage: parseOpenCodeUsage() };
+    case "pricing":
+      return await loadPricingWithMeta();
+  }
+}
+
+function sourceReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Map) return Object.fromEntries(value);
+  if (value instanceof Set) return [...value].sort();
+  return value;
+}
+
 // CLI mode: print JSON
 if (import.meta.main) {
-  buildStats()
+  const args = process.argv.slice(2);
+  const sourceAt = args.indexOf("--source");
+  const source = sourceAt >= 0 ? args[sourceAt + 1] : undefined;
+  if (sourceAt >= 0 && !SOURCES.includes(source as SourceName)) {
+    console.error(SOURCE_USAGE);
+    process.exit(2);
+  }
+  (source ? readSource(source as SourceName) : buildStats())
     .then((data) => {
-      process.stdout.write(JSON.stringify(data, null, 2));
+      process.stdout.write(
+        JSON.stringify(data, source ? sourceReplacer : undefined, 2),
+      );
     })
     .catch((err) => {
       console.error(err.message ?? err);
