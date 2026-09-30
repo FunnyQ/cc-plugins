@@ -38,6 +38,7 @@ The TS is the only reference implementation for the measurements and the real-ho
      - `bun test packages/monitor/skills/usage-dashboard/contract/`
      - `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/`
    - Take the TS-side measurements and run the real-home golden check (sections below).
+   - Q authorized this task's executor to snapshot the real home into a temp root for these two checks, overriding the human-only line in `../_context/shared.md`. Every copy stays local under `/tmp/q-lab/monitor/`; nothing leaves the machine. If a permission prompt for the snapshot is denied, stop and report — do not report a plan defect.
    - If either suite is red, stop and report. Do not delete on a red suite.
 2. **Delete** the TS using the importer rule below.
 3. **Rewire the contract suite** to Rust-only.
