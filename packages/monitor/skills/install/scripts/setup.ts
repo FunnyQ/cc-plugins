@@ -43,8 +43,14 @@ import {
   compareMonitorVersions,
   reapStaleMonitorProcesses,
 } from "./reap-stale";
-import { applyStatusline } from "./setup-statusline";
-import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
+import { applyStatusline, writeSettings } from "./setup-statusline";
+import {
+  decideStatusLine,
+  migrateCollectorCommand,
+  SHIM_COLLECTOR_RE,
+  type StatusLineConfig,
+  TS_COLLECTOR_RE,
+} from "./statusline-decision";
 
 const HOME = homedir();
 // Absolute path a user can paste into ~/.claude.json (no $CLAUDE_PLUGIN_ROOT there).
@@ -142,13 +148,13 @@ function channelConfiguredPath(): string | null {
   );
 }
 
-// The collector script path currently referenced by statusLine.command, or null
-// if the statusline isn't running a collector at all.
-function statuslineReferencedCollector(): string | null {
+// Which collector form statusLine.command runs, or null if it runs none.
+function statuslineReferencedCollector(): "shim" | "ts" | null {
   const { data } = readJson(SETTINGS_JSON);
   const cmd = data?.statusLine?.command;
   if (typeof cmd !== "string") return null;
-  return cmd.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
+  if (SHIM_COLLECTOR_RE.test(cmd)) return "shim";
+  return TS_COLLECTOR_RE.test(cmd) ? "ts" : null;
 }
 
 // --- cockpit channel checks (the piece this skill owns) ---------------------
@@ -276,7 +282,7 @@ function applyStatuslinePiece(dryRun: boolean): boolean {
     console.log(`✗ ${result.error}`);
     return false;
   }
-  console.log(`✓ Wired statusline collector in ${SETTINGS_JSON}`);
+  console.log(`✓ Wired cockpit atlas statusline in ${SETTINGS_JSON}`);
   if (result.preserved)
     console.log(`   (wrapped your existing statusline command)`);
   if (result.backup) console.log(`   (backup: ${result.backup})`);
@@ -333,17 +339,33 @@ function scriptPermissionChecks(): Check[] {
   ];
 }
 
-// --- migrate: clean up the stale channel entry -----------------------------
-// Never touches the statusline: any collector path keeps working across plugin
-// updates, and wiring it is the user's opt-in via /monitor:install.
+// --- migrate: stale channel entry + removed TS statusline collector ----------
+// Rewrites an existing TS collector command because its file is gone once the
+// clone updates, failing every tick; never fresh-wires, that is /monitor:install.
 function migrate(): string[] {
   const changed: string[] = [];
 
   if (unwireChannel(false) === "removed") {
     changed.push("cockpit-channel cleanup");
   }
+  if (migrateStatusline()) {
+    changed.push("statusline collector");
+  }
 
   return changed;
+}
+
+function migrateStatusline(): boolean {
+  const { data, readable } = readJson(SETTINGS_JSON);
+  const cmd = data?.statusLine?.command;
+  if (!readable || typeof cmd !== "string") return false;
+  const next = migrateCollectorCommand(cmd, COLLECTOR_COMMAND);
+  if (next === null) return false;
+  data.statusLine = { ...data.statusLine, command: next };
+  const bak = writeSettings(data);
+  console.log(`✓ Rewrote statusLine.command to: ${next}`);
+  if (bak) console.log(`   (backup: ${bak})`);
+  return true;
 }
 
 // --- drift watch: read-only, runs every session -----------------------------
@@ -378,6 +400,13 @@ function driftReport(): DriftItem[] {
   }
 
   const items: DriftItem[] = [];
+  if (collector === "ts") {
+    items.push({
+      key: "statusline-old-collector",
+      message:
+        "statusLine still runs the removed TS collector (statusline-collector.ts), so the status line fails. Run the /monitor:install skill to point it at cockpit atlas statusline.",
+    });
+  }
   if (channelConfiguredPath() !== null) {
     items.push({
       key: "stale-channel",

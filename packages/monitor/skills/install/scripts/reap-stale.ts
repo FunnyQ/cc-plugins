@@ -16,9 +16,10 @@
 // safe to signal because it self-heals: any live channel's next poll fails and calls
 // `ensureCockpitDaemon()`, which respawns it.
 //
-// `atlas-server` is deliberately NOT in scope, even though it orphans to PID 1 the same
-// way. It IS the usage dashboard — the thing the user has open in a browser tab — and
-// unlike the cockpit daemon, **nothing re-ensures it**: the channel never touches it, and
+// The usage dashboard — `bun …/atlas-server.ts`, and now `cockpit atlas serve` — is
+// deliberately NOT in scope, even though it orphans to PID 1 the same way. It is the
+// thing the user has open in a browser tab — and unlike the cockpit daemon, **nothing
+// re-ensures it**: the channel never touches it, and
 // usage-dashboard's SKILL.md says the skill owns its lifecycle. Reaping it after an
 // upgrade would kill a dashboard the user is actively looking at, permanently. It was
 // never part of the leak (no polling loop, so it burns nothing); it is merely idle.

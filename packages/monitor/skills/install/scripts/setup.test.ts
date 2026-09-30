@@ -21,7 +21,11 @@ const CHANNEL_SCRIPT = resolve(
   "scripts",
   "cockpit-channel.ts",
 );
-const COLLECTOR_SCRIPT = resolve(
+const COCKPIT_SHIM = resolve(import.meta.dir, "../../cockpit/bin/cockpit");
+// No marketplace clone is registered under the temp HOME, so the live shim wins.
+const COLLECTOR_COMMAND = `${COCKPIT_SHIM} atlas statusline`;
+// The removed TS collector, as a pre-migration settings.json still names it.
+const TS_COLLECTOR = resolve(
   import.meta.dir,
   "..",
   "..",
@@ -87,8 +91,6 @@ describe("versionGte", () => {
     expect(versionGte("2.0.5", "2.1.0")).toBe(false);
   });
 });
-
-const COCKPIT_SHIM = resolve(import.meta.dir, "../../cockpit/bin/cockpit");
 
 describe("--check", () => {
   test("covers both skills: dashboard prerequisites + cockpit channel", () => {
@@ -191,11 +193,11 @@ describe("--apply", () => {
   test("wires statusline, leaves no channel entry, and reports done", () => {
     const { code, stdout } = run(["--apply"]);
     expect(code).toBe(0);
-    expect(stdout).toContain("✓ Wired statusline collector");
+    expect(stdout).toContain("✓ Wired cockpit atlas statusline");
 
     // channel is plugin-packaged now — apply never writes one into ~/.claude.json
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
-    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
+    expect(settingsJson().statusLine.command).toBe(COLLECTOR_COMMAND);
   });
 
   test("removes a stale channel entry but preserves other mcpServers", () => {
@@ -226,7 +228,7 @@ describe("--apply", () => {
     const sj = settingsJson();
     expect(sj.theme).toBe("dark");
     expect(sj.statusLine.command).toBe(
-      `TOKEN_ATLAS_STATUSLINE_COMMAND='my-old-line' bun ${COLLECTOR_SCRIPT}`,
+      `TOKEN_ATLAS_STATUSLINE_COMMAND='my-old-line' ${COLLECTOR_COMMAND}`,
     );
   });
 
@@ -299,41 +301,53 @@ describe("single-piece flags", () => {
 });
 
 describe("version drift", () => {
-  // An old plugin-cache path whose version segment differs from the current one.
+  // Old plugin-cache paths whose version segment differs from the current one.
   const OLD_COLLECTOR =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+  const OLD_SHIM =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/6.0.0/skills/cockpit/bin/cockpit";
   const OLD_CHANNEL =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/cockpit/scripts/cockpit-channel.ts";
 
-  test("--check flags a statusline running a collector at another path", () => {
+  function statusLine(command: string) {
     writeFileSync(
       join(home, ".claude", "settings.json"),
-      JSON.stringify({
-        statusLine: {
-          type: "command",
-          command: `bun ${OLD_COLLECTOR}`,
-          padding: 0,
-        },
-      }),
+      JSON.stringify({ statusLine: { type: "command", command, padding: 0 } }),
     );
+  }
+
+  test("--check flags a statusline running the shim at another path", () => {
+    statusLine(`${OLD_SHIM} atlas statusline`);
     const { stdout } = run();
     expect(stdout).toContain("○ live usage limits");
     expect(stdout).toContain("another path");
   });
 
-  test("--apply re-points a drifted statusline to the current path", () => {
-    writeFileSync(
-      join(home, ".claude", "settings.json"),
-      JSON.stringify({
-        statusLine: {
-          type: "command",
-          command: `bun ${OLD_COLLECTOR}`,
-          padding: 0,
-        },
-      }),
-    );
+  test("--check flags a statusline still running the removed TS collector", () => {
+    statusLine(`bun ${OLD_COLLECTOR}`);
+    const { stdout } = run();
+    expect(stdout).toContain("○ live usage limits");
+    expect(stdout).toContain("removed TS collector");
+  });
+
+  test("--check reports the statusline wired when it holds exactly COLLECTOR_COMMAND", () => {
+    statusLine(COLLECTOR_COMMAND);
+    expect(run().stdout).toContain("✓ live usage limits (statusline collector)");
+  });
+
+  test("--apply re-points a drifted shim to the current path", () => {
+    statusLine(`${OLD_SHIM} atlas statusline`);
     run(["--apply-statusline"]);
-    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
+    expect(settingsJson().statusLine.command).toBe(COLLECTOR_COMMAND);
+  });
+
+  test("--apply replaces the removed TS collector, keeping a wrapped command", () => {
+    const wrap = "TOKEN_ATLAS_STATUSLINE_COMMAND='npx claude-powerline'";
+    statusLine(`${wrap} bun ${OLD_COLLECTOR}`);
+    run(["--apply-statusline"]);
+    expect(settingsJson().statusLine.command).toBe(
+      `${wrap} ${COLLECTOR_COMMAND}`,
+    );
   });
 
   test("--apply removes a drifted cockpit-channel entry instead of re-pointing", () => {
@@ -350,7 +364,7 @@ describe("version drift", () => {
   });
 });
 
-describe("--migrate (channel cleanup only, never fresh-wire)", () => {
+describe("--migrate (channel cleanup + TS collector rewrite, never fresh-wire)", () => {
   test("recognizes and removes a hand-wired shim channel", () => {
     writeFileSync(join(home, ".claude.json"), JSON.stringify({
       mcpServers: { "cockpit-channel": { command: COCKPIT_SHIM, args: ["channel"] } },
@@ -362,23 +376,54 @@ describe("--migrate (channel cleanup only, never fresh-wire)", () => {
 
   const OLD_COLLECTOR =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+  const OLD_SHIM_COMMAND =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/6.0.0/skills/cockpit/bin/cockpit atlas statusline";
 
-  test("leaves a wired statusline alone, whatever collector path it runs", () => {
+  function statusLine(command: string) {
     writeFileSync(
       join(home, ".claude", "settings.json"),
       JSON.stringify({
-        statusLine: {
-          type: "command",
-          command: `bun ${OLD_COLLECTOR}`,
-          padding: 0,
-        },
+        statusLine: { type: "command", command, padding: 3 },
+        theme: "dark",
       }),
     );
+  }
+
+  test("rewrites the removed TS collector to the shim, and only once", () => {
+    statusLine(`bun ${OLD_COLLECTOR}`);
     const { stdout } = run(["--migrate"]);
-    expect(stdout).toContain("Nothing to migrate");
-    expect(settingsJson().statusLine.command).toBe(`bun ${OLD_COLLECTOR}`);
+    expect(stdout).toContain("Re-pointed: statusline collector");
+    const sj = settingsJson();
+    expect(sj.statusLine).toEqual({
+      type: "command",
+      command: COLLECTOR_COMMAND,
+      padding: 3,
+    });
+    expect(sj.theme).toBe("dark");
+    expect(names(join(home, ".claude"))).toContain("settings.json.bak");
     // Channel was never configured — migrate must NOT create it.
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
+
+    const after = readFileSync(join(home, ".claude", "settings.json"), "utf-8");
+    expect(run(["--migrate"]).stdout).toContain("Nothing to migrate");
+    expect(readFileSync(join(home, ".claude", "settings.json"), "utf-8")).toBe(
+      after,
+    );
+  });
+
+  test("leaves a shim statusline alone, whatever path it runs", () => {
+    statusLine(OLD_SHIM_COMMAND);
+    const { stdout } = run(["--migrate"]);
+    expect(stdout).toContain("Nothing to migrate");
+    expect(settingsJson().statusLine.command).toBe(OLD_SHIM_COMMAND);
+  });
+
+  test("leaves a foreign statusline-collector.ts alone", () => {
+    statusLine("bun /home/me/bin/statusline-collector.ts");
+    expect(run(["--migrate"]).stdout).toContain("Nothing to migrate");
+    expect(settingsJson().statusLine.command).toBe(
+      "bun /home/me/bin/statusline-collector.ts",
+    );
   });
 
   test("removes a stale hand-wired channel entry", () => {
@@ -471,6 +516,67 @@ describe("--session-check (marker-gated)", () => {
     const second = run(["--session-check"]);
     expect(second.stdout).not.toContain("/monitor:install");
   });
+
+  describe("statusline migration", () => {
+    const SETTINGS = () => join(home, ".claude", "settings.json");
+    const WRAP = "TOKEN_ATLAS_STATUSLINE_COMMAND='npx claude-powerline'";
+
+    test("rewrites the removed TS collector, speaking only one JSON line", () => {
+      writeFileSync(
+        SETTINGS(),
+        JSON.stringify({
+          statusLine: { type: "command", command: `${WRAP} bun ${TS_COLLECTOR}` },
+        }),
+      );
+      const original = readFileSync(SETTINGS(), "utf-8");
+
+      const { code, out } = run(["--session-check"]);
+
+      expect(code).toBe(0);
+      expect(settingsJson().statusLine.command).toBe(
+        `${WRAP} ${COLLECTOR_COMMAND}`,
+      );
+      expect(readFileSync(`${SETTINGS()}.bak`, "utf-8")).toBe(original);
+      const lines = out.split("\n").filter(Boolean);
+      expect(lines).toHaveLength(1);
+      const message = JSON.parse(lines[0]!).systemMessage as string;
+      expect(message).toContain("statusline collector");
+      expect(message).toContain(COLLECTOR_COMMAND);
+      expect(message).not.toContain("removed TS collector");
+    });
+
+    test("a second session changes nothing", () => {
+      writeFileSync(
+        SETTINGS(),
+        JSON.stringify({
+          statusLine: { type: "command", command: `bun ${TS_COLLECTOR}` },
+        }),
+      );
+      run(["--session-check"]);
+      const after = readFileSync(SETTINGS(), "utf-8");
+      const bak = readFileSync(`${SETTINGS()}.bak`, "utf-8");
+
+      const second = run(["--session-check"]);
+
+      expect(readFileSync(SETTINGS(), "utf-8")).toBe(after);
+      expect(readFileSync(`${SETTINGS()}.bak`, "utf-8")).toBe(bak);
+      expect(second.out).not.toContain("statusline collector");
+    });
+
+    test("leaves an unparseable settings.json byte-identical", () => {
+      writeFileSync(SETTINGS(), "{ not json");
+      run(["--session-check"]);
+      expect(readFileSync(SETTINGS(), "utf-8")).toBe("{ not json");
+      expect(existsSync(`${SETTINGS()}.bak`)).toBe(false);
+    });
+
+    test("never adds a statusLine block that was absent", () => {
+      writeFileSync(SETTINGS(), JSON.stringify({ theme: "dark" }));
+      run(["--session-check"]);
+      expect(settingsJson()).toEqual({ theme: "dark" });
+      expect(existsSync(`${SETTINGS()}.bak`)).toBe(false);
+    });
+  });
 });
 
 describe("malformed config", () => {
@@ -488,22 +594,27 @@ describe("malformed config", () => {
 describe("--session-check drift watch (every session, read-only)", () => {
   const OLD_COLLECTOR =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
+  const OLD_SHIM_COMMAND =
+    "/h/.claude/plugins/cache/q-lab-marketplace/monitor/6.0.0/skills/cockpit/bin/cockpit atlas statusline";
   const PERMISSIONS = [
     "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
     "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
     "Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)",
   ];
 
-  function wire(collector = COLLECTOR_SCRIPT, allow = PERMISSIONS) {
+  function wire(command = COLLECTOR_COMMAND, allow = PERMISSIONS) {
     writeFileSync(
       join(home, ".claude", "settings.json"),
       JSON.stringify({
-        statusLine: { type: "command", command: `bun ${collector}` },
+        statusLine: { type: "command", command },
         permissions: { allow },
       }),
     );
   }
-  const unapproved = () => wire(COLLECTOR_SCRIPT, []);
+  const unapproved = () => wire(COLLECTOR_COMMAND, []);
+  // A current marker closes the migrate gate, so only the drift watch runs.
+  const markerCurrent = () =>
+    writeFileSync(join(dataDir, ".wired-version"), "999.0.0\n");
 
   test("a notice is a single JSON object with a systemMessage", () => {
     const { out } = run(["--session-check"]);
@@ -518,14 +629,39 @@ describe("--session-check drift watch (every session, read-only)", () => {
   });
 
   test("reports a missing shim permission even when Bun is approved", () => {
-    wire(COLLECTOR_SCRIPT, PERMISSIONS.filter((p) => p.startsWith("Bash(bun ")));
+    wire(COLLECTOR_COMMAND, PERMISSIONS.filter((p) => p.startsWith("Bash(bun ")));
     expect(run(["--session-check"]).stdout).toContain("permissions.allow");
   });
 
-  test("says nothing about a collector at another path", () => {
-    wire(OLD_COLLECTOR);
+  test("says nothing about a shim at another path", () => {
+    wire(OLD_SHIM_COMMAND);
     const { out } = run(["--session-check"]);
     expect(out.trim()).toBe("");
+  });
+
+  test("reports a restored TS collector as statusline-old-collector", () => {
+    wire(`bun ${OLD_COLLECTOR}`);
+    markerCurrent();
+    const { out } = run(["--session-check"]);
+    const message = JSON.parse(out.trim()).systemMessage as string;
+    expect(message).toContain("removed TS collector");
+    expect(message).toContain("/monitor:install");
+    expect(message).not.toContain("not set up yet");
+    expect(readFileSync(join(dataDir, ".drift-notice"), "utf-8")).toBe(
+      "statusline-old-collector\n",
+    );
+  });
+
+  test("reports statusline-missing only when neither form is present", () => {
+    wire("starship prompt");
+    markerCurrent();
+    run(["--session-check"]);
+    expect(readFileSync(join(dataDir, ".drift-notice"), "utf-8")).toBe(
+      "statusline-missing\n",
+    );
+    wire();
+    run(["--session-check"]);
+    expect(readFileSync(join(dataDir, ".drift-notice"), "utf-8")).toBe("\n");
   });
 
   test("notices drift that appears within the same version, and writes nothing", () => {
@@ -555,8 +691,7 @@ describe("--session-check drift watch (every session, read-only)", () => {
         },
       }),
     );
-    // Marker already current, so only the drift watch runs.
-    writeFileSync(join(dataDir, ".wired-version"), "999.0.0\n");
+    markerCurrent();
 
     const { out } = run(["--session-check"]);
     const message = JSON.parse(out.trim()).systemMessage as string;
@@ -593,38 +728,50 @@ describe("--session-check drift watch (every session, read-only)", () => {
 describe("stable collector path", () => {
   // A marketplace clone registered with Claude Code. Its path carries no
   // version, so a statusline wired here survives plugin updates.
-  function registerMarketplace(withCollector: boolean): string {
+  function registerMarketplace(withShim: boolean): string {
     const root = join(home, "mkt");
     mkdirSync(join(root, ".claude-plugin"), { recursive: true });
     writeFileSync(
       join(root, ".claude-plugin", "marketplace.json"),
       JSON.stringify({ plugins: [{ name: "monitor", source: "./pkgs/mon" }] }),
     );
-    const collector = join(
-      root,
-      "pkgs/mon/skills/usage-dashboard/scripts/statusline-collector.ts",
-    );
-    if (withCollector) {
-      mkdirSync(join(collector, ".."), { recursive: true });
-      writeFileSync(collector, "");
+    const shim = join(root, "pkgs/mon/skills/cockpit/bin/cockpit");
+    if (withShim) {
+      mkdirSync(join(shim, ".."), { recursive: true });
+      writeFileSync(shim, "");
     }
     mkdirSync(join(home, ".claude", "plugins"), { recursive: true });
     writeFileSync(
       join(home, ".claude", "plugins", "known_marketplaces.json"),
       JSON.stringify({ "q-lab-marketplace": { installLocation: root } }),
     );
-    return collector;
+    return shim;
   }
 
-  test("--apply wires the marketplace clone's collector", () => {
-    const collector = registerMarketplace(true);
+  test("--apply wires the marketplace clone's shim", () => {
+    const shim = registerMarketplace(true);
     run(["--apply"]);
-    expect(settingsJson().statusLine.command).toBe(`bun ${collector}`);
+    expect(settingsJson().statusLine.command).toBe(`${shim} atlas statusline`);
   });
 
-  test("falls back to this install's collector when the clone lacks it", () => {
+  test("falls back to this install's shim when the clone lacks it", () => {
     registerMarketplace(false);
     run(["--apply"]);
-    expect(settingsJson().statusLine.command).toBe(`bun ${COLLECTOR_SCRIPT}`);
+    expect(settingsJson().statusLine.command).toBe(COLLECTOR_COMMAND);
+  });
+
+  test("session-check migrates the TS collector to the clone's shim", () => {
+    const shim = registerMarketplace(true);
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: {
+          type: "command",
+          command: `bun ${join(home, "mkt", "pkgs/mon/skills/usage-dashboard/scripts/statusline-collector.ts")}`,
+        },
+      }),
+    );
+    run(["--session-check"]);
+    expect(settingsJson().statusLine.command).toBe(`${shim} atlas statusline`);
   });
 });

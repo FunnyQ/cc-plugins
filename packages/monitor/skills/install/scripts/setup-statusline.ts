@@ -10,7 +10,6 @@ import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
 // drift and make the check disagree with what this file writes.
 import { COLLECTOR_COMMAND, SETTINGS_JSON as SETTINGS } from "./install";
 
-
 export type ApplyResult =
   | {
       ok: true;
@@ -42,18 +41,26 @@ export function applyStatusline(): ApplyResult {
     return { ok: true, skipped: true, preserved: null, backup: null };
   }
 
-  const backup = existsSync(SETTINGS) ? `${SETTINGS}.bak` : null;
-  if (backup) copyFileSync(SETTINGS, backup);
-
   settings.statusLine = {
     ...statusLine,
     type: "command",
     command: decision.command,
     padding: decision.padding,
   };
-  writeFileSync(SETTINGS, `${JSON.stringify(settings, null, 2)}\n`);
+  const backup = writeSettings(settings);
 
   return { ok: true, skipped: false, preserved: decision.preserved, backup };
+}
+
+// The one settings.json writer: setup.ts's session-check migration shares it so
+// both writes keep one backup name and one format.
+export function writeSettings(
+  settings: Record<string, unknown>,
+): string | null {
+  const backup = existsSync(SETTINGS) ? `${SETTINGS}.bak` : null;
+  if (backup) copyFileSync(SETTINGS, backup);
+  writeFileSync(SETTINGS, `${JSON.stringify(settings, null, 2)}\n`);
+  return backup;
 }
 
 // CLI: run by the dashboard skill after user approval.
@@ -64,10 +71,12 @@ if (import.meta.main) {
     process.exit(1);
   }
   if (result.skipped) {
-    console.log("✓ statusLine already runs the collector — nothing to do.");
+    console.log(
+      "✓ statusLine already runs cockpit atlas statusline — nothing to do.",
+    );
     process.exit(0);
   }
-  console.log(`✓ Wired statusLine collector into ${SETTINGS}`);
+  console.log(`✓ Wired cockpit atlas statusline into ${SETTINGS}`);
   if (result.preserved) {
     console.log(`  Preserved your existing line: ${result.preserved}`);
     console.log(`  (re-runs it via TOKEN_ATLAS_STATUSLINE_COMMAND)`);

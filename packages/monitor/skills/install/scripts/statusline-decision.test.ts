@@ -1,25 +1,62 @@
 // Run: bun test packages/monitor/skills/install/scripts/statusline-decision.test.ts
 import { describe, expect, test } from "bun:test";
-import { decideStatusLine } from "./statusline-decision";
+import {
+  decideStatusLine,
+  migrateCollectorCommand,
+  SHIM_COLLECTOR_RE,
+} from "./statusline-decision";
 
-const COLLECTOR = "bun /plugin/scripts/statusline-collector.ts";
+const SHIM = "/plugin/skills/cockpit/bin/cockpit";
+const COLLECTOR = `${SHIM} atlas statusline`;
+const WRAP = "TOKEN_ATLAS_STATUSLINE_COMMAND='npx claude-powerline'";
+const OLD_TS =
+  "bun /old/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
 
 describe("decideStatusLine", () => {
-  test("skips only when already pointing at the exact live collector path", () => {
+  test("skips only when already pointing at the exact live shim", () => {
     const d = decideStatusLine({ command: COLLECTOR }, COLLECTOR);
     expect(d).toEqual({ action: "skip" });
   });
 
-  test("re-points a drifted/old collector path to the current one", () => {
-    // A different collector path (e.g. an older cache version that still
-    // exists) must be rewritten — not skipped, not wrapped.
+  test("skips the live shim behind a wrapped user command", () => {
+    const d = decideStatusLine({ command: `${WRAP} ${COLLECTOR}` }, COLLECTOR);
+    expect(d).toEqual({ action: "skip" });
+  });
+
+  test("re-points a new-form shim at another path, keeping the wrapped prefix", () => {
     const d = decideStatusLine(
-      { command: "bun /old/monitor/3.1.0/scripts/statusline-collector.ts" },
+      {
+        command: `${WRAP} /old/clone/skills/cockpit/bin/cockpit atlas statusline`,
+        padding: 1,
+      },
+      COLLECTOR,
+    );
+    expect(d).toEqual({
+      action: "write",
+      command: `${WRAP} ${COLLECTOR}`,
+      padding: 1,
+      preserved: null,
+    });
+  });
+
+  test("replaces an old-form TS collector at any path with the shim", () => {
+    const d = decideStatusLine(
+      { command: "bun /anywhere/statusline-collector.ts" },
       COLLECTOR,
     );
     expect(d).toEqual({
       action: "write",
       command: COLLECTOR,
+      padding: 0,
+      preserved: null,
+    });
+  });
+
+  test("keeps the wrapped prefix byte-for-byte when replacing the old form", () => {
+    const d = decideStatusLine({ command: `${WRAP} ${OLD_TS}` }, COLLECTOR);
+    expect(d).toEqual({
+      action: "write",
+      command: `${WRAP} ${COLLECTOR}`,
       padding: 0,
       preserved: null,
     });
@@ -52,5 +89,55 @@ describe("decideStatusLine", () => {
     const d = decideStatusLine({ command: "x", padding: "nope" }, COLLECTOR);
     expect(d.action).toBe("write");
     if (d.action === "write") expect(d.padding).toBe(0);
+  });
+});
+
+describe("migrateCollectorCommand", () => {
+  const CLONE = "/x/marketplaces/q-lab-marketplace/packages/monitor";
+  const CLONE_SHIM = `${CLONE}/skills/cockpit/bin/cockpit atlas statusline`;
+  const CLONE_TS = `bun ${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts`;
+
+  test("rewrites the bare old form to the shim", () => {
+    expect(migrateCollectorCommand(CLONE_TS, CLONE_SHIM)).toBe(
+      "/x/marketplaces/q-lab-marketplace/packages/monitor/skills/cockpit/bin/cockpit atlas statusline",
+    );
+  });
+
+  test("rewrites a wrapped old form, keeping the prefix byte-for-byte", () => {
+    expect(migrateCollectorCommand(`${WRAP} ${CLONE_TS}`, CLONE_SHIM)).toBe(
+      "TOKEN_ATLAS_STATUSLINE_COMMAND='npx claude-powerline' /x/marketplaces/q-lab-marketplace/packages/monitor/skills/cockpit/bin/cockpit atlas statusline",
+    );
+  });
+
+  test("leaves the new form alone, wherever its shim lives", () => {
+    expect(migrateCollectorCommand(CLONE_SHIM, CLONE_SHIM)).toBeNull();
+    expect(
+      migrateCollectorCommand(
+        "/elsewhere/skills/cockpit/bin/cockpit atlas statusline",
+        CLONE_SHIM,
+      ),
+    ).toBeNull();
+  });
+
+  test("leaves a foreign statusline-collector.ts alone", () => {
+    expect(
+      migrateCollectorCommand(
+        "bun /home/me/bin/statusline-collector.ts",
+        CLONE_SHIM,
+      ),
+    ).toBeNull();
+  });
+
+  test("leaves a non-collector command and an empty one alone", () => {
+    expect(migrateCollectorCommand("starship prompt", CLONE_SHIM)).toBeNull();
+    expect(migrateCollectorCommand("", CLONE_SHIM)).toBeNull();
+  });
+});
+
+describe("SHIM_COLLECTOR_RE", () => {
+  test("captures the shim path and ignores other cockpit subcommands", () => {
+    expect(COLLECTOR.match(SHIM_COLLECTOR_RE)?.[1]).toBe(SHIM);
+    expect(`${SHIM} atlas serve`.match(SHIM_COLLECTOR_RE)).toBeNull();
+    expect(`${SHIM} atlas statuslines`.match(SHIM_COLLECTOR_RE)).toBeNull();
   });
 });

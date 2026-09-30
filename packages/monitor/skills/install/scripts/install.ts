@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { SHIM_COLLECTOR_RE, TS_COLLECTOR_RE } from "./statusline-decision";
 
 export type Level = "required" | "optional";
 export type Check = { label: string; ok: boolean; level: Level; hint?: string };
@@ -15,13 +16,20 @@ const HOME = homedir();
 // usage-dashboard assets live one skill over; resolve cross-skill from here.
 const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
 
-const LIVE_COLLECTOR = join(DASH, "scripts", "statusline-collector.ts");
+const LIVE_SHIM = resolve(
+  import.meta.dir,
+  "..",
+  "..",
+  "cockpit",
+  "bin",
+  "cockpit",
+);
 
-// The same collector inside the marketplace clone Claude Code keeps at
+// The same shim inside the marketplace clone Claude Code keeps at
 // ~/.claude/plugins/marketplaces/. The clone updates in place, while the plugin
 // cache path carries the version and goes stale on every plugin update. Null when
 // the marketplace isn't registered or its monitor isn't a relative-path source.
-function marketplaceCollector(): string | null {
+function marketplaceShim(): string | null {
   try {
     const known = JSON.parse(
       readFileSync(
@@ -38,15 +46,8 @@ function marketplaceCollector(): string | null {
       (p: { name?: string }) => p?.name === "monitor",
     )?.source;
     if (typeof source !== "string") return null;
-    const collector = join(
-      root,
-      source,
-      "skills",
-      "usage-dashboard",
-      "scripts",
-      "statusline-collector.ts",
-    );
-    return existsSync(collector) ? collector : null;
+    const shim = join(root, source, "skills", "cockpit", "bin", "cockpit");
+    return existsSync(shim) ? shim : null;
   } catch {
     return null;
   }
@@ -55,8 +56,9 @@ function marketplaceCollector(): string | null {
 // Exported because "is the statusline wired?" is decided by comparing the
 // configured path against this one; setup.ts and setup-statusline.ts must not
 // build their own copy, or the check and the write disagree.
-export const COLLECTOR_SCRIPT = marketplaceCollector() ?? LIVE_COLLECTOR;
-export const COLLECTOR_COMMAND = `bun ${COLLECTOR_SCRIPT}`;
+export const COLLECTOR_SCRIPT = marketplaceShim() ?? LIVE_SHIM;
+// No `bun`: the shim is an executable POSIX sh script.
+export const COLLECTOR_COMMAND = `${COLLECTOR_SCRIPT} atlas statusline`;
 export const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 // The plugin manifest sits three levels up from skills/install/scripts/.
 const PLUGIN_JSON = resolve(
@@ -137,13 +139,19 @@ export function dashboardChecks(): Check[] {
     settingsReadable = false;
   }
   const referencedCollector =
-    statuslineCommand?.match(/(\S*statusline-collector\.ts)/)?.[1] ?? null;
+    statuslineCommand?.match(SHIM_COLLECTOR_RE)?.[1] ?? null;
+  const referencedTsCollector =
+    statuslineCommand?.match(TS_COLLECTOR_RE)?.[1] ?? null;
   const collectorWired =
     referencedCollector !== null && referencedCollector === COLLECTOR_SCRIPT;
 
   let usageHint: string | undefined;
   if (!settingsReadable) {
     usageHint = `Couldn't parse ${settingsPath} — fix it, then add a statusLine command running: ${COLLECTOR_COMMAND}`;
+  } else if (!referencedCollector && referencedTsCollector) {
+    usageHint =
+      `statusLine still runs the removed TS collector (${referencedTsCollector}).\n` +
+      `   The next session start after a plugin update rewrites it, or run the /monitor:install skill now to set it to: ${COLLECTOR_COMMAND}`;
   } else if (referencedCollector && !collectorWired) {
     usageHint =
       `statusLine runs a collector at another path (${referencedCollector}).\n` +
@@ -201,7 +209,7 @@ if (import.meta.main) {
       "All required checks passed (some optional data missing — dashboard will still launch).",
     );
   } else {
-    console.log("All checks passed. Run: bun run scripts/atlas-server.ts");
+    console.log(`All checks passed. Run: ${LIVE_SHIM} atlas serve`);
   }
   process.exit(0);
 }

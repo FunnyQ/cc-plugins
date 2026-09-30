@@ -4,8 +4,9 @@
 
 `<plugin-root>/skills/usage-dashboard` is
 `~/.config/opencode/skills/usage-dashboard`. `CLAUDE_PLUGIN_ROOT` is empty and
-there is no skill base-directory banner, so state the path literally:
-`bun ~/.config/opencode/skills/usage-dashboard/scripts/…`.
+there is no skill base-directory banner, so state the path literally. The
+dashboard runs from the sibling cockpit skill's shim, at
+`~/.config/opencode/skills/cockpit/bin/cockpit`.
 
 ## OpenCode usage data needs no integration
 
@@ -21,7 +22,7 @@ OpenCode's bash tool has no background-run parameter — none exists to pass.
 Detach at the shell instead:
 
 ```bash
-bun ~/.config/opencode/skills/usage-dashboard/scripts/atlas-server.ts … &
+~/.config/opencode/skills/cockpit/bin/cockpit atlas serve … &
 ```
 
 This is the same `… &` fallback the "Run" section of `SKILL.md` already gives

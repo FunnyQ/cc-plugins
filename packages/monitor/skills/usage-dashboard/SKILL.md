@@ -11,7 +11,7 @@ when_to_use: >-
 
 # AI Code Stats Dashboard
 
-A petite-vue + Chart.js single-page dashboard served from a local Bun HTTP server. It reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, `~/.codex/sessions/`, and OpenCode data under `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db`, with a legacy JSON fallback from `storage/` plus `project/*/storage/`. By default the dashboard is local-only. It performs no usage export unless `LLM_QUOTA_INGEST_URL` is explicitly configured. The dashboard consults OpenRouter opportunistically for live pricing; a failure there stays silent.
+A petite-vue + Chart.js single-page dashboard served by `cockpit atlas serve`, a subcommand of the monitor plugin's Rust `cockpit` binary. It reads `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, `~/.claude/projects/`, `~/.codex/state_5.sqlite`, `~/.codex/sessions/`, and OpenCode data under `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db`, with a legacy JSON fallback from `storage/` plus `project/*/storage/`. By default the dashboard is local-only. It performs no usage export unless `LLM_QUOTA_INGEST_URL` is explicitly configured. The dashboard consults OpenRouter opportunistically for live pricing; a failure there stays silent.
 
 ## Run
 
@@ -24,8 +24,12 @@ bun <plugin-root>/skills/install/scripts/install.ts
 If it exits 0, launch the server in the **background**.
 
 ```bash
-bun <plugin-root>/skills/usage-dashboard/scripts/atlas-server.ts
+<plugin-root>/skills/cockpit/bin/cockpit atlas serve
 ```
+
+`skills/cockpit/bin/cockpit` is the plugin's shim: it runs the `cockpit` binary
+for this plugin version, downloading it on first use. Call it directly, not
+through `bun`.
 
 The server holds the process open and never returns on its own. A foreground
 launch blocks until the tool times out, then reports a failure for a dashboard
@@ -69,12 +73,19 @@ Flags:
 Claude Code feeds the dashboard's usage-window panel (5hr / weekly) from
 `rate_limits`. It hands `rate_limits` only to the **status line** command. To
 capture it, point `statusLine.command` in `~/.claude/settings.json` at
-`statusline-collector.ts`. The collector reads the statusline JSON from
-stdin. It writes `~/.cache/token-atlas/rate-limits.json`. Then it forwards
-the unchanged payload to its inner statusline (default
+`<plugin-root>/skills/cockpit/bin/cockpit atlas statusline`. The collector
+reads the statusline JSON from stdin. It writes
+`~/.cache/token-atlas/rate-limits.json`. Then it forwards the unchanged
+payload to its inner statusline (default
 `bunx -y ccstatusline@latest`; override with the
 `TOKEN_ATLAS_STATUSLINE_COMMAND` env var to keep an existing line like
 claude-powerline rendering).
+
+A statusline wired by an older plugin version still runs the retired
+TypeScript collector through `bun`. monitor's SessionStart hook rewrites that
+command to `cockpit atlas statusline` once, on the first session after the
+plugin updates, and keeps any wrapped `TOKEN_ATLAS_STATUSLINE_COMMAND='…'`
+prefix. It never adds a statusline you did not have.
 
 ## Optional Remote Usage Export
 

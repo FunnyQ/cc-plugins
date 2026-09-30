@@ -6,7 +6,7 @@
 >
 > **Depends on**: server/02, cli/01
 > **Blocks**: ship/02
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -83,24 +83,24 @@ The exclusion is by omission (only cockpit channel/daemon command lines are sele
 
 ## Acceptance criteria
 
-- [ ] `decideStatusLine` returns `skip` for the live new form and rewrites old-form and drifted new-form commands with any `TOKEN_ATLAS_STATUSLINE_COMMAND='…'` prefix preserved byte-for-byte; the five table rows are unit tests.
-- [ ] `migrateCollectorCommand` rewrites the two pinned examples exactly, and returns `null` for the new form, a foreign `statusline-collector.ts` path, a non-collector command, and an empty string.
-- [ ] `setup.ts --session-check` with an old-form `settings.json` under a temp `HOME` rewrites `statusLine.command`, writes `settings.json.bak`, prints exactly one JSON line to stdout whose `systemMessage` names the statusline update, and a second run changes nothing.
-- [ ] Session-check leaves an unparseable `settings.json` byte-identical and never adds a `statusLine` block that was absent.
-- [ ] The drift watch reports `statusline-old-collector` for an old-form command, nothing for the live new form, and `statusline-missing` only when neither form is present.
-- [ ] `COLLECTOR_COMMAND` equals `<shim path> atlas statusline` with no `bun` prefix, and `install.ts` reports the statusline wired when `settings.json` holds exactly that command.
-- [ ] SKILL.md and `references/opencode.md` launch the dashboard with `cockpit atlas serve`; the TS script names survive only in the old-form detection code.
-- [ ] (human) Q only, under the statusline exception in `../_context/shared.md` (settings backed up to `~/.claude/settings.json.pre-atlas` first): after `bun packages/monitor/skills/install/scripts/setup.ts --session-check` against Q's real settings (with `CLAUDE_PLUGIN_DATA` set to the monitor data dir), a fresh Claude Code session renders the statusline through `cockpit atlas statusline` and `~/.cache/token-atlas/rate-limits.json` gets a new mtime.
+- [x] `decideStatusLine` returns `skip` for the live new form and rewrites old-form and drifted new-form commands with any `TOKEN_ATLAS_STATUSLINE_COMMAND='…'` prefix preserved byte-for-byte; the five table rows are unit tests.
+- [x] `migrateCollectorCommand` rewrites the two pinned examples exactly, and returns `null` for the new form, a foreign `statusline-collector.ts` path, a non-collector command, and an empty string.
+- [x] `setup.ts --session-check` with an old-form `settings.json` under a temp `HOME` rewrites `statusLine.command`, writes `settings.json.bak`, prints exactly one JSON line to stdout whose `systemMessage` names the statusline update, and a second run changes nothing.
+- [x] Session-check leaves an unparseable `settings.json` byte-identical and never adds a `statusLine` block that was absent.
+- [x] The drift watch reports `statusline-old-collector` for an old-form command, nothing for the live new form, and `statusline-missing` only when neither form is present.
+- [x] `COLLECTOR_COMMAND` equals `<shim path> atlas statusline` with no `bun` prefix, and `install.ts` reports the statusline wired when `settings.json` holds exactly that command.
+- [x] SKILL.md and `references/opencode.md` launch the dashboard with `cockpit atlas serve`; the TS script names survive only in the old-form detection code.
+- [x] (human) Q only, under the statusline exception in `../_context/shared.md` (settings backed up to `~/.claude/settings.json.pre-atlas` first): after `bun packages/monitor/skills/install/scripts/setup.ts --session-check` against Q's real settings (with `CLAUDE_PLUGIN_DATA` set to the monitor data dir), a fresh Claude Code session renders the statusline through `cockpit atlas statusline` and `~/.cache/token-atlas/rate-limits.json` gets a new mtime.
 
 ## Verification
 
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/` passes — every subcommand the wiring points at is now whole.
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/` passes — every subcommand the wiring points at is now whole.
 
-- [ ] `bun test packages/monitor/skills/install/scripts/` passes.
-- [ ] `bunx --bun tsc --noEmit | grep install/scripts` prints nothing.
-- [ ] `rg -ln 'atlas-server\.ts|statusline-collector\.ts' packages/monitor/skills/usage-dashboard/SKILL.md packages/monitor/skills/usage-dashboard/references packages/monitor/skills/install/scripts | grep -vE 'install/scripts/(statusline-decision|setup|reap-stale)(\.test)?\.ts$'` prints nothing (the allowed legacy references in `../_context/contracts.md` §7).
-- [ ] `git status --short -- packages/monitor/skills/usage-dashboard/SKILL.md packages/monitor/skills/install/scripts/setup.ts packages/monitor/skills/install/scripts/statusline-decision.ts` lists all three as modified.
-- [ ] (human) The live statusline check from the acceptance criteria.
+- [x] `bun test packages/monitor/skills/install/scripts/` passes.
+- [x] `bunx --bun tsc --noEmit | grep install/scripts` prints nothing.
+- [x] `rg -ln 'atlas-server\.ts|statusline-collector\.ts' packages/monitor/skills/usage-dashboard/SKILL.md packages/monitor/skills/usage-dashboard/references packages/monitor/skills/install/scripts | grep -vE 'install/scripts/(statusline-decision|setup|reap-stale)(\.test)?\.ts$'` prints nothing (the allowed legacy references in `../_context/contracts.md` §7).
+- [x] `git status --short -- packages/monitor/skills/usage-dashboard/SKILL.md packages/monitor/skills/install/scripts/setup.ts packages/monitor/skills/install/scripts/statusline-decision.ts` lists all three as modified.
+- [x] (human) The live statusline check from the acceptance criteria.
 
 ## Eval rubric
 

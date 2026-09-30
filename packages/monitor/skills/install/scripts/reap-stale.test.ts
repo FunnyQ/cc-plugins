@@ -75,6 +75,13 @@ describe("selectStaleMonitorPids", () => {
     expect(select(rows)).toEqual([]);
   });
 
+  test.each([
+    `sh ${CACHE}/3.18.5/skills/cockpit/bin/cockpit atlas serve --no-open`,
+    "/Users/x/.local/share/q-lab/cockpit-bin/3.18.5/cockpit atlas serve --no-open",
+  ])("never reaps the Rust usage dashboard: %s", (command) => {
+    expect(select([row({ pid: 90093, ppid: 1, command })])).toEqual([]);
+  });
+
   // The predicate that keeps this sweep from being destructive. A user can have an
   // older session still open when a newer one starts: its channel has a real parent
   // and is doing its job. A foreign version root is NOT evidence of orphanhood.
