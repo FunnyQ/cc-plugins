@@ -1,0 +1,15 @@
+{
+  "version": "0.9.0",
+  "models": {
+    "opencode": {
+      "delegate": "opencode-go/deepseek-v4-flash",
+      "review": "opencode-go/deepseek-v4-pro"
+    }
+  },
+  "suggestions": {
+    "opencode": {
+      "delegate": ["opencode-go/kimi-k3", "opencode-go/glm-5.3"],
+      "review": ["opencode-go/qwen3.8-max", "opencode-go/kimi-k3"]
+    }
+  }
+}

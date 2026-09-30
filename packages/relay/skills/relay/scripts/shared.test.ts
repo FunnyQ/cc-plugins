@@ -1,5 +1,8 @@
 import { describe, it, expect } from "bun:test";
+import { readFileSync } from "fs";
 import {
+  CLI_DEFAULT,
+  SUGGESTED_CONFIG_PATH,
   resolveModel,
   addTimestampSuffix,
   createTmpRunDir,
@@ -39,6 +42,15 @@ describe("resolveModel", () => {
     expect(
       resolveModel("opencode", "review", undefined, () => ({
         models: { opencode: { delegate: "model" } },
+      })),
+    ).toBeUndefined();
+  });
+
+  it("maps cli-default to undefined, from the flag or the config", () => {
+    expect(resolveModel("opencode", "delegate", CLI_DEFAULT, () => ({}))).toBeUndefined();
+    expect(
+      resolveModel("opencode", "review", undefined, () => ({
+        models: { opencode: { review: CLI_DEFAULT } },
       })),
     ).toBeUndefined();
   });
@@ -118,5 +130,19 @@ describe("timestampForPath", () => {
     const now = new Date(2025, 0, 5, 9, 5, 3, 7); // Jan 5, 2025 09:05:03.007
     const result = timestampForPath(now);
     expect(result).toBe("20250105-090503-007");
+  });
+});
+
+describe("the shipped suggested config", () => {
+  const suggested = JSON.parse(readFileSync(SUGGESTED_CONFIG_PATH, "utf-8"));
+
+  it("carries a version and provider/model ids for opencode delegate and review", () => {
+    expect(suggested.version).toMatch(/^\d+\.\d+\.\d+$/);
+    for (const mode of ["delegate", "review"]) {
+      expect(suggested.models.opencode[mode]).toMatch(/^[\w-]+\/.+/);
+      for (const id of suggested.suggestions.opencode[mode]) {
+        expect(id).toMatch(/^[\w-]+\/.+/);
+      }
+    }
   });
 });

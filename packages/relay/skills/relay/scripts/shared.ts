@@ -17,6 +17,17 @@ export const CONFIG_PATH = join(
   "config.json",
 );
 
+// Ships with relay; `config check` compares the user's version against it.
+export const SUGGESTED_CONFIG_PATH = join(
+  import.meta.dir,
+  "..",
+  "references",
+  "config.suggested.json",
+);
+
+// A stored choice to omit the model flag, so an unset entry can still mean "never asked".
+export const CLI_DEFAULT = "cli-default";
+
 export function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -96,15 +107,18 @@ export function resolveModel(
   flagModel: string | undefined,
   readConfig: () => unknown,
 ): string | undefined {
-  if (flagModel) return flagModel;
+  const model = flagModel || configuredModel(readConfig(), backend, mode);
+  return model === CLI_DEFAULT ? undefined : model;
+}
 
-  const config = readConfig();
-  if (isObject(config) && isObject(config.models)) {
-    const backendModels = config.models[backend];
-    if (isObject(backendModels) && typeof backendModels[mode] === "string") {
-      return backendModels[mode];
-    }
-  }
-
-  return undefined;
+function configuredModel(
+  config: unknown,
+  backend: string,
+  mode: Mode,
+): string | undefined {
+  if (!isObject(config) || !isObject(config.models)) return undefined;
+  const backendModels = config.models[backend];
+  return isObject(backendModels) && typeof backendModels[mode] === "string"
+    ? backendModels[mode]
+    : undefined;
 }

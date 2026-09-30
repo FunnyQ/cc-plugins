@@ -77,6 +77,32 @@ Editing capability is identical: same CLI, model, and write access. So "more pre
 
 ---
 
+## Config check (before delegate or review)
+
+Run this before step 1 of `delegate` and before `review`.
+In a non-interactive context (a sub-agent or headless caller), skip the questions below and run relay with the config as it is.
+
+1. Run `relay.ts config check`. It prints one JSON report and exits with a status code.
+2. On exit `4` (`malformed`), report `path` and `error` to the user. Stop. Do not offer an update or ask for a model.
+3. On exit `3` (`missing`, `no-version`, or `outdated`), show the user `suggested.models` beside their `models` and `version`.
+   - Ask with the harness's question tool. Offer: Merge (keep the chosen models, fill only the missing ones), Overwrite (replace with the suggested models), Skip this time.
+   - For `missing`, merge and overwrite write the same file, so offer only Apply and Skip this time.
+   - Apply the answer with `relay.ts config apply --merge` or `relay.ts config apply --overwrite`.
+   - Leave the file untouched on Skip this time. The question returns on the next run.
+4. On exit `0` (`current`), continue.
+
+### Model pick (opencode only)
+
+Run this after the config check when all of these hold: the backend is `opencode`, the mode is `delegate` or `review`, the user passed no `--model`, and `models.opencode.<mode>` is absent. Re-run `config check` after an apply to read the updated `models`.
+
+1. Run `opencode models`. Keep the ids from `suggested.models.opencode.<mode>` and `suggested.suggestions.opencode.<mode>` that appear in its output.
+2. Ask with the harness's question tool. Offer up to 3 surviving ids, plus opencode defaults.
+3. Save a picked id with `relay.ts config set-model opencode <mode> "<id>"`.
+4. Save opencode defaults with `relay.ts config set-model opencode <mode> cli-default`. Relay then omits `-m`, and the question does not return.
+5. Run relay without `--model`. It reads the saved choice.
+
+---
+
 ## `/relay:relay <backend> delegate <task>`
 
 For non-review tasks: implementing features, refactoring, suggesting an approach, debugging.
@@ -193,7 +219,7 @@ When the user passes an explicit `--model` flag:
 
 Config file location: `~/.config/q-lab/cc-plugins/relay/config.json`.
 
-Model precedence is `--model` flag, then this config, then the backend CLI's own default. Relay pins no opencode model. A malformed config file fails the run with `Could not read relay config`. Report that file to Q. Do not ask for a model.
+Model precedence is `--model` flag, then this config, then the backend CLI's own default. The value `cli-default` in either place omits the model flag. `relay.ts` pins no model; the suggested models reach the config only through `config apply`. A malformed config file fails the run with `Could not read relay config`. Report that file to the user. Do not ask for a model.
 
 ---
 
