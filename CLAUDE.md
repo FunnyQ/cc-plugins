@@ -40,18 +40,14 @@ cc-plugins/
 │   │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks + cockpit channel
 │   │   ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hooks
 │   │   ├── cockpit-rs/                  # Rust crate: server, channel, CLI, hook subcommands
+│   │   │   └── src/atlas/               # usage-dashboard engine + server: `cockpit atlas <sub>`
+│   │   │       # stats.rs / rollup_db.rs / rollup_update.rs / codex.rs / live.rs / server.rs / statusline.rs
 │   │   ├── commands/                     # thoughtful.md, nudge.md
 │   │   └── skills/
 │   │       ├── usage-dashboard/
 │   │       │   ├── PRODUCT.md            # design direction — Sunrise Atlas
-│   │       │   ├── scripts/
-│   │       │   │   ├── api.ts            # data engine → buildStats()
-│   │       │   │   ├── rollup-db.ts      # bun:sqlite schema + accessors
-│   │       │   │   ├── rollup-update.ts  # incremental transcript ingest
-│   │       │   │   ├── codex-cache.ts    # per-rollout summary cache (own DB)
-│   │       │   │   ├── live.ts           # active sessions, both providers
-│   │       │   │   ├── atlas-server.ts   # Bun HTTP server, port 5938
-│   │       │   │   └── statusline-collector.ts
+│   │       │   ├── contract/         # Bun black-box suite for `cockpit atlas`
+│   │       │   │   └── golden/           # recorded TS outputs — the permanent parity reference
 │   │       │   ├── dashboard/dist/       # committed SPA, no build step
 │   │       │   └── references/pricing-defaults.json
 │   │       ├── cockpit/
@@ -61,19 +57,13 @@ cc-plugins/
 │   │       │   ├── bin/cockpit          # POSIX sh shim: fetch + verify + exec
 │   │       │   ├── contract/            # permanent Bun black-box suite
 │   │       │   ├── scripts/             # kept TS + their tests
-│   │       │   │   ├── cockpit-home.ts  # shared usage-dashboard paths
-│   │       │   │   ├── http.ts          # shared usage-dashboard responses
 │   │       │   │   └── diagram-lint.ts  # Mermaid gate spawned by Rust
 │   │       │   └── dashboard/dist/
-│   │       ├── install/scripts/
-│   │       │   ├── setup.ts              # plugin-wide check + wire (--check/--dry-run/--apply/--session-check)
-│   │       │   ├── install.ts            # dashboard precheck
-│   │       │   ├── setup-statusline.ts
-│   │       │   └── statusline-decision.ts    # pure decision, unit-tested
-│   │       └── shared/scripts/           # imported by BOTH dashboards — extend, never duplicate
-│   │           ├── opencode.ts           # OpenCode DB reader
-│   │           ├── path-inside.ts
-│   │           └── static-server.ts
+│   │       └── install/scripts/
+│   │           ├── setup.ts              # plugin-wide check + wire (--check/--dry-run/--apply/--session-check)
+│   │           ├── install.ts            # dashboard precheck
+│   │           ├── setup-statusline.ts
+│   │           └── statusline-decision.ts    # pure decision, unit-tested
 │   ├── dispatch/
 │   │   ├── hooks/flightplan-lint.sh      # PostToolUse, path + content gated
 │   │   └── skills/{preflight,hop,flightplan,autopilot,waypoints,deckplan}/
@@ -129,22 +119,22 @@ Every `packages/<plugin>/` holds both a `.claude-plugin/plugin.json` and a `.cod
 
 ### Data flow
 
-1. `api.ts` reads three providers: `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, and `~/.claude/projects/**/*.jsonl`; `~/.codex/state_5.sqlite` and `~/.codex/sessions/`; and `~/.local/share/opencode/opencode.db` through `skills/shared/scripts/opencode.ts`.
+1. The engine lives in `packages/monitor/cockpit-rs/src/atlas/`. `stats.rs` builds the payload from three providers: `~/.claude/stats-cache.json`, `~/.claude/history.jsonl`, and `~/.claude/projects/**/*.jsonl`; `~/.codex/state_5.sqlite` and `~/.codex/sessions/`; and `~/.local/share/opencode/opencode.db` through `opencode.rs`; `codex.rs` owns the Codex side and `live.rs` the active sessions.
 2. Pricing resolves in order: bundled defaults → OpenRouter live fetch (3s timeout, silent fail) → user override at `~/.config/cc-dashboard/pricing.json`.
-3. `atlas-server.ts` serves `dashboard/dist/` and exposes `GET /api/stats` and `GET /api/live`. It binds `127.0.0.1`.
+3. `server.rs` (`cockpit atlas serve`) serves `dashboard/dist/` and exposes `GET /api/stats`, `GET /api/live`, and `POST /api/pricing/refresh`. It binds `127.0.0.1`.
 4. The frontend fetches `/api/stats` on load and renders with petite-vue and Chart.js.
 
 ### Usage rollup DB
 
 Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The rollup DB makes token history outlive that deletion.
 
-**Never read transcript contents on the request path.** `parseTranscriptUsage()` walks `PROJECTS_DIR` for paths only (~110ms of readdir), hands them to `updateRollup()`, and reads everything else back out of the DB. Reading the transcripts there instead cost 13.4s per request on a 2.2GB corpus.
+**Never read transcript contents on the request path.** `read_rollup()` (`claude.rs`) walks `PROJECTS_DIR` for paths only (~110ms of readdir), hands them to `update_rollup()`, and reads everything else back out of the DB. Reading the transcripts there instead cost 13.4s per request on a 2.2GB corpus.
 
-- `rollup-update.ts` tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`. The same pass fills the session ledger — one parse, both outputs.
-- The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively. The ledger follows the same rule: `date`, `projectName`, `model` and `tokens` are all derived in `readRollupLedger()`, never stored.
+- `rollup_update.rs` (`cockpit atlas rollup-update`) tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`. The same pass fills the session ledger — one parse, both outputs.
+- The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively. The ledger follows the same rule: `date`, `projectName`, `model` and `tokens` are all derived in `read_rollup_ledger()`, never stored.
 - `hour_ms` is the local hour start. It matches `hourStartMs`, so daily and heatmap reconstruction is byte-identical.
-- Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudge()` of `rollup-update.ts` from `statusline-collector.ts` (secondary). There is no daemon.
-- A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, v2 → v3 rewinds every cursor to backfill the ledger, and unsupported versions are refused — including a *newer* one, so an older monitor build refuses a v3 file rather than corrupting it. `openRollupDb()` writes `<db>.v<old>.bak` via `VACUUM INTO` before any version-changing migration (a plain copy of a WAL database can read back short). The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
+- Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudge()` of `cockpit atlas rollup-update` from `statusline.rs` (`cockpit atlas statusline`, secondary). There is no daemon.
+- A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, v2 → v3 rewinds every cursor to backfill the ledger, and unsupported versions are refused — including a *newer* one, so an older monitor build refuses a v3 file rather than corrupting it. `open_rollup_db()` (`rollup_db.rs`) writes `<db>.v<old>.bak` via `VACUUM INTO` before any version-changing migration (a plain copy of a WAL database can read back short). The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
 - The DB lives at `~/.local/share/q-lab/token-atlas/rollup.db`, outside dotfile sync.
 
 **`usage_hourly` and `session_ledger` have opposite deletion and replay rules.** Get this backwards and the failure is silent arithmetic.
@@ -154,11 +144,11 @@ Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The roll
 | Transcript deleted | tokens stay — the whole point | rows pruned with the file |
 | Replay from byte 0 | untouched; `seen_requests` blocks re-billing | file's rows deleted, then rewritten |
 
-`interactions` and `tool_calls` have no `seen_requests`-style gate, so accumulating them onto surviving rows would double them on every rebuild — hence the per-file clear, and hence `parseSlice`'s `replay` flag. A replay must then ignore `seen_requests` to re-derive what it just deleted, so it dedups tokens against a run-scoped `ledgerSeen` set instead; that works only because every replay path rewinds *all* files.
+`interactions` and `tool_calls` have no `seen_requests`-style gate, so accumulating them onto surviving rows would double them on every rebuild — hence the per-file clear, and hence `parse_slice`'s `replay` flag. A replay must then ignore `seen_requests` to re-derive what it just deleted, so it dedups tokens against a run-scoped `ledgerSeen` set instead; that works only because every replay path rewinds *all* files.
 
 Ledger rows are keyed `(path, session_key)` and summed per session on read. A session spans several files — a subagent transcript carries its parent's `sessionId` (1,442 of 2,571 measured) — while a file holds exactly one session key. Per-file rows are what let the ledger prune with the file.
 
-**Tool-call dedup is scoped per session, spanning files.** Both other scopes are wrong and were caught only by diffing against a pre-change payload: per file over-counts (1,202 keys appear in more than one file of one session), and global under-counts, because a resumed or forked session legitimately replays another session's message ids. `seen_tool_calls` is cleared wholesale by `rewindRollup` — the opposite of `seen_requests`, which must never be cleared — and carries no `path` column, since pruning by `session_key NOT IN (SELECT session_key FROM session_ledger)` saves 44MB of column and index.
+**Tool-call dedup is scoped per session, spanning files.** Both other scopes are wrong and were caught only by diffing against a pre-change payload: per file over-counts (1,202 keys appear in more than one file of one session), and global under-counts, because a resumed or forked session legitimately replays another session's message ids. `seen_tool_calls` is cleared wholesale by `rewind` — the opposite of `seen_requests`, which must never be cleared — and carries no `path` column, since pruning by `session_key NOT IN (SELECT session_key FROM session_ledger)` saves 44MB of column and index.
 
 **Codex rollouts have their own cache, `codex-sessions.db`, deliberately not in `rollup.db`.** The rollup is authoritative data that outlives its source; this is a pure cache, safe to delete. Rollouts are append-only but folded whole (last `token_count` wins), so there is no tail-parse equivalent — it keys the whole summary on path + size + mtime.
 
@@ -171,13 +161,13 @@ Clicking a row calls `openInCockpit(session)`. The port comes from `/api/live`'s
 ### Key design decisions
 
 - **No build step.** `dashboard/dist/` is committed as-is, vendor libs included.
-- **Bun-only runtime.** Uses `bun:sqlite`, `Bun.serve`, `Bun.file`.
+- **The dashboard server is Rust** (`cockpit atlas serve`). Bun is still required for the contract suite, `install/`, and `diagram-lint.ts`.
 - **Namespaced model keys** — `provider:model`, e.g. `claude:claude-opus-4-7`.
-- **Billing dedup** by `requestId:messageId`. The shared key lives in `dedup.ts`; the rollup ingest reuses it.
+- **Billing dedup** by `requestId:messageId`. The shared key lives in `dedup.rs`; the rollup ingest reuses it.
 - **Theme** — light and dark through `[data-theme]` on `<html>`. Tokens are defined twice in `styles/base.css` (`:root` and `[data-theme="dark"]`). The toggle cross-fades with the View Transitions API.
 - **`index.html` links all 12 sheets directly.** A chained `@import` is discovered only after its parent downloads, so an aggregator loaded them serially. Add a new sheet as a `<link>`, in cascade order.
-- **Compression is opt-in per caller.** `gzipJsonResponse` (`cockpit/scripts/http.ts`) serves `/api/stats` only; every other endpoint keeps `jsonResponse`. `serveStaticFile` gzips its `COMPRESSIBLE` set and takes the `Request` as an optional third argument, so the two-argument form stays plain.
-- **ETags are mtime + size, never a content hash** — hashing re-reads the file the 304 exists to skip. `serveStaticFile` puts the encoding in the key, since the gzip and plain bodies differ. `/api/stats` reuses its cache fingerprint prefixed by a **per-process `BOOT_ID`**: pricing partly comes from a live OpenRouter fetch, which moves no file, so without it a browser would 304 past a restart that repriced. Both need `Cache-Control: no-cache` — `no-store` leaves the client nothing to revalidate with. Cold load 8.6MB → 0.98MB, warm reload → 12.8KB.
+- **Compression is opt-in per caller.** `server.rs` gzips the `/api/stats` JSON only; every other endpoint answers plain. The static-file path gzips its compressible types.
+- **ETags are mtime + size, never a content hash** — hashing re-reads the file the 304 exists to skip. The static-file ETag puts the encoding in the key, since the gzip and plain bodies differ. `/api/stats` reuses its cache fingerprint prefixed by a **per-process `BOOT_ID`**: pricing partly comes from a live OpenRouter fetch, which moves no file, so without it a browser would 304 past a restart that repriced. Both need `Cache-Control: no-cache` — `no-store` leaves the client nothing to revalidate with. Cold load 8.6MB → 0.98MB, warm reload → 12.8KB.
 - **A `.jpg` in `assets/` must hold real JPEG data.** MIME comes from the extension alone; browsers sniff, which is how two 1.28MB PNGs sat behind `.jpg` names unnoticed. Renaming an asset moves the `url()` reference and the MIME table with it.
 - **Sunrise Bloom** — `.panel` / `.card` / `.budget-panel` / `.data-health-panel` / `.live-panel` carry a radial-gradient bloom. `installBloomTracker()` lerps `--bloom-x/--bloom-y` toward the cursor each frame. Register a new panel class in **both** the CSS selector list and the JS `SELECTOR` constant.
 - **Hero wave** — `.hero-band` masks with a 200%-wide SVG holding two identical wave cycles. `hero-wave-drift` slides `mask-position-x` one wavelength for a seamless loop.
@@ -258,15 +248,15 @@ A `pending` live result keeps its marker: the pane is still running and still be
 
 ```bash
 # Dashboard (port 5938, auto-opens browser)
-bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts   # [--port N] [--no-open]
+packages/monitor/skills/cockpit/bin/cockpit atlas serve   # [--port N] [--no-open]
 
 # Data as JSON (CLI mode)
-bun packages/monitor/skills/usage-dashboard/scripts/api.ts
-bun packages/monitor/skills/usage-dashboard/scripts/live.ts
+packages/monitor/skills/cockpit/bin/cockpit atlas stats
+packages/monitor/skills/cockpit/bin/cockpit atlas live
 
 # Rollup DB (--rebuild rescans while preserving history and dedup keys, and
 # rewrites the session ledger, which a replay always re-derives from scratch)
-bun packages/monitor/skills/usage-dashboard/scripts/rollup-update.ts  # [--rebuild]
+packages/monitor/skills/cockpit/bin/cockpit atlas rollup-update   # [--rebuild]
 
 # monitor:install engine — checks both skills, wires the statusline
 bun packages/monitor/skills/install/scripts/setup.ts                  # --check | --dry-run | --apply
@@ -298,7 +288,9 @@ bun test packages/monitor/skills/cockpit/contract/
 COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/
 bun test packages/monitor/skills/cockpit/scripts/
 bun test packages/monitor/skills/install/scripts/
-bun test packages/monitor/skills/usage-dashboard/scripts/rollup-update.test.ts
+bun test packages/monitor/skills/usage-dashboard/contract/   # atlas suite + golden; defaults to target/release/cockpit
+COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/
+bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts
 bun test opencode/
 
 # Whole-repo test run — --parallel runs test files across worker processes (Bun 1.4)

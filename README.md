@@ -157,15 +157,16 @@ A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and v
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) runtime
-- At least one Claude Code session
+- At least one Claude Code session (the `cockpit` shim fetches its release binary on first run)
 - For Claude usage totals, run `/stats` once to seed `stats-cache.json`
 
 ### Quick Start
 
 ```bash
-bun packages/monitor/skills/usage-dashboard/scripts/atlas-server.ts
+packages/monitor/skills/cockpit/bin/cockpit atlas serve   # [--port N] [--no-open]
 ```
+
+As JSON instead: `cockpit atlas stats` (dashboard data), `cockpit atlas live` (active sessions), `cockpit atlas rollup-update [--rebuild]` (rollup DB).
 
 Opens `http://localhost:5938` in your default browser.
 

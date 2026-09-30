@@ -6,7 +6,7 @@
 >
 > **Depends on**: ship/01, engine/09
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -148,26 +148,26 @@ A difference is a blocking finding. Report it; do not delete the TS over it.
 
 ## Acceptance criteria
 
-- [ ] Before any deletion, the atlas contract suite was green against both TS and Rust, and `docs/atlas-rust/measurements.md` records that run.
-- [ ] Every file under `packages/monitor/skills/usage-dashboard/scripts/` is deleted. Every shared or cockpit TS helper with no remaining importer is deleted. Every helper that was kept is listed under `## Kept TS` in `docs/atlas-rust/measurements.md`, with the file that imports it.
-- [ ] With `COCKPIT_BIN` unset, the contract launcher runs the locally built binary. It throws the exact missing-binary message when that binary is absent. No test in `contract/` is skipped on `isRust()`.
-- [ ] `contract/record-golden.ts` is deleted. Every pre-existing `contract/golden/` file is unchanged; `contract/golden/live.json` is the only new one.
-- [ ] `rg -ln 'atlas-server\.ts|scripts/api\.ts|statusline-collector\.ts|rollup-update\.ts' packages/ opencode/ CLAUDE.md README.md | grep -vE 'install/scripts/(statusline-decision|setup|reap-stale)(\.test)?\.ts$'` prints nothing (the allowed legacy references in `../_context/contracts.md` §7).
-- [ ] `docs/atlas-rust/measurements.md` records all three metrics with target and PASS/MISS, the TS baselines, and the real-home golden result.
-- [ ] `CLAUDE.md` documents `cockpit atlas serve|stats|live|rollup-update`, `POST /api/pricing/refresh`, and the `cockpit-rs/src/atlas/` location.
-- [ ] (human) Q reads `docs/atlas-rust/measurements.md` and accepts any MISS it records, or asks for a follow-up.
+- [x] Before any deletion, the atlas contract suite was green against both TS and Rust, and `docs/atlas-rust/measurements.md` records that run.
+- [x] Every file under `packages/monitor/skills/usage-dashboard/scripts/` is deleted. Every shared or cockpit TS helper with no remaining importer is deleted. Every helper that was kept is listed under `## Kept TS` in `docs/atlas-rust/measurements.md`, with the file that imports it.
+- [x] With `COCKPIT_BIN` unset, the contract launcher runs the locally built binary. It throws the exact missing-binary message when that binary is absent. No test in `contract/` is skipped on `isRust()`.
+- [x] `contract/record-golden.ts` is deleted. Every pre-existing `contract/golden/` file is unchanged; `contract/golden/live.json` is the only new one.
+- [x] `rg -ln 'atlas-server\.ts|scripts/api\.ts|statusline-collector\.ts|rollup-update\.ts' packages/ opencode/ CLAUDE.md README.md | grep -vE 'install/scripts/(statusline-decision|setup|reap-stale)(\.test)?\.ts$'` prints nothing (the allowed legacy references in `../_context/contracts.md` §7).
+- [x] `docs/atlas-rust/measurements.md` records all three metrics with target and PASS/MISS, the TS baselines, and the real-home golden result.
+- [x] `CLAUDE.md` documents `cockpit atlas serve|stats|live|rollup-update`, `POST /api/pricing/refresh`, and the `cockpit-rs/src/atlas/` location.
+- [x] (human) Q reads `docs/atlas-rust/measurements.md` and accepts any MISS it records, or asks for a follow-up.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/` passes with `COCKPIT_BIN` unset. After deletion this runs the Rust binary, with 0 skipped.
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/` passes.
-- [ ] `bun test packages/monitor/skills/install/scripts/` passes.
-- [ ] `bun test --parallel packages/monitor/` passes.
-- [ ] `rg -ln 'atlas-server\.ts|scripts/api\.ts|statusline-collector\.ts|rollup-update\.ts' packages/ opencode/ CLAUDE.md README.md | grep -vE 'install/scripts/(statusline-decision|setup|reap-stale)(\.test)?\.ts$'` prints nothing (the allowed legacy references in `../_context/contracts.md` §7).
-- [ ] `rg -ln "statusline-collector\.ts" --glob '!*.test.ts' packages/ opencode/ CLAUDE.md README.md` lists at most `packages/monitor/skills/install/scripts/statusline-decision.ts` and `packages/monitor/skills/install/scripts/setup.ts`.
-- [ ] `bunx --bun tsc --noEmit | grep -E "usage-dashboard|shared/scripts|install/scripts|cockpit/scripts"` prints nothing.
-- [ ] `test ! -e packages/monitor/skills/usage-dashboard/scripts/api.ts && test -f docs/atlas-rust/measurements.md && grep -cE "PASS|MISS" docs/atlas-rust/measurements.md` prints at least `3`.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/` passes with `COCKPIT_BIN` unset. After deletion this runs the Rust binary, with 0 skipped.
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/` passes.
+- [x] `bun test packages/monitor/skills/install/scripts/` passes.
+- [x] `bun test --parallel packages/monitor/` passes.
+- [x] `rg -ln 'atlas-server\.ts|scripts/api\.ts|statusline-collector\.ts|rollup-update\.ts' packages/ opencode/ CLAUDE.md README.md | grep -vE 'install/scripts/(statusline-decision|setup|reap-stale)(\.test)?\.ts$'` prints nothing (the allowed legacy references in `../_context/contracts.md` §7).
+- [x] `rg -ln "statusline-collector\.ts" --glob '!*.test.ts' packages/ opencode/ CLAUDE.md README.md` lists at most `packages/monitor/skills/install/scripts/statusline-decision.ts` and `packages/monitor/skills/install/scripts/setup.ts`.
+- [x] `bunx --bun tsc --noEmit | grep -E "usage-dashboard|shared/scripts|install/scripts|cockpit/scripts"` prints nothing.
+- [x] `test ! -e packages/monitor/skills/usage-dashboard/scripts/api.ts && test -f docs/atlas-rust/measurements.md && grep -cE "PASS|MISS" docs/atlas-rust/measurements.md` prints at least `3`.
 
 ## Eval rubric
 

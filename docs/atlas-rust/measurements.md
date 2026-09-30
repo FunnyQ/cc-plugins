@@ -1,10 +1,10 @@
-# atlas-rust measurements (ship/02, step 1)
+# atlas-rust measurements (ship/02)
 
 Measured 2026-10-01 on macOS arm64, release build of `cockpit-rs`, Bun 1.4.0.
 
 ## Status
 
-**The TS has not been deleted.** The real-home golden check found differences (below), and the task makes any difference a blocking finding. Steps 2–5 (deletion, Rust-only launcher, docs) wait for Q's call.
+Steps 1–5 ran. The TS was deleted only after both suites were green and the real-home golden check came back equal under the tolerance Q accepted on 2026-10-01 (`|a - b| <= 1e-9 * max(|a|, |b|)`). The RSS MISS below is recorded as a MISS; Q accepted it at 77.8 MB on 2026-10-01.
 
 ## Contract suite before deletion
 
@@ -29,11 +29,32 @@ Measured 2026-10-01 on macOS arm64, release build of `cockpit-rs`, Bun 1.4.0.
 
 ## Real-home golden check
 
-Result: **not equal** — 1,253 differing paths after path normalization and stripping `volatile-keys.json` + `pricingMeta.openRouter.error` + `codexUsageLimits`.
+Result: **equal** under the accepted tolerance (re-run 2026-10-01, after `baa9bcf` made Rust pass unknown session-file keys through).
 
-1. **1,199 float last-digit differences** in cost fields (`byModel.*.costUSD`, `daily.*.costUSD`, `daily.*.usageByModel.*.costUSD`, …), e.g. `byModel.4.costUSD` TS `626.3233549` vs Rust `626.3233549000001`. All within 1e-9 relative, but not bit-equal, so some cost sum runs in a different operation order than the TS (shared.md requires the same order). The fixture golden suite does not catch it.
-2. **54 missing fields in `sessions.*`**: TS `readSessionFiles()` (`session-files.ts`) passes each `~/.claude/sessions/*.json` object through whole; Rust `atlas/session_files.rs` deserializes into a fixed struct and drops unknown keys. Real session files carry `procStart`, `peerProtocol`, `peerFeatures`, `pidDomain`, `messagingSocketPath`, `name`, `nameSource`, `nameSince`, `statusUpdatedAt`, which the Rust payload omits.
+- Same frozen snapshot, two fresh roots, one `TOKEN_ATLAS_NOW_MS`, network cut; TS `bun …/scripts/api.ts` vs Rust `cockpit atlas stats`.
+- Both outputs path-normalized with `normalizeFixturePaths`, then stripped of `volatile-keys.json` + `pricingMeta.openRouter.error` + `codexUsageLimits`.
+- 0 differing paths. 1,199 numbers (cost sums: `byModel.*.costUSD`, `daily.*.costUSD`, `daily.*.usageByModel.*.costUSD`, …) differ in the last float digit only, e.g. `626.3233549` vs `626.3233549000001`; all are within the 1e-9 relative tolerance. They are not bit-equal, so some Rust cost sum still runs in a different operation order than the TS; the fixture golden suite does not catch that.
+- The earlier run's 54 missing `sessions.*` fields are gone.
+
+## Contract suite after deletion
+
+`contract/golden/live.json` was recorded from the TS `live.ts` on the `extendLiveFixture` home before deletion; `live.contract.test.ts` now compares Rust `atlas live` against it. Removed with the TS, since they can only run against it: the four `TS seams` tests in `fixtures.test.ts` (they imported `api.ts` for `nowMs` and the URL constants) and `mixed fleet: Rust reuses a running TS server` in `lifecycle.contract.test.ts`.
+
+| Run | Result |
+|---|---|
+| `bun test packages/monitor/skills/usage-dashboard/contract/` (`COCKPIT_BIN` unset → local release binary) | 106 pass, 0 skip, 0 fail |
+| `bun test --parallel packages/monitor/` | 370 pass, 0 fail |
 
 ## Kept TS
 
-Not determined yet: no deletion ran.
+None. Every candidate's only importers were in the deletion set or its own test:
+
+| Module | Importers found | Outcome |
+|---|---|---|
+| `shared/scripts/jsonl-lines.ts` | its own test | deleted with test |
+| `shared/scripts/static-server.ts` | its own test | deleted with test |
+| `shared/scripts/path-inside.ts` | `static-server.ts` (deleted) | deleted |
+| `shared/scripts/process-alive.ts` | none | deleted |
+| `shared/scripts/opencode.ts` | none (relay's hits are its own `backends/opencode.ts`) | deleted |
+| `cockpit/scripts/http.ts` | its own test | deleted with test |
+| `cockpit/scripts/cockpit-home.ts` | its own test (`cockpit/bin/cockpit.test.ts` does not import it) | deleted with test |
