@@ -12,8 +12,6 @@ argument-hint: "[scribe|restart]"
 
 # /cockpit
 
-Thin router for the cockpit skill. Do not inline mode procedures here.
-
 ## Step 0 — Provider
 
 Determine which harness is running this skill:
@@ -30,8 +28,6 @@ Then **read the matching reference once**. It defines the provider value,
 - Codex → [references/codex.md](references/codex.md)
 - OpenCode → `~/.config/opencode/skills/cockpit/references/opencode.md`
   (absolute, because OpenCode prints no skill base-directory banner)
-
-Use the provider reference exactly as the selected mode reference requires.
 
 ## Mode dispatch
 

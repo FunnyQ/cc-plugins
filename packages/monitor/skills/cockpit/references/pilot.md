@@ -29,9 +29,6 @@ If the user explicitly asks to change it, run:
 bun <plugin-root>/skills/cockpit/scripts/cockpit.ts config --log-language "<lang>"
 ```
 
-Write `--decision` / `--reason` / `--tradeoff` entries in the configured
-language. Do not use per-project metadata for language.
-
 ## Step 3 — Open the cockpit
 
 The trail is only useful if the user can see it, so open the dashboard. When
@@ -208,8 +205,7 @@ context intact.
   ```
 
   Run `wait` according to the **wait policy in your provider reference**.
-  Claude Code parks it as a background task. Codex blocks in the
-  foreground. `wait` requires the dashboard daemon (Step 3) to be running.
+  `wait` requires the dashboard daemon (Step 3) to be running.
   `cockpit send <id> <answer>` is the terminal twin of a UI option button.
   Both are part of this plugin's control-loop bridge between a parked
   session and the user's answer.
@@ -303,6 +299,4 @@ dashboard.
   Never type a `${...}` placeholder (e.g. `${CLAUDE_PLUGIN_ROOT}`) into a
   Bash command. It is empty in the shell, and it collapses the path to a
   broken `/skills/...`.
-- The cockpit CLI path resolves from the skill base-dir banner in the
-  instructions.
 - One session = one log file. Concurrent sessions never share a file.

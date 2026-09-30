@@ -1,30 +1,27 @@
 # /cockpit-scribe
 
 Distill the just-completed work into a small set of typed cockpit log
-entries. This skill runs inside a **background fork** spawned by
-`/thoughtful`. It inherits the conversation context (the "why") and
-augments it with the code diff (the "what"). It is **not** meant to be
-invoked directly by the user.
+entries. You usually run as a background scribe spawned from the main
+session, so you inherit its conversation (the "why") and add the code diff
+(the "what"). A user can also run `/cockpit scribe` directly.
 
 ---
 
-## Step 1 — Resolve the cockpit CLI path
+## Step 1 — Setup
 
-`CLAUDE_PLUGIN_ROOT` is NOT reliable inside an agent Bash call. Resolve the
-CLI from the load-time "Base directory for this skill" banner that Claude
-Code prints when the skill loads.
+If your prompt names the CLI, use it. Otherwise build it from the
+`<plugin-root>` your provider reference resolved, and set the provider flag
+off Claude Code:
 
 ```bash
-# Substitute the real banner path in place of <BANNER_PATH>
-SKILL_DIR="<BANNER_PATH>"        # the cockpit skill base dir
-CLI="$SKILL_DIR/scripts/cockpit.ts"   # same skill — no ../ hop
+CLI="<plugin-root>/skills/cockpit/scripts/cockpit.ts"   # absolute, substituted literally
+PROVIDER_FLAG=""   # "--provider codex" under Codex, "--provider opencode" under OpenCode
 ```
 
-The fork **must** substitute the real banner path. It cannot fall back to
-an env var. Do not test for the file first — a wrong path makes bun print
-`error: Module not found "<path>"` and exit 1 before anything runs, and that
-printed path is how you see an unsubstituted `<BANNER_PATH>`. Surface it and
-stop. Do not guess another path.
+Do not test for the file first. A wrong path makes bun print
+`error: Module not found "<path>"` and exit 1; surface that and stop rather
+than guess another path. Use `$PROVIDER_FLAG` on every call below — without
+it, scribe resolves against Claude sessions and can write to the wrong one.
 
 ### Session — honor the parent handoff
 
@@ -42,32 +39,7 @@ write to the child session. **Direct/manual** `/cockpit scribe`
 invocations have no parent handoff. They preserve the existing behavior:
 omit `--session` and let the CLI auto-resolve the live session.
 
-### Provider — set it explicitly when running under Codex
-
-`cockpit scribe` auto-resolves the session against **Claude** transcripts
-by default. If this fork is running under **Codex** (not Claude Code),
-every `cockpit scribe` call below **must** pass `--provider codex`. This
-applies to both `--prep` and the write calls. Without it, scribe resolves
-against the wrong vendor's sessions — it may write to a stale Claude
-session, or fail to find one:
-
-```bash
-# Under Codex, set this and append it to every scribe call:
-PROVIDER_FLAG="--provider codex"
-# Under Claude Code, leave it empty (claude is the default):
-# PROVIDER_FLAG=""
-```
-
-Decide which surface you are on from the inherited context, which carries
-the parent's harness. A Codex spawn prompt also says so outright. Use
-`$PROVIDER_FLAG` consistently in every call below.
-
-### Run the prep bundle — BEFORE you write anything
-
-Entries must be written in the configured decision-log language, **not**
-the language of the inherited conversation or your spawn prompt. Resolve
-it now, as part of setup. It must be fixed before Step 2 writes a single
-entry:
+### Run the prep bundle before you write anything
 
 ```bash
 bun "$CLI" scribe --prep --session "<parent-session-id>" $PROVIDER_FLAG
@@ -75,18 +47,15 @@ bun "$CLI" scribe --prep --session "<parent-session-id>" $PROVIDER_FLAG
 
 For a direct/manual invocation, omit the shown `--session` argument.
 
-This one call prints the configured language, the last 8 scribe-authored
-entries for dedup, and git change context: `git diff`,
-`git diff --staged`, and `git log --oneline -5`. Read the output
-carefully. The diff is your primary source for `rationale` and `caveat`
-entries. The conversation context is your primary source for `decision`
-and `learning` entries. Do **not** re-log material already covered by the recent scribe
-entries. If the diff is fully described by existing entries, skip to Step
-3. If git context is unavailable, the command prints labeled notices and
-still exits 0.
-
-Write every `--title` / `--text` in the printed language, even when the
-inherited conversation and this prompt are in English.
+It prints the configured decision-log language, the last 8 scribe-authored
+entries, and git change context (`git diff`, `git diff --staged`,
+`git log --oneline -5`). Write every `--title` / `--text` in that language,
+not the language of the conversation or your spawn prompt. The diff is your
+main source for `rationale` and `caveat` entries; the conversation is your
+main source for `decision` and `learning`. Do not re-log what the recent
+entries already cover — if they cover the whole diff, skip to Step 3. When
+git context is unavailable, the command prints a labeled notice and still
+exits 0.
 
 ---
 
@@ -134,8 +103,7 @@ first.
 ### Then: write each surviving entry
 
 For each insight that is genuinely worth recording and not yet covered,
-pick a `kind` and call. Write `--title` and `--text` in the language
-printed by Step 1.
+pick a `kind` and call:
 
 ```bash
 bun "$CLI" scribe --type <kind> --title "<short headline>" --text "<body, markdown>" --session "<parent-session-id>" $PROVIDER_FLAG
@@ -188,28 +156,10 @@ over SQLite to stay dependency-free in Bun."
 
 ## Step 3 — Consolidate; end quietly
 
-**Dedup across lenses — don't collapse to one.** The bar is per-*insight*,
-not per-entry-count. Cut entries that repeat each other or restate the
-diff mechanically. Do not cut a genuine `caveat` or `learning` just to keep
-the total low. A few high-signal entries spanning two or three lenses is
-the target. It is not one entry per file, step, or command. It is not a
-single lonely `decision` when the work also taught something or hid a
-trap. If the sweep in Step 2 truly surfaced nothing worth keeping (e.g.,
-purely mechanical changes), write nothing. End.
+**Dedup, but keep the lenses.** The bar is per insight, not per entry
+count. Cut entries that repeat each other or restate the diff mechanically,
+and one entry per file, step, or command. Do not cut a genuine `caveat` or
+`learning` just to keep the total low. If the sweep surfaced nothing worth
+keeping, such as purely mechanical changes, write nothing.
 
-This is a fire-and-forget fork. The side effect is the written log. No
-summary or confirmation message is needed.
-
----
-
-## Implementation notes
-
-This reference guide is meant to be invoked from inside a
-context-inheriting fork spawned by the cockpit skill (via the `thoughtful`
-command or auto-logging hook). On Claude Code, that fork is an Agent-tool
-call with `subagent_type: "fork"`. On Codex, it is a background sub-agent
-with `fork_context: true`. Either way, the fork inherits the full
-conversation context (the "why"). It augments that context with the code
-diff (the "what"). Do not spawn it with `subagent_type` omitted, or set to
-any other custom or named type. That starts a fresh agent with no
-conversation context, and it defeats the purpose.
+The written log is the whole output; no summary or confirmation is needed.
