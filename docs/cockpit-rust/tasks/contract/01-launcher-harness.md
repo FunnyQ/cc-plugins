@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: contract/02, contract/03, contract/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -121,19 +121,19 @@ Fixture shapes must be the minimum the TS readers accept. Read those readers; do
 
 ## Acceptance criteria
 
-- [ ] `launcher.ts` exports exactly the API above, and `underTest` is `"rust"` only when `COCKPIT_BIN` is non-empty.
-- [ ] In TS mode, `command()` maps every `Proc` and every CLI subcommand, including `find-session`, to the TS script listed above.
-- [ ] `makeProviderFixtures` output resolves through `find-session.ts` for all three providers.
-- [ ] `startDaemon` returns a `daemon.json` with numeric `pid` and `port`, a string `token`, and a `root` ending in `/skills/cockpit/scripts`. `stopDaemon` leaves that pid dead.
-- [ ] No test reads or writes the real `~/.local/share/q-lab/cockpit`, `~/.config/q-lab`, `~/.claude`, `~/.codex`, or port 5858.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `launcher.ts` exports exactly the API above, and `underTest` is `"rust"` only when `COCKPIT_BIN` is non-empty.
+- [x] In TS mode, `command()` maps every `Proc` and every CLI subcommand, including `find-session`, to the TS script listed above.
+- [x] `makeProviderFixtures` output resolves through `find-session.ts` for all three providers.
+- [x] `startDaemon` returns a `daemon.json` with numeric `pid` and `port`, a string `token`, and a `root` ending in `/skills/cockpit/scripts`. `stopDaemon` leaves that pid dead.
+- [x] No test reads or writes the real `~/.local/share/q-lab/cockpit`, `~/.config/q-lab`, `~/.claude`, `~/.codex`, or port 5858.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/contract/launcher.test.ts` passes (TS mode, `COCKPIT_BIN` unset).
-- [ ] `bun test packages/monitor/skills/cockpit/contract/` passes.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
-- [ ] `git status --short -- packages/monitor/skills/cockpit/contract/` lists `launcher.ts`, `fixtures.ts`, `launcher.test.ts`.
+- [x] `bun test packages/monitor/skills/cockpit/contract/launcher.test.ts` passes (TS mode, `COCKPIT_BIN` unset).
+- [x] `bun test packages/monitor/skills/cockpit/contract/` passes.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `git status --short -- packages/monitor/skills/cockpit/contract/` lists `launcher.ts`, `fixtures.ts`, `launcher.test.ts`.
 
 ## Eval rubric
 
