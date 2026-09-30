@@ -41,6 +41,12 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
         pending: false,
         error: "runLive not stubbed",
       }),
+    collectLive: () =>
+      Promise.resolve({
+        ok: false,
+        pending: false,
+        error: "collectLive not stubbed",
+      }),
     ...overrides,
   };
 }
@@ -613,7 +619,90 @@ describe("executeRelay", () => {
     );
 
     expect(result.code).toBe(7);
-    expect(errors.join("")).toBe("failed");
+    expect(errors.join("")).toBe(
+      "claude failed (exit 7, model: CLI default): failed\n",
+    );
+  });
+
+  it("surfaces the backend's stdout error and the model, never argv or the prompt", async () => {
+    const errors: string[] = [];
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "SECRET-PROMPT", "--model", "p/m"],
+      deps({
+        run: () => ({
+          ok: false,
+          stdout: JSON.stringify({
+            type: "error",
+            error: { name: "UnknownError", data: { message: "Model not found" } },
+          }),
+          stderr: "",
+          code: 1,
+        }),
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(errors.join("")).toBe(
+      "opencode failed (exit 1, model: p/m): Model not found\n",
+    );
+    expect(errors.join("")).not.toContain("SECRET-PROMPT");
+  });
+
+  it("omits -m for opencode when nothing is configured", async () => {
+    let invocation: string[] = [];
+    await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(invocation).not.toContain("-m");
+  });
+
+  it("uses the configured model when the flag is absent", async () => {
+    let invocation: string[] = [];
+    const config = JSON.stringify({
+      models: { opencode: { delegate: "cfg/model" } },
+    });
+    await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        fileExists: (path) => path === CONFIG_PATH || path === "/tmp/prompt.md",
+        readFile: (path) => (path === CONFIG_PATH ? config : "built prompt"),
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+      }),
+    );
+
+    expect(invocation.slice(2, 4)).toEqual(["-m", "cfg/model"]);
+  });
+
+  it("fails on a malformed config instead of running with the CLI default", async () => {
+    const errors: string[] = [];
+    let spawned = false;
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "x", "--headless"],
+      deps({
+        fileExists: (path) => path === CONFIG_PATH,
+        readFile: () => "{not json",
+        run: () => {
+          spawned = true;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        stderr: (text) => errors.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(spawned).toBe(false);
+    expect(errors.join("")).toContain(`Could not read relay config (${CONFIG_PATH})`);
   });
 });
 

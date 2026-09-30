@@ -479,6 +479,20 @@ export async function executeRelay(
     return { code: 1 };
   }
 
+  let model: string | undefined;
+  try {
+    model = resolveModel(parsed.backend, parsed.mode, parsed.flags.model, () =>
+      readJsonObject(CONFIG_PATH, deps),
+    );
+  } catch (error) {
+    deps.stderr(
+      `Could not read relay config (${CONFIG_PATH}): ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    return { code: 1 };
+  }
+
   const dir = deps.createTmpRunDir();
   const effectiveTask =
     parsed.mode === "review" && parsed.flags.promptFile
@@ -489,7 +503,7 @@ export async function executeRelay(
     promptText:
       parsed.mode === "review" ? buildReviewPrompt(effectiveTask) : undefined,
     out: parsed.flags.out,
-    model: resolveModel(parsed.backend, parsed.mode, parsed.flags.model),
+    model,
     effort: parsed.flags.effort,
     lastFile: join(dir, "raw.txt"),
     dangerous: parsed.flags.dangerous,
@@ -662,11 +676,15 @@ export async function executeRelay(
   });
 
   if (!result.ok) {
+    // Never echo argv: it carries the whole prompt.
+    const detail =
+      result.stderr.trim() ||
+      backend.parseError?.(result.stdout) ||
+      "no error output";
     deps.stderr(
-      result.stderr ||
-        `Backend command failed with exit code ${result.code}: ${invocation.argv.join(
-          " ",
-        )}\n`,
+      `${backend.name} failed (exit ${result.code}, model: ${
+        opts.model ?? "CLI default"
+      }): ${detail}\n`,
     );
     return { code: result.code, dir, lastFile: opts.lastFile };
   }

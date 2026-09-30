@@ -4,7 +4,6 @@ import {
   addTimestampSuffix,
   createTmpRunDir,
   TMP_ROOT,
-  DEFAULT_MODELS,
   timestampForPath,
 } from "./shared";
 import type { Mode } from "./types";
@@ -24,61 +23,32 @@ describe("resolveModel", () => {
     expect(result).toBe("config-model");
   });
 
-  it("returns DEFAULT_MODELS[backend][mode] when flag and config absent", () => {
-    const result = resolveModel("opencode", "delegate", undefined, () => ({}));
-    expect(result).toBe("opencode-go/deepseek-v4-light");
+  it("returns undefined when flag and config are absent, so the CLI picks its own model", () => {
+    for (const backend of ["opencode", "codex", "claude"]) {
+      expect(resolveModel(backend, "delegate", undefined, () => ({}))).toBeUndefined();
+      expect(resolveModel(backend, "review", undefined, () => ({}))).toBeUndefined();
+    }
   });
 
-  it("returns undefined for codex delegate when flag, config, and constant absent", () => {
-    const result = resolveModel("codex", "delegate", undefined, () => ({}));
-    expect(result).toBeUndefined();
+  it("returns undefined when config has no entry for this backend or mode", () => {
+    expect(
+      resolveModel("opencode", "delegate", undefined, () => ({
+        models: { codex: { delegate: "model" } },
+      })),
+    ).toBeUndefined();
+    expect(
+      resolveModel("opencode", "review", undefined, () => ({
+        models: { opencode: { delegate: "model" } },
+      })),
+    ).toBeUndefined();
   });
 
-  it("returns undefined for claude review when flag, config, and constant absent", () => {
-    const result = resolveModel("claude", "review", undefined, () => ({}));
-    expect(result).toBeUndefined();
-  });
-
-  it("handles missing config gracefully (no throw)", () => {
-    const result = resolveModel("opencode", "review", undefined, () => {
-      throw new Error("file not found");
-    });
-    // Should fall back to DEFAULT_MODELS
-    expect(result).toBe("opencode-go/deepseek-v4-pro");
-  });
-
-  it("handles malformed JSON gracefully (no throw)", () => {
-    const result = resolveModel("opencode", "delegate", undefined, () => {
-      // Simulate a readConfig that encounters invalid JSON
-      return undefined;
-    });
-    expect(result).toBe("opencode-go/deepseek-v4-light");
-  });
-
-  it("falls back to constant when config is invalid shape", () => {
-    const result = resolveModel("opencode", "delegate", undefined, () => ({
-      models: { someBackend: { someMode: "model" } }, // wrong backend
-    }));
-    expect(result).toBe("opencode-go/deepseek-v4-light");
-  });
-
-  it("falls back to constant when config.models is missing", () => {
-    const result = resolveModel("opencode", "review", undefined, () => ({}));
-    expect(result).toBe("opencode-go/deepseek-v4-pro");
-  });
-
-  it("falls back to constant when config.models[backend] is missing", () => {
-    const result = resolveModel("opencode", "delegate", undefined, () => ({
-      models: {},
-    }));
-    expect(result).toBe("opencode-go/deepseek-v4-light");
-  });
-
-  it("falls back to constant when config.models[backend][mode] is missing", () => {
-    const result = resolveModel("opencode", "image", undefined, () => ({
-      models: { opencode: {} },
-    }));
-    expect(result).toBeUndefined(); // opencode image is not in DEFAULT_MODELS
+  it("lets a config read error propagate instead of looking like nothing configured", () => {
+    expect(() =>
+      resolveModel("opencode", "delegate", undefined, () => {
+        throw new Error("Unexpected token");
+      }),
+    ).toThrow("Unexpected token");
   });
 });
 
@@ -148,20 +118,5 @@ describe("timestampForPath", () => {
     const now = new Date(2025, 0, 5, 9, 5, 3, 7); // Jan 5, 2025 09:05:03.007
     const result = timestampForPath(now);
     expect(result).toBe("20250105-090503-007");
-  });
-});
-
-describe("DEFAULT_MODELS", () => {
-  it("has empty object for codex", () => {
-    expect(DEFAULT_MODELS.codex).toEqual({});
-  });
-
-  it("has empty object for claude", () => {
-    expect(DEFAULT_MODELS.claude).toEqual({});
-  });
-
-  it("has delegate and review for opencode", () => {
-    expect(DEFAULT_MODELS.opencode.delegate).toBe("opencode-go/deepseek-v4-light");
-    expect(DEFAULT_MODELS.opencode.review).toBe("opencode-go/deepseek-v4-pro");
   });
 });
