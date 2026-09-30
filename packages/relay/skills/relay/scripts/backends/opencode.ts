@@ -4,9 +4,8 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
  * opencode Backend: delegate + emulated (prompt-based) review.
  *
  * Both modes run off relay's built prompt (no native review).
- * Model defaults: delegate → opencode-go/deepseek-v4-light; review → opencode-go/deepseek-v4-pro.
+ * No model is pinned: hosted ids churn, and a pinned default rotted once already.
  * Delegate uses the max reasoning variant.
- * --model flag overrides the defaults.
  *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
  * and live TUI). Headless `run` auto-REJECTS approval prompts when `--auto` is
@@ -33,12 +32,11 @@ export const opencodeBackend: Backend = {
   supports: new Set(["delegate", "review"]),
 
   invoke(mode: Mode, opts: InvokeOpts) {
-    // Model is already resolved in relay.ts (flag > config > per-mode default);
-    // opts.model is the final value — do not re-resolve here.
+    // Model is already resolved in relay.ts (flag > config); opts.model is the
+    // final value — do not re-resolve here.
     const model = opts.model;
     const argv: string[] = ["opencode", "run"];
 
-    // Add resolved model (or default)
     if (model) {
       argv.push("-m", model);
     }
@@ -88,6 +86,8 @@ export const opencodeBackend: Backend = {
     // Extract the concatenated `text` parts from the JSONL stream.
     return parseJsonl(raw);
   },
+
+  parseError,
 };
 
 /**
@@ -119,4 +119,22 @@ export function parseJsonl(raw: string): string {
   }
 
   return textParts.join("");
+}
+
+/**
+ * `opencode run` exits 1 with empty stderr and reports the cause as a JSONL
+ * event on stdout: {"type":"error","error":{"name":..,"data":{"message":..}}}.
+ */
+export function parseError(stdout: string): string | undefined {
+  for (const line of stdout.split("\n")) {
+    try {
+      const obj = JSON.parse(line.trim());
+      if (obj.type === "error") {
+        return obj.error?.data?.message || obj.error?.name || undefined;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
 }

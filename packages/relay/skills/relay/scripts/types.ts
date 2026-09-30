@@ -44,6 +44,9 @@ export type Backend = {
   // side effects (e.g. codex image: locate the PNG, copy it to opts.out, return "Image saved: <path>").
   // relay.ts calls `b.postRun ? b.postRun(mode, parsed, opts) : ...` — no backend-name branching.
   postRun?(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult;
+  // Optional: pull the real error out of a failed run's stdout, for CLIs that
+  // exit non-zero with empty stderr (opencode reports it as a JSONL event).
+  parseError?(stdout: string): string | undefined;
   // Optional live seam: describe the interactive TUI launch for a herdr pane.
   // Pure — no spawning. Returning null means this mode has no live path
   // (e.g. codex image), so relay stays headless for it.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { opencodeBackend, parseJsonl } from "./opencode";
+import { opencodeBackend, parseError, parseJsonl } from "./opencode";
 import type { InvokeOpts } from "../types";
 
 describe("opencodeBackend", () => {
@@ -46,7 +46,7 @@ describe("opencodeBackend", () => {
   });
 
   describe("invoke", () => {
-    // relay.ts resolves the model (flag > config > per-mode default) and passes
+    // relay.ts resolves the model (flag > config) and passes
     // it as opts.model; invoke trusts that value. These pass the resolved model
     // the way relay.ts would.
     it("builds delegate argv with the resolved model", () => {
@@ -274,5 +274,34 @@ describe("parseJsonl", () => {
     ].join("\n");
     const result = parseJsonl(jsonl);
     expect(result).toBe("Valid");
+  });
+});
+
+describe("parseError", () => {
+  it("returns the message of the JSONL error event", () => {
+    const raw = [
+      JSON.stringify({ type: "step_start" }),
+      JSON.stringify({
+        type: "error",
+        error: { name: "UnknownError", data: { message: "Model not found: x/y" } },
+      }),
+    ].join("\n");
+
+    expect(parseError(raw)).toBe("Model not found: x/y");
+  });
+
+  it("falls back to the error name when there is no message", () => {
+    const raw = JSON.stringify({ type: "error", error: { name: "UnknownError" } });
+
+    expect(parseError(raw)).toBe("UnknownError");
+  });
+
+  it("returns undefined without an error event, skipping malformed lines", () => {
+    expect(parseError("not json\n" + JSON.stringify({ type: "text" }))).toBeUndefined();
+    expect(parseError("")).toBeUndefined();
+  });
+
+  it("is wired as the backend's parseError", () => {
+    expect(opencodeBackend.parseError).toBe(parseError);
   });
 });
