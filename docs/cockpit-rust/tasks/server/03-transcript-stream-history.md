@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: server/02, server/08
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -63,20 +63,20 @@ An entry is displayed when `type` ∈ `{user, assistant, system, tool, tool_use,
 
 ## Acceptance criteria
 
-- [ ] Every `server: transcript` contract test passes against the Rust binary and still passes against TS.
-- [ ] The Claude/Codex backlog is the last 50 lines of the file, then filtered for display, and `backlog-done` carries `historyStart`/`hasMore` that page correctly through `/api/transcript/history` to offset 0.
-- [ ] A transcript created after the stream opens is streamed once it appears; a symlink escaping the provider root answers 403 before any SSE bytes.
-- [ ] OpenCode streams produce entries identical to TS on the contract's OpenCode fixture, including `read` tool results and patch summaries, and new messages arrive on the next poll without duplicates.
-- [ ] A 2.4 GB-class transcript never gets read whole: backlog and history reads are bounded to 2 MiB (verified by a `cargo test` on a sparse large file).
-- [ ] (human) Open the dashboard served by the Rust server against real sessions; the transcript, decision log, subagent and design-system panels render as they do on the Bun server.
+- [x] Every `server: transcript` contract test passes against the Rust binary and still passes against TS.
+- [x] The Claude/Codex backlog is the last 50 lines of the file, then filtered for display, and `backlog-done` carries `historyStart`/`hasMore` that page correctly through `/api/transcript/history` to offset 0.
+- [x] A transcript created after the stream opens is streamed once it appears; a symlink escaping the provider root answers 403 before any SSE bytes.
+- [x] OpenCode streams produce entries identical to TS on the contract's OpenCode fixture, including `read` tool results and patch summaries, and new messages arrive on the next poll without duplicates.
+- [x] A 2.4 GB-class transcript never gets read whole: backlog and history reads are bounded to 2 MiB (verified by a `cargo test` on a sparse large file).
+- [x] (human) Open the dashboard served by the Rust server against real sessions; the transcript, decision log, subagent and design-system panels render as they do on the Bun server.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: transcript"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: transcript"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: transcript"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: transcript"` (TS still green)
 
 ## Eval rubric
 

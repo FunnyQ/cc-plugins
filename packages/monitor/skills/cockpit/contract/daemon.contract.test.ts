@@ -465,6 +465,139 @@ describe("server: log-stream watcher", () => {
 
 describe("server: transcript", () => {
   const c = group();
+  function registerCodex(session: string, path: string) {
+    const db = new Database(c.f.codexStateDb);
+    try {
+      db.query("insert into threads values (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(session, c.f.projectDir, "Transcript fixture", 0, path, 1, 1, 1000, 1000);
+    } finally { db.close(); }
+  }
+  test("validates parameters on both transcript routes", async () => {
+    for (const route of ["/api/transcript/stream", "/api/transcript/history"]) {
+      expect(await get(c.d, route, { session: c.f.claudeSessionId, provider: "unknown" }, 400)).toEqual({ error: "invalid provider" });
+      for (const session of ["", "../escape", "x".repeat(161)]) {
+        expect(await get(c.d, route, { session }, 400)).toEqual({ error: "invalid session id" });
+        expect(await get(c.d, route, { session, provider: "opencode" }, 400)).toEqual({ error: "invalid session id" });
+      }
+    }
+  });
+  test("bounds backlog to 50 raw lines before filtering and pages both providers to zero", async () => {
+    for (const provider of ["claude", "codex"]) {
+      const session = crypto.randomUUID();
+      const path = provider === "claude"
+        ? join(transcriptPath(c.f), "..", `${session}.jsonl`)
+        : join(c.f.codexSessionsDir, `rollout-${session}.jsonl`);
+      if (provider === "codex") registerCodex(session, path);
+      const records = Array.from({ length: 125 }, (_, index) => index % 5 === 0
+        ? { type: "progress", index }
+        : { type: "assistant", index, message: { role: "assistant", content: `Line ${index} 中文` } });
+      const lines = records.map((record) => JSON.stringify(record) + "\n");
+      writeFileSync(path, lines.join(""));
+      const query = { session, provider };
+      const s = await stream(url(c.d, "/api/transcript/stream", query));
+      try {
+        for (const record of records.slice(-50).filter((record) => record.type === "assistant")) {
+          expect(await s.next()).toEqual({ event: "message", data: record });
+        }
+        const cursor = Buffer.byteLength(lines.slice(0, 75).join(""));
+        expect(await s.next()).toEqual({ event: "backlog-done", data: { historyStart: cursor, hasMore: true } });
+        let before = cursor;
+        const pages: unknown[] = [];
+        while (before > 0) {
+          const page = await get(c.d, "/api/transcript/history", { ...query, before: String(before), limit: "30" });
+          expect(page.historyStart).toBeLessThan(before);
+          expect(page.hasMore).toBe(page.historyStart > 0);
+          pages.unshift(...page.entries);
+          before = page.historyStart;
+        }
+        expect(pages).toEqual(records.slice(0, 75).filter((record) => record.type === "assistant"));
+      } finally { await s.close(); }
+    }
+  });
+  test("waits for a transcript created after opening for both file providers", async () => {
+    for (const provider of ["claude", "codex"]) {
+      const session = crypto.randomUUID();
+      const path = provider === "claude"
+        ? join(transcriptPath(c.f), "..", `${session}.jsonl`)
+        : join(c.f.codexSessionsDir, `rollout-${session}.jsonl`);
+      if (provider === "codex") registerCodex(session, path);
+      const s = await stream(url(c.d, "/api/transcript/stream", { session, provider }));
+      try {
+        const record = { type: "user", message: { role: "user", content: "Created later" } };
+        writeFileSync(path, JSON.stringify(record) + "\n");
+        expect(await s.next(2000)).toEqual({ event: "message", data: record });
+        expect(await s.next()).toEqual({ event: "backlog-done", data: { historyStart: 0, hasMore: false } });
+      } finally { await s.close(); }
+    }
+  });
+  test("rejects escaping Codex transcript symlinks before SSE", async () => {
+    const { symlinkSync } = require("node:fs") as typeof import("node:fs");
+    const outside = join(c.h.root, "outside-transcript.jsonl");
+    writeFileSync(outside, JSON.stringify({ type: "user", message: "Outside" }) + "\n");
+    const session = crypto.randomUUID();
+    const path = join(c.f.codexSessionsDir, `rollout-${session}.jsonl`);
+    registerCodex(session, path);
+    symlinkSync(outside, path);
+    for (const route of ["/api/transcript/stream", "/api/transcript/history"]) {
+      expect(await get(c.d, route, { session, provider: "codex", before: "99999" }, 403)).toEqual({
+        error: "transcript path is outside Codex sessions",
+      });
+    }
+  });
+  test("maps OpenCode parts in order and suppresses updated message duplicates", async () => {
+    const session = `ses_parts_${crypto.randomUUID()}`;
+    const timestamp = Date.now();
+    const db = new Database(c.f.opencodeDb);
+    const parts = [
+      { type: "step-start" },
+      { type: "text", text: "Answer" },
+      { type: "reasoning", text: "Reason" },
+      { type: "tool", tool: "read", state: { input: { filePath: "/repo/src/server/file.rs" }, output: "fallback", metadata: { preview: "preview", display: { text: "display text" } } } },
+      { type: "tool", name: "Run", input: { command: "pwd" } },
+      { type: "patch", files: ["/repo/src/server/file.rs", 123, "/repo/README.md"] },
+      { type: "step-finish" },
+    ];
+    try {
+      db.query("insert into message values (?, ?, ?, ?, ?)").run("msg_parts", session, timestamp, timestamp, JSON.stringify({ role: "assistant" }));
+      parts.forEach((part, index) => db.query("insert into part values (?, ?, ?, ?)").run(`part_${index}`, "msg_parts", timestamp + index, JSON.stringify(part)));
+      const s = await stream(url(c.d, "/api/transcript/stream", { session, provider: "opencode" }));
+      try {
+        expect(await s.next()).toEqual({ event: "message", data: {
+          type: "assistant", uuid: "msg_parts", timestamp: new Date(timestamp).toISOString(),
+          message: { role: "assistant", content: [
+            { type: "text", text: "Answer" }, { type: "thinking", thinking: "Reason" },
+            { type: "tool_result", label: "Read · src/server/file.rs", file_path: "/repo/src/server/file.rs", content: "display text" },
+            { type: "tool_use", name: "Run", input: { command: "pwd" } },
+            { type: "text", text: "Changed files:\n- `src/server/file.rs`\n- `repo/README.md`" },
+          ] }, provider: "opencode",
+        } });
+        expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
+        db.query("update message set time_updated = ? where id = ?").run(timestamp + 1000, "msg_parts");
+        await Bun.sleep(250);
+        db.query("insert into message values (?, ?, ?, ?, ?)").run("msg_parts_new", session, timestamp + 2000, timestamp + 2000, JSON.stringify({ role: "user", text: "Next message" }));
+        expect(await s.next(2000)).toEqual({ event: "message", data: { type: "user", uuid: "msg_parts_new", timestamp: new Date(timestamp + 2000).toISOString(), message: { role: "user", content: "Next message" }, provider: "opencode" } });
+        await expect(s.next(250)).rejects.toThrow("SSE event deadline exceeded");
+      } finally { await s.close(); }
+    } finally { db.close(); }
+  });
+  test("filters invalid lines and response items and preserves JS history coercions", async () => {
+    const session = crypto.randomUUID();
+    const path = join(transcriptPath(c.f), "..", `${session}.jsonl`);
+    const entries: Array<{ type: string; payload?: { type: string } }> = ["user", "assistant", "system", "tool", "tool_use", "tool_result"].map((type) => ({ type }));
+    entries.push(...["message", "function_call", "function_call_output", "custom_tool_call"].map((type) => ({ type: "response_item", payload: { type } })));
+    writeFileSync(path, ["", "invalid JSON", JSON.stringify({ type: "progress" }), JSON.stringify({ type: "response_item", payload: { type: "reasoning" } }), ...entries.map((entry) => JSON.stringify(entry))].join("\n") + "\n");
+    const size = String(statSync(path).size);
+    for (const before of ["", "0", "-1", "NaN", "Infinity"]) {
+      expect(await get(c.d, "/api/transcript/history", { session, before })).toEqual({ entries: [], historyStart: 0, hasMore: false });
+    }
+    expect(await get(c.d, "/api/transcript/history", { session, before: size, limit: "" })).toEqual({ entries, historyStart: 0, hasMore: false });
+    expect((await get(c.d, "/api/transcript/history", { session, before: size, limit: "0" })).entries).toEqual(entries);
+    expect((await get(c.d, "/api/transcript/history", { session, before: size, limit: "-1" })).entries).toEqual(entries.slice(-1));
+    const s = await stream(url(c.d, "/api/transcript/stream", { session }));
+    try {
+      for (const entry of entries) expect(await s.next()).toEqual({ event: "message", data: entry });
+      expect(await s.next()).toEqual({ event: "backlog-done", data: { historyStart: 0, hasMore: false } });
+    } finally { await s.close(); }
+  });
   test("pages Claude history using byte cursors", async () => {
     const records = readJsonl(transcriptPath(c.f));
     const first = await get(c.d, "/api/transcript/history", { session: c.f.claudeSessionId, before: String(statSync(transcriptPath(c.f)).size), limit: "2" });
