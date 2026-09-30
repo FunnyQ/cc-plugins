@@ -27,6 +27,13 @@ mod process_alive;
 #[allow(dead_code)]
 mod call_log;
 
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod find_session;
+// Consumed by later subcommand ports.
+#[allow(dead_code)]
+mod nudge_toggle;
+
 #[derive(Parser)]
 #[command(name = "cockpit", version)]
 struct Cli {

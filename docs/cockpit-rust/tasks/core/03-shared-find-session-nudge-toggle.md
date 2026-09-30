@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/02
 > **Blocks**: channel/02, cli/01, hooks/01, server/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -96,21 +96,21 @@ Mirror every case in `packages/monitor/skills/cockpit/scripts/find-session.test.
 
 ## Acceptance criteria
 
-- [ ] `find_session` returns the same id as TS for each provider on the fixtures from `find-session.test.ts`, including the env-var short-circuits.
-- [ ] Every not-found and DB-error path prints the exact TS stderr line and returns `None`.
-- [ ] The Codex query adds the `thread_spawn_edges` clause only when that table exists.
-- [ ] `resolve_nudge_enabled`, `apply_action`, and `read_scopes` match every case in `nudge-toggle.test.ts`, including the 7-day expiry and dropping invalid entries.
-- [ ] `set_scope` writes `scribe-nudge-toggle.json` as compact JSON with no trailing newline. Clearing the project scope removes the key, and removes an emptied `projects` map.
-- [ ] No other Rust file re-implements the per-provider transcript/DB lookup or nudge-scope persistence. Orchestration that calls these modules (the channel's env → ancestor session file → ancestor argv → `find_session` chain, the hook's parent-session resolution) may live in its own module.
-- [ ] fmt and clippy (`-D warnings`) are clean.
+- [x] `find_session` returns the same id as TS for each provider on the fixtures from `find-session.test.ts`, including the env-var short-circuits.
+- [x] Every not-found and DB-error path prints the exact TS stderr line and returns `None`.
+- [x] The Codex query adds the `thread_spawn_edges` clause only when that table exists.
+- [x] `resolve_nudge_enabled`, `apply_action`, and `read_scopes` match every case in `nudge-toggle.test.ts`, including the 7-day expiry and dropping invalid entries.
+- [x] `set_scope` writes `scribe-nudge-toggle.json` as compact JSON with no trailing newline. Clearing the project scope removes the key, and removes an emptied `projects` map.
+- [x] No other Rust file re-implements the per-provider transcript/DB lookup or nudge-scope persistence. Orchestration that calls these modules (the channel's env → ancestor session file → ancestor argv → `find_session` chain, the hook's parent-session resolution) may live in its own module.
+- [x] fmt and clippy (`-D warnings`) are clean.
 
 ## Verification
 
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml find_session`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml nudge_toggle`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml find_session`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml nudge_toggle`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
 
 ## Eval rubric
 
