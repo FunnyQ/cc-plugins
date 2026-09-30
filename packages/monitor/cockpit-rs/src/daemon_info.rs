@@ -1,6 +1,6 @@
 use crate::paths;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, fs, io::Read};
+use std::{cmp::Ordering, fs};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DaemonInfo {
@@ -16,6 +16,25 @@ pub struct PartialDaemonInfo {
     pub port: Option<u16>,
     pub token: Option<String>,
     pub root: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DaemonCoords {
+    pub port: u16,
+    pub token: String,
+}
+
+impl PartialDaemonInfo {
+    pub fn coords(&self) -> Option<DaemonCoords> {
+        Some(DaemonCoords {
+            port: self.port?,
+            token: self.token.clone()?,
+        })
+    }
+}
+
+pub fn read_daemon_coords() -> Option<DaemonCoords> {
+    read_daemon_info()?.coords()
 }
 
 pub enum StartupDecision {
@@ -46,6 +65,11 @@ pub fn read_daemon_info() -> Option<PartialDaemonInfo> {
             .and_then(|v| v.as_str())
             .map(str::to_owned),
     })
+}
+
+// A record without a pid or port counts as no daemon.
+pub fn read_process_info() -> Option<PartialDaemonInfo> {
+    read_daemon_info().filter(|info| info.pid.is_some() && info.port.is_some())
 }
 
 pub fn write_daemon_info(info: &DaemonInfo) {
@@ -127,21 +151,27 @@ pub fn should_supersede_daemon(daemon_root: Option<&str>, my_root: &str) -> bool
     compare_versions(&mine, &theirs) == Ordering::Greater
 }
 
+// Keep the TS `<plugin root>/skills/cockpit/scripts` shape so a 5.x channel's version rule reads it.
+pub fn daemon_root() -> Result<String, String> {
+    Ok(paths::plugin_root()?
+        .join("skills/cockpit/scripts")
+        .to_string_lossy()
+        .into_owned())
+}
+
+pub fn spawn_detached_server(args: &[&str]) -> std::io::Result<std::process::Child> {
+    let mut command = std::process::Command::new(std::env::current_exe()?);
+    command
+        .arg("server")
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    crate::process_alive::detach(&mut command).spawn()
+}
+
 pub fn new_token() -> String {
-    let mut bytes = [0u8; 16];
-    if let Err(error) =
-        fs::File::open("/dev/urandom").and_then(|mut file| file.read_exact(&mut bytes))
-    {
-        // A token from predictable fallback bytes would expose the daemon's authenticated API.
-        panic!("cockpit: cannot read token entropy: {error}");
-    }
-    let mut token = String::with_capacity(32);
-    const HEX: &[u8] = b"0123456789abcdef";
-    for byte in bytes {
-        token.push(HEX[(byte >> 4) as usize] as char);
-        token.push(HEX[(byte & 15) as usize] as char);
-    }
-    token
+    uuid::Uuid::new_v4().simple().to_string()
 }
 
 #[cfg(test)]

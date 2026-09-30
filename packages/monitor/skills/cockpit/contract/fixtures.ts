@@ -2,7 +2,7 @@ import type { Subprocess } from "bun";
 import { Database } from "bun:sqlite";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { command, PLUGIN_ROOT, underTest, type Proc } from "./launcher";
+import { command, PLUGIN_ROOT, type Proc } from "./launcher";
 
 export type Env = Record<string, string>;
 export type Homes = { cockpitHome: string; configHome: string; dataHome: string; root: string };
@@ -39,7 +39,7 @@ export function baseEnv(h: Homes, extra: Env = {}): Env {
     ) delete env[key];
   }
   Object.assign(env, { HOME: h.root, COCKPIT_HOME: h.cockpitHome, XDG_CONFIG_HOME: h.configHome, XDG_DATA_HOME: h.dataHome });
-  if (underTest === "rust") env.COCKPIT_PLUGIN_ROOT = PLUGIN_ROOT;
+  env.COCKPIT_PLUGIN_ROOT = PLUGIN_ROOT;
   return { ...env, ...extra };
 }
 

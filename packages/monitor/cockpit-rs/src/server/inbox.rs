@@ -1,6 +1,7 @@
 use super::{
     AppState,
-    broker::{Parks, Stash, budget, error, expires, parse, reply, take_stash, validate},
+    broker::{Parks, Stash, budget, expires, parse, take_stash, validate},
+    json_error, json_response,
 };
 use axum::{
     Router,
@@ -39,7 +40,7 @@ async fn inbox(
         session,
         None,
     ) {
-        return reply(json!({"message": message}));
+        return json_response(StatusCode::OK, json!({"message": message}));
     }
     let (guard, receiver) = state
         .inbox
@@ -52,8 +53,8 @@ async fn inbox(
         .flatten();
     drop(guard);
     match message {
-        Some(message) => reply(json!({"message": message})),
-        None => reply(json!({"message": null, "timeout": true})),
+        Some(message) => json_response(StatusCode::OK, json!({"message": message})),
+        None => json_response(StatusCode::OK, json!({"message": null, "timeout": true})),
     }
 }
 
@@ -74,7 +75,7 @@ async fn send_message(State(state): State<AppState>, body: Bytes) -> Response {
         .trim_matches(|c: char| (c.is_whitespace() && c != '\u{0085}') || c == '\u{feff}')
         .is_empty()
     {
-        return error(StatusCode::BAD_REQUEST, "empty text");
+        return json_error(StatusCode::BAD_REQUEST, "empty text");
     }
     let delivered = state.inbox.parks.deliver(session, None, text.into());
     if !delivered {
@@ -92,7 +93,7 @@ async fn send_message(State(state): State<AppState>, body: Bytes) -> Response {
                 },
             );
     }
-    reply(json!({"delivered": delivered}))
+    json_response(StatusCode::OK, json!({"delivered": delivered}))
 }
 
 pub fn router() -> Router<AppState> {

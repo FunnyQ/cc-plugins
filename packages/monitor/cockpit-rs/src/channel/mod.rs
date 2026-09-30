@@ -166,15 +166,7 @@ impl AbortToken {
         *self.0.borrow()
     }
     pub(super) async fn cancelled(&self) {
-        let mut receiver = self.0.subscribe();
-        loop {
-            if *receiver.borrow_and_update() {
-                return;
-            }
-            if receiver.changed().await.is_err() {
-                return;
-            }
-        }
+        let _ = self.0.subscribe().wait_for(|aborted| *aborted).await;
     }
 }
 

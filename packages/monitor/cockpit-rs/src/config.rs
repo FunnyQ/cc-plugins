@@ -4,7 +4,8 @@ use std::fs;
 
 pub type CockpitConfig = Map<String, Value>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum NudgeState {
     On,
     Off,

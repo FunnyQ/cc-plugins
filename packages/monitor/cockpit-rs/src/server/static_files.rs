@@ -132,11 +132,14 @@ pub async fn serve(
         return not_found();
     };
     if gzip {
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::new(6));
-        if encoder.write_all(&body).is_err() {
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
-        let Ok(compressed) = encoder.finish() else {
+        // Off the single runtime thread: gzipping the 3.3 MB mermaid bundle would stall every open stream.
+        let compressed = tokio::task::spawn_blocking(move || {
+            let mut encoder = GzEncoder::new(Vec::new(), Compression::new(6));
+            encoder.write_all(&body)?;
+            encoder.finish()
+        })
+        .await;
+        let Ok(Ok(compressed)) = compressed else {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         };
         body = compressed;
@@ -155,15 +158,9 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let state = AppState {
             presence: Default::default(),
-            views: Default::default(),
-            log_stream: Default::default(),
-            transcript: Default::default(),
             broker: Default::default(),
             inbox: Default::default(),
             permission: Default::default(),
-            codex: Default::default(),
-            opencode: Default::default(),
-            token: "test".into(),
             plugin_root: fixture.path().into(),
         };
         let runtime = tokio::runtime::Builder::new_current_thread()

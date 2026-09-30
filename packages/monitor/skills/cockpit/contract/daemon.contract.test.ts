@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { chmodSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { request } from "node:http";
 import { command, PLUGIN_ROOT } from "./launcher";
 import {
   appendTrail, baseEnv, cleanup, DECISION_RECORD, fixtureEnv, freePort, makeHomes,
@@ -989,41 +988,20 @@ describe("server: codex", () => {
   test("reports unavailable control and failed sends without a Codex binary/socket", async () => {
     expect(await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId, token: "bad" }, 401)).toEqual({ error: "unauthorized" });
     expect(await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, token: "bad", text: "Hello" }, 401)).toEqual({ error: "unauthorized" });
-    if (process.env.COCKPIT_BIN) {
-      // Rust reports spawn failures instead of inheriting TS's unhandled ENOENT crash.
-      const status = await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId });
-      expect(status).toEqual({
-        ready: false,
-        controlMode: "direct-app-server",
-        warnings: [expect.stringMatching(/^remote-control start failed: .+/)],
-        errors: [
-          expect.stringMatching(/^codex --version failed: .+/),
-          expect.stringMatching(/^direct app-server failed: .+/),
-        ],
-      });
-      const send = await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, text: "Hello" }, 502);
-      expect(send).toEqual({ error: status.errors.join("; "), warnings: status.warnings });
-      expect(c.d.proc.exitCode).toBeNull();
-      return;
-    }
-    // pins TS quirk: missing codex emits an unhandled spawn ENOENT; both routes drop HTTP and exit 1.
-    for (const path of ["/api/codex-control/status", "/api/send-codex-message"]) {
-      if (c.d.proc.exitCode !== null) c.d = await startDaemon(c.env);
-      const body = JSON.stringify({ token: c.d.token, session: c.f.codexThreadId, text: "Hello" });
-      // Use a single HTTP attempt: fetch retries GET resets and hides them as ConnectionRefused.
-      const response = new Promise<number | undefined>((resolve, reject) => {
-        const req = request(url(c.d, path, { session: c.f.codexThreadId }), {
-          method: path.endsWith("status") ? "GET" : "POST",
-          agent: false,
-          headers: { "content-type": "application/json" },
-        }, (res) => { res.resume(); resolve(res.statusCode); });
-        req.on("error", reject);
-        req.end(path.endsWith("status") ? undefined : body);
-      });
-      await expect(response).rejects.toMatchObject({ code: "ECONNRESET" });
-      expect(await c.d.proc.exited).toBe(1);
-      expect(c.d.proc.signalCode).toBeNull();
-    }
+    // Rust reports spawn failures instead of inheriting TS's unhandled ENOENT crash.
+    const status = await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId });
+    expect(status).toEqual({
+      ready: false,
+      controlMode: "direct-app-server",
+      warnings: [expect.stringMatching(/^remote-control start failed: .+/)],
+      errors: [
+        expect.stringMatching(/^codex --version failed: .+/),
+        expect.stringMatching(/^direct app-server failed: .+/),
+      ],
+    });
+    const send = await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, text: "Hello" }, 502);
+    expect(send).toEqual({ error: status.errors.join("; "), warnings: status.warnings });
+    expect(c.d.proc.exitCode).toBeNull();
   });
 });
 

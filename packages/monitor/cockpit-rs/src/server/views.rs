@@ -1,21 +1,18 @@
-use super::AppState;
+use super::{AppState, json_response};
 use axum::{
     Router,
     extract::{Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::Response,
     routing::any,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use std::{collections::HashMap, path::PathBuf};
 
 mod design;
 pub(crate) mod session_title;
 mod sessions;
 pub(crate) mod subagents;
-
-#[derive(Default)]
-pub struct ViewsState {}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -25,29 +22,26 @@ pub fn router() -> Router<AppState> {
         .route("/api/design-system", any(design_system))
 }
 
-fn response(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            ("content-type", "application/json; charset=utf-8"),
-            ("cache-control", "no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
+// Off the single runtime thread: a build reads every decision log and several SQLite files, stalling open streams.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 async fn sessions(State(state): State<AppState>) -> Response {
-    match sessions::build_sessions(&state) {
-        Ok(sessions) => response(StatusCode::OK, json!({"sessions": sessions})),
-        Err(error) => response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": error})),
+    match blocking(move || sessions::build_sessions(&state)).await {
+        Ok(sessions) => json_response(StatusCode::OK, json!({"sessions": sessions})),
+        Err(error) => json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": error})),
     }
 }
 
 async fn projects(State(state): State<AppState>) -> Response {
-    match sessions::build_projects(&state) {
-        Ok(projects) => response(StatusCode::OK, json!({"projects": projects})),
-        Err(error) => response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": error})),
+    match blocking(move || sessions::build_projects(&state)).await {
+        Ok(projects) => json_response(StatusCode::OK, json!({"projects": projects})),
+        Err(error) => json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": error})),
     }
 }
 
@@ -62,27 +56,27 @@ fn known_project(requested: &str) -> Option<PathBuf> {
 async fn project_info(Query(query): Query<HashMap<String, String>>) -> Response {
     let Some(project) = known_project(query.get("project").map(String::as_str).unwrap_or(""))
     else {
-        return response(StatusCode::BAD_REQUEST, json!({"error": "unknown project"}));
+        return json_response(StatusCode::BAD_REQUEST, json!({"error": "unknown project"}));
     };
-    response(StatusCode::OK, design::build_project_info(&project))
+    json_response(StatusCode::OK, design::build_project_info(&project))
 }
 
 async fn design_system(Query(query): Query<HashMap<String, String>>) -> Response {
     let Some(requested) = query.get("project").filter(|value| !value.is_empty()) else {
-        return response(StatusCode::NOT_FOUND, json!({"error": "project required"}));
+        return json_response(StatusCode::NOT_FOUND, json!({"error": "project required"}));
     };
     let Some(project) = known_project(requested) else {
-        return response(StatusCode::NOT_FOUND, json!({"error": "unknown project"}));
+        return json_response(StatusCode::NOT_FOUND, json!({"error": "unknown project"}));
     };
     match design::read_project_design_system(&project) {
-        Ok(design) => response(StatusCode::OK, design),
+        Ok(design) => json_response(StatusCode::OK, design),
         Err(error) => {
             let status = if error.contains("not found") {
                 StatusCode::NOT_FOUND
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
             };
-            response(status, json!({"error": error}))
+            json_response(status, json!({"error": error}))
         }
     }
 }

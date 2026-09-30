@@ -1,21 +1,11 @@
 use crate::server::{
-    log_stream::sse_tailer::{HEARTBEAT_MS, tail_poll_ms},
-    sources::{opencode_db, opencode_timestamp_ms},
+    log_stream::sse_tailer::{HEARTBEAT_MS, sse_response, tail_poll_ms},
+    sources::opencode_timestamp_ms,
 };
-use axum::{body::Body, response::IntoResponse};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
-use std::{
-    collections::HashSet,
-    io,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
-    time::Instant,
-};
+use std::{collections::HashSet, time::Duration};
+use tokio::time::Instant;
 
 const BACKLOG_LINES: i64 = 50;
 
@@ -39,16 +29,6 @@ fn compact_path(path: &str) -> String {
 
 fn nonnull<'a>(values: impl IntoIterator<Item = &'a Value>) -> Option<&'a Value> {
     values.into_iter().find(|value| !value.is_null())
-}
-
-fn truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(value) => *value,
-        Value::Number(value) => value.as_f64().is_some_and(|value| value != 0.0),
-        Value::String(value) => !value.is_empty(),
-        _ => true,
-    }
 }
 
 fn part_content(part: &Value) -> Vec<Value> {
@@ -127,19 +107,17 @@ fn entries(rows: &[Row]) -> Vec<Value> {
     // A vector preserves JS Map first-seen order; preserve_order keeps TS field insertion order.
     let mut groups: Vec<(&Row, Vec<Value>)> = Vec::new();
     for row in rows {
-        let index = groups
-            .iter()
-            .position(|(first, _)| first.id == row.id)
-            .unwrap_or_else(|| {
-                groups.push((row, Vec::new()));
-                groups.len() - 1
-            });
+        // read_rows orders by (message created, message id), so a message's rows are contiguous.
+        if groups.last().is_none_or(|(first, _)| first.id != row.id) {
+            groups.push((row, Vec::new()));
+        }
         if let Some(part) = row
             .part
             .as_deref()
             .and_then(|part| serde_json::from_str::<Value>(part).ok())
+            && let Some((_, parts)) = groups.last_mut()
         {
-            groups[index].1.extend(part_content(&part));
+            parts.extend(part_content(&part));
         }
     }
     let mut output = Vec::new();
@@ -155,7 +133,7 @@ fn entries(rows: &[Row]) -> Vec<Value> {
             nonnull([&data["content"], &data["text"]])
                 .cloned()
                 .unwrap_or_else(|| {
-                    if truthy(&data["summary"]) {
+                    if crate::server::opencode::js_truthy(&data["summary"]) {
                         json!(serde_json::to_string_pretty(&data["summary"]).unwrap_or_default())
                     } else {
                         json!("")
@@ -183,7 +161,10 @@ fn entries(rows: &[Row]) -> Vec<Value> {
 
 fn read_rows(session: &str, cursor: i64) -> Vec<Row> {
     let read = || -> rusqlite::Result<Vec<Row>> {
-        let db = Connection::open_with_flags(opencode_db(), OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let db = Connection::open_with_flags(
+            crate::paths::opencode_db(),
+            OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
         let mut query = db.prepare("select m.id as message_id, m.time_created as message_created, m.time_updated as message_updated, m.data as message_data, p.id as part_id, p.time_created as part_created, p.data as part_data from (select id, session_id, time_created, time_updated, data from message where session_id = ? and time_updated > ? order by time_updated desc, id desc limit ?) m left join part p on p.message_id = m.id order by m.time_created asc, m.id asc, p.time_created asc, p.id asc")?;
         query
             .query_map((session, cursor, BACKLOG_LINES), |row| {
@@ -219,55 +200,8 @@ fn emit_rows(rows: &[Row], cursor: &mut i64, seen: &mut HashSet<String>) -> Stri
     output
 }
 
-// Dropping the HTTP body aborts the poller even when no database rows arrive.
-struct Reader {
-    inner: tokio::io::DuplexStream,
-    task: tokio::task::JoinHandle<()>,
-}
-impl Drop for Reader {
-    fn drop(&mut self) {
-        self.task.abort();
-    }
-}
-impl AsyncRead for Reader {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buffer: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buffer)
-    }
-}
-impl AsyncWrite for Reader {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bytes: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.inner).poll_write(cx, bytes)
-    }
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
-    }
-}
-
 pub(super) fn stream(session: String) -> axum::response::Response {
-    use std::{future::Future, task::Waker};
-    use tokio_tungstenite::{
-        WebSocketStream,
-        tungstenite::protocol::{
-            Role,
-            frame::{
-                Frame,
-                coding::{Data, OpCode},
-            },
-        },
-    };
-    let (reader, mut writer) = tokio::io::duplex(64 * 1024);
-    let task = tokio::spawn(async move {
+    sse_response(|sender| async move {
         let mut cursor = 0;
         let mut seen = HashSet::new();
         let mut chunk = format!(
@@ -278,15 +212,8 @@ pub(super) fn stream(session: String) -> axum::response::Response {
         let mut poll = Instant::now() + cadence;
         let mut heartbeat = Instant::now() + Duration::from_millis(HEARTBEAT_MS);
         loop {
-            if !chunk.is_empty() {
-                let mut bytes = Vec::new();
-                if Frame::message(chunk.into_bytes(), OpCode::Data(Data::Binary), true)
-                    .format(&mut bytes)
-                    .is_err()
-                    || writer.write_all(&bytes).await.is_err()
-                {
-                    break;
-                }
+            if !chunk.is_empty() && sender.send(chunk).await.is_err() {
+                break;
             }
             chunk = tokio::select! {
                 _ = tokio::time::sleep_until(poll) => {
@@ -299,29 +226,7 @@ pub(super) fn stream(session: String) -> axum::response::Response {
                 }
             };
         }
-    });
-    let reader = Reader {
-        inner: reader,
-        task,
-    };
-    let mut constructor =
-        std::pin::pin!(WebSocketStream::from_raw_socket(reader, Role::Client, None));
-    // Match the shared tailer envelope without adding a stream dependency.
-    let Poll::Ready(stream) = constructor
-        .as_mut()
-        .poll(&mut Context::from_waker(Waker::noop()))
-    else {
-        unreachable!("from_raw_socket performs no asynchronous I/O")
-    };
-    (
-        [
-            ("content-type", "text/event-stream"),
-            ("cache-control", "no-cache"),
-            ("connection", "keep-alive"),
-        ],
-        Body::from_stream(stream),
-    )
-        .into_response()
+    })
 }
 
 #[cfg(test)]

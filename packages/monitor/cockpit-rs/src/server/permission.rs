@@ -1,21 +1,21 @@
 use super::{
     AppState,
-    broker::{budget, error, expires, parse, reply, validate},
+    broker::{budget, expires, parse, validate},
+    json_error, json_response,
     sources::resolve_claude_transcript_path,
 };
 use axum::{
     Router,
-    body::{Body, Bytes},
+    body::Bytes,
     extract::{Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::Response,
     routing::any,
 };
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
-    io,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -149,19 +149,20 @@ async fn mutate(State(state): State<AppState>, uri: axum::http::Uri, body: Bytes
         .and_then(Value::as_str)
         .filter(|s| !s.is_empty())
     else {
-        return error(StatusCode::BAD_REQUEST, "invalid request_id");
+        return json_error(StatusCode::BAD_REQUEST, "invalid request_id");
     };
     match uri.path() {
-        "/api/permission-resolved" => {
-            reply(json!({"resolved": resolve_elsewhere(&state, session, id)}))
-        }
+        "/api/permission-resolved" => json_response(
+            StatusCode::OK,
+            json!({"resolved": resolve_elsewhere(&state, session, id)}),
+        ),
         "/api/permission-verdict" => {
             let Some(behavior) = body
                 .get("behavior")
                 .and_then(Value::as_str)
                 .filter(|s| matches!(*s, "allow" | "deny"))
             else {
-                return error(StatusCode::BAD_REQUEST, "invalid behavior");
+                return json_error(StatusCode::BAD_REQUEST, "invalid behavior");
             };
             let mut entries = state
                 .permission
@@ -169,7 +170,7 @@ async fn mutate(State(state): State<AppState>, uri: axum::http::Uri, body: Bytes
                 .lock()
                 .expect("permission lock poisoned");
             if !take_pending(&mut entries, session).is_some_and(|p| p.id == id) {
-                return error(StatusCode::CONFLICT, "stale request");
+                return json_error(StatusCode::CONFLICT, "stale request");
             }
             entries.pending.remove(session);
             let verdict = json!({"request_id": id, "behavior": behavior});
@@ -186,7 +187,7 @@ async fn mutate(State(state): State<AppState>, uri: axum::http::Uri, body: Bytes
                 session,
                 &frame(json!({"type": "resolved", "request_id": id, "source": "ui"})),
             );
-            reply(json!({"delivered": delivered}))
+            json_response(StatusCode::OK, json!({"delivered": delivered}))
         }
         _ => {
             let prior = state
@@ -245,7 +246,7 @@ async fn mutate(State(state): State<AppState>, uri: axum::http::Uri, body: Bytes
                 pending.watcher = Some(watcher);
                 pending.tasks.push(task);
             }
-            reply(json!({"ok": true}))
+            json_response(StatusCode::OK, json!({"ok": true}))
         }
     }
 }
@@ -286,7 +287,7 @@ async fn pull(
         if let Some((verdict, deadline)) = entries.verdict_stash.remove(session)
             && deadline > Instant::now()
         {
-            return reply(verdict);
+            return json_response(StatusCode::OK, verdict);
         }
         if let Some((_, sender)) = entries.pulls.remove(session) {
             let _ = sender.send(timeout());
@@ -310,7 +311,7 @@ async fn pull(
         .and_then(Result::ok)
         .unwrap_or_else(timeout);
     drop(guard);
-    reply(value)
+    json_response(StatusCode::OK, value)
 }
 async fn stream(
     State(state): State<AppState>,
@@ -350,81 +351,8 @@ pub fn router() -> Router<AppState> {
         .route("/api/permission-pull", any(pull))
 }
 
-// Match the tailer SSE envelope using its existing WebSocketStream framing dependency.
-struct FrameReader {
-    receiver: mpsc::UnboundedReceiver<Vec<u8>>,
-    pending: io::Cursor<Vec<u8>>,
-    task: tokio::task::JoinHandle<()>,
-}
-
-impl Drop for FrameReader {
-    fn drop(&mut self) {
-        self.task.abort();
-    }
-}
-
-impl tokio::io::AsyncRead for FrameReader {
-    fn poll_read(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buffer: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<io::Result<()>> {
-        loop {
-            let position = self.pending.position() as usize;
-            if position < self.pending.get_ref().len() {
-                let length = buffer
-                    .remaining()
-                    .min(self.pending.get_ref().len() - position);
-                buffer.put_slice(&self.pending.get_ref()[position..position + length]);
-                self.pending.set_position((position + length) as u64);
-                return std::task::Poll::Ready(Ok(()));
-            }
-            match self.receiver.poll_recv(cx) {
-                std::task::Poll::Ready(Some(bytes)) => self.pending = io::Cursor::new(bytes),
-                std::task::Poll::Ready(None) => return std::task::Poll::Ready(Ok(())),
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-            }
-        }
-    }
-}
-
-impl tokio::io::AsyncWrite for FrameReader {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-        bytes: &[u8],
-    ) -> std::task::Poll<io::Result<usize>> {
-        std::task::Poll::Ready(Ok(bytes.len()))
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<io::Result<()>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<io::Result<()>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-}
-
 async fn sse_response(mut receiver: mpsc::UnboundedReceiver<String>) -> Response {
-    use tokio_tungstenite::{
-        WebSocketStream,
-        tungstenite::protocol::{
-            Role,
-            frame::{
-                Frame,
-                coding::{Data, OpCode},
-            },
-        },
-    };
-    let (sender, frames) = mpsc::unbounded_channel();
-    let task = tokio::spawn(async move {
+    super::log_stream::sse_tailer::sse_response(|sender| async move {
         let mut heartbeat = tokio::time::interval(Duration::from_millis(
             super::log_stream::sse_tailer::HEARTBEAT_MS,
         ));
@@ -435,31 +363,11 @@ async fn sse_response(mut receiver: mpsc::UnboundedReceiver<String>) -> Response
                 chunk = receiver.recv() => { let Some(chunk) = chunk else { break; }; chunk },
                 _ = heartbeat.tick() => ": ping\n\n".into(),
             };
-            let mut bytes = Vec::new();
-            if Frame::message(chunk.into_bytes(), OpCode::Data(Data::Binary), true)
-                .format(&mut bytes)
-                .is_err()
-                || sender.send(bytes).is_err()
-            {
+            if sender.send(chunk).await.is_err() {
                 break;
             }
         }
-    });
-    let reader = FrameReader {
-        receiver: frames,
-        pending: io::Cursor::new(Vec::new()),
-        task,
-    };
-    let stream = WebSocketStream::from_raw_socket(reader, Role::Client, None).await;
-    (
-        [
-            ("content-type", "text/event-stream"),
-            ("cache-control", "no-cache"),
-            ("connection", "keep-alive"),
-        ],
-        Body::from_stream(stream),
-    )
-        .into_response()
+    })
 }
 
 #[cfg(test)]

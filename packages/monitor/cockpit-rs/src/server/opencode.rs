@@ -1,19 +1,15 @@
-use super::AppState;
+use super::{AppState, json_error, json_response};
 use axum::{
     Router,
     body::Bytes,
     extract::Query,
     http::StatusCode,
-    response::IntoResponse,
     routing::{get, post},
 };
 use regex::Regex;
 use reqwest::{Client, RequestBuilder};
 use serde_json::{Value, json};
 use std::{collections::HashMap, process::Stdio, sync::LazyLock, time::Duration};
-
-#[derive(Default)]
-pub struct OpencodeState {}
 
 const UNAVAILABLE: &str = "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
 
@@ -205,7 +201,7 @@ async fn send(client: &Client, report: &mut Report, text: &str) {
     report.delivered = true;
 }
 
-fn js_truthy(value: &Value) -> bool {
+pub(crate) fn js_truthy(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(value) => *value,
@@ -232,18 +228,6 @@ fn js_string(value: &Value) -> String {
             .join(","),
         _ => value.to_string(),
     }
-}
-
-fn response(status: StatusCode, body: Value) -> axum::response::Response {
-    (
-        status,
-        [
-            ("content-type", "application/json; charset=utf-8"),
-            ("cache-control", "no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
 }
 
 fn validate<'a>(
@@ -279,7 +263,7 @@ async fn status(Query(query): Query<HashMap<String, String>>) -> axum::response:
         query.get("session").map(String::as_str),
     ) {
         Ok(session) => session,
-        Err((status, error)) => return response(status, json!({"error": error})),
+        Err((status, error)) => return json_error(status, error),
     };
     let report = check(&Client::new(), candidates().await, session).await;
     let mut body = json!({"ready": report.ready});
@@ -288,20 +272,20 @@ async fn status(Query(query): Query<HashMap<String, String>>) -> axum::response:
     }
     body["warnings"] = json!([]);
     body["errors"] = json!(report.errors);
-    response(StatusCode::OK, body)
+    json_response(StatusCode::OK, body)
 }
 
 async fn message(bytes: Bytes) -> axum::response::Response {
     let body: Value = match serde_json::from_slice(&bytes) {
         Ok(body) => body,
-        Err(_) => return response(StatusCode::BAD_REQUEST, json!({"error": "invalid json"})),
+        Err(_) => return json_error(StatusCode::BAD_REQUEST, "invalid json"),
     };
     let session = match validate(
         body.get("token"),
         body.get("session").and_then(Value::as_str),
     ) {
         Ok(session) => session,
-        Err((status, error)) => return response(status, json!({"error": error})),
+        Err((status, error)) => return json_error(status, error),
     };
     let text = body
         .get("text")
@@ -309,19 +293,19 @@ async fn message(bytes: Bytes) -> axum::response::Response {
         .unwrap_or_default()
         .trim();
     if text.is_empty() {
-        return response(StatusCode::BAD_REQUEST, json!({"error": "empty text"}));
+        return json_error(StatusCode::BAD_REQUEST, "empty text");
     }
     let client = Client::new();
     let mut report = check(&client, candidates().await, session).await;
     send(&client, &mut report, text).await;
     if !report.delivered {
         let error = report.errors.join("; ");
-        return response(
+        return json_response(
             StatusCode::BAD_GATEWAY,
             json!({"error": if error.is_empty() { "OpenCode send failed".into() } else { error }, "warnings": []}),
         );
     }
-    response(
+    json_response(
         StatusCode::OK,
         json!({"delivered": true, "delivery": "tui", "serverUrl": report.server, "warnings": []}),
     )
@@ -421,7 +405,7 @@ mod tests {
             "/tui/append-prompt" if fail => json!({"data": {"message": "append denied"}}),
             _ => json!(true),
         };
-        response(StatusCode::OK, body)
+        json_response(StatusCode::OK, body)
     }
 
     #[test]

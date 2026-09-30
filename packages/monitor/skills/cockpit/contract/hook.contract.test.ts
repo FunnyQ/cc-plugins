@@ -386,10 +386,9 @@ describe("hook: stop", () => {
     const claude = join(bin, "claude");
     writeFileSync(claude, `#!${process.execPath}\nimport { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(capture)}, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), delegated: process.env.RELAY_DELEGATED }));\n`);
     chmodSync(claude, 0o755);
-    const { underTest } = await import("./launcher");
     const skill = join(PLUGIN_ROOT, "skills/cockpit");
-    const cli = join(skill, underTest === "rust" ? "bin/cockpit" : "scripts/cockpit.ts");
-    const invocation = `${underTest === "rust" ? "" : "bun "}${cli}`;
+    const cli = join(skill, "bin/cockpit");
+    const invocation = cli;
     const refs = join(skill, "references");
     const session = fixtures.claudeSessionId;
     const prompt = `Scribe this session's decision log. In one turn, read ${refs}/scribe.md and run \`${invocation} scribe --prep --session ${session}\`. Then follow scribe.md: the CLI is ${cli}, and every call passes --session ${session}. Spell each call as \`${invocation} scribe …\`, never through a shell variable. When done, reply with one line.`;

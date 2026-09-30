@@ -1,53 +1,30 @@
 use super::{flag_value, positionals};
-use crate::{call_log, daemon_info, process_alive, registry, tunables};
+use crate::{
+    call_log,
+    daemon_info::{self, DaemonCoords},
+    process_alive, registry,
+    server::opencode::js_truthy,
+    tunables,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{
-    fs,
     process::ExitCode,
     time::{Duration, Instant},
 };
 use tokio::time::sleep;
 
-pub struct Daemon {
-    pub pid: Option<i32>,
-    pub port: u16,
-    pub token: String,
-}
-pub fn read_daemon() -> Option<Daemon> {
-    let record = daemon_info::read_daemon_info()?;
-    Some(Daemon {
-        pid: record.pid,
-        port: record.port?,
-        token: record.token?,
-    })
-}
-fn require_daemon() -> Result<Daemon, String> {
-    read_daemon()
+fn require_daemon() -> Result<DaemonCoords, String> {
+    daemon_info::read_daemon_info()
         .filter(|d| !d.pid.is_some_and(|p| !process_alive::is_alive(p)))
+        .and_then(|d| d.coords())
         .ok_or_else(|| "cockpit daemon not running — start the dashboard first".into())
 }
 pub fn resolve_call_id(session: &str, explicit: Option<&str>) -> Option<String> {
     if let Some(call) = explicit.filter(|s| !s.is_empty()) {
         return Some(call.into());
     }
-    let entry = registry::read_registry()
-        .into_iter()
-        .find(|e| e.session_id() == session)?;
-    let text = fs::read_to_string(entry.log_path()).ok()?;
-    call_log::latest_open_call_id(&text.split('\n').collect::<Vec<_>>())
-}
-pub fn encode_component(value: &str) -> String {
-    let mut out = String::new();
-    for b in value.bytes() {
-        if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) {
-            out.push(b as char);
-        } else {
-            use std::fmt::Write;
-            let _ = write!(out, "%{b:02X}");
-        }
-    }
-    out
+    call_log::latest_open_call_in(registry::entry_for(session)?.log_path())
 }
 pub fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
@@ -55,19 +32,10 @@ pub fn client() -> Result<reqwest::Client, String> {
         .build()
         .map_err(|e| e.to_string())
 }
-fn truthy(v: &Value) -> bool {
-    match v {
-        Value::Null => false,
-        Value::Bool(v) => *v,
-        Value::Number(v) => v.as_f64().is_some_and(|n| n != 0.0),
-        Value::String(v) => !v.is_empty(),
-        _ => true,
-    }
-}
 async fn error_text(res: reqwest::Response) -> String {
     let status = res.status().as_u16();
     if let Ok(body) = res.json::<Value>().await
-        && let Some(error) = body.get("error").filter(|v| truthy(v))
+        && let Some(error) = body.get("error").filter(|v| js_truthy(v))
     {
         let error = error
             .as_str()
@@ -132,7 +100,7 @@ async fn command(sub: &str, rest: &[String]) -> Result<u8, String> {
             return Err(format!("cockpit send: {}", error_text(res).await));
         }
         let data = res.json::<Value>().await.unwrap_or(Value::Null);
-        if data.get("delivered").is_some_and(truthy) {
+        if data.get("delivered").is_some_and(js_truthy) {
             println!("delivered: true");
         } else {
             println!(
@@ -143,30 +111,29 @@ async fn command(sub: &str, rest: &[String]) -> Result<u8, String> {
     }
     // COCKPIT_WAIT_MAX_MS is the TS-honored total wait override, defaulting to six hours.
     let max = Duration::from_millis(tunables::env_int("COCKPIT_WAIT_MAX_MS", 21_600_000));
-    let mut url = format!(
-        "http://127.0.0.1:{}/api/wait?session={}&token={}&require_watcher=1",
-        d.port,
-        encode_component(session),
-        encode_component(&d.token)
-    );
+    let mut query = vec![
+        ("session", session.to_owned()),
+        ("token", d.token.clone()),
+        ("require_watcher", "1".to_owned()),
+    ];
     if let Some(call) = call.filter(|s| !s.is_empty()) {
-        url.push_str(&format!("&call={}", encode_component(&call)));
+        query.push(("call", call));
     }
+    let url = format!("http://127.0.0.1:{}/api/wait", d.port);
     let start = Instant::now();
     let mut failures = 0;
     while start.elapsed() < max {
-        let res = match client.get(&url).send().await {
+        let res = match client.get(&url).query(&query).send().await {
             Ok(res) => {
                 failures = 0;
                 res
             }
             Err(e) => {
                 failures += 1;
-                let fresh = read_daemon();
+                let fresh = daemon_info::read_daemon_info();
                 if failures >= 3
                     || fresh.is_none_or(|f| {
-                        f.port != d.port
-                            || f.token != d.token
+                        f.coords().as_ref() != Some(&d)
                             || f.pid.is_some_and(|p| !process_alive::is_alive(p))
                     })
                 {
@@ -207,14 +174,7 @@ async fn command(sub: &str, rest: &[String]) -> Result<u8, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn component_matches_javascript() {
-        assert_eq!(encode_component("session/ with&"), "session%2F%20with%26");
-        assert_eq!(
-            encode_component("!~*'()-_.中文"),
-            "!~*'()-_.%E4%B8%AD%E6%96%87"
-        );
-    }
+    use std::fs;
     #[test]
     fn resolves_call_from_registry_and_explicit_override() {
         let env = crate::paths::tests::TestEnv::new();

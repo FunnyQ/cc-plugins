@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { command, PLUGIN_ROOT, SCRIPTS_DIR, underTest } from "./launcher";
+import { command, PLUGIN_ROOT, SCRIPTS_DIR } from "./launcher";
 import {
   baseEnv, cleanup, fixtureEnv, makeHomes, makeProviderFixtures,
   startDaemon, stopDaemon,
@@ -9,7 +9,6 @@ import {
 
 describe("harness: launcher", () => {
   test("maps every process and CLI subcommand to the binary", () => {
-    expect(underTest).toBe("rust");
     expect(SCRIPTS_DIR).toBe(join(PLUGIN_ROOT, "skills/cockpit/scripts"));
     const binary = process.env.COCKPIT_BIN || join(PLUGIN_ROOT, "cockpit-rs/target/release/cockpit");
     expect(command("server", ["--port", "1"])).toEqual([binary, "server", "--port", "1"]);

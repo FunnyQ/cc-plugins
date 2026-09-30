@@ -1,10 +1,21 @@
 use serde_json::Value;
 use std::collections::HashSet;
 
-pub fn latest_open_call_id(lines: &[&str]) -> Option<String> {
+pub fn latest_open_call_in(path: &str) -> Option<String> {
+    if path.is_empty() {
+        return None;
+    }
+    latest_open_call_id(std::fs::read_to_string(path).ok()?.lines())
+}
+
+pub fn latest_open_call_id<'a, I>(lines: I) -> Option<String>
+where
+    I: IntoIterator<Item = &'a str>,
+    I::IntoIter: DoubleEndedIterator,
+{
     let mut answered_calls = HashSet::new();
     let mut saw_legacy_response = false;
-    for line in lines.iter().rev() {
+    for line in lines.into_iter().rev() {
         let Ok(record) = serde_json::from_str::<Value>(line.trim()) else {
             continue;
         };
@@ -45,19 +56,19 @@ mod tests {
 
     #[test]
     fn empty_and_goal_only_logs_have_no_open_call() {
-        assert_eq!(latest_open_call_id(&[]), None);
-        assert_eq!(latest_open_call_id(&[GOAL]), None);
+        assert_eq!(latest_open_call_id([]), None);
+        assert_eq!(latest_open_call_id([GOAL]), None);
     }
 
     #[test]
     fn returns_the_open_call_id() {
-        assert_eq!(latest_open_call_id(&[GOAL, C1]).as_deref(), Some("c1"));
+        assert_eq!(latest_open_call_id([GOAL, C1]).as_deref(), Some("c1"));
     }
 
     #[test]
     fn plain_decisions_are_not_calls() {
         assert_eq!(
-            latest_open_call_id(&[
+            latest_open_call_id([
                 GOAL,
                 r#"{"type":"decision","id":"d1","needs_your_call":false}"#
             ]),
@@ -67,33 +78,33 @@ mod tests {
 
     #[test]
     fn response_closes_its_call() {
-        assert_eq!(latest_open_call_id(&[GOAL, C1, R1]), None);
+        assert_eq!(latest_open_call_id([GOAL, C1, R1]), None);
     }
 
     #[test]
     fn latest_call_is_open_after_earlier_answer() {
         assert_eq!(
-            latest_open_call_id(&[GOAL, C1, R1, C2]).as_deref(),
+            latest_open_call_id([GOAL, C1, R1, C2]).as_deref(),
             Some("c2")
         );
     }
 
     #[test]
     fn most_recent_response_closes_latest_call() {
-        assert_eq!(latest_open_call_id(&[GOAL, C1, C2, R2]), None);
+        assert_eq!(latest_open_call_id([GOAL, C1, C2, R2]), None);
     }
 
     #[test]
     fn answering_older_call_leaves_latest_open() {
         assert_eq!(
-            latest_open_call_id(&[GOAL, C1, C2, R1]).as_deref(),
+            latest_open_call_id([GOAL, C1, C2, R1]).as_deref(),
             Some("c2")
         );
     }
 
     #[test]
     fn answering_latest_never_reopens_superseded_call() {
-        assert_eq!(latest_open_call_id(&[GOAL, C1, C2, R2]), None);
+        assert_eq!(latest_open_call_id([GOAL, C1, C2, R2]), None);
     }
 
     #[test]
@@ -103,18 +114,18 @@ mod tests {
             r#"{"type":"response"}"#,
             r#"{"type":"response","call":42}"#,
         ] {
-            assert_eq!(latest_open_call_id(&[GOAL, C1, C2, response]), None);
+            assert_eq!(latest_open_call_id([GOAL, C1, C2, response]), None);
         }
     }
 
     #[test]
     fn blank_malformed_and_nonobject_lines_are_skipped() {
         assert_eq!(
-            latest_open_call_id(&["", "  ", "not json", C1]).as_deref(),
+            latest_open_call_id(["", "  ", "not json", C1]).as_deref(),
             Some("c1")
         );
         assert_eq!(
-            latest_open_call_id(&[C1, "\n", "{", "null", "42", "[]", "true", r#""text""#])
+            latest_open_call_id([C1, "\n", "{", "null", "42", "[]", "true", r#""text""#])
                 .as_deref(),
             Some("c1")
         );
@@ -127,14 +138,14 @@ mod tests {
             r#"{"type":"decision","needs_your_call":true,"id":null}"#,
             r#"{"type":"decision","needs_your_call":true,"id":42}"#,
         ] {
-            assert_eq!(latest_open_call_id(&[C1, call]), None);
+            assert_eq!(latest_open_call_id([C1, call]), None);
         }
     }
 
     #[test]
     fn only_boolean_true_marks_a_call_and_empty_ids_are_strings() {
         assert_eq!(
-            latest_open_call_id(&[
+            latest_open_call_id([
                 C1,
                 r#"{"type":"decision","id":"c2","needs_your_call":"true"}"#
             ])
@@ -142,11 +153,11 @@ mod tests {
             Some("c1")
         );
         assert_eq!(
-            latest_open_call_id(&[r#"{"type":"decision","id":"","needs_your_call":true}"#])
+            latest_open_call_id([r#"{"type":"decision","id":"","needs_your_call":true}"#])
                 .as_deref(),
             Some("")
         );
-        assert_eq!(latest_open_call_id(&[R1, C1]).as_deref(), Some("c1"));
+        assert_eq!(latest_open_call_id([R1, C1]).as_deref(), Some("c1"));
     }
 
     #[test]

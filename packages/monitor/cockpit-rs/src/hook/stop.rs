@@ -4,10 +4,9 @@ use serde_json::{Map, Value, json};
 use std::{
     fs,
     io::{self, Write},
-    os::unix::{fs::PermissionsExt, process::CommandExt},
+    os::unix::fs::PermissionsExt,
     path::Path,
     process::{Command, Stdio},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 const MARKER_TTL_MS: i64 = 24 * 60 * 60_000;
@@ -159,10 +158,7 @@ pub fn run() -> io::Result<()> {
         return Ok(());
     };
     let env: Env = std::env::vars().collect();
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(io::Error::other)?
-        .as_millis() as i64;
+    let now = crate::registry::now_ms();
     if reminder::should_skip(&env, &input, now) {
         return Ok(());
     }
@@ -247,17 +243,7 @@ pub fn run() -> io::Result<()> {
             .stdin(Stdio::null())
             .stderr(out.try_clone()?)
             .stdout(out);
-        // setsid detaches the child from the hook's process group and terminal.
-        unsafe {
-            command.pre_exec(|| {
-                if libc::setsid() < 0 {
-                    Err(io::Error::last_os_error())
-                } else {
-                    Ok(())
-                }
-            });
-        }
-        command.spawn()?;
+        crate::process_alive::detach(&mut command).spawn()?;
         return Ok(());
     }
     let text = build_reminder(

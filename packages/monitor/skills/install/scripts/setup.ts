@@ -177,13 +177,11 @@ function channelChecks(): Check[] {
     );
   }
   let executable = false;
-  if (existsSync(COCKPIT_SHIM)) {
-    try {
-      accessSync(COCKPIT_SHIM, constants.X_OK);
-      executable = true;
-    } catch {
-      // A partial install must report a non-executable shim as a required failure.
-    }
+  try {
+    accessSync(COCKPIT_SHIM, constants.X_OK);
+    executable = true;
+  } catch {
+    // A missing or non-executable shim is a partial install: a required failure.
   }
   add(
     "cockpit shim exists and is executable",

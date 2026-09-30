@@ -1,10 +1,15 @@
 use crate::{daemon_info, paths, process_alive};
-use axum::{Router, http::StatusCode, response::IntoResponse, routing::any};
+use axum::{
+    Router,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::any,
+};
 use std::{
     path::Path,
     process::{ExitCode, Stdio},
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 pub mod broker;
@@ -19,19 +24,12 @@ pub mod static_files;
 pub mod transcript;
 pub mod views;
 
-#[allow(dead_code)] // callers are the future route groups
 #[derive(Clone)]
 pub struct AppState {
     pub presence: Arc<presence::Presence>,
-    pub views: Arc<views::ViewsState>,
-    pub log_stream: Arc<log_stream::LogStreamState>,
-    pub transcript: Arc<transcript::TranscriptState>,
     pub broker: Arc<broker::BrokerState>,
     pub inbox: Arc<inbox::InboxState>,
     pub permission: Arc<permission::PermissionState>,
-    pub codex: Arc<codex::CodexState>,
-    pub opencode: Arc<opencode::OpencodeState>,
-    pub token: Arc<str>,
     pub plugin_root: Arc<Path>,
 }
 
@@ -74,19 +72,8 @@ fn open_browser(url: &str, no_open: bool) {
         .spawn();
 }
 
-fn wait_for_exit(pid: i32, timeout_ms: u64) {
-    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
-    while Instant::now() < deadline {
-        if !process_alive::is_alive(pid) {
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
-async fn token() -> impl IntoResponse {
-    let info =
-        daemon_info::read_daemon_info().filter(|info| info.pid.is_some() && info.port.is_some());
+async fn token() -> Response {
+    let info = daemon_info::read_process_info();
     let (status, body) = match info
         .and_then(|info| info.token)
         .filter(|token| !token.is_empty())
@@ -97,31 +84,37 @@ async fn token() -> impl IntoResponse {
             serde_json::json!({"error": "daemon token unavailable"}),
         ),
     };
+    json_response(status, body)
+}
+
+pub(crate) fn json_response(status: StatusCode, value: serde_json::Value) -> Response {
     (
         status,
         [
             ("content-type", "application/json; charset=utf-8"),
             ("cache-control", "no-store"),
         ],
-        body.to_string(),
+        value.to_string(),
     )
+        .into_response()
+}
+
+pub(crate) fn json_error(status: StatusCode, message: &str) -> Response {
+    json_response(status, serde_json::json!({"error": message}))
 }
 
 pub fn run(args: &[String]) -> ExitCode {
-    let plugin_root = match paths::plugin_root() {
-        Ok(root) => root,
+    let (plugin_root, root) = match paths::plugin_root()
+        .and_then(|plugin_root| daemon_info::daemon_root().map(|root| (plugin_root, root)))
+    {
+        Ok(roots) => roots,
         Err(error) => {
             eprintln!("{error}");
             return ExitCode::from(2);
         }
     };
-    let root = plugin_root
-        .join("skills/cockpit/scripts")
-        .to_string_lossy()
-        .into_owned();
     let no_open = args.iter().any(|arg| arg == "--no-open");
-    let info =
-        daemon_info::read_daemon_info().filter(|info| info.pid.is_some() && info.port.is_some());
+    let info = daemon_info::read_process_info();
     match daemon_info::decide_startup(info.as_ref(), &root, process_alive::is_alive) {
         daemon_info::StartupDecision::Reuse(info) => {
             let pid = info.pid.expect("startup reuse has a live pid");
@@ -137,17 +130,7 @@ pub fn run(args: &[String]) -> ExitCode {
                 "superseding stale cockpit daemon (pid {pid}, root {}) — this install is {root}",
                 info.root.as_deref().unwrap_or("unknown")
             );
-            // Only the recorded daemon selected by the core lifecycle rule may be terminated.
-            unsafe {
-                libc::kill(pid, libc::SIGTERM);
-            }
-            wait_for_exit(pid, 1500);
-            if process_alive::is_alive(pid) {
-                unsafe {
-                    libc::kill(pid, libc::SIGKILL);
-                }
-                wait_for_exit(pid, 1000);
-            }
+            process_alive::terminate(pid);
             std::thread::sleep(Duration::from_millis(100));
         }
         daemon_info::StartupDecision::Start => {}
@@ -175,13 +158,11 @@ pub fn run(args: &[String]) -> ExitCode {
         };
         let token = daemon_info::new_token();
         daemon_info::write_daemon_info(&daemon_info::DaemonInfo {
-            pid: std::process::id() as i32, port, token: token.clone(), root,
+            pid: std::process::id() as i32, port, token, root,
         });
         let state = AppState {
-            presence: Arc::default(), views: Arc::default(), log_stream: Arc::default(),
-            transcript: Arc::default(), broker: Arc::default(), inbox: Arc::default(),
-            permission: Arc::default(), codex: Arc::default(), opencode: Arc::default(),
-            token: token.into(), plugin_root: plugin_root.into(),
+            presence: Arc::default(), broker: Arc::default(), inbox: Arc::default(),
+            permission: Arc::default(), plugin_root: plugin_root.into(),
         };
         let router = Router::new().route("/api/token", any(self::token))
             .merge(views::router()).merge(log_stream::router()).merge(transcript::router())

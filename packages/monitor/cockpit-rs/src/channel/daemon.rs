@@ -1,10 +1,7 @@
-use crate::{paths, process_alive::is_alive};
-use serde_json::Value;
-use std::{
-    fs,
-    os::unix::process::CommandExt,
-    path::Path,
-    process::{Command, Stdio},
+pub use crate::daemon_info::{DaemonCoords, read_daemon_coords};
+use crate::{
+    daemon_info::{self, PartialDaemonInfo, should_supersede_daemon},
+    process_alive::is_alive,
 };
 use tokio::time::{Duration, Instant, sleep};
 
@@ -19,89 +16,28 @@ const POLL_JITTER_MS: f64 = 250.0;
 // Bound reconnect latency while a daemon is unavailable.
 const MAX_RECONNECT_MS: u64 = 30_000;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DaemonCoords {
-    pub port: u16,
-    pub token: String,
-}
-#[derive(Debug)]
-pub struct ProcessInfo {
-    pub pid: i32,
-    // Keep the required process-record interface even though liveness needs only pid.
-    #[cfg_attr(not(test), expect(dead_code))]
-    pub port: u16,
-    pub root: Option<String>,
-}
-
-pub fn read_daemon_coords() -> Option<DaemonCoords> {
-    read_coords(&paths::daemon_info_path())
-}
-fn read_coords(path: &Path) -> Option<DaemonCoords> {
-    let value: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
-    Some(DaemonCoords {
-        port: u16::try_from(value.get("port")?.as_u64()?).ok()?,
-        token: value.get("token")?.as_str()?.to_owned(),
-    })
-}
-pub fn read_process_info(path: &Path) -> Option<ProcessInfo> {
-    let value: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
-    Some(ProcessInfo {
-        pid: i32::try_from(value.get("pid")?.as_i64()?).ok()?,
-        port: u16::try_from(value.get("port")?.as_u64()?).ok()?,
-        root: value.get("root").and_then(Value::as_str).map(str::to_owned),
-    })
-}
-pub use crate::daemon_info::{compare_versions, version_from_root};
-pub fn should_supersede_daemon(daemon_root: Option<&str>, my_root: &str) -> bool {
-    let Some(root) = daemon_root.filter(|root| *root != my_root) else {
-        return false;
-    };
-    match (version_from_root(my_root), version_from_root(root)) {
-        (Some(mine), Some(theirs)) => {
-            compare_versions(&mine, &theirs) == std::cmp::Ordering::Greater
-        }
-        _ => false,
-    }
-}
-fn should_spawn(info: Option<&ProcessInfo>, my_root: &str, alive: impl Fn(i32) -> bool) -> bool {
+fn should_spawn(
+    info: Option<&PartialDaemonInfo>,
+    my_root: &str,
+    alive: impl Fn(i32) -> bool,
+) -> bool {
     info.is_none_or(|info| {
-        !alive(info.pid) || should_supersede_daemon(info.root.as_deref(), my_root)
+        !info.pid.is_some_and(&alive) || should_supersede_daemon(info.root.as_deref(), my_root)
     })
 }
-pub fn ensure_server(info_path: &Path, my_root: &str) -> bool {
-    if !should_spawn(read_process_info(info_path).as_ref(), my_root, is_alive) {
-        return false;
-    }
-    let Ok(executable) = std::env::current_exe() else {
-        return false;
-    };
-    let mut command = Command::new(executable);
-    command
-        .args(["server", "--no-open"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    // setsid detaches the server from the channel's terminal and process group.
-    unsafe {
-        command.pre_exec(|| {
-            if libc::setsid() == -1 {
-                Err(std::io::Error::last_os_error())
-            } else {
-                Ok(())
-            }
-        });
-    }
-    command.spawn().is_ok()
+pub fn ensure_server(my_root: &str) -> bool {
+    should_spawn(daemon_info::read_process_info().as_ref(), my_root, is_alive)
+        && daemon_info::spawn_detached_server(&["--no-open"])
+            .map(crate::process_alive::reap_in_background)
+            .is_ok()
 }
 pub async fn ensure_cockpit_daemon() -> Option<DaemonCoords> {
-    let root = paths::plugin_root().ok()?.join("skills/cockpit/scripts");
-    let info_path = paths::daemon_info_path();
-    ensure_server(&info_path, &root.to_string_lossy());
+    ensure_server(&daemon_info::daemon_root().ok()?);
     let deadline = Instant::now() + STARTUP_BUDGET;
     loop {
-        if let Some(info) = read_process_info(&info_path)
-            && is_alive(info.pid)
-            && let Some(coords) = read_daemon_coords()
+        if let Some(info) = daemon_info::read_process_info()
+            && info.pid.is_some_and(is_alive)
+            && let Some(coords) = info.coords()
         {
             return Some(coords);
         }
@@ -126,6 +62,10 @@ pub fn poll_floor_delay_ms(elapsed_ms: u64, floor_ms: u64, rand: f64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        daemon_info::{compare_versions, version_from_root},
+        paths,
+    };
     use std::cmp::Ordering;
     #[test]
     fn numeric_versions_and_supersede_convergence() {
@@ -148,9 +88,10 @@ mod tests {
         assert!(!should_supersede_daemon(Some("/repo/scripts"), new));
         assert!(!should_supersede_daemon(None, new));
         assert!(should_spawn(None, new, |_| true));
-        let info = ProcessInfo {
-            pid: 1,
-            port: 42,
+        let info = PartialDaemonInfo {
+            pid: Some(1),
+            port: Some(42),
+            token: None,
             root: Some(old.into()),
         };
         assert!(should_spawn(Some(&info), old, |_| false));
@@ -170,24 +111,25 @@ mod tests {
     }
     #[test]
     fn records_validate_fields_and_read_fresh() {
-        let dir = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
-        let file = dir.path().join("daemon.json");
-        assert!(read_coords(&file).is_none());
+        let fixture = crate::paths::tests::TestEnv::new();
+        crate::paths::tests::TestEnv::set("COCKPIT_HOME", fixture.dir.path());
+        let file = paths::daemon_info_path();
+        assert!(read_daemon_coords().is_none());
         for value in [
             r#"{"port":"42","token":"t","pid":1}"#,
             r#"{"port":42,"token":0,"pid":1}"#,
             "garbage",
         ] {
-            fs::write(&file, value).unwrap();
-            assert!(read_coords(&file).is_none());
+            std::fs::write(&file, value).unwrap();
+            assert!(read_daemon_coords().is_none());
         }
-        fs::write(&file, r#"{"port":42,"token":"t","pid":1,"root":4}"#).unwrap();
-        assert_eq!(read_coords(&file).unwrap().token, "t");
-        let info = read_process_info(&file).unwrap();
-        assert_eq!(info.port, 42);
+        std::fs::write(&file, r#"{"port":42,"token":"t","pid":1,"root":4}"#).unwrap();
+        assert_eq!(read_daemon_coords().unwrap().token, "t");
+        let info = daemon_info::read_process_info().unwrap();
+        assert_eq!(info.port, Some(42));
         assert_eq!(info.root, None);
-        fs::write(&file, r#"{"port":43,"token":"new","pid":"1"}"#).unwrap();
-        assert_eq!(read_coords(&file).unwrap().token, "new");
-        assert!(read_process_info(&file).is_none());
+        std::fs::write(&file, r#"{"port":43,"token":"new","pid":"1"}"#).unwrap();
+        assert_eq!(read_daemon_coords().unwrap().token, "new");
+        assert!(daemon_info::read_process_info().is_none());
     }
 }

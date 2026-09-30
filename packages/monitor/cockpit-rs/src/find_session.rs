@@ -2,12 +2,7 @@ use crate::paths;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use std::{env, fs, path::Path, str::FromStr};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Provider {
-    Claude,
-    Codex,
-    Opencode,
-}
+pub use crate::registry::Provider;
 
 impl FromStr for Provider {
     type Err = String;
@@ -46,10 +41,7 @@ pub fn find_session(provider: Provider, project: &Path) -> Option<String> {
 fn lookup(provider: Provider, project: &Path) -> Result<String, String> {
     if provider == Provider::Claude {
         if let Some(id) = trimmed_env("CLAUDE_CODE_SESSION_ID")
-            && id.len() == 36
-            && id
-                .bytes()
-                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c) || c == b'-')
+            && crate::registry::is_session_id(&id)
         {
             return Ok(id);
         }

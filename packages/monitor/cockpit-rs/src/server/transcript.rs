@@ -1,15 +1,10 @@
 use super::{
-    AppState,
+    AppState, json_error, json_response,
     log_stream::sse_tailer::{self, Backlog, Resolve, TailSource, split_complete_lines},
     sources,
 };
-use axum::{
-    Router,
-    extract::Query,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    routing::get,
-};
+use crate::registry::Provider;
+use axum::{Router, extract::Query, http::StatusCode, response::Response, routing::get};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -26,9 +21,6 @@ const BACKLOG_READ_CHUNK_BYTES: u64 = 256 * 1024;
 const MAX_BACKLOG_READ_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_HISTORY_LIMIT: usize = 200;
 
-#[derive(Default)]
-pub struct TranscriptState {}
-
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/transcript/stream", get(stream))
@@ -44,35 +36,14 @@ struct Params {
     limit: Option<String>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum Provider {
-    Claude,
-    Codex,
-    OpenCode,
-}
-
-fn json_response(status: StatusCode, value: Value) -> Response {
-    (
-        status,
-        [
-            ("content-type", "application/json; charset=utf-8"),
-            ("cache-control", "no-store"),
-        ],
-        value.to_string(),
-    )
-        .into_response()
-}
-fn error(message: &str, status: StatusCode) -> Response {
-    json_response(status, json!({"error":message}))
-}
 fn validate(params: &Params) -> Result<Provider, &'static str> {
     let provider = match params.provider.as_deref() {
         None | Some("" | "claude") => Provider::Claude,
         Some("codex") => Provider::Codex,
-        Some("opencode") => Provider::OpenCode,
+        Some("opencode") => Provider::Opencode,
         _ => return Err("invalid provider"),
     };
-    let valid = if provider == Provider::OpenCode {
+    let valid = if provider == Provider::Opencode {
         !params.session.is_empty()
             && params.session.len() <= 160
             && params
@@ -80,11 +51,7 @@ fn validate(params: &Params) -> Result<Provider, &'static str> {
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b':' | b'-'))
     } else {
-        params.session.len() == 36
-            && params
-                .session
-                .bytes()
-                .all(|b| matches!(b,b'0'..=b'9'|b'a'..=b'f'|b'-'))
+        crate::registry::is_session_id(&params.session)
     };
     if !valid {
         return Err("invalid session id");
@@ -180,9 +147,9 @@ fn parse_entries<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<Value> {
 async fn stream(Query(params): Query<Params>) -> Response {
     let provider = match validate(&params) {
         Ok(p) => p,
-        Err(message) => return error(message, StatusCode::BAD_REQUEST),
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };
-    if provider == Provider::OpenCode {
+    if provider == Provider::Opencode {
         return opencode_rows::stream(params.session);
     }
     sse_tailer::create_tail_stream(TranscriptSource {
@@ -236,7 +203,7 @@ fn js_number(value: Option<&str>) -> f64 {
 async fn history(Query(params): Query<Params>) -> Response {
     let provider = match validate(&params) {
         Ok(p) => p,
-        Err(message) => return error(message, StatusCode::BAD_REQUEST),
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };
     let empty = || {
         json_response(
@@ -245,7 +212,7 @@ async fn history(Query(params): Query<Params>) -> Response {
         )
     };
     let before = js_number(params.before.as_deref());
-    if provider == Provider::OpenCode || !before.is_finite() || before <= 0.0 {
+    if provider == Provider::Opencode || !before.is_finite() || before <= 0.0 {
         return empty();
     }
     let source = TranscriptSource {
@@ -255,7 +222,7 @@ async fn history(Query(params): Query<Params>) -> Response {
     let path = match source.resolve() {
         Resolve::Ready(path) => path,
         Resolve::Wait => return empty(),
-        Resolve::Fail { message, .. } => return error(&message, StatusCode::FORBIDDEN),
+        Resolve::Fail { message, .. } => return json_error(StatusCode::FORBIDDEN, &message),
     };
     let result = || -> io::Result<Value> {
         let end = before.min(fs::metadata(&path)?.len() as f64) as u64;
@@ -275,9 +242,9 @@ async fn history(Query(params): Query<Params>) -> Response {
     };
     match result() {
         Ok(value) => json_response(StatusCode::OK, value),
-        Err(_) => error(
-            "failed to read transcript history",
+        Err(_) => json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to read transcript history",
         ),
     }
 }

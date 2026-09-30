@@ -3,7 +3,6 @@ use std::{
     fs,
     io::{self, Write},
     os::unix::fs::PermissionsExt,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 const WHEN: &str = "DECISION LOG ACTIVE — /cockpit scribe is this session decision log. When you finish a chunk of work genuinely worth recording — a non-obvious decision between real alternatives, deliberate-but-odd code, a tricky learning, or a sharp caveat/ordering trap — spawn a background fork to distill it: ";
@@ -47,10 +46,7 @@ fn claude_on_path(env: &Env) -> bool {
 pub fn run() -> io::Result<()> {
     let input = parse_input(io::stdin().lock()).unwrap_or_default();
     let env: Env = std::env::vars().collect();
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(io::Error::other)?
-        .as_millis() as i64;
+    let now = crate::registry::now_ms();
     if reminder::should_skip(&env, &input, now)
         || (reminder::is_claude_code(&env, &input) && claude_on_path(&env))
     {

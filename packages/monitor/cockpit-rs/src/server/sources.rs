@@ -1,5 +1,3 @@
-#![allow(dead_code)] // Shared provider readers are used by later transcript and views routes.
-
 use crate::paths;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use std::{
@@ -8,23 +6,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn codex_dir() -> PathBuf {
-    paths::codex_dir()
-}
-
-pub fn codex_state_db() -> PathBuf {
-    paths::codex_state_db()
-}
-
-pub fn opencode_db() -> PathBuf {
-    paths::opencode_db()
-}
-
 pub fn codex_sessions_dir() -> PathBuf {
     env::var_os("COCKPIT_CODEX_SESSIONS_DIR")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .unwrap_or_else(|| codex_dir().join("sessions"))
+        .unwrap_or_else(|| paths::codex_dir().join("sessions"))
 }
 
 pub fn resolve_claude_transcript_path(id: &str) -> Option<PathBuf> {
@@ -45,12 +31,24 @@ pub fn resolve_claude_transcript_path(id: &str) -> Option<PathBuf> {
         }
         None
     }
-    find(&paths::claude_projects_dir(), &format!("{id}.jsonl"))
+    let root = paths::claude_projects_dir();
+    let name = format!("{id}.jsonl");
+    // Claude writes <projects>/<encoded cwd>/<id>.jsonl, so one stat per project spares the
+    // full walk through every subagent tree on each 3 s sessions poll.
+    for entry in fs::read_dir(&root).ok()?.flatten() {
+        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+            let path = entry.path().join(&name);
+            if fs::symlink_metadata(&path).is_ok_and(|meta| meta.is_file()) {
+                return Some(path);
+            }
+        }
+    }
+    find(&root, &name)
 }
 
 pub fn resolve_codex_rollout_path(id: &str) -> Option<PathBuf> {
-    let db =
-        Connection::open_with_flags(codex_state_db(), OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    let db = Connection::open_with_flags(paths::codex_state_db(), OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .ok()?;
     let path: String = db
         .query_row(
             "select rollout_path from threads where id = ?1 and archived = 0 and rollout_path != '' limit 1",
@@ -154,8 +152,8 @@ mod tests {
         let fixture = TestEnv::new();
         TestEnv::set("COCKPIT_CODEX_DIR", fixture.dir.path());
         assert_eq!(resolve_codex_rollout_path("missing"), None);
-        assert!(!codex_state_db().exists());
-        let db = Connection::open(codex_state_db()).unwrap();
+        assert!(!paths::codex_state_db().exists());
+        let db = Connection::open(paths::codex_state_db()).unwrap();
         assert_eq!(resolve_codex_rollout_path("missing"), None);
         db.execute_batch("create table threads (id text, archived integer, rollout_path text); insert into threads values ('relative',0,'sessions/file.jsonl'), ('absolute',0,'/absolute.jsonl'), ('archived',1,'old.jsonl'), ('empty',0,'');").unwrap();
         assert_eq!(
@@ -170,7 +168,7 @@ mod tests {
             assert_eq!(resolve_codex_rollout_path(id), None);
         }
         drop(db);
-        fs::write(codex_state_db(), "invalid sqlite").unwrap();
+        fs::write(paths::codex_state_db(), "invalid sqlite").unwrap();
         assert_eq!(resolve_codex_rollout_path("relative"), None);
     }
 

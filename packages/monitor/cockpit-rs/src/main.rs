@@ -7,37 +7,17 @@ mod server;
 
 mod hook;
 
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
-mod paths;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
 mod config;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
+mod paths;
 mod tunables;
 
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
-mod registry;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
-mod log_root;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
-mod daemon_info;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
-mod process_alive;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
 mod call_log;
+mod daemon_info;
+mod log_root;
+mod process_alive;
+mod registry;
 
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
 mod find_session;
-// Consumed by later subcommand ports.
-#[allow(dead_code)]
 mod nudge_toggle;
 
 mod cli;

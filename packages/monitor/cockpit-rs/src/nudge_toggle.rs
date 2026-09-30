@@ -5,12 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum NudgeState {
-    On,
-    Off,
-}
+pub use crate::config::NudgeState;
 pub enum NudgeScope {
     Session,
     Project,
@@ -77,18 +72,6 @@ fn session_state(session_id: Option<&str>, now_ms: i64) -> Option<NudgeState> {
         .and_then(|entry| entry.get("state"))
         .and_then(|state| serde_json::from_value(state.clone()).ok())
 }
-fn from_config(state: Option<config::NudgeState>) -> Option<NudgeState> {
-    state.map(|state| match state {
-        config::NudgeState::On => NudgeState::On,
-        config::NudgeState::Off => NudgeState::Off,
-    })
-}
-fn to_config(state: Option<NudgeState>) -> Option<config::NudgeState> {
-    state.map(|state| match state {
-        NudgeState::On => config::NudgeState::On,
-        NudgeState::Off => config::NudgeState::Off,
-    })
-}
 pub fn read_scopes(
     session_id: Option<&str>,
     cwd: &Path,
@@ -96,15 +79,16 @@ pub fn read_scopes(
 ) -> (Option<NudgeState>, Option<NudgeState>, Option<NudgeState>) {
     (
         session_state(session_id, now_ms),
-        from_config(config::get_project_nudge(
-            &project_key(cwd).to_string_lossy(),
-        )),
-        from_config(config::get_user_nudge()),
+        config::get_project_nudge(&project_key(cwd).to_string_lossy()),
+        config::get_user_nudge(),
     )
 }
+// Lazy on purpose: the project scope forks git, which a session override makes moot.
 pub fn nudge_enabled_for(session_id: Option<&str>, cwd: &Path, now_ms: i64) -> bool {
-    let (session, project, user) = read_scopes(session_id, cwd, now_ms);
-    resolve_nudge_enabled(session, project, user)
+    session_state(session_id, now_ms)
+        .or_else(|| config::get_project_nudge(&project_key(cwd).to_string_lossy()))
+        .or_else(config::get_user_nudge)
+        != Some(NudgeState::Off)
 }
 pub fn set_scope(
     scope: NudgeScope,
@@ -134,13 +118,13 @@ pub fn set_scope(
         NudgeScope::Project => {
             let key = project_key(cwd);
             let key = key.to_string_lossy();
-            let next = apply_action(action, from_config(config::get_project_nudge(&key)));
-            config::set_project_nudge(&key, to_config(next));
+            let next = apply_action(action, config::get_project_nudge(&key));
+            config::set_project_nudge(&key, next);
             next
         }
         NudgeScope::User => {
-            let next = apply_action(action, from_config(config::get_user_nudge()));
-            config::set_user_nudge(to_config(next));
+            let next = apply_action(action, config::get_user_nudge());
+            config::set_user_nudge(next);
             next
         }
     }

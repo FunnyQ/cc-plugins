@@ -28,7 +28,7 @@ function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: numb
   const home = join(root, "home");
   mkdirSync(home);
   const data = join(root, "data");
-  const installed = join(data, `q-lab/cockpit/bin/${version}/cockpit`);
+  const installed = join(data, `q-lab/cockpit-bin/${version}/cockpit`);
   let requests = 0;
   let assets = 0;
   const server = Bun.serve({
@@ -89,6 +89,8 @@ test("Download + verify + install", async () => {
   expect(existsSync(dirname(dirname(f.installed)))).toBe(false);
   success(await f.run(), f.plugin);
   expect(statSync(f.installed).mode & 0o111).not.toBe(0);
+  // The binary migrates a legacy ~/.cockpit only while the XDG cockpit home is absent.
+  expect(existsSync(join(f.root, "data/q-lab/cockpit"))).toBe(false);
   const requests = f.requests();
   expect(requests).toBe(2);
   success(await f.run(), f.plugin);
@@ -126,7 +128,7 @@ test("Unsupported platform", async () => {
   const f = fixture();
   const stubs = join(f.root, "stubs"); mkdirSync(stubs);
   const uname = join(stubs, "uname");
-  writeFileSync(uname, '#!/bin/sh\ncase "$1" in -s) echo Plan9;; -m) echo mips;; esac\n'); chmodSync(uname, 0o755);
+  writeFileSync(uname, '#!/bin/sh\ncase "$1" in -s) echo Plan9;; -m) echo mips;; -sm) echo Plan9 mips;; esac\n'); chmodSync(uname, 0o755);
   expect(await f.run([], { PATH: `${stubs}:${process.env.PATH}` })).toEqual({ code: 1, stdout: "", stderr: "cockpit: unsupported platform Plan9/mips\n" });
   expect(f.requests()).toBe(0);
 });

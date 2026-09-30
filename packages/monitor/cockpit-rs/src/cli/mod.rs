@@ -163,11 +163,8 @@ pub fn provider(args: &Args) -> Result<Provider, String> {
         Some(v) => Err(format!("cockpit: invalid provider \"{v}\"")),
     }
 }
-pub fn now_ms() -> i64 {
-    registry::now_ms()
-}
 pub fn timestamp() -> String {
-    registry::iso_timestamp(now_ms())
+    registry::iso_timestamp(registry::now_ms())
 }
 pub fn upsert(
     provider: Provider,
@@ -175,11 +172,6 @@ pub fn upsert(
     session: &str,
     logpath: &Path,
 ) -> std::io::Result<()> {
-    let provider = match provider {
-        Provider::Claude => registry::Provider::Claude,
-        Provider::Codex => registry::Provider::Codex,
-        Provider::Opencode => registry::Provider::Opencode,
-    };
     registry::upsert_session(RegistryEntry::new(
         provider,
         &cwd.to_string_lossy(),

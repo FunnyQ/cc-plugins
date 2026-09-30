@@ -1,11 +1,6 @@
-use super::AppState;
+use super::{AppState, json_error, json_response};
 use axum::{
-    Router,
-    body::Bytes,
-    extract::Query,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    routing::any,
+    Router, body::Bytes, extract::Query, http::StatusCode, response::Response, routing::any,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -14,9 +9,6 @@ use tokio::process::Command;
 
 mod transport;
 use transport::Transport;
-
-#[derive(Default)]
-pub struct CodexState {}
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -53,46 +45,14 @@ pub fn router() -> Router<AppState> {
         .route("/api/send-codex-message", any(send))
 }
 
-fn response(status: StatusCode, value: Value) -> Response {
-    (
-        status,
-        [
-            ("content-type", "application/json; charset=utf-8"),
-            ("cache-control", "no-store"),
-        ],
-        value.to_string(),
-    )
-        .into_response()
-}
-
-fn error(status: StatusCode, message: &str) -> Response {
-    response(status, json!({"error": message}))
-}
-
-fn authorized(token: Option<&str>) -> bool {
-    token.is_some_and(|token| {
-        crate::daemon_info::read_daemon_info()
-            .and_then(|info| info.token)
-            .as_deref()
-            == Some(token)
-    })
-}
-
-fn valid_session(session: &str) -> bool {
-    session.len() == 36
-        && session
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b) || b == b'-')
-}
-
 async fn status(Query(query): Query<HashMap<String, String>>) -> Response {
-    if !authorized(query.get("token").map(String::as_str)) {
-        return error(StatusCode::UNAUTHORIZED, "unauthorized");
-    }
-    let session = query.get("session").map(String::as_str).unwrap_or("");
-    if !valid_session(session) {
-        return error(StatusCode::BAD_REQUEST, "invalid session");
-    }
+    let session = match super::broker::validate(
+        query.get("token").map(String::as_str),
+        query.get("session").map(String::as_str),
+    ) {
+        Ok(session) => session,
+        Err(response) => return *response,
+    };
     let report = run_probe(Some(session), None).await;
     let mut value = json!({"ready": report.ok && report.resume_ok == Some(true)});
     if let Some(mode) = report.control_mode {
@@ -100,31 +60,31 @@ async fn status(Query(query): Query<HashMap<String, String>>) -> Response {
     }
     value["warnings"] = json!(report.warnings);
     value["errors"] = json!(report.errors);
-    response(StatusCode::OK, value)
+    json_response(StatusCode::OK, value)
 }
 
 async fn send(body: Bytes) -> Response {
     let Ok(body) = serde_json::from_slice::<Value>(&body) else {
-        return error(StatusCode::BAD_REQUEST, "invalid json");
+        return json_error(StatusCode::BAD_REQUEST, "invalid json");
     };
-    if !authorized(body.get("token").and_then(Value::as_str)) {
-        return error(StatusCode::UNAUTHORIZED, "unauthorized");
-    }
-    let session = body.get("session").and_then(Value::as_str).unwrap_or("");
-    if !valid_session(session) {
-        return error(StatusCode::BAD_REQUEST, "invalid session");
-    }
+    let session = match super::broker::validate(
+        body.get("token").and_then(Value::as_str),
+        body.get("session").and_then(Value::as_str),
+    ) {
+        Ok(session) => session,
+        Err(response) => return *response,
+    };
     let text = body
         .get("text")
         .and_then(Value::as_str)
         .unwrap_or("")
         .trim();
     if text.is_empty() {
-        return error(StatusCode::BAD_REQUEST, "empty text");
+        return json_error(StatusCode::BAD_REQUEST, "empty text");
     }
     let report = run_probe(Some(session), Some(text)).await;
     if !report.ok || (report.turn_start_ok != Some(true) && report.turn_steer_ok != Some(true)) {
-        return response(
+        return json_response(
             StatusCode::BAD_GATEWAY,
             json!({"error": if report.errors.is_empty() { "Codex send failed".into() } else { report.errors.join("; ") }, "warnings": report.warnings}),
         );
@@ -140,7 +100,7 @@ async fn send(body: Bytes) -> Response {
         value["turnStatus"] = json!(status);
     }
     value["warnings"] = json!(report.warnings);
-    response(StatusCode::OK, value)
+    json_response(StatusCode::OK, value)
 }
 
 async fn cli(args: &[&str]) -> Result<String, String> {
@@ -289,7 +249,7 @@ async fn run_probe(thread: Option<&str>, text: Option<&str>) -> ProbeReport {
     loop {
         let transport = if report.control_mode == Some("remote-control") {
             Transport::socket(
-                &super::sources::codex_dir().join("app-server-control/app-server-control.sock"),
+                &crate::paths::codex_dir().join("app-server-control/app-server-control.sock"),
             )
             .await
         } else {

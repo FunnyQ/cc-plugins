@@ -19,16 +19,10 @@ const SESSION_BUDGET: Duration = Duration::from_secs(3);
 // Retry without busy polling while the transcript appears.
 const SESSION_POLL: Duration = Duration::from_millis(100);
 
-fn valid_uuid(value: &str) -> bool {
-    value.len() == 36
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte) || byte == b'-')
-}
 fn environment_session(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
-        .filter(|value| valid_uuid(value))
+        .filter(|value| crate::registry::is_session_id(value))
         .map(str::to_owned)
 }
 pub fn session_id_from_command(command: &str) -> Option<String> {
@@ -47,11 +41,11 @@ pub fn session_id_from_command(command: &str) -> Option<String> {
             return tokens
                 .get(index + 1)
                 .copied()
-                .filter(|value| valid_uuid(value))
+                .filter(|value| crate::registry::is_session_id(value))
                 .map(str::to_owned);
         }
         let value = token.strip_prefix("--session-id=");
-        if let Some(value) = value.filter(|value| valid_uuid(value)) {
+        if let Some(value) = value.filter(|value| crate::registry::is_session_id(value)) {
             return Some(value.to_owned());
         }
     }
@@ -88,7 +82,7 @@ fn session_file(dir: &Path, pid: i32) -> Option<String> {
         return None;
     }
     let id = value.get("sessionId")?.as_str()?;
-    valid_uuid(id).then(|| id.to_owned())
+    crate::registry::is_session_id(id).then(|| id.to_owned())
 }
 fn resolve_initial(
     env: Option<&str>,

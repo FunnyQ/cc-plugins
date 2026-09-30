@@ -16,13 +16,15 @@ done
 COCKPIT_PLUGIN_ROOT=$(cd -P "$(dirname "$SHIM")/../../.." && pwd)
 export COCKPIT_PLUGIN_ROOT
 VERSION_FILE=$COCKPIT_PLUGIN_ROOT/.claude-plugin/plugin.json
-VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$VERSION_FILE" 2>/dev/null | head -n 1)
+VERSION=$(sed -n '/"version"/{s/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p;q;}' "$VERSION_FILE" 2>/dev/null)
 if [ -z "$VERSION" ]; then
     printf 'cockpit: cannot read version from %s\n' "$VERSION_FILE" >&2
     exit 1
 fi
-OS=$(uname -s)
-ARCH=$(uname -m)
+# Hooks run this on every turn, so one uname fork reads both fields.
+read -r OS ARCH <<EOF
+$(uname -sm)
+EOF
 case "$OS/$ARCH" in
     Darwin/arm64) TARGET=aarch64-apple-darwin ;;
     Darwin/x86_64) TARGET=x86_64-apple-darwin ;;
@@ -30,7 +32,8 @@ case "$OS/$ARCH" in
     Linux/aarch64|Linux/arm64) TARGET=aarch64-unknown-linux-musl ;;
     *) printf 'cockpit: unsupported platform %s/%s\n' "$OS" "$ARCH" >&2; exit 1 ;;
 esac
-BIN_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/q-lab/cockpit/bin/$VERSION
+# Outside the cockpit home: creating that dir first would stop the binary migrating ~/.cockpit.
+BIN_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/q-lab/cockpit-bin/$VERSION
 BIN=$BIN_DIR/cockpit
 if [ -x "$BIN" ]; then
     if [ "${1:-}" = __download ]; then exit 0; fi

@@ -53,7 +53,7 @@ fn is_inside(root: &Path, target: &Path) -> bool {
         && !relative.is_absolute()
 }
 
-fn absolute_lexical(path: &Path) -> Option<PathBuf> {
+pub fn absolute_lexical(path: &Path) -> Option<PathBuf> {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {

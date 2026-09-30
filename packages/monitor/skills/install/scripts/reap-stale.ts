@@ -72,7 +72,7 @@ function monitorScriptVersion(
   const shim = new RegExp(
     `${escapeRegExp(cacheRoot)}[/\\\\](\\d+\\.\\d+\\.\\d+)[/\\\\]skills[/\\\\]cockpit[/\\\\]bin[/\\\\]cockpit\\s+(?:channel|server)\\b`,
   );
-  const binary = /[/\\]q-lab[/\\]cockpit[/\\]bin[/\\](\d+\.\d+\.\d+)[/\\]cockpit\s+(?:channel|server)\b/;
+  const binary = /[/\\]q-lab[/\\]cockpit-bin[/\\](\d+\.\d+\.\d+)[/\\]cockpit\s+(?:channel|server)\b/;
   return (
     command.match(script)?.[1] ??
     command.match(shim)?.[1] ??

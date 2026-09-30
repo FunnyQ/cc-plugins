@@ -1,17 +1,18 @@
 use super::AppState;
-use crate::registry::{RegistryEntry, read_registry};
+use crate::{
+    log_root::absolute_lexical,
+    registry::{RegistryEntry, read_registry},
+};
 use axum::{Router, extract::Query, routing::get};
 use serde::Deserialize;
 use std::{
-    fs, io,
-    path::{Component, Path, PathBuf},
+    fs,
+    io::{self, Read},
+    path::{Path, PathBuf},
 };
 
 pub mod sse_tailer;
 use sse_tailer::{Backlog, Resolve, TailSource, split_complete_lines};
-
-#[derive(Default)]
-pub struct LogStreamState {}
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/api/log/stream", get(stream))
@@ -32,25 +33,6 @@ async fn stream(Query(params): Query<Params>) -> axum::response::Response {
     })
 }
 
-fn absolute(path: &Path) -> Option<PathBuf> {
-    let path = if path.is_absolute() {
-        path.to_owned()
-    } else {
-        std::env::current_dir().ok()?.join(path)
-    };
-    let mut result = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::ParentDir => {
-                result.pop();
-            }
-            Component::CurDir => {}
-            other => result.push(other.as_os_str()),
-        }
-    }
-    Some(result)
-}
-
 fn inside(root: &Path, path: &Path) -> bool {
     path != root && path.starts_with(root)
 }
@@ -60,18 +42,13 @@ fn resolve_with_entry(
     session: &str,
     entry: Option<&RegistryEntry>,
 ) -> Option<PathBuf> {
-    if project.is_empty()
-        || session.len() != 36
-        || !session
-            .bytes()
-            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'-'))
-    {
+    if project.is_empty() || !crate::registry::is_session_id(session) {
         return None;
     }
-    let project = absolute(Path::new(project))?;
+    let project = absolute_lexical(Path::new(project))?;
     let mut root = project.clone();
     if let Some(entry) = entry {
-        let tracked = absolute(Path::new(entry.project()))?;
+        let tracked = absolute_lexical(Path::new(entry.project()))?;
         if tracked != project && !inside(&tracked, &project) && !inside(&project, &tracked) {
             return None;
         }
@@ -81,7 +58,7 @@ fn resolve_with_entry(
     }
     let logs = root.join(".cockpit/logs");
     let path = match entry.filter(|entry| !entry.log_path().is_empty()) {
-        Some(entry) => absolute(Path::new(entry.log_path()))?,
+        Some(entry) => absolute_lexical(Path::new(entry.log_path()))?,
         None => logs.join(format!("{session}.jsonl")),
     };
     if !inside(&logs, &path) {
@@ -122,8 +99,10 @@ impl TailSource for LogSource {
         }
     }
 
-    fn read_backlog(&self, path: &Path, _size: u64) -> io::Result<Backlog> {
-        let bytes = fs::read(path)?;
+    fn read_backlog(&self, path: &Path, size: u64) -> io::Result<Backlog> {
+        // Stop at the stat size: the tailer resumes from it, so reading past it would repeat an append.
+        let mut bytes = Vec::new();
+        fs::File::open(path)?.take(size).read_to_end(&mut bytes)?;
         let (complete, partial) = split_complete_lines(&bytes);
         Ok(Backlog {
             complete: String::from_utf8_lossy(complete).into_owned(),
@@ -206,6 +185,20 @@ mod tests {
         fs::write(&outside, b"{}\n").unwrap();
         symlink(outside, expected).unwrap();
         assert!(resolve_with_entry(project, SESSION, None).is_none());
+    }
+
+    #[test]
+    fn backlog_stops_at_the_stat_size() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("log.jsonl");
+        fs::write(&path, b"{\"a\":1}\n{\"b\":2}\n").unwrap();
+        let source = LogSource {
+            project: String::new(),
+            session: String::new(),
+        };
+        let backlog = source.read_backlog(&path, 11).unwrap();
+        assert_eq!(backlog.complete, "{\"a\":1}");
+        assert_eq!(backlog.partial, b"{\"b");
     }
 
     #[test]

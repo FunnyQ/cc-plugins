@@ -11,14 +11,6 @@ pub fn env_int(name: &str, fallback: u64) -> u64 {
         .unwrap_or(fallback)
 }
 
-// Keep each hop below the daemon's 255-second idle timeout.
-pub fn wait_timeout_ms() -> u64 {
-    env_int("COCKPIT_WAIT_TIMEOUT_MS", 240_000)
-}
-pub fn stash_ttl_ms() -> u64 {
-    env_int("COCKPIT_STASH_TTL_MS", 60_000)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,16 +38,5 @@ mod tests {
             TestEnv::set("COCKPIT_WAIT_TIMEOUT_MS", raw);
             assert_eq!(env_int("COCKPIT_WAIT_TIMEOUT_MS", 17), expected, "{raw}");
         }
-    }
-
-    #[test]
-    fn budgets_have_defaults_and_overrides() {
-        let _env = TestEnv::new();
-        assert_eq!(wait_timeout_ms(), 240_000);
-        assert_eq!(stash_ttl_ms(), 60_000);
-        TestEnv::set("COCKPIT_WAIT_TIMEOUT_MS", "250abc");
-        TestEnv::set("COCKPIT_STASH_TTL_MS", "100");
-        assert_eq!(wait_timeout_ms(), 250);
-        assert_eq!(stash_ttl_ms(), 100);
     }
 }

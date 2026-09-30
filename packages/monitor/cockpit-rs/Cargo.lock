@@ -267,6 +267,7 @@ dependencies = [
  "axum",
  "clap",
  "flate2",
+ "futures-core",
  "jiff",
  "libc",
  "notify",

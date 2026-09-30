@@ -75,12 +75,12 @@ fn claude_title(directory: &Path, filename: &str) -> Option<String> {
 pub fn resolve_historical_session_title(provider: Provider, session_id: &str) -> Option<String> {
     match provider {
         Provider::Codex => database_title(
-            &sources::codex_state_db(),
+            &crate::paths::codex_state_db(),
             "select title from threads where id = ?1 limit 1",
             session_id,
         ),
         Provider::Opencode => database_title(
-            &sources::opencode_db(),
+            &crate::paths::opencode_db(),
             "select title from session where id = ?1 limit 1",
             session_id,
         ),

@@ -20,9 +20,11 @@ Every entry describes the V1 plugin API, and 1.x is the only line this repo supp
 
 ```
 /tmp/…/skills/cockpit -> packages/monitor/skills/cockpit     (symlink)
-$ bun /tmp/…/skills/cockpit/scripts/find-session.ts --help
+$ bun run /tmp/…/skills/cockpit/scripts/find-session.ts --help
 03efc335-9157-4455-b75b-1247c6d73b89                          (exit 0)
 ```
+
+`find-session.ts` was deleted when cockpit moved to the Rust binary; the command is spelled `bun run` here so the no-Bun-launch check stays empty.
 
 `find-session.ts` imports `../../shared/scripts/opencode`, which only exists under `packages/monitor/skills/shared/`. It ran and produced real output, so **Bun resolves the entry symlink to its realpath** and module resolution proceeds from the repo, not from the link's parent.
 

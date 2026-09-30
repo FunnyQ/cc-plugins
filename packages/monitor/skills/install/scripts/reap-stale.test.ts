@@ -37,16 +37,16 @@ describe("selectStaleMonitorPids", () => {
     server("3.18.5"),
     `sh ${CACHE}/3.18.5/skills/cockpit/bin/cockpit channel`,
     `sh ${CACHE}/3.18.5/skills/cockpit/bin/cockpit server --port 1234`,
-    "/Users/x/.local/share/q-lab/cockpit/bin/3.18.5/cockpit channel",
-    "/Users/x/.local/share/q-lab/cockpit/bin/3.18.5/cockpit server --no-open",
-    "/Users/x/.local/share/q-lab/cockpit/bin/3.18.5/cockpit server --port 1234",
+    "/Users/x/.local/share/q-lab/cockpit-bin/3.18.5/cockpit channel",
+    "/Users/x/.local/share/q-lab/cockpit-bin/3.18.5/cockpit server --no-open",
+    "/Users/x/.local/share/q-lab/cockpit-bin/3.18.5/cockpit server --port 1234",
   ])("reaps an older orphan: %s", (command) => {
     expect(select([row({ command })])).toEqual([100]);
   });
 
   test.each([
     `sh ${CACHE}/3.18.5/skills/cockpit/bin/cockpit log`,
-    "/Users/x/.local/share/q-lab/cockpit/bin/3.18.5/cockpit log",
+    "/Users/x/.local/share/q-lab/cockpit-bin/3.18.5/cockpit log",
   ])("leaves CLI calls alone: %s", (command) => {
     expect(select([row({ command })])).toEqual([]);
   });

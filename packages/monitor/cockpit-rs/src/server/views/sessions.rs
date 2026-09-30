@@ -1,6 +1,6 @@
 use super::{session_title::resolve_historical_session_title, subagents};
 use crate::{
-    call_log::latest_open_call_id,
+    call_log::latest_open_call_in,
     paths,
     registry::{self, LiveStatus, Provider, SessionStatus, TitleUpdate},
     server::{AppState, sources},
@@ -75,7 +75,9 @@ fn active_subagents(active: bool, provider: Provider, id: &str, now: i64) -> u32
         Provider::Claude => sources::resolve_claude_transcript_path(id)
             .map(|path| subagents::claude_active_subagents(&path, now))
             .unwrap_or(0),
-        Provider::Codex => subagents::codex_active_subagents(&sources::codex_state_db(), id, now),
+        Provider::Codex => {
+            subagents::codex_active_subagents(&crate::paths::codex_state_db(), id, now)
+        }
         Provider::Opencode => 0,
     }
 }
@@ -133,13 +135,7 @@ fn build_sessions_at(state: &AppState, now: i64) -> Result<Vec<SessionView>, Str
                 title: title.clone(),
             });
         }
-        let open_call = active
-            && !entry.log_path().is_empty()
-            && fs::read_to_string(entry.log_path())
-                .ok()
-                .is_some_and(|text| {
-                    latest_open_call_id(&text.split('\n').collect::<Vec<_>>()).is_some()
-                });
+        let open_call = active && latest_open_call_in(entry.log_path()).is_some();
         sessions.push(SessionView {
             provider,
             project: entry.project().into(),
@@ -162,7 +158,7 @@ fn build_sessions_at(state: &AppState, now: i64) -> Result<Vec<SessionView>, Str
             tracked: true,
         });
     }
-    persist_title_updates(&updates)?;
+    registry::persist_title_updates(&updates)?;
     for session in live {
         if !seen.insert((session.provider as u8, session.id.clone())) {
             continue;
@@ -183,37 +179,6 @@ fn build_sessions_at(state: &AppState, now: i64) -> Result<Vec<SessionView>, Str
     }
     sessions.sort_by(session_order);
     Ok(sessions)
-}
-
-fn persist_title_updates(updates: &[TitleUpdate]) -> Result<(), String> {
-    if updates.is_empty() {
-        return Ok(());
-    }
-    let mut entries = registry::read_registry();
-    let mut changed = false;
-    for update in updates {
-        let Some(entry) = entries.iter_mut().find(|entry| {
-            entry.provider() == update.provider && entry.session_id() == update.session_id
-        }) else {
-            continue;
-        };
-        if !update.title.is_empty() && entry.title() != Some(update.title.as_str()) {
-            entry.set("title", Value::String(update.title.clone()));
-            changed = true;
-        }
-        if !entry.title_resolved() {
-            entry.set("titleResolved", Value::Bool(true));
-            changed = true;
-        }
-    }
-    if changed {
-        // The core writer aborts on I/O errors; routes must instead return 500.
-        let text = serde_json::to_string_pretty(&serde_json::json!({"sessions": entries}))
-            .map_err(|error| error.to_string())?;
-        fs::create_dir_all(paths::cockpit_home()).map_err(|error| error.to_string())?;
-        fs::write(paths::registry_path(), text).map_err(|error| error.to_string())?;
-    }
-    Ok(())
 }
 
 pub fn build_projects(state: &AppState) -> Result<Vec<ProjectView>, String> {
@@ -297,10 +262,10 @@ fn live_sessions(now: i64) -> Vec<LiveSession> {
         }
     }
     live.extend(
-        database_live(&sources::codex_state_db(), Provider::Codex, now).unwrap_or_default(),
+        database_live(&crate::paths::codex_state_db(), Provider::Codex, now).unwrap_or_default(),
     );
     live.extend(
-        database_live(&sources::opencode_db(), Provider::Opencode, now).unwrap_or_default(),
+        database_live(&crate::paths::opencode_db(), Provider::Opencode, now).unwrap_or_default(),
     );
     live
 }
@@ -376,7 +341,7 @@ mod tests {
             session_id: "id".into(),
             title: "Title".into(),
         };
-        persist_title_updates(&[update]).unwrap();
+        registry::persist_title_updates(&[update]).unwrap();
         let text = fs::read_to_string(paths::registry_path()).unwrap();
         assert!(!text.ends_with('\n'));
         let entries = registry::read_registry();

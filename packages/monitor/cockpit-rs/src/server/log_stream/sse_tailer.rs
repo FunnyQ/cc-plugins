@@ -36,151 +36,75 @@ pub trait TailSource: Send + Sync + 'static {
     fn emit(&self, out: &mut Vec<String>, complete_text: &str);
 }
 
-// WebSocketStream supplies a named Stream through existing dependencies; framing stays internal.
-struct FrameReader {
-    receiver: mpsc::Receiver<Vec<u8>>,
-    pending: io::Cursor<Vec<u8>>,
+// Dropping the body aborts the producer, so a closed client stops its poller and watcher.
+struct SseBody {
+    receiver: mpsc::Receiver<String>,
     task: tokio::task::JoinHandle<()>,
 }
 
-impl Drop for FrameReader {
+impl Drop for SseBody {
     fn drop(&mut self) {
         self.task.abort();
     }
 }
 
-impl tokio::io::AsyncRead for FrameReader {
-    fn poll_read(
+impl futures_core::Stream for SseBody {
+    type Item = Result<String, std::convert::Infallible>;
+    fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-        buffer: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<io::Result<()>> {
-        loop {
-            let position = self.pending.position() as usize;
-            if position < self.pending.get_ref().len() {
-                let length = buffer
-                    .remaining()
-                    .min(self.pending.get_ref().len() - position);
-                buffer.put_slice(&self.pending.get_ref()[position..position + length]);
-                self.pending.set_position((position + length) as u64);
-                return std::task::Poll::Ready(Ok(()));
-            }
-            match self.receiver.poll_recv(cx) {
-                std::task::Poll::Ready(Some(bytes)) => self.pending = io::Cursor::new(bytes),
-                std::task::Poll::Ready(None) => return std::task::Poll::Ready(Ok(())),
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-            }
-        }
+    ) -> std::task::Poll<Option<Self::Item>> {
+        self.receiver.poll_recv(cx).map(|chunk| chunk.map(Ok))
     }
 }
 
-impl tokio::io::AsyncWrite for FrameReader {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-        bytes: &[u8],
-    ) -> std::task::Poll<io::Result<usize>> {
-        std::task::Poll::Ready(Ok(bytes.len()))
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<io::Result<()>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<io::Result<()>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-}
-
-pub fn create_tail_stream(source: impl TailSource) -> axum::response::Response {
-    use axum::{http::StatusCode, response::IntoResponse};
-
-    let stream = match TailStream::new(source) {
-        Ok(stream) => stream,
-        Err((message, status)) => {
-            return (
-                StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_REQUEST),
-                [
-                    ("content-type", "application/json; charset=utf-8"),
-                    ("cache-control", "no-store"),
-                ],
-                serde_json::json!({"error": message}).to_string(),
-            )
-                .into_response();
-        }
-    };
-    response(stream)
-}
-
-fn response<S: TailSource>(mut stream: TailStream<S>) -> axum::response::Response {
+/// Streams the preformatted SSE chunks `produce` sends; the body ends when it returns.
+pub fn sse_response<F>(produce: impl FnOnce(mpsc::Sender<String>) -> F) -> axum::response::Response
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
     use axum::{body::Body, response::IntoResponse};
-    use std::{
-        future::Future,
-        task::{Context, Poll, Waker},
-    };
-    use tokio_tungstenite::{
-        WebSocketStream,
-        tungstenite::protocol::{
-            Role,
-            frame::{
-                Frame,
-                coding::{Data, OpCode},
-            },
-        },
-    };
-
     let (sender, receiver) = mpsc::channel(16);
-    let task = tokio::spawn(async move {
-        loop {
-            let next = tokio::select! {
-                _ = sender.closed() => break,
-                next = stream.next() => next,
-            };
-            let Some(next) = next else {
-                let mut bytes = Vec::new();
-                let _ = Frame::close(None).format(&mut bytes);
-                let _ = sender.send(bytes).await;
-                break;
-            };
-            let mut bytes = Vec::new();
-            if Frame::message(next.into_bytes(), OpCode::Data(Data::Binary), true)
-                .format(&mut bytes)
-                .is_err()
-                || sender.send(bytes).await.is_err()
-            {
-                break;
-            }
-        }
-    });
-    let reader = FrameReader {
-        receiver,
-        pending: io::Cursor::new(Vec::new()),
-        task,
-    };
-    let mut constructor =
-        std::pin::pin!(WebSocketStream::from_raw_socket(reader, Role::Client, None));
-    // The pinned 0.28 implementation constructs without I/O and always resolves on its first poll.
-    let Poll::Ready(stream) = constructor
-        .as_mut()
-        .poll(&mut Context::from_waker(Waker::noop()))
-    else {
-        unreachable!("from_raw_socket performs no asynchronous I/O")
-    };
+    let task = tokio::spawn(produce(sender));
     (
         [
             ("content-type", "text/event-stream"),
             ("cache-control", "no-cache"),
             ("connection", "keep-alive"),
         ],
-        Body::from_stream(stream),
+        Body::from_stream(SseBody { receiver, task }),
     )
         .into_response()
+}
+
+pub fn create_tail_stream(source: impl TailSource) -> axum::response::Response {
+    use axum::http::StatusCode;
+
+    let stream = match TailStream::new(source) {
+        Ok(stream) => stream,
+        Err((message, status)) => {
+            return crate::server::json_error(
+                StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_REQUEST),
+                &message,
+            );
+        }
+    };
+    response(stream)
+}
+
+fn response<S: TailSource>(mut stream: TailStream<S>) -> axum::response::Response {
+    sse_response(|sender| async move {
+        loop {
+            let next = tokio::select! {
+                _ = sender.closed() => break,
+                next = stream.next() => next,
+            };
+            let Some(chunk) = next else { break };
+            if sender.send(chunk).await.is_err() {
+                break;
+            }
+        }
+    })
 }
 
 pub fn split_complete_lines(bytes: &[u8]) -> (&[u8], &[u8]) {
@@ -238,7 +162,8 @@ impl<S: TailSource> TailStream<S> {
         resolve_cadence: Duration,
         tail_cadence: Duration,
     ) -> Result<Self, (String, u16)> {
-        if let Resolve::Fail { message, status } = source.resolve() {
+        let first = source.resolve();
+        if let Resolve::Fail { message, status } = first {
             return Err((message, status));
         }
         let (watch_sender, events) = mpsc::channel(1);
@@ -261,7 +186,7 @@ impl<S: TailSource> TailStream<S> {
             tail_cadence,
             closed: false,
         };
-        stream.resolve();
+        stream.apply(first);
         Ok(stream)
     }
 
@@ -308,7 +233,12 @@ impl<S: TailSource> TailStream<S> {
     }
 
     fn resolve(&mut self) {
-        match self.source.resolve() {
+        let resolution = self.source.resolve();
+        self.apply(resolution);
+    }
+
+    fn apply(&mut self, resolution: Resolve) {
+        match resolution {
             Resolve::Ready(path) if path.exists() => {
                 if let Ok(metadata) = fs::metadata(&path) {
                     self.inode = metadata.ino();
@@ -569,6 +499,33 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn response_passes_a_chunk_over_16_mib() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("log");
+        let line = "x".repeat(17 << 20);
+        fs::write(&path, format!("{line}\n")).unwrap();
+        let response = response(stream(&path));
+        let body = response.into_body();
+        let mut collected = Vec::new();
+        let mut body = std::pin::pin!(body);
+        while !collected.ends_with(b"event: backlog-done\ndata: {}\n\n") {
+            use axum::body::HttpBody;
+            let frame = tokio::time::timeout(
+                Duration::from_secs(5),
+                std::future::poll_fn(|cx| body.as_mut().poll_frame(cx)),
+            )
+            .await
+            .unwrap()
+            .expect("stream ended early")
+            .unwrap();
+            collected.extend_from_slice(&frame.into_data().unwrap());
+        }
+        let expected =
+            format!(": connected\n\ndata: {line}\n\nevent: backlog-done\ndata: {{}}\n\n");
+        assert!(collected == expected.as_bytes());
     }
 
     #[tokio::test(flavor = "current_thread")]

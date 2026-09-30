@@ -1,18 +1,18 @@
-use super::{AppState, presence::Presence};
+use super::{AppState, json_error, json_response, presence::Presence};
 use crate::{call_log, config, daemon_info, registry, tunables};
 use axum::{
     Router,
     body::Bytes,
     extract::{Query, State},
     http::{Method, StatusCode},
-    response::{IntoResponse, Response},
+    response::Response,
     routing::{any, get, post},
 };
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
-    fs::{self, OpenOptions},
-    io::{Read, Write},
+    fs::OpenOptions,
+    io::Write,
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -226,27 +226,13 @@ pub(super) fn take_stash(
     (entry.expires > Instant::now()).then_some(entry.text)
 }
 
+// Keep each hop below the daemon's 255-second idle timeout.
 pub(super) fn budget() -> Duration {
     Duration::from_millis(tunables::env_int("COCKPIT_WAIT_TIMEOUT_MS", 240_000))
 }
 
 pub(super) fn expires() -> Instant {
     Instant::now() + Duration::from_millis(tunables::env_int("COCKPIT_STASH_TTL_MS", 60_000))
-}
-
-pub(super) fn reply(value: Value) -> Response {
-    (
-        [
-            ("content-type", "application/json; charset=utf-8"),
-            ("cache-control", "no-store"),
-        ],
-        value.to_string(),
-    )
-        .into_response()
-}
-
-pub(super) fn error(status: StatusCode, message: &str) -> Response {
-    (status, reply(json!({"error": message}))).into_response()
 }
 
 pub(super) fn authorized(token: Option<&str>) -> bool {
@@ -259,49 +245,25 @@ pub(super) fn validate<'a>(
     session: Option<&'a str>,
 ) -> Result<&'a str, Box<Response>> {
     if !authorized(token) {
-        return Err(Box::new(error(StatusCode::UNAUTHORIZED, "unauthorized")));
+        return Err(Box::new(json_error(
+            StatusCode::UNAUTHORIZED,
+            "unauthorized",
+        )));
     }
     session
-        .filter(|s| {
-            s.len() == 36
-                && s.bytes()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b) || b == b'-')
-        })
-        .ok_or_else(|| Box::new(error(StatusCode::BAD_REQUEST, "invalid session")))
+        .filter(|s| registry::is_session_id(s))
+        .ok_or_else(|| Box::new(json_error(StatusCode::BAD_REQUEST, "invalid session")))
 }
 
 pub(super) fn parse(body: &[u8]) -> Result<Value, Box<Response>> {
     serde_json::from_slice(body)
-        .map_err(|_| Box::new(error(StatusCode::BAD_REQUEST, "invalid json")))
+        .map_err(|_| Box::new(json_error(StatusCode::BAD_REQUEST, "invalid json")))
 }
 
 fn log_path(session: &str) -> Option<String> {
-    registry::read_registry()
-        .iter()
-        .find(|entry| entry.session_id() == session)
+    registry::entry_for(session)
         .map(|entry| entry.log_path().to_owned())
         .filter(|path| !path.is_empty())
-}
-
-fn open_call(path: &str) -> Option<String> {
-    let raw = fs::read_to_string(path).ok()?;
-    call_log::latest_open_call_id(&raw.lines().collect::<Vec<_>>())
-}
-
-fn uuid() -> std::io::Result<String> {
-    let mut bytes = [0_u8; 16];
-    fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-    Ok(format!(
-        "{}-{}-{}-{}-{}",
-        &hex[..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..]
-    ))
 }
 
 async fn wait(
@@ -325,14 +287,14 @@ async fn wait(
         session,
         call,
     ) {
-        return reply(json!({"answer": answer}));
+        return json_response(StatusCode::OK, json!({"answer": answer}));
     }
     // A moot call gets the precise superseded sentinel even when no watcher is present.
     if let Some(call) = call
         && let Some(path) = log_path(session)
-        && open_call(&path).as_deref() != Some(call)
+        && call_log::latest_open_call_in(&path).as_deref() != Some(call)
     {
-        return reply(json!({"answer": null, "superseded": true}));
+        return json_response(StatusCode::OK, json!({"answer": null, "superseded": true}));
     }
     // Presence comes last because it must not hide a delivered answer or superseded call.
     if query
@@ -347,7 +309,10 @@ async fn wait(
             None
         };
         if let Some(reason) = reason {
-            return reply(json!({"answer": null, "not_watching": true, "reason": reason}));
+            return json_response(
+                StatusCode::OK,
+                json!({"answer": null, "not_watching": true, "reason": reason}),
+            );
         }
     }
     let (guard, receiver) = state
@@ -361,8 +326,8 @@ async fn wait(
         .flatten();
     drop(guard);
     match answer {
-        Some(answer) => reply(json!({"answer": answer})),
-        None => reply(json!({"answer": null, "timeout": true})),
+        Some(answer) => json_response(StatusCode::OK, json!({"answer": answer})),
+        None => json_response(StatusCode::OK, json!({"answer": null, "timeout": true})),
     }
 }
 
@@ -380,11 +345,10 @@ async fn respond(State(state): State<AppState>, body: Bytes) -> Response {
     };
     let answer = body.get("answer").and_then(Value::as_str).unwrap_or("");
     let path = log_path(session);
-    let open = path.as_deref().and_then(open_call);
+    let open = path.as_deref().and_then(call_log::latest_open_call_in);
     let target = body.get("call").and_then(Value::as_str).or(open.as_deref());
-    if let Some(path) = path
-        && let Ok(id) = uuid()
-    {
+    if let Some(path) = path {
+        let id = uuid::Uuid::new_v4().to_string();
         let record = json!({"id": id, "type": "response", "call": target, "answer": answer, "ts": registry::iso_timestamp(registry::now_ms())});
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
             let _ = writeln!(file, "{record}");
@@ -406,7 +370,7 @@ async fn respond(State(state): State<AppState>, body: Bytes) -> Response {
                 },
             );
     }
-    reply(json!({"delivered": delivered}))
+    json_response(StatusCode::OK, json!({"delivered": delivered}))
 }
 
 async fn answer_here(
@@ -420,18 +384,21 @@ async fn answer_here(
             Err(e) => return *e,
         };
         if !authorized(body.get("token").and_then(Value::as_str)) {
-            return error(StatusCode::UNAUTHORIZED, "unauthorized");
+            return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
         }
         let Some(on) = body.get("on").and_then(Value::as_bool) else {
-            return error(StatusCode::BAD_REQUEST, "invalid on");
+            return json_error(StatusCode::BAD_REQUEST, "invalid on");
         };
         config::set_answer_here(on);
-        reply(json!({"answer_here": on}))
+        json_response(StatusCode::OK, json!({"answer_here": on}))
     } else {
         if !authorized(Some(query.get("token").map_or("", String::as_str))) {
-            return error(StatusCode::UNAUTHORIZED, "unauthorized");
+            return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
         }
-        reply(json!({"answer_here": config::get_answer_here()}))
+        json_response(
+            StatusCode::OK,
+            json!({"answer_here": config::get_answer_here()}),
+        )
     }
 }
 

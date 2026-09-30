@@ -1,4 +1,4 @@
-use super::{now_ms, parse_args, positionals};
+use super::{parse_args, positionals};
 use crate::{config, find_session, nudge_toggle};
 use find_session::Provider;
 use nudge_toggle::{NudgeScope, NudgeState, ToggleAction};
@@ -92,7 +92,7 @@ fn fmt_scope(state: Option<NudgeState>) -> &'static str {
 
 fn run_nudge(rest: &[String], cwd: &Path) -> Result<(), String> {
     let (action, scope) = parse_nudge(rest)?;
-    let now = now_ms();
+    let now = crate::registry::now_ms();
     let session_id = find_session::find_session(Provider::Claude, cwd);
     if action != "status" && matches!(scope, NudgeScope::Session) && session_id.is_none() {
         return Err("cockpit nudge: could not resolve the current session id (no CLAUDE_CODE_SESSION_ID and no transcript). Run inside a Claude session, or target --scope project|user.".to_owned());

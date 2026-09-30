@@ -97,10 +97,7 @@ fn recent(args: &Args, provider: crate::find_session::Provider, cwd: &Path, proj
         return;
     };
     let mut candidates = vec![log_root::log_path_for(project, &id)];
-    if let Some(entry) = registry::read_registry()
-        .iter()
-        .find(|s| s.session_id() == id)
-    {
+    if let Some(entry) = registry::entry_for(&id) {
         let path = std::path::PathBuf::from(entry.log_path());
         if !entry.log_path().is_empty() && !candidates.contains(&path) {
             candidates.push(path);

@@ -110,20 +110,26 @@ pub struct TitleUpdate {
 pub const STALE_MS: i64 = 10 * 60 * 1000;
 pub const REGISTRY_TTL_MS: i64 = 14 * 24 * 60 * 60 * 1000;
 
+pub fn entry_for(session: &str) -> Option<RegistryEntry> {
+    read_registry()
+        .into_iter()
+        .find(|entry| entry.session_id() == session)
+}
+
 pub fn read_registry() -> Vec<RegistryEntry> {
-    let Some(value) = fs::read_to_string(registry_path())
+    let Some(mut value) = fs::read_to_string(registry_path())
         .ok()
         .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
     else {
         return Vec::new();
     };
-    let Some(sessions) = value.get("sessions").and_then(Value::as_array) else {
+    let Some(Value::Array(sessions)) = value.get_mut("sessions").map(Value::take) else {
         return Vec::new();
     };
     sessions
-        .iter()
+        .into_iter()
         .filter_map(|value| {
-            let mut entry: RegistryEntry = serde_json::from_value(value.clone()).ok()?;
+            let mut entry: RegistryEntry = serde_json::from_value(value).ok()?;
             entry.raw.get("sessionId")?.as_str()?;
             entry.set(
                 "provider",
@@ -168,21 +174,21 @@ pub fn derive_live_status(active: bool, open_call: bool, harness: Option<&str>) 
 }
 
 fn persist(entries: Vec<RegistryEntry>) {
+    if let Err(error) = try_persist(entries) {
+        panic!("cockpit: cannot write registry: {error}");
+    }
+}
+
+// Routes surface a failed write as a 500; the hooks and CLI keep aborting through persist.
+fn try_persist(entries: Vec<RegistryEntry>) -> Result<(), String> {
     #[derive(Serialize)]
     struct Registry {
         sessions: Vec<RegistryEntry>,
     }
-    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        fs::create_dir_all(cockpit_home())?;
-        fs::write(
-            registry_path(),
-            serde_json::to_string_pretty(&Registry { sessions: entries })?,
-        )?;
-        Ok(())
-    })();
-    if let Err(error) = result {
-        panic!("cockpit: cannot write registry: {error}");
-    }
+    let text = serde_json::to_string_pretty(&Registry { sessions: entries })
+        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(cockpit_home()).map_err(|error| error.to_string())?;
+    fs::write(registry_path(), text).map_err(|error| error.to_string())
 }
 
 pub fn write_registry(mut entries: Vec<RegistryEntry>, now_ms: i64) {
@@ -206,30 +212,9 @@ pub fn upsert_session(entry: RegistryEntry) {
     write_registry(entries, now_ms());
 }
 
-pub fn refresh_heartbeat(project: &str, session_id: &str, provider: Provider, log_path: &str) {
-    let mut entries = read_registry();
-    let now = now_ms();
-    let heartbeat = iso_timestamp(now);
-    if let Some(entry) = entries.iter_mut().find(|e| e.session_id() == session_id) {
-        for (key, value) in [
-            ("provider", provider.as_str()),
-            ("project", project),
-            ("logPath", log_path),
-            ("lastHeartbeat", &heartbeat),
-        ] {
-            entry.set(key, Value::String(value.to_owned()));
-        }
-        write_registry(entries, now);
-    } else {
-        upsert_session(RegistryEntry::new(
-            provider, project, session_id, log_path, &heartbeat,
-        ));
-    }
-}
-
-pub fn persist_title_updates(updates: &[TitleUpdate]) {
+pub fn persist_title_updates(updates: &[TitleUpdate]) -> Result<(), String> {
     if updates.is_empty() {
-        return;
+        return Ok(());
     }
     let mut entries = read_registry();
     let mut changed = false;
@@ -250,8 +235,9 @@ pub fn persist_title_updates(updates: &[TitleUpdate]) {
         }
     }
     if changed {
-        persist(entries);
+        try_persist(entries)?;
     }
+    Ok(())
 }
 
 fn system_ms(time: SystemTime) -> i64 {
@@ -261,27 +247,22 @@ fn system_ms(time: SystemTime) -> i64 {
     }
 }
 
+/// The 36-character lowercase UUID shape every Claude and Codex session id takes.
+pub fn is_session_id(value: &str) -> bool {
+    value.len() == 36
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'-'))
+}
+
 pub fn now_ms() -> i64 {
     system_ms(SystemTime::now())
 }
 
 pub fn iso_timestamp(ms: i64) -> String {
-    let seconds = ms.div_euclid(1000) as libc::time_t;
-    // gmtime_r writes every calendar field into the supplied storage without shared state.
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    if unsafe { libc::gmtime_r(&seconds, &mut tm) }.is_null() {
-        panic!("cockpit: heartbeat is outside the UTC calendar range");
-    }
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
-        tm.tm_year + 1900,
-        tm.tm_mon + 1,
-        tm.tm_mday,
-        tm.tm_hour,
-        tm.tm_min,
-        tm.tm_sec,
-        ms.rem_euclid(1000)
-    )
+    let timestamp = jiff::Timestamp::from_millisecond(ms)
+        .expect("cockpit: heartbeat is outside the UTC calendar range");
+    format!("{timestamp:.3}")
 }
 
 fn parse_timestamp(text: &str) -> Option<i64> {
@@ -573,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    fn upsert_and_heartbeat_preserve_order_unknown_keys_and_title() {
+    fn upsert_preserves_order_unknown_keys_and_title() {
         let _env = fixture();
         let mut original = Map::new();
         for (key, value) in [
@@ -602,38 +583,6 @@ mod tests {
         assert_eq!(updated.raw["unknown"], json!({"nested":true}));
         assert_eq!(updated.title(), Some("Kept title"));
         assert_eq!(updated.provider(), Provider::Codex);
-        refresh_heartbeat(
-            "/repo",
-            "s",
-            Provider::Opencode,
-            "/repo/.cockpit/logs/s.jsonl",
-        );
-        let updated = &read_registry()[0];
-        assert_eq!(updated.raw.keys().cloned().collect::<Vec<_>>(), keys);
-        assert_eq!(updated.raw["unknown"], json!({"nested":true}));
-        assert_eq!(updated.title(), Some("Kept title"));
-        assert!(updated.title_resolved());
-        assert_eq!(updated.project(), "/repo");
-        assert_eq!(updated.provider(), Provider::Opencode);
-        assert_eq!(updated.log_path(), "/repo/.cockpit/logs/s.jsonl");
-        assert!(parse_timestamp(updated.last_heartbeat()).unwrap() >= now_ms() - 1000);
-    }
-
-    #[test]
-    fn heartbeat_auto_registers_and_refreshes_existing_timestamp() {
-        let _env = fixture();
-        let before = now_ms();
-        refresh_heartbeat("/repo", "new", Provider::Codex, "/repo/log");
-        let e = &read_registry()[0];
-        assert_eq!(e.provider(), Provider::Codex);
-        assert_eq!(e.project(), "/repo");
-        assert_eq!(e.log_path(), "/repo/log");
-        assert!(parse_timestamp(e.last_heartbeat()).unwrap() >= before);
-        let mut old = e.clone();
-        old.set("lastHeartbeat", json!("1970-01-01T00:00:00.000Z"));
-        seed(json!({"sessions": [old]}));
-        refresh_heartbeat("/repo", "new", Provider::Claude, "/repo/log");
-        assert!(parse_timestamp(read_registry()[0].last_heartbeat()).unwrap() >= before);
     }
 
     #[test]
@@ -645,12 +594,13 @@ mod tests {
         codex.set("provider", json!("codex"));
         seed(json!({"sessions": [claude, codex, entry("other", 0)]}));
         let untouched = fs::read(registry_path()).unwrap();
-        persist_title_updates(&[]);
+        persist_title_updates(&[]).unwrap();
         persist_title_updates(&[TitleUpdate {
             provider: Provider::Opencode,
             session_id: "same".into(),
             title: "No match".into(),
-        }]);
+        }])
+        .unwrap();
         assert_eq!(fs::read(registry_path()).unwrap(), untouched);
         persist_title_updates(&[
             TitleUpdate {
@@ -663,7 +613,8 @@ mod tests {
                 session_id: "same".into(),
                 title: String::new(),
             },
-        ]);
+        ])
+        .unwrap();
         let entries = read_registry();
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].title(), Some("Existing"));
@@ -679,13 +630,15 @@ mod tests {
             provider: Provider::Codex,
             session_id: "same".into(),
             title: "New title".into(),
-        }]);
+        }])
+        .unwrap();
         assert_eq!(fs::read(registry_path()).unwrap(), raw);
         persist_title_updates(&[TitleUpdate {
             provider: Provider::Claude,
             session_id: "other".into(),
             title: String::new(),
-        }]);
+        }])
+        .unwrap();
         assert_eq!(read_registry()[2].title(), None);
         assert!(read_registry()[2].title_resolved());
     }
