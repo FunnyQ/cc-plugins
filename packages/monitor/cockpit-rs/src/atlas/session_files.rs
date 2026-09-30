@@ -20,6 +20,9 @@ pub struct ClaudeSessionFile {
     pub kind: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrypoint: Option<Value>,
+    // Every other key passes through whole, as readSessionFiles pushes the parsed object.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, Value>,
 }
 
 pub fn read_session_files() -> Vec<ClaudeSessionFile> {
@@ -72,5 +75,40 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].session_id, "s");
         assert_eq!(files[0].kind, Some(Value::from("interactive")));
+    }
+
+    fn read_one(text: &str) -> Vec<ClaudeSessionFile> {
+        let env = TestEnv::new();
+        let dir = env.dir.path().join(".claude/sessions");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.json"), text).unwrap();
+        read_session_files()
+    }
+
+    #[test]
+    fn skips_each_invalid_shape() {
+        for text in [
+            r#"{"cwd":"/r","startedAt":5}"#,
+            r#"{"sessionId":1,"cwd":"/r","startedAt":5}"#,
+            r#"{"sessionId":"s","startedAt":5}"#,
+            r#"{"sessionId":"s","cwd":null,"startedAt":5}"#,
+            r#"{"sessionId":"s","cwd":"/r"}"#,
+            r#"{"sessionId":"s","cwd":"/r","startedAt":"5"}"#,
+            r#"{"sessionId":"s","cwd":"/r","startedAt":5"#,
+            "null",
+        ] {
+            assert!(read_one(text).is_empty(), "{text}");
+        }
+    }
+
+    #[test]
+    fn passes_unknown_keys_through() {
+        let src = serde_json::json!({
+            "sessionId": "s", "cwd": "/r", "startedAt": 5, "pid": 7,
+            "name": "n", "peerFeatures": {"a": [1, {"b": true}]}
+        });
+        let files = read_one(&src.to_string());
+        assert_eq!(files.len(), 1);
+        assert_eq!(serde_json::to_value(&files[0]).unwrap(), src);
     }
 }

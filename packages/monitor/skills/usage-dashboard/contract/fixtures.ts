@@ -510,6 +510,8 @@ function writeClaude(home: string): void {
       version: "2.1.300",
       kind: "interactive",
       entrypoint: "cli",
+      nameSource: "fixture",
+      peerFeatures: { messaging: true, protocols: [1, 2] },
     }),
   );
   writeText(
@@ -524,6 +526,8 @@ function writeClaude(home: string): void {
       version: "2.1.300",
       kind: "interactive",
       entrypoint: "cli",
+      nameSource: "fixture",
+      peerFeatures: { messaging: true, protocols: [1, 2] },
     }),
   );
 }
