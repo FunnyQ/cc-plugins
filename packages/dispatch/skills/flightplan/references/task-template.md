@@ -113,6 +113,11 @@ Every plan ends with **one terminal task that reviews the whole deliverable**. M
 
 This is the holistic gate. Per-task rubrics catch per-task quality. The final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes, for example **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, and **No regressions**. It does not re-score individual tasks.
 
+**Check what the leg changed with `git diff`, never `git status`.** Autopilot commits between waves, so by the time the Final review runs, every earlier task's edits are committed and `git status` no longer lists them. Write `git diff --name-only <baseRef> -- <paths>` instead. Autopilot substitutes `<baseRef>` with the commit the run started from, and the diff covers committed and uncommitted edits alike. `lint-task.ts` rejects any `git status` in a Final review gate as the `final-review-git-status` rule.
+
+- ❌ `` `git status --short -- DESIGN.md docs/deploy.md` shows both as changed. ``
+- ✅ `` `git diff --name-only <baseRef> -- DESIGN.md docs/deploy.md` lists both paths. ``
+
 Consider one more axis at a low weight: **Leanness** — did the tree ship abstractions with one caller, config nobody sets, or hand-rolled versions of what the stdlib and the platform already provide? Per-task rubrics may miss the accumulated effect, because each task looks proportionate on its own and only the whole diff shows the pile-up. Score the *judgement*, never a line count: a plan that legitimately adds a lot of code should still score well here. Autopilot's closing round runs a `leanness` review lens against exactly this question, so the axis gives the judge a reason to care whether the fixer acted on what that lens found.
 
 A plan with a single task is exempt. That task is its own terminal. Don't mark more than one task. Keep one unambiguous closing gate.
@@ -200,6 +205,8 @@ Before finalizing a task file, verify each:
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes.
 - [ ] Write Verification commands relative to the repo root so they check the task's worktree, not an absolute path into the main tree.
 - [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
+- [ ] Every Final review gate that checks which files changed uses `git diff --name-only <baseRef> -- <paths>`, never `git status`.
+- [ ] Every criterion about a report names the report's file in backticks, for example `` The report at `docs/<slug>/review-notes.md` lists … ``. In the Final review, `lint-task.ts` flags "the report" with no path as the `report-path` rule, because a verifier checks disk and finds nothing to check.
 - [ ] Each gate section holds at least one item a verifier can run itself — an all-`(human)` section fails lint. See "Human-only gate items" below.
 - [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
 - [ ] Nothing in this file requires opening PLAN.md or another task file to understand.

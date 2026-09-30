@@ -164,6 +164,36 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
   return hits;
 }
 
+/** Final review gate items that read `git status`, first line only, in document order. */
+export function finalReviewGitStatusItems(task: ParsedTask): string[] {
+  if (!task.finalReview) return [];
+  const hits: string[] = [];
+  for (const heading of GATE_SECTIONS) {
+    for (const item of checklistItems(extractSection(task.body, heading))) {
+      if (GIT_STATUS_REGEX.test(item)) hits.push(item.split("\n")[0].trim());
+    }
+  }
+  return hits;
+}
+
+// "The report" with no backticked path: the verifier looks on disk and finds nothing to check.
+const REPORT_REGEX = /\bthe report\b/i;
+const PATH_SPAN_REGEX = /`[^`\n]*(?:\/|\.[a-z0-9]+\b)[^`\n]*`/i;
+
+/** Final review gate items that cite "the report" without naming its file, first line only. */
+export function unlocatedReportItems(task: ParsedTask): string[] {
+  if (!task.finalReview) return [];
+  const hits: string[] = [];
+  for (const heading of GATE_SECTIONS) {
+    for (const item of checklistItems(extractSection(task.body, heading))) {
+      if (REPORT_REGEX.test(item) && !PATH_SPAN_REGEX.test(item)) {
+        hits.push(item.split("\n")[0].trim());
+      }
+    }
+  }
+  return hits;
+}
+
 /**
  * The tag marking a gate item only a person can perform. It sits at the head of
  * the item, immediately after the checkbox: `- [ ] (human) sweep the pointer …`.
@@ -364,6 +394,20 @@ export async function lintFile(
         ? `a \`git status\` scope gate with no \`--\` pathspec reads the WHOLE working tree, which no task owns: autopilot runs tasks in parallel in one tree, so a sibling's legitimate uncommitted edits land in your output and fail a correct implementation. Narrow it to this task's own files, e.g. \`git status --short -- <this task's files>\`: ${hit.item}`
         : `a \`git status\` scope gate that claims exclusivity cannot pass under autopilot — the runner edits this very file (Status → in-progress, then mark-done ticks every gate box). Assert that your own paths changed; never claim what else did not: ${hit.item}`;
     push("scope-git-status", detail);
+  }
+
+  for (const item of finalReviewGitStatusItems(task)) {
+    push(
+      "final-review-git-status",
+      `a \`git status\` gate cannot see what earlier tasks changed: autopilot commits between waves, so their paths are clean by the time the Final review runs. Use \`git diff --name-only <baseRef> -- <paths>\` — the verifier substitutes the commit the run started from, and the diff covers committed and uncommitted edits alike. For this review's own uncommitted edits, \`git diff --name-only -- <paths>\` is enough: ${item}`,
+    );
+  }
+
+  for (const item of unlocatedReportItems(task)) {
+    push(
+      "report-path",
+      `"the report" names no file, so a verifier has nothing on disk to check. Name the path it lives at in backticks: ${item}`,
+    );
   }
 
   for (const heading of humanOnlyGateSections(task)) {

@@ -385,7 +385,7 @@ You are implementing flightplan task ${ref} in the tree at ${CFG.tasksDir}.
 Read the task file at ${path} and every file in its "Required reading".
 Implement the task fully: create/modify the listed files, follow Implementation notes.
 ${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nAddress that specifically.' : ''}
-${STATUS_RULE} When done, run the task's ## Verification commands yourself.
+${STATUS_RULE} When done, run the task's ## Verification commands yourself. ${BASE_REF_RULE}
 ${NO_COMMIT_RULE}
 Then log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase end --message "<what you changed>"
@@ -540,7 +540,7 @@ Use the identical label in both start and end calls.
 You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}). Independent reviewers have each written findings to ${reviewDir(attempt)}/ (one file per lens: ${reviewEngine.label}, reuse, leanness, efficiency).
 1. Read EVERY file in ${reviewDir(attempt)}/. If ${reviewEngine.label}.md is MISSING, is empty, or begins with "${reviewEngine.token}", call that out prominently — the cross-vendor pass did not run.
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the three Claude lenses (behaviour-preserving). On the ABSTRACTION axis the two lenses point opposite ways on purpose: \`reuse\` may ask for more code, \`leanness\` only ever asks for less. Where they land on the same span, that is a genuine trade-off for you to settle — not a contradiction to route around. This split says nothing about \`efficiency\`: a cheaper approach that needs a cache, a batch, or an index is a normal fix, so never reject an efficiency finding merely because it adds code. For any finding you reject, say why.
-3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.
+3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met. ${BASE_REF_RULE}
 ${attempt > 1 ? 'This is re-loop attempt ' + attempt + ' (capped at ' + FINAL_MAX + '). The previous round was rejected:\n' + feedback + '\nEnsure the new findings + your fixes address that.' : ''}
 ${STATUS_RULE}
 ${NO_COMMIT_RULE}
@@ -564,6 +564,9 @@ async function runFinalReview(ref, path, attempt, attempts, fixChoice) {
 // is unrunnable on its own, which would be the softening every other prompt
 // bans. `lint-task.ts`'s `human-gate` rule refuses a gate section whose items
 // are ALL tagged, so a tagged plan always leaves the verifier real work.
+// A plan is written before the run, so it cannot name the commit the run starts from.
+const BASE_REF_RULE = `Where a Verification command or criterion says \`<baseRef>\`, substitute ${CFG.baseRef}, the commit this run started from. That substitution is the one edit "exactly as written" allows.`
+
 const HUMAN_GATE_RULE = `A gate item written \`- [ ] (human) …\` in ## Acceptance criteria or ## Verification is one the PLAN declares only a person can perform — a physical action, a visual sweep, a device or UI interaction no command reaches. Do not invent a way to run it, and do not fail the task for it. Return each one verbatim as written in the file in humanPending, and name it in summary as not machine-checked.
 The tag exempts that ONE item. Every untagged item is yours exactly as before: run it, and any non-zero exit is passed=false. You may never add the tag yourself, or treat an untagged item as human-only because it looked hard to run — an item you believe is unrunnable is a plan defect, so leave it standing and let it fail.`
 
@@ -608,7 +611,8 @@ Do NOT trust the dev's claims. Open the task file at ${path}, then:
   2. Check every box in ## Acceptance criteria against the actual code/output.
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
-${HUMAN_GATE_RULE}${CFG.attestationFile ? attestationRule(path) : ''}
+${HUMAN_GATE_RULE}
+${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ''}
 ${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.

@@ -1231,6 +1231,114 @@ describe("scope-git-status rule", () => {
   });
 });
 
+// Autopilot commits between waves, so by the time the Final review runs every
+// earlier task's edits are committed and `git status` no longer lists them.
+describe("final-review-git-status rule", () => {
+  const lintOne = async (body: string) => {
+    const root = await writeTree({ "tasks/review/01-close.md": body });
+    const violations = await lintFile(join(root, "tasks/review/01-close.md"));
+    await rm(root, { recursive: true, force: true });
+    return violations;
+  };
+  const gate = "git status --short -- DESIGN.md docs/deploy.md";
+
+  test("flags a pathspec git status gate in the Final review", async () => {
+    const violations = await lintOne(
+      taskWith({
+        bucket: "review",
+        nn: "01",
+        finalReview: true,
+        verification: gate,
+      }),
+    );
+
+    const hit = violations.find((v) => v.rule === "final-review-git-status");
+    expect(hit).toBeDefined();
+    expect(hit!.detail).toContain("git diff --name-only <baseRef>");
+  });
+
+  test("allows the same gate in a non-final task", async () => {
+    const violations = await lintOne(
+      taskWith({ bucket: "review", nn: "01", verification: gate }),
+    );
+
+    expect(violations.some((v) => v.rule === "final-review-git-status")).toBe(
+      false,
+    );
+  });
+
+  test("allows a baseRef diff in the Final review", async () => {
+    const violations = await lintOne(
+      taskWith({
+        bucket: "review",
+        nn: "01",
+        finalReview: true,
+        verification:
+          "git diff --name-only <baseRef> -- DESIGN.md docs/deploy.md",
+      }),
+    );
+
+    expect(violations.some((v) => v.rule === "final-review-git-status")).toBe(
+      false,
+    );
+  });
+});
+
+describe("report-path rule", () => {
+  const lintOne = async (item: string, finalReview = true) => {
+    const root = await writeTree({
+      "tasks/ui/01-fixture-state-shell.md": VALID_TASK.replace(
+        "- [ ] One",
+        item,
+      ).replace(
+        "> **Status**: todo",
+        `${finalReview ? "> **Final review**: true\n" : ""}> **Status**: todo`,
+      ),
+    });
+    const violations = await lintFile(
+      join(root, "tasks/ui/01-fixture-state-shell.md"),
+    );
+    await rm(root, { recursive: true, force: true });
+    return violations;
+  };
+
+  test("flags a report criterion that names no file", async () => {
+    const violations = await lintOne(
+      "- [ ] The report lists every integration fix applied, or states that none was needed.",
+    );
+
+    const hit = violations.find((v) => v.rule === "report-path");
+    expect(hit).toBeDefined();
+    expect(hit!.detail).toContain("The report lists");
+  });
+
+  test("allows a report criterion that names its file", async () => {
+    const violations = await lintOne(
+      "- [ ] The report at `docs/x/review-notes.md` lists every integration fix applied.",
+    );
+
+    expect(violations.some((v) => v.rule === "report-path")).toBe(false);
+  });
+
+  // Outside the Final review, "the report" is usually a program's output, such as a CLI's stdout.
+  test("ignores a report criterion in a non-final task", async () => {
+    const violations = await lintOne(
+      "- [ ] The report is written to **stdout** in whole-tree mode.",
+      false,
+    );
+
+    expect(violations.some((v) => v.rule === "report-path")).toBe(false);
+  });
+
+  test("ignores the word inside another noun", async () => {
+    const violations = await lintOne(
+      "- [ ] The reporter page renders every row.",
+    );
+
+    expect(violations.some((v) => v.rule === "report-path")).toBe(false);
+  });
+});
+
 // Declared file count is the one task-size proxy that predicted retries in the
 // field: over one 47-task flight the first-attempt retry rate rose monotonically
 // with it — 43% at <=8 declared files, 56% at 9-11, 70% at 12-14, 89% at >=15.
