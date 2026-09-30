@@ -1,5 +1,19 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile, readFile, chmod } from "node:fs/promises";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  test,
+} from "bun:test";
+import {
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+  readFile,
+  chmod,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseJsonl, DEFAULT_MODEL, REVIEW_GUARD } from "./opencode-run.ts";
@@ -25,6 +39,9 @@ process.stdout.write(JSON.stringify({ type: "text", part: { text: "did the thing
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "opencode-run-test-"));
+  // Every spawn inherits this HOME, so the developer's own relay config never
+  // reaches a test that expects the wrapper default.
+  process.env.HOME = dir;
   fakeOpencode = join(dir, "fake-opencode.ts");
   argsLog = join(dir, "args.json");
   await writeFile(fakeOpencode, FAKE);
@@ -139,6 +156,55 @@ describe("opencode-run model resolution", () => {
     expect(res.success).toBe(true);
     const args = await loggedArgs();
     expect(args).toContain("env/picked-model");
+  });
+
+  describe("with a relay config", () => {
+    const configDir = () =>
+      join(dir, ".config", "q-lab", "cc-plugins", "relay");
+    const writeRelayConfig = async (models: unknown) => {
+      await mkdir(configDir(), { recursive: true });
+      await writeFile(
+        join(configDir(), "config.json"),
+        JSON.stringify({ models }),
+      );
+    };
+    const spawn = (rest: string[]) =>
+      Bun.spawnSync(["bun", SCRIPT, ...rest], {
+        stdin: Buffer.from("x"),
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, OPENCODE_BIN: opencodeBin, ARGS_LOG: argsLog },
+      });
+    afterEach(async () => {
+      await rm(configDir(), { recursive: true, force: true });
+    });
+
+    test("takes the relay config model over the default", async () => {
+      await writeRelayConfig({ opencode: { review: "acme/relay-pick" } });
+      expect(spawn(["review"]).success).toBe(true);
+      const args = await loggedArgs();
+      expect(args).toContain("acme/relay-pick");
+      expect(args).not.toContain(DEFAULT_MODEL.review);
+    });
+
+    // The flag is how a model picked at autopilot's setup question arrives.
+    test("--model beats the relay config", async () => {
+      await writeRelayConfig({ opencode: { delegate: "acme/relay-pick" } });
+      expect(spawn(["delegate", "--model", "acme/custom-1"]).success).toBe(
+        true,
+      );
+      const args = await loggedArgs();
+      expect(args).toContain("acme/custom-1");
+      expect(args).not.toContain("acme/relay-pick");
+    });
+
+    test("cli-default omits -m so opencode picks its own model", async () => {
+      await writeRelayConfig({ opencode: { delegate: "cli-default" } });
+      expect(spawn(["delegate"]).success).toBe(true);
+      const args = await loggedArgs();
+      expect(args).not.toContain("-m");
+      expect(args).not.toContain("cli-default");
+    });
   });
 });
 

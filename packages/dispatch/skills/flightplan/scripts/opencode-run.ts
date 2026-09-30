@@ -20,9 +20,10 @@
  *              documented tradeoff; the Final review fixer is the only step that
  *              edits, and it re-runs verification afterwards.
  *
- * Model (opencode requires `-m provider/model`): `--model` flag > `OPENCODE_MODEL`
- * env > per-mode default (delegate `opencode-go/kimi-k2.7-code`, review
- * `opencode-go/qwen3.7-max`).
+ * Model (`-m provider/model`): `--model` flag > `OPENCODE_MODEL` env > relay's
+ * config (`models.opencode.<mode>`) > per-mode default (delegate
+ * `opencode-go/kimi-k2.7-code`, review `opencode-go/qwen3.7-max`). Relay's
+ * `cli-default` omits `-m`, as relay itself does.
  *
  * The prompt comes from `--prompt-file <path>` or, if omitted, stdin — the same
  * caller interface as `codex-run.ts`, even though opencode takes the prompt as an
@@ -42,6 +43,7 @@ import {
   printChangedFiles,
   readPrompt,
 } from "./lib/harness-run";
+import { relayModel } from "./lib/relay-model";
 
 const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode";
 
@@ -59,12 +61,12 @@ const REVIEW_GUARD =
   "READ-ONLY REVIEW. Analyze only — do NOT modify, create, or delete any file, " +
   "and do not run any command that writes to disk. Report findings only.\n\n";
 
-function resolveModel(mode: Mode, args: string[]): string {
-  return (
-    flagValue(args, "--model") ??
-    process.env.OPENCODE_MODEL ??
-    DEFAULT_MODEL[mode]
-  );
+// null means omit `-m`.
+function resolveModel(mode: Mode, args: string[]): string | null {
+  const explicit = flagValue(args, "--model") ?? process.env.OPENCODE_MODEL;
+  if (explicit !== undefined) return explicit;
+  const configured = relayModel("opencode", mode);
+  return configured === undefined ? DEFAULT_MODEL[mode] : configured;
 }
 
 /**
@@ -91,7 +93,7 @@ export function parseJsonl(raw: string): string {
 
 // Returns the process exit code. Never calls process.exit itself — so any caller
 // wrapping this stays in control of teardown (mirrors codex-run's contract).
-function run(mode: Mode, prompt: string, model: string): number {
+function run(mode: Mode, prompt: string, model: string | null): number {
   if (!prompt.trim()) {
     process.stderr.write("Empty prompt — nothing to send to opencode\n");
     return 2;
@@ -105,7 +107,14 @@ function run(mode: Mode, prompt: string, model: string): number {
   let proc: Bun.SyncSubprocess<"pipe", "pipe">;
   try {
     proc = Bun.spawnSync(
-      [OPENCODE_BIN, "run", "-m", model, "--format", "json", message],
+      [
+        OPENCODE_BIN,
+        "run",
+        ...(model ? ["-m", model] : []),
+        "--format",
+        "json",
+        message,
+      ],
       // stdin "ignore": opencode inherits stdin and hangs if it stays open with no
       // EOF; closing it makes `run` return normally (see relay's backends note).
       // RELAY_DELEGATED marks this an unattended delegate, so monitor's

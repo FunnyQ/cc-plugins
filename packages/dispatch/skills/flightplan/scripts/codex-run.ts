@@ -20,9 +20,10 @@
  *
  * The prompt comes from `--prompt-file <path>` or, if omitted, stdin.
  *
- * Model: `--model` flag > `CODEX_MODEL` > the per-mode `DEFAULT_MODEL`. Pinned rather
- * than left to `~/.codex/config.toml`, so a flight's engine does not change under it
- * when the user retunes their own codex default between waves.
+ * Model: `--model` flag > `CODEX_MODEL` > relay's config (`models.codex.<mode>`) >
+ * the per-mode `DEFAULT_MODEL`, so the headless path picks the same model as a
+ * relay live pane. Relay's `cli-default` omits `-m` and leaves the pick to
+ * `~/.codex/config.toml`; nothing else does.
  *
  * Usage:
  *   bun codex-run.ts delegate [--prompt-file <path>] [--model <m>]   # < prompt also works
@@ -41,6 +42,7 @@ import {
   printChangedFiles,
   readPrompt,
 } from "./lib/harness-run";
+import { relayModel } from "./lib/relay-model";
 
 const CODEX_BIN = process.env.CODEX_BIN ?? "codex";
 
@@ -54,12 +56,14 @@ const DEFAULT_MODEL: Record<Mode, string> = {
   review: "gpt-6-astra",
 };
 
-function resolveModel(mode: Mode, args: string[]): string {
+// null means omit `-m`.
+function resolveModel(mode: Mode, args: string[]): string | null {
   // An empty CODEX_MODEL is treated as unset, not as a model named "": the test
   // harness and a `CODEX_MODEL= bun ...` invocation both clear it that way.
-  return (
-    flagValue(args, "--model") || process.env.CODEX_MODEL || DEFAULT_MODEL[mode]
-  );
+  const explicit = flagValue(args, "--model") || process.env.CODEX_MODEL;
+  if (explicit) return explicit;
+  const configured = relayModel("codex", mode);
+  return configured === undefined ? DEFAULT_MODEL[mode] : configured;
 }
 
 const MODE_ARGS: Record<Mode, string[]> = {
@@ -77,7 +81,7 @@ function run(
   mode: Mode,
   prompt: string,
   lastFile: string,
-  model: string,
+  model: string | null,
 ): number {
   if (!prompt.trim()) {
     process.stderr.write("Empty prompt — nothing to send to codex\n");
@@ -87,7 +91,15 @@ function run(
   let proc: Bun.SyncSubprocess<"pipe", "pipe">;
   try {
     proc = Bun.spawnSync(
-      [CODEX_BIN, "exec", ...MODE_ARGS[mode], "-m", model, "-o", lastFile, "-"],
+      [
+        CODEX_BIN,
+        "exec",
+        ...MODE_ARGS[mode],
+        ...(model ? ["-m", model] : []),
+        "-o",
+        lastFile,
+        "-",
+      ],
       // RELAY_DELEGATED marks this an unattended delegate, so monitor's
       // decision-log hooks stay quiet. `codex exec` runs its session in-process
       // and does read this var — only codex's interactive TUI cannot, because

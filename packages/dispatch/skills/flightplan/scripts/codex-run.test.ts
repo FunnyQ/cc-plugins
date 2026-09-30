@@ -1,5 +1,19 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile, readFile, chmod } from "node:fs/promises";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  test,
+} from "bun:test";
+import {
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+  readFile,
+  chmod,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -23,6 +37,9 @@ if (oi !== -1) writeFileSync(argv[oi + 1], "CODEX SAYS: did the thing");
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "codex-run-test-"));
+  // Every spawn inherits this HOME, so the developer's own relay config never
+  // reaches a test that expects the wrapper default.
+  process.env.HOME = dir;
   fakeCodex = join(dir, "fake-codex.ts");
   argsLog = join(dir, "args.json");
   await writeFile(fakeCodex, FAKE);
@@ -155,6 +172,61 @@ describe("codex-run model selection", () => {
     const viaFlag = await loggedArgs();
     expect(viaFlag[viaFlag.indexOf("-m") + 1]).toBe("gpt-5.6-terra");
   });
+
+  describe("with a relay config", () => {
+    const configDir = () =>
+      join(dir, ".config", "q-lab", "cc-plugins", "relay");
+    const writeRelayConfig = async (models: unknown) => {
+      await mkdir(configDir(), { recursive: true });
+      await writeFile(
+        join(configDir(), "config.json"),
+        JSON.stringify({ models }),
+      );
+    };
+    afterEach(async () => {
+      await rm(configDir(), { recursive: true, force: true });
+    });
+
+    test("takes the relay config model over the default", async () => {
+      await writeRelayConfig({
+        codex: { delegate: "gpt-6.1-sol", review: "gpt-6.1-terra" },
+      });
+      for (const [mode, model] of [
+        ["delegate", "gpt-6.1-sol"],
+        ["review", "gpt-6.1-terra"],
+      ]) {
+        expect(spawn([mode!]).success).toBe(true);
+        const logged = await loggedArgs();
+        expect(logged[logged.indexOf("-m") + 1]).toBe(model);
+      }
+    });
+
+    // The flag is how a model picked at autopilot's setup question arrives.
+    test("--model and CODEX_MODEL both beat the relay config", async () => {
+      await writeRelayConfig({ codex: { delegate: "gpt-6.1-sol" } });
+      expect(spawn(["delegate", "--model", "gpt-6-astra"]).success).toBe(true);
+      const viaFlag = await loggedArgs();
+      expect(viaFlag[viaFlag.indexOf("-m") + 1]).toBe("gpt-6-astra");
+
+      expect(spawn(["delegate"], "gpt-5.6-terra").success).toBe(true);
+      const viaEnv = await loggedArgs();
+      expect(viaEnv[viaEnv.indexOf("-m") + 1]).toBe("gpt-5.6-terra");
+    });
+
+    test("cli-default omits -m so codex picks its own model", async () => {
+      await writeRelayConfig({ codex: { review: "cli-default" } });
+      expect(spawn(["review"]).success).toBe(true);
+      expect(await loggedArgs()).not.toContain("-m");
+    });
+
+    test("an unparseable relay config fails instead of falling back", async () => {
+      await mkdir(configDir(), { recursive: true });
+      await writeFile(join(configDir(), "config.json"), "{ not json");
+      const res = spawn(["delegate"]);
+      expect(res.success).toBe(false);
+      expect(res.stderr.toString()).toContain("Could not read relay config");
+    });
+  });
 });
 
 describe("codex-run errors", () => {
@@ -208,7 +280,9 @@ describe("codex-run unattended contract", () => {
       });
       expect(res.success).toBe(true);
 
-      const stdin = (await readFile(argsLog, "utf-8")).split("\n--STDIN--\n")[1]!;
+      const stdin = (await readFile(argsLog, "utf-8")).split(
+        "\n--STDIN--\n",
+      )[1]!;
       expect(stdin).toContain("Nobody is watching this run");
       expect(stdin).toContain("do the thing");
     }

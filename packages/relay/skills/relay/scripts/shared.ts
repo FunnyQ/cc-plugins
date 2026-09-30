@@ -7,7 +7,8 @@ import type { Mode, RunResult } from "./types";
 // Temp directory root for relay runs
 export const TMP_ROOT = "/tmp/q-lab/relay/relay";
 
-// Config file path for relay models (XDG standard)
+// Config file path for relay models (XDG standard). dispatch's
+// flightplan/scripts/lib/relay-model.ts reads this path and `models` shape without importing it.
 export const CONFIG_PATH = join(
   homedir(),
   ".config",
