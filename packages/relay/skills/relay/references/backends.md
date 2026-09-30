@@ -92,7 +92,9 @@ Unset by default, so codex uses its own configured model. When a caller passes `
 
 ---
 
-## opencode (2.0.16)
+## opencode (1.x)
+
+Relay supports opencode 1.x only. On 2.x, suggest downgrading to 1.x. 2.x drops `--variant`, drops `-m` from the TUI, and changes the error event shape.
 
 Binary: `opencode`. Headless subcommand: `opencode run [message..]`.
 
@@ -125,10 +127,10 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Relevant flags
 
-- `-m, --model <provider/model>` — model specification (optional; relay passes it only when `--model` or the relay config sets one, otherwise opencode uses its own configured or provider default). The 2.x interactive TUI has no `-m` and prints help on it, so a run with a model always goes headless, even inside herdr
+- `-m, --model <provider/model>` — model specification (optional; relay passes it only when `--model` or the relay config sets one, otherwise opencode uses its own configured or provider default). The live TUI takes the same `-m`
 - `--agent <name>` — agent profile (optional)
 - `--format <default|json>` — output format
-- `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous`. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist on `run` and collapsed to the same boolean on 1.18.18 (not rechecked on 2.x) — they are not a stronger bypass. `--auto` still respects explicit deny rules, unlike codex's full bypass.
+- `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous`. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist on `run` and collapsed to the same boolean on 1.18.18 — they are not a stronger bypass. `--auto` still respects explicit deny rules, unlike codex's full bypass.
 - `--` — relay appends this separator before the message so flag-like task text (e.g. "add --help flag") is passed through as the message, not parsed as options.
 
 ### Output parsing
@@ -142,13 +144,13 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Model
 
-`relay.ts` pins no opencode model. Precedence is `--model` flag, then relay config, then opencode's own default (`-m` omitted). A `cli-default` value also omits `-m`. Format is `provider/model`. Relay passes no `--variant`: 2.x removed the flag, and an unknown flag makes `opencode run` print help and exit 1. Pick a variant in the id itself (`provider/model#variant`).
+`relay.ts` pins no opencode model. Precedence is `--model` flag, then relay config, then opencode's own default (`-m` omitted). A `cli-default` value also omits `-m`. Format is `provider/model`. Relay passes no `--variant`, so the model runs at its default variant.
 
 The suggested models ship in `references/config.suggested.json` and reach the user's config only through `relay.ts config apply`. Its `version` is a unix timestamp in seconds. Set it to `date +%s` whenever its `models` or `suggestions` change, and only then. A user config whose `version` is not a number counts as having no version. `config check` compares that `version` with the user's, so an unchanged file never prompts anyone.
 
 ### Errors
 
-A failed `opencode run` leaves stderr empty and reports the cause as a JSONL `error` event on stdout. Both 1.x and 2.x exit 1. Relay prints the event's message, or its type or name when there is no message. The failure line names the model or "CLI default". It never echoes the argv or the prompt.
+A failed `opencode run` leaves stderr empty and reports the cause as a JSONL `error` event on stdout. `opencode run` exits 1. Relay prints the event's `data.message`, or its `name` when there is no message. A bad model id often yields only `Unexpected server error. Check server logs for details.`, because opencode puts nothing more in the event. The failure line names the model or "CLI default". It never echoes the argv or the prompt.
 
 ---
 
