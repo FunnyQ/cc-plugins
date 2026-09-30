@@ -21,7 +21,14 @@
 //   --apply               wire the statusline + remove any stale channel entry
 //   --apply-statusline    apply only the statusline collector wiring
 //
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  accessSync,
+  constants,
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -41,13 +48,13 @@ import { decideStatusLine, type StatusLineConfig } from "./statusline-decision";
 
 const HOME = homedir();
 // Absolute path a user can paste into ~/.claude.json (no $CLAUDE_PLUGIN_ROOT there).
-const CHANNEL_SCRIPT = resolve(
+const COCKPIT_SHIM = resolve(
   import.meta.dir,
   "..",
   "..",
   "cockpit",
-  "scripts",
-  "cockpit-channel.ts",
+  "bin",
+  "cockpit",
 );
 const COCKPIT_SCRIPTS = resolve(
   import.meta.dir,
@@ -68,6 +75,8 @@ const MIN_CLAUDE_VERSION = "2.1.80"; // channels research-preview floor
 const SCRIPT_PERMISSIONS = [
   "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
   "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+  // Nested sub-agents cannot answer permission prompts for cockpit log calls.
+  "Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)",
 ];
 
 // --- helpers ----------------------------------------------------------------
@@ -118,8 +127,14 @@ function defaultResolve(specifier: string, from: string): string {
 // packaged now, so any such entry should be removed to avoid double registration.
 function channelConfiguredPath(): string | null {
   const { data } = readJson(CLAUDE_JSON);
-  const args = data?.mcpServers?.["cockpit-channel"]?.args;
+  const entry = data?.mcpServers?.["cockpit-channel"];
+  const args = entry?.args;
   if (!Array.isArray(args)) return null;
+  if (
+    typeof entry?.command === "string" &&
+    /(?:^|[/\\])skills[/\\]cockpit[/\\]bin[/\\]cockpit$/.test(entry.command) &&
+    args[0] === "channel"
+  ) return entry.command;
   return (
     args.find(
       (a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"),
@@ -161,11 +176,20 @@ function channelChecks(): Check[] {
       `Channels need Claude Code ${MIN_CLAUDE_VERSION}+. Update Claude Code to use the cockpit send box.`,
     );
   }
+  let executable = false;
+  if (existsSync(COCKPIT_SHIM)) {
+    try {
+      accessSync(COCKPIT_SHIM, constants.X_OK);
+      executable = true;
+    } catch {
+      // A partial install must report a non-executable shim as a required failure.
+    }
+  }
   add(
-    "cockpit-channel script exists",
-    existsSync(CHANNEL_SCRIPT),
+    "cockpit shim exists and is executable",
+    executable,
     "required",
-    `Expected at ${CHANNEL_SCRIPT}`,
+    `Expected at ${COCKPIT_SHIM}`,
   );
   // The channel is packaged in the plugin manifest now; a leftover hand-wired
   // entry would register it twice. Flag it for cleanup.
@@ -209,10 +233,7 @@ function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
     console.log(`✗ Couldn't parse ${CLAUDE_JSON} — fix it first.`);
     return "error";
   }
-  const args = data?.mcpServers?.["cockpit-channel"]?.args;
-  const hasEntry =
-    Array.isArray(args) &&
-    args.some((a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"));
+  const hasEntry = channelConfiguredPath() !== null;
   if (!hasEntry) return "none";
   if (dryRun) {
     console.log(

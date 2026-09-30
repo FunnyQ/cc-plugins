@@ -65,10 +65,20 @@ function monitorScriptVersion(
   command: string,
   cacheRoot: string,
 ): string | null {
+  // Keep the TS pattern for Bun orphans left behind by 5.x upgrades.
   const script = new RegExp(
     `${escapeRegExp(cacheRoot)}[/\\\\](\\d+\\.\\d+\\.\\d+)[/\\\\]skills[/\\\\]cockpit[/\\\\]scripts[/\\\\](?:cockpit-channel|cockpit-server)\\.ts\\b`,
   );
-  return command.match(script)?.[1] ?? null;
+  const shim = new RegExp(
+    `${escapeRegExp(cacheRoot)}[/\\\\](\\d+\\.\\d+\\.\\d+)[/\\\\]skills[/\\\\]cockpit[/\\\\]bin[/\\\\]cockpit\\s+(?:channel|server)\\b`,
+  );
+  const binary = /[/\\]q-lab[/\\]cockpit[/\\]bin[/\\](\d+\.\d+\.\d+)[/\\]cockpit\s+(?:channel|server)\b/;
+  return (
+    command.match(script)?.[1] ??
+    command.match(shim)?.[1] ??
+    command.match(binary)?.[1] ??
+    null
+  );
 }
 
 export function parsePsRows(out: string): ProcRow[] {

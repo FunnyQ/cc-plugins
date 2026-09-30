@@ -88,6 +88,8 @@ describe("versionGte", () => {
   });
 });
 
+const COCKPIT_SHIM = resolve(import.meta.dir, "../../cockpit/bin/cockpit");
+
 describe("--check", () => {
   test("covers both skills: dashboard prerequisites + cockpit channel", () => {
     const { code, stdout } = run();
@@ -97,7 +99,7 @@ describe("--check", () => {
     expect(stdout).toContain("stats-cache.json");
     expect(stdout).toContain("live usage limits (statusline collector)");
     // cockpit side — channel is plugin-packaged; with no stale entry it's green
-    expect(stdout).toContain("cockpit-channel script exists");
+    expect(stdout).toContain("cockpit shim exists and is executable");
     expect(stdout).toContain("✓ no stale cockpit-channel entry");
     expect(stdout).toContain("mermaid diagram lint (happy-dom)");
   });
@@ -260,6 +262,16 @@ describe("--apply", () => {
     expect(stdout).not.toContain("Removed stale cockpit-channel");
   });
 
+  test("pre-approves the shim alongside existing Bun scripts", () => {
+    run(["--apply"]);
+    expect(settingsJson().permissions.allow).toContain(
+      "Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)",
+    );
+    expect(settingsJson().permissions.allow).toContain(
+      "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+    );
+  });
+
   test("re-check is all green after apply", () => {
     run(["--apply"]);
     const { code, stdout } = run();
@@ -339,6 +351,15 @@ describe("version drift", () => {
 });
 
 describe("--migrate (channel cleanup only, never fresh-wire)", () => {
+  test("recognizes and removes a hand-wired shim channel", () => {
+    writeFileSync(join(home, ".claude.json"), JSON.stringify({
+      mcpServers: { "cockpit-channel": { command: COCKPIT_SHIM, args: ["channel"] } },
+    }));
+    expect(run().stdout).toContain("○ no stale cockpit-channel entry");
+    run(["--migrate"]);
+    expect(claudeJson().mcpServers["cockpit-channel"]).toBeUndefined();
+  });
+
   const OLD_COLLECTOR =
     "/h/.claude/plugins/cache/q-lab-marketplace/monitor/3.1.0/skills/usage-dashboard/scripts/statusline-collector.ts";
 
@@ -470,6 +491,7 @@ describe("--session-check drift watch (every session, read-only)", () => {
   const PERMISSIONS = [
     "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
     "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+    "Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)",
   ];
 
   function wire(collector = COLLECTOR_SCRIPT, allow = PERMISSIONS) {
@@ -493,6 +515,11 @@ describe("--session-check drift watch (every session, read-only)", () => {
     wire();
     const { out } = run(["--session-check"]);
     expect(out.trim()).toBe("");
+  });
+
+  test("reports a missing shim permission even when Bun is approved", () => {
+    wire(COLLECTOR_SCRIPT, PERMISSIONS.filter((p) => p.startsWith("Bash(bun ")));
+    expect(run(["--session-check"]).stdout).toContain("permissions.allow");
   });
 
   test("says nothing about a collector at another path", () => {

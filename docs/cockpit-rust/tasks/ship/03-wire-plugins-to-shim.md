@@ -7,7 +7,7 @@
 >
 > **Depends on**: ship/01, channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02
 > **Blocks**: ship/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -101,21 +101,21 @@ It finds orphaned channels and daemons by matching `ps` command lines. Two regex
 
 ## Acceptance criteria
 
-- [ ] Claude `plugin.json` launches `cockpit-channel` as `${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit` with args `["channel"]`, and its SessionStart and Stop cockpit hooks run `… bin/cockpit" hook session-start` and `… hook stop` with timeouts 5 and 10.
-- [ ] Codex `hooks.json` carries the same two hook commands with `${PLUGIN_ROOT}`. The `setup.ts --session-check` hook is unchanged in both manifests.
-- [ ] `opencode/plugin.ts` spawns the shim with `hook session-start` and `hook stop`, still imports nothing from the repo, and reads no harness env var.
-- [ ] `reap-stale.ts` extracts the version from the old `.ts`, the shim, and the exec'd binary command lines for channel and server, and never matches a `cockpit log` CLI call.
-- [ ] `setup.ts` checks that the shim exists and is executable, and pre-approves the shim in `permissions.allow`, including the drift check's expected set.
-- [ ] No runtime launch of a cockpit TS script remains in the manifests, the OpenCode plugin, or the install scripts.
+- [x] Claude `plugin.json` launches `cockpit-channel` as `${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit` with args `["channel"]`, and its SessionStart and Stop cockpit hooks run `… bin/cockpit" hook session-start` and `… hook stop` with timeouts 5 and 10.
+- [x] Codex `hooks.json` carries the same two hook commands with `${PLUGIN_ROOT}`. The `setup.ts --session-check` hook is unchanged in both manifests.
+- [x] `opencode/plugin.ts` spawns the shim with `hook session-start` and `hook stop`, still imports nothing from the repo, and reads no harness env var.
+- [x] `reap-stale.ts` extracts the version from the old `.ts`, the shim, and the exec'd binary command lines for channel and server, and never matches a `cockpit log` CLI call.
+- [x] `setup.ts` checks that the shim exists and is executable, and pre-approves the shim in `permissions.allow`, including the drift check's expected set.
+- [x] No runtime launch of a cockpit TS script remains in the manifests, the OpenCode plugin, or the install scripts.
 
 ## Verification
 
-- [ ] `bun -e 'for (const f of ["packages/monitor/.claude-plugin/plugin.json","packages/monitor/.codex-plugin/hooks.json"]) JSON.parse(require("fs").readFileSync(f,"utf8")); console.log("json ok")'`
-- [ ] `! rg -n 'bun .*cockpit/scripts/(cockpit|cockpit-server|cockpit-channel|decision-log-start|scribe-nudge|find-session)\.ts' packages/monitor/.claude-plugin packages/monitor/.codex-plugin opencode/plugin.ts packages/monitor/skills/install/scripts --glob '!*.test.ts'`
-- [ ] `rg -n '"args": \[\s*"channel"' packages/monitor/.claude-plugin/plugin.json` finds the channel args, or an equivalent `bun -e` JSON assertion on `mcpServers["cockpit-channel"]`.
-- [ ] `bun test opencode/`
-- [ ] `bun test packages/monitor/skills/install/scripts/`
-- [ ] `bunx --bun tsc --noEmit | grep -E 'opencode/plugin|skills/install/scripts'` prints nothing.
+- [x] `bun -e 'for (const f of ["packages/monitor/.claude-plugin/plugin.json","packages/monitor/.codex-plugin/hooks.json"]) JSON.parse(require("fs").readFileSync(f,"utf8")); console.log("json ok")'`
+- [x] `! rg -n 'bun .*cockpit/scripts/(cockpit|cockpit-server|cockpit-channel|decision-log-start|scribe-nudge|find-session)\.ts' packages/monitor/.claude-plugin packages/monitor/.codex-plugin opencode/plugin.ts packages/monitor/skills/install/scripts --glob '!*.test.ts'`
+- [x] `rg -n '"args": \[\s*"channel"' packages/monitor/.claude-plugin/plugin.json` finds the channel args, or an equivalent `bun -e` JSON assertion on `mcpServers["cockpit-channel"]`.
+- [x] `bun test opencode/`
+- [x] `bun test packages/monitor/skills/install/scripts/`
+- [x] `bunx --bun tsc --noEmit | grep -E 'opencode/plugin|skills/install/scripts'` prints nothing.
 
 ## Eval rubric
 

@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${PLUGIN_ROOT}/skills/cockpit/scripts/decision-log-start.ts\"",
+            "command": "\"${PLUGIN_ROOT}/skills/cockpit/bin/cockpit\" hook session-start",
             "timeout": 5
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${PLUGIN_ROOT}/skills/cockpit/scripts/scribe-nudge.ts\"",
+            "command": "\"${PLUGIN_ROOT}/skills/cockpit/bin/cockpit\" hook stop",
             "timeout": 10
           }
         ]

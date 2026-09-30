@@ -12,9 +12,7 @@ type EditArgs = {
 const CHECK_BRANCH = "packages/chronicle/hooks/check-branch.sh";
 const FLIGHTPLAN_LINT = "packages/dispatch/hooks/flightplan-lint.sh";
 const COMMENT_GUARD = "packages/guard/hooks/comment-guard.ts";
-const DECISION_LOG_START =
-  "packages/monitor/skills/cockpit/scripts/decision-log-start.ts";
-const SCRIBE_NUDGE = "packages/monitor/skills/cockpit/scripts/scribe-nudge.ts";
+const COCKPIT_SHIM = "packages/monitor/skills/cockpit/bin/cockpit";
 
 // Each shell hook opens with a gate that discards almost every call it receives.
 // Mirroring that gate here keeps the common tool call from paying a bash + jq
@@ -282,7 +280,7 @@ const QLabPlugin = Object.assign(
             // scribe against. `provider` marks it as ours: a directory lookup
             // would pick whichever OpenCode session touched this worktree last.
             const result = await run(
-              ["bun", join(root, DECISION_LOG_START)],
+              [join(root, COCKPIT_SHIM), "hook", "session-start"],
               JSON.stringify({
                 session_id: input.sessionID,
                 cwd,
@@ -299,7 +297,7 @@ const QLabPlugin = Object.assign(
             // immediately when that parse fails, so an empty stdin silently
             // disables the nudge entirely. The payload is the behavior.
             const result = await run(
-              ["bun", join(root, SCRIBE_NUDGE)],
+              [join(root, COCKPIT_SHIM), "hook", "stop"],
               JSON.stringify({
                 session_id: input.sessionID,
                 cwd,
