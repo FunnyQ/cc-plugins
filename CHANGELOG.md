@@ -1,5 +1,12 @@
 # Changelog
 
+## [herdr 0.7.11] - 2026-10-01
+
+_tracks tag `herdr-v0.7.11`_
+
+### Changed
+- Refreshed the herdr references for herdr 0.9.3, covering the removal of pane.graphics.*, the events_lost resync via session.snapshot, new config keys, TERM_PROGRAM=herdr in new panes, and the machine status/reconnect subcommands.
+
 ## [monitor 7.0.0] - 2026-10-01
 
 _tracks tag `monitor-v7.0.0`_
