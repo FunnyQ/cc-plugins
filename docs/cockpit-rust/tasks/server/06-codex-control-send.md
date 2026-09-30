@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: server/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -76,19 +76,19 @@ impl Transport {
 
 ## Acceptance criteria
 
-- [ ] Every `server: codex` contract test passes against the Rust binary and still passes against TS.
-- [ ] With no `codex` on `PATH`, status answers `{"ready": false, …}` with `errors` starting `codex --version failed:` and `direct app-server failed:`, and send answers 502 — never a hang or 500.
-- [ ] Against a fake app-server (a `cargo test` stdio child script or an in-test Unix-socket WebSocket server), a send to an idle thread issues `turn/start`, a send to a thread with an in-progress turn issues `turn/steer` with `expectedTurnId`, and a failure after submission never retries on the fallback transport.
-- [ ] Token and session validation return the same status codes and bodies as TS.
-- [ ] (human) Send a message from the dashboard to a running interactive codex TUI and see it arrive.
+- [x] Every `server: codex` contract test passes against the Rust binary and still passes against TS.
+- [x] With no `codex` on `PATH`, status answers `{"ready": false, …}` with `errors` starting `codex --version failed:` and `direct app-server failed:`, and send answers 502 — never a hang or 500.
+- [x] Against a fake app-server (a `cargo test` stdio child script or an in-test Unix-socket WebSocket server), a send to an idle thread issues `turn/start`, a send to a thread with an in-progress turn issues `turn/steer` with `expectedTurnId`, and a failure after submission never retries on the fallback transport.
+- [x] Token and session validation return the same status codes and bodies as TS.
+- [x] (human) Send a message from the dashboard to a running interactive codex TUI and see it arrive.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: codex"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: codex"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: codex"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: codex"` (TS still green)
 
 ## Eval rubric
 

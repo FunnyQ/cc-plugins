@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/01
 > **Blocks**: server/05, server/08
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -71,21 +71,21 @@ In this exact order:
 
 ## Acceptance criteria
 
-- [ ] Every `server: broker` and `server: inbox` contract test passes against the Rust binary and still passes against TS. The `server: presence` group (waits that need a live permission-stream subscriber) is not this task's gate: no subscriber exists until the permission routes land, so here the gate can only answer `no_tab`.
-- [ ] An answer sent before the wait parks is delivered by the next wait hop for the same call (stash), and never delivered to a wait parked on a different call.
-- [ ] A wait naming a call that is no longer the open one returns `superseded` without parking; with `require_watcher=1` the gate answers `toggle_off` / `no_tab` only after the stash and superseded checks.
-- [ ] `/api/respond` appends exactly one `response` line with `call` set to the explicit or open call, even when no wait is parked.
-- [ ] Two concurrent sessions never receive each other's answers or messages; a second park for one session releases the first with the timeout sentinel.
-- [ ] A client that disconnects mid-park leaves no entry behind, and a later park for that session is not disturbed by the dropped one's guard (`cargo test`).
-- [ ] `has_channel` stays true in the gap between one inbox poll resolving and the next re-parking (TTL window).
+- [x] Every `server: broker` and `server: inbox` contract test passes against the Rust binary and still passes against TS. The `server: presence` group (waits that need a live permission-stream subscriber) is not this task's gate: no subscriber exists until the permission routes land, so here the gate can only answer `no_tab`.
+- [x] An answer sent before the wait parks is delivered by the next wait hop for the same call (stash), and never delivered to a wait parked on a different call.
+- [x] A wait naming a call that is no longer the open one returns `superseded` without parking; with `require_watcher=1` the gate answers `toggle_off` / `no_tab` only after the stash and superseded checks.
+- [x] `/api/respond` appends exactly one `response` line with `call` set to the explicit or open call, even when no wait is parked.
+- [x] Two concurrent sessions never receive each other's answers or messages; a second park for one session releases the first with the timeout sentinel.
+- [x] A client that disconnects mid-park leaves no entry behind, and a later park for that session is not disturbed by the dropped one's guard (`cargo test`).
+- [x] `has_channel` stays true in the gap between one inbox poll resolving and the next re-parking (TTL window).
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (broker|inbox)"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (broker|inbox)"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (broker|inbox)"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: (broker|inbox)"` (TS still green)
 
 ## Eval rubric
 

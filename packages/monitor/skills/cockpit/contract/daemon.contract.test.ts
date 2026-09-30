@@ -284,6 +284,7 @@ describe("server: views", () => {
 });
 
 describe("server: log-stream", () => {
+  const { renameSync } = require("node:fs") as typeof import("node:fs");
   const c = group();
   test("replays backlog and streams an append within two seconds", async () => {
     const s = await stream(url(c.d, "/api/log/stream", { project: c.f.projectDir, session: c.f.claudeSessionId }));
@@ -302,6 +303,59 @@ describe("server: log-stream", () => {
     for (const session of ["", "../../bad"]) {
       expect(await get(c.d, "/api/log/stream", { project: c.f.projectDir, session }, 400)).toEqual({ error: "invalid project/session" });
     }
+  });
+  test("rejects an unrelated project before opening SSE", async () => {
+    expect(await get(c.d, "/api/log/stream", {
+      project: c.f.projectDir + "-unrelated", session: c.f.claudeSessionId,
+    }, 400)).toEqual({ error: "invalid project/session" });
+  });
+  test("resolves a file created after the connection opens", async () => {
+    const session = crypto.randomUUID();
+    const s = await stream(url(c.d, "/api/log/stream", { project: c.f.projectDir, session }));
+    try {
+      const rec = call();
+      seedTrail(c.f.projectDir, session, [rec]);
+      expect(await s.next(1500)).toEqual({ event: "message", data: rec });
+      expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
+    } finally { await s.close(); }
+  });
+  test("resets backlog after truncation and atomic replacement", async () => {
+    const session = crypto.randomUUID();
+    const original = { text: "Original record is longer than the truncated record" };
+    const path = seedTrail(c.f.projectDir, session, [original]);
+    const s = await stream(url(c.d, "/api/log/stream", { project: c.f.projectDir, session }));
+    try {
+      expect(await s.next()).toEqual({ event: "message", data: original });
+      expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
+      const truncated = { text: "short" };
+      writeFileSync(path, JSON.stringify(truncated) + "\n");
+      expect(await s.next(1500)).toEqual({ event: "message", data: truncated });
+      expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
+      const replacement = { text: "replacement" };
+      writeFileSync(path + ".replacement", JSON.stringify(replacement) + "\n");
+      renameSync(path + ".replacement", path);
+      expect(await s.next(1500)).toEqual({ event: "message", data: replacement });
+      expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
+      const appended = call();
+      appendTrail(path, appended);
+      expect(await s.next(1500)).toEqual({ event: "message", data: appended });
+    } finally { await s.close(); }
+  });
+
+});
+
+describe("server: log-stream watcher", () => {
+  const c = group(() => ({ COCKPIT_TAIL_POLL_MS: "2000" }));
+  test("delivers watched appends before the two-second fallback poll", async () => {
+    const session = crypto.randomUUID();
+    const path = seedTrail(c.f.projectDir, session, []);
+    const s = await stream(url(c.d, "/api/log/stream", { project: c.f.projectDir, session }));
+    try {
+      expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
+      const rec = call();
+      appendTrail(path, rec);
+      expect(await s.next(1500)).toEqual({ event: "message", data: rec });
+    } finally { await s.close(); }
   });
 });
 
@@ -358,6 +412,56 @@ describe("server: transcript", () => {
 
 describe("server: broker", () => {
   const c = group();
+  test("replaces one park without cross-delivering another session", async () => {
+    const session = crypto.randomUUID(), other = crypto.randomUUID();
+    const first = get(c.d, "/api/wait", { session });
+    const separate = get(c.d, "/api/wait", { session: other });
+    await Bun.sleep(100);
+    const replacement = get(c.d, "/api/wait", { session });
+    expect(await first).toEqual({ answer: null, timeout: true });
+    expect(await post(c.d, "/api/respond", { session, answer: "One" })).toEqual({ delivered: true });
+    expect(await replacement).toEqual({ answer: "One" });
+    expect(await post(c.d, "/api/respond", { session: other, answer: "Two" })).toEqual({ delivered: true });
+    expect(await separate).toEqual({ answer: "Two" });
+  });
+  test("keeps mismatched stashes and expires matching stashes", async () => {
+    const rec = call();
+    appendTrail(c.trail, rec);
+    await post(c.d, "/api/respond", { session: c.f.claudeSessionId, call: rec.id, answer: "Saved" });
+    expect(await wait(c.d, c.f.claudeSessionId, { call: crypto.randomUUID() })).toEqual({ answer: null, superseded: true });
+    expect(await wait(c.d, c.f.claudeSessionId, { call: rec.id })).toEqual({ answer: "Saved" });
+    const expired = call();
+    appendTrail(c.trail, expired);
+    await post(c.d, "/api/respond", { session: c.f.claudeSessionId, answer: "Expired" });
+    await Bun.sleep(2100);
+    expect(await wait(c.d, c.f.claudeSessionId, { call: expired.id })).toEqual({ answer: null, superseded: true });
+  });
+  test("does not wake a wait for a different call and appends exactly one ordered response", async () => {
+    const current = call();
+    appendTrail(c.trail, current);
+    const parked = get(c.d, "/api/wait", { session: c.f.claudeSessionId, call: current.id });
+    await Bun.sleep(100);
+    const before = readJsonl(c.trail).length;
+    const stale = crypto.randomUUID();
+    expect(await post(c.d, "/api/respond", { session: c.f.claudeSessionId, call: stale, answer: "Old" })).toEqual({ delivered: false });
+    expect(readJsonl(c.trail).length).toBe(before + 1);
+    const record = readJsonl(c.trail).at(-1);
+    expect(Object.keys(record)).toEqual(["id", "type", "call", "answer", "ts"]);
+    expect(record.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    responseRecord(c.trail, stale, "Old");
+    expect(await post(c.d, "/api/respond", { session: c.f.claudeSessionId, call: current.id, answer: 42 })).toEqual({ delivered: true });
+    expect(await parked).toEqual({ answer: "" });
+    expect(await wait(c.d, c.f.claudeSessionId, { call: stale })).toEqual({ answer: "Old" });
+  });
+  test("validates JSON, then token, then session and toggle types", async () => {
+    for (const path of ["/api/respond", "/api/answer-here"]) {
+      expect(await json(await fetch(`${c.d.base}${path}`, { method: "POST", body: "{" }), 400)).toEqual({ error: "invalid json" });
+    }
+    expect(await post(c.d, "/api/respond", { session: "bad", token: "bad" }, 401)).toEqual({ error: "unauthorized" });
+    expect(await post(c.d, "/api/respond", { session: "bad" }, 400)).toEqual({ error: "invalid session" });
+    expect(await get(c.d, "/api/wait", { session: "bad" }, 400)).toEqual({ error: "invalid session" });
+    expect(await post(c.d, "/api/answer-here", { on: "true" }, 400)).toEqual({ error: "invalid on" });
+  });
   test("defaults answer_here off and persists authenticated toggles", async () => {
     expect(await get(c.d, "/api/answer-here")).toEqual({ answer_here: false });
     for (const token of ["", "bad"]) {
@@ -456,6 +560,33 @@ describe("server: presence", () => {
 
 describe("server: inbox", () => {
   const c = group();
+  test("replaces polls and isolates sessions while preserving untrimmed text", async () => {
+    const session = crypto.randomUUID(), other = crypto.randomUUID();
+    const first = get(c.d, "/api/inbox", { session });
+    const separate = get(c.d, "/api/inbox", { session: other });
+    await Bun.sleep(100);
+    const replacement = get(c.d, "/api/inbox", { session });
+    expect(await first).toEqual({ message: null, timeout: true });
+    expect(await post(c.d, "/api/send-message", { session, text: " One " })).toEqual({ delivered: true });
+    expect(await replacement).toEqual({ message: " One " });
+    expect(await post(c.d, "/api/send-message", { session: other, text: "Two" })).toEqual({ delivered: true });
+    expect(await separate).toEqual({ message: "Two" });
+    expect(await post(c.d, "/api/send-message", { session, text: "\u0085" })).toEqual({ delivered: false });
+    expect(await get(c.d, "/api/inbox", { session })).toEqual({ message: "\u0085" });
+  });
+  test("expires stashes and validates messages in order", async () => {
+    const session = crypto.randomUUID();
+    await post(c.d, "/api/send-message", { session, text: "Expired" });
+    await Bun.sleep(2100);
+    expect(await get(c.d, "/api/inbox", { session })).toEqual({ message: null, timeout: true });
+    expect(await json(await fetch(`${c.d.base}/api/send-message`, { method: "POST", body: "{" }), 400)).toEqual({ error: "invalid json" });
+    expect(await post(c.d, "/api/send-message", { token: "bad", session: "bad", text: "" }, 401)).toEqual({ error: "unauthorized" });
+    expect(await post(c.d, "/api/send-message", { session: 42, text: "Hello" }, 400)).toEqual({ error: "invalid session" });
+    expect(await get(c.d, "/api/inbox", { session: "bad" }, 400)).toEqual({ error: "invalid session" });
+    for (const text of [42, "", " \t\n", "\ufeff"]) {
+      expect(await post(c.d, "/api/send-message", { session, text }, 400)).toEqual({ error: "empty text" });
+    }
+  });
   test("delivers a message to a parked poll", async () => {
     const poll = get(c.d, "/api/inbox", { session: c.f.claudeSessionId });
     await Bun.sleep(100);
@@ -530,9 +661,49 @@ function isolatedPath(h: Homes) {
 
 describe("server: codex", () => {
   const c = group((h) => ({ PATH: isolatedPath(h) }));
+  test("validates JSON, token, session and text before probing", async () => {
+    expect(await json(await fetch(c.d.base + "/api/send-codex-message", { method: "POST", body: "{" }), 400)).toEqual({ error: "invalid json" });
+    for (const token of ["", "bad"]) {
+      expect(await get(c.d, "/api/codex-control/status", { session: "bad", token }, 401)).toEqual({ error: "unauthorized" });
+      expect(await post(c.d, "/api/send-codex-message", { session: "bad", token, text: "" }, 401)).toEqual({ error: "unauthorized" });
+    }
+    for (const session of ["", "bad", c.f.codexThreadId.toUpperCase()]) {
+      expect(await get(c.d, "/api/codex-control/status", { session }, 400)).toEqual({ error: "invalid session" });
+      expect(await post(c.d, "/api/send-codex-message", { session, text: "Hello" }, 400)).toEqual({ error: "invalid session" });
+    }
+    for (const text of ["", "  \n ", null, 123, {}]) {
+      expect(await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, text }, 400)).toEqual({ error: "empty text" });
+    }
+    const path = join(c.h.cockpitHome, "daemon.json");
+    try {
+      writeFileSync(path, JSON.stringify({ ...c.d.info, token: "replacement" }));
+      expect(await get(c.d, "/api/codex-control/status", { session: "bad" }, 401)).toEqual({ error: "unauthorized" });
+      expect(await get(c.d, "/api/codex-control/status", { session: "bad", token: "replacement" }, 400)).toEqual({ error: "invalid session" });
+      expect(await post(c.d, "/api/send-codex-message", { session: "bad", token: "replacement", text: "Hello" }, 400)).toEqual({ error: "invalid session" });
+    } finally {
+      writeFileSync(path, JSON.stringify(c.d.info));
+    }
+  });
   test("reports unavailable control and failed sends without a Codex binary/socket", async () => {
     expect(await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId, token: "bad" }, 401)).toEqual({ error: "unauthorized" });
     expect(await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, token: "bad", text: "Hello" }, 401)).toEqual({ error: "unauthorized" });
+    if (process.env.COCKPIT_BIN) {
+      // Rust reports spawn failures instead of inheriting TS's unhandled ENOENT crash.
+      const status = await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId });
+      expect(status).toEqual({
+        ready: false,
+        controlMode: "direct-app-server",
+        warnings: [expect.stringMatching(/^remote-control start failed: .+/)],
+        errors: [
+          expect.stringMatching(/^codex --version failed: .+/),
+          expect.stringMatching(/^direct app-server failed: .+/),
+        ],
+      });
+      const send = await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, text: "Hello" }, 502);
+      expect(send).toEqual({ error: status.errors.join("; "), warnings: status.warnings });
+      expect(c.d.proc.exitCode).toBeNull();
+      return;
+    }
     // pins TS quirk: missing codex emits an unhandled spawn ENOENT; both routes drop HTTP and exit 1.
     for (const path of ["/api/codex-control/status", "/api/send-codex-message"]) {
       if (c.d.proc.exitCode !== null) c.d = await startDaemon(c.env);
@@ -557,16 +728,20 @@ describe("server: codex", () => {
 describe("server: opencode", () => {
   let bridge: ReturnType<typeof Bun.serve>;
   let mode: "unavailable" | "ready" | "missing" = "unavailable";
+  let appendBody: unknown = true;
+  let submitBody: unknown = true;
   const seen: Array<{ method: string; path: string; directory: string | null; body: unknown }> = [];
   // One isolated daemon sees only this candidate; health false excludes it initially.
   beforeAll(() => {
     bridge = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req) {
+      expect(req.headers.has("authorization")).toBe(false);
       const u = new URL(req.url);
       const body = req.method === "POST" && u.pathname === "/tui/append-prompt" ? await req.json() : null;
       seen.push({ method: req.method, path: u.pathname, directory: u.searchParams.get("directory"), body });
       if (u.pathname === "/global/health") return Response.json({ healthy: mode !== "unavailable" });
       if (u.pathname.startsWith("/session/")) return mode === "missing" ? Response.json({}, { status: 404 }) : Response.json({ id: u.pathname.slice(9), directory: c.f.projectDir });
-      if (u.pathname === "/tui/append-prompt" || u.pathname === "/tui/submit-prompt") return Response.json(true);
+      if (u.pathname === "/tui/append-prompt") return Response.json(appendBody);
+      if (u.pathname === "/tui/submit-prompt") return Response.json(submitBody);
       return new Response("Not found", { status: 404 });
     } });
   });
@@ -588,6 +763,39 @@ describe("server: opencode", () => {
       { method: "POST", path: "/tui/submit-prompt", directory: c.f.projectDir, body: null },
     ]);
   });
+  test("requires true bodies and follows JavaScript truthiness for errors", async () => {
+    mode = "ready";
+    for (const [body, error] of [
+      [{ data: { message: "append denied" } }, "append denied"],
+      [{ data: { message: 0 }, message: false, error: "fallback error" }, "fallback error"],
+      [{ data: { message: 42 }, message: "ignored" }, "42"],
+      [{ data: { message: {} } }, "[object Object]"],
+      [{ data: { message: [] } }, "OpenCode send failed"],
+      [false, "OpenCode TUI append failed: 200"],
+    ] as const) {
+      appendBody = body;
+      seen.length = 0;
+      expect(await post(c.d, "/api/send-opencode-message", { session: c.f.opencodeSessionId, text: "Hello" }, 502)).toEqual({ error, warnings: [] });
+      expect(seen.map((r) => r.path)).toEqual(["/global/health", `/session/${c.f.opencodeSessionId}`, "/tui/append-prompt"]);
+    }
+    appendBody = true;
+    submitBody = { message: "submit denied" };
+    expect(await post(c.d, "/api/send-opencode-message", { session: c.f.opencodeSessionId, text: "Hello" }, 502)).toEqual({ error: "submit denied", warnings: [] });
+    submitBody = true;
+  });
+  test("compares fresh daemon tokens including null without coercion", async () => {
+    const path = join(c.h.cockpitHome, "daemon.json");
+    try {
+      writeFileSync(path, JSON.stringify({ ...c.d.info, token: "replacement" }));
+      expect(await get(c.d, "/api/opencode-control/status", { session: "bad" }, 401)).toEqual({ error: "unauthorized" });
+      expect(await get(c.d, "/api/opencode-control/status", { session: "bad", token: "replacement" }, 400)).toEqual({ error: "invalid session" });
+      writeFileSync(path, "{}");
+      expect(await json(await fetch(c.d.base + "/api/opencode-control/status?session=bad"), 400)).toEqual({ error: "invalid session" });
+      expect(await post(c.d, "/api/send-opencode-message", { token: null, session: "bad" }, 400)).toEqual({ error: "invalid session" });
+      expect(await post(c.d, "/api/send-opencode-message", { token: 0, session: "bad" }, 401)).toEqual({ error: "unauthorized" });
+      expect(await json(await fetch(c.d.base + "/api/send-opencode-message", { method: "POST", body: JSON.stringify({ session: "bad" }) }), 401)).toEqual({ error: "unauthorized" });
+    } finally { writeFileSync(path, JSON.stringify(c.d.info)); }
+  });
   test("reports a missing session and rejects bad tokens", async () => {
     mode = "missing";
     seen.length = 0;
@@ -595,5 +803,62 @@ describe("server: opencode", () => {
     expect(seen.map((r) => r.path)).toEqual(["/global/health", `/session/${c.f.opencodeSessionId}`]);
     expect(await get(c.d, "/api/opencode-control/status", { session: c.f.opencodeSessionId, token: "bad" }, 401)).toEqual({ error: "unauthorized" });
     expect(await post(c.d, "/api/send-opencode-message", { session: c.f.opencodeSessionId, text: "Hello", token: "bad" }, 401)).toEqual({ error: "unauthorized" });
+  });
+});
+
+
+describe("server: opencode closed candidate", () => {
+  let closedPort: number;
+  beforeAll(async () => { closedPort = await freePort(); });
+  const c = group((h) => ({ PATH: isolatedPath(h), OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${closedPort}` }));
+  test("returns unavailable status and 502 within two seconds per request", async () => {
+    const error = "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
+    let started = performance.now();
+    expect(await get(c.d, "/api/opencode-control/status", { session: c.f.opencodeSessionId })).toEqual({ ready: false, warnings: [], errors: [error] });
+    expect(performance.now() - started).toBeLessThan(2000);
+    started = performance.now();
+    expect(await post(c.d, "/api/send-opencode-message", { session: c.f.opencodeSessionId, text: "Hello" }, 502)).toEqual({ error, warnings: [] });
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+});
+
+describe("server: opencode candidate timeouts and auth", () => {
+  const bridges: Array<ReturnType<typeof Bun.serve>> = [];
+  const seen: string[] = [];
+  beforeAll(() => {
+    for (let index = 0; index < 3; index++) {
+      bridges.push(Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req) {
+        expect(req.headers.get("authorization")).toBe("Basic dXNlcjpzZWNyZXQ=");
+        const path = new URL(req.url).pathname;
+        seen.push(`${index}:${path}`);
+        if (index < 2) {
+          await Bun.sleep(3500);
+          return Response.json({ healthy: true });
+        }
+        if (path === "/global/health") return Response.json({ healthy: true });
+        if (path.startsWith("/session/")) return Response.json({ directory: "" });
+        expect(new URL(req.url).search).toBe("");
+        return Response.json(true);
+      } }));
+    }
+  });
+  const c = group((h) => {
+    const path = isolatedPath(h);
+    writeFileSync(join(path, "ps"), `#!/bin/sh
+printf '%s\n' 'COMMAND' 'opencode --port ${bridges[1].port}' '/usr/local/bin/opencode -p ${bridges[2].port} --hostname 127.0.0.1'
+`);
+    return { PATH: path, OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${bridges[0].port}///`,
+      OPENCODE_SERVER_URL: "http://127.0.0.1:1", OPENCODE_SERVER_USERNAME: "user", OPENCODE_SERVER_PASSWORD: "secret" };
+  });
+  afterAll(() => { for (const bridge of bridges) bridge.stop(true); });
+  test("times out two candidates in TS order and delivers through the third", async () => {
+    const started = performance.now();
+    expect(await post(c.d, "/api/send-opencode-message", { session: c.f.opencodeSessionId, text: "Hello" })).toEqual({
+      delivered: true, delivery: "tui", serverUrl: `http://127.0.0.1:${bridges[2].port}`, warnings: [],
+    });
+    expect(seen).toEqual(["0:/global/health", "1:/global/health", "2:/global/health",
+      `2:/session/${c.f.opencodeSessionId}`, "2:/tui/append-prompt", "2:/tui/submit-prompt"]);
+    expect(performance.now() - started).toBeGreaterThanOrEqual(1900);
+    expect(performance.now() - started).toBeLessThan(3000);
   });
 });

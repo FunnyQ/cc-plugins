@@ -7,7 +7,7 @@
 >
 > **Depends on**: server/01
 > **Blocks**: server/03, server/05
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -68,20 +68,20 @@ Behavior to keep, in order:
 
 ## Acceptance criteria
 
-- [ ] Every `server: log-stream` contract test passes against the Rust binary and still passes against TS.
-- [ ] An invalid session id or an unrelated project returns HTTP 400 JSON before any SSE bytes.
-- [ ] A log file created after the connection opens is picked up (resolve poll), and appended lines arrive as `data:` frames without waiting for the 2 s poll when file watching works.
-- [ ] Truncating or atomically replacing the log re-emits the backlog and a new `backlog-done` frame instead of stalling or duplicating from a stale offset.
-- [ ] A `cargo test` shows a multibyte UTF-8 character split across two appends is emitted intact once its line completes. This deliberate deviation is not a contract case: TS emits U+FFFD there, so no shared assertion can pass both.
-- [ ] Closing the client stops the heartbeat, polls, and watchers (no leaked tasks — verified by a `cargo test` that drops the stream and asserts the watcher handle is released).
+- [x] Every `server: log-stream` contract test passes against the Rust binary and still passes against TS.
+- [x] An invalid session id or an unrelated project returns HTTP 400 JSON before any SSE bytes.
+- [x] A log file created after the connection opens is picked up (resolve poll), and appended lines arrive as `data:` frames without waiting for the 2 s poll when file watching works.
+- [x] Truncating or atomically replacing the log re-emits the backlog and a new `backlog-done` frame instead of stalling or duplicating from a stale offset.
+- [x] A `cargo test` shows a multibyte UTF-8 character split across two appends is emitted intact once its line completes. This deliberate deviation is not a contract case: TS emits U+FFFD there, so no shared assertion can pass both.
+- [x] Closing the client stops the heartbeat, polls, and watchers (no leaked tasks — verified by a `cargo test` that drops the stream and asserts the watcher handle is released).
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: log-stream"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: log-stream"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: log-stream"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: log-stream"` (TS still green)
 
 ## Eval rubric
 

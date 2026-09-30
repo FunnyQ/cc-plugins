@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: server/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -53,20 +53,20 @@ Only this file changes. Use the HTTP client crate already in `Cargo.toml` (added
 
 ## Acceptance criteria
 
-- [ ] Every `server: opencode` contract test passes against the Rust binary and still passes against TS.
-- [ ] With exactly one unreachable candidate (`OPENCODE_TUI_SERVER_URL` pointing at a closed port, no other `OPENCODE_*` env, a `ps` stub that lists no opencode), status answers `ready: false` with the exact unavailable message and send answers 502 within ~2 s. A separate case with two unreachable candidates and a third reachable stub probes them in TS order and delivers through the third; discovery order and per-candidate timeouts stay as in TS.
-- [ ] Against a fake OpenCode HTTP server named by `OPENCODE_TUI_SERVER_URL` (a `cargo test` using an in-process axum server), a send performs health → session → append (with `directory`) → submit in that order and answers `delivered: true`; a non-`true` append body surfaces its `data.message` as the error.
-- [ ] Basic auth is sent only when `OPENCODE_SERVER_PASSWORD` is set.
-- [ ] The `ps` line parser accepts `opencode --port 4096` and `/usr/local/bin/opencode -p 4096 --hostname 0.0.0.0`, and rejects `opencode serve --port 4096` (`cargo test`).
-- [ ] (human) Send a message from the dashboard to a running opencode 1.x TUI and see it arrive.
+- [x] Every `server: opencode` contract test passes against the Rust binary and still passes against TS.
+- [x] With exactly one unreachable candidate (`OPENCODE_TUI_SERVER_URL` pointing at a closed port, no other `OPENCODE_*` env, a `ps` stub that lists no opencode), status answers `ready: false` with the exact unavailable message and send answers 502 within ~2 s. A separate case with two unreachable candidates and a third reachable stub probes them in TS order and delivers through the third; discovery order and per-candidate timeouts stay as in TS.
+- [x] Against a fake OpenCode HTTP server named by `OPENCODE_TUI_SERVER_URL` (a `cargo test` using an in-process axum server), a send performs health → session → append (with `directory`) → submit in that order and answers `delivered: true`; a non-`true` append body surfaces its `data.message` as the error.
+- [x] Basic auth is sent only when `OPENCODE_SERVER_PASSWORD` is set.
+- [x] The `ps` line parser accepts `opencode --port 4096` and `/usr/local/bin/opencode -p 4096 --hostname 0.0.0.0`, and rejects `opencode serve --port 4096` (`cargo test`).
+- [x] (human) Send a message from the dashboard to a running opencode 1.x TUI and see it arrive.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: opencode"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: opencode"` (TS still green)
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check && cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: opencode"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: opencode"` (TS still green)
 
 ## Eval rubric
 
