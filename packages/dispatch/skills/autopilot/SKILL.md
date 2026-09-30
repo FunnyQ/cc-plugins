@@ -143,6 +143,8 @@ If the live-pane env is not fulfilled, omit the live-panes question from the sec
 
 Then show the user a one-screen brief. State the slug and how many tasks there are. State that non-final tasks run in isolated worktrees at `<repo-parent>/.<repo-name>-autopilot/<slug>/<bucket>-<NN>`. State the per-role model map and any task whose `> **Models**:` header overrides it. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State each codex model whose role resolved to codex. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State the plan's `Max parallel` when it is declared. State that each wave is committed before the next one starts. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
+State that the user's latest message is relayed verbatim to every agent in the run, framed as the only user voice and ranked above that agent's task. An imperative meant for you, such as "stop and fix plan", therefore reaches every dev and verifier as an order: in one run all eight refused their task and parked it with no work done. When the latest message is such an imperative, ask the user to send a plain go-ahead first.
+
 This is real compute, real edits, and an external code review. Get an explicit go from the user before calling Workflow.
 
 ## Launch flightdeck after confirmation
@@ -173,6 +175,8 @@ The script requires `slug`, `repoRoot`, `tasksDir`, `planPath`, `logFile`, `plan
 
 Then call `Workflow({ scriptPath: <the printed path> })`. No `args` needed. Do not rely on the Workflow `args` global.
 
+**Drain a running flight with `touch <plan dir>/.flightlog/drain`.** While the file exists, the orchestrator dispatches no new task, lets in-flight tasks finish and land, runs the post-loop commit, and returns the undispatched refs in `drained`. Delete the file before the next run; at Step 1, if it already exists, ask the user before removing it.
+
 **Use `scriptPath` here, not an inline `script`.** The Workflow tool's own guidance says to pass the script inline and not Write it first. That guidance assumes a script you author. This one is ~1,500 lines of generated source, and transcribing it inline is unreliable. Do not move the baked file: `scriptPath` accepts only a path the tool returned or a file inside the working directory, so a `/tmp` path fails with `scriptPath must be a script path this tool returned, or a file you can already read`. The plan dir sits inside the repo, and the worktree leak check excludes it.
 
 **`CFG.devEngine` and `CFG.reviewEngine` are independent axes.** `devEngine` controls who writes non-final tasks. `reviewEngine` controls the external bug/correctness lens in the closing Final review. The full external-engine behavior, the opencode model fields, and failure handling live in `references/orchestrator.md`.
@@ -197,7 +201,9 @@ Score gate ─ consumes score-task.ts --json verdict
    ├─ fail → loop back to Dev with the judge's rationale
    ▼ pass
 land (main-tree lock)
-   ├─ conflict / failed drift re-verify → rebase worktree → next Dev attempt
+   ├─ conflict → the land agent (Opus/low) rebases, resolves in the worktree, lands again → re-verify
+   │             unresolved → park + escalate (never costs an attempt)
+   ├─ failed re-verify → unland, rebase worktree → next Dev attempt
    ├─ leak → abort run
    ▼ clean (drift re-verify passed when required)
 done → mark-done.ts: Status: done + tick ## Acceptance criteria / ## Verification boxes
@@ -213,7 +219,7 @@ completed   (next wave's next-ready will see it)
 [post-loop]              final atomic-commit ─ commits Final review's changes
 ```
 
-On a **clean** land, merge the result into the main tree. On a **conflict**, count the attempt as failed after rebasing the worktree with conflict markers. On **drift** because something else landed since the task started, re-run the task's Verification in the main tree as `reverify:<ref>#<attempt>`, whose failure undoes the land and rebases the worktree as a failed attempt that supersedes the judge's passing score. On a **leak** because the main tree changed outside a land, abort the run with every task stopped before its next slot, attempt, or land, no further commits or end sweep, and no changes reverted.
+On a **clean** land, merge the result into the main tree. On a **conflict**, the land agent keeps the main-tree lock, rebases the worktree, resolves the markers there, and lands again; a resolved land always gets the separate re-verify below. A conflict never counts against `maxAttempts`, and one the agent cannot resolve parks the task at once. When a dev or verifier reports a **plan defect**, park the task at once with that reason. On **drift** because something else landed since the task started, re-run the task's Verification in the main tree as `reverify:<ref>#<attempt>`, whose failure undoes the land and rebases the worktree as a failed attempt that supersedes the judge's passing score. On a **leak** because the main tree changed outside a land, abort the run with every task stopped before its next slot, attempt, or land, no further commits or end sweep, and no changes reverted.
 
 After a leak abort, report the leaked paths, the kept `worktrees` (preserved for inspection because they hold unlanded work), and any `cleanupFailures`. The main-tree lock, the `--op` replay ids, and the null-result retries around `worktree.ts` live in `references/orchestrator.md`.
 

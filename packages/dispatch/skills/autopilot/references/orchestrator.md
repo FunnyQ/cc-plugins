@@ -78,6 +78,7 @@ const CFG = {
 // reviewLens hunts quality issues at high effort on the configured model.
 // scout reads readiness; markDone and park perform fixed status transitions.
 // markDone and worktree only relay a script's result; park may repair a malformed header.
+// land resolves a land conflict in the task worktree, which is judgment, not relay.
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const MODEL = {
   dev: { model: 'opus', effort: 'low' },
@@ -94,6 +95,7 @@ const MODEL = {
   markDone: { model: 'haiku', effort: 'low' },
   park: { model: 'sonnet', effort: 'low' },
   worktree: { model: 'haiku', effort: 'low' },
+  land: { model: 'opus', effort: 'low' },
 }
 // Null effort must omit the option so the runtime chooses its own default.
 const pick = (choice) => choice.effort ? { model: choice.model, effort: choice.effort } : { model: choice.model }
@@ -235,6 +237,7 @@ const SCOUT_SCHEMA = {
     stdout:   { type: 'string' },   // verbatim stdout, uninterpreted
     exitCode: { type: 'number' },
     stderr:   { type: 'string' },
+    drain:    { type: 'boolean' },  // the drain file exists: dispatch nothing new
     // Copied apart from stdout: a cheap model transcribing the blob drops its trailing null field.
     maxParallel: { type: ['integer', 'null'] },
     readyModels: {
@@ -246,7 +249,7 @@ const SCOUT_SCHEMA = {
       },
     },
   },
-  required: ['stdout', 'exitCode', 'stderr', 'maxParallel', 'readyModels'],
+  required: ['stdout', 'exitCode', 'stderr', 'drain', 'maxParallel', 'readyModels'],
 }
 
 const COMMIT_SCHEMA = {
@@ -298,6 +301,7 @@ const GATE_SCHEMA = {
     passed: { type: 'boolean' },     // every MACHINE-CHECKABLE Verification command + Acceptance criterion passed
     summary: { type: 'string' },     // raw evidence: commands run, exit codes, failing output
     humanPending: { type: 'array', items: { type: 'string' } },  // `(human)` gate items nobody has attested to yet
+    planDefect: { type: ['string', 'null'] },  // a gate item no implementation can satisfy as written; optional like humanPending
   },
   required: ['passed', 'summary'],
 }
@@ -322,6 +326,14 @@ const JUDGE_SCHEMA = {
 }
 
 // ── Prompts ───────────────────────────────────────────────────────────────
+// A defect no attempt can fix must stop the retry loop, not feed it: one run spent
+// three attempts on a `pgrep` gate that matched other sessions' processes.
+const PLAN_DEFECT_MEANING = `A plan defect is a task instruction or gate item that no implementation can satisfy as written: it contradicts another item or the task's own scope, or it depends on state outside the task's control, such as other processes on the machine or a service the task forbids contacting. Code that is merely wrong or hard to write is not a plan defect.`
+const DEV_PLAN_DEFECT = `${PLAN_DEFECT_MEANING} If you hit one, stop and make the FIRST line of your reply exactly \`PLAN DEFECT: <one line naming the item and why no implementation can pass it>\`. The task is then parked for a person to fix the plan, and no further attempt is spent on it.`
+const planDefectOf = (reply) => typeof reply === 'string'
+  ? (/^\s*PLAN DEFECT:\s*(.+)/.exec(reply)?.[1].trim() || null)
+  : null
+
 // Status ownership is one policy shared by every worker prompt: workers may only
 // move a task to in-progress; only the post-judge mark-done step writes `done`.
 // Single-sourced here so the three prompts below can never drift apart.
@@ -350,6 +362,8 @@ ${NO_RESTORE_RULE}`
 
 // Every q-lab plugin scratches under /tmp/q-lab/<plugin>/<skill>/; project + slug group one flight's files.
 const SCRATCH = `/tmp/q-lab/dispatch/autopilot/${CFG.repoRoot.split('/').pop()}/${CFG.slug}`
+// While this file exists no new task is dispatched; in-flight tasks finish and land.
+const DRAIN = `${CFG.planDir}/.flightlog/drain`
 const scratchDir = (role, ref, attempt) => `mkdir -p ${SCRATCH} && mktemp -d ${SCRATCH}/${role}-${ref.replace('/','-')}-a${attempt}-XXXXXX`
 
 const worktreeRules = (wtPath) => wtPath ? `WORKTREE: ${wtPath}
@@ -373,6 +387,7 @@ Implement the task fully: create/modify the listed files, follow Implementation 
 ${attempt > 1 ? 'This is retry attempt ' + attempt + '. The previous attempt was rejected:\n' + feedback + '\nAddress that specifically.' : ''}
 ${STATUS_RULE} When done, run the task's ## Verification commands yourself. ${BASE_REF_RULE}
 ${NO_COMMIT_RULE}
+${DEV_PLAN_DEFECT}
 Then log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "<your label>" --phase end --message "<what you changed>"
 Return a one-paragraph summary of what you did.`
@@ -424,7 +439,8 @@ ${liveDev && COLLECT_ROUNDS > 0 ? `5. PENDING — relay prints a report starting
    Then establish only WHETHER work landed, not whether it is correct: read the changed-file list from the command's stdout, or run \`git status --short\` once if that stdout did not print one. Do NOT run the task's ## Verification commands, do NOT run the test suite, and do NOT edit a source file to make anything pass. An empty changed-file list means ${engine.label} produced nothing and belongs in your step-7 log and your summary. A non-empty one is all you report — the independent verifier downstream runs every command and owns the pass/fail verdict, including any red output you would have seen here.
 7. Log a narrative note:
   bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role dev --attempt ${attempt} --agent "dev-${engine.label}:${ref}#${attempt}" --phase end --message "<what ${engine.label} changed, or '${engine.label} unreachable'>"
-Return a one-paragraph summary: what ${engine.label} implemented and which files changed.`
+Return a one-paragraph summary: what ${engine.label} implemented and which files changed.
+${DEV_PLAN_DEFECT} Judge it from the task file and from what ${engine.label} reported, never by softening the instruction you wrote for it.`
 
 // ── Final review: orchestrator-level multi-lens review fan-out ──────────────
 // The dev and the rubric judge are both Claude, so they share blind spots. The
@@ -585,7 +601,7 @@ Report passed=true ONLY if all verification commands succeed AND all acceptance 
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
 ${HUMAN_GATE_RULE}
 ${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ''}
-${closing}
+${reverify ? '' : `${PLAN_DEFECT_MEANING} Return planDefect as null by default. When a plan defect decided a failing item, set planDefect to one line naming the item and why no implementation can pass it, and report passed=false as usual. The task is parked for a person to fix the plan instead of spending another attempt.\n`}${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
 When humanPending is not empty, end that same message with " — NEEDS HUMAN: <n> item(s)". The run's final report reads the structured list, but RUNLOG.md is what a person opens weeks later, and a pending check that appears in neither is a check nobody makes.
@@ -780,12 +796,14 @@ const wtCommand = (args) => `bun ${S}/worktree.ts ${args} ${wtArgs}`
 const wtObject = (properties) => ({ type: 'object', properties, required: Object.keys(properties) })
 const wtStrings = { type: 'array', items: { type: 'string' } }
 const WT_SCHEMA = {
-  create: wtObject({ path: { type: 'string' }, base: { type: 'string' } }),
+  // `drained` rides only the drain-guarded create, so it stays optional.
+  create: { type: 'object', properties: { path: { type: 'string' }, base: { type: 'string' }, drained: { type: 'boolean' } }, required: ['path', 'base'] },
   rebase: wtObject({ path: { type: 'string' }, base: { type: 'string' }, conflicted: wtStrings }),
   land: wtObject({
     status: { type: 'string', enum: ['clean', 'conflict', 'leak'] },
     drift: { type: 'boolean' }, files: wtStrings, paths: wtStrings,
     fingerprint: { type: 'string' }, previous: { type: 'string' },
+    resolved: { type: 'boolean' },   // the land agent resolved a conflict and relanded
   }),
   unland: wtObject({ restored: wtStrings }),
   remove: wtObject({ removed: { type: 'boolean' } }),
@@ -798,6 +816,43 @@ const wtCall = (label, command, schema) => resilient(async (retryModel) => {
   const result = await agent(`Run exactly this one command: ${command}\nReturn its stdout JSON through StructuredOutput.\n${RETURN_CONTRACT}`,
     { label, phase: 'Execute', ...pick(retryModel ?? MODEL.worktree), schema })
   if (result === null) throw new Error(`${label}: no structured result`)
+  return result
+}, MODEL.structuredRetry)
+
+// The land agent holds the main-tree lock through a conflict: it rebases the task
+// worktree, resolves the markers there, and lands again under a fresh op id, so
+// nothing else can land in between and the second land is clean. It never
+// verifies its own resolution; a separate reverify does, after the land.
+const landPrompt = (ref, attempt, wtPath, retry) => {
+  const note = (phase, message) => `bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role land --attempt ${attempt} --agent "land:${ref}#${attempt}" --phase ${phase}${message ? ` --message "${message}"` : ''}`
+  const land = (op) => wtCommand(`land ${ref} --expect ${mainFingerprint} --op a${attempt}-${op}`)
+  return `You land flightplan task ${ref} from its worktree ${wtPath} into the main tree ${CFG.repoRoot}. You hold the main-tree lock: nothing else lands until you return, so the main tree does not move under you.
+${NO_COMMIT_RULE}
+Never edit a file under ${CFG.repoRoot} yourself: only the worktree.ts commands below change the main tree.
+First, announce yourself: ${note('start')}
+${retry ? `An earlier run of this step stopped partway. Before step 1, run:
+  ${wtCommand(`reset ${ref} --op a${attempt}-land-rebase`)}
+It restores the worktree to the state step 2 leaves, or prints {"reset":false} when step 2 never ran. Either way, continue at step 1.
+` : ''}1. Run: ${land('land')}
+   It prints JSON with a status.
+   - "clean" or "leak": run ${note('end', '<CLEAN or LEAK> — <its files or paths>')}, then return that JSON with resolved: false. Stop here.
+   - "conflict": run ${note('end', 'CONFLICT — <its files>')}, then continue.
+2. Run: ${wtCommand(`rebase ${ref} --op a${attempt}-land-rebase`)}
+   It merges the current main tree into the worktree. Every file in its "conflicted" list now holds conflict markers.
+3. Resolve every conflicted file inside ${wtPath}, keeping the intent of both sides: one side is work another task already landed, the other is this task's passing work. Never hand-merge a generated lockfile (Cargo.lock, bun.lock, package-lock.json, yarn.lock, pnpm-lock.yaml, Gemfile.lock and the like): copy the main tree's version from ${CFG.repoRoot}, then run its package manager in ${wtPath} so it adds what this task's manifest needs (for example \`cargo metadata --format-version 1 > /dev/null\` or \`bun install\`). Then confirm that \`grep -nE '^(<<<<<<<|=======|>>>>>>>)( |$)'\` over the conflicted files prints nothing.
+   Do not run the task's Verification commands and do not judge the result: an independent verifier checks the landed main tree after you.
+   If you cannot resolve a file with confidence, run ${note('end', 'CONFLICT — unresolved: <files>')} and return step 1's JSON with resolved: false. A person resolves it instead; a guessed merge that lands is worse.
+4. Run: ${land('reland')}
+   - "clean": run ${note('end', 'CLEAN — resolved <conflicted files>; landed <files>')}, then return that JSON with resolved: true.
+   - anything else: run ${note('end', '<CONFLICT or LEAK> — unresolved: <files or paths>')}, then return that JSON with resolved: false.
+${RETURN_CONTRACT}`
+}
+// Call under withMainLock. A retry replays the recorded ops, so it must first undo
+// a half-finished resolution that no op record captured.
+const landCall = (ref, attempt, wtPath) => resilient(async (retryModel) => {
+  const result = await agent(landPrompt(ref, attempt, wtPath, retryModel !== null),
+    { label: `wt-land:${ref}`, phase: 'Execute', ...pick(retryModel ?? MODEL.land), schema: WT_SCHEMA.land })
+  if (result === null) throw new Error(`wt-land:${ref}: no structured result`)
   return result
 }, MODEL.structuredRetry)
 
@@ -852,11 +907,15 @@ async function executeTask(item) {
               `the kept worktree for ${ref} is gone: ${shown.path} — resume from dev instead`, false)
           }
         }
-        const created = await wtCall(`wt-create:${ref}`, wtCommand(`create ${ref}`), WT_SCHEMA.create)
+        const create = wtCommand(`create ${ref}`)
+        const created = await wtCall(`wt-create:${ref}`,
+          RESUME ? create : `test -e ${DRAIN} && echo '{"drained":true,"path":"","base":""}' || ${create}`, WT_SCHEMA.create)
+        if (created.drained === true) return created
         live.set(ref, created.path)
         return created
       })
       if (wt.infrastructure) return wt
+      if (wt.drained === true) return { task: ref, drained: true }
       // Keep initial dev dispatch concurrent after worktree creation.
       await mainTail
     } catch (error) {
@@ -875,10 +934,15 @@ async function executeTask(item) {
     const rejected = (gateSummary) => attempts.push({
       n: attempt, model: attemptModel, gateSummary, rationale: null, weighted: null, hardFailed: false, missing: [],
     })
+    const planDefectFailure = async (role, defect) => {
+      const reason = `PLAN DEFECT reported by ${role} on attempt ${attempt}: ${defect}. Fix the task file, then reset its Status to todo and re-run.`
+      return { task: ref, passed: false, infrastructure: false, attempt, parked: await parkBlocked(ref, path, reason), reason: withKeptWorktree(ref, reason) }
+    }
     const rebaseTask = async () => {
       const rebased = await wtCall(`wt-rebase:${ref}`, wtCommand(`rebase ${ref} --op a${attempt}-rebase`), WT_SCHEMA.rebase)
       wt.base = rebased.base
     }
+    let devReply = null
     if (startAt !== 'dev') {
       // Nothing to write: the resume takes this attempt's dev work as done.
     } else if (finalReview) {
@@ -899,21 +963,22 @@ async function executeTask(item) {
       const claudeCap = last - (lastShotEngine ? 1 : 0)
       if (vendorRung) {
         attemptModel = lastShotEngine.label
-        await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts), wt?.path),
+        devReply = await agent(devExternalPrompt(lastShotEngine, ref, path, attempt, renderHistory(attempts), wt?.path),
           { label: `dev-${lastShotEngine.label}:${ref}#${attempt}`, phase: 'Execute', ...pick(MODEL.devExternal) })
       } else if (devEngine && !lastShot) {
         attemptModel = devEngine.label
-        await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts), wt?.path),
+        devReply = await agent(devExternalPrompt(devEngine, ref, path, attempt, renderHistory(attempts), wt?.path),
           { label: `dev-${devEngine.label}:${ref}#${attempt}`, phase: 'Execute', ...pick(MODEL.devExternal) })
       } else {
         const devChoice = attempt >= claudeCap ? devLast : choices.dev
         attemptModel = modelLabel(devChoice)
-        await agent(devPrompt(ref, path, attempt, renderHistory(attempts), wt?.path),
+        devReply = await agent(devPrompt(ref, path, attempt, renderHistory(attempts), wt?.path),
           { label: `dev:${ref}#${attempt}`, phase: 'Execute', ...pick(devChoice) })
       }
     }
 
     checkAbort()
+    if (planDefectOf(devReply)) return planDefectFailure('dev', planDefectOf(devReply))
     // A verifier that returns NO structured result did not verify anything. That
     // is not the same as `passed: false`, which is a real verdict on real work.
     // Conflating them retries the dev loop against an unknown state.
@@ -932,6 +997,7 @@ async function executeTask(item) {
         + ` — the verify agent produced no structured result. The harness exposes no original cause for a null agent result, so none is reported here.`
       return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
     }
+    if (typeof gate.planDefect === 'string' && gate.planDefect.trim()) return planDefectFailure('verify', gate.planDefect.trim())
     if (!gate.passed) {
       rejected(gate.summary ?? 'no output')
       continue
@@ -966,14 +1032,14 @@ async function executeTask(item) {
         try {
           landed = await withMainLock(async () => {
             checkAbort()
-            const result = await wtCall(`wt-land:${ref}`,
-              wtCommand(`land ${ref} --expect ${mainFingerprint} --op a${attempt}-land`), WT_SCHEMA.land)
+            const result = await landCall(ref, attempt, wt.path)
             if (result.status === 'leak') {
               aborted ??= { reason: `main tree leak observed by ${ref}`, paths: result.paths }
               checkAbort()
             }
             if (result.status === 'clean') {
-              if (result.drift) {
+              // A resolved conflict is unverified code in the main tree, drift or not.
+              if (result.drift || result.resolved === true) {
                 const prompt = verifyPrompt(ref, path, attempt, undefined, true)
                 try {
                   reverified = await resilient(async (retryModel) => {
@@ -998,7 +1064,7 @@ async function executeTask(item) {
           const cause = `worktree land failed: ${error?.message ?? String(error)}`
           return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
         }
-        if (landed.status === 'clean' && landed.drift && !reverified?.passed) {
+        if (landed.status === 'clean' && (landed.drift || landed.resolved === true) && !reverified?.passed) {
           if (!reverified) {
             const cause = `drift re-verify returned no structured result on attempt ${attempt}; the land was undone`
             return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
@@ -1006,15 +1072,11 @@ async function executeTask(item) {
           rejected(`REVERIFY FAIL:\n${reverified.summary}`)
           continue
         }
+        // The judged work passed, so an unresolved conflict never costs an attempt.
         if (landed.status === 'conflict') {
-          try {
-            await withMainLock(rebaseTask)
-          } catch (error) {
-            const cause = `worktree rebase failed: ${error?.message ?? String(error)}`
-            return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
-          }
-          rejected(`LAND CONFLICT:\n${landed.files.join('\n')}`)
-          continue
+          const cause = `the land agent could not resolve a land conflict on attempt ${attempt}: ${landed.files.join(', ')}. `
+            + `The worktree holds the rebased result with its markers or a partial resolution; resolve it there by hand and resume from verify, or resume from dev.`
+          return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause))
         }
 
         let finalized = null
@@ -1133,6 +1195,8 @@ const escalations = []
 // its own list, or the main agent would report a park that never happened.
 const needsHuman = []
 const parked = new Set()
+// Ready tasks left `todo` because the drain file was present at their dispatch.
+const drained = []
 
 // Only an escalation that makes the TREE untrustworthy blocks a commit. A parked
 // task does not: its unlanded edits stay in its worktree, so the rest of the
@@ -1218,6 +1282,7 @@ while (!RESUME) {
     + `Use the identical label in both start and end calls.\n`
     + `Run exactly this command: bun ${S}/next-ready.ts ${CFG.tasksDir} --summary\n`
     + `Return its stdout verbatim (unmodified), its exit code, and its stderr.\n`
+    + `Also run \`test -e ${DRAIN}\` and return drain: true when it exits 0, false otherwise.\n`
     + `Also return maxParallel: the value of the "maxParallel" key in that JSON, the last key in it — an integer, or null when it prints null.\n`
     + `Also return readyModels: copy each ready item into { ref, modelsRaw }, preserving its modelsRaw string exactly or null when it prints null.\n`
     + `Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task scout --role scout --agent "<your label>" --phase end --message "command complete"\n`
@@ -1405,6 +1470,12 @@ while (!RESUME) {
     break
   }
 
+  if (scout.drain === true) {
+    drained.push(...fresh.map(f => f.ref))
+    log(`Drained before wave ${wave}: ${DRAIN} exists, so ${drained.join(', ')} stay todo.`)
+    break
+  }
+
   if (wave > 1 && CFG.commitBetweenWaves && !commitBlocked()) {
     const { value: committed, threw } = await settled(() => agent(
       `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`)}`,
@@ -1455,6 +1526,10 @@ while (!RESUME) {
   for (let i = 0; i < fresh.length; i++) {
     const item = fresh[i]
     const r = results[i]
+    if (r?.drained) {
+      drained.push(item.ref)
+      continue
+    }
     // Never read r.passed without this guard — r is null when even the guarded
     // wrapper could not return.
     if (r && r.passed) {
@@ -1475,7 +1550,7 @@ while (!RESUME) {
     if (item.finalReview) failedInMainTree.add(item.ref)
   }
   // No task passed this wave → no new work will unblock; stop to avoid spinning.
-  if (aborted || !passedThisWave) break
+  if (aborted || !passedThisWave || drained.length > 0) break
 }
 
 // ── Single-task resume ──────────────────────────────────────────────────────
@@ -1533,7 +1608,7 @@ if (CFG.commitBetweenWaves && !commitBlocked()) {
   }
 }
 
-return { slug: CFG.slug, aborted, completed, escalations, needsHuman, worktrees: keptWorktrees(), cleanupFailures: cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref)) }
+return { slug: CFG.slug, aborted, completed, escalations, needsHuman, drained, worktrees: keptWorktrees(), cleanupFailures: cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref)) }
 })()
 ```
 
@@ -1544,8 +1619,9 @@ return { slug: CFG.slug, aborted, completed, escalations, needsHuman, worktrees:
 - `escalations` — `[{ task, attempt, infrastructure, parked, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` identifies a pipeline or mechanical failure; report the cause rather than claiming the work was rejected. When the cause says "landed, but Status was not marked done", tell the user to run `mark-done.ts` by hand before another run. `parked: false` means the task was NOT confirmed as `blocked`; report its Status as unknown and follow the escalation's recovery instruction.
 - `needsHuman` — `[{ task, criteria }]`, the `(human)` gate items that passed with no machine check and no attestation. Report it **separately from `escalations`**: those tasks are genuinely `done`, nothing is parked, and nothing needs a Status reset. Print the criteria verbatim as the user's closing checklist, and say that `mark-done.ts` ticked their boxes like any other, so the task file no longer shows the check is outstanding.
 - `worktrees` — report the sorted `{ ref, path }` union of live worktrees and blocked leftovers retained from the start sweep. If a scout failed, preserve the returned worktree list without filtering it further.
+- `drained` — ready tasks left `todo` because `<planDir>/.flightlog/drain` existed at their dispatch. Report them as not started, not as failures. Tell the user to delete the drain file before the next run.
 - `cleanupFailures` — report landed worktrees whose removal could not be confirmed, separately from kept worktrees. A removal failure alone leaves the task completed, with no escalation.
-- A task ref appears in `completed` or in `escalations`, never in both. A ref in `needsHuman` is always also in `completed`.
+- A task ref appears in exactly one of `completed`, `escalations`, and `drained`. A ref in `needsHuman` is always also in `completed`.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
 - **Resume**: after the user unblocks a parked task, follow `SKILL.md` → "Escalation — park & continue, then resume".
 
@@ -1602,7 +1678,7 @@ Preserve unlanded work when a main-tree leak aborts the run. Resume each non-fin
 - **`CFG.devEngine: 'codex'` (or `'opencode'`) hands the dev step to that CLI.** The default is `'claude'` (`MODEL.dev`, then `MODEL.devLast` on the last Claude rung). `CFG.lastShotEngine` defaults to `''` (off); on a Claude ladder, setting it to `'codex'` or `'opencode'` appends one external attempt after the Opus rung without replacing Opus. It is ignored when `devEngine` is already external, because that ladder already ends on Claude-Opus. When `devEngine` is set to an external engine, each non-finalReview task's dev step becomes a *driver* on `MODEL.devExternal`. That driver runs the `<engine>-run.ts delegate` wrapper — the same wrapper the cross-vendor review lens uses, reachable from a Workflow agent's Bash. So the external CLI writes the implementation. If `CFG.liveDevEngine` is true and `CFG.relayPath` resolved under `HERDR_ENV=1`, the driver instead runs the same delegate through relay in a visible herdr live pane. Otherwise it uses the headless wrapper. The verify → judge → score pipeline stays Claude. This *strengthens* the dev≠judge split into a cross-vendor one: the external CLI writes, and Claude-Opus judges. An external-engine ladder's last attempt before the cap still falls back to Claude-Opus, so a task the external engine cannot clear gets one strong Claude try before parking — **except at `maxAttempts: 1`**, where the `last > first` guard keeps that single attempt on the external engine rather than skipping it entirely, and there is no Claude fallback. A Claude ladder can instead end on the configured `lastShotEngine` after its Opus rung. If the CLI is unreachable, or relay returns no result, the driver never fabricates. The binary gate fails that attempt, and the loop reaches the next rung. The live path passes `--wait-timeout 480000` (8 min), and the driver is told to make ONE foreground Bash call with `timeout: 600000`. **That pairing is load-bearing: the wait must expire inside the Bash tool's 600s hard cap — with margin.** The margin is not optional: relay's poll clock starts *after* it spawns the pane and waits up to `SPAWN_IDLE_WAIT_MS` (20s) for the TUI to settle, so the Bash call's wall time is that setup plus the wait plus cleanup. 480s leaves roughly 90s of slack; 540s did not. A command that outruns the cap is moved to the background, and a driver left to invent its own wait writes a `jobs`-based poll loop that can never work — every Bash call gets a fresh shell where `jobs` sees nothing — and burns the full 600s after the delegate has finished. So the driver prompt bans `run_in_background` and shell poll loops outright, and the wait is bounded below the cap so the one call returns on its own. Relay's poll loop returns the instant the result lands, so the budget costs nothing for normal-speed tasks. **A `pending` outcome is not a failure and must not be treated as one.** Relay checks the pane's status before reporting it: an agent that has settled without a verified result is reported as a real failure instead, so `pending` specifically means the delegate is *still working* — and still writing the working tree, with its pane still open. Failing the attempt there would start a second writer on the same files. So the driver keeps waiting instead: `CFG.liveCollectRounds` (default 3) more `relay collect` calls, each reattaching to that same pane for another 8-minute window. A task can therefore run ~32 min while every individual Bash call still returns inside the 600s cap. Only when the last allowed collect is still pending does the attempt fail. Do not wait indefinitely, and do not use `herd wait` for this — it blocks until `idle`, and codex parks at `done`, so it can miss a finished delegate entirely; `collect` reuses relay's own `idle`-or-`done`-plus-marker test. `devEngine` and `reviewEngine` are independent. You can have opencode write and codex review, or the reverse. Only the dev step changes. finalReview's multi-lens round, and everything else, stay untouched.
 
 - **The external dev driver does not run the task's Verification commands; the Claude dev prompt still does.** That asymmetry is deliberate, not a missed edit. A Claude dev is the author: it holds Edit/Write, and a red result in its own turn is a self-correction that saves an attempt before the gate ever sees it. The driver holds no such lever — it may not hand-write the implementation (instruction shape (a)), and re-delegating is not a step it is given, so its verification could only ever be a report. And nothing reads that report: the dev step is `await agent(...)` with no assignment and no schema, and retry feedback is built by `renderHistory(attempts)` from the gate and judge verdicts, never from the dev's returned prose. A driver run would only repeat the independent verifier's work on wall clock, and it would put a model in front of red output it has no sanctioned response to — the pressure behind the destructive-git failures described below. **Step 6 keeps two checks that are not duplicated work.** `lint-task.ts` is the only structural check the task file gets — the external engine writes outside the harness, so the Edit/Write lint hook never sees it, and the verify agent does not lint. The changed-file list separates "the engine produced nothing" from "the engine produced something wrong"; the headless wrapper already prints a `git status --short`, so on that path it costs no command.
-- **The destructive-git ban belongs to every prompt that lets its agent choose what to run, not only to the prompts whose agents write source code.** Every Workflow agent has Bash, so the boundary is command discretion, not role: dev, driver, fixer, verifier, judge, review lenses, and commit agents carry `NO_RESTORE_RULE`, while `mark-done`, `mark-blocked`, the scout, and the `worktree.ts` calls run one scripted command and do not. The commit agents are included because their instructions anticipate blocking hooks and merge conflicts, exactly the pressure under which an agent reaches for `reset` to tidy the tree. A verifier that sees red output it did not create — a sibling's in-progress edits — and has no sanctioned response will try `git reset --hard`; one did. This is defense-in-depth, not enforcement: Workflow `agent()` accepts no tool allowlist, and a before/after tree comparison detects damage only after it is unrecoverable, so the prompt is the only lever the script has. Keep dev, verify, and judge in the same task worktree so the verifier sees the uncommitted edits it must verify.
+- **The destructive-git ban belongs to every prompt that lets its agent choose what to run, not only to the prompts whose agents write source code.** Every Workflow agent has Bash, so the boundary is command discretion, not role: dev, driver, fixer, verifier, judge, review lenses, commit agents, and the land agent carry `NO_RESTORE_RULE`, while `mark-done`, `mark-blocked`, the scout, and the other `worktree.ts` calls run one scripted command and do not. The commit agents are included because their instructions anticipate blocking hooks and merge conflicts, exactly the pressure under which an agent reaches for `reset` to tidy the tree. A verifier that sees red output it did not create — a sibling's in-progress edits — and has no sanctioned response will try `git reset --hard`; one did. This is defense-in-depth, not enforcement: Workflow `agent()` accepts no tool allowlist, and a before/after tree comparison detects damage only after it is unrecoverable, so the prompt is the only lever the script has. Keep dev, verify, and judge in the same task worktree so the verifier sees the uncommitted edits it must verify.
 
 - **Only the commit agents commit — every other writer leaves its work unstaged.** `NO_COMMIT_RULE` goes into the Claude dev prompt, the external dev driver's prompt *and* the instruction that driver writes for its CLI, and the final-review fixer's prompt. It is one shared constant so the three writers cannot drift apart. Two things break when a task commits itself. The wave stops being one atomic commit — the inter-wave commit agent finds a partially committed tree and writes a second, incoherent commit for the remainder. And in a parallel wave, whatever the committing task stages sweeps up a sibling task's half-finished edits, so a commit message describes work its diff does not contain and a later revert takes an unrelated task with it. The external engines need the ban twice over: `codex` and `opencode` write the tree outside the harness, where no hook can stop them, and both are trained to finish a job by committing it.
 
@@ -1624,9 +1700,17 @@ Preserve unlanded work when a main-tree leak aborts the run. Resume each non-fin
 
 - **Do NOT give the dev agent `isolation: 'worktree'`.** Avoid `agent({isolation: 'worktree'})`: it isolates one agent call and never merges back. Let the orchestrator own one worktree per task across dev → verify → judge, with mechanical agents creating and landing it through `worktree.ts`. Admit a judged pass into the main tree only through a three-way land under the main-tree lock.
 
-- **Rebase the task worktree onto the current main tree after a land conflict.** Charge one attempt because dev must resolve the conflict markers. Allow conflicting edits within a wave without a `Depends on` edge.
+- **The land agent resolves a land conflict itself, and a conflict never costs an attempt.** The work already passed its judge; charging an attempt for a conflict parked `channel/01` twice at 4.86 and 4.71 over `Cargo.toml`, `Cargo.lock`, and `src/main.rs`. So the land runs on `MODEL.land` (opus/low), not the relaying `MODEL.worktree`. On `conflict` it keeps the main-tree lock, runs `rebase --op a<N>-land-rebase`, resolves the markers inside the task worktree (a lockfile is regenerated by its package manager, never hand-merged), and lands again with `--op a<N>-reland`. Nothing else can land meanwhile, so that second land is clean. It returns `resolved: true`, which forces the separate `reverify` exactly as drift does: the resolver never verifies its own resolution. A reverify failure still unlands, rebases with `a<N>-rebase`, and costs the attempt. When the agent cannot resolve a file with confidence it returns the conflict, and the task parks as an infrastructure escalation with the worktree kept; no further dev attempt is spent. Allow conflicting edits within a wave without a `Depends on` edge.
 
-- **Use a land op id per attempt.** After a conflict fix, let the next attempt's land act instead of replaying the old conflict.
+- **A land retry resets the worktree before it replays.** `resilient` re-runs the whole land agent, and the recorded `land` and `rebase` ops replay as no-ops, so a half-finished resolution would otherwise be the retry's starting point. The retry prompt therefore first runs `worktree.ts reset <ref> --op a<N>-land-rebase`, which restores the tree that rebase recorded, or prints `{"reset":false}` when the rebase never ran. **Residual:** a retry after a successful reland also resets the worktree to its marker state; the main tree already holds the resolved land, so this matters only when the following reverify fails and the next dev attempt starts from those markers.
+
+- **Every land writes a `land` flightlog row whose message starts `CLEAN`, `CONFLICT`, or `LEAK`.** `flightlog.ts progress` reads it: a last attempt whose land ended on `CONFLICT` resumes `--from dev`, because the worktree holds markers or a partial resolution that only a dev step can finish.
+
+- **Use a land op id per attempt.** The next attempt's land must act instead of replaying an old result.
+
+- **A plan defect parks at once.** A dev reply whose first line is `PLAN DEFECT: <why>`, or a verifier returning a non-empty `planDefect`, parks the task with that text as the reason and starts no further attempt. `contract/03` otherwise spent three attempts on a `pgrep -f` gate that matched live sessions. The dev reports it as a text line rather than through a schema, because the dev step has no schema: adding one would turn a dev that writes its payload as text into a thrown pipeline that parks finished work.
+
+- **`<planDir>/.flightlog/drain` stops dispatch without stopping the run.** The scout reports whether it exists, and every non-resume `wt-create` runs behind `test -e <drain>`, so a task queued for a slot inside a wave is caught too. A drained task stays `todo` with no worktree and lands in `drained`, never in `escalations`. In-flight tasks finish and land, the wave loop stops, and the post-loop commit runs as usual. The file is never deleted by the run.
 
 - **Hold the main-tree lock around every `worktree.ts` call.** Prevent an unlocked create from snapshotting half a land and two unlocked state rewrites from losing an entry. Stop the run with its cause if a sweep or baseline fails twice; no task owns that failure.
 
