@@ -6,27 +6,7 @@ This is the narrative log. The executable gate is `docs/opencode-compat/tasks/_c
 
 Seventeen of eighteen items are resolved from observed behavior. Only S12 remains open, and it was never a gate.
 
----
-
-## V2 — what changed on opencode 2.0.16 ⚠️ READ FIRST
-
-OpenCode 2.x replaced the plugin API. Every hook-shape item below (S3, S4, S5a, S5b, S5c, S11, S18, S19, S20, S21) was observed on 1.18.18 and describes V1. Their *decisions* still hold — seed synchronously, ride up to `PUSH_CAP` requests, materialize once, translate camelCase — but the names and shapes changed. `plugin.ts` targets V2 and does not load on 1.x.
-
-Read off the 2.0.16 binary (`strings ~/.opencode/bin/opencode`), 2026-09-24. GitHub `dev` (latest release v1.18.32) still ships V1, so it is the wrong source for V2 shapes.
-
-| Concern | V1 (1.18.18) | V2 (2.0.16) |
-|---|---|---|
-| Module shape | exported `async (ctx) => hooks` function | default export `{ id, setup(ctx) }`; the loader reads `.default` alone and rejects anything else with `Plugin must export a default definition with an id and an effect or setup function.` |
-| Cleanup | none | `setup`'s returned function |
-| Working dir (S11) | `ctx.directory` / `ctx.worktree` | `ctx.location.directory` |
-| Events (S1/S20) | `event` hook, `event.properties.sessionID`, dispatched without await | `ctx.event.subscribe({ signal })` async iterable, `event.data.sessionID` |
-| System prompt (S19/S21) | `experimental.chat.system.transform`, `output.system: string[]` | `ctx.session.hook("context", cb)`, `event.system` holds `{ type: "text", text }` parts |
-| Before hook (S3/S5a) | `tool.execute.before(input, output)`, args on `output.args` | `ctx.tool.hook("execute.before", cb)`, args on `event.input`; a throw still blocks |
-| After hook (S4/S5a) | `tool.execute.after(input, output)`, append to `output.output` | `ctx.tool.hook("execute.after", cb)`, `{ status, result: { content } }`; the runtime reads `result.content` back after the hook |
-| Shell tool (S5b) | `bash` | `shell` |
-| File field (S5c) | `filePath` | `path` (write: `path`, `content`; edit: `path`, `oldString`, `newString`) |
-| Failure log (S19) | `client.app.log` | removed; stderr |
-| S18 | every export is called, and a non-function export breaks loading | named exports are ignored; only `.default` counts |
+Every entry describes the V1 plugin API, and 1.x is the only line this repo supports. OpenCode 2.x replaced the plugin API and removed the TUI bridge. A V2 port existed briefly and was dropped. Recover its shapes from git (`acfda97`, `ed1f03c`) if 2.x support returns.
 
 ---
 
@@ -129,7 +109,7 @@ Full write-ups, each with its observation and the decision it drove, live in `do
 - **S11** — no hook-side prompting. Context is `{ client, project, worktree, directory, experimental_workspace, serverUrl, $ }`.
 - **S16** — no skill base-directory banner. State literal install paths.
 - **S6** — symlinked skill directories are discovered and invocable.
-- **S13** — all three legs of the cockpit send bridge respond, but `/tui/append-prompt` returns `200 true` **with no TUI attached**, and `opencode serve` is excluded from the bridge's `ps` discovery. On 2.0.16 the whole bridge is gone — no `--port`, no `/tui/*`, `/global/health` serves the web UI's HTML — and sends go through the background service's `/api/session/<id>/prompt` instead (see cockpit's `references/opencode.md`).
+- **S13** — all three legs of the cockpit send bridge respond, but `/tui/append-prompt` returns `200 true` **with no TUI attached**, and `opencode serve` is excluded from the bridge's `ps` discovery.
 - **S1 / S2** — full event list captured; `session.idle` is turn-scoped, not tool-scoped. Resume behavior and multi-turn idle cadence remain untested.
 - **S12** — still open, and never a gate.
 - **S19** — plugin stderr renders **red in the TUI and never reaches the model**; the model reads only the system prompt. `experimental.chat.system.transform` (`{ sessionID?, model }` → `output.system: string[]`) appends strings the model demonstrably reads, so the session guidance seeded by `session.created`/`session.idle` is injected there, mirroring Claude's `additionalContext`. Failures go to `client.app.log` instead — the TUI shows nothing, so debug with `opencode run --print-logs`. The seed map is capped (least-recently-stashed evicted) because guidance is time-sensitive and a session ending right after its last nudge would otherwise leave one never-consumed entry per session while a `serve` process lives. Delivery is not consume-once — see S21 for why.
