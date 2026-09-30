@@ -4,12 +4,15 @@ import type { InvokeOpts } from "../types";
 
 describe("opencodeBackend", () => {
   describe("invokeLive", () => {
-    it("declines live when a model is set: the 2.x TUI has no -m flag", () => {
+    it("launches the TUI with the resolved model", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {
         model: "opencode-go/deepseek-v4-flash",
       });
 
-      expect(spec).toBeNull();
+      expect(spec).toEqual({
+        agentBin: "opencode",
+        argv: ["-m", "opencode-go/deepseek-v4-flash"],
+      });
     });
 
     it("maps --dangerous to --auto (opencode's approval bypass), never headless flags", () => {
@@ -79,7 +82,7 @@ describe("opencodeBackend", () => {
       ]);
     });
 
-    it("never passes --variant: opencode 2.x prints help and fails on it", () => {
+    it("never passes --variant", () => {
       for (const mode of ["delegate", "review"] as const) {
         expect(opencodeBackend.invoke(mode, { promptText: "p" }).argv).not.toContain(
           "--variant",
@@ -272,17 +275,6 @@ describe("parseJsonl", () => {
 });
 
 describe("parseError", () => {
-  it("reads the opencode 2.x shape: error.message, else error.type", () => {
-    const withMessage = JSON.stringify({
-      type: "error",
-      error: { type: "provider.no-route", message: "Model unavailable: x/y" },
-    });
-    const typeOnly = JSON.stringify({ type: "error", error: { type: "provider.no-route" } });
-
-    expect(parseError(withMessage)).toBe("Model unavailable: x/y");
-    expect(parseError(typeOnly)).toBe("provider.no-route");
-  });
-
   it("returns the message of the JSONL error event", () => {
     const raw = [
       JSON.stringify({ type: "step_start" }),

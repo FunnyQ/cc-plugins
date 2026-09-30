@@ -62,10 +62,9 @@ export const opencodeBackend: Backend = {
     return { argv };
   },
 
-  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec | null {
-    // The 2.x TUI has no -m and prints help on it, so a chosen model runs headless.
-    if (opts.model) return null;
+  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
     const argv: string[] = [];
+    if (opts.model) argv.push("-m", opts.model);
     // opencode's approval-bypass flag is `--auto` ("auto-approve permissions
     // that are not explicitly denied (dangerous!)"), accepted by the interactive
     // TUI too. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist
@@ -119,16 +118,14 @@ export function parseJsonl(raw: string): string {
 
 /**
  * `opencode run` exits 1 with empty stderr and reports the cause only as a
- * JSONL event on stdout: 1.x {"error":{"name":..,"data":{"message":..}}},
- * 2.x {"error":{"type":..,"message":..}}.
+ * JSONL event on stdout: {"type":"error","error":{"name":..,"data":{"message":..}}}.
  */
 export function parseError(stdout: string): string | undefined {
   for (const line of stdout.split("\n")) {
     try {
       const obj = JSON.parse(line.trim());
       if (obj.type === "error") {
-        const e = obj.error;
-        return e?.message || e?.data?.message || e?.type || e?.name || undefined;
+        return obj.error?.data?.message || obj.error?.name || undefined;
       }
     } catch {
       continue;
