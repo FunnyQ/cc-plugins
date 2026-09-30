@@ -263,7 +263,8 @@ Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge
 | **Final review — cross-vendor lens** | sonnet / low | Drive the external CLI that performs the review. |
 | **Final review — quality lenses** | `CFG.reviewLensModel` (default opus) / high | Hunt reuse, leanness, and efficiency issues with independent context. |
 | **Final review — fixer** | opus / medium | Apply findings the high-effort lenses already found. |
-| **Scout / mark-done / park / worktree calls** | sonnet / low | Run the fixed readiness, status transition, or `worktree.ts` command. |
+| **Scout / park** | sonnet / low | Read readiness, or park a task, repairing a malformed Status line. |
+| **Mark-done / worktree calls** | haiku / low | Relay the result of `mark-done.ts` or `worktree.ts`; a structured failure retries on opus. |
 | **Structured retry** | opus / medium | Recover a failed structured call with a complete model and effort choice. |
 
 A task's `> **Models**:` header overrides dev, verify, judge, and fix for that task.

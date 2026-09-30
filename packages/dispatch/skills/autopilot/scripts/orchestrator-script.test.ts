@@ -2441,7 +2441,7 @@ describe("per-role model and effort choices", () => {
     assertChoice(log, "verify:ui/01#1", "opus", "low");
     assertChoice(log, "judge:ui/01#1", "opus", "medium");
     assertChoice(log, "fix:review/01#1", "opus", "medium");
-    assertChoice(log, "done:ui/01", "sonnet", "low");
+    assertChoice(log, "done:ui/01", "haiku", "low");
     assertChoice(log, "scout-wave-1", "sonnet", "low");
     assertChoice(log, "commit-wave-2", "opus", "low");
     assertChoice(log, "commit-post-loop", "opus", "low");
@@ -2690,7 +2690,7 @@ describe("task worktree isolation", () => {
         "--repo /abs/repo --slug my-plan",
       );
       expect(promptFor(log, label)).toContain("StructuredOutput");
-      expect(modelFor(log, label)).toBe("sonnet");
+      expect(modelFor(log, label)).toBe("haiku");
       expect(effortFor(log, label)).toBe("low");
     }
   });
@@ -2746,7 +2746,7 @@ describe("task worktree isolation", () => {
     expect(prompts[0]).toContain(
       `land ${ref} --expect f0 --op a1-land --repo /abs/repo --slug my-plan`,
     );
-    expect(modelsFor(log, `wt-land:${ref}`)).toEqual(["sonnet", "opus"]);
+    expect(modelsFor(log, `wt-land:${ref}`)).toEqual(["haiku", "opus"]);
     expect(log.result.completed).toEqual([ref]);
   });
 
@@ -2912,7 +2912,7 @@ describe("task worktree isolation", () => {
     expect(prompts).toHaveLength(2);
     expect(prompts[0]).toBe(prompts[1]);
     expect(prompts[0]).toContain("--op a1-rebase");
-    expect(modelsFor(log, `wt-rebase:${ref}`)).toEqual(["sonnet", "opus"]);
+    expect(modelsFor(log, `wt-rebase:${ref}`)).toEqual(["haiku", "opus"]);
     expect(log.labels).toContain(`dev:${ref}#2`);
     expect(log.result.completed).toEqual([ref]);
   });

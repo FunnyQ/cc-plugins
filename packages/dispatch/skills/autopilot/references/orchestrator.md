@@ -77,6 +77,7 @@ const CFG = {
 // reviewExternal drives an external CLI that does the reasoning.
 // reviewLens hunts quality issues at high effort on the configured model.
 // scout reads readiness; markDone and park perform fixed status transitions.
+// markDone and worktree only relay a script's result; park may repair a malformed header.
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const MODEL = {
   dev: { model: 'opus', effort: 'low' },
@@ -90,8 +91,9 @@ const MODEL = {
   reviewExternal: { model: 'sonnet', effort: 'low' },
   reviewLens: { model: CFG.reviewLensModel ?? 'opus', effort: 'high' },
   scout: { model: 'sonnet', effort: 'low' },
-  markDone: { model: 'sonnet', effort: 'low' },
+  markDone: { model: 'haiku', effort: 'low' },
   park: { model: 'sonnet', effort: 'low' },
+  worktree: { model: 'haiku', effort: 'low' },
 }
 // Null effort must omit the option so the runtime chooses its own default.
 const pick = (choice) => choice.effort ? { model: choice.model, effort: choice.effort } : { model: choice.model }
@@ -794,7 +796,7 @@ const WT_SCHEMA = {
 // Call under withMainLock; keep the command identical through the structured retry.
 const wtCall = (label, command, schema) => resilient(async (retryModel) => {
   const result = await agent(`Run exactly this one command: ${command}\nReturn its stdout JSON through StructuredOutput.\n${RETURN_CONTRACT}`,
-    { label, phase: 'Execute', ...pick(retryModel ?? MODEL.park), schema })
+    { label, phase: 'Execute', ...pick(retryModel ?? MODEL.worktree), schema })
   if (result === null) throw new Error(`${label}: no structured result`)
   return result
 }, MODEL.structuredRetry)
