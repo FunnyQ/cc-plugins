@@ -56,37 +56,17 @@ On exit `4` nobody is watching the cockpit — ask the same question in chat,
 then record the answer with `cockpit send`. See "Nobody is watching" in
 `pilot.md`.
 
-## Sends go over the OpenCode service API
+## Sends go over the TUI HTTP bridge
 
 OpenCode never registers the cockpit channel MCP server, so a send takes a
 different path: `scripts/opencode-send.ts`, served by the cockpit daemon at
-`/api/send-opencode-message`.
+`/api/send-opencode-message`. It discovers the TUI server from
+`OPENCODE_TUI_SERVER_URL` or `OPENCODE_SERVER_URL`, falls back to a `ps` scan
+for `opencode --port <n>`, health-checks `/global/health`, resolves the
+session through `/session/<id>`, and delivers via `/tui/append-prompt` then
+`/tui/submit-prompt`.
 
-**opencode 2.x** runs one background service per user, and the TUI is its
-client. The send reads the service's URL and password from
-`$XDG_STATE_HOME/opencode/service.json` (default
-`~/.local/state/opencode/service.json`, present only while the service runs),
-and authenticates with Basic `opencode:<password>`. Set `OPENCODE_SERVER_URL`
-to target another service; it then pairs only with `OPENCODE_PASSWORD` /
-`OPENCODE_SERVER_PASSWORD`, never with the registration's password. It checks
-`/api/info` for a JSON `version`, resolves the session through
-`/api/session/<id>`, and posts `/api/session/<id>/prompt` with
-`delivery: "steer"`, so the message lands in the running turn. Keep an
-opencode TUI open: it starts the service, and with no service running there is
-no registration to find. A 401 or 403 from the service is reported as a
-rejected password and never falls through to 1.x. Only the `latest`, `dev`,
-`beta`, and `next` channels write `service.json`; another channel writes
-`service-<channel>.json`, which discovery does not read.
-
-**opencode 1.x** is the fallback, used only when no 2.x service answers. Every
-1.x send carries an upgrade notice in its `warnings`, which the dashboard shows
-on the send button, and toasts it once per server in the TUI through
-`/tui/show-toast`. It
-discovers the TUI server from `OPENCODE_TUI_SERVER_URL` or
-`OPENCODE_SERVER_URL`, falls back to a `ps` scan for `opencode --port <n>`,
-health-checks `/global/health`, resolves the session through `/session/<id>`,
-and delivers via `/tui/append-prompt` then `/tui/submit-prompt`. Two
-preconditions, both observed on opencode 1.18.18:
+Two preconditions, both observed on opencode 1.18.18:
 
 - **Start the TUI with a port.** Run `opencode --port <n>`, or set
   `OPENCODE_TUI_SERVER_URL` before the cockpit daemon starts. An

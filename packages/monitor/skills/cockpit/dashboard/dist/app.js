@@ -193,9 +193,7 @@ export const store = reactive({
       if (!control) return "Checking OpenCode bridge";
       if (control.checking) return "Checking OpenCode bridge";
       if (!control.ready) return control.error || "OpenCode bridge unavailable";
-      return control.warning
-        ? `Send to OpenCode session — ${control.warning}`
-        : "Send to OpenCode session";
+      return "Send to OpenCode session";
     }
     if (!s.channel) return "Launch this session with the cockpit channel";
     return "Send to cockpit channel";
@@ -430,7 +428,6 @@ export const store = reactive({
           ready: j.ready === true,
           checking: false,
           error: j.ready === true ? "" : error || "OpenCode bridge unavailable",
-          warning: Array.isArray(j.warnings) ? j.warnings.join("; ") : "",
           serverUrl: j.serverUrl || "",
         },
       };
