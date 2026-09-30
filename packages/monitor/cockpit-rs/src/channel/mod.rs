@@ -45,6 +45,17 @@ impl ServerHandler for ChannelServer {
             .with_instructions("Messages from the cockpit dashboard arrive as <channel source=\"cockpit\">...</channel>.")
     }
 
+    // Claude Code skips channel notifications on 2026-07-28, so refuse discovery as MCP SDK 1.29 did
+    // and let the client fall back to `initialize` on 2025-11-25: https://code.claude.com/docs/en/channels.md
+    async fn discover(
+        &self,
+        _: rmcp::service::RequestContext<RoleServer>,
+    ) -> Result<rmcp::model::DiscoverResult, rmcp::ErrorData> {
+        Err(rmcp::ErrorData::method_not_found::<
+            rmcp::model::DiscoverRequestMethod,
+        >())
+    }
+
     async fn on_custom_notification(
         &self,
         notification: CustomNotification,

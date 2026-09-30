@@ -94,8 +94,8 @@ class McpClient {
     return this.notifications.splice(this.notifications.findIndex((message) => message.method === method), 1)[0]!;
   }
 
-  async initialize(): Promise<unknown> {
-    const result = await this.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "contract-client", version: "1.0.0" } });
+  async initialize(protocolVersion = "2025-06-18"): Promise<unknown> {
+    const result = await this.request("initialize", { protocolVersion, capabilities: {}, clientInfo: { name: "contract-client", version: "1.0.0" } });
     this.notify("notifications/initialized");
     return result;
   }
@@ -204,6 +204,11 @@ describe("channel: handshake", () => {
     expect(await client.request("ping")).toEqual({});
     await until(() => stub.requests.length > 0);
     stub.assertAuth();
+  }));
+  // Claude Code refuses to register a channel on 2026-07-28: https://code.claude.com/docs/en/channels.md
+  test("refuses server/discover so Claude Code falls back to initialize on 2025-11-25", async () => withStub(async (client) => {
+    await expect(client.request("server/discover", { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {} } })).rejects.toThrow('"code":-32601');
+    expect((await client.initialize("2026-07-28") as Record<string, unknown>).protocolVersion).toBe("2025-11-25");
   }));
 });
 
