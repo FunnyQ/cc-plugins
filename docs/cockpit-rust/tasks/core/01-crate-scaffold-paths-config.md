@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: core/02, channel/01, ship/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -115,25 +115,25 @@ Mirror the cases in `packages/monitor/skills/cockpit/scripts/cockpit-home.test.t
 
 ## Acceptance criteria
 
-- [ ] A cargo test with `{"log_language":123,"answer_here":true}` shows `get_language()` = `English`, `get_answer_here()` = `true`, and `set_language("zh-TW")` rewrites the file keeping `answer_here`.
+- [x] A cargo test with `{"log_language":123,"answer_here":true}` shows `get_language()` = `English`, `get_answer_here()` = `true`, and `set_language("zh-TW")` rewrites the file keeping `answer_here`.
 
-- [ ] `cargo build --release` produces `packages/monitor/cockpit-rs/target/release/cockpit`; `cockpit --version` prints `cockpit <version>` equal to `packages/monitor/.claude-plugin/plugin.json`'s version.
-- [ ] Every subcommand listed above is accepted by clap and, stubbed, exits 2 with `cockpit: <sub> not implemented yet` on stderr; unknown subcommands exit non-zero.
-- [ ] `paths.rs` honors every env override and fallback listed above, including empty-string-as-unset, and the one-time `~/.cockpit` migration only when `COCKPIT_HOME` is unset.
-- [ ] `config.rs` reads a missing/corrupt/array file as default, preserves unknown keys and key order on rewrite, writes 2-space JSON plus a trailing newline, and removes an empty `nudges.projects`.
-- [ ] `env_int` matches `parseInt` leading-digit semantics with the positive-only rule.
-- [ ] `.gitignore` ignores `packages/monitor/cockpit-rs/target/`; `Cargo.lock` is present.
-- [ ] fmt and clippy (`-D warnings`) are clean.
+- [x] `cargo build --release` produces `packages/monitor/cockpit-rs/target/release/cockpit`; `cockpit --version` prints `cockpit <version>` equal to `packages/monitor/.claude-plugin/plugin.json`'s version.
+- [x] Every subcommand listed above is accepted by clap and, stubbed, exits 2 with `cockpit: <sub> not implemented yet` on stderr; unknown subcommands exit non-zero.
+- [x] `paths.rs` honors every env override and fallback listed above, including empty-string-as-unset, and the one-time `~/.cockpit` migration only when `COCKPIT_HOME` is unset.
+- [x] `config.rs` reads a missing/corrupt/array file as default, preserves unknown keys and key order on rewrite, writes 2-space JSON plus a trailing newline, and removes an empty `nudges.projects`.
+- [x] `env_int` matches `parseInt` leading-digit semantics with the positive-only rule.
+- [x] `.gitignore` ignores `packages/monitor/cockpit-rs/target/`; `Cargo.lock` is present.
+- [x] fmt and clippy (`-D warnings`) are clean.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `test "$(packages/monitor/cockpit-rs/target/release/cockpit --version)" = "cockpit $(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' packages/monitor/.claude-plugin/plugin.json)"`
-- [ ] `packages/monitor/cockpit-rs/target/release/cockpit log; test $? -eq 2`
-- [ ] `git check-ignore -q packages/monitor/cockpit-rs/target/release/cockpit`
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `test "$(packages/monitor/cockpit-rs/target/release/cockpit --version)" = "cockpit $(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' packages/monitor/.claude-plugin/plugin.json)"`
+- [x] `packages/monitor/cockpit-rs/target/release/cockpit log; test $? -eq 2`
+- [x] `git check-ignore -q packages/monitor/cockpit-rs/target/release/cockpit`
 
 ## Eval rubric
 

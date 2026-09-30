@@ -1,0 +1,24 @@
+[package]
+name = "cockpit"
+version = "5.2.4"
+edition = "2024"
+
+[[bin]]
+name = "cockpit"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "~4.5", features = ["derive"] }
+serde = { version = "~1.0", features = ["derive"] }
+serde_json = { version = "~1.0", features = ["preserve_order"] }
+tokio = { version = "~1.49", features = ["rt"] }
+
+[dev-dependencies]
+tempfile = "~3.24"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
