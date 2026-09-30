@@ -5,7 +5,6 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
  *
  * Both modes run off relay's built prompt (no native review).
  * No model is pinned: hosted ids churn, and a pinned default rotted once already.
- * Delegate uses the max reasoning variant.
  *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
  * and live TUI). Headless `run` auto-REJECTS approval prompts when `--auto` is
@@ -40,9 +39,6 @@ export const opencodeBackend: Backend = {
     if (model) {
       argv.push("-m", model);
     }
-    if (mode === "delegate") {
-      argv.push("--variant", "max");
-    }
 
     // JSON gives a clean, structured stream we can extract the final answer from
     // (parseOutput → parseJsonl); --format default interleaves TUI/progress noise.
@@ -66,10 +62,10 @@ export const opencodeBackend: Backend = {
     return { argv };
   },
 
-  invokeLive(mode: Mode, opts: InvokeOpts): LiveSpec {
+  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec | null {
+    // The 2.x TUI has no -m and prints help on it, so a chosen model runs headless.
+    if (opts.model) return null;
     const argv: string[] = [];
-    if (opts.model) argv.push("-m", opts.model);
-    if (mode === "delegate") argv.push("--variant", "max");
     // opencode's approval-bypass flag is `--auto` ("auto-approve permissions
     // that are not explicitly denied (dangerous!)"), accepted by the interactive
     // TUI too. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist
@@ -122,15 +118,17 @@ export function parseJsonl(raw: string): string {
 }
 
 /**
- * `opencode run` exits 1 with empty stderr and reports the cause as a JSONL
- * event on stdout: {"type":"error","error":{"name":..,"data":{"message":..}}}.
+ * `opencode run` exits 1 with empty stderr and reports the cause only as a
+ * JSONL event on stdout: 1.x {"error":{"name":..,"data":{"message":..}}},
+ * 2.x {"error":{"type":..,"message":..}}.
  */
 export function parseError(stdout: string): string | undefined {
   for (const line of stdout.split("\n")) {
     try {
       const obj = JSON.parse(line.trim());
       if (obj.type === "error") {
-        return obj.error?.data?.message || obj.error?.name || undefined;
+        const e = obj.error;
+        return e?.message || e?.data?.message || e?.type || e?.name || undefined;
       }
     } catch {
       continue;

@@ -4,20 +4,12 @@ import type { InvokeOpts } from "../types";
 
 describe("opencodeBackend", () => {
   describe("invokeLive", () => {
-    it("launches the bare TUI with the resolved model", () => {
+    it("declines live when a model is set: the 2.x TUI has no -m flag", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {
-        model: "opencode-go/deepseek-v4-light",
+        model: "opencode-go/deepseek-v4-flash",
       });
 
-      expect(spec).toEqual({
-        agentBin: "opencode",
-        argv: [
-          "-m",
-          "opencode-go/deepseek-v4-light",
-          "--variant",
-          "max",
-        ],
-      });
+      expect(spec).toBeNull();
     });
 
     it("maps --dangerous to --auto (opencode's approval bypass), never headless flags", () => {
@@ -25,7 +17,7 @@ describe("opencodeBackend", () => {
         dangerous: true,
       })!;
 
-      expect(spec.argv).toEqual(["--variant", "max", "--auto"]);
+      expect(spec.argv).toEqual(["--auto"]);
       expect(spec.argv).not.toContain("run");
       expect(spec.argv).not.toContain("--format");
     });
@@ -33,7 +25,7 @@ describe("opencodeBackend", () => {
     it("omits --auto without --dangerous (prompts surface in the pane)", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {})!;
 
-      expect(spec.argv).toEqual(["--variant", "max"]);
+      expect(spec.argv).toEqual([]);
     });
   });
 
@@ -61,8 +53,6 @@ describe("opencodeBackend", () => {
         "run",
         "-m",
         "opencode-go/deepseek-v4-light",
-        "--variant",
-        "max",
         "--format",
         "json",
         "--",
@@ -89,6 +79,14 @@ describe("opencodeBackend", () => {
       ]);
     });
 
+    it("never passes --variant: opencode 2.x prints help and fails on it", () => {
+      for (const mode of ["delegate", "review"] as const) {
+        expect(opencodeBackend.invoke(mode, { promptText: "p" }).argv).not.toContain(
+          "--variant",
+        );
+      }
+    });
+
     it("omits -m when no model was resolved", () => {
       const opts: InvokeOpts = { promptText: "test prompt" };
       const result = opencodeBackend.invoke("delegate", opts);
@@ -96,8 +94,6 @@ describe("opencodeBackend", () => {
       expect(result.argv).toEqual([
         "opencode",
         "run",
-        "--variant",
-        "max",
         "--format",
         "json",
         "--",
@@ -136,8 +132,6 @@ describe("opencodeBackend", () => {
         "run",
         "-m",
         "opencode-go/deepseek-v4-light",
-        "--variant",
-        "max",
         "--format",
         "json",
       ]);
@@ -278,6 +272,17 @@ describe("parseJsonl", () => {
 });
 
 describe("parseError", () => {
+  it("reads the opencode 2.x shape: error.message, else error.type", () => {
+    const withMessage = JSON.stringify({
+      type: "error",
+      error: { type: "provider.no-route", message: "Model unavailable: x/y" },
+    });
+    const typeOnly = JSON.stringify({ type: "error", error: { type: "provider.no-route" } });
+
+    expect(parseError(withMessage)).toBe("Model unavailable: x/y");
+    expect(parseError(typeOnly)).toBe("provider.no-route");
+  });
+
   it("returns the message of the JSONL error event", () => {
     const raw = [
       JSON.stringify({ type: "step_start" }),
