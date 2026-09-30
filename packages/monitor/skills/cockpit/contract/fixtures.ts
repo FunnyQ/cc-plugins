@@ -1,7 +1,6 @@
 import type { Subprocess } from "bun";
 import { Database } from "bun:sqlite";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { command, PLUGIN_ROOT, underTest, type Proc } from "./launcher";
 
@@ -9,7 +8,7 @@ export type Env = Record<string, string>;
 export type Homes = { cockpitHome: string; configHome: string; dataHome: string; root: string };
 
 export function makeHomes(): Homes {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "cockpit-contract-")));
+  const root = realpathSync(mkdtempSync(join(import.meta.dir, ".cockpit-contract-")));
   const homes = {
     root,
     cockpitHome: join(root, "cockpit"),
@@ -65,8 +64,10 @@ export function makeProviderFixtures(h: Homes): ProviderFixtures {
     opencodeSessionId: `ses_${crypto.randomUUID().replaceAll("-", "")}`,
   };
   for (const dir of [f.claudeProjectsDir, f.claudeSessionsDir, f.codexSessionsDir, join(h.root, "opencode"), f.projectDir]) mkdirSync(dir, { recursive: true });
-  const git = Bun.spawnSync(["git", "init", "-q"], { cwd: f.projectDir, env: baseEnv(h) });
-  if (git.exitCode !== 0) throw new Error(`Fixture git init failed: ${git.stderr.toString()}`);
+  mkdirSync(join(f.projectDir, ".git/objects"), { recursive: true });
+  mkdirSync(join(f.projectDir, ".git/refs/heads"), { recursive: true });
+  writeFileSync(join(f.projectDir, ".git/HEAD"), "ref: refs/heads/main\n");
+  writeFileSync(join(f.projectDir, ".git/config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n");
   const now = Date.now();
   const timestamp = new Date(now).toISOString();
   const claudeDir = join(f.claudeProjectsDir, f.projectDir.replace(/[/.]/g, "-"));
@@ -128,7 +129,9 @@ export async function startDaemon(env: Env, opts: { port?: number } = {}): Promi
   if (!env.COCKPIT_HOME) throw new Error("startDaemon requires an isolated COCKPIT_HOME");
   const port = opts.port ?? await freePort();
   const base = `http://127.0.0.1:${port}`;
-  const proc = Bun.spawn(command("server", ["--no-open", "--port", String(port)]), { env, stdout: "pipe", stderr: "pipe" });
+  const argv = command("server", ["--no-open", "--port", String(port)]);
+  if (argv[0] === "bun") argv[0] = process.execPath;
+  const proc = Bun.spawn(argv, { env, stdout: "pipe", stderr: "pipe" });
   const stdout = new Response(proc.stdout).text();
   const stderr = new Response(proc.stderr).text();
   const deadline = Date.now() + 10000;
@@ -190,4 +193,105 @@ export function readJsonl(path: string): any[] {
 
 export function cleanup(...dirs: string[]): void {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
+}
+
+export type RegistryEntry = {
+  provider: "claude" | "codex" | "opencode";
+  project: string;
+  sessionId: string;
+  title?: string;
+  titleResolved?: boolean;
+  logPath: string;
+  lastHeartbeat: string;
+};
+
+// Freeze the shapes sampled from a direct TS `cockpit.ts log --needs-call` run.
+export const DECISION_RECORD = Object.freeze({
+  id: "d8b1ecb9-3bbf-4fdf-9c64-b608f8ee7630",
+  type: "decision", kind: "decision", source: "agent",
+  decision: "Fixture decision", reason: "Fixture reason", tradeoff: "",
+  facets: [], needs_your_call: true, options: [], files: [],
+  timestamp: "2026-09-30T10:53:59.398Z",
+});
+
+export const REGISTRY_ENTRY: Readonly<RegistryEntry> = Object.freeze({
+  provider: "claude",
+  project: "/fixture/project",
+  sessionId: "11111111-1111-4111-8111-111111111111",
+  logPath: "/fixture/project/.cockpit/logs/11111111-1111-4111-8111-111111111111.jsonl",
+  lastHeartbeat: "2026-09-30T10:53:59.399Z",
+});
+
+export function seedTrail(projectDir: string, sid: string, records: object[]): string {
+  const dir = join(projectDir, ".cockpit/logs");
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `${sid}.jsonl`);
+  writeFileSync(path, records.map((record) => JSON.stringify(record) + "\n").join(""));
+  return path;
+}
+
+export function appendTrail(path: string, record: object): void {
+  appendFileSync(path, JSON.stringify(record) + "\n");
+}
+
+export function seedRegistry(cockpitHome: string, entries: RegistryEntry[]): void {
+  mkdirSync(cockpitHome, { recursive: true });
+  writeFileSync(join(cockpitHome, "registry.json"), JSON.stringify({ sessions: entries }, null, 2));
+}
+
+export async function openSse(url: string): Promise<{
+  response: Response;
+  next(timeoutMs?: number): Promise<{ event: string; data: any }>;
+  close(): Promise<void>;
+}> {
+  const controller = new AbortController();
+  const response = await fetch(url, { signal: controller.signal });
+  if (!response.body) throw new Error("SSE response has no body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let closed = false;
+  async function close(): Promise<void> {
+    if (closed) return;
+    closed = true;
+    controller.abort();
+    await reader.cancel().catch(() => {});
+  }
+  async function next(timeoutMs = 5000): Promise<{ event: string; data: any }> {
+    const deadline = Date.now() + Math.min(timeoutMs, 5000);
+    while (!closed) {
+      let boundary: number;
+      while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        let event = "message";
+        const data: string[] = [];
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trimStart();
+          if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+        }
+        if (data.length) return { event, data: JSON.parse(data.join("\n")) };
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) { await close(); throw new Error("SSE event deadline exceeded"); }
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const chunk = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("SSE event deadline exceeded")), remaining);
+          }),
+        ]);
+        if (chunk.done) throw new Error("SSE stream ended before an event");
+        buffer += decoder.decode(chunk.value, { stream: true });
+      } catch (error) {
+        await close();
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw new Error("SSE stream is closed");
+  }
+  return { response, next, close };
 }

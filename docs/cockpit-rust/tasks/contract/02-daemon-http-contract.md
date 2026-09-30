@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -138,24 +138,24 @@ export function seedRegistry(cockpitHome: string, entries: RegistryEntry[]): voi
 
 ## Acceptance criteria
 
-- [ ] `daemon.contract.test.ts` has all 12 `server: *` groups, and every test sits inside one of them.
-- [ ] Every route in contracts.md §3's table is exercised at least once, plus the static 404 for an unknown path.
-- [ ] No test calls `run("cli", …)`; all fixtures come from `seedTrail`, `appendTrail`, `seedRegistry`, or the provider fixtures, and no `server: broker` test opens `/api/permission-stream`.
-- [ ] Failure paths are asserted: bad token, `{timeout:true}`, `{not_watching:true}`, `{abandoned:true}`, 304, gzip, traversal refused, dead-pid start, supersede.
-- [ ] Each group passes when run alone with `-t "server: <group>"`.
-- [ ] The suite passes against TS in under 90 s and leaves no daemon process running.
-- [ ] No test touches the real home, the real XDG dirs, or port 5858.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `daemon.contract.test.ts` has all 12 `server: *` groups, and every test sits inside one of them.
+- [x] Every route in contracts.md §3's table is exercised at least once, plus the static 404 for an unknown path.
+- [x] No test calls `run("cli", …)`; all fixtures come from `seedTrail`, `appendTrail`, `seedRegistry`, or the provider fixtures, and no `server: broker` test opens `/api/permission-stream`.
+- [x] Failure paths are asserted: bad token, `{timeout:true}`, `{not_watching:true}`, `{abandoned:true}`, 304, gzip, traversal refused, dead-pid start, supersede.
+- [x] Each group passes when run alone with `-t "server: <group>"`.
+- [x] The suite passes against TS in under 90 s and leaves no daemon process running.
+- [x] No test touches the real home, the real XDG dirs, or port 5858.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts` passes (`COCKPIT_BIN` unset).
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: broker"` passes on its own.
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: static"` passes on its own.
-- [ ] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: presence"` passes on its own.
-- [ ] `grep -c 'run("cli"' packages/monitor/skills/cockpit/contract/daemon.contract.test.ts` prints `0`.
-- [ ] `pgrep -f 'cockpit-server.ts --no-open --port' ; test $? -eq 1` after the run (no leaked daemon).
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts` passes (`COCKPIT_BIN` unset).
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: broker"` passes on its own.
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: static"` passes on its own.
+- [x] `bun test packages/monitor/skills/cockpit/contract/daemon.contract.test.ts -t "server: presence"` passes on its own.
+- [x] `grep -c 'run("cli"' packages/monitor/skills/cockpit/contract/daemon.contract.test.ts` prints `0`.
+- [x] `pgrep -f 'cockpit-server.ts --no-open --port' ; test $? -eq 1` after the run (no leaked daemon).
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Eval rubric
 

@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -125,23 +125,23 @@ Every `describe` name starts with exactly one of the prefixes below. Each group 
 
 ## Acceptance criteria
 
-- [ ] `cli.contract.test.ts` has the 6 `cli: *` groups and `hook.contract.test.ts` has the 2 `hook: *` groups. Every test sits inside one.
-- [ ] All 9 CLI subcommands are exercised: `log`, `scribe`, `prep`, `config`, `nudge`, `find-session`, `wait`, `send`, `restart`. So are `--help` and the unknown-subcommand path.
-- [ ] `wait` exit 3 on superseded and exit 4 on `not_watching`, the diagram-lint failure (exit 1 + exact stderr prefix + no trail write), and restart supersede are asserted.
-- [ ] `cli: send` asserts the `/api/respond` path: `delivered: true` waking a parked `wait`, `delivered: false` with nobody parked, the `response` trail line with the right `call`, and no request to `/api/inbox`.
-- [ ] Both hooks are asserted for the Claude and Codex (`PLUGIN_ROOT`) output shapes, `RELAY_DELEGATED=1` suppression, and the delegation-marker write-back. Nudge-off suppression is asserted for `hook: stop` only; `hook: session-start` asserts that guidance still prints with nudges off, because `decision-log-start.ts` never reads the nudge toggle.
-- [ ] Both suites pass against TS. Each group passes alone with `-t`. No daemon survives the run.
-- [ ] No test touches the real home, the real XDG dirs, or port 5858.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `cli.contract.test.ts` has the 6 `cli: *` groups and `hook.contract.test.ts` has the 2 `hook: *` groups. Every test sits inside one.
+- [x] All 9 CLI subcommands are exercised: `log`, `scribe`, `prep`, `config`, `nudge`, `find-session`, `wait`, `send`, `restart`. So are `--help` and the unknown-subcommand path.
+- [x] `wait` exit 3 on superseded and exit 4 on `not_watching`, the diagram-lint failure (exit 1 + exact stderr prefix + no trail write), and restart supersede are asserted.
+- [x] `cli: send` asserts the `/api/respond` path: `delivered: true` waking a parked `wait`, `delivered: false` with nobody parked, the `response` trail line with the right `call`, and no request to `/api/inbox`.
+- [x] Both hooks are asserted for the Claude and Codex (`PLUGIN_ROOT`) output shapes, `RELAY_DELEGATED=1` suppression, and the delegation-marker write-back. Nudge-off suppression is asserted for `hook: stop` only; `hook: session-start` asserts that guidance still prints with nudges off, because `decision-log-start.ts` never reads the nudge toggle.
+- [x] Both suites pass against TS. Each group passes alone with `-t`. No daemon survives the run.
+- [x] No test touches the real home, the real XDG dirs, or port 5858.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts` passes (`COCKPIT_BIN` unset).
-- [ ] `bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts` passes (`COCKPIT_BIN` unset).
-- [ ] `bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: wait"` passes on its own.
-- [ ] `bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: send"` passes on its own.
-- [ ] `pgrep -f 'cockpit-server.ts --no-open --port' ; test $? -eq 1` after the run.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts` passes (`COCKPIT_BIN` unset).
+- [x] `bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts` passes (`COCKPIT_BIN` unset).
+- [x] `bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: wait"` passes on its own.
+- [x] `bun test packages/monitor/skills/cockpit/contract/cli.contract.test.ts -t "cli: send"` passes on its own.
+- [x] `pgrep -f 'cockpit-server.ts --no-open --port' ; test $? -eq 1` after the run.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Eval rubric
 

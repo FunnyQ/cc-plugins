@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/01
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 
