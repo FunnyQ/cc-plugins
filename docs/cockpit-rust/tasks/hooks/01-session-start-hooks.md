@@ -7,7 +7,7 @@
 >
 > **Depends on**: core/03, contract/04
 > **Blocks**: hooks/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -121,21 +121,21 @@ Spawn no subprocess. `find_session` for Codex reads sqlite locally. Make no HTTP
 
 ## Acceptance criteria
 
-- [ ] Against Rust, `hook: session-start` passes: Claude-with-`claude`-on-PATH silence, guidance text for Claude without `claude` on PATH, the Codex (`PLUGIN_ROOT`) variant, the OpenCode (`provider: "opencode"`) variant, and the skips for `RELAY_DELEGATED=1`, the `sdk` entrypoint, and `agent_id`.
-- [ ] A Codex run whose cwd matches an armed marker prints nothing, and its `session_id` is appended to that marker file. A later run with the same `session_id` after `armUntil` is still silenced.
-- [ ] Without `PLUGIN_ROOT`, a matching marker is ignored and the guidance still prints.
-- [ ] With every suppression cleared (no `RELAY_DELEGATED`, no `sdk` entrypoint, no `claude` on `PATH`, no matching marker), garbage or empty stdin still produces guidance (default input). Under each env/PATH suppression (`RELAY_DELEGATED=1`, an `sdk` entrypoint, `claude` on `PATH` under Claude Code), the same malformed stdin gives empty stdout. `agent_id` and matching-marker suppression need fields a malformed payload cannot carry, so they are tested only with valid JSON payloads. The process exits 0 in every case.
-- [ ] `cargo test` covers every `classify_markers` branch, and `build_guidance` for Codex/Claude × with/without an id.
-- [ ] `time cockpit hook session-start` on a fixture input finishes under 1 s.
+- [x] Against Rust, `hook: session-start` passes: Claude-with-`claude`-on-PATH silence, guidance text for Claude without `claude` on PATH, the Codex (`PLUGIN_ROOT`) variant, the OpenCode (`provider: "opencode"`) variant, and the skips for `RELAY_DELEGATED=1`, the `sdk` entrypoint, and `agent_id`.
+- [x] A Codex run whose cwd matches an armed marker prints nothing, and its `session_id` is appended to that marker file. A later run with the same `session_id` after `armUntil` is still silenced.
+- [x] Without `PLUGIN_ROOT`, a matching marker is ignored and the guidance still prints.
+- [x] With every suppression cleared (no `RELAY_DELEGATED`, no `sdk` entrypoint, no `claude` on `PATH`, no matching marker), garbage or empty stdin still produces guidance (default input). Under each env/PATH suppression (`RELAY_DELEGATED=1`, an `sdk` entrypoint, `claude` on `PATH` under Claude Code), the same malformed stdin gives empty stdout. `agent_id` and matching-marker suppression need fields a malformed payload cannot carry, so they are tested only with valid JSON payloads. The process exits 0 in every case.
+- [x] `cargo test` covers every `classify_markers` branch, and `build_guidance` for Codex/Claude × with/without an id.
+- [x] `time cockpit hook session-start` on a fixture input finishes under 1 s.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: session-start"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: session-start"` (against TS) still passes.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: session-start"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: session-start"` (against TS) still passes.
 
 ## Eval rubric
 
