@@ -1,0 +1,496 @@
+{
+  "usage": {
+    "modelUsage": {
+      "codex:gpt-5.1-codex": {
+        "inputTokens": 9000,
+        "outputTokens": 2100,
+        "cacheReadInputTokens": 11000,
+        "cacheCreationInputTokens": 0,
+        "reasoningOutputTokens": 700
+      },
+      "codex:gpt-5.1-codex-mini": {
+        "inputTokens": 3000,
+        "outputTokens": 500,
+        "cacheReadInputTokens": 1000,
+        "cacheCreationInputTokens": 0,
+        "reasoningOutputTokens": 120
+      }
+    },
+    "dailyModelUsage": {
+      "2026-09-27": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 4000,
+          "outputTokens": 2100,
+          "cacheReadInputTokens": 11000,
+          "cacheCreationInputTokens": 0,
+          "reasoningOutputTokens": 700
+        }
+      },
+      "2026-09-28": {
+        "codex:gpt-5.1-codex-mini": {
+          "inputTokens": 3000,
+          "outputTokens": 500,
+          "cacheReadInputTokens": 1000,
+          "cacheCreationInputTokens": 0,
+          "reasoningOutputTokens": 120
+        }
+      },
+      "2026-09-26": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 5000,
+          "outputTokens": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0,
+          "reasoningOutputTokens": 0
+        }
+      }
+    },
+    "hourlyUsage": {
+      "1790474400000": {
+        "timestampMs": 1790474400000,
+        "usageByModel": {
+          "codex:gpt-5.1-codex": {
+            "inputTokens": 3000,
+            "outputTokens": 900,
+            "cacheReadInputTokens": 5000,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 300
+          }
+        }
+      },
+      "1790478000000": {
+        "timestampMs": 1790478000000,
+        "usageByModel": {
+          "codex:gpt-5.1-codex": {
+            "inputTokens": 1000,
+            "outputTokens": 1200,
+            "cacheReadInputTokens": 6000,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 400
+          }
+        }
+      },
+      "1790582400000": {
+        "timestampMs": 1790582400000,
+        "usageByModel": {
+          "codex:gpt-5.1-codex-mini": {
+            "inputTokens": 3000,
+            "outputTokens": 500,
+            "cacheReadInputTokens": 1000,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 120
+          }
+        }
+      },
+      "1790424000000": {
+        "timestampMs": 1790424000000,
+        "usageByModel": {
+          "codex:gpt-5.1-codex": {
+            "inputTokens": 5000,
+            "outputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 0
+          }
+        }
+      }
+    },
+    "projectTokens": {
+      "/work/proj-a": 17100,
+      "/work/proj-c": 4500,
+      "/work/proj-b": 5000
+    },
+    "projectModelUsage": {
+      "/work/proj-a": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 4000,
+          "outputTokens": 2100,
+          "cacheReadInputTokens": 11000,
+          "cacheCreationInputTokens": 0,
+          "reasoningOutputTokens": 700
+        }
+      },
+      "/work/proj-c": {
+        "codex:gpt-5.1-codex-mini": {
+          "inputTokens": 3000,
+          "outputTokens": 500,
+          "cacheReadInputTokens": 1000,
+          "cacheCreationInputTokens": 0,
+          "reasoningOutputTokens": 120
+        }
+      },
+      "/work/proj-b": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 5000,
+          "outputTokens": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0,
+          "reasoningOutputTokens": 0
+        }
+      }
+    },
+    "projectActivity": {
+      "/work/proj-a": {
+        "threadCount": 1,
+        "interactionCount": 1,
+        "toolCallCount": 2,
+        "firstSeen": 1790474400000,
+        "lastSeen": 1790479200000,
+        "path": "/work/proj-a"
+      },
+      "/work/proj-c": {
+        "threadCount": 1,
+        "interactionCount": 1,
+        "toolCallCount": 1,
+        "firstSeen": 1790582400000,
+        "lastSeen": 1790583000000,
+        "path": "/work/proj-c"
+      }
+    },
+    "dailyActivity": {
+      "2026-09-27": {
+        "threadCount": 1,
+        "interactionCount": 1,
+        "toolCallCount": 2
+      },
+      "2026-09-28": {
+        "threadCount": 1,
+        "interactionCount": 1,
+        "toolCallCount": 1
+      }
+    },
+    "weekHourMatrix": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "dailyHourCounts": {
+      "2026-09-27": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "2026-09-28": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "totalThreads": 2,
+    "totalInteractions": 2,
+    "totalToolCalls": 3,
+    "ledger": [
+      {
+        "id": "codex:019a0000-0000-7000-8000-000000000001",
+        "provider": "codex",
+        "timestampMs": 1790479200000,
+        "date": "2026-09-27",
+        "projectPath": "/work/proj-a",
+        "projectName": "proj-a",
+        "model": "codex:gpt-5.1-codex",
+        "interactions": 1,
+        "toolCalls": 2,
+        "tokens": 17100,
+        "costBasis": "usage",
+        "usageByModel": {
+          "codex:gpt-5.1-codex": {
+            "inputTokens": 4000,
+            "outputTokens": 2100,
+            "cacheReadInputTokens": 11000,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 700
+          }
+        }
+      },
+      {
+        "id": "codex:019a0000-0000-7000-8000-000000000002",
+        "provider": "codex",
+        "timestampMs": 1790583000000,
+        "date": "2026-09-28",
+        "projectPath": "/work/proj-c",
+        "projectName": "proj-c",
+        "model": "codex:gpt-5.1-codex-mini",
+        "interactions": 1,
+        "toolCalls": 1,
+        "tokens": 4500,
+        "costBasis": "usage",
+        "usageByModel": {
+          "codex:gpt-5.1-codex-mini": {
+            "inputTokens": 3000,
+            "outputTokens": 500,
+            "cacheReadInputTokens": 1000,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 120
+          }
+        }
+      },
+      {
+        "id": "codex:019a0000-0000-7000-8000-000000000003",
+        "provider": "codex",
+        "timestampMs": 1790425800000,
+        "date": "2026-09-26",
+        "projectPath": "/work/proj-b",
+        "projectName": "proj-b",
+        "model": "codex:gpt-5.1-codex",
+        "interactions": 1,
+        "toolCalls": 0,
+        "tokens": 5000,
+        "costBasis": "thread_tokens",
+        "usageByModel": {
+          "codex:gpt-5.1-codex": {
+            "inputTokens": 5000,
+            "outputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "reasoningOutputTokens": 0
+          }
+        }
+      }
+    ],
+    "codexSessionFileCount": 2,
+    "codexThreadRowCount": 3
+  },
+  "usageLimits": {
+    "source": "codex-api",
+    "path": "~/.cache/token-atlas/codex-usage-limits.json",
+    "capturedAt": "2026-09-28T18:00:00.000Z",
+    "stale": false,
+    "error": null,
+    "plan": "plus",
+    "fiveHour": {
+      "usedPercent": 42,
+      "resetAt": "2026-09-28T20:00:00.000Z",
+      "elapsedPercent": 60,
+      "remainingMs": 7200000,
+      "durationMs": 18000000
+    },
+    "weekly": {
+      "usedPercent": 17,
+      "resetAt": "2026-10-01T18:00:00.000Z",
+      "elapsedPercent": 57.14285714285714,
+      "remainingMs": 259200000,
+      "durationMs": 604800000
+    }
+  }
+}

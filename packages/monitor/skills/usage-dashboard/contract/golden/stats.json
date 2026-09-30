@@ -1,0 +1,1486 @@
+{
+  "period": {
+    "from": "2026-09-26",
+    "to": "2026-09-28"
+  },
+  "summary": {
+    "totalSessions": 5,
+    "totalMessages": 14,
+    "totalTokens": 51010,
+    "totalInputTokens": 14517,
+    "totalOutputTokens": 4213,
+    "totalCacheReadTokens": 30000,
+    "totalCacheCreationTokens": 1400,
+    "totalReasoningTokens": 880,
+    "totalToolCalls": 8,
+    "estimatedCostUSD": 0.08370000000000002,
+    "providers": {
+      "claude": {
+        "totalSessions": 2,
+        "totalMessages": 10
+      },
+      "codex": {
+        "totalSessions": 2,
+        "totalMessages": 2,
+        "totalToolCalls": 3
+      },
+      "opencode": {
+        "totalSessions": 1,
+        "totalMessages": 2,
+        "totalToolCalls": 2
+      }
+    }
+  },
+  "byModel": [
+    {
+      "model": "codex:gpt-5.1-codex",
+      "provider": "codex",
+      "inputTokens": 9000,
+      "outputTokens": 2100,
+      "cacheReadTokens": 11000,
+      "cacheCreationTokens": 0,
+      "reasoningTokens": 700,
+      "costUSD": 0.033625,
+      "isExternal": true
+    },
+    {
+      "model": "claude:claude-opus-4-7",
+      "provider": "claude",
+      "inputTokens": 407,
+      "outputTokens": 613,
+      "cacheReadTokens": 6000,
+      "cacheCreationTokens": 1000,
+      "reasoningTokens": 0,
+      "costUSD": 0.02661,
+      "isExternal": false
+    },
+    {
+      "model": "opencode:claude-sonnet-4-6",
+      "provider": "opencode",
+      "inputTokens": 800,
+      "outputTokens": 150,
+      "cacheReadTokens": 2500,
+      "cacheCreationTokens": 300,
+      "reasoningTokens": 0,
+      "costUSD": 0.0123,
+      "isExternal": false
+    },
+    {
+      "model": "claude:claude-sonnet-4-6",
+      "provider": "claude",
+      "inputTokens": 90,
+      "outputTokens": 480,
+      "cacheReadTokens": 5000,
+      "cacheCreationTokens": 0,
+      "reasoningTokens": 0,
+      "costUSD": 0.007235000000000001,
+      "isExternal": false
+    },
+    {
+      "model": "opencode:kimi-k2",
+      "provider": "opencode",
+      "inputTokens": 1200,
+      "outputTokens": 340,
+      "cacheReadTokens": 4000,
+      "cacheCreationTokens": 0,
+      "reasoningTokens": 60,
+      "costUSD": 0.00181,
+      "isExternal": true
+    },
+    {
+      "model": "codex:gpt-5.1-codex-mini",
+      "provider": "codex",
+      "inputTokens": 3000,
+      "outputTokens": 500,
+      "cacheReadTokens": 1000,
+      "cacheCreationTokens": 0,
+      "reasoningTokens": 120,
+      "costUSD": 0.001775,
+      "isExternal": true
+    },
+    {
+      "model": "claude:claude-haiku-4-5",
+      "provider": "claude",
+      "inputTokens": 20,
+      "outputTokens": 30,
+      "cacheReadTokens": 500,
+      "cacheCreationTokens": 100,
+      "reasoningTokens": 0,
+      "costUSD": 0.000345,
+      "isExternal": false
+    }
+  ],
+  "pricingMeta": {
+    "defaultsLoaded": true,
+    "openRouter": {
+      "attempted": true,
+      "used": true,
+      "error": null
+    },
+    "userOverride": {
+      "path": "~/.config/cc-dashboard/pricing.json",
+      "loaded": true,
+      "error": null
+    },
+    "models": {
+      "priced": 7,
+      "default": 2,
+      "fallback": 0,
+      "fallbackModels": []
+    }
+  },
+  "budget": {
+    "monthlyBudgetUSD": 200,
+    "source": "~/.config/cc-dashboard/budget.json",
+    "loaded": true,
+    "error": null
+  },
+  "usageLimits": {
+    "source": "statusline-cache",
+    "path": "~/.cache/token-atlas/rate-limits.json",
+    "capturedAt": "2026-09-28T17:59:00.000Z",
+    "stale": false,
+    "error": null,
+    "fiveHour": {
+      "usedPercent": 37,
+      "resetAt": "2026-09-28T20:00:00.000Z",
+      "elapsedPercent": 60,
+      "remainingMs": 7200000,
+      "durationMs": 18000000
+    },
+    "weekly": {
+      "usedPercent": 12.5,
+      "resetAt": "2026-10-01T18:00:00.000Z",
+      "elapsedPercent": 57.14285714285714,
+      "remainingMs": 259200000,
+      "durationMs": 604800000
+    }
+  },
+  "codexUsageLimits": {
+    "source": "codex-api",
+    "path": "~/.cache/token-atlas/codex-usage-limits.json",
+    "capturedAt": "2026-09-28T18:00:00.000Z",
+    "stale": false,
+    "error": null,
+    "plan": "plus",
+    "fiveHour": {
+      "usedPercent": 42,
+      "resetAt": "2026-09-28T20:00:00.000Z",
+      "elapsedPercent": 60,
+      "remainingMs": 7200000,
+      "durationMs": 18000000
+    },
+    "weekly": {
+      "usedPercent": 17,
+      "resetAt": "2026-10-01T18:00:00.000Z",
+      "elapsedPercent": 57.14285714285714,
+      "remainingMs": 259200000,
+      "durationMs": 604800000
+    }
+  },
+  "dataHealth": {
+    "sources": [
+      {
+        "name": "Claude stats cache",
+        "path": "~/.claude/stats-cache.json",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "required"
+      },
+      {
+        "name": "Claude history",
+        "path": "~/.claude/history.jsonl",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional activity timeline"
+      },
+      {
+        "name": "Claude sessions",
+        "path": "~/.claude/sessions",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional session records"
+      },
+      {
+        "name": "Claude projects",
+        "path": "~/.claude/projects",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional transcript records"
+      },
+      {
+        "name": "Codex state DB",
+        "path": "~/.codex/state_5.sqlite",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional thread index"
+      },
+      {
+        "name": "Codex sessions",
+        "path": "~/.codex/sessions",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional rollout records"
+      },
+      {
+        "name": "Codex usage cache",
+        "path": "~/.cache/token-atlas/codex-usage-limits.json",
+        "status": "ok",
+        "note": "optional live limit cache"
+      },
+      {
+        "name": "OpenCode storage",
+        "path": "~/.local/share/opencode/storage",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional root storage"
+      },
+      {
+        "name": "OpenCode database",
+        "path": "~/.local/share/opencode/opencode.db",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional SQLite usage"
+      },
+      {
+        "name": "OpenCode projects",
+        "path": "~/.local/share/opencode/project",
+        "status": "missing",
+        "modifiedAt": null,
+        "note": "optional project storage"
+      },
+      {
+        "name": "Pricing override",
+        "path": "~/.config/cc-dashboard/pricing.json",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional user pricing"
+      },
+      {
+        "name": "Budget config",
+        "path": "~/.config/cc-dashboard/budget.json",
+        "status": "ok",
+        "modifiedAt": "2026-09-28T16:00:00.000Z",
+        "note": "optional budget"
+      }
+    ],
+    "counts": {
+      "claudeTranscriptFiles": 3,
+      "codexSessionFiles": 2,
+      "codexThreadRows": 3,
+      "openCodeSessionFiles": 1,
+      "openCodeMessageFiles": 1,
+      "openCodeSessionRows": 1,
+      "openCodeMessageRows": 4
+    }
+  },
+  "daily": [
+    {
+      "date": "2026-09-26",
+      "messages": 6,
+      "sessions": 1,
+      "toolCalls": 1,
+      "tokens": 6310,
+      "tokensByModel": {
+        "claude:claude-opus-4-7": 1310,
+        "codex:gpt-5.1-codex": 5000
+      },
+      "usageByModel": {
+        "claude:claude-opus-4-7": {
+          "inputTokens": 100,
+          "outputTokens": 10,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 200,
+          "reasoningTokens": 0,
+          "costUSD": 0.0025,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 5000,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00625,
+          "provider": "codex",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.00875,
+      "providers": {
+        "claude": {
+          "messages": 6,
+          "sessions": 1,
+          "toolCalls": 1
+        },
+        "codex": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0
+        },
+        "opencode": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0
+        }
+      }
+    },
+    {
+      "date": "2026-09-27",
+      "messages": 5,
+      "sessions": 2,
+      "toolCalls": 4,
+      "tokens": 21900,
+      "tokensByModel": {
+        "claude:claude-sonnet-4-6": 3450,
+        "claude:claude-haiku-4-5": 650,
+        "codex:gpt-5.1-codex": 17800
+      },
+      "usageByModel": {
+        "claude:claude-sonnet-4-6": {
+          "inputTokens": 50,
+          "outputTokens": 400,
+          "cacheReadTokens": 3000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.0056749999999999995,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "claude:claude-haiku-4-5": {
+          "inputTokens": 20,
+          "outputTokens": 30,
+          "cacheReadTokens": 500,
+          "cacheCreationTokens": 100,
+          "reasoningTokens": 0,
+          "costUSD": 0.000345,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 4000,
+          "outputTokens": 2100,
+          "cacheReadTokens": 11000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 700,
+          "costUSD": 0.027375000000000003,
+          "provider": "codex",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.033395,
+      "providers": {
+        "claude": {
+          "messages": 4,
+          "sessions": 1,
+          "toolCalls": 2
+        },
+        "codex": {
+          "messages": 1,
+          "sessions": 1,
+          "toolCalls": 2
+        },
+        "opencode": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0
+        }
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "messages": 6,
+      "sessions": 3,
+      "toolCalls": 3,
+      "tokens": 22790,
+      "tokensByModel": {
+        "claude:claude-opus-4-7": 6700,
+        "claude:claude-sonnet-4-6": 2120,
+        "codex:gpt-5.1-codex-mini": 4620,
+        "opencode:kimi-k2": 5600,
+        "opencode:claude-sonnet-4-6": 3750
+      },
+      "usageByModel": {
+        "claude:claude-opus-4-7": {
+          "inputTokens": 300,
+          "outputTokens": 600,
+          "cacheReadTokens": 5000,
+          "cacheCreationTokens": 800,
+          "reasoningTokens": 0,
+          "costUSD": 0.024,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "claude:claude-sonnet-4-6": {
+          "inputTokens": 40,
+          "outputTokens": 80,
+          "cacheReadTokens": 2000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00156,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "codex:gpt-5.1-codex-mini": {
+          "inputTokens": 3000,
+          "outputTokens": 500,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 120,
+          "costUSD": 0.001775,
+          "provider": "codex",
+          "isExternal": true
+        },
+        "opencode:kimi-k2": {
+          "inputTokens": 1200,
+          "outputTokens": 340,
+          "cacheReadTokens": 4000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 60,
+          "costUSD": 0.00181,
+          "provider": "opencode",
+          "isExternal": true
+        },
+        "opencode:claude-sonnet-4-6": {
+          "inputTokens": 800,
+          "outputTokens": 150,
+          "cacheReadTokens": 2500,
+          "cacheCreationTokens": 300,
+          "reasoningTokens": 0,
+          "costUSD": 0.0123,
+          "provider": "opencode",
+          "isExternal": false
+        }
+      },
+      "costUSD": 0.041444999999999996,
+      "providers": {
+        "claude": {
+          "messages": 3,
+          "sessions": 1,
+          "toolCalls": 0
+        },
+        "codex": {
+          "messages": 1,
+          "sessions": 1,
+          "toolCalls": 1
+        },
+        "opencode": {
+          "messages": 2,
+          "sessions": 1,
+          "toolCalls": 2
+        }
+      }
+    }
+  ],
+  "ledger": [
+    {
+      "id": "claude:22222222-2222-4222-8222-222222222222",
+      "provider": "claude",
+      "timestampMs": 1790606400000,
+      "date": "2026-09-28",
+      "projectPath": "/work/proj-b",
+      "projectName": "proj-b",
+      "model": "mixed",
+      "interactions": 2,
+      "toolCalls": 0,
+      "tokens": 8820,
+      "costUSD": 0.02556,
+      "costBasis": "usage",
+      "usageByModel": {
+        "claude:claude-opus-4-7": {
+          "inputTokens": 300,
+          "outputTokens": 600,
+          "cacheReadTokens": 5000,
+          "cacheCreationTokens": 800,
+          "reasoningTokens": 0,
+          "costUSD": 0.024,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "claude:claude-sonnet-4-6": {
+          "inputTokens": 40,
+          "outputTokens": 80,
+          "cacheReadTokens": 2000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00156,
+          "provider": "claude",
+          "isExternal": false
+        }
+      }
+    },
+    {
+      "id": "codex:019a0000-0000-7000-8000-000000000002",
+      "provider": "codex",
+      "timestampMs": 1790583000000,
+      "date": "2026-09-28",
+      "projectPath": "/work/proj-c",
+      "projectName": "proj-c",
+      "model": "codex:gpt-5.1-codex-mini",
+      "interactions": 1,
+      "toolCalls": 1,
+      "tokens": 4500,
+      "costUSD": 0.001775,
+      "costBasis": "usage",
+      "usageByModel": {
+        "codex:gpt-5.1-codex-mini": {
+          "inputTokens": 3000,
+          "outputTokens": 500,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 120,
+          "costUSD": 0.001775,
+          "provider": "codex",
+          "isExternal": true
+        }
+      }
+    },
+    {
+      "id": "opencode:ses_fixture_db_1",
+      "provider": "opencode",
+      "timestampMs": 1790564520000,
+      "date": "2026-09-28",
+      "projectPath": "/work/proj-c",
+      "projectName": "proj-c",
+      "model": "mixed",
+      "interactions": 2,
+      "toolCalls": 2,
+      "tokens": 9350,
+      "costUSD": 0.014110000000000001,
+      "costBasis": "usage",
+      "usageByModel": {
+        "opencode:kimi-k2": {
+          "inputTokens": 1200,
+          "outputTokens": 340,
+          "cacheReadTokens": 4000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 60,
+          "costUSD": 0.00181,
+          "provider": "opencode",
+          "isExternal": true
+        },
+        "opencode:claude-sonnet-4-6": {
+          "inputTokens": 800,
+          "outputTokens": 150,
+          "cacheReadTokens": 2500,
+          "cacheCreationTokens": 300,
+          "reasoningTokens": 0,
+          "costUSD": 0.0123,
+          "provider": "opencode",
+          "isExternal": false
+        }
+      }
+    },
+    {
+      "id": "codex:019a0000-0000-7000-8000-000000000001",
+      "provider": "codex",
+      "timestampMs": 1790479200000,
+      "date": "2026-09-27",
+      "projectPath": "/work/proj-a",
+      "projectName": "proj-a",
+      "model": "codex:gpt-5.1-codex",
+      "interactions": 1,
+      "toolCalls": 2,
+      "tokens": 17100,
+      "costUSD": 0.027375000000000003,
+      "costBasis": "usage",
+      "usageByModel": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 4000,
+          "outputTokens": 2100,
+          "cacheReadTokens": 11000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 700,
+          "costUSD": 0.027375000000000003,
+          "provider": "codex",
+          "isExternal": true
+        }
+      }
+    },
+    {
+      "id": "claude:11111111-1111-4111-8111-111111111111",
+      "provider": "claude",
+      "timestampMs": 1790443860000,
+      "date": "2026-09-27",
+      "projectPath": "/work/proj-a",
+      "projectName": "proj-a",
+      "model": "mixed",
+      "interactions": 3,
+      "toolCalls": 3,
+      "tokens": 5420,
+      "costUSD": 0.008629999999999999,
+      "costBasis": "usage",
+      "usageByModel": {
+        "claude:claude-sonnet-4-6": {
+          "inputTokens": 50,
+          "outputTokens": 400,
+          "cacheReadTokens": 3000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.0056749999999999995,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "claude:claude-haiku-4-5": {
+          "inputTokens": 20,
+          "outputTokens": 30,
+          "cacheReadTokens": 500,
+          "cacheCreationTokens": 100,
+          "reasoningTokens": 0,
+          "costUSD": 0.000345,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "claude:claude-opus-4-7": {
+          "inputTokens": 107,
+          "outputTokens": 13,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 200,
+          "reasoningTokens": 0,
+          "costUSD": 0.0026100000000000003,
+          "provider": "claude",
+          "isExternal": false
+        }
+      }
+    },
+    {
+      "id": "codex:019a0000-0000-7000-8000-000000000003",
+      "provider": "codex",
+      "timestampMs": 1790425800000,
+      "date": "2026-09-26",
+      "projectPath": "/work/proj-b",
+      "projectName": "proj-b",
+      "model": "codex:gpt-5.1-codex",
+      "interactions": 1,
+      "toolCalls": 0,
+      "tokens": 5000,
+      "costUSD": 0.00625,
+      "costBasis": "thread_tokens",
+      "usageByModel": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 5000,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00625,
+          "provider": "codex",
+          "isExternal": true
+        }
+      }
+    }
+  ],
+  "hourlyUsage": [
+    {
+      "timestampMs": 1790384400000,
+      "date": "2026-09-26",
+      "tokens": 1310,
+      "tokensByModel": {
+        "claude:claude-opus-4-7": 1310
+      },
+      "usageByModel": {
+        "claude:claude-opus-4-7": {
+          "inputTokens": 100,
+          "outputTokens": 10,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 200,
+          "reasoningTokens": 0,
+          "costUSD": 0.0025,
+          "provider": "claude",
+          "isExternal": false
+        }
+      },
+      "costUSD": 0.0025
+    },
+    {
+      "timestampMs": 1790424000000,
+      "date": "2026-09-26",
+      "tokens": 5000,
+      "tokensByModel": {
+        "codex:gpt-5.1-codex": 5000
+      },
+      "usageByModel": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 5000,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00625,
+          "provider": "codex",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.00625
+    },
+    {
+      "timestampMs": 1790442000000,
+      "date": "2026-09-27",
+      "tokens": 4100,
+      "tokensByModel": {
+        "claude:claude-sonnet-4-6": 3450,
+        "claude:claude-haiku-4-5": 650
+      },
+      "usageByModel": {
+        "claude:claude-sonnet-4-6": {
+          "inputTokens": 50,
+          "outputTokens": 400,
+          "cacheReadTokens": 3000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.0056749999999999995,
+          "provider": "claude",
+          "isExternal": false
+        },
+        "claude:claude-haiku-4-5": {
+          "inputTokens": 20,
+          "outputTokens": 30,
+          "cacheReadTokens": 500,
+          "cacheCreationTokens": 100,
+          "reasoningTokens": 0,
+          "costUSD": 0.000345,
+          "provider": "claude",
+          "isExternal": false
+        }
+      },
+      "costUSD": 0.006019999999999999
+    },
+    {
+      "timestampMs": 1790474400000,
+      "date": "2026-09-27",
+      "tokens": 9200,
+      "tokensByModel": {
+        "codex:gpt-5.1-codex": 9200
+      },
+      "usageByModel": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 3000,
+          "outputTokens": 900,
+          "cacheReadTokens": 5000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 300,
+          "costUSD": 0.013375,
+          "provider": "codex",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.013375
+    },
+    {
+      "timestampMs": 1790478000000,
+      "date": "2026-09-27",
+      "tokens": 8600,
+      "tokensByModel": {
+        "codex:gpt-5.1-codex": 8600
+      },
+      "usageByModel": {
+        "codex:gpt-5.1-codex": {
+          "inputTokens": 1000,
+          "outputTokens": 1200,
+          "cacheReadTokens": 6000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 400,
+          "costUSD": 0.014,
+          "provider": "codex",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.014
+    },
+    {
+      "timestampMs": 1790557200000,
+      "date": "2026-09-28",
+      "tokens": 5600,
+      "tokensByModel": {
+        "opencode:kimi-k2": 5600
+      },
+      "usageByModel": {
+        "opencode:kimi-k2": {
+          "inputTokens": 1200,
+          "outputTokens": 340,
+          "cacheReadTokens": 4000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 60,
+          "costUSD": 0.00181,
+          "provider": "opencode",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.00181
+    },
+    {
+      "timestampMs": 1790564400000,
+      "date": "2026-09-28",
+      "tokens": 3750,
+      "tokensByModel": {
+        "opencode:claude-sonnet-4-6": 3750
+      },
+      "usageByModel": {
+        "opencode:claude-sonnet-4-6": {
+          "inputTokens": 800,
+          "outputTokens": 150,
+          "cacheReadTokens": 2500,
+          "cacheCreationTokens": 300,
+          "reasoningTokens": 0,
+          "costUSD": 0.0123,
+          "provider": "opencode",
+          "isExternal": false
+        }
+      },
+      "costUSD": 0.0123
+    },
+    {
+      "timestampMs": 1790575200000,
+      "date": "2026-09-28",
+      "tokens": 6700,
+      "tokensByModel": {
+        "claude:claude-opus-4-7": 6700
+      },
+      "usageByModel": {
+        "claude:claude-opus-4-7": {
+          "inputTokens": 300,
+          "outputTokens": 600,
+          "cacheReadTokens": 5000,
+          "cacheCreationTokens": 800,
+          "reasoningTokens": 0,
+          "costUSD": 0.024,
+          "provider": "claude",
+          "isExternal": false
+        }
+      },
+      "costUSD": 0.024
+    },
+    {
+      "timestampMs": 1790582400000,
+      "date": "2026-09-28",
+      "tokens": 4620,
+      "tokensByModel": {
+        "codex:gpt-5.1-codex-mini": 4620
+      },
+      "usageByModel": {
+        "codex:gpt-5.1-codex-mini": {
+          "inputTokens": 3000,
+          "outputTokens": 500,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 120,
+          "costUSD": 0.001775,
+          "provider": "codex",
+          "isExternal": true
+        }
+      },
+      "costUSD": 0.001775
+    },
+    {
+      "timestampMs": 1790604000000,
+      "date": "2026-09-28",
+      "tokens": 2120,
+      "tokensByModel": {
+        "claude:claude-sonnet-4-6": 2120
+      },
+      "usageByModel": {
+        "claude:claude-sonnet-4-6": {
+          "inputTokens": 40,
+          "outputTokens": 80,
+          "cacheReadTokens": 2000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00156,
+          "provider": "claude",
+          "isExternal": false
+        }
+      },
+      "costUSD": 0.00156
+    }
+  ],
+  "activityDays": [
+    {
+      "date": "2026-09-26",
+      "messages": 6,
+      "sessions": 1,
+      "interactions": 7
+    },
+    {
+      "date": "2026-09-27",
+      "messages": 4,
+      "sessions": 2,
+      "interactions": 6
+    },
+    {
+      "date": "2026-09-28",
+      "messages": 3,
+      "sessions": 3,
+      "interactions": 6
+    }
+  ],
+  "hourlyDistribution": {
+    "1": 2,
+    "9": 4,
+    "14": 1,
+    "22": 1
+  },
+  "weekHourMatrix": [
+    [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "dailyHourCounts": {
+    "2026-09-26": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "2026-09-27": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "2026-09-28": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0
+    ]
+  },
+  "projects": [
+    {
+      "name": "proj-a",
+      "path": "/work/proj-a",
+      "messageCount": 3,
+      "claudeMessages": 2,
+      "codexMessages": 1,
+      "codexThreads": 1,
+      "codexToolCalls": 2,
+      "openCodeMessages": 0,
+      "openCodeSessions": 0,
+      "openCodeToolCalls": 0,
+      "claudeTokens": 5420,
+      "codexTokens": 17100,
+      "openCodeTokens": 0,
+      "tokens": 22520,
+      "claudeCostUSD": 0.008629999999999999,
+      "codexCostUSD": 0.027375000000000003,
+      "openCodeCostUSD": 0,
+      "costUSD": 0.036005,
+      "providers": {
+        "claude": {
+          "messages": 2,
+          "sessions": 0,
+          "toolCalls": 0,
+          "tokens": 5420,
+          "costUSD": 0.008629999999999999
+        },
+        "codex": {
+          "messages": 1,
+          "sessions": 1,
+          "toolCalls": 2,
+          "tokens": 17100,
+          "costUSD": 0.027375000000000003
+        },
+        "opencode": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0,
+          "tokens": 0,
+          "costUSD": 0
+        }
+      },
+      "models": [
+        {
+          "model": "codex:gpt-5.1-codex",
+          "provider": "codex",
+          "inputTokens": 4000,
+          "outputTokens": 2100,
+          "cacheReadTokens": 11000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 700,
+          "costUSD": 0.027375000000000003,
+          "isExternal": true
+        },
+        {
+          "model": "claude:claude-sonnet-4-6",
+          "provider": "claude",
+          "inputTokens": 50,
+          "outputTokens": 400,
+          "cacheReadTokens": 3000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.0056749999999999995,
+          "isExternal": false
+        },
+        {
+          "model": "claude:claude-opus-4-7",
+          "provider": "claude",
+          "inputTokens": 107,
+          "outputTokens": 13,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 200,
+          "reasoningTokens": 0,
+          "costUSD": 0.0026100000000000003,
+          "isExternal": false
+        },
+        {
+          "model": "claude:claude-haiku-4-5",
+          "provider": "claude",
+          "inputTokens": 20,
+          "outputTokens": 30,
+          "cacheReadTokens": 500,
+          "cacheCreationTokens": 100,
+          "reasoningTokens": 0,
+          "costUSD": 0.000345,
+          "isExternal": false
+        }
+      ],
+      "firstSeen": "2026-09-26",
+      "lastSeen": "2026-09-27",
+      "lastSeenMs": 1790479200000
+    },
+    {
+      "name": "proj-b",
+      "path": "/work/proj-b",
+      "messageCount": 3,
+      "claudeMessages": 3,
+      "codexMessages": 0,
+      "codexThreads": 0,
+      "codexToolCalls": 0,
+      "openCodeMessages": 0,
+      "openCodeSessions": 0,
+      "openCodeToolCalls": 0,
+      "claudeTokens": 8820,
+      "codexTokens": 5000,
+      "openCodeTokens": 0,
+      "tokens": 13820,
+      "claudeCostUSD": 0.02556,
+      "codexCostUSD": 0.00625,
+      "openCodeCostUSD": 0,
+      "costUSD": 0.03181,
+      "providers": {
+        "claude": {
+          "messages": 3,
+          "sessions": 0,
+          "toolCalls": 0,
+          "tokens": 8820,
+          "costUSD": 0.02556
+        },
+        "codex": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0,
+          "tokens": 5000,
+          "costUSD": 0.00625
+        },
+        "opencode": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0,
+          "tokens": 0,
+          "costUSD": 0
+        }
+      },
+      "models": [
+        {
+          "model": "claude:claude-opus-4-7",
+          "provider": "claude",
+          "inputTokens": 300,
+          "outputTokens": 600,
+          "cacheReadTokens": 5000,
+          "cacheCreationTokens": 800,
+          "reasoningTokens": 0,
+          "costUSD": 0.024,
+          "isExternal": false
+        },
+        {
+          "model": "codex:gpt-5.1-codex",
+          "provider": "codex",
+          "inputTokens": 5000,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00625,
+          "isExternal": true
+        },
+        {
+          "model": "claude:claude-sonnet-4-6",
+          "provider": "claude",
+          "inputTokens": 40,
+          "outputTokens": 80,
+          "cacheReadTokens": 2000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 0,
+          "costUSD": 0.00156,
+          "isExternal": false
+        }
+      ],
+      "firstSeen": "2026-09-28",
+      "lastSeen": "2026-09-28",
+      "lastSeenMs": 1790606340000
+    },
+    {
+      "name": "proj-c",
+      "path": "/work/proj-c",
+      "messageCount": 3,
+      "claudeMessages": 0,
+      "codexMessages": 1,
+      "codexThreads": 1,
+      "codexToolCalls": 1,
+      "openCodeMessages": 2,
+      "openCodeSessions": 1,
+      "openCodeToolCalls": 2,
+      "claudeTokens": 0,
+      "codexTokens": 4500,
+      "openCodeTokens": 9350,
+      "tokens": 13850,
+      "claudeCostUSD": 0,
+      "codexCostUSD": 0.001775,
+      "openCodeCostUSD": 0.014110000000000001,
+      "costUSD": 0.015885,
+      "providers": {
+        "claude": {
+          "messages": 0,
+          "sessions": 0,
+          "toolCalls": 0,
+          "tokens": 0,
+          "costUSD": 0
+        },
+        "codex": {
+          "messages": 1,
+          "sessions": 1,
+          "toolCalls": 1,
+          "tokens": 4500,
+          "costUSD": 0.001775
+        },
+        "opencode": {
+          "messages": 2,
+          "sessions": 1,
+          "toolCalls": 2,
+          "tokens": 9350,
+          "costUSD": 0.014110000000000001
+        }
+      },
+      "models": [
+        {
+          "model": "opencode:claude-sonnet-4-6",
+          "provider": "opencode",
+          "inputTokens": 800,
+          "outputTokens": 150,
+          "cacheReadTokens": 2500,
+          "cacheCreationTokens": 300,
+          "reasoningTokens": 0,
+          "costUSD": 0.0123,
+          "isExternal": false
+        },
+        {
+          "model": "opencode:kimi-k2",
+          "provider": "opencode",
+          "inputTokens": 1200,
+          "outputTokens": 340,
+          "cacheReadTokens": 4000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 60,
+          "costUSD": 0.00181,
+          "isExternal": true
+        },
+        {
+          "model": "codex:gpt-5.1-codex-mini",
+          "provider": "codex",
+          "inputTokens": 3000,
+          "outputTokens": 500,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 120,
+          "costUSD": 0.001775,
+          "isExternal": true
+        }
+      ],
+      "firstSeen": "2026-09-28",
+      "lastSeen": "2026-09-28",
+      "lastSeenMs": 1790583000000
+    }
+  ],
+  "sessions": [
+    {
+      "pid": 90001,
+      "sessionId": "22222222-2222-4222-8222-222222222222",
+      "cwd": "/work/proj-b",
+      "startedAt": 1790607600000,
+      "updatedAt": 1790618280000,
+      "status": "busy",
+      "version": "2.1.300",
+      "kind": "interactive",
+      "entrypoint": "cli"
+    },
+    {
+      "pid": 90002,
+      "sessionId": "11111111-1111-4111-8111-111111111111",
+      "cwd": "/work/proj-a",
+      "startedAt": 1790385240000,
+      "updatedAt": 1790443860000,
+      "status": "idle",
+      "version": "2.1.300",
+      "kind": "interactive",
+      "entrypoint": "cli"
+    }
+  ],
+  "insights": {
+    "mostActiveDay": "2026-09-26",
+    "mostActiveDayMessages": 6,
+    "mostUsedModel": "codex:gpt-5.1-codex",
+    "averageMessagesPerSession": 2.8,
+    "mostActiveProject": "proj-a",
+    "firstSessionDate": "2026-09-26T01:14:00.000Z",
+    "longestSession": {
+      "sessionId": "11111111-1111-4111-8111-111111111111",
+      "duration": 3600000,
+      "messageCount": 6,
+      "timestamp": "2026-09-26T01:14:00.000Z"
+    }
+  },
+  "meta": {
+    "generatedAt": "2026-09-28T18:00:00.000Z",
+    "cacheVersion": 2,
+    "lastComputedDate": "2026-09-27"
+  }
+}

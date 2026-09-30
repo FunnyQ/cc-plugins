@@ -6,7 +6,7 @@
 >
 > **Depends on**: contract/01
 > **Blocks**: server/01, cli/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -83,19 +83,19 @@ Every test must be launcher-driven so the same file runs with `COCKPIT_BIN` set.
 
 ## Acceptance criteria
 
-- [ ] `cli.contract.test.ts` covers every bullet above for `statusline`, `push-usage`, `rollup-update`, `stats`, and `live`, each as its own `test(...)`.
-- [ ] The rate-limits test pins the exact file text (2-space indent, no trailing newline, key order) and the untouched-file cases.
-- [ ] The inner-command test proves stdout forwarding, stdin passthrough, and exit-code forwarding (`3`).
-- [ ] The nudge tests prove marker creation, the 5-minute throttle (mtime unchanged on a second run), and that `.push-nudge` appears only with a non-empty `LLM_QUOTA_INGEST_URL`.
-- [ ] The push-usage tests prove no request without a URL, the exact headers and body keys with one, and exit 0 on a `500` and on an unreachable URL.
-- [ ] Every spawned process runs with the fixture env only; no test reads or writes under the real `HOME`.
-- [ ] The whole file passes against the TS implementation (`COCKPIT_BIN` unset).
+- [x] `cli.contract.test.ts` covers every bullet above for `statusline`, `push-usage`, `rollup-update`, `stats`, and `live`, each as its own `test(...)`.
+- [x] The rate-limits test pins the exact file text (2-space indent, no trailing newline, key order) and the untouched-file cases.
+- [x] The inner-command test proves stdout forwarding, stdin passthrough, and exit-code forwarding (`3`).
+- [x] The nudge tests prove marker creation, the 5-minute throttle (mtime unchanged on a second run), and that `.push-nudge` appears only with a non-empty `LLM_QUOTA_INGEST_URL`.
+- [x] The push-usage tests prove no request without a URL, the exact headers and body keys with one, and exit 0 on a `500` and on an unreachable URL.
+- [x] Every spawned process runs with the fixture env only; no test reads or writes under the real `HOME`.
+- [x] The whole file passes against the TS implementation (`COCKPIT_BIN` unset).
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts` passes with `COCKPIT_BIN` unset.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts` prints nothing.
-- [ ] `grep -nE 'process\.env(\s*[,}])|\.\.\.process\.env' packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts` prints nothing (the real env is never spread into a child).
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts` passes with `COCKPIT_BIN` unset.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts` prints nothing.
+- [x] `grep -nE 'process\.env(\s*[,}])|\.\.\.process\.env' packages/monitor/skills/usage-dashboard/contract/cli.contract.test.ts` prints nothing (the real env is never spread into a child).
 
 ## Eval rubric
 

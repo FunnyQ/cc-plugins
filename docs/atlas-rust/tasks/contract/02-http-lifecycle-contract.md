@@ -6,7 +6,7 @@
 >
 > **Depends on**: contract/01
 > **Blocks**: server/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -85,19 +85,19 @@ One fixture home and one server per `describe`, fresh port from `freePort()`.
 
 ## Acceptance criteria
 
-- [ ] `http.contract.test.ts` covers `/api/stats` (keys, gzip/plain, ETag shape, 304 headers, ETag change on file touch, BOOT_ID differs across launches), `/api/live` (alive and dead daemon pid), pricing refresh (models body, no body, OpenRouter 500, corrupt override → 500), and static files (index, MIME, no-gzip for jpg/woff2, `-gz` ETag suffix, 304, traversal and missing → 404 `Not found`).
-- [ ] `lifecycle.contract.test.ts` covers `atlas.json` exact text, reuse (exit 0, message, no second bind), supersede of a live foreign pid, port-in-use (exit 1, exact stderr), and corrupt `atlas.json`.
-- [ ] The Rust-only live-during-build test is present, skipped when `COCKPIT_BIN` is unset, carries its one-line reason, and fails if the stats request finished before `/api/live` was measured.
-- [ ] Every process is spawned through `atlasCommand`; no test hard-codes `bun`, a script path, or a binary path.
-- [ ] Every test uses `makeFixtureHome()` temp dirs and `freePort()` ports; no test reads or writes the real `HOME`, and none binds 5938.
-- [ ] Every non-skipped test passes against the TS server.
+- [x] `http.contract.test.ts` covers `/api/stats` (keys, gzip/plain, ETag shape, 304 headers, ETag change on file touch, BOOT_ID differs across launches), `/api/live` (alive and dead daemon pid), pricing refresh (models body, no body, OpenRouter 500, corrupt override → 500), and static files (index, MIME, no-gzip for jpg/woff2, `-gz` ETag suffix, 304, traversal and missing → 404 `Not found`).
+- [x] `lifecycle.contract.test.ts` covers `atlas.json` exact text, reuse (exit 0, message, no second bind), supersede of a live foreign pid, port-in-use (exit 1, exact stderr), and corrupt `atlas.json`.
+- [x] The Rust-only live-during-build test is present, skipped when `COCKPIT_BIN` is unset, carries its one-line reason, and fails if the stats request finished before `/api/live` was measured.
+- [x] Every process is spawned through `atlasCommand`; no test hard-codes `bun`, a script path, or a binary path.
+- [x] Every test uses `makeFixtureHome()` temp dirs and `freePort()` ports; no test reads or writes the real `HOME`, and none binds 5938.
+- [x] Every non-skipped test passes against the TS server.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts` passes (COCKPIT_BIN unset, so against TS), reporting exactly one skipped test.
-- [ ] `grep -nE '5938|/Users/|homedir\(\)' packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts packages/monitor/skills/usage-dashboard/contract/serve.ts` prints nothing.
-- [ ] `bunx --bun tsc --noEmit | grep usage-dashboard/contract/` prints nothing.
-- [ ] After the run, `pgrep -f 'usage-dashboard/scripts/atlas-server.ts --port'` lists no process left behind by the suite.
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts` passes (COCKPIT_BIN unset, so against TS), reporting exactly one skipped test.
+- [x] `grep -nE '5938|/Users/|homedir\(\)' packages/monitor/skills/usage-dashboard/contract/http.contract.test.ts packages/monitor/skills/usage-dashboard/contract/lifecycle.contract.test.ts packages/monitor/skills/usage-dashboard/contract/serve.ts` prints nothing.
+- [x] `bunx --bun tsc --noEmit | grep usage-dashboard/contract/` prints nothing.
+- [x] After the run, `pgrep -f 'usage-dashboard/scripts/atlas-server.ts --port'` lists no process left behind by the suite.
 
 ## Eval rubric
 

@@ -6,7 +6,7 @@
 >
 > **Depends on**: contract/01
 > **Blocks**: engine/03, engine/04, engine/05, engine/06, engine/07
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -90,20 +90,20 @@ Every fixture home is a fresh `mkdtemp`, and transcript paths land in rollup row
 
 ## Acceptance criteria
 
-- [ ] Every test name in the frozen list exists in `golden.contract.test.ts` exactly as written.
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts` passes against TS, with only `rollup pre-rust backup` skipped.
-- [ ] Running `record-golden.ts` twice produces byte-identical files under `contract/golden/`.
-- [ ] `record-golden.ts` exits 1 with the refusal message when `COCKPIT_BIN` is set.
-- [ ] `volatile-keys.json` entries each have a one-line reason in the test file, and removing any one entry makes a `stats key` test fail on a second recording.
-- [ ] The `rollup transcript deleted` test asserts `usage_hourly` survives and the deleted file's ledger rows are gone, independent of golden.
-- [ ] No test reads or writes outside its fixture home or `os.tmpdir()`.
+- [x] Every test name in the frozen list exists in `golden.contract.test.ts` exactly as written.
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts` passes against TS, with only `rollup pre-rust backup` skipped.
+- [x] Running `record-golden.ts` twice produces byte-identical files under `contract/golden/`.
+- [x] `record-golden.ts` exits 1 with the refusal message when `COCKPIT_BIN` is set.
+- [x] `volatile-keys.json` entries each have a one-line reason in the test file, and removing any one entry makes a `stats key` test fail on a second recording.
+- [x] The `rollup transcript deleted` test asserts `usage_hourly` survives and the deleted file's ledger rows are gone, independent of golden.
+- [x] No test reads or writes outside its fixture home or `os.tmpdir()`.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts`
-- [ ] `bun packages/monitor/skills/usage-dashboard/contract/record-golden.ts && git diff --exit-code -- packages/monitor/skills/usage-dashboard/contract/golden/`
-- [ ] `COCKPIT_BIN=/bin/false bun packages/monitor/skills/usage-dashboard/contract/record-golden.ts; test $? -eq 1`
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/usage-dashboard/contract/` prints nothing.
+- [x] `bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts`
+- [x] `bun packages/monitor/skills/usage-dashboard/contract/record-golden.ts && git diff --exit-code -- packages/monitor/skills/usage-dashboard/contract/golden/`
+- [x] `COCKPIT_BIN=/bin/false bun packages/monitor/skills/usage-dashboard/contract/record-golden.ts; test $? -eq 1`
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/usage-dashboard/contract/` prints nothing.
 
 ## Eval rubric
 

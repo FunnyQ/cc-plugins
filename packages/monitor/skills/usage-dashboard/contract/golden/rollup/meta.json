@@ -1,0 +1,10 @@
+[
+  {
+    "key": "ledger_rebuild_pending",
+    "value": "0"
+  },
+  {
+    "key": "schema_version",
+    "value": "3"
+  }
+]
