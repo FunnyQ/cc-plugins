@@ -57,7 +57,8 @@ function parsePort(): number {
     const p = parseInt(argv[idx + 1], 10);
     if (Number.isFinite(p) && p > 0 && p < 65536) return p;
   }
-  return DEFAULT_PORT;
+  const envPort = parseInt(process.env.COCKPIT_SERVER_PORT || "", 10);
+  return Number.isFinite(envPort) && envPort > 0 && envPort < 65536 ? envPort : DEFAULT_PORT;
 }
 
 const NO_OPEN = process.argv.includes("--no-open");
@@ -250,7 +251,7 @@ try {
 
 writeDaemonInfo({
   pid: process.pid,
-  port: server.port,
+  port: server.port!, // buildServer always binds TCP; only Unix socket servers omit port.
   token: randomBytes(16).toString("hex"),
   root: ROOT,
 });

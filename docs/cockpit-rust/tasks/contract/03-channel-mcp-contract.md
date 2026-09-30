@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/01
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -97,24 +97,24 @@ return Number.isFinite(envPort) && envPort > 0 && envPort < 65536 ? envPort : DE
 
 ## Acceptance criteria
 
-- [ ] `channel.contract.test.ts` has the 5 `channel: *` groups, and every test sits inside one of them.
-- [ ] The handshake asserts `serverInfo`, both experimental capability keys, `tools`, `instructions`, the empty `tools/list`, and `ping`.
-- [ ] Inbox ordering, the notification `params` shape, the token and session on requests, and the re-poll floor are asserted.
-- [ ] The permission relay is asserted in both directions, plus the cancel list, the undocumented-permission fallback, and ignored unknown notifications.
-- [ ] `channel: lifecycle` asserts EOF exit 0, SIGTERM exit, and survival while the daemon is unreachable, all against the stub.
-- [ ] `channel: spawn` asserts `ensureServer` started a server on the `COCKPIT_SERVER_PORT` free port, and no test in the file binds or probes 5858.
-- [ ] `cockpit-server.ts --no-open` with `COCKPIT_SERVER_PORT` set and no `--port` binds that port; with `--port` also given, `--port` wins.
-- [ ] The suite passes against TS, each group also passes alone with `-t`, and no spawned server or channel survives the run.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `channel.contract.test.ts` has the 5 `channel: *` groups, and every test sits inside one of them.
+- [x] The handshake asserts `serverInfo`, both experimental capability keys, `tools`, `instructions`, the empty `tools/list`, and `ping`.
+- [x] Inbox ordering, the notification `params` shape, the token and session on requests, and the re-poll floor are asserted.
+- [x] The permission relay is asserted in both directions, plus the cancel list, the undocumented-permission fallback, and ignored unknown notifications.
+- [x] `channel: lifecycle` asserts EOF exit 0, SIGTERM exit, and survival while the daemon is unreachable, all against the stub.
+- [x] `channel: spawn` asserts `ensureServer` started a server on the `COCKPIT_SERVER_PORT` free port, and no test in the file binds or probes 5858.
+- [x] `cockpit-server.ts --no-open` with `COCKPIT_SERVER_PORT` set and no `--port` binds that port; with `--port` also given, `--port` wins.
+- [x] The suite passes against TS, each group also passes alone with `-t`, and no spawned server or channel survives the run.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts` passes (`COCKPIT_BIN` unset).
-- [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: handshake"` passes on its own.
-- [ ] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: spawn"` passes on its own.
-- [ ] `ps -eo command= | grep '[c]ockpit-channel.ts' | grep -v '/.claude/plugins/cache/'; test $? -eq 1` after the run (no leaked channel).
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/scripts/cockpit-server.ts` prints nothing.
-- [ ] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
+- [x] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts` passes (`COCKPIT_BIN` unset).
+- [x] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: handshake"` passes on its own.
+- [x] `bun test packages/monitor/skills/cockpit/contract/channel.contract.test.ts -t "channel: spawn"` passes on its own.
+- [x] `ps -eo command= | grep '[c]ockpit-channel.ts' | grep -v '/.claude/plugins/cache/'; test $? -eq 1` after the run (no leaked channel).
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/scripts/cockpit-server.ts` prints nothing.
+- [x] `bunx --bun tsc --noEmit | grep packages/monitor/skills/cockpit/contract/` prints nothing.
 
 ## Eval rubric
 
