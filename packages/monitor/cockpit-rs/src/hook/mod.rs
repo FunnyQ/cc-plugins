@@ -1,6 +1,7 @@
 pub mod delegation_marker;
 pub mod reminder;
 mod session_start;
+mod stop;
 
 use serde::Deserialize;
 use std::{collections::HashMap, io::Read, process::ExitCode};
@@ -26,6 +27,8 @@ pub fn parse_input(mut reader: impl Read) -> Option<HookInput> {
 pub fn run(session_start: bool) -> ExitCode {
     if session_start {
         let _ = self::session_start::run();
+    } else {
+        let _ = stop::run();
     }
     ExitCode::SUCCESS
 }

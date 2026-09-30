@@ -329,6 +329,75 @@ describe("hook: session-start", () => {
 });
 
 describe("hook: stop", () => {
+  test("suppresses invalid stdin, active Stop hooks, SDK and subagents", () => {
+    for (const stdin of ["", "{broken", JSON.stringify({ ...payload("Stop"), stop_hook_active: true }), JSON.stringify({ ...payload("Stop"), agent_id: "child" })])
+      expect(hook("stop", {}, stdin)).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+    expect(hook("stop", { CLAUDE_CODE_ENTRYPOINT: "sdk-cli" }).stdout).toBe("");
+  });
+
+  test("prints structural text in both harnesses", () => {
+    for (const codex of [false, true]) {
+      const session = codex ? fixtures.codexThreadId : fixtures.claudeSessionId;
+      const light = reminder(session, codex);
+      const text = light.replace("💭 If that change", "📐 Sizable change (1 files, ~80 lines). If it")
+        .replace("prefer a Mermaid `--diagram` if it has any shape, else a terse note. Otherwise skip.", "draw it with a Mermaid `--diagram` first (flow / sequence / state / fan-out), prose only for what a picture can't carry.");
+      const output = codex ? { systemMessage: text } : { hookSpecificOutput: { hookEventName: "Stop", additionalContext: text } };
+      expect(hook("stop", { FIXTURE_CHANGED_LINES: "80", COCKPIT_NUDGE_THROTTLE_MS: "-1", ...(codex ? { PLUGIN_ROOT } : {}) }, JSON.stringify({ ...payload("Stop"), session_id: codex ? fixtures.codexThreadId : fixtures.claudeSessionId })).stdout).toBe(JSON.stringify(output));
+    }
+  });
+
+  test("suppresses unchanged signatures after throttle expires and preserves raw git stdout", () => {
+    expect(hook("stop", { COCKPIT_NUDGE_THROTTLE_MS: "-1" }).stdout).not.toBe("");
+    const marker = JSON.parse(readFileSync(join(homes.cockpitHome, "scribe-nudge.json"), "utf8"));
+    expect(marker[fixtures.claudeSessionId].lastSig).toBe(new Bun.CryptoHasher("sha1").update("fixture-head\n 1\t0\tfixture.ts\n  M fixture.ts\n").digest("hex"));
+    expect(hook("stop", { COCKPIT_NUDGE_THROTTLE_MS: "-1" }).stdout).toBe("");
+  });
+
+  test("throttles before any git process and falls back for zero and garbage windows", () => {
+    const calls = join(homes.root, "git-calls");
+    writeFileSync(join(bin, "git"), `#!/bin/sh\nprintf called >> '${calls}'\nexit 1\n`);
+    for (const window of ["60000", "0", "garbage"]) {
+      writeFileSync(join(homes.cockpitHome, "scribe-nudge.json"), JSON.stringify({ [fixtures.claudeSessionId]: { lastNudgeMs: Date.now(), lastSig: "old" } }));
+      expect(hook("stop", { COCKPIT_NUDGE_THROTTLE_MS: window })).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+    }
+    expect(existsSync(calls)).toBe(false);
+  });
+
+  test("suppresses project and user opt-outs", () => {
+    const path = join(homes.configHome, "q-lab/cockpit/config.json");
+    mkdirSync(join(homes.configHome, "q-lab/cockpit"), { recursive: true });
+    for (const nudges of [{ user: "off" }, { projects: { [fixtures.projectDir]: "off" } }]) {
+      writeFileSync(path, JSON.stringify({ nudges }));
+      expect(hook("stop")).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+    }
+  });
+
+  test("returns silently outside git and prunes stale marker entries", () => {
+    const path = join(homes.cockpitHome, "scribe-nudge.json");
+    writeFileSync(path, JSON.stringify({ stale: { lastNudgeMs: Date.now() - 86400001, lastSig: "old" }, fresh: { lastNudgeMs: Date.now(), lastSig: "keep" } }));
+    expect(hook("stop").stdout).not.toBe("");
+    expect(Object.keys(JSON.parse(readFileSync(path, "utf8")))).toEqual(["fresh", fixtures.claudeSessionId]);
+    writeFileSync(join(bin, "git"), "#!/bin/sh\nexit 1\n");
+    expect(hook("stop", { COCKPIT_NUDGE_THROTTLE_MS: "-1" })).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+  });
+
+  test("launches a detached headless scribe with the exact argv", async () => {
+    const capture = join(homes.root, "launch.json");
+    const claude = join(bin, "claude");
+    writeFileSync(claude, `#!${process.execPath}\nimport { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(capture)}, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), delegated: process.env.RELAY_DELEGATED }));\n`);
+    chmodSync(claude, 0o755);
+    const { underTest } = await import("./launcher");
+    const skill = join(PLUGIN_ROOT, "skills/cockpit");
+    const cli = join(skill, underTest === "rust" ? "bin/cockpit" : "scripts/cockpit.ts");
+    const invocation = `${underTest === "rust" ? "" : "bun "}${cli}`;
+    const refs = join(skill, "references");
+    const session = fixtures.claudeSessionId;
+    const prompt = `Scribe this session's decision log. In one turn, read ${refs}/scribe.md and run \`${invocation} scribe --prep --session ${session}\`. Then follow scribe.md: the CLI is ${cli}, and every call passes --session ${session}. Spell each call as \`${invocation} scribe …\`, never through a shell variable. When done, reply with one line.`;
+    expect(hook("stop")).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+    for (let i = 0; i < 100 && !existsSync(capture); i++) await Bun.sleep(20);
+    expect(JSON.parse(readFileSync(capture, "utf8"))).toEqual({ argv: ["-p", prompt, "--resume", session, "--fork-session", "--no-session-persistence", "--effort", "low", "--output-format", "json", "--allowedTools", `Bash(${invocation} scribe:*)`, `Read(/${refs}/**)`], cwd: fixtures.projectDir, delegated: "1" });
+  });
+
   test("prints the exact Claude JSON without a trailing newline", () => {
     seedTrail();
     // pins TS quirk: without claude on PATH Stop emits context instead of spawning a detached scribe.

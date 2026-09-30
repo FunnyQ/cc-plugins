@@ -36,6 +36,9 @@ jiff = "~0.2"
 # Generate RFC 4122 v4 record ids compatible with crypto.randomUUID().
 uuid = { version = "~1.23", features = ["v4"] }
 
+# sha1 of the git state: the signature stored in scribe-nudge.json must stay stable across releases
+sha1_smol = "~1.0"
+
 [dev-dependencies]
 tempfile = "~3.24"
 

@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: hooks/01, core/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -102,20 +102,20 @@ Git is the only blocking subprocess. The hook has a 10 s timeout, and a throttle
 
 ## Acceptance criteria
 
-- [ ] Against Rust, `hook: stop` passes: the reminder JSON shape for Claude (no `claude` on PATH) and for Codex, both the structural and light texts, throttle suppression, the unchanged-signature suppression, the nudge-off scopes, the skips for `RELAY_DELEGATED`, `stop_hook_active`, and `agent_id`, and a non-git cwd producing no output.
-- [ ] With a fake `claude` executable first on `PATH`, a Claude-shaped input spawns it detached with the argv above (`--allowedTools` last) and prints nothing. The CLI path in the prompt and in `--allowedTools` is the one deliberate argv difference: the contract case picks its expectation by the launcher's `underTest` — `bun <scripts>/cockpit.ts` for TS, `<skill_dir>/bin/cockpit` for Rust — and asserts every other argv element identically for both.
-- [ ] A throttled invocation runs no `git` process (checked in a cargo or contract test by pointing `PATH` at a `git` stub that records calls).
-- [ ] `scribe-nudge.json` entries older than 24 h are pruned on write.
-- [ ] `cargo test` covers `assess_complexity` (binary `-`, untracked `??`, both thresholds), `decide_nudge` (all four branches), both `build_reminder` variants × with/without id, and `build_hook_output`.
+- [x] Against Rust, `hook: stop` passes: the reminder JSON shape for Claude (no `claude` on PATH) and for Codex, both the structural and light texts, throttle suppression, the unchanged-signature suppression, the nudge-off scopes, the skips for `RELAY_DELEGATED`, `stop_hook_active`, and `agent_id`, and a non-git cwd producing no output.
+- [x] With a fake `claude` executable first on `PATH`, a Claude-shaped input spawns it detached with the argv above (`--allowedTools` last) and prints nothing. The CLI path in the prompt and in `--allowedTools` is the one deliberate argv difference: the contract case picks its expectation by the launcher's `underTest` — `bun <scripts>/cockpit.ts` for TS, `<skill_dir>/bin/cockpit` for Rust — and asserts every other argv element identically for both.
+- [x] A throttled invocation runs no `git` process (checked in a cargo or contract test by pointing `PATH` at a `git` stub that records calls).
+- [x] `scribe-nudge.json` entries older than 24 h are pruned on write.
+- [x] `cargo test` covers `assess_complexity` (binary `-`, untracked `??`, both thresholds), `decide_nudge` (all four branches), both `build_reminder` variants × with/without id, and `build_hook_output`.
 
 ## Verification
 
-- [ ] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
-- [ ] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
-- [ ] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
-- [ ] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: stop"`
-- [ ] `bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: stop"` (against TS) still passes.
+- [x] `cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo test --manifest-path packages/monitor/cockpit-rs/Cargo.toml`
+- [x] `cargo fmt --manifest-path packages/monitor/cockpit-rs/Cargo.toml -- --check`
+- [x] `cargo clippy --manifest-path packages/monitor/cockpit-rs/Cargo.toml --all-targets -- -D warnings`
+- [x] `COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: stop"`
+- [x] `bun test packages/monitor/skills/cockpit/contract/hook.contract.test.ts -t "hook: stop"` (against TS) still passes.
 
 ## Eval rubric
 
