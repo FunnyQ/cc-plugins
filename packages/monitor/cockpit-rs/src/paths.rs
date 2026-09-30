@@ -120,6 +120,9 @@ pub(crate) mod tests {
         "COCKPIT_PLUGIN_ROOT",
         "COCKPIT_WAIT_TIMEOUT_MS",
         "COCKPIT_STASH_TTL_MS",
+        "TOKEN_ATLAS_PROJECTS_DIR",
+        "TOKEN_ATLAS_ROLLUP_DB",
+        "TOKEN_ATLAS_NOW_MS",
     ];
 
     pub(crate) struct TestEnv {

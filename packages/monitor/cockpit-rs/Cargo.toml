@@ -29,8 +29,10 @@ serde_norway = "~0.9"
 regex = "~1.12"
 # Preserve Bun's level-6 gzip representation for compressible static assets.
 flate2 = "~1.1"
-# Reuse TLS-free HTTP for OpenCode and cancellable loopback channel polls.
-reqwest = { version = "~0.12", default-features = false, features = ["json"] }
+# Reuse one HTTP client for loopback polls and atlas's HTTPS calls (OpenRouter, Codex usage) without a system OpenSSL.
+reqwest = { version = "~0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots"] }
+# Keep TS Map insertion order in atlas aggregates, which later becomes payload array order.
+indexmap = { version = "~2", features = ["serde"] }
 # Parse RFC 3339 heartbeats and emit UTC timestamps with millisecond precision.
 jiff = "~0.2"
 # Generate RFC 4122 v4 record ids compatible with crypto.randomUUID().

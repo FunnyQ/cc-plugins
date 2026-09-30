@@ -73,7 +73,11 @@ pub async fn serve(
     request_headers: HeaderMap,
 ) -> Response {
     let root = state.plugin_root.join("skills/cockpit/dashboard/dist");
-    let Some(path) = file_path(&root, uri.path()) else {
+    serve_dir(&root, &uri, &request_headers).await
+}
+
+pub async fn serve_dir(root: &Path, uri: &Uri, request_headers: &HeaderMap) -> Response {
+    let Some(path) = file_path(root, uri.path()) else {
         return not_found();
     };
     let Ok(metadata) = tokio::fs::metadata(&path).await else {

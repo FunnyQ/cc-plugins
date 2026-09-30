@@ -1,3 +1,4 @@
+mod atlas;
 mod channel;
 
 use clap::{Args, Parser, Subcommand};
@@ -48,6 +49,7 @@ enum Command {
     Restart(TrailingArgs),
     Nudge(TrailingArgs),
     FindSession(TrailingArgs),
+    Atlas(TrailingArgs),
     Hook {
         #[command(subcommand)]
         command: HookCommand,
@@ -77,6 +79,7 @@ fn main() -> ExitCode {
         Command::Restart(args) => cli::restart::run(&args.args),
         Command::Nudge(args) => cli::run("nudge", &args.args),
         Command::FindSession(args) => cli::run("find-session", &args.args),
+        Command::Atlas(args) => atlas::run(&args.args),
         Command::Hook { command } => match command {
             HookCommand::SessionStart(_) => hook::run(true),
             HookCommand::Stop(_) => hook::run(false),
@@ -102,6 +105,7 @@ mod tests {
             "restart",
             "nudge",
             "find-session",
+            "atlas",
         ] {
             assert!(Cli::try_parse_from(["cockpit", sub, "--unknown", "value", "-x"]).is_ok());
             assert!(Cli::try_parse_from(["cockpit", sub]).is_ok());

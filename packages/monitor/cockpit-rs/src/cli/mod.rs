@@ -26,8 +26,8 @@ pub const USAGE: &str = r#"usage: cockpit <log|scribe|prep|config|wait|send|rest
   cockpit restart [--port N] [--no-open]
   cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]"#;
 // Subcommands that exist only in the Rust binary keep clap's own help and errors.
-const RUST_ONLY: [&str; 3] = ["server", "channel", "hook"];
-const KNOWN: [&str; 12] = [
+const RUST_ONLY: [&str; 4] = ["server", "channel", "hook", "atlas"];
+const KNOWN: [&str; 13] = [
     "log",
     "scribe",
     "prep",
@@ -40,6 +40,7 @@ const KNOWN: [&str; 12] = [
     "server",
     "channel",
     "hook",
+    "atlas",
 ];
 /// Runs before clap so `--help` and an unknown subcommand match `cockpit.ts main`.
 pub fn preflight(argv: &[String]) -> Option<ExitCode> {
