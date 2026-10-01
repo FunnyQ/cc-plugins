@@ -27,10 +27,12 @@ const EXPECTED_SKILL_NAMES = [
   "adr",
   "ask",
   "autopilot",
+  "chrome",
   "chronicle-install",
   "cockpit",
   "commit",
   "deckplan",
+  "firefox",
   "flightplan",
   "herdr",
   "herdr-browser",
@@ -41,6 +43,7 @@ const EXPECTED_SKILL_NAMES = [
   "preflight",
   "relay",
   "release",
+  "safari",
   "tell",
   "usage-dashboard",
   "waypoints",
@@ -59,12 +62,9 @@ describe("findSkillDirs", () => {
     expect(dirs).toHaveLength(EXPECTED_SKILL_NAMES.length);
   });
 
-  test("excludes monitor's shared support directory", () => {
-    expect(
-      dirs.some(
-        (entry) => entry.plugin === "monitor" && entry.dir === "shared",
-      ),
-    ).toBe(false);
+  // monitor and browsers both keep imported code in skills/shared/, which has no SKILL.md.
+  test("excludes every plugin's shared support directory", () => {
+    expect(dirs.filter((entry) => entry.dir === "shared")).toEqual([]);
   });
 });
 

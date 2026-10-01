@@ -33,6 +33,11 @@
       "name": "guard",
       "source": "./packages/guard",
       "description": "Turn coding rules into harness-enforced ones. comment-guard hands every newly added comment line back to the model with one question: is this why, or is this what?"
+    },
+    {
+      "name": "browsers",
+      "source": "./packages/browsers",
+      "description": "Drive Firefox, Zen, and Safari from the terminal — open pages, read and drive them, and take screenshots. Firefox and Zen run as isolated headless instances over Marionette; Safari runs in its own automation window over safaridriver."
     }
   ]
 }

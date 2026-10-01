@@ -37,6 +37,20 @@
       ]
     },
     {
+      "name": "browsers",
+      "path": "packages/browsers",
+      "versionFiles": [
+        {
+          "path": "packages/browsers/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/browsers/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
+    },
+    {
       "name": "guard",
       "path": "packages/guard",
       "versionFiles": [

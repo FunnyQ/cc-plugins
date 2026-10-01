@@ -68,6 +68,18 @@
       "name": "guard",
       "source": "./packages/guard",
       "description": "Turn coding rules into harness-enforced ones. comment-guard hands every newly added comment line back to the model with one question: is this why, or is this what?"
+    },
+    {
+      "name": "browsers",
+      "source": {
+        "source": "local",
+        "path": "./packages/browsers"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
     }
   ]
 }
