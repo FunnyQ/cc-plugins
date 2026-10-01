@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.5.1] - 2026-10-01
+
+_tracks tag `dispatch-v5.5.1`_
+
+### Changed
+- The flightdeck fleet stream no longer resends unchanged frames and sends each rationale once per stream, cutting a steady frame from about 398KB to 96KB and stopping the browser memory creep.
+
 ## [herdr 0.7.11] - 2026-10-01
 
 _tracks tag `herdr-v0.7.11`_
