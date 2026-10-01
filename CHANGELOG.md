@@ -1,5 +1,15 @@
 # Changelog
 
+## [browsers 0.1.0] - 2026-10-01
+
+_tracks tag `browsers-v0.1.0`_
+
+### Added
+- New browsers plugin with three skills that share one command surface, where each parallel agent gets its own throwaway profile, process, and port so agents never share a browser.
+- Drive an isolated headless Chrome over CDP when Herdr is not running, with navigations that wait for load so clicks and key presses no longer race page loads.
+- Drive the installed Firefox and Zen through Marionette, so bugs that only reproduce on Gecko can be investigated.
+- Drive Safari through safaridriver; it allows one session per machine, and its live test is opt-in via SAFARI_LIVE=1 because it opens a window that steals focus.
+
 ## [dispatch 5.5.1] - 2026-10-01
 
 _tracks tag `dispatch-v5.5.1`_
