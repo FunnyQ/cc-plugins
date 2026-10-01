@@ -5,6 +5,7 @@ import {
   elapsedText,
   isFleetCollapsed,
   isInFlight,
+  rememberRationales,
   renderFleet,
   renderMessage,
   runElapsed,
@@ -194,6 +195,33 @@ describe("toggleRubric", () => {
     expect(html).toContain("<code>kind.rs:68</code>");
     // The meters still lead — the prose is the supporting evidence, not the verdict.
     expect(html.indexOf("Correctness")).toBeLessThan(html.indexOf("rationale"));
+  });
+});
+
+describe("rememberRationales", () => {
+  const scoreFor = () => ({
+    task: "core/01",
+    attempt: 1,
+    ts: "2026-01-01T00:00:00.000Z",
+    breakdown: [{ name: "Correctness", score: 5, weight: 3 }],
+  });
+
+  test("restores a rationale sent in an earlier frame onto later rows", () => {
+    rememberRationales({
+      rows: [{ key: "a", score: scoreFor() }],
+      rationales: { "core/01|1|2026-01-01T00:00:00.000Z": "Earlier prose." },
+    });
+    const later = { rows: [{ key: "a", score: scoreFor() }] };
+
+    rememberRationales(later);
+
+    expect(later.rows[0].score.rationale).toBe("Earlier prose.");
+  });
+
+  test("leaves a row without a score untouched", () => {
+    const payload = { rows: [{ key: "b" }] };
+    expect(() => rememberRationales(payload)).not.toThrow();
+    expect(payload.rows[0]).toEqual({ key: "b" });
   });
 });
 

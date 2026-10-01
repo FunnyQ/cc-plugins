@@ -4,6 +4,7 @@ import {
   connectEvents,
   elapsedByTask,
   isInFlight,
+  rememberRationales,
   renderFleet,
   runElapsed,
   tickElapsed,
@@ -414,6 +415,7 @@ window.__flightdeck = store;
 
 connectEvents({
   onFleet(payload) {
+    rememberRationales(payload);
     fleetState.rows = Array.isArray(payload.rows) ? payload.rows : [];
     fleetState.entryCount = payload.entryCount ?? 0;
     fleetState.logPresent = payload.logPresent === true;

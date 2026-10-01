@@ -5,6 +5,8 @@ import {
   decodeLogChunk,
   eventsHandler,
   formatFleetFrame,
+  newFrameMemory,
+  nextFleetFrame,
 } from "./events-api";
 import { projectSlug, type TranscriptSource } from "./usage-source";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -39,6 +41,23 @@ function agent(overrides: Partial<AgentUsage> = {}): AgentUsage {
     models: ["claude-haiku-4-5-20251001"],
     counts: counts(10),
     ...overrides,
+  };
+}
+
+function judged(rationale: string): FlightlogEntry {
+  return {
+    kind: "score",
+    ts: "2026-08-01T00:01:00.000Z",
+    task: "server/05",
+    attempt: 1,
+    weighted: 4.5,
+    passed: true,
+    hardFailed: false,
+    missing: [],
+    threshold: 4,
+    passOp: ">=",
+    breakdown: [{ name: "Correctness", weight: 1, score: 4.5 }],
+    rationale,
   };
 }
 
@@ -95,6 +114,52 @@ describe("formatFleetFrame", () => {
       codexTotals: emptyCounts(),
       codexRunCount: 0,
     });
+  });
+
+  test("sends each judge rationale once per stream, outside the rows", () => {
+    const score = judged("Long judge prose.");
+    const memory = newFrameMemory();
+
+    const first = frameData(formatFleetFrame([entry, score], true, [], memory));
+    const rows = first.rows as Array<{ score?: { rationale?: string } }>;
+    expect(rows.some((row) => row.score)).toBe(true);
+    expect(rows.every((row) => row.score?.rationale === undefined)).toBe(true);
+    expect(first.rationales).toEqual({
+      "server/05|1|2026-08-01T00:01:00.000Z": "Long judge prose.",
+    });
+
+    const second = frameData(
+      formatFleetFrame([entry, score], true, [], memory),
+    );
+    expect(second.rationales).toBeUndefined();
+  });
+
+  // A rewritten flightlog can keep a score's identity and change its prose.
+  test("resends a rationale whose text changed under the same key", () => {
+    const memory = newFrameMemory();
+    nextFleetFrame([entry, judged("Original")], true, [], memory);
+
+    const frame = nextFleetFrame(
+      [entry, judged("Corrected")],
+      true,
+      [],
+      memory,
+    );
+
+    expect(frameData(frame!).rationales).toEqual({
+      "server/05|1|2026-08-01T00:01:00.000Z": "Corrected",
+    });
+  });
+
+  test("skips an unchanged snapshot even after a frame that carried rationales", () => {
+    const memory = newFrameMemory();
+    expect(
+      nextFleetFrame([entry, judged("Prose")], true, [], memory),
+    ).toBeDefined();
+
+    expect(
+      nextFleetFrame([entry, judged("Prose")], true, [], memory),
+    ).toBeUndefined();
   });
 
   test("excludes malformed and blank lines", () => {
@@ -226,6 +291,38 @@ describe("eventsHandler", () => {
         frameData(String(second.value)).usage as { totals: TokenCounts }
       ).totals;
       expect(totals.input).toBeGreaterThan(10);
+    } finally {
+      controller.abort();
+      await reader.cancel();
+    }
+  }, 10_000);
+
+  // A finished run polls the same snapshot forever; resending it every 2s made the
+  // browser parse ~400KB a frame for nothing. Slow for the same reason as above.
+  test("skips a frame identical to the last one sent", async () => {
+    const steadySource: TranscriptSource = { read: () => [agent()] };
+    const controller = new AbortController();
+    const request = new Request("http://localhost/api/events", {
+      signal: controller.signal,
+    });
+
+    const response = eventsHandler(
+      request,
+      "/nonexistent/run.jsonl",
+      "/nonexistent/plan",
+      { source: steadySource },
+    );
+    const reader = response.body!.getReader();
+
+    try {
+      const first = await reader.read();
+      expect(String(first.value).startsWith("event: fleet\n")).toBe(true);
+
+      const next = await Promise.race([
+        reader.read().then(() => "frame"),
+        Bun.sleep(5_000).then(() => "silent"),
+      ]);
+      expect(next).toBe("silent");
     } finally {
       controller.abort();
       await reader.cancel();

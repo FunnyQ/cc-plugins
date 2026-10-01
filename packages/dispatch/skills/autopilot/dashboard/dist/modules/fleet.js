@@ -17,6 +17,25 @@ const expandedRows = new Set();
 // Collapse state lives here, not in the DOM: every SSE frame rebuilds the panel,
 // so a class on the old node would be thrown away a second later.
 let fleetCollapsed = false;
+// The server sends each judge's prose once per connection; later frames rely on this.
+const rationales = new Map();
+
+/** Spelled identically in `scripts/events-api.ts`, which has no import path to this file. */
+function rationaleKey(score) {
+  return `${score.task}|${score.attempt}|${score.ts}`;
+}
+
+/** Puts back on each row's score the rationale an earlier frame carried. Mutates `payload`. */
+export function rememberRationales(payload) {
+  for (const [key, text] of Object.entries(payload?.rationales ?? {})) {
+    rationales.set(key, text);
+  }
+  for (const row of Array.isArray(payload?.rows) ? payload.rows : []) {
+    if (!row.score) continue;
+    const text = rationales.get(rationaleKey(row.score));
+    if (text !== undefined) row.score.rationale = text;
+  }
+}
 
 // Why we render rows as given: The server owns all derivation — pairing, ordering,
 // label parsing, and score attachment. We receive fully aggregated FleetRow objects

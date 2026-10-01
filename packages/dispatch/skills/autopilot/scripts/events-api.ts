@@ -34,6 +34,8 @@ export type FleetSnapshot = {
   logPresent: boolean;
   /** Plan-wide token rollup. Always present; all-zero when no transcript was found. */
   usage: UsageRollup;
+  /** Judge prose not yet sent on this stream, keyed by `rationaleKey`. Absent when none is new. */
+  rationales?: Record<string, string>;
 };
 
 export type Debouncer = {
@@ -41,19 +43,71 @@ export type Debouncer = {
   cancel: () => void;
 };
 
-export function formatFleetFrame(
+/** Spelled identically in the dashboard's `modules/fleet.js`, which has no import path to this file. */
+function rationaleKey(score: { task: string; attempt: number; ts: string }) {
+  return `${score.task}|${score.attempt}|${score.ts}`;
+}
+
+/** What one stream has already told its browser. Both fields are updated in place. */
+export type FrameMemory = {
+  /** Rationale text by `rationaleKey`, as last sent. */
+  rationales: Map<string, string>;
+  /** The last snapshot sent, rationales excluded. */
+  snapshot: string;
+};
+
+export function newFrameMemory(): FrameMemory {
+  return { rationales: new Map(), snapshot: "" };
+}
+
+/**
+ * Rationales were 85% of a frame — 19 judge essays copied onto the 88 rows that
+ * share them — so rows never carry the prose, and each essay travels once per
+ * stream, again only if its text changes. Returns undefined when the browser
+ * already holds everything this frame would say.
+ */
+export function nextFleetFrame(
   entries: FlightlogEntry[],
   logPresent: boolean,
   agents: AgentUsage[],
-): string {
+  memory: FrameMemory,
+): string | undefined {
   const attributed = attributeUsage(aggregateFleet(entries), agents);
+  const rationales: Record<string, string> = {};
+  const rows = attributed.rows.map((row) => {
+    if (row.score?.rationale === undefined) return row;
+    const { rationale, ...score } = row.score;
+    const key = rationaleKey(score);
+    if (memory.rationales.get(key) !== rationale) {
+      memory.rationales.set(key, rationale);
+      rationales[key] = rationale;
+    }
+    return { ...row, score };
+  });
   const payload: FleetSnapshot = {
-    rows: attributed.rows,
+    rows,
     entryCount: entries.length,
     logPresent,
     usage: attributed.rollup,
   };
-  return `event: fleet\ndata: ${JSON.stringify(payload)}\n\n`;
+  // Compared without the rationales, or the frame after one that carried them
+  // always differs and an unchanged snapshot goes out twice.
+  const snapshot = JSON.stringify(payload);
+  const fresh = Object.keys(rationales).length > 0;
+  if (snapshot === memory.snapshot && !fresh) return undefined;
+  memory.snapshot = snapshot;
+  return `event: fleet\ndata: ${JSON.stringify(fresh ? { ...payload, rationales } : payload)}\n\n`;
+}
+
+/** Always a frame: a fresh memory has sent nothing, and a shared one only drops rationales. */
+export function formatFleetFrame(
+  entries: FlightlogEntry[],
+  logPresent: boolean,
+  agents: AgentUsage[],
+  memory = newFrameMemory(),
+): string {
+  memory.snapshot = "";
+  return nextFleetFrame(entries, logPresent, agents, memory)!;
 }
 
 export function decodeLogChunk(
@@ -181,10 +235,12 @@ export function eventsHandler(
           cleanup();
         }
       };
+      const memory = newFrameMemory();
       const emitSnapshot = (): void => {
         // Affordable only because `read()` is incremental: an unchanged transcript
         // costs one `stat` and zero bytes read.
-        enqueue(formatFleetFrame(entries, logPresent, readAgents()));
+        const frame = nextFleetFrame(entries, logPresent, readAgents(), memory);
+        if (frame !== undefined) enqueue(frame);
       };
       const debounce = createDebouncer(emitSnapshot, SNAPSHOT_DEBOUNCE_MS);
 
