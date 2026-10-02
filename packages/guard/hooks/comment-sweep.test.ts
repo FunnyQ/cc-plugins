@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ASK } from "./comment-guard.ts";
+import { ASK } from "./comment-core.ts";
 import { snapshot, sweep } from "./comment-sweep.ts";
 import { recordReported } from "./sweep-state.ts";
 

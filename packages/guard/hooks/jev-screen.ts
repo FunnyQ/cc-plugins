@@ -9,12 +9,12 @@
  * A port of chronicle's `askJev`, not an import: plugins never import each other.
  */
 
-import type { CommentBlock } from "./comment-guard.ts";
+import type { CommentBlock } from "./comment-core.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";
 // Measured max 344 ms; the whole hook has 10 s and a network stall must not eat it.
-const TIMEOUT_MS = 2_000;
+export const TIMEOUT_MS = 2_000;
 const PASS_WHY = 0.8;
 
 const CRITERIA = {
@@ -24,10 +24,16 @@ const CRITERIA = {
 
 type Answer = { probabilities?: Record<string, number> };
 
+// The caller hands in its transport, and the transport enforces TIMEOUT_MS: the mod has neither a global `fetch` nor `AbortSignal.timeout`.
+export type Post = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string },
+) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+
 async function allWhy(
   file: string,
   block: CommentBlock,
-  opts: { apiKey: string; fetch?: typeof fetch },
+  opts: { apiKey: string; fetch: Post },
 ): Promise<boolean> {
   const questions: Record<string, unknown> = {};
   block.added.forEach((added, k) => {
@@ -39,7 +45,7 @@ async function allWhy(
     };
   });
   try {
-    const response = await (opts.fetch ?? fetch)(ENDPOINT, {
+    const response = await opts.fetch(ENDPOINT, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${opts.apiKey}`,
@@ -50,7 +56,6 @@ async function allWhy(
         state: { comment: { file, lines: block.lines } },
         questions,
       }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) return false;
     const { answers } = (await response.json()) as {
@@ -70,7 +75,7 @@ export type Screen = { kept: CommentBlock[]; withdrawn: number; ms?: number };
 export async function screenBlocks(
   file: string,
   blocks: CommentBlock[],
-  opts: { apiKey: string | undefined; fetch?: typeof fetch },
+  opts: { apiKey: string | undefined; fetch: Post },
 ): Promise<Screen> {
   const { apiKey } = opts;
   if (!apiKey) return { kept: blocks, withdrawn: 0 };

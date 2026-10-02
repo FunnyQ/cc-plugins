@@ -393,7 +393,7 @@ describe("COMMENT_GUARDED", () => {
   // Enumerate from the tables, never a hand-listed sample: a sample is a third copy that drifts the same silent way, missing exactly the entry nobody remembered.
   test("agrees with the hook's own lookup, entry for entry", async () => {
     const { BY_EXT, BY_NAME, syntaxFor } = await import(
-      "../packages/guard/hooks/comment-guard.ts"
+      "../packages/guard/hooks/comment-core.ts"
     );
     const covered = [
       ...Object.keys(BY_EXT).map((ext) => `src/a${ext}`),

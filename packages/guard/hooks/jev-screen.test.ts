@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { CommentBlock } from "./comment-guard.ts";
+import type { CommentBlock } from "./comment-core.ts";
 import { screenBlocks, screenNote } from "./jev-screen.ts";
 
 const block = (

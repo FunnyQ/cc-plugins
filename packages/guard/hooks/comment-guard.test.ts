@@ -1,16 +1,19 @@
 import { describe, expect, test } from "bun:test";
+import { basename, extname } from "node:path";
 import {
   addedCommentLines,
   ASK,
+  baseName,
   commentFlags,
+  extName,
   flaggedBlocks,
   formatReason,
   isGuardedPath,
   patchLines,
   resolveAdded,
   syntaxFor,
-} from "./comment-guard.ts";
-import type { Syntax } from "./comment-guard.ts";
+} from "./comment-core.ts";
+import type { Syntax } from "./comment-core.ts";
 
 // A key in the developer's shell would send these fixtures to Jev; jev-screen.test.ts covers that path offline.
 delete process.env.TYPESAFE_API_KEY;
@@ -25,6 +28,41 @@ const flagsOf = (text: string, syntax: Syntax) =>
     text.split("\n").map((l) => l.trim()),
     syntax,
   );
+
+describe("baseName / extName", () => {
+  test("answer what node:path answers", () => {
+    const paths = [
+      "a/user.rb",
+      "/abs/app.TS",
+      "src/.env",
+      "src/.env.local",
+      "Dockerfile",
+      "Dockerfile.DEV",
+      "a/b.min.js",
+      "file.",
+      "..",
+      "...",
+      "a/..",
+      "....",
+      "..a",
+      "a..",
+      "/",
+      "a/.",
+      ".hidden.rb",
+      "dir/",
+      "dir/x.rb/",
+      "",
+      "a//b.ts",
+    ];
+    for (const p of paths) {
+      expect([p, baseName(p), extName(p)]).toEqual([
+        p,
+        basename(p),
+        extname(p),
+      ]);
+    }
+  });
+});
 
 describe("syntaxFor", () => {
   test("maps each family to its comment forms", () => {

@@ -29,7 +29,8 @@ import {
   syntaxFor,
   type CommentBlock,
   type Hunk,
-} from "./comment-guard.ts";
+} from "./comment-core.ts";
+import { fetchPost } from "./jev-fetch.ts";
 import { screenBlocks, screenNote } from "./jev-screen.ts";
 import {
   clearBaseline,
@@ -194,7 +195,10 @@ export async function sweep(payload: Payload): Promise<SweepOutput | null> {
   // In parallel: 20 files asked one by one could outlast the hook's 10 s timeout.
   const screened = await Promise.all(
     found.map(({ file, blocks }) =>
-      screenBlocks(file, blocks, { apiKey: process.env.TYPESAFE_API_KEY }),
+      screenBlocks(file, blocks, {
+        apiKey: process.env.TYPESAFE_API_KEY,
+        fetch: fetchPost,
+      }),
     ),
   );
   const reasons = found.flatMap(({ file }, i) =>
