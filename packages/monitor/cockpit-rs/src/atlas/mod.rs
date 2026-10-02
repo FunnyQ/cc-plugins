@@ -3,6 +3,7 @@ pub mod codex;
 pub mod dedup;
 pub mod jsonl;
 pub mod live;
+pub mod measure;
 pub mod model;
 pub mod opencode;
 pub mod paths;
@@ -13,7 +14,6 @@ pub mod rollup_update;
 pub mod server;
 pub mod session_files;
 pub mod stats;
-pub mod statusline;
 
 use std::process::ExitCode;
 
@@ -26,7 +26,7 @@ pub fn run(args: &[String]) -> ExitCode {
         Some("stats") => stats::run_cli(rest),
         Some("live") => live::run_cli(rest),
         Some("rollup-update") => rollup_update::run(rest),
-        Some("measure") => statusline::run_measure(rest),
+        Some("measure") => measure::run_measure(rest),
         Some("push-usage") => push_usage::run(rest),
         _ => {
             eprintln!("{USAGE}");
