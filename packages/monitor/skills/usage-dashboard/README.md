@@ -15,7 +15,7 @@ Human-facing overview for the usage dashboard skill.
 
 ## File layout
 
-The engine and server are Rust: `packages/monitor/cockpit-rs/src/atlas/`, run as `cockpit atlas serve|stats|live|rollup-update|statusline`.
+The engine and server are Rust: `packages/monitor/cockpit-rs/src/atlas/`, run as `cockpit atlas serve|stats|live|rollup-update|measure|statusline`.
 
 ```
 usage-dashboard/

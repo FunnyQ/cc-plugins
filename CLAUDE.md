@@ -43,6 +43,7 @@ cc-plugins/
 │   ├── monitor/
 │   │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks + cockpit channel
 │   │   ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hooks
+│   │   ├── hooks/                       # Claude Code mod: session.measure → `cockpit atlas measure`
 │   │   ├── cockpit-rs/                  # Rust crate: server, channel, CLI, hook subcommands
 │   │   │   └── src/atlas/               # usage-dashboard engine + server: `cockpit atlas <sub>`
 │   │   │       # stats.rs / rollup_db.rs / rollup_update.rs / codex.rs / live.rs / server.rs / statusline.rs
@@ -66,8 +67,7 @@ cc-plugins/
 │   │       └── install/scripts/
 │   │           ├── setup.ts              # plugin-wide check + wire (--check/--dry-run/--apply/--session-check)
 │   │           ├── install.ts            # dashboard precheck
-│   │           ├── setup-statusline.ts
-│   │           └── statusline-decision.ts    # pure decision, unit-tested
+│   │           └── statusline-decision.ts    # pure unwrap of the retired collector, unit-tested
 │   ├── dispatch/
 │   │   ├── hooks/flightplan-lint.sh      # PostToolUse, path + content gated
 │   │   └── skills/{preflight,hop,flightplan,autopilot,waypoints,deckplan}/
@@ -145,7 +145,7 @@ Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The roll
 - `rollup_update.rs` (`cockpit atlas rollup-update`) tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`. The same pass fills the session ledger — one parse, both outputs.
 - The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively. The ledger follows the same rule: `date`, `projectName`, `model` and `tokens` are all derived in `read_rollup_ledger()`, never stored.
 - `hour_ms` is the local hour start. It matches `hourStartMs`, so daily and heatmap reconstruction is byte-identical.
-- Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudge()` of `cockpit atlas rollup-update` from `statusline.rs` (`cockpit atlas statusline`, secondary). There is no daemon.
+- Triggers: the dashboard load (primary) and a detached, 5-minute-throttled `nudge()` of `cockpit atlas rollup-update` from `statusline.rs` (secondary), run by `cockpit atlas measure` — which the monitor mod's `session.measure` hook spawns after each turn — and by the retired `cockpit atlas statusline` passthrough. There is no daemon.
 - A file shrinking below `bytes_parsed` or `--rebuild` replays transcripts while preserving `usage_hourly` and existing dedup keys. Deleted files are pruned from `ingested_files` and `seen_requests`; their tokens remain. Schema upgrades must migrate in place: v1 → v2 retains legacy keys with an unknown path, v2 → v3 rewinds every cursor to backfill the ledger, and unsupported versions are refused — including a *newer* one, so an older monitor build refuses a v3 file rather than corrupting it. `open_rollup_db()` (`rollup_db.rs`) writes `<db>.v<old>.bak` via `VACUUM INTO` before any version-changing migration (a plain copy of a WAL database can read back short). The rollup is authoritative for deleted transcripts, so clearing it permanently loses history. Replays do not correct prior over-counts or changed billing/bucketing; restored transcripts whose keys were already pruned can count again.
 - The DB lives at `~/.local/share/q-lab/token-atlas/rollup.db`, outside dotfile sync.
 
@@ -250,9 +250,9 @@ A `pending` live result keeps its marker: the pane is still running and still be
 
 **The autopilot wrappers suppress through the env, not the marker.** `codex-run.ts` and `opencode-run.ts` spawn with `env: { ...process.env, RELAY_DELEGATED: "1" }`. They never went through relay, so before this they set nothing at all. `codex exec` and opencode both read the var, so neither needs the marker.
 
-**The statusline collector runs from the marketplace clone.** `install.ts` resolves `~/.claude/plugins/marketplaces/q-lab-marketplace/packages/monitor/...` through `known_marketplaces.json`, because the plugin cache path encodes the version (`.../monitor/3.1.0/...`). monitor's `SessionStart` hook never touches the statusline; once per version (marker `$CLAUDE_PLUGIN_DATA/.wired-version`) it only reaps old daemons and removes a stale channel entry. The hook never fresh-wires — initial opt-in stays manual.
+**The usage limits come from a mod, not the statusline.** monitor's `hooks/register.ts` hooks `session.measure` and pipes the rate-limit windows, reshaped to the statusline's `{rate_limits: {five_hour: {used_percentage, resets_at}}}`, to `cockpit atlas measure`, which shares `statusline.rs`'s ingest: one cache format, one throttle marker. Its tests import `claude-code/testing`, so bun and tsc exclude `packages/monitor/hooks/**`, and `claude plugin test packages/monitor` cannot run in place — it collects monitor's bun suites too, and refuses a symlinked folder as path-traversal. Copy the mod out first (see Commands). `cockpit atlas statusline` survives one release as a passthrough: monitor's `SessionStart` hook unwraps it once per version (marker `$CLAUDE_PLUGIN_DATA/.wired-version`), and a statusline renders through the new binary before that first hook runs. Delete the subcommand in the release after the unwrap ships. The hook never fresh-wires.
 
-**Drift inside a version is noticed, never fixed.** The same hook then runs a read-only drift watch on every session, because the marker gate is blind to a hand-edited `settings.json`, a restored backup, or a reinstall under another cache root. It reports a foreign collector path, a stale hand-wired channel, missing `permissions.allow` patterns, and an unparseable `settings.json`, then tells the user to run `/monitor:install`. Two rules make it work: the notice ships as a `systemMessage` inside **one** JSON object on stdout — bare stdout reaches only the model, so nothing else in `--session-check` may print and `migrate()`'s output is captured — and repetition is keyed on which pieces are off, stored in `$CLAUDE_PLUGIN_DATA/.drift-notice`, so one complaint is made once but a drift that returns is reported again.
+**Drift inside a version is noticed, never fixed.** The same hook then runs a read-only drift watch on every session, because the marker gate is blind to a hand-edited `settings.json`, a restored backup, or a reinstall under another cache root. It reports a stale hand-wired channel, missing `permissions.allow` patterns, and an unparseable `settings.json`, then tells the user to run `/monitor:install`. Two rules make it work: the notice ships as a `systemMessage` inside **one** JSON object on stdout — bare stdout reaches only the model, so nothing else in `--session-check` may print and `migrate()`'s output is captured — and repetition is keyed on which pieces are off, stored in `$CLAUDE_PLUGIN_DATA/.drift-notice`, so one complaint is made once but a drift that returns is reported again.
 
 **Cockpit Rust distribution.** Fetch `cockpit-<triple>` and `SHA256SUMS` from the `monitor-v<version>` GitHub release through `skills/cockpit/bin/cockpit`. Cache the verified binary in `$XDG_DATA_HOME/q-lab/cockpit-bin/<version>/`, outside the cockpit home, so the binary migrates a legacy `~/.cockpit` on first run. Set `COCKPIT_BIN` to override the fetch. Hooks fail soft while the binary downloads. Keep `daemon.json.root` at `<plugin root>/skills/cockpit/scripts` so version-aware supersede works across a mixed fleet. Treat `cockpit-rs/Cargo.toml` as a monitor version file. Finish the release workflow before users update, or their first session runs without hooks.
 
@@ -270,8 +270,8 @@ packages/monitor/skills/cockpit/bin/cockpit atlas live
 # rewrites the session ledger, which a replay always re-derives from scratch)
 packages/monitor/skills/cockpit/bin/cockpit atlas rollup-update   # [--rebuild]
 
-# monitor:install engine — checks both skills, wires the statusline
-bun packages/monitor/skills/install/scripts/setup.ts                  # --check | --dry-run | --apply
+# monitor:install engine — checks both skills, wires permissions, unwraps the retired collector
+bun packages/monitor/skills/install/scripts/setup.ts                  # --check | --dry-run | --apply | --migrate
 bun packages/monitor/skills/install/scripts/install.ts                # dashboard precheck only
 
 # Cockpit daemon (port 5858)
@@ -304,6 +304,8 @@ bun test packages/monitor/skills/usage-dashboard/contract/   # atlas suite + gol
 COCKPIT_BIN=$PWD/packages/monitor/cockpit-rs/target/release/cockpit bun test packages/monitor/skills/usage-dashboard/contract/
 bun test packages/monitor/skills/usage-dashboard/contract/golden.contract.test.ts
 bun test opencode/
+# monitor's mod: `claude plugin test` collects every *.test.ts, so test a copy
+d=$(mktemp -d) && cp -R packages/monitor/.claude-plugin packages/monitor/hooks "$d" && claude plugin test "$d"; rm -rf "$d"
 
 # Whole-repo test run — --parallel runs test files across worker processes (Bun 1.4)
 bun test --parallel .

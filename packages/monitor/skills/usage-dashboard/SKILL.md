@@ -70,48 +70,35 @@ Flags:
 
 ## Live Usage Limits
 
-Claude Code feeds the dashboard's usage-window panel (5hr / weekly) from
-`rate_limits`. It hands `rate_limits` only to the **status line** command. To
-capture it, point `statusLine.command` in `~/.claude/settings.json` at
-`<plugin-root>/skills/cockpit/bin/cockpit atlas statusline`. The collector
-reads the statusline JSON from stdin. It writes
-`~/.cache/token-atlas/rate-limits.json`. Then it forwards the unchanged
-payload to its inner statusline (default
-`bunx -y ccstatusline@latest`; override with the
-`TOKEN_ATLAS_STATUSLINE_COMMAND` env var to keep an existing line like
-claude-powerline rendering).
+The usage-window panel (5hr / weekly) reads
+`~/.cache/token-atlas/rate-limits.json`. On Claude Code, the monitor mod's
+`session.measure` hook fills it. The engine fires that hook after each
+main-thread turn and whenever a rate-limit window moves a whole point. The
+hook pipes the windows to `cockpit atlas measure`, which writes the cache.
+Nothing needs wiring, and your statusline stays yours.
 
 A statusline wired by an older plugin version still runs the retired
-TypeScript collector through `bun`. monitor's SessionStart hook rewrites that
-command to `cockpit atlas statusline` once, on the first session after the
-plugin updates, and keeps any wrapped `TOKEN_ATLAS_STATUSLINE_COMMAND='…'`
-prefix. It never adds a statusline you did not have.
+collector (`cockpit atlas statusline`). monitor's SessionStart hook unwraps it
+once, on the first session after the plugin updates, back to the command it
+forwarded to. It never adds a statusline you did not have.
 
 ## Optional Remote Usage Export
 
-The statusline collector can also push the latest Claude + Codex usage-window
+`cockpit atlas measure` can also push the latest Claude + Codex usage-window
 snapshot to a server, for example an n8n webhook. An external dashboard, for
 example TRMNL, can then display current quota and usage information. This
-export is opt-in. It runs only when `LLM_QUOTA_INGEST_URL` is set in the
-statusline collector's environment.
+export is opt-in. It runs only when `LLM_QUOTA_INGEST_URL` is set in Claude
+Code's environment, which the hook's child process inherits.
 
 When enabled, the detached background worker POSTs JSON containing:
 
 - `capturedAt` — the export timestamp
-- `claude` — the cached Claude statusline usage limits
+- `claude` — the cached Claude usage limits
 - `codex` — the Codex usage limits from the local cache or Codex usage API
 
 It does not send transcripts, message content, or project/session lists. If
-`LLM_QUOTA_INGEST_SECRET` is set, the collector sends it as the
+`LLM_QUOTA_INGEST_SECRET` is set, the worker sends it as the
 `X-Auth-Token` header.
-
-### Offer to wire it up
-
-When the precheck shows the usage-limits check as `○` (not wired), ask the
-user with `AskUserQuestion` whether to wire it. Do not edit their global
-config yourself. If they agree, run the `monitor:install` skill, which owns
-every config write for this plugin. If they decline, launch the dashboard
-anyway; the usage-limits panel stays empty.
 
 ## Pricing
 

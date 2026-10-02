@@ -14,7 +14,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 |-------|-------------|
 | [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code, Codex, and OpenCode: sessions, tokens, cost, model mix, and project activity, plus live sessions for Claude Code and Codex |
 | [cockpit](./packages/monitor/skills/cockpit) | Per-project work cockpit for Claude Code, Codex, and OpenCode: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
-| [install](./packages/monitor/skills/install) | One-stop prerequisite check and statusline wiring for the whole plugin, command-triggered |
+| [install](./packages/monitor/skills/install) | One-stop prerequisite check and permission wiring for the whole plugin, command-triggered |
 
 **dispatch** bundles five skills:
 
