@@ -16,8 +16,20 @@ const DEFAULT_COMMAND: &str = "bunx -y ccstatusline@latest";
 pub fn run(_args: &[String]) -> ExitCode {
     let mut payload = Vec::new();
     let _ = std::io::stdin().read_to_end(&mut payload);
+    ingest(&payload);
+    ExitCode::from(run_statusline(payload) as u8)
+}
 
-    cache_rate_limits(&payload);
+// The monitor mod's session.measure hook: the statusline's ingest without a statusline to render.
+pub fn run_measure(_args: &[String]) -> ExitCode {
+    let mut payload = Vec::new();
+    let _ = std::io::stdin().read_to_end(&mut payload);
+    ingest(&payload);
+    ExitCode::SUCCESS
+}
+
+fn ingest(payload: &[u8]) {
+    cache_rate_limits(payload);
 
     let cache_dir = paths::token_atlas_cache_dir();
     nudge(
@@ -32,8 +44,6 @@ pub fn run(_args: &[String]) -> ExitCode {
             "push-usage",
         );
     }
-
-    ExitCode::from(run_statusline(payload) as u8)
 }
 
 // The TS stamps rate-limits.json and throttles nudges off the real clock, not the TOKEN_ATLAS_NOW_MS seam.

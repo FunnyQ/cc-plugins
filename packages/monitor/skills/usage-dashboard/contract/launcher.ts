@@ -7,6 +7,7 @@ export type AtlasSub =
   | "live"
   | "rollup-update"
   | "statusline"
+  | "measure"
   | "push-usage";
 
 export const DEFAULT_BIN = join(

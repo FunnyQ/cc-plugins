@@ -17,7 +17,7 @@ pub mod statusline;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: cockpit atlas <serve|stats|live|rollup-update|statusline|push-usage>";
+const USAGE: &str = "usage: cockpit atlas <serve|stats|live|rollup-update|statusline|measure|push-usage>";
 
 pub fn run(args: &[String]) -> ExitCode {
     let rest = args.get(1..).unwrap_or_default();
@@ -27,6 +27,7 @@ pub fn run(args: &[String]) -> ExitCode {
         Some("live") => live::run_cli(rest),
         Some("rollup-update") => rollup_update::run(rest),
         Some("statusline") => statusline::run(rest),
+        Some("measure") => statusline::run_measure(rest),
         Some("push-usage") => push_usage::run(rest),
         _ => {
             eprintln!("{USAGE}");

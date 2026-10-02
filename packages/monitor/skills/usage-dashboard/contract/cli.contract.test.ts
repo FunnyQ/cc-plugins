@@ -203,6 +203,44 @@ describe("statusline", () => {
   }, 15_000);
 });
 
+describe("measure", () => {
+  test("rate_limits input writes the same cache record as statusline, and prints nothing", async () => {
+    const f = await fixture();
+    const r = await run(f, "measure", {
+      stdin: JSON.stringify({ rate_limits: RATE_LIMITS }),
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("");
+    const parsed = JSON.parse(readFileSync(rateLimitsPath(f), "utf8"));
+    expect(Object.keys(parsed)).toEqual([
+      "capturedAt",
+      "capturedAtEpochMs",
+      "rate_limits",
+    ]);
+    expect(parsed.rate_limits).toEqual(RATE_LIMITS);
+  });
+
+  test("no rate_limits keeps a pre-seeded cache file byte-identical", async () => {
+    const f = await fixture();
+    const path = rateLimitsPath(f);
+    mkdirSync(cacheDir(f), { recursive: true });
+    writeFileSync(path, '{"seeded":true}');
+    const r = await run(f, "measure", { stdin: "{}" });
+    expect(r.code).toBe(0);
+    expect(readFileSync(path, "utf8")).toBe('{"seeded":true}');
+  });
+
+  test("rollup nudge shares the statusline marker and throttle", async () => {
+    const f = await fixture();
+    const marker = join(cacheDir(f), ".rollup-nudge");
+    await run(f, "statusline", { stdin: "{}", env: quiet });
+    const mtime = statSync(marker).mtimeMs;
+    const r = await run(f, "measure", { stdin: "{}" });
+    expect(r.elapsedMs).toBeLessThan(2_000);
+    expect(statSync(marker).mtimeMs).toBe(mtime);
+  });
+});
+
 describe("push-usage", () => {
   const ingestRequests = (f: Fixture) =>
     f.stub.requests.filter((req) => req.path === STUB_PATHS.ingest);
