@@ -31,6 +31,8 @@ export type Hunk = {
 export type ToolResponse = {
   type?: string;
   structuredPatch?: Hunk[];
+  /** Claude Code held the edit for review: the file on disk is unchanged. */
+  staged?: boolean;
 };
 
 /** A language's comment forms: line markers, plus open/close block pairs. */

@@ -665,6 +665,32 @@ describe("main", () => {
     expect(out.stderr).toBe("");
   });
 
+  // A staged edit never reached the disk, so the diff's lines miss and the text fallback would mark the untouched block that repeats them.
+  test("an edit held for review reports nothing", async () => {
+    const out = await run(
+      {
+        tool_name: "Edit",
+        tool_input: {
+          file_path: "<FILE>",
+          old_string: "const b = 2;",
+          new_string: "const b = 2;\n// one\n// two\n// three",
+        },
+        tool_response: {
+          staged: true,
+          structuredPatch: [
+            {
+              newStart: 5,
+              lines: [" const b = 2;", "+// one", "+// two", "+// three"],
+            },
+          ],
+        },
+      },
+      BLOCKED,
+    );
+    expect(out.exitCode).toBe(0);
+    expect(out.stderr).toBe("");
+  });
+
   // Claude Code sends an empty patch for a create, so the whole file is new and
   // the text path is the only one that can answer.
   test("a Write that created the file reports through the text path", async () => {

@@ -38,6 +38,7 @@ export const register: Register = (on) => {
     if (!syntax) return ran;
 
     const response = ran.result as ToolResponse;
+    if (response.staged) return ran;
     const patch = response.structuredPatch;
     // A Write that creates a file reports no hunks at all, so an empty patch means "nothing changed" only when the file already existed.
     if (response.type === "update" && patch?.length === 0) return ran;

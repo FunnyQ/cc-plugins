@@ -61,6 +61,7 @@ async function main(): Promise<number> {
   if (!syntax) return 0;
 
   const response = payload.tool_response ?? {};
+  if (response.staged) return 0;
   const patch = response.structuredPatch;
   // A Write that creates a file reports no hunks at all (78 of 78 measured), so
   // an empty patch means "nothing changed" only when the file already existed.

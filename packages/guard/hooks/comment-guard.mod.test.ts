@@ -197,3 +197,12 @@ test("Jev stalling past the timeout keeps the question", async ($, on) => {
   const ran = await call;
   expect(ran.context).toHaveLength(1);
 });
+
+test("an Edit held for review never reached the disk and reports nothing", async ($, on) => {
+  const { files } = world(on, {
+    result: { ...editResult(ADDING_BLOCK), staged: true },
+  });
+  const ran = await $.tool.call(edit);
+  expect(ran.context ?? []).toEqual([]);
+  expect(Object.keys(files).some((p) => p.startsWith("/state/"))).toBe(false);
+});
