@@ -82,7 +82,8 @@ cc-plugins/
 │   │   ├── agents/                       # lawspeaker (commit) / storykeeper (pr) / annalist (release) /
 │   │   │                                 # judge+codifier+barrowkeeper (adr) — none spawns a child
 │   │   ├── agents-codex/                 # Codex agent definitions (TOML format)
-│   │   ├── hooks/check-branch.sh         # PreToolUse, guards commits on main/master
+│   │   ├── hooks/register.ts             # Claude Code mod: classic.PreToolUse Bash, matcher gates on `git commit`, asks
+│   │   ├── hooks/check-branch.sh         # OpenCode only: the same guard on main/master
 │   │   └── skills/{adr,commit,pr,release,install}/
 │   ├── relay/
 │   │   ├── commands/                     # backend-fixed aliases: codex / opencode / claude-cli
@@ -225,7 +226,7 @@ Hook parity — which Claude hooks port to which OpenCode events:
 | monitor | `SessionStart` (`startup\|resume\|clear\|compact`) | `skills/install/scripts/setup.ts --session-check` | **No** — dead code outside Claude Code: it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work (statusline-path migration, reaping orphaned Claude processes) is Claude-only |
 | monitor | `SessionStart` (same matcher) | `skills/cockpit/bin/cockpit hook session-start` | Yes → `session.created` event, delivered by `experimental.chat.system.transform` |
 | monitor | `Stop` | `skills/cockpit/bin/cockpit hook stop` | Yes → `session.idle` event, same delivery |
-| chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.execute.before` on the `bash` tool |
+| chronicle | `PreToolUse` (matcher `Bash`) — OpenCode only; Claude Code runs the `classic.PreToolUse` mod, Codex runs neither | `hooks/check-branch.sh` | Yes → `tool.execute.before` on the `bash` tool |
 | dispatch | `PostToolUse` (matcher `Edit\|Write`) — OpenCode only; Claude Code runs the `tool.call` mod, Codex runs neither | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
 | guard | `PostToolUse` (matcher `Edit\|Write`) — Codex only; Claude Code runs the `tool.call` mod | `hooks/comment-guard.ts` | Yes → `tool.execute.after`, sharing the event with the lint |
 | guard | `UserPromptSubmit` + `Stop` | `hooks/comment-sweep.ts snapshot` / `sweep` | **No** — `session.idle` has no way to hand a reason back to the model |
