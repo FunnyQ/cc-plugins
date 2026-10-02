@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { Director } from './director'
-import { cells, pixels, svg } from './encode'
+import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
 
 const TICK_MS = 50
@@ -25,7 +25,7 @@ export const register: Register = on => {
   let index = 0
   let elapsed = 0
   // terminals without kitty Unicode placeholders (herdr's libghostty) deny Image blits
-  let useRaster = false
+  let useText = false
   // the desktop has no blit, so each frame is a redraw of a static SVG (transparent, unlike an isInteractive frame)
   let isDesktop = false
 
@@ -49,18 +49,13 @@ export const register: Register = on => {
         index = 0
         clip = director.next(inputs())
       }
-      if (isDesktop) {
+      if (isDesktop || useText) {
         $.ui.invalidate('ui.render')
-        return
-      }
-
-      if (useRaster) {
-        $.ui.blit({ requestId, key: 'clawd', cells: cells(clip, index) })
         return
       }
       $.ui.blit({ requestId, key: 'clawd', source: pixels(clip, index) }).then(r => {
         if (!('deny' in r)) return
-        useRaster = true
+        useText = true
         $.ui.invalidate('ui.render')
       })
     })
@@ -120,13 +115,19 @@ export const register: Register = on => {
       return <Svg key="clawd" source={svg(clip, index)} alt={`Clawd ${clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />
     }
     if (e.surface !== 'terminal') return next(e)
-    const { Image, Raster } = $.ui.resolve(e)
+    const { Box, Image, Text } = $.ui.resolve(e)
 
-    if (useRaster) {
-      return <Raster key="clawd" columns={20} rows={8} cells={cells(clip, index)} />
+    // Raster refuses non-BMP characters, so octants go out as plain coloured Text
+    if (useText) {
+      return (
+        <Box key="clawd" flexDirection="column">
+          {octants(clip, index).map((runs, y) => (
+            <Text key={y}>{runs.map((run, x) => <Text key={x} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
+          ))}
+        </Box>
+      )
     }
 
-    // 20x16 pixels over 10x4 cells keeps them square, a cell being twice as tall as wide
-    return <Image key="clawd" columns={10} rows={4} alt=" " source={pixels(clip, index)} />
+    return <Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clip, index)} />
   })
 }
