@@ -17,7 +17,7 @@ const COCKPIT_SHIM = "packages/monitor/skills/cockpit/bin/cockpit";
 // Each shell hook opens with a gate that discards almost every call it receives.
 // Mirroring that gate here keeps the common tool call from paying a bash + jq
 // spawn; the script stays the verdict authority for everything that passes.
-const COMMIT_COMMAND = /git\s+commit/; // check-branch.sh:13
+const COMMIT_COMMAND = /git\s+commit/; // packages/chronicle/hooks/commit-command.ts
 const FLIGHTPLAN_TASK =
   /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/; // packages/dispatch/hooks/task-path.ts
 // comment-core.ts BY_EXT and BY_NAME. Widening this alone only wastes a spawn;

@@ -15,7 +15,7 @@ fi
 # never break every Bash command just because jq isn't installed.
 command=$(echo "$input" | jq -r '.tool_input.command // empty' 2>/dev/null || echo "")
 
-# Only care about git commit commands
+# Only care about git commit commands (commit-command.test.ts holds this equal to commit-command.ts)
 if [[ ! "$command" =~ git[[:space:]]+commit ]]; then
   exit 0
 fi

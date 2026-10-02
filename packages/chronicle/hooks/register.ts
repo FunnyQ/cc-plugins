@@ -7,6 +7,7 @@
  */
 
 import type { Register } from "claude-code";
+import { COMMIT_COMMAND } from "./commit-command.ts";
 
 type PrConfig = {
   workflow?: string;
@@ -18,7 +19,7 @@ type PrConfig = {
 export const register: Register = (on) => {
   on(
     "classic.PreToolUse",
-    { tool: "Bash", command: /git\s+commit/ },
+    { tool: "Bash", command: COMMIT_COMMAND },
     async ($, e, next) => {
       if (e.tool !== "Bash") return next(e);
 

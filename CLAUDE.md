@@ -83,6 +83,7 @@ cc-plugins/
 │   │   │                                 # judge+codifier+barrowkeeper (adr) — none spawns a child
 │   │   ├── agents-codex/                 # Codex agent definitions (TOML format)
 │   │   ├── hooks/register.ts             # Claude Code mod: classic.PreToolUse Bash, matcher gates on `git commit`, asks
+│   │   ├── hooks/commit-command.ts       # that command regex; commit-command.test.ts holds the sh and opencode copies equal
 │   │   ├── hooks/check-branch.sh         # OpenCode only: the same guard on main/master
 │   │   └── skills/{adr,commit,pr,release,install}/
 │   ├── relay/
