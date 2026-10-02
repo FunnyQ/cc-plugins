@@ -25,6 +25,7 @@ import {
   flaggedBlocks,
   formatReason,
   isGuardedPath,
+  patchLines,
   resolveAdded,
   syntaxFor,
   type CommentBlock,
@@ -94,8 +95,33 @@ export function parseHunks(diff: string): Hunk[] {
   return hunks;
 }
 
-// The Edit hook already put these lines to the model this turn; asking again would repeat the question it answered.
-function withoutReported(
+/**
+ * A block moved between files reads as removed here and added there, and the
+ * per-file diff only cancels a move within one file. A deleted file counts too,
+ * since moving a block out of a file often ends with removing the file.
+ */
+export function movedOut(diff: string): Map<string, number> {
+  const pool = new Map<string, number>();
+  for (const section of diff.split(/^diff --git /m).slice(1)) {
+    const from = /^--- (.*)$/m.exec(section)?.[1]?.replace(/^"|"$/g, "");
+    if (!from || from === "/dev/null" || !syntaxFor(from.replace(/^a\//, ""))) {
+      continue;
+    }
+    const { added, removed } = patchLines(parseHunks(section));
+    const left = new Map<string, number>();
+    for (const text of removed) left.set(text, (left.get(text) ?? 0) + 1);
+    for (const { text } of added) {
+      if (left.has(text)) left.set(text, left.get(text)! - 1);
+    }
+    for (const [text, n] of left) {
+      if (n > 0) pool.set(text, (pool.get(text) ?? 0) + n);
+    }
+  }
+  return pool;
+}
+
+// Spends `seen` as it matches, so one removed or reported line excuses one added line, not every copy of it.
+function without(
   added: Set<number> | string[],
   lines: string[],
   seen: Map<string, number> | undefined,
@@ -156,6 +182,19 @@ export async function sweep(payload: Payload): Promise<SweepOutput | null> {
     .filter((f) => f && isGuardedPath(f) && syntaxFor(f));
   if (files.length === 0 || files.length > MAX_FILES) return null;
 
+  const moved = movedOut(
+    git(root, [
+      "diff-tree",
+      "-p",
+      "-U0",
+      "--no-renames",
+      "--no-ext-diff",
+      "--no-textconv",
+      baseline.tree,
+      tree,
+    ]) ?? "",
+  );
+
   const found: { file: string; blocks: CommentBlock[] }[] = [];
   for (const file of files) {
     const diff = git(root, [
@@ -181,10 +220,11 @@ export async function sweep(payload: Payload): Promise<SweepOutput | null> {
       continue;
     }
     const lines = text.split("\n").map((l) => l.trim());
-    const added = withoutReported(
-      resolveAdded(hunks, lines),
+    // The Edit hook already put the reported lines to the model this turn; asking again would repeat the question it answered.
+    const added = without(
+      without(resolveAdded(hunks, lines), lines, reported.get(abs)),
       lines,
-      reported.get(abs),
+      moved,
     );
     if (added instanceof Set ? added.size === 0 : added.length === 0) continue;
 

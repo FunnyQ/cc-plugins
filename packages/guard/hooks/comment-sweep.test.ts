@@ -74,6 +74,37 @@ describe("sweep", () => {
     expect(await sweep(payload)).toBeNull();
   });
 
+  test("a block moved to another file is not an addition", async () => {
+    await Bun.write(join(repo, "old.ts"), BLOCK);
+    await Bun.write(join(repo, "keep.ts"), "export {};\n");
+    await snapshot(payload);
+    await Bun.write(join(repo, "old.ts"), "const a = 1;\nconst b = 2;\n");
+    await Bun.write(join(repo, "keep.ts"), `export {};\n${BLOCK}`);
+    expect(await sweep(payload)).toBeNull();
+  });
+
+  test("a block moved out of a file deleted in the same turn is not an addition", async () => {
+    await Bun.write(join(repo, "old.ts"), BLOCK);
+    await snapshot(payload);
+    await Bun.$`rm ${join(repo, "old.ts")}`.quiet();
+    await Bun.write(join(repo, "new.ts"), BLOCK);
+    expect(await sweep(payload)).toBeNull();
+  });
+
+  test("a block removed in one file still reports a different block added in another", async () => {
+    await Bun.write(join(repo, "old.ts"), BLOCK);
+    await snapshot(payload);
+    await Bun.write(join(repo, "old.ts"), "const a = 1;\nconst b = 2;\n");
+    await Bun.write(
+      join(repo, "new.ts"),
+      BLOCK.replace("// two", "// changed"),
+    );
+    const reason = (await sweep(payload))?.reason;
+    expect(reason).toContain("in new.ts");
+    expect(reason).toContain("+ 3  // changed");
+    expect(reason).toContain("  2  // one");
+  });
+
   test("the snapshot leaves the real index alone", async () => {
     await Bun.write(join(repo, "app.ts"), BLOCK);
     await snapshot(payload);
