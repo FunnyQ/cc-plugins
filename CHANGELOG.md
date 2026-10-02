@@ -1,5 +1,16 @@
 # Changelog
 
+## [monitor 7.1.0] - 2026-10-03
+
+_tracks tag `monitor-v7.1.0`_
+
+### Added
+- The monitor mod now feeds your rate-limit usage to the cockpit cache on every session measure, so limits stay current without a statusLine wrapper, and API-key users still get the rollup nudge.
+- New `cockpit atlas measure` subcommand writes the rate-limit cache and throttle markers directly, sharing one cache format with the statusline.
+
+### Changed
+- `monitor:install` no longer wires the statusline collector into settings.json, and existing setups running the retired collector are migrated back to the command they originally forwarded to, so updating breaks nothing.
+
 ## [clawd 0.1.2] - 2026-10-02
 
 _tracks tag `clawd-v0.1.2`_
