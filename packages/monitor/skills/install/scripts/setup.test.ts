@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { cockpitChecks, versionGte } from "./setup";
+import { cockpitChecks } from "./setup";
 
 const SCRIPT = join(import.meta.dir, "setup.ts");
 const CHANNEL_SCRIPT = resolve(
@@ -83,31 +83,21 @@ afterEach(() => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-describe("versionGte", () => {
-  test("compares semver parts numerically", () => {
-    expect(versionGte("2.1.150", "2.1.80")).toBe(true);
-    expect(versionGte("2.1.80", "2.1.80")).toBe(true);
-    expect(versionGte("2.1.79", "2.1.80")).toBe(false);
-    expect(versionGte("3.0.0", "2.9.9")).toBe(true);
-    expect(versionGte("2.0.5", "2.1.0")).toBe(false);
-  });
-});
-
 describe("--check", () => {
-  test("covers both skills: dashboard prerequisites + cockpit channel", () => {
+  test("covers both skills: dashboard prerequisites + cockpit", () => {
     const { code, stdout } = run();
     expect(code).toBe(0);
     // dashboard side
     expect(stdout).toContain("✓ bun runtime");
     expect(stdout).toContain("stats-cache.json");
     expect(stdout).not.toContain("statusline");
-    // cockpit side — channel is plugin-packaged; with no stale entry it's green
+    // cockpit side — with no leftover entry it's green
     expect(stdout).toContain("cockpit shim exists and is executable");
-    expect(stdout).toContain("✓ no stale cockpit-channel entry");
+    expect(stdout).toContain("✓ no leftover cockpit-channel entry");
     expect(stdout).toContain("mermaid diagram lint (happy-dom)");
   });
 
-  test("flags a stale hand-wired cockpit-channel entry", () => {
+  test("flags a leftover hand-wired cockpit-channel entry", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -117,7 +107,7 @@ describe("--check", () => {
       }),
     );
     const { stdout } = run();
-    expect(stdout).toContain("○ no stale cockpit-channel entry");
+    expect(stdout).toContain("○ no leftover cockpit-channel entry");
     expect(stdout).toContain("--migrate");
   });
 
@@ -173,7 +163,7 @@ describe("--dry-run", () => {
     expect(existsSync(join(home, ".claude", "settings.json"))).toBe(false);
   });
 
-  test("previews removing a stale channel entry without writing", () => {
+  test("previews removing a leftover channel entry without writing", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -183,7 +173,7 @@ describe("--dry-run", () => {
       }),
     );
     const { stdout } = run(["--dry-run"]);
-    expect(stdout).toContain("Would remove the stale cockpit-channel entry");
+    expect(stdout).toContain("Would remove the leftover cockpit-channel entry");
     // still present — dry-run wrote nothing
     expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
   });
@@ -194,12 +184,12 @@ describe("--apply", () => {
     const { code, stdout } = run(["--apply"]);
     expect(code).toBe(0);
     expect(stdout).toContain("✓ Pre-approved q-lab plugin scripts");
-    // channel is plugin-packaged now — apply never writes one into ~/.claude.json
+    // the channel is gone — apply never writes one into ~/.claude.json
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
     expect(settingsJson().statusLine).toBeUndefined();
   });
 
-  test("removes a stale channel entry but preserves other mcpServers and the statusLine", () => {
+  test("removes a leftover channel entry but preserves other mcpServers and the statusLine", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -218,7 +208,7 @@ describe("--apply", () => {
     );
 
     const { stdout } = run(["--apply"]);
-    expect(stdout).toContain("✓ Removed stale cockpit-channel");
+    expect(stdout).toContain("✓ Removed leftover cockpit-channel");
 
     const cj = claudeJson();
     expect(cj.mcpServers.other).toEqual({ command: "x" });
@@ -276,7 +266,7 @@ describe("--apply", () => {
     const { stdout } = run(["--apply"]);
     expect(stdout).toContain("already pre-approved");
     // no channel entry was ever written, so nothing to remove on either pass
-    expect(stdout).not.toContain("Removed stale cockpit-channel");
+    expect(stdout).not.toContain("Removed leftover cockpit-channel");
   });
 
   test("pre-approves the shim alongside existing Bun scripts", () => {
@@ -293,7 +283,7 @@ describe("--apply", () => {
     run(["--apply"]);
     const { code, stdout } = run();
     expect(code).toBe(0);
-    expect(stdout).toContain("✓ no stale cockpit-channel entry");
+    expect(stdout).toContain("✓ no leftover cockpit-channel entry");
     expect(stdout).toContain("✓ q-lab plugin scripts pre-approved");
   });
 });
@@ -303,7 +293,7 @@ describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () 
     writeFileSync(join(home, ".claude.json"), JSON.stringify({
       mcpServers: { "cockpit-channel": { command: COCKPIT_SHIM, args: ["channel"] } },
     }));
-    expect(run().stdout).toContain("○ no stale cockpit-channel entry");
+    expect(run().stdout).toContain("○ no leftover cockpit-channel entry");
     run(["--migrate"]);
     expect(claudeJson().mcpServers["cockpit-channel"]).toBeUndefined();
   });
@@ -367,7 +357,7 @@ describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () 
     );
   });
 
-  test("removes a stale hand-wired channel entry", () => {
+  test("removes a leftover hand-wired channel entry", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -390,7 +380,7 @@ describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () 
 });
 
 describe("--session-check (marker-gated)", () => {
-  test("removes a stale channel entry on first run and writes the version marker", () => {
+  test("removes a leftover channel entry on first run and writes the version marker", () => {
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -410,7 +400,7 @@ describe("--session-check (marker-gated)", () => {
     run(["--session-check"]);
     const marker = join(dataDir, ".wired-version");
     expect(existsSync(marker)).toBe(true);
-    // Now plant a stale channel entry; a second run should NOT remove it, because
+    // Now plant a leftover channel entry; a second run should NOT remove it, because
     // the marker already records this version (the gate skips the migrate).
     writeFileSync(
       join(home, ".claude.json"),

@@ -64,7 +64,7 @@ describe("selectStaleMonitorPids", () => {
   });
 
   // The usage dashboard orphans to PID 1 the same way, but it IS the page the user has
-  // open in a browser, and nothing re-ensures it — the channel only respawns the cockpit
+  // open in a browser, and nothing re-ensures it — the old channel only respawned the cockpit
   // daemon. Reaping it after an upgrade would kill a live dashboard for good. It never
   // polled anything, so it was never part of the leak.
   test("never reaps the usage dashboard, orphaned or not", () => {

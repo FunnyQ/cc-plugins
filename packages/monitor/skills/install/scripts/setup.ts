@@ -6,12 +6,12 @@
 //     (so deeply-nested sub-agents — e.g. chronicle:drafter — can run them without
 //     hitting an unanswerable permission prompt that silently denies them).
 //
-// The cockpit channel is now packaged in the plugin manifest (mcpServers +
-// channels), so it no longer needs a hand-written ~/.claude.json entry. This
-// engine only CLEANS UP a stale entry left by older versions — otherwise the
-// channel would register twice once the packaged one loads.
+// The cockpit channel MCP server is gone: a mod in hooks/register.ts delivers
+// dashboard sends and the permission relay now. This engine only CLEANS UP the
+// leftover hand-wired cockpit-channel entry older versions wrote to
+// ~/.claude.json — it would launch a command that no longer exists.
 //
-// Checks reuse install.ts (dashboard) + the channel prerequisites here.
+// Checks reuse install.ts (dashboard) + the cockpit prerequisites here.
 //
 // The monitor mod's session.measure hook feeds the usage limits now, so a
 // statusLine that still runs the retired collector is unwrapped by --migrate.
@@ -19,8 +19,8 @@
 // Modes:
 //   (default) / --check   read-only status report, exit 1 if a required check fails
 //   --dry-run             print exactly what --apply would change, write nothing
-//   --apply               pre-approve scripts + remove any stale channel entry
-//   --migrate             unwrap the retired collector + remove a stale channel entry
+//   --apply               pre-approve scripts + remove any leftover channel entry
+//   --migrate             unwrap the retired collector + remove a leftover channel entry
 //
 import {
   accessSync,
@@ -63,7 +63,6 @@ const COCKPIT_SCRIPTS = resolve(
   "scripts",
 );
 const CLAUDE_JSON = join(HOME, ".claude.json");
-const MIN_CLAUDE_VERSION = "2.1.80"; // channels research-preview floor
 
 // Pre-approve `bun <q-lab-marketplace plugin script>.ts` in permissions.allow.
 // Without this, an un-allowlisted bun call hits a permission prompt — and a
@@ -105,25 +104,15 @@ function claudeVersion(): string | null {
   }
 }
 
-export function versionGte(a: string, b: string): boolean {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true;
-    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false;
-  }
-  return true;
-}
-
 type ResolveDependency = (specifier: string, from: string) => string;
 
 function defaultResolve(specifier: string, from: string): string {
   return Bun.resolveSync(specifier, from);
 }
 
-// A stale cockpit-channel entry in ~/.claude.json from an older version that
-// hand-wired the channel, or null if there's none. The channel is plugin-
-// packaged now, so any such entry should be removed to avoid double registration.
+// A leftover cockpit-channel entry in ~/.claude.json from an older version that
+// hand-wired the channel, or null if there's none. The channel no longer exists,
+// so any such entry points at a dead command and should be removed.
 function channelConfiguredPath(): string | null {
   const { data } = readJson(CLAUDE_JSON);
   const entry = data?.mcpServers?.["cockpit-channel"];
@@ -141,8 +130,8 @@ function channelConfiguredPath(): string | null {
   );
 }
 
-// --- cockpit channel checks (the piece this skill owns) ---------------------
-function channelChecks(): Check[] {
+// --- cockpit prerequisite checks (the piece this skill owns) ----------------
+function cockpitCliChecks(): Check[] {
   const checks: Check[] = [];
   const add = (
     label: string,
@@ -156,16 +145,8 @@ function channelChecks(): Check[] {
     `claude CLI ${ver ? `(${ver})` : ""}`.trim(),
     ver !== null,
     "optional",
-    "Claude Code not found on PATH — the cockpit channel needs it.",
+    "Claude Code not found on PATH — the cockpit send box and permission relay need a build with function-hook mods.",
   );
-  if (ver) {
-    add(
-      `claude >= ${MIN_CLAUDE_VERSION} (channels)`,
-      versionGte(ver, MIN_CLAUDE_VERSION),
-      "optional",
-      `Channels need Claude Code ${MIN_CLAUDE_VERSION}+. Update Claude Code to use the cockpit send box.`,
-    );
-  }
   let executable = false;
   try {
     accessSync(COCKPIT_SHIM, constants.X_OK);
@@ -179,13 +160,12 @@ function channelChecks(): Check[] {
     "required",
     `Expected at ${COCKPIT_SHIM}`,
   );
-  // The channel is packaged in the plugin manifest now; a leftover hand-wired
-  // entry would register it twice. Flag it for cleanup.
+  // Older versions hand-wired the channel; the entry is a leftover now.
   add(
-    "no stale cockpit-channel entry in ~/.claude.json",
+    "no leftover cockpit-channel entry in ~/.claude.json",
     channelConfiguredPath() === null,
     "optional",
-    `Found a hand-wired cockpit-channel in ~/.claude.json — the channel is plugin-packaged now.\n   Run: bun ${import.meta.path} --migrate to remove it.`,
+    `Found a hand-wired cockpit-channel in ~/.claude.json — the channel was removed, so it is a leftover.\n   Run: bun ${import.meta.path} --migrate to remove it.`,
   );
   return checks;
 }
@@ -211,9 +191,9 @@ export function cockpitChecks(
   ];
 }
 
-// --- cleanup: remove a stale hand-wired cockpit-channel from ~/.claude.json --
-// Older versions wrote the channel here; it's plugin-packaged now, so a leftover
-// entry would register the channel twice. "removed" when it deleted one, "none"
+// --- cleanup: remove a leftover hand-wired cockpit-channel from ~/.claude.json --
+// Older versions wrote the channel here; the channel is gone, so the entry points
+// at a dead command. "removed" when it deleted one, "none"
 // when there was nothing to do, "error" when the file couldn't be parsed.
 function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   const { data, readable } = readJson(CLAUDE_JSON);
@@ -225,7 +205,7 @@ function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   if (!hasEntry) return "none";
   if (dryRun) {
     console.log(
-      `Would remove the stale cockpit-channel entry from ${CLAUDE_JSON}.`,
+      `Would remove the leftover cockpit-channel entry from ${CLAUDE_JSON}.`,
     );
     return "removed";
   }
@@ -233,7 +213,7 @@ function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   delete next.mcpServers["cockpit-channel"];
   const bak = backup(CLAUDE_JSON);
   writeFileSync(CLAUDE_JSON, `${JSON.stringify(next, null, 2)}\n`);
-  console.log(`✓ Removed stale cockpit-channel from ${CLAUDE_JSON}`);
+  console.log(`✓ Removed leftover cockpit-channel from ${CLAUDE_JSON}`);
   if (bak) console.log(`   (backup: ${bak})`);
   return "removed";
 }
@@ -288,7 +268,7 @@ function scriptPermissionChecks(): Check[] {
   ];
 }
 
-// --- migrate: stale channel entry + retired statusline collector -----------
+// --- migrate: leftover channel entry + retired statusline collector -----------
 // Unwraps the collector rather than leaving it: the mod feeds the usage limits
 // now, and the collector subcommand goes away in a later release.
 function migrate(): string[] {
@@ -342,7 +322,7 @@ function driftReport(): DriftItem[] {
   if (channelConfiguredPath() !== null) {
     items.push({
       key: "stale-channel",
-      message: `${CLAUDE_JSON} still hand-wires cockpit-channel, so the plugin-packaged channel registers twice. Run the /monitor:install skill to remove the stale entry.`,
+      message: `${CLAUDE_JSON} still hand-wires cockpit-channel, a leftover from an older version that now points at a removed command. Run the /monitor:install skill to remove it.`,
     });
   }
   if (missingScriptPermissions().length > 0) {
@@ -487,19 +467,14 @@ function main() {
     let ok = unwireChannel(dryRun) !== "error";
     ok = applyScriptPermissions(dryRun) && ok;
     console.log();
-    if (!dryRun && ok) {
-      console.log("Done. Launch an opted-in session with:");
-      console.log(
-        "   claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace",
-      );
-    }
+    if (!dryRun && ok) console.log("Done.");
     process.exit(ok ? 0 : 1);
   }
 
-  // default: check — dashboard prerequisites + cockpit channel
+  // default: check — dashboard prerequisites + cockpit
   const { requiredFailed } = printReport([
     ...dashboardChecks(),
-    ...channelChecks(),
+    ...cockpitCliChecks(),
     ...cockpitChecks(),
     ...scriptPermissionChecks(),
   ]);

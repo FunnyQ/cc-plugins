@@ -1,5 +1,9 @@
 // Reap monitor daemons left behind by PREVIOUS plugin versions.
 //
+// The channel is gone from current versions (a mod does its job over HTTP), but a
+// session started before the upgrade still runs one until it restarts, and an orphan
+// of that kind is still here to reap. Keep the `channel` patterns for that reason.
+//
 // Until 3.19.0 the cockpit channel had no exit path: the MCP SDK's stdio transport
 // listens only for stdin 'data'/'error', so when Claude Code closed the pipe the
 // channel was reparented to PID 1 and kept long-polling the daemon forever. Every
@@ -13,8 +17,8 @@
 // The selection is deliberately narrow on TWO axes.
 //
 // WHICH PROCESSES — only the cockpit channel and its daemon. A stale cockpit daemon is
-// safe to signal because it self-heals: any live channel's next poll fails and calls
-// `ensureCockpitDaemon()`, which respawns it.
+// safe to signal because it self-heals: a live old channel's next poll fails and calls
+// `ensureCockpitDaemon()`, and the mod's next call spawns `cockpit ensure-daemon`.
 //
 // The usage dashboard — `bun …/atlas-server.ts`, and now `cockpit atlas serve` — is
 // deliberately NOT in scope, even though it orphans to PID 1 the same way. It is the
