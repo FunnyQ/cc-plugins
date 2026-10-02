@@ -1,5 +1,14 @@
 # Changelog
 
+## [clawd 0.1.0] - 2026-10-02
+
+_tracks tag `clawd-v0.1.0`_
+
+### Added
+- New clawd plugin animates Clawd, hey-clawd's pixel crab, in the band above the Claude Code prompt: it works while a turn runs, calls for attention on a permission prompt, celebrates when a turn ends, and yawns and sleeps when idle, picking from 35 clips by mood.
+- Clawd renders in real pixels through kitty graphics in terminals that support Unicode placeholders, falls back to half-block characters elsewhere (such as inside herdr), and draws a crisp pixel SVG on desktop.
+- Clawd works with Claude Code only (no Codex) and requires Claude Code's function hooks, which are in early access.
+
 ## [browsers 0.1.0] - 2026-10-01
 
 _tracks tag `browsers-v0.1.0`_
