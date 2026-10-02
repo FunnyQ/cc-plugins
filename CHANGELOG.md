@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 5.6.0] - 2026-10-03
+
+_tracks tag `dispatch-v5.6.0`_
+
+### Added
+- flightplan-lint now runs as a Claude Code mod that matches the task path first, so unrelated Edit and Write calls no longer spawn a shell, and violations reach the model through the result context.
+
+### Changed
+- The Required-reading header check behind flightplan-lint now lives in lint-task.ts alone, and a test fails if the three copies of the task-path pattern drift apart.
+
 ## [guard 0.7.1] - 2026-10-03
 
 _tracks tag `guard-v0.7.1`_
