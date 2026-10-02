@@ -278,10 +278,15 @@ export type LintOptions = {
    * autopilot's external-dev driver lints after the engine writes and is told to
    * repair the file until clean (size is not repairable by it), and the scout
    * lints the whole tree before flying, where a size violation would ground a
-   * correct plan authored before this rule existed.
+   * correct plan authored before this rule existed. It also passes a file
+   * without the Required-reading header, since the edit hooks call it on every
+   * task-shaped path and only the header tells a flightplan task apart.
    */
   authoring?: boolean;
 };
+
+// Both scaffolded forms: `**Required reading**:` and `**Required reading** (…):`. The `**` right after the label keeps `**Required reading later**:` out.
+const TASK_HEADER = /^> \*\*Required reading\*\*(\s*\([^)]*\))?\s*:/m;
 
 export async function lintFile(
   filePath: string,
@@ -298,6 +303,7 @@ export async function lintFile(
     push("read", `cannot read file: ${(err as Error).message}`);
     return violations;
   }
+  if (options.authoring && !TASK_HEADER.test(content)) return violations;
 
   const parsed = parseTask(content);
   if (!parsed.ok) {

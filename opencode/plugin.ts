@@ -19,7 +19,7 @@ const COCKPIT_SHIM = "packages/monitor/skills/cockpit/bin/cockpit";
 // spawn; the script stays the verdict authority for everything that passes.
 const COMMIT_COMMAND = /git\s+commit/; // check-branch.sh:13
 const FLIGHTPLAN_TASK =
-  /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/; // flightplan-lint.sh:28
+  /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/; // packages/dispatch/hooks/task-path.ts
 // comment-core.ts BY_EXT and BY_NAME. Widening this alone only wastes a spawn;
 // narrowing it past the hook silently stops guarding a language, so
 // plugin.test.ts cross-checks both directions against syntaxFor.

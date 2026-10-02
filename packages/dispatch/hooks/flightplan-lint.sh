@@ -9,10 +9,9 @@
 #   2 = violations found (PostToolUse exit 2 + stderr surfaces feedback to the LLM)
 #
 # Scope: this hook is plugin-wide, but two filters narrow it to flightplan tasks:
-#   1. Path matches docs/<slug>/tasks/<bucket>/NN-*.md
-#   2. File carries the Required-reading header, in either supported form:
-#        > **Required reading**:
-#        > **Required reading** (read before starting; ...):
+#   1. Path matches docs/<slug>/tasks/<bucket>/NN-*.md (task-path.test.ts holds
+#      it equal to task-path.ts and opencode/plugin.ts)
+#   2. lint-task.ts --authoring passes a file without the Required-reading header
 # Either check failing → silent exit 0, no false positives on unrelated files.
 
 set -e
@@ -40,14 +39,6 @@ if ! [[ "$file_path" =~ (^|/)docs/.+/tasks/[a-z][a-z0-9]*/[0-9]{2}-.+\.md$ ]]; t
   exit 0
 fi
 
-# 2. Content sniff — file has the flightplan header marker.
-# Accepts the current scaffolded header (an annotation in parentheses before the
-# colon) and the legacy bare-colon header. The `**` immediately after the label
-# keeps near misses such as `**Required reading later**:` out.
-if ! grep -Eq '^> \*\*Required reading\*\*([[:space:]]*\([^)]*\))?[[:space:]]*:' "$file_path" 2>/dev/null; then
-  exit 0
-fi
-
 # Resolve lint script via CLAUDE_PLUGIN_ROOT (set by Claude Code) with a
 # best-effort fallback for direct invocation / tests.
 lint_script="${CLAUDE_PLUGIN_ROOT:-}/skills/flightplan/scripts/lint-task.ts"
@@ -63,6 +54,8 @@ fi
 
 # --authoring adds the task-size check. It belongs on this surface only: the
 # write just landed, so the author is present and splitting is still cheap.
+# It also passes a file without the Required-reading header, so the content
+# sniff lives in lint-task.ts alone.
 # Autopilot's own lint calls (the external-dev driver, the pre-flight scout) omit
 # the flag, so a plan authored before the rule existed still flies.
 if output=$(bun "$lint_script" --authoring "$file_path" 2>&1); then

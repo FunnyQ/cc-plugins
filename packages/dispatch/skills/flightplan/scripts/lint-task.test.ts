@@ -129,7 +129,10 @@ describe("lintFile Models", () => {
     expect(sectionStart).toBeGreaterThanOrEqual(0);
     const sectionBody = template.slice(sectionStart + "### Models\n".length);
     const nextHeading = sectionBody.search(/^#{2,3} /m);
-    const section = sectionBody.slice(0, nextHeading < 0 ? undefined : nextHeading);
+    const section = sectionBody.slice(
+      0,
+      nextHeading < 0 ? undefined : nextHeading,
+    );
     const example = section.match(/^> \*\*Models\*\*:.*$/m);
     expect(example).not.toBeNull();
 
@@ -179,25 +182,30 @@ describe("lintFile Models", () => {
     ["fix=opus", false, 1],
     ["fix=opus", true, 0],
     ["dev, scout=haiku, fix=opus", false, 3],
-  ] as const)("checks %s with finalReview=%s", async (value, finalReview, count) => {
-    const root = await writeTree({
-      "tasks/_context/shared.md": "# Shared\n",
-      "tasks/ui/01-foo.md": VALID_TASK.replace(
-        "> **Status**: todo",
-        `> **Status**: todo\n> **Models**: ${value}${finalReview ? "\n> **Final review**: true" : ""}`,
-      ),
-    });
-    try {
-      const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
-      const models = violations.filter((v) => v.rule === "models");
-      expect(models).toHaveLength(count);
-      if (count > 0) {
-        expect(models.at(-1)?.detail).toBe("`fix` is legal only on the Final review task");
+  ] as const)(
+    "checks %s with finalReview=%s",
+    async (value, finalReview, count) => {
+      const root = await writeTree({
+        "tasks/_context/shared.md": "# Shared\n",
+        "tasks/ui/01-foo.md": VALID_TASK.replace(
+          "> **Status**: todo",
+          `> **Status**: todo\n> **Models**: ${value}${finalReview ? "\n> **Final review**: true" : ""}`,
+        ),
+      });
+      try {
+        const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+        const models = violations.filter((v) => v.rule === "models");
+        expect(models).toHaveLength(count);
+        if (count > 0) {
+          expect(models.at(-1)?.detail).toBe(
+            "`fix` is legal only on the Final review task",
+          );
+        }
+      } finally {
+        await rm(root, { recursive: true });
       }
-    } finally {
-      await rm(root, { recursive: true });
-    }
-  });
+    },
+  );
 });
 
 describe("lintFile", () => {
@@ -1410,6 +1418,46 @@ describe("task-size advisory", () => {
   });
 });
 
+// The edit hooks lint every task-shaped path, so authoring mode alone must pass a file that is not a flightplan task.
+describe("authoring header gate", () => {
+  const lintBody = async (
+    body: string,
+    opts?: Parameters<typeof lintFile>[1],
+  ) => {
+    const root = await writeTree({ "tasks/ui/01-x.md": body });
+    const violations = await lintFile(join(root, "tasks/ui/01-x.md"), opts);
+    await rm(root, { recursive: true, force: true });
+    return violations;
+  };
+
+  test("passes a file without the header in authoring mode", async () => {
+    expect(
+      await lintBody("# notes\n\nnot a task\n", { authoring: true }),
+    ).toEqual([]);
+  });
+
+  test("passes a near-miss label in authoring mode", async () => {
+    const body = VALID_TASK.replace(
+      "> **Required reading**:",
+      "> **Required reading later**:",
+    );
+    expect(await lintBody(body, { authoring: true })).toEqual([]);
+  });
+
+  test("lints a file with the annotated header in authoring mode", async () => {
+    const body = VALID_TASK.replace(
+      "> **Required reading**:",
+      "> **Required reading** (read before starting):",
+    ).replace("One sentence.", "See PLAN.md.");
+    const violations = await lintBody(body, { authoring: true });
+    expect(violations.some((v) => v.rule !== "task-size")).toBe(true);
+  });
+
+  test("still flags a header-less file outside authoring mode", async () => {
+    expect((await lintBody("# notes\n")).length).toBeGreaterThan(0);
+  });
+});
+
 describe("plan concurrency", () => {
   const treeWithPlan = (plan: string, shared = "# Shared\n") =>
     writeTree({
@@ -1481,8 +1529,13 @@ describe("plan concurrency", () => {
 
 describe("human-gate", () => {
   const withGates = (acceptance: string, verification: string) =>
-    VALID_TASK.replace("## Acceptance criteria\n- [ ] One", `## Acceptance criteria\n${acceptance}`)
-      .replace("## Verification\n- [ ] Run `bun test`", `## Verification\n${verification}`);
+    VALID_TASK.replace(
+      "## Acceptance criteria\n- [ ] One",
+      `## Acceptance criteria\n${acceptance}`,
+    ).replace(
+      "## Verification\n- [ ] Run `bun test`",
+      `## Verification\n${verification}`,
+    );
 
   const lint = async (body: string) => {
     const root = await writeTree({
@@ -1520,7 +1573,10 @@ describe("human-gate", () => {
 
   test("an all-human verification section is rejected", async () => {
     const violations = await lint(
-      withGates("- [ ] The widget renders", "- [ ] (human) Click the menu-bar icon"),
+      withGates(
+        "- [ ] The widget renders",
+        "- [ ] (human) Click the menu-bar icon",
+      ),
     );
     expect(
       violations.filter((v) => v.rule === "human-gate").map((v) => v.detail),
@@ -1579,16 +1635,26 @@ describe("scope-pgrep rule", () => {
   });
 
   test("flags quoted patterns and combined flag clusters", async () => {
-    expect(await lintGate('- [ ] Run `pgrep -f "cockpit-channel.ts"`')).toHaveLength(1);
-    expect(await lintGate("- [ ] Run `pgrep -af 'cockpit-channel.ts'`")).toHaveLength(1);
-    expect(await lintGate("- [ ] Run `pgrep -f -l cockpit-channel.ts`")).toHaveLength(1);
+    expect(
+      await lintGate('- [ ] Run `pgrep -f "cockpit-channel.ts"`'),
+    ).toHaveLength(1);
+    expect(
+      await lintGate("- [ ] Run `pgrep -af 'cockpit-channel.ts'`"),
+    ).toHaveLength(1);
+    expect(
+      await lintGate("- [ ] Run `pgrep -f -l cockpit-channel.ts`"),
+    ).toHaveLength(1);
   });
 
   test("passes a pattern anchored to a flag or a path", async () => {
     expect(
-      await lintGate("- [ ] Run `pgrep -f 'cockpit-server.ts --no-open --port'`"),
+      await lintGate(
+        "- [ ] Run `pgrep -f 'cockpit-server.ts --no-open --port'`",
+      ),
     ).toEqual([]);
-    expect(await lintGate("- [ ] Run `pgrep -f /tmp/x/cockpit-server.ts`")).toEqual([]);
+    expect(
+      await lintGate("- [ ] Run `pgrep -f /tmp/x/cockpit-server.ts`"),
+    ).toEqual([]);
   });
 
   test("ignores pgrep without -f", async () => {

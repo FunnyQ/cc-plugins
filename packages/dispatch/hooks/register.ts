@@ -7,10 +7,7 @@
  */
 
 import type { Register } from "claude-code";
-
-// Same as flightplan-lint.sh's path filter and FLIGHTPLAN_TASK in opencode/plugin.ts.
-const TASK_PATH = /(^|\/)docs\/.+\/tasks\/[a-z][a-z0-9]*\/[0-9]{2}-.+\.md$/;
-const HEADER = /^> \*\*Required reading\*\*(\s*\([^)]*\))?\s*:/m;
+import { TASK_PATH } from "./task-path.ts";
 
 export const register: Register = (on) => {
   on(
@@ -21,15 +18,7 @@ export const register: Register = (on) => {
       if (ran.deny !== undefined || ran.isError) return ran;
       if ((ran.result as { staged?: boolean }).staged) return ran;
 
-      let text: string;
-      try {
-        text = await $.fs.read(e.file_path);
-      } catch {
-        return ran;
-      }
-      if (!HEADER.test(text)) return ran;
-
-      // --authoring adds the task-size check, which only the author's own write should face.
+      // --authoring adds the task-size check, which only the author's own write should face, and passes a file without the task header.
       const lint = await $.process.run([
         "bun",
         `${$.plugin.root}/skills/flightplan/scripts/lint-task.ts`,

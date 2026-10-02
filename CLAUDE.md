@@ -70,7 +70,8 @@ cc-plugins/
 │   │           └── statusline-decision.ts    # pure unwrap of the retired collector, unit-tested
 │   ├── dispatch/
 │   │   ├── hooks/register.ts             # Claude Code mod: tool.call Edit|Write, matcher gates on the task path
-│   │   ├── hooks/flightplan-lint.sh      # OpenCode only: the same lint, path + content gated
+│   │   ├── hooks/task-path.ts            # that path regex; task-path.test.ts holds the sh and opencode copies equal
+│   │   ├── hooks/flightplan-lint.sh      # OpenCode only: the same lint; lint-task.ts --authoring owns the header sniff
 │   │   └── skills/{preflight,hop,flightplan,autopilot,waypoints,deckplan}/
 │   │       # preflight/references/intent-template.md — the INTENT.md contract;
 │   │       # preflight borrows flightplan's scaffold.ts for its collision check
