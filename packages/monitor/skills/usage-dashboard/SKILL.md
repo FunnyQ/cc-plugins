@@ -62,7 +62,7 @@ The precheck (`install.ts`, owned by the sibling `install` skill) verifies `bun`
 
 If the precheck exits non-zero, surface the failed `✗` lines and their `→ hint` to the user verbatim. Then stop. Do **not** attempt to auto-fix: no `bun install`, no file fetches. The hints are actionable steps the user takes themselves, for example installing bun or running `/stats` once in Claude Code to seed `stats-cache.json`.
 
-Default port: `5938`. This behavior is an idempotent **ensure + open**. A PID file tracks the live instance. Re-running reuses an already-running dashboard, or supersedes a stale one from an out-of-date install. Either way, it opens `http://localhost:5938` in the default browser. The dashboard is independent of the cockpit channel. Nothing else starts it for you, so this skill owns its lifecycle.
+Default port: `5938`. This behavior is an idempotent **ensure + open**. A PID file tracks the live instance. Re-running reuses an already-running dashboard, or supersedes a stale one from an out-of-date install. Either way, it opens `http://localhost:5938` in the default browser. The dashboard is independent of the cockpit daemon and the monitor mod. Nothing else starts it for you, so this skill owns its lifecycle.
 
 Flags:
 - `--port <n>` — pick a different port

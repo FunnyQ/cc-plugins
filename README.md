@@ -216,23 +216,21 @@ Opens `http://localhost:5858` in your default browser.
 - OpenCode transcripts resolve via the `opencode` provider in `packages/monitor/cockpit-rs/src/server/transcript.rs`, reading the same `~/.local/share/opencode/opencode.db` the usage-dashboard uses.
 - Decision logs live per-project under `.cockpit/`; the registry and wait/send bridge are shared through `~/.local/share/q-lab/cockpit/`.
 
-### Channel (send box)
+### Send box
 
 The send box at the bottom of the Decision Log column can send text into a running session.
 
-- **Claude Code** uses the cockpit channel MCP server. The agent's answer comes back through the live transcript.
+- **Claude Code** uses the monitor mod's inbox poll, described below. The agent's answer comes back through the live transcript.
 - **Codex** uses the managed Codex remote-control daemon. Cockpit connects to the local app-server control socket, resumes the selected thread, and submits or steers a turn. Direct app-server is only a fallback when remote-control is unavailable.
-- **OpenCode** uses the TUI HTTP bridge, not an MCP channel: it discovers the running TUI from `OPENCODE_TUI_SERVER_URL` (or a `ps` scan for `opencode --port <n>`) and delivers through `/tui/append-prompt` + `/tui/submit-prompt`. Same port precondition as the OpenCode Installation section above — the TUI must have been started with `--port`; a `serve` process is not discovered, and a successful send is not a delivery receipt.
+- **OpenCode** uses the TUI HTTP bridge, not the mod: it discovers the running TUI from `OPENCODE_TUI_SERVER_URL` (or a `ps` scan for `opencode --port <n>`) and delivers through `/tui/append-prompt` + `/tui/submit-prompt`. Same port precondition as the OpenCode Installation section above — the TUI must have been started with `--port`; a `serve` process is not discovered, and a successful send is not a delivery receipt.
 
-Channels require Claude Code 2.1.80 or later and are still behind the research-preview development flag. The channel MCP server is packaged in the plugin manifest (`mcpServers` + `channels` in `.claude-plugin/plugin.json`), so installing the plugin registers it — no hand-written `~/.claude.json` entry. (If you set one up for an older version, `/monitor:install` removes it; leaving it in place double-registers the channel.)
-
-Launch an opted-in session — the channel only attaches to sessions started with the development channel flag and cannot retro-attach to an already-running session:
+A monitor mod (`hooks/register.ts`) delivers Claude Code sends. On session start it long-polls the cockpit daemon's inbox over HTTP and submits each message as a new turn once the session is idle. The same mod relays permission dialogs to the dashboard. It needs a Claude Code build with function-hook mods, and a plain `claude` session gets both:
 
 ```bash
-claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace
+claude
 ```
 
-Append Claude Code arguments to this command (e.g. `--resume`). See the [cockpit skill](./packages/monitor/skills/cockpit/SKILL.md) for the full setup.
+If an older version left a hand-wired `cockpit-channel` entry in `~/.claude.json`, `/monitor:install` removes it. See the [cockpit skill](./packages/monitor/skills/cockpit/SKILL.md) for the full setup.
 
 For Codex send support, install and enable the managed standalone Codex remote-control daemon:
 

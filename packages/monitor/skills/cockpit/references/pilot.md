@@ -32,9 +32,9 @@ If the user explicitly asks to change it, run:
 ## Step 3 — Open the cockpit
 
 The trail is only useful if the user can see it, so open the dashboard. When
-this session was launched with the cockpit channel, the daemon is **already
-running**. The channel MCP launches it headless, with no browser. Either
-way, run:
+this is a Claude Code session, the daemon is usually **already running**:
+the monitor mod launches it headless with `cockpit ensure-daemon`, with no
+browser. Either way, run:
 
 ```bash
 <plugin-root>/skills/cockpit/bin/cockpit server
@@ -42,7 +42,7 @@ way, run:
 
 This command is an idempotent **ensure + open**. If the daemon is already
 up, it opens the browser and exits. If the daemon is not up — a Codex
-session, or Claude launched without the channel flag — it launches the
+session, or a Claude session whose mod has not started it — it launches the
 daemon and opens the browser. On a cold boot the daemon is long-lived and
 would otherwise block, so run it as a background task. Then tell the user
 the URL (default `http://localhost:5858`). See **The dashboard daemon**
@@ -56,11 +56,11 @@ session.
 - **Singleton, idempotent.** A PID file at `~/.local/share/q-lab/cockpit/daemon.json` tracks the
   live instance. Running it again detects the running daemon. It opens the
   browser, prints the URL, and exits `0`. Re-running always lands the user
-  on the cockpit, even when the daemon was launched headless by the channel
-  MCP.
+  on the cockpit, even when the daemon was launched headless by the monitor
+  mod.
 - **Binds `127.0.0.1:5858`.** Override with `--port <n>`. Pass `--no-open`
-  to skip opening the browser — the channel MCP launches the daemon this
-  way.
+  to skip opening the browser — `cockpit ensure-daemon` launches the
+  daemon this way.
 - **It will not kill a foreign process.** If port 5858 is held by something
   that is not a cockpit daemon, it exits `1` with a clear message. Re-run
   with `--port <n>`.

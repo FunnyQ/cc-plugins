@@ -41,10 +41,10 @@ cc-plugins/
 ├── CHANGELOG.md                      # Keep a Changelog format, per-plugin headings
 ├── packages/
 │   ├── monitor/
-│   │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks + cockpit channel
+│   │   ├── .claude-plugin/plugin.json    # manifest + SessionStart hooks
 │   │   ├── .codex-plugin/{plugin,hooks}.json  # mirrors the Claude hooks
-│   │   ├── hooks/                       # Claude Code mod: session.measure → `cockpit atlas measure`
-│   │   ├── cockpit-rs/                  # Rust crate: server, channel, CLI, hook subcommands
+│   │   ├── hooks/                       # Claude Code mod: session.measure → `cockpit atlas measure`; session.start inbox poll + permission relay
+│   │   ├── cockpit-rs/                  # Rust crate: server, CLI (incl. `ensure-daemon`), hook subcommands
 │   │   │   └── src/atlas/               # usage-dashboard engine + server: `cockpit atlas <sub>`
 │   │   │       # stats.rs / rollup_db.rs / rollup_update.rs / codex.rs / live.rs / server.rs / measure.rs
 │   │   ├── commands/                     # thoughtful.md, nudge.md
@@ -210,9 +210,15 @@ Place the gate **after** the stash drain and the superseded check, so a fast ans
 
 Do not infer intent from visibility. `document.hidden` stays false when another app covers the browser — verified: a minimized window still reports the tab visible. Liveness alone is also not enough: with the switch on and no tab connected, a park hangs forever.
 
-**Leave the permission relay ungated.** Its protocol is notification-based and the terminal prompt stays live beside the cockpit card, so it already defaults to the TUI.
+**Leave the permission relay ungated.** The terminal prompt stays live beside the cockpit card, so it already defaults to the TUI.
 
-**Route sends by provider.** Claude sends use the cockpit channel MCP server. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends use the opencode 1.x TUI HTTP bridge (`cockpit-rs/src/server/opencode.rs`): the running TUI is discovered from `OPENCODE_TUI_SERVER_URL`, `OPENCODE_SERVER_URL`, or a `ps` scan for `opencode --port <n>` (a `serve` process is excluded from that scan), then delivered through `/tui/append-prompt` followed by `/tui/submit-prompt`. The channel is UI→agent only; the agent's answers ride the transcript.
+**The Claude permission race lives in `tool.call` + `tool.check` + `classic.PermissionRequest`, never in `classic.PermissionRequest` alone.** A `classic.PermissionRequest` hook that waits on the dashboard holds the terminal dialog shut until it returns, so it runs only to learn that a dialog actually opened and to post `/api/permission-request`. The wait itself races inside `tool.call`: a dashboard deny refuses the call, a dashboard allow lifts the `ask` in `tool.check` for that `tool_use_id` and reruns the call, which closes the terminal dialog, and a terminal answer first posts `/api/permission-resolved`.
+
+**Route sends by provider.** Claude sends use the monitor mod: on `session.start` it long-polls `/api/inbox` and submits each message with `$.prompt.submit`, so it lands as a new turn once the session is idle, not as a `<channel>` tag. Codex sends use the managed Codex remote-control app-server socket, with direct app-server as fallback. OpenCode sends use the opencode 1.x TUI HTTP bridge (`cockpit-rs/src/server/opencode.rs`): the running TUI is discovered from `OPENCODE_TUI_SERVER_URL`, `OPENCODE_SERVER_URL`, or a `ps` scan for `opencode --port <n>` (a `serve` process is excluded from that scan), then delivered through `/tui/append-prompt` followed by `/tui/submit-prompt`. The send path is UI→agent only; the agent's answers ride the transcript.
+
+**Every mod long-poll must re-poll, because `$.http.fetch` aborts at 30s.** Park each poll under that limit and loop. A throw after ~29s is the abort, not a failure; only an earlier throw counts as an error.
+
+**The daemon is started by `cockpit ensure-daemon`, not by a channel.** It supersedes a stale daemon, then prints `{"port":N,"token":"T"}`; the mod spawns it and reads the port and token from that line. The daemon-side names (`mark_channel_seen`, the `channel` presence field) stay.
 
 ## Harness constraints
 
@@ -259,9 +265,9 @@ A `pending` live result keeps its marker: the pane is still running and still be
 
 **The usage limits come from a mod, not the statusline.** monitor's `hooks/register.ts` hooks `session.measure` and pipes the rate-limit windows, reshaped to the statusline's `{rate_limits: {five_hour: {used_percentage, resets_at}}}`, to `cockpit atlas measure` (`measure.rs`), the one writer of the rate-limit cache and its throttle marker. Its tests import `claude-code/testing`, so bun and tsc exclude `packages/monitor/hooks/**`, and `claude plugin test packages/monitor` cannot run in place — it collects monitor's bun suites too, and refuses a symlinked folder as path-traversal. Copy the mod out first (see Commands). The `cockpit atlas statusline` passthrough is gone; monitor's `SessionStart` hook still unwraps a leftover wiring once per version (marker `$CLAUDE_PLUGIN_DATA/.wired-version`), so keep `unwrapCollectorCommand`. Until that first hook runs, a statusline still pointing at it gets the CLI's unknown-subcommand usage error, so the statusline renders empty for that one session. The hook never fresh-wires.
 
-**Drift inside a version is noticed, never fixed.** The same hook then runs a read-only drift watch on every session, because the marker gate is blind to a hand-edited `settings.json`, a restored backup, or a reinstall under another cache root. It reports a stale hand-wired channel, missing `permissions.allow` patterns, and an unparseable `settings.json`, then tells the user to run `/monitor:install`. Two rules make it work: the notice ships as a `systemMessage` inside **one** JSON object on stdout — bare stdout reaches only the model, so nothing else in `--session-check` may print and `migrate()`'s output is captured — and repetition is keyed on which pieces are off, stored in `$CLAUDE_PLUGIN_DATA/.drift-notice`, so one complaint is made once but a drift that returns is reported again.
+**Drift inside a version is noticed, never fixed.** The same hook then runs a read-only drift watch on every session, because the marker gate is blind to a hand-edited `settings.json`, a restored backup, or a reinstall under another cache root. It reports a leftover hand-wired `cockpit-channel` entry, missing `permissions.allow` patterns, and an unparseable `settings.json`, then tells the user to run `/monitor:install`. Two rules make it work: the notice ships as a `systemMessage` inside **one** JSON object on stdout — bare stdout reaches only the model, so nothing else in `--session-check` may print and `migrate()`'s output is captured — and repetition is keyed on which pieces are off, stored in `$CLAUDE_PLUGIN_DATA/.drift-notice`, so one complaint is made once but a drift that returns is reported again.
 
-**Cockpit Rust distribution.** Fetch `cockpit-<triple>` and `SHA256SUMS` from the `monitor-v<version>` GitHub release through `skills/cockpit/bin/cockpit`. Cache the verified binary in `$XDG_DATA_HOME/q-lab/cockpit-bin/<version>/`, outside the cockpit home, so the binary migrates a legacy `~/.cockpit` on first run. Set `COCKPIT_BIN` to override the fetch. Hooks fail soft while the binary downloads. Keep `daemon.json.root` at `<plugin root>/skills/cockpit/scripts` so version-aware supersede works across a mixed fleet. Treat `cockpit-rs/Cargo.toml` as a monitor version file. Finish the release workflow before users update, or their first session runs without hooks.
+**Cockpit Rust distribution.** Fetch `cockpit-<triple>` and `SHA256SUMS` from the `monitor-v<version>` GitHub release through `skills/cockpit/bin/cockpit`. Cache the verified binary in `$XDG_DATA_HOME/q-lab/cockpit-bin/<version>/`, outside the cockpit home, so the binary migrates a legacy `~/.cockpit` on first run. Set `COCKPIT_BIN` to override the fetch. Hooks and the mod's `cockpit ensure-daemon` spawn fail soft while the binary downloads. Keep `daemon.json.root` at `<plugin root>/skills/cockpit/scripts` so version-aware supersede works across a mixed fleet. Treat `cockpit-rs/Cargo.toml` as a monitor version file. Finish the release workflow before users update, or their first session runs without hooks.
 
 ## Commands
 

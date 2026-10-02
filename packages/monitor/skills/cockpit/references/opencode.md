@@ -58,7 +58,7 @@ then record the answer with `cockpit send`. See "Nobody is watching" in
 
 ## Sends go over the TUI HTTP bridge
 
-OpenCode never registers the cockpit channel MCP server, so a send takes a
+The monitor mod that delivers Claude sends does not run on OpenCode, so a send takes a
 different path: the Rust OpenCode send bridge, served by the cockpit daemon at
 `/api/send-opencode-message`. It discovers the TUI server from
 `OPENCODE_TUI_SERVER_URL` or `OPENCODE_SERVER_URL`, falls back to a `ps` scan

@@ -20,9 +20,9 @@ Run it in the **foreground**. Do not background it. It kills the live
 daemon and rebinds from the install you invoked it from. It verifies that
 our root won the port before it returns.
 
-A Claude session with the cockpit channel keeps respawning the daemon
-whenever the daemon dies. `restart` supersedes that respawn and retries past
-the race. It does not lose the port to a stale install.
+A Claude session's monitor mod respawns the daemon with
+`cockpit ensure-daemon` whenever it finds the daemon gone. `restart`
+supersedes that respawn and retries past the race. It does not lose the port to a stale install.
 
 ## Step 2 — Report
 
@@ -30,18 +30,18 @@ the race. It does not lose the port to a stale install.
   URL it printed, default `http://localhost:5858`.
 - Exit non-zero: it could not confirm a fresh daemon from this install.
   Another install is contending for the port. Retry once. If it still fails,
-  tell the user to restart the Claude session so its channel MCP loads the
+  tell the user to restart the Claude session so its mod loads the
   updated plugin.
 
-## Caveat — the channel MCP is a separate process
+## Caveat — the mod is loaded once per session
 
 `restart` refreshes the **daemon**: the dashboard, the transcript stream,
-and the wait/send broker. It does **not** refresh the cockpit **channel MCP
-server** of an already running Claude session. That process was spawned
-from whatever plugin cache the session started with.
+and the wait/send broker. It does **not** refresh the monitor **mod** of an
+already running Claude session. That mod was loaded from whatever plugin
+cache the session started with.
 
-If the fix the user is chasing lives in `cockpit channel`, the daemon
-restart is not enough. The user needs to restart the session itself. Say so
+If the fix the user is chasing lives in the mod (`hooks/register.ts`), the
+daemon restart is not enough. The user needs to restart the session itself. Say so
 plainly. Do not imply that the update fully landed.
 
 ## Notes
