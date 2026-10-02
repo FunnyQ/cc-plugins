@@ -1,5 +1,15 @@
 # Changelog
 
+## [guard 0.7.0] - 2026-10-03
+
+_tracks tag `guard-v0.7.0`_
+
+### Added
+- On Claude Code, comment-guard now runs in-process as a mod on every Edit/Write instead of spawning bun each time, so edits are no longer slowed by a process launch.
+
+### Changed
+- When TYPESAFE_API_KEY is set and Jev withdraws every flagged block, Claude Code now shows a toast instead of a system message; Codex and OpenCode behave as before.
+
 ## [monitor 7.1.0] - 2026-10-03
 
 _tracks tag `monitor-v7.1.0`_
