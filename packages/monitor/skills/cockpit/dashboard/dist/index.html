@@ -214,9 +214,9 @@
           <div class="channel-console">
             <div class="channel-relaunch" v-if="channelNeedsRelaunch">
               <p class="channel-relaunch__note">
-                This session started without the cockpit channel. It can't
-                attach to a running session — restart Claude with the cockpit
-                channel flags:
+                This session is not polling the cockpit. It runs a monitor
+                plugin older than its mod, or the mod failed to load — update
+                the plugin, then resume the session:
               </p>
               <button
                 type="button"

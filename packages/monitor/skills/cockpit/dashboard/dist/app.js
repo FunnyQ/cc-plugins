@@ -195,8 +195,8 @@ export const store = reactive({
       if (!control.ready) return control.error || "OpenCode bridge unavailable";
       return "Send to OpenCode session";
     }
-    if (!s.channel) return "Launch this session with the cockpit channel";
-    return "Send to cockpit channel";
+    if (!s.channel) return "This session is not polling the cockpit";
+    return "Send to Claude session";
   },
 
   get channelPlaceholder() {
@@ -217,17 +217,15 @@ export const store = reactive({
     );
   },
 
-  // A Claude session in the manifest but without a live channel was launched
-  // without --dangerously-load-development-channels. The channel can't
-  // retro-attach, so the only fix is to relaunch via the channel-aware
-  // launcher — surfaced as an inline hint with a copyable command.
+  // A Claude session whose monitor mod is not polling the inbox runs an older plugin; a mod loads only at session start.
   get channelNeedsRelaunch() {
     const s = this.selectedSession;
     return !!s && s.provider === "claude" && s.channel !== true;
   },
 
   get channelRelaunchCommand() {
-    return "claude --dangerously-load-development-channels plugin:monitor@q-lab-marketplace";
+    const s = this.selectedSession;
+    return s ? `claude --resume ${s.sessionId}` : "";
   },
 
   get agentBadgeLabel() {
