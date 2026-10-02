@@ -77,5 +77,5 @@ async fn restart(rest: &[String]) -> Result<(), String> {
             let _ = child.try_wait();
         }
     }
-    Err("cockpit restart: could not confirm a fresh daemon from this install — a respawn from another install may be contending for the port. Retry, or restart the Claude session so its channel uses the updated plugin.".into())
+    Err("cockpit restart: could not confirm a fresh daemon from this install — a respawn from another install may be contending for the port. Retry, or restart the Claude session so its monitor mod uses the updated plugin.".into())
 }

@@ -40,7 +40,6 @@ uuid = { version = "~1.23", features = ["v4"] }
 # Name the Stream trait axum's Body::from_stream needs for SSE bodies.
 futures-core = "~0.3"
 # Verify experimental capabilities and arbitrary notifications without HTTP transports.
-rmcp = { version = "=3.5.0", default-features = false, features = ["server", "transport-io"] }
 anyhow = "~1.0"
 
 # sha1 of the git state: the signature stored in scribe-nudge.json must stay stable across releases

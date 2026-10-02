@@ -33,6 +33,7 @@ impl PartialDaemonInfo {
     }
 }
 
+#[cfg(test)]
 pub fn read_daemon_coords() -> Option<DaemonCoords> {
     read_daemon_info()?.coords()
 }

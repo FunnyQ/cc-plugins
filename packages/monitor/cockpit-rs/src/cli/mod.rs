@@ -1,4 +1,5 @@
 pub mod broker_client;
+pub mod ensure_daemon;
 pub mod restart;
 pub mod settings;
 pub mod trail;
@@ -26,7 +27,7 @@ pub const USAGE: &str = r#"usage: cockpit <log|scribe|prep|config|wait|send|rest
   cockpit restart [--port N] [--no-open]
   cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]"#;
 // Subcommands that exist only in the Rust binary keep clap's own help and errors.
-const RUST_ONLY: [&str; 4] = ["server", "channel", "hook", "atlas"];
+const RUST_ONLY: [&str; 4] = ["server", "ensure-daemon", "hook", "atlas"];
 const KNOWN: [&str; 13] = [
     "log",
     "scribe",
@@ -38,7 +39,7 @@ const KNOWN: [&str; 13] = [
     "nudge",
     "find-session",
     "server",
-    "channel",
+    "ensure-daemon",
     "hook",
     "atlas",
 ];

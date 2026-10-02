@@ -12,8 +12,7 @@ describe("harness: launcher", () => {
     expect(SCRIPTS_DIR).toBe(join(PLUGIN_ROOT, "skills/cockpit/scripts"));
     const binary = process.env.COCKPIT_BIN || join(PLUGIN_ROOT, "cockpit-rs/target/release/cockpit");
     expect(command("server", ["--port", "1"])).toEqual([binary, "server", "--port", "1"]);
-    expect(command("channel", [])).toEqual([binary, "channel"]);
-    for (const subcommand of ["log", "scribe", "prep", "config", "wait", "send", "restart", "nudge", "find-session"]) {
+    for (const subcommand of ["log", "scribe", "prep", "config", "wait", "send", "restart", "nudge", "find-session", "ensure-daemon"]) {
       expect(command("cli", [subcommand, "argument"])).toEqual([binary, subcommand, "argument"]);
     }
     for (const hook of ["session-start", "stop"]) {

@@ -1,5 +1,4 @@
 mod atlas;
-mod channel;
 
 use clap::{Args, Parser, Subcommand};
 use std::process::ExitCode;
@@ -39,7 +38,7 @@ struct TrailingArgs {
 #[derive(Subcommand)]
 enum Command {
     Server(TrailingArgs),
-    Channel(TrailingArgs),
+    EnsureDaemon(TrailingArgs),
     Log(TrailingArgs),
     Scribe(TrailingArgs),
     Prep(TrailingArgs),
@@ -69,7 +68,7 @@ fn main() -> ExitCode {
     }
     match Cli::parse().command {
         Command::Server(args) => server::run(&args.args),
-        Command::Channel(_) => channel::run(),
+        Command::EnsureDaemon(_) => cli::ensure_daemon::run(),
         Command::Log(args) => cli::run("log", &args.args),
         Command::Scribe(args) => cli::run("scribe", &args.args),
         Command::Prep(args) => cli::run("prep", &args.args),
@@ -95,7 +94,7 @@ mod tests {
     fn every_stub_accepts_arbitrary_trailing_arguments() {
         for sub in [
             "server",
-            "channel",
+            "ensure-daemon",
             "log",
             "scribe",
             "prep",

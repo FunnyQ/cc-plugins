@@ -1,20 +1,17 @@
-pub use crate::daemon_info::{DaemonCoords, read_daemon_coords};
 use crate::{
     daemon_info::{self, PartialDaemonInfo, should_supersede_daemon},
-    process_alive::is_alive,
+    process_alive::{self, is_alive},
 };
-use tokio::time::{Duration, Instant, sleep};
+use std::{
+    process::ExitCode,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
-// Give the detached server the same startup grace period as the Bun channel.
+// Give the detached server the same startup grace period the Bun channel had.
 const STARTUP_BUDGET: Duration = Duration::from_secs(3);
 // Discover a just-written daemon record without busy polling.
 const STARTUP_POLL: Duration = Duration::from_millis(100);
-// Pad instant timeout responses to avoid hammering the daemon.
-pub const POLL_FLOOR_MS: u64 = 1000;
-// Desynchronize channels after simultaneous long-poll timeouts.
-const POLL_JITTER_MS: f64 = 250.0;
-// Bound reconnect latency while a daemon is unavailable.
-const MAX_RECONNECT_MS: u64 = 30_000;
 
 fn should_spawn(
     info: Option<&PartialDaemonInfo>,
@@ -25,37 +22,42 @@ fn should_spawn(
         !info.pid.is_some_and(&alive) || should_supersede_daemon(info.root.as_deref(), my_root)
     })
 }
-pub fn ensure_server(my_root: &str) -> bool {
+fn ensure_server(my_root: &str) -> bool {
     should_spawn(daemon_info::read_process_info().as_ref(), my_root, is_alive)
         && daemon_info::spawn_detached_server(&["--no-open"])
-            .map(crate::process_alive::reap_in_background)
+            .map(process_alive::reap_in_background)
             .is_ok()
 }
-pub async fn ensure_cockpit_daemon() -> Option<DaemonCoords> {
-    ensure_server(&daemon_info::daemon_root().ok()?);
+
+pub fn run() -> ExitCode {
+    match ensure() {
+        Ok(coords) => {
+            println!(
+                "{}",
+                serde_json::json!({"port": coords.port, "token": coords.token})
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("cockpit ensure-daemon: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+fn ensure() -> Result<daemon_info::DaemonCoords, String> {
+    ensure_server(&daemon_info::daemon_root()?);
     let deadline = Instant::now() + STARTUP_BUDGET;
     loop {
         if let Some(info) = daemon_info::read_process_info()
             && info.pid.is_some_and(is_alive)
             && let Some(coords) = info.coords()
         {
-            return Some(coords);
+            return Ok(coords);
         }
         if Instant::now() >= deadline {
-            return None;
+            return Err("no live daemon within 3s".into());
         }
-        sleep(STARTUP_POLL.min(deadline.saturating_duration_since(Instant::now()))).await;
-    }
-}
-pub fn next_reconnect_delay_ms(failures: u32) -> u64 {
-    (POLL_FLOOR_MS * (1_u64 << failures.min(5))).min(MAX_RECONNECT_MS)
-}
-pub fn poll_floor_delay_ms(elapsed_ms: u64, floor_ms: u64, rand: f64) -> u64 {
-    let remaining = floor_ms.saturating_sub(elapsed_ms);
-    if remaining == 0 {
-        0
-    } else {
-        remaining + (rand * POLL_JITTER_MS).floor() as u64
+        sleep(STARTUP_POLL);
     }
 }
 
@@ -63,7 +65,7 @@ pub fn poll_floor_delay_ms(elapsed_ms: u64, floor_ms: u64, rand: f64) -> u64 {
 mod tests {
     use super::*;
     use crate::{
-        daemon_info::{compare_versions, version_from_root},
+        daemon_info::{compare_versions, read_daemon_coords, version_from_root},
         paths,
     };
     use std::cmp::Ordering;
@@ -98,16 +100,6 @@ mod tests {
         assert!(!should_spawn(Some(&info), old, |_| true));
         assert!(should_spawn(Some(&info), new, |_| true));
         assert!(!should_supersede_daemon(Some(new), old));
-    }
-    #[test]
-    fn backoff_and_floor() {
-        assert_eq!(
-            (0..8).map(next_reconnect_delay_ms).collect::<Vec<_>>(),
-            vec![1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000]
-        );
-        assert_eq!(poll_floor_delay_ms(1000, 1000, 0.5), 0);
-        assert_eq!(poll_floor_delay_ms(1100, 1000, 0.5), 0);
-        assert_eq!(poll_floor_delay_ms(100, 1000, 0.5), 1025);
     }
     #[test]
     fn records_validate_fields_and_read_fresh() {

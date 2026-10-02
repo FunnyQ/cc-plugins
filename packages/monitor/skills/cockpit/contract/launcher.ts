@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-export type Proc = "server" | "channel" | "cli" | "hook";
+export type Proc = "server" | "cli" | "hook";
 export const PLUGIN_ROOT = resolve(import.meta.dir, "../../..");
 export const SCRIPTS_DIR = join(PLUGIN_ROOT, "skills/cockpit/scripts");
 // The ported TS processes are deleted, so a missing binary must fail the suite.
