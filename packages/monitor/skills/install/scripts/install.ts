@@ -7,7 +7,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { SHIM_COLLECTOR_RE, TS_COLLECTOR_RE } from "./statusline-decision";
 
 export type Level = "required" | "optional";
 export type Check = { label: string; ok: boolean; level: Level; hint?: string };
@@ -18,40 +17,6 @@ const DASH = resolve(import.meta.dir, "..", "..", "usage-dashboard");
 
 const LIVE_SHIM = resolve(import.meta.dir, "../../cockpit/bin/cockpit");
 
-// The same shim inside the marketplace clone Claude Code keeps at
-// ~/.claude/plugins/marketplaces/. The clone updates in place, while the plugin
-// cache path carries the version and goes stale on every plugin update. Null when
-// the marketplace isn't registered or its monitor isn't a relative-path source.
-function marketplaceShim(): string | null {
-  try {
-    const known = JSON.parse(
-      readFileSync(
-        join(HOME, ".claude", "plugins", "known_marketplaces.json"),
-        "utf-8",
-      ),
-    );
-    const root = known?.["q-lab-marketplace"]?.installLocation;
-    if (typeof root !== "string") return null;
-    const manifest = JSON.parse(
-      readFileSync(join(root, ".claude-plugin", "marketplace.json"), "utf-8"),
-    );
-    const source = manifest?.plugins?.find(
-      (p: { name?: string }) => p?.name === "monitor",
-    )?.source;
-    if (typeof source !== "string") return null;
-    const shim = join(root, source, "skills", "cockpit", "bin", "cockpit");
-    return existsSync(shim) ? shim : null;
-  } catch {
-    return null;
-  }
-}
-
-// Exported because "is the statusline wired?" is decided by comparing the
-// configured path against this one; setup.ts and setup-statusline.ts must not
-// build their own copy, or the check and the write disagree.
-export const COLLECTOR_SCRIPT = marketplaceShim() ?? LIVE_SHIM;
-// No `bun`: the shim is an executable POSIX sh script.
-export const COLLECTOR_COMMAND = `${COLLECTOR_SCRIPT} atlas statusline`;
 export const SETTINGS_JSON = join(HOME, ".claude", "settings.json");
 // The plugin manifest sits three levels up from skills/install/scripts/.
 const PLUGIN_JSON = resolve(
@@ -72,8 +37,8 @@ export function pluginVersion(): string | null {
   }
 }
 
-// All read-only checks the dashboard cares about: bun, Claude data, committed
-// vendor/pricing assets, and whether the statusline collector is wired.
+// All read-only checks the dashboard cares about: bun, Claude data, and
+// committed vendor/pricing assets.
 export function dashboardChecks(): Check[] {
   const checks: Check[] = [];
   const check = (label: string, ok: boolean, level: Level, hint?: string) =>
@@ -116,56 +81,6 @@ export function dashboardChecks(): Check[] {
 
   const pricing = join(DASH, "references", "pricing-defaults.json");
   check(`pricing defaults (${pricing})`, existsSync(pricing), "required");
-
-  // Live usage limits — optional: dashboard works without it, the usage-window
-  // panel just stays empty until Claude Code's statusline feeds rate_limits in.
-  const settingsPath = SETTINGS_JSON;
-  let statuslineCommand: string | null = null;
-  let settingsReadable = true;
-  try {
-    if (existsSync(settingsPath)) {
-      const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-      const cmd = settings?.statusLine?.command;
-      if (typeof cmd === "string") statuslineCommand = cmd;
-    }
-  } catch {
-    settingsReadable = false;
-  }
-  const referencedCollector =
-    statuslineCommand?.match(SHIM_COLLECTOR_RE)?.[1] ?? null;
-  const referencedTsCollector =
-    statuslineCommand?.match(TS_COLLECTOR_RE)?.[1] ?? null;
-  const collectorWired =
-    referencedCollector !== null && referencedCollector === COLLECTOR_SCRIPT;
-
-  let usageHint: string | undefined;
-  if (!settingsReadable) {
-    usageHint = `Couldn't parse ${settingsPath} — fix it, then add a statusLine command running: ${COLLECTOR_COMMAND}`;
-  } else if (!referencedCollector && referencedTsCollector) {
-    usageHint =
-      `statusLine still runs the removed TS collector (${referencedTsCollector}).\n` +
-      `   The next session start after a plugin update rewrites it, or run the /monitor:install skill now to set it to: ${COLLECTOR_COMMAND}`;
-  } else if (referencedCollector && !collectorWired) {
-    usageHint =
-      `statusLine runs a collector at another path (${referencedCollector}).\n` +
-      `   Re-run setup to update statusLine.command in ${settingsPath} to: ${COLLECTOR_COMMAND}`;
-  } else if (statuslineCommand) {
-    usageHint =
-      `statusLine is set but doesn't run the collector, so live rate_limits aren't captured.\n` +
-      `   Wrap your current line — set statusLine.command in ${settingsPath} to:\n` +
-      `   "TOKEN_ATLAS_STATUSLINE_COMMAND='${statuslineCommand}' ${COLLECTOR_COMMAND}"`;
-  } else {
-    usageHint =
-      `No statusLine configured. Add to ${settingsPath} to capture live usage limits:\n` +
-      `   "statusLine": { "type": "command", "command": "${COLLECTOR_COMMAND}", "padding": 0 }\n` +
-      `   Forwards to "bunx -y ccstatusline@latest" by default (override via TOKEN_ATLAS_STATUSLINE_COMMAND).`;
-  }
-  check(
-    "live usage limits (statusline collector)",
-    collectorWired,
-    "optional",
-    usageHint,
-  );
 
   return checks;
 }

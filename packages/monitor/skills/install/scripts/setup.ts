@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 //
 // monitor:install engine — the single entry that checks every prerequisite for
-// both skills and wires the configs a non-dev user otherwise edits by hand:
-//   - the usage-dashboard statusline collector in ~/.claude/settings.json
+// both skills and wires the config a non-dev user otherwise edits by hand:
 //   - permissions.allow entries that pre-approve `bun <q-lab plugin script>.ts`
 //     (so deeply-nested sub-agents — e.g. chronicle:drafter — can run them without
 //     hitting an unanswerable permission prompt that silently denies them).
@@ -12,14 +11,16 @@
 // engine only CLEANS UP a stale entry left by older versions — otherwise the
 // channel would register twice once the packaged one loads.
 //
-// Checks reuse install.ts (dashboard) + the channel prerequisites here; the
-// statusline write reuses setup-statusline.ts.
+// Checks reuse install.ts (dashboard) + the channel prerequisites here.
+//
+// The monitor mod's session.measure hook feeds the usage limits now, so a
+// statusLine that still runs the retired collector is unwrapped by --migrate.
 //
 // Modes:
 //   (default) / --check   read-only status report, exit 1 if a required check fails
 //   --dry-run             print exactly what --apply would change, write nothing
-//   --apply               wire the statusline + remove any stale channel entry
-//   --apply-statusline    apply only the statusline collector wiring
+//   --apply               pre-approve scripts + remove any stale channel entry
+//   --migrate             unwrap the retired collector + remove a stale channel entry
 //
 import {
   accessSync,
@@ -33,7 +34,6 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type Check,
-  COLLECTOR_COMMAND,
   dashboardChecks,
   pluginVersion,
   printReport,
@@ -43,14 +43,7 @@ import {
   compareMonitorVersions,
   reapStaleMonitorProcesses,
 } from "./reap-stale";
-import { applyStatusline, writeSettings } from "./setup-statusline";
-import {
-  decideStatusLine,
-  migrateCollectorCommand,
-  SHIM_COLLECTOR_RE,
-  type StatusLineConfig,
-  TS_COLLECTOR_RE,
-} from "./statusline-decision";
+import { unwrapCollectorCommand } from "./statusline-decision";
 
 const HOME = homedir();
 // Absolute path a user can paste into ~/.claude.json (no $CLAUDE_PLUGIN_ROOT there).
@@ -146,15 +139,6 @@ function channelConfiguredPath(): string | null {
       (a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"),
     ) ?? null
   );
-}
-
-// Which collector form statusLine.command runs, or null if it runs none.
-function statuslineReferencedCollector(): "shim" | "ts" | null {
-  const { data } = readJson(SETTINGS_JSON);
-  const cmd = data?.statusLine?.command;
-  if (typeof cmd !== "string") return null;
-  if (SHIM_COLLECTOR_RE.test(cmd)) return "shim";
-  return TS_COLLECTOR_RE.test(cmd) ? "ts" : null;
 }
 
 // --- cockpit channel checks (the piece this skill owns) ---------------------
@@ -254,41 +238,6 @@ function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   return "removed";
 }
 
-// --- apply: statusline collector (delegates to setup-statusline) ------------
-function applyStatuslinePiece(dryRun: boolean): boolean {
-  // Read just the statusLine block to detect skip / preview the write.
-  let statusLine: StatusLineConfig = {};
-  if (existsSync(SETTINGS_JSON)) {
-    try {
-      statusLine = (JSON.parse(readFileSync(SETTINGS_JSON, "utf-8"))
-        .statusLine ?? {}) as StatusLineConfig;
-    } catch {
-      console.log(`✗ Couldn't parse ${SETTINGS_JSON} — fix it first.`);
-      return false;
-    }
-  }
-  const decision = decideStatusLine(statusLine, COLLECTOR_COMMAND);
-  if (decision.action === "skip") {
-    console.log("○ statusline collector already wired — nothing to do.");
-    return true;
-  }
-  if (dryRun) {
-    console.log(`Would set statusLine.command in ${SETTINGS_JSON}:`);
-    console.log(`   ${decision.command}`);
-    return true;
-  }
-  const result = applyStatusline();
-  if (!result.ok) {
-    console.log(`✗ ${result.error}`);
-    return false;
-  }
-  console.log(`✓ Wired cockpit atlas statusline in ${SETTINGS_JSON}`);
-  if (result.preserved)
-    console.log(`   (wrapped your existing statusline command)`);
-  if (result.backup) console.log(`   (backup: ${result.backup})`);
-  return true;
-}
-
 // --- apply: pre-approve q-lab plugin scripts in permissions.allow -----------
 function missingScriptPermissions(): string[] {
   const { data } = readJson(SETTINGS_JSON);
@@ -339,30 +288,33 @@ function scriptPermissionChecks(): Check[] {
   ];
 }
 
-// --- migrate: stale channel entry + removed TS statusline collector ----------
-// Rewrites an existing TS collector command because its file is gone once the
-// clone updates, failing every tick; never fresh-wires, that is /monitor:install.
+// --- migrate: stale channel entry + retired statusline collector -----------
+// Unwraps the collector rather than leaving it: the mod feeds the usage limits
+// now, and the collector subcommand goes away in a later release.
 function migrate(): string[] {
   const changed: string[] = [];
 
   if (unwireChannel(false) === "removed") {
     changed.push("cockpit-channel cleanup");
   }
-  if (migrateStatusline()) {
-    changed.push("statusline collector");
+  if (unwrapStatusline()) {
+    changed.push("statusline collector removal");
   }
 
   return changed;
 }
 
-function migrateStatusline(): boolean {
+function unwrapStatusline(): boolean {
   const { data, readable } = readJson(SETTINGS_JSON);
   const cmd = data?.statusLine?.command;
   if (!readable || typeof cmd !== "string") return false;
-  const next = migrateCollectorCommand(cmd, COLLECTOR_COMMAND);
+  const next = unwrapCollectorCommand(cmd);
   if (next === null) return false;
-  data.statusLine = { ...data.statusLine, command: next };
-  const bak = writeSettings(data);
+  const bak = backup(SETTINGS_JSON);
+  writeFileSync(
+    SETTINGS_JSON,
+    `${JSON.stringify({ ...data, statusLine: { ...data.statusLine, command: next } }, null, 2)}\n`,
+  );
   console.log(`✓ Rewrote statusLine.command to: ${next}`);
   if (bak) console.log(`   (backup: ${bak})`);
   return true;
@@ -381,32 +333,12 @@ function driftReport(): DriftItem[] {
     return [
       {
         key: "settings-unparseable",
-        message: `${SETTINGS_JSON} is not valid JSON, so the statusline and permission wiring can't be read. Fix the file, then run the /monitor:install skill.`,
-      },
-    ];
-  }
-
-  const collector = statuslineReferencedCollector();
-  if (!collector) {
-    // Nothing wired at all — the installer never ran, or was undone. That one
-    // line already covers every other item, so don't pile them on.
-    return [
-      {
-        key: "statusline-missing",
-        message:
-          "not set up yet — run the /monitor:install skill to enable the cockpit send box and live usage limits.",
+        message: `${SETTINGS_JSON} is not valid JSON, so the permission wiring can't be read. Fix the file, then run the /monitor:install skill.`,
       },
     ];
   }
 
   const items: DriftItem[] = [];
-  if (collector === "ts") {
-    items.push({
-      key: "statusline-old-collector",
-      message:
-        "statusLine still runs the removed TS collector (statusline-collector.ts), so the status line fails. Run the /monitor:install skill to point it at cockpit atlas statusline.",
-    });
-  }
   if (channelConfiguredPath() !== null) {
     items.push({
       key: "stale-channel",
@@ -545,21 +477,15 @@ function main() {
     const changed = migrate();
     console.log(
       changed.length
-        ? `Re-pointed: ${changed.join(" + ")} → current version.`
-        : "Nothing to migrate — configured paths are current.",
+        ? `Migrated: ${changed.join(" + ")}.`
+        : "Nothing to migrate.",
     );
     process.exit(0);
   }
 
-  if (flags.has("--apply") || flags.has("--apply-statusline") || dryRun) {
-    let ok = true;
-    // --apply / --dry-run also clean up a stale hand-wired channel entry and
-    // pre-approve the q-lab plugin scripts.
-    if (flags.has("--apply") || dryRun) {
-      ok = unwireChannel(dryRun) !== "error" && ok;
-      ok = applyScriptPermissions(dryRun) && ok;
-    }
-    ok = applyStatuslinePiece(dryRun) && ok;
+  if (flags.has("--apply") || dryRun) {
+    let ok = unwireChannel(dryRun) !== "error";
+    ok = applyScriptPermissions(dryRun) && ok;
     console.log();
     if (!dryRun && ok) {
       console.log("Done. Launch an opted-in session with:");
@@ -584,7 +510,7 @@ function main() {
   }
   console.log("Required checks passed. To wire config, run:");
   console.log(
-    `   bun ${import.meta.path} --apply        # statusline + cleanup`,
+    `   bun ${import.meta.path} --apply        # permissions + cleanup`,
   );
   console.log(
     `   bun ${import.meta.path} --dry-run      # preview without writing`,
