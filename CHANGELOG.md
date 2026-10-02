@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.22.0] - 2026-10-03
+
+_tracks tag `chronicle-v0.22.0`_
+
+### Added
+- The branch guard now runs as a Claude Code mod that fires only on `git commit`, so other Bash calls no longer pay a shell start-up cost, while the branch rules and messages stay the same.
+
 ## [dispatch 5.6.0] - 2026-10-03
 
 _tracks tag `dispatch-v5.6.0`_
