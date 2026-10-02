@@ -69,7 +69,8 @@ cc-plugins/
 │   │           ├── install.ts            # dashboard precheck
 │   │           └── statusline-decision.ts    # pure unwrap of the retired collector, unit-tested
 │   ├── dispatch/
-│   │   ├── hooks/flightplan-lint.sh      # PostToolUse, path + content gated
+│   │   ├── hooks/register.ts             # Claude Code mod: tool.call Edit|Write, matcher gates on the task path
+│   │   ├── hooks/flightplan-lint.sh      # OpenCode only: the same lint, path + content gated
 │   │   └── skills/{preflight,hop,flightplan,autopilot,waypoints,deckplan}/
 │   │       # preflight/references/intent-template.md — the INTENT.md contract;
 │   │       # preflight borrows flightplan's scaffold.ts for its collision check
@@ -224,7 +225,7 @@ Hook parity — which Claude hooks port to which OpenCode events:
 | monitor | `SessionStart` (same matcher) | `skills/cockpit/bin/cockpit hook session-start` | Yes → `session.created` event, delivered by `experimental.chat.system.transform` |
 | monitor | `Stop` | `skills/cockpit/bin/cockpit hook stop` | Yes → `session.idle` event, same delivery |
 | chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | Yes → `tool.execute.before` on the `bash` tool |
-| dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
+| dispatch | `PostToolUse` (matcher `Edit\|Write`) — OpenCode only; Claude Code runs the `tool.call` mod, Codex runs neither | `hooks/flightplan-lint.sh` | Yes → `tool.execute.after` |
 | guard | `PostToolUse` (matcher `Edit\|Write`) — Codex only; Claude Code runs the `tool.call` mod | `hooks/comment-guard.ts` | Yes → `tool.execute.after`, sharing the event with the lint |
 | guard | `UserPromptSubmit` + `Stop` | `hooks/comment-sweep.ts snapshot` / `sweep` | **No** — `session.idle` has no way to hand a reason back to the model |
 

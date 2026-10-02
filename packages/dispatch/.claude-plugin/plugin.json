@@ -23,19 +23,5 @@
     "requirements",
     "tasks",
     "execute"
-  ],
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/flightplan-lint.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }

@@ -291,7 +291,7 @@ bun "$SCRIPTS"/next-ready.ts docs/<slug>/tasks
 
 ## Automatic lint hook
 
-`hooks/flightplan-lint.sh` lints each task file (`docs/<slug>/tasks/<bucket>/NN-*.md` carrying the template's Required-reading header) right after an `Edit|Write`, and reports violations as hook feedback. Writing `_context/` before task files keeps it quiet during normal flow. It cannot see files written by Bash, relay, or an external CLI, so it is early feedback, not the gate — Step 6's whole-tree lint is.
+A dispatch hook (`hooks/register.ts` on Claude Code, `hooks/flightplan-lint.sh` on OpenCode) lints each task file (`docs/<slug>/tasks/<bucket>/NN-*.md` carrying the template's Required-reading header) right after an `Edit|Write`, and reports violations as hook feedback. Writing `_context/` before task files keeps it quiet during normal flow. It cannot see files written by Bash, relay, or an external CLI, so it is early feedback, not the gate — Step 6's whole-tree lint is.
 
 ## Additional resources
 
