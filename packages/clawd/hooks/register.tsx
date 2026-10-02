@@ -130,7 +130,7 @@ export const register: Register = on => {
       return right(
         <Box key="clawd" flexDirection="column">
           {octants(clip, index).map((runs, y) => (
-            <Text key={y}>{runs.map((run, x) => <Text key={x} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
+            <Text key={String(y)}>{runs.map((run, x) => <Text key={String(x)} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
           ))}
         </Box>
       )

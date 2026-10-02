@@ -1,4 +1,5 @@
-import { expect, mock, test } from 'claude-code/testing'
+import type { On } from 'claude-code'
+import { expect, mock, test, type Engine } from 'claude-code/testing'
 
 const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 80, scroll: { offset: 0, bodyRows: 20 }, view: {} } } as const
 
@@ -27,10 +28,12 @@ test('Clawd sits at the right edge of the band, sized to bodyColumns rather than
 const WORKING = ['crabWalking', 'typing', 'building', 'builder', 'sweeping', 'carrying', 'pushing', 'debugger', 'thinking', 'wizard', 'ultrathink', 'confused']
 const turnEnd = { answer: '', durationMs: 0, isAborted: false, turnId: 't', reason: 'answer' } as const
 
-const clipAfter = async ($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1], act: () => Promise<unknown>) => {
+const clipAfter = async ($: Engine, on: On, act: () => Promise<unknown>) => {
   const clock = mock.clock(on)
   on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text key="engine">engine</Text> })
-  for (const event of ['session.start', 'prompt.submit', 'classic.SubagentStart'] as const) on(event, (_$, e) => e as never)
+  on('session.start', (_$, e) => e as never)
+  on('prompt.submit', (_$, e) => e as never)
+  on('classic.SubagentStart', (_$, e) => e as never)
   on('turn.complete', () => ({ text: '' }) as never)
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   const desk = await $.ui.mount({ plugin: 'clawd', surface: 'desktop', ...BAND })
