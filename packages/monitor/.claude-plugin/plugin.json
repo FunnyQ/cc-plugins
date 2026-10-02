@@ -17,20 +17,6 @@
     "codex",
     "opencode"
   ],
-  "mcpServers": {
-    "cockpit-channel": {
-      "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit",
-      "args": [
-        "channel"
-      ]
-    }
-  },
-  "channels": [
-    {
-      "server": "cockpit-channel"
-    }
-  ],
   "hooks": {
     "SessionStart": [
       {
