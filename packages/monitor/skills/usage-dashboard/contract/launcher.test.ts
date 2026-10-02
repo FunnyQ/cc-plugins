@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { atlasCommand, DEFAULT_BIN, type AtlasSub } from "./launcher";
 
-const SUBS: AtlasSub[] = ["serve", "stats", "live", "rollup-update", "statusline", "push-usage"];
+const SUBS: AtlasSub[] = ["serve", "stats", "live", "rollup-update", "measure", "push-usage"];
 const MISSING =
   "atlas contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN";
 

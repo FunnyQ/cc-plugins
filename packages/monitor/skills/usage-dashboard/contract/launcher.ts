@@ -6,7 +6,6 @@ export type AtlasSub =
   | "stats"
   | "live"
   | "rollup-update"
-  | "statusline"
   | "measure"
   | "push-usage";
 

@@ -895,7 +895,7 @@ function writeConfigAndCache(home: string): void {
     join(home, ".config", "cc-dashboard", "budget.json"),
     JSON.stringify({ monthlyBudgetUSD: 200 }, null, 2),
   );
-  // buildRateLimitsRecord's shape, written the way `cockpit atlas statusline` writes
+  // buildRateLimitsRecord's shape, written the way `cockpit atlas measure` writes
   // it; captured a minute before now, so readUsageLimits reports it fresh.
   const captured = FIXTURE_NOW_MS - 60_000;
   writeText(

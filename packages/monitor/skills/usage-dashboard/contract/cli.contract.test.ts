@@ -64,20 +64,18 @@ const cacheDir = (f: Fixture) => join(f.home, ".cache", "token-atlas");
 const rateLimitsPath = (f: Fixture) => join(cacheDir(f), "rate-limits.json");
 const defaultDb = (f: Fixture) =>
   join(f.env.XDG_DATA_HOME, "q-lab", "token-atlas", "rollup.db");
-const quiet = { TOKEN_ATLAS_STATUSLINE_COMMAND: "printf ok" };
 
 const RATE_LIMITS = {
   five_hour: { used_percentage: 42.5, resets_at: 1790000000 },
   seven_day: { used_percentage: 7, resets_at: 1790500000 },
 };
 
-describe("statusline", () => {
+describe("measure", () => {
   test("rate_limits input writes the exact cache record", async () => {
     const f = await fixture();
     const before = Date.now();
-    const r = await run(f, "statusline", {
+    const r = await run(f, "measure", {
       stdin: JSON.stringify({ model: { id: "x" }, rate_limits: RATE_LIMITS }),
-      env: quiet,
     });
     const after = Date.now();
     expect(r.code).toBe(0);
@@ -107,7 +105,7 @@ describe("statusline", () => {
       // The fixture may pre-seed the cache; start from a fresh one for this case.
       const path = rateLimitsPath(f);
       if (existsSync(path)) await Bun.file(path).delete();
-      const r = await run(f, "statusline", { stdin, env: quiet });
+      const r = await run(f, "measure", { stdin });
       expect(r.code).toBe(0);
       expect(existsSync(path)).toBe(false);
     });
@@ -118,44 +116,21 @@ describe("statusline", () => {
       mkdirSync(cacheDir(f), { recursive: true });
       const seeded = '{"seeded":true}';
       writeFileSync(path, seeded);
-      const r = await run(f, "statusline", { stdin, env: quiet });
+      const r = await run(f, "measure", { stdin });
       expect(r.code).toBe(0);
       expect(readFileSync(path, "utf8")).toBe(seeded);
     });
   }
 
-  test("inner command gets stdin, its stdout and exit code forward", async () => {
-    const f = await fixture();
-    const stdin = '{"hello":"wörld"}\nsecond line';
-    const r = await run(f, "statusline", {
-      stdin,
-      env: { TOKEN_ATLAS_STATUSLINE_COMMAND: "printf 'INNER:'; cat; exit 3" },
-    });
-    expect(r.stdout).toBe("INNER:" + stdin);
-    expect(r.code).toBe(3);
-  });
-
-  test("inner command does not inherit TOKEN_ATLAS_STATUSLINE_COMMAND", async () => {
-    const f = await fixture();
-    const r = await run(f, "statusline", {
-      stdin: "{}",
-      env: {
-        TOKEN_ATLAS_STATUSLINE_COMMAND:
-          'printf "%s" "${TOKEN_ATLAS_STATUSLINE_COMMAND-unset}"',
-      },
-    });
-    expect(r.stdout).toBe("unset");
-  });
-
   test("rollup nudge creates its marker, runs rollup-update, and throttles", async () => {
     const f = await fixture();
     const marker = join(cacheDir(f), ".rollup-nudge");
-    await run(f, "statusline", { stdin: "{}", env: quiet });
+    await run(f, "measure", { stdin: "{}" });
     expect(existsSync(marker)).toBe(true);
     // 15 s: a cold detached rollup-update over the fixture corpus, with slack for a loaded CI box.
     expect(await waitFor(() => existsSync(defaultDb(f)), 15_000)).toBe(true);
     const mtime = statSync(marker).mtimeMs;
-    await run(f, "statusline", { stdin: "{}", env: quiet });
+    await run(f, "measure", { stdin: "{}" });
     expect(statSync(marker).mtimeMs).toBe(mtime);
   }, 30_000);
 
@@ -165,79 +140,28 @@ describe("statusline", () => {
   ] as const) {
     test(`push nudge never fires with LLM_QUOTA_INGEST_URL ${name}`, async () => {
       const f = await fixture();
-      const env: Record<string, string> = { ...quiet };
+      const env: Record<string, string> = {};
       if (url !== undefined) env.LLM_QUOTA_INGEST_URL = url;
-      await run(f, "statusline", { stdin: "{}", env });
+      await run(f, "measure", { stdin: "{}", env });
       expect(existsSync(join(cacheDir(f), ".push-nudge"))).toBe(false);
     });
   }
 
   test("push nudge fires with LLM_QUOTA_INGEST_URL set", async () => {
     const f = await fixture();
-    await run(f, "statusline", {
+    await run(f, "measure", {
       stdin: "{}",
-      env: { ...quiet, LLM_QUOTA_INGEST_URL: f.stub.url + STUB_PATHS.ingest },
+      env: { LLM_QUOTA_INGEST_URL: f.stub.url + STUB_PATHS.ingest },
     });
     expect(existsSync(join(cacheDir(f), ".push-nudge"))).toBe(true);
   });
 
   test("exits promptly without waiting on nudged children", async () => {
     const f = await fixture();
-    const r = await run(f, "statusline", { stdin: "{}", env: quiet });
-    expect(r.stdout).toBe("ok");
-    // Catches a collector that waits on its nudges; cannot prove the child is fully detached.
-    expect(r.elapsedMs).toBeLessThan(2_000);
-  });
-
-  test("inner command printing 1 MB before reading 1 MB of stdin does not deadlock", async () => {
-    const f = await fixture();
-    const mb = 1024 * 1024;
-    const r = await run(f, "statusline", {
-      stdin: "x".repeat(mb),
-      env: {
-        TOKEN_ATLAS_STATUSLINE_COMMAND: `head -c ${mb} /dev/zero | tr '\\0' y; cat >/dev/null`,
-      },
-    });
-    expect(r.code).toBe(0);
-    expect(r.stdout.length).toBe(mb);
-  }, 15_000);
-});
-
-describe("measure", () => {
-  test("rate_limits input writes the same cache record as statusline, and prints nothing", async () => {
-    const f = await fixture();
-    const r = await run(f, "measure", {
-      stdin: JSON.stringify({ rate_limits: RATE_LIMITS }),
-    });
-    expect(r.code).toBe(0);
+    const r = await run(f, "measure", { stdin: "{}" });
     expect(r.stdout).toBe("");
-    const parsed = JSON.parse(readFileSync(rateLimitsPath(f), "utf8"));
-    expect(Object.keys(parsed)).toEqual([
-      "capturedAt",
-      "capturedAtEpochMs",
-      "rate_limits",
-    ]);
-    expect(parsed.rate_limits).toEqual(RATE_LIMITS);
-  });
-
-  test("no rate_limits keeps a pre-seeded cache file byte-identical", async () => {
-    const f = await fixture();
-    const path = rateLimitsPath(f);
-    mkdirSync(cacheDir(f), { recursive: true });
-    writeFileSync(path, '{"seeded":true}');
-    const r = await run(f, "measure", { stdin: "{}" });
-    expect(r.code).toBe(0);
-    expect(readFileSync(path, "utf8")).toBe('{"seeded":true}');
-  });
-
-  test("rollup nudge shares the statusline marker and throttle", async () => {
-    const f = await fixture();
-    const marker = join(cacheDir(f), ".rollup-nudge");
-    await run(f, "statusline", { stdin: "{}", env: quiet });
-    const mtime = statSync(marker).mtimeMs;
-    const r = await run(f, "measure", { stdin: "{}" });
+    // Catches a hook that waits on its nudges; cannot prove the child is fully detached.
     expect(r.elapsedMs).toBeLessThan(2_000);
-    expect(statSync(marker).mtimeMs).toBe(mtime);
   });
 });
 

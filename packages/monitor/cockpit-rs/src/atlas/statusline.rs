@@ -1,7 +1,7 @@
 use crate::server::opencode::js_truthy;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::Path;
-use std::process::{Command, ExitCode, ExitStatus, Stdio};
+use std::process::{Command, ExitCode, Stdio};
 use std::time::UNIX_EPOCH;
 
 use serde_json::{Value, json};
@@ -11,16 +11,8 @@ use super::paths;
 
 const ROLLUP_NUDGE_THROTTLE_MS: i64 = 5 * 60 * 1000;
 const PUSH_NUDGE_THROTTLE_MS: i64 = 2 * 60 * 1000;
-const DEFAULT_COMMAND: &str = "bunx -y ccstatusline@latest";
 
-pub fn run(_args: &[String]) -> ExitCode {
-    let mut payload = Vec::new();
-    let _ = std::io::stdin().read_to_end(&mut payload);
-    ingest(&payload);
-    ExitCode::from(run_statusline(payload) as u8)
-}
-
-// The monitor mod's session.measure hook: the statusline's ingest without a statusline to render.
+// The monitor mod's session.measure hook: caches the rate limits and nudges the rollup.
 pub fn run_measure(_args: &[String]) -> ExitCode {
     let mut payload = Vec::new();
     let _ = std::io::stdin().read_to_end(&mut payload);
@@ -107,55 +99,9 @@ fn nudge(marker: &Path, throttle_ms: i64, sub: &str) {
     let _ = command.spawn();
 }
 
-fn exit_code_for(result: &std::io::Result<ExitStatus>) -> i32 {
-    match result {
-        Ok(status) => status.code().unwrap_or(0),
-        Err(_) => 1,
-    }
-}
-
-fn run_statusline(payload: Vec<u8>) -> i32 {
-    let command = std::env::var("TOKEN_ATLAS_STATUSLINE_COMMAND")
-        .ok()
-        .map(|c| c.trim().to_string())
-        .filter(|c| !c.is_empty())
-        .unwrap_or_else(|| DEFAULT_COMMAND.to_string());
-    let spawned = Command::new("sh")
-        .arg("-c")
-        .arg(&command)
-        // An inner command that is itself `atlas statusline` would otherwise re-read the var and spawn forever.
-        .env_remove("TOKEN_ATLAS_STATUSLINE_COMMAND")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn();
-    let mut child = match spawned {
-        Ok(child) => child,
-        Err(e) => return exit_code_for(&Err(e)),
-    };
-    // Feed stdin from a thread so an inner command that prints before reading cannot deadlock us.
-    let writer = child.stdin.take().map(|mut stdin| {
-        std::thread::spawn(move || {
-            let _ = stdin.write_all(&payload);
-        })
-    });
-    let output = child.wait_with_output();
-    if let Some(writer) = writer {
-        let _ = writer.join();
-    }
-    if let Ok(out) = &output {
-        // Raw bytes: identical to the TS utf8 decode/re-encode for valid UTF-8.
-        let mut stdout = std::io::stdout();
-        let _ = stdout.write_all(&out.stdout);
-        let _ = stdout.flush();
-    }
-    exit_code_for(&output.map(|o| o.status))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::process::ExitStatusExt;
 
     const NOW: i64 = 1_779_667_200_000;
 
@@ -207,12 +153,5 @@ mod tests {
         assert!(should_nudge(None, NOW, 300_000));
         assert!(!should_nudge(Some(NOW - 299_999), NOW, 300_000));
         assert!(should_nudge(Some(NOW - 300_000), NOW, 300_000));
-    }
-
-    #[test]
-    fn exit_code_mapping() {
-        assert_eq!(exit_code_for(&Ok(ExitStatus::from_raw(3 << 8))), 3);
-        assert_eq!(exit_code_for(&Ok(ExitStatus::from_raw(9))), 0);
-        assert_eq!(exit_code_for(&Err(std::io::Error::other("x"))), 1);
     }
 }

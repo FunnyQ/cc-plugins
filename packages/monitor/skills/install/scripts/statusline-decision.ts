@@ -3,7 +3,7 @@
 // feeds the rate-limit cache now, so the collector only stands between Claude
 // Code and the command it forwarded to.
 
-// New form: `<path>/skills/cockpit/bin/cockpit atlas statusline`. Quotes
+// New form (the subcommand is removed from the binary): `<path>/skills/cockpit/bin/cockpit atlas statusline`. Quotes
 // around the path are matched too.
 export const SHIM_COLLECTOR_RE =
   /["']?([^\s"']*\/skills\/cockpit\/bin\/cockpit)["']? atlas statusline\b/;
@@ -14,7 +14,7 @@ const TS_COLLECTOR_RE =
   /(?:(?<!\S)["']?(?:[^\s"']*\/)?bun["']?\s+)?["']?([^\s"']*statusline-collector\.ts)["']?/;
 const TS_COLLECTOR_SUFFIX =
   "/skills/usage-dashboard/scripts/statusline-collector.ts";
-// The collector's forward target when no TOKEN_ATLAS_STATUSLINE_COMMAND was set: DEFAULT_COMMAND in cockpit-rs atlas/statusline.rs.
+// The removed collector's forward target when no TOKEN_ATLAS_STATUSLINE_COMMAND was set.
 const DEFAULT_INNER = "bunx -y ccstatusline@latest";
 // The only prefix the installer ever wrote; it did not escape single quotes.
 const WRAP_RE = /TOKEN_ATLAS_STATUSLINE_COMMAND='([^']*)'\s+$/;
