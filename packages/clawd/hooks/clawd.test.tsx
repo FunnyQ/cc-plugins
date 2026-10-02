@@ -13,6 +13,17 @@ test('Clawd draws a 4x2 Image on the terminal and an Svg on the desktop', async 
   await desk.unmount()
 })
 
+test('Clawd sits at the right edge of the band, sized to bodyColumns rather than the viewport', async ($, on) => {
+  on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text key="engine">engine</Text> })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'clawd', surface, ...BAND, props: { ...BAND.props, bodyColumns: 63 } })
+    const row = await ui.find({ key: 'clawd-row' })
+    expect(row?.props).toMatchObject({ flexDirection: 'row', justifyContent: 'flex-end', width: 63 })
+    expect((row?.children?.[0] as { type?: string } | undefined)?.type).toBe(surface === 'desktop' ? 'Svg' : 'Image')
+    await ui.unmount()
+  }
+})
+
 const WORKING = ['crabWalking', 'typing', 'building', 'builder', 'sweeping', 'carrying', 'pushing', 'debugger', 'thinking', 'wizard', 'ultrathink', 'confused']
 const turnEnd = { answer: '', durationMs: 0, isAborted: false, turnId: 't', reason: 'answer' } as const
 

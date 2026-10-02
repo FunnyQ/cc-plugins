@@ -111,17 +111,23 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return next(e)
 
     requestId = e.requestId
+    if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
+    const { Box } = $.ui.resolve(e)
+    // bodyColumns, not the viewport: a docked pane narrows the band
+    const right = (sprite: ReturnType<typeof h>) => (
+      <Box key="clawd-row" flexDirection="row" justifyContent="flex-end" width={e.props.bodyColumns}>{sprite}</Box>
+    )
+
     if (e.surface === 'desktop') {
       isDesktop = true
       const { Svg } = $.ui.resolve(e)
-      return <Svg key="clawd" source={svg(clip, index)} alt={`Clawd ${clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />
+      return right(<Svg key="clawd" source={svg(clip, index)} alt={`Clawd ${clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
     }
-    if (e.surface !== 'terminal') return next(e)
-    const { Box, Image, Text } = $.ui.resolve(e)
+    const { Image, Text } = $.ui.resolve(e)
 
     // Raster refuses non-BMP characters, so octants go out as plain coloured Text
     if (useText) {
-      return (
+      return right(
         <Box key="clawd" flexDirection="column">
           {octants(clip, index).map((runs, y) => (
             <Text key={y}>{runs.map((run, x) => <Text key={x} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
@@ -130,6 +136,6 @@ export const register: Register = on => {
       )
     }
 
-    return <Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clip, index)} />
+    return right(<Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clip, index)} />)
   })
 }
