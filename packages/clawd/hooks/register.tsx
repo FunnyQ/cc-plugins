@@ -6,7 +6,7 @@ import { CLIPS } from './frames'
 
 const TICK_MS = 50
 // a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
-const DONE_MS = 60_000
+const DONE_MS = 5_000
 // 20x16 grid at 2 CSS px per pixel
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
@@ -31,7 +31,7 @@ export const register: Register = on => {
 
   const inputs = () => ({
     blocked,
-    busy: isWorking ? 1 + subagents : 0,
+    busy: (isWorking ? 1 : 0) + subagents,
     done: now - doneAt < DONE_MS,
     longestTurn: isWorking ? (now - turnStartedAt) / 1000 : 0,
     idleFor: isWorking ? 0 : (now - lastActiveAt) / 1000,
@@ -71,9 +71,10 @@ export const register: Register = on => {
   })
 
   on('turn.complete', ($, e, next) => {
+    // fires for each subagent turn too; only the main loop's ends the work, and subagents outlive it
+    if (e.agentId) return next(e)
     isWorking = false
     blocked = 0
-    subagents = 0
     doneAt = now
     lastActiveAt = now
     director.cheer()
@@ -102,6 +103,7 @@ export const register: Register = on => {
 
   on('classic.SubagentStop', ($, e, next) => {
     subagents = Math.max(0, subagents - 1)
+    lastActiveAt = now
     return next(e)
   })
 
