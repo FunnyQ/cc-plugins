@@ -1,5 +1,13 @@
 # Changelog
 
+## [clawd 0.1.1] - 2026-10-02
+
+_tracks tag `clawd-v0.1.1`_
+
+### Fixed
+- The clawd mascot no longer looks blurry or oversized in Kitty and Ghostty, because its sprite is now scaled with nearest-neighbour filtering before display.
+- In herdr, which lacks Kitty placeholders, the mascot now renders with sharper octant glyphs drawn as coloured text instead of the old half-block fallback.
+
 ## [clawd 0.1.0] - 2026-10-02
 
 _tracks tag `clawd-v0.1.0`_
