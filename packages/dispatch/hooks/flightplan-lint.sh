@@ -54,8 +54,6 @@ fi
 
 # --authoring adds the task-size check. It belongs on this surface only: the
 # write just landed, so the author is present and splitting is still cheap.
-# It also passes a file without the Required-reading header, so the content
-# sniff lives in lint-task.ts alone.
 # Autopilot's own lint calls (the external-dev driver, the pre-flight scout) omit
 # the flag, so a plan authored before the rule existed still flies.
 if output=$(bun "$lint_script" --authoring "$file_path" 2>&1); then
