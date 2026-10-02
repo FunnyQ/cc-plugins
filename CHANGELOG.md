@@ -1,5 +1,13 @@
 # Changelog
 
+## [clawd 0.1.2] - 2026-10-02
+
+_tracks tag `clawd-v0.1.2`_
+
+### Fixed
+- Clawd no longer replays the done animation when a subagent's turn ends, and the celebration now lasts 5 seconds instead of 60.
+- Clawd stays in the working state for as long as subagents are running, even after the main turn has ended.
+
 ## [clawd 0.1.1] - 2026-10-02
 
 _tracks tag `clawd-v0.1.1`_
