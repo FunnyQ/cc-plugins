@@ -1,6 +1,6 @@
 {
   "name": "monitor",
-  "version": "7.2.0",
+  "version": "8.0.0",
   "description": "Monitor your Claude Code, Codex, and OpenCode sessions \u2014 a usage dashboard plus a per-project cockpit with a decision trail, live session view, needs-your-call bridge, and thoughtful auto-logging.",
   "author": {
     "name": "Q"

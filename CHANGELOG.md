@@ -1,5 +1,40 @@
 # Changelog
 
+## [monitor 8.0.0] - 2026-10-03
+
+_tracks tag `monitor-v8.0.0`_
+
+### Added
+- A plain `claude` session now receives cockpit dashboard messages and the permission relay through the monitor mod, with no `--dangerously-load-development-channels` flag needed, and a dashboard answer can close the terminal permission dialog.
+
+### Changed
+- Breaking: `cockpit channel` is removed and `cockpit ensure-daemon` takes over starting or superseding the daemon; sessions started before the upgrade keep the old behaviour until they restart.
+- The install flow no longer prompts for the dev flag or checks the claude channels version, and still cleans up a leftover hand-wired cockpit-channel entry.
+
+### Fixed
+- The dashboard relaunch hint no longer asks for the dev flag; it says the session is not polling and suggests `claude --resume <sessionId>`.
+
+## [chronicle 0.22.1] - 2026-10-03
+
+_tracks tag `chronicle-v0.22.1`_
+
+### Changed
+- The `git commit` gate regex now lives in one shared file, with a test that fails if the shell, OpenCode and mod copies drift apart; behaviour is unchanged.
+
+## [guard 0.7.2] - 2026-10-03
+
+_tracks tag `guard-v0.7.2`_
+
+### Changed
+- Added a tsconfig so `tsc -p packages/guard` can typecheck the guard mod; no runtime change.
+
+## [clawd 0.1.4] - 2026-10-03
+
+_tracks tag `clawd-v0.1.4`_
+
+### Fixed
+- Fixed six type errors in the clawd mod that surfaced under mod typechecking, with no change in behaviour.
+
 ## [chronicle 0.22.0] - 2026-10-03
 
 _tracks tag `chronicle-v0.22.0`_

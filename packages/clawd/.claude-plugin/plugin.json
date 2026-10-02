@@ -1,6 +1,6 @@
 {
   "name": "clawd",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Clawd, hey-clawd's pixel crab, animates above the prompt: it works while a turn runs, celebrates when it ends, and dozes off when idle. Terminal and desktop.",
   "author": { "name": "Q" },
   "license": "MIT",
