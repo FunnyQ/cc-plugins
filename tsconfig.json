@@ -9,5 +9,6 @@
     "types": ["bun"],
     "allowImportingTsExtensions": true
   },
-  "include": ["packages/**/*.ts", "opencode/**/*.ts"]
+  "include": ["packages/**/*.ts", "opencode/**/*.ts"],
+  "exclude": ["packages/clawd/**"]
 }

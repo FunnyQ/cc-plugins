@@ -1,0 +1,3 @@
+[test]
+# clawd's tests import 'claude-code/testing' and run under `claude plugin test`, not bun
+pathIgnorePatterns = ["packages/clawd/**"]
