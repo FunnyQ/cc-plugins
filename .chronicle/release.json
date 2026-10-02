@@ -113,6 +113,16 @@
           "kind": "json"
         }
       ]
+    },
+    {
+      "name": "clawd",
+      "path": "packages/clawd",
+      "versionFiles": [
+        {
+          "path": "packages/clawd/.claude-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
     }
   ]
 }

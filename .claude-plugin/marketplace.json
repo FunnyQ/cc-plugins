@@ -38,6 +38,11 @@
       "name": "browsers",
       "source": "./packages/browsers",
       "description": "Drive Firefox, Zen, and Safari from the terminal — open pages, read and drive them, and take screenshots. Firefox and Zen run as isolated headless instances over Marionette; Safari runs in its own automation window over safaridriver."
+    },
+    {
+      "name": "clawd",
+      "source": "./packages/clawd",
+      "description": "Clawd, hey-clawd's pixel crab, animates above the prompt as a Claude Code mod — working while a turn runs, celebrating when it ends, dozing when idle. Claude Code only: it runs on function hooks, which Codex lacks."
     }
   ]
 }
