@@ -3,46 +3,49 @@
   "owner": {
     "name": "Q"
   },
+  "metadata": {
+    "description": "Q's plugins for Claude Code, Codex, and OpenCode. Docs: https://github.com/FunnyQ/cc-plugins#readme"
+  },
   "plugins": [
     {
       "name": "monitor",
       "source": "./packages/monitor",
-      "description": "Monitor your Claude Code and Codex sessions — a usage dashboard (sessions, tokens, cost, model mix) plus a per-project cockpit (goal + decision log + live session view)."
+      "description": "Usage dashboard and live session cockpit for Claude Code, Codex, and OpenCode."
     },
     {
       "name": "dispatch",
       "source": "./packages/dispatch",
-      "description": "Plan before you fly — interview-driven specs you can execute. preflight captures what you want as INTENT.md before any solution is chosen; hop interviews, plans, and executes a small scope in one session; flightplan writes a multi-file blueprint (PLAN.md + tasks/) to disk; autopilot flies the tree with a dev→verify→judge→score quality loop and a closing final-review gate; waypoints maps a whole project into milestone legs and plans each one just-in-time."
+      "description": "Interview-driven planning, from captured intent to executed task trees."
     },
     {
       "name": "relay",
       "source": "./packages/relay",
-      "description": "Delegate a task to another harness — relay work to the codex, opencode, or claude CLI (delegate / review / image), capture the result, and report back."
+      "description": "Delegate a task to the codex, opencode, or claude CLI."
     },
     {
       "name": "chronicle",
       "source": "./packages/chronicle",
-      "description": "Write and guard your project's history — craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail."
+      "description": "Commits, PRs/MRs, releases, and ADRs from your git history."
     },
     {
       "name": "herdr",
       "source": "./packages/herdr",
-      "description": "Herdr terminal workspace manager reference + in-session agent orchestration — config, CLI, plugin development, controlling sibling panes/agents, and driving web pages in a Herdr browser pane over CDP."
+      "description": "Herdr terminal reference and cross-pane agent orchestration."
     },
     {
       "name": "guard",
       "source": "./packages/guard",
-      "description": "Turn coding rules into harness-enforced ones. comment-guard hands every newly added comment line back to the model with one question: is this why, or is this what?"
+      "description": "Coding rules enforced as hooks: comments must say why, not what."
     },
     {
       "name": "browsers",
       "source": "./packages/browsers",
-      "description": "Drive Firefox, Zen, and Safari from the terminal — open pages, read and drive them, and take screenshots. Firefox and Zen run as isolated headless instances over Marionette; Safari runs in its own automation window over safaridriver."
+      "description": "Drive Firefox, Zen, Chrome, and Safari from the terminal."
     },
     {
       "name": "clawd",
       "source": "./packages/clawd",
-      "description": "Clawd, hey-clawd's pixel crab, animates above the prompt as a Claude Code mod — working while a turn runs, celebrating when it ends, dozing when idle. Claude Code only: it runs on function hooks, which Codex lacks."
+      "description": "A pixel crab that animates above the prompt. Claude Code only."
     }
   ]
 }
