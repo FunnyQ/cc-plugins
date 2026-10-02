@@ -16,6 +16,8 @@
     "packages/guard/hooks/register.ts",
     "packages/guard/hooks/*.mod.test.ts",
     "packages/dispatch/hooks/register.ts",
-    "packages/dispatch/hooks/*.mod.test.ts"
+    "packages/dispatch/hooks/*.mod.test.ts",
+    "packages/chronicle/hooks/register.ts",
+    "packages/chronicle/hooks/*.mod.test.ts"
   ]
 }
