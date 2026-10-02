@@ -10,5 +10,5 @@
     "allowImportingTsExtensions": true
   },
   "include": ["packages/**/*.ts", "opencode/**/*.ts"],
-  "exclude": ["packages/clawd/**"]
+  "exclude": ["packages/clawd/**", "packages/monitor/hooks/**"]
 }
