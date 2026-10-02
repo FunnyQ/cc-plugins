@@ -1,5 +1,13 @@
 # Changelog
 
+## [guard 0.7.1] - 2026-10-03
+
+_tracks tag `guard-v0.7.1`_
+
+### Fixed
+- comment-sweep no longer re-asks about comment blocks you moved from one file to another, including blocks moved out of a file deleted in the same turn; a reworded line is still asked.
+- comment-guard no longer asks about an edit Claude Code held for review instead of writing, which could previously flag an untouched block that repeated the same text.
+
 ## [monitor 7.2.0] - 2026-10-03
 
 _tracks tag `monitor-v7.2.0`_

@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Turn coding rules into harness-enforced ones. comment-guard (each Edit/Write) and comment-sweep (at Stop, for writes that bypassed them) hand back the comment blocks of three or more lines the agent added or grew, with one question: is this why, or is this what?",
   "author": { "name": "Q" },
   "license": "MIT",
