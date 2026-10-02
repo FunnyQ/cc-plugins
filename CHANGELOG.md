@@ -1,5 +1,19 @@
 # Changelog
 
+## [monitor 7.2.0] - 2026-10-03
+
+_tracks tag `monitor-v7.2.0`_
+
+### Removed
+- The retired `cockpit atlas statusline` subcommand is gone, since rate limits have come from the monitor mod via `cockpit atlas measure` since 7.1.0; if you skipped 7.1.0 and still have the old statusline wiring, your statusline stays blank until your next session start, when the automatic unwrap restores your original command.
+
+## [clawd 0.1.3] - 2026-10-03
+
+_tracks tag `clawd-v0.1.3`_
+
+### Fixed
+- The mascot now sits at the right edge of the band above the prompt, sized to the conversation body's width so a docked pane no longer pushes it off.
+
 ## [guard 0.7.0] - 2026-10-03
 
 _tracks tag `guard-v0.7.0`_
