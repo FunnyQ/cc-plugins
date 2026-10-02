@@ -15,19 +15,18 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_STATE_DIR, reportedFile, reportedLine, safe } from "./ledger.ts";
 
 export type Baseline = { root: string; tree: string };
 
 function dir(): string {
-  const path = process.env.GUARD_STATE_DIR ?? "/tmp/q-lab/guard";
+  const path = process.env.GUARD_STATE_DIR ?? DEFAULT_STATE_DIR;
   mkdirSync(path, { recursive: true });
   return path;
 }
 
-// Session ids come off stdin and become file names.
-const safe = (sessionId: string) => sessionId.replace(/[^\w.-]/g, "_");
 const baselinePath = (id: string) => join(dir(), `${safe(id)}.baseline.json`);
-const reportedPath = (id: string) => join(dir(), `${safe(id)}.reported.jsonl`);
+const reportedPath = (id: string) => reportedFile(dir(), id);
 
 export function writeBaseline(sessionId: string, baseline: Baseline): void {
   writeFileSync(baselinePath(sessionId), JSON.stringify(baseline));
@@ -56,7 +55,7 @@ export function recordReported(
 ): void {
   appendFileSync(
     reportedPath(sessionId),
-    JSON.stringify({ file, texts }) + "\n",
+    reportedLine(file, texts),
   );
 }
 

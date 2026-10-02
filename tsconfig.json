@@ -10,5 +10,10 @@
     "allowImportingTsExtensions": true
   },
   "include": ["packages/**/*.ts", "opencode/**/*.ts"],
-  "exclude": ["packages/clawd/**", "packages/monitor/hooks/**"]
+  "exclude": [
+    "packages/clawd/**",
+    "packages/monitor/hooks/**",
+    "packages/guard/hooks/register.ts",
+    "packages/guard/hooks/*.mod.test.ts"
+  ]
 }
