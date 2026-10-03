@@ -1,6 +1,6 @@
 import type { Elements } from "claude-code";
 
-import type { Side } from "../config";
+import { config, type Side } from "../config";
 import { hex } from "./ansi";
 import { cells, wrap } from "./text";
 
@@ -30,17 +30,25 @@ const BRIGHTNESS = 0.75;
 // one entry per colour drawn: the configured ones, the shell palette and glow's
 const muted = new Map<string, string>();
 
-// pulls each channel halfway to the colour's grey, then dims it, so the hue stays at lower saturation and brightness
-export const mute = (color: string) => {
-  const known = muted.get(color);
+// glow's light style is the one sign of a light terminal the config carries
+export const isLight = () => config.glow.style === "light";
+
+// pulls each channel halfway to the colour's grey, then moves it a quarter toward the background,
+// so the hue stays at lower saturation and contrast
+export const mute = (color: string, light = isLight()) => {
+  const key = `${light}${color}`;
+  const known = muted.get(key);
   if (known) return known;
   const rgb = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   const [r = 0, g = 0, b = 0] = rgb;
   const grey = 0.299 * r + 0.587 * g + 0.114 * b;
   const out = hex(
-    ...rgb.map((c) => Math.round((c + (grey - c) * SATURATION) * BRIGHTNESS)),
+    ...rgb.map((c) => {
+      const flat = c + (grey - c) * SATURATION;
+      return Math.round(light ? 255 - (255 - flat) * BRIGHTNESS : flat * BRIGHTNESS);
+    }),
   );
-  muted.set(color, out);
+  muted.set(key, out);
   return out;
 };
 

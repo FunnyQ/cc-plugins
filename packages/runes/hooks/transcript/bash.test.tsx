@@ -306,3 +306,23 @@ test("output of no known language never reaches glow", async ($, on) => {
   await new Promise((r) => setTimeout(r, 20));
   expect(stdins.some((s) => s.includes("total 3"))).toBe(false);
 });
+
+test("on a light terminal mute lifts a colour toward white instead of dimming it", () => {
+  expect(mute("#808080", true)).toBe("#a0a0a0");
+});
+
+test("glow's light style switches the cards to the light palette", async ($, on) => {
+  await startSession($, on, { files: new Map([[CONFIG, "glow:\n  style: light\n"]]) });
+  expect(
+    await within($, CALL({ command: "bun test --parallel" }), "bash", /^test$/),
+  ).toMatchObject({
+    props: { color: mute("#4d4d4c", true) },
+    hover: { color: "#4d4d4c", scope: "t1:call" },
+  });
+  expect(
+    await within($, CALL({ command: "bun test --parallel" }), "bash", /^--parallel$/),
+  ).toMatchObject({
+    props: { color: mute("#8e908c", true) },
+    hover: { color: "#8e908c", scope: "t1:call" },
+  });
+});

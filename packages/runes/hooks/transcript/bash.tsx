@@ -2,7 +2,7 @@ import type { On } from "claude-code";
 
 import { config } from "../config";
 import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
-import { bubble, foldRows, paint, runLine } from "./bubble";
+import { bubble, foldRows, isLight, paint, runLine } from "./bubble";
 import { glow } from "./glow";
 import { type Kind, layout } from "./shell";
 import { language } from "./sniff";
@@ -10,20 +10,35 @@ import { innerWidth, wrapRuns } from "./text";
 
 type Style = { color?: string; bold?: boolean; italic?: boolean };
 
-// stands in for the terminal's foreground, which has no hex to mute; tuned for a dark theme
-const TEXT = "#d4d4d4";
-// the quiet kinds; dimColor lit every card's dim text at once under any pointer, live
-const DIM = "#8a8a8a";
-
-// fixed shell palette; move it into config.yaml if anyone wants to retheme it
-const SHELL: Partial<Record<Kind, Style>> = {
-  prompt: { color: DIM },
-  flag: { color: DIM },
-  str: { color: "#b5bd68" },
-  var: { color: "#b294bb" },
-  op: { color: "#de935f" },
-  comment: { color: DIM, italic: true },
+// text stands in for the terminal's foreground, which has no hex to mute
+// dim replaces dimColor, which lit every card's dim text at once under any pointer, live
+// move these into config.yaml if anyone wants to retheme
+const PALETTES = {
+  dark: {
+    text: "#d4d4d4",
+    dim: "#8a8a8a",
+    str: "#b5bd68",
+    var: "#b294bb",
+    op: "#de935f",
+  },
+  light: {
+    text: "#4d4d4c",
+    dim: "#8e908c",
+    str: "#718c00",
+    var: "#8959a8",
+    op: "#f5871f",
+  },
 };
+
+const shell = (p: (typeof PALETTES)["dark"]): Partial<Record<Kind, Style>> => ({
+  prompt: { color: p.dim },
+  flag: { color: p.dim },
+  str: { color: p.str },
+  var: { color: p.var },
+  op: { color: p.op },
+  comment: { color: p.dim, italic: true },
+});
+const SHELL = { dark: shell(PALETTES.dark), light: shell(PALETTES.light) };
 
 // a finished card's command and output never change, yet every redraw re-tokenized, re-parsed and re-wrapped them
 const MEMO_SIZE = 200;
@@ -90,7 +105,12 @@ export const bash = (on: On) => {
       const isBad = isErrored || isInterrupted;
       const tint = isBad ? error_color : color;
 
-      const fold = (part: string, total: number, scope: string, width: number) => {
+      const fold = (
+        part: string,
+        total: number,
+        scope: string,
+        width: number,
+      ) => {
         const key = `${id}:${part}`;
         if (total <= foldLines) return [];
         return foldRows(Button, {
@@ -110,8 +130,10 @@ export const bash = (on: On) => {
       // each card is one hover group, so the pointer anywhere on it lights all of it
       const callScope = `${id}:call`;
       const outScope = `${id}:out`;
+      const theme = isLight() ? "light" : "dark";
+      const { text: TEXT, dim: DIM } = PALETTES[theme];
       const tokenStyle = ({ kind }: { kind: Kind }): object => {
-        const s = kind === "cmd" ? { bold: true, color } : SHELL[kind];
+        const s = kind === "cmd" ? { bold: true, color } : SHELL[theme][kind];
         if (!s) return paint(TEXT, callScope);
         return s.color ? { ...s, ...paint(s.color, callScope) } : s;
       };
