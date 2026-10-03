@@ -440,6 +440,7 @@ test("agents with no task sit in a bordered box above the waves; none means no b
   const at = (needle: string) => texts.findIndex((t) => t.includes(needle));
   expect(at("scout scout-wave-2")).toBeGreaterThan(-1);
   expect(at("scout scout-wave-2")).toBeLessThan(at("running"));
+  expect(at("wave 1/1")).toBeLessThan(at("running"));
   expect(at("running")).toBeLessThan(at("W1"));
   expect(at("dev #2")).toBeGreaterThan(at("W1"));
   await ui.unmount();

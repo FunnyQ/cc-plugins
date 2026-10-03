@@ -3,8 +3,7 @@ import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask } from "./t
 // Width is text.length: every glyph used here (✓ ● ○ · ✗ █ ░ … —) is one BMP code unit drawn one column wide.
 
 // `ref` is set only on card segments; the mod makes those pressable
-// `fill` marks the one segment the mod lets the layout stretch or truncate, so a line drawn wider than computed never wraps.
-export type Seg = { text: string; color?: string; dim?: boolean; ref?: string; fill?: boolean };
+export type Seg = { text: string; color?: string; dim?: boolean; ref?: string };
 export type Line = Seg[];
 
 export const GLYPH: Record<DeckState, string> = {
@@ -61,7 +60,6 @@ function diagnostics(s: DeckSnapshot, stale: boolean): Line {
   return line;
 }
 
-const RULE = "─";
 const BAR = "━";
 
 // a bar of `cells` heavy-rule cells: the done share green, the rest dim
@@ -83,27 +81,14 @@ export function runTotals(s: DeckSnapshot, now: number): { time: string; tokens:
   };
 }
 
-export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number): Line[] {
+export function summary(s: DeckSnapshot, stale: boolean): Line[] {
   const state = endState(s);
-  const right: Seg =
+  const wave: Line = [
     state === "wave"
       ? { text: `wave ${s.currentWave}/${s.waves.length}` }
       : state === "done"
         ? { text: "all done" }
-        : { text: `stuck · ${stuckRefs(s).length} unschedulable`, color: COLOR.invalid };
-  const fill = Math.max(1, w - s.slug.length - right.text.length - 2);
-  const title: Line = [
-    { text: `${s.slug} ` },
-    { text: RULE.repeat(fill), dim: true, fill: true },
-    { text: " " },
-    right,
-  ];
-
-
-  const count = `${s.counts.done}/${s.counts.total}`;
-  const progress: Line = [
-    ...bar(s.counts.done, s.counts.total, Math.max(1, w - count.length - 1)),
-    { text: ` ${count}` },
+        : { text: `stuck · ${stuckRefs(s).length} unschedulable`, color: COLOR.invalid },
   ];
 
   const c = s.counts;
@@ -121,7 +106,7 @@ export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number)
     { text: "  " },
     pair("invalid", c.invalid, ""),
   ];
-  return [title, progress, states];
+  return [wave, states];
 }
 
 export function compactSummary(s: DeckSnapshot, stale: boolean): Line {
@@ -282,10 +267,19 @@ export function docked(
   w: number,
   now: number,
   stale: boolean,
-): { head: Line[]; totals: ReturnType<typeof runTotals>; bars: Line[]; states: Line; cards: WaveCards; crew: Line[] } {
-  const [title, progress, states] = summary(s, stale, w, now);
+): {
+  title: string;
+  totals: ReturnType<typeof runTotals>;
+  bars: Line[];
+  wave: Line;
+  states: Line;
+  cards: WaveCards;
+  crew: Line[];
+} {
+  const [wave, states] = summary(s, stale);
   return {
-    head: [title, progress].map((l) => clip(l, w)),
+    title: s.slug,
+    wave: clip(wave, w),
     totals: runTotals(s, now),
     bars: bucketBars(s, w).map((l) => clip(l, w)),
     states: clip(states, w),

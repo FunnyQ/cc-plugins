@@ -211,14 +211,6 @@ export const flightdeck = (on: On) => {
       <Box flexDirection="row">
         {line.length === 0 && <Text> </Text>}
         {line.map((seg) => {
-          if (seg.fill)
-            return (
-              <Box flexGrow={1} flexShrink={1} overflow="hidden">
-                <Text color={seg.color} dimColor={seg.dim} wrap="truncate-end">
-                  {seg.text}
-                </Text>
-              </Box>
-            );
           const task = seg.ref ? s?.tasks[seg.ref] : undefined;
           if (!task)
             return (
@@ -259,7 +251,7 @@ export const flightdeck = (on: On) => {
       const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
-    const { head, totals, bars, states, cards, crew } = docked(s, width, Date.now(), stale);
+    const { title, totals, bars, wave, states, cards, crew } = docked(s, width, Date.now(), stale);
     // a Button takes no colour, so the glyph is coloured Text and the ref beside it is the pressable part
     const cardBox = (c: CardModel) => (
       <Box
@@ -296,7 +288,9 @@ export const flightdeck = (on: On) => {
     return (
       // the top row clears the pane's close mark, which sits over the body's first line
       <Box flexDirection="column" paddingTop={1}>
-        {head.map(row)}
+        <Box key="title" justifyContent="center" borderStyle="round" borderDimColor>
+          <Text bold>{title}</Text>
+        </Box>
         {totals && (
           <Box
             key="totals"
@@ -326,6 +320,9 @@ export const flightdeck = (on: On) => {
         )}
         {row([])}
         <Box flexDirection="row" justifyContent="center">
+          {row(wave)}
+        </Box>
+        <Box flexDirection="row" justifyContent="center">
           {row(states)}
         </Box>
         {cards.groups.map((g) => (
@@ -336,11 +333,13 @@ export const flightdeck = (on: On) => {
             </Box>
           </Box>
         ))}
-        <Button
-          key="open"
-          label="Open flightdeck"
-          onPress={() => void launch()}
-        />
+        <Box flexDirection="row" justifyContent="center">
+          <Button
+            key="open"
+            label="Open flightdeck"
+            onPress={() => void launch()}
+          />
+        </Box>
       </Box>
     );
   });

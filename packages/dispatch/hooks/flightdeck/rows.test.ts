@@ -298,12 +298,8 @@ describe("summary / compactSummary / endState", () => {
   test("stuck fixture, stale with errors", () => {
     const s = stuck();
     expect(endState(s)).toBe("stuck");
-    const [l1, l2, l3] = summary(s, true, 40, 0);
-    expect(text(l1)).toBe(`demo ${"─".repeat(11)} stuck · 1 unschedulable`);
-    expect(l1.at(-1)!.color).toBe("#f85149");
-    expect(text(l2)).toBe(`${"━".repeat(34)} 19/20`);
-    expect(l2[0]).toMatchObject({ text: "━".repeat(32), color: COLOR.done });
-    expect(l2[1]).toMatchObject({ text: "━━", dim: true });
+    const [l1, l3] = summary(s, true);
+    expect(l1).toEqual([{ text: "stuck · 1 unschedulable", color: "#f85149" }]);
     expect(text(l3)).toBe("stale · 2 errors · ● 0 running  ○ 0 ready  · 1 waiting  ✗ 0");
     expect(l3.find((g) => g.text === "✗ 0")?.color).toBeUndefined();
     expect(text(compactSummary(s, true))).toBe(
@@ -314,7 +310,7 @@ describe("summary / compactSummary / endState", () => {
 
   test("no stale, no errors", () => {
     const s = { ...stuck(), errors: 0 };
-    const all = [...summary(s, false, 40, 0), compactSummary(s, false)]
+    const all = [...summary(s, false), compactSummary(s, false)]
       .map(text)
       .join("\n");
     expect(all).not.toContain("stale");
@@ -328,7 +324,7 @@ describe("summary / compactSummary / endState", () => {
       waves: [[], [], []],
       currentWave: 2,
     });
-    expect(text(summary(s, false, 30, 0)[0])).toBe(`demo ${"─".repeat(16)} wave 2/3`);
+    expect(text(summary(s, false)[0])).toBe("wave 2/3");
     expect(text(compactSummary(s, false))).toBe("4/20 · W2/3 · demo");
     const done = snap({
       counts: {
@@ -343,11 +339,11 @@ describe("summary / compactSummary / endState", () => {
       tasks: tasksOf([task("a", "done")]),
     });
     expect(endState(done)).toBe("done");
-    expect(text(summary(done, false, 20, 0)[0])).toBe(`demo ${"─".repeat(6)} all done`);
+    expect(text(summary(done, false)[0])).toBe("all done");
     expect(text(compactSummary(done, false))).toBe("2/2 · all done · demo");
   });
 
-  test("the title's rule is the one fill segment; the run's wall time and tokens sit under the progress bar", () => {
+  test("the run's wall time and tokens", () => {
     const now = Date.parse("2026-01-01T00:04:12Z");
     const s = snap({
       counts: { ...big().counts },
@@ -355,10 +351,6 @@ describe("summary / compactSummary / endState", () => {
       currentWave: 2,
       time: { startedAt: "2026-01-01T00:00:00Z", endedAt: null },
     });
-    const [title] = summary(s, false, 40, now);
-    expect(title.filter((g) => g.fill)).toEqual([expect.objectContaining({ dim: true })]);
-    expect(text(title).endsWith(" wave 2/3")).toBe(true);
-    expect(cols(title)).toBe(40);
     expect(runTotals(s, now)).toEqual({ time: "4m12s", tokens: null });
     const ended = { ...s, time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:01:05Z" }, tokens: 12_345_678 };
     expect(runTotals(ended, now)).toEqual({ time: "1m05s", tokens: "12.3M tok" });
@@ -376,7 +368,7 @@ describe("summary / compactSummary / endState", () => {
         invalid: 1,
       },
     });
-    expect(summary(s, false, 40, 0)[2].find((g) => g.text === "✗ 1")?.color).toBe(
+    expect(summary(s, false)[1].find((g) => g.text === "✗ 1")?.color).toBe(
       "#f85149",
     );
   });
@@ -451,16 +443,17 @@ describe("docked", () => {
     const s = big();
     for (const w of [24, 40, 80]) {
       const d = docked(s, w, Date.parse("2026-01-01T01:00:00Z"), true);
-      for (const line of [...d.head, ...d.bars, d.states, ...d.crew])
+      for (const line of [d.wave, ...d.bars, d.states, ...d.crew])
         expect(cols(line)).toBeLessThanOrEqual(w);
       expect(d.cards.inner + 2 + d.cards.groups[0].label.length).toBeLessThanOrEqual(w);
     }
   });
 
-  test("top is summary then bars; agents only when some are in flight", () => {
+  test("the title is the bare slug; the wave and state lines are separate; crew only when present", () => {
     const s = big();
     const d = docked(s, 80, Date.parse("2026-01-01T00:00:00Z"), false);
-    expect(d.head).toHaveLength(2);
+    expect(d.title).toBe("demo");
+    expect(text(d.wave)).toBe("wave 2/4");
     expect(d.bars).toHaveLength(3);
     expect(text(d.states)).toContain("running");
     expect(d.cards.groups).toHaveLength(5);
