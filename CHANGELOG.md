@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.7.1] - 2026-10-03
+
+_tracks tag `runes-v0.7.1`_
+
+### Added
+- Pasted images can now be opened in Quick Look: the prompt bubble draws a button for each `[Image #N]`, and pressing it previews the matching image.
+
 ## [runes 0.7.0] - 2026-10-03
 
 _tracks tag `runes-v0.7.0`_
