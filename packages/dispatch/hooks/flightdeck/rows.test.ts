@@ -12,6 +12,7 @@ import {
   GLYPH,
   inline,
   type Line,
+  runTotals,
   summary,
   waveCards,
 } from "./rows.ts";
@@ -297,7 +298,7 @@ describe("summary / compactSummary / endState", () => {
   test("stuck fixture, stale with errors", () => {
     const s = stuck();
     expect(endState(s)).toBe("stuck");
-    const [l1, l2, , l3] = summary(s, true, 40, 0);
+    const [l1, l2, l3] = summary(s, true, 40, 0);
     expect(text(l1)).toBe(`demo ${"─".repeat(11)} stuck · 1 unschedulable`);
     expect(l1.at(-1)!.color).toBe("#f85149");
     expect(text(l2)).toBe(`${"━".repeat(34)} 19/20`);
@@ -354,15 +355,14 @@ describe("summary / compactSummary / endState", () => {
       currentWave: 2,
       time: { startedAt: "2026-01-01T00:00:00Z", endedAt: null },
     });
-    const [title, , totals] = summary(s, false, 40, now);
+    const [title] = summary(s, false, 40, now);
     expect(title.filter((g) => g.fill)).toEqual([expect.objectContaining({ dim: true })]);
     expect(text(title).endsWith(" wave 2/3")).toBe(true);
     expect(cols(title)).toBe(40);
-    expect(text(totals).trim()).toBe("4m12s");
-    expect(totals[0]).toMatchObject({ fill: true });
+    expect(runTotals(s, now)).toEqual({ time: "4m12s", tokens: null });
     const ended = { ...s, time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:01:05Z" }, tokens: 12_345_678 };
-    expect(text(summary(ended, false, 40, now)[2]).trim()).toBe("1m05s · 12.3M tok");
-    expect(summary({ ...s, time: null }, false, 40, now)[2]).toEqual([]);
+    expect(runTotals(ended, now)).toEqual({ time: "1m05s", tokens: "12.3M tok" });
+    expect(runTotals({ ...s, time: null }, now)).toBeNull();
   });
 
   test("red invalid pair only when invalid > 0", () => {
@@ -376,7 +376,7 @@ describe("summary / compactSummary / endState", () => {
         invalid: 1,
       },
     });
-    expect(summary(s, false, 40, 0)[3].find((g) => g.text === "✗ 1")?.color).toBe(
+    expect(summary(s, false, 40, 0)[2].find((g) => g.text === "✗ 1")?.color).toBe(
       "#f85149",
     );
   });

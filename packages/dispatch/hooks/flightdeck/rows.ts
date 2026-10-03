@@ -73,6 +73,16 @@ function bar(done: number, total: number, cells: number): Line {
   return line;
 }
 
+// the web header's pair: the run's wall time and its token rollup; null before any agent started
+export function runTotals(s: DeckSnapshot, now: number): { time: string; tokens: string | null } | null {
+  if (!s.time) return null;
+  const end = s.time.endedAt === null ? now : Date.parse(s.time.endedAt);
+  return {
+    time: formatElapsed(end - Date.parse(s.time.startedAt)),
+    tokens: s.tokens === null ? null : `${formatTokens(s.tokens)} tok`,
+  };
+}
+
 export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number): Line[] {
   const state = endState(s);
   const right: Seg =
@@ -89,14 +99,6 @@ export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number)
     right,
   ];
 
-  // right-aligned under the count, the way the web header pairs wall time with the token rollup
-  const wall = s.time
-    ? formatElapsed((s.time.endedAt === null ? now : Date.parse(s.time.endedAt)) - Date.parse(s.time.startedAt))
-    : null;
-  const total = [wall, s.tokens === null ? null : `${formatTokens(s.tokens)} tok`].filter(Boolean).join(" · ");
-  const totals: Line = total
-    ? [{ text: " ".repeat(Math.max(0, w - total.length)), fill: true }, { text: total, dim: true }]
-    : [];
 
   const count = `${s.counts.done}/${s.counts.total}`;
   const progress: Line = [
@@ -119,7 +121,7 @@ export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number)
     { text: "  " },
     pair("invalid", c.invalid, ""),
   ];
-  return [title, progress, totals, states];
+  return [title, progress, states];
 }
 
 export function compactSummary(s: DeckSnapshot, stale: boolean): Line {
@@ -280,10 +282,11 @@ export function docked(
   w: number,
   now: number,
   stale: boolean,
-): { head: Line[]; bars: Line[]; states: Line; cards: WaveCards; crew: Line[] } {
-  const [title, progress, totals, states] = summary(s, stale, w, now);
+): { head: Line[]; totals: ReturnType<typeof runTotals>; bars: Line[]; states: Line; cards: WaveCards; crew: Line[] } {
+  const [title, progress, states] = summary(s, stale, w, now);
   return {
-    head: [title, progress, ...(totals.length > 0 ? [totals] : [])].map((l) => clip(l, w)),
+    head: [title, progress].map((l) => clip(l, w)),
+    totals: runTotals(s, now),
     bars: bucketBars(s, w).map((l) => clip(l, w)),
     states: clip(states, w),
     cards: waveCards(s, w, now),

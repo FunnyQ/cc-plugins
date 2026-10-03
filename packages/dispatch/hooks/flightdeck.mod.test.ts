@@ -455,7 +455,8 @@ test("a pane with no taskless agents draws no agent box", async ($, on) => {
 
 test("a done task's tokens are read once, with --usage, and kept on later ticks", async ($, on) => {
   const w = world(on, (argv) => {
-    const s = snap(argv[2]!);
+    // every snapshot carries the run's time; only a --usage one carries tokens
+    const s = snap(argv[2]!, { time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:04:12Z" } });
     if (argv.includes("--usage")) {
       s.tasks["api/01"]!.tokens = 1_234_567;
       s.tokens = 2_000_000;
@@ -470,6 +471,10 @@ test("a done task's tokens are read once, with --usage, and kept on later ticks"
   expect(texts).toContain("3m12s");
   expect(texts).toContain("1.2M tok");
   expect(texts).toContain("2.0M tok");
+  expect(texts).toContain("Total Cost");
+  const ui = await mountPane($);
+  expect(await ui.find({ key: "totals" })).toBeDefined();
+  await ui.unmount();
 });
 
 test("the inline seat draws two lines: the summary and the current wave's cards", async ($, on) => {

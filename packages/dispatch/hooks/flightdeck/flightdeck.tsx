@@ -259,7 +259,7 @@ export const flightdeck = (on: On) => {
       const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
-    const { head, bars, states, cards, crew } = docked(s, width, Date.now(), stale);
+    const { head, totals, bars, states, cards, crew } = docked(s, width, Date.now(), stale);
     // a Button takes no colour, so the glyph is coloured Text and the ref beside it is the pressable part
     const cardBox = (c: CardModel) => (
       <Box
@@ -297,6 +297,21 @@ export const flightdeck = (on: On) => {
       // the top row clears the pane's close mark, which sits over the body's first line
       <Box flexDirection="column" paddingTop={1}>
         {head.map(row)}
+        {totals && (
+          <Box
+            key="totals"
+            flexDirection="column"
+            borderStyle="round"
+            borderDimColor
+            paddingX={1}
+          >
+            <Text dimColor>Total Cost</Text>
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text>{totals.time}</Text>
+              {totals.tokens && <Text>{totals.tokens}</Text>}
+            </Box>
+          </Box>
+        )}
         {bars.map(row)}
         {crew.length > 0 && (
           <Box
