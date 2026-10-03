@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.6.0] - 2026-10-03
+
+_tracks tag `runes-v0.6.0`_
+
+### Added
+- Transcript now shows Read, Edit, Write and Agent cards, each with its own on/off switch under `transcript:` in config.yaml (older configs are backfilled automatically), with Read and Write-create folded by default and Edit drawing a diff.
+
 ## [runes 0.5.1] - 2026-10-03
 
 _tracks tag `runes-v0.5.1`_
