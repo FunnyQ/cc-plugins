@@ -8,14 +8,10 @@
 
 import type { Register } from "claude-code";
 import {
-  addedCommentLines,
   ASK,
   baseName,
-  flaggedBlocks,
+  blocksFor,
   formatReason,
-  isGuardedPath,
-  resolveAdded,
-  syntaxFor,
   type ToolResponse,
 } from "./comment-core.ts";
 import {
@@ -33,38 +29,15 @@ export const register: Register = (on) => {
     if (e.tool !== "Edit" && e.tool !== "Write") return ran;
 
     const filePath = e.file_path;
-    if (!isGuardedPath(filePath)) return ran;
-    const syntax = syntaxFor(filePath);
-    if (!syntax) return ran;
-
-    const response = ran.result as ToolResponse;
-    if (response.staged) return ran;
-    const patch = response.structuredPatch;
-    // A Write that creates a file reports no hunks at all, so an empty patch means "nothing changed" only when the file already existed.
-    if (response.type === "update" && patch?.length === 0) return ran;
-
-    let fileText: string;
-    try {
-      fileText = await $.fs.read(filePath);
-    } catch {
-      return ran;
-    }
-
-    const added = patch?.length
-      ? resolveAdded(
-          patch,
-          fileText.split("\n").map((l) => l.trim()),
-        )
-      : addedCommentLines(e.tool, e, syntax);
-    if (added instanceof Set ? added.size === 0 : added.length === 0) {
-      return ran;
-    }
-
-    const blocks = flaggedBlocks(fileText, syntax, added);
+    const { blocks, asked } = await blocksFor(
+      e.tool,
+      e,
+      ran.result as ToolResponse,
+      (path) => $.fs.read(path),
+    );
     if (blocks.length === 0) return ran;
 
     // Read-then-write, not an append: two parallel writes can drop one entry, which costs one re-asked block at Stop.
-    const asked = blocks.flatMap((b) => b.lines.filter((_, k) => b.added[k]));
     const dir = (await $.env.get("GUARD_STATE_DIR")) ?? DEFAULT_STATE_DIR;
     const ledger = reportedFile(dir, await $.session.id());
     const prior = (await $.fs.exists(ledger)) ? await $.fs.read(ledger) : "";

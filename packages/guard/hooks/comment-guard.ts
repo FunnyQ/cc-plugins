@@ -21,14 +21,10 @@
  */
 
 import {
-  addedCommentLines,
   ASK,
   baseName,
-  flaggedBlocks,
+  blocksFor,
   formatReason,
-  isGuardedPath,
-  resolveAdded,
-  syntaxFor,
   type ToolInput,
   type ToolResponse,
 } from "./comment-core.ts";
@@ -54,44 +50,15 @@ async function main(): Promise<number> {
 
   const input = payload.tool_input ?? {};
   const filePath = input.file_path ?? "";
-  if (!filePath) return 0;
-
-  if (!isGuardedPath(filePath)) return 0;
-  const syntax = syntaxFor(filePath);
-  if (!syntax) return 0;
-
-  const response = payload.tool_response ?? {};
-  if (response.staged) return 0;
-  const patch = response.structuredPatch;
-  // A Write that creates a file reports no hunks at all (78 of 78 measured), so
-  // an empty patch means "nothing changed" only when the file already existed.
-  if (response.type === "update" && patch?.length === 0) return 0;
-
-  // PostToolUse runs after the write landed, so the file on disk is the shape
-  // being judged. Without it there is no block sizing worth reporting.
-  let fileText: string;
-  try {
-    fileText = await Bun.file(filePath).text();
-  } catch {
-    return 0;
-  }
-
-  // Live on both harnesses, not dead code: a create Write sends an empty patch, and OpenCode's `commentPayload` sends none at all.
-  const added = patch?.length
-    ? resolveAdded(
-        patch,
-        fileText.split("\n").map((l) => l.trim()),
-      )
-    : addedCommentLines(toolName, input, syntax);
-  if (added instanceof Set ? added.size === 0 : added.length === 0) return 0;
-
-  const blocks = flaggedBlocks(fileText, syntax, added);
+  const { blocks, asked } = await blocksFor(
+    toolName,
+    input,
+    payload.tool_response ?? {},
+    (path) => Bun.file(path).text(),
+  );
   if (blocks.length === 0) return 0;
 
-  if (payload.session_id) {
-    const asked = blocks.flatMap((b) => b.lines.filter((_, k) => b.added[k]));
-    recordReported(payload.session_id, filePath, asked);
-  }
+  if (payload.session_id) recordReported(payload.session_id, filePath, asked);
 
   const fileName = baseName(filePath);
   const screen = await screenBlocks(fileName, blocks, {

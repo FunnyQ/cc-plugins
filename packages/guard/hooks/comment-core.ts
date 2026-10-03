@@ -402,6 +402,47 @@ export function flaggedBlocks(
   return blocks;
 }
 
+// The read is injected rather than done up front so a skipped edit never touches the disk.
+export async function blocksFor(
+  toolName: string,
+  input: ToolInput,
+  response: ToolResponse,
+  read: (filePath: string) => Promise<string>,
+): Promise<{ blocks: CommentBlock[]; asked: string[] }> {
+  const none = { blocks: [], asked: [] };
+  const filePath = input.file_path ?? "";
+  if (!filePath || !isGuardedPath(filePath)) return none;
+  const syntax = syntaxFor(filePath);
+  if (!syntax) return none;
+
+  if (response.staged) return none;
+  const patch = response.structuredPatch;
+  // A Write that creates a file reports no hunks at all (78 of 78 measured), so
+  // an empty patch means "nothing changed" only when the file already existed.
+  if (response.type === "update" && patch?.length === 0) return none;
+
+  // PostToolUse runs after the write landed, so the file on disk is the shape
+  // being judged. Without it there is no block sizing worth reporting.
+  let fileText: string;
+  try {
+    fileText = await read(filePath);
+  } catch {
+    return none;
+  }
+
+  // Live on both harnesses, not dead code: a create Write sends an empty patch, and OpenCode's `commentPayload` sends none at all.
+  const added = patch?.length
+    ? resolveAdded(
+        patch,
+        fileText.split("\n").map((l) => l.trim()),
+      )
+    : addedCommentLines(toolName, input, syntax);
+
+  const blocks = flaggedBlocks(fileText, syntax, added);
+  const asked = blocks.flatMap((b) => b.lines.filter((_, k) => b.added[k]));
+  return { blocks, asked };
+}
+
 // Kept out of formatReason so the sweep asks once however many files it reports.
 export const ASK =
   "Answer for every line marked +: does it say why, or what? Delete the ones that say what.";
