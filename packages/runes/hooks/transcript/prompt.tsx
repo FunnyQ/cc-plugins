@@ -33,8 +33,10 @@ export const prompt = (on: On) => {
   on(
     "ui.render",
     { component: "UserMessage", props: { origin: { kind: "composer" } } },
-    ($, e, next) => {
+    async ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled.prompt) return next(e);
+      // run the chain anyway so plugins beneath still see the row; its tree is discarded
+      await next(e);
       // a prompt body taller than fold_lines folds to its head
       const { color, icon, side, fold_lines: foldLines } = config.prompt;
       const { Box, Text, Button } = $.ui.resolve(e);

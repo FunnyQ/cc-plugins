@@ -107,7 +107,11 @@ test("a prompt body renders through glow once the worker has run", async ($, on)
   await row.unmount();
 });
 
-test("a reminder's head is cut to the row by cell width, so CJK cannot push the border out", async ($) => {
+test("a reminder's head is cut to the row by cell width, so CJK cannot push the border out", async ($, on) => {
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return <Text key="engine">engine</Text>;
+  });
   const head = "中".repeat(60);
   const row = await $.ui.mount({
     plugin: "runes",

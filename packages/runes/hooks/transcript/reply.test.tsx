@@ -130,3 +130,9 @@ test("side: right moves the reply's bar after the bubble", async ($, on) => {
   await row.unmount();
   expect(bubble?.children?.at(-1)).toMatchObject({ props: { backgroundColor: "#d97757" } });
 });
+
+test("a drawn bubble still runs the chain, so a plugin beneath sees the row", async ($, on) => {
+  const host = await startSession($, on, { run: () => ran(1, "") });
+  expect(await draws($, REPLY("x", "row-1"), { key: "reply" })).toBe(true);
+  expect(host.beneath).toContain("row-1");
+});

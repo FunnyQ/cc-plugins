@@ -7,8 +7,10 @@ import { bubble, runLine } from "./bubble";
 import { innerWidth, wrap } from "./text";
 
 export const reply = (on: On) => {
-  on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
+  on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
     if (!config.enabled.transcript || !config.enabled.reply) return next(e);
+    // run the chain anyway so plugins beneath still see the row; its tree is discarded
+    await next(e);
     const { color, icon, side } = config.reply;
     const inner = innerWidth(e.viewport?.columns);
     const rendered = glow.view(inner, e.props.text, e.requestId);

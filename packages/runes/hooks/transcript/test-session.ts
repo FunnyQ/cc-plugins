@@ -85,12 +85,19 @@ export const fakeHost = (
 export const startSession = async ($: Engine, on: On, opts?: Parameters<typeof fakeHost>[1]) => {
   const host = fakeHost(on, opts);
   on("session.start", (_$, e) => e as never);
+  // the engine beneath the message rows, which the bubbles still run so other plugins see each row
+  const beneath: string[] = [];
+  for (const component of ["UserMessage", "AssistantMessage"] as const)
+    on("ui.render", { component }, (_$, e) => {
+      beneath.push(e.requestId);
+      return { type: "Text", props: { key: "engine" }, children: ["engine"] } as never;
+    });
   await $.session.start({
     cwd: "/",
     surface: "terminal",
     isInteractive: false,
   } as never);
-  return host;
+  return Object.assign(host, { beneath });
 };
 
 // the worker runs glow off the render path, so a test polls until its result lands
