@@ -10,6 +10,9 @@ const POLL_INTERVAL_MS = 500;
 
 export type Args = { plan: string; port: number; open: boolean };
 
+// the dispatch mod reads this line back, because a launch's --plan is often a shell variable the command text never expands
+export const planLine = (plan: string) => `flightdeck plan: ${plan}`;
+
 export function parseArgs(
   argv: string[],
 ): { ok: true; args: Args } | { ok: false; message: string } {
@@ -227,6 +230,7 @@ export async function main(): Promise<void> {
 
   const url = `http://localhost:${port}/`;
   console.log(url);
+  console.log(planLine(plan));
 
   if (open) {
     openBrowser(url);

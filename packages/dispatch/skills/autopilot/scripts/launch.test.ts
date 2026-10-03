@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectSource } from "./graph-source";
-import { parseArgs, validatePlanDir } from "./launch";
+import { parseArgs, planLine, validatePlanDir } from "./launch";
 
 describe("parseArgs", () => {
   test("parses valid arguments", () => {
@@ -84,5 +84,11 @@ describe("detectSource and validatePlanDir", () => {
     writeFileSync(file, "");
     expect(validatePlanDir(file)).toEqual({ ok: false, message: "--plan must be a directory" });
     expect(validatePlanDir(join(dir, "absent"))).toEqual({ ok: false, message: "--plan directory does not exist" });
+  });
+});
+
+describe("planLine", () => {
+  test("names the plan the launcher served, for the dispatch mod to read back", () => {
+    expect(planLine("/abs/docs/x")).toBe("flightdeck plan: /abs/docs/x");
   });
 });
