@@ -4191,4 +4191,16 @@ describe("cockpit-rust flight fixes", () => {
     expect(log.result.escalations).toEqual([]);
     expect(log.labels.at(-1)).toBe("commit-post-loop");
   });
+
+  test("a create that returns an empty path parks the task instead of running dev in the main tree", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0)],
+      worktree: { [`wt-create:${ref}`]: [{ path: "", base: "" }] },
+    });
+    expect(log.labels).not.toContain(`dev:${ref}#1`);
+    expect(log.result.completed).toEqual([]);
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: ref, infrastructure: true }),
+    ]);
+  });
 });

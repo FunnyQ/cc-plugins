@@ -911,6 +911,8 @@ async function executeTask(item) {
         const created = await wtCall(`wt-create:${ref}`,
           RESUME ? create : `test -e ${DRAIN} && echo '{"drained":true,"path":"","base":""}' || ${create}`, WT_SCHEMA.create)
         if (created.drained === true) return created
+        // a relay that drops `drained` from the drain echo returns an empty path, and dev would then run in the main tree
+        if (!created.path) throw new Error(`worktree.ts returned no path for ${ref}`)
         live.set(ref, created.path)
         return created
       })
