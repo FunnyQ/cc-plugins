@@ -90,8 +90,8 @@ export const DEFAULTS: Config = {
   },
   // nf-md-robot_outline U+F167A, needs a Nerd Font; peer's filled robot draws the hand-back
   agent: { color: "#7f8fd1", error_color: "#c94f4f", icon: "\u{F167A}", side: "left" },
-  // nf-fa-magic U+F0D0, needs a Nerd Font
-  skill: { color: "#d4a72c", error_color: "#c94f4f", icon: "\u{F0D0}", side: "left" },
+  // nf-md-arm_flex U+F0FD7, needs a Nerd Font
+  skill: { color: "#d4a72c", error_color: "#c94f4f", icon: "\u{F0FD7}", side: "left" },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   glow: { style: "dark" },
@@ -162,7 +162,7 @@ transcript:
     enabled: ${enabled.skill}    # Skill calls: the skill, its args, and a forked run's result folded
     # color: "${DEFAULTS.skill.color}"
     # error_color: "${DEFAULTS.skill.error_color}"
-    # icon: "\\uF0D0"       # Nerd Font glyph
+    # icon: "\\U000F0FD7"   # Nerd Font glyph
     # side: ${DEFAULTS.skill.side}
   peer:
     enabled: ${enabled.peer}    # subagents' and other sessions' messages
