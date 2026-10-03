@@ -1,5 +1,19 @@
 # Changelog
 
+## [runes 0.3.0] - 2026-10-03
+
+_tracks tag `runes-v0.3.0`_
+
+### Added
+- New transcript rune redraws your own prompts as a rounded bubble with a blue bar and icon, with long prompts and system reminders foldable; turn it off with `/runes transcript off`.
+- Claude's replies now appear as an orange bubble, with markdown rendered through glow.
+- Prompt bubbles render markdown through glow, which fixes mid-word line breaks and falls back to plain wrapping when glow is unavailable.
+- Both bubbles still draw without glow installed, using wrapped raw text and a one-time install hint, and one aborted glow run no longer turns glow off for the session.
+
+### Fixed
+- Transcript glow rendering now runs in a background worker, so a redraw no longer aborts it; a message's first draw shows raw text for about 30 ms.
+- Glow no longer creates a literal `~` folder in your working directory, and the bubble sides are swapped so your prompt sits on the right and Claude's reply on the left.
+
 ## [chronicle 0.22.2] - 2026-10-03
 
 _tracks tag `chronicle-v0.22.2`_
