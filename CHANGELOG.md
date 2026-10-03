@@ -1,5 +1,13 @@
 # Changelog
 
+## [runes 0.7.3] - 2026-10-03
+
+_tracks tag `runes-v0.7.3`_
+
+### Added
+- A new /minimap command opens a 24-column side pane that shows the whole session as coloured bars; press Enter or click a bar to scroll the transcript there.
+- The minimap rune is switchable from config.yaml and off by default, since it opens a pane; /runes on still turns it on with the rest.
+
 ## [runes 0.7.2] - 2026-10-03
 
 _tracks tag `runes-v0.7.2`_
