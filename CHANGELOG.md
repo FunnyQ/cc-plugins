@@ -1,5 +1,26 @@
 # Changelog
 
+## [runes 0.5.0] - 2026-10-03
+
+_tracks tag `runes-v0.5.0`_
+
+### Added
+- A new bash rune redraws Bash tool calls as linked command and output cards, with hover highlighting and folding of long output, plus a matching `bash` section in config.yaml.
+- Shell commands are now syntax-highlighted, and command output goes through glow only when its type (JSON, diff, single file) is recognised, so plain text is no longer turned into headings and bullets.
+- A new peer rune draws subagent hand-backs as a card titled with the agent name and folds the harness's long frame behind a toggle; display only, the model still reads the full text. It is enabled by default.
+- Older config.yaml files are backfilled with sections for runes added since they were written.
+
+### Changed
+- config.yaml changed format: each rune's switch now lives in its own section (`bash:\n  enabled: true`) instead of a top-level `enabled:` block. An older file is migrated automatically at session start; a comment on an old switch line does not move with it.
+- New config files set only the switches and write every other field as a commented default, so a changed default reaches them instead of being frozen in.
+- Clawd animation no longer redraws the whole transcript on every frame, only the band above the prompt, so idle sessions stay light.
+- Transcript rendering is faster through shared wrapping helpers and per-card caching, with no change in how it looks.
+
+### Fixed
+- Bash cards are readable on light terminals: they pick a light or dark palette from the glow style setting.
+- Right-side bubbles no longer show an extra column of gap before the bar, and icons are padded consistently.
+- The prompt bubble's "more lines" fold now matches the Bash cards and no longer lights up every card at once.
+
 ## [runes 0.4.0] - 2026-10-03
 
 _tracks tag `runes-v0.4.0`_
