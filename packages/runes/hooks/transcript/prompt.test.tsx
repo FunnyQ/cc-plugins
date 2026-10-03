@@ -1,7 +1,8 @@
 import { expect, test } from "claude-code/testing";
 import type { On } from "claude-code";
 
-import { prompt, segments, wrap } from "./prompt";
+import { prompt, segments } from "./prompt";
+import { wrap } from "./text";
 
 const ran = (exitCode: number, stdout: string) => ({
   value: { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },

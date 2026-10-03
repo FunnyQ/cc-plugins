@@ -2,35 +2,25 @@ import type { On } from "claude-code";
 
 import { enabled } from "../switch";
 import type { Run } from "./ansi";
-import { GLOW_INIT, glow, glowArgv, toLines } from "./glow";
-import { cells } from "./prompt";
+import { glow, INSTALL_HINT } from "./glow";
+import { cells, innerWidth, wrap } from "./text";
 
 const CLAUDE = "#d97757";
 // nf-cod icon U+EC82, needs a Nerd Font
 const ICON = "";
-// what the bar, its margin, the transcript gutter and the side borders take from the viewport
-const CHROME = 7;
 
 export const reply = (on: On) => {
   on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
-    if (enabled.transcript === false || glow.missing) return next(e);
-    const inner = Math.max(10, (e.viewport?.columns ?? 80) - CHROME);
-    const key = `${inner}\0${e.props.text}`;
-    if (!glow.rendered.has(key)) {
-      let lines: Run[][] | null = null;
-      try {
-        const { exitCode, stdout } = await $.process.run(glowArgv(inner), {
-          ...GLOW_INIT,
-          stdin: e.props.text,
-        });
-        if (exitCode === 0) lines = toLines(stdout);
-      } catch {
-        glow.missing = true;
-      }
-      glow.remember(key, lines);
-    }
-    const lines = glow.rendered.get(key);
-    if (!lines?.length) return next(e);
+    if (enabled.transcript === false) return next(e);
+    const inner = innerWidth(e.viewport?.columns);
+    const rendered = glow.missing
+      ? null
+      : await glow.render((argv, init) => $.process.run(argv, init), inner, e.props.text, e.requestId);
+    if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
+    // without glow the raw markdown still gets the bubble, wrapped by cell width
+    const lines: Run[][] = rendered?.length
+      ? rendered
+      : wrap(e.props.text, inner).map((l) => (l ? [{ text: l }] : []));
     const { Box, Text } = $.ui.resolve(e);
 
     // the glyph draws wider than its one cell and covers the space after it, so it gets two

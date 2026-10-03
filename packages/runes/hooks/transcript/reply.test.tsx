@@ -44,13 +44,48 @@ test("a reply draws glow's lines inside the orange bubble", async ($, on) => {
   await row.unmount();
 });
 
-test("a reply keeps the engine's drawing when glow fails", async ($, on) => {
+test("a reply glow cannot render still draws its raw text in the bubble", async ($, on) => {
   on("process.run", () => ran(1, ""));
+  const row = await $.ui.mount(REPLY("other text"));
+  expect(await row.find({ key: "reply" })).toBeDefined();
+  expect(await row.find({ type: "Text", text: "other text" })).toBeDefined();
+  await row.unmount();
+});
+
+test("one failed glow run is retried on the next draw instead of turning glow off", async ($, on) => {
+  let calls = 0;
+  on("process.run", () => {
+    calls++;
+    if (calls === 1) throw new Error("aborted");
+    return ran(0, GLOW);
+  });
   on("ui.render", ($, e) => {
     const { Text } = $.ui.resolve(e);
     return <Text key="engine">engine</Text>;
   });
-  const row = await $.ui.mount(REPLY("other text"));
-  expect(await row.find({ key: "reply" })).toBeUndefined();
+  let row = await $.ui.mount(REPLY("retry me"));
+  // the failed draw falls back to the raw text, not glow's
+  expect(await row.find({ type: "Text", text: "hi" })).toBeUndefined();
   await row.unmount();
+  row = await $.ui.mount(REPLY("retry me"));
+  expect(await row.find({ type: "Text", text: "hi" })).toBeDefined();
+  await row.unmount();
+});
+
+// last in the file: it leaves glow marked missing for the module
+test("glow failing to start suggests installing it, once", async ($, on) => {
+  on("process.run", () => {
+    throw new Error("cannot start glow");
+  });
+  const toasts: string[] = [];
+  on("ui.toast", (_$, e) => {
+    toasts.push(e.text);
+  });
+  for (const text of ["a", "b", "c", "d"]) {
+    const row = await $.ui.mount(REPLY(text));
+    expect(await row.find({ key: "reply" })).toBeDefined();
+    await row.unmount();
+  }
+  expect(toasts).toHaveLength(1);
+  expect(toasts[0]).toContain("brew install glow");
 });

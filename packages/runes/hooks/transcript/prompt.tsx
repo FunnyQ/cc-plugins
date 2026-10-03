@@ -2,43 +2,14 @@ import type { On } from "claude-code";
 
 import { enabled } from "../switch";
 import type { Run } from "./ansi";
-import { GLOW_INIT, glow, glowArgv, toLines } from "./glow";
+import { glow, INSTALL_HINT } from "./glow";
+import { cells, innerWidth, wrap } from "./text";
 
 // a prompt body taller than this folds to its head
 const FOLD_LINES = 6;
 const ACCENT = "#1b5ea6";
 // nf-md icon U+F064C, needs a Nerd Font
 const ICON = "\u{F064C}";
-// what the bar, its margin, the transcript gutter and the side borders take from the viewport
-const CHROME = 7;
-
-// East Asian wide ranges and emoji take two cells
-const WIDE =
-  /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6\u{1F300}-\u{1FAFF}]/u;
-
-export const cells = (text: string): number =>
-  [...text].reduce((n, ch) => n + (WIDE.test(ch) ? 2 : 1), 0);
-
-// breaks by cell width, not at word boundaries: hard-wraps mid-word, word wrap if it reads badly
-export const wrap = (text: string, width: number): string[] =>
-  text.split("\n").flatMap((line) => {
-    const out: string[] = [];
-    let cur = "";
-    let used = 0;
-    for (const ch of line) {
-      const w = WIDE.test(ch) ? 2 : 1;
-      if (used + w > width && cur) {
-        out.push(cur);
-        cur = "";
-        used = 0;
-      }
-      cur += ch;
-      used += w;
-    }
-    out.push(cur);
-    return out;
-  });
-
 export type Segment = { kind: "body" | "reminder"; text: string };
 
 export const segments = (text: string): Segment[] => {
@@ -74,7 +45,7 @@ export const prompt = (on: On) => {
         $.ui.invalidate("ui.render");
       };
 
-      const inner = Math.max(10, (e.viewport?.columns ?? 80) - CHROME);
+      const inner = innerWidth(e.viewport?.columns);
       // each row is one terminal line, so the side borders are one glyph tall
       const row = (key: string, child: unknown) => (
         <Box key={key} flexDirection="row">
@@ -90,32 +61,22 @@ export const prompt = (on: On) => {
       );
       const parts = segments(e.props.text);
       // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
-      const shownOf = (s: Segment, i: number) => {
+      const shown = parts.map((s, i) => {
         const lines = s.text.split("\n");
         return lines.length > FOLD_LINES && !open.has(`${e.requestId}:${i}`)
           ? lines.slice(0, FOLD_LINES).join("\n")
           : s.text;
-      };
-      const glowed = new Map<number, Run[][]>();
-      for (const [i, s] of parts.entries()) {
-        if (s.kind !== "body" || glow.missing) continue;
-        const key = `${inner}\0${shownOf(s, i)}`;
-        if (!glow.rendered.has(key)) {
-          let lines: Run[][] | null = null;
-          try {
-            const { exitCode, stdout } = await $.process.run(glowArgv(inner), {
-              ...GLOW_INIT,
-              stdin: shownOf(s, i),
-            });
-            if (exitCode === 0) lines = toLines(stdout);
-          } catch {
-            glow.missing = true;
-          }
-          glow.remember(key, lines);
-        }
-        const lines = glow.rendered.get(key);
-        if (lines?.length) glowed.set(i, lines);
-      }
+      });
+      const glowed: (Run[][] | null)[] = glow.missing
+        ? []
+        : await Promise.all(
+            parts.map((s, i) =>
+              s.kind === "body"
+                ? glow.render((argv, init) => $.process.run(argv, init), inner, shown[i])
+                : null,
+            ),
+          );
+      if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
 
       const rows = parts.flatMap((s, i) => {
         const id = `${e.requestId}:${i}`;
@@ -144,9 +105,9 @@ export const prompt = (on: On) => {
 
         const lines = s.text.split("\n");
         const isLong = lines.length > FOLD_LINES;
-        const runs = glowed.get(i);
+        const runs = glowed[i];
         // glow failed or is missing, so the body falls back to plain cell-width wrapping
-        const body = runs
+        const body = runs?.length
           ? runs.map((line, j) =>
               row(
                 `body:${i}:${j}`,
@@ -161,7 +122,7 @@ export const prompt = (on: On) => {
                 </Text>,
               ),
             )
-          : wrap(shownOf(s, i), inner).map((line, j) =>
+          : wrap(shown[i], inner).map((line, j) =>
               row(`body:${i}:${j}`, <Text>{line}</Text>),
             );
         if (!isLong) return body;
