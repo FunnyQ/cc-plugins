@@ -3,6 +3,7 @@ import type { On } from "claude-code";
 import { config } from "../config";
 import { bubble, foldRows, runLine } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
+import { imageIds } from "./images";
 import { cells, innerWidth, wrap } from "./text";
 
 type Segment = { kind: "body" | "reminder"; text: string };
@@ -43,7 +44,10 @@ export const prompt = (on: On) => {
       };
 
       const inner = innerWidth(e.viewport?.columns);
-      const row = (key: string, child: unknown): [string, unknown] => [key, child];
+      const row = (key: string, child: unknown): [string, unknown] => [
+        key,
+        child,
+      ];
       const parts = segments(e.props.text);
       // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
       const shown = parts.map((s, i) => {
@@ -89,12 +93,7 @@ export const prompt = (on: On) => {
         const runs = glowed[i];
         // glow failed or is missing, so the body falls back to plain cell-width wrapping
         const body = runs?.length
-          ? runs.map((line, j) =>
-              row(
-                `body:${i}:${j}`,
-                runLine(Text, line),
-              ),
-            )
+          ? runs.map((line, j) => row(`body:${i}:${j}`, runLine(Text, line)))
           : wrap(shown[i], inner).map((line, j) =>
               row(`body:${i}:${j}`, <Text>{line}</Text>),
             );
@@ -111,9 +110,29 @@ export const prompt = (on: On) => {
         ];
       });
 
+      // the row carries no image bytes, so a press asks a bun child to dig them out of the transcript
+      const openImage = (id: number) => async () => {
+        const script = `${$.plugin.root}/hooks/transcript/open-image.ts`;
+        const sessionId = await $.session.id();
+        const { exitCode, stderr } = await $.process.run(
+          ["bun", script, sessionId, String(id)],
+          { stdin: e.props.text },
+        );
+        if (exitCode !== 0)
+          $.ui.toast(stderr.trim() || `could not open image #${id}`);
+      };
+      const images = imageIds(e.props.text).map((id) =>
+        row(
+          `image:${id}:row`,
+          <Button key={`image:${id}`} plain dimColor onPress={openImage(id)}>
+            {`▸ open Image #${id} in Quick Look`}
+          </Button>,
+        ),
+      );
+
       return bubble(
         { Box, Text },
-        { key: "prompt", color, icon, side, inner, rows },
+        { key: "prompt", color, icon, side, inner, rows: [...rows, ...images] },
       );
     },
   );

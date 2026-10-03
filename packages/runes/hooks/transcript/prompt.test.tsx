@@ -167,3 +167,41 @@ test("a right-side bubble keeps one column to its bar, its slack going left", as
   expect(bubble?.props.justifyContent).toBe("flex-end");
   expect((bubble?.children?.[0] as { props?: { flexGrow?: number } }).props?.flexGrow).toBeUndefined();
 });
+
+test("each pasted image gets a button that opens it through open-image.ts", async ($, on) => {
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return <Text key="engine">engine</Text>;
+  });
+  on("session.id", () => ({ value: "sess" }) as never);
+  const calls: { argv: readonly string[]; stdin?: string }[] = [];
+  await startSession($, on, {
+    run: (e) => {
+      calls.push({ argv: e.argv, stdin: e.init?.stdin });
+      return ran(0, "");
+    },
+  });
+  const text = "[Image #1] [Image #2] look";
+  const row = await $.ui.mount({ plugin: "runes", surface: "terminal", ...ROW(text) });
+  expect(await row.find({ key: "image:1" })).toBeDefined();
+  await row.press({ key: "image:2" });
+  await row.unmount();
+  expect(
+    await eventually(async () => calls.some((c) => c.argv.at(-1) === "2")),
+  ).toBe(true);
+  const call = calls.find((c) => c.argv.at(-1) === "2")!;
+  expect(call.argv[1]).toMatch(/hooks\/transcript\/open-image\.ts$/);
+  expect(call.argv.slice(2)).toEqual(["sess", "2"]);
+  expect(call.stdin).toBe(text);
+});
+
+test("a prompt without images draws no image button", async ($, on) => {
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return <Text key="engine">engine</Text>;
+  });
+  prompt(on);
+  const row = await $.ui.mount({ plugin: "runes", surface: "terminal", ...ROW("hi") });
+  expect(await row.find({ key: "image:1" })).toBeUndefined();
+  await row.unmount();
+});
