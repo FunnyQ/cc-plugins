@@ -10,12 +10,10 @@ const CLAUDE = "#d97757";
 const ICON = "";
 
 export const reply = (on: On) => {
-  on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
+  on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
     if (enabled.transcript === false) return next(e);
     const inner = innerWidth(e.viewport?.columns);
-    const rendered = glow.missing
-      ? null
-      : await glow.render((argv, init) => $.process.run(argv, init), inner, e.props.text, e.requestId);
+    const rendered = glow.view(inner, e.props.text, e.requestId);
     if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
     // without glow the raw markdown still gets the bubble, wrapped by cell width
     const lines: Run[][] = rendered?.length

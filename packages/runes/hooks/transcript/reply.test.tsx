@@ -1,11 +1,13 @@
-import { expect, test } from "claude-code/testing";
+import { expect, test, type Engine } from "claude-code/testing";
 
-const REPLY = (text: string) =>
+import { eventually, startSession } from "./test-session";
+
+const REPLY = (text: string, requestId = "a1") =>
   ({
     plugin: "runes",
     surface: "terminal",
     component: "AssistantMessage",
-    requestId: "a1",
+    requestId,
     props: { text, isFirstOfReply: true },
     viewport: { columns: 60, rows: 40 },
   }) as never;
@@ -23,56 +25,83 @@ const ran = (exitCode: number, stdout: string) => ({
   },
 });
 
-test("a reply draws glow's lines inside the orange bubble", async ($, on) => {
-  const calls: (readonly string[])[] = [];
+// mounts the reply once and reports whether the query matches what it drew
+const draws = async (
+  $: Engine,
+  reply: never,
+  query: Parameters<Awaited<ReturnType<Engine["ui"]["mount"]>>["find"]>[0],
+) => {
+  const row = await $.ui.mount(reply);
+  const found = (await row.find(query)) !== undefined;
+  await row.unmount();
+  return found;
+};
+
+test("a reply draws glow's lines inside the orange bubble once the worker has run", async ($, on) => {
   let home: string | undefined;
   on("process.run", (_$, e) => {
-    calls.push(e.argv);
     home = e.init?.env?.HOME;
     return ran(0, GLOW);
   });
+  await startSession($, on);
+  expect(
+    await eventually(() =>
+      draws($, REPLY("**hi** there\n\nsecond"), { type: "Text", text: "hi" }),
+    ),
+  ).toBe(true);
   const row = await $.ui.mount(REPLY("**hi** there\n\nsecond"));
-  expect(await row.find({ key: "reply" })).toBeDefined();
-  expect(await row.find({ key: "line:0" })).toBeDefined();
   expect(await row.find({ key: "line:1" })).toBeDefined();
   // glow's blank first and last lines are trimmed
   expect(await row.find({ key: "line:2" })).toBeUndefined();
-  expect(await row.find({ type: "Text", text: "hi" })).toBeDefined();
-  expect(calls[0][0]).toBe("glow");
+  await row.unmount();
   // a mod's child gets no HOME, and glow then writes its config under a literal ~ in the cwd
   expect(home).toBe("/tmp/q-lab/runes/glow");
+});
+
+test("a draw never waits on glow: it shows the raw text in the bubble first", async ($, on) => {
+  let release = () => {};
+  on(
+    "process.run",
+    () => new Promise((r) => (release = () => r(ran(0, GLOW)))) as never,
+  );
+  await startSession($, on);
+  const row = await $.ui.mount(REPLY("still rendering"));
+  expect(await row.find({ key: "reply" })).toBeDefined();
+  expect(
+    await row.find({ type: "Text", text: "still rendering" }),
+  ).toBeDefined();
   await row.unmount();
+  release();
+});
+
+test("a streamed reply keeps its last formatted text while the next chunk renders", async ($, on) => {
+  let release = () => {};
+  on("process.run", (_$, e) =>
+    e.init?.stdin === "first"
+      ? ran(0, GLOW)
+      : (new Promise((r) => (release = () => r(ran(0, GLOW)))) as never),
+  );
+  await startSession($, on);
+  expect(
+    await eventually(() =>
+      draws($, REPLY("first", "s1"), { type: "Text", text: "hi" }),
+    ),
+  ).toBe(true);
+  expect(
+    await draws($, REPLY("first and more", "s1"), { type: "Text", text: "hi" }),
+  ).toBe(true);
+  release();
 });
 
 test("a reply glow cannot render still draws its raw text in the bubble", async ($, on) => {
   on("process.run", () => ran(1, ""));
-  const row = await $.ui.mount(REPLY("other text"));
-  expect(await row.find({ key: "reply" })).toBeDefined();
-  expect(await row.find({ type: "Text", text: "other text" })).toBeDefined();
-  await row.unmount();
+  await startSession($, on);
+  expect(await draws($, REPLY("other text"), { key: "reply" })).toBe(true);
+  expect(
+    await draws($, REPLY("other text"), { type: "Text", text: "other text" }),
+  ).toBe(true);
 });
 
-test("one failed glow run is retried on the next draw instead of turning glow off", async ($, on) => {
-  let calls = 0;
-  on("process.run", () => {
-    calls++;
-    if (calls === 1) throw new Error("aborted");
-    return ran(0, GLOW);
-  });
-  on("ui.render", ($, e) => {
-    const { Text } = $.ui.resolve(e);
-    return <Text key="engine">engine</Text>;
-  });
-  let row = await $.ui.mount(REPLY("retry me"));
-  // the failed draw falls back to the raw text, not glow's
-  expect(await row.find({ type: "Text", text: "hi" })).toBeUndefined();
-  await row.unmount();
-  row = await $.ui.mount(REPLY("retry me"));
-  expect(await row.find({ type: "Text", text: "hi" })).toBeDefined();
-  await row.unmount();
-});
-
-// last in the file: it leaves glow marked missing for the module
 test("glow failing to start suggests installing it, once", async ($, on) => {
   on("process.run", () => {
     throw new Error("cannot start glow");
@@ -81,11 +110,15 @@ test("glow failing to start suggests installing it, once", async ($, on) => {
   on("ui.toast", (_$, e) => {
     toasts.push(e.text);
   });
-  for (const text of ["a", "b", "c", "d"]) {
-    const row = await $.ui.mount(REPLY(text));
-    expect(await row.find({ key: "reply" })).toBeDefined();
-    await row.unmount();
-  }
+  await startSession($, on);
+  expect(
+    await eventually(
+      async () =>
+        (await draws($, REPLY("a"), { key: "reply" })) && toasts.length > 0,
+    ),
+  ).toBe(true);
+  for (const text of ["b", "c"])
+    expect(await draws($, REPLY(text), { key: "reply" })).toBe(true);
   expect(toasts).toHaveLength(1);
   expect(toasts[0]).toContain("brew install glow");
 });

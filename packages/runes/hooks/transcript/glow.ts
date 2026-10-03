@@ -17,15 +17,23 @@ const glowArgv = (width: number) => [
 // a mod's child gets no HOME, so glow wrote its config and log under a literal ~ in the session's cwd
 const GLOW_INIT = { env: { HOME: "/tmp/q-lab/runes/glow" } };
 
-// $ may not leave its hook, so each hook hands in a closure that runs the command for it
+// $ may not leave its hook, so session.start hands the worker closures that use it
 type RunCommand = (
   argv: string[],
   init: typeof GLOW_INIT & { stdin: string },
 ) => Promise<{ exitCode: number; stdout: string }>;
 
+type Job = { key: string; width: number; text: string };
+
 // module state shared by both bubbles, so a hot reload renders everything again
-const rendered = new Map<string, Promise<Run[][] | null>>();
-const latest = new Map<string, string>();
+const rendered = new Map<string, Run[][] | null>();
+// a streamed reply's last formatted text, drawn while its next chunk is still in glow
+const lastGood = new Map<string, Run[][]>();
+// keyed by owner, so a reply streaming faster than glow queues only its newest text
+const queue = new Map<string, Job>();
+let transport: { run: RunCommand; redraw: () => void } | undefined;
+let working = false;
+let wake: (() => void) | undefined;
 
 const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   map.delete(key);
@@ -33,15 +41,11 @@ const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   if (map.size > CACHE_SIZE) map.delete(map.keys().next().value!);
 };
 
-// a run is aborted with the redraw that started it, so only this many rejections in a row mean glow is gone
-const GIVE_UP_AFTER = 3;
-let failures = 0;
-
 export const INSTALL_HINT = "runes: install glow for markdown bubbles — brew install glow";
 let hinted = false;
 
 export const glow = {
-  // glow could not start, so stop paying a spawn per render
+  // glow could not start, so stop queueing work for it
   missing: false,
   // true once, on the first draw after glow is found missing, so the install hint shows a single time
   hintDue() {
@@ -49,36 +53,50 @@ export const glow = {
     hinted = true;
     return true;
   },
-  // the promise is cached, so a redraw landing while glow runs joins it instead of spawning again
-  render(
-    run: RunCommand,
-    width: number,
-    text: string,
-    owner?: string,
-  ): Promise<Run[][] | null> {
+  // a draw never waits on glow: it takes what is rendered, or the owner's last, or null for raw text
+  view(width: number, text: string, owner?: string): Run[][] | null {
     const key = `${width}\0${text}`;
-    if (owner !== undefined) {
-      // a streamed reply leaves a partial per chunk; only its latest text is worth a slot
-      const prev = latest.get(owner);
-      if (prev !== undefined && prev !== key) rendered.delete(prev);
-      keep(latest, owner, key);
+    if (rendered.has(key)) {
+      const lines = rendered.get(key)!;
+      keep(rendered, key, lines);
+      if (owner !== undefined && lines?.length) keep(lastGood, owner, lines);
+      return lines;
     }
-    const lines =
-      rendered.get(key) ??
-      run(glowArgv(width), { ...GLOW_INIT, stdin: text }).then(
-        ({ exitCode, stdout }) => {
-          failures = 0;
-          return exitCode === 0 ? toLines(stdout) : null;
-        },
-        () => {
-          // a rejection is not a rendering, so the next redraw runs glow again
-          rendered.delete(key);
-          glow.missing = ++failures >= GIVE_UP_AFTER;
-          return null;
-        },
-      );
-    keep(rendered, key, lines);
-    return lines;
+    if (!transport || glow.missing) return null;
+    queue.set(owner ?? key, { key, width, text });
+    wake?.();
+    return owner === undefined ? null : (lastGood.get(owner) ?? null);
+  },
+  // glow ran inside the render dispatch and died with it when a redraw superseded that draw;
+  // run from session.start, it outlives every draw and only a real failure to start stops it
+  work(run: RunCommand, redraw: () => void) {
+    transport = { run, redraw };
+    glow.missing = false;
+    hinted = false;
+    if (working) return;
+    working = true;
+    void (async () => {
+      for (;;) {
+        const next = queue.entries().next();
+        if (next.done) {
+          await new Promise<void>((r) => (wake = r));
+          wake = undefined;
+          continue;
+        }
+        const [slot, job] = next.value;
+        queue.delete(slot);
+        if (rendered.has(job.key)) continue;
+        const t = transport!;
+        try {
+          const { exitCode, stdout } = await t.run(glowArgv(job.width), { ...GLOW_INIT, stdin: job.text });
+          keep(rendered, job.key, exitCode === 0 ? toLines(stdout) : null);
+        } catch {
+          glow.missing = true;
+          queue.clear();
+        }
+        t.redraw();
+      }
+    })();
   },
 };
 

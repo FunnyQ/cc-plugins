@@ -1,7 +1,6 @@
 import type { On } from "claude-code";
 
 import { enabled } from "../switch";
-import type { Run } from "./ansi";
 import { glow, INSTALL_HINT } from "./glow";
 import { cells, innerWidth, wrap } from "./text";
 
@@ -37,7 +36,7 @@ export const prompt = (on: On) => {
   on(
     "ui.render",
     { component: "UserMessage", props: { origin: { kind: "composer" } } },
-    async ($, e, next) => {
+    ($, e, next) => {
       if (enabled.transcript === false) return next(e);
       const { Box, Text, Button } = $.ui.resolve(e);
       const toggle = (id: string) => () => {
@@ -67,15 +66,9 @@ export const prompt = (on: On) => {
           ? lines.slice(0, FOLD_LINES).join("\n")
           : s.text;
       });
-      const glowed: (Run[][] | null)[] = glow.missing
-        ? []
-        : await Promise.all(
-            parts.map((s, i) =>
-              s.kind === "body"
-                ? glow.render((argv, init) => $.process.run(argv, init), inner, shown[i])
-                : null,
-            ),
-          );
+      const glowed = parts.map((s, i) =>
+        s.kind === "body" ? glow.view(inner, shown[i]) : null,
+      );
       if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
 
       const rows = parts.flatMap((s, i) => {
