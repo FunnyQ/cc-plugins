@@ -59,7 +59,7 @@ const good = (plan: string): Answer => ({
 function world(
   on: On,
   answer: (argv: readonly string[]) => Answer,
-  tool: { isError?: boolean } = {},
+  tool: { isError?: boolean; stdout?: string } = {},
   // false stands for a terminal under the unasked floor: the pane opens but waits undrawn
   place: { next: boolean } = { next: true },
 ) {
@@ -118,7 +118,7 @@ function world(
     "tool.call",
     () =>
       ({
-        result: {},
+        result: { stdout: tool.stdout ?? "", stderr: "", interrupted: false },
         text: "ok",
         ...(tool.isError ? { isError: true } : {}),
       }) as never,
@@ -218,6 +218,18 @@ test("a successful flightdeck.ts --plan Bash call opens the pane on that plan, r
     command: 'bun "$OWN"/flightdeck.ts --plan "/abs/docs/x"',
   } as never);
   expect(ran.text).toBe("ok");
+  expect(w.panes.get("flightdeck")).toBe("Flightdeck · x");
+  expect(w.snapshots("/abs/docs/x")).toHaveLength(1);
+});
+
+test("a launch whose --plan is a shell variable opens on the plan the launcher printed", async ($, on) => {
+  const w = world(on, (argv) => good(argv[2]!), {
+    stdout: "http://localhost:5757/\nflightdeck plan: /abs/docs/x\n",
+  });
+  await $.tool.call({
+    tool: "Bash",
+    command: 'D=/abs/docs/x; bun $B/autopilot/scripts/flightdeck.ts --plan "$D"; echo done',
+  } as never);
   expect(w.panes.get("flightdeck")).toBe("Flightdeck · x");
   expect(w.snapshots("/abs/docs/x")).toHaveLength(1);
 });

@@ -2,7 +2,7 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, On, Timer } from "claude-code";
 
 import type { FlightdeckDeck } from "../../types";
-import { FLIGHTDECK_COMMAND, planArg } from "./deck-command.ts";
+import { FLIGHTDECK_COMMAND, planArg, planFromOutput } from "./deck-command.ts";
 import { type CardModel, clip, COLOR, docked, inline, type Line } from "./rows.ts";
 import type { DeckSnapshot, DeckTask } from "./types.ts";
 
@@ -171,7 +171,9 @@ export const flightdeck = (on: On) => {
     async ($, e, next) => {
       const ran = await next(e);
       if (ran.deny !== undefined || ran.isError) return ran;
-      const plan = planArg(e.command);
+      const plan =
+        planFromOutput((ran.result as { stdout?: string }).stdout ?? "") ??
+        planArg(e.command);
       if (plan && !(await openOn($, plan)).isPlaced)
         $.ui.toast("Flightdeck is waiting for a wider terminal. Type /flightdeck to show it.");
       return ran;

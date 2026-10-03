@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { FLIGHTDECK_COMMAND, planArg } from "./deck-command.ts";
+import { planLine } from "../../skills/autopilot/scripts/launch.ts";
+import { FLIGHTDECK_COMMAND, planArg, planFromOutput } from "./deck-command.ts";
 
 describe("FLIGHTDECK_COMMAND", () => {
   test.each([
@@ -57,5 +58,21 @@ describe("planArg", () => {
   test("is null without --plan", () => {
     expect(planArg("bun flightdeck.ts")).toBeNull();
     expect(planArg("bun flightdeck.ts --planned /abs/x")).toBeNull();
+  });
+});
+
+describe("planFromOutput", () => {
+  test("reads the launcher's plan line out of a compound command's output", () => {
+    const stdout = `http://localhost:5757/\n${planLine("/abs/docs/x")}\n/abs/docs/x/.flightlog/orchestrator.js\n`;
+    expect(planFromOutput(stdout)).toBe("/abs/docs/x");
+  });
+
+  test("a path with spaces survives the round trip", () => {
+    expect(planFromOutput(planLine("/a b/docs/x"))).toBe("/a b/docs/x");
+  });
+
+  test("no plan line, no plan", () => {
+    expect(planFromOutput("http://localhost:5757/\n")).toBeNull();
+    expect(planFromOutput("")).toBeNull();
   });
 });
