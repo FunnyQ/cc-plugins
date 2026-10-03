@@ -29,8 +29,10 @@ export const register: Register = (on) => {
       };
 
       const ask = async (): Promise<string | undefined> => {
-        const branch = await git("branch", "--show-current");
-        const root = await git("rev-parse", "--show-toplevel");
+        const [branch, root] = await Promise.all([
+          git("branch", "--show-current"),
+          git("rev-parse", "--show-toplevel"),
+        ]);
         let config: PrConfig = {};
         if (root) {
           try {
