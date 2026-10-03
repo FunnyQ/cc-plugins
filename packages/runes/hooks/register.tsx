@@ -11,6 +11,8 @@ import {
   RUNES,
   setSwitch,
   TEMPLATE,
+  fillMissing,
+  isComplete,
 } from "./config";
 import { bash } from "./transcript/bash";
 import { glow } from "./transcript/glow";
@@ -67,8 +69,19 @@ const load = async ($: $): Promise<Loaded> => {
       Object.assign(config, DEFAULTS, { enabled });
       return { path, text, problems: [], parse };
     }
-    const text = String(await $.fs.read(path));
-    const loaded = normalize(await parse(text));
+    let text = String(await $.fs.read(path));
+    let raw = await parse(text);
+    const filled = fillMissing(text, raw);
+    if (filled !== text) {
+      // setSwitch edits the first enabled: block, so a text comparison passed a file whose second block wins
+      const back = await parse(filled).catch(() => undefined);
+      if (isComplete(back)) {
+        await $.fs.write(path, filled);
+        text = filled;
+        raw = back;
+      }
+    }
+    const loaded = normalize(raw);
     Object.assign(config, loaded.config);
     return { path, text, problems: loaded.problems, parse };
   } catch (err) {

@@ -27,7 +27,10 @@ type Config = {
 };
 
 export const DEFAULTS: Config = {
-  enabled: Object.fromEntries(RUNES.map((r) => [r, true])) as Record<Rune, boolean>,
+  enabled: Object.fromEntries(RUNES.map((r) => [r, true])) as Record<
+    Rune,
+    boolean
+  >,
   // nf-md icon U+F064C, needs a Nerd Font
   prompt: { color: "#1b5ea6", icon: "\u{F064C}", side: "right", fold_lines: 6 },
   // nf-cod icon U+EC82, needs a Nerd Font
@@ -109,10 +112,9 @@ const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
 const RULES: {
   [S in keyof Config]: { [F in keyof Config[S]]: [Check, string] };
 } = {
-  enabled: Object.fromEntries(RUNES.map((r) => [r, [isBool, "true | false"]])) as Record<
-    Rune,
-    [Check, string]
-  >,
+  enabled: Object.fromEntries(
+    RUNES.map((r) => [r, [isBool, "true | false"]]),
+  ) as Record<Rune, [Check, string]>,
   prompt: {
     color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
@@ -192,6 +194,48 @@ export const setSwitch = (text: string, name: Rune, value: boolean): string => {
       .slice(head + 1, end)
       .find((l) => /^\s+\w/.test(l))
       ?.match(/^\s+/)?.[0] ?? "  ";
-  lines.splice(head + 1, 0, `${indent}${name}: ${value}`);
+  // after the nearest rune that comes before it in RUNES, so added switches keep the template's order
+  const before = RUNES.slice(0, RUNES.indexOf(name)).reverse();
+  let at = head;
+  for (const r of before) {
+    const i = lines.findIndex(
+      (l, j) => j > head && j < end && new RegExp(`^\\s+${r}\\s*:`).test(l),
+    );
+    if (i !== -1) {
+      at = i;
+      break;
+    }
+  }
+  lines.splice(at + 1, 0, `${indent}${name}: ${value}`);
   return lines.join("\n");
+};
+
+// true once a parsed file names every switch and section, so an addition that a flow mapping or a duplicate key swallowed is caught
+export const isComplete = (raw: unknown): boolean =>
+  isMap(raw) &&
+  isMap(raw.enabled) &&
+  RUNES.every(
+    (r) => (raw.enabled as Record<string, unknown>)[r] !== undefined,
+  ) &&
+  Object.keys(DEFAULTS).every((s) => raw[s] !== undefined);
+
+// a file an older runes wrote lacks the switches and sections added since; each goes in with its default and the template's comments
+export const fillMissing = (text: string, raw: unknown): string => {
+  const given = raw === null || raw === undefined ? {} : raw;
+  if (!isMap(given)) return text;
+  const switches = isMap(given.enabled) ? given.enabled : {};
+  let out = RUNES.filter((r) => switches[r] === undefined).reduce(
+    (t, r) => setSwitch(t, r, DEFAULTS.enabled[r]),
+    text,
+  );
+  const template = TEMPLATE(DEFAULTS.enabled).split("\n");
+  for (const section of Object.keys(DEFAULTS)) {
+    if (section === "enabled" || given[section] !== undefined) continue;
+    const head = template.findIndex((l) => l.startsWith(`${section}:`));
+    let end = head + 1;
+    while (end < template.length && !/^[^\s#]/.test(template[end]!)) end++;
+    const block = template.slice(head, end).join("\n").replace(/\n+$/, "");
+    out = `${out === "" || out.endsWith("\n") ? out : `${out}\n`}${block}\n`;
+  }
+  return out;
 };

@@ -111,3 +111,16 @@ test("/runes reload re-reads a hand edit", async ($, on) => {
   expect(await run($, "reload")).toContain("clawd: off");
   expect(await hasClawd($)).toBe(false);
 });
+
+test("a file from an older runes gets the sections and switches added since, its own lines kept", async ($, on) => {
+  const old = "enabled:\n  clawd: false   # mine\nreply:\n  side: right\n";
+  const host = await start($, on, new Map([[CONFIG, old]]));
+  await session($);
+  const text = host.files.get(CONFIG)!;
+  expect(text).toContain("  clawd: false   # mine\n");
+  expect(text).toContain("reply:\n  side: right\n");
+  expect(text).toContain("  bash: true\n");
+  expect(text).toContain("bash:\n");
+  expect(text).toContain("peer:\n");
+  expect(await hasClawd($)).toBe(false);
+});

@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { DEFAULTS, normalize, setSwitch, TEMPLATE } from "./config";
+import { DEFAULTS, fillMissing, normalize, setSwitch, TEMPLATE } from "./config";
 
 test("normalize fills every missing field from the defaults", () => {
   expect(normalize(null)).toEqual({ config: DEFAULTS, problems: [] });
@@ -47,14 +47,14 @@ test("setSwitch edits only the matching line and keeps its comment", () => {
   ).toHaveLength(1);
 });
 
-test("setSwitch inserts a missing key under enabled:", () => {
+test("setSwitch inserts a missing key after the rune before it", () => {
   const out = setSwitch(
     "# top\nenabled:\n  clawd: true\nglow:\n  style: dark\n",
     "reply",
     false,
   );
   expect(out).toBe(
-    "# top\nenabled:\n  reply: false\n  clawd: true\nglow:\n  style: dark\n",
+    "# top\nenabled:\n  clawd: true\n  reply: false\nglow:\n  style: dark\n",
   );
 });
 
@@ -80,4 +80,30 @@ test("TEMPLATE writes the switches it is given", () => {
   const text = TEMPLATE({ ...DEFAULTS.enabled, clawd: false });
   expect(text).toContain("  clawd: false\n");
   expect(text).toContain('icon: "\\U000F064C"');
+});
+
+test("fillMissing adds the switches and sections an older file lacks, with the template's text", () => {
+  const old = "enabled:\n  clawd: false\nprompt:\n  side: left\n";
+  const out = fillMissing(old, { enabled: { clawd: false }, prompt: { side: "left" } });
+  expect(out.startsWith("enabled:\n")).toBe(true);
+  expect(out).toContain("  clawd: false\n");
+  expect(out).toContain("  peer: true\n");
+  expect(out).toContain("prompt:\n  side: left\n");
+  expect(out).toContain('bash:\n  color: "#5f8f6a"\n');
+  expect(out).toContain("  output_icon: \"\\uEF11\"   # Nerd Font glyph\n");
+  expect(out).toContain("peer:\n");
+  expect(out).not.toContain('prompt:\n  color:');
+});
+
+test("fillMissing leaves a complete file alone", () => {
+  const full = TEMPLATE(DEFAULTS.enabled);
+  expect(fillMissing(full, DEFAULTS)).toBe(full);
+});
+
+test("fillMissing puts the switches it adds in RUNES order", () => {
+  const out = fillMissing("enabled:\n  prompt: false\n", { enabled: { prompt: false } });
+  const block = out.slice(0, out.indexOf("\nprompt:"));
+  expect(block).toBe(
+    "enabled:\n  clawd: true\n  transcript: true\n  prompt: false\n  reply: true\n  bash: true\n  peer: true",
+  );
 });
