@@ -1,5 +1,33 @@
 # Changelog
 
+## [chronicle 0.22.2] - 2026-10-03
+
+_tracks tag `chronicle-v0.22.2`_
+
+### Changed
+- Commit and branch checks respond faster because two independent git lookups now run in parallel.
+
+## [guard 0.7.3] - 2026-10-03
+
+_tracks tag `guard-v0.7.3`_
+
+### Changed
+- Comment checks behave the same across Claude Code, Codex, and OpenCode because they now share one block-detection pipeline instead of two hand-synced copies.
+
+## [monitor 8.0.1] - 2026-10-03
+
+_tracks tag `monitor-v8.0.1`_
+
+### Changed
+- Tool calls do less work and concurrent requests share a single daemon spawn instead of starting duplicates.
+
+## [runes 0.2.1] - 2026-10-03
+
+_tracks tag `runes-v0.2.1`_
+
+### Changed
+- The mascot redraws with less per-frame work, and the runes on/off switches are loaded once at session start.
+
 ## [runes 0.2.0] - 2026-10-03
 
 _tracks tag `runes-v0.2.0`_
