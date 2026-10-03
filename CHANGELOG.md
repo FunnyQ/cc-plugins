@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 5.7.1] - 2026-10-04
+
+_tracks tag `dispatch-v5.7.1`_
+
+### Added
+- The Flightdeck pane's Open flightdeck button now opens the web dashboard on demand, and the launcher gains an --open flag to opt back in to opening the browser.
+
+### Changed
+- Under Claude Code the Flightdeck launcher no longer opens the browser by default, since the pane is already open; Codex and OpenCode behave as before, and the docs now say so.
+
 ## [dispatch 5.7.0] - 2026-10-04
 
 _tracks tag `dispatch-v5.7.0`_
