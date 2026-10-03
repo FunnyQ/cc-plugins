@@ -6,7 +6,7 @@
 >
 > **Depends on**: data/01
 > **Blocks**: mod/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -124,21 +124,21 @@ Build fixtures in the test file with a small helper, for example `snap(overrides
 
 ## Acceptance criteria
 
-- [ ] `card` gives each of the 5 states its glyph and colour from the table in `../_context/shared.md`, and `blocked` is dim.
-- [ ] `card` appends the attempt count only when `attempts > 1` (`<ref> ●` at 1, `<ref> ●2` at 2).
-- [ ] `waveRows` on a snapshot with one wave of six done tasks with graph-style refs `task-1`…`task-6` (attempts 1, no unschedulable) at width 40 returns exactly `W1 task-1 ✓  task-2 ✓  task-3 ✓` and `   task-4 ✓  task-5 ✓  task-6 ✓`.
-- [ ] `clip` returns the four exact outputs listed under `docked`, and on a line holding a 60-character slug or a 50-character graph ref at width 24 returns a line exactly 24 wide ending in `…`, and a clipped card keeps its `ref`.
-- [ ] `waveRows` adds a final `W?` group holding exactly the `unschedulable` refs, and none when the list is empty.
-- [ ] `inline` returns exactly 2 lines; line 2 matches the five exact outputs listed under `inline` (widths 40, 13, 2, 1, 0); line 2 follows `endState`: `all done` when every task is done (including a fixture whose done tasks form a cycle in `unschedulable`), `W? ` plus the not-done unschedulable cards when stuck.
-- [ ] On a fixture with `slug` `demo`, `counts` `{ total: 20, done: 19, inProgress: 0, ready: 0, blocked: 1, invalid: 0 }`, `currentWave` `null`, one unschedulable ref, `errors` 2 and `stale` true, at width 40: `summary` lines are exactly `19/20 done · stuck · 1 unschedulable` and `stale · 2 errors · ●0 ○0 ·1 ✗0`, and `compactSummary` is exactly `stale · 2 errors · 19/20 · stuck · demo` (39 columns; inline uses the short `stuck`, never the count). With `stale` false and `errors` 0, none of `stale` or `errors` appears.
-- [ ] `formatElapsed` returns `59s` for 59 000, `1m00s` for 60 000, and `1h00m` for 3 600 000.
-- [ ] No line returned by `docked` on the 20-task fixture is wider than the width, for widths 24, 40, and 80.
+- [x] `card` gives each of the 5 states its glyph and colour from the table in `../_context/shared.md`, and `blocked` is dim.
+- [x] `card` appends the attempt count only when `attempts > 1` (`<ref> ●` at 1, `<ref> ●2` at 2).
+- [x] `waveRows` on a snapshot with one wave of six done tasks with graph-style refs `task-1`…`task-6` (attempts 1, no unschedulable) at width 40 returns exactly `W1 task-1 ✓  task-2 ✓  task-3 ✓` and `   task-4 ✓  task-5 ✓  task-6 ✓`.
+- [x] `clip` returns the four exact outputs listed under `docked`, and on a line holding a 60-character slug or a 50-character graph ref at width 24 returns a line exactly 24 wide ending in `…`, and a clipped card keeps its `ref`.
+- [x] `waveRows` adds a final `W?` group holding exactly the `unschedulable` refs, and none when the list is empty.
+- [x] `inline` returns exactly 2 lines; line 2 matches the five exact outputs listed under `inline` (widths 40, 13, 2, 1, 0); line 2 follows `endState`: `all done` when every task is done (including a fixture whose done tasks form a cycle in `unschedulable`), `W? ` plus the not-done unschedulable cards when stuck.
+- [x] On a fixture with `slug` `demo`, `counts` `{ total: 20, done: 19, inProgress: 0, ready: 0, blocked: 1, invalid: 0 }`, `currentWave` `null`, one unschedulable ref, `errors` 2 and `stale` true, at width 40: `summary` lines are exactly `19/20 done · stuck · 1 unschedulable` and `stale · 2 errors · ●0 ○0 ·1 ✗0`, and `compactSummary` is exactly `stale · 2 errors · 19/20 · stuck · demo` (39 columns; inline uses the short `stuck`, never the count). With `stale` false and `errors` 0, none of `stale` or `errors` appears.
+- [x] `formatElapsed` returns `59s` for 59 000, `1m00s` for 60 000, and `1h00m` for 3 600 000.
+- [x] No line returned by `docked` on the 20-task fixture is wider than the width, for widths 24, 40, and 80.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/hooks/flightdeck/rows.test.ts` passes.
-- [ ] `! (bunx --bun tsc --noEmit | grep hooks/flightdeck/rows)` exits 0.
-- [ ] `! grep -E 'from "(claude-code|node:)' packages/dispatch/hooks/flightdeck/rows.ts` exits 0.
+- [x] `bun test packages/dispatch/hooks/flightdeck/rows.test.ts` passes.
+- [x] `! (bunx --bun tsc --noEmit | grep hooks/flightdeck/rows)` exits 0.
+- [x] `! grep -E 'from "(claude-code|node:)' packages/dispatch/hooks/flightdeck/rows.ts` exits 0.
 
 ## Eval rubric
 
