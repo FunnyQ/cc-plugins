@@ -6,7 +6,7 @@
 >
 > **Depends on**: mod/02
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -56,18 +56,18 @@ Near the `flightdeck.ts --plan` launch command, add one sentence with the same m
 
 ## Acceptance criteria
 
-- [ ] `grep -n "/flightdeck" CLAUDE.md` matches the dispatch summary bullet.
-- [ ] `grep -n "deck-snapshot" CLAUDE.md` matches both the dispatch bullet and the Architecture tree.
-- [ ] `grep -n "hooks/flightdeck" CLAUDE.md` matches the Architecture tree.
-- [ ] `grep -n "packages/dispatch/.claude-plugin" CLAUDE.md` matches the new Commands entry.
-- [ ] `grep -n "Flightdeck pane" packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/deckplan/SKILL.md` prints one match in each file.
-- [ ] `git diff -- CLAUDE.md packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/deckplan/SKILL.md` shows changes only in the named sections: no other prose reworded.
+- [x] `grep -n "/flightdeck" CLAUDE.md` matches the dispatch summary bullet.
+- [x] `grep -n "deck-snapshot" CLAUDE.md` matches both the dispatch bullet and the Architecture tree.
+- [x] `grep -n "hooks/flightdeck" CLAUDE.md` matches the Architecture tree.
+- [x] `grep -n "packages/dispatch/.claude-plugin" CLAUDE.md` matches the new Commands entry.
+- [x] `grep -n "Flightdeck pane" packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/deckplan/SKILL.md` prints one match in each file.
+- [x] `git diff -- CLAUDE.md packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/deckplan/SKILL.md` shows changes only in the named sections: no other prose reworded.
 
 ## Verification
 
-- [ ] Run each grep from the acceptance criteria and confirm the matches.
-- [ ] Run `git diff --stat -- CLAUDE.md packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/deckplan/SKILL.md` and read the diff.
-- [ ] `bun test packages/dispatch/skills/autopilot/` passes, as a regression net for tests that read SKILL.md.
+- [x] Run each grep from the acceptance criteria and confirm the matches.
+- [x] Run `git diff --stat -- CLAUDE.md packages/dispatch/skills/autopilot/SKILL.md packages/dispatch/skills/deckplan/SKILL.md` and read the diff.
+- [x] `bun test packages/dispatch/skills/autopilot/` passes, as a regression net for tests that read SKILL.md.
 
 ## Eval rubric
 

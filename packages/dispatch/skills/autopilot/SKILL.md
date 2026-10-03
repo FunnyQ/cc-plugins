@@ -157,7 +157,7 @@ bun "$OWN"/flightdeck.ts --plan "<the absolute plan dir resolved during scout>"
 
 Pass the plan directory, not the tasks directory. The daemon expects the parent and reads the tasks tree and flightlog beneath it.
 
-The command spawns the server detached, waits for readiness itself, prints the URL, and exits — add no wait, poll, or health check around it. Tell the user the URL so they can reopen flightdeck later.
+The command spawns the server detached, waits for readiness itself, prints the URL, and exits — add no wait, poll, or health check around it. Tell the user the URL so they can reopen flightdeck later. Under Claude Code the dispatch mod opens a Flightdeck pane after this command, so do not tell the user to open it.
 
 If the command exits non-zero, note that the monitor is unavailable and fly anyway. A broken monitor must never block a run.
 
