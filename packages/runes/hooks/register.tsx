@@ -22,6 +22,7 @@ import { prompt } from "./transcript/prompt";
 import { peer } from "./transcript/peer";
 import { read } from "./transcript/read";
 import { reply } from "./transcript/reply";
+import { skill } from "./transcript/skill";
 import { where } from "./transcript/where";
 
 type $ = Parameters<Hook<"session.start">>[0];
@@ -176,5 +177,6 @@ export const register: Register = (on) => {
   read(on);
   edit(on);
   agent(on);
+  skill(on);
   peer(on);
 };

@@ -9,6 +9,7 @@ export const RUNES = [
   "edit",
   "write",
   "agent",
+  "skill",
   "peer",
 ] as const;
 export type Rune = (typeof RUNES)[number];
@@ -43,6 +44,7 @@ type Config = {
     fold_lines: number;
   };
   agent: { color: string; error_color: string; icon: string; side: Side };
+  skill: { color: string; error_color: string; icon: string; side: Side };
   peer: { color: string; icon: string; side: Side; fold_lines: number };
   glow: { style: string };
 };
@@ -88,6 +90,8 @@ export const DEFAULTS: Config = {
   },
   // nf-md-robot_outline U+F167A, needs a Nerd Font; peer's filled robot draws the hand-back
   agent: { color: "#7f8fd1", error_color: "#c94f4f", icon: "\u{F167A}", side: "left" },
+  // nf-fa-magic U+F0D0, needs a Nerd Font
+  skill: { color: "#d4a72c", error_color: "#c94f4f", icon: "\u{F0D0}", side: "left" },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   glow: { style: "dark" },
@@ -141,7 +145,7 @@ transcript:
     # side: ${DEFAULTS.edit.side}
     # fold_lines: ${DEFAULTS.edit.fold_lines}
   write:
-    enabled: ${enabled.write}    # Write calls: a new file folded, a replaced one as a diff
+    enabled: ${enabled.write}    # Write calls: a new file's head, a replaced one as a diff; both fold past fold_lines
     # color: "${DEFAULTS.write.color}"
     # error_color: "${DEFAULTS.write.error_color}"
     # icon: "\\U000F0752"   # Nerd Font glyph, a new file
@@ -154,6 +158,12 @@ transcript:
     # error_color: "${DEFAULTS.agent.error_color}"
     # icon: "\\U000F167A"   # Nerd Font glyph
     # side: ${DEFAULTS.agent.side}
+  skill:
+    enabled: ${enabled.skill}    # Skill calls: the skill, its args, and a forked run's result folded
+    # color: "${DEFAULTS.skill.color}"
+    # error_color: "${DEFAULTS.skill.error_color}"
+    # icon: "\\uF0D0"       # Nerd Font glyph
+    # side: ${DEFAULTS.skill.side}
   peer:
     enabled: ${enabled.peer}    # subagents' and other sessions' messages
     # color: "${DEFAULTS.peer.color}"
@@ -174,6 +184,7 @@ const UNDER = [
   "edit",
   "write",
   "agent",
+  "skill",
   "peer",
   "glow",
 ] as const;
@@ -245,6 +256,12 @@ const RULES: {
     fold_lines: [isCount, "a whole number above 0"],
   },
   agent: {
+    color: [isColor, "#rrggbb"],
+    error_color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
+  },
+  skill: {
     color: [isColor, "#rrggbb"],
     error_color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],

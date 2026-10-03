@@ -22,6 +22,7 @@ const CURRENT = () => ({
     edit: { enabled: true },
     write: { enabled: true },
     agent: { enabled: true },
+    skill: { enabled: true },
     peer: { enabled: true },
     glow: null,
   },
