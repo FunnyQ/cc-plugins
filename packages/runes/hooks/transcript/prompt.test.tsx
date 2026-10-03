@@ -1,6 +1,14 @@
 import { expect, test } from "claude-code/testing";
+import type { On } from "claude-code";
 
 import { prompt, segments, wrap } from "./prompt";
+
+const ran = (exitCode: number, stdout: string) => ({
+  value: { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
+});
+
+// glow exits non-zero, so the body takes the plain wrap path these tests pin
+const noGlow = (on: On) => on("process.run", () => ran(1, ""));
 
 const ROW = (text: string, isExpanded = false) =>
   ({
@@ -25,6 +33,7 @@ test("a reminder starts folded and its toggle unfolds it", async ($, on) => {
     const { Text } = $.ui.resolve(e);
     return <Text key="engine">engine</Text>;
   });
+  noGlow(on);
   prompt(on);
   const row = await $.ui.mount({
     plugin: "runes",
@@ -43,6 +52,7 @@ test("a long prompt folds past the line cap", async ($, on) => {
     const { Text } = $.ui.resolve(e);
     return <Text key="engine">engine</Text>;
   });
+  noGlow(on);
   prompt(on);
   const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
   const row = await $.ui.mount({
@@ -59,6 +69,7 @@ test("an expanded row still starts folded", async ($, on) => {
     const { Text } = $.ui.resolve(e);
     return <Text key="engine">engine</Text>;
   });
+  noGlow(on);
   prompt(on);
   const row = await $.ui.mount({
     plugin: "runes",
@@ -73,4 +84,17 @@ test("wrap breaks by cell width and counts CJK as two", () => {
   expect(wrap("abcdef", 4)).toEqual(["abcd", "ef"]);
   expect(wrap("中文字", 4)).toEqual(["中文", "字"]);
   expect(wrap("a\nb", 4)).toEqual(["a", "b"]);
+});
+
+test("a prompt body renders through glow when it is there", async ($, on) => {
+  on("process.run", () => ran(0, "\n  \x1b[1mhello\x1b[m world\n  second line\n\n"));
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return <Text key="engine">engine</Text>;
+  });
+  const row = await $.ui.mount({ plugin: "runes", surface: "terminal", ...ROW("**hello** world second line") });
+  expect(await row.find({ key: "body:0:1" })).toBeDefined();
+  expect(await row.find({ key: "body:0:2" })).toBeUndefined();
+  expect(await row.find({ type: "Text", text: "hello" })).toBeDefined();
+  await row.unmount();
 });

@@ -1,6 +1,8 @@
 import type { On } from "claude-code";
 
 import { enabled } from "../switch";
+import type { Run } from "./ansi";
+import { glow, glowArgv, toLines } from "./glow";
 
 // a prompt body taller than this folds to its head
 const FOLD_LINES = 6;
@@ -63,7 +65,7 @@ export const prompt = (on: On) => {
   on(
     "ui.render",
     { component: "UserMessage", props: { origin: { kind: "composer" } } },
-    ($, e, next) => {
+    async ($, e, next) => {
       if (enabled.transcript === false) return next(e);
       const { Box, Text, Button } = $.ui.resolve(e);
       const toggle = (id: string) => () => {
@@ -93,7 +95,33 @@ export const prompt = (on: On) => {
           {"─".repeat(Math.max(0, n))}
         </Text>
       );
-      const rows = segments(e.props.text).flatMap((s, i) => {
+      const parts = segments(e.props.text);
+      // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
+      const shownOf = (s: Segment, i: number) => {
+        const lines = s.text.split("\n");
+        return lines.length > FOLD_LINES && !open.has(`${e.requestId}:${i}`)
+          ? lines.slice(0, FOLD_LINES).join("\n")
+          : s.text;
+      };
+      const glowed = new Map<number, Run[][]>();
+      for (const [i, s] of parts.entries()) {
+        if (s.kind !== "body" || glow.missing) continue;
+        const key = `${inner}\0${shownOf(s, i)}`;
+        if (!glow.rendered.has(key)) {
+          let lines: Run[][] | null = null;
+          try {
+            const { exitCode, stdout } = await $.process.run(glowArgv(inner), { stdin: shownOf(s, i) });
+            if (exitCode === 0) lines = toLines(stdout);
+          } catch {
+            glow.missing = true;
+          }
+          glow.remember(key, lines);
+        }
+        const lines = glow.rendered.get(key);
+        if (lines?.length) glowed.set(i, lines);
+      }
+
+      const rows = parts.flatMap((s, i) => {
         const id = `${e.requestId}:${i}`;
         // isExpanded is true for any row fitting the label cap, so folds ignore it
         const isOpen = open.has(id);
@@ -120,10 +148,24 @@ export const prompt = (on: On) => {
 
         const lines = s.text.split("\n");
         const isLong = lines.length > FOLD_LINES;
-        const shown = isLong && !isOpen ? lines.slice(0, FOLD_LINES).join("\n") : s.text;
-        const body = wrap(shown, inner).map((line, j) =>
-          row(`body:${i}:${j}`, <Text>{line}</Text>),
-        );
+        const runs = glowed.get(i);
+        // glow failed or is missing, so the body falls back to plain cell-width wrapping
+        const body = runs
+          ? runs.map((line, j) =>
+              row(
+                `body:${i}:${j}`,
+                <Text>
+                  {line.length
+                    ? line.map(({ text, ...style }, k) => (
+                        <Text key={String(k)} {...style}>
+                          {text}
+                        </Text>
+                      ))
+                    : " "}
+                </Text>,
+              ),
+            )
+          : wrap(shownOf(s, i), inner).map((line, j) => row(`body:${i}:${j}`, <Text>{line}</Text>));
         if (!isLong) return body;
         return [
           ...body,
