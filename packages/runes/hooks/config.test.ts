@@ -109,3 +109,28 @@ test("upgrade leaves a current file alone, and isComplete tells the two apart", 
   expect(isComplete(parsed)).toBe(true);
   expect(isComplete({ ...parsed, enabled: { clawd: true } })).toBe(false);
 });
+
+test("TEMPLATE sets only the switches, every other field a commented default", () => {
+  const text = TEMPLATE(DEFAULTS.enabled);
+  const set = text.split("\n").filter((l) => /^\s+\w+:/.test(l));
+  expect(set.every((l) => /^\s+enabled:/.test(l))).toBe(true);
+  expect(text).toContain('  # color: "#5f8f6a"');
+  expect(text).toContain("  # style: dark");
+});
+
+test("a section holding only comments reads as YAML null, which is neither a problem nor incomplete", () => {
+  const raw: Record<string, unknown> = { glow: null };
+  for (const r of Object.keys(DEFAULTS.enabled)) raw[r] = { enabled: true };
+  expect(normalize(raw).problems).toEqual([]);
+  expect(normalize(raw).config.glow).toEqual(DEFAULTS.glow);
+  expect(isComplete(raw)).toBe(true);
+});
+
+test("a rune section left empty gets its switch back, and never throws", () => {
+  const raw: Record<string, unknown> = { glow: null };
+  for (const r of Object.keys(DEFAULTS.enabled)) raw[r] = { enabled: true };
+  raw.clawd = null;
+  expect(isComplete(raw)).toBe(false);
+  const text = TEMPLATE(DEFAULTS.enabled).replace("clawd:\n  enabled: true\n", "clawd:\n");
+  expect(upgrade(text, raw)).toContain("clawd:\n  enabled: true\n");
+});

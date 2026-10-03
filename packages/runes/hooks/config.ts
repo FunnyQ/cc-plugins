@@ -56,40 +56,42 @@ export const configPath = (home: string) =>
 // what renders read; register.tsx replaces its sections at session.start and on every /runes
 export const config: Config = { ...DEFAULTS };
 
+// only the switches are set; every other field is its default, commented, so a changed default reaches every file
 export const TEMPLATE = (
   enabled: Config["enabled"],
 ) => `# runes — edits apply at the next session start, or right away after any /runes
+# a commented field uses its default; uncomment it to change it
 clawd:
   enabled: ${enabled.clawd}
 transcript:
   enabled: ${enabled.transcript}    # every bubble below needs it
 prompt:
   enabled: ${enabled.prompt}    # the person's bubble
-  color: "${DEFAULTS.prompt.color}"
-  icon: "\\U000F064C"   # Nerd Font glyph
-  side: ${DEFAULTS.prompt.side}          # left | right
-  fold_lines: ${DEFAULTS.prompt.fold_lines}
+  # color: "${DEFAULTS.prompt.color}"
+  # icon: "\\U000F064C"   # Nerd Font glyph
+  # side: ${DEFAULTS.prompt.side}          # left | right
+  # fold_lines: ${DEFAULTS.prompt.fold_lines}
 reply:
   enabled: ${enabled.reply}    # Claude's bubble
-  color: "${DEFAULTS.reply.color}"
-  icon: "\\uEC82"       # Nerd Font glyph
-  side: ${DEFAULTS.reply.side}
+  # color: "${DEFAULTS.reply.color}"
+  # icon: "\\uEC82"       # Nerd Font glyph
+  # side: ${DEFAULTS.reply.side}
 bash:
   enabled: ${enabled.bash}    # Bash calls and their output
-  color: "${DEFAULTS.bash.color}"
-  error_color: "${DEFAULTS.bash.error_color}"
-  icon: "\\uF489"       # Nerd Font glyph
-  output_icon: "\\uEF11"   # Nerd Font glyph
-  side: ${DEFAULTS.bash.side}
-  fold_lines: ${DEFAULTS.bash.fold_lines}
+  # color: "${DEFAULTS.bash.color}"
+  # error_color: "${DEFAULTS.bash.error_color}"
+  # icon: "\\uF489"       # Nerd Font glyph
+  # output_icon: "\\uEF11"   # Nerd Font glyph
+  # side: ${DEFAULTS.bash.side}
+  # fold_lines: ${DEFAULTS.bash.fold_lines}
 peer:
   enabled: ${enabled.peer}    # subagents' and other sessions' messages
-  color: "${DEFAULTS.peer.color}"
-  icon: "\\U000F06A9"   # Nerd Font glyph
-  side: ${DEFAULTS.peer.side}
-  fold_lines: ${DEFAULTS.peer.fold_lines}
+  # color: "${DEFAULTS.peer.color}"
+  # icon: "\\U000F06A9"   # Nerd Font glyph
+  # side: ${DEFAULTS.peer.side}
+  # fold_lines: ${DEFAULTS.peer.fold_lines}
 glow:
-  style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
+  # style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 `;
 
 // the file's top-level keys in the order the template writes them
@@ -158,7 +160,8 @@ export const normalize = (
   const out: Record<string, Record<string, unknown>> = {};
   for (const [section, fields] of Object.entries(RULES)) {
     const given = isMap(raw[section]) ? raw[section] : {};
-    if (raw[section] !== undefined && !isMap(raw[section]))
+    // a section holding only comments parses to null
+    if (raw[section] !== undefined && raw[section] !== null && !isMap(raw[section]))
       problems.push(`${section}: not a mapping`);
     out[section] = { ...DEFAULTS[section as keyof Config] };
     for (const [field, [check, want]] of Object.entries(
@@ -227,8 +230,8 @@ export const setSwitch = (text: string, name: Rune, value: boolean): string => {
 export const isComplete = (raw: unknown): boolean =>
   isMap(raw) &&
   raw.enabled === undefined &&
-  SECTIONS.every((s) => isMap(raw[s])) &&
-  RUNES.every((r) => (raw[r] as Record<string, unknown>).enabled !== undefined);
+  SECTIONS.every((s) => s in raw) &&
+  RUNES.every((r) => isMap(raw[r]) && raw[r].enabled !== undefined);
 
 // brings a file an older runes wrote up to the template: the top-level enabled: block moves into each rune's
 // section, and every missing section goes in with the template's text, in the template's order
@@ -250,7 +253,7 @@ export const upgrade = (text: string, raw: unknown): string => {
       const head = template.findIndex((l) => l.startsWith(`${section}:`));
       const block = template.slice(head, blockEnd(template, head)).join("\n").replace(/\n+$/, "");
       out = insertBlock(out, section, block);
-    } else if (section !== "glow" && isMap(own) && own.enabled === undefined) {
+    } else if (section !== "glow" && (own === null || (isMap(own) && own.enabled === undefined))) {
       out = setSwitch(out, section, carried[section]);
     }
   }
