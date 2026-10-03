@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 5.7.0] - 2026-10-04
+
+_tracks tag `dispatch-v5.7.0`_
+
+### Added
+- Flightdeck now runs as a Claude Code pane: `/flightdeck [planDir|close]` toggles it, and it opens itself after an autopilot launch, with a toast when the terminal is too narrow to place it.
+- Flightdeck shows each task as a bordered card with its in-flight agents inside, plus a crew box listing the latest scout and commit agents.
+- Flightdeck shows run time and a token total in a "Total Cost" block, with a centred plan title and state chips placed directly above the task grid.
+
+### Fixed
+- Flightdeck now auto-opens when autopilot is launched with a shell variable for `--plan`, because it reads the plan path from the launcher's output.
+- Autopilot parks a task as an infrastructure failure when worktree creation returns an empty path, instead of running it in the main tree and aborting the whole run.
+- Flightdeck skips redundant redraws when nothing changed and keeps clipped cards pressable.
+
 ## [runes 0.7.4] - 2026-10-04
 
 _tracks tag `runes-v0.7.4`_
