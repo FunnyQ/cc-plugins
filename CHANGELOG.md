@@ -1,5 +1,15 @@
 # Changelog
 
+## [runes 0.7.4] - 2026-10-04
+
+_tracks tag `runes-v0.7.4`_
+
+### Added
+- The minimap rune gains a compact inline layout, a sideways strip of fixed-width bars with an orange marker on the active row.
+
+### Changed
+- /minimap is now part of /runes: use `/runes minimap` with open, close, on or off, bare `/runes` toggles all runes, and the old status view moved to `/runes status`.
+
 ## [runes 0.7.3] - 2026-10-03
 
 _tracks tag `runes-v0.7.3`_
