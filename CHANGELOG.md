@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.2.0] - 2026-10-03
+
+_tracks tag `runes-v0.2.0`_
+
+### Added
+- The clawd plugin is now runes, a home for switchable Claude Code UI mods, with the Clawd mascot as its first rune and `/runes on|off|status` plus `/runes clawd on|off` to turn them on or off; the choice is remembered across sessions, and a rune never switched off stays on. Uninstall the old clawd plugin when you install runes, or two mascots will draw.
+
 ## [monitor 8.0.0] - 2026-10-03
 
 _tracks tag `monitor-v8.0.0`_
