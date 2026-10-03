@@ -50,8 +50,39 @@ export const DIVIDER = Symbol("divider");
 export const paint = (color: string, scope?: string) =>
   scope ? { color: mute(color), hover: { color, scope } } : { color };
 
-export const foldLabel = (isOpen: boolean, hidden: number) =>
-  isOpen ? "▾ fold" : `▸ ${hidden} more lines`;
+// a divider, then the fold label centred on a Button padded to the row: Box takes no onPress,
+// so the padding is what makes the whole row the press target
+export const foldRows = (
+  Button: Elements["terminal"]["Button"],
+  {
+    key,
+    isOpen,
+    hidden,
+    width,
+    onPress,
+    hover,
+  }: {
+    key: string;
+    isOpen: boolean;
+    hidden: number;
+    width: number;
+    onPress: () => void;
+    hover?: { color: string; scope: string };
+  },
+): [string, unknown][] => {
+  const text = isOpen ? "▾ fold" : `▸ ${hidden} more lines`;
+  const left = Math.max(0, Math.floor((width - cells(text)) / 2));
+  const right = Math.max(0, width - cells(text) - left);
+  return [
+    [`${key}:divider`, DIVIDER],
+    [
+      `${key}:more:row`,
+      <Button key={`${key}:more`} plain {...(hover ? { hover } : {})} onPress={onPress}>
+        {`${" ".repeat(left)}${text}${" ".repeat(right)}`}
+      </Button>,
+    ],
+  ];
+};
 
 // one row of styled runs; an empty one draws a space so the row keeps its height
 export const runLine = <R extends { text: string }>(

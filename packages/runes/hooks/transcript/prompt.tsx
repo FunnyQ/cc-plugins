@@ -1,7 +1,7 @@
 import type { On } from "claude-code";
 
 import { config } from "../config";
-import { bubble, foldLabel, runLine } from "./bubble";
+import { bubble, foldRows, runLine } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
 import { cells, innerWidth, wrap } from "./text";
 
@@ -101,12 +101,13 @@ export const prompt = (on: On) => {
         if (!isLong) return body;
         return [
           ...body,
-          row(
-            `body:${i}:more:row`,
-            <Button key={`body:${i}:more`} plain dimColor onPress={toggle(id)}>
-              {foldLabel(isOpen, lines.length - foldLines)}
-            </Button>,
-          ),
+          ...foldRows(Button, {
+            key: `body:${i}`,
+            isOpen,
+            hidden: lines.length - foldLines,
+            width: inner,
+            onPress: toggle(id),
+          }),
         ];
       });
 

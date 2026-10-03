@@ -2,11 +2,11 @@ import type { On } from "claude-code";
 
 import { config } from "../config";
 import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
-import { bubble, DIVIDER, foldLabel, paint, runLine } from "./bubble";
+import { bubble, foldRows, paint, runLine } from "./bubble";
 import { glow } from "./glow";
 import { type Kind, layout } from "./shell";
 import { language } from "./sniff";
-import { cells, innerWidth, wrap, wrapRuns } from "./text";
+import { innerWidth, wrap, wrapRuns } from "./text";
 
 type Style = { color?: string; bold?: boolean; italic?: boolean };
 
@@ -90,35 +90,20 @@ export const bash = (on: On) => {
       const isBad = isErrored || isInterrupted;
       const tint = isBad ? error_color : color;
 
-      // Box takes no onPress, so the Button's label is padded to the row's width to make the whole row its target
-      const fold = (
-        part: string,
-        total: number,
-        scope: string,
-        width: number,
-      ): [string, unknown][] => {
+      const fold = (part: string, total: number, scope: string, width: number) => {
         const key = `${id}:${part}`;
         if (total <= foldLines) return [];
-        const text = foldLabel(open.has(key), total - foldLines);
-        const left = Math.max(0, Math.floor((width - cells(text)) / 2));
-        const right = Math.max(0, width - cells(text) - left);
-        return [
-          [`${part}:divider`, DIVIDER],
-          [
-            `${part}:more:row`,
-            <Button
-              key={`${part}:more`}
-              plain
-              hover={{ color: tint, scope }}
-              onPress={() => {
-                open.has(key) ? open.delete(key) : open.add(key);
-                $.ui.invalidate("ui.render");
-              }}
-            >
-              {`${" ".repeat(left)}${text}${" ".repeat(right)}`}
-            </Button>,
-          ],
-        ];
+        return foldRows(Button, {
+          key: part,
+          isOpen: open.has(key),
+          hidden: total - foldLines,
+          width,
+          hover: { color: tint, scope },
+          onPress: () => {
+            open.has(key) ? open.delete(key) : open.add(key);
+            $.ui.invalidate("ui.render");
+          },
+        });
       };
       const visible = <T,>(part: string, all: T[]) =>
         open.has(`${id}:${part}`) ? all : all.slice(0, foldLines);
