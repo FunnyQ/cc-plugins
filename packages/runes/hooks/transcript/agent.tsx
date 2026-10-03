@@ -61,9 +61,23 @@ const statsLine = (t: NonNullable<Output["toolStats"]>) =>
 
 const remember = memo();
 
+// a full id shows as its family, so claude-sonnet-5-5 reads sonnet; an alias stays as given
+const family = (model: string) => model.match(/^claude-([a-z]+)-/)?.[1] ?? model;
+
 export const agent = (on: On) => {
   // module state, so a hot reload folds every card again
   const open = new Set<string>();
+
+  // no Agent output carries the effort, so it is read off the subagent's own model requests, by agentId
+  const efforts = new Map<string, string>();
+  on("turn.step", async function* ($, e, next) {
+    const effort = e.effort === undefined ? undefined : String(e.effort);
+    if (e.agentId && effort && efforts.get(e.agentId) !== effort) {
+      efforts.set(e.agentId, effort);
+      $.ui.invalidate("ui.render");
+    }
+    return yield* next(e);
+  });
 
   hideResult(on, "Agent", "agent");
 
@@ -86,7 +100,9 @@ export const agent = (on: On) => {
       const { text: TEXT, dim: DIM } = palette();
       const o = (typeof output === "object" && output ? output : {}) as Output;
 
-      const model = input.model ?? o.resolvedModel;
+      const name = input.model ?? o.resolvedModel;
+      const effort = o.agentId ? efforts.get(o.agentId) : undefined;
+      const model = name && `${family(name)}${effort ? `/${effort}` : ""}`;
       const state =
         stateOf(e.props) ||
         (o.status === "async_launched"

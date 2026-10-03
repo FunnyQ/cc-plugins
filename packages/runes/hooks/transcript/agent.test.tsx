@@ -189,3 +189,32 @@ test("enabled.agent: false hands the row to the engine", async ($, on) => {
     }),
   ).toBeDefined();
 });
+
+test("a full model id shows as its family", async ($, on) => {
+  await startSession($, on);
+  const card = CALL({ input: { ...INPUT, model: undefined }, output: { ...DONE, resolvedModel: "claude-sonnet-5-5" } });
+  expect(
+    await find($, card, { type: "Text", text: /Review the diff · sonnet\s*$/ }),
+  ).toBeDefined();
+});
+
+test("the effort a subagent's requests carry joins its model as model/effort", async ($, on) => {
+  // stands in for the engine sending the request
+  on("turn.step", async function* (_$, e) {
+    return { turnId: e.turnId, index: e.index, answer: "", toolUses: [] } as never;
+  });
+  await startSession($, on);
+  // the stream runs its hooks only as it is read
+  for await (const _ of $.turn.step({
+    turnId: "t1",
+    index: 0,
+    model: "claude-sonnet-5-5",
+    effort: "low",
+    messageCount: 1,
+    agentId: "ag1",
+  } as never));
+  const card = CALL({ input: { ...INPUT, model: "claude-sonnet-5-5" }, output: DONE });
+  expect(
+    await find($, card, { type: "Text", text: /Review the diff · sonnet\/low/ }),
+  ).toBeDefined();
+});
