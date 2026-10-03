@@ -1,5 +1,14 @@
 # Changelog
 
+## [runes 0.7.0] - 2026-10-03
+
+_tracks tag `runes-v0.7.0`_
+
+### Added
+- Skill tool calls now get their own transcript card showing the skill's args and a plain success or failed status, with a forked skill's result folded, plus an expandable SKILL.md block read only on first press and an arm_flex icon by default.
+- Agent cards show the model and effort in the title, such as `sonnet/low`, so you can see how each subagent is running at a glance.
+- The Write card now shows the first 12 rows of a newly created file with a "more lines" fold, instead of hiding the whole file.
+
 ## [runes 0.6.0] - 2026-10-03
 
 _tracks tag `runes-v0.6.0`_
