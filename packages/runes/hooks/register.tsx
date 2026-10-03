@@ -12,6 +12,7 @@ import {
   setSwitch,
   TEMPLATE,
 } from "./config";
+import { bash } from "./transcript/bash";
 import { glow } from "./transcript/glow";
 import { prompt } from "./transcript/prompt";
 import { reply } from "./transcript/reply";
@@ -151,4 +152,5 @@ export const register: Register = (on) => {
   mascot(on);
   prompt(on);
   reply(on);
+  bash(on);
 };

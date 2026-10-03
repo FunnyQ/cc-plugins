@@ -31,3 +31,31 @@ export const wrap = (text: string, width: number): string[] =>
     out.push(cur);
     return out;
   });
+
+type Styled = { text: string };
+
+// breaks styled runs by cell width, each piece keeping its run's style; glow leaves a code block's long lines unwrapped
+export const wrapRuns = <R extends Styled>(runs: R[], width: number): R[][] => {
+  const lines: R[][] = [[]];
+  let used = 0;
+  for (const run of runs)
+    for (const ch of run.text) {
+      const w = cellWidth(ch);
+      if (used + w > width && used > 0) {
+        lines.push([]);
+        used = 0;
+      }
+      const line = lines[lines.length - 1]!;
+      const last = line[line.length - 1];
+      if (last && sameStyle(last, run)) last.text += ch;
+      else line.push({ ...run, text: ch });
+      used += w;
+    }
+  return lines;
+};
+
+const sameStyle = (a: Styled, b: Styled) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  keys.delete("text");
+  return [...keys].every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k]);
+};

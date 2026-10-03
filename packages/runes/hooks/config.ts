@@ -1,5 +1,11 @@
 // every rune; a new rune adds its name here, to DEFAULTS and to TEMPLATE, and gates its hooks on `config.enabled[name]`
-export const RUNES = ["clawd", "transcript", "prompt", "reply"] as const;
+export const RUNES = [
+  "clawd",
+  "transcript",
+  "prompt",
+  "reply",
+  "bash",
+] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
 
@@ -7,15 +13,39 @@ export type Config = {
   enabled: Record<Rune, boolean>;
   prompt: { color: string; icon: string; side: Side; fold_lines: number };
   reply: { color: string; icon: string; side: Side };
+  bash: {
+    color: string;
+    error_color: string;
+    icon: string;
+    output_icon: string;
+    side: Side;
+    fold_lines: number;
+  };
   glow: { style: string };
 };
 
 export const DEFAULTS: Config = {
-  enabled: { clawd: true, transcript: true, prompt: true, reply: true },
+  enabled: {
+    clawd: true,
+    transcript: true,
+    prompt: true,
+    reply: true,
+    bash: true,
+  },
   // nf-md icon U+F064C, needs a Nerd Font
   prompt: { color: "#1b5ea6", icon: "\u{F064C}", side: "right", fold_lines: 6 },
   // nf-cod icon U+EC82, needs a Nerd Font
   reply: { color: "#d97757", icon: "\u{EC82}", side: "left" },
+  // nf-oct-terminal icon U+F489, needs a Nerd Font
+  bash: {
+    color: "#5f8f6a",
+    error_color: "#c94f4f",
+    icon: "\u{F489}",
+    // nf-cod icon U+EF11
+    output_icon: "\u{EF11}",
+    side: "left",
+    fold_lines: 8,
+  },
   glow: { style: "dark" },
 };
 
@@ -33,6 +63,7 @@ enabled:
   transcript: ${enabled.transcript}
   prompt: ${enabled.prompt}    # the person's bubble; needs transcript
   reply: ${enabled.reply}     # Claude's bubble; needs transcript
+  bash: ${enabled.bash}      # Bash calls and their output; needs transcript
 prompt:
   color: "${DEFAULTS.prompt.color}"
   icon: "\\U000F064C"   # Nerd Font glyph
@@ -42,6 +73,13 @@ reply:
   color: "${DEFAULTS.reply.color}"
   icon: "\\uEC82"       # Nerd Font glyph
   side: ${DEFAULTS.reply.side}
+bash:
+  color: "${DEFAULTS.bash.color}"
+  error_color: "${DEFAULTS.bash.error_color}"
+  icon: "\\uF489"       # Nerd Font glyph
+  output_icon: "\\uEF11"   # Nerd Font glyph
+  side: ${DEFAULTS.bash.side}
+  fold_lines: ${DEFAULTS.bash.fold_lines}
 glow:
   style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 `;
@@ -72,6 +110,7 @@ const RULES: {
     transcript: [isBool, "true | false"],
     prompt: [isBool, "true | false"],
     reply: [isBool, "true | false"],
+    bash: [isBool, "true | false"],
   },
   prompt: {
     color: [isColor, "#rrggbb"],
@@ -83,6 +122,14 @@ const RULES: {
     color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
+  },
+  bash: {
+    color: [isColor, "#rrggbb"],
+    error_color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
+    output_icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
+    fold_lines: [isCount, "a whole number above 0"],
   },
   glow: { style: [isText, "dark | light | a style file path"] },
 };
