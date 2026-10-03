@@ -3,6 +3,7 @@ import type { Register } from 'claude-code'
 import { mascot } from './clawd/mascot'
 import { enabled, RUNES } from './switch'
 import { prompt } from './transcript/prompt'
+import { reply } from './transcript/reply'
 
 const status = () => RUNES.map(r => `${r}: ${enabled[r] === false ? 'off' : 'on'}`).join(', ')
 
@@ -38,4 +39,5 @@ export const register: Register = on => {
 
   mascot(on)
   prompt(on)
+  reply(on)
 }
