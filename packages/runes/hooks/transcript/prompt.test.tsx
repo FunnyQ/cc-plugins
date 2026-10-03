@@ -2,7 +2,7 @@ import { expect, test } from "claude-code/testing";
 
 import { prompt, segments } from "./prompt";
 import { eventually, startSession } from "./test-session";
-import { wrap } from "./text";
+import { cells, innerWidth, wrap } from "./text";
 
 const ran = (exitCode: number, stdout: string) => ({
   value: { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
@@ -98,5 +98,19 @@ test("a prompt body renders through glow once the worker has run", async ($, on)
   const row = await mount();
   expect(await row.find({ key: "body:0:1" })).toBeDefined();
   expect(await row.find({ key: "body:0:2" })).toBeUndefined();
+  await row.unmount();
+});
+
+test("a reminder's head is cut to the row by cell width, so CJK cannot push the border out", async ($) => {
+  const head = "中".repeat(60);
+  const row = await $.ui.mount({
+    plugin: "runes",
+    surface: "terminal",
+    ...ROW(`hi\n<system-reminder>\n${head}\n</system-reminder>`),
+  });
+  const button = await row.find({ key: "reminder:1" });
+  const label = String((button as { text?: string } | undefined)?.text ?? "");
+  expect(label).toContain("中");
+  expect(cells(label)).toBeLessThanOrEqual(innerWidth());
   await row.unmount();
 });

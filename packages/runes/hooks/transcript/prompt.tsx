@@ -77,11 +77,13 @@ export const prompt = (on: On) => {
         const isOpen = open.has(id);
 
         if (s.kind === "reminder") {
-          const head = s.text.split("\n")[0].slice(0, inner - 14);
+          const prefix = `${isOpen ? "▾" : "▸"} reminder · `;
+          // cut by cells, not characters: a wide head wraps the button and the one-glyph borders break
+          const head = wrap(s.text.split("\n")[0], inner - cells(prefix))[0];
           const button = row(
             `reminder:${i}:row`,
             <Button key={`reminder:${i}`} plain dimColor onPress={toggle(id)}>
-              {`${isOpen ? "▾" : "▸"} reminder · ${head}`}
+              {prefix + head}
             </Button>,
           );
           if (!isOpen) return [button];
