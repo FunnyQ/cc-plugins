@@ -2,12 +2,13 @@ import type { Elements } from "claude-code";
 
 import type { Side } from "../config";
 import { hex } from "./ansi";
-import { cells } from "./text";
+import { cells, wrap } from "./text";
 
 type BubbleProps = {
   color: string;
-  // the icon with its trailing padding: a glyph drawn wider than its cell covers the space after it
-  label: string;
+  icon: string;
+  // cut to the header's room
+  title?: string;
   // where the bar and the icon sit
   side: Side;
   inner: number;
@@ -107,7 +108,8 @@ export const bubble = (
   { Box, Text }: Pick<Elements["terminal"], "Box" | "Text">,
   {
     color,
-    label,
+    icon,
+    title,
     side,
     inner,
     rows,
@@ -119,6 +121,10 @@ export const bubble = (
   }: BubbleProps,
 ) => {
   const ink = paint(color, scope);
+  // a glyph drawn wider than its one cell covers the space after it, so an icon before text or a left rule gets two
+  const label = title
+    ? `${wrap(`${icon}  ${title}`, inner - 3)[0]} `
+    : `${icon}${side === "right" ? " " : "  "}`;
   const mid = link ? link.at - indent : -1;
   // what the header's rule fills: the frame less its corners, the label and its padding
   const fill = inner - cells(label);
@@ -152,8 +158,7 @@ export const bubble = (
   const frame = (
     <Box
       flexDirection="column"
-      flexGrow={1}
-      marginLeft={side === "left" ? 1 : 0}
+      {...(side === "left" ? { flexGrow: 1, marginLeft: 1 } : {})}
     >
       {header}
       {/* each row is one terminal line, so the side borders are one glyph tall */}
@@ -194,6 +199,8 @@ export const bubble = (
       flexDirection="row"
       marginTop={link?.to === "up" ? 0 : 1}
       marginLeft={indent}
+      // the column CHROME leaves spare goes before a right-side frame, not between it and its bar
+      {...(side === "right" ? { justifyContent: "flex-end" as const } : {})}
       // a hover group lights over the Box's whole area, so a hovering card must not stretch past its frame
       {...(scope ? { alignSelf: "flex-start" as const } : {})}
     >

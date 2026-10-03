@@ -113,7 +113,7 @@ export const prompt = (on: On) => {
 
       return bubble(
         { Box, Text },
-        { key: "prompt", color, label: `${icon} `, side, inner, rows },
+        { key: "prompt", color, icon, side, inner, rows },
       );
     },
   );

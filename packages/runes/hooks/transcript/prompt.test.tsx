@@ -149,3 +149,21 @@ test("enabled.prompt: false hands the row to the engine", async ($, on) => {
   expect(bubble).toBeUndefined();
   expect(engine).toBeDefined();
 });
+
+test("an icon alone on a right-side header gets one space after it", async ($, on) => {
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return <Text key="engine">engine</Text>;
+  });
+  await startSession($, on, { files: new Map([[CONFIG, 'prompt:\n  icon: "P"\n']]), run: () => ran(1, "") });
+  const row = await $.ui.mount({ plugin: "runes", surface: "terminal", ...ROW("hi") });
+  const label = await row.find({ type: "Text", text: /^ P $/ });
+  await row.unmount();
+  expect(label).toBeDefined();
+});
+
+test("a right-side bubble keeps one column to its bar, its slack going left", async ($, on) => {
+  const { bubble } = await drawPrompt($, on, "");
+  expect(bubble?.props.justifyContent).toBe("flex-end");
+  expect((bubble?.children?.[0] as { props?: { flexGrow?: number } }).props?.flexGrow).toBeUndefined();
+});

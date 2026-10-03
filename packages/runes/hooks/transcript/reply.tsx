@@ -23,8 +23,7 @@ export const reply = (on: On) => {
       {
         key: "reply",
         color,
-        // the glyph draws wider than its one cell and covers the space after it, so it gets two
-        label: `${icon}  `,
+        icon,
         side,
         inner,
         rows: lines.map((runs, i) => [

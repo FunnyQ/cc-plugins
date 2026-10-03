@@ -6,7 +6,7 @@ import { bubble, foldRows, paint, runLine } from "./bubble";
 import { glow } from "./glow";
 import { type Kind, layout } from "./shell";
 import { language } from "./sniff";
-import { innerWidth, wrap, wrapRuns } from "./text";
+import { innerWidth, wrapRuns } from "./text";
 
 type Style = { color?: string; bold?: boolean; italic?: boolean };
 
@@ -126,17 +126,13 @@ export const bash = (on: On) => {
       const lines = remember(`cmd\0${id}\0${inner}\0${command.length}`, () =>
         layout(command, inner),
       );
-      // the glyph draws wider than its one cell and covers the space after it, so it gets two
-      const label = wrap(
-        `${icon}  ${description ?? "Bash"}${state}`,
-        inner - 3,
-      )[0];
       const call = bubble(
         { Box, Text },
         {
           key: "bash",
           color: tint,
-          label: `${label} `,
+          icon,
+          title: `${description ?? "Bash"}${state}`,
           side,
           inner,
           rows: [
@@ -222,7 +218,8 @@ export const bash = (on: On) => {
             {
               key: "bash:output",
               color: tint,
-              label: `${outputIcon}  ${isBad ? "error" : "output"} `,
+              icon: outputIcon,
+              title: isBad ? "error" : "output",
               side,
               // two columns in, and two narrower, so its right edge stays under the call's
               inner: inner - 2,
