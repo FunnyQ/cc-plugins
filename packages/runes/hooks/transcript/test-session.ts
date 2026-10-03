@@ -4,23 +4,34 @@ import type { Engine } from "claude-code/testing";
 export const HOME = "/home/q";
 export const CONFIG = `${HOME}/.config/q-lab/cc-plugins/runes/config.yaml`;
 
-// the YAML subset the template uses; a line it cannot read fails the way bun's parser does
+// the YAML subset the template uses, nested by indent; a header with no children reads as null, as bun's parser has it,
+// and a line it cannot read fails the way bun's parser does
 const fakeYaml = (text: string) => {
   const root: Record<string, unknown> = {};
-  let section: Record<string, unknown> = root;
+  // each open mapping with the indent its keys sit at; a header's mapping exists once a child arrives
+  const stack: { indent: number; map: Record<string, unknown>; parent?: Record<string, unknown>; key?: string }[] = [
+    { indent: -1, map: root },
+  ];
   for (const raw of text.split("\n")) {
     const line = raw.replace(/\s+#.*$|^\s*#.*$/, "");
     if (!line.trim()) continue;
     const m = line.match(/^(\s*)([\w-]+):\s*(.*)$/);
     if (!m) return undefined;
-    const [, indent, key, rest] = m;
-    const value =
+    const [, lead, key, rest] = m;
+    const indent = lead!.length;
+    while (stack.length > 1 && indent <= stack.at(-1)!.indent) stack.pop();
+    const top = stack.at(-1)!;
+    if (top.parent && top.key !== undefined) top.parent[top.key] = top.map;
+    if (!rest) {
+      top.map[key!] = null;
+      stack.push({ indent, map: {}, parent: top.map, key });
+      continue;
+    }
+    top.map[key!] =
       rest === "true" ? true
       : rest === "false" ? false
-      : /^\d+$/.test(rest) ? Number(rest)
-      : rest.replace(/^"(.*)"$/, "$1");
-    if (!indent && !rest) root[key] = section = {};
-    else (indent ? section : root)[key] = value;
+      : /^\d+$/.test(rest!) ? Number(rest)
+      : rest!.replace(/^"(.*)"$/, "$1");
   }
   return root;
 };

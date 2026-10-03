@@ -120,8 +120,8 @@ test("a file from an older runes moves its switches into their sections and gain
   const text = host.files.get(CONFIG)!;
   expect(text).not.toMatch(/^enabled:/m);
   expect(text).toContain("clawd:\n  enabled: false\n");
-  expect(text).toContain("reply:\n  enabled: true\n  side: right   # mine\n");
-  expect(text).toContain("bash:\n  enabled: true");
-  expect(text).toContain("peer:\n  enabled: true");
+  expect(text).toContain("  reply:\n    enabled: true\n    side: right   # mine\n");
+  expect(text).toContain("  bash:\n    enabled: true");
+  expect(text).toContain("  peer:\n    enabled: true");
   expect(await hasClawd($)).toBe(false);
 });
