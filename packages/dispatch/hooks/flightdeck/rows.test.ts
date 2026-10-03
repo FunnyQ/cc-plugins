@@ -13,7 +13,7 @@ import {
   inline,
   type Line,
   summary,
-  waveRows,
+  waveCards,
 } from "./rows.ts";
 import type { DeckSnapshot, DeckState, DeckTask } from "./types.ts";
 
@@ -149,21 +149,50 @@ describe("card", () => {
   });
 });
 
-describe("waveRows", () => {
+describe("waveCards", () => {
   const six = Array.from({ length: 6 }, (_, i) =>
     task(`task-${i + 1}`, "done"),
   );
 
-  test("wraps a wave with an indented continuation", () => {
+  test("one group per wave, each card carries glyph, ref, title and meta", () => {
     const s = snap({
-      waves: [six.map((t) => t.ref)],
-      tasks: tasksOf(six),
-      currentWave: null,
+      waves: [["a", "b"]],
+      tasks: tasksOf([
+        { ...task("a", "done"), score: { weighted: 4.56, threshold: 4, passed: true } },
+        task("b", "in-progress", 2),
+      ]),
     });
-    expect(waveRows(s, 40).map(text)).toEqual([
-      "W1 task-1 ✓  task-2 ✓  task-3 ✓",
-      "   task-4 ✓  task-5 ✓  task-6 ✓",
+    const [g] = waveCards(s, 80, 0).groups;
+    expect(g.label).toBe("W1 ");
+    expect(g.cards.map((c) => [c.head, c.sub])).toEqual([
+      ["✓ a", "title a   4.6"],
+      ["● b", "title b    a2"],
     ]);
+    expect(g.cards[0].color).toBe(COLOR.done);
+    expect(g.cards[1].color).toBe(COLOR["in-progress"]);
+  });
+
+  test("every card in a snapshot shares one inner width", () => {
+    const s = snap({ waves: [six.map((t) => t.ref)], tasks: tasksOf(six) });
+    const { inner, groups } = waveCards(s, 80, 0);
+    expect(inner).toBe(13);
+    for (const c of groups[0].cards) {
+      expect(c.head.length).toBeLessThanOrEqual(inner);
+      expect(c.sub.length).toBe(inner);
+    }
+  });
+
+  test("a long title clips to the card, and the card never outgrows the pane", () => {
+    const long = "x".repeat(50);
+    const s = snap({
+      waves: [[long]],
+      tasks: tasksOf([{ ...task(long, "blocked"), title: "y".repeat(80) }]),
+    });
+    const { inner, groups } = waveCards(s, 24, 0);
+    expect(inner).toBe(24 - 3 - 2);
+    expect(groups[0].cards[0].head).toBe(`· ${"x".repeat(inner - 3)}…`);
+    expect(groups[0].cards[0].sub).toBe(`${"y".repeat(inner - 1)}…`);
+    expect(groups[0].cards[0].dim).toBe(true);
   });
 
   test("W? group holds exactly the unschedulable refs, none when empty", () => {
@@ -176,10 +205,13 @@ describe("waveRows", () => {
         task("c", "ready"),
       ]),
     });
-    expect(waveRows(s, 80).map(text)).toEqual(["W1 a ✓", "W? b ·  c ○"]);
-    expect(waveRows({ ...s, unschedulable: [] }, 80).map(text)).toEqual([
-      "W1 a ✓",
+    const refs = (x: DeckSnapshot) =>
+      waveCards(x, 80, 0).groups.map((g) => [g.label, g.cards.map((c) => c.ref)]);
+    expect(refs(s)).toEqual([
+      ["W1 ", ["a"]],
+      ["W? ", ["b", "c"]],
     ]);
+    expect(refs({ ...s, unschedulable: [] })).toEqual([["W1 ", ["a"]]]);
   });
 
   test("labels pad to the longest label", () => {
@@ -188,18 +220,9 @@ describe("waveRows", () => {
       waves: refs.map((r) => [r]),
       tasks: tasksOf(refs.map((r) => task(r, "ready"))),
     });
-    const rows = waveRows(s, 80).map(text);
-    expect(rows[0]).toBe("W1  t0 ○");
-    expect(rows[9]).toBe("W10 t9 ○");
-  });
-
-  test("a card wider than a line goes on its own line", () => {
-    const long = "x".repeat(50);
-    const s = snap({
-      waves: [["a", long]],
-      tasks: tasksOf([task("a", "done"), task(long, "done")]),
-    });
-    expect(waveRows(s, 24).map(text)).toEqual(["W1 a ✓", `   ${long} ✓`]);
+    const groups = waveCards(s, 80, 0).groups;
+    expect(groups[0].label).toBe("W1  ");
+    expect(groups[9].label).toBe("W10 ");
   });
 });
 
@@ -336,7 +359,7 @@ describe("bucketBars", () => {
   });
 });
 
-describe("formatElapsed / agentLines", () => {
+describe("formatElapsed / agent rows", () => {
   test("boundaries", () => {
     expect(formatElapsed(42_000)).toBe("42s");
     expect(formatElapsed(59_000)).toBe("59s");
@@ -347,40 +370,41 @@ describe("formatElapsed / agentLines", () => {
     expect(formatElapsed(-5_000)).toBe("0s");
   });
 
-  test("layout with ref/attempt and with label/null start", () => {
+  test("an agent on a task rides that task's card, one line each", () => {
+    const now = Date.parse("2026-01-01T00:03:12Z");
+    const s = big();
+    const { inner, groups } = waveCards(s, 80, now);
+    const host = groups[0].cards.find((c) => c.ref === s.agents[0].ref)!;
+    expect(host.agents).toEqual([`${"dev #2".padEnd(inner - 6)} 3m12s`]);
+    expect(groups[0].cards.filter((c) => c.agents.length > 0)).toHaveLength(1);
+  });
+
+  test("an agent with no task falls back to a line under the grid", () => {
     const now = Date.parse("2026-01-01T00:03:12Z");
     expect(agentLines(big(), now).map(text)).toEqual([
-      "dev    frontend-longer-name/01 #2  3m12s",
       "verify verifier-label  —",
     ]);
   });
 });
 
 describe("docked", () => {
-  test("no line exceeds width at 24/40/80", () => {
+  test("no text line exceeds width at 24/40/80", () => {
     const s = big();
     for (const w of [24, 40, 80]) {
-      for (const line of docked(
-        s,
-        w,
-        Date.parse("2026-01-01T01:00:00Z"),
-        true,
-      )) {
+      const d = docked(s, w, Date.parse("2026-01-01T01:00:00Z"), true);
+      for (const line of [...d.top, ...d.agents])
         expect(cols(line)).toBeLessThanOrEqual(w);
-      }
+      expect(d.cards.inner + 2 + d.cards.groups[0].label.length).toBeLessThanOrEqual(w);
     }
   });
 
-  test("order: summary, bars, blank, waves, blank, agents", () => {
+  test("top is summary then bars; agents only when some are in flight", () => {
     const s = big();
-    const lines = docked(s, 80, Date.parse("2026-01-01T00:00:00Z"), false);
-    const waves = waveRows(s, 80).length;
-    expect(lines.length).toBe(2 + 3 + 1 + waves + 1 + 2);
-    expect(lines[5]).toEqual([]);
-    expect(lines[6 + waves]).toEqual([]);
-    expect(docked({ ...s, agents: [] }, 80, 0, false).length).toBe(
-      2 + 3 + 1 + waves,
-    );
+    const d = docked(s, 80, Date.parse("2026-01-01T00:00:00Z"), false);
+    expect(d.top).toHaveLength(2 + 3);
+    expect(d.cards.groups).toHaveLength(5);
+    expect(d.agents).toHaveLength(1);
+    expect(docked({ ...s, agents: [] }, 80, 0, false).agents).toEqual([]);
   });
 });
 

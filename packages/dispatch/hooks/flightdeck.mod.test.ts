@@ -60,10 +60,13 @@ function world(
   on: On,
   answer: (argv: readonly string[]) => Answer,
   tool: { isError?: boolean } = {},
+  // false stands for a terminal under the unasked floor: the pane opens but waits undrawn
+  place: { next: boolean } = { next: true },
 ) {
   const clock = mock.clock(on);
   const runs: (readonly string[])[] = [];
   const panes = new Map<string, string>();
+  const placed = new Set<string>();
   const opens: Record<string, unknown>[] = [];
   const toasts: string[] = [];
   on("process.run", async (_$, e) => {
@@ -89,17 +92,21 @@ function world(
           title,
           isShown: true,
           isFocused: false,
-          isPlaced: true,
+          isPlaced: placed.has(id),
         })),
       }) as never,
   );
   on("ui.open", (_$, e) => {
     panes.set(e.id, e.title ?? e.id);
     opens.push({ ...e });
+    if (!place.next)
+      return { value: { isPlaced: false, reason: "144 columns, 100 now" } } as never;
+    placed.add(e.id);
     return { value: { isPlaced: true } } as never;
   });
   on("ui.close", (_$, e) => {
     panes.delete(e.id);
+    placed.delete(e.id);
     return { value: undefined } as never;
   });
   on("ui.toast", (_$, e) => {
@@ -213,6 +220,23 @@ test("a successful flightdeck.ts --plan Bash call opens the pane on that plan, r
   expect(ran.text).toBe("ok");
   expect(w.panes.get("flightdeck")).toBe("Flightdeck · x");
   expect(w.snapshots("/abs/docs/x")).toHaveLength(1);
+});
+
+test("an auto-open the terminal is too narrow to place toasts how to show it", async ($, on) => {
+  const place = { next: false };
+  const w = world(on, (argv) => good(argv[2]!), {}, place);
+  await $.tool.call({
+    tool: "Bash",
+    command: 'bun "$OWN"/flightdeck.ts --plan "/abs/docs/x"',
+  } as never);
+  expect(w.toasts).toEqual([
+    "Flightdeck is waiting for a wider terminal. Type /flightdeck to show it.",
+  ]);
+
+  place.next = true;
+  expect(await run($, "")).toContain("/abs/docs/x");
+  expect(w.panes.has("flightdeck")).toBe(true);
+  expect(w.opens).toHaveLength(2);
 });
 
 test("an errored flightdeck.ts --plan Bash call opens nothing", async ($, on) => {
@@ -378,6 +402,33 @@ test("pressing a card toasts its details, and Open flightdeck toasts a failed la
     "--plan",
     "/abs/docs/x",
   ] as never);
+});
+
+test("agents with no task sit in a bordered box above the waves; none means no box", async ($, on) => {
+  const scout = { role: "scout", ref: null, attempt: null, label: "scout-wave-2", startedAt: null };
+  const dev = { role: "dev", ref: "api/02", attempt: 2, label: "dev-a", startedAt: null };
+  world(on, (argv) => ({
+    exitCode: 0,
+    stdout: JSON.stringify(snap(argv[2]!, { agents: [scout, dev] })),
+  }));
+  await run($, "/abs/docs/x");
+  const ui = await mountPane($);
+  const box = await ui.find({ key: "loose-agents" });
+  expect(box).toBeDefined();
+  const texts = (await ui.findAll({ type: "Text" })).map((el) => el.text);
+  const at = (needle: string) => texts.findIndex((t) => t.includes(needle));
+  expect(at("scout scout-wave-2")).toBeGreaterThan(-1);
+  expect(at("scout scout-wave-2")).toBeLessThan(at("W1"));
+  expect(at("dev #2")).toBeGreaterThan(at("W1"));
+  await ui.unmount();
+});
+
+test("a pane with no taskless agents draws no agent box", async ($, on) => {
+  world(on, (argv) => good(argv[2]!));
+  await run($, "/abs/docs/x");
+  const ui = await mountPane($);
+  expect(await ui.find({ key: "loose-agents" })).toBeUndefined();
+  await ui.unmount();
 });
 
 test("the inline seat draws two lines: the summary and the current wave's cards", async ($, on) => {

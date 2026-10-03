@@ -3,7 +3,7 @@ import type { EngineInterface, On, Timer } from "claude-code";
 
 import type { FlightdeckDeck } from "../../types";
 import { FLIGHTDECK_COMMAND, planArg } from "./deck-command.ts";
-import { clip, docked, inline, type Line } from "./rows.ts";
+import { type CardModel, clip, COLOR, docked, inline, type Line } from "./rows.ts";
 import type { DeckSnapshot, DeckTask } from "./types.ts";
 
 const PANE = "flightdeck";
@@ -27,6 +27,8 @@ let generation = 0;
 let ticker: Timer | undefined;
 // the last snapshot stdout drawn; an identical tick skips the parse and the publish
 let lastOut = "";
+// the plan the open pane follows, so a bare /flightdeck can seat a pane that waits undrawn
+let current: string | null = null;
 
 const publish = ($: EngineInterface) => update($, deck, () => view);
 
@@ -39,6 +41,8 @@ const runScript = ($: EngineInterface, name: string, ...args: string[]) =>
   ]);
 const isOpen = async ($: EngineInterface) =>
   (await $.ui.panes()).some((p) => p.id === PANE);
+const isPlaced = async ($: EngineInterface) =>
+  (await $.ui.panes()).some((p) => p.id === PANE && p.isPlaced);
 
 const toastText = (t: DeckTask) => {
   const parts = [t.ref, t.title, t.state, `attempt ${t.attempts}`];
@@ -77,6 +81,7 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
 // only open and close touch the ticker, synchronously before their first await
 const openOn = async ($: EngineInterface, plan: string) => {
   const gen = ++generation;
+  current = plan;
   view = EMPTY;
   lastOut = "";
   void publish($);
@@ -91,6 +96,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
         // closed by hand: stop here, unless an open or close already moved on and owns the ticker
         if (gen === generation) {
           generation++;
+          current = null;
           own.cancel();
         }
         return;
@@ -105,7 +111,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
   ticker = own;
   void tick();
   const title = `Flightdeck · ${plan.replace(/\/+$/, "").split("/").pop()}`;
-  await $.ui.open({
+  return $.ui.open({
     id: PANE,
     title,
     columns: COLUMNS,
@@ -115,6 +121,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
 
 const close = async ($: EngineInterface) => {
   generation++;
+  current = null;
   ticker?.cancel();
   ticker = undefined;
   await $.ui.close({ id: PANE });
@@ -133,13 +140,15 @@ export const flightdeck = (on: On) => {
 
   on("command.run", { command: "flightdeck" }, async ($, e) => {
     const arg = e.args.trim();
-    if (arg === "close" || (arg === "" && (await isOpen($)))) {
+    if (arg === "close" || (arg === "" && (await isPlaced($)))) {
       await close($);
       return { text: "Flightdeck closed." };
     }
-    if (arg !== "") {
-      await openOn($, arg);
-      return { text: `Flightdeck opened on ${arg}.` };
+    // a bare command while an auto-open waits undrawn is the person asking, which seats it at any width
+    const target = arg || current;
+    if (target) {
+      await openOn($, target);
+      return { text: `Flightdeck opened on ${target}.` };
     }
     const gen = generation;
     const top = await $.process.run(["git", "rev-parse", "--show-toplevel"]);
@@ -163,7 +172,8 @@ export const flightdeck = (on: On) => {
       const ran = await next(e);
       if (ran.deny !== undefined || ran.isError) return ran;
       const plan = planArg(e.command);
-      if (plan) await openOn($, plan);
+      if (plan && !(await openOn($, plan)).isPlaced)
+        $.ui.toast("Flightdeck is waiting for a wider terminal. Type /flightdeck to show it.");
       return ran;
     },
   );
@@ -218,9 +228,57 @@ export const flightdeck = (on: On) => {
       const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
+    const { top, cards, agents } = docked(s, width, Date.now(), stale);
+    // a Button takes no colour, so the glyph is coloured Text and the ref beside it is the pressable part
+    const cardBox = (c: CardModel) => (
+      <Box
+        flexDirection="column"
+        width={cards.inner + 2}
+        borderStyle="round"
+        borderColor={c.color}
+        borderDimColor={c.dim}
+      >
+        <Box flexDirection="row">
+          <Text color={c.color} dimColor={c.dim}>
+            {c.head.slice(0, 2)}
+          </Text>
+          <Button
+            key={`card:${c.ref}`}
+            plain
+            dimColor={c.dim}
+            label={c.head.slice(2)}
+            onPress={() => $.ui.toast(toastText(s.tasks[c.ref]!))}
+          />
+        </Box>
+        <Text dimColor>{c.sub}</Text>
+        {c.agents.map((line) => (
+          <Text color={COLOR["in-progress"]}>{line}</Text>
+        ))}
+      </Box>
+    );
     return (
       <Box flexDirection="column">
-        {docked(s, width, Date.now(), stale).map(row)}
+        {top.map(row)}
+        {agents.length > 0 && (
+          <Box
+            key="loose-agents"
+            flexDirection="column"
+            alignItems="center"
+            borderStyle="round"
+            borderColor={COLOR["in-progress"]}
+          >
+            {agents.map(row)}
+          </Box>
+        )}
+        {row([])}
+        {cards.groups.map((g) => (
+          <Box flexDirection="row">
+            <Text>{g.label}</Text>
+            <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={1}>
+              {g.cards.map(cardBox)}
+            </Box>
+          </Box>
+        ))}
         <Button
           key="open"
           label="Open flightdeck"

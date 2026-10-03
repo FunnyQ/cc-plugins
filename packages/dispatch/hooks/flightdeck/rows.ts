@@ -120,37 +120,70 @@ export function bucketBars(s: DeckSnapshot, w: number): Line[] {
   });
 }
 
-export function waveRows(s: DeckSnapshot, w: number): Line[] {
+// a card's inner width never drops below "Final review" plus a score, so short refs still show their title
+const MIN_INNER = 13;
+
+export type CardModel = {
+  ref: string;
+  head: string; // glyph + ref
+  sub: string; // title, then attempts/score right-aligned, padded to the inner width
+  agents: string[]; // one line per in-flight agent on this task: role, attempt, elapsed
+  color?: string;
+  dim?: boolean;
+};
+export type WaveCards = {
+  inner: number; // every card's width inside its border
+  groups: { label: string; cards: CardModel[] }[];
+};
+
+const fit = (text: string, w: number) =>
+  text.length <= w ? text : `${text.slice(0, Math.max(0, w - 1))}…`;
+
+const elapsedOf = (a: DeckAgent, now: number) =>
+  a.startedAt === null ? "—" : formatElapsed(now - Date.parse(a.startedAt));
+
+// the label or text on the left, `right` flush to the inner width
+const spread = (left: string, right: string, inner: number) => {
+  const leftW = Math.max(0, inner - right.length - 1);
+  return `${fit(left, leftW).padEnd(leftW)} ${right}`.slice(0, inner);
+};
+
+export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
   const groups = s.waves.map((refs, i) => ({ label: `W${i + 1}`, refs }));
   if (s.unschedulable.length > 0)
     groups.push({ label: "W?", refs: s.unschedulable });
-  const labelW = Math.max(0, ...groups.map((g) => g.label.length));
-  const indent = " ".repeat(labelW + 1);
+  const labelW = Math.max(0, ...groups.map((g) => g.label.length)) + 1;
+  const longest = Math.max(0, ...groups.flatMap((g) => g.refs.map((r) => r.length)));
+  const inner = Math.max(1, Math.min(Math.max(MIN_INNER, longest + 2), w - labelW - 2));
 
-  const lines: Line[] = [];
-  for (const g of groups) {
-    let line: Line = [{ text: `${g.label.padEnd(labelW)} ` }];
-    let used = labelW + 1;
-    let empty = true;
-    for (const ref of g.refs) {
-      const seg = card(s.tasks[ref]!);
-      if (!empty && used + 2 + seg.text.length > w) {
-        lines.push(line);
-        line = [{ text: indent }];
-        used = indent.length;
-        empty = true;
-      }
-      if (!empty) {
-        line.push({ text: "  " });
-        used += 2;
-      }
-      line.push(seg);
-      used += seg.text.length;
-      empty = false;
-    }
-    lines.push(line);
-  }
-  return lines;
+  const model = (t: DeckTask): CardModel => {
+    const meta = [
+      t.score ? t.score.weighted.toFixed(1) : "",
+      t.attempts > 1 ? `a${t.attempts}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const { color, dim } = styled(t.state, "");
+    return {
+      ref: t.ref,
+      head: fit(`${GLYPH[t.state]} ${t.ref}`, inner),
+      sub: meta ? spread(t.title, meta, inner) : fit(t.title, inner).padEnd(inner),
+      agents: s.agents
+        .filter((a) => a.ref === t.ref)
+        .map((a) =>
+          spread(`${a.role}${a.attempt === null ? "" : ` #${a.attempt}`}`, elapsedOf(a, now), inner),
+        ),
+      ...(color && { color }),
+      ...(dim && { dim }),
+    };
+  };
+  return {
+    inner,
+    groups: groups.map((g) => ({
+      label: g.label.padEnd(labelW),
+      cards: g.refs.map((ref) => model(s.tasks[ref]!)),
+    })),
+  };
 }
 
 export function formatElapsed(ms: number): string {
@@ -161,14 +194,14 @@ export function formatElapsed(ms: number): string {
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}m`;
 }
 
+// agents with no task in the grid have no card to ride, so they keep a line under it
 export function agentLines(s: DeckSnapshot, now: number): Line[] {
-  const roleW = Math.max(0, ...s.agents.map((a) => a.role.length));
-  return s.agents.map((a: DeckAgent) => {
+  const loose = s.agents.filter((a) => a.ref === null || !s.tasks[a.ref]);
+  const roleW = Math.max(0, ...loose.map((a) => a.role.length));
+  return loose.map((a) => {
     const who = a.ref ?? a.label;
     const attempt = a.attempt === null ? "" : ` #${a.attempt}`;
-    const elapsed =
-      a.startedAt === null ? "—" : formatElapsed(now - Date.parse(a.startedAt));
-    return [{ text: `${a.role.padEnd(roleW)} ${who}${attempt}  ${elapsed}` }];
+    return [{ text: `${a.role.padEnd(roleW)} ${who}${attempt}  ${elapsedOf(a, now)}` }];
   });
 }
 
@@ -194,15 +227,13 @@ export function docked(
   w: number,
   now: number,
   stale: boolean,
-): Line[] {
-  const lines = [
-    ...summary(s, stale),
-    ...bucketBars(s, w),
-    [],
-    ...waveRows(s, w),
-  ];
-  if (s.agents.length > 0) lines.push([], ...agentLines(s, now));
-  return lines.map((line) => clip(line, w));
+): { top: Line[]; cards: WaveCards; agents: Line[] } {
+  return {
+    top: [...summary(s, stale), ...bucketBars(s, w)].map((l) => clip(l, w)),
+    cards: waveCards(s, w, now),
+    // the taskless agents' box spends two columns on its border
+    agents: agentLines(s, now).map((l) => clip(l, w - 2)),
+  };
 }
 
 export function inline(s: DeckSnapshot, w: number, stale: boolean): Line[] {
