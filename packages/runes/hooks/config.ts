@@ -5,6 +5,7 @@ export const RUNES = [
   "prompt",
   "reply",
   "bash",
+  "peer",
 ] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
@@ -21,6 +22,7 @@ type Config = {
     side: Side;
     fold_lines: number;
   };
+  peer: { color: string; icon: string; side: Side; fold_lines: number };
   glow: { style: string };
 };
 
@@ -40,6 +42,8 @@ export const DEFAULTS: Config = {
     side: "left",
     fold_lines: 8,
   },
+  // nf-md-robot U+F06A9, needs a Nerd Font
+  peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   glow: { style: "dark" },
 };
 
@@ -58,6 +62,7 @@ enabled:
   prompt: ${enabled.prompt}    # the person's bubble; needs transcript
   reply: ${enabled.reply}     # Claude's bubble; needs transcript
   bash: ${enabled.bash}      # Bash calls and their output; needs transcript
+  peer: ${enabled.peer}      # subagents' and other sessions' messages; needs transcript
 prompt:
   color: "${DEFAULTS.prompt.color}"
   icon: "\\U000F064C"   # Nerd Font glyph
@@ -74,6 +79,11 @@ bash:
   output_icon: "\\uEF11"   # Nerd Font glyph
   side: ${DEFAULTS.bash.side}
   fold_lines: ${DEFAULTS.bash.fold_lines}
+peer:
+  color: "${DEFAULTS.peer.color}"
+  icon: "\\U000F06A9"   # Nerd Font glyph
+  side: ${DEFAULTS.peer.side}
+  fold_lines: ${DEFAULTS.peer.fold_lines}
 glow:
   style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 `;
@@ -119,6 +129,12 @@ const RULES: {
     error_color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
     output_icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
+    fold_lines: [isCount, "a whole number above 0"],
+  },
+  peer: {
+    color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
     fold_lines: [isCount, "a whole number above 0"],
   },

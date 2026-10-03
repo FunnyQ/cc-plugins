@@ -15,6 +15,7 @@ import {
 import { bash } from "./transcript/bash";
 import { glow } from "./transcript/glow";
 import { prompt } from "./transcript/prompt";
+import { peer } from "./transcript/peer";
 import { reply } from "./transcript/reply";
 
 type $ = Parameters<Hook<"session.start">>[0];
@@ -153,4 +154,5 @@ export const register: Register = (on) => {
   prompt(on);
   reply(on);
   bash(on);
+  peer(on);
 };
