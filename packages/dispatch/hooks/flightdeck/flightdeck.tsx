@@ -88,7 +88,8 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
     }
   }
   // a tick whose snapshot did not change still moves the agents' and tasks' elapsed times
-  if ((view.snapshot as DeckSnapshot | null)?.agents.length)
+  const live = view.snapshot as DeckSnapshot | null;
+  if (live?.agents.length || (live?.time && live.time.endedAt === null))
     $.ui.invalidate("ui.render");
 };
 
@@ -205,6 +206,14 @@ export const flightdeck = (on: On) => {
       <Box flexDirection="row">
         {line.length === 0 && <Text> </Text>}
         {line.map((seg) => {
+          if (seg.fill)
+            return (
+              <Box flexGrow={1} flexShrink={1} overflow="hidden">
+                <Text color={seg.color} dimColor={seg.dim} wrap="truncate-end">
+                  {seg.text}
+                </Text>
+              </Box>
+            );
           const task = seg.ref ? s?.tasks[seg.ref] : undefined;
           if (!task)
             return (
@@ -266,17 +275,27 @@ export const flightdeck = (on: On) => {
             label={c.head.slice(2)}
             onPress={() => $.ui.toast(toastText(s.tasks[c.ref]!))}
           />
+          {c.time && (
+            <Box flexGrow={1} justifyContent="flex-end">
+              <Text dimColor>{c.time}</Text>
+            </Box>
+          )}
         </Box>
         <Text dimColor>{c.sub}</Text>
-        {c.stats && <Text dimColor>{c.stats}</Text>}
         {c.agents.map((line) => (
           <Text color={COLOR["in-progress"]}>{line}</Text>
         ))}
+        {c.tokens && <Text dimColor>{c.tokens}</Text>}
       </Box>
     );
     return (
-      <Box flexDirection="column">
-        {top.map(row)}
+      // the top row clears the pane's close mark, which sits over the body's first line
+      <Box flexDirection="column" paddingTop={1}>
+        {top.slice(0, 2).map(row)}
+        <Box flexDirection="row" justifyContent="center">
+          {row(top[2]!)}
+        </Box>
+        {top.slice(3).map(row)}
         {crew.length > 0 && (
           <Box
             key="loose-agents"

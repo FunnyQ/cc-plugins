@@ -373,6 +373,18 @@ describe("buildDeckSnapshot", () => {
     expect(read.tasks["a/02"].tokens).toBeNull();
     expect(snapshot(tasks).tasks["a/01"].tokens).toBeNull();
   });
+
+  test("the run's wall time spans every row, the way the web header counts it", () => {
+    const deck = snapshot(
+      [view("a/01", "done")],
+      [
+        row({ ref: "scout", role: "scout", status: "finished", startedAt: "2026-10-04T10:00:00Z", elapsedMs: 1_000 }),
+        row({ ref: "a/01", status: "finished", startedAt: "2026-10-04T10:00:05Z", elapsedMs: 60_000 }),
+      ],
+    );
+    expect(deck.time).toEqual({ startedAt: "2026-10-04T10:00:00.000Z", endedAt: "2026-10-04T10:01:05.000Z" });
+    expect(snapshot([view("a/01", "ready")]).time).toBeNull();
+  });
 });
 
 const KEYS: (keyof DeckSnapshot)[] = [
@@ -388,6 +400,7 @@ const KEYS: (keyof DeckSnapshot)[] = [
   "tasks",
   "agents",
   "crew",
+  "time",
   "errors",
 ];
 

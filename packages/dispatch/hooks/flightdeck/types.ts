@@ -51,6 +51,7 @@ export type DeckSnapshot = {
   currentWave: number | null; // 1-based: lowest wave holding a non-done task; null when no wave holds one (all done, or only unschedulable work left)
   tasks: Record<string, DeckTask>;
   agents: DeckAgent[]; // FleetRow.status === "in-flight" only, startedAt ascending
-  crew: DeckCrew[]; // the latest 3 taskless fleet rows of any status, newest first
+  crew: DeckCrew[];
+  time: DeckTask["time"]; // the whole run: first agent start to last finish, open while one runs // the latest 3 taskless fleet rows of any status, newest first
   errors: number; // TreePayload.errors.length
 };

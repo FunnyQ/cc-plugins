@@ -48,6 +48,7 @@ function snap(overrides: Partial<DeckSnapshot> = {}): DeckSnapshot {
     tasks: {},
     agents: [],
     crew: [],
+    time: null,
     errors: 0,
     ...overrides,
   };
@@ -200,7 +201,7 @@ describe("waveCards", () => {
     expect(groups[0].cards[0].dim).toBe(true);
   });
 
-  test("line 3 carries the task's time, and its tokens once it is done", () => {
+  test("time sits right on the first line; tokens sit bottom-right once done", () => {
     const now = Date.parse("2026-01-01T00:10:00Z");
     const s = snap({
       waves: [["a", "b", "c"]],
@@ -212,9 +213,9 @@ describe("waveCards", () => {
     });
     const { inner, groups } = waveCards(s, 80, now);
     const [a, b, c] = groups[0].cards;
-    expect(a.stats).toBe(`${"3m12s".padEnd(inner - 9)} 1.2M tok`);
-    expect(b.stats).toBe("45s".padEnd(inner));
-    expect(c.stats).toBeNull();
+    expect([a.head, a.time, a.tokens]).toEqual(["✓ a", "3m12s", "1.2M tok".padStart(inner)]);
+    expect([b.time, b.tokens]).toEqual(["45s", null]);
+    expect([c.time, c.tokens]).toEqual([null, null]);
   });
 
   test("W? group holds exactly the unschedulable refs, none when empty", () => {
@@ -295,7 +296,7 @@ describe("summary / compactSummary / endState", () => {
   test("stuck fixture, stale with errors", () => {
     const s = stuck();
     expect(endState(s)).toBe("stuck");
-    const [l1, l2, l3] = summary(s, true, 40);
+    const [l1, l2, l3] = summary(s, true, 40, 0);
     expect(text(l1)).toBe(`demo ${"─".repeat(11)} stuck · 1 unschedulable`);
     expect(l1.at(-1)!.color).toBe("#f85149");
     expect(text(l2)).toBe(`${"━".repeat(34)} 19/20`);
@@ -311,7 +312,7 @@ describe("summary / compactSummary / endState", () => {
 
   test("no stale, no errors", () => {
     const s = { ...stuck(), errors: 0 };
-    const all = [...summary(s, false, 40), compactSummary(s, false)]
+    const all = [...summary(s, false, 40, 0), compactSummary(s, false)]
       .map(text)
       .join("\n");
     expect(all).not.toContain("stale");
@@ -325,7 +326,7 @@ describe("summary / compactSummary / endState", () => {
       waves: [[], [], []],
       currentWave: 2,
     });
-    expect(text(summary(s, false, 30)[0])).toBe(`demo ${"─".repeat(16)} wave 2/3`);
+    expect(text(summary(s, false, 30, 0)[0])).toBe(`demo ${"─".repeat(16)} wave 2/3`);
     expect(text(compactSummary(s, false))).toBe("4/20 · W2/3 · demo");
     const done = snap({
       counts: {
@@ -340,8 +341,24 @@ describe("summary / compactSummary / endState", () => {
       tasks: tasksOf([task("a", "done")]),
     });
     expect(endState(done)).toBe("done");
-    expect(text(summary(done, false, 20)[0])).toBe(`demo ${"─".repeat(6)} all done`);
+    expect(text(summary(done, false, 20, 0)[0])).toBe(`demo ${"─".repeat(6)} all done`);
     expect(text(compactSummary(done, false))).toBe("2/2 · all done · demo");
+  });
+
+  test("the title's rule is the one fill segment, and the run's wall time rides beside the wave", () => {
+    const now = Date.parse("2026-01-01T00:04:12Z");
+    const s = snap({
+      counts: { ...big().counts },
+      waves: [[], [], []],
+      currentWave: 2,
+      time: { startedAt: "2026-01-01T00:00:00Z", endedAt: null },
+    });
+    const [title] = summary(s, false, 40, now);
+    expect(title.filter((g) => g.fill)).toEqual([expect.objectContaining({ dim: true })]);
+    expect(text(title).endsWith(" wave 2/3 · 4m12s")).toBe(true);
+    expect(cols(title)).toBe(40);
+    const ended = { ...s, time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:01:05Z" } };
+    expect(text(summary(ended, false, 40, now)[0]).endsWith(" wave 2/3 · 1m05s")).toBe(true);
   });
 
   test("red invalid pair only when invalid > 0", () => {
@@ -355,7 +372,7 @@ describe("summary / compactSummary / endState", () => {
         invalid: 1,
       },
     });
-    expect(summary(s, false, 40)[2].find((g) => g.text === "✗ 1")?.color).toBe(
+    expect(summary(s, false, 40, 0)[2].find((g) => g.text === "✗ 1")?.color).toBe(
       "#f85149",
     );
   });

@@ -142,6 +142,7 @@ export function buildDeckSnapshot(input: {
     tasks,
     agents,
     crew,
+    time: timeOf(input.fleet),
     errors: payload.errors.length,
   };
 }

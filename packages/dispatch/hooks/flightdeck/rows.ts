@@ -2,8 +2,9 @@ import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask } from "./t
 
 // Width is text.length: every glyph used here (✓ ● ○ · ✗ █ ░ … —) is one BMP code unit drawn one column wide.
 
-// `ref` is set only on card segments; the mod makes those pressable
-export type Seg = { text: string; color?: string; dim?: boolean; ref?: string };
+// `ref` is set only on card segments; the mod makes those pressable.
+// `fill` marks the one segment the mod lets the layout stretch or truncate, so a line drawn wider than computed never wraps.
+export type Seg = { text: string; color?: string; dim?: boolean; ref?: string; fill?: boolean };
 export type Line = Seg[];
 
 export const GLYPH: Record<DeckState, string> = {
@@ -72,7 +73,7 @@ function bar(done: number, total: number, cells: number): Line {
   return line;
 }
 
-export function summary(s: DeckSnapshot, stale: boolean, w: number): Line[] {
+export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number): Line[] {
   const state = endState(s);
   const right: Seg =
     state === "wave"
@@ -80,12 +81,16 @@ export function summary(s: DeckSnapshot, stale: boolean, w: number): Line[] {
       : state === "done"
         ? { text: "all done" }
         : { text: `stuck · ${stuckRefs(s).length} unschedulable`, color: COLOR.invalid };
-  const fill = Math.max(1, w - s.slug.length - right.text.length - 2);
+  const wall = s.time
+    ? ` · ${formatElapsed((s.time.endedAt === null ? now : Date.parse(s.time.endedAt)) - Date.parse(s.time.startedAt))}`
+    : "";
+  const fill = Math.max(1, w - s.slug.length - right.text.length - wall.length - 2);
   const title: Line = [
     { text: `${s.slug} ` },
-    { text: RULE.repeat(fill), dim: true },
+    { text: RULE.repeat(fill), dim: true, fill: true },
     { text: " " },
     right,
+    ...(wall ? [{ text: wall }] : []),
   ];
 
   const count = `${s.counts.done}/${s.counts.total}`;
@@ -148,7 +153,8 @@ export type CardModel = {
   ref: string;
   head: string; // glyph + ref
   sub: string; // title, then attempts/score right-aligned, padded to the inner width
-  stats: string | null; // time spent, then tokens once done; null before any agent started
+  time: string | null; // time spent, right of the head; null before any agent started
+  tokens: string | null; // billed tokens right-aligned to the inner width, done tasks only
   agents: string[]; // one line per in-flight agent on this task: role, attempt, elapsed
   color?: string;
   dim?: boolean;
@@ -177,11 +183,10 @@ export function formatTokens(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
-function statsOf(t: DeckTask, now: number, inner: number): string | null {
+function timeOf(t: DeckTask, now: number): string | null {
   if (!t.time) return null;
   const end = t.time.endedAt === null ? now : Date.parse(t.time.endedAt);
-  const spent = formatElapsed(end - Date.parse(t.time.startedAt));
-  return t.tokens === null ? fit(spent, inner).padEnd(inner) : spread(spent, `${formatTokens(t.tokens)} tok`, inner);
+  return formatElapsed(end - Date.parse(t.time.startedAt));
 }
 
 export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
@@ -200,11 +205,13 @@ export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
       .filter(Boolean)
       .join(" ");
     const { color, dim } = styled(t.state, "");
+    const time = timeOf(t, now);
     return {
       ref: t.ref,
-      head: fit(`${GLYPH[t.state]} ${t.ref}`, inner),
+      head: fit(`${GLYPH[t.state]} ${t.ref}`, time ? inner - time.length - 1 : inner),
+      time,
+      tokens: t.tokens === null ? null : `${formatTokens(t.tokens)} tok`.padStart(inner),
       sub: meta ? spread(t.title, meta, inner) : fit(t.title, inner).padEnd(inner),
-      stats: statsOf(t, now, inner),
       agents: s.agents
         .filter((a) => a.ref === t.ref)
         .map((a) =>
@@ -270,7 +277,7 @@ export function docked(
   stale: boolean,
 ): { top: Line[]; cards: WaveCards; crew: Line[] } {
   return {
-    top: [...summary(s, stale, w), ...bucketBars(s, w)].map((l) => clip(l, w)),
+    top: [...summary(s, stale, w, now), ...bucketBars(s, w)].map((l) => clip(l, w)),
     cards: waveCards(s, w, now),
     // the crew box spends two columns on its border
     crew: crewLines(s, now).map((l) => clip(l, w - 2)),
