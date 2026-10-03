@@ -7,6 +7,7 @@
  */
 
 import type { Register } from "claude-code";
+import { flightdeck } from "./flightdeck/flightdeck.tsx";
 import { TASK_PATH } from "./task-path.ts";
 
 export const register: Register = (on) => {
@@ -37,4 +38,6 @@ export const register: Register = (on) => {
       };
     },
   );
+
+  flightdeck(on);
 };

@@ -6,7 +6,7 @@
 >
 > **Depends on**: data/01, mod/01
 > **Blocks**: mod/03
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -129,27 +129,27 @@ Stub `ui.panes`, `ui.open`, `ui.close`, and `clock` (`mock.clock(on)` for `$.clo
 
 ## Acceptance criteria
 
-- [ ] `planArg` returns the plan dir for the autopilot form, the deckplan form, `--plan=`, and single-quoted values, and `FLIGHTDECK_COMMAND` rejects `bun flightdeck.test.ts`.
-- [ ] `/flightdeck <dir>` opens pane `flightdeck` (40 columns, 2 inline rows) and a bare `/flightdeck` toggles it closed; `/flightdeck close` closes it.
-- [ ] A successful Bash `flightdeck.ts --plan <dir>` call opens the pane on `<dir>` and returns the tool result unchanged; an errored or denied call opens nothing.
-- [ ] A failing snapshot keeps the last good snapshot and marks it stale; the ticker cancels when the pane is gone.
-- [ ] With a delayed `--latest` stub: `/flightdeck close` or `/flightdeck <planB>` issued before the lookup returns leaves the pane closed, or on plan B, respectively.
-- [ ] With a delayed `process.run` stub for plan A: switching to plan B, or closing, before A's first snapshot returns leaves exactly one live ticker (B's, or none after close), and A's late result is discarded.
-- [ ] `flightdeck.tsx` imports no `node:` module, uses no `Bun` global, and passes `$` to no other file's function.
-- [ ] (human) In a real Claude Code session, the docked pane shows the summary line, bucket bars, wave rows with coloured cards, in-flight agents, and the `Open flightdeck` button; pressing a card toasts its details.
-- [ ] (human) In a narrow terminal the pane sits above the prompt as two lines: the summary and the current wave's cards.
-- [ ] (human) A real `/autopilot` launch opens the pane by itself, and it refreshes about every 2 s while agents run.
+- [x] `planArg` returns the plan dir for the autopilot form, the deckplan form, `--plan=`, and single-quoted values, and `FLIGHTDECK_COMMAND` rejects `bun flightdeck.test.ts`.
+- [x] `/flightdeck <dir>` opens pane `flightdeck` (40 columns, 2 inline rows) and a bare `/flightdeck` toggles it closed; `/flightdeck close` closes it.
+- [x] A successful Bash `flightdeck.ts --plan <dir>` call opens the pane on `<dir>` and returns the tool result unchanged; an errored or denied call opens nothing.
+- [x] A failing snapshot keeps the last good snapshot and marks it stale; the ticker cancels when the pane is gone.
+- [x] With a delayed `--latest` stub: `/flightdeck close` or `/flightdeck <planB>` issued before the lookup returns leaves the pane closed, or on plan B, respectively.
+- [x] With a delayed `process.run` stub for plan A: switching to plan B, or closing, before A's first snapshot returns leaves exactly one live ticker (B's, or none after close), and A's late result is discarded.
+- [x] `flightdeck.tsx` imports no `node:` module, uses no `Bun` global, and passes `$` to no other file's function.
+- [x] (human) In a real Claude Code session, the docked pane shows the summary line, bucket bars, wave rows with coloured cards, in-flight agents, and the `Open flightdeck` button; pressing a card toasts its details.
+- [x] (human) In a narrow terminal the pane sits above the prompt as two lines: the summary and the current wave's cards.
+- [x] (human) A real `/autopilot` launch opens the pane by itself, and it refreshes about every 2 s while agents run.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/hooks/flightdeck/deck-command.test.ts` passes.
-- [ ] The mod test on a copy exits 0:
+- [x] `bun test packages/dispatch/hooks/flightdeck/deck-command.test.ts` passes.
+- [x] The mod test on a copy exits 0:
   ```sh
   (d=$(mktemp -d) && mkdir "$d/hooks" && cp -R packages/dispatch/.claude-plugin "$d" && (cd packages/dispatch/hooks && cp -R hooks.json register.ts task-path.ts flightdeck flightdeck.mod.test.ts flightplan-lint.mod.test.ts "$d/hooks") && rm -f "$d"/hooks/flightdeck/*.test.ts && claude plugin test "$d"; s=$?; rm -rf "$d"; exit $s)
   ```
-- [ ] `bunx --bun tsc --noEmit | grep -E 'hooks/flightdeck|hooks/register'` prints nothing.
-- [ ] `rg -n 'from "node:|\bBun\.' packages/dispatch/hooks/flightdeck/flightdeck.tsx` prints nothing.
-- [ ] `grep -n 'packages/dispatch/.claude-plugin/types/' .gitignore` finds the line.
+- [x] `bunx --bun tsc --noEmit | grep -E 'hooks/flightdeck|hooks/register'` prints nothing.
+- [x] `rg -n 'from "node:|\bBun\.' packages/dispatch/hooks/flightdeck/flightdeck.tsx` prints nothing.
+- [x] `grep -n 'packages/dispatch/.claude-plugin/types/' .gitignore` finds the line.
 
 ## Eval rubric
 
