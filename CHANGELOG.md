@@ -1,5 +1,15 @@
 # Changelog
 
+## [runes 0.4.0] - 2026-10-03
+
+_tracks tag `runes-v0.4.0`_
+
+### Added
+- Edit runes bubble colours, icons, sides, prompt fold height, glow style and on/off switches by hand in ~/.config/q-lab/cc-plugins/runes/config.yaml, with /runes writing switch changes back to that file and /runes reload re-reading it (bun must now be on the PATH).
+
+### Fixed
+- Folded system-reminder heads with CJK or emoji text no longer overflow the row and break the side borders, because they are now cut by display width.
+
 ## [runes 0.3.0] - 2026-10-03
 
 _tracks tag `runes-v0.3.0`_
