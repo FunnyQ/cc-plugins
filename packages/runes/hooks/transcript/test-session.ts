@@ -38,7 +38,7 @@ const fakeYaml = (text: string) => {
 
 type Run = Parameters<Hook<"process.run">>;
 
-// the kit has no store, fs, env or process; these stand in for the host's, and `run` answers every command but bun
+// the kit has no store, fs, env or process; these stand in for the host's, and `run` answers every command but the YAML parse
 export const fakeHost = (
   on: On,
   { files = new Map<string, string>(), run }: { files?: Map<string, string>; run?: (e: Run[1]) => unknown } = {},
@@ -65,7 +65,7 @@ export const fakeHost = (
     toasts.push(e.text);
   });
   on("process.run", (_$, e, next) => {
-    if (e.argv[0] !== "bun") return (run ? run(e) : next(e)) as never;
+    if (e.argv[0] !== "bun" || e.argv[1] !== "-e") return (run ? run(e) : next(e)) as never;
     const parsed = fakeYaml(e.init?.stdin ?? "");
     return {
       value: {
