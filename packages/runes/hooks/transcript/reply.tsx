@@ -1,6 +1,7 @@
 import type { On } from "claude-code";
 
 import { config } from "../config";
+import { noteRow } from "../minimap/minimap";
 import type { Run } from "./ansi";
 import { glow, INSTALL_HINT } from "./glow";
 import { bubble, runLine } from "./bubble";
@@ -8,6 +9,7 @@ import { innerWidth, wrap } from "./text";
 
 export const reply = (on: On) => {
   on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
+    noteRow(e.requestId, Boolean(e.props.onScreen));
     if (!config.enabled.transcript || !config.enabled.reply) return next(e);
     // run the chain anyway so plugins beneath still see the row; its tree is discarded
     await next(e);

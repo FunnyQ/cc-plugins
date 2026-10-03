@@ -1,6 +1,7 @@
 import type { Hook, Register } from "claude-code";
 
 import { mascot } from "./clawd/mascot";
+import { minimap } from "./minimap/minimap";
 import {
   config,
   configPath,
@@ -67,7 +68,7 @@ const load = async ($: $): Promise<Loaded> => {
       const keys = RUNES.map((r) => `rune:${r}`);
       const stored = await Promise.all(keys.map((k) => $.store.get(k)));
       const enabled = Object.fromEntries(
-        RUNES.map((r, i) => [r, stored[i] !== false]),
+        RUNES.map((r, i) => [r, stored[i] === undefined ? DEFAULTS.enabled[r] : stored[i] !== false]),
       ) as Record<Rune, boolean>;
       const text = TEMPLATE(enabled);
       await $.fs.write(path, text);
@@ -113,6 +114,11 @@ export const register: Register = (on) => {
         name: "runes",
         description: "Turn runes (UI mods) on or off",
         argumentHint: USAGE,
+      }),
+      $.command.register({
+        name: "minimap",
+        description: "Open the transcript minimap (the minimap rune)",
+        argumentHint: "[columns] | off",
       }),
     ]);
     const said = notice(loaded);
@@ -179,4 +185,5 @@ export const register: Register = (on) => {
   agent(on);
   skill(on);
   peer(on);
+  minimap(on);
 };

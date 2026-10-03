@@ -1,6 +1,7 @@
 import type { On } from "claude-code";
 
 import { config } from "../config";
+import { noteRow } from "../minimap/minimap";
 import { bubble, foldRows, runLine } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
 import { imageIds } from "./images";
@@ -34,6 +35,7 @@ export const prompt = (on: On) => {
     "ui.render",
     { component: "UserMessage", props: { origin: { kind: "composer" } } },
     async ($, e, next) => {
+      noteRow(e.requestId, Boolean(e.props.onScreen));
       if (!config.enabled.transcript || !config.enabled.prompt) return next(e);
       // run the chain anyway so plugins beneath still see the row; its tree is discarded
       await next(e);
