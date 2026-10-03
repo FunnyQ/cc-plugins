@@ -64,6 +64,7 @@ export function buildDeckSnapshot(input: {
   payload: TreePayload;
   fleet: FleetRow[];
   usage?: Map<string, number>; // billed tokens per ref, read only on a --usage run
+  runTokens?: number; // the run's billed total, every attributed row included
 }): DeckSnapshot {
   const { payload } = input;
   const rowsByRef = Map.groupBy(
@@ -143,6 +144,7 @@ export function buildDeckSnapshot(input: {
     agents,
     crew,
     time: timeOf(input.fleet),
+    tokens: input.runTokens ?? null,
     errors: payload.errors.length,
   };
 }
@@ -173,20 +175,23 @@ export async function latestPlan(root: string): Promise<string | null> {
 }
 
 // Claude tokens only: the codex side of a dev or review row is left to the web fleet
-function usageByRef(
+function readUsage(
   plan: string,
   deckSource: "tasks" | "graph",
   fleet: FleetRow[],
-): Map<string, number> {
+): { usage: Map<string, number>; runTokens: number } {
   const runId = deckSource === "graph" ? readRunId(plan) : undefined;
   const agents = createTranscriptSource(plan, undefined, repoRootOf(plan) ?? undefined).read(runId);
-  const byRef = new Map<string, number>();
+  const usage = new Map<string, number>();
+  let runTokens = 0;
   for (const row of attributeUsage(fleet, agents).rows) {
-    if (!row.ref || !row.usage) continue;
+    if (!row.usage) continue;
     const u = row.usage;
-    byRef.set(row.ref, (byRef.get(row.ref) ?? 0) + u.input + u.output + u.cacheRead + u.cacheWrite);
+    const n = u.input + u.output + u.cacheRead + u.cacheWrite;
+    runTokens += n;
+    if (row.ref) usage.set(row.ref, (usage.get(row.ref) ?? 0) + n);
   }
-  return byRef;
+  return { usage, runTokens };
 }
 
 async function main(): Promise<void> {
@@ -222,8 +227,8 @@ async function main(): Promise<void> {
   const payload = buildTreePayload({ ...loaded, deckSource });
   const fleet = aggregateFleet(loaded.entries);
   // a cold transcript read costs ~500 ms, so the pane asks for it only when a task newly lands
-  const usage = withUsage ? usageByRef(plan, deckSource, fleet) : undefined;
-  console.log(JSON.stringify(buildDeckSnapshot({ plan, payload, fleet, usage })));
+  const read = withUsage ? readUsage(plan, deckSource, fleet) : {};
+  console.log(JSON.stringify(buildDeckSnapshot({ plan, payload, fleet, ...read })));
 }
 
 if (import.meta.main) {

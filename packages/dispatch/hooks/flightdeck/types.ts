@@ -52,6 +52,7 @@ export type DeckSnapshot = {
   tasks: Record<string, DeckTask>;
   agents: DeckAgent[]; // FleetRow.status === "in-flight" only, startedAt ascending
   crew: DeckCrew[];
-  time: DeckTask["time"]; // the whole run: first agent start to last finish, open while one runs // the latest 3 taskless fleet rows of any status, newest first
+  time: DeckTask["time"]; // the whole run: first agent start to last finish, open while one runs
+  tokens: number | null; // the whole run's billed tokens, crew included, only from a --usage run // the latest 3 taskless fleet rows of any status, newest first
   errors: number; // TreePayload.errors.length
 };

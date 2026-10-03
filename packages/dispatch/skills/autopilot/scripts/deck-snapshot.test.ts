@@ -372,6 +372,8 @@ describe("buildDeckSnapshot", () => {
     expect(read.tasks["a/01"].tokens).toBe(1234);
     expect(read.tasks["a/02"].tokens).toBeNull();
     expect(snapshot(tasks).tasks["a/01"].tokens).toBeNull();
+    expect(buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage, runTokens: 5000 }).tokens).toBe(5000);
+    expect(read.tokens).toBeNull();
   });
 
   test("the run's wall time spans every row, the way the web header counts it", () => {
@@ -401,6 +403,7 @@ const KEYS: (keyof DeckSnapshot)[] = [
   "agents",
   "crew",
   "time",
+  "tokens",
   "errors",
 ];
 
