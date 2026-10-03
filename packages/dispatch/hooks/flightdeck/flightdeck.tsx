@@ -53,14 +53,28 @@ const toastText = (t: DeckTask) => {
   return parts.join(" · ");
 };
 
+// a done task's tokens never change, so each is read once and kept; null marks a read that found none
+const tokens = new Map<string, number | null>();
+const unread = (s: DeckSnapshot | null) =>
+  Object.values(s?.tasks ?? {}).some((t) => t.state === "done" && !tokens.has(t.ref));
+
 const refresh = async ($: EngineInterface, gen: number, plan: string) => {
-  const r = await runScript($, "deck-snapshot.ts", plan);
+  const withUsage = unread(view.snapshot as DeckSnapshot | null);
+  const r = withUsage
+    ? await runScript($, "deck-snapshot.ts", plan, "--usage")
+    : await runScript($, "deck-snapshot.ts", plan);
   if (gen !== generation) return;
   if (r.exitCode === 0) {
-    if (r.stdout !== lastOut || view.stale) {
+    if (r.stdout !== lastOut || view.stale || withUsage) {
       lastOut = r.stdout;
+      const snapshot = JSON.parse(r.stdout) as DeckSnapshot;
+      for (const t of Object.values(snapshot.tasks)) {
+        if (t.state !== "done") continue;
+        if (withUsage && !tokens.has(t.ref)) tokens.set(t.ref, t.tokens);
+        t.tokens = tokens.get(t.ref) ?? null;
+      }
       view = {
-        snapshot: JSON.parse(r.stdout),
+        snapshot,
         stale: false,
         message: null,
       };
@@ -73,7 +87,7 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
       await publish($);
     }
   }
-  // a tick whose snapshot did not change still moves the agents' elapsed times
+  // a tick whose snapshot did not change still moves the agents' and tasks' elapsed times
   if ((view.snapshot as DeckSnapshot | null)?.agents.length)
     $.ui.invalidate("ui.render");
 };
@@ -82,6 +96,7 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
 const openOn = async ($: EngineInterface, plan: string) => {
   const gen = ++generation;
   current = plan;
+  tokens.clear();
   view = EMPTY;
   lastOut = "";
   void publish($);
@@ -230,7 +245,7 @@ export const flightdeck = (on: On) => {
       const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
-    const { top, cards, agents } = docked(s, width, Date.now(), stale);
+    const { top, cards, crew } = docked(s, width, Date.now(), stale);
     // a Button takes no colour, so the glyph is coloured Text and the ref beside it is the pressable part
     const cardBox = (c: CardModel) => (
       <Box
@@ -253,6 +268,7 @@ export const flightdeck = (on: On) => {
           />
         </Box>
         <Text dimColor>{c.sub}</Text>
+        {c.stats && <Text dimColor>{c.stats}</Text>}
         {c.agents.map((line) => (
           <Text color={COLOR["in-progress"]}>{line}</Text>
         ))}
@@ -261,7 +277,7 @@ export const flightdeck = (on: On) => {
     return (
       <Box flexDirection="column">
         {top.map(row)}
-        {agents.length > 0 && (
+        {crew.length > 0 && (
           <Box
             key="loose-agents"
             flexDirection="column"
@@ -269,7 +285,7 @@ export const flightdeck = (on: On) => {
             borderStyle="round"
             borderColor={COLOR["in-progress"]}
           >
-            {agents.map(row)}
+            {crew.map(row)}
           </Box>
         )}
         {row([])}

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  agentLines,
+  crewLines,
   bucketBars,
   card,
   clip,
@@ -23,6 +23,8 @@ const task = (ref: string, state: DeckState, attempts = 1): DeckTask => ({
   state,
   attempts,
   score: null,
+  time: null,
+  tokens: null,
 });
 
 function snap(overrides: Partial<DeckSnapshot> = {}): DeckSnapshot {
@@ -45,6 +47,7 @@ function snap(overrides: Partial<DeckSnapshot> = {}): DeckSnapshot {
     currentWave: null,
     tasks: {},
     agents: [],
+    crew: [],
     errors: 0,
     ...overrides,
   };
@@ -197,6 +200,23 @@ describe("waveCards", () => {
     expect(groups[0].cards[0].dim).toBe(true);
   });
 
+  test("line 3 carries the task's time, and its tokens once it is done", () => {
+    const now = Date.parse("2026-01-01T00:10:00Z");
+    const s = snap({
+      waves: [["a", "b", "c"]],
+      tasks: tasksOf([
+        { ...task("a", "done"), time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:03:12Z" }, tokens: 1_234_567 },
+        { ...task("b", "in-progress"), time: { startedAt: "2026-01-01T00:09:15Z", endedAt: null } },
+        task("c", "ready"),
+      ]),
+    });
+    const { inner, groups } = waveCards(s, 80, now);
+    const [a, b, c] = groups[0].cards;
+    expect(a.stats).toBe(`${"3m12s".padEnd(inner - 9)} 1.2M tok`);
+    expect(b.stats).toBe("45s".padEnd(inner));
+    expect(c.stats).toBeNull();
+  });
+
   test("W? group holds exactly the unschedulable refs, none when empty", () => {
     const s = snap({
       waves: [["a"]],
@@ -275,11 +295,14 @@ describe("summary / compactSummary / endState", () => {
   test("stuck fixture, stale with errors", () => {
     const s = stuck();
     expect(endState(s)).toBe("stuck");
-    const [l1, l2] = summary(s, true);
-    expect(text(l1)).toBe("19/20 done · stuck · 1 unschedulable");
-    expect(l1[1].color).toBe("#f85149");
-    expect(text(l2)).toBe("stale · 2 errors · ●0 ○0 ·1 ✗0");
-    expect(l2.find((g) => g.text === "✗0")?.color).toBeUndefined();
+    const [l1, l2, l3] = summary(s, true, 40);
+    expect(text(l1)).toBe(`demo ${"─".repeat(11)} stuck · 1 unschedulable`);
+    expect(l1.at(-1)!.color).toBe("#f85149");
+    expect(text(l2)).toBe(`${"━".repeat(34)} 19/20`);
+    expect(l2[0]).toMatchObject({ text: "━".repeat(32), color: COLOR.done });
+    expect(l2[1]).toMatchObject({ text: "━━", dim: true });
+    expect(text(l3)).toBe("stale · 2 errors · ● 0 running  ○ 0 ready  · 1 waiting  ✗ 0");
+    expect(l3.find((g) => g.text === "✗ 0")?.color).toBeUndefined();
     expect(text(compactSummary(s, true))).toBe(
       "stale · 2 errors · 19/20 · stuck · demo",
     );
@@ -288,7 +311,7 @@ describe("summary / compactSummary / endState", () => {
 
   test("no stale, no errors", () => {
     const s = { ...stuck(), errors: 0 };
-    const all = [...summary(s, false), compactSummary(s, false)]
+    const all = [...summary(s, false, 40), compactSummary(s, false)]
       .map(text)
       .join("\n");
     expect(all).not.toContain("stale");
@@ -302,7 +325,7 @@ describe("summary / compactSummary / endState", () => {
       waves: [[], [], []],
       currentWave: 2,
     });
-    expect(text(summary(s, false)[0])).toBe("4/20 done · wave 2 of 3");
+    expect(text(summary(s, false, 30)[0])).toBe(`demo ${"─".repeat(16)} wave 2/3`);
     expect(text(compactSummary(s, false))).toBe("4/20 · W2/3 · demo");
     const done = snap({
       counts: {
@@ -317,7 +340,7 @@ describe("summary / compactSummary / endState", () => {
       tasks: tasksOf([task("a", "done")]),
     });
     expect(endState(done)).toBe("done");
-    expect(text(summary(done, false)[0])).toBe("2/2 done · all done");
+    expect(text(summary(done, false, 20)[0])).toBe(`demo ${"─".repeat(6)} all done`);
     expect(text(compactSummary(done, false))).toBe("2/2 · all done · demo");
   });
 
@@ -332,7 +355,7 @@ describe("summary / compactSummary / endState", () => {
         invalid: 1,
       },
     });
-    expect(summary(s, false)[1].find((g) => g.text === "✗1")?.color).toBe(
+    expect(summary(s, false, 40)[2].find((g) => g.text === "✗ 1")?.color).toBe(
       "#f85149",
     );
   });
@@ -347,17 +370,18 @@ describe("bucketBars", () => {
       ],
     });
     const [a, b] = bucketBars(s, 20);
-    expect(text(a)).toBe("api    █████░░░░ 1/2");
+    expect(text(a)).toBe("api    ━━━━━━━━━ 1/2");
     expect(cols(a)).toBe(20);
-    expect(a[1].color).toBe("#3fb950");
-    expect(text(b)).toBe("web-ui ░░░░░░░░░ 0/0");
+    expect(a[1]).toMatchObject({ text: "━━━━━", color: "#3fb950" });
+    expect(a[2]).toMatchObject({ text: "━━━━", dim: true });
+    expect(text(b)).toBe("web-ui ━━━━━━━━━ 0/0");
   });
 
   test("bar never below 1 cell", () => {
     const s = snap({
       buckets: [{ name: "a-very-long-bucket", done: 1, total: 1 }],
     });
-    expect(text(bucketBars(s, 5)[0])).toBe("a-very-long-bucket █ 1/1");
+    expect(text(bucketBars(s, 5)[0])).toBe("a-very-long-bucket ━ 1/1");
   });
 });
 
@@ -381,11 +405,23 @@ describe("formatElapsed / agent rows", () => {
     expect(groups[0].cards.filter((c) => c.agents.length > 0)).toHaveLength(1);
   });
 
-  test("an agent with no task falls back to a line under the grid", () => {
-    const now = Date.parse("2026-01-01T00:03:12Z");
-    expect(agentLines(big(), now).map(text)).toEqual([
-      "verify verifier-label  —",
+  test("crew rows: in-flight amber with live elapsed, finished dim with its duration", () => {
+    const now = Date.parse("2026-01-01T00:00:03Z");
+    const s = snap({
+      crew: [
+        { role: "scout", label: "scout-wave-2", status: "in-flight", startedAt: "2026-01-01T00:00:00Z", elapsedMs: null },
+        { role: "commit", label: "commit-wave-2", status: "finished", startedAt: null, elapsedMs: 12_000 },
+        { role: "scout", label: "scout-wave-1", status: "abandoned", startedAt: null, elapsedMs: null },
+      ],
+    });
+    const lines = crewLines(s, now);
+    expect(lines.map(text)).toEqual([
+      "● scout  scout-wave-2   3s",
+      "✓ commit commit-wave-2  12s",
+      "✗ scout  scout-wave-1   —",
     ]);
+    expect(lines[0][0].color).toBe(COLOR["in-progress"]);
+    expect(lines[1][0].dim).toBe(true);
   });
 });
 
@@ -394,7 +430,7 @@ describe("docked", () => {
     const s = big();
     for (const w of [24, 40, 80]) {
       const d = docked(s, w, Date.parse("2026-01-01T01:00:00Z"), true);
-      for (const line of [...d.top, ...d.agents])
+      for (const line of [...d.top, ...d.crew])
         expect(cols(line)).toBeLessThanOrEqual(w);
       expect(d.cards.inner + 2 + d.cards.groups[0].label.length).toBeLessThanOrEqual(w);
     }
@@ -403,10 +439,11 @@ describe("docked", () => {
   test("top is summary then bars; agents only when some are in flight", () => {
     const s = big();
     const d = docked(s, 80, Date.parse("2026-01-01T00:00:00Z"), false);
-    expect(d.top).toHaveLength(2 + 3);
+    expect(d.top).toHaveLength(3 + 3);
     expect(d.cards.groups).toHaveLength(5);
-    expect(d.agents).toHaveLength(1);
-    expect(docked({ ...s, agents: [] }, 80, 0, false).agents).toEqual([]);
+    expect(d.crew).toEqual([]);
+    const withCrew = { ...s, crew: [{ role: "scout", label: "s", status: "finished" as const, startedAt: null, elapsedMs: 1000 }] };
+    expect(docked(withCrew, 80, 0, false).crew).toHaveLength(1);
   });
 });
 

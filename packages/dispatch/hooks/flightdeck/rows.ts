@@ -1,4 +1,4 @@
-import type { DeckAgent, DeckSnapshot, DeckState, DeckTask } from "./types.ts";
+import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask } from "./types.ts";
 
 // Width is text.length: every glyph used here (✓ ● ○ · ✗ █ ░ … —) is one BMP code unit drawn one column wide.
 
@@ -60,36 +60,56 @@ function diagnostics(s: DeckSnapshot, stale: boolean): Line {
   return line;
 }
 
-export function summary(s: DeckSnapshot, stale: boolean): Line[] {
-  const first: Line = [
-    { text: `${s.counts.done}/${s.counts.total} done${SEP}` },
-  ];
+const RULE = "─";
+const BAR = "━";
+
+// a bar of `cells` heavy-rule cells: the done share green, the rest dim
+function bar(done: number, total: number, cells: number): Line {
+  const filled = total > 0 ? Math.round((done / total) * cells) : 0;
+  const line: Line = [];
+  if (filled > 0) line.push({ text: BAR.repeat(filled), color: COLOR.done });
+  if (cells - filled > 0) line.push({ text: BAR.repeat(cells - filled), dim: true });
+  return line;
+}
+
+export function summary(s: DeckSnapshot, stale: boolean, w: number): Line[] {
   const state = endState(s);
-  if (state === "wave")
-    first.push({ text: `wave ${s.currentWave} of ${s.waves.length}` });
-  else if (state === "done") first.push({ text: "all done" });
-  else
-    first.push({
-      text: `stuck · ${stuckRefs(s).length} unschedulable`,
-      color: COLOR.invalid,
-    });
+  const right: Seg =
+    state === "wave"
+      ? { text: `wave ${s.currentWave}/${s.waves.length}` }
+      : state === "done"
+        ? { text: "all done" }
+        : { text: `stuck · ${stuckRefs(s).length} unschedulable`, color: COLOR.invalid };
+  const fill = Math.max(1, w - s.slug.length - right.text.length - 2);
+  const title: Line = [
+    { text: `${s.slug} ` },
+    { text: RULE.repeat(fill), dim: true },
+    { text: " " },
+    right,
+  ];
+
+  const count = `${s.counts.done}/${s.counts.total}`;
+  const progress: Line = [
+    ...bar(s.counts.done, s.counts.total, Math.max(1, w - count.length - 1)),
+    { text: ` ${count}` },
+  ];
 
   const c = s.counts;
-  const pair = (state: DeckState, n: number): Seg =>
-    state === "invalid" && n === 0
-      ? { text: `${GLYPH[state]}${n}` }
-      : styled(state, `${GLYPH[state]}${n}`);
-  const second: Line = [
+  const pair = (state: DeckState, n: number, word: string): Seg => {
+    const text = `${GLYPH[state]} ${n}${word ? ` ${word}` : ""}`;
+    return state === "invalid" && n === 0 ? { text } : styled(state, text);
+  };
+  const states: Line = [
     ...diagnostics(s, stale),
-    pair("in-progress", c.inProgress),
-    { text: " " },
-    pair("ready", c.ready),
-    { text: " " },
-    pair("blocked", c.blocked),
-    { text: " " },
-    pair("invalid", c.invalid),
+    pair("in-progress", c.inProgress, "running"),
+    { text: "  " },
+    pair("ready", c.ready, "ready"),
+    { text: "  " },
+    pair("blocked", c.blocked, "waiting"),
+    { text: "  " },
+    pair("invalid", c.invalid, ""),
   ];
-  return [first, second];
+  return [title, progress, states];
 }
 
 export function compactSummary(s: DeckSnapshot, stale: boolean): Line {
@@ -111,12 +131,11 @@ export function bucketBars(s: DeckSnapshot, w: number): Line[] {
   return s.buckets.map((b) => {
     const count = `${b.done}/${b.total}`;
     const barW = Math.max(1, w - nameW - 2 - count.length);
-    const filled = b.total > 0 ? Math.round((b.done / b.total) * barW) : 0;
-    const line: Line = [{ text: `${b.name.padEnd(nameW)} ` }];
-    if (filled > 0) line.push({ text: "█".repeat(filled), color: COLOR.done });
-    if (barW - filled > 0) line.push({ text: "░".repeat(barW - filled) });
-    line.push({ text: ` ${count}` });
-    return line;
+    return [
+      { text: `${b.name.padEnd(nameW)} ` },
+      ...bar(b.done, b.total, barW),
+      { text: ` ${count}` },
+    ];
   });
 }
 
@@ -129,6 +148,7 @@ export type CardModel = {
   ref: string;
   head: string; // glyph + ref
   sub: string; // title, then attempts/score right-aligned, padded to the inner width
+  stats: string | null; // time spent, then tokens once done; null before any agent started
   agents: string[]; // one line per in-flight agent on this task: role, attempt, elapsed
   color?: string;
   dim?: boolean;
@@ -150,6 +170,20 @@ const spread = (left: string, right: string, inner: number) => {
   return `${fit(left, leftW).padEnd(leftW)} ${right}`.slice(0, inner);
 };
 
+// the web fleet's token format, so the two views print one number the same way
+export function formatTokens(n: number): string {
+  if (n < 1_000) return String(Math.trunc(n));
+  if (n < 1_000_000) return `${(n / 1_000).toFixed(1)}K`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
+function statsOf(t: DeckTask, now: number, inner: number): string | null {
+  if (!t.time) return null;
+  const end = t.time.endedAt === null ? now : Date.parse(t.time.endedAt);
+  const spent = formatElapsed(end - Date.parse(t.time.startedAt));
+  return t.tokens === null ? fit(spent, inner).padEnd(inner) : spread(spent, `${formatTokens(t.tokens)} tok`, inner);
+}
+
 export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
   const groups = s.waves.map((refs, i) => ({ label: `W${i + 1}`, refs }));
   if (s.unschedulable.length > 0)
@@ -170,6 +204,7 @@ export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
       ref: t.ref,
       head: fit(`${GLYPH[t.state]} ${t.ref}`, inner),
       sub: meta ? spread(t.title, meta, inner) : fit(t.title, inner).padEnd(inner),
+      stats: statsOf(t, now, inner),
       agents: s.agents
         .filter((a) => a.ref === t.ref)
         .map((a) =>
@@ -196,14 +231,18 @@ export function formatElapsed(ms: number): string {
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}m`;
 }
 
-// agents with no task in the grid have no card to ride, so they keep a line under it
-export function agentLines(s: DeckSnapshot, now: number): Line[] {
-  const loose = s.agents.filter((a) => a.ref === null || !s.tasks[a.ref]);
-  const roleW = Math.max(0, ...loose.map((a) => a.role.length));
-  return loose.map((a) => {
-    const who = a.ref ?? a.label;
-    const attempt = a.attempt === null ? "" : ` #${a.attempt}`;
-    return [{ text: `${a.role.padEnd(roleW)} ${who}${attempt}  ${elapsedOf(a, now)}` }];
+const CREW_GLYPH = { "in-flight": GLYPH["in-progress"], finished: GLYPH.done, abandoned: GLYPH.invalid };
+
+export function crewLines(s: DeckSnapshot, now: number): Line[] {
+  const roleW = Math.max(0, ...s.crew.map((c) => c.role.length));
+  const labelW = Math.max(0, ...s.crew.map((c) => c.label.length));
+  return s.crew.map((c: DeckCrew) => {
+    const elapsed =
+      c.status === "in-flight"
+        ? c.startedAt === null ? "—" : formatElapsed(now - Date.parse(c.startedAt))
+        : c.elapsedMs === null ? "—" : formatElapsed(c.elapsedMs);
+    const text = `${CREW_GLYPH[c.status]} ${c.role.padEnd(roleW)} ${c.label.padEnd(labelW)}  ${elapsed}`;
+    return [c.status === "in-flight" ? { text, color: COLOR["in-progress"] } : { text, dim: true }];
   });
 }
 
@@ -229,12 +268,12 @@ export function docked(
   w: number,
   now: number,
   stale: boolean,
-): { top: Line[]; cards: WaveCards; agents: Line[] } {
+): { top: Line[]; cards: WaveCards; crew: Line[] } {
   return {
-    top: [...summary(s, stale), ...bucketBars(s, w)].map((l) => clip(l, w)),
+    top: [...summary(s, stale, w), ...bucketBars(s, w)].map((l) => clip(l, w)),
     cards: waveCards(s, w, now),
-    // the taskless agents' box spends two columns on its border
-    agents: agentLines(s, now).map((l) => clip(l, w - 2)),
+    // the crew box spends two columns on its border
+    crew: crewLines(s, now).map((l) => clip(l, w - 2)),
   };
 }
 

@@ -37,6 +37,8 @@ const snap = (
       state: "done",
       attempts: 1,
       score: null,
+      time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:03:12Z" },
+      tokens: null,
     },
     "api/02": {
       ref: "api/02",
@@ -44,9 +46,12 @@ const snap = (
       state: "in-progress",
       attempts: 2,
       score: { weighted: 3.8, threshold: 4, passed: false },
+      time: null,
+      tokens: null,
     },
   },
   agents: [],
+  crew: [],
   errors: 0,
   ...over,
 });
@@ -417,11 +422,15 @@ test("pressing a card toasts its details, and Open flightdeck toasts a failed la
 });
 
 test("agents with no task sit in a bordered box above the waves; none means no box", async ($, on) => {
-  const scout = { role: "scout", ref: null, attempt: null, label: "scout-wave-2", startedAt: null };
   const dev = { role: "dev", ref: "api/02", attempt: 2, label: "dev-a", startedAt: null };
   world(on, (argv) => ({
     exitCode: 0,
-    stdout: JSON.stringify(snap(argv[2]!, { agents: [scout, dev] })),
+    stdout: JSON.stringify(
+      snap(argv[2]!, {
+        agents: [dev],
+        crew: [{ role: "scout", label: "scout-wave-2", status: "in-flight", startedAt: null, elapsedMs: null }],
+      }),
+    ),
   }));
   await run($, "/abs/docs/x");
   const ui = await mountPane($);
@@ -441,6 +450,21 @@ test("a pane with no taskless agents draws no agent box", async ($, on) => {
   const ui = await mountPane($);
   expect(await ui.find({ key: "loose-agents" })).toBeUndefined();
   await ui.unmount();
+});
+
+test("a done task's tokens are read once, with --usage, and kept on later ticks", async ($, on) => {
+  const w = world(on, (argv) => {
+    const s = snap(argv[2]!);
+    if (argv.includes("--usage")) s.tasks["api/01"]!.tokens = 1_234_567;
+    return { exitCode: 0, stdout: JSON.stringify(s) };
+  });
+  await run($, "/abs/docs/x");
+  await w.clock.advance(8000);
+  const usage = w.runs.filter((argv) => argv.includes("--usage"));
+  expect(usage).toHaveLength(1);
+  const texts = await drawnText($);
+  expect(texts).toContain("3m12s");
+  expect(texts).toContain("1.2M tok");
 });
 
 test("the inline seat draws two lines: the summary and the current wave's cards", async ($, on) => {
