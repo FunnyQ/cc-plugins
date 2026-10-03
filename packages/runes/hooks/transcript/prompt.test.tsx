@@ -1,7 +1,9 @@
-import { expect, test } from "claude-code/testing";
+import type { On } from "claude-code";
+import { expect, test, type Engine } from "claude-code/testing";
+
 
 import { prompt, segments } from "./prompt";
-import { eventually, startSession } from "./test-session";
+import { CONFIG, eventually, startSession } from "./test-session";
 import { cells, innerWidth, wrap } from "./text";
 
 const ran = (exitCode: number, stdout: string) => ({
@@ -83,8 +85,7 @@ test("wrap breaks by cell width and counts CJK as two", () => {
 });
 
 test("a prompt body renders through glow once the worker has run", async ($, on) => {
-  on("process.run", () => ran(0, "\n  \x1b[1mhello\x1b[m world\n  second line\n\n"));
-  await startSession($, on);
+  await startSession($, on, { run: () => ran(0, "\n  \x1b[1mhello\x1b[m world\n  second line\n\n") });
   const mount = () =>
     $.ui.mount({ plugin: "runes", surface: "terminal", ...ROW("**hello** world second line") });
   expect(
@@ -113,4 +114,33 @@ test("a reminder's head is cut to the row by cell width, so CJK cannot push the 
   expect(label).toContain("中");
   expect(cells(label)).toBeLessThanOrEqual(innerWidth());
   await row.unmount();
+});
+
+const drawPrompt = async ($: Engine, on: On, config: string) => {
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return <Text key="engine">engine</Text>;
+  });
+  await startSession($, on, { files: new Map([[CONFIG, config]]), run: () => ran(1, "") });
+  const row = await $.ui.mount({ plugin: "runes", surface: "terminal", ...ROW("hi") });
+  const bubble = await row.find({ key: "prompt" });
+  const engine = await row.find({ type: "Text", text: "engine" });
+  await row.unmount();
+  return { bubble, engine };
+};
+
+test("side: left puts the prompt's bar first, in the configured colour", async ($, on) => {
+  const { bubble } = await drawPrompt($, on, 'prompt:\n  side: left\n  color: "#00ff00"\n');
+  expect(bubble?.children?.[0]).toMatchObject({ props: { backgroundColor: "#00ff00" } });
+});
+
+test("the prompt's bar sits on the right by default", async ($, on) => {
+  const { bubble } = await drawPrompt($, on, "");
+  expect(bubble?.children?.at(-1)).toMatchObject({ props: { backgroundColor: "#1b5ea6" } });
+});
+
+test("enabled.prompt: false hands the row to the engine", async ($, on) => {
+  const { bubble, engine } = await drawPrompt($, on, "enabled:\n  prompt: false\n");
+  expect(bubble).toBeUndefined();
+  expect(engine).toBeDefined();
 });

@@ -1,6 +1,8 @@
 import type { On } from 'claude-code'
 import { expect, mock, test, type Engine } from 'claude-code/testing'
 
+import { fakeHost } from '../transcript/test-session'
+
 const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 80, scroll: { offset: 0, bodyRows: 20 }, view: {} } } as const
 
 test('Clawd draws a 4x2 Image on the terminal and an Svg on the desktop', async ($, on) => {
@@ -25,20 +27,13 @@ test('Clawd sits at the right edge of the band, sized to bodyColumns rather than
   }
 })
 
-// the kit has no store of its own; this one stands in for the host's
-const memoryStore = (on: On) => {
-  const values = new Map<string, unknown>()
-  on('store.get', (_$, e) => ({ value: values.get(e.key) }) as never)
-  on('store.set', (_$, e) => { values.set(e.key, e.value); return { value: undefined } as never })
-}
 
 const WORKING = ['crabWalking', 'typing', 'building', 'builder', 'sweeping', 'carrying', 'pushing', 'debugger', 'thinking', 'wizard', 'ultrathink', 'confused']
 const turnEnd = { answer: '', durationMs: 0, isAborted: false, turnId: 't', reason: 'answer' } as const
 
 const clipAfter = async ($: Engine, on: On, act: () => Promise<unknown>) => {
   const clock = mock.clock(on)
-  memoryStore(on)
-  on('command.register', () => ({ value: undefined }) as never)
+  fakeHost(on)
   on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text key="engine">engine</Text> })
   on('session.start', (_$, e) => e as never)
   on('prompt.submit', (_$, e) => e as never)

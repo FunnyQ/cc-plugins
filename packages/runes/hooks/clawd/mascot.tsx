@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
-import { enabled } from '../switch'
+import { config } from '../config'
 
 const TICK_MS = 50
 // a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
@@ -44,7 +44,7 @@ export const mascot = (on: On) => {
     $.clock.every(TICK_MS, () => {
       now += TICK_MS
       elapsed += TICK_MS
-      if (enabled.clawd === false || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
+      if (!config.enabled.clawd || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
       elapsed = 0
       index += 1
       if (index === CLIPS[clip]!.length) {
@@ -110,7 +110,7 @@ export const mascot = (on: On) => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
-    if (enabled.clawd === false || e.props.hasSurvey) return next(e)
+    if (!config.enabled.clawd || e.props.hasSurvey) return next(e)
 
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)

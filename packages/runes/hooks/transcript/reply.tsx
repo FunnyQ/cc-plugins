@@ -1,18 +1,15 @@
 import type { On } from "claude-code";
 
-import { enabled } from "../switch";
+import { config } from "../config";
 import type { Run } from "./ansi";
 import { glow, INSTALL_HINT } from "./glow";
 import { bubble } from "./bubble";
 import { innerWidth, wrap } from "./text";
 
-const CLAUDE = "#d97757";
-// nf-cod icon U+EC82, needs a Nerd Font
-const ICON = "";
-
 export const reply = (on: On) => {
   on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
-    if (enabled.transcript === false) return next(e);
+    if (!config.enabled.transcript || !config.enabled.reply) return next(e);
+    const { color, icon, side } = config.reply;
     const inner = innerWidth(e.viewport?.columns);
     const rendered = glow.view(inner, e.props.text, e.requestId);
     if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
@@ -25,10 +22,10 @@ export const reply = (on: On) => {
       { Box, Text },
       {
         key: "reply",
-        color: CLAUDE,
+        color,
         // the glyph draws wider than its one cell and covers the space after it, so it gets two
-        label: `${ICON}  `,
-        side: "left",
+        label: `${icon}  `,
+        side,
         inner,
         rows: lines.map((runs, i) => [
           `line:${i}`,

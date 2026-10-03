@@ -1,3 +1,4 @@
+import { config } from "../config";
 import { parseAnsi, type Run } from "./ansi";
 
 // glow's dark style indents every line by this much
@@ -5,10 +6,10 @@ const GLOW_MARGIN = 2;
 // renders kept across redraws; the least recently drawn goes past this
 const CACHE_SIZE = 200;
 
-const glowArgv = (width: number) => [
+const glowArgv = (width: number, style: string) => [
   "glow",
   "-s",
-  "dark",
+  style,
   "-w",
   String(width + GLOW_MARGIN),
   "-",
@@ -23,7 +24,7 @@ type RunCommand = (
   init: typeof GLOW_INIT & { stdin: string },
 ) => Promise<{ exitCode: number; stdout: string }>;
 
-type Job = { key: string; width: number; text: string };
+type Job = { key: string; width: number; text: string; style: string };
 
 // module state shared by both bubbles, so a hot reload renders everything again
 const rendered = new Map<string, Run[][] | null>();
@@ -55,7 +56,9 @@ export const glow = {
   },
   // a draw never waits on glow: it takes what is rendered, or the owner's last, or null for raw text
   view(width: number, text: string, owner?: string): Run[][] | null {
-    const key = `${width}\0${text}`;
+    const { style } = config.glow;
+    // the style is in the key, so a /runes reload that changes it renders everything again
+    const key = `${style}\0${width}\0${text}`;
     if (rendered.has(key)) {
       const lines = rendered.get(key)!;
       keep(rendered, key, lines);
@@ -63,7 +66,7 @@ export const glow = {
       return lines;
     }
     if (!transport || glow.missing) return null;
-    queue.set(owner ?? key, { key, width, text });
+    queue.set(owner ?? key, { key, width, text, style });
     wake?.();
     return owner === undefined ? null : (lastGood.get(owner) ?? null);
   },
@@ -88,7 +91,7 @@ export const glow = {
         if (rendered.has(job.key)) continue;
         const t = transport!;
         try {
-          const { exitCode, stdout } = await t.run(glowArgv(job.width), { ...GLOW_INIT, stdin: job.text });
+          const { exitCode, stdout } = await t.run(glowArgv(job.width, job.style), { ...GLOW_INIT, stdin: job.text });
           keep(rendered, job.key, exitCode === 0 ? toLines(stdout) : null);
         } catch {
           glow.missing = true;

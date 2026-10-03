@@ -1,15 +1,10 @@
 import type { On } from "claude-code";
 
-import { enabled } from "../switch";
+import { config } from "../config";
 import { bubble } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
 import { cells, innerWidth, wrap } from "./text";
 
-// a prompt body taller than this folds to its head
-const FOLD_LINES = 6;
-const ACCENT = "#1b5ea6";
-// nf-md icon U+F064C, needs a Nerd Font
-const ICON = "\u{F064C}";
 export type Segment = { kind: "body" | "reminder"; text: string };
 
 export const segments = (text: string): Segment[] => {
@@ -38,7 +33,9 @@ export const prompt = (on: On) => {
     "ui.render",
     { component: "UserMessage", props: { origin: { kind: "composer" } } },
     ($, e, next) => {
-      if (enabled.transcript === false) return next(e);
+      if (!config.enabled.transcript || !config.enabled.prompt) return next(e);
+      // a prompt body taller than fold_lines folds to its head
+      const { color, icon, side, fold_lines: foldLines } = config.prompt;
       const { Box, Text, Button } = $.ui.resolve(e);
       const toggle = (id: string) => () => {
         open.has(id) ? open.delete(id) : open.add(id);
@@ -51,8 +48,8 @@ export const prompt = (on: On) => {
       // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
       const shown = parts.map((s, i) => {
         const lines = s.text.split("\n");
-        return lines.length > FOLD_LINES && !open.has(`${e.requestId}:${i}`)
-          ? lines.slice(0, FOLD_LINES).join("\n")
+        return lines.length > foldLines && !open.has(`${e.requestId}:${i}`)
+          ? lines.slice(0, foldLines).join("\n")
           : s.text;
       });
       const glowed = parts.map((s, i) =>
@@ -88,7 +85,7 @@ export const prompt = (on: On) => {
         }
 
         const lines = s.text.split("\n");
-        const isLong = lines.length > FOLD_LINES;
+        const isLong = lines.length > foldLines;
         const runs = glowed[i];
         // glow failed or is missing, so the body falls back to plain cell-width wrapping
         const body = runs?.length
@@ -115,16 +112,15 @@ export const prompt = (on: On) => {
           row(
             `body:${i}:more:row`,
             <Button key={`body:${i}:more`} plain dimColor onPress={toggle(id)}>
-              {isOpen ? "▾ fold" : `▸ ${lines.length - FOLD_LINES} more lines`}
+              {isOpen ? "▾ fold" : `▸ ${lines.length - foldLines} more lines`}
             </Button>,
           ),
         ];
       });
 
-      // the person's bubble keeps its icon and bar on the right, Claude's on the left
       return bubble(
         { Box, Text },
-        { key: "prompt", color: ACCENT, label: `${ICON} `, side: "right", inner, rows },
+        { key: "prompt", color, label: `${icon} `, side, inner, rows },
       );
     },
   );
