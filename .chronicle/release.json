@@ -115,11 +115,11 @@
       ]
     },
     {
-      "name": "clawd",
-      "path": "packages/clawd",
+      "name": "runes",
+      "path": "packages/runes",
       "versionFiles": [
         {
-          "path": "packages/clawd/.claude-plugin/plugin.json",
+          "path": "packages/runes/.claude-plugin/plugin.json",
           "kind": "json"
         }
       ]

@@ -1,4 +1,4 @@
-import type { Register } from 'claude-code'
+import type { On } from 'claude-code'
 
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
@@ -11,7 +11,10 @@ const DONE_MS = 5_000
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
 
-export const register: Register = on => {
+// the engine lists $.state refs per file, so each file spells this one out
+const RUNES_ON = { plugin: 'runes', key: 'enabled' } as const
+
+export const mascot = (on: On) => {
   const director = new Director()
   let requestId: string | undefined
   let now = 0
@@ -37,12 +40,16 @@ export const register: Register = on => {
     idleFor: isWorking ? 0 : (now - lastActiveAt) / 1000,
   })
 
-  on('session.start', async ($, e, next) => {
+  // mirrors the switch for the tick; ui.render refreshes it, and a switch write redraws ui.render
+  let isOn = true
+
+  // register.tsx holds the unmatched session.start; a mascot only matters where someone watches
+  on('session.start', { isInteractive: true }, async ($, e, next) => {
     clip = director.next(inputs())
     $.clock.every(TICK_MS, () => {
       now += TICK_MS
       elapsed += TICK_MS
-      if (requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
+      if (!isOn || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
       elapsed = 0
       index += 1
       if (index === CLIPS[clip]!.length) {
@@ -107,8 +114,10 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
-    if (e.props.hasSurvey) return next(e)
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const { value: runes } = await $.state.get(RUNES_ON)
+    isOn = runes?.clawd !== false
+    if (!isOn || e.props.hasSurvey) return next(e)
 
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)

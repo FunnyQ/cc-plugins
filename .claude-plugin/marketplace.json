@@ -43,9 +43,9 @@
       "description": "Drive Firefox, Zen, Chrome, and Safari from the terminal."
     },
     {
-      "name": "clawd",
-      "source": "./packages/clawd",
-      "description": "A pixel crab that animates above the prompt. Claude Code only."
+      "name": "runes",
+      "source": "./packages/runes",
+      "description": "Switchable UI mods, toggled with /runes. First rune: Clawd, a pixel crab above the prompt. Claude Code only."
     }
   ]
 }

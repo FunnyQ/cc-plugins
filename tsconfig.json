@@ -11,7 +11,7 @@
   },
   "include": ["packages/**/*.ts", "opencode/**/*.ts"],
   "exclude": [
-    "packages/clawd/**",
+    "packages/runes/**",
     "packages/monitor/hooks/**",
     "packages/guard/hooks/register.ts",
     "packages/guard/hooks/*.mod.test.ts",

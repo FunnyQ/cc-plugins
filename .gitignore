@@ -16,4 +16,4 @@ node_modules/
 packages/monitor/cockpit-rs/target/
 
 # Claude Code writes a mod's API types beside it on load
-packages/clawd/.claude-plugin/types/
+packages/runes/.claude-plugin/types/
