@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, mock, test, type Engine } from 'claude-code/testing'
 
-import { fakeHost } from '../transcript/test-session'
+import { CONFIG, fakeHost } from '../transcript/test-session'
 
 const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 80, scroll: { offset: 0, bodyRows: 20 }, view: {} } } as const
 
@@ -62,3 +62,30 @@ test("a subagent's own turn ending does not end the main turn", async ($, on) =>
   expect(WORKING).toContain(clip)
 })
 
+
+test("Clawd's frames redraw the band alone, never the transcript", async ($, on) => {
+  const clock = mock.clock(on)
+  fakeHost(on, { files: new Map([[CONFIG, 'enabled:\n  transcript: false\n']]) })
+  let rows = 0
+  on('ui.render', ($, e) => {
+    if (e.component === 'UserMessage') rows += 1
+    const { Text } = $.ui.resolve(e)
+    return <Text key="engine">engine</Text>
+  })
+  on('session.start', (_$, e) => e as never)
+  on('prompt.submit', (_$, e) => e as never)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const desk = await $.ui.mount({ plugin: 'runes', surface: 'desktop', ...BAND })
+  const row = await $.ui.mount({ plugin: 'runes', surface: 'desktop', component: 'UserMessage', requestId: 'm1', props: { text: 'hi', origin: { kind: 'composer' }, isExpanded: false } } as never)
+  await $.prompt.submit({ text: 'go' } as never)
+  const before = rows
+  const alts = new Set<string>()
+  for (let i = 0; i < 20; i++) {
+    await clock.advance(500)
+    alts.add(JSON.stringify((await desk.find({ type: 'Svg' }))?.props.source))
+  }
+  await row.unmount()
+  await desk.unmount()
+  expect(alts.size).toBeGreaterThan(1)
+  expect(rows).toBe(before)
+})

@@ -12,6 +12,9 @@ const DONE_MS = 5_000
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
 
+// read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks
+const FRAME = { plugin: 'runes', key: 'frame' } as const
+
 export const mascot = (on: On) => {
   const director = new Director()
   let requestId: string | undefined
@@ -52,13 +55,13 @@ export const mascot = (on: On) => {
         clip = director.next(inputs())
       }
       if (isDesktop || useText) {
-        $.ui.invalidate('ui.render')
+        void $.state.set(FRAME, { clip, index })
         return
       }
       $.ui.blit({ requestId, key: 'clawd', source: pixels(clip, index) }).then(r => {
         if (!('deny' in r)) return
         useText = true
-        $.ui.invalidate('ui.render')
+        void $.state.set(FRAME, { clip, index })
       })
     })
 
@@ -109,11 +112,12 @@ export const mascot = (on: On) => {
     return next(e)
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!config.enabled.clawd || e.props.hasSurvey) return next(e)
 
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
+    const { value: frame = { clip, index } } = await $.state.get(FRAME)
     const { Box, Image, Svg, Text } = $.ui.resolve(e)
     // bodyColumns, not the viewport: a docked pane narrows the band
     const right = (sprite: ReturnType<typeof h>) => (
@@ -122,13 +126,13 @@ export const mascot = (on: On) => {
 
     if (e.surface === 'desktop') {
       isDesktop = true
-      return right(<Svg key="clawd" source={svg(clip, index)} alt={`Clawd ${clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
+      return right(<Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
     }
     // Raster refuses non-BMP characters, so octants go out as plain coloured Text
     if (useText) {
       return right(
         <Box key="clawd" flexDirection="column">
-          {octants(clip, index).map((runs, y) => (
+          {octants(frame.clip, frame.index).map((runs, y) => (
             <Text key={String(y)}>{runs.map((run, x) => <Text key={String(x)} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
           ))}
         </Box>

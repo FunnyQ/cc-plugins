@@ -2,6 +2,7 @@
   "name": "runes",
   "version": "0.4.0",
   "description": "Runes, switchable UI mods for Claude Code. First rune: Clawd, hey-clawd's pixel crab, animating above the prompt. Toggle with /runes.",
+  "types": "./types/index.d.ts",
   "author": {
     "name": "Q"
   },
