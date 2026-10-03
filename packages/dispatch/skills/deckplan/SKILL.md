@@ -42,6 +42,6 @@ Use the resolved absolute installed `autopilot/scripts` path and run directory t
 bun "<absolute autopilot/scripts path>/flightdeck.ts" --plan "<absolute run directory>"
 ```
 
-Under Claude Code the dispatch mod opens a Flightdeck pane after this command, so do not tell the user to open it.
+Under Claude Code the dispatch mod opens a Flightdeck pane after this command, so do not tell the user to open it. Under Claude Code the launcher also leaves the browser shut, because the pane's `Open flightdeck` button opens it on demand.
 
 Check the installed reader's graph support before describing the invocation as usable: a launcher that reports `--plan must contain a tasks/ directory` predates graph support. A graph-capable build names both sources in that message. Use a graph-capable flightdeck build for graph runs; do not scaffold a dummy task tree to bypass that check.
