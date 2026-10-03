@@ -5,7 +5,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: data/01, mod/01, mod/02, mod/03
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -35,23 +35,23 @@ Autopilot commits between waves, so `git status` no longer lists earlier tasks' 
 
 ## Acceptance criteria
 
-- [ ] `grep -rn "type DeckSnapshot" packages/dispatch` prints exactly one line, in `packages/dispatch/hooks/flightdeck/types.ts`.
-- [ ] `grep -n 'hooks/flightdeck/types.ts' packages/dispatch/skills/autopilot/scripts/deck-snapshot.ts` and `grep -n '"./types.ts"' packages/dispatch/hooks/flightdeck/rows.ts` each print at least one import line.
-- [ ] `grep -rnE "from \"node:|\\bBun\\." packages/dispatch/hooks/register.ts packages/dispatch/hooks/flightdeck/ --include='*.ts' --include='*.tsx' --exclude='*.test.ts'` prints nothing.
-- [ ] `git diff --name-only <baseRef> -- packages/dispatch/skills/autopilot/scripts/flightdeck.ts packages/dispatch/skills/autopilot/scripts/tree-api.ts packages/dispatch/skills/autopilot/scripts/events-api.ts packages/dispatch/skills/autopilot/dashboard` prints nothing.
-- [ ] `git diff --name-only <baseRef> -- packages/dispatch tsconfig.json bunfig.toml CLAUDE.md` lists `packages/dispatch/skills/autopilot/scripts/deck-snapshot.ts`, `packages/dispatch/hooks/flightdeck/types.ts`, `packages/dispatch/hooks/flightdeck/rows.ts`, `packages/dispatch/hooks/flightdeck/deck-command.ts`, `packages/dispatch/hooks/flightdeck/flightdeck.tsx`, `packages/dispatch/hooks/flightdeck.mod.test.ts`, and `CLAUDE.md`.
-- [ ] `git diff <baseRef> -- packages/dispatch/.claude-plugin/plugin.json packages/dispatch/.codex-plugin/plugin.json CHANGELOG.md` prints nothing.
-- [ ] (human) Q runs `/flightdeck docs/flightdeck-mod` in a real Claude Code session and confirms the pane shows the summary line, the bucket bars, one row group per wave, the agent lines, and the `Open flightdeck` button as `../_context/shared.md` describes.
+- [x] `grep -rn "type DeckSnapshot" packages/dispatch` prints exactly one line, in `packages/dispatch/hooks/flightdeck/types.ts`.
+- [x] `grep -n 'hooks/flightdeck/types.ts' packages/dispatch/skills/autopilot/scripts/deck-snapshot.ts` and `grep -n '"./types.ts"' packages/dispatch/hooks/flightdeck/rows.ts` each print at least one import line.
+- [x] `grep -rnE "from \"node:|\\bBun\\." packages/dispatch/hooks/register.ts packages/dispatch/hooks/flightdeck/ --include='*.ts' --include='*.tsx' --exclude='*.test.ts'` prints nothing.
+- [x] `git diff --name-only <baseRef> -- packages/dispatch/skills/autopilot/scripts/flightdeck.ts packages/dispatch/skills/autopilot/scripts/tree-api.ts packages/dispatch/skills/autopilot/scripts/events-api.ts packages/dispatch/skills/autopilot/dashboard` prints nothing.
+- [x] `git diff --name-only <baseRef> -- packages/dispatch tsconfig.json bunfig.toml CLAUDE.md` lists `packages/dispatch/skills/autopilot/scripts/deck-snapshot.ts`, `packages/dispatch/hooks/flightdeck/types.ts`, `packages/dispatch/hooks/flightdeck/rows.ts`, `packages/dispatch/hooks/flightdeck/deck-command.ts`, `packages/dispatch/hooks/flightdeck/flightdeck.tsx`, `packages/dispatch/hooks/flightdeck.mod.test.ts`, and `CLAUDE.md`.
+- [x] `git diff <baseRef> -- packages/dispatch/.claude-plugin/plugin.json packages/dispatch/.codex-plugin/plugin.json CHANGELOG.md` prints nothing.
+- [x] (human) Q runs `/flightdeck docs/flightdeck-mod` in a real Claude Code session and confirms the pane shows the summary line, the bucket bars, one row group per wave, the agent lines, and the `Open flightdeck` button as `../_context/shared.md` describes.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/` passes.
-- [ ] The mod test on a copy passes, including both `flightdeck.mod.test.ts` and `flightplan-lint.mod.test.ts`:
+- [x] `bun test packages/dispatch/` passes.
+- [x] The mod test on a copy passes, including both `flightdeck.mod.test.ts` and `flightplan-lint.mod.test.ts`:
   ```sh
   (d=$(mktemp -d) && mkdir "$d/hooks" && cp -R packages/dispatch/.claude-plugin "$d" && (cd packages/dispatch/hooks && cp -R hooks.json register.ts task-path.ts flightdeck flightdeck.mod.test.ts flightplan-lint.mod.test.ts "$d/hooks") && rm -f "$d"/hooks/flightdeck/*.test.ts && claude plugin test "$d"; s=$?; rm -rf "$d"; exit $s)
   ```
-- [ ] `bunx --bun tsc --noEmit | grep -E 'deck-snapshot|hooks/flightdeck|hooks/register'` prints nothing.
-- [ ] `bun packages/dispatch/skills/autopilot/scripts/deck-snapshot.ts docs/flightdeck-mod` exits 0 and prints JSON with `deckSource`, `waves`, `tasks`, and `agents` keys.
+- [x] `bunx --bun tsc --noEmit | grep -E 'deck-snapshot|hooks/flightdeck|hooks/register'` prints nothing.
+- [x] `bun packages/dispatch/skills/autopilot/scripts/deck-snapshot.ts docs/flightdeck-mod` exits 0 and prints JSON with `deckSource`, `waves`, `tasks`, and `agents` keys.
 
 ## Eval rubric
 
