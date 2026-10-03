@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.5.1] - 2026-10-03
+
+_tracks tag `runes-v0.5.1`_
+
+### Changed
+- In config.yaml, prompt, reply, bash, peer and glow now sit under `transcript:`, next to the switch that already controls those bubbles; a 0.5.0 file (and the older top-level `enabled:` layout) is moved over automatically at session start, keeping your own values and comments.
+
 ## [runes 0.5.0] - 2026-10-03
 
 _tracks tag `runes-v0.5.0`_
