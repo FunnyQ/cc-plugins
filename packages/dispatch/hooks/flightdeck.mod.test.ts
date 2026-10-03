@@ -377,7 +377,7 @@ test("switching to plan B before A's first snapshot returns discards A's result 
   const ui = await mountPane($);
   await ui.press({ key: "open" });
   await ui.unmount();
-  expect(w.runs.at(-1)?.slice(-2)).toEqual(["--plan", "/abs/b"]);
+  expect(w.runs.at(-1)?.slice(-3)).toEqual(["--plan", "/abs/b", "--open"]);
 
   await w.clock.advance(4000);
   expect(w.snapshots("/abs/a")).toHaveLength(1);
@@ -418,6 +418,7 @@ test("pressing a card toasts its details, and Open flightdeck toasts a failed la
     expect.stringMatching(/\/skills\/autopilot\/scripts\/flightdeck\.ts$/),
     "--plan",
     "/abs/docs/x",
+    "--open",
   ] as never);
 });
 

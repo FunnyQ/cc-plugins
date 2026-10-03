@@ -248,7 +248,7 @@ export const flightdeck = (on: On) => {
         <Box flexDirection="column">{inline(s, width, stale).map(row)}</Box>
       );
     const launch = async () => {
-      const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
+      const r = await runScript($, "flightdeck.ts", "--plan", s.plan, "--open");
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
     const { title, totals, bars, wave, states, cards, crew } = docked(s, width, Date.now(), stale);
