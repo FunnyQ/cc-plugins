@@ -1,14 +1,12 @@
 import type { On } from "claude-code";
 
 import { config } from "../config";
-import { parseAnsi, type Run } from "./ansi";
-import { bubble, DIVIDER, paint } from "./bubble";
+import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
+import { bubble, DIVIDER, foldLabel, paint, runLine } from "./bubble";
 import { glow } from "./glow";
 import { type Kind, layout } from "./shell";
 import { language } from "./sniff";
 import { cells, innerWidth, wrap, wrapRuns } from "./text";
-
-type Line = { text: string; isErr?: boolean };
 
 type Style = { color?: string; bold?: boolean; italic?: boolean };
 
@@ -27,52 +25,40 @@ const SHELL: Partial<Record<Kind, Style>> = {
   comment: { color: DIM, italic: true },
 };
 
+// a finished card's command and output never change, yet every redraw re-tokenized, re-parsed and re-wrapped them
+const MEMO_SIZE = 200;
+const memo = new Map<string, unknown>();
+const remember = <V,>(key: string, make: () => V): V => {
+  if (memo.has(key)) return memo.get(key) as V;
+  const value = make();
+  memo.set(key, value);
+  if (memo.size > MEMO_SIZE) memo.delete(memo.keys().next().value!);
+  return value;
+};
+
 // a progress bar redraws its line with \r, so only the text after the last one is what the terminal showed
-const plain = (text: string) =>
-  text
-    .replace(/\n+$/, "")
-    .split("\n")
-    .map((l) =>
-      parseAnsi(l.slice(l.lastIndexOf("\r") + 1))
-        .map((r) => r.text)
-        .join("")
-        .replaceAll("\t", "    "),
-    );
-
-const outputLines = (output: unknown): Line[] => {
-  if (typeof output === "string")
-    return plain(output).map((text) => ({ text, isErr: true }));
-  const o = (output ?? {}) as {
-    stdout?: string;
-    stderr?: string;
-    backgroundTaskId?: string;
-  };
-  return [
-    ...(o.stdout ? plain(o.stdout).map((text) => ({ text })) : []),
-    ...(o.stderr ? plain(o.stderr).map((text) => ({ text, isErr: true })) : []),
-  ];
-};
-
-// drops the first n characters of a line, across as many runs as they span
-const dropLead = (runs: Run[], n: number): Run[] => {
-  const out = runs.map((r) => ({ ...r }));
-  while (n > 0 && out.length) {
-    const cut = Math.min(n, out[0]!.text.length);
-    out[0]!.text = out[0]!.text.slice(cut);
-    n -= cut;
-    if (!out[0]!.text) out.shift();
-  }
-  return out;
-};
+const toRuns = (text: unknown, color?: string): Run[][] =>
+  typeof text === "string" && text
+    ? text
+        .replace(/\n+$/, "")
+        .split("\n")
+        .map((l) => {
+          const t = parseAnsi(l.slice(l.lastIndexOf("\r") + 1))
+            .map((r) => r.text)
+            .join("")
+            .replaceAll("\t", "    ");
+          return t ? [{ text: t, ...(color ? { color } : {}) }] : [];
+        })
+    : [];
 
 // glow indents a fenced block; the indent every line shares goes, so the code starts at the card's edge
 const dedent = (lines: Run[][]): Run[][] => {
-  const lead = (runs: Run[]) => {
-    const t = runs.map((r) => r.text).join("");
-    return t.trim() ? t.length - t.trimStart().length : Infinity;
-  };
+  const lead = (runs: Run[]) =>
+    runs.some((r) => r.text.trim()) ? leadingSpaces(runs) : Infinity;
   const n = Math.min(...lines.map(lead));
-  return Number.isFinite(n) && n > 0 ? lines.map((runs) => dropLead(runs, n)) : lines;
+  return Number.isFinite(n) && n > 0
+    ? lines.map((runs) => dropLead(runs, n))
+    : lines;
 };
 
 export const bash = (on: On) => {
@@ -99,13 +85,11 @@ export const bash = (on: On) => {
         command?: string;
         description?: string;
       };
+      const id = e.requestId;
       const inner = innerWidth(e.viewport?.columns);
       const isBad = isErrored || isInterrupted;
+      const tint = isBad ? error_color : color;
 
-      const flip = (id: string) => () => {
-        open.has(id) ? open.delete(id) : open.add(id);
-        $.ui.invalidate("ui.render");
-      };
       // Box takes no onPress, so the Button's label is padded to the row's width to make the whole row its target
       const fold = (
         part: string,
@@ -113,9 +97,9 @@ export const bash = (on: On) => {
         scope: string,
         width: number,
       ): [string, unknown][] => {
-        const id = `${e.requestId}:${part}`;
+        const key = `${id}:${part}`;
         if (total <= foldLines) return [];
-        const text = open.has(id) ? "▾ fold" : `▸ ${total - foldLines} more lines`;
+        const text = foldLabel(open.has(key), total - foldLines);
         const left = Math.max(0, Math.floor((width - cells(text)) / 2));
         const right = Math.max(0, width - cells(text) - left);
         return [
@@ -125,8 +109,11 @@ export const bash = (on: On) => {
             <Button
               key={`${part}:more`}
               plain
-              hover={{ color: isBad ? error_color : color, scope }}
-              onPress={flip(id)}
+              hover={{ color: tint, scope }}
+              onPress={() => {
+                open.has(key) ? open.delete(key) : open.add(key);
+                $.ui.invalidate("ui.render");
+              }}
             >
               {`${" ".repeat(left)}${text}${" ".repeat(right)}`}
             </Button>,
@@ -134,81 +121,99 @@ export const bash = (on: On) => {
         ];
       };
       const visible = <T,>(part: string, all: T[]) =>
-        open.has(`${e.requestId}:${part}`) ? all : all.slice(0, foldLines);
+        open.has(`${id}:${part}`) ? all : all.slice(0, foldLines);
       // each card is one hover group, so the pointer anywhere on it lights all of it
-      const callScope = `${e.requestId}:call`;
-      const outScope = `${e.requestId}:out`;
-      // plain text takes a fixed grey: a dimColor hover lit every card's plain text at once, live
-      const quiet = (scope: string) => paint(TEXT, scope);
-      const tokenStyle = (kind: Kind): object => {
+      const callScope = `${id}:call`;
+      const outScope = `${id}:out`;
+      const tokenStyle = ({ kind }: { kind: Kind }): object => {
         const s = kind === "cmd" ? { bold: true, color } : SHELL[kind];
-        if (!s) return quiet(callScope);
+        if (!s) return paint(TEXT, callScope);
         return s.color ? { ...s, ...paint(s.color, callScope) } : s;
       };
+      // the link runs through the middle column of the call card, and the output card meets it there
+      const linkAt = Math.floor((inner + 4) / 2);
 
-      const state = isInterrupted ? " · interrupted" : isRunning ? " · running" : "";
+      const state = isInterrupted
+        ? " · interrupted"
+        : isRunning
+          ? " · running"
+          : "";
+      const lines = remember(`cmd\0${id}\0${inner}\0${command.length}`, () =>
+        layout(command, inner),
+      );
       // the glyph draws wider than its one cell and covers the space after it, so it gets two
-      const lines = layout(command, inner);
-      const label = wrap(`${icon}  ${description ?? "Bash"}${state}`, inner - 3)[0];
-      const cmdRows: [string, unknown][] = [
-        ...visible("cmd", lines).map((line, i): [string, unknown] => [
-          `cmd:${i}`,
-          <Text hover={{ scope: callScope }}>
-            {line.map((t, j) => (
-              <Text key={String(j)} {...tokenStyle(t.kind)}>
-                {t.text}
-              </Text>
-            ))}
-          </Text>,
-        ]),
-        ...fold("cmd", lines.length, callScope, inner),
-      ];
+      const label = wrap(
+        `${icon}  ${description ?? "Bash"}${state}`,
+        inner - 3,
+      )[0];
       const call = bubble(
         { Box, Text },
         {
           key: "bash",
-          color: isBad ? error_color : color,
+          color: tint,
           label: `${label} `,
           side,
           inner,
-          rows: cmdRows,
-          link: isRunning ? undefined : "down",
+          rows: [
+            ...visible("cmd", lines).map((line, i): [string, unknown] => [
+              `cmd:${i}`,
+              runLine(Text, line, tokenStyle, { hover: { scope: callScope } }),
+            ]),
+            ...fold("cmd", lines.length, callScope, inner),
+          ],
+          link: isRunning ? undefined : { to: "down", at: linkAt },
           bar: false,
           scope: callScope,
         },
       );
       if (isRunning) return call;
 
-      const o = (output ?? {}) as { stdout?: unknown; stderr?: unknown; backgroundTaskId?: string };
+      const o = (output ?? {}) as {
+        stdout?: unknown;
+        stderr?: unknown;
+        backgroundTaskId?: string;
+      };
       const stdout = typeof o.stdout === "string" ? o.stdout : "";
-      const lang = isBad || !stdout ? undefined : language(command, stdout);
-      const glowed = lang
-        ? glow.view(
-            inner - 2,
-            lang === "markdown" ? stdout : `\`\`\`${lang}\n${stdout.replace(/\n+$/, "")}\n\`\`\``,
-          )
-        : null;
-      const errLines = (text: unknown): Run[][] =>
-        typeof text === "string" && text ? plain(text).map((t) => [{ text: t, color: error_color }]) : [];
+      // the output's lengths are in every key: a card can draw once without output before its result lands
+      const size = `${stdout.length}\0${String(o.stderr ?? "").length}\0${typeof output === "string" ? output.length : -1}`;
+      const { lang, fence } = remember(`lang\0${id}\0${isBad}\0${size}`, () => {
+        const lang = isBad || !stdout ? undefined : language(command, stdout);
+        const fence =
+          lang === "markdown"
+            ? stdout
+            : `\`\`\`${lang}\n${stdout.replace(/\n+$/, "")}\n\`\`\``;
+        return { lang, fence };
+      });
+      const glowed = lang ? glow.view(inner - 2, fence) : null;
       // until glow has rendered, or with no language to give it, the output draws as plain text
-      const source: Run[][] = glowed?.length
-        ? [...(lang === "markdown" ? glowed : dedent(glowed)), ...errLines(o.stderr)]
-        : outputLines(output).map((l) =>
-            l.text ? [{ text: l.text, ...(l.isErr ? { color: error_color } : {}) }] : [],
+      const out = remember(
+        `out\0${id}\0${inner}\0${isBad}\0${size}\0${glowed?.length ? "glow" : "plain"}`,
+        () => {
+          const source: Run[][] = glowed?.length
+            ? [
+                ...(lang === "markdown" ? glowed : dedent(glowed)),
+                ...toRuns(o.stderr, error_color),
+              ]
+            : typeof output === "string"
+              ? toRuns(output, error_color)
+              : [...toRuns(stdout), ...toRuns(o.stderr, error_color)];
+          return source.flatMap((runs) =>
+            runs.length ? wrapRuns(runs, inner - 2) : [[]],
           );
-      const out = source.flatMap((runs) => (runs.length ? wrapRuns(runs, inner - 2) : [[]]));
+        },
+      );
       const outRows: [string, unknown][] = [
         ...visible("out", out).map((runs, i): [string, unknown] => [
           `out:${i}`,
-          <Text hover={{ scope: outScope }}>
-            {runs.length
-              ? runs.map(({ text, color: c, ...style }, j) => (
-                  <Text key={String(j)} {...style} {...(c ? paint(c, outScope) : quiet(outScope))}>
-                    {text}
-                  </Text>
-                ))
-              : " "}
-          </Text>,
+          runLine(
+            Text,
+            runs,
+            ({ text: _, color: c, ...style }) => ({
+              ...style,
+              ...paint(c ?? TEXT, outScope),
+            }),
+            { hover: { scope: outScope } },
+          ),
         ]),
         ...(out.length
           ? []
@@ -231,14 +236,14 @@ export const bash = (on: On) => {
             { Box, Text },
             {
               key: "bash:output",
-              color: isBad ? error_color : color,
+              color: tint,
               label: `${outputIcon}  ${isBad ? "error" : "output"} `,
               side,
               // two columns in, and two narrower, so its right edge stays under the call's
               inner: inner - 2,
               indent: 2,
               rows: outRows,
-              link: "up",
+              link: { to: "up", at: linkAt },
               bar: false,
               scope: outScope,
             },

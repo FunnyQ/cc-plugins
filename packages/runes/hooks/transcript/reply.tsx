@@ -3,7 +3,7 @@ import type { On } from "claude-code";
 import { config } from "../config";
 import type { Run } from "./ansi";
 import { glow, INSTALL_HINT } from "./glow";
-import { bubble } from "./bubble";
+import { bubble, runLine } from "./bubble";
 import { innerWidth, wrap } from "./text";
 
 export const reply = (on: On) => {
@@ -29,15 +29,7 @@ export const reply = (on: On) => {
         inner,
         rows: lines.map((runs, i) => [
           `line:${i}`,
-          <Text>
-            {runs.length
-              ? runs.map(({ text, ...style }, j) => (
-                  <Text key={String(j)} {...style}>
-                    {text}
-                  </Text>
-                ))
-              : " "}
-          </Text>,
+          runLine(Text, runs),
         ]),
       },
     );

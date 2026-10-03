@@ -1,4 +1,4 @@
-import { cells } from "./text";
+import { cells, wrapRuns } from "./text";
 
 export type Kind =
   | "prompt"
@@ -10,7 +10,7 @@ export type Kind =
   | "comment"
   | "text"
   | "space";
-export type Token = { text: string; kind: Kind };
+type Token = { text: string; kind: Kind };
 
 // longest first, so `&&` is never read as two `&`
 const OPS = ["2>&1", "&&", "||", ">>", "$(", "|", ";", "(", ")", ">", "<", "&"];
@@ -68,26 +68,6 @@ export const tokenize = (line: string): Token[] => {
 
 const CONTINUE: Token = { text: "  ", kind: "prompt" };
 
-// breaks by cell width, carrying each character's kind into the line it lands on
-const wrapTokens = (tokens: Token[], width: number): Token[][] => {
-  const lines: Token[][] = [[]];
-  let used = 0;
-  for (const t of tokens)
-    for (const ch of t.text) {
-      const w = cells(ch);
-      if (used + w > width && used > CONTINUE.text.length) {
-        lines.push([{ ...CONTINUE }]);
-        used = CONTINUE.text.length;
-      }
-      const line = lines[lines.length - 1]!;
-      const last = line[line.length - 1];
-      if (last?.kind === t.kind) last.text += ch;
-      else line.push({ text: ch, kind: t.kind });
-      used += w;
-    }
-  return lines;
-};
-
 // a line too wide for the row breaks before each top-level &&, || and |, then hard-wraps what is still too wide
 export const layout = (command: string, width: number): Token[][] =>
   command.split("\n").flatMap((src, n) => {
@@ -116,6 +96,6 @@ export const layout = (command: string, width: number): Token[][] =>
         text: s === 0 ? lead : CONTINUE.text,
         kind: "prompt" as const,
       };
-      return wrapTokens([head, ...seg], width);
+      return wrapRuns([head, ...seg], width, CONTINUE);
     });
   });

@@ -34,16 +34,26 @@ export const wrap = (text: string, width: number): string[] =>
 
 type Styled = { text: string };
 
-// breaks styled runs by cell width, each piece keeping its run's style; glow leaves a code block's long lines unwrapped
-export const wrapRuns = <R extends Styled>(runs: R[], width: number): R[][] => {
+// equal in every field but text; per character in wrapRuns, so it allocates nothing
+export const sameStyle = (a: object, b: object) => {
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  for (const k in x) if (k !== "text" && x[k] !== y[k]) return false;
+  for (const k in y) if (k !== "text" && x[k] !== y[k]) return false;
+  return true;
+};
+
+// breaks styled runs by cell width, each piece keeping its run's style; a `lead` opens every wrapped line
+export const wrapRuns = <R extends Styled>(runs: R[], width: number, lead?: R): R[][] => {
+  const indent = lead ? cells(lead.text) : 0;
   const lines: R[][] = [[]];
   let used = 0;
   for (const run of runs)
     for (const ch of run.text) {
       const w = cellWidth(ch);
-      if (used + w > width && used > 0) {
-        lines.push([]);
-        used = 0;
+      if (used + w > width && used > indent) {
+        lines.push(lead ? [{ ...lead }] : []);
+        used = indent;
       }
       const line = lines[lines.length - 1]!;
       const last = line[line.length - 1];
@@ -52,10 +62,4 @@ export const wrapRuns = <R extends Styled>(runs: R[], width: number): R[][] => {
       used += w;
     }
   return lines;
-};
-
-const sameStyle = (a: Styled, b: Styled) => {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  keys.delete("text");
-  return [...keys].every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k]);
 };

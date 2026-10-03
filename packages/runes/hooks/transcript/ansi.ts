@@ -1,3 +1,5 @@
+import { sameStyle } from "./text";
+
 export type Run = {
   text: string;
   color?: string;
@@ -29,7 +31,7 @@ const BASIC = [
   "#ffffff",
 ];
 const CUBE = [0, 95, 135, 175, 215, 255];
-const hex = (...rgb: number[]) =>
+export const hex = (...rgb: number[]) =>
   `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 
 export const xterm256 = (n: number): string => {
@@ -87,19 +89,6 @@ const apply = (style: Style, params: string): Style => {
   return s;
 };
 
-// key order differs with the order the codes came in, so compare field by field
-const same = (a: Style, b: Style) =>
-  (
-    [
-      "color",
-      "backgroundColor",
-      "bold",
-      "italic",
-      "underline",
-      "strikethrough",
-    ] as const
-  ).every((k) => a[k] === b[k]);
-
 // one terminal line of SGR-styled text to runs; other escapes (OSC 8 links) are dropped
 export const parseAnsi = (line: string): Run[] => {
   const runs: Run[] = [];
@@ -110,7 +99,7 @@ export const parseAnsi = (line: string): Run[] => {
   const push = (text: string) => {
     if (!text) return;
     const prev = runs.at(-1);
-    if (prev && same(prev, style)) prev.text += text;
+    if (prev && sameStyle(prev, style)) prev.text += text;
     else runs.push({ text, ...style });
   };
   for (const m of line.matchAll(re)) {
@@ -120,4 +109,22 @@ export const parseAnsi = (line: string): Run[] => {
   }
   push(line.slice(last));
   return runs;
+};
+
+// how many spaces open a line, counted across its runs
+export const leadingSpaces = (runs: Run[]) => {
+  const t = runs.map((r) => r.text).join("");
+  return t.length - t.trimStart().length;
+};
+
+// drops the first n characters of a line, across as many runs as they span
+export const dropLead = (runs: Run[], n: number): Run[] => {
+  const out = runs.map((r) => ({ ...r }));
+  while (n > 0 && out.length) {
+    const cut = Math.min(n, out[0]!.text.length);
+    out[0]!.text = out[0]!.text.slice(cut);
+    n -= cut;
+    if (!out[0]!.text) out.shift();
+  }
+  return out;
 };

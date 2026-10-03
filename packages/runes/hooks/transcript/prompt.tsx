@@ -1,11 +1,11 @@
 import type { On } from "claude-code";
 
 import { config } from "../config";
-import { bubble } from "./bubble";
+import { bubble, foldLabel, runLine } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
 import { cells, innerWidth, wrap } from "./text";
 
-export type Segment = { kind: "body" | "reminder"; text: string };
+type Segment = { kind: "body" | "reminder"; text: string };
 
 export const segments = (text: string): Segment[] => {
   const out: Segment[] = [];
@@ -92,15 +92,7 @@ export const prompt = (on: On) => {
           ? runs.map((line, j) =>
               row(
                 `body:${i}:${j}`,
-                <Text>
-                  {line.length
-                    ? line.map(({ text, ...style }, k) => (
-                        <Text key={String(k)} {...style}>
-                          {text}
-                        </Text>
-                      ))
-                    : " "}
-                </Text>,
+                runLine(Text, line),
               ),
             )
           : wrap(shown[i], inner).map((line, j) =>
@@ -112,7 +104,7 @@ export const prompt = (on: On) => {
           row(
             `body:${i}:more:row`,
             <Button key={`body:${i}:more`} plain dimColor onPress={toggle(id)}>
-              {isOpen ? "▾ fold" : `▸ ${lines.length - foldLines} more lines`}
+              {foldLabel(isOpen, lines.length - foldLines)}
             </Button>,
           ),
         ];

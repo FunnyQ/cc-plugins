@@ -1,5 +1,5 @@
 import { config } from "../config";
-import { parseAnsi, type Run } from "./ansi";
+import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
 
 // glow's dark style indents every line by this much
 const GLOW_MARGIN = 2;
@@ -35,6 +35,10 @@ const queue = new Map<string, Job>();
 let transport: { run: RunCommand; redraw: () => void } | undefined;
 let working = false;
 let wake: (() => void) | undefined;
+// glow could not start, so stop queueing work for it
+let missing = false;
+// each owner's last landed render; a streamed reply's older chunks are never drawn again, so they leave the cache
+const landed = new Map<string, string>();
 
 const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   map.delete(key);
@@ -46,11 +50,9 @@ export const INSTALL_HINT = "runes: install glow for markdown bubbles — brew i
 let hinted = false;
 
 export const glow = {
-  // glow could not start, so stop queueing work for it
-  missing: false,
   // true once, on the first draw after glow is found missing, so the install hint shows a single time
   hintDue() {
-    if (!glow.missing || hinted) return false;
+    if (!missing || hinted) return false;
     hinted = true;
     return true;
   },
@@ -65,7 +67,7 @@ export const glow = {
       if (owner !== undefined && lines?.length) keep(lastGood, owner, lines);
       return lines;
     }
-    if (!transport || glow.missing) return null;
+    if (!transport || missing) return null;
     queue.set(owner ?? key, { key, width, text, style });
     wake?.();
     return owner === undefined ? null : (lastGood.get(owner) ?? null);
@@ -74,7 +76,7 @@ export const glow = {
   // run from session.start, it outlives every draw and only a real failure to start stops it
   work(run: RunCommand, redraw: () => void) {
     transport = { run, redraw };
-    glow.missing = false;
+    missing = false;
     hinted = false;
     if (working) return;
     working = true;
@@ -93,8 +95,13 @@ export const glow = {
         try {
           const { exitCode, stdout } = await t.run(glowArgv(job.width, job.style), { ...GLOW_INIT, stdin: job.text });
           keep(rendered, job.key, exitCode === 0 ? toLines(stdout) : null);
+          if (slot !== job.key) {
+            const old = landed.get(slot);
+            if (old !== undefined && old !== job.key) rendered.delete(old);
+            keep(landed, slot, job.key);
+          }
         } catch {
-          glow.missing = true;
+          missing = true;
           queue.clear();
         }
         t.redraw();
@@ -107,16 +114,7 @@ const isBlank = (runs: Run[]) => runs.every((r) => !r.text.trim());
 
 // glow pads every line to its width and indents it; both go, so each row is the text alone
 const tidy = (runs: Run[]): Run[] => {
-  const out = runs.map((r) => ({ ...r }));
-  let cut = GLOW_MARGIN;
-  while (cut > 0 && out.length) {
-    const lead = out[0].text.length - out[0].text.trimStart().length;
-    const n = Math.min(cut, lead);
-    if (n === 0) break;
-    out[0].text = out[0].text.slice(n);
-    cut -= n;
-    if (!out[0].text) out.shift();
-  }
+  const out = dropLead(runs, Math.min(GLOW_MARGIN, leadingSpaces(runs)));
   while (out.length && !out.at(-1)!.backgroundColor && !out.at(-1)!.text.trim())
     out.pop();
   if (out.length && !out.at(-1)!.backgroundColor)

@@ -1,38 +1,46 @@
 import type { Elements } from "claude-code";
 
+import type { Side } from "../config";
+import { hex } from "./ansi";
 import { cells } from "./text";
 
-export type BubbleProps = {
+type BubbleProps = {
   color: string;
   // the icon with its trailing padding: a glyph drawn wider than its cell covers the space after it
   label: string;
   // where the bar and the icon sit
-  side: "left" | "right";
+  side: Side;
   inner: number;
   rows: [key: string, child: unknown][];
   key: string;
-  // down: a tee on the bottom edge hands a line to the card drawn next; up: this card takes that line in
-  link?: "down" | "up";
+  // down: a tee on the bottom edge hands a line to the card drawn next; up: this card takes that line in.
+  // `at` is the link's column from an unindented card's left edge, so both cards of a pair share one number
+  link?: { to: "down" | "up"; at: number };
   // false draws the bar's column blank, so the frame still lines up with the other bubbles
   bar?: boolean;
-  // columns the card sits in; the link column stays where an unindented card of the same total width has it
+  // columns the card sits in
   indent?: number;
-  // a hover group: every edge rests at half saturation and lights to `color` while the pointer is on any of it
+  // a hover group: every edge rests muted and lights to `color` while the pointer is on any of it
   scope?: string;
 };
 
+const SATURATION = 0.5;
+const BRIGHTNESS = 0.75;
+// one entry per colour drawn: the configured ones, the shell palette and glow's
+const muted = new Map<string, string>();
+
 // pulls each channel halfway to the colour's grey, then dims it, so the hue stays at lower saturation and brightness
-export const mute = (hex: string, amount = 0.5, light = 0.75) => {
-  const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+export const mute = (color: string) => {
+  const known = muted.get(color);
+  if (known) return known;
+  const rgb = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   const [r = 0, g = 0, b = 0] = rgb;
   const grey = 0.299 * r + 0.587 * g + 0.114 * b;
-  return `#${rgb
-    .map((c) =>
-      Math.round((c + (grey - c) * amount) * light)
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")}`;
+  const out = hex(
+    ...rgb.map((c) => Math.round((c + (grey - c) * SATURATION) * BRIGHTNESS)),
+  );
+  muted.set(color, out);
+  return out;
 };
 
 // a row that draws a rule across the card, joined to its side borders
@@ -42,7 +50,28 @@ export const DIVIDER = Symbol("divider");
 export const paint = (color: string, scope?: string) =>
   scope ? { color: mute(color), hover: { color, scope } } : { color };
 
-// both bubbles share this frame; every edge is drawn by hand, since Box borders refuse single sides and hid an absolute label
+export const foldLabel = (isOpen: boolean, hidden: number) =>
+  isOpen ? "▾ fold" : `▸ ${hidden} more lines`;
+
+// one row of styled runs; an empty one draws a space so the row keeps its height
+export const runLine = <R extends { text: string }>(
+  Text: Elements["terminal"]["Text"],
+  runs: R[],
+  styleOf: (run: R) => object = ({ text: _, ...style }) => style,
+  outer: object = {},
+) => (
+  <Text {...outer}>
+    {runs.length
+      ? runs.map((run, j) => (
+          <Text key={String(j)} {...styleOf(run)}>
+            {run.text}
+          </Text>
+        ))
+      : " "}
+  </Text>
+);
+
+// every bubble shares this frame; every edge is drawn by hand, since Box borders refuse single sides and hid an absolute label
 export const bubble = (
   { Box, Text }: Pick<Elements["terminal"], "Box" | "Text">,
   {
@@ -59,12 +88,13 @@ export const bubble = (
   }: BubbleProps,
 ) => {
   const ink = paint(color, scope);
-  // the link runs through the middle column of the frame
-  const mid = Math.floor((inner + indent + 4) / 2) - indent;
+  const mid = link ? link.at - indent : -1;
+  // what the header's rule fills: the frame less its corners, the label and its padding
+  const fill = inner - cells(label);
   // a rule starting at column `from` takes the link's ┴ when the middle falls inside it
-  const rule = (n: number, from: number) => {
-    const line = [..."─".repeat(Math.max(0, n))];
-    if (link === "up" && mid >= from && mid < from + line.length)
+  const rule = (from: number) => {
+    const line = [..."─".repeat(Math.max(0, fill))];
+    if (link?.to === "up" && mid >= from && mid < from + line.length)
       line[mid - from] = "┴";
     return <Text {...ink}>{line.join("")}</Text>;
   };
@@ -75,13 +105,13 @@ export const bubble = (
         <Text bold {...ink}>
           {label}
         </Text>
-        {rule(inner + 4 - 3 - cells(label) - 1, 3 + cells(label))}
+        {rule(3 + cells(label))}
         <Text {...ink}>{"╮"}</Text>
       </Box>
     ) : (
       <Box flexDirection="row">
         <Text {...ink}>{"╭"}</Text>
-        {rule(inner + 4 - 1 - cells(` ${label}`) - 2, 1)}
+        {rule(1)}
         <Text bold {...ink}>
           {` ${label}`}
         </Text>
@@ -102,16 +132,16 @@ export const bubble = (
             <Text {...ink}>{`├${"─".repeat(inner + 2)}┤`}</Text>
           </Box>
         ) : (
-        <Box key={k} flexDirection="row">
-          <Text {...ink}>{"│ "}</Text>
-          <Box width={inner}>{child as never}</Box>
-          <Text {...ink}>{" │"}</Text>
-        </Box>
-      ),
+          <Box key={k} flexDirection="row">
+            <Text {...ink}>{"│ "}</Text>
+            <Box width={inner}>{child as never}</Box>
+            <Text {...ink}>{" │"}</Text>
+          </Box>
+        ),
       )}
       <Box flexDirection="row">
         <Text {...ink}>
-          {link === "down"
+          {link?.to === "down"
             ? `╰${"─".repeat(mid - 1)}┬${"─".repeat(inner + 2 - mid)}╯`
             : `╰${"─".repeat(inner + 2)}╯`}
         </Text>
@@ -131,7 +161,7 @@ export const bubble = (
     <Box
       key={key}
       flexDirection="row"
-      marginTop={link === "up" ? 0 : 1}
+      marginTop={link?.to === "up" ? 0 : 1}
       marginLeft={indent}
       // a hover group lights over the Box's whole area, so a hovering card must not stretch past its frame
       {...(scope ? { alignSelf: "flex-start" as const } : {})}
