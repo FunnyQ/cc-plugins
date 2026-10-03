@@ -61,8 +61,11 @@ test("/runes clawd off writes the line and hides Clawd, and /runes on brings it 
   expect(text).toContain("# the person's bubble");
   expect(await hasClawd($)).toBe(false);
 
+  // `/runes on` turns every rune on, the minimap that starts off included
   await run($, "on");
-  expect(host.files.get(CONFIG)).toBe(TEMPLATE(DEFAULTS.enabled));
+  expect(host.files.get(CONFIG)).toBe(
+    TEMPLATE({ ...DEFAULTS.enabled, minimap: true }),
+  );
   expect(await hasClawd($)).toBe(true);
 });
 

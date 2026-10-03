@@ -26,6 +26,7 @@ const CURRENT = () => ({
     peer: { enabled: true },
     glow: null,
   },
+  minimap: { enabled: true },
 });
 
 test("normalize fills every missing field from the defaults", () => {
@@ -219,4 +220,9 @@ test("a section holding only comments reads as null, which is neither a problem 
   expect(normalize(CURRENT()).problems).toEqual([]);
   expect(normalize(CURRENT()).config.glow).toEqual(DEFAULTS.glow);
   expect(RUNES.every((r) => normalize(CURRENT()).config.enabled[r])).toBe(true);
+});
+
+test("the minimap rune starts off and its section sits at the top level", () => {
+  expect(DEFAULTS.enabled.minimap).toBe(false);
+  expect(TEMPLATE(DEFAULTS.enabled)).toContain("\nminimap:\n  enabled: false");
 });

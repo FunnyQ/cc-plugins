@@ -11,6 +11,7 @@ export const RUNES = [
   "agent",
   "skill",
   "peer",
+  "minimap",
 ] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
@@ -50,7 +51,8 @@ type Config = {
 };
 
 export const DEFAULTS: Config = {
-  enabled: Object.fromEntries(RUNES.map((r) => [r, true])) as Record<
+  // every rune starts on but the minimap, which opens a pane and so waits to be asked for
+  enabled: Object.fromEntries(RUNES.map((r) => [r, r !== "minimap"])) as Record<
     Rune,
     boolean
   >,
@@ -172,10 +174,12 @@ transcript:
     # fold_lines: ${DEFAULTS.peer.fold_lines}
   glow:
     # style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
+minimap:
+  enabled: ${enabled.minimap}    # /minimap: the whole transcript as coloured bars in a pane; Enter jumps there
 `;
 
 // the keys at each level in the order the template writes them; the bubbles and glow live under transcript
-const TOP = ["clawd", "transcript"] as const;
+const TOP = ["clawd", "transcript", "minimap"] as const;
 const UNDER = [
   "prompt",
   "reply",
