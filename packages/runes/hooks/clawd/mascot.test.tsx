@@ -65,7 +65,7 @@ test("a subagent's own turn ending does not end the main turn", async ($, on) =>
 
 test("Clawd's frames redraw the band alone, never the transcript", async ($, on) => {
   const clock = mock.clock(on)
-  fakeHost(on, { files: new Map([[CONFIG, 'enabled:\n  transcript: false\n']]) })
+  fakeHost(on, { files: new Map([[CONFIG, 'transcript:\n  enabled: false\n']]) })
   let rows = 0
   on('ui.render', ($, e) => {
     if (e.component === 'UserMessage') rows += 1

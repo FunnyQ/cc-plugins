@@ -177,7 +177,7 @@ const engine = (on: Parameters<Parameters<typeof test>[1]>[1]) =>
 test("enabled.bash: false hands both rows to the engine", async ($, on) => {
   engine(on);
   await startSession($, on, {
-    files: new Map([[CONFIG, "enabled:\n  bash: false\n"]]),
+    files: new Map([[CONFIG, "bash:\n  enabled: false\n"]]),
   });
   expect(
     await find($, CALL({ command: "ls" }), { key: "bash" }),

@@ -1,4 +1,4 @@
-// every rune; a new rune adds its name here and to TEMPLATE, any settings to DEFAULTS, and gates its hooks on `config.enabled[name]`
+// every rune; a new rune adds its name here and its section to TEMPLATE, any settings to DEFAULTS, and gates its hooks on `config.enabled[name]`
 export const RUNES = [
   "clawd",
   "transcript",
@@ -59,23 +59,23 @@ export const config: Config = { ...DEFAULTS };
 export const TEMPLATE = (
   enabled: Config["enabled"],
 ) => `# runes — edits apply at the next session start, or right away after any /runes
-enabled:
-  clawd: ${enabled.clawd}
-  transcript: ${enabled.transcript}
-  prompt: ${enabled.prompt}    # the person's bubble; needs transcript
-  reply: ${enabled.reply}     # Claude's bubble; needs transcript
-  bash: ${enabled.bash}      # Bash calls and their output; needs transcript
-  peer: ${enabled.peer}      # subagents' and other sessions' messages; needs transcript
+clawd:
+  enabled: ${enabled.clawd}
+transcript:
+  enabled: ${enabled.transcript}    # every bubble below needs it
 prompt:
+  enabled: ${enabled.prompt}    # the person's bubble
   color: "${DEFAULTS.prompt.color}"
   icon: "\\U000F064C"   # Nerd Font glyph
   side: ${DEFAULTS.prompt.side}          # left | right
   fold_lines: ${DEFAULTS.prompt.fold_lines}
 reply:
+  enabled: ${enabled.reply}    # Claude's bubble
   color: "${DEFAULTS.reply.color}"
   icon: "\\uEC82"       # Nerd Font glyph
   side: ${DEFAULTS.reply.side}
 bash:
+  enabled: ${enabled.bash}    # Bash calls and their output
   color: "${DEFAULTS.bash.color}"
   error_color: "${DEFAULTS.bash.error_color}"
   icon: "\\uF489"       # Nerd Font glyph
@@ -83,6 +83,7 @@ bash:
   side: ${DEFAULTS.bash.side}
   fold_lines: ${DEFAULTS.bash.fold_lines}
 peer:
+  enabled: ${enabled.peer}    # subagents' and other sessions' messages
   color: "${DEFAULTS.peer.color}"
   icon: "\\U000F06A9"   # Nerd Font glyph
   side: ${DEFAULTS.peer.side}
@@ -90,6 +91,9 @@ peer:
 glow:
   style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 `;
+
+// the file's top-level keys in the order the template writes them
+const SECTIONS = [...RUNES, "glow"] as const;
 
 // bun's YAML parser runs in a child, since a mod has no Bun global; an empty file parses to null
 export const PARSE = [
@@ -110,11 +114,10 @@ const isSide: Check = (v) => v === "left" || v === "right";
 const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
 
 const RULES: {
-  [S in keyof Config]: { [F in keyof Config[S]]: [Check, string] };
+  [S in Exclude<keyof Config, "enabled">]: {
+    [F in keyof Config[S]]: [Check, string];
+  };
 } = {
-  enabled: Object.fromEntries(
-    RUNES.map((r) => [r, [isBool, "true | false"]]),
-  ) as Record<Rune, [Check, string]>,
   prompt: {
     color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
@@ -167,75 +170,89 @@ export const normalize = (
       else problems.push(`${section}.${field}: ${JSON.stringify(v)} (${want})`);
     }
   }
-  return { config: out as Config, problems };
+  // an older file kept every switch in one top-level enabled: block; a section's own switch wins over it
+  const legacy = isMap(raw.enabled) ? raw.enabled : {};
+  const enabled = { ...DEFAULTS.enabled };
+  for (const r of RUNES) {
+    const own = isMap(raw[r]) ? raw[r].enabled : undefined;
+    const [v, name] = own !== undefined ? [own, `${r}.enabled`] : [legacy[r], `enabled.${r}`];
+    if (v === undefined) continue;
+    if (isBool(v)) enabled[r] = v as boolean;
+    else problems.push(`${name}: ${JSON.stringify(v)} (true | false)`);
+  }
+  return { config: { ...out, enabled } as Config, problems };
 };
 
-// rewrites only the switch's own line under `enabled:`, so comments and layout survive;
+// where a top-level key's block ends: the next line that starts a key of its own
+const blockEnd = (lines: string[], head: number) => {
+  let end = head + 1;
+  while (end < lines.length && !/^[^\s#]/.test(lines[end]!)) end++;
+  return end;
+};
+
+// a block goes in before the first section the template writes after it, so the file keeps the template's order
+const insertBlock = (text: string, section: string, block: string): string => {
+  const lines = text.split("\n");
+  const later = SECTIONS.slice(SECTIONS.indexOf(section as never) + 1);
+  const at = lines.findIndex((l) => later.some((s) => l.startsWith(`${s}:`)));
+  if (at === -1) {
+    const body = text === "" || text.endsWith("\n") ? text : `${text}\n`;
+    return `${body}${block}\n`;
+  }
+  lines.splice(at, 0, ...block.split("\n"));
+  return lines.join("\n");
+};
+
+// rewrites only the switch's own line in its section, so comments and layout survive;
 // a flow mapping is left as it is, and the caller's read-back refuses the result
 export const setSwitch = (text: string, name: Rune, value: boolean): string => {
   const lines = text.split("\n");
-  const head = lines.findIndex((l) => /^enabled:/.test(l));
-  if (head === -1) {
-    const body = text === "" || text.endsWith("\n") ? text : `${text}\n`;
-    return `${body}enabled:\n  ${name}: ${value}\n`;
-  }
-  if (!/^enabled:\s*(#.*)?$/.test(lines[head])) return text;
-  let end = head + 1;
-  while (end < lines.length && !/^[^\s#]/.test(lines[end])) end++;
-  const key = new RegExp(`^(\\s+${name}\\s*:\\s*)([^#]*?)(\\s*#.*)?$`);
+  const head = lines.findIndex((l) => l.startsWith(`${name}:`));
+  if (head === -1) return insertBlock(text, name, `${name}:\n  enabled: ${value}`);
+  if (!new RegExp(`^${name}:\\s*(#.*)?$`).test(lines[head]!)) return text;
+  const end = blockEnd(lines, head);
   for (let i = head + 1; i < end; i++) {
-    const m = lines[i].match(key);
+    const m = lines[i]!.match(/^(\s+enabled\s*:\s*)([^#]*?)(\s*#.*)?$/);
     if (!m) continue;
     lines[i] = `${m[1]}${value}${m[3] ?? ""}`;
     return lines.join("\n");
   }
-  const indent =
-    lines
-      .slice(head + 1, end)
-      .find((l) => /^\s+\w/.test(l))
-      ?.match(/^\s+/)?.[0] ?? "  ";
-  // after the nearest rune that comes before it in RUNES, so added switches keep the template's order
-  const before = RUNES.slice(0, RUNES.indexOf(name)).reverse();
-  let at = head;
-  for (const r of before) {
-    const i = lines.findIndex(
-      (l, j) => j > head && j < end && new RegExp(`^\\s+${r}\\s*:`).test(l),
-    );
-    if (i !== -1) {
-      at = i;
-      break;
-    }
-  }
-  lines.splice(at + 1, 0, `${indent}${name}: ${value}`);
+  const indent = lines.slice(head + 1, end).find((l) => /^\s+\w/.test(l))?.match(/^\s+/)?.[0] ?? "  ";
+  lines.splice(head + 1, 0, `${indent}enabled: ${value}`);
   return lines.join("\n");
 };
 
-// true once a parsed file names every switch and section, so an addition that a flow mapping or a duplicate key swallowed is caught
+// true once a parsed file has every section, each rune's with its switch, and no older enabled: block;
+// an addition a flow mapping or a duplicate key swallowed fails it
 export const isComplete = (raw: unknown): boolean =>
   isMap(raw) &&
-  isMap(raw.enabled) &&
-  RUNES.every(
-    (r) => (raw.enabled as Record<string, unknown>)[r] !== undefined,
-  ) &&
-  Object.keys(DEFAULTS).every((s) => raw[s] !== undefined);
+  raw.enabled === undefined &&
+  SECTIONS.every((s) => isMap(raw[s])) &&
+  RUNES.every((r) => (raw[r] as Record<string, unknown>).enabled !== undefined);
 
-// a file an older runes wrote lacks the switches and sections added since; each goes in with its default and the template's comments
-export const fillMissing = (text: string, raw: unknown): string => {
+// brings a file an older runes wrote up to the template: the top-level enabled: block moves into each rune's
+// section, and every missing section goes in with the template's text, in the template's order
+export const upgrade = (text: string, raw: unknown): string => {
   const given = raw === null || raw === undefined ? {} : raw;
   if (!isMap(given)) return text;
-  const switches = isMap(given.enabled) ? given.enabled : {};
-  let out = RUNES.filter((r) => switches[r] === undefined).reduce(
-    (t, r) => setSwitch(t, r, DEFAULTS.enabled[r]),
-    text,
-  );
-  const template = TEMPLATE(DEFAULTS.enabled).split("\n");
-  for (const section of Object.keys(DEFAULTS)) {
-    if (section === "enabled" || given[section] !== undefined) continue;
-    const head = template.findIndex((l) => l.startsWith(`${section}:`));
-    let end = head + 1;
-    while (end < template.length && !/^[^\s#]/.test(template[end]!)) end++;
-    const block = template.slice(head, end).join("\n").replace(/\n+$/, "");
-    out = `${out === "" || out.endsWith("\n") ? out : `${out}\n`}${block}\n`;
+  const legacy = isMap(given.enabled) ? given.enabled : {};
+  const carried = Object.fromEntries(
+    RUNES.map((r) => [r, isBool(legacy[r]) ? legacy[r] : DEFAULTS.enabled[r]]),
+  ) as Config["enabled"];
+  let lines = text.split("\n");
+  const old = lines.findIndex((l) => /^enabled:\s*(#.*)?$/.test(l));
+  if (old !== -1) lines.splice(old, blockEnd(lines, old) - old);
+  let out = lines.join("\n");
+  const template = TEMPLATE(carried).split("\n");
+  for (const section of SECTIONS) {
+    const own = given[section];
+    if (own === undefined) {
+      const head = template.findIndex((l) => l.startsWith(`${section}:`));
+      const block = template.slice(head, blockEnd(template, head)).join("\n").replace(/\n+$/, "");
+      out = insertBlock(out, section, block);
+    } else if (section !== "glow" && isMap(own) && own.enabled === undefined) {
+      out = setSwitch(out, section, carried[section]);
+    }
   }
   return out;
 };

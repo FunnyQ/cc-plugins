@@ -11,7 +11,7 @@ import {
   RUNES,
   setSwitch,
   TEMPLATE,
-  fillMissing,
+  upgrade,
   isComplete,
 } from "./config";
 import { bash } from "./transcript/bash";
@@ -71,9 +71,9 @@ const load = async ($: $): Promise<Loaded> => {
     }
     let text = String(await $.fs.read(path));
     let raw = await parse(text);
-    const filled = fillMissing(text, raw);
+    const filled = upgrade(text, raw);
     if (filled !== text) {
-      // setSwitch edits the first enabled: block, so a text comparison passed a file whose second block wins
+      // checked by meaning: a text comparison passed a file whose duplicate key won over the edited one
       const back = await parse(filled).catch(() => undefined);
       if (isComplete(back)) {
         await $.fs.write(path, filled);

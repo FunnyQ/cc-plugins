@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { DEFAULTS, fillMissing, normalize, setSwitch, TEMPLATE } from "./config";
+import { DEFAULTS, isComplete, normalize, setSwitch, TEMPLATE, upgrade } from "./config";
 
 test("normalize fills every missing field from the defaults", () => {
   expect(normalize(null)).toEqual({ config: DEFAULTS, problems: [] });
@@ -10,9 +10,10 @@ test("normalize fills every missing field from the defaults", () => {
   expect(problems).toEqual([]);
 });
 
-test("normalize drops only the invalid field and names it", () => {
+test("normalize reads each rune's switch from its own section and drops only an invalid field", () => {
   const { config, problems } = normalize({
-    enabled: { clawd: "off", transcript: false },
+    clawd: { enabled: "off" },
+    transcript: { enabled: false },
     prompt: { color: "blue", side: "middle", fold_lines: 3 },
     glow: { style: 7 },
   });
@@ -23,11 +24,21 @@ test("normalize drops only the invalid field and names it", () => {
   expect(config.prompt.side).toBe("right");
   expect(config.prompt.fold_lines).toBe(3);
   expect(config.glow.style).toBe("dark");
-  expect(problems.join("\n")).toContain("enabled.clawd");
+  expect(problems.join("\n")).toContain("clawd.enabled");
   expect(problems.join("\n")).toContain("prompt.color");
   expect(problems.join("\n")).toContain("prompt.side");
   expect(problems.join("\n")).toContain("glow.style");
   expect(problems).toHaveLength(4);
+});
+
+test("normalize still reads an older file's top-level enabled block, a section's own switch winning", () => {
+  const { config, problems } = normalize({
+    enabled: { clawd: false, bash: false },
+    bash: { enabled: true },
+  });
+  expect(config.enabled.clawd).toBe(false);
+  expect(config.enabled.bash).toBe(true);
+  expect(problems).toEqual([]);
 });
 
 test("normalize refuses a file that is not a mapping", () => {
@@ -36,74 +47,65 @@ test("normalize refuses a file that is not a mapping", () => {
   expect(problems).toHaveLength(1);
 });
 
-test("setSwitch edits only the matching line and keeps its comment", () => {
-  const text = TEMPLATE(DEFAULTS.enabled);
-  const out = setSwitch(text, "prompt", false);
-  expect(out).toContain(
-    "  prompt: false    # the person's bubble; needs transcript",
-  );
-  expect(
-    out.split("\n").filter((l, i) => l !== text.split("\n")[i]),
-  ).toHaveLength(1);
-});
-
-test("setSwitch inserts a missing key after the rune before it", () => {
-  const out = setSwitch(
-    "# top\nenabled:\n  clawd: true\nglow:\n  style: dark\n",
-    "reply",
-    false,
-  );
-  expect(out).toBe(
-    "# top\nenabled:\n  clawd: true\n  reply: false\nglow:\n  style: dark\n",
-  );
-});
-
-test("setSwitch adds the enabled: block when the file has none", () => {
-  expect(setSwitch("glow:\n  style: dark\n", "clawd", false)).toBe(
-    "glow:\n  style: dark\nenabled:\n  clawd: false\n",
-  );
-});
-
-test("setSwitch leaves a flow mapping alone, so the read-back refuses it", () => {
-  const text = "enabled: { clawd: true }\n";
-  expect(setSwitch(text, "clawd", false)).toBe(text);
-});
-
-test("setSwitch ignores a same-named key outside enabled:", () => {
-  const text = "enabled:\n  clawd: true\nprompt:\n  clawd: true\n";
-  expect(setSwitch(text, "clawd", false)).toBe(
-    "enabled:\n  clawd: false\nprompt:\n  clawd: true\n",
-  );
-});
-
-test("TEMPLATE writes the switches it is given", () => {
+test("TEMPLATE gives every rune a section that opens with its switch", () => {
   const text = TEMPLATE({ ...DEFAULTS.enabled, clawd: false });
-  expect(text).toContain("  clawd: false\n");
+  expect(text).toContain("clawd:\n  enabled: false\n");
+  expect(text).toContain("transcript:\n  enabled: true");
+  expect(text).toContain("bash:\n  enabled: true");
+  expect(text).not.toMatch(/^enabled:/m);
   expect(text).toContain('icon: "\\U000F064C"');
 });
 
-test("fillMissing adds the switches and sections an older file lacks, with the template's text", () => {
-  const old = "enabled:\n  clawd: false\nprompt:\n  side: left\n";
-  const out = fillMissing(old, { enabled: { clawd: false }, prompt: { side: "left" } });
-  expect(out.startsWith("enabled:\n")).toBe(true);
-  expect(out).toContain("  clawd: false\n");
-  expect(out).toContain("  peer: true\n");
-  expect(out).toContain("prompt:\n  side: left\n");
-  expect(out).toContain('bash:\n  color: "#5f8f6a"\n');
-  expect(out).toContain("  output_icon: \"\\uEF11\"   # Nerd Font glyph\n");
-  expect(out).toContain("peer:\n");
-  expect(out).not.toContain('prompt:\n  color:');
+test("setSwitch edits only the switch's line in its section and keeps its comment", () => {
+  const text = TEMPLATE(DEFAULTS.enabled);
+  const out = setSwitch(text, "prompt", false);
+  expect(out).toContain("prompt:\n  enabled: false    # the person's bubble");
+  expect(out.split("\n").filter((l, i) => l !== text.split("\n")[i])).toHaveLength(1);
 });
 
-test("fillMissing leaves a complete file alone", () => {
-  const full = TEMPLATE(DEFAULTS.enabled);
-  expect(fillMissing(full, DEFAULTS)).toBe(full);
+test("setSwitch never touches another section's enabled line", () => {
+  const text = "clawd:\n  enabled: true\nprompt:\n  enabled: true\n";
+  expect(setSwitch(text, "prompt", false)).toBe("clawd:\n  enabled: true\nprompt:\n  enabled: false\n");
 });
 
-test("fillMissing puts the switches it adds in RUNES order", () => {
-  const out = fillMissing("enabled:\n  prompt: false\n", { enabled: { prompt: false } });
-  const block = out.slice(0, out.indexOf("\nprompt:"));
-  expect(block).toBe(
-    "enabled:\n  clawd: true\n  transcript: true\n  prompt: false\n  reply: true\n  bash: true\n  peer: true",
+test("setSwitch opens a section that has no switch with one", () => {
+  expect(setSwitch("bash:\n  side: right\n", "bash", false)).toBe("bash:\n  enabled: false\n  side: right\n");
+});
+
+test("setSwitch adds a missing section before the next one in order", () => {
+  expect(setSwitch("clawd:\n  enabled: true\nbash:\n  side: right\nglow:\n  style: dark\n", "reply", false)).toBe(
+    "clawd:\n  enabled: true\nreply:\n  enabled: false\nbash:\n  side: right\nglow:\n  style: dark\n",
   );
+  expect(setSwitch("# top\n", "peer", false)).toBe("# top\npeer:\n  enabled: false\n");
+});
+
+test("setSwitch leaves a flow mapping alone, so the read-back refuses it", () => {
+  const text = "clawd: { enabled: true }\n";
+  expect(setSwitch(text, "clawd", false)).toBe(text);
+});
+
+test("upgrade moves an older file's switches into their sections, keeping the person's lines", () => {
+  const old = "# mine\nenabled:\n  clawd: false   # off for now\n  bash: false\nprompt:\n  side: left\n";
+  const raw = { enabled: { clawd: false, bash: false }, prompt: { side: "left" } };
+  const out = upgrade(old, raw);
+  expect(out).not.toMatch(/^enabled:/m);
+  expect(out).toContain("# mine\n");
+  expect(out).toContain("clawd:\n  enabled: false\n");
+  expect(out).toContain("prompt:\n  enabled: true\n  side: left\n");
+  expect(out).toContain("bash:\n  enabled: false    # Bash calls");
+  expect(out).toContain('peer:\n  enabled: true');
+  const order = ["clawd:", "transcript:", "prompt:", "reply:", "bash:", "peer:", "glow:"].map((s) => out.indexOf(`\n${s}`));
+  expect(order).toEqual([...order].sort((a, b) => a - b));
+  expect(order.every((i) => i >= 0)).toBe(true);
+});
+
+test("upgrade leaves a current file alone, and isComplete tells the two apart", () => {
+  const full = TEMPLATE(DEFAULTS.enabled);
+  const parsed = Object.fromEntries(
+    Object.entries({ ...DEFAULTS, enabled: undefined }).filter(([k]) => k !== "enabled"),
+  ) as Record<string, unknown>;
+  for (const r of Object.keys(DEFAULTS.enabled)) parsed[r] = { ...(parsed[r] as object), enabled: true };
+  expect(upgrade(full, parsed)).toBe(full);
+  expect(isComplete(parsed)).toBe(true);
+  expect(isComplete({ ...parsed, enabled: { clawd: true } })).toBe(false);
 });

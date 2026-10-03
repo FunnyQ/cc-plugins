@@ -118,7 +118,7 @@ test("enabled.reply: false hands the reply to the engine", async ($, on) => {
     const { Text } = $.ui.resolve(e);
     return <Text key="engine">engine</Text>;
   });
-  await startSession($, on, { files: new Map([[CONFIG, "enabled:\n  reply: false\n"]]), run: () => ran(1, "") });
+  await startSession($, on, { files: new Map([[CONFIG, "reply:\n  enabled: false\n"]]), run: () => ran(1, "") });
   expect(await draws($, REPLY("x"), { key: "reply" })).toBe(false);
   expect(await draws($, REPLY("x"), { type: "Text", text: "engine" })).toBe(true);
 });

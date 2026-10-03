@@ -57,8 +57,8 @@ test("/runes clawd off writes the line and hides Clawd, and /runes on brings it 
   await session($);
   expect(await run($, "clawd off")).toContain("clawd: off");
   const text = host.files.get(CONFIG)!;
-  expect(text).toContain("  clawd: false\n");
-  expect(text).toContain("# the person's bubble; needs transcript");
+  expect(text).toContain("clawd:\n  enabled: false\n");
+  expect(text).toContain("# the person's bubble");
   expect(await hasClawd($)).toBe(false);
 
   await run($, "on");
@@ -67,7 +67,7 @@ test("/runes clawd off writes the line and hides Clawd, and /runes on brings it 
 });
 
 test("a broken file falls back to defaults with one toast, and /runes refuses to write", async ($, on) => {
-  const broken = "enabled:\n  clawd: false\n  [oops\n";
+  const broken = "clawd:\n  enabled: false\n  [oops\n";
   const host = await start($, on, new Map([[CONFIG, broken]]));
   await session($);
   expect(host.toasts).toHaveLength(0);
@@ -80,24 +80,25 @@ test("a broken file falls back to defaults with one toast, and /runes refuses to
 });
 
 test("an edit that does not read back as intended is refused", async ($, on) => {
-  const text = "enabled:\n  clawd: true\nenabled:\n  clawd: true\n";
+  const text = "clawd:\n  enabled: true\nclawd:\n  enabled: true\n";
   const host = await start($, on, new Map([[CONFIG, text]]));
   await session($);
   expect(await run($, "clawd off")).toContain("nothing written");
-  expect(host.files.get(CONFIG)).toBe(text);
+  // the sections added since still go in, but neither clawd block is touched
+  expect(host.files.get(CONFIG)!.startsWith(text)).toBe(true);
 });
 
 test("an invalid field toasts its name and keeps its default", async ($, on) => {
   const host = await start(
     $,
     on,
-    new Map([[CONFIG, "enabled:\n  clawd: off\n"]]),
+    new Map([[CONFIG, "clawd:\n  enabled: off\n"]]),
   );
   await session($);
   expect(host.toasts).toHaveLength(0);
   await host.clock.advance(1000);
   expect(host.toasts).toHaveLength(1);
-  expect(host.toasts[0]).toContain("enabled.clawd");
+  expect(host.toasts[0]).toContain("clawd.enabled");
   expect(await hasClawd($)).toBe(true);
 });
 
@@ -106,21 +107,21 @@ test("/runes reload re-reads a hand edit", async ($, on) => {
   await session($);
   host.files.set(
     CONFIG,
-    host.files.get(CONFIG)!.replace("  clawd: true", "  clawd: false"),
+    host.files.get(CONFIG)!.replace("clawd:\n  enabled: true", "clawd:\n  enabled: false"),
   );
   expect(await run($, "reload")).toContain("clawd: off");
   expect(await hasClawd($)).toBe(false);
 });
 
-test("a file from an older runes gets the sections and switches added since, its own lines kept", async ($, on) => {
-  const old = "enabled:\n  clawd: false   # mine\nreply:\n  side: right\n";
+test("a file from an older runes moves its switches into their sections and gains the sections added since", async ($, on) => {
+  const old = "enabled:\n  clawd: false\nreply:\n  side: right   # mine\n";
   const host = await start($, on, new Map([[CONFIG, old]]));
   await session($);
   const text = host.files.get(CONFIG)!;
-  expect(text).toContain("  clawd: false   # mine\n");
-  expect(text).toContain("reply:\n  side: right\n");
-  expect(text).toContain("  bash: true\n");
-  expect(text).toContain("bash:\n");
-  expect(text).toContain("peer:\n");
+  expect(text).not.toMatch(/^enabled:/m);
+  expect(text).toContain("clawd:\n  enabled: false\n");
+  expect(text).toContain("reply:\n  enabled: true\n  side: right   # mine\n");
+  expect(text).toContain("bash:\n  enabled: true");
+  expect(text).toContain("peer:\n  enabled: true");
   expect(await hasClawd($)).toBe(false);
 });

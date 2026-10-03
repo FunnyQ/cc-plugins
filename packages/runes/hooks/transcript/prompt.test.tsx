@@ -145,7 +145,7 @@ test("the prompt's bar sits on the right by default", async ($, on) => {
 });
 
 test("enabled.prompt: false hands the row to the engine", async ($, on) => {
-  const { bubble, engine } = await drawPrompt($, on, "enabled:\n  prompt: false\n");
+  const { bubble, engine } = await drawPrompt($, on, "prompt:\n  enabled: false\n");
   expect(bubble).toBeUndefined();
   expect(engine).toBeDefined();
 });

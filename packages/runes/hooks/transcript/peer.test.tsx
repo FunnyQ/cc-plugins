@@ -61,7 +61,7 @@ test("a report taller than fold_lines folds to its head", async ($, on) => {
 
 test("enabled.peer: false hands the row to the engine", async ($, on) => {
   engine(on);
-  await startSession($, on, { files: new Map([[CONFIG, "enabled:\n  peer: false\n"]]), run: () => ran(1, "") });
+  await startSession($, on, { files: new Map([[CONFIG, "peer:\n  enabled: false\n"]]), run: () => ran(1, "") });
   const row = await $.ui.mount(PEER("plain note"));
   expect(await row.find({ key: "peer" })).toBeUndefined();
   expect(await row.find({ type: "Text", text: "engine" })).toBeDefined();
